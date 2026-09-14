@@ -12,8 +12,12 @@ const SettingsPage = lazy(() => import("../components/DashboardBuilder/SettingsP
 const UserDashboard = lazy(() => import("../components/DashboardBuilder/UserDashboard"));
 const MyPlanPage = lazy(() => import("../components/DashboardBuilder/MyPlanPage"));
 const NotificationsPage = lazy(() => import("../components/DashboardBuilder/NotificationsPage"));
+const EcommerceProductEditorPage = lazy(() => import("../components/DashboardBuilder/EcommerceProductEditorPage"));
 const ArchivePage = lazy(() => import("../components/DashboardBuilder/ArchivePage"));
 const EcommercePage = lazy(() => import("../components/DashboardBuilder/EcommercePage"));
+const EcommerceDeliveryPage = lazy(() => import("../components/DashboardBuilder/EcommerceDeliveryPage"));
+const EcommerceOrdersPage = lazy(() => import("../components/DashboardBuilder/EcommerceOrdersPage"));
+const EcommerceLoyaltyPage = lazy(() => import("../components/DashboardBuilder/EcommerceLoyaltyPage"));
 const EcommerceThemePage = lazy(() => import("../components/DashboardBuilder/EcommerceThemePage"));
 const EcommerceStorePage = lazy(() => import("../components/DashboardBuilder/EcommerceStorePage"));
 const CvRerankPage = lazy(() => import("../components/DashboardBuilder/CvRerankPage"));
@@ -224,6 +228,26 @@ export default function UserWorkspaceRoutes({
       <Route
         path="/ecommerce/products/*"
         element={renderShell(<EcommercePage key="products" section="products" user={user} />)}
+      />
+      <Route
+        path="/ecommerce/products/new"
+        element={renderShell(<EcommerceProductEditorPage user={user} />)}
+      />
+      <Route
+        path="/ecommerce/products/:productId/edit"
+        element={renderShell(<EcommerceProductEditorPage user={user} />)}
+      />
+      <Route
+        path="/ecommerce/delivery/*"
+        element={renderShell(<EcommerceDeliveryPage user={user} />)}
+      />
+      <Route
+        path="/ecommerce/orders/*"
+        element={renderShell(<EcommerceOrdersPage user={user} />)}
+      />
+      <Route
+        path="/ecommerce/loyalty/*"
+        element={renderShell(<EcommerceLoyaltyPage user={user} />)}
       />
       <Route
         path="/ecommerce/theme/*"

@@ -1,6 +1,6 @@
 # Madar production release acceptance policy
 
-Last implementation review: 2026-09-01
+Last implementation review: 2026-09-14
 
 ## A. Purpose and authority
 
@@ -30,6 +30,7 @@ Primary implementation:
 - `web/deployment/bin/madar-control-plane-guard`
 - `web/deployment/lib/release_deployer.py :: ReleaseDeployer.deploy()`
 - `web/deployment/lib/migration_executor.py`
+- `web/deployment/lib/supabase_ledger_reconciliation.py`
 - `web/deployment/bin/madar-migrate`
 - `web/scripts/check_migrations.py`
 - `web/scripts/check_migration_transitions.py`
@@ -65,6 +66,13 @@ safety-critical production path through the interactive shell environment.
 Repository/test invocations may retain explicit isolated-path overrides, but
 the release controller always requires an explicit absolute storage root; it
 has no release-local storage fallback.
+
+The application Compose file is rooted at `web/docker-compose.yml`. Both
+documented repository use and the immutable release controller evaluate it with
+`web` as the Compose project directory. Therefore its development-only relative
+defaults are `.env` and `./backend`; production never relies on those defaults
+because the controller supplies the absolute protected environment and storage
+paths above.
 
 For active-runtime refresh modes, non-path application settings are re-read
 authoritatively from `MADAR_ENV_FILE` so stale interactive-shell values cannot
@@ -275,13 +283,39 @@ queried directly. Its SHA must match state and its reported compatibility range
 must contain the live schema. Candidate rollback bounds are descriptive metadata
 today; retained-target attestation is the operative rollback check.
 
-Current bridge contract after this policy update is schema range `81..93`, target
-`93`, class `expand-only`, rollback metadata `81..92`, manifest
-`migrations-093.json`, and migration policy
+Current bridge contract after this policy update is schema range `81..98`, target
+`98`, class `expand-only`, rollback metadata `81..97`, and manifest
+`migrations-098.json`. It promotes and is accepted while schema 97 is live.
+Existing website and ecommerce behavior remains compatible during the bridge:
+public visit recording is best effort and dashboard visit metrics report an
+unavailable zero state until schema 098 is installed. Only then may the
+coordinator create a schema-97-bound verified backup and execute the pinned
+expand-only 97-to-98 transition. Migration 098 adds tenant-scoped atomic website
+and store opening counters. It stores aggregate counts only, without visitor
+identity, IP address, user agent, or other personal data.
+
+The preceding schema-097 bridge added verified-customer loyalty through atomic
+functions. Identity is `(store tenant_id, public.users.id)`; checkout email and
+phone are never identity keys. The append-only ledger is authoritative, balances
+are locked/versioned projections, and returns remain a future
+compensating-ledger flow.
+
+
+Schema 096 caps one product aggregate at 50 descriptive attributes, 5 options,
+50 values per option, 500 explicit variants, and 4 images per variant. These
+are abuse and payload-size safeguards rather than catalog dictionaries: five
+dimensions and 500 explicitly stocked combinations cover normal v1 catalogs
+without permitting pathological lock time or request size.
+
+An earlier bridge contract was schema range `81..95`, target
+`95`, class `expand-only`, rollback metadata `81..94`, manifest
+`migrations-095.json`, and migration policy
 `automatic-after-known-good-backup-first-forward-repair`. It promotes and is
-accepted while schema 92 is live. Only afterward may the separate coordinator
-create a schema-92-bound verified backup and execute 92→93. Code that touches
-new objects must remain safe throughout that bridge interval.
+accepted while schema 94 is live. Structured delivery checkout and merchant
+order operations deliberately fail closed until the schema-095 RPCs and tables
+are present. Only afterward may the separate coordinator create a
+schema-94-bound verified backup and execute 94→95. Existing catalog and settings
+reads remain safe throughout that bridge interval.
 
 Implemented by `web/deployment/lib/release_deployer.py :: Compatibility.load()`
 and `ReleaseDeployer.deploy()`, plus `DockerGitOperations.schema_version()`,
@@ -516,6 +550,33 @@ Implemented by `web/deployment/bin/madar-migrate`,
 `LockedMigrationExecutor.verify_migrations()`/`run()`, and
 `web/scripts/verify_backup.sh`.
 
+### Operator-only Supabase ledger reconciliation
+
+Madar's executor owns `application_schema_state` and intentionally does not
+write Supabase CLI's `supabase_migrations.schema_migrations` table. After an
+executed migration reaches its target and the coordinator has completed worker
+refresh plus active/stable health validation, an operator may reconcile that
+single version with:
+
+```bash
+python3 web/deployment/lib/supabase_ledger_reconciliation.py \
+  --release-sha <exact-40-character-sha> \
+  --repository-root /srv/madar/production \
+  --state-root /var/lib/madar/releases \
+  --confirm 097:<pinned-sha256>
+```
+
+The command requires a clean exact-SHA checkout; the release contract and
+manifest transition; the pinned SQL checksum; matching completed
+`automation.json` and `execution.json`; target-schema known-good history; a
+direct live schema read; stable version/readiness identity; and a contiguous
+remote predecessor. Only then does it invoke the supported
+`supabase migration repair --status applied` ledger-only operation. It verifies
+the postcondition and writes a private atomic audit record. Repeated execution
+is idempotent. It never applies SQL or reads/writes tenant or business rows.
+This is a separate reviewed operator action, not part of automatic migration,
+and `supabase db push` remains prohibited as a replacement for the coordinator.
+
 ### Active known-good environment refresh
 
 `madar-release-deploy <full-sha> --refresh-active-runtime --slot <slot>` is the
@@ -740,6 +801,7 @@ Implemented by `ReleaseDeployer._checkpoint()` and `_recover_interrupted()`.
 | `check_migrations.py` | Yes, preflight | Yes, rerun before backup | No | Backend CI |
 | `check_migration_transitions.py` | Yes, preflight | Yes, rerun before backup | No | Backend CI |
 | `check_secret_hygiene.py` | Yes, preflight | No | No | Backend CI |
+| `check_production_config.py` | No | No | No | Operator/staging presence and shape validation; never prints values |
 | `check_dependency_locks.py` | No | No | No | Backend and frontend CI |
 | `check_host_capacity.sh` | No | No | No | Installed periodic host-capacity service/timer; host-specific |
 | `rehearse_migration_*.sh` | No | No | No | Manual, migration-specific rehearsals |
@@ -764,6 +826,8 @@ Before saying a main-targeting change is ready:
 - [ ] validate release compatibility metadata against actual bridge behavior;
 - [ ] run focused and reasonably broad backend/frontend tests;
 - [ ] run `check_dependency_locks.py` and `check_secret_hygiene.py`;
+- [ ] run `check_production_config.py` against the intended production and
+      isolated-E2E environment files and resolve every `MISSING`/`INVALID` item;
 - [ ] run applicable lint/type/build and production image/build checks;
 - [ ] review `git diff --check`, status, stat, and full diff for secrets,
       generated/debug files, unrelated churn, dead code, or weakened gates;

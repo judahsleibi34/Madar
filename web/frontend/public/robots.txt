@@ -1,16 +1,11 @@
 User-agent: *
+Allow: /
 Disallow: /dashboard
 Disallow: /admin
-Disallow: /page-builder
-Disallow: /builder-responses
-Disallow: /builder-data
-Disallow: /settings
-Disallow: /my-plan
-Disallow: /notifications
-Disallow: /login
-Disallow: /signup
-Disallow: /forgot-password
-Disallow: /reset-password
-Disallow: /api
-
-Sitemap: https://madarportal.com/sitemap.xml
+Disallow: /ecommerce
+Disallow: /shop/checkout
+Disallow: /shop/confirmation/
+Disallow: /store/*/checkout
+Disallow: /store/*/confirmation/
+Disallow: /site/*/shop/checkout
+Disallow: /site/*/shop/confirmation/

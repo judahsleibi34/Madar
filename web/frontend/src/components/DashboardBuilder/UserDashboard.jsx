@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import {
@@ -8,15 +8,19 @@ import {
   CreditCard,
   ExternalLink,
   FileText,
+  Globe2,
   HardDrive,
   KeyRound,
   ListRestart,
+  ShoppingBag,
+  SlidersHorizontal,
   Users,
 } from "lucide-react";
 import { STORAGE_KEY } from "../PageBuilder/core/PageBuilder.constants";
-import { getLocalTenantPath } from "../PageBuilder/core/PageBuilder.routing";
+import { getProductionTenantUrl } from "../PageBuilder/core/PageBuilder.routing";
 import { getBuilderWorkspacePath } from "../PageBuilder/core/PageBuilder.workspaceRouting";
 import WeeklyScreenTimePanel from "./WeeklyScreenTimePanel";
+import { fetchSiteVisitMetrics } from "../../services/siteVisitApi";
 import {
   getDashboardCacheScope,
   readDashboardMetricsCache,
@@ -41,12 +45,41 @@ const EMPTY_METRICS = {
   reservationForms: 0,
   newReservations: 0,
   totalReservations: 0,
+  websiteVisits: 0,
+  storeVisits: 0,
   usedBytes: 0,
   quotaBytes: 0,
   permittedUsers: 0,
   permissionTypes: [],
   projectId: "",
-  websitePath: "",
+  storeUrl: "",
+  websiteUrl: "",
+};
+
+const DASHBOARD_VISIBILITY_STORAGE_KEY = "madar-dashboard-card-visibility-v1";
+
+const readHiddenDashboardCards = (scope) => {
+  try {
+    const value = JSON.parse(
+      window.localStorage.getItem(
+        `${DASHBOARD_VISIBILITY_STORAGE_KEY}:${scope}`,
+      ) || "[]",
+    );
+    return Array.isArray(value) ? value.map(String) : [];
+  } catch {
+    return [];
+  }
+};
+
+const normalizeDashboardMetrics = (value) => {
+  const cached = value && typeof value === "object" ? value : {};
+  return {
+    ...EMPTY_METRICS,
+    ...cached,
+    permissionTypes: Array.isArray(cached.permissionTypes)
+      ? cached.permissionTypes
+      : EMPTY_METRICS.permissionTypes,
+  };
 };
 
 function toTitleCase(value) {
@@ -161,9 +194,47 @@ async function loadAllReservations() {
 
 function UserDashboardContent({ user, weeklyScreenTimeSeconds = 0, cacheScope = "" }) {
   const { t } = useTranslation();
-  const initialMetrics = readDashboardMetricsCache(cacheScope);
+  const visibilityScope = cacheScope || `user:${user?.id || user?.email || "default"}`;
+  const customizerRef = useRef(null);
+  const [customizerOpen, setCustomizerOpen] = useState(false);
+  const [hiddenCardIds, setHiddenCardIds] = useState(() =>
+    readHiddenDashboardCards(visibilityScope),
+  );
+  const cachedInitialMetrics = readDashboardMetricsCache(cacheScope);
+  const initialMetrics = cachedInitialMetrics
+    ? normalizeDashboardMetrics(cachedInitialMetrics)
+    : null;
   const [metrics, setMetrics] = useState(() => initialMetrics || EMPTY_METRICS);
   const [loading, setLoading] = useState(() => !initialMetrics);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(
+        `${DASHBOARD_VISIBILITY_STORAGE_KEY}:${visibilityScope}`,
+        JSON.stringify(hiddenCardIds),
+      );
+    } catch {
+      // Keep the current selection for this session if storage is unavailable.
+    }
+  }, [hiddenCardIds, visibilityScope]);
+
+  useEffect(() => {
+    if (!customizerOpen) return undefined;
+    const closeOnOutsidePress = (event) => {
+      if (!customizerRef.current?.contains(event.target)) {
+        setCustomizerOpen(false);
+      }
+    };
+    const closeOnEscape = (event) => {
+      if (event.key === "Escape") setCustomizerOpen(false);
+    };
+    document.addEventListener("pointerdown", closeOnOutsidePress);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutsidePress);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [customizerOpen]);
 
   const displayName =
     user?.first_name ||
@@ -185,7 +256,7 @@ function UserDashboardContent({ user, weeklyScreenTimeSeconds = 0, cacheScope = 
     const loadMetrics = async () => {
       const cachedMetrics = readDashboardMetricsCache(cacheScope);
       if (cachedMetrics) {
-        setMetrics(cachedMetrics);
+        setMetrics(normalizeDashboardMetrics(cachedMetrics));
         setLoading(false);
       }
 
@@ -212,7 +283,7 @@ function UserDashboardContent({ user, weeklyScreenTimeSeconds = 0, cacheScope = 
         primaryRecord?.id || primaryRecord?.project_id || primaryProject?.id || ""
       );
 
-      const [storage, reservations, memberGroups] = await Promise.all([
+      const [storage, reservations, memberGroups, visitMetrics] = await Promise.all([
         fetchBuilderStorageUsage().catch(() => null),
         loadAllReservations().catch(() => []),
         Promise.all(
@@ -223,6 +294,10 @@ function UserDashboardContent({ user, weeklyScreenTimeSeconds = 0, cacheScope = 
               : Promise.resolve([]);
           })
         ),
+        fetchSiteVisitMetrics().catch(() => ({
+          website_visits: 0,
+          store_visits: 0,
+        })),
       ]);
 
       if (cancelled) return;
@@ -251,12 +326,15 @@ function UserDashboardContent({ user, weeklyScreenTimeSeconds = 0, cacheScope = 
           (reservation) => String(reservation?.status || "new").toLowerCase() === "new"
         ).length,
         totalReservations: reservations.length,
+        websiteVisits: Number(visitMetrics?.website_visits || 0),
+        storeVisits: Number(visitMetrics?.store_visits || 0),
         usedBytes,
         quotaBytes: Number(storage?.quota_bytes || 0),
         permittedUsers: uniqueMembers.size,
         permissionTypes: getPermissionTypes(projects),
         projectId,
-        websitePath: primaryProject ? getLocalTenantPath(primaryProject) : "",
+        storeUrl: primaryProject ? getProductionTenantUrl(primaryProject, "/shop") : "",
+        websiteUrl: primaryProject ? getProductionTenantUrl(primaryProject) : "",
       };
       writeDashboardMetricsCache(cacheScope, nextMetrics);
       setMetrics(nextMetrics);
@@ -289,18 +367,25 @@ function UserDashboardContent({ user, weeklyScreenTimeSeconds = 0, cacheScope = 
 
     return [
       {
-        id: "forms",
-        label: "Forms used",
-        value: metrics.forms.toLocaleString(),
-        note: projectNote,
-        icon: FileText,
+        id: "plan",
+        label: "Plan",
+        value: planLabel,
+        note: planStatus,
+        icon: CreditCard,
       },
       {
-        id: "reservation-forms",
-        label: "Reservation forms used",
-        value: metrics.reservationForms.toLocaleString(),
-        note: "Configured booking blocks",
-        icon: CalendarClock,
+        id: "website-visits",
+        label: "Website visits",
+        value: metrics.websiteVisits.toLocaleString(),
+        note: "Every published website opening",
+        icon: Globe2,
+      },
+      {
+        id: "store-visits",
+        label: "Store visits",
+        value: metrics.storeVisits.toLocaleString(),
+        note: "Every published store opening",
+        icon: ShoppingBag,
       },
       {
         id: "reservation-notifications",
@@ -309,24 +394,6 @@ function UserDashboardContent({ user, weeklyScreenTimeSeconds = 0, cacheScope = 
         note: reservationNote,
         icon: BellRing,
         accent: metrics.newReservations > 0,
-      },
-      {
-        id: "storage",
-        label: "Used space",
-        value: formatBytes(metrics.usedBytes),
-        note:
-          metrics.quotaBytes > 0
-            ? storagePercent + "% of " + formatBytes(metrics.quotaBytes)
-            : "Storage usage",
-        icon: HardDrive,
-        progress: storagePercent,
-      },
-      {
-        id: "plan",
-        label: "Plan",
-        value: planLabel,
-        note: planStatus,
-        icon: CreditCard,
       },
       {
         id: "permitted-users",
@@ -341,8 +408,36 @@ function UserDashboardContent({ user, weeklyScreenTimeSeconds = 0, cacheScope = 
         value:
           metrics.permissionTypes.length +
           (metrics.permissionTypes.length === 1 ? " type" : " types"),
-        note: permissionNote,
+        note:
+          metrics.permissionTypes.length > 0
+            ? "Enabled workspace permissions"
+            : permissionNote,
         icon: KeyRound,
+      },
+      {
+        id: "storage",
+        label: "Used space",
+        value: formatBytes(metrics.usedBytes),
+        note:
+          metrics.quotaBytes > 0
+            ? storagePercent + "% of " + formatBytes(metrics.quotaBytes)
+            : "Storage usage",
+        icon: HardDrive,
+        progress: storagePercent,
+      },
+      {
+        id: "forms",
+        label: "Forms used",
+        value: metrics.forms.toLocaleString(),
+        note: projectNote,
+        icon: FileText,
+      },
+      {
+        id: "reservation-forms",
+        label: "Reservation forms used",
+        value: metrics.reservationForms.toLocaleString(),
+        note: "Configured booking blocks",
+        icon: CalendarClock,
       },
     ];
   }, [metrics, planLabel, planStatus]);
@@ -350,11 +445,15 @@ function UserDashboardContent({ user, weeklyScreenTimeSeconds = 0, cacheScope = 
   const responsesPath = metrics.projectId
     ? getBuilderWorkspacePath(metrics.projectId, "responses", "builder-responses")
     : "/builder-responses";
-  const websitePath = metrics.websitePath || (
-    metrics.projectId
-      ? getBuilderWorkspacePath(metrics.projectId, "publish")
-      : "/page-builder"
-  );
+  const visibleCards = cards.filter((card) => !hiddenCardIds.includes(card.id));
+
+  const toggleCardVisibility = (cardId) => {
+    setHiddenCardIds((current) =>
+      current.includes(cardId)
+        ? current.filter((id) => id !== cardId)
+        : [...current, cardId],
+    );
+  };
 
   return (
     <div className="user-dashboard-page">
@@ -373,7 +472,7 @@ function UserDashboardContent({ user, weeklyScreenTimeSeconds = 0, cacheScope = 
         </p>
       </header>
 
-      <nav className="user-dashboard-quick-actions" aria-label="Form and website shortcuts">
+      <nav className="user-dashboard-quick-actions" aria-label="Form, website, and store shortcuts">
         <Link to={responsesPath + "/incomplete"}>
           <ListRestart size={18} aria-hidden="true" />
           <span>Incomplete forms</span>
@@ -382,10 +481,73 @@ function UserDashboardContent({ user, weeklyScreenTimeSeconds = 0, cacheScope = 
           <CircleCheckBig size={18} aria-hidden="true" />
           <span>Completed forms</span>
         </Link>
-        <Link className="is-primary" to={websitePath}>
-          <ExternalLink size={18} aria-hidden="true" />
-          <span>View website</span>
-        </Link>
+        {metrics.websiteUrl && (
+          <a
+            className="is-primary"
+            href={metrics.websiteUrl}
+            target="_blank"
+            rel="noreferrer"
+          >
+            <ExternalLink size={18} aria-hidden="true" />
+            <span>View website</span>
+          </a>
+        )}
+        {metrics.storeUrl && (
+          <a
+            className="is-primary"
+            href={metrics.storeUrl}
+            target="_blank"
+            rel="noreferrer"
+          >
+            <ShoppingBag size={18} aria-hidden="true" />
+            <span>View store</span>
+          </a>
+        )}
+        <div className="user-dashboard-customizer" ref={customizerRef}>
+          <button
+            type="button"
+            className="user-dashboard-customizer-toggle"
+            aria-expanded={customizerOpen}
+            aria-controls="dashboard-card-checklist"
+            onClick={() => setCustomizerOpen((current) => !current)}
+          >
+            <SlidersHorizontal size={18} aria-hidden="true" />
+            <span>Customize dashboard</span>
+          </button>
+          {customizerOpen && (
+            <div
+              className="user-dashboard-customizer-menu"
+              id="dashboard-card-checklist"
+            >
+              <div className="user-dashboard-customizer-header">
+                <div>
+                  <strong>Dashboard cards</strong>
+                  <span>Choose what you want to see</span>
+                </div>
+                <button
+                  type="button"
+                  className="user-dashboard-customizer-reset"
+                  onClick={() => setHiddenCardIds([])}
+                  disabled={hiddenCardIds.length === 0}
+                >
+                  Show all
+                </button>
+              </div>
+              <div className="user-dashboard-customizer-list">
+                {cards.map((card) => (
+                  <label key={card.id}>
+                    <input
+                      type="checkbox"
+                      checked={!hiddenCardIds.includes(card.id)}
+                      onChange={() => toggleCardVisibility(card.id)}
+                    />
+                    <span>{card.label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
       </nav>
 
       <section
@@ -393,12 +555,13 @@ function UserDashboardContent({ user, weeklyScreenTimeSeconds = 0, cacheScope = 
         aria-label="Workspace metrics"
         aria-busy={loading}
       >
-        {cards.map((card) => {
+        {visibleCards.map((card) => {
           const Icon = card.icon;
           return (
             <article
               className={
                 "user-dashboard-metric-card" +
+                (card.id === "plan" ? " user-dashboard-metric-card--plan" : "") +
                 (card.accent ? " user-dashboard-metric-card--accent" : "")
               }
               key={card.id}
@@ -432,6 +595,11 @@ function UserDashboardContent({ user, weeklyScreenTimeSeconds = 0, cacheScope = 
             </article>
           );
         })}
+        {visibleCards.length === 0 && (
+          <div className="user-dashboard-metrics-empty">
+            No cards selected. Use Customize dashboard to add cards.
+          </div>
+        )}
       </section>
 
       <WeeklyScreenTimePanel

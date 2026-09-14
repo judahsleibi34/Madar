@@ -13,7 +13,6 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { useTranslation } from "react-i18next";
 
 import AuthToast from "../AuthPages/AuthToast";
 
@@ -24,6 +23,8 @@ import {
   uploadEcommerceProductImage,
 } from "../../services/ecommerceApi";
 import { resolveMediaUrl } from "../../utils/media";
+import { formatCommerceMoney, useCommerceI18n } from "../../utils/commerceI18n";
+import { commerceProductStock } from "../../utils/commerceStock";
 import { readEcommerceCatalogCacheSnapshot } from "./utils/ecommerceCatalogCache";
 
 const SECTION_CONFIG = {
@@ -151,7 +152,7 @@ function payloadFromForm(section, form) {
   };
 }
 
-function TranslationFields({ form, setForm, descriptions = false }) {
+function TranslationFields({ form, setForm, descriptions = false, t }) {
   const update = (locale, field, value) => {
     setForm((current) => ({
       ...current,
@@ -164,16 +165,16 @@ function TranslationFields({ form, setForm, descriptions = false }) {
 
   return (
     <fieldset className="ecommerce-form-section">
-      <legend>Translations</legend>
+      <legend>{t("commerce:admin.translations")}</legend>
       <div className="ecommerce-translation-grid">
         {[
-          ["en", "English", "ltr"],
-          ["ar", "Arabic", "rtl"],
+          ["en", t("commerce:admin.english"), "ltr"],
+          ["ar", t("commerce:admin.arabic"), "rtl"],
         ].map(([locale, label, direction]) => (
           <div className="ecommerce-translation-card" key={locale} dir={direction}>
             <strong>{label}</strong>
             <label>
-              Name
+              {t("commerce:admin.name")}
               <input
                 value={form.translations[locale].name}
                 onChange={(event) => update(locale, "name", event.target.value)}
@@ -183,7 +184,7 @@ function TranslationFields({ form, setForm, descriptions = false }) {
             </label>
             {descriptions && (
               <label>
-                Description
+                {t("commerce:admin.description")}
                 <textarea
                   value={form.translations[locale].description}
                   onChange={(event) => update(locale, "description", event.target.value)}
@@ -199,26 +200,26 @@ function TranslationFields({ form, setForm, descriptions = false }) {
   );
 }
 
-function CommonFields({ form, setForm }) {
+function CommonFields({ form, setForm, t }) {
   return (
     <div className="ecommerce-field-grid">
       <label>
-        Slug
+        {t("commerce:merchant.slug")}
         <input value={form.slug} onChange={(event) => setForm({ ...form, slug: event.target.value })} required />
       </label>
       <label>
-        Status
-        <select value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value })} required><option value="" disabled>Choose status</option>
-          <option value="draft">Draft</option>
-          <option value="active">Active</option><option value="inactive">Inactive</option>
-          <option value="archived">Archived</option>
+        {t("commerce:common.status")}
+        <select value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value })} required><option value="" disabled>{t("commerce:admin.chooseStatus")}</option>
+          <option value="draft">{t("commerce:common.draft")}</option>
+          <option value="active">{t("commerce:common.active")}</option><option value="inactive">{t("commerce:common.inactive")}</option>
+          <option value="archived">{t("commerce:common.archived")}</option>
         </select>
       </label>
     </div>
   );
 }
 
-function ProductFields({ form, setForm, catalog }) {
+function ProductFields({ form, setForm, catalog, t, language }) {
   const update = (field, value) => setForm((current) => ({ ...current, [field]: value }));
   const selectedTagIds = Array.isArray(form.tag_ids) ? form.tag_ids : [];
   const toggleTag = (tagId) => update(
@@ -236,25 +237,25 @@ function ProductFields({ form, setForm, catalog }) {
     setImageUploadError("");
     if (!files.length) return;
     if (files.length > 4 - productImages.length) {
-      setImageUploadError(`You can add ${4 - productImages.length} more image${4 - productImages.length === 1 ? "" : "s"}.`);
+      setImageUploadError(t("commerce:errors.imageLimit", { count: 4 - productImages.length }));
       return;
     }
     if (files.some((file) => !["image/png", "image/jpeg", "image/webp"].includes(file.type))) {
-      setImageUploadError("Choose PNG, JPG, or WebP images only.");
+      setImageUploadError(t("commerce:errors.invalidImageType"));
       return;
     }
     setImageUploadBusy(true);
     try {
       for (const file of files) {
         const imageUrl = await uploadEcommerceProductImage(file);
-        if (!imageUrl) throw new Error("The image upload did not return a usable image.");
+        if (!imageUrl) throw new Error(t("commerce:errors.unusableImage"));
         setForm((current) => ({
           ...current,
           images: [...(Array.isArray(current.images) ? current.images : []), imageUrl].slice(0, 4),
         }));
       }
     } catch (uploadError) {
-      setImageUploadError(uploadError.message || "Could not upload this image.");
+      setImageUploadError(uploadError.message || t("commerce:errors.uploadImage"));
     } finally {
       setImageUploadBusy(false);
     }
@@ -283,62 +284,62 @@ function ProductFields({ form, setForm, catalog }) {
   return (
     <>
       <fieldset className="ecommerce-form-section">
-        <legend>Identity and organization</legend>
+        <legend>{t("commerce:admin.identityOrganization")}</legend>
         <div className="ecommerce-field-grid ecommerce-field-grid--three">
           <label>
-            <span className="ecommerce-field-label">SKU <span className="ecommerce-field-optional">Automatic</span></span>
+            <span className="ecommerce-field-label">{t("commerce:common.sku")} <span className="ecommerce-field-optional">{t("commerce:admin.automatic")}</span></span>
             <input aria-label="SKU" aria-describedby="product-sku-help" value={form.sku} onChange={(event) => update("sku", event.target.value)} />
-            <small id="product-sku-help" className="ecommerce-field-help">Leave empty and Madar will generate a unique product code.</small>
+            <small id="product-sku-help" className="ecommerce-field-help">{t("commerce:admin.skuHelp")}</small>
           </label>
           <label>
-            <span className="ecommerce-field-label">Barcode <span className="ecommerce-field-optional">Optional</span></span>
+            <span className="ecommerce-field-label">{t("commerce:common.barcode")} <span className="ecommerce-field-optional">{t("commerce:admin.optional")}</span></span>
             <input aria-label="Barcode" aria-describedby="product-barcode-help" value={form.barcode} onChange={(event) => update("barcode", event.target.value)} />
-            <small id="product-barcode-help" className="ecommerce-field-help">Enter the printed barcode only when the product has one.</small>
+            <small id="product-barcode-help" className="ecommerce-field-help">{t("commerce:admin.barcodeHelp")}</small>
           </label>
-          <label>Brand<input value={form.brand} onChange={(event) => update("brand", event.target.value)} /></label>
-          <label>Product type<select value={form.product_type} onChange={(event) => update("product_type", event.target.value)} required><option value="" disabled>Choose product type</option><option value="physical">Physical</option><option value="digital">Digital</option><option value="service">Service</option></select></label>
-          <label>Category<select value={form.category_id} onChange={(event) => update("category_id", event.target.value)}><option value="">Uncategorized</option>{catalog.categories.map((category) => <option key={category.id} value={category.id}>{translatedName(category)}</option>)}</select></label>
-          <label>Status<select value={form.status} onChange={(event) => update("status", event.target.value)} required><option value="" disabled>Choose status</option><option value="draft">Draft</option><option value="active">Active</option><option value="inactive">Inactive</option><option value="archived">Archived</option></select></label>
+          <label>{t("commerce:merchant.brand")}<input value={form.brand} onChange={(event) => update("brand", event.target.value)} /></label>
+          <label>{t("commerce:admin.productType")}<select value={form.product_type} onChange={(event) => update("product_type", event.target.value)} required><option value="" disabled>{t("commerce:admin.chooseProductType")}</option><option value="physical">{t("commerce:admin.physical")}</option><option value="digital">{t("commerce:admin.digital")}</option><option value="service">{t("commerce:admin.service")}</option></select></label>
+          <label>{t("commerce:merchant.category")}<select value={form.category_id} onChange={(event) => update("category_id", event.target.value)}><option value="">{t("commerce:admin.uncategorized")}</option>{catalog.categories.map((category) => <option key={category.id} value={category.id}>{translatedName(category, language)}</option>)}</select></label>
+          <label>{t("commerce:common.status")}<select value={form.status} onChange={(event) => update("status", event.target.value)} required><option value="" disabled>{t("commerce:admin.chooseStatus")}</option><option value="draft">{t("commerce:common.draft")}</option><option value="active">{t("commerce:common.active")}</option><option value="inactive">{t("commerce:common.inactive")}</option><option value="archived">{t("commerce:common.archived")}</option></select></label>
         </div>
         {catalog.tags.length > 0 && (
           <div className="ecommerce-tag-picker">
-            <span>Tags</span>
-            <div>{catalog.tags.map((tag) => <label key={tag.id}><input type="checkbox" checked={selectedTagIds.includes(tag.id)} onChange={() => toggleTag(tag.id)} />{translatedName(tag)}</label>)}</div>
+            <span>{t("commerce:common.tags")}</span>
+            <div>{catalog.tags.map((tag) => <label key={tag.id}><input type="checkbox" checked={selectedTagIds.includes(tag.id)} onChange={() => toggleTag(tag.id)} />{translatedName(tag, language)}</label>)}</div>
           </div>
         )}
       </fieldset>
 
       <fieldset className="ecommerce-form-section">
-        <legend>Pricing</legend>
+        <legend>{t("commerce:merchant.pricing")}</legend>
         <div className="ecommerce-field-grid ecommerce-field-grid--three">
-          <label>Regular price<input type="number" min="0" step="0.01" value={form.price} onChange={(event) => update("price", event.target.value)} required /></label>
-          <label><span className="ecommerce-field-label">Discounted price <span className="ecommerce-field-optional">Optional</span></span><input type="number" min="0" max={form.price || undefined} step="0.01" value={form.discount_price} onChange={(event) => update("discount_price", event.target.value)} /><small className="ecommerce-field-help">Leave empty when the product is not on sale.</small></label>
-          <label>Currency<select value={form.currency} onChange={(event) => update("currency", event.target.value)} required><option value="" disabled>Choose currency</option><option value="ILS">Israeli shekel (ILS)</option><option value="USD">US dollar (USD)</option><option value="JOD">Jordanian dinar (JOD)</option><option value="EUR">Euro (EUR)</option></select></label>
+          <label>{t("commerce:admin.regularPrice")}<input type="number" min="0" step="0.01" value={form.price} onChange={(event) => update("price", event.target.value)} required /></label>
+          <label><span className="ecommerce-field-label">{t("commerce:admin.discountedPrice")} <span className="ecommerce-field-optional">{t("commerce:admin.optional")}</span></span><input type="number" min="0" max={form.price || undefined} step="0.01" value={form.discount_price} onChange={(event) => update("discount_price", event.target.value)} /><small className="ecommerce-field-help">{t("commerce:admin.discountHelp")}</small></label>
+          <label>{t("commerce:common.currency")}<select value={form.currency} onChange={(event) => update("currency", event.target.value)} required><option value="" disabled>{t("commerce:admin.chooseCurrency")}</option><option value="ILS">{t("commerce:admin.ils")}</option><option value="USD">{t("commerce:admin.usd")}</option><option value="JOD">{t("commerce:admin.jod")}</option><option value="EUR">{t("commerce:admin.eur")}</option></select></label>
         </div>
       </fieldset>
 
       <fieldset className="ecommerce-form-section">
-        <legend>Inventory</legend>
+        <legend>{t("commerce:merchant.inventory")}</legend>
         <div className="ecommerce-field-grid ecommerce-field-grid--three">
-          <label>Current stock<input type="number" min="0" value={form.inventory_quantity} required onChange={(event) => update("inventory_quantity", event.target.value)} /><small className="ecommerce-field-help">How many items are available now.</small></label>
-          <label>Warn me when stock reaches<input type="number" min="0" value={form.low_stock_threshold} required onChange={(event) => update("low_stock_threshold", event.target.value)} /><small className="ecommerce-field-help">Madar will show a low-stock warning at this number or below.</small></label>
-          <div className="ecommerce-check-row"><label className="ecommerce-check"><input type="checkbox" checked={form.track_inventory} onChange={(event) => update("track_inventory", event.target.checked)} /><span>Track inventory</span></label>
-          <label className="ecommerce-check"><input type="checkbox" checked={form.allow_backorder} onChange={(event) => update("allow_backorder", event.target.checked)} /><span className="ecommerce-check-copy"><strong>Let customers order when sold out</strong><small>Customers can still place an order when stock reaches zero.</small></span></label></div>
+          <label>{t("commerce:merchant.currentStock")}<input type="number" min="0" value={form.inventory_quantity} required onChange={(event) => update("inventory_quantity", event.target.value)} /><small className="ecommerce-field-help">{t("commerce:admin.stockHelp")}</small></label>
+          <label>{t("commerce:merchant.lowThreshold")}<input type="number" min="0" value={form.low_stock_threshold} required onChange={(event) => update("low_stock_threshold", event.target.value)} /><small className="ecommerce-field-help">{t("commerce:admin.thresholdHelp")}</small></label>
+          <div className="ecommerce-check-row"><label className="ecommerce-check"><input type="checkbox" checked={form.track_inventory} onChange={(event) => update("track_inventory", event.target.checked)} /><span>{t("commerce:merchant.trackInventory")}</span></label>
+          <label className="ecommerce-check"><input type="checkbox" checked={form.allow_backorder} onChange={(event) => update("allow_backorder", event.target.checked)} /><span className="ecommerce-check-copy"><strong>{t("commerce:merchant.allowBackorder")}</strong><small>{t("commerce:admin.backorderHelp")}</small></span></label></div>
         </div>
       </fieldset>
 
       <fieldset className="ecommerce-form-section ecommerce-form-section--media">
-        <legend>Images and weight</legend>
+        <legend>{t("commerce:admin.imagesWeight")}</legend>
         <div className="ecommerce-product-images">
           <div className="ecommerce-product-images-header">
-            <div><strong>Product gallery</strong><span>The first image will be the main product image.</span></div>
-            <span className="ecommerce-product-image-count">{productImages.length} of 4</span>
+            <div><strong>{t("commerce:admin.productGallery")}</strong><span>{t("commerce:admin.galleryHelp")}</span></div>
+            <span className="ecommerce-product-image-count">{t("commerce:admin.imageCount", { count: productImages.length })}</span>
           </div>
           <div className={`ecommerce-product-image-grid${productImages.length ? " has-images" : ""}`}>
             {productImages.map((imageUrl, index) => (
               <figure key={imageUrl}>
-                <img src={resolveMediaUrl(imageUrl)} alt={`Product image ${index + 1}`} />
-                <figcaption>{index === 0 ? "Main image" : `Image ${index + 1}`}</figcaption>
+                <img src={resolveMediaUrl(imageUrl)} alt={t("commerce:admin.productImage", { count: index + 1 })} />
+                <figcaption>{index === 0 ? t("commerce:admin.mainImage") : t("commerce:admin.image", { count: index + 1 })}</figcaption>
                 <button type="button" onClick={() => removeProductImage(imageUrl)} aria-label={`Remove product image ${index + 1}`}><X size={15} /></button>
               </figure>
             ))}
@@ -351,9 +352,9 @@ function ProductFields({ form, setForm, catalog }) {
                 onDrop={dropProductImages}
               >
                 <span className="ecommerce-product-image-upload-icon"><ImagePlus size={23} /></span>
-                <strong>{imageUploadBusy ? "Uploading images…" : productImages.length ? "Add another image" : "Add product images"}</strong>
-                <span>{imageUploadBusy ? "Please keep this window open." : "Drag and drop, or click to browse"}</span>
-                <small>PNG, JPG, or WebP · 25 MB maximum</small>
+                <strong>{imageUploadBusy ? t("commerce:merchant.uploading") : productImages.length ? t("commerce:admin.addAnotherImage") : t("commerce:merchant.addImages")}</strong>
+                <span>{imageUploadBusy ? t("commerce:admin.keepOpen") : t("commerce:admin.dragBrowse")}</span>
+                <small>{t("commerce:admin.imageRequirements")}</small>
                 <input type="file" accept="image/png,image/jpeg,image/webp" multiple disabled={imageUploadBusy} aria-label="Upload product images" onChange={uploadProductImages} />
               </label>
             )}
@@ -361,8 +362,8 @@ function ProductFields({ form, setForm, catalog }) {
           {imageUploadError && <div className="ecommerce-error" role="alert">{imageUploadError}</div>}
         </div>
         <div className="ecommerce-field-grid ecommerce-field-grid--two">
-          <label>Weight<input type="number" min="0" step="0.001" value={form.weight} onChange={(event) => update("weight", event.target.value)} /></label>
-          <label>Unit<select value={form.weight_unit} onChange={(event) => update("weight_unit", event.target.value)} required><option value="" disabled>Choose unit</option><option value="kg">kg</option><option value="g">g</option><option value="lb">lb</option><option value="oz">oz</option></select></label>
+          <label>{t("commerce:admin.weight")}<input type="number" min="0" step="0.001" value={form.weight} onChange={(event) => update("weight", event.target.value)} /></label>
+          <label>{t("commerce:admin.unit")}<select value={form.weight_unit} onChange={(event) => update("weight_unit", event.target.value)} required><option value="" disabled>{t("commerce:admin.chooseUnit")}</option><option value="kg">kg</option><option value="g">g</option><option value="lb">lb</option><option value="oz">oz</option></select></label>
 
         </div>
       </fieldset>
@@ -384,9 +385,9 @@ function requiredFieldLabel(field) {
   return languageCard && labelText === "Name" ? `${languageCard} name` : labelText;
 }
 
-function EcommercePageSkeleton() {
+function EcommercePageSkeleton({ label }) {
   return (
-    <div className="ecommerce-page-skeleton" role="status" aria-label="Loading online store catalog">
+    <div className="ecommerce-page-skeleton" role="status" aria-label={label}>
       <header><div><i /><i /><i /></div><i /></header>
       <section>{Array.from({ length: 3 }, (_, index) => <i key={index} />)}</section>
       <article><header><div><i /><i /></div><i /></header>{Array.from({ length: 5 }, (_, index) => <i key={index} />)}</article>
@@ -395,16 +396,16 @@ function EcommercePageSkeleton() {
 }
 
 export default function EcommercePage({ section = "products", user }) {
-  const { i18n } = useTranslation(["dashboard"]);
+  const { t, locale: language, direction } = useCommerceI18n();
   const config = SECTION_CONFIG[section] || SECTION_CONFIG.products;
   const Icon = config.icon;
-  const language = i18n?.resolvedLanguage?.split("-")[0] || "en";
   const cacheScope = user?.id ? `user-${user.id}` : "authenticated";
   const initialCatalogSnapshot = useMemo(() => readEcommerceCatalogCacheSnapshot(cacheScope), [cacheScope]);
-  const [catalog, setCatalog] = useState(() => initialCatalogSnapshot?.catalog || { tags: [], categories: [], products: [] });
+  const [catalog, setCatalog] = useState(() => initialCatalogSnapshot?.catalog || { tags: [], categories: [], products: [], stock_summary: { low_stock: 0, out_of_stock: 0 } });
   const [status, setStatus] = useState(() => initialCatalogSnapshot ? "ready" : "loading");
   const [query, setQuery] = useState("");
   const [editing, setEditing] = useState(null);
+  const [stockFilter, setStockFilter] = useState("all");
   const [form, setForm] = useState(() => blankForm(section));
   const [formOpen, setFormOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -424,18 +425,18 @@ export default function EcommercePage({ section = "products", user }) {
     }
     try {
       const data = await fetchEcommerceCatalog({ scope: cacheScope, force: Boolean(cached?.isStale) });
-      setCatalog({ tags: data?.tags || [], categories: data?.categories || [], products: data?.products || [] });
+      setCatalog({ tags: data?.tags || [], categories: data?.categories || [], products: data?.products || [], stock_summary: data?.stock_summary || { low_stock: 0, out_of_stock: 0 }, commerce_currency: data?.commerce_currency || null });
       setStatus("ready");
     } catch (loadError) {
       if (cached) {
         setStatus("ready");
         return;
       }
-      const message = loadError.message || "Could not load the catalog.";
+      const message = loadError.message || t("commerce:admin.loadCatalog");
       setStatus("error");
-      showToast({ type: "error", title: "Could not load online store", message });
+      showToast({ type: "error", title: t("commerce:admin.loadCommerce"), message });
     }
-  }, [cacheScope, showToast]);
+  }, [cacheScope, showToast, t]);
 
   useEffect(() => {
     const timer = window.setTimeout(loadCatalog, 0);
@@ -445,9 +446,12 @@ export default function EcommercePage({ section = "products", user }) {
   const items = useMemo(() => catalog[section] || [], [catalog, section]);
   const filteredItems = useMemo(() => {
     const needle = query.trim().toLowerCase();
-    if (!needle) return items;
-    return items.filter((item) => [translatedName(item, language), item.slug, item.sku, item.brand].filter(Boolean).some((value) => String(value).toLowerCase().includes(needle)));
-  }, [items, language, query]);
+    return items.filter((item) => {
+      const matchesSearch = !needle || [translatedName(item, language), item.slug, item.sku, item.brand].filter(Boolean).some((value) => String(value).toLowerCase().includes(needle));
+      const matchesStock = section !== "products" || stockFilter === "all" || (stockFilter === "low_stock" ? item.has_low_stock : item.has_out_of_stock);
+      return matchesSearch && matchesStock;
+    });
+  }, [items, language, query, section, stockFilter]);
 
   const openCreate = () => {
     setEditing(null);
@@ -468,11 +472,11 @@ export default function EcommercePage({ section = "products", user }) {
       .find((field) => field.willValidate && !field.validity.valid);
     if (invalidField) {
       const fieldLabel = requiredFieldLabel(invalidField);
-      const action = invalidField.tagName === "SELECT" ? "Choose" : "Enter";
+      const action = invalidField.tagName === "SELECT" ? t("commerce:admin.choose") : t("commerce:admin.enter");
       showToast({
         type: "error",
-        title: "Complete the required fields",
-        message: `${action} ${fieldLabel.toLowerCase()} before saving.`,
+        title: t("commerce:admin.completeRequired"),
+        message: t("commerce:admin.requiredBeforeSave", { action, field: fieldLabel.toLocaleLowerCase(language) }),
       });
       invalidField.focus({ preventScroll: true });
       invalidField.scrollIntoView?.({ behavior: "smooth", block: "center" });
@@ -500,19 +504,19 @@ export default function EcommercePage({ section = "products", user }) {
       setFormOpen(false);
       showToast({
         type: "success",
-        title: `${config.singular[0].toUpperCase()}${config.singular.slice(1)} saved`,
-        message: wasEditing ? "Your changes were saved successfully." : `The new ${config.singular} was created successfully.`,
+        title: t("commerce:admin.savedTitle", { item: t(`commerce:admin.${sectionKey}Singular`) }),
+        message: wasEditing ? t("commerce:admin.changesSaved") : t("commerce:admin.createdSuccessfully", { item: t(`commerce:admin.${sectionKey}Singular`).toLocaleLowerCase(language) }),
       });
     } catch (saveError) {
-      const message = saveError.message || `Could not save this ${config.singular}.`;
-      showToast({ type: "error", title: `Could not save ${config.singular}`, message });
+      const message = saveError.message || t("commerce:admin.saveFailed", { item: t(`commerce:admin.${sectionKey}Singular`).toLocaleLowerCase(language) });
+      showToast({ type: "error", title: t("commerce:admin.saveFailedTitle", { item: t(`commerce:admin.${sectionKey}Singular`).toLocaleLowerCase(language) }), message });
     } finally {
       setSaving(false);
     }
   };
 
   const remove = async (item) => {
-    if (!window.confirm(`Delete ${translatedName(item, language)}?`)) return;
+    if (!window.confirm(t("commerce:admin.deleteConfirm", { name: translatedName(item, language) }))) return;
     try {
       await deleteEcommerceItem(section, item.id, { scope: cacheScope });
       setCatalog((current) => ({
@@ -521,45 +525,57 @@ export default function EcommercePage({ section = "products", user }) {
       }));
       showToast({
         type: "success",
-        title: `${config.singular[0].toUpperCase()}${config.singular.slice(1)} deleted`,
-        message: `${translatedName(item, language)} was removed.`,
+        title: t("commerce:admin.deletedTitle", { item: t(`commerce:admin.${sectionKey}Singular`) }),
+        message: t("commerce:admin.deletedBody", { name: translatedName(item, language) }),
       });
     } catch (deleteError) {
-      const message = deleteError.message || `Could not delete this ${config.singular}.`;
-      showToast({ type: "error", title: `Could not delete ${config.singular}`, message });
+      const message = deleteError.message || t("commerce:admin.deleteFailed", { item: t(`commerce:admin.${sectionKey}Singular`).toLocaleLowerCase(language) });
+      showToast({ type: "error", title: t("commerce:admin.deleteFailedTitle", { item: t(`commerce:admin.${sectionKey}Singular`).toLocaleLowerCase(language) }), message });
     }
   };
   const activeCount = items.filter((item) => item.status === "active").length;
   const inactiveCount = items.filter((item) => item.status === "inactive").length;
+  const stockSummary = catalog.stock_summary || {};
+  const lowStockCount = Number(stockSummary.low_stock ?? items.reduce((count, item) => count + Number(item.low_stock_count || 0), 0));
+  const outOfStockCount = Number(stockSummary.out_of_stock ?? items.reduce((count, item) => count + Number(item.out_of_stock_count || 0), 0));
+  const sectionKey = section === "categories" ? "categories" : section === "tags" ? "tags" : "products";
 
   if (status === "loading") {
-    return <section className="ecommerce-page"><EcommercePageSkeleton /></section>;
+    return <section className="ecommerce-page"><EcommercePageSkeleton label={t("commerce:admin.loadingCatalog")} /></section>;
   }
 
   return (
-    <section className="ecommerce-page" aria-labelledby={`ecommerce-${section}-title`}>
+    <section className="ecommerce-page" aria-labelledby={`ecommerce-${section}-title`} dir={direction} lang={language}>
       <header className="ecommerce-page-header app-page-intro">
         <div>
-          <h1 id={`ecommerce-${section}-title`}>{config.title}</h1>
-          <p>{config.description}</p>
+          <h1 id={`ecommerce-${section}-title`}>{t(`dashboard:ecommercePages.${sectionKey}.title`)}</h1>
+          <p>{t(`dashboard:ecommercePages.${sectionKey}.description`)}</p>
         </div>
-        <button type="button" className="ecommerce-primary-button" onClick={openCreate}><Plus size={18} />Add {config.singular}</button>
+        <button type="button" className="ecommerce-primary-button" onClick={openCreate}><Plus size={18} />{t("commerce:admin.add", { item: t(`commerce:admin.${sectionKey}Singular`) })}</button>
+        {section === "products" && <a className="ecommerce-secondary-button" href="/ecommerce/products/new">{t("commerce:admin.fullProductEditor")}</a>}
       </header>
 
-      <div className="ecommerce-summary-grid" aria-label="Catalog overview">
-        {[[`Total ${config.title.toLowerCase()}`, items.length, Icon], ["Active", activeCount, CheckCircle2], ["Inactive", inactiveCount, Boxes]].map(([label, value, SummaryIcon]) => (
+      <div className="ecommerce-summary-grid" aria-label={t("dashboard:ecommercePages.overview")}>
+        {[[t(`dashboard:ecommercePages.${sectionKey}.totalLabel`), items.length, Icon], [t("commerce:common.active"), activeCount, CheckCircle2], [t("commerce:common.inactive"), inactiveCount, Boxes],
+          ...(section === "products" ? [[t("commerce:merchant.lowStock"), lowStockCount, Package], [t("commerce:merchant.outOfStock"), outOfStockCount, Boxes]] : [])].map(([label, value, SummaryIcon]) => (
           <article className="ecommerce-summary-card" key={label}><span className="ecommerce-summary-icon"><SummaryIcon size={20} /></span><div><strong>{value}</strong><span>{label}</span></div></article>
         ))}
       </div>
 
       <section className="ecommerce-list-card" aria-labelledby={`ecommerce-${section}-list-title`}>
         <header className="ecommerce-list-header">
-          <div><h2 id={`ecommerce-${section}-list-title`}>Manage {config.title.toLowerCase()}</h2></div>
-          <label className="ecommerce-search"><Search size={17} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={`Search ${config.title.toLowerCase()}`} /></label>
+          <div><h2 id={`ecommerce-${section}-list-title`}>{t("commerce:admin.manage", { items: t(`dashboard:ecommercePages.${sectionKey}.title`) })}</h2></div>
+          <label className="ecommerce-search"><Search size={17} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("commerce:admin.search", { items: t(`dashboard:ecommercePages.${sectionKey}.title`) })} /></label>
+        {section === "products" && <div className="ecommerce-stock-filters" role="group" aria-label={t("commerce:admin.stockFilter")}>
+          {["all", "low_stock", "out_of_stock"].map((value) => <button type="button" key={value} className={stockFilter === value ? "is-active" : ""} aria-pressed={stockFilter === value} onClick={() => setStockFilter(value)}>
+            {value === "all" ? t("commerce:merchant.allStock") : value === "low_stock" ? t("commerce:merchant.lowStock") : t("commerce:merchant.outOfStock")}
+          </button>)}
+        </div>}
+
         </header>
 
         {filteredItems.length === 0 ? (
-          <div className="ecommerce-empty-state"><span><Icon size={27} /></span><h3>{query ? "No matching results" : `No ${config.title.toLowerCase()} yet`}</h3><p>{query ? "Try a different search." : `Select “Add ${config.singular}” to create the first one.`}</p></div>
+          <div className="ecommerce-empty-state"><span><Icon size={27} /></span><h3>{query || stockFilter !== "all" ? t("commerce:admin.noMatching") : t(`dashboard:ecommercePages.${sectionKey}.emptyTitle`)}</h3><p>{query || stockFilter !== "all" ? t("commerce:admin.tryDifferent") : t(`dashboard:ecommercePages.${sectionKey}.emptyDescription`)}</p></div>
         ) : (
           <div className="ecommerce-record-list">
             {filteredItems.map((item) => {
@@ -568,10 +584,10 @@ export default function EcommercePage({ section = "products", user }) {
               return (
                 <article className="ecommerce-record" key={item.id}>
                   <span className="ecommerce-record-icon"><Icon size={18} /></span>
-                  <div className="ecommerce-record-main"><strong>{translatedName(item, language)}</strong><span>{section === "products" ? `${item.sku} · ${item.currency} ${Number(item.price || 0).toFixed(2)}` : item.slug}</span></div>
-                  <div className="ecommerce-record-meta">{parent ? `Under ${translatedName(parent, language)}` : category ? translatedName(category, language) : section === "categories" ? "Top level" : ""}</div>
-                  <span className={`ecommerce-status is-${item.status}`}>{item.status}</span>
-                  <div className="ecommerce-record-actions"><button type="button" onClick={() => openEdit(item)} aria-label={`Edit ${translatedName(item, language)}`}><Pencil size={16} /></button><button type="button" onClick={() => remove(item)} aria-label={`Delete ${translatedName(item, language)}`}><Trash2 size={16} /></button></div>
+                  <div className="ecommerce-record-main"><strong>{translatedName(item, language)}</strong><span>{section === "products" ? <><bdi>{item.sku}</bdi> · <bdi>{formatCommerceMoney(item.price, item.currency, language)}</bdi></> : item.slug}</span>{section === "products" && <span className={`ecommerce-stock-indicator is-${commerceProductStock(item).state}`}>{t(`commerce:stock.${commerceProductStock(item).state}`)}{item.options?.length ? ` · ${t("commerce:admin.variantStockCounts", { low: item.low_stock_count || 0, out: item.out_of_stock_count || 0 })}` : ""}</span>}</div>
+                  <div className="ecommerce-record-meta">{parent ? t("commerce:admin.under", { name: translatedName(parent, language) }) : category ? translatedName(category, language) : section === "categories" ? t("commerce:admin.topLevel") : ""}</div>
+                  <span className={`ecommerce-status is-${item.status}`}>{t(`commerce:status.${item.status}`, { defaultValue: item.status })}</span>
+                  <div className="ecommerce-record-actions">{section === "products" && <a href={`/ecommerce/products/${item.id}/edit`} aria-label={t("commerce:admin.openEditor", { name: translatedName(item, language) })}><Pencil size={16} /></a>}<button type="button" onClick={() => openEdit(item)} aria-label={t("commerce:admin.quickEdit", { name: translatedName(item, language) })}><Pencil size={16} /></button><button type="button" onClick={() => remove(item)} aria-label={t("commerce:admin.delete", { name: translatedName(item, language) })}><Trash2 size={16} /></button></div>
                 </article>
               );
             })}
@@ -582,13 +598,13 @@ export default function EcommercePage({ section = "products", user }) {
       {formOpen && (
         <div className="ecommerce-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) closeForm(); }}>
           <section className="ecommerce-modal" role="dialog" aria-modal="true" aria-labelledby="ecommerce-form-title">
-            <header><div><span>{editing ? "Edit" : "Create"}</span><h2 id="ecommerce-form-title">{editing ? `Edit ${config.singular}` : `New ${config.singular}`}</h2></div><button type="button" onClick={closeForm} aria-label="Close"><X size={20} /></button></header>
+            <header><div><span>{editing ? t("commerce:admin.edit") : t("commerce:admin.create")}</span><h2 id="ecommerce-form-title">{editing ? t("commerce:admin.editItem", { item: t(`commerce:admin.${sectionKey}Singular`) }) : t("commerce:admin.newItem", { item: t(`commerce:admin.${sectionKey}Singular`) })}</h2></div><button type="button" onClick={closeForm} aria-label={t("commerce:admin.close")}><X size={20} /></button></header>
             <form onSubmit={submit} noValidate>
-              <TranslationFields form={form} setForm={setForm} descriptions={section !== "tags"} />
-              {section === "tags" && <CommonFields form={form} setForm={setForm} />}
-              {section === "categories" && <><CommonFields form={form} setForm={setForm} /><fieldset className="ecommerce-form-section"><legend>Hierarchy</legend><div className="ecommerce-field-grid"><label>Parent category<select value={form.parent_id || ""} onChange={(event) => setForm({ ...form, parent_id: event.target.value })}><option value="">Top level</option>{catalog.categories.filter((category) => category.id !== editing?.id).map((category) => <option key={category.id} value={category.id}>{translatedName(category, language)}</option>)}</select></label><label><span>Display position</span><input type="number" min="0" step="1" inputMode="numeric" value={form.sort_order} required aria-label="Display position" aria-describedby="category-display-position-help" onChange={(event) => setForm({ ...form, sort_order: event.target.value })} /><small id="category-display-position-help" className="ecommerce-field-help">Lower numbers appear first. Use 0 for the first position.</small></label></div></fieldset></>}
-              {section === "products" && <><div className="ecommerce-field-grid"><label>Slug<input value={form.slug} onChange={(event) => setForm({ ...form, slug: event.target.value })} required /></label></div><ProductFields form={form} setForm={setForm} catalog={catalog} /></>}
-              <footer><button type="button" className="ecommerce-secondary-button" onClick={closeForm}>Cancel</button><button type="submit" className="ecommerce-primary-button" disabled={saving}>{saving && <LoaderCircle size={17} className="is-spinning" />}{saving ? "Saving…" : "Save"}</button></footer>
+              <TranslationFields form={form} setForm={setForm} descriptions={section !== "tags"} t={t} />
+              {section === "tags" && <CommonFields form={form} setForm={setForm} t={t} />}
+              {section === "categories" && <><CommonFields form={form} setForm={setForm} t={t} /><fieldset className="ecommerce-form-section"><legend>{t("commerce:admin.hierarchy")}</legend><div className="ecommerce-field-grid"><label>{t("commerce:admin.parentCategory")}<select value={form.parent_id || ""} onChange={(event) => setForm({ ...form, parent_id: event.target.value })}><option value="">{t("commerce:admin.topLevel")}</option>{catalog.categories.filter((category) => category.id !== editing?.id).map((category) => <option key={category.id} value={category.id}>{translatedName(category, language)}</option>)}</select></label><label><span>{t("commerce:admin.displayPosition")}</span><input type="number" min="0" step="1" inputMode="numeric" value={form.sort_order} required aria-label={t("commerce:admin.displayPosition")} aria-describedby="category-display-position-help" onChange={(event) => setForm({ ...form, sort_order: event.target.value })} /><small id="category-display-position-help" className="ecommerce-field-help">{t("commerce:admin.displayOrderHelp")}</small></label></div></fieldset></>}
+              {section === "products" && <><div className="ecommerce-field-grid"><label>{t("commerce:merchant.slug")}<input value={form.slug} onChange={(event) => setForm({ ...form, slug: event.target.value })} required /></label></div><ProductFields form={form} setForm={setForm} catalog={catalog} t={t} language={language} /></>}
+              <footer><button type="button" className="ecommerce-secondary-button" onClick={closeForm}>{t("commerce:common.cancel")}</button><button type="submit" className="ecommerce-primary-button" disabled={saving}>{saving && <LoaderCircle size={17} className="is-spinning" />}{saving ? t("commerce:merchant.saving") : t("commerce:common.save")}</button></footer>
             </form>
           </section>
         </div>

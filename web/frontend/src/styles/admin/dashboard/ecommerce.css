@@ -1249,4 +1249,55 @@
   .ecommerce-store-page-skeleton i { animation: none; }
   .ecommerce-store-frame-loading i { animation: none; }
   .ecommerce-theme-frame-skeleton i { animation: none; }
+
+.ecommerce-stock-filters { display:flex; flex-wrap:wrap; gap:8px; padding:0 20px 14px; }
+.ecommerce-stock-filters button { min-height:36px; padding:0 13px; border:1px solid var(--theme-border); border-radius:999px; background:var(--theme-card-bg); color:var(--theme-text-muted); cursor:pointer; }
+.ecommerce-stock-filters button.is-active { border-color:var(--theme-primary); background:color-mix(in srgb,var(--theme-primary) 10%,var(--theme-card-bg)); color:var(--theme-primary); }
+.ecommerce-stock-indicator { display:inline-flex; width:max-content; max-width:100%; margin-top:4px; padding:3px 8px; border-radius:999px; background:var(--theme-bg-soft); color:var(--theme-text-muted); font-size:.72rem; }
+.ecommerce-stock-indicator.is-low_stock { color:var(--color-status-warning-text); }
+.ecommerce-stock-indicator.is-out_of_stock { color:var(--color-status-danger-text); }
+.ecommerce-page[dir="rtl"] .ecommerce-record-actions,
+.ecommerce-page[dir="rtl"] .ecommerce-page-actions { direction:rtl; }
+.ecommerce-page bdi, .ecommerce-page [dir="ltr"] { unicode-bidi:isolate; }
+@media (max-width: 760px) {
+  .ecommerce-stock-filters { padding-inline:14px; }
+  .ecommerce-summary-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
 }
+}
+
+.ecommerce-growth-controls {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--app-border, #d8dee8);
+}
+
+.ecommerce-growth-controls > div p,
+.ecommerce-growth-controls > small {
+  color: var(--app-muted, #667085);
+  margin: 0.25rem 0 0;
+}
+
+.ecommerce-growth-controls label:not(.ecommerce-growth-toggle) {
+  display: grid;
+  gap: 0.45rem;
+  font-weight: 650;
+}
+
+.ecommerce-growth-controls input,
+.ecommerce-growth-controls textarea,
+.ecommerce-growth-controls select {
+  width: 100%;
+  border: 1px solid var(--app-border, #cfd7e3);
+  border-radius: 0.65rem;
+  padding: 0.72rem 0.8rem;
+  background: var(--app-surface, #fff);
+  color: var(--app-text, #162033);
+  font: inherit;
+}
+
+.ecommerce-growth-controls textarea { min-height: 6rem; resize: vertical; }
+.ecommerce-growth-controls select[multiple] { min-height: 8rem; }
+.ecommerce-growth-toggle { display: flex; align-items: center; gap: 0.65rem; font-weight: 700; }
+.ecommerce-growth-toggle input { width: auto; }

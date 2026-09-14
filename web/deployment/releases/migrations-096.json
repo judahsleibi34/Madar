@@ -1,0 +1,13 @@
+{
+  "release_sha": "CURRENT",
+  "migrations": [
+    {
+      "number": 96,
+      "path": "web/database/migrations/096_create_ecommerce_product_variants.sql",
+      "sha256": "86019626c0052882bde35532dfc1c3f0ede930017eb6858c888a960a9eafed8d",
+      "from_schema": 95,
+      "to_schema": 96,
+      "compatibility": "expand-only"
+    }
+  ]
+}

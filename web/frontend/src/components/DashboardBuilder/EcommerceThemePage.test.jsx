@@ -2,11 +2,14 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import EcommerceThemePage from "./EcommerceThemePage";
-import { fetchEcommerceTheme, saveEcommerceTheme } from "../../services/ecommerceApi";
+import { fetchEcommerceCatalog, fetchEcommerceGrowth, fetchEcommerceTheme, saveEcommerceGrowth, saveEcommerceTheme } from "../../services/ecommerceApi";
 import { fetchWebsiteSettings } from "../PageBuilder/services/PageBuilder.api";
 
 vi.mock("../../services/ecommerceApi", () => ({
+  fetchEcommerceCatalog: vi.fn(),
+  fetchEcommerceGrowth: vi.fn(),
   fetchEcommerceTheme: vi.fn(),
+  saveEcommerceGrowth: vi.fn(),
   saveEcommerceTheme: vi.fn(),
 }));
 
@@ -31,6 +34,12 @@ beforeEach(() => {
       muted: "#697181",
     },
   });
+  fetchEcommerceGrowth.mockResolvedValue({ growth: { announcement_enabled: false, featured_product_ids: [], featured_category_ids: [] } });
+  fetchEcommerceCatalog.mockResolvedValue({
+    products: [{ id: "product-1", status: "active", translations: { en: { name: "Soap" }, ar: { name: "صابون" } } }],
+    categories: [{ id: "category-1", status: "active", translations: { en: { name: "Gifts" }, ar: { name: "هدايا" } } }],
+  });
+  saveEcommerceGrowth.mockImplementation(async (growth) => ({ growth }));
   saveEcommerceTheme.mockImplementation(async (theme) => ({ theme }));
   fetchWebsiteSettings.mockResolvedValue({ subdomain: "olive-house" });
 });
@@ -71,5 +80,21 @@ describe("EcommerceThemePage", () => {
 
     expect(await screen.findByText("Check the colors")).toBeTruthy();
     expect(saveEcommerceTheme).not.toHaveBeenCalled();
+  });
+
+  it("loads and explicitly saves localized SEO and merchandising settings", async () => {
+    render(<EcommerceThemePage />);
+    fireEvent.change(await screen.findByLabelText("Store SEO title (English)"), { target: { value: "Olive shop" } });
+    fireEvent.change(screen.getByLabelText("Announcement (Arabic)"), { target: { value: "توصيل محلي" } });
+    fireEvent.click(screen.getByLabelText("Show announcement banner"));
+    const featuredProducts = screen.getByLabelText("Featured products");
+    featuredProducts.options[0].selected = true;
+    fireEvent.change(featuredProducts);
+    fireEvent.click(screen.getByRole("button", { name: "Save SEO and merchandising" }));
+
+    await waitFor(() => expect(saveEcommerceGrowth).toHaveBeenCalledWith(expect.objectContaining({
+      seo_title_en: "Olive shop", announcement_enabled: true, announcement_text_ar: "توصيل محلي", featured_product_ids: ["product-1"],
+    })));
+    expect(await screen.findByText("Storefront growth settings saved")).toBeTruthy();
   });
 });

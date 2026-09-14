@@ -57,6 +57,7 @@ import { resolveReservationBlockValue } from "../core/PageBuilder.reservations";
 import { getResponsiveMediaProps, resolveMediaUrl } from "../../../utils/media";
 import { getTenantRuntimeContent } from "../../../content/pageBuilder";
 import useWeeklyScreenTime from "../../../hooks/useWeeklyScreenTime";
+import { recordPublicSiteVisit } from "../../../services/siteVisitApi";
 import { getReservationErrorMessage } from "./reservationSubmission";
 import {
   getDefaultPublicPage,
@@ -526,6 +527,15 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
   const pendingProtectedPageRef = useRef("");
   const loadedResumeTokenRef = useRef("");
   const detectedPublicationRef = useRef("");
+  const recordedVisitRef = useRef("");
+
+  useEffect(() => {
+    if (!isPublicRuntime || !cleanSubdomain) return;
+    const visitKey = `website:${cleanSubdomain}`;
+    if (recordedVisitRef.current === visitKey) return;
+    recordedVisitRef.current = visitKey;
+    recordPublicSiteVisit(cleanSubdomain, "website").catch(() => {});
+  }, [cleanSubdomain, isPublicRuntime]);
 
   const showFormToast = useCallback((title, message) => {
     setFormToast({ id: Date.now(), title, message });

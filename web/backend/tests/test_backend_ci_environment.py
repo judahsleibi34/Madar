@@ -60,6 +60,17 @@ def _docker_environment(command: str) -> dict[str, str]:
 
 
 class BackendCiEnvironmentTests(unittest.TestCase):
+    def test_ci_uses_git_capable_test_target_without_expanding_runtime_image(self):
+        workflow = WORKFLOW.read_text(encoding="utf-8")
+        dockerfile = (ROOT / "backend/Dockerfile").read_text(encoding="utf-8")
+        self.assertIn("docker build --target test -t madar-backend-test web/backend", workflow)
+        self.assertIn("FROM application AS test", dockerfile)
+        self.assertIn("apt-get install --yes --no-install-recommends git", dockerfile)
+        self.assertLess(dockerfile.index("FROM application AS test"), dockerfile.index("FROM application AS runtime"))
+        runtime = dockerfile.split("FROM application AS runtime", 1)[1]
+        self.assertNotIn("apt-get", runtime)
+        self.assertNotIn("install", runtime)
+
     def test_compose_declares_environment_classification_explicitly(self):
         production = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
         development = (ROOT / "docker-compose.dev.yml").read_text(encoding="utf-8")

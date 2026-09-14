@@ -15,6 +15,7 @@ import enAuth from "./locales/en/auth.json";
 import enPublic from "./locales/en/public.json";
 import enDashboard from "./locales/en/dashboard.json";
 import enPageBuilder from "./locales/en/pageBuilder.json";
+import enCommerce from "./locales/en/commerce.json";
 import enDataAnalysis from "./locales/en/dataAnalysis.json";
 import en from "./locales/en";
 
@@ -24,6 +25,7 @@ import arPublic from "./locales/ar/public.json";
 import arDashboard from "./locales/ar/dashboard.json";
 import arPageBuilder from "./locales/ar/pageBuilder.json";
 import arDataAnalysis from "./locales/ar/dataAnalysis.json";
+import arCommerce from "./locales/ar/commerce.json";
 import ar from "./locales/ar";
 
 export const LANGUAGE_STORAGE_KEY = "madar.language";
@@ -46,6 +48,7 @@ export const I18N_NAMESPACES = [
   "auth",
   "public",
   "dashboard",
+  "commerce",
   "pageBuilder",
   "dataAnalysis",
 ];
@@ -175,6 +178,7 @@ const resources = {
       notifications: en.notifications,
       myPlan: en.myPlan,
     }),
+    commerce: enCommerce,
     pageBuilder: enPageBuilder,
     dataAnalysis: enDataAnalysis,
   },
@@ -190,6 +194,7 @@ const resources = {
       notifications: ar.notifications,
       myPlan: ar.myPlan,
     }),
+    commerce: arCommerce,
     pageBuilder: arPageBuilder,
     dataAnalysis: arDataAnalysis,
   },

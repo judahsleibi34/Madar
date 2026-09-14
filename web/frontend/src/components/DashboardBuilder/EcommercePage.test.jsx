@@ -10,10 +10,6 @@ import {
 } from "../../services/ecommerceApi";
 import { clearEcommerceCatalogCache, writeEcommerceCatalogCache } from "./utils/ecommerceCatalogCache";
 
-vi.mock("react-i18next", () => ({
-  useTranslation: () => ({ i18n: { resolvedLanguage: "en" } }),
-}));
-
 vi.mock("../../services/ecommerceApi", () => ({
   fetchEcommerceCatalog: vi.fn(),
   saveEcommerceItem: vi.fn(),
@@ -151,3 +147,34 @@ describe("EcommercePage", () => {
     expect(screen.queryByAltText("Product image 1")).toBeNull();
   });
 });
+  it("shows aggregate stock counts and filters simple and variant products", async () => {
+    fetchEcommerceCatalog.mockResolvedValue({
+      tags: [], categories: [], stock_summary: { low_stock: 2, out_of_stock: 2 },
+      products: [
+        { id: "low", slug: "low", sku: "LOW", price: 10, currency: "ILS", status: "active", translations: { en: { name: "Low simple" } }, options: [], inventory_status: "low_stock", low_stock_count: 1, out_of_stock_count: 0, has_low_stock: true, has_out_of_stock: false },
+        { id: "out", slug: "out", sku: "OUT", price: 10, currency: "ILS", status: "active", translations: { en: { name: "Out simple" } }, options: [], inventory_status: "out_of_stock", low_stock_count: 0, out_of_stock_count: 1, has_low_stock: false, has_out_of_stock: true },
+        { id: "mixed", slug: "mixed", sku: "MIX", price: 10, currency: "ILS", status: "active", translations: { en: { name: "Mixed variants" } }, options: [{ id: "size" }], inventory_status: "low_stock", low_stock_count: 1, out_of_stock_count: 1, has_low_stock: true, has_out_of_stock: true },
+        { id: "healthy", slug: "healthy", sku: "OK", price: 10, currency: "ILS", status: "active", translations: { en: { name: "Healthy" } }, options: [], inventory_status: "healthy", low_stock_count: 0, out_of_stock_count: 0, has_low_stock: false, has_out_of_stock: false },
+      ],
+    });
+
+    render(<EcommercePage section="products" />);
+
+    expect(await screen.findByText("Low simple")).toBeTruthy();
+    const lowSummary = screen.getAllByText("Low stock").find((node) => node.closest(".ecommerce-summary-card"));
+    const outSummary = screen.getAllByText("Out of stock").find((node) => node.closest(".ecommerce-summary-card"));
+    expect(lowSummary.closest(".ecommerce-summary-card").textContent).toContain("2");
+    expect(outSummary.closest(".ecommerce-summary-card").textContent).toContain("2");
+    expect(screen.getByText(/1 low · 1 out/)).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Low stock" }));
+    expect(screen.getByText("Low simple")).toBeTruthy();
+    expect(screen.getByText("Mixed variants")).toBeTruthy();
+    expect(screen.queryByText("Out simple")).toBeNull();
+    expect(screen.queryByText("Healthy")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Out of stock" }));
+    expect(screen.getByText("Out simple")).toBeTruthy();
+    expect(screen.getByText("Mixed variants")).toBeTruthy();
+    expect(screen.queryByText("Low simple")).toBeNull();
+  });

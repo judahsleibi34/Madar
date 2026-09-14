@@ -12,7 +12,8 @@ from decimal import Decimal
 from typing import Any, Literal, Optional
 from uuid import UUID
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
-from urllib.parse import urlparse
+from urllib.parse import quote, urlparse
+from xml.sax.saxutils import escape as xml_escape
 
 from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
@@ -93,6 +94,10 @@ FRONTEND_URL = resolve_frontend_url()
 
 class PublicScreenTimeHeartbeat(BaseModel):
     active_seconds: int = Field(..., ge=1, le=60)
+
+
+class PublicSiteVisitCreate(BaseModel):
+    surface: Literal["website", "store"]
 
 
 class PublicFormSubmissionCreate(BaseModel):
@@ -185,20 +190,28 @@ class PublicStoreOrderItemCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     product_id: UUID
+    variant_id: UUID | None = None
     quantity: int = Field(..., ge=1, le=99)
 
 
 class PublicStoreOrderCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    idempotency_key: str = Field(..., min_length=16, max_length=128)
     customer_name: str = Field(..., min_length=2, max_length=160)
     email: EmailStr
     phone: str = Field(..., min_length=5, max_length=50)
-    address_line_1: str = Field(..., min_length=3, max_length=240)
+    service_area_id: UUID
+    street: str = Field(..., min_length=3, max_length=240)
+    building: str = Field(default="", max_length=120)
+    floor_apartment: str = Field(default="", max_length=120)
+    address_description: str = Field(default="", max_length=500)
+    delivery_notes: str = Field(default="", max_length=1000)
+    address_line_1: str = Field(default="", max_length=240)
     address_line_2: str = Field(default="", max_length=240)
-    city: str = Field(..., min_length=2, max_length=120)
+    city: str = Field(default="", max_length=120)
     postal_code: str = Field(default="", max_length=30)
-    country: str = Field(..., min_length=2, max_length=120)
+    country: str = Field(default="", max_length=120)
     notes: str = Field(default="", max_length=1000)
     payment_method: Literal["cash_on_delivery"] = "cash_on_delivery"
     items: list[PublicStoreOrderItemCreate] = Field(..., min_length=1, max_length=50)
@@ -206,10 +219,15 @@ class PublicStoreOrderCreate(BaseModel):
     @field_validator("items")
     @classmethod
     def unique_products(cls, value):
-        product_ids = [item.product_id for item in value]
-        if len(product_ids) != len(set(product_ids)):
-            raise ValueError("Each product can appear only once")
+        identities = [(item.product_id, item.variant_id) for item in value]
+        if len(identities) != len(set(identities)):
+            raise ValueError("Each product variant can appear only once")
         return value
+
+
+class PublicStoreCartReconcile(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    items: list[PublicStoreOrderItemCreate] = Field(..., min_length=1, max_length=50)
 
 
 def rows(response):
@@ -850,6 +868,21 @@ LEGACY_DEFAULT_PUBLIC_STORE_THEME = {
     "muted": "#697181",
 }
 
+def _public_store_growth(saved_theme: dict[str, Any]) -> dict[str, Any]:
+    value = saved_theme.get("growth") if isinstance(saved_theme, dict) else None
+    value = value if isinstance(value, dict) else {}
+    text_fields = (
+        "seo_title_en", "seo_title_ar", "seo_description_en", "seo_description_ar",
+        "announcement_text_en", "announcement_text_ar", "announcement_link",
+    )
+    result = {key: str(value.get(key) or "").strip() for key in text_fields}
+    result["announcement_enabled"] = bool(value.get("announcement_enabled"))
+    for key, limit in (("featured_product_ids", 12), ("featured_category_ids", 6)):
+        selected = value.get(key) if isinstance(value.get(key), list) else []
+        result[key] = list(dict.fromkeys(str(item) for item in selected if item))[:limit]
+    return result
+
+
 def build_public_store_profile(settings: dict, subdomain: str) -> dict:
     """Build storefront identity without reading any page-builder project."""
     saved_theme = settings.get("ecommerce_theme") if isinstance(settings.get("ecommerce_theme"), dict) else {}
@@ -864,7 +897,8 @@ def build_public_store_profile(settings: dict, subdomain: str) -> dict:
         "contact_email": settings.get("contact_email"),
         "phone": settings.get("phone"),
         "description": settings.get("description"),
-        "store_theme": {**DEFAULT_PUBLIC_STORE_THEME, **saved_theme},
+        "store_theme": {**DEFAULT_PUBLIC_STORE_THEME, **{key: value for key, value in saved_theme.items() if key != "growth"}},
+        "growth": _public_store_growth(saved_theme),
     }
 
 def build_public_site_profile(settings: dict, subdomain: str, project: dict) -> dict:
@@ -1908,6 +1942,7 @@ def _public_catalog_product(
     track_inventory = bool(row.get("track_inventory"))
     inventory_quantity = int(row.get("inventory_quantity") or 0)
     allow_backorder = bool(row.get("allow_backorder"))
+    seo_availability = "InStock" if (not track_inventory or inventory_quantity > 0) else "BackOrder" if allow_backorder else "OutOfStock"
     return {
         "id": str(row.get("id") or ""),
         "slug": str(row.get("slug") or ""),
@@ -1927,6 +1962,7 @@ def _public_catalog_product(
         "currency": str(row.get("currency") or "USD"),
         "in_stock": (not track_inventory) or inventory_quantity > 0 or allow_backorder,
         "allow_backorder": allow_backorder,
+        "seo_availability": seo_availability,
         "images": [
             str(value)
             for value in (row.get("images") or [])
@@ -2077,6 +2113,16 @@ def _sort_catalog(products: list[dict[str, Any]], sort: str) -> list[dict[str, A
         products.sort(key=lambda item: str(item.get("name") or "").casefold())
     return products
 
+def _optional_p1a_rows(query) -> list[dict[str, Any]] | None:
+    try:
+        return rows(query.execute())
+    except Exception as error:
+        message = str(error).lower()
+        if "pgrst205" in message or "could not find the table" in message or "schema cache" in message:
+            return None
+        raise
+
+
 
 def _catalog_payload(
     *,
@@ -2088,6 +2134,8 @@ def _catalog_payload(
     sort: Literal["latest", "price_low", "price_high", "name"] = "latest",
     page: int = 1,
     limit: int = 12,
+    featured_product_ids: list[str] | None = None,
+    featured_category_ids: list[str] | None = None,
 ) -> dict[str, Any]:
     category_rows, tag_rows, product_rows, link_rows = _cached_public_catalog_rows(tenant_id)
     tags_by_product: dict[str, list[str]] = {}
@@ -2114,7 +2162,16 @@ def _catalog_payload(
         category=category,
         tag=tag,
     )
+    variant_products = _optional_p1a_rows(service_supabase.table("ecommerce_product_options").select("product_id").eq("tenant_id", tenant_id))
+    if variant_products is not None:
+        variant_product_ids = {str(item.get("product_id")) for item in variant_products}
+        for product in products:
+            product["has_variants"] = str(product.get("id")) in variant_product_ids
     products = _sort_catalog(_search_catalog(products, search), sort)
+    products_by_id = {str(item.get("id")): item for item in products}
+    categories_by_id = {str(item.get("id")): item for item in categories}
+    selected_products = [products_by_id[item] for item in (featured_product_ids or []) if item in products_by_id]
+    selected_categories = [categories_by_id[item] for item in (featured_category_ids or []) if item in categories_by_id]
 
     total = len(products)
     safe_page = max(1, page)
@@ -2124,6 +2181,8 @@ def _catalog_payload(
         "categories": categories,
         "tags": tags,
         "products": products[start:start + safe_limit],
+        "featured_products": selected_products,
+        "featured_categories": selected_categories,
         "pagination": {
             "page": safe_page,
             "limit": safe_limit,
@@ -2173,7 +2232,40 @@ def _catalog_product_payload(
         for item in tag_rows
         if str(item.get("id") or "") in product_tag_ids
     ]
-    return {"product": product, "category": category, "tags": tags}
+    attribute_rows = _optional_p1a_rows(service_supabase.table("ecommerce_product_attributes").select("id,name_translations,value_translations,sort_order").eq("tenant_id", tenant_id).eq("product_id", product_id).order("sort_order"))
+    if attribute_rows is None:
+        return {"product": product, "category": category, "tags": tags, "attributes": [], "options": [], "variants": []}
+    option_rows = rows(service_supabase.table("ecommerce_product_options").select("id,code,name_translations,required,sort_order").eq("tenant_id", tenant_id).eq("product_id", product_id).order("sort_order").execute())
+    option_ids = [str(item["id"]) for item in option_rows]
+    value_rows = [] if not option_ids else rows(service_supabase.table("ecommerce_product_option_values").select("id,option_id,code,value_translations,sort_order").eq("tenant_id", tenant_id).eq("product_id", product_id).eq("active", True).in_("option_id", option_ids).order("sort_order").execute())
+    variant_rows = rows(service_supabase.table("ecommerce_product_variants").select("id,sku,price_override,compare_at_price_override,track_inventory,inventory_quantity,allow_backorder,images").eq("tenant_id", tenant_id).eq("product_id", product_id).eq("active", True).execute())
+    variant_ids = [str(item["id"]) for item in variant_rows]
+    links = [] if not variant_ids else rows(service_supabase.table("ecommerce_variant_option_values").select("variant_id,option_id,option_value_id").eq("tenant_id", tenant_id).in_("variant_id", variant_ids).execute())
+    for option in option_rows:
+        names = option.pop("name_translations") or {}
+        option["name"] = names.get(locale) or names.get("en") or next(iter(names.values()), "")
+        option["values"] = []
+        for source in value_rows:
+            if str(source.get("option_id")) == str(option["id"]):
+                value = dict(source); labels = value.pop("value_translations") or {}
+                value["value"] = labels.get(locale) or labels.get("en") or next(iter(labels.values()), "")
+                option["values"].append(value)
+    for variant in variant_rows:
+        variant["option_value_ids"] = [str(link["option_value_id"]) for link in links if str(link["variant_id"]) == str(variant["id"])]
+        variant["price"] = str(variant.get("price_override") if variant.get("price_override") is not None else product["price"])
+        variant["compare_at_price"] = variant.get("compare_at_price_override") if variant.get("compare_at_price_override") is not None else product.get("compare_at_price")
+        variant["in_stock"] = not variant.get("track_inventory") or bool(variant.get("allow_backorder")) or int(variant.get("inventory_quantity") or 0) > 0
+        variant["seo_availability"] = "InStock" if (not variant.get("track_inventory") or int(variant.get("inventory_quantity") or 0) > 0) else "BackOrder" if variant.get("allow_backorder") else "OutOfStock"
+        variant["images"] = variant.get("images") or product.get("images") or []
+    attributes = []
+    for attribute in attribute_rows:
+        names, values = attribute.pop("name_translations") or {}, attribute.pop("value_translations") or {}
+        attribute["name"] = names.get(locale) or names.get("en") or next(iter(names.values()), "")
+        attribute["value"] = values.get(locale) or values.get("en") or next(iter(values.values()), "")
+        attributes.append(attribute)
+    product["has_variants"] = bool(option_rows)
+    product["in_stock"] = any(item["in_stock"] for item in variant_rows) if option_rows else product["in_stock"]
+    return {"product": product, "category": category, "tags": tags, "attributes": attributes, "options": option_rows, "variants": variant_rows}
 
 
 def normalize_email(value: str) -> str:
@@ -2565,6 +2657,45 @@ def get_public_store_profile(subdomain: str, request: Request, response: Respons
         )
     return {"success": True, "site": site_profile}
 
+def _canonical_storefront_base(settings: dict, site_identifier: str, request: Request) -> str:
+    if _request_uses_branded_address(request, site_identifier):
+        public_domain = os.getenv("PUBLIC_SITE_DOMAIN", "madarportal.com").strip().lower()
+        return f"https://{site_identifier}.{public_domain}/shop"
+    slug = str(settings.get("standard_path_slug") or site_identifier).strip().lower()
+    return f"{FRONTEND_URL.rstrip('/')}/site/{quote(slug, safe='')}/shop"
+
+
+def _storefront_sitemap_xml(settings: dict, site_identifier: str, request: Request) -> str:
+    tenant_id = resolve_tenant_id(settings)
+    categories, _tags, products, _links = _cached_public_catalog_rows(tenant_id)
+    base = _canonical_storefront_base(settings, site_identifier, request)
+    entries = [(base, settings.get("updated_at"))]
+    entries.extend((f"{base}/catalog?category={quote(str(row.get('slug') or ''), safe='-')}", row.get("updated_at")) for row in categories if row.get("slug"))
+    entries.extend((f"{base}/product/{quote(str(row.get('slug') or ''), safe='-')}", row.get("updated_at")) for row in products if row.get("slug"))
+    urls = []
+    for location, updated_at in entries:
+        lastmod = str(updated_at or "")[:10]
+        lastmod_xml = f"<lastmod>{xml_escape(lastmod)}</lastmod>" if re.fullmatch(r"\d{4}-\d{2}-\d{2}", lastmod) else ""
+        urls.append(f"<url><loc>{xml_escape(location)}</loc>{lastmod_xml}</url>")
+    return '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' + "".join(urls) + "</urlset>"
+
+
+@router.get("/sites/{subdomain}/sitemap.xml", name="get_public_storefront_sitemap")
+def get_public_storefront_sitemap(subdomain: str, request: Request):
+    clean_subdomain = normalize_subdomain(subdomain)
+    enforce_public_rate_limit(request, "storefront_sitemap", clean_subdomain)
+    settings = resolve_public_store_settings(clean_subdomain, request=request)
+    return Response(content=_storefront_sitemap_xml(settings, clean_subdomain, request), media_type="application/xml", headers={"Cache-Control": "public, max-age=300, stale-while-revalidate=3600"})
+
+
+@router.get("/sites/{subdomain}/robots.txt")
+def get_public_storefront_robots(subdomain: str, request: Request):
+    clean_subdomain = normalize_subdomain(subdomain)
+    resolve_public_store_settings(clean_subdomain, request=request)
+    sitemap = request.url_for("get_public_storefront_sitemap", subdomain=clean_subdomain)
+    body = "User-agent: *\nDisallow: /checkout\nDisallow: /confirmation/\nDisallow: /account\nSitemap: " + str(sitemap) + "\n"
+    return Response(content=body, media_type="text/plain", headers={"Cache-Control": "public, max-age=300"})
+
 @router.get("/sites/{subdomain}/catalog")
 def get_public_catalog(
     subdomain: str,
@@ -2588,6 +2719,7 @@ def get_public_catalog(
     tag_value = str(tag or "")[:160]
     page_value = max(1, page)
     limit_value = max(1, min(limit, 48))
+    growth = _public_store_growth(settings.get("ecommerce_theme") if isinstance(settings.get("ecommerce_theme"), dict) else {})
     cache_key = ecommerce_cache_key(
         tenant_id,
         "catalog-v1",
@@ -2612,6 +2744,8 @@ def get_public_catalog(
                 sort=sort,
                 page=page_value,
                 limit=limit_value,
+                featured_product_ids=growth["featured_product_ids"],
+                featured_category_ids=growth["featured_category_ids"],
             ),
         )
     except Exception as error:
@@ -2715,101 +2849,287 @@ def get_public_catalog_product(
     }
 
 
+def _ecommerce_order_storage_error(error: Exception) -> HTTPException:
+    message = str(error).lower()
+    mappings = (
+        ("idempotency_conflict", 409, "idempotency_conflict", "This checkout key was already used for a different order."),
+        ("ecommerce_inventory_insufficient", 409, "inventory_insufficient", "A product does not have enough stock."),
+        ("ecommerce_variant_required", 409, "variant_required", "Choose all required product options."),
+        ("ecommerce_variant_unavailable", 409, "variant_unavailable", "The selected product variant is unavailable."),
+        ("ecommerce_variant_incomplete", 409, "variant_unavailable", "The selected product variant is incomplete."),
+        ("ecommerce_variant_not_allowed", 409, "variant_invalid", "This simple product does not accept a variant."),
+        ("ecommerce_product_unavailable", 409, "product_unavailable", "One or more products are no longer available."),
+        ("ecommerce_delivery_area_unavailable", 409, "delivery_area_unavailable", "This store no longer delivers to the selected area."),
+        ("ecommerce_delivery_street_required", 400, "delivery_street_required", "A street address is required."),
+        ("ecommerce_currency_configuration_required", 409, "currency_configuration_required", "This store must configure one currency before accepting orders."),
+        ("ecommerce_currency_product_mismatch", 409, "currency_mismatch", "The catalog contains a product in a different currency."),
+        ("ecommerce_quantity_invalid", 400, "quantity_invalid", "Choose a quantity between 1 and 99."),
+        ("ecommerce_order_items", 400, "order_items_invalid", "The order items are invalid."),
+        ("ecommerce_order_payload_invalid", 400, "order_invalid", "The order is invalid."),
+    )
+    for marker, status, code, detail in mappings:
+        if marker in message:
+            return api_error(status, code, detail)
+    if "pgrst202" in message or "create_ecommerce_order_safe" in message or "schema cache" in message:
+        return api_error(503, "checkout_upgrade_required", "Checkout is temporarily unavailable while the store is upgraded.")
+    return api_error(503, "dependency_unavailable", "The order could not be saved. Try again shortly.")
+
+
+@router.get("/sites/{subdomain}/delivery-areas")
+def get_public_store_delivery_areas(subdomain: str, request: Request):
+    clean_subdomain = normalize_subdomain(subdomain)
+    enforce_public_rate_limit(request, "store_delivery_areas", clean_subdomain)
+    settings = resolve_public_store_settings(clean_subdomain, request=request)
+    tenant_id = resolve_tenant_id(settings)
+    mapping_rows = rows(
+        service_supabase.table("ecommerce_tenant_service_areas")
+        .select("service_area_id")
+        .eq("tenant_id", tenant_id)
+        .eq("enabled", True)
+        .execute()
+    )
+    enabled_ids = [str(row.get("service_area_id")) for row in mapping_rows if row.get("service_area_id")]
+    areas = [] if not enabled_ids else rows(
+        service_supabase.table("ecommerce_service_areas").select("id,code,name_en,name_ar,sort_order")
+        .in_("id", enabled_ids).eq("active", True).order("sort_order").execute()
+    )
+    return {"success": True, "areas": areas}
+
+
+@router.post("/sites/{subdomain}/cart/reconcile")
+def reconcile_public_store_cart(
+    subdomain: str,
+    payload: PublicStoreCartReconcile,
+    request: Request,
+):
+    clean_subdomain = normalize_subdomain(subdomain)
+    enforce_public_rate_limit(request, "store_cart_reconcile", clean_subdomain)
+    settings = resolve_public_store_settings(clean_subdomain, request=request)
+    tenant_id = resolve_tenant_id(settings)
+    currency = str(settings.get("ecommerce_currency") or "").strip().upper()
+    if not currency:
+        raise api_error(409, "currency_configuration_required", "This store must configure one currency before checkout.")
+
+    requested_product_ids = list(dict.fromkeys(str(item.product_id) for item in payload.items))
+    product_rows = rows(
+        service_supabase.table("ecommerce_products")
+        .select("id,slug,translations,status,price,currency,track_inventory,inventory_quantity,allow_backorder,images")
+        .eq("tenant_id", tenant_id)
+        .eq("status", "active")
+        .in_("id", requested_product_ids)
+        .execute()
+    )
+    by_id = {str(product.get("id")): product for product in product_rows}
+    optional_options = _optional_p1a_rows(service_supabase.table("ecommerce_product_options").select("product_id").eq("tenant_id", tenant_id).in_("product_id", requested_product_ids))
+    option_rows = optional_options or []
+    variant_product_ids = {str(item.get("product_id")) for item in option_rows}
+    requested_variant_ids = list(dict.fromkeys(str(item.variant_id) for item in payload.items if item.variant_id))
+    variant_rows = [] if optional_options is None or not requested_variant_ids else rows(
+        service_supabase.table("ecommerce_product_variants")
+        .select("id,product_id,sku,price_override,track_inventory,inventory_quantity,allow_backorder,images,active")
+        .eq("tenant_id", tenant_id).in_("id", requested_variant_ids).execute()
+    )
+    variants_by_id = {str(variant.get("id")): variant for variant in variant_rows}
+    reconciled = []
+    for item in payload.items:
+        product_id = str(item.product_id)
+        variant_id = str(item.variant_id) if item.variant_id else None
+        product = by_id.get(product_id)
+        if not product:
+            reconciled.append({"product_id": product_id, "variant_id": variant_id, "requested_quantity": item.quantity, "available": False, "reason": "unavailable"})
+            continue
+        product_currency = str(product.get("currency") or "").upper()
+        variant = variants_by_id.get(variant_id) if variant_id else None
+        has_variants = product_id in variant_product_ids
+        reason = None
+        if has_variants and not variant_id:
+            reason = "variant_required"
+        elif variant_id and (not variant or str(variant.get("product_id")) != product_id or not variant.get("active")):
+            reason = "variant_unavailable"
+        elif not has_variants and variant_id:
+            reason = "variant_invalid"
+        inventory_owner = variant if has_variants and variant else product
+        tracked = bool(inventory_owner.get("track_inventory"))
+        backorder = bool(inventory_owner.get("allow_backorder"))
+        inventory = max(0, int(inventory_owner.get("inventory_quantity") or 0))
+        maximum = 99 if not tracked or backorder else min(99, inventory)
+        if product_currency != currency:
+            reason = "currency_mismatch"
+        elif reason is None and item.quantity > maximum:
+            reason = "insufficient_inventory"
+        price = variant.get("price_override") if variant and variant.get("price_override") is not None else product.get("price")
+        images = variant.get("images") if variant and variant.get("images") else product.get("images")
+        reconciled.append({
+            "product_id": product_id,
+            "variant_id": variant_id,
+            "requested_quantity": item.quantity,
+            "available": reason is None,
+            "reason": reason,
+            "max_quantity": maximum,
+            "name": _localized_catalog_text(product.get("translations"), "en")["name"],
+            "slug": str(product.get("slug") or ""),
+            "images": images or [],
+            "price": str(Decimal(str(price or "0")).quantize(Decimal("0.01"))),
+            "sku": variant.get("sku") if variant else product.get("sku"),
+            "currency": currency,
+        })
+    return {"success": True, "currency": currency, "valid": all(item["available"] for item in reconciled), "items": reconciled}
+
+
 @router.post("/sites/{subdomain}/orders", status_code=201)
 def create_public_store_order(
     subdomain: str,
     payload: PublicStoreOrderCreate,
     request: Request,
+    response: Response,
 ):
     clean_subdomain = normalize_subdomain(subdomain)
     enforce_public_rate_limit(request, "store_order_create", clean_subdomain)
     settings = resolve_public_store_settings(clean_subdomain, request=request)
     tenant_id = resolve_tenant_id(settings)
-    requested = {str(item.product_id): item.quantity for item in payload.items}
-
-    product_rows = rows(
-        service_supabase.table("ecommerce_products")
-        .select("id,sku,translations,status,price,currency,track_inventory,inventory_quantity,allow_backorder")
-        .eq("tenant_id", tenant_id)
-        .eq("status", "active")
-        .in_("id", list(requested))
-        .execute()
-    )
-    by_id = {str(product.get("id")): product for product in product_rows}
-    if set(by_id) != set(requested):
-        raise HTTPException(status_code=409, detail="One or more products are no longer available")
-
-    currencies = {str(product.get("currency") or "USD") for product in product_rows}
-    if len(currencies) != 1:
-        raise HTTPException(status_code=409, detail="Products with different currencies cannot share an order")
-    currency = next(iter(currencies))
-    subtotal = Decimal("0.00")
-    order_items = []
-    for product_id, quantity in requested.items():
-        product = by_id[product_id]
-        available = int(product.get("inventory_quantity") or 0)
-        if bool(product.get("track_inventory")) and not bool(product.get("allow_backorder")) and quantity > available:
-            raise HTTPException(status_code=409, detail="A product does not have enough stock")
-        unit_price = Decimal(str(product.get("price") or "0")).quantize(Decimal("0.01"))
-        line_total = (unit_price * quantity).quantize(Decimal("0.01"))
-        subtotal += line_total
-        order_items.append({
-            "tenant_id": tenant_id,
-            "product_id": product_id,
-            "sku": str(product.get("sku") or ""),
-            "product_name": _localized_catalog_text(product.get("translations"), "en")["name"],
-            "quantity": quantity,
-            "unit_price": str(unit_price),
-            "line_total": str(line_total),
-        })
-
-    order_number = f"MD-{datetime.now(timezone.utc).strftime('%Y%m%d')}-{secrets.token_hex(3).upper()}"
-    created_order = first_row(
-        service_supabase.table("ecommerce_orders").insert({
-            "tenant_id": tenant_id,
-            "order_number": order_number,
-            "status": "pending",
-            "payment_status": "unpaid",
-            "payment_method": payload.payment_method,
-            "currency": currency,
-            "subtotal": str(subtotal),
-            "total": str(subtotal),
-            "customer_name": payload.customer_name.strip(),
-            "customer_email": str(payload.email).lower(),
-            "customer_phone": payload.phone.strip(),
-            "address_line_1": payload.address_line_1.strip(),
-            "address_line_2": payload.address_line_2.strip(),
-            "city": payload.city.strip(),
-            "postal_code": payload.postal_code.strip(),
-            "country": payload.country.strip(),
-            "notes": payload.notes.strip(),
-        }).execute()
-    )
-    if not created_order:
-        raise HTTPException(status_code=503, detail="Could not create the order")
-
-    order_id = str(created_order.get("id"))
+    idempotency_key = normalize_idempotency_key(payload, request)
+    if not idempotency_key:
+        raise api_error(400, "idempotency_key_required", "An idempotency key is required for checkout.")
+    confirmation_token = hash_public_identifier(f"ecommerce-confirmation:{tenant_id}:{idempotency_key}")
+    customer_id = None
+    if request.cookies.get("madar_access_token") or request.cookies.get("madar_refresh_token"):
+        try:
+            customer = get_authenticated_user_row(
+                request, response,
+                allow_admin_account_access=False,
+                reject_admin_account_access=True,
+            )
+            customer_id = int(customer["id"])
+        except HTTPException:
+            customer_id = None
+    order_payload = {
+        "tenant_id": tenant_id,
+        "verified_customer_id": customer_id,
+        "customer_name": payload.customer_name.strip(),
+        "email": str(payload.email).lower(),
+        "phone": payload.phone.strip(),
+        "address_line_1": payload.address_line_1.strip(),
+        "address_line_2": payload.address_line_2.strip(),
+        "city": payload.city.strip(),
+        "postal_code": payload.postal_code.strip(),
+        "country": payload.country.strip(),
+        "notes": payload.notes.strip(),
+        "service_area_id": str(payload.service_area_id),
+        "street": payload.street.strip(),
+        "building": payload.building.strip(),
+        "floor_apartment": payload.floor_apartment.strip(),
+        "address_description": payload.address_description.strip(),
+        "delivery_notes": payload.delivery_notes.strip(),
+        "payment_method": payload.payment_method,
+        "items": [item.model_dump(mode="json") for item in payload.items],
+    }
     try:
-        service_supabase.table("ecommerce_order_items").insert([
-            {**item, "order_id": order_id}
-            for item in order_items
-        ]).execute()
-    except Exception:
-        service_supabase.table("ecommerce_orders").delete().eq("id", order_id).eq("tenant_id", tenant_id).execute()
+        rpc_params = {
+            "p_order": order_payload,
+            "p_idempotency_key_hash": hash_public_identifier(f"ecommerce-order:{tenant_id}:{idempotency_key}"),
+            "p_request_hash": canonical_request_hash(order_payload),
+            "p_confirmation_token_hash": hash_public_identifier(f"ecommerce-confirmation-token:{confirmation_token}"),
+            "p_customer_id": customer_id,
+        }
+        try:
+            rpc_response = service_supabase.rpc("create_ecommerce_order_safe", rpc_params).execute()
+        except Exception as rpc_error:
+            raw_error = str(rpc_error).lower()
+            missing_identity_overload = "p_customer_id" in raw_error and (
+                "pgrst202" in raw_error or "could not find" in raw_error or "schema cache" in raw_error
+            )
+            if not missing_identity_overload:
+                raise
+            legacy_params = {key: value for key, value in rpc_params.items() if key != "p_customer_id"}
+            rpc_response = service_supabase.rpc("create_ecommerce_order_safe", legacy_params).execute()
+        result = getattr(rpc_response, "data", None)
+        if isinstance(result, list):
+            result = result[0] if result else None
+        if not isinstance(result, dict):
+            raise RuntimeError("create_ecommerce_order_safe_empty_result")
+    except HTTPException:
         raise
+    except Exception as error:
+        raise _ecommerce_order_storage_error(error) from error
+    order = result.get("order")
+    if not isinstance(order, dict):
+        raise api_error(503, "dependency_unavailable", "The order could not be saved. Try again shortly.")
 
     return {
         "success": True,
-        "order": {
-            "id": order_id,
-            "order_number": order_number,
-            "status": "pending",
-            "payment_status": "unpaid",
-            "payment_method": payload.payment_method,
-            "currency": currency,
-            "subtotal": str(subtotal),
-            "total": str(subtotal),
+        "confirmation_token": confirmation_token,
+        "confirmation_path": f"/confirmation/{confirmation_token}",
+        "idempotent_replay": bool(result.get("duplicate")),
+        "order": {key: order.get(key) for key in (
+            "id", "order_number", "status", "payment_status", "payment_method",
+            "currency", "subtotal", "discount_total", "total",
+        )},
+    }
+
+
+@router.get("/sites/{subdomain}/orders/confirmation/{confirmation_token}")
+def get_public_order_confirmation(subdomain: str, confirmation_token: str, request: Request):
+    clean_subdomain = normalize_subdomain(subdomain)
+    enforce_public_rate_limit(request, "store_order_confirmation", clean_subdomain)
+    if not re.fullmatch(r"[0-9a-f]{64}", str(confirmation_token or "")):
+        raise HTTPException(status_code=404, detail="Order confirmation not found")
+    settings = resolve_public_store_settings(clean_subdomain, request=request)
+    tenant_id = resolve_tenant_id(settings)
+    token_hash = hash_public_identifier(f"ecommerce-confirmation-token:{confirmation_token}")
+    order_rows = rows(
+        service_supabase.table("ecommerce_orders").select(
+            "id,order_number,status,payment_status,payment_method,currency,subtotal,discount_total,total,created_at,customer_name,customer_email,customer_phone,service_area_code,service_area_name_en,service_area_name_ar,street,building,floor_apartment,address_description,delivery_notes"
+        ).eq("tenant_id", tenant_id).eq("confirmation_token_hash", token_hash).limit(1).execute()
+    )
+    if not order_rows:
+        raise HTTPException(status_code=404, detail="Order confirmation not found")
+    order = order_rows[0]
+    order_id = str(order.get("id"))
+    item_rows = rows(
+        service_supabase.table("ecommerce_order_items").select(
+            "id,sku,product_name,product_slug,product_snapshot,variant_snapshot,selected_options_snapshot,quantity,list_unit_price,discount_amount,discount_source,loyalty_entitlement_id,unit_price,line_total"
+        ).eq("tenant_id", tenant_id).eq("order_id", order_id).order("created_at").execute()
+    )
+    history_rows = rows(
+        service_supabase.table("ecommerce_order_status_history").select(
+            "previous_status,new_status,note,created_at"
+        ).eq("tenant_id", tenant_id).eq("order_id", order_id).order("created_at").execute()
+    )
+    return {"success": True, "site": build_public_store_profile(settings, clean_subdomain), "order": order, "items": item_rows, "status_history": history_rows}
+
+
+@router.get("/sites/{subdomain}/loyalty/me")
+def get_public_store_loyalty(subdomain: str, request: Request, response: Response):
+    clean_subdomain = normalize_subdomain(subdomain)
+    settings = resolve_public_store_settings(clean_subdomain, request=request)
+    tenant_id = resolve_tenant_id(settings)
+    customer = get_authenticated_user_row(
+        request, response,
+        allow_admin_account_access=False,
+        reject_admin_account_access=True,
+    )
+    customer_id = int(customer["id"])
+    try:
+        service_supabase.rpc("expire_ecommerce_loyalty_entitlements_safe", {
+            "p_tenant_id": tenant_id, "p_customer_id": customer_id,
+        }).execute()
+        account_rows = rows(service_supabase.table("ecommerce_loyalty_accounts").select("*").eq("tenant_id", tenant_id).eq("customer_id", customer_id).limit(1).execute())
+        entitlement_rows = rows(service_supabase.table("ecommerce_loyalty_entitlements").select("*").eq("tenant_id", tenant_id).eq("customer_id", customer_id).order("created_at", desc=True).limit(20).execute())
+        transaction_rows = rows(service_supabase.table("ecommerce_loyalty_transactions").select("id,transaction_type,points_delta,balance_after,order_id,rule_version,entitlement_id,metadata,created_at").eq("tenant_id", tenant_id).eq("customer_id", customer_id).order("created_at", desc=True).limit(50).execute())
+        product_ids = list({str(item.get("reward_product_id")) for item in entitlement_rows if item.get("reward_product_id")})
+        products = rows(service_supabase.table("ecommerce_products").select("id,slug,translations,images").eq("tenant_id", tenant_id).in_("id", product_ids).execute()) if product_ids else []
+    except Exception as error:
+        raise HTTPException(status_code=503, detail="Loyalty is temporarily unavailable") from error
+    products_by_id = {str(product.get("id")): product for product in products}
+    return {
+        "account": account_rows[0] if account_rows else {
+            "current_balance": 0, "lifetime_earned": 0, "lifetime_spent": 0,
         },
+        "entitlements": [
+            {**item, "reward_product": products_by_id.get(str(item.get("reward_product_id")))}
+            for item in entitlement_rows
+        ],
+        "transactions": transaction_rows,
     }
 
 
@@ -2831,6 +3151,45 @@ def get_public_site_bootstrap(subdomain: str, request: Request):
             "published_at": project.get("last_published_at"),
         },
     }
+
+
+@router.post("/sites/{subdomain}/visits", status_code=201)
+def record_public_site_visit(
+    subdomain: str,
+    visit: PublicSiteVisitCreate,
+    request: Request,
+):
+    clean_subdomain = normalize_subdomain(subdomain)
+    enforce_public_rate_limit(
+        request,
+        "site_visit",
+        f"{clean_subdomain}:{visit.surface}",
+    )
+    settings = resolve_website_settings(clean_subdomain, request=request)
+    tenant_id = resolve_tenant_id(settings)
+    try:
+        service_supabase.rpc(
+            "record_public_site_visit_safe",
+            {
+                "p_tenant_id": tenant_id,
+                "p_surface": visit.surface,
+            },
+        ).execute()
+    except Exception as error:
+        raw = str(error).lower()
+        if (
+            "record_public_site_visit_safe" in raw
+            or "site_visit_counters" in raw
+            or "pgrst202" in raw
+            or "schema cache" in raw
+        ):
+            raise api_error(
+                503,
+                "visit_tracking_upgrade_required",
+                "Visit tracking is temporarily unavailable.",
+            ) from error
+        raise
+    return {"success": True}
 
 
 @router.get("/sites/{subdomain}")

@@ -221,7 +221,7 @@ class ParserIsolationTests(unittest.TestCase):
         self.assertIn('security_opt: ["no-new-privileges:true"]', worker)
         self.assertIn("pids_limit: 64", worker)
         self.assertIn(
-            "${MADAR_STORAGE_ROOT:-../backend}/private_uploads:/app/private_uploads:ro",
+            "${MADAR_STORAGE_ROOT:-./backend}/private_uploads:/app/private_uploads:ro",
             worker,
         )
         self.assertIn("- parser_internal", worker)

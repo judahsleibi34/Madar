@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
   Home,
@@ -10,9 +10,11 @@ import {
   CalendarDays,
   Database,
   CreditCard,
+  Gift,
   FolderTree,
   FileSearch,
   Package,
+  MapPin,
   Palette,
   ShoppingBag,
   Tag,
@@ -170,6 +172,8 @@ export default function DashboardSidebar({
     DASHBOARD_ROUTES.ecommerceTags,
     DASHBOARD_ROUTES.ecommerceCategories,
     DASHBOARD_ROUTES.ecommerceProducts,
+    DASHBOARD_ROUTES.ecommerceDelivery,
+    DASHBOARD_ROUTES.ecommerceOrders,
     DASHBOARD_ROUTES.ecommerceTheme,
     DASHBOARD_ROUTES.ecommerceStore,
   ].some(
@@ -182,7 +186,7 @@ export default function DashboardSidebar({
     pathname: location.pathname,
   });
   const [ecommerceExpansion, setEcommerceExpansion] = useState({
-    open: false,
+    open: ecommerceRouteActive,
     pathname: location.pathname,
   });
   const [settingsExpansion, setSettingsExpansion] = useState({
@@ -286,6 +290,21 @@ export default function DashboardSidebar({
       label: t("sidebar.products", { defaultValue: "Products" }),
       path: DASHBOARD_ROUTES.ecommerceProducts,
       icon: Package,
+    },
+    {
+      label: t("sidebar.delivery", { defaultValue: "Delivery" }),
+      path: DASHBOARD_ROUTES.ecommerceDelivery,
+      icon: MapPin,
+    },
+    {
+      label: t("sidebar.orders", { defaultValue: "Orders" }),
+      path: DASHBOARD_ROUTES.ecommerceOrders,
+      icon: ClipboardList,
+    },
+    {
+      label: t("sidebar.loyalty", { defaultValue: "Loyalty" }),
+      path: DASHBOARD_ROUTES.ecommerceLoyalty,
+      icon: Gift,
     },
     {
       label: t("sidebar.storeTheme", { defaultValue: "Store theme" }),
@@ -562,23 +581,6 @@ export default function DashboardSidebar({
               icon={ShoppingBag}
               label={t("sidebar.ecommerce", { defaultValue: "Online Store" })}
               onClick={() => {
-                if (!ecommerceRouteActive) {
-                  setEcommerceExpansion({
-                    open: true,
-                    pathname: location.pathname,
-                  });
-                  setWorkspaceExpansion({
-                    open: false,
-                    pathname: location.pathname,
-                  });
-                  setSettingsExpansion({
-                    open: false,
-                    pathname: location.pathname,
-                  });
-                  goTo(DASHBOARD_ROUTES.ecommerceProducts);
-                  return;
-                }
-
                 const nextOpen = !ecommerceIsExpanded;
 
                 setEcommerceExpansion({
@@ -609,17 +611,19 @@ export default function DashboardSidebar({
                   const active = isActive(item.path);
 
                   return (
-                    <button
-                      type="button"
+                    <Link
+                      to={item.path}
                       key={item.path}
                       className={active ? "active" : ""}
-                      onClick={() => goTo(item.path)}
+                      onClick={() => {
+                        if (typeof onNavigate === "function") onNavigate();
+                      }}
                       title={item.label}
                       aria-current={active ? "page" : undefined}
                     >
                       <Icon size={16} aria-hidden="true" />
                       <span>{item.label}</span>
-                    </button>
+                    </Link>
                   );
                 })}
               </div>

@@ -92,7 +92,7 @@ class MonorepoDeploymentTests(unittest.TestCase):
         self.assertIn('"docker", "compose", "--project-name", f"madar-{slot}"', self.release_deploy)
         self.assertIn('"--project-directory", str(web)', self.release_deploy)
         self.assertIn('"--env-file", str(self.env_file)', self.release_deploy)
-        self.assertEqual(self.compose.count("${MADAR_ENV_FILE:-../.env}"), 4)
+        self.assertEqual(self.compose.count("${MADAR_ENV_FILE:-.env}"), 4)
         self.assertIn("candidate_image_identity_changed", self.release_deploy)
         self.assertIn("self._digest(tag)", self.release_deploy)
         self.assertIn("docker-compose.release.yml", self.release_deploy)
@@ -135,12 +135,20 @@ class MonorepoDeploymentTests(unittest.TestCase):
 
     def test_persistent_bind_mounts_keep_their_pre_move_host_paths(self):
         for path in (
-            "${MADAR_STORAGE_ROOT:-../backend}/avatar_uploads",
-            "${MADAR_STORAGE_ROOT:-../backend}/uploads",
-            "${MADAR_STORAGE_ROOT:-../backend}/private_uploads",
-            "${MADAR_STORAGE_ROOT:-../backend}/private_generated_charts",
+            "${MADAR_STORAGE_ROOT:-./backend}/avatar_uploads",
+            "${MADAR_STORAGE_ROOT:-./backend}/uploads",
+            "${MADAR_STORAGE_ROOT:-./backend}/private_uploads",
+            "${MADAR_STORAGE_ROOT:-./backend}/private_generated_charts",
         ):
             self.assertIn(path, self.compose)
+
+    def test_compose_defaults_match_the_explicit_web_project_directory(self):
+        self.assertEqual(COMPOSE.parent, WEB_ROOT)
+        self.assertIn('"--project-directory", str(web)', self.release_deploy)
+        self.assertNotIn("${MADAR_ENV_FILE:-../", self.compose)
+        self.assertNotIn("${MADAR_STORAGE_ROOT:-../", self.compose)
+        self.assertEqual((COMPOSE.parent / ".env").resolve(), WEB_ROOT / ".env")
+        self.assertEqual((COMPOSE.parent / "backend").resolve(), WEB_ROOT / "backend")
 
     def test_wrapper_keeps_git_operations_at_repository_root(self):
         self.assertIn('git -C "$REPO_ROOT" fetch', self.wrapper)
