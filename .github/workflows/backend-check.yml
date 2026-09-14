@@ -20,20 +20,13 @@ jobs:
           python3 web/scripts/check_migration_transitions.py
           python3 web/scripts/check_secret_hygiene.py
 
-      - name: Build locked backend test image
-        run: docker build --target test -t madar-backend-test web/backend
-
-      - name: Build Git-equipped CI-only backend image
+      - name: Build locked backend runtime and test images
         run: |
-          docker tag madar-backend-test madar-backend-runtime-test
+          docker build --target runtime -t madar-backend-runtime-test web/backend
+          docker build --target test -t madar-backend-test web/backend
 
-          printf '%s\n' \
-            'FROM madar-backend-runtime-test' \
-            'USER 0:0' \
-            'RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*' \
-            'USER 65534:65534' \
-            | docker build -t madar-backend-test -
-
+      - name: Verify Git is confined to the CI-only backend image
+        run: |
           docker run --rm madar-backend-runtime-test sh -ceu '
             test "$(id -u)" = "65534"
             test "$(id -g)" = "65534"
