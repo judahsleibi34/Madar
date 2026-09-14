@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 
 from data_analysis.ai.planner import AIPlannerError
 from data_analysis.routes import analysis_routes
-from tests.entitlement_test_support import installed_business_fixture
+from tests.entitlement_test_support import EntitlementTestState, installed_business_fixture
 
 
 _entitlement_fixture = installed_business_fixture(1, 2, extra_capabilities=("ai_analytics",))
@@ -313,6 +313,43 @@ class AIUsageRouteTests(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertEqual(self.finalizations, [])
         self.assertEqual(self.releases, ["request-1"])
+
+
+class TenantAICommercialBoundaryTests(unittest.TestCase):
+    def test_execution_profile_uses_current_tenant_capabilities(self):
+        state = (
+            EntitlementTestState()
+            .activate_plan(7, "forms")
+            .activate_plan(8, "business_plus")
+        )
+        with state.installed():
+            self.assertEqual(analysis_routes._resolve_ai_plan(7), "free")
+            self.assertEqual(analysis_routes._resolve_ai_plan(8), "pro")
+            state.activate_plan(8, "forms")
+            self.assertEqual(analysis_routes._resolve_ai_plan(8), "free")
+
+    def test_ai_addon_denied_before_dataset_or_provider_access(self):
+        state = EntitlementTestState().activate_plan(7, "business")
+        with (
+            state.installed(),
+            patch.object(
+                analysis_routes,
+                "require_active_tenant_user_id",
+                return_value=tenant_context(3, 7),
+            ),
+            patch.object(analysis_routes.data_services, "read_dataset") as dataset,
+            patch.object(
+                analysis_routes.ai_service,
+                "run_ai_analysis_on_dataframe",
+            ) as provider,
+        ):
+            response = build_client().post(
+                "/users/3/analysis/ai",
+                json={"input_path": "private.csv", "user_message": "Summarize"},
+            )
+        self.assertEqual(response.status_code,403)
+        dataset.assert_not_called()
+        provider.assert_not_called()
 
 
 if __name__ == "__main__":
