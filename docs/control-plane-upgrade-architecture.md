@@ -343,6 +343,41 @@ fabricate a new controller backup. Its controlled deployment promotes the
 application through the canonical immutable release machinery, runs same-SHA
 validation, and restores the timer's captured state.
 
+## DB-ahead recovery operation
+
+`--recover-current-schema` is an explicit operator mode and is absent from
+`madar-auto-deploy`. It uses a distinct current-production preflight because
+the ordinary preflight correctly refuses an incompatible serving binary. This
+special preflight accepts only a clean and coherent known-good/proxy origin,
+an auto-deploy timer already disabled, an actual live schema strictly above
+the serving binary maximum, and no degradation beyond schema incompatibility
+plus the known legacy notification-queue classification.
+
+The paired `--rehearsal-attestation` file must be absolute, nonsymlinked,
+root-owned, mode 0400 or 0600, no older than seven days, and bind the exact
+approved SHA and live schema to all required backend, frontend, browser,
+database, worker, RLS, and readiness checks. Candidate staging then validates
+the separate exact-schema, no-migration recovery contract before any
+installation or application deployment.
+
+The installed controller invokes `madar-release-deploy <SHA>
+--recover-current-schema` only through the same one-use systemd credential and
+interlock boundary used by governed upgrades. The release state machine stages
+the inactive slot with queue consumers disabled, performs a no-overlap worker
+handoff, rechecks state/schema/backup identity, uses the existing atomic switch,
+and builds a second compatible bridge slot before success. After routing has
+changed, failure handling detects the actual routed candidate even if durable
+known-good finalization was interrupted and records forward-repair semantics.
+It never routes to the incompatible historical release.
+
+Because an installed controller that predates this mode cannot parse the new
+flags, the first use requires the already-documented exact-SHA, root-protected
+manual controller bootstrap. That bootstrap installs controller code only; it
+does not switch application traffic or alter schema. The separately reviewed
+recovery command then performs the application transition. Exact commands and
+abort conditions are in
+[`schema-96-forward-recovery-runbook.md`](schema-96-forward-recovery-runbook.md).
+
 ## Implementation and test map
 
 - orchestration, staging, audit, attestation, failure boundaries:

@@ -157,11 +157,13 @@ class DockerGitOperations:
         state_root: Path,
         env_file: Path,
         compatibility: Compatibility,
+        metadata_filename: str = "release.json",
     ):
         self.repo = repo
         self.state_root = state_root
         self.env_file = env_file
         self.compatibility = compatibility
+        self.metadata_filename = metadata_filename
         self.release_root: Path | None = None
 
     @staticmethod
@@ -305,6 +307,63 @@ class DockerGitOperations:
             raise RuntimeError("schema_state_missing")
         return int(rows[0]["schema_version"])
 
+    def current_traffic_slot(self) -> str:
+        path = Path(os.environ["MADAR_ACTIVE_UPSTREAMS_FILE"]).resolve()
+        if not path.is_file() or path.is_symlink():
+            raise RuntimeError("active_proxy_target_invalid")
+        content = path.read_text(encoding="utf-8")
+        for slot, ports in SLOT_PORTS.items():
+            expected = (
+                f"upstream madar_backend_active {{ server 127.0.0.1:{ports['backend']}; }}\n"
+                f"upstream madar_frontend_active {{ server 127.0.0.1:{ports['frontend']}; }}\n"
+            )
+            if content == expected:
+                return slot
+        raise RuntimeError("active_proxy_target_unknown")
+
+    def validate_recovery_backup(self, schema: int) -> dict:
+        """Require a fresh local backup and its read-only verified Node 1 copy."""
+
+        root = Path(os.environ["MADAR_BACKUP_DIR"]).resolve()
+        marker = Path(os.environ["MADAR_BACKUP_FRESHNESS_MARKER"]).resolve()
+        scripts = WEB_ROOT / "scripts"
+        latest = Path(self.run(
+            [sys.executable, str(scripts / "backup_support.py"), "latest", str(marker)],
+            capture=True,
+        )).resolve()
+        if latest.parent != root or not latest.is_dir() or latest.is_symlink():
+            raise RuntimeError("recovery_backup_path_invalid")
+        try:
+            manifest = json.loads((latest / "manifest.json").read_text(encoding="utf-8"))
+            backup_schema = int((manifest.get("database") or {})["schema_version"])
+        except (OSError, ValueError, KeyError, TypeError) as error:
+            raise RuntimeError("recovery_backup_manifest_invalid") from error
+        if backup_schema != schema:
+            raise RuntimeError("recovery_backup_schema_mismatch")
+        raw = self.run(
+            [sys.executable, str(scripts / "replicate_latest_node1.py"), "--verify-only"],
+            capture=True,
+        )
+        try:
+            node1 = json.loads(raw)
+        except ValueError as error:
+            raise RuntimeError("recovery_node1_receipt_invalid") from error
+        if node1.get("status") != "verified_existing" or node1.get("backup_id") != latest.name:
+            raise RuntimeError("recovery_node1_receipt_invalid")
+        marker_state = Path("/var/lib/madar/backup-state/latest.json")
+        try:
+            published = json.loads(marker_state.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as error:
+            raise RuntimeError("recovery_backup_state_invalid") from error
+        if published.get("verified") is not True or published.get("backup_id") != latest.name:
+            raise RuntimeError("recovery_backup_state_invalid")
+        return {
+            "backup_id": latest.name,
+            "schema": schema,
+            "manifest_sha256": published.get("manifest_sha256"),
+            "node1_sha256sums_sha256": node1.get("sha256sums_sha256"),
+        }
+
     def _environment(
         self, sha: str, slot: str, images: dict[str, str], *, workers_active: bool = False,
     ) -> dict[str, str]:
@@ -377,7 +436,7 @@ class DockerGitOperations:
             raise RuntimeError("release_source_not_prepared")
 
         candidate_compatibility = Compatibility.load(
-            self.release_root / "web/deployment/releases/release.json"
+            self.release_root / "web/deployment/releases" / self.metadata_filename
         )
         if candidate_compatibility != self.compatibility:
             raise RuntimeError("control_plane_release_contract_mismatch")
@@ -1046,6 +1105,46 @@ def _attest_migration_backup(
         raise RuntimeError("automatic_migration_backup_identity_mismatch")
 
 
+def _establish_compatible_migration_fallback(
+    *, sha: str, slot: str, schema: int, state_root: Path,
+    operations: DockerGitOperations,
+) -> dict:
+    """Replace the old inactive runtime with the accepted bridge itself."""
+
+    state_file = state_root / "state.json"
+    state = _json_file(state_file, "release_state_missing_or_invalid")
+    known_good = state.get("known_good_release") or {}
+    if known_good.get("sha") != sha or known_good.get("slot") != slot:
+        raise RuntimeError("migration_fallback_active_identity_mismatch")
+    fallback_slot = "green" if slot == "blue" else "blue"
+    existing = state.get("compatible_fallback_release") or {}
+    if (
+        existing.get("sha") == sha
+        and existing.get("slot") == fallback_slot
+        and int(existing.get("schema", -1)) == schema
+    ):
+        operations.validate_candidate(sha, fallback_slot)
+        return existing
+    images = known_good.get("images") or {}
+    operations.start_candidate(sha, fallback_slot, images)
+    operations.validate_candidate(sha, fallback_slot)
+    if operations.schema_version() != schema:
+        raise RuntimeError("migration_fallback_schema_changed")
+    fallback = {
+        "sha": sha,
+        "slot": fallback_slot,
+        "images": images,
+        "schema": schema,
+        "schema_compatible_min": operations.compatibility.schema_min,
+        "schema_compatible_max": operations.compatibility.schema_max,
+        "workers_active": False,
+        "established_at": utc_now().isoformat(),
+    }
+    state["compatible_fallback_release"] = fallback
+    atomic_json(state_file, state)
+    return fallback
+
+
 def automatic_migrate_known_good(
     *, sha: str, state_root: Path, compatibility: Compatibility,
     operations: DockerGitOperations,
@@ -1328,6 +1427,13 @@ def automatic_migrate_known_good(
         _attest_migration_backup(
             backup, release_sha=sha, source_schema=source_schema,
         )
+        fallback = _establish_compatible_migration_fallback(
+            sha=sha,
+            slot=slot,
+            schema=current_schema,
+            state_root=state_root,
+            operations=operations,
+        )
         executor = LockedMigrationExecutor(
             connection_factory=lambda: psycopg.connect(
                 os.getenv("MADAR_MIGRATION_DATABASE_URL", "")
@@ -1347,6 +1453,19 @@ def automatic_migrate_known_good(
         refresh_event = refresh_active_workers(
             sha=sha, slot=slot, state_root=state_root, operations=operations,
         )
+        operations.validate_candidate(sha, str(fallback["slot"]))
+        state_after = _json_file(
+            state_file, "release_state_missing_or_invalid"
+        )
+        persisted_fallback = state_after.get("compatible_fallback_release") or {}
+        if (
+            persisted_fallback.get("sha") != sha
+            or persisted_fallback.get("slot") != fallback.get("slot")
+        ):
+            raise RuntimeError("migration_fallback_state_missing")
+        persisted_fallback["schema"] = target_schema
+        persisted_fallback["validated_at"] = utc_now().isoformat()
+        atomic_json(state_file, state_after)
         result = {
             "release_sha": sha,
             "source_schema": source_schema,
@@ -1395,6 +1514,10 @@ def main() -> int:
         help="Safely apply environment changes to the exact active known-good release",
     )
     mode.add_argument("--automatic-migrate", action="store_true", help="Run an opted-in migration only after this SHA is known-good")
+    mode.add_argument(
+        "--recover-current-schema", action="store_true",
+        help="Explicit forward-only recovery when every retained release is schema-incompatible",
+    )
     parser.add_argument("--slot", choices=tuple(SLOT_PORTS), default="green")
     args = parser.parse_args()
     normalized_sha = args.sha.lower()
@@ -1409,8 +1532,32 @@ def main() -> int:
         load_active_runtime_environment(env_file)
     else:
         load_environment_file(env_file)
-    compatibility = Compatibility.load(WEB_ROOT / "deployment/releases/release.json")
-    operations = DockerGitOperations(repo, state_root, env_file, compatibility)
+    metadata_path = WEB_ROOT / "deployment/releases/release.json"
+    if args.recover_current_schema:
+        metadata_path = WEB_ROOT / "deployment/releases/schema-96-recovery.json"
+    compatibility = Compatibility.load(metadata_path)
+    operations = DockerGitOperations(
+        repo, state_root, env_file, compatibility,
+        metadata_filename=metadata_path.name,
+    )
+    if args.recover_current_schema:
+        metadata = _json_file(
+            metadata_path,
+            "recovery_release_metadata_invalid",
+        )
+        if (
+            metadata.get("migration_policy") != "schema-recovery-no-migration"
+            or "migration_manifest" in metadata
+        ):
+            raise RuntimeError("recovery_release_migration_contract_invalid")
+        deployer = ReleaseDeployer(
+            state_root=state_root,
+            compatibility=compatibility,
+            operations=operations,
+        )
+        result = deployer.recover_current_schema(normalized_sha)
+        print(json.dumps(result, indent=2, sort_keys=True))
+        return 0
     if args.automatic_migrate:
         with deployment_lock(state_root):
             result = automatic_migrate_known_good(

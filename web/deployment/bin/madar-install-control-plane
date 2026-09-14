@@ -51,6 +51,7 @@ declare -a tracked_files=(
   lib/migration_executor.py
   lib/release_deployer.py
   releases/release.json
+  releases/schema-96-recovery.json
   proxy/docker-compose.yml
   proxy/nginx.conf
 )

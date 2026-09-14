@@ -950,10 +950,10 @@ of this section and the architecture document.
 
 ## Maintenance validation safety
 
-Compose retains the legacy repository-root environment and persistent-file
-fallbacks (`../.env` and `../backend` relative to `web`). The governed deployer
-always overrides both with the canonical absolute configuration and storage
-paths. Frontend-only changes must not relocate these fallback data roots.
+Compose uses project-directory-relative development fallbacks (`.env` and
+`./backend` relative to `web`). The governed deployer always overrides both
+with the canonical absolute configuration and storage paths. Frontend-only
+changes must not relocate these fallback data roots.
 Authenticated browser rehearsals reject `madarportal.com` and all subdomains
 without relying on an optional operator-supplied production-host list.
 
@@ -966,3 +966,45 @@ configuration, credentials, grants, or full application readiness.
 Publication validation also requires standalone form IDs to be unique across
 the tenant lookup; bound-project preference cannot hide a duplicate and a
 truncated lookup cannot establish uniqueness.
+
+## Exceptional current-schema forward recovery
+
+An out-of-band schema advance can leave the live database newer than every
+retained serving binary. Ordinary deployment must continue to reject that
+state. It may be repaired only with the explicit
+`--recover-current-schema --rehearsal-attestation` control-plane operation and
+the separate `schema-96-recovery.json` contract. Neither auto-deploy nor the
+ordinary release manifest selects this operation.
+
+The recovery contract is exact: compatible minimum, maximum, target, and both
+rollback bounds all equal the live schema; migration class is `none`; and no
+migration manifest is allowed. The operator supplies an exact `origin/main`
+SHA and a recent, root-owned, mode-0600 rehearsal attestation for that same SHA
+and schema. Current preflight requires the database to be strictly ahead of the
+serving release, the only permitted readiness degradation to be schema plus an
+optional legacy notification-queue result, and auto-deploy to already be
+disabled.
+
+The release controller then revalidates a fresh complete local backup, the
+matching read-only Node 1 replica, immutable image identities, and the pinned
+schema. Candidate queue consumers remain off while the inactive slot is
+checked. Old consumers are stopped before candidate consumers start; they
+never overlap. The database, release state, proxy target, candidate, and backup
+identity are checked again immediately before the governed atomic traffic
+switch. No migration or schema write occurs.
+
+After the switch, the old binary is not a valid rollback target. Any failure is
+durably classified as forward repair and traffic is never sent back to the
+incompatible release. Success requires the former active slot to be recreated
+and validated with the same exact-schema bridge, workers inactive, before it is
+recorded as `compatible_fallback_release`. The former release is retained only
+as `incompatible_pre_recovery_release` forensic history. A same-SHA rerun is
+byte-idempotent.
+
+Normal forward migrations establish an inactive copy of the accepted bridge
+before applying SQL and revalidate that copy at the target schema after worker
+refresh. Consequently the post-migration state has a proven compatible
+fallback rather than only an incompatible historical slot.
+
+The operator procedure is
+[`schema-96-forward-recovery-runbook.md`](schema-96-forward-recovery-runbook.md).

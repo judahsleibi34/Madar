@@ -53,6 +53,19 @@ class MonorepoDeploymentTests(unittest.TestCase):
         self.assertIn('MADAR_PROVIDER_BACKUP_REQUIRED=true', unit)
         self.assertIn('OnFailure=madar-ops-alert@%n.service', unit)
 
+    def test_schema_recovery_is_installed_but_not_auto_deploy_reachable(self):
+        installer = INSTALLER.read_text(encoding="utf-8")
+        automatic = WRAPPER.read_text(encoding="utf-8")
+        release = RELEASE_DEPLOY.read_text(encoding="utf-8")
+        recovery_contract = (
+            WEB_ROOT / "deployment/releases/schema-96-recovery.json"
+        ).read_text(encoding="utf-8")
+        self.assertIn("releases/schema-96-recovery.json", installer)
+        self.assertIn("--recover-current-schema", release)
+        self.assertNotIn("--recover-current-schema", automatic)
+        self.assertIn('"migration_class": "none"', recovery_contract)
+        self.assertNotIn("migration_manifest", recovery_contract)
+
     def setUp(self):
         self.deploy = DEPLOY.read_text(encoding="utf-8")
         self.wrapper = WRAPPER.read_text(encoding="utf-8")

@@ -80,6 +80,8 @@ class Operations(Protocol):
     def switch_traffic(self, slot: str) -> None: ...
     def observe(self, sha: str, slot: str) -> None: ...
     def stop_candidate(self, slot: str) -> None: ...
+    def current_traffic_slot(self) -> str: ...
+    def validate_recovery_backup(self, schema: int) -> dict[str, Any]: ...
 
 
 class ReleaseDeployer:
@@ -295,3 +297,294 @@ class ReleaseDeployer:
                 state.pop("in_progress_release", None)
                 self._record(state, release)
                 raise
+
+    def recover_current_schema(self, sha: str) -> dict[str, Any]:
+        """Replace an incompatible serving release without changing schema.
+
+        This path is intentionally separate from ordinary deployment.  Its
+        caller is the root-owned recovery coordinator, which supplies the
+        one-use control-plane authorization.  The candidate contract is pinned
+        to one schema and cannot carry a migration.
+        """
+
+        if len(sha) != 40 or any(char not in "0123456789abcdef" for char in sha):
+            raise ValueError("candidate must be a full lowercase Git SHA")
+        if not (
+            self.compatibility.schema_min
+            == self.compatibility.schema_max
+            == self.compatibility.target_schema
+        ):
+            raise RuntimeError("recovery_candidate_not_exact_schema")
+        if self.compatibility.migration_class != "none":
+            raise RuntimeError("recovery_candidate_requires_migration")
+
+        self.state_root.mkdir(parents=True, exist_ok=True, mode=0o700)
+        with self.lock_file.open("a+", encoding="utf-8") as lock:
+            try:
+                fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError as error:
+                raise RuntimeError("deployment_already_running") from error
+
+            state = self._state()
+            schema = self.operations.schema_version()
+            if schema != self.compatibility.target_schema:
+                raise RuntimeError("recovery_live_schema_changed")
+            traffic = self.operations.current_traffic_slot()
+            known_good = state.get("known_good_release")
+
+            fallback = state.get("compatible_fallback_release")
+            if (
+                isinstance(known_good, dict)
+                and known_good.get("sha") == sha
+                and known_good.get("slot") == traffic
+                and int(known_good.get("schema", -1)) == schema
+                and isinstance(fallback, dict)
+                and fallback.get("sha") == sha
+                and fallback.get("slot") in {"blue", "green"} - {traffic}
+                and int(fallback.get("schema", -1)) == schema
+            ):
+                self.operations.verify_source(sha)
+                self.operations.validate_candidate(sha, traffic)
+                self.operations.validate_candidate(sha, str(fallback["slot"]))
+                if self.operations.schema_version() != schema:
+                    raise RuntimeError("recovery_live_schema_changed")
+                return {
+                    "release_sha": sha,
+                    "status": "already_recovered",
+                    "phase": "complete",
+                    "schema": schema,
+                    "traffic_target": traffic,
+                    "fallback_slot": fallback["slot"],
+                }
+
+            interrupted = state.get("in_progress_release")
+            if interrupted:
+                if not isinstance(interrupted, dict) or not interrupted.get("schema_recovery"):
+                    raise RuntimeError("unrelated_release_in_progress")
+                if interrupted.get("release_sha") != sha:
+                    raise RuntimeError("different_schema_recovery_in_progress")
+                previous_slot = str(interrupted.get("previous_traffic_target") or "")
+                candidate_slot = str(interrupted.get("candidate_slot") or "")
+                if {previous_slot, candidate_slot} != {"blue", "green"}:
+                    raise RuntimeError("interrupted_recovery_state_invalid")
+                images = interrupted.get("images") or {}
+                if traffic == candidate_slot:
+                    # The schema-compatible candidate is already serving.  A
+                    # database rollback and a switch to the old incompatible
+                    # release are both forbidden; finish forward from here.
+                    self.operations.verify_source(sha)
+                    self.operations.validate_candidate(sha, candidate_slot)
+                    return self._finish_schema_recovery(
+                        state=state,
+                        release=interrupted,
+                        sha=sha,
+                        schema=schema,
+                        candidate_slot=candidate_slot,
+                        previous_slot=previous_slot,
+                        images=images,
+                    )
+                if traffic != previous_slot:
+                    raise RuntimeError("interrupted_recovery_traffic_unknown")
+                previous = interrupted.get("previous_known_good_release")
+                if isinstance(previous, dict):
+                    self.operations.restore_workers(previous)
+                self.operations.deactivate_workers(
+                    {"sha": sha, "slot": candidate_slot, "images": images}
+                )
+                self.operations.stop_candidate(candidate_slot)
+                state.pop("in_progress_release", None)
+                atomic_json(self.state_file, state)
+
+            if state.get("rollback_failure"):
+                raise RuntimeError("release_rollback_failure_present")
+            known_good = state.get("known_good_release")
+            previous_slot = str(state.get("active_slot") or "")
+            if (
+                not isinstance(known_good, dict)
+                or known_good.get("slot") != previous_slot
+                or previous_slot not in {"blue", "green"}
+                or known_good.get("sha") == sha
+            ):
+                raise RuntimeError("recovery_origin_state_invalid")
+            if traffic != previous_slot:
+                raise RuntimeError("recovery_origin_traffic_mismatch")
+
+            backup = self.operations.validate_recovery_backup(schema)
+            candidate_slot = "green" if previous_slot == "blue" else "blue"
+            release = {
+                "release_sha": sha,
+                "candidate_slot": candidate_slot,
+                "previous_known_good_release": dict(known_good),
+                "previous_traffic_target": previous_slot,
+                "schema_recovery": True,
+                "schema": schema,
+                "backup_attestation": backup,
+                "images": {},
+                "started_at": utc_now().isoformat(),
+                "status": "running",
+                "phase": "source_validation",
+            }
+            self._checkpoint(state, release)
+            switched = False
+            workers_cut_over = False
+            try:
+                self.operations.verify_source(sha)
+                release["phase"] = "immutable_build"
+                self._checkpoint(state, release)
+                images = self.operations.build(sha, candidate_slot)
+                if any(
+                    "@sha256:" not in str(images.get(name) or "")
+                    for name in ("backend", "frontend", "worker")
+                ):
+                    raise RuntimeError("immutable_image_digest_missing")
+                release["images"] = images
+                self._checkpoint(state, release)
+                if self.operations.schema_version() != schema:
+                    raise RuntimeError("recovery_live_schema_changed")
+                release["phase"] = "preflight"
+                self._checkpoint(state, release)
+                self.operations.preflight(sha, candidate_slot, images, schema)
+                release["phase"] = "candidate_start_workers_inactive"
+                self._checkpoint(state, release)
+                self.operations.start_candidate(sha, candidate_slot, images)
+                self.operations.validate_candidate(sha, candidate_slot)
+
+                # Queue consumers never overlap.  The old release continues
+                # serving while its consumers are stopped and the candidate's
+                # consumers are proven before the atomic traffic transition.
+                release["phase"] = "worker_cutover"
+                self._checkpoint(state, release)
+                self.operations.deactivate_workers(known_good)
+                try:
+                    self.operations.activate_workers(sha, candidate_slot, images)
+                    self.operations.validate_candidate(sha, candidate_slot)
+                    workers_cut_over = True
+                    release["workers_cut_over"] = True
+                    self._checkpoint(state, release)
+                except Exception:
+                    self.operations.deactivate_workers(
+                        {"sha": sha, "slot": candidate_slot, "images": images}
+                    )
+                    self.operations.restore_workers(known_good)
+                    raise
+
+                release["phase"] = "final_pre_switch_attestation"
+                self._checkpoint(state, release)
+                current = self._state()
+                if (
+                    current.get("active_slot") != previous_slot
+                    or (current.get("known_good_release") or {}).get("sha")
+                    != known_good.get("sha")
+                    or self.operations.current_traffic_slot() != previous_slot
+                ):
+                    raise RuntimeError("recovery_pre_switch_state_changed")
+                if self.operations.validate_recovery_backup(schema) != backup:
+                    raise RuntimeError("recovery_pre_switch_backup_changed")
+                # Pin again after the potentially remote backup check so a
+                # concurrent schema change during that check cannot slip past.
+                if self.operations.schema_version() != schema:
+                    raise RuntimeError("recovery_pre_switch_state_changed")
+                self.operations.validate_candidate(sha, candidate_slot)
+
+                release["phase"] = "traffic_switch"
+                release["forward_only_after_switch"] = True
+                self._checkpoint(state, release)
+                self.operations.switch_traffic(candidate_slot)
+                switched = True
+                release["phase"] = "post_switch_validation"
+                self._checkpoint(state, release)
+                self.operations.observe(sha, candidate_slot)
+                if self.operations.schema_version() != schema:
+                    raise RuntimeError("recovery_live_schema_changed_after_switch")
+                return self._finish_schema_recovery(
+                    state=state,
+                    release=release,
+                    sha=sha,
+                    schema=schema,
+                    candidate_slot=candidate_slot,
+                    previous_slot=previous_slot,
+                    images=images,
+                )
+            except Exception as error:
+                release.update(
+                    status="failed_forward_repair_required" if switched else "failed",
+                    completed_at=utc_now().isoformat(),
+                    failure_reason=type(error).__name__,
+                    failure_code=str(error)[:200],
+                )
+                if switched:
+                    # The former target cannot run the current schema.  Keep
+                    # the candidate and checkpoint for an explicit forward
+                    # recovery rerun; never switch traffic backward.
+                    release["rollback"] = "forbidden_old_target_schema_incompatible"
+                    state["in_progress_release"] = dict(release)
+                    atomic_json(self.state_file, state)
+                    raise RuntimeError(
+                        "recovery_post_switch_forward_repair_required"
+                    ) from error
+                release["rollback"] = "not_required_old_traffic_untouched"
+                if workers_cut_over:
+                    self.operations.deactivate_workers(
+                        {"sha": sha, "slot": candidate_slot, "images": release.get("images") or {}}
+                    )
+                    self.operations.restore_workers(known_good)
+                self.operations.stop_candidate(candidate_slot)
+                state.pop("in_progress_release", None)
+                self._record(state, release)
+                raise
+
+    def _finish_schema_recovery(
+        self, *, state: dict[str, Any], release: dict[str, Any], sha: str,
+        schema: int, candidate_slot: str, previous_slot: str,
+        images: dict[str, str],
+    ) -> dict[str, Any]:
+        if self.operations.current_traffic_slot() != candidate_slot:
+            raise RuntimeError("recovery_candidate_not_serving")
+        if self.operations.schema_version() != schema:
+            raise RuntimeError("recovery_live_schema_changed")
+        self.operations.validate_candidate(sha, candidate_slot)
+
+        release["phase"] = "compatible_fallback_establishment"
+        self._checkpoint(state, release)
+        self.operations.start_candidate(sha, previous_slot, images)
+        self.operations.validate_candidate(sha, previous_slot)
+        if (
+            self.operations.current_traffic_slot() != candidate_slot
+            or self.operations.schema_version() != schema
+        ):
+            raise RuntimeError("recovery_state_changed_during_fallback")
+
+        old_release = release.get("previous_known_good_release")
+        known_good = {
+            "sha": sha,
+            "slot": candidate_slot,
+            "images": images,
+            "schema": schema,
+            "schema_compatible_min": self.compatibility.schema_min,
+            "schema_compatible_max": self.compatibility.schema_max,
+        }
+        compatible_fallback = {
+            "sha": sha,
+            "slot": previous_slot,
+            "images": images,
+            "schema": schema,
+            "schema_compatible_min": self.compatibility.schema_min,
+            "schema_compatible_max": self.compatibility.schema_max,
+            "workers_active": False,
+        }
+        release.update(
+            status="known_good",
+            phase="complete",
+            completed_at=utc_now().isoformat(),
+            traffic_target=candidate_slot,
+            fallback_slot=previous_slot,
+        )
+        state["active_slot"] = candidate_slot
+        state["known_good_release"] = known_good
+        state["compatible_fallback_release"] = compatible_fallback
+        state["incompatible_pre_recovery_release"] = old_release
+        state.pop("in_progress_release", None)
+        state.pop("rollback_failure", None)
+        state.setdefault("failed_releases", {}).pop(sha, None)
+        self._record(state, release)
+        return release

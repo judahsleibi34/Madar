@@ -57,6 +57,9 @@ class FakeOperations:
     def validate_candidate(self, sha: str, slot: str) -> None:
         self.events.append(f"validate:{sha}:{slot}")
 
+    def start_candidate(self, sha: str, slot: str, _images: dict) -> None:
+        self.events.append(f"fallback:{sha}:{slot}")
+
     def preflight(self, sha: str, slot: str, _images: dict, schema: int) -> None:
         self.events.append(f"preflight:{sha}:{slot}:{schema}")
 
