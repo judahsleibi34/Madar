@@ -42,7 +42,7 @@ services:
     tmpfs:
       - /tmp:rw,noexec,nosuid,size=256m
     env_file:
-      - ${MADAR_ENV_FILE:-../.env}
+      - ${MADAR_ENV_FILE:-.env}
     environment:
       APP_ENV: production
       MADAR_RELEASE_SHA: ${MADAR_RELEASE_SHA:-development}
@@ -148,14 +148,14 @@ services:
     ports:
       - "127.0.0.1:${MADAR_BACKEND_BIND_PORT:-8001}:8000"
     volumes:
-      - ${MADAR_STORAGE_ROOT:-../backend}/avatar_uploads:/app/avatar_uploads
+      - ${MADAR_STORAGE_ROOT:-./backend}/avatar_uploads:/app/avatar_uploads
       - type: bind
-        source: ${MADAR_STORAGE_ROOT:-../backend}/uploads
+        source: ${MADAR_STORAGE_ROOT:-./backend}/uploads
         target: /app/uploads
         bind:
           create_host_path: false
-      - ${MADAR_STORAGE_ROOT:-../backend}/private_uploads:/app/private_uploads
-      - ${MADAR_STORAGE_ROOT:-../backend}/private_generated_charts:/app/private_generated_charts
+      - ${MADAR_STORAGE_ROOT:-./backend}/private_uploads:/app/private_uploads
+      - ${MADAR_STORAGE_ROOT:-./backend}/private_generated_charts:/app/private_generated_charts
       - ./database:/app/database:ro
       - ./supabase:/app/supabase:ro
       - ./scripts:/scripts:ro
@@ -191,7 +191,7 @@ services:
       - /tmp:rw,noexec,nosuid,size=128m
     profiles: ["workers"]
     env_file:
-      - ${MADAR_ENV_FILE:-../.env}
+      - ${MADAR_ENV_FILE:-.env}
     environment:
       APP_ENV: production
       MADAR_RELEASE_SHA: ${MADAR_RELEASE_SHA:-development}
@@ -241,7 +241,7 @@ services:
     tmpfs:
       - /tmp:rw,noexec,nosuid,size=128m
     env_file:
-      - ${MADAR_ENV_FILE:-../.env}
+      - ${MADAR_ENV_FILE:-.env}
     environment:
       APP_ENV: production
       MADAR_RELEASE_SHA: ${MADAR_RELEASE_SHA:-development}
@@ -296,7 +296,7 @@ services:
     # generic worker deployment from starting the deletion consumer early.
     profiles: ["deletion-worker"]
     env_file:
-      - ${MADAR_ENV_FILE:-../.env}
+      - ${MADAR_ENV_FILE:-.env}
     environment:
       APP_ENV: production
       MADAR_RELEASE_SHA: ${MADAR_RELEASE_SHA:-development}
@@ -314,8 +314,8 @@ services:
       STRUCTURED_LOGS: ${STRUCTURED_LOGS:-true}
     command: ["python", "-m", "workers.data_deletion_worker"]
     volumes:
-      - ${MADAR_STORAGE_ROOT:-../backend}/private_uploads:/app/private_uploads
-      - ${MADAR_STORAGE_ROOT:-../backend}/private_generated_charts:/app/private_generated_charts
+      - ${MADAR_STORAGE_ROOT:-./backend}/private_uploads:/app/private_uploads
+      - ${MADAR_STORAGE_ROOT:-./backend}/private_generated_charts:/app/private_generated_charts
       - ./scripts:/scripts:ro
     depends_on:
       redis:
@@ -360,7 +360,7 @@ services:
       STRUCTURED_LOGS: ${STRUCTURED_LOGS:-true}
     command: ["python", "-m", "workers.parser_worker"]
     volumes:
-      - ${MADAR_STORAGE_ROOT:-../backend}/private_uploads:/app/private_uploads:ro
+      - ${MADAR_STORAGE_ROOT:-./backend}/private_uploads:/app/private_uploads:ro
     networks:
       - parser_internal
     healthcheck:
