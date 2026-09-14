@@ -3,6 +3,7 @@ import { ExternalLink, RefreshCw, Settings } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 
 import { fetchWebsiteSettings } from "../PageBuilder/services/PageBuilder.api";
+import { useCommerceI18n } from "../../utils/commerceI18n";
 
 const STOREFRONT_ORIGIN = String(
   import.meta.env.VITE_STOREFRONT_URL || import.meta.env.VITE_PUBLIC_APP_URL || "https://madarportal.com"
@@ -10,6 +11,7 @@ const STOREFRONT_ORIGIN = String(
 
 export default function EcommerceStorePage() {
   const location = useLocation();
+  const { t, locale, direction } = useCommerceI18n();
   const draftPreview = new URLSearchParams(location.search).get("preview") === "draft";
   const [website, setWebsite] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -25,7 +27,7 @@ export default function EcommerceStorePage() {
       })
       .catch((requestError) => {
         if (!cancelled) {
-          setError(requestError?.message || "Could not load website settings.");
+          setError(requestError?.message || t("admin.loadSettingsError"));
         }
       })
       .finally(() => {
@@ -34,7 +36,7 @@ export default function EcommerceStorePage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [t]);
 
   const subdomain = String(website?.subdomain || "").trim();
   const livePath = subdomain
@@ -52,48 +54,48 @@ export default function EcommerceStorePage() {
   const openUrl = draftPreview ? previewPath : liveUrl;
 
   return (
-    <main className="ecommerce-store-admin">
+    <main className="ecommerce-store-admin" dir={direction} lang={locale}>
       <header className="ecommerce-store-admin-header app-page-intro">
         <div>
-          <h1>{draftPreview ? "Draft preview" : "Published store"}</h1>
-          <p>{draftPreview ? "This private browser preview uses your unpublished design draft. Nothing here is live yet." : "Review the customer experience currently available in production."}</p>
+          <h1>{draftPreview ? t("admin.draftPreview") : t("admin.publishedStore")}</h1>
+          <p>{draftPreview ? t("admin.draftPreviewBody") : t("admin.publishedStoreBody")}</p>
         </div>
         {liveUrl && (
           <div className="ecommerce-store-admin-actions">
             <button type="button" onClick={() => { setFrameReady(false); setFrameVersion((value) => value + 1); }}>
               <RefreshCw size={16} aria-hidden="true" />
-              Refresh
+              {t("common.retry")}
             </button>
             <a href={openUrl} target="_blank" rel="noreferrer">
               <ExternalLink size={16} aria-hidden="true" />
-              {draftPreview ? "Open preview" : "Open production store"}
+              {draftPreview ? t("admin.openPreview") : t("admin.openPublishedStore")}
             </a>
           </div>
         )}
       </header>
 
-      {loading && <div className="ecommerce-store-page-skeleton" role="status" aria-label="Loading store preview"><i /><i /><i /></div>}
+      {loading && <div className="ecommerce-store-page-skeleton" role="status" aria-label={t("admin.loadingStorePreview")}><i /><i /><i /></div>}
       {!loading && error && (
         <div className="ecommerce-store-admin-state is-error">
-          <h2>Store preview unavailable</h2>
+          <h2>{t("admin.previewUnavailable")}</h2>
           <p>{error}</p>
         </div>
       )}
       {!loading && !error && !subdomain && (
         <div className="ecommerce-store-admin-state">
           <Settings size={30} aria-hidden="true" />
-          <h2>Set your store address first</h2>
-          <p>Choose a public store address in Settings before opening the live store.</p>
-          <Link to="/settings">Open store settings</Link>
+          <h2>{t("admin.setAddressFirst")}</h2>
+          <p>{t("admin.chooseAddressBeforeLive")}</p>
+          <Link to="/settings">{t("admin.openStoreSettings")}</Link>
         </div>
       )}
       {!loading && !error && subdomain && (
         <section className="ecommerce-store-frame-shell">
-          {!frameReady && <div className="ecommerce-store-frame-loading" role="status" aria-label="Loading storefront"><i /><i /><i /><i /></div>}
+          {!frameReady && <div className="ecommerce-store-frame-loading" role="status" aria-label={t("admin.loadingStorefront")}><i /><i /><i /><i /></div>}
           <iframe
             key={frameVersion}
             src={previewPath}
-            title={draftPreview ? "Draft online store preview" : "Published online store"}
+            title={draftPreview ? t("admin.draftStoreTitle") : t("admin.publishedStoreTitle")}
             className="ecommerce-store-frame"
             onLoad={() => setFrameReady(true)}
           />

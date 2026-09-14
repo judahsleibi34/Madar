@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Keep this tracked LF-only: it is executed by Linux from cross-platform checkouts.
 set -Eeuo pipefail
 
 readonly SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"

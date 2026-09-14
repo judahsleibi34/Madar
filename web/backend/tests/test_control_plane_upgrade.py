@@ -1,6 +1,8 @@
 import hashlib
 import importlib.util
+import contextlib
 import errno
+import io
 import json
 import os
 import stat
@@ -520,8 +522,13 @@ class ControlPlaneUpgradeTests(unittest.TestCase):
                     upgrade.normalize_sha(invalid)
 
     def test_cli_requires_effective_root(self):
-        with mock.patch.object(upgrade.os, "geteuid", return_value=1000):
+        stderr = io.StringIO()
+        with (
+            mock.patch.object(upgrade.os, "geteuid", return_value=1000),
+            contextlib.redirect_stderr(stderr),
+        ):
             self.assertEqual(upgrade.main([self.SHA]), 1)
+        self.assertIn("effective_root_required", stderr.getvalue())
 
     def test_candidate_must_be_fresh_main_and_descend_from_production(self):
         operations = object.__new__(upgrade.SystemOperations)

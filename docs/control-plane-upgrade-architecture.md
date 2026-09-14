@@ -336,3 +336,6 @@ validation, and restores the timer's captured state.
   `web/backend/tests/test_control_plane_upgrade.py`
 - integration coverage: `web/backend/tests/test_monorepo_deployment.py` and
   `test_schema_compatibility_control_plane.py`
+- post-terminal operator-only Supabase CLI ledger reconciliation:
+  `web/deployment/lib/supabase_ledger_reconciliation.py` (never invoked by the
+  privileged upgrade transaction itself)

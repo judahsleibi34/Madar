@@ -1,0 +1,12 @@
+* text=auto
+
+# Files executed or parsed inside Linux release tooling must never inherit a
+# Windows checkout's CRLF conversion.
+*.sh text eol=lf
+*.py text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+Dockerfile text eol=lf
+web/deployment/bin/* text eol=lf
+web/deployment/*.conf text eol=lf
+web/deployment/systemd/* text eol=lf

@@ -10,9 +10,11 @@ import {
   CalendarDays,
   Database,
   CreditCard,
+  Gift,
   FolderTree,
   FileSearch,
   Package,
+  MapPin,
   Palette,
   ShoppingBag,
   Tag,
@@ -170,6 +172,8 @@ export default function DashboardSidebar({
     DASHBOARD_ROUTES.ecommerceTags,
     DASHBOARD_ROUTES.ecommerceCategories,
     DASHBOARD_ROUTES.ecommerceProducts,
+    DASHBOARD_ROUTES.ecommerceDelivery,
+    DASHBOARD_ROUTES.ecommerceOrders,
     DASHBOARD_ROUTES.ecommerceTheme,
     DASHBOARD_ROUTES.ecommerceStore,
   ].some(
@@ -286,6 +290,21 @@ export default function DashboardSidebar({
       label: t("sidebar.products", { defaultValue: "Products" }),
       path: DASHBOARD_ROUTES.ecommerceProducts,
       icon: Package,
+    },
+    {
+      label: t("sidebar.delivery", { defaultValue: "Delivery" }),
+      path: DASHBOARD_ROUTES.ecommerceDelivery,
+      icon: MapPin,
+    },
+    {
+      label: t("sidebar.orders", { defaultValue: "Orders" }),
+      path: DASHBOARD_ROUTES.ecommerceOrders,
+      icon: ClipboardList,
+    },
+    {
+      label: t("sidebar.loyalty", { defaultValue: "Loyalty" }),
+      path: DASHBOARD_ROUTES.ecommerceLoyalty,
+      icon: Gift,
     },
     {
       label: t("sidebar.storeTheme", { defaultValue: "Store theme" }),

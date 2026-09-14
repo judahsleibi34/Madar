@@ -1,6 +1,6 @@
 # Automated database migration architecture
 
-Last implementation review: 2026-09-01
+Last implementation review: 2026-09-14
 
 ## 1. Purpose, authority, and scope
 
@@ -28,6 +28,7 @@ gate to make documentation true. The principal implementation is:
   - `MigrationManifest.load()`
   - `LockedMigrationExecutor.verify_migrations()`
   - `LockedMigrationExecutor.run()`
+- `web/deployment/lib/supabase_ledger_reconciliation.py`
 - `web/deployment/systemd/madar-auto-deploy.timer`
 - `web/scripts/backup_madar.sh` and `web/scripts/verify_backup.sh`
 
@@ -108,6 +109,7 @@ schema downgrade capability.
 | `automation.json` | Per-release migration coordinator state, retry deadline, backup path, phase, and final result. |
 | `execution.json` | Per-release SQL executor state, verified backup, observed schema, and per-migration status/checksum. |
 | `application_schema_state` | Authoritative live database schema for `contract_key='core'`; it decides whether a transition is pending or already committed. |
+| Operator ledger reconciler | After coordinator completion only, validates exact release/state/health/schema/checksum identity and records the already-applied version in Supabase's CLI ledger. It never runs migration SQL. |
 
 ## 5. Ordinary unattended call flow
 
@@ -443,6 +445,48 @@ post-migration worker/route failure. Operators must repair forward or perform a
 separately reviewed disaster-recovery procedure; they must not edit state files
 to manufacture success.
 
+### Supabase CLI ledger boundary
+
+The application schema row and Supabase CLI ledger are separate authorities.
+The automatic executor advances only `application_schema_state`; treating a
+direct SQL commit as if it also updated the CLI ledger previously caused
+`db push` to attempt replay. The remedy is deliberately post-terminal and
+operator-only. `supabase_ledger_reconciliation.py` refuses to act until the
+exact migration SHA and checksum, completed execution state, completed
+post-migration worker/stable-health state, and a live target-schema read all
+agree. It then uses Supabase's ledger repair operation for that one version,
+verifies the ledger result, and records a private atomic audit artifact.
+Idempotent replay observes the existing row. A source-schema database, missing
+health evidence, dirty/different release, checksum drift, missing predecessor,
+or a ledger already beyond target fails before mutation. No tenant/business
+table is queried or changed.
+
+### Current schema 097 bridge
+
+The current release contract accepts schema `81..97` and targets `97` with the
+pinned `migrations-097.json` manifest. Migration 097 is an expand-only 96-to-97
+transition. The application may be promoted on schema 96: catalog, variants,
+guest checkout, delivery, and order paths remain compatible while loyalty
+configuration and verified-customer reads fail closed. Identity binding, ledger
+processing, entitlement issuance, and discounts are enabled only after the
+schema-097 atomic functions exist. After advancement, the retained schema-96
+release is no longer an automatic rollback target.
+
+Loyalty configuration and customer reads fail closed on schema 96. Verified
+identity binding, ledger processing, entitlement issuance, and discounts are
+enabled only after migration 097. Schema 96 then ceases to be an automatic
+rollback target under the standard forward-repair policy.
+
+### Earlier schema 095 bridge
+
+The current release contract accepts schema `81..95` and targets `95` with the
+pinned `migrations-095.json` manifest. Migration 095 is an expand-only `94→95`
+transition. The application may be promoted on schema 94, but structured public
+checkout and merchant delivery/order operations fail closed until their RPCs and
+tables exist; catalog and settings reads keep their schema-94 bridge behavior.
+After the coordinator advances the database, the retained schema-94 release is
+no longer an automatic rollback target and
+the standard forward-repair policy applies.
 ## 16. Critical invariants and architecture-to-test map
 
 The following are the mandatory design invariants. Test names are from
@@ -459,7 +503,7 @@ The following are the mandatory design invariants. Test names are from
 | 7 | A completed schema transition is never blindly replayed after interruption. | Executor compares live schema to each `to_schema` and records `already_applied`; database schema is authoritative. The persistent timer and same-known-good branch re-enter that idempotent path after reboot. | `test_migration_executor.py :: test_resume_from_schema_82_skips_first_migration`; `test_automatic_migration_control_plane.py :: test_committed_transition_reuses_backup_without_old_release_rollback`; `test_monorepo_deployment.py :: test_auto_deploy_suppresses_bad_sha_and_refuses_uninitialized_state`, `test_timer_waits_after_completion_instead_of_retrying_immediately`. |
 | 8 | Once DB schema exceeds the previous release's compatibility maximum, automatic traffic rollback to it is prohibited. | Retained target is validated only at source before mutation; automatic migration has no switch/restore path and partial resume requires the original backup. | `test_committed_transition_reuses_backup_without_old_release_rollback`; `test_release_deployer.py :: test_retained_target_is_attested_against_observed_schema_before_start`. |
 | 9 | Reverse SQL migrations are not automatically attempted. | Manifests require one-step forward transitions; executor skips reached targets and has no reverse executor; coordinator failure semantics are forward-repair-only. | `test_committed_transition_reuses_backup_without_old_release_rollback`; `test_migration_executor.py :: test_resume_from_schema_82_skips_first_migration`. |
-| 10 | Final success after an executed transition waits for target schema, worker refresh, active application validation, and stable-route validation. | `automatic_migrate_known_good()` target check followed by actual `refresh_active_workers()`; transition completion write occurs last. A proven fresh `already_at_target` release has already passed promotion workers/observation and repeats stable validation before recording its nonexecuting result. | `test_successful_92_to_93_records_target_only_after_worker_and_route_validation`, `test_stable_route_failure_prevents_final_migration_success`, `test_prior_release_migrates_then_later_release_noops_idempotently`; `test_release_bootstrap.py :: test_post_migration_refresh_requires_exact_known_good_and_schema_83`. |
+| 10 | Final success after an executed transition waits for target schema, worker refresh, active application validation, and stable-route validation. | `automatic_migrate_known_good()` target check followed by actual `refresh_active_workers()`; transition completion write occurs last. A proven fresh `already_at_target` release has already passed promotion workers/observation and repeats stable validation before recording its nonexecuting result. | `test_successful_94_to_95_records_target_only_after_worker_and_route_validation`, `test_stable_route_failure_prevents_final_migration_success`, `test_prior_release_migrates_then_later_release_noops_idempotently`; `test_release_bootstrap.py :: test_post_migration_refresh_requires_exact_known_good_and_schema_83`. |
 | 11 | A later release accepted at an already-reached target neither borrows the prior release's backup nor bypasses a genuine current-release resume. | Fresh no-op requires no per-SHA state plus matching known-good and acceptance-time target observations. Any current-release state retains exact SHA/source backup attestation. | `test_prior_release_migrates_then_later_release_noops_idempotently`, `test_current_release_partial_state_without_backup_still_fails_closed`, `test_current_release_substituted_resume_backup_still_fails_closed`. |
 
 Static orchestration tests in `test_monorepo_deployment.py` additionally verify

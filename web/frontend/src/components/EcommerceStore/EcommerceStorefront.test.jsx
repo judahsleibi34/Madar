@@ -3,19 +3,27 @@ import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import EcommerceStorefront from "./EcommerceStorefront";
-import { fetchPublicEcommerceCatalog, fetchPublicEcommerceProduct, fetchPublicEcommerceProfile } from "../../services/ecommerceApi";
+import i18n from "../../i18n";
+import { fetchPublicEcommerceCatalog, fetchPublicEcommerceDeliveryAreas, fetchPublicEcommerceProduct, fetchPublicEcommerceProfile } from "../../services/ecommerceApi";
+import { fetchPublicEcommerceOrderConfirmation } from "../../services/ecommerceApi";
 
 vi.mock("../../services/ecommerceApi", () => ({
   fetchPublicEcommerceCatalog: vi.fn(),
+  fetchPublicEcommerceDeliveryAreas: vi.fn(),
+  fetchPublicEcommerceOrderConfirmation: vi.fn(),
+  fetchPublicEcommerceLoyalty: vi.fn(() => Promise.reject(new Error("guest"))),
   fetchPublicEcommerceProduct: vi.fn(),
   fetchPublicEcommerceProfile: vi.fn(),
   createPublicEcommerceOrder: vi.fn(),
+  reconcilePublicEcommerceCart: vi.fn(),
 }));
 
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
   localStorage.clear();
+  sessionStorage.clear();
+  i18n.changeLanguage("en");
   document.documentElement.lang = "en";
   document.documentElement.removeAttribute("dir");
   document.body.removeAttribute("dir");
@@ -51,6 +59,9 @@ describe("EcommerceStorefront", () => {
     }]));
     fetchPublicEcommerceCatalog.mockResolvedValue(catalog);
     fetchPublicEcommerceProfile.mockResolvedValue({ site: { brand: "Test Store" } });
+    fetchPublicEcommerceDeliveryAreas.mockResolvedValue({
+      areas: [{ id: "95000000-0000-0000-0000-000000000001", code: "ramallah", name_en: "Ramallah", name_ar: "رام الله" }],
+    });
 
     render(
       <MemoryRouter initialEntries={["/store/demo"]}>
@@ -341,4 +352,160 @@ describe("EcommerceStorefront", () => {
     expect(screen.getByLabelText("No product image")).toBeTruthy();
   });
 
+  it("reloads a durable tokenized order confirmation with delivery snapshots", async () => {
+    const token = "a".repeat(64);
+    fetchPublicEcommerceOrderConfirmation.mockResolvedValue({
+      site: { brand: "Test Store" },
+      order: {
+        id: "order-1", order_number: "MD-1001", created_at: "2026-09-12T10:00:00Z",
+        customer_name: "Buyer", customer_phone: "0590000000", customer_email: "buyer@example.com",
+        service_area_name_en: "Ramallah", street: "Main Street", building: "7", floor_apartment: "2A",
+        subtotal: "25", discount_total: "0", total: "25", currency: "ILS",
+        payment_status: "unpaid", status: "pending",
+      },
+      items: [{ id: "item-1", product_name: "Snapshot Product", sku: "SKU-1", quantity: 2, line_total: "25" }],
+      status_history: [{ new_status: "pending", created_at: "2026-09-12T10:00:00Z" }],
+    });
+
+    render(
+      <MemoryRouter initialEntries={[`/store/demo/confirmation/${token}`]}>
+        <Routes><Route path="/store/:subdomain/*" element={<EcommerceStorefront />} /></Routes>
+      </MemoryRouter>
+    );
+
+    expect(await screen.findByRole("heading", { level: 1, name: "MD-1001" })).toBeTruthy();
+    expect(screen.getByText("Snapshot Product")).toBeTruthy();
+    expect(screen.getByText(/Main Street/)).toBeTruthy();
+    expect(fetchPublicEcommerceOrderConfirmation).toHaveBeenCalledWith("demo", token);
+  });
+
+  it("switches the live storefront between English LTR and Arabic RTL", async () => {
+    fetchPublicEcommerceCatalog.mockImplementation((_subdomain, options) => Promise.resolve({
+      site: { brand: "Bilingual Store" },
+      catalog: {
+        categories: [], tags: [],
+        products: [{ id: "product-1", slug: "chair", name: options.locale === "ar" ? "كرسي" : "Chair", price: "20", currency: "ILS", in_stock: true, images: [] }],
+        pagination: { page: 1, pages: 1, total: 1, limit: 12 },
+      },
+    }));
+
+    render(
+      <MemoryRouter initialEntries={["/store/demo/catalog"]}>
+        <Routes><Route path="/store/:subdomain/*" element={<EcommerceStorefront />} /></Routes>
+      </MemoryRouter>
+    );
+
+    expect((await screen.findAllByText("Chair")).length).toBeGreaterThan(0);
+    expect(document.querySelector(".live-store").getAttribute("dir")).toBe("ltr");
+    fireEvent.click(screen.getByRole("button", { name: "العربية" }));
+
+    expect((await screen.findAllByText("كرسي")).length).toBeGreaterThan(0);
+    await waitFor(() => expect(document.querySelector(".live-store").getAttribute("dir")).toBe("rtl"));
+    expect(document.documentElement.getAttribute("dir")).toBe("rtl");
+    expect(document.body.getAttribute("dir")).toBe("rtl");
+    expect(screen.getAllByRole("link", { name: "المنتجات" }).length).toBeGreaterThan(0);
+    expect(fetchPublicEcommerceCatalog).toHaveBeenCalledWith("demo", expect.objectContaining({ locale: "ar" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "English" }));
+    expect((await screen.findAllByText("Chair")).length).toBeGreaterThan(0);
+    await waitFor(() => expect(document.querySelector(".live-store").getAttribute("dir")).toBe("ltr"));
+    expect(document.documentElement.getAttribute("dir")).toBe("ltr");
+  });
+
+  it("localizes Arabic checkout and service areas with safe English fallback", async () => {
+    await i18n.changeLanguage("ar");
+    localStorage.setItem("madar-store-cart:demo", JSON.stringify([{
+      id: "product-1", slug: "chair", name: "كرسي", quantity: 1, price: "20", currency: "ILS", images: [],
+    }]));
+    fetchPublicEcommerceProfile.mockResolvedValue({ site: { brand: "متجر" } });
+    fetchPublicEcommerceDeliveryAreas.mockResolvedValue({ areas: [
+      { id: "area-1", code: "ramallah", name_en: "Ramallah", name_ar: "رام الله" },
+      { id: "area-2", code: "fallback", name_en: "English fallback", name_ar: "" },
+    ] });
+
+    render(
+      <MemoryRouter initialEntries={["/store/demo/checkout"]}>
+        <Routes><Route path="/store/:subdomain/*" element={<EcommerceStorefront />} /></Routes>
+      </MemoryRouter>
+    );
+
+    expect(await screen.findByRole("heading", { level: 1, name: "إتمام الطلب" })).toBeTruthy();
+    const area = screen.getByLabelText("منطقة التوصيل");
+    await screen.findByRole("option", { name: "رام الله" });
+    expect(area.textContent).toContain("رام الله");
+    expect(area.textContent).toContain("English fallback");
+    expect(screen.getByRole("button", { name: "إرسال الطلب" })).toBeTruthy();
+    expect(document.querySelector(".live-store-checkout").closest(".live-store").getAttribute("dir")).toBe("rtl");
+  });
+
+  it("emits non-blocking PDP and cart events with stable commerce context", async () => {
+    const received = [];
+    const listener = (event) => received.push(event.detail);
+    window.addEventListener("madar:commerce", listener);
+    fetchPublicEcommerceProduct.mockResolvedValue({
+      site: { brand: "Store" },
+      product: { id: "product-1", slug: "chair", name: "Chair", price: "20", currency: "ILS", in_stock: true, images: [] },
+      category: null, tags: [], attributes: [], options: [], variants: [],
+    });
+
+    render(
+      <MemoryRouter initialEntries={["/store/demo/product/chair"]}>
+        <Routes><Route path="/store/:subdomain/*" element={<EcommerceStorefront />} /></Routes>
+      </MemoryRouter>
+    );
+
+    expect(await screen.findByRole("heading", { level: 1, name: "Chair" })).toBeTruthy();
+    await waitFor(() => expect(received.filter((item) => item.event === "view_item")).toHaveLength(1));
+    fireEvent.click(screen.getByRole("button", { name: "Add to cart" }));
+    fireEvent.click(screen.getByRole("button", { name: "Open cart, 1 item" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Remove Chair" }));
+
+    await waitFor(() => {
+      expect(received.map((item) => item.event)).toEqual(expect.arrayContaining(["view_item", "add_to_cart", "view_cart", "remove_from_cart"]));
+    });
+    expect(received.filter((item) => item.event === "view_item")).toHaveLength(1);
+    expect(received.find((item) => item.event === "add_to_cart").payload).toMatchObject({
+      product_id: "product-1", variant_id: null, quantity: 1, currency: "ILS", locale: "en",
+    });
+    window.removeEventListener("madar:commerce", listener);
+  });
+
+  it("renders localized announcement and configured featured order without changing price truth", async () => {
+    const received = [];
+    const listener = (event) => received.push(event.detail);
+    window.addEventListener("madar:commerce", listener);
+    fetchPublicEcommerceCatalog.mockResolvedValue({
+      site: {
+        brand: "Test Store",
+        growth: {
+          announcement_enabled: true,
+          announcement_text_en: "Free local delivery this week",
+          announcement_text_ar: "توصيل محلي مجاني هذا الأسبوع",
+          announcement_link: "/store/demo/catalog",
+          featured_product_ids: ["featured"],
+          featured_category_ids: [],
+        },
+      },
+      catalog: {
+        categories: [], tags: [],
+        products: [{ id: "latest", slug: "latest", name: "Latest", price: "5", currency: "USD", in_stock: true, images: [] }],
+        featured_products: [{ id: "featured", slug: "featured", name: "Featured Soap", price: "12", compare_at_price: "15", currency: "USD", in_stock: true, images: [] }],
+        featured_categories: [],
+        pagination: { page: 1, pages: 1, total: 2, limit: 12 },
+      },
+    });
+
+    render(<MemoryRouter initialEntries={["/store/demo"]}><Routes><Route path="/store/:subdomain/*" element={<EcommerceStorefront />} /></Routes></MemoryRouter>);
+
+    const announcement = await screen.findByText("Free local delivery this week");
+    expect(announcement.closest(".live-store-announcement")).toBeTruthy();
+    expect(screen.getAllByText("Featured Soap").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Latest")).toBeNull();
+    expect(screen.getAllByText("$12.00").length).toBeGreaterThan(0);
+    const announcementLink = screen.getByRole("link", { name: "Free local delivery this week" });
+    announcementLink.addEventListener("click", (event) => event.preventDefault(), { once: true });
+    fireEvent.click(announcementLink);
+    await waitFor(() => expect(received.map((item) => item.event)).toEqual(expect.arrayContaining(["promotion_view", "promotion_click"])));
+    window.removeEventListener("madar:commerce", listener);
+  });
 });

@@ -1,6 +1,7 @@
 import unittest
 from fastapi import HTTPException
 from pydantic import ValidationError
+from unittest.mock import patch
 
 from routes.ecommerce_routes import CatalogItemPayload, ProductPayload, StoreThemePayload, _clean_slug, _product_data
 from routes.public_site_routes import (
@@ -85,7 +86,8 @@ class EcommerceRoutesTests(unittest.TestCase):
             translations=translations("Summer Shirt"),
         )
 
-        data, _tag_ids = _product_data(payload, type("Context", (), {"tenant_id": 7})())
+        with patch("routes.ecommerce_routes._store_currency_for_tenant", return_value=None):
+            data, _tag_ids = _product_data(payload, type("Context", (), {"tenant_id": 7})())
 
         self.assertRegex(data["sku"], r"^SUMMER-SHIRT-[A-F0-9]{8}$")
 
@@ -148,7 +150,8 @@ class EcommerceRoutesTests(unittest.TestCase):
         ]
         payload = ProductPayload(translations=translations(), images=images)
 
-        data, _tag_ids = _product_data(payload, type("Context", (), {"tenant_id": 7})())
+        with patch("routes.ecommerce_routes._store_currency_for_tenant", return_value=None):
+            data, _tag_ids = _product_data(payload, type("Context", (), {"tenant_id": 7})())
 
         self.assertEqual(data["images"], images)
 
