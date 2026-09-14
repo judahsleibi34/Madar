@@ -9,6 +9,6 @@
     "rollback_compatible_max": 98
   },
   "migration_policy": "automatic-after-known-good-backup-first-forward-repair",
-  "notes": "Schema 098/099 commercial ledger bridge. Accept the exact release on schema 098, then create and verify the governed backup before migration 099. Seed unresolved tenants as review_required without granting access or inventing payments. Global commercial enforcement remains operator-disabled pending deliberate tenant review. After schema advances to 099, recover by forward repair; do not roll traffic back to schema-098-only binaries.",
+  "notes": "Schema 096-099 commercial ledger bridge. Accept the exact backwards-compatible release, then create and verify the governed backup before applying the contiguous 097, 098 and 099 migrations. Seed unresolved tenants as review_required without granting access or inventing payments. Global commercial enforcement remains operator-disabled pending deliberate tenant review. After schema advances, recover by forward repair; do not roll traffic back to a binary incompatible with the observed schema.",
   "migration_manifest": "migrations-099.json"
 }

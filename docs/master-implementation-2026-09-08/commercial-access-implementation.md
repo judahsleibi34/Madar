@@ -24,7 +24,7 @@ Shared builder routes additionally authorize document changes. Forms saves may r
 
 ## Rollout and recovery
 
-Schema 099 is an additive bridge compatible with schemas 081–099; rollback to the retained schema-098 application is valid only before migration. The exact-SHA governed controller upgrade is required for the new release metadata. The isolated migration runner applies the paired tree, validates RLS/grants, exercises real SQL concurrency/idempotency, dumps/restores a synthetic financial ledger and verifies schema/index/history invariants. No production commercial-ledger migration has been run for this change.
+Schema 099 is an additive bridge compatible with schemas 081–099. Its release manifest carries the contiguous 096→097→098→099 chain because production has not yet applied the two intervening mainline migrations. Rollback to the retained pre-migration application is valid only before migration. The exact-SHA governed controller upgrade is required for the new release metadata. The isolated migration runner applies the paired tree, validates RLS/grants, exercises real SQL concurrency/idempotency, dumps/restores a synthetic financial ledger and verifies schema/index/history invariants. No production commercial-ledger migration has been run for this change.
 
 Global COMMERCIAL_ENTITLEMENTS_ENFORCED remains disabled until every active production tenant has a deliberate reviewed state. Code readiness and global activation are separate. There are no CyberSource credentials, payment-provider calls, production database endpoint changes or customer connectors in this commercial change.
 

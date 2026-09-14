@@ -535,14 +535,16 @@ claim is represented as proven.
 
 The current release manifest is `web/deployment/releases/migrations-099.json`.
 The application is compatible with schemas 081 through 099; the target is 099.
-Before the target exists, the commercial snapshot service accepts the existing
-resolver only after independently verifying schema 098. Missing RPCs at any
-other schema fail closed. Manual-ledger administration remains unavailable
-until migration 099 completes.
+The release manifest contains the contiguous 096→097→098→099 chain so a host
+that has not deployed the intervening mainline releases cannot skip their
+schema changes. Before the target exists, the commercial snapshot service
+accepts the existing resolver only after independently verifying schema 098.
+Missing RPCs at any other schema fail closed. Manual-ledger administration
+remains unavailable until migration 099 completes.
 
-The existing controller first accepts the schema-098-compatible application,
+The existing controller first accepts the backwards-compatible application,
 creates and verifies its governed pre-migration backup, then applies the exact
-paired migration checksum and revalidates the serving release. Migration 099
+ordered migration checksums and revalidates the serving release. Migration 099
 adds the tenant review state and append-only manual financial/access ledger.
 It seeds review-required rows only: no tenant plan assignment, historical payment
 backfill, production enforcement activation, provider activation, or database
