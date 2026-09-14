@@ -427,6 +427,7 @@ class ReleaseDeployer:
             self._checkpoint(state, release)
             switched = False
             workers_cut_over = False
+            old_workers_may_be_inactive = False
             try:
                 self.operations.verify_source(sha)
                 release["phase"] = "immutable_build"
@@ -454,6 +455,11 @@ class ReleaseDeployer:
                 # consumers are proven before the atomic traffic transition.
                 release["phase"] = "worker_cutover"
                 self._checkpoint(state, release)
+                # A compose-level stop can fail after stopping only a subset
+                # of services.  Treat the retained workers as potentially
+                # inactive before issuing the operation so every pre-switch
+                # failure restores the complete retained worker set.
+                old_workers_may_be_inactive = True
                 self.operations.deactivate_workers(known_good)
                 try:
                     self.operations.activate_workers(sha, candidate_slot, images)
@@ -466,6 +472,7 @@ class ReleaseDeployer:
                         {"sha": sha, "slot": candidate_slot, "images": images}
                     )
                     self.operations.restore_workers(known_good)
+                    old_workers_may_be_inactive = False
                     raise
 
                 release["phase"] = "final_pre_switch_attestation"
@@ -527,6 +534,7 @@ class ReleaseDeployer:
                     self.operations.deactivate_workers(
                         {"sha": sha, "slot": candidate_slot, "images": release.get("images") or {}}
                     )
+                if old_workers_may_be_inactive:
                     self.operations.restore_workers(known_good)
                 self.operations.stop_candidate(candidate_slot)
                 state.pop("in_progress_release", None)

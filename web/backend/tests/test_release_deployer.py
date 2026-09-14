@@ -279,6 +279,18 @@ class SchemaRecoveryDeployerTests(unittest.TestCase):
                 self.deployer(root, operations).recover_current_schema(SHA)
         self.assertEqual(operations.traffic, "blue")
 
+    def test_partial_retained_worker_stop_failure_restores_before_abort(self):
+        with tempfile.TemporaryDirectory() as root:
+            self.seed(root)
+            operations = FakeOperations(fail_at="deactivate_workers", schema=96)
+            with self.assertRaisesRegex(
+                RuntimeError, "injected_deactivate_workers_failure"
+            ):
+                self.deployer(root, operations).recover_current_schema(SHA)
+        self.assertEqual(operations.traffic, "blue")
+        self.assertIn(("restore_workers", "blue"), operations.calls)
+        self.assertFalse(any(call[0] == "switch_traffic" for call in operations.calls))
+
     def test_missing_or_stale_backup_rejects_before_source_or_build(self):
         with tempfile.TemporaryDirectory() as root:
             self.seed(root)
