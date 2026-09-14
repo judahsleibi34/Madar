@@ -95,7 +95,7 @@ def run(
     release = load_json(web_root / "deployment/releases/release.json", "ledger_reconciliation_release_contract_invalid")
     target = int(release.get("schema", {}).get("target", -1))
     manifest_name = str(release.get("migration_manifest") or "")
-    if target != 97 or Path(manifest_name).name != manifest_name:
+    if target != 98 or Path(manifest_name).name != manifest_name:
         raise RuntimeError("ledger_reconciliation_release_contract_invalid")
     manifest = load_json(web_root / "deployment/releases" / manifest_name, "ledger_reconciliation_manifest_invalid")
     manifest_release = str(manifest.get("release_sha") or "")

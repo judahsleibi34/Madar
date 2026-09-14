@@ -6,6 +6,7 @@ import EcommerceStorefront from "./EcommerceStorefront";
 import i18n from "../../i18n";
 import { fetchPublicEcommerceCatalog, fetchPublicEcommerceDeliveryAreas, fetchPublicEcommerceProduct, fetchPublicEcommerceProfile } from "../../services/ecommerceApi";
 import { fetchPublicEcommerceOrderConfirmation } from "../../services/ecommerceApi";
+import { recordPublicSiteVisit } from "../../services/siteVisitApi";
 
 vi.mock("../../services/ecommerceApi", () => ({
   fetchPublicEcommerceCatalog: vi.fn(),
@@ -16,6 +17,10 @@ vi.mock("../../services/ecommerceApi", () => ({
   fetchPublicEcommerceProfile: vi.fn(),
   createPublicEcommerceOrder: vi.fn(),
   reconcilePublicEcommerceCart: vi.fn(),
+}));
+
+vi.mock("../../services/siteVisitApi", () => ({
+  recordPublicSiteVisit: vi.fn(() => Promise.resolve({ success: true })),
 }));
 
 afterEach(() => {
@@ -76,6 +81,8 @@ describe("EcommerceStorefront", () => {
     expect(await screen.findByRole("heading", { level: 1, name: "Checkout" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Place order" })).toBeTruthy();
     expect(fetchPublicEcommerceProfile).toHaveBeenCalledWith("demo");
+    expect(recordPublicSiteVisit).toHaveBeenCalledTimes(1);
+    expect(recordPublicSiteVisit).toHaveBeenCalledWith("demo", "store");
   });
 
   it("supports catalog and store-wide search from URL state", async () => {

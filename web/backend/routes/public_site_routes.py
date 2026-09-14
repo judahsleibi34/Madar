@@ -96,6 +96,10 @@ class PublicScreenTimeHeartbeat(BaseModel):
     active_seconds: int = Field(..., ge=1, le=60)
 
 
+class PublicSiteVisitCreate(BaseModel):
+    surface: Literal["website", "store"]
+
+
 class PublicFormSubmissionCreate(BaseModel):
     answers: dict[str, Any] = Field(default_factory=dict)
     form_element_id: Optional[str] = None
@@ -3142,6 +3146,45 @@ def get_public_site_bootstrap(subdomain: str, request: Request):
             "published_at": project.get("last_published_at"),
         },
     }
+
+
+@router.post("/sites/{subdomain}/visits", status_code=201)
+def record_public_site_visit(
+    subdomain: str,
+    visit: PublicSiteVisitCreate,
+    request: Request,
+):
+    clean_subdomain = normalize_subdomain(subdomain)
+    enforce_public_rate_limit(
+        request,
+        "site_visit",
+        f"{clean_subdomain}:{visit.surface}",
+    )
+    settings = resolve_website_settings(clean_subdomain, request=request)
+    tenant_id = resolve_tenant_id(settings)
+    try:
+        service_supabase.rpc(
+            "record_public_site_visit_safe",
+            {
+                "p_tenant_id": tenant_id,
+                "p_surface": visit.surface,
+            },
+        ).execute()
+    except Exception as error:
+        raw = str(error).lower()
+        if (
+            "record_public_site_visit_safe" in raw
+            or "site_visit_counters" in raw
+            or "pgrst202" in raw
+            or "schema cache" in raw
+        ):
+            raise api_error(
+                503,
+                "visit_tracking_upgrade_required",
+                "Visit tracking is temporarily unavailable.",
+            ) from error
+        raise
+    return {"success": True}
 
 
 @router.get("/sites/{subdomain}")

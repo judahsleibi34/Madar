@@ -461,21 +461,29 @@ health evidence, dirty/different release, checksum drift, missing predecessor,
 or a ledger already beyond target fails before mutation. No tenant/business
 table is queried or changed.
 
-### Current schema 097 bridge
+### Current schema 098 bridge
 
-The current release contract accepts schema `81..97` and targets `97` with the
-pinned `migrations-097.json` manifest. Migration 097 is an expand-only 96-to-97
-transition. The application may be promoted on schema 96: catalog, variants,
-guest checkout, delivery, and order paths remain compatible while loyalty
-configuration and verified-customer reads fail closed. Identity binding, ledger
-processing, entitlement issuance, and discounts are enabled only after the
-schema-097 atomic functions exist. After advancement, the retained schema-96
-release is no longer an automatic rollback target.
+The current release contract accepts schema `81..98` and targets `98` with the
+pinned `migrations-098.json` manifest. Migration 098 is an expand-only 97-to-98
+transition. The application may be promoted on schema 97: existing website and
+ecommerce paths remain compatible, public visit recording is best effort, and
+dashboard visit metrics expose an unavailable zero state until the new table
+and atomic function exist. After advancement, the retained schema-97 release is
+no longer an automatic rollback target.
 
-Loyalty configuration and customer reads fail closed on schema 96. Verified
-identity binding, ledger processing, entitlement issuance, and discounts are
-enabled only after migration 097. Schema 96 then ceases to be an automatic
-rollback target under the standard forward-repair policy.
+Schema 098 stores only tenant-level aggregate opening counts for the published
+website and store. It does not persist visitor identity, IP address, user agent,
+or other personal data. Each public runtime mount makes one best-effort request;
+the database function atomically increments exactly one surface counter.
+
+### Earlier schema 097 bridge
+
+The preceding release contract accepted schema `81..97` and targeted `97`
+with the pinned `migrations-097.json` manifest. Migration 097 was an
+expand-only 96-to-97 transition adding verified-customer loyalty. Loyalty
+configuration and customer reads failed closed on schema 96; verified identity
+binding, ledger processing, entitlement issuance, and discounts became
+available after migration 097.
 
 ### Earlier schema 095 bridge
 

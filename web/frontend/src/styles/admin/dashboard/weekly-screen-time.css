@@ -49,10 +49,11 @@
   min-width: 310px;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  padding: 3px;
-  border: 1px solid var(--theme-border);
-  border-radius: 10px;
-  background: var(--theme-surface-elevated);
+  gap: 5px;
+  padding: 4px;
+  border: 0;
+  border-radius: 0;
+  background: var(--color-surface);
 }
 
 .weekly-screen-time-period button {
@@ -61,11 +62,15 @@
   border: 1px solid var(--color-border-control);
   border-radius: 7px;
   color: var(--theme-text-muted);
-  background: transparent;
+  background: var(--color-surface);
   font: inherit;
   font-size: 0.78rem;
   font-weight: 750;
   cursor: pointer;
+  transition:
+    color 160ms ease,
+    border-color 160ms ease,
+    background-color 160ms ease;
 }
 
 .weekly-screen-time-period button.is-active {

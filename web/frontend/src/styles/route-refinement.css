@@ -3207,7 +3207,7 @@ body.theme-dark .page-builder .builder-toast,
   padding-inline-start: 20px;
 }
 
-.admin-sidebar .admin-sidebar-subnav > button,
+.admin-sidebar .admin-sidebar-subnav > :is(button, a),
 .admin-sidebar .admin-sidebar-language-item,
 .admin-sidebar
   .admin-sidebar-language-item
@@ -3244,7 +3244,7 @@ body.theme-dark .page-builder .builder-toast,
   padding: 0 !important;
 }
 
-.admin-sidebar .admin-sidebar-subnav > button:hover,
+.admin-sidebar .admin-sidebar-subnav > :is(button, a):hover,
 .admin-sidebar
   .admin-sidebar-language-item
   > .language-toggle-button:hover {
@@ -3252,7 +3252,7 @@ body.theme-dark .page-builder .builder-toast,
   color: var(--sidebar-accent) !important;
 }
 
-.admin-sidebar .admin-sidebar-subnav > button > svg,
+.admin-sidebar .admin-sidebar-subnav > :is(button, a) > svg,
 .admin-sidebar
   .admin-sidebar-language-item
   .language-toggle-animation
@@ -3265,7 +3265,7 @@ body.theme-dark .page-builder .builder-toast,
   margin: 0 !important;
 }
 
-.admin-sidebar .admin-sidebar-subnav > button > span {
+.admin-sidebar .admin-sidebar-subnav > :is(button, a) > span {
   flex: 1 1 auto;
   min-width: 0;
   line-height: 1.2;
@@ -3370,7 +3370,7 @@ body.theme-dark .page-builder .builder-toast,
 
 .admin-sidebar .admin-sidebar-group-trigger:focus-visible,
 .admin-sidebar .admin-sidebar-row:focus-visible,
-.admin-sidebar .admin-sidebar-subnav button:focus-visible,
+.admin-sidebar .admin-sidebar-subnav :is(button, a):focus-visible,
 .admin-sidebar .admin-sidebar-subnav .language-toggle-button:focus-visible {
   outline: 2px solid var(--sidebar-accent) !important;
   outline-offset: 2px;
@@ -3433,7 +3433,7 @@ body.theme-dark .page-builder .builder-toast,
     --sidebar-top-row-height: 38px;
   }
 
-  .admin-sidebar .admin-sidebar-subnav > button,
+  .admin-sidebar .admin-sidebar-subnav > :is(button, a),
   .admin-sidebar .admin-sidebar-language-item,
   .admin-sidebar
     .admin-sidebar-language-item

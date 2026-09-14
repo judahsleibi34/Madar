@@ -19,6 +19,7 @@ import { getResponsiveMediaProps } from "../../utils/media";
 import { normalizeStoreTheme } from "../../utils/ecommerceTheme";
 import { formatCommerceMoney, normalizeCommerceLocale } from "../../utils/commerceI18n";
 import { trackCommerceEvent, trackPurchaseOnce } from "../../services/commerceAnalytics";
+import { recordPublicSiteVisit } from "../../services/siteVisitApi";
 import "../../styles/public/ecommerce-storefront.css";
 
 const EMPTY_CATALOG = {
@@ -672,6 +673,15 @@ export default function EcommerceStorefront({ subdomain: suppliedSubdomain = "",
   const [cartOpen, setCartOpen] = useState(false);
   const orderAttemptRef = useRef({ fingerprint: "", key: "" });
   const analyticsViewsRef = useRef(new Set());
+  const recordedVisitRef = useRef("");
+
+  useEffect(() => {
+    if (!subdomain || draftPreviewMode) return;
+    const visitKey = `store:${subdomain}`;
+    if (recordedVisitRef.current === visitKey) return;
+    recordedVisitRef.current = visitKey;
+    recordPublicSiteVisit(subdomain, "store").catch(() => {});
+  }, [draftPreviewMode, subdomain]);
 
   const filters = {
     search: urlFilters.get("search") || "",

@@ -2,13 +2,13 @@
   "release_metadata_version": 1,
   "schema": {
     "compatible_min": 81,
-    "compatible_max": 97,
-    "target": 97,
+    "compatible_max": 98,
+    "target": 98,
     "migration_class": "expand-only",
     "rollback_compatible_min": 81,
-    "rollback_compatible_max": 96
+    "rollback_compatible_max": 97
   },
   "migration_policy": "automatic-after-known-good-backup-first-forward-repair",
-  "notes": "Compatibility bridge for schema 097. Promote and accept while schema 096 is serving; existing catalog, variants, guest checkout, delivery, and order operations remain available. Loyalty settings and verified-customer rewards fail closed or remain absent until this bridge is known-good and the separately locked automation creates and verifies a schema-096 backup, applies pinned expand migration 097, and revalidates the active release. Loyalty identity and discounts are enabled only with the schema-097 atomic functions. The retained schema-096 release remains a traffic rollback target only until migration begins; after schema advances to 097, forward repair is required by policy.",
-  "migration_manifest": "migrations-097.json"
+  "notes": "Compatibility bridge for schema 098. Promote and accept while schema 097 is serving; all existing website and ecommerce behavior remains available while visit tracking fails open for public visitors and dashboard visit metrics report zero/unavailable. Only after this bridge is known-good may the separately locked automation create and verify a schema-097 backup, apply the pinned expand-only migration 098, and revalidate the active release. Schema 098 adds tenant-scoped atomic website and store opening counters without visitor identity or personal data. The retained schema-097 release remains a traffic rollback target only until migration begins; after schema advances to 098, forward repair is required by policy.",
+  "migration_manifest": "migrations-098.json"
 }

@@ -2210,6 +2210,37 @@ def read_weekly_screen_time(
     }
 
 
+@router.get("/builder/visit-metrics")
+def read_site_visit_metrics(request: Request, response: Response):
+    context = require_builder_context(request, response, require_active_tenant_member)
+    try:
+        result = (
+            service_supabase.table("site_visit_counters")
+            .select("website_visits,store_visits")
+            .eq("tenant_id", context.tenant_id)
+            .limit(1)
+            .execute()
+        )
+    except Exception as error:
+        raw = str(error).lower()
+        if "site_visit_counters" in raw or "pgrst205" in raw or "schema cache" in raw:
+            return {
+                "success": True,
+                "available": False,
+                "website_visits": 0,
+                "store_visits": 0,
+            }
+        raise
+    metric_rows = getattr(result, "data", None) or []
+    metrics = metric_rows[0] if metric_rows else {}
+    return {
+        "success": True,
+        "available": True,
+        "website_visits": int(metrics.get("website_visits") or 0),
+        "store_visits": int(metrics.get("store_visits") or 0),
+    }
+
+
 @router.get("/users/{user_id}/builder/projects", include_in_schema=False)
 @router.get("/builder/projects")
 def list_builder_projects(
