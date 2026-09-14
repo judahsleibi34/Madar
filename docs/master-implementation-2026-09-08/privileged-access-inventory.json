@@ -1,6 +1,6 @@
 {
   "inventory_version": 1,
-  "review_date": "2026-09-09",
+  "review_date": "2026-09-14",
   "scope": "Direct privileged Supabase references in application Python; callers and SQL ACL inventory are reviewed separately. This inventory alone is not proof of authorization.",
   "entries": [
     {
