@@ -170,6 +170,66 @@ class ReleaseBootstrapTests(unittest.TestCase):
         self.assertEqual(active["DATA_DELETION_WORKER_ENABLED"], "true")
         self.assertEqual(active["CALENDAR_FEATURE_ENABLED"], "true")
         self.assertEqual(active["CALENDAR_SYNC_WORKER_ENABLED"], "true")
+        self.assertEqual(inactive["MADAR_RELEASE_SLOT"], "green")
+
+    def test_worker_stop_command_failure_is_fatal(self):
+        operations = release_cli.DockerGitOperations.__new__(release_cli.DockerGitOperations)
+        operations._container_state = lambda _name: ("sha256:x", "running", "healthy")
+        operations.run = unittest.mock.Mock(side_effect=RuntimeError("docker stop failed"))
+        with self.assertRaisesRegex(RuntimeError, "docker stop failed"):
+            operations.deactivate_workers({"slot": "blue"})
+
+    def test_worker_still_running_after_stop_is_fatal(self):
+        operations = release_cli.DockerGitOperations.__new__(release_cli.DockerGitOperations)
+        operations._container_state = lambda _name: ("sha256:x", "running", "healthy")
+        operations.run = unittest.mock.Mock()
+        with self.assertRaisesRegex(RuntimeError, "worker_failed_to_quiesce"):
+            operations.deactivate_workers({"slot": "blue"})
+
+    def test_worker_restart_during_quiescence_is_fatal(self):
+        operations = release_cli.DockerGitOperations.__new__(release_cli.DockerGitOperations)
+        states = iter([
+            ("sha256:x", "running", "healthy"),
+            ("sha256:x", "exited", "none"),
+            ("sha256:x", "running", "healthy"),
+        ])
+        operations._worker_names = lambda _slot: ["madar-blue-notification-worker"]
+        operations._container_state = lambda _name: next(states)
+        operations.run = unittest.mock.Mock()
+        with patch.object(release_cli.time, "sleep"):
+            with self.assertRaisesRegex(RuntimeError, "worker_failed_to_quiesce"):
+                operations.deactivate_workers({"slot": "blue"})
+
+    def test_installed_recovery_helpers_resolve_inside_installed_control_root(self):
+        with tempfile.TemporaryDirectory() as root:
+            installed = Path(root) / "deployment"
+            (installed / "bin").mkdir(parents=True)
+            (installed / "scripts").mkdir()
+            script = installed / "bin/madar-release-deploy"
+            for name in ("backup_support.py", "replicate_latest_node1.py"):
+                (installed / "scripts" / name).write_text("# fixture\n", encoding="utf-8")
+            with patch.object(release_cli, "SCRIPT", script):
+                resolved = release_cli.DockerGitOperations.recovery_helper_root()
+        self.assertEqual(resolved, installed / "scripts")
+
+    def test_serving_slot_identity_wins_when_proxy_file_is_stale(self):
+        operations = release_cli.DockerGitOperations.__new__(release_cli.DockerGitOperations)
+        operations._json = lambda _url: {"release_sha": SHA, "release_slot": "green"}
+        operations.current_traffic_slot = lambda: "blue"
+        self.assertEqual(
+            operations.resolve_serving_slot({"blue": SHA, "green": SHA}),
+            "green",
+        )
+
+    def test_serving_slot_is_unknown_when_health_and_proxy_cannot_identify_it(self):
+        operations = release_cli.DockerGitOperations.__new__(release_cli.DockerGitOperations)
+        operations._json = lambda _url: {"release_sha": SHA}
+        operations.current_traffic_slot = lambda: (_ for _ in ()).throw(
+            RuntimeError("unknown")
+        )
+        self.assertIsNone(
+            operations.resolve_serving_slot({"blue": SHA, "green": SHA})
+        )
 
     def test_post_migration_refresh_requires_exact_known_good_and_schema_83(self):
         with tempfile.TemporaryDirectory() as root:

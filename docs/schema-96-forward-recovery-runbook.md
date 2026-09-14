@@ -98,6 +98,12 @@ same-SHA idempotence, and cleanup. Expected final output is `SCHEMA RECOVERY:
 SUCCESS`, schema `96 -> 96`, migration result `not_requested`, and auto-deploy
 still disabled because its captured state was disabled.
 
+This root coordinator is the only authorized entry point. The ordinary
+`madar-production-deploy` wrapper rejects recovery arguments, and direct
+`madar-release-deploy --recover-current-schema` invocation fails unless the
+coordinator-created one-use credential and interlock bind the exact operation,
+SHA, schema, and reviewed rehearsal digest. Do not invoke an inner command.
+
 ## State transitions
 
 1. Old schema-incompatible active slot remains routed.
@@ -111,14 +117,20 @@ still disabled because its captured state was disabled.
 9. Former slot is recreated from the same candidate with consumers inactive.
 10. Durable state records the active bridge, compatible fallback, and old
     incompatible release as forensic history.
-11. A second exact-SHA invocation proves byte-idempotence.
+11. The coordinator advances the canonical production checkout using its
+    governed verified fast-forward-only operation; it never pulls or resets it.
+12. A second exact-SHA invocation proves byte-idempotence.
 
 ## Abort conditions
 
-Before the switch, any failure stops/removes the candidate, restores old
+Before the switch, any failure stops/removes the candidate only after the
+stable serving identity proves the old target is still routed, restores old
 consumers if they were stopped, leaves old traffic unchanged, and records the
-failure. After the switch, the old binary is never selected because it cannot
-serve schema 96. The timer remains disabled and the checkpoint requires
+failure. If a switch returns an error or times out, the controller reads the
+stable runtime's SHA and release-slot identity. If it cannot determine the
+serving slot, it stops neither target and preserves the checkpoint for operator
+diagnosis. After a proven switch, the old binary is never selected because it
+cannot serve schema 96. The timer remains disabled and the checkpoint requires
 forward repair.
 
 Abort on stale or missing backup, missing Node 1 proof, schema other than 96,
@@ -128,11 +140,16 @@ rehearsal check, stale SHA, or any unexpected readiness degradation.
 
 ## Recovery after interruption
 
-Rerun the exact same command and SHA after diagnosing the interruption. If the
-old slot is still routed, the state machine cleans the incomplete candidate and
-restarts the guarded attempt. If the bridge is already routed, it continues
-forward from the checkpoint and establishes the compatible fallback. A fully
-completed rerun makes no state or proxy change.
+Rerun the exact same coordinator command, SHA, schema, and reviewed attestation
+after diagnosing the interruption. The durable recovery ID binds those values
+to the original known-good SHA. A different candidate, schema, origin, or
+operation is rejected. If the old slot is provably still routed, the state
+machine first proves candidate consumers inactive, restores the old consumers,
+cleans the incomplete candidate, and restarts the guarded attempt. If the
+bridge is provably routed, it continues forward from the checkpoint and
+establishes the compatible fallback. If routing is ambiguous, it stops nothing.
+A fully completed rerun validates both compatible slots and completes any
+pending governed checkout fast-forward without changing proxy or database.
 
 Never edit `state.json`, mark a migration, use `git pull` in production, change
 nginx manually, or downgrade the database.
@@ -155,3 +172,9 @@ After success, only a schema-96-compatible slot may receive traffic. The old
 schema-93-era artifacts may be retained for forensics but are not a rollback
 target. A failed bridge after traffic transition is repaired forward with the
 same or another independently proven schema-96-compatible exact SHA.
+
+The compatible fallback does not turn later releases into recovery reruns.
+Normal deployment may stage a separately reviewed application supporting the
+96-to-target migration chain, validate the schema-96 fallback, and then follow
+the ordinary backup-first migration procedure. Recovery-specific authorization
+is never reused by that normal release.

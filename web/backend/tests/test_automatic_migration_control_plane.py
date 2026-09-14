@@ -270,6 +270,14 @@ class AutomaticMigrationControlPlaneTests(unittest.TestCase):
         )
         self.assertFalse(any("merge --ff-only" in event for event in events))
 
+    def test_normal_production_wrapper_rejects_recovery_mode(self):
+        completed = subprocess.run(
+            ["bash", str(PRODUCTION_DEPLOY), "--recover-current-schema"],
+            text=True, capture_output=True, check=False,
+        )
+        self.assertEqual(completed.returncode, 2)
+        self.assertIn("coordinator-only", completed.stderr)
+
     def test_backup_and_execution_begin_only_after_known_good_validation(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -329,6 +337,76 @@ class AutomaticMigrationControlPlaneTests(unittest.TestCase):
         attest_backup.assert_called_once_with(
             backup, release_sha=self.sha, source_schema=97
         )
+
+    def test_recovered_fallback_is_authoritative_for_next_migration(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            state_root, operations, compatibility, events = self.fixture(root)
+            state_path = state_root / "state.json"
+            state = json.loads(state_path.read_text())
+            state["compatible_fallback_release"] = {
+                "sha": self.sha, "slot": "blue", "schema": 97,
+                "schema_compatible_min": 97, "schema_compatible_max": 97,
+            }
+            state_path.write_text(json.dumps(state), encoding="utf-8")
+            backup = root / "backups/madar-20260830T000000Z"
+            backup.mkdir(parents=True)
+
+            class FakeExecutor:
+                def __init__(_self, **kwargs): pass
+                def verify_migrations(_self): pass
+                def run(_self):
+                    operations.schema = compatibility.target_schema
+                    return {"status": "completed"}
+
+            with (
+                patch.object(self.module, "LockedMigrationExecutor", FakeExecutor),
+                patch.object(self.module, "_validate_stable_known_good"),
+                patch.object(self.module, "_create_verified_migration_backup", return_value=backup),
+                patch.object(self.module, "_attest_migration_backup"),
+                patch.dict(os.environ, {"MADAR_BACKUP_DIR": str(root / "backups")}),
+            ):
+                self.module.automatic_migrate_known_good(
+                    sha=self.sha, state_root=state_root,
+                    compatibility=compatibility, operations=operations,
+                )
+        self.assertIn(f"rollback:{self.sha}:97", events)
+        self.assertNotIn(f"rollback:{'b' * 40}:97", events)
+
+    def test_failed_migration_retry_reuses_replacement_fallback(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            state_root, operations, compatibility, events = self.fixture(root)
+            backup = root / "backups/madar-20260830T000000Z"
+            backup.mkdir(parents=True)
+
+            class FailingExecutor:
+                def __init__(_self, **_kwargs): pass
+                def verify_migrations(_self): pass
+                def run(_self): raise RuntimeError("synthetic_precommit_failure")
+
+            with (
+                patch.object(self.module, "LockedMigrationExecutor", FailingExecutor),
+                patch.object(self.module, "_validate_stable_known_good"),
+                patch.object(self.module, "_create_verified_migration_backup", return_value=backup),
+                patch.object(self.module, "_attest_migration_backup"),
+                patch.dict(os.environ, {"MADAR_BACKUP_DIR": str(root / "backups")}),
+            ):
+                with self.assertRaisesRegex(RuntimeError, "synthetic_precommit_failure"):
+                    self.module.automatic_migrate_known_good(
+                        sha=self.sha, state_root=state_root,
+                        compatibility=compatibility, operations=operations,
+                    )
+                first_end = len(events)
+                result = self.module.automatic_migrate_known_good(
+                    sha=self.sha, state_root=state_root,
+                    compatibility=compatibility, operations=operations,
+                )
+
+        self.assertEqual(result["phase"], "retry_suppressed")
+        retry_events = events[first_end:]
+        self.assertIn(f"rollback:{self.sha}:97", retry_events)
+        self.assertNotIn(f"rollback:{'b' * 40}:97", retry_events)
 
     def test_successful_97_to_98_records_target_only_after_worker_and_route_validation(self):
         with tempfile.TemporaryDirectory() as directory:

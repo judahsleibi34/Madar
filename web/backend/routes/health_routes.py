@@ -21,6 +21,7 @@ def live():
 def version():
     return {
         "release_sha": os.getenv("MADAR_RELEASE_SHA", "development"),
+        "release_slot": os.getenv("MADAR_RELEASE_SLOT", ""),
         "build_timestamp": os.getenv("MADAR_BUILD_TIMESTAMP", "unknown"),
         "schema_compatible_min": int(os.getenv("SCHEMA_COMPATIBLE_MIN", "81")),
         "schema_compatible_max": int(os.getenv("SCHEMA_COMPATIBLE_MAX", "83")),

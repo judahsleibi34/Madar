@@ -370,6 +370,14 @@ changed, failure handling detects the actual routed candidate even if durable
 known-good finalization was interrupted and records forward-repair semantics.
 It never routes to the incompatible historical release.
 
+Successful finalization marks the canonical active and compatible-fallback
+records as schema-recovery artifacts and records `migration_result` as
+`not_requested`. A later ordinary control-plane inspection recognizes that
+terminal only when the completed recovery record, active slot/SHA/schema and
+the exact zero-migration recovery contract all agree. It otherwise reports a
+missing or invalid migration terminal and stops. Recovery credentials and the
+recovery entrypoint are never accepted by that later normal release.
+
 Because an installed controller that predates this mode cannot parse the new
 flags, the first use requires the already-documented exact-SHA, root-protected
 manual controller bootstrap. That bootstrap installs controller code only; it

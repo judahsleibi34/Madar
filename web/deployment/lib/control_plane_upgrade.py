@@ -620,6 +620,24 @@ class SystemOperations:
             raise UpgradeError("live_schema_invalid") from error
 
     def migration_terminal(self, sha: str, schema: int) -> str:
+        release_state = json_file(
+            self.state_root / "state.json", "release_state_invalid"
+        )
+        known_good = release_state.get("known_good_release") or {}
+        if known_good.get("sha") == sha and known_good.get("schema_recovery") is True:
+            try:
+                recorded_schema = int(known_good.get("schema", -1))
+            except (TypeError, ValueError) as error:
+                raise UpgradeError("recovery_known_good_state_invalid") from error
+            if (
+                recorded_schema != schema
+                or known_good.get("migration_result") != "not_requested"
+            ):
+                raise UpgradeError("recovery_known_good_state_invalid")
+            self.validate_recovery_candidate_contract(
+                self.state_root / "releases" / sha, schema
+            )
+            return "not_requested"
         release = json_file(
             self.state_root / "releases" / sha / "web/deployment/releases/release.json",
             "known_good_release_contract_missing",
@@ -842,7 +860,8 @@ class SystemOperations:
         }
 
     def current_recovery_preflight(
-        self, *, lock_deployment: bool = True
+        self, *, candidate_sha: str | None = None,
+        lock_deployment: bool = True,
     ) -> dict[str, Any]:
         """Attest only the exceptional DB-ahead recovery origin."""
 
@@ -858,25 +877,70 @@ class SystemOperations:
         state = json_file(self.state_root / "state.json", "release_state_invalid")
         known = state.get("known_good_release") or {}
         slot = str(state.get("active_slot") or "")
-        if (
-            slot not in SLOT_PORTS
-            or known.get("slot") != slot
-            or known.get("sha") != production_sha
-            or state.get("in_progress_release")
-            or state.get("rollback_failure")
-        ):
+        configured_traffic = self.current_traffic_slot()
+        traffic = configured_traffic
+        interrupted = state.get("in_progress_release")
+        fallback = state.get("compatible_fallback_release")
+        if slot not in SLOT_PORTS or state.get("rollback_failure"):
             raise UpgradeError("recovery_origin_state_invalid")
-        if self.current_traffic_slot() != slot:
+        if candidate_sha is not None and not LOWER_SHA_RE.fullmatch(candidate_sha):
+            raise UpgradeError("recovery_candidate_sha_invalid")
+        resume = isinstance(interrupted, dict) and interrupted.get("schema_recovery") is True
+        if resume and (
+            candidate_sha is None
+            or interrupted.get("release_sha") != candidate_sha
+            or interrupted.get("candidate_slot") not in SLOT_PORTS
+            or interrupted.get("previous_traffic_target") not in SLOT_PORTS
+        ):
+            raise UpgradeError("recovery_resume_identity_mismatch")
+        completed = (
+            candidate_sha is not None
+            and known.get("sha") == candidate_sha
+            and known.get("slot") == slot
+            and isinstance(fallback, dict)
+            and fallback.get("sha") == candidate_sha
+        )
+        initial = (
+            not interrupted and not completed
+            and known.get("sha") == production_sha and known.get("slot") == slot
+        )
+        expected_slots = {slot: str(known.get("sha") or "")}
+        if resume:
+            expected_slots[str(interrupted["candidate_slot"])] = str(candidate_sha)
+            expected_slots[str(interrupted["previous_traffic_target"])] = str(
+                (interrupted.get("previous_known_good_release") or {}).get("sha") or ""
+            )
+        stable_identity = self.http_json("http://127.0.0.1:8001/health/version")
+        stable_sha = str(stable_identity.get("release_sha") or "")
+        stable_slot = str(stable_identity.get("release_slot") or "")
+        matching_slots = [
+            expected_slot for expected_slot, expected_sha in expected_slots.items()
+            if expected_sha and expected_sha == stable_sha
+        ]
+        if stable_slot in matching_slots:
+            traffic = stable_slot
+        elif len(matching_slots) == 1:
+            traffic = matching_slots[0]
+        elif configured_traffic not in matching_slots:
+            raise UpgradeError("recovery_origin_traffic_ambiguous")
+        if not (resume or completed or initial):
+            raise UpgradeError("recovery_origin_state_invalid")
+        allowed_traffic = {slot}
+        if resume:
+            allowed_traffic = {
+                str(interrupted["candidate_slot"]),
+                str(interrupted["previous_traffic_target"]),
+            }
+        if traffic not in allowed_traffic:
             raise UpgradeError("recovery_origin_traffic_mismatch")
-        schema = self.live_schema(slot)
+        schema = self.live_schema(traffic)
         try:
             recorded_schema = int(known["schema"])
         except (KeyError, TypeError, ValueError) as error:
             raise UpgradeError("known_good_schema_invalid") from error
-        if schema <= recorded_schema:
+        if initial and schema <= recorded_schema:
             raise UpgradeError("recovery_origin_schema_not_ahead_of_state")
-        fallback = state.get("compatible_fallback_release")
-        if isinstance(fallback, dict):
+        if initial and isinstance(fallback, dict):
             try:
                 fallback_min = int(fallback["schema_compatible_min"])
                 fallback_max = int(fallback["schema_compatible_max"])
@@ -884,43 +948,53 @@ class SystemOperations:
                 raise UpgradeError("recovery_fallback_contract_invalid") from error
             if fallback_min <= schema <= fallback_max:
                 raise UpgradeError("recovery_compatible_fallback_available")
+        serving_candidate = completed or (
+            resume and traffic == interrupted.get("candidate_slot")
+        )
+        expected_serving_sha = candidate_sha if serving_candidate else production_sha
         identities = (
             self.http_json("http://127.0.0.1:8001/health/version"),
             self.http_json(
-                f"http://127.0.0.1:{SLOT_PORTS[slot]['backend']}/health/version"
+                f"http://127.0.0.1:{SLOT_PORTS[traffic]['backend']}/health/version"
             ),
         )
         for identity in identities:
-            if identity.get("release_sha") != production_sha:
+            if identity.get("release_sha") != expected_serving_sha:
                 raise UpgradeError("serving_release_identity_mismatch")
             try:
                 minimum = int(identity["schema_compatible_min"])
                 maximum = int(identity["schema_compatible_max"])
             except (KeyError, TypeError, ValueError) as error:
                 raise UpgradeError("serving_schema_contract_invalid") from error
-            if schema <= maximum or schema < minimum:
-                raise UpgradeError("recovery_origin_not_database_ahead")
+            if not serving_candidate:
+                if schema <= maximum or schema < minimum:
+                    raise UpgradeError("recovery_origin_not_database_ahead")
+            elif not minimum <= schema <= maximum:
+                raise UpgradeError("recovery_resume_candidate_incompatible")
         for url in (
             "http://127.0.0.1:8001/health/ready",
-            f"http://127.0.0.1:{SLOT_PORTS[slot]['backend']}/health/ready",
+            f"http://127.0.0.1:{SLOT_PORTS[traffic]['backend']}/health/ready",
         ):
             readiness = self.http_json_allow_503(url)
             components = readiness.get("components")
-            if readiness.get("ready") is not False or not isinstance(components, dict):
+            expected_ready = serving_candidate
+            if readiness.get("ready") is not expected_ready or not isinstance(components, dict):
                 raise UpgradeError("recovery_origin_readiness_unexpected")
-            degraded = {
-                name for name, value in components.items()
-                if value not in {"ok", "disabled", "configured", "not_required", "development"}
-            }
-            if components.get("schema") != "incompatible" or not degraded <= {
-                "schema", "notification_queue"
-            }:
-                raise UpgradeError("recovery_origin_unrelated_degradation")
+            if not expected_ready:
+                degraded = {
+                    name for name, value in components.items()
+                    if value not in {"ok", "disabled", "configured", "not_required", "development"}
+                }
+                if components.get("schema") != "incompatible" or not degraded <= {
+                    "schema", "notification_queue"
+                }:
+                    raise UpgradeError("recovery_origin_unrelated_degradation")
         self.http_ok("http://127.0.0.1:3000/")
         self.http_ok(
-            f"http://127.0.0.1:{SLOT_PORTS[slot]['frontend']}/"
+            f"http://127.0.0.1:{SLOT_PORTS[traffic]['frontend']}/"
         )
-        self.attest_active_images(slot, known)
+        if not serving_candidate:
+            self.attest_active_images(traffic, known)
         timer = self.systemctl_state("madar-auto-deploy.timer")
         service = self.systemctl_state("madar-auto-deploy.service")
         if timer != {"enabled": "disabled", "active": "inactive"}:
@@ -935,9 +1009,30 @@ class SystemOperations:
             "installed_sha": installed_sha,
             "slot": slot,
             "schema": schema,
-            "migration": "out_of_band_schema_ahead",
+            "migration": (
+                "recovery_resume" if resume else
+                "recovery_complete_checkout_pending" if completed else
+                "out_of_band_schema_ahead"
+            ),
             "timer": timer,
         }
+
+    def advance_production_checkout(self, approved_sha: str) -> None:
+        """Fast-forward the canonical checkout after recovery acceptance."""
+        self.require_clean_repository()
+        current = self.repository_head()
+        if current == approved_sha:
+            return
+        ancestry = self.madar_git(
+            "git_recovery_checkout_ancestry", "merge-base", "--is-ancestor",
+            current, approved_sha, check=False,
+        )
+        if ancestry.returncode != 0:
+            raise UpgradeError("recovery_checkout_not_fast_forward")
+        self.madar_git("git_recovery_checkout_advance", "merge", "--ff-only", approved_sha)
+        if self.repository_head() != approved_sha:
+            raise UpgradeError("recovery_checkout_advance_failed")
+        self.require_clean_repository()
 
     def resolve_candidate(self, approved_sha: str, *, dry_run: bool) -> None:
         if self.repository_origin() != EXPECTED_CONTRACT["MADAR_CANONICAL_GIT_REMOTE"]:
@@ -1464,14 +1559,23 @@ class SystemOperations:
             cwd=backup,
         )
 
-    def write_authorization(self, approved_sha: str) -> None:
+    def write_authorization(
+        self, approved_sha: str, *, recovery: bool = False,
+        schema: int | None = None, rehearsal_sha256: str | None = None,
+    ) -> None:
         require_root_directory(self.runtime_root, mode=0o711)
         token = secrets.token_urlsafe(32)
         descriptor, temporary = tempfile.mkstemp(prefix=".authorized.", dir=self.runtime_root)
         try:
             with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
                 json.dump(
-                    {"approved_sha": approved_sha, "token": token}, handle,
+                    {
+                        "approved_sha": approved_sha,
+                        "token": token,
+                        "operation": "schema_recovery" if recovery else "release",
+                        "schema": schema,
+                        "rehearsal_sha256": rehearsal_sha256,
+                    }, handle,
                     sort_keys=True,
                 )
                 handle.write("\n")
@@ -1487,6 +1591,9 @@ class SystemOperations:
                         token.encode("utf-8")
                     ).hexdigest(),
                     "status": "authorized_cycle",
+                    "operation": "schema_recovery" if recovery else "release",
+                    "schema": schema,
+                    "rehearsal_sha256": rehearsal_sha256,
                 },
             )
             os.chmod(self.interlock_file, 0o644)
@@ -1503,7 +1610,15 @@ class SystemOperations:
     def run_deploy_service(
         self, label: str, approved_sha: str, *, recovery: bool = False
     ) -> None:
-        self.write_authorization(approved_sha)
+        self.write_authorization(
+            approved_sha,
+            recovery=recovery,
+            schema=getattr(self, "recovery_schema", None) if recovery else None,
+            rehearsal_sha256=(
+                getattr(self, "recovery_rehearsal_sha256", None)
+                if recovery else None
+            ),
+        )
         unit = f"madar-control-plane-upgrade-{os.getpid()}-{label}"
         started = time.time()
         try:
@@ -1527,6 +1642,7 @@ class SystemOperations:
                     "--property=NoNewPrivileges=yes",
                     "--property=TimeoutStartSec=45min",
                     "--property=EnvironmentFile=/etc/madar/backup.env",
+                    "--property=EnvironmentFile=/etc/madar/node1-backup.env",
                     f"--property=EnvironmentFile={self.contract_path}",
                     "--property=Environment=MADAR_TRAFFIC_SWITCH_DRIVER=docker-nginx",
                     "--property=Environment=MADAR_PROXY_CONTAINER=madar-release-proxy",
@@ -1608,7 +1724,10 @@ class UpgradeCoordinator:
             if recovery else "current_production_preflight"
         )
         before = (
-            self.operations.current_recovery_preflight(lock_deployment=not dry_run)
+            self.operations.current_recovery_preflight(
+                candidate_sha=self.record.approved_sha,
+                lock_deployment=not dry_run,
+            )
             if recovery
             else self.operations.current_preflight(lock_deployment=not dry_run)
         )
@@ -1632,6 +1751,10 @@ class UpgradeCoordinator:
                     self.record.approved_sha,
                     before["schema"],
                 )
+            )
+            self.operations.recovery_schema = before["schema"]
+            self.operations.recovery_rehearsal_sha256 = (
+                self.record.rehearsal_attestation_sha256
             )
         self.audit.persist()
 
@@ -1740,6 +1863,7 @@ class UpgradeCoordinator:
                 "controlled_candidate_deployment", self.record.approved_sha,
                 recovery=True,
             )
+            self.operations.advance_production_checkout(self.record.approved_sha)
         else:
             self.operations.run_deploy_service(
                 "controlled_candidate_deployment", self.record.approved_sha
@@ -1832,6 +1956,7 @@ class UpgradeCoordinator:
                 try:
                     restore_safe = (
                         self.operations.current_recovery_preflight(
+                            candidate_sha=self.record.approved_sha,
                             lock_deployment=False
                         )["schema"] == self.record.schema_before
                         if self.recovery

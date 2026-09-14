@@ -296,6 +296,26 @@ def delete_auth_cookies(response: Response):
         )
 
 
+def revoke_verified_auth_session(request: Request) -> bool:
+    """Revoke only the provider session already verified for this request."""
+    verified = getattr(request.state, "verified_auth_session", None)
+    if not isinstance(verified, dict):
+        return False
+
+    access_token = verified.get("access_token")
+    refresh_token = verified.get("refresh_token")
+    if not access_token or not refresh_token:
+        return False
+
+    client = create_session_supabase_client()
+    client.auth.set_session(access_token, refresh_token)
+    client.auth.sign_out({"scope": "local"})
+    request.state.verified_auth_session = None
+    request.state.verified_session_assurance = None
+    request.state.mfa_client = None
+    return True
+
+
 def build_user_payload(user_data):
     first_name = user_data.get("first_name") or ""
     last_name = user_data.get("last_name") or ""

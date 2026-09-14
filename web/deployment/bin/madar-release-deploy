@@ -321,12 +321,31 @@ class DockerGitOperations:
                 return slot
         raise RuntimeError("active_proxy_target_unknown")
 
+    def resolve_serving_slot(self, expected: dict[str, str]) -> str | None:
+        """Resolve loaded stable traffic even when the target file is stale."""
+        try:
+            identity = self._json("http://127.0.0.1:8001/health/version")
+            stable_sha = str(identity.get("release_sha") or "")
+            stable_slot = str(identity.get("release_slot") or "")
+        except Exception:
+            return None
+        if stable_slot in expected and expected[stable_slot] == stable_sha:
+            return stable_slot
+        matches = [slot for slot, sha in expected.items() if sha and sha == stable_sha]
+        if len(matches) == 1:
+            return matches[0]
+        try:
+            configured = self.current_traffic_slot()
+        except RuntimeError:
+            return None
+        return configured if configured in matches else None
+
     def validate_recovery_backup(self, schema: int) -> dict:
         """Require a fresh local backup and its read-only verified Node 1 copy."""
 
         root = Path(os.environ["MADAR_BACKUP_DIR"]).resolve()
         marker = Path(os.environ["MADAR_BACKUP_FRESHNESS_MARKER"]).resolve()
-        scripts = WEB_ROOT / "scripts"
+        scripts = self.recovery_helper_root()
         latest = Path(self.run(
             [sys.executable, str(scripts / "backup_support.py"), "latest", str(marker)],
             capture=True,
@@ -364,6 +383,15 @@ class DockerGitOperations:
             "node1_sha256sums_sha256": node1.get("sha256sums_sha256"),
         }
 
+    @staticmethod
+    def recovery_helper_root() -> Path:
+        installed_scripts = SCRIPT.parents[1] / "scripts"
+        scripts = installed_scripts if installed_scripts.is_dir() else WEB_ROOT / "scripts"
+        required = ("backup_support.py", "replicate_latest_node1.py")
+        if any(not (scripts / name).is_file() for name in required):
+            raise RuntimeError("recovery_backup_helpers_unavailable")
+        return scripts
+
     def _environment(
         self, sha: str, slot: str, images: dict[str, str], *, workers_active: bool = False,
     ) -> dict[str, str]:
@@ -375,6 +403,7 @@ class DockerGitOperations:
         env.update({
             "MADAR_ENV_FILE": str(self.env_file),
             "MADAR_SLOT": slot,
+            "MADAR_RELEASE_SLOT": slot,
             "MADAR_RELEASE_SHA": sha,
             "MADAR_BUILD_TIMESTAMP": images["build_timestamp"],
             "MADAR_BACKEND_IMAGE": images["backend"].split("@", 1)[0],
@@ -518,10 +547,20 @@ class DockerGitOperations:
         slot = str(release.get("slot") or "")
         if slot not in SLOT_PORTS:
             raise RuntimeError("worker_release_slot_invalid")
-        subprocess.run(
-            ["docker", "stop", *self._worker_names(slot)], check=False,
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-        )
+        names = [
+            name for name in self._worker_names(slot)
+            if self._container_state(name) is not None
+        ]
+        if not names:
+            return
+        self.run(["docker", "stop", *names])
+        for observation in range(2):
+            for name in names:
+                state = self._container_state(name)
+                if state is not None and state[1] == "running":
+                    raise RuntimeError(f"worker_failed_to_quiesce:{name}")
+            if observation == 0:
+                time.sleep(0.2)
 
     def restore_workers(self, release: dict) -> None:
         slot = str(release.get("slot") or "")
@@ -538,6 +577,10 @@ class DockerGitOperations:
         if not existing:
             raise RuntimeError("retained_worker_containers_missing")
         self.run(["docker", "start", *existing])
+        for name in existing:
+            state = self._container_state(name)
+            if state is None or state[1] != "running" or state[2] not in {"healthy", "none"}:
+                raise RuntimeError(f"retained_worker_restore_failed:{name}")
 
     def _json(self, url: str) -> dict:
         with urllib.request.urlopen(url, timeout=5) as response:
@@ -1274,11 +1317,16 @@ def automatic_migrate_known_good(
             <= compatibility.rollback_schema_max
         ):
             raise RuntimeError("automatic_migration_rollback_contract_invalid")
-        retained = (
-            acceptance.get("previous_known_good_release")
-            if isinstance(acceptance, dict)
-            else None
-        )
+        # Recovery may have deliberately replaced the historical incompatible
+        # rollback process with a schema-compatible copy of the bridge. That
+        # durable topology is authoritative for later migration retries.
+        retained = state.get("compatible_fallback_release")
+        if not isinstance(retained, dict):
+            retained = (
+                acceptance.get("previous_known_good_release")
+                if isinstance(acceptance, dict)
+                else None
+            )
         if not isinstance(retained, dict):
             raise RuntimeError("automatic_migration_retained_rollback_attestation_missing")
         retained_sha = str(retained.get("sha") or "")
@@ -1541,6 +1589,12 @@ def main() -> int:
         metadata_filename=metadata_path.name,
     )
     if args.recover_current_schema:
+        require_upgrade_authorization(
+            normalized_sha,
+            required_operation="schema_recovery",
+            required_schema=compatibility.target_schema,
+            require_rehearsal=True,
+        )
         metadata = _json_file(
             metadata_path,
             "recovery_release_metadata_invalid",

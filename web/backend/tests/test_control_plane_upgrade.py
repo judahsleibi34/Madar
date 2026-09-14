@@ -77,7 +77,7 @@ class FakeOperations:
             "timer": dict(self.timer),
         }
 
-    def current_recovery_preflight(self, *, lock_deployment=True):
+    def current_recovery_preflight(self, *, candidate_sha=None, lock_deployment=True):
         self._event("current_recovery_preflight")
         self.events.append(f"deployment_lock={lock_deployment}")
         return {
@@ -161,6 +161,10 @@ class FakeOperations:
             self.recovery = recovery
             if recovery:
                 self.schema = 96
+
+    def advance_production_checkout(self, sha):
+        self._event("advance_production_checkout")
+        self.production = sha
 
     def attest_serving(self, sha, *, recovery=False):
         self._event("attest_serving")
@@ -1452,6 +1456,10 @@ class ControlPlaneUpgradeTests(unittest.TestCase):
         )
         self.assertEqual(operations.events.count("recovery=True"), 2)
         self.assertNotIn("recovery=False", operations.events)
+        self.assertLess(
+            operations.events.index("advance_production_checkout"),
+            operations.events.index("attest_serving"),
+        )
         self.assertEqual(
             operations.timer, {"enabled": "disabled", "active": "inactive"}
         )
@@ -1646,6 +1654,117 @@ class ControlPlaneUpgradeTests(unittest.TestCase):
                 upgrade.UpgradeError, "recovery_origin_unrelated_degradation"
             ):
                 operations.current_recovery_preflight()
+
+    def test_schema_recovery_preflight_accepts_exact_resume_after_switch(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations = self.recovery_preflight_operations(root)
+            state_path = operations.state_root / "state.json"
+            state = json.loads(state_path.read_text())
+            old = state["known_good_release"]
+            state["in_progress_release"] = {
+                "schema_recovery": True,
+                "release_sha": self.SHA,
+                "candidate_slot": "green",
+                "previous_traffic_target": "blue",
+                "previous_known_good_release": old,
+                "schema": 96,
+            }
+            state_path.write_text(json.dumps(state), encoding="utf-8")
+            operations.current_traffic_slot.return_value = "green"
+            operations.http_json.return_value = {
+                "release_sha": self.SHA,
+                "schema_compatible_min": 96,
+                "schema_compatible_max": 96,
+            }
+            operations.http_json_allow_503.return_value = {
+                "ready": True, "components": {"schema": "ok"},
+            }
+            result = operations.current_recovery_preflight(candidate_sha=self.SHA)
+        self.assertEqual(result["migration"], "recovery_resume")
+        self.assertEqual(result["schema"], 96)
+
+    def test_schema_recovery_preflight_accepts_completed_checkout_pending(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations = self.recovery_preflight_operations(root)
+            state_path = operations.state_root / "state.json"
+            state = json.loads(state_path.read_text())
+            state["active_slot"] = "green"
+            state["known_good_release"] = {
+                "sha": self.SHA, "slot": "green", "schema": 96,
+            }
+            state["compatible_fallback_release"] = {
+                "sha": self.SHA, "slot": "blue", "schema": 96,
+                "schema_compatible_min": 96, "schema_compatible_max": 96,
+            }
+            state_path.write_text(json.dumps(state), encoding="utf-8")
+            operations.current_traffic_slot.return_value = "green"
+            operations.http_json.return_value = {
+                "release_sha": self.SHA,
+                "schema_compatible_min": 96,
+                "schema_compatible_max": 96,
+            }
+            operations.http_json_allow_503.return_value = {
+                "ready": True, "components": {"schema": "ok"},
+            }
+            result = operations.current_recovery_preflight(candidate_sha=self.SHA)
+        self.assertEqual(result["migration"], "recovery_complete_checkout_pending")
+
+    def test_normal_preflight_accepts_completed_zero_migration_recovery(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations = object.__new__(upgrade.SystemOperations)
+            operations.state_root = Path(root)
+            release_root = Path(root) / "releases" / self.SHA
+            (release_root / "web/deployment/releases").mkdir(parents=True)
+            (release_root / "web/deployment/releases/schema-96-recovery.json").write_text(
+                json.dumps({
+                    "migration_policy": "schema-recovery-no-migration",
+                    "schema": {
+                        "compatible_min": 96,
+                        "compatible_max": 96,
+                        "target": 96,
+                        "migration_class": "none",
+                        "rollback_compatible_min": 96,
+                        "rollback_compatible_max": 96,
+                    },
+                }),
+                encoding="utf-8",
+            )
+            (Path(root) / "state.json").write_text(json.dumps({
+                "known_good_release": {
+                    "sha": self.SHA,
+                    "schema": 96,
+                    "schema_recovery": True,
+                    "migration_result": "not_requested",
+                },
+            }), encoding="utf-8")
+
+            self.assertEqual(
+                operations.migration_terminal(self.SHA, 96), "not_requested"
+            )
+
+    def test_recovery_checkout_advance_is_fast_forward_only_and_verified(self):
+        operations = object.__new__(upgrade.SystemOperations)
+        old_sha = "1" * 40
+        operations.require_clean_repository = mock.Mock()
+        operations.repository_head = mock.Mock(side_effect=[old_sha, self.SHA])
+        operations.madar_git = mock.Mock(side_effect=[
+            subprocess.CompletedProcess([], 0),
+            subprocess.CompletedProcess([], 0),
+        ])
+        operations.advance_production_checkout(self.SHA)
+        self.assertEqual(operations.madar_git.call_args_list[0].args[1:3], (
+            "merge-base", "--is-ancestor",
+        ))
+        self.assertIn("--ff-only", operations.madar_git.call_args_list[1].args)
+        self.assertEqual(operations.require_clean_repository.call_count, 2)
+
+    def test_recovery_checkout_rejects_non_fast_forward(self):
+        operations = object.__new__(upgrade.SystemOperations)
+        operations.require_clean_repository = mock.Mock()
+        operations.repository_head = mock.Mock(return_value="1" * 40)
+        operations.madar_git = mock.Mock(return_value=subprocess.CompletedProcess([], 1))
+        with self.assertRaisesRegex(upgrade.UpgradeError, "not_fast_forward"):
+            operations.advance_production_checkout(self.SHA)
 
     def test_schema_recovery_post_switch_attestation_failure_is_forward_only(self):
         with tempfile.TemporaryDirectory() as root:
@@ -2004,6 +2123,50 @@ class ControlPlaneUpgradeTests(unittest.TestCase):
                         self.SHA, interlock=writable
                     )
 
+    def test_recovery_authorization_is_mandatory_and_bound(self):
+        with tempfile.TemporaryDirectory() as root:
+            marker = Path(root) / "in-progress.json"
+            with self.assertRaisesRegex(RuntimeError, "recovery_authorization_required"):
+                require_upgrade_authorization(
+                    self.SHA, interlock=marker,
+                    required_operation="schema_recovery", required_schema=96,
+                    require_rehearsal=True,
+                )
+            token = "one-use-recovery-token"
+            rehearsal = "a" * 64
+            document = {
+                "approved_sha": self.SHA,
+                "authorization_sha256": hashlib.sha256(token.encode()).hexdigest(),
+                "operation": "schema_recovery", "schema": 96,
+                "rehearsal_sha256": rehearsal,
+            }
+            marker.write_text(json.dumps(document), encoding="utf-8")
+            marker.chmod(0o644)
+            credentials = Path(root) / "credentials"
+            credentials.mkdir()
+            (credentials / "madar-control-plane-upgrade").write_text(json.dumps({
+                "approved_sha": self.SHA, "token": token,
+                "operation": "schema_recovery", "schema": 96,
+                "rehearsal_sha256": rehearsal,
+            }), encoding="utf-8")
+            root_stat = SimpleNamespace(st_uid=0, st_mode=stat.S_IFREG | 0o644)
+            with mock.patch.object(Path, "stat", return_value=root_stat), mock.patch.dict(
+                os.environ, {"CREDENTIALS_DIRECTORY": str(credentials)}, clear=True
+            ):
+                require_upgrade_authorization(
+                    self.SHA, interlock=marker,
+                    required_operation="schema_recovery", required_schema=96,
+                    require_rehearsal=True,
+                )
+                document["schema"] = 97
+                marker.write_text(json.dumps(document), encoding="utf-8")
+                with self.assertRaisesRegex(RuntimeError, "exclusive_interlock"):
+                    require_upgrade_authorization(
+                        self.SHA, interlock=marker,
+                        required_operation="schema_recovery", required_schema=96,
+                        require_rehearsal=True,
+                    )
+
     def test_installer_and_service_define_self_update_and_authorization_boundary(self):
         installer = INSTALLER_PATH.read_text(encoding="utf-8")
         service = SERVICE_PATH.read_text(encoding="utf-8")
@@ -2054,6 +2217,8 @@ class ControlPlaneUpgradeTests(unittest.TestCase):
         self.assertIn("--gid=madar", invocation)
         self.assertIn("--property=NoNewPrivileges=yes", invocation)
         self.assertIn("--property=TimeoutStartSec=45min", invocation)
+        self.assertIn("--property=EnvironmentFile=/etc/madar/backup.env", invocation)
+        self.assertIn("--property=EnvironmentFile=/etc/madar/node1-backup.env", invocation)
         self.assertIn("--property=LoadCredential=madar-control-plane-upgrade:", joined)
         self.assertNotIn("MADAR_CONTROL_PLANE_UPGRADE_TOKEN=", joined)
         self.assertNotIn("SUPABASE_SERVICE_KEY", joined)

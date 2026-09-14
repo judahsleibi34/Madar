@@ -1001,6 +1001,15 @@ recorded as `compatible_fallback_release`. The former release is retained only
 as `incompatible_pre_recovery_release` forensic history. A same-SHA rerun is
 byte-idempotent.
 
+Both recovered slot records are explicitly marked `schema_recovery: true` with
+`migration_result: not_requested`. The normal release preflight may treat that
+terminal result as authoritative only when the canonical recovery record is
+complete, names the same active exact SHA, schema and slot, and that SHA still
+has the exact zero-migration recovery contract. Missing, stale, inconsistent or
+ordinary-release records continue to fail closed. This narrow bridge lets the
+subsequent normal 96-to-target manifest enter its ordinary migration workflow
+without fabricating a migration terminal or reusing recovery authorization.
+
 Normal forward migrations establish an inactive copy of the accepted bridge
 before applying SQL and revalidate that copy at the target schema after worker
 refresh. Consequently the post-migration state has a proven compatible

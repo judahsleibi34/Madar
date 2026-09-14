@@ -52,6 +52,9 @@ class FakeOperations:
     def current_traffic_slot(self):
         self._call("current_traffic_slot")
         return self.traffic
+    def resolve_serving_slot(self, expected):
+        self._call("resolve_serving_slot", tuple(sorted(expected.items())))
+        return self.traffic if self.traffic in expected else None
     def validate_recovery_backup(self, schema):
         self._call("validate_recovery_backup", schema)
         return {
@@ -246,8 +249,13 @@ class SchemaRecoveryDeployerTests(unittest.TestCase):
         self.assertEqual(result["status"], "known_good")
         self.assertEqual(state["active_slot"], "green")
         self.assertEqual(state["known_good_release"]["schema"], 96)
+        self.assertTrue(state["known_good_release"]["schema_recovery"])
+        self.assertEqual(
+            state["known_good_release"]["migration_result"], "not_requested"
+        )
         self.assertEqual(state["compatible_fallback_release"]["slot"], "blue")
         self.assertEqual(state["compatible_fallback_release"]["sha"], SHA)
+        self.assertTrue(state["compatible_fallback_release"]["schema_recovery"])
         self.assertEqual(operations.traffic, "green")
         self.assertEqual(
             [call for call in operations.calls if call[0] == "switch_traffic"],
@@ -384,6 +392,63 @@ class SchemaRecoveryDeployerTests(unittest.TestCase):
             result = self.deployer(root, resumed).recover_current_schema(SHA)
         self.assertEqual(result["status"], "known_good")
         self.assertFalse(any(call == ("switch_traffic", "blue") for call in resumed.calls))
+
+    def test_lost_switch_ack_reconciles_serving_candidate(self):
+        class LostAck(FakeOperations):
+            def switch_traffic(self, slot):
+                self.calls.append(("switch_traffic", slot))
+                self.traffic = slot
+                raise RuntimeError("lost acknowledgement")
+
+        with tempfile.TemporaryDirectory() as root:
+            self.seed(root)
+            operations = LostAck(schema=96)
+            result = self.deployer(root, operations).recover_current_schema(SHA)
+        self.assertEqual(result["status"], "known_good")
+        self.assertEqual(operations.traffic, "green")
+        self.assertFalse(any(call == ("stop_candidate", "green") for call in operations.calls))
+
+    def test_ambiguous_switch_preserves_both_targets_and_checkpoint(self):
+        class Ambiguous(FakeOperations):
+            def switch_traffic(self, slot):
+                self.calls.append(("switch_traffic", slot))
+                raise RuntimeError("unknown switch outcome")
+            def resolve_serving_slot(self, expected):
+                self.calls.append(("resolve_serving_slot", tuple(sorted(expected.items()))))
+                return None
+
+        with tempfile.TemporaryDirectory() as root:
+            self.seed(root)
+            operations = Ambiguous(schema=96)
+            with self.assertRaisesRegex(RuntimeError, "recovery_traffic_state_ambiguous"):
+                self.deployer(root, operations).recover_current_schema(SHA)
+            state = json.loads(Path(root, "state.json").read_text())
+        self.assertIn("in_progress_release", state)
+        self.assertFalse(any(call[0] == "stop_candidate" for call in operations.calls))
+        self.assertFalse(any(call[0] == "restore_workers" for call in operations.calls))
+
+    def test_normal_release_is_accepted_after_schema96_recovery(self):
+        next_sha = "b" * 40
+
+        class Schema96Operations(FakeOperations):
+            def validate_rollback_target(self, release, schema):
+                self._call("validate_rollback_target", release["sha"], release["slot"], schema)
+                return {"compatible_min": 96, "compatible_max": 96}
+
+        with tempfile.TemporaryDirectory() as root:
+            self.seed(root)
+            recovered = Schema96Operations(schema=96)
+            self.deployer(root, recovered).recover_current_schema(SHA)
+            normal = Schema96Operations(schema=96)
+            normal.traffic = "green"
+            deployer = ReleaseDeployer(
+                state_root=Path(root),
+                compatibility=Compatibility(96, 99, 99, "expand-only", 96, 99),
+                operations=normal,
+            )
+            result = deployer.deploy(next_sha)
+        self.assertEqual(result["status"], "known_good")
+        self.assertIn(("validate_rollback_target", SHA, "green", 96), normal.calls)
 
 
 if __name__ == "__main__":

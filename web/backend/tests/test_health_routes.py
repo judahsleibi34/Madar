@@ -1,3 +1,4 @@
+import os
 import unittest
 from unittest.mock import patch
 
@@ -19,6 +20,16 @@ class HealthRouteTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {"status": "ok"})
+
+    def test_version_exposes_nonsecret_release_slot_identity(self):
+        with patch.dict(os.environ, {
+            "MADAR_RELEASE_SHA": "a" * 40,
+            "MADAR_RELEASE_SLOT": "green",
+        }, clear=False):
+            response = build_client().get("/health/version")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["release_sha"], "a" * 40)
+        self.assertEqual(response.json()["release_slot"], "green")
 
     def test_ready_returns_ok_when_configured(self):
         client = build_client()

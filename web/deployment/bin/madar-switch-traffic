@@ -113,7 +113,12 @@ def main() -> int:
     if driver not in {"nginx", "docker-nginx"}:
         raise RuntimeError("unsupported traffic switch driver")
     target = Path(os.getenv("MADAR_ACTIVE_UPSTREAMS_FILE", "/var/lib/madar/proxy/active-upstreams.conf"))
-    target.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    # The hardened Docker proxy runs as UID 101 and bind-mounts this directory
+    # read-only.  The upstream file is non-secret, so the directory must be
+    # traversable by that unprivileged process.  mkdir's mode is ignored for an
+    # existing directory; enforce the installed contract on every switch.
+    target.parent.mkdir(parents=True, exist_ok=True, mode=0o755)
+    os.chmod(target.parent, 0o755)
     upstream_host = "127.0.0.1"
     content = (
         f"upstream madar_backend_active {{ server {upstream_host}:{backend}; }}\n"

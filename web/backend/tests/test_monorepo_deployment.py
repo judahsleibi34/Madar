@@ -222,6 +222,7 @@ class MonorepoDeploymentTests(unittest.TestCase):
         self.assertIn("MADAR_STABLE_BACKEND_URL", self.switch)
         self.assertIn("_atomic_bytes(target, previous)", self.switch)
         self.assertIn("_reload(driver, container)", self.switch)
+        self.assertIn("os.chmod(target.parent, 0o755)", self.switch)
         self.assertIn("listen 127.0.0.1:8001", self.proxy_config)
         self.assertIn("listen 127.0.0.1:3000", self.proxy_config)
         self.assertIn('cap_drop: ["ALL"]', self.proxy_compose)

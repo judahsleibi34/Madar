@@ -1,7 +1,11 @@
 import os
+import base64
 from pathlib import Path
 import unittest
 from unittest.mock import patch
+
+from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
+from py_vapid import Vapid
 
 from services import notification_delivery_queue_service
 from services import readiness_service
@@ -26,6 +30,23 @@ class RpcClient:
 
 class NotificationChannelGatingTests(unittest.TestCase):
     @staticmethod
+    def valid_push_environment():
+        vapid = Vapid()
+        vapid.generate_keys()
+        return {
+            "WEB_PUSH_ENABLED": "true",
+            "WEB_PUSH_VAPID_PUBLIC_KEY": base64.urlsafe_b64encode(
+                vapid.public_key.public_bytes(
+                    Encoding.X962, PublicFormat.UncompressedPoint
+                )
+            ).rstrip(b"=").decode("ascii"),
+            "WEB_PUSH_VAPID_PRIVATE_KEY": base64.urlsafe_b64encode(
+                vapid.private_key.private_numbers().private_value.to_bytes(32, "big")
+            ).rstrip(b"=").decode("ascii"),
+            "WEB_PUSH_VAPID_SUBJECT": "mailto:test@example.invalid",
+        }
+
+    @staticmethod
     def repository_root() -> Path:
         local = Path(__file__).resolve().parents[2]
         return local if (local / "database/migrations").is_dir() else Path("/workspace")
@@ -37,10 +58,7 @@ class NotificationChannelGatingTests(unittest.TestCase):
             os.environ,
             {
                 "EMAIL_CHANNEL_ENABLED": "false",
-                "WEB_PUSH_ENABLED": "true",
-                "WEB_PUSH_VAPID_PUBLIC_KEY": "public",
-                "WEB_PUSH_VAPID_PRIVATE_KEY": "private",
-                "WEB_PUSH_VAPID_SUBJECT": "mailto:test@example.invalid",
+                **self.valid_push_environment(),
             },
             clear=False,
         ):
@@ -210,10 +228,7 @@ class NotificationChannelGatingTests(unittest.TestCase):
             "NOTIFICATION_QUEUE_MAX_AGE_SECONDS": "900",
             "NOTIFICATION_QUEUE_MAX_DEAD": "3",
             "NOTIFICATION_DEAD_READINESS_WINDOW_SECONDS": "86400",
-            "WEB_PUSH_ENABLED": "true",
-            "WEB_PUSH_VAPID_PUBLIC_KEY": "public",
-            "WEB_PUSH_VAPID_PRIVATE_KEY": "private",
-            "WEB_PUSH_VAPID_SUBJECT": "mailto:test@example.invalid",
+            **self.valid_push_environment(),
         }
         metrics = {
             "queue_depth": 0,
