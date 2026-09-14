@@ -29,7 +29,7 @@ These defaults are conservative starting points and require operator approval ag
 - `madar_http_errors_total`: alert on a sustained five-minute increase, grouped by route.
 - notification queue depth over `NOTIFICATION_QUEUE_MAX_DEPTH=1000`: urgent investigation.
 - oldest notification over `NOTIFICATION_QUEUE_MAX_AGE_SECONDS=900`: urgent investigation.
-- any dead notification (`NOTIFICATION_QUEUE_MAX_DEAD=0`): investigate the channel and configuration; never delete it merely to clear the alert.
+- recent actionable dead notifications above `NOTIFICATION_QUEUE_MAX_DEAD` during `NOTIFICATION_DEAD_READINESS_WINDOW_SECONDS`: investigate the queue, worker, or provider configuration. Terminal recipient outcomes and older failures remain telemetry but do not permanently block deployment; never delete or relabel them merely to clear an alert.
 - free space below `STORAGE_DISK_FREE_FLOOR_BYTES=2147483648`: readiness fails and uploads are refused.
 - backup marker older than `BACKUP_MAX_AGE_SECONDS=129600`: readiness fails when backup freshness is required.
 

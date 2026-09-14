@@ -228,19 +228,47 @@ def check_notification_queue() -> str:
     if not _env_bool("NOTIFICATION_WORKER_REQUIRED", False):
         return "disabled"
     try:
-        metrics = get_queue_metrics()
+        dead_window = int(
+            os.getenv("NOTIFICATION_DEAD_READINESS_WINDOW_SECONDS", "86400")
+        )
+        if dead_window <= 0:
+            return "misconfigured"
+        metrics = get_queue_metrics(
+            dead_readiness_window_seconds=dead_window,
+        )
         maximum_depth = int(os.getenv("NOTIFICATION_QUEUE_MAX_DEPTH", "1000"))
         maximum_age = int(os.getenv("NOTIFICATION_QUEUE_MAX_AGE_SECONDS", "900"))
         maximum_dead = int(os.getenv("NOTIFICATION_QUEUE_MAX_DEAD", "0"))
         if min(maximum_depth, maximum_age, maximum_dead) < 0:
             return "misconfigured"
         if "outbox_dead" in metrics:
-            relevant_dead = int(metrics.get("outbox_dead") or 0)
-            relevant_dead += int(metrics.get("delivery_internal_dead") or 0)
+            relevant_dead = int(
+                metrics.get("outbox_dead_actionable", metrics.get("outbox_dead"))
+                or 0
+            )
+            relevant_dead += int(
+                metrics.get(
+                    "delivery_internal_dead_actionable",
+                    metrics.get("delivery_internal_dead"),
+                )
+                or 0
+            )
             if _env_bool("EMAIL_CHANNEL_ENABLED", False):
-                relevant_dead += int(metrics.get("delivery_email_dead") or 0)
+                relevant_dead += int(
+                    metrics.get(
+                        "delivery_email_dead_actionable",
+                        metrics.get("delivery_email_dead"),
+                    )
+                    or 0
+                )
             if get_web_push_configuration().operational:
-                relevant_dead += int(metrics.get("delivery_web_push_dead") or 0)
+                relevant_dead += int(
+                    metrics.get(
+                        "delivery_web_push_dead_actionable",
+                        metrics.get("delivery_web_push_dead"),
+                    )
+                    or 0
+                )
         else:
             # Compatibility fallback for legacy metrics/test doubles.
             relevant_dead = int(metrics.get("dead") or 0)
@@ -263,9 +291,17 @@ def check_notification_email() -> str:
     if not all(os.getenv(name, "").strip() for name in required):
         return "unavailable"
     try:
-        metrics = get_delivery_channel_metrics().get("email", {})
+        dead_window = int(
+            os.getenv("NOTIFICATION_DEAD_READINESS_WINDOW_SECONDS", "86400")
+        )
+        if dead_window <= 0:
+            return "misconfigured"
+        metrics = get_delivery_channel_metrics(
+            dead_readiness_window_seconds=dead_window
+        ).get("email", {})
         maximum_dead = int(os.getenv("NOTIFICATION_EMAIL_MAX_DEAD", "0"))
-        return "degraded" if int(metrics.get("dead") or 0) > maximum_dead else "configured"
+        relevant_dead = int(metrics.get("actionable_dead", metrics.get("dead")) or 0)
+        return "degraded" if relevant_dead > maximum_dead else "configured"
     except Exception:
         return "unavailable"
 

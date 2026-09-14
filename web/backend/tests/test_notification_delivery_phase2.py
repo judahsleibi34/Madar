@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from pathlib import Path
 import unittest
 from unittest.mock import patch
@@ -32,6 +33,33 @@ class DomainRpcClient:
     def rpc(self, name, payload):
         self.calls.append((name, payload))
         return Response(self.result)
+
+
+class DeliveryQuery:
+    def __init__(self, rows):
+        self.rows = rows
+
+    def select(self, *_args):
+        return self
+
+    def in_(self, *_args):
+        return self
+
+    def limit(self, *_args):
+        return self
+
+    def execute(self):
+        return Response(self.rows)
+
+
+class DeliveryMetricsClient:
+    def __init__(self, rows):
+        self.rows = rows
+
+    def table(self, name):
+        if name != "notification_deliveries":
+            raise AssertionError(name)
+        return DeliveryQuery(self.rows)
 
 
 class NotificationDeliveryQueueTests(unittest.TestCase):
@@ -77,6 +105,41 @@ class NotificationDeliveryQueueTests(unittest.TestCase):
             client=client,
         )
         self.assertIsNotNone(client.calls[-1][1]["p_available_at"])
+
+    def test_channel_metrics_separate_actionable_terminal_and_historical_dead(self):
+        rows = [
+            {
+                "channel": "web_push",
+                "status": "dead",
+                "last_error_code": "web_push_subscription_revoked",
+                "updated_at": "2026-07-20T00:04:30+00:00",
+            },
+            {
+                "channel": "web_push",
+                "status": "dead",
+                "last_error_code": "web_push_provider_unauthorized",
+                "updated_at": "2026-07-20T00:04:40+00:00",
+            },
+            {
+                "channel": "web_push",
+                "status": "dead",
+                "last_error_code": "web_push_provider_rejected",
+                "updated_at": "2026-07-18T00:00:00+00:00",
+            },
+        ]
+        with patch.object(
+            notification_delivery_queue_service,
+            "_now",
+            return_value=datetime(2026, 7, 20, 0, 5, tzinfo=timezone.utc),
+        ):
+            metrics = notification_delivery_queue_service.get_delivery_channel_metrics(
+                client=DeliveryMetricsClient(rows),
+                dead_readiness_window_seconds=3600,
+            )
+
+        self.assertEqual(metrics["web_push"]["dead"], 3)
+        self.assertEqual(metrics["web_push"]["terminal_dead"], 1)
+        self.assertEqual(metrics["web_push"]["actionable_dead"], 1)
 
     def test_migration_has_database_backed_delivery_invariants(self):
         root = self.repository_root()
