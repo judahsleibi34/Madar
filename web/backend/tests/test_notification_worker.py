@@ -71,6 +71,25 @@ class NotificationWorkerTests(unittest.TestCase):
         self.assertEqual(notification_worker.retry_delay(row), notification_worker.retry_delay(row))
         self.assertLessEqual(notification_worker.retry_delay(row), 3600)
 
+    def test_provider_retry_after_is_honored_by_persisted_retry(self):
+        finished = []
+        notification_worker.process_batch(
+            limit=1,
+            claim=lambda **_kwargs: [
+                {"id": "rate-limited", "channel": "web_push", "attempts": 1}
+            ],
+            deliver=lambda _row: (_ for _ in ()).throw(
+                DeliveryError(
+                    "web_push_rate_limited",
+                    retry_after_seconds=120,
+                )
+            ),
+            finish=lambda _delivery_id, **kwargs: finished.append(kwargs)
+            or {"status": "pending"},
+        )
+        self.assertEqual(finished[0]["outcome"], "retry")
+        self.assertGreaterEqual(finished[0]["retry_after_seconds"], 120)
+
     def test_resolution_creates_deliveries_before_outbox_completion(self):
         rows = [{"id": "outbox", "channel": "internal", "attempts": 1}]
         resolved = []

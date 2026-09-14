@@ -173,6 +173,65 @@ class NotificationChannelGatingTests(unittest.TestCase):
                 "backlogged",
             )
 
+    def test_terminal_web_push_outcomes_remain_telemetry_without_poisoning_readiness(self):
+        environment = {
+            "NOTIFICATION_WORKER_REQUIRED": "true",
+            "NOTIFICATION_QUEUE_MAX_DEPTH": "1000",
+            "NOTIFICATION_QUEUE_MAX_AGE_SECONDS": "900",
+            "NOTIFICATION_QUEUE_MAX_DEAD": "3",
+            "NOTIFICATION_DEAD_READINESS_WINDOW_SECONDS": "86400",
+            "WEB_PUSH_ENABLED": "true",
+            "WEB_PUSH_VAPID_PUBLIC_KEY": "public",
+            "WEB_PUSH_VAPID_PRIVATE_KEY": "private",
+            "WEB_PUSH_VAPID_SUBJECT": "mailto:test@example.invalid",
+        }
+        metrics = {
+            "queue_depth": 0,
+            "oldest_pending_age_seconds": 0,
+            "outbox_dead": 0,
+            "outbox_dead_actionable": 0,
+            "delivery_internal_dead": 0,
+            "delivery_internal_dead_actionable": 0,
+            "delivery_email_dead": 0,
+            "delivery_email_dead_actionable": 0,
+            "delivery_web_push_dead": 4,
+            "delivery_web_push_dead_actionable": 0,
+            "delivery_dead_terminal": 4,
+        }
+        with patch.dict(os.environ, environment, clear=False), patch.object(
+            readiness_service, "get_queue_metrics", return_value=metrics
+        ):
+            self.assertEqual(readiness_service.check_notification_queue(), "ok")
+
+    def test_web_push_provider_credentials_remain_readiness_actionable(self):
+        environment = {
+            "NOTIFICATION_WORKER_REQUIRED": "true",
+            "NOTIFICATION_QUEUE_MAX_DEPTH": "1000",
+            "NOTIFICATION_QUEUE_MAX_AGE_SECONDS": "900",
+            "NOTIFICATION_QUEUE_MAX_DEAD": "3",
+            "NOTIFICATION_DEAD_READINESS_WINDOW_SECONDS": "86400",
+            "WEB_PUSH_ENABLED": "true",
+            "WEB_PUSH_VAPID_PUBLIC_KEY": "public",
+            "WEB_PUSH_VAPID_PRIVATE_KEY": "private",
+            "WEB_PUSH_VAPID_SUBJECT": "mailto:test@example.invalid",
+        }
+        metrics = {
+            "queue_depth": 0,
+            "oldest_pending_age_seconds": 0,
+            "outbox_dead": 0,
+            "outbox_dead_actionable": 0,
+            "delivery_internal_dead_actionable": 0,
+            "delivery_email_dead_actionable": 0,
+            "delivery_web_push_dead": 4,
+            "delivery_web_push_dead_actionable": 4,
+        }
+        with patch.dict(os.environ, environment, clear=False), patch.object(
+            readiness_service, "get_queue_metrics", return_value=metrics
+        ):
+            self.assertEqual(
+                readiness_service.check_notification_queue(), "backlogged"
+            )
+
     def test_migration_preserves_legacy_rpc_and_adds_capability_gated_v2(self):
         root = self.repository_root()
 

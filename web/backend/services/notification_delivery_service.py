@@ -6,6 +6,7 @@ import os
 import smtplib
 import socket
 from email.message import EmailMessage
+from email.utils import parsedate_to_datetime
 from datetime import datetime, timezone
 from typing import Any
 
@@ -44,6 +45,24 @@ class DeliveryError(RuntimeError):
         self.retryable = retryable
         self.terminal_outcome = terminal_outcome
         self.retry_after_seconds = retry_after_seconds
+
+
+def _retry_after_delay(value: Any, *, now: datetime | None = None) -> int | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    try:
+        return max(1, min(int(text), 86400))
+    except ValueError:
+        pass
+    try:
+        deadline = parsedate_to_datetime(text)
+        if deadline.tzinfo is None:
+            deadline = deadline.replace(tzinfo=timezone.utc)
+        seconds = int((deadline - (now or datetime.now(timezone.utc))).total_seconds())
+        return max(1, min(seconds, 86400))
+    except (TypeError, ValueError, OverflowError):
+        return None
 
 
 def _rows(response) -> list[dict[str, Any]]:
@@ -206,7 +225,9 @@ def _deliver_internal(row: dict[str, Any]) -> None:
                 "channel": "internal",
             },
         )
-        raise DeliveryError("recipient_inactive", retryable=False)
+        raise DeliveryError(
+            "recipient_inactive", retryable=False, terminal_outcome="revoked"
+        )
     event_data = normalize_notification_data(
         event.get("data") if isinstance(event.get("data"), dict) else canonical_payload_data,
         default_kind=action_kind_for_source(
@@ -286,7 +307,9 @@ def _deliver_email(row: dict[str, Any]) -> None:
                 "notifications.delivery_skipped_inactive_member",
                 extra={"tenant_id": row.get("tenant_id"), "user_id": user_id, "channel": "email"},
             )
-            raise DeliveryError("recipient_inactive", retryable=False)
+            raise DeliveryError(
+                "recipient_inactive", retryable=False, terminal_outcome="revoked"
+            )
         users = _rows(service_supabase.table("users").select("email").eq("id", user_id).limit(1).execute())
         recipient = str(users[0].get("email") if users else "").strip()
         payload = row.get("payload") or {}
@@ -365,7 +388,9 @@ def _deliver_web_push(row: dict[str, Any]) -> None:
                 "notifications.delivery_skipped_inactive_member",
                 extra={"tenant_id": tenant_id, "user_id": target_user_id, "channel": "web_push"},
             )
-            raise DeliveryError("recipient_inactive", retryable=False)
+            raise DeliveryError(
+                "recipient_inactive", retryable=False, terminal_outcome="revoked"
+            )
     else:
         recipient_ids = [int(target_user_id)]
     data = build_web_push_payload(row)
@@ -438,7 +463,9 @@ def _deliver_web_push(row: dict[str, Any]) -> None:
             "notifications.delivery_skipped_inactive_member",
             extra={"tenant_id": tenant_id, "user_id": recipient_id, "channel": "web_push"},
         )
-        raise DeliveryError("recipient_inactive", retryable=False)
+        raise DeliveryError(
+            "recipient_inactive", retryable=False, terminal_outcome="revoked"
+        )
     try:
         webpush(
             subscription_info={"endpoint": safe_endpoint, "keys": {"p256dh": subscription.get("p256dh"), "auth": subscription.get("auth")}},
@@ -462,17 +489,32 @@ def _deliver_web_push(row: dict[str, Any]) -> None:
             retry_after = getattr(getattr(error, "response", None), "headers", {}).get(
                 "Retry-After"
             )
-            try:
-                retry_after_seconds = max(1, min(int(retry_after), 86400))
-            except (TypeError, ValueError):
-                retry_after_seconds = None
             raise DeliveryError(
                 "web_push_rate_limited",
-                retry_after_seconds=retry_after_seconds,
+                retry_after_seconds=_retry_after_delay(retry_after),
             ) from error
+        if status is not None and int(status) == 400:
+            raise DeliveryError("web_push_request_invalid", retryable=False) from error
+        if status is not None and int(status) == 401:
+            raise DeliveryError(
+                "web_push_provider_unauthorized", retryable=False
+            ) from error
+        if status is not None and int(status) == 403:
+            raise DeliveryError("web_push_provider_forbidden", retryable=False) from error
         if status is not None and 400 <= int(status) < 500:
             raise DeliveryError("web_push_provider_rejected", retryable=False) from error
+        if status is not None and int(status) >= 500:
+            raise DeliveryError("web_push_provider_unavailable") from error
         raise DeliveryError("web_push_delivery_failed") from error
+    except (TypeError, ValueError) as error:
+        service_supabase.table("web_push_subscriptions").update(
+            {"revoked_at": datetime.now(timezone.utc).isoformat()}
+        ).eq("id", subscription.get("id")).execute()
+        raise DeliveryError(
+            "web_push_subscription_malformed",
+            retryable=False,
+            terminal_outcome="revoked",
+        ) from error
 
 
 def deliver_notification(row: dict[str, Any]) -> None:

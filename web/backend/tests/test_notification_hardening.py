@@ -1,6 +1,8 @@
 import socket
 import os
 import unittest
+from datetime import datetime, timedelta, timezone
+from email.utils import format_datetime
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -298,6 +300,65 @@ class ExternalDeliveryMembershipTests(unittest.TestCase):
         gone = WebPushException("gone", response=SimpleNamespace(status_code=410))
         with patch.object(notification_delivery_service, "service_supabase", self.client), patch.dict("os.environ", environment, clear=False), patch.object(notification_delivery_service, "validate_push_endpoint", side_effect=lambda value: value), patch("pywebpush.webpush", side_effect=gone), self.assertRaises(notification_delivery_service.DeliveryError) as raised:
             notification_delivery_service._deliver_web_push(row)
+        self.assertFalse(raised.exception.retryable)
+        self.assertEqual(raised.exception.terminal_outcome, "revoked")
+        active = next(item for item in self.client.tables["web_push_subscriptions"] if item["id"] == "active")
+        self.assertIsNotNone(active["revoked_at"])
+
+    def test_worker_classifies_provider_failures_without_persisting_provider_content(self):
+        from pywebpush import WebPushException
+
+        row = {"channel": "web_push", "tenant_id": 1, "user_id": 10, "subscription_id": "active", "payload": {"title": "Title"}}
+        environment = {"WEB_PUSH_ENABLED": "true", "WEB_PUSH_VAPID_PUBLIC_KEY": "public", "WEB_PUSH_VAPID_PRIVATE_KEY": "private", "WEB_PUSH_VAPID_SUBJECT": "mailto:test@example.com"}
+        expectations = (
+            (400, "web_push_request_invalid", False),
+            (401, "web_push_provider_unauthorized", False),
+            (403, "web_push_provider_forbidden", False),
+            (500, "web_push_provider_unavailable", True),
+            (503, "web_push_provider_unavailable", True),
+        )
+        for status, code, retryable in expectations:
+            with self.subTest(status=status):
+                failure = WebPushException(
+                    "provider response must not be persisted",
+                    response=SimpleNamespace(status_code=status, headers={}),
+                )
+                with patch.object(notification_delivery_service, "service_supabase", self.client), patch.dict("os.environ", environment, clear=False), patch.object(notification_delivery_service, "validate_push_endpoint", side_effect=lambda value: value), patch("pywebpush.webpush", side_effect=failure), self.assertRaises(notification_delivery_service.DeliveryError) as raised:
+                    notification_delivery_service._deliver_web_push(row)
+                self.assertEqual(raised.exception.code, code)
+                self.assertEqual(raised.exception.retryable, retryable)
+                self.assertNotIn("provider response", raised.exception.code)
+
+    def test_worker_honors_numeric_and_http_date_retry_after(self):
+        from pywebpush import WebPushException
+
+        row = {"channel": "web_push", "tenant_id": 1, "user_id": 10, "subscription_id": "active", "payload": {"title": "Title"}}
+        environment = {"WEB_PUSH_ENABLED": "true", "WEB_PUSH_VAPID_PUBLIC_KEY": "public", "WEB_PUSH_VAPID_PRIVATE_KEY": "private", "WEB_PUSH_VAPID_SUBJECT": "mailto:test@example.com"}
+        values = (
+            ("120", 120),
+            (format_datetime(datetime.now(timezone.utc) + timedelta(seconds=120)), 120),
+        )
+        for retry_after, expected in values:
+            with self.subTest(retry_after=retry_after):
+                failure = WebPushException(
+                    "limited",
+                    response=SimpleNamespace(
+                        status_code=429,
+                        headers={"Retry-After": retry_after},
+                    ),
+                )
+                with patch.object(notification_delivery_service, "service_supabase", self.client), patch.dict("os.environ", environment, clear=False), patch.object(notification_delivery_service, "validate_push_endpoint", side_effect=lambda value: value), patch("pywebpush.webpush", side_effect=failure), self.assertRaises(notification_delivery_service.DeliveryError) as raised:
+                    notification_delivery_service._deliver_web_push(row)
+                self.assertEqual(raised.exception.code, "web_push_rate_limited")
+                self.assertTrue(raised.exception.retryable)
+                self.assertLessEqual(abs(raised.exception.retry_after_seconds - expected), 2)
+
+    def test_worker_revokes_locally_malformed_subscription(self):
+        row = {"channel": "web_push", "tenant_id": 1, "user_id": 10, "subscription_id": "active", "payload": {"title": "Title"}}
+        environment = {"WEB_PUSH_ENABLED": "true", "WEB_PUSH_VAPID_PUBLIC_KEY": "public", "WEB_PUSH_VAPID_PRIVATE_KEY": "private", "WEB_PUSH_VAPID_SUBJECT": "mailto:test@example.com"}
+        with patch.object(notification_delivery_service, "service_supabase", self.client), patch.dict("os.environ", environment, clear=False), patch.object(notification_delivery_service, "validate_push_endpoint", side_effect=lambda value: value), patch("pywebpush.webpush", side_effect=ValueError("invalid local key material")), self.assertRaises(notification_delivery_service.DeliveryError) as raised:
+            notification_delivery_service._deliver_web_push(row)
+        self.assertEqual(raised.exception.code, "web_push_subscription_malformed")
         self.assertFalse(raised.exception.retryable)
         self.assertEqual(raised.exception.terminal_outcome, "revoked")
         active = next(item for item in self.client.tables["web_push_subscriptions"] if item["id"] == "active")
