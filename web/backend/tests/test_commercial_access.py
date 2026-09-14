@@ -49,15 +49,15 @@ class CommercialAccessTests(unittest.TestCase):
             access.execute_commercial_command(tenant_id=7,actor_user_id=3,aal='aal1',request_id='test',operation='manual_payment',command=access.ManualPayment(**self.payload()))
         self.assertEqual(caught.exception.status_code,403);db.rpc.assert_not_called()
 
-    def test_resolver_fails_closed_except_verified_schema93_bridge(self):
+    def test_resolver_fails_closed_except_verified_schema98_bridge(self):
         class Missing(Exception): code='PGRST202'
         db=MagicMock();db.rpc.return_value.execute.side_effect=Missing()
         with patch.dict(environ,{'COMMERCIAL_ACCESS_TEST_LOOKUPS':'true'}),patch.object(access,'service_supabase',db):
-            for schema in [None,92,94]:
+            for schema in [None,97,99]:
                 db.table.return_value.select.return_value.eq.return_value.limit.return_value.execute.return_value.data=[] if schema is None else [{'schema_version':schema}]
                 with self.assertRaises(HTTPException) as caught:access.read_commercial_snapshot(7)
                 self.assertEqual(caught.exception.status_code,503)
-            db.table.return_value.select.return_value.eq.return_value.limit.return_value.execute.return_value.data=[{'schema_version':93}]
+            db.table.return_value.select.return_value.eq.return_value.limit.return_value.execute.return_value.data=[{'schema_version':98}]
             self.assertIsNone(access.read_commercial_snapshot(7))
 
     def state(self, plan='business_plus', **changes):

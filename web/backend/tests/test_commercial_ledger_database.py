@@ -31,8 +31,8 @@ class CommercialLedgerDatabaseTests(unittest.TestCase):
             actual = conn.execute("select shobj_description(oid,'pg_database') from pg_database where datname=current_database()").fetchone()[0]
             if actual != MARKER:
                 raise RuntimeError('Refusing an unmarked database')
-            if conn.execute("select schema_version from public.application_schema_state where contract_key='core'").fetchone()[0] != 94:
-                raise RuntimeError('Expected rehearsal schema 94')
+            if conn.execute("select schema_version from public.application_schema_state where contract_key='core'").fetchone()[0] != 99:
+                raise RuntimeError('Expected rehearsal schema 99')
             # A synthetic bootstrap administrator remains for authenticated E2E.
             # Preserve the real last-administrator safeguard during test cleanup.
             if not conn.execute("select 1 from public.users where user_type='admin' and account_status='active' limit 1").fetchone():

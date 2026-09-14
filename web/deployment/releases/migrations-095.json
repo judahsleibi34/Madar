@@ -1,0 +1,13 @@
+{
+  "release_sha": "CURRENT",
+  "migrations": [
+    {
+      "number": 95,
+      "path": "web/database/migrations/095_create_ecommerce_delivery_and_order_operations.sql",
+      "sha256": "d4ce11936baccd60ff4a278f39d3dd0a005a246cb3403759aa9dfa10c6665a26",
+      "from_schema": 94,
+      "to_schema": 95,
+      "compatibility": "expand-only"
+    }
+  ]
+}

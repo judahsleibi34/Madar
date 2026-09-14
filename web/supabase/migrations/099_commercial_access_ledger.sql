@@ -265,9 +265,9 @@ do $$
 declare v_schema_version public.application_schema_state.schema_version%TYPE;
 begin
   select schema_version into v_schema_version from public.application_schema_state where contract_key = 'core' for update;
-  if v_schema_version is null then raise exception using errcode='P0001',message='migration_094_schema_state_missing'; end if;
-  if v_schema_version <> 93 then raise exception using errcode='P0001',message=format('migration_094_expected_schema_93_got_%s',v_schema_version); end if;
-  update public.application_schema_state set schema_version=94,applied_at=now() where contract_key = 'core';
+  if v_schema_version is null then raise exception using errcode='P0001',message='migration_099_schema_state_missing'; end if;
+  if v_schema_version <> 98 then raise exception using errcode='P0001',message=format('migration_099_expected_schema_98_got_%s',v_schema_version); end if;
+  update public.application_schema_state set schema_version=99,applied_at=now() where contract_key = 'core';
 end;
 $$;
 notify pgrst,'reload schema';

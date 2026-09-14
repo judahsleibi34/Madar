@@ -105,8 +105,8 @@ def read_commercial_snapshot(tenant_id: int) -> dict | None:
         if getattr(error, 'code', None) in {'PGRST202', '42883'}:
             try:
                 rows = service_supabase.table('application_schema_state').select('schema_version').eq('contract_key', 'core').limit(1).execute().data
-                if len(rows or []) == 1 and rows[0]['schema_version'] == 93:
-                    return None  # Explicit schema-93 compatibility bridge only.
+                if len(rows or []) == 1 and rows[0]['schema_version'] == 98:
+                    return None  # Explicit schema-98 compatibility bridge only.
             except Exception:
                 pass
         logger.warning('commercial.snapshot_unavailable', extra={'tenant_id': tenant_id, 'error_type': type(error).__name__})

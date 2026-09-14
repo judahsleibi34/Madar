@@ -32,7 +32,7 @@ def load_release_cli():
 
 
 class FakeOperations:
-    def __init__(self, release_root: Path, events: list[str], schema: int = 93):
+    def __init__(self, release_root: Path, events: list[str], schema: int = 98):
         self.release_root = release_root
         self.events = events
         self.schema = schema
@@ -96,7 +96,7 @@ class AutomaticMigrationControlPlaneTests(unittest.TestCase):
             )
         )
 
-    def test_current_manifest_and_rollback_contract_start_at_schema_93(self):
+    def test_current_manifest_and_rollback_contract_start_at_schema_98(self):
         manifest = json.loads(
             (
                 WEB_ROOT
@@ -104,13 +104,13 @@ class AutomaticMigrationControlPlaneTests(unittest.TestCase):
                 / self.metadata["migration_manifest"]
             ).read_text(encoding="utf-8")
         )
-        self.assertEqual(manifest["migrations"][0]["from_schema"], 93)
-        self.assertEqual(manifest["migrations"][-1]["to_schema"], 94)
+        self.assertEqual(manifest["migrations"][0]["from_schema"], 98)
+        self.assertEqual(manifest["migrations"][-1]["to_schema"], 99)
         self.assertEqual(
-            self.metadata["schema"]["rollback_compatible_max"], 93
+            self.metadata["schema"]["rollback_compatible_max"], 98
         )
 
-    def fixture(self, root: Path, *, schema: int = 93):
+    def fixture(self, root: Path, *, schema: int = 98):
         release_root = root / "release"
         release_dir = release_root / "web/deployment/releases"
         release_dir.mkdir(parents=True)
@@ -166,7 +166,7 @@ class AutomaticMigrationControlPlaneTests(unittest.TestCase):
                     "sha": "b" * 40,
                     "slot": "blue",
                     "schema_compatible_min": 81,
-                    "schema_compatible_max": 93,
+                    "schema_compatible_max": 98,
                 },
             }],
         }), encoding="utf-8")
@@ -324,10 +324,10 @@ class AutomaticMigrationControlPlaneTests(unittest.TestCase):
         self.assertLess(events.index("backup"), events.index("execute"))
         self.assertLess(events.index("execute"), events.index("refresh"))
         attest_backup.assert_called_once_with(
-            backup, release_sha=self.sha, source_schema=93
+            backup, release_sha=self.sha, source_schema=98
         )
 
-    def test_successful_93_to_94_records_target_only_after_worker_and_route_validation(self):
+    def test_successful_98_to_99_records_target_only_after_worker_and_route_validation(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             state_root, operations, compatibility, events = self.fixture(root)
@@ -343,9 +343,9 @@ class AutomaticMigrationControlPlaneTests(unittest.TestCase):
 
                 def run(_self):
                     events.append("execute")
-                    self.assertEqual(operations.schema, 93)
-                    events.append("migration:93->94")
-                    operations.schema = 94
+                    self.assertEqual(operations.schema, 98)
+                    events.append("migration:98->99")
+                    operations.schema = 99
                     return {"status": "completed"}
 
             with (
@@ -376,18 +376,18 @@ class AutomaticMigrationControlPlaneTests(unittest.TestCase):
                 ).read_text()
             )
 
-        self.assertEqual(result["observed_schema"], 94)
+        self.assertEqual(result["observed_schema"], 99)
         self.assertEqual(automation["status"], "completed")
         self.assertEqual(
             automation["phase"], "post_migration_validation_complete"
         )
-        self.assertEqual(state["known_good_release"]["schema"], 94)
+        self.assertEqual(state["known_good_release"]["schema"], 99)
         self.assertEqual(
             state["history"][-1]["phase"],
             "post_migration_workers_refreshed",
         )
         self.assertIn(f"workers:{self.sha}:green", events)
-        self.assertIn("migration:93->94", events)
+        self.assertIn("migration:98->99", events)
         pre_refresh_validation = events.index(f"pre-refresh:{self.sha}:green")
         worker_activation = events.index(f"workers:{self.sha}:green")
         full_validation = events.index(f"validate:{self.sha}:green")
@@ -457,7 +457,7 @@ class AutomaticMigrationControlPlaneTests(unittest.TestCase):
                 ).read_text()
             )
 
-        self.assertEqual(state["known_good_release"]["schema"], 93)
+        self.assertEqual(state["known_good_release"]["schema"], 98)
         self.assertEqual(
             automation["status"], "failed_forward_repair_required"
         )
@@ -604,7 +604,7 @@ class AutomaticMigrationControlPlaneTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             state_root, operations, compatibility, _events = self.fixture(
-                root, schema=94
+                root, schema=99
             )
             candidate_manifest = (
                 operations.release_root
@@ -629,7 +629,7 @@ class AutomaticMigrationControlPlaneTests(unittest.TestCase):
                 ),
             ):
                 with self.assertRaisesRegex(
-                    RuntimeError, "migration_checksum_mismatch:94"
+                    RuntimeError, "migration_checksum_mismatch:99"
                 ):
                     self.module.automatic_migrate_known_good(
                         sha=self.sha,
@@ -642,7 +642,7 @@ class AutomaticMigrationControlPlaneTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             state_root, operations, compatibility, events = self.fixture(
-                root, schema=94
+                root, schema=99
             )
             backup_root = root / "backups"
             backup = backup_root / "madar-20260830T000000Z"
@@ -690,7 +690,7 @@ class AutomaticMigrationControlPlaneTests(unittest.TestCase):
                     operations=operations,
                 )
 
-        self.assertEqual(result["observed_schema"], 94)
+        self.assertEqual(result["observed_schema"], 99)
         self.assertFalse(any(event.startswith("rollback:") for event in events))
         self.assertFalse(any(event.startswith("traffic:") for event in events))
 
@@ -709,7 +709,7 @@ class AutomaticMigrationControlPlaneTests(unittest.TestCase):
                 "status": "complete",
                 "backup_id": old_backup.name,
                 "release": {"git_sha": previous_sha},
-                "database": {"schema_version": "93"},
+                "database": {"schema_version": "98"},
             }))
 
             class TransitionExecutor:
@@ -721,8 +721,8 @@ class AutomaticMigrationControlPlaneTests(unittest.TestCase):
                     events.append("previous-checksums")
 
                 def run(_self):
-                    events.append("previous-sql:93->94")
-                    operations.schema = 94
+                    events.append("previous-sql:98->99")
+                    operations.schema = 99
                     _self.state_file.parent.mkdir(parents=True, exist_ok=True)
                     _self.state_file.write_text(json.dumps({
                         "release_sha": previous_sha,
@@ -731,7 +731,7 @@ class AutomaticMigrationControlPlaneTests(unittest.TestCase):
                             "path": str(_self.backup_dir),
                             "verified": True,
                         },
-                        "observed_schema": 94,
+                        "observed_schema": 99,
                     }))
                     return {"status": "completed"}
 
@@ -764,7 +764,7 @@ class AutomaticMigrationControlPlaneTests(unittest.TestCase):
                 **state["known_good_release"],
                 "sha": current_sha,
                 "slot": "blue",
-                "schema": 94,
+                "schema": 99,
             }
             state["active_slot"] = "blue"
             state["history"].extend([
@@ -772,18 +772,18 @@ class AutomaticMigrationControlPlaneTests(unittest.TestCase):
                     "release_sha": previous_sha,
                     "status": "known_good",
                     "phase": "post_migration_workers_refreshed",
-                    "schema": {"observed": 94},
+                    "schema": {"observed": 99},
                 },
                 {
                     "release_sha": current_sha,
                     "status": "known_good",
                     "phase": "complete",
-                    "schema": {"observed": 94, "target": 94},
+                    "schema": {"observed": 99, "target": 99},
                     "previous_known_good_release": {
                         "sha": previous_sha,
                         "slot": "green",
                         "schema_compatible_min": 81,
-                        "schema_compatible_max": 94,
+                        "schema_compatible_max": 99,
                     },
                 },
             ])
@@ -849,7 +849,7 @@ class AutomaticMigrationControlPlaneTests(unittest.TestCase):
             old_execution_after = old_execution.read_bytes()
 
         self.assertEqual(prior_result["execution_status"], "completed")
-        self.assertIn("previous-sql:93->94", events)
+        self.assertIn("previous-sql:98->99", events)
         self.assertEqual(first, second)
         self.assertEqual(first["status"], "completed")
         self.assertEqual(first["phase"], "already_at_target")
@@ -866,11 +866,11 @@ class AutomaticMigrationControlPlaneTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             state_root, operations, compatibility, _events = self.fixture(
-                root, schema=94
+                root, schema=99
             )
             state = json.loads((state_root / "state.json").read_text())
-            state["known_good_release"]["schema"] = 93
-            state["history"][-1]["schema"] = {"observed": 93}
+            state["known_good_release"]["schema"] = 98
+            state["history"][-1]["schema"] = {"observed": 98}
             (state_root / "state.json").write_text(json.dumps(state))
             migration_state = state_root / "migrations" / self.sha
             migration_state.mkdir(parents=True)
@@ -882,8 +882,8 @@ class AutomaticMigrationControlPlaneTests(unittest.TestCase):
             (migration_state / "execution.json").write_text(json.dumps({
                 "release_sha": self.sha,
                 "status": "running",
-                "phase": "migration_94",
-                "migrations": [{"number": 94, "status": "applying"}],
+                "phase": "migration_99",
+                "migrations": [{"number": 99, "status": "applying"}],
             }))
             with (
                 patch.object(self.module, "_validate_stable_known_good"),
@@ -908,11 +908,11 @@ class AutomaticMigrationControlPlaneTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             state_root, operations, compatibility, _events = self.fixture(
-                root, schema=94
+                root, schema=99
             )
             state = json.loads((state_root / "state.json").read_text())
-            state["known_good_release"]["schema"] = 93
-            state["history"][-1]["schema"] = {"observed": 93}
+            state["known_good_release"]["schema"] = 98
+            state["history"][-1]["schema"] = {"observed": 98}
             (state_root / "state.json").write_text(json.dumps(state))
             with (
                 patch.object(self.module, "_validate_stable_known_good"),
@@ -937,11 +937,11 @@ class AutomaticMigrationControlPlaneTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             state_root, operations, compatibility, _events = self.fixture(
-                root, schema=94
+                root, schema=99
             )
             state = json.loads((state_root / "state.json").read_text())
-            state["known_good_release"]["schema"] = 93
-            state["history"][-1]["schema"] = {"observed": 93}
+            state["known_good_release"]["schema"] = 98
+            state["history"][-1]["schema"] = {"observed": 98}
             (state_root / "state.json").write_text(json.dumps(state))
             backup_root = root / "backups"
             backup = backup_root / "madar-20260831T195925Z"
@@ -951,7 +951,7 @@ class AutomaticMigrationControlPlaneTests(unittest.TestCase):
                 "status": "complete",
                 "backup_id": backup.name,
                 "release": {"git_sha": "b" * 40},
-                "database": {"schema_version": "93"},
+                "database": {"schema_version": "98"},
             }))
             migration_state = state_root / "migrations" / self.sha
             migration_state.mkdir(parents=True)
@@ -995,7 +995,7 @@ class AutomaticMigrationControlPlaneTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             state_root, operations, compatibility, _events = self.fixture(
-                root, schema=95
+                root, schema=100
             )
             with (
                 patch.object(self.module, "_validate_stable_known_good"),
@@ -1106,19 +1106,19 @@ class AutomaticMigrationControlPlaneTests(unittest.TestCase):
                 "format_version": 3,
                 "status": "complete",
                 "release": {"git_sha": self.sha},
-                "database": {"schema_version": "93"},
+                "database": {"schema_version": "94"},
             }
             (backup / "manifest.json").write_text(json.dumps(manifest))
             self.module._attest_migration_backup(
-                backup, release_sha=self.sha, source_schema=93
+                backup, release_sha=self.sha, source_schema=94
             )
-            manifest["database"]["schema_version"] = "94"
+            manifest["database"]["schema_version"] = "97"
             (backup / "manifest.json").write_text(json.dumps(manifest))
             with self.assertRaisesRegex(
                 RuntimeError, "automatic_migration_backup_identity_mismatch"
             ):
                 self.module._attest_migration_backup(
-                    backup, release_sha=self.sha, source_schema=93
+                    backup, release_sha=self.sha, source_schema=94
                 )
 
 

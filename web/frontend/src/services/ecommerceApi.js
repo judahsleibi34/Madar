@@ -80,6 +80,54 @@ export const saveEcommerceTheme = async (theme, { scope } = {}) => {
   writeEcommerceThemeCache(scope, result?.theme || theme);
   return result;
 };
+
+export const fetchEcommerceGrowth = () => request("/ecommerce/growth");
+
+export const saveEcommerceGrowth = (growth) => request("/ecommerce/growth", {
+  method: "PUT",
+  body: JSON.stringify(growth),
+});
+
+export const fetchEcommerceSettings = () => request("/ecommerce/settings");
+
+export const saveEcommerceSettings = (currency) => request("/ecommerce/settings", {
+  method: "PUT",
+  body: JSON.stringify({ currency }),
+});
+
+export const fetchEcommerceDeliveryAreas = () => request("/ecommerce/delivery-areas");
+
+export const saveEcommerceDeliveryAreas = (enabledServiceAreaIds) => request("/ecommerce/delivery-areas", {
+  method: "PUT",
+  body: JSON.stringify({ enabled_service_area_ids: enabledServiceAreaIds }),
+});
+
+export const fetchEcommerceOrders = (filters = {}) => {
+  const params = new URLSearchParams();
+  Object.entries(filters).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && String(value).trim() !== "") params.set(key, String(value));
+  });
+  return request(`/ecommerce/orders${params.toString() ? `?${params}` : ""}`);
+};
+
+export const fetchEcommerceOrder = (orderId) => request(`/ecommerce/orders/${encodeURIComponent(orderId)}`);
+
+export const transitionEcommerceOrder = (orderId, status, note = "", idempotencyKey = globalThis.crypto?.randomUUID?.()) =>
+  request(`/ecommerce/orders/${encodeURIComponent(orderId)}/status`, {
+    method: "POST",
+    body: JSON.stringify({ status, note, idempotency_key: idempotencyKey || `status-${Date.now()}-${Math.random().toString(36).slice(2)}` }),
+  });
+
+export const collectEcommerceOrderPayment = (orderId) => request(`/ecommerce/orders/${encodeURIComponent(orderId)}/collect-payment`, {
+  method: "POST",
+});
+
+export const fetchEcommerceLoyalty = () => request("/ecommerce/loyalty");
+
+export const saveEcommerceLoyalty = (payload) => request("/ecommerce/loyalty", { method: "PUT", body: JSON.stringify(payload) });
+
+export const revokeEcommerceLoyaltyEntitlement = (entitlementId) => request(`/ecommerce/loyalty/entitlements/${encodeURIComponent(entitlementId)}/revoke`, { method: "POST" });
+
 export const uploadEcommerceProductImage = async (file) => {
   const formData = new FormData();
   formData.append("file", file);
@@ -221,6 +269,21 @@ export const fetchPublicEcommerceProduct = async (subdomain, slug, locale = "en"
   );
   return rememberEmbeddedStoreProfile(subdomain, data);
 };
+
+export const reconcilePublicEcommerceCart = (subdomain, items) =>
+  request(`/public/sites/${encodeURIComponent(subdomain)}/cart/reconcile`, {
+    method: "POST",
+    body: JSON.stringify({ items }),
+  });
+
+export const fetchPublicEcommerceDeliveryAreas = (subdomain) =>
+  request(`/public/sites/${encodeURIComponent(subdomain)}/delivery-areas`);
+
+export const fetchPublicEcommerceLoyalty = (subdomain) =>
+  request(`/public/sites/${encodeURIComponent(subdomain)}/loyalty/me`);
+
+export const fetchPublicEcommerceOrderConfirmation = (subdomain, token) =>
+  request(`/public/sites/${encodeURIComponent(subdomain)}/orders/confirmation/${encodeURIComponent(token)}`);
 
 export const createPublicEcommerceOrder = (subdomain, payload) =>
   request(`/public/sites/${encodeURIComponent(subdomain)}/orders`, {

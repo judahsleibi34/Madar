@@ -15,4 +15,6 @@
 @import "./archive.css";
 @import "./reservation-calendar.css";
 @import "./ecommerce.css";
+@import "./ecommerce-product-editor.css";
+@import "./ecommerce-operations.css";
 @import "./cv-rerank.css";

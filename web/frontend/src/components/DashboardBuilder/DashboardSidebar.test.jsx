@@ -123,8 +123,8 @@ describe("DashboardSidebar navigation hierarchy", () => {
     expect(screen.getByRole("button", { name: "Archive" })).toBeTruthy();
   });
 
-  it("renders Ecommerce below Workspace as an expandable section", () => {
-    renderSidebar();
+  it("renders Ecommerce below Workspace as an expandable section without navigating", () => {
+    const props = renderSidebar();
 
     const workspace = screen.getByRole("button", { name: "Workspace" });
     const ecommerce = screen.getByRole("button", { name: "Online Store" });
@@ -138,31 +138,28 @@ describe("DashboardSidebar navigation hierarchy", () => {
     fireEvent.click(ecommerce);
 
     expect(ecommerce.getAttribute("aria-expanded")).toBe("true");
+    expect(props.onNavigate).not.toHaveBeenCalled();
     expect(document.getElementById("dashboard-sidebar-ecommerce")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Tags" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Categories" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Products" }).getAttribute("aria-current")).toBe("page");
-    expect(screen.getByRole("button", { name: "Store theme" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Tags" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Categories" }).getAttribute("href")).toBe("/ecommerce/categories");
+    expect(screen.getByRole("link", { name: "Store" }).hasAttribute("aria-current")).toBe(false);
+    expect(screen.getByRole("link", { name: "Store theme" })).toBeTruthy();
     expect(within(document.getElementById("dashboard-sidebar-ecommerce")).queryByRole("button", { name: "CV Rerank" })).toBeNull();
-    expect(screen.getByRole("button", { name: "Store" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Store" })).toBeTruthy();
   });
 
-  it("keeps Ecommerce collapsed on a child route until the parent is clicked", () => {
+  it("keeps Ecommerce expanded on a child route and highlights the child", () => {
     renderSidebar("/ecommerce/categories");
 
     const ecommerce = screen.getByRole("button", { name: "Online Store" });
 
-    expect(ecommerce.getAttribute("aria-expanded")).toBe("false");
-    expect(ecommerce.classList.contains("active-parent")).toBe(true);
-    expect(screen.queryByRole("button", { name: "Categories" })).toBeNull();
-
-    fireEvent.click(ecommerce);
-
-    const categories = screen.getByRole("button", { name: "Categories" });
     expect(ecommerce.getAttribute("aria-expanded")).toBe("true");
+    expect(ecommerce.classList.contains("active-parent")).toBe(true);
+
+    const categories = screen.getByRole("link", { name: "Categories" });
     expect(categories.getAttribute("aria-current")).toBe("page");
     expect(
-      screen.getByRole("button", { name: "Products" }).hasAttribute("aria-current"),
+      screen.getByRole("link", { name: "Products" }).hasAttribute("aria-current"),
     ).toBe(false);
   });
 
@@ -178,21 +175,16 @@ describe("DashboardSidebar navigation hierarchy", () => {
     expect(cvRerank.compareDocumentPosition(myPlan) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it("keeps Ecommerce collapsed on the live view route until clicked", () => {
+  it("keeps Ecommerce expanded on the live view route", () => {
     renderSidebar("/ecommerce/store");
 
     const ecommerce = screen.getByRole("button", { name: "Online Store" });
-    expect(ecommerce.getAttribute("aria-expanded")).toBe("false");
-    expect(screen.queryByRole("button", { name: "Store" })).toBeNull();
-
-    fireEvent.click(ecommerce);
-
     expect(ecommerce.getAttribute("aria-expanded")).toBe("true");
-    expect(screen.getByRole("button", { name: "Store" }).getAttribute("aria-current")).toBe("page");
+    expect(screen.getByRole("link", { name: "Store" }).getAttribute("aria-current")).toBe("page");
   });
 
   it("keeps only one expandable sidebar section open at a time", () => {
-    renderSidebar();
+    const props = renderSidebar();
 
     const workspace = screen.getByRole("button", { name: "Workspace" });
     const ecommerce = screen.getByRole("button", { name: "Online Store" });
@@ -205,6 +197,7 @@ describe("DashboardSidebar navigation hierarchy", () => {
     fireEvent.click(ecommerce);
     expect(workspace.getAttribute("aria-expanded")).toBe("false");
     expect(ecommerce.getAttribute("aria-expanded")).toBe("true");
+    expect(props.onNavigate).not.toHaveBeenCalled();
 
     fireEvent.click(workspace);
     expect(workspace.getAttribute("aria-expanded")).toBe("true");

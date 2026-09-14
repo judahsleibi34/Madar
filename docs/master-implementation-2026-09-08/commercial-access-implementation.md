@@ -1,6 +1,6 @@
 # Commercial access implementation — continuation
 
-Status: implementation under validation on builder-backend; production remains schema93. This document supersedes the earlier unresolved plan-mapping notes, not their historical evidence.
+Status: implementation under validation on builder-backend; the commercial ledger now follows the mainline schema-098 commerce migrations as schema 099. This document supersedes the earlier unresolved plan-mapping notes, not their historical evidence.
 
 ## Canonical commercial contract
 
@@ -24,7 +24,7 @@ Shared builder routes additionally authorize document changes. Forms saves may r
 
 ## Rollout and recovery
 
-Schema94 is an additive bridge compatible with93–94; rollback to the retained schema93 application is valid only before migration. The exact-SHA governed controller upgrade is required for the new release metadata. The isolated migration runner applies the paired tree, validates RLS/grants, exercises real SQL concurrency/idempotency, dumps/restores a synthetic financial ledger and verifies schema/index/history invariants. No production migration has been run for this change.
+Schema 099 is an additive bridge compatible with schemas 081–099; rollback to the retained schema-098 application is valid only before migration. The exact-SHA governed controller upgrade is required for the new release metadata. The isolated migration runner applies the paired tree, validates RLS/grants, exercises real SQL concurrency/idempotency, dumps/restores a synthetic financial ledger and verifies schema/index/history invariants. No production commercial-ledger migration has been run for this change.
 
 Global COMMERCIAL_ENTITLEMENTS_ENFORCED remains disabled until every active production tenant has a deliberate reviewed state. Code readiness and global activation are separate. There are no CyberSource credentials, payment-provider calls, production database endpoint changes or customer connectors in this commercial change.
 

@@ -632,7 +632,7 @@
 .admin-dashboard-layout.admin-dashboard-layout-builder
   .admin-sidebar.dashboard-sidebar
   :where(
-    .admin-sidebar-subnav > button,
+    .admin-sidebar-subnav > :is(button, a),
     .admin-sidebar-language-item,
     .admin-sidebar-language-item > .language-toggle-button
   ) {
@@ -1046,7 +1046,7 @@
   .admin-dashboard-layout.authenticated-shell.admin-dashboard-layout-builder
     > .admin-sidebar.dashboard-sidebar:not(.is-workspace-collapsed)
     .admin-sidebar-subnav
-    > button {
+    > :is(button, a) {
     gap: 10px !important;
     column-gap: 10px !important;
   }

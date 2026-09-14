@@ -12,6 +12,7 @@ import {
   getTenantVisitorStatus,
   loginTenantVisitor,
 } from "../services/PageBuilder.api";
+import { recordPublicSiteVisit } from "../../../services/siteVisitApi";
 
 vi.mock("../services/PageBuilder.api", async () => ({
   ...(await vi.importActual("../services/PageBuilder.api")),
@@ -22,6 +23,10 @@ vi.mock("../services/PageBuilder.api", async () => ({
   fetchPublicSiteBootstrap: vi.fn(),
   getTenantVisitorStatus: vi.fn(),
   loginTenantVisitor: vi.fn(),
+}));
+
+vi.mock("../../../services/siteVisitApi", () => ({
+  recordPublicSiteVisit: vi.fn(() => Promise.resolve({ success: true })),
 }));
 
 const PROJECT_ID = "3023144a-6f48-46ee-90ed-fe712f51283a";
@@ -277,6 +282,8 @@ describe("TenantSiteRuntime explicit project preview", () => {
     });
 
     expect(document.querySelector(".built-site-header")?.style.backgroundColor).toBe("rgb(18, 52, 86)");
+    expect(recordPublicSiteVisit).toHaveBeenCalledTimes(1);
+    expect(recordPublicSiteVisit).toHaveBeenCalledWith("tenant-site", "website");
   });
 
   it.each([

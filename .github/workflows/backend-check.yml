@@ -22,8 +22,8 @@ jobs:
           python3 web/scripts/check_migration_transitions.py
           python3 web/scripts/check_secret_hygiene.py
 
-      - name: Build locked backend image
-        run: docker build -t madar-backend-test web/backend
+      - name: Build locked backend test image
+        run: docker build --target test -t madar-backend-test web/backend
 
       - name: Build Git-equipped CI-only backend image
         run: |
@@ -86,4 +86,4 @@ jobs:
         run: docker run --rm madar-backend-test python -m pip check
 
       - name: Rehearse commercial migration, isolation and restore
-        run: bash web/scripts/rehearse_migration_094.sh
+        run: bash web/scripts/rehearse_migration_099.sh

@@ -21,7 +21,7 @@ import {
 import { getBuilderAssetFileName } from "../PageBuilder/core/PageBuilder.uploadHandlers";
 import { apiFetch } from "../../utils/apiClient";
 import { resolveMediaUrl } from "../../utils/media";
-import { clearPublicEcommerceCache } from "../../services/ecommerceApi";
+import { clearPublicEcommerceCache, fetchEcommerceSettings, saveEcommerceSettings } from "../../services/ecommerceApi";
 import { getSettingsContent } from "../../content";
 import { buildProfilePayload } from "./profilePayload";
 import SecurityMfaPage from "./SecurityMfaPage";
@@ -260,6 +260,7 @@ export default function SettingsPage({
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
   const [isSavingSite, setIsSavingSite] = useState(false);
   const [isSavingStore, setIsSavingStore] = useState(false);
+  const [commerceSettings, setCommerceSettings] = useState({ currency: "", currency_locked: false });
   const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
   const [failedLogoUrl, setFailedLogoUrl] = useState("");
 
@@ -644,6 +645,18 @@ export default function SettingsPage({
     };
   }, [accountOnly, scopedStorageKey]);
 
+  useEffect(() => {
+    let cancelled = false;
+    if (!accountOnly) {
+      fetchEcommerceSettings()
+        .then((settings) => {
+          if (!cancelled) setCommerceSettings({ currency: settings?.currency || "", currency_locked: Boolean(settings?.currency_locked) });
+        })
+        .catch(() => {});
+    }
+    return () => { cancelled = true; };
+  }, [accountOnly]);
+
   const uploadWebsiteLogo = async (event) => {
     const file = event.target.files?.[0];
     event.target.value = "";
@@ -869,6 +882,10 @@ export default function SettingsPage({
     setIsSavingStore(true);
 
     try {
+      if (commerceSettings.currency) {
+        const settings = await saveEcommerceSettings(commerceSettings.currency);
+        setCommerceSettings({ currency: settings?.currency || commerceSettings.currency, currency_locked: Boolean(settings?.currency_locked) });
+      }
       const response = await apiFetch(`${API_URL}/website/settings`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -1303,6 +1320,20 @@ export default function SettingsPage({
                     <span className="settings-field-error">{fieldErrors.footerStoreName}</span>
                   )}
                   <small>{t.storeNameHelp}</small>
+                </label>
+
+                <label>
+                  Store currency
+                  <select
+                    aria-label="Store currency"
+                    value={commerceSettings.currency}
+                    disabled={commerceSettings.currency_locked}
+                    onChange={(event) => setCommerceSettings((current) => ({ ...current, currency: event.target.value }))}
+                  >
+                    <option value="">Select currency</option>
+                    {["ILS", "JOD", "USD", "EUR"].map((currency) => <option key={currency} value={currency}>{currency}</option>)}
+                  </select>
+                  <small>{commerceSettings.currency_locked ? "Locked after the first order." : "All active products and orders use this currency. No currency conversion is applied."}</small>
                 </label>
 
                 <label>

@@ -1,0 +1,13 @@
+{
+  "release_sha": "CURRENT",
+  "migrations": [
+    {
+      "number": 99,
+      "path": "web/database/migrations/099_commercial_access_ledger.sql",
+      "sha256": "a94a58c0aa112946ebc1abe00d2438ff354e64448c3ceef4b9115c2ed588294f",
+      "from_schema": 98,
+      "to_schema": 99,
+      "compatibility": "expand-only"
+    }
+  ]
+}

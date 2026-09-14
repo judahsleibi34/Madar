@@ -2,13 +2,13 @@
 set -euo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 WEB_ROOT="$(cd -- "$SCRIPT_DIR/.." && pwd)"
-CONTAINER_NAME="madar-094-synthetic-$RANDOM-$$"
+CONTAINER_NAME="madar-099-synthetic-$RANDOM-$$"
 POSTGRES_IMAGE="postgres:17-alpine@sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73"
 BACKEND_TEST_IMAGE="${BACKEND_TEST_IMAGE:-madar-backend-test}"
 created=false
 cleanup() { if "$created"; then docker rm -f "$CONTAINER_NAME" >/dev/null; fi; }
 trap cleanup EXIT
-docker run -d --name "$CONTAINER_NAME" --label madar.rehearsal=synthetic-commercial-094 \
+docker run -d --name "$CONTAINER_NAME" --label madar.rehearsal=synthetic-commercial-099 \
   --publish 127.0.0.1:55435:5432 --tmpfs /var/lib/postgresql/data:rw,noexec,nosuid,size=1g \
   -e POSTGRES_HOST_AUTH_METHOD=trust "$POSTGRES_IMAGE" >/dev/null
 created=true
@@ -34,7 +34,7 @@ comment on database postgres is 'madar-commercial-synthetic-rehearsal';
 SQL
 for migration in "$WEB_ROOT"/database/migrations/*.sql; do
   number="$(basename "$migration" | cut -d_ -f1)"
-  ((10#$number > 94)) && continue
+  ((10#$number > 99)) && continue
   docker exec -e PGOPTIONS='-c client_min_messages=warning' -i "$CONTAINER_NAME" psql -X -U postgres -v ON_ERROR_STOP=1 -q < "$migration"
 done
 docker run --rm --network host --read-only --tmpfs /tmp:rw,noexec,nosuid,size=64m \
@@ -67,7 +67,7 @@ docker exec "$CONTAINER_NAME" pg_restore -U postgres --exit-on-error --dbname=co
 docker exec -i "$CONTAINER_NAME" psql -X -U postgres -d commercial_restore -v ON_ERROR_STOP=1 -q <<'SQL'
 do $$
 begin
-  if (select schema_version from public.application_schema_state where contract_key='core')<>94 then raise exception 'restored_schema_mismatch'; end if;
+  if (select schema_version from public.application_schema_state where contract_key='core')<>99 then raise exception 'restored_schema_mismatch'; end if;
   if exists(select 1 from pg_index where not indisvalid) then raise exception 'restored_invalid_indexes'; end if;
   if (select count(*) from public.commercial_manual_payments)<>1 or (select count(*) from public.commercial_access_periods)<>1
      or (select count(*) from public.commercial_access_events)<>1 then raise exception 'restored_ledger_incomplete'; end if;
@@ -76,4 +76,4 @@ end $$;
 SQL
 docker exec "$CONTAINER_NAME" sha256sum /tmp/commercial-proof.dump
 docker exec "$CONTAINER_NAME" psql -X -U postgres -v ON_ERROR_STOP=1 -At -c "select schema_version from public.application_schema_state where contract_key='core'; select count(*) from pg_index where not indisvalid;"
-echo "Migration 094 fresh synthetic upgrade and PostgreSQL regression suite passed"
+echo "Migration 099 fresh synthetic upgrade and PostgreSQL regression suite passed"

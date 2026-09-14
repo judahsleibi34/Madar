@@ -28,28 +28,28 @@ from routes.builder_routes import (
 
 IBTIKAR = "https://ibtikar.ps"
 MEDIA = {
-    "logo": f"{IBTIKAR}/wp-content/uploads/2023/08/logo-2023-ibtikar.png",
-    "hero": f"{IBTIKAR}/wp-content/uploads/2025/03/4783a8fe-f6da-4458-b474-186374e2afff.jpeg",
-    "education": f"{IBTIKAR}/wp-content/uploads/2025/03/Copy-of-IMG_7594.jpg",
-    "future": f"{IBTIKAR}/wp-content/uploads/2025/03/slider1.jpg",
-    "collage": f"{IBTIKAR}/wp-content/uploads/2025/03/Ibtikar-Collage-1.jpg",
-    "puppets": f"{IBTIKAR}/wp-content/uploads/2025/03/01784fb2-e758-4ed7-ad0b-1bd195549471-scaled.jpg",
-    "story_bazaar": f"{IBTIKAR}/wp-content/uploads/2025/06/IMG_6941-1-1024x683.jpg",
-    "story_sheleads": f"{IBTIKAR}/wp-content/uploads/2025/06/IMG_8932-1-1024x683.jpg",
-    "story_resilience": f"{IBTIKAR}/wp-content/uploads/2025/03/IMG_4657-1-scaled.jpg",
+    "logo": "",
+    "hero": "",
+    "education": "",
+    "future": "",
+    "collage": "",
+    "puppets": "",
+    "story_bazaar": "",
+    "story_sheleads": "",
+    "story_resilience": "",
 }
 
 DONOR_LOGOS = [
-    ("Partner logo", f"{IBTIKAR}/wp-content/uploads/2025/03/Picture1-1-150x150.png"),
-    ("GIZ", f"{IBTIKAR}/wp-content/uploads/2025/03/giz-2-150x150.jpg"),
-    ("GIZ partner", f"{IBTIKAR}/wp-content/uploads/2025/03/giz2-150x150.jpg"),
-    ("Kinder partner", f"{IBTIKAR}/wp-content/uploads/2025/03/small_thumb_Kinder_Logo_small-1-150x150.png"),
-    ("SANAD", f"{IBTIKAR}/wp-content/uploads/2025/03/small_thumb_sanad-color-1-150x150.png"),
-    ("Mercy Relief", f"{IBTIKAR}/wp-content/uploads/2025/03/logo-mercyrelief@2x-150x150.png"),
-    ("Ministere partner", f"{IBTIKAR}/wp-content/uploads/2025/03/ministere-150x150.jpg"),
-    ("EFG", f"{IBTIKAR}/wp-content/uploads/2025/03/efg-150x150.jpg"),
-    ("Women Rights Online", f"{IBTIKAR}/wp-content/uploads/2025/03/Laboratory-women-right-online-LOGO-150x150.png"),
-    ("Donor logo", f"{IBTIKAR}/wp-content/uploads/2025/07/Donor-150x150.png"),
+    ("Partner logo", ""),
+    ("GIZ", ""),
+    ("GIZ partner", ""),
+    ("Kinder partner", ""),
+    ("SANAD", ""),
+    ("Mercy Relief", ""),
+    ("Ministere partner", ""),
+    ("EFG", ""),
+    ("Women Rights Online", ""),
+    ("Donor logo", ""),
 ]
 
 THEME = {

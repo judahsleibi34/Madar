@@ -1,4 +1,5 @@
 import { useWorkspaceCapabilities, builderTabCapabilities } from "../../../commercial/capabilityContext";
+import SelectionBoundary from "../core/PageBuilder.selectionBoundary";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { Link, useLocation, useNavigate } from "react-router-dom";
@@ -22,6 +23,8 @@ import {
   List,
   ListOrdered,
   Move,
+  Minus,
+  Plus,
   Redo2,
   Save,
   Trash2,
@@ -163,9 +166,11 @@ import {
   getCanvasTextSelectionRange,
   createDomTextRange,
   getFloatingToolbarPlacement,
+  getSelectionMoveHandlePlacement,
   createInputTextSelection,
   getTextBlockFormats,
   getTextBlockIndexesForRange,
+  getEditableSelectionBlockIndexes,
   replaceRichTextRangeStyle,
 } from "../core/PageBuilder.text";
 import {
@@ -200,6 +205,7 @@ import {
   getSectionCanvasHeight,
   compactDirectSectionAfterElementRemoval,
   convertSectionToDirectLayout,
+  measureAutoSectionLayout,
   positionsOverlap,
   getProjectOverlapWarnings as getProjectOverlapWarningsFromLayout,
   snapToGrid,
@@ -805,8 +811,6 @@ export default function PageBuilder({
   const [activeTopbarAction, setActiveTopbarAction] = useState("");
   const [quizOptionsOpen, setQuizOptionsOpen] = useState(false);
   const [assetUploadBusy, setAssetUploadBusy] = useState(false);
-  const [logoUrlDraft, setLogoUrlDraft] = useState(() => project.siteChrome?.logoUrl || "");
-  const [logoUrlDraftEdited, setLogoUrlDraftEdited] = useState(false);
   const projectRef = useRef(project);
   const undoStackRef = useRef([]);
   const redoStackRef = useRef([]);
@@ -827,6 +831,7 @@ export default function PageBuilder({
   const [hasCopiedElement, setHasCopiedElement] = useState(false);
   const [inlineToolbarPosition, setInlineToolbarPosition] = useState(null);
   const inlineToolbarRef = useRef(null);
+  const inlineToolbarTargetRef = useRef(null);
   const inlineToolbarInteractionRef = useRef(false);
   const elementClipboardRef = useRef(null);
   const backendAutosaveTimerRef = useRef(null);
@@ -4334,14 +4339,23 @@ export default function PageBuilder({
 
     // Selecting or editing an auto-layout component must never rewrite its section.
     // Only the explicit move/resize handle opts into free-position conversion.
-    if (element.mode !== "direct" && !forceInteraction) return;
+    const location = findElementLocation(element.id);
+    const sourceSectionForInteraction = activePage?.sections.find((section) => section.id === location?.sectionId);
+    const isDirect = ["direct", "free"].includes(sourceSectionForInteraction?.mode);
+    if (!isDirect && !forceInteraction) return;
 
-    if (element.mode !== "direct") {
-      const location = findElementLocation(element.id);
-      const sourceSection = activePage?.sections.find((section) => section.id === location?.sectionId);
+    if (!isDirect) {
+      const sourceSection = sourceSectionForInteraction;
       if (!sourceSection) return;
 
-      convertedSourceSection = convertSectionToDirectLayout(sourceSection);
+      const sourceNode = findBuilderDataElement(
+        canvasShellRef.current, "data-builder-content-id", element.id
+      )?.closest(".site-section");
+      const measuredLayout = measureAutoSectionLayout(sourceNode);
+      convertedSourceSection = convertSectionToDirectLayout(
+        sourceSection,
+        measuredLayout ? { [viewport]: measuredLayout } : {}
+      );
       directElement = (convertedSourceSection.freeElements || []).find(
         (candidate) => candidate.id === element.id
       );
@@ -4395,8 +4409,8 @@ export default function PageBuilder({
       const position = {
         x: Number(frame.dataset.logicalX),
         y: Number(frame.dataset.logicalY),
-        width: Number(frame.dataset.logicalWidth),
-        height: Number(frame.dataset.logicalHeight),
+        width: frame.offsetWidth || Number(frame.dataset.logicalWidth),
+        height: frame.offsetHeight || Number(frame.dataset.logicalHeight),
       };
       return Object.values(position).every(Number.isFinite) ? position : null;
     };
@@ -4414,8 +4428,11 @@ export default function PageBuilder({
       return [candidate.id, position];
     }));
 
+    const layoutPositions = Object.fromEntries(sourceElements.map((candidate) =>
+      [candidate.id, getRenderedFramePosition(candidate)]
+    ).filter(([, position]) => position));
     const minimumSize = getDirectElementMinimumSize(directElement);
-    let current = groupStartPositions[directElement.id] || clampElementToBounds(
+    const current = groupStartPositions[directElement.id] || clampElementToBounds(
       getRenderedFramePosition(directElement) || directElement.position?.[viewport] || createPosition()[viewport],
       pointer.bounds,
       {
@@ -4424,17 +4441,6 @@ export default function PageBuilder({
         allowBottomOverflow: true,
       }
     );
-    if (
-      interaction === "resize" &&
-      directElement.type === "heading" &&
-      directElement.directWidthMode !== "fixed"
-    ) {
-      current = {
-        ...current,
-        width: Math.max(minimumSize.width, pointer.bounds.width - current.x),
-      };
-    }
-
     if (!effectiveSelectedElementIds.includes(directElement.id)) {
       setSelectedElementIds([directElement.id]);
     }
@@ -4443,6 +4449,8 @@ export default function PageBuilder({
       elementId: directElement.id,
       groupElementIds,
       groupStartPositions,
+      layoutPositions,
+      hasMoved: false,
       startClientX: event.clientX,
       startClientY: event.clientY,
       startX: current.x || 0,
@@ -4501,6 +4509,7 @@ export default function PageBuilder({
   const positionInlineToolbarNear = useCallback((target, preferredRect = null) => {
     if (!target || typeof window === "undefined") return;
 
+    inlineToolbarTargetRef.current = target;
     const targetRect = target.getBoundingClientRect();
     const sourceRect = preferredRect
       && Number.isFinite(preferredRect.top)
@@ -4539,10 +4548,29 @@ export default function PageBuilder({
       horizontalBounds,
       left: anchorRect.left,
       top: anchorRect.bottom + 10,
-      maxWidth: Math.max(1, horizontalBounds.right - horizontalBounds.left),
+      maxWidth: Math.min(560, Math.max(1, horizontalBounds.right - horizontalBounds.left)),
       placement: "below",
     });
   }, []);
+
+  const inlineToolbarVisible = Boolean(inlineToolbarPosition);
+  useEffect(() => {
+    if (!inlineToolbarVisible) return;
+    const reposition = () => {
+      const target = inlineToolbarTargetRef.current;
+      if (target?.isConnected) positionInlineToolbarNear(target);
+    };
+    reposition();
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(reposition);
+    if (inlineToolbarTargetRef.current) observer?.observe(inlineToolbarTargetRef.current);
+    window.addEventListener("resize", reposition);
+    window.addEventListener("scroll", reposition, true);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener("resize", reposition);
+      window.removeEventListener("scroll", reposition, true);
+    };
+  }, [inlineToolbarVisible, positionInlineToolbarNear, selectedElement]);
 
   useLayoutEffect(() => {
     const toolbar = inlineToolbarRef.current;
@@ -4585,19 +4613,9 @@ export default function PageBuilder({
     const textBlocks = [...event.currentTarget.children].filter((node) =>
       node.hasAttribute("data-builder-text-block")
     );
-    const getBlockIndex = (node) => {
-      const elementNode = node?.nodeType === Node.ELEMENT_NODE ? node : node?.parentElement;
-      const block = elementNode?.closest?.("[data-builder-text-block]");
-      return block ? textBlocks.indexOf(block) : -1;
-    };
-    const startBlockIndex = getBlockIndex(browserRangeForBlocks?.startContainer);
-    const endBlockIndex = getBlockIndex(browserRangeForBlocks?.endContainer);
-    const firstBlockIndex = startBlockIndex >= 0 ? startBlockIndex : 0;
-    const lastBlockIndex = endBlockIndex >= firstBlockIndex ? endBlockIndex : firstBlockIndex;
-    const blockIndexes = textBlocks.length
-      ? Array.from({ length: lastBlockIndex - firstBlockIndex + 1 }, (_, index) => firstBlockIndex + index)
-      : [];
-    const blockFormat = textBlocks[firstBlockIndex]?.dataset.builderTextBlock || null;
+    const blockIndexes = getEditableSelectionBlockIndexes(event.currentTarget, browserRangeForBlocks);
+    const selectedFormats = blockIndexes.map((index) => textBlocks[index]?.dataset.builderTextBlock);
+    const blockFormat = new Set(selectedFormats).size > 1 ? "mixed" : selectedFormats[0] || null;
     const nextTextSelection = {
       elementId,
       field,
@@ -4613,10 +4631,7 @@ export default function PageBuilder({
     const browserRange = !range.collapsed && browserSelection?.rangeCount
       ? browserSelection.getRangeAt(0)
       : null;
-    const selectedRangeRect = browserRange
-      ? browserRange.getBoundingClientRect?.()
-      : null;
-    positionInlineToolbarNear(event.currentTarget, selectedRangeRect);
+    positionInlineToolbarNear(event.currentTarget);
     setInlineFontSizeDraft(null);
 
     if (range.collapsed) {
@@ -5106,7 +5121,39 @@ export default function PageBuilder({
       10
     );
 
+    const hasBoundaryMoveHandle = ["direct", "free"].includes(getElementSection(selectedElement.id)?.mode);
+    const edgeRect = inlineToolbarPosition.avoidanceRect;
+    const toolbarBounds = inlineToolbarRef.current?.getBoundingClientRect();
+    const moveHandle = getSelectionMoveHandlePlacement({
+      elementRect: edgeRect,
+      toolbarRect: {
+        left: inlineToolbarPosition.left,
+        top: inlineToolbarPosition.top,
+        right: inlineToolbarPosition.left + (toolbarBounds?.width || 560),
+        bottom: inlineToolbarPosition.top + (toolbarBounds?.height || 100),
+      },
+      horizontalBounds: inlineToolbarPosition.horizontalBounds,
+      viewportHeight: window.innerHeight,
+      placement: inlineToolbarPosition.placement,
+    });
+
     return (
+      <>
+      {!hasBoundaryMoveHandle && <button
+        type="button"
+        className="builder-selection-move-handle"
+        data-edge={moveHandle.edge}
+        aria-label="Move component"
+        title="Drag to move component"
+        style={{
+          left: `${moveHandle.left}px`,
+          top: `${moveHandle.top}px`,
+        }}
+        onClick={(event) => event.stopPropagation()}
+        onPointerDown={(event) => startDrag(event, selectedElement, "move", true)}
+      >
+        <Move size={16} aria-hidden="true" />
+      </button>}
       <div
         className="builder-inline-text-toolbar is-floating"
         ref={inlineToolbarRef}
@@ -5132,14 +5179,7 @@ export default function PageBuilder({
           inlineToolbarInteractionRef.current = false;
         }}
       >
-        <button
-          type="button"
-          aria-label="Move component"
-          title="Drag to move component"
-          onPointerDown={(event) => startDrag(event, selectedElement, "move", true)}
-        >
-          <Move size={16} aria-hidden="true" />
-        </button>
+        <div className="builder-inline-toolbar-row" role="group" aria-label="Typography">
         <select
           aria-label="Text style"
           value={getInlineTextFormatValue()}
@@ -5151,6 +5191,7 @@ export default function PageBuilder({
               <option value="listItem">Bullet point</option>
             </>
           )}
+          <option value="mixed" disabled>Mixed styles</option>
           <option value="text">Text</option>
           <option value="h1">H1</option>
           <option value="h2">H2</option>
@@ -5180,6 +5221,7 @@ export default function PageBuilder({
           <span>Size</span>
           <input
             type="number"
+            aria-label="Text size"
             min="8"
             max={MAX_BUILDER_TEXT_FONT_SIZE_PX}
             step="1"
@@ -5211,6 +5253,8 @@ export default function PageBuilder({
           />
           <span aria-hidden="true">%</span>
         </label>
+        </div>
+        <div className="builder-inline-toolbar-row" role="group" aria-label="Text appearance and alignment">
         {inlineTextToolbarButtons.map((item) => {
           const Icon = item.icon;
           const selectedRangeFontWeight = getSelectedTextRangeStyle("fontWeight");
@@ -5244,8 +5288,9 @@ export default function PageBuilder({
             <button
               key={item.id}
               type="button"
-              className={isActive ? "is-active" : ""}
+              className={`${isActive ? "is-active" : ""} ${["bold", "bullets", "align-left"].includes(item.id) ? "starts-group" : ""}`}
               aria-label={item.label}
+              aria-pressed={item.id === "undo" || item.id === "redo" ? undefined : isActive}
               title={item.label}
               onClick={() => applyInlineTextToolbarAction(item.id)}
             >
@@ -5256,6 +5301,9 @@ export default function PageBuilder({
         <button
           type="button"
           className={selectedElement.styles?.direction === "ltr" ? "is-active" : ""}
+          title="Left to right text"
+          aria-label="Left to right text"
+          aria-pressed={selectedElement.styles?.direction === "ltr"}
           onClick={() => updateSelectedElement({ styles: { direction: "ltr" } })}
         >
           LTR
@@ -5263,6 +5311,9 @@ export default function PageBuilder({
         <button
           type="button"
           className={selectedElement.styles?.direction === "rtl" ? "is-active" : ""}
+          title="Right to left text"
+          aria-label="Right to left text"
+          aria-pressed={selectedElement.styles?.direction === "rtl"}
           onClick={() => updateSelectedElement({ styles: { direction: "rtl" } })}
         >
           RTL
@@ -5270,6 +5321,7 @@ export default function PageBuilder({
         <label className="builder-inline-toolbar-color" title="Text color">
           <Baseline size={16} aria-hidden="true" />
           <input
+            aria-label="Text color"
             type="color"
             value={selectedElement.styles?.selectedTextColor || selectedElement.styles?.color || "#000000"}
             onChange={(event) => applyTextColor(event.target.value)}
@@ -5278,12 +5330,15 @@ export default function PageBuilder({
         <label className="builder-inline-toolbar-color" title="Background color">
           <Highlighter size={16} aria-hidden="true" />
           <input
+            aria-label="Background color"
             type="color"
             value={selectedRangeBackgroundColor || selectedElement.styles?.backgroundColor || "#fffdfa"}
             onChange={(event) => applyTextBackgroundColor(event.target.value)}
           />
         </label>
+        </div>
       </div>
+      </>
     );
   };
 
@@ -5393,6 +5448,7 @@ export default function PageBuilder({
     const bounds = parentGeometry.geometry.bounds;
     const deltaX = localPointer.x - dragState.startPointerLocalX;
     const deltaY = localPointer.y - dragState.startPointerLocalY;
+    if (!dragState.hasMoved && Math.hypot(event.clientX - dragState.startClientX, event.clientY - dragState.startClientY) < 3) return;
     const canvasWidth = bounds.width;
     const canvasHeight = bounds.height;
     const visibleCanvasBounds = getVisibleCanvasLocalBounds(
@@ -5517,6 +5573,7 @@ export default function PageBuilder({
     );
 
     pendingDragPreviewRef.current = {
+      hasMoved: true,
       previewPosition,
       previewPositions,
       previewSectionHeight,
@@ -5580,6 +5637,10 @@ export default function PageBuilder({
     }
     const finalPreview = pendingDragPreviewRef.current || dragState;
     pendingDragPreviewRef.current = null;
+    if (!finalPreview.hasMoved) {
+      setDragState(null);
+      return;
+    }
     const sourceLocation = findElementLocation(selectedElement.id);
     const targetFrame = finalPreview.dropSectionId
       ? findBuilderDataElement(document, "data-section-id", finalPreview.dropSectionId)
@@ -5864,18 +5925,6 @@ export default function PageBuilder({
     }));
   }, [updateProject]);
 
-  useEffect(() => {
-    return deferEffectStateUpdate(() => {
-      setLogoUrlDraft(siteChrome.logoUrl || "");
-      setLogoUrlDraftEdited(false);
-    });
-  }, [siteChrome.logoUrl]);
-
-  const applyLogoUrl = useCallback(() => {
-    updateSiteChrome({ logoUrl: logoUrlDraft.trim() });
-    setLogoUrlDraftEdited(false);
-    showToast("Logo URL applied.");
-  }, [logoUrlDraft, showToast, updateSiteChrome]);
 
   const getHeaderButtonPageTargetId = useCallback(
     (targetValue = "") => {
@@ -6319,6 +6368,13 @@ export default function PageBuilder({
           renderSiteFooter={renderSiteFooter}
           carouselElementTypes={carouselElementTypes}
           getDirectElementPosition={getRenderedDirectElementPosition}
+          interactionPositionsBySection={dragState ? {
+            [dragState.parentSectionId]: {
+              ...dragState.layoutPositions,
+              ...dragState.previewPositions,
+              [dragState.elementId]: dragState.previewPosition,
+            },
+          } : undefined}
           getSectionLogicalHeight={(section) =>
             dragState?.elementId && getElementSection(dragState.elementId)?.id === section.id
               ? Math.max(getSectionCanvasHeight(section, viewport), Number(dragState.previewSectionHeight) || 0)
@@ -6411,31 +6467,15 @@ export default function PageBuilder({
               onClick: (event) => { if (!preview) event.stopPropagation(); },
             };
           }}
-          renderDirectElementOverlay={(element) => {
-            const elementSelected = effectiveSelectedElementIds.includes(element.id);
-            const usesDetachedEditBoundary = elementSelected && element.layer === "behindText" && !preview;
-            if (!elementSelected || preview || usesDetachedEditBoundary) return null;
-            return (
-              <div className="editor-overlay editor-element-overlay">
-                <button type="button" className="direct-move-handle" aria-label={"Move " + (element.name || "component")} title="Drag to move in any direction" onPointerDown={(event) => startDrag(event, element, "move", true)}>
-                  <Move size={13} aria-hidden="true" />
-                </button>
-                <button type="button" className="direct-resize-handle" aria-label={"Resize " + (element.name || "component")} title="Drag to resize" onPointerDown={(event) => startDrag(event, element, "resize", true)} />
-              </div>
-            );
-          }}
           renderAfterDirectElement={(element, section, frameStyle) => {
-            const elementSelected = effectiveSelectedElementIds.includes(element.id);
-            if (!elementSelected || element.layer !== "behindText" || preview) return null;
+            if (preview || !effectiveSelectedElementIds.includes(element.id)) return null;
             return (
-              <div className="direct-element-frame direct-element-edit-boundary is-selected" style={{ ...frameStyle, zIndex: 6 }} tabIndex={-1} onPointerDownCapture={(event) => event.currentTarget.focus({ preventScroll: true })} onPointerDown={(event) => startDrag(event, element, "move")} onClick={(event) => event.stopPropagation()}>
-                <div className="editor-overlay editor-element-overlay">
+              <SelectionBoundary frameStyle={frameStyle} elementId={element.id}>
                 <button type="button" className="direct-move-handle" aria-label={"Move " + (element.name || "component")} title="Drag to move in any direction" onPointerDown={(event) => startDrag(event, element, "move", true)}>
                   <Move size={13} aria-hidden="true" />
                 </button>
-                <button type="button" className="direct-resize-handle" aria-label={"Resize " + (element.name || "component")} title="Drag to resize" onPointerDown={(event) => startDrag(event, element, "resize", true)} />
-                </div>
-              </div>
+                <button type="button" className="direct-resize-handle" aria-label={"Resize " + (element.name || "component")} title="Drag to resize the box" onPointerDown={(event) => startDrag(event, element, "resize", true)} />
+              </SelectionBoundary>
             );
           }}
           getColumnProps={(column, section) => ({
@@ -6720,42 +6760,6 @@ export default function PageBuilder({
                       )}
                     </div>
                   </div>
-                  <details className="carousel-image-url-control">
-                    <summary>Public image URL</summary>
-                    <label>
-                      HTTPS image URL
-                      <input
-                        key={`${selectedElement.id}_slide_url_${index}_${slide.image}`}
-                        type="url"
-                        inputMode="url"
-                        autoComplete="off"
-                        placeholder="https://example.com/image.jpg"
-                        defaultValue={/^https:\/\//i.test(String(slide.image || "").trim()) ? slide.image : ""}
-                        onBlur={(event) => {
-                          const imageUrl = event.currentTarget.value.trim();
-                          const urlError = getStoredUrlError(imageUrl, {
-                            fieldName: "Image URL",
-                            allowRelative: false,
-                            allowEmpty: true,
-                          });
-
-                          if (urlError) {
-                            showToast(urlError);
-                            event.currentTarget.value = /^https:\/\//i.test(String(slide.image || "").trim()) ? slide.image : "";
-                            return;
-                          }
-
-                          if (imageUrl === slide.image || (!imageUrl && !/^https:\/\//i.test(String(slide.image || "").trim()))) return;
-
-                          const slides = parseCarouselSlides(selectedElement.content).map((item, itemIndex) =>
-                            itemIndex === index ? { ...item, image: imageUrl } : item
-                          );
-                          updateSelectedElement({ content: serializeCarouselSlides(slides) });
-                        }}
-                      />
-                      <small>Only public HTTPS image URLs are accepted. Uploaded file paths stay hidden.</small>
-                    </label>
-                  </details>
                   <button type="button" className="danger-lite" disabled={parseCarouselSlides(selectedElement.content).length <= 1} onClick={() => updateSelectedElement({ content: serializeCarouselSlides(parseCarouselSlides(selectedElement.content).filter((_, itemIndex) => itemIndex !== index)) })}>{selectedElement.type === "logoSlider" ? "Remove logo" : "Remove card"}</button>
                     </div>
                   </details>
@@ -7416,22 +7420,19 @@ export default function PageBuilder({
                     <span className="site-chrome-logo-control">
                       <input
                         id="site-chrome-logo-url"
-                        value={logoUrlDraftEdited ? logoUrlDraft : getBuilderAssetFileName(siteChrome.logoUrl)}
-                        placeholder="Image URL"
-                        onChange={(event) => {
-                          setLogoUrlDraftEdited(true);
-                          setLogoUrlDraft(event.target.value);
-                        }}
+                        readOnly
+                        value={getBuilderAssetFileName(siteChrome.logoUrl)}
+                        placeholder="No logo uploaded"
                       />
-                      <button type="button" className="upload-image-button site-chrome-logo-apply" onClick={applyLogoUrl}>
-                        Apply URL
-                      </button>
                       <label className="upload-image-button site-chrome-logo-upload">
-                        {assetUploadBusy ? "Uploading" : "Choose file"}
+                        {assetUploadBusy ? "Uploading" : siteChrome.logoUrl ? "Replace file" : "Choose file"}
                         <input type="file" accept="image/png,image/jpeg,image/webp" disabled={assetUploadBusy} onChange={handleSiteLogoUpload} />
                       </label>
+                      {siteChrome.logoUrl && (
+                        <button type="button" className="danger-lite" disabled={assetUploadBusy} onClick={() => updateSiteChrome({ logoUrl: "" })}>Remove logo</button>
+                      )}
                     </span>
-                    <small>Paste an image URL or upload a PNG, JPG, or WebP from your computer.</small>
+                    <small>PNG, JPG, and WebP uploads are stored as managed workspace assets.</small>
                   </div>
                   <label className="span-2">
                     Logo width
@@ -7932,10 +7933,15 @@ export default function PageBuilder({
           activeTopbarAction={activeTopbarAction}
           artboardCameraControls={(
             <div className="artboard-camera-controls" role="toolbar" aria-label="Artboard zoom">
-              <button type="button" className={manualEditorZoom === 1 ? "is-active" : ""} onClick={() => setManualEditorZoom(1)}>100%</button>
-              <button type="button" aria-label="Zoom out" onClick={() => setManualEditorZoom((value) => clampEditorZoom(value - 0.1))}>-</button>
-              <output>{Math.round(canvasScale * 100)}%</output>
-              <button type="button" aria-label="Zoom in" onClick={() => setManualEditorZoom((value) => clampEditorZoom(value + 0.1))}>+</button>
+              <button type="button" aria-label="Zoom out" title="Zoom out" disabled={preview || manualEditorZoom <= 0.1} onClick={() => setManualEditorZoom((value) => clampEditorZoom(Math.round((value - 0.1) * 10) / 10))}>
+                <Minus size={16} aria-hidden="true" />
+              </button>
+              <button type="button" className="builder-zoom-value" aria-label={`Zoom ${Math.round(canvasScale * 100)}%. Reset to 100%`} title="Reset zoom to 100%" disabled={preview} onClick={() => setManualEditorZoom(1)}>
+                {Math.round(canvasScale * 100)}%
+              </button>
+              <button type="button" aria-label="Zoom in" title="Zoom in" disabled={preview || manualEditorZoom >= 2} onClick={() => setManualEditorZoom((value) => clampEditorZoom(Math.round((value + 0.1) * 10) / 10))}>
+                <Plus size={16} aria-hidden="true" />
+              </button>
             </div>
           )}
           builderCopy={builderCopy}

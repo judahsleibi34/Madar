@@ -1024,7 +1024,6 @@
   text-align: end;
 }
 
-.site-chrome-logo-apply,
 .site-chrome-logo-upload {
   min-width: 0;
   width: 100%;
@@ -2944,7 +2943,6 @@ summary {
   cursor: pointer;
 }
 
-.site-chrome-workspace .site-chrome-logo-apply,
 .site-chrome-workspace .site-chrome-logo-upload {
   min-height: 36px;
   padding: 0 8px !important;
@@ -4412,3 +4410,89 @@ summary {
     padding: 2.5rem 1.25rem;
   }
 }
+/* Selection tools override the larger workspace form controls. */
+.page-builder .builder-inline-text-toolbar {
+  width: 560px;
+  box-sizing: border-box;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  padding: 10px;
+  border-radius: 12px;
+  transition: none;
+}
+.page-builder .builder-inline-toolbar-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+.page-builder .builder-inline-toolbar-row + .builder-inline-toolbar-row {
+  border-top: 1px solid var(--madar-border-strong);
+  padding-top: 8px;
+}
+.page-builder .builder-inline-text-toolbar :is(button, select, label) {
+  box-sizing: border-box;
+  width: auto;
+  min-width: 0;
+  height: 32px;
+  min-height: 32px;
+  margin: 0;
+  padding: 0 6px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  flex: 0 0 auto;
+}
+.page-builder .builder-inline-text-toolbar select {
+  width: 100px;
+  max-width: 100%;
+}
+.page-builder .builder-inline-text-toolbar .builder-inline-toolbar-font-family { width: 140px; }
+.page-builder .builder-inline-text-toolbar button {
+  min-width: 30px;
+  border-color: transparent;
+}
+.page-builder .builder-inline-text-toolbar label {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 4px;
+}
+.page-builder .builder-inline-toolbar-size input {
+  box-sizing: border-box;
+  width: 46px;
+  min-width: 0;
+  height: 28px;
+  min-height: 0;
+  padding: 0 2px;
+  border: 0;
+  border-radius: 3px;
+  font: inherit;
+  background: transparent;
+}
+.page-builder .builder-inline-text-toolbar :is(button, select, input):focus-visible,
+.page-builder .builder-selection-move-handle:focus-visible {
+  outline: 2px solid var(--color-accent-text);
+  outline-offset: 2px;
+}
+.page-builder .builder-selection-move-handle {
+  position: fixed;
+  z-index: 81;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
+  min-height: 32px;
+  padding: 0;
+  border: 2px solid var(--theme-surface);
+  border-radius: 8px;
+  background: var(--madar-red);
+  color: var(--theme-text-inverse);
+  box-shadow: 0 2px 8px rgba(var(--theme-shadow-rgb), 0.24);
+  cursor: grab;
+  touch-action: none;
+}
+.page-builder .builder-selection-move-handle:active { cursor: grabbing; }

@@ -1,14 +1,14 @@
 {
   "release_metadata_version": 1,
   "schema": {
-    "compatible_min": 93,
-    "compatible_max": 94,
-    "target": 94,
+    "compatible_min": 81,
+    "compatible_max": 99,
+    "target": 99,
     "migration_class": "expand-only",
-    "rollback_compatible_min": 93,
-    "rollback_compatible_max": 93
+    "rollback_compatible_min": 81,
+    "rollback_compatible_max": 98
   },
   "migration_policy": "automatic-after-known-good-backup-first-forward-repair",
-  "notes": "Schema 093/094 commercial ledger bridge. Accept the exact release on schema 093, then create and verify the governed backup before migration 094. Seed unresolved tenants as review_required without granting access or inventing payments. Global commercial enforcement remains operator-disabled pending deliberate tenant review. After schema advances to 094, recover by forward repair; do not roll traffic back to schema-093-only binaries.",
-  "migration_manifest": "migrations-094.json"
+  "notes": "Schema 098/099 commercial ledger bridge. Accept the exact release on schema 098, then create and verify the governed backup before migration 099. Seed unresolved tenants as review_required without granting access or inventing payments. Global commercial enforcement remains operator-disabled pending deliberate tenant review. After schema advances to 099, recover by forward repair; do not roll traffic back to schema-098-only binaries.",
+  "migration_manifest": "migrations-099.json"
 }
