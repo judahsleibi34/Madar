@@ -61,6 +61,10 @@ class MonorepoDeploymentTests(unittest.TestCase):
             WEB_ROOT / "deployment/releases/schema-96-recovery.json"
         ).read_text(encoding="utf-8")
         self.assertIn("releases/schema-96-recovery.json", installer)
+        self.assertIn("lib/runtime_authority.py", installer)
+        self.assertTrue(
+            (WEB_ROOT / "deployment/lib/runtime_authority.py").is_file()
+        )
         self.assertIn("--recover-current-schema", release)
         self.assertNotIn("--recover-current-schema", automatic)
         self.assertIn('"migration_class": "none"', recovery_contract)

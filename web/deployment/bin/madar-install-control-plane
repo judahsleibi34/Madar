@@ -50,6 +50,7 @@ declare -a tracked_files=(
   lib/control_plane_upgrade_authorization.py
   lib/migration_executor.py
   lib/release_deployer.py
+  lib/runtime_authority.py
   releases/release.json
   releases/schema-96-recovery.json
   proxy/docker-compose.yml
