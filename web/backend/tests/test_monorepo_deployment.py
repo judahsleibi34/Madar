@@ -102,7 +102,11 @@ class MonorepoDeploymentTests(unittest.TestCase):
 
     def test_release_deployer_uses_explicit_compose_and_environment_roots(self):
         self.assertIn('"MADAR_ENV_FILE": str(self.env_file)', self.release_deploy)
-        self.assertIn('"docker", "compose", "--project-name", f"madar-{slot}"', self.release_deploy)
+        self.assertIn(
+            '"docker", "compose", "--project-name", f"{self.project_prefix}-{slot}"',
+            self.release_deploy,
+        )
+        self.assertIn('project_prefix: str = "madar"', self.release_deploy)
         self.assertIn('"--project-directory", str(web)', self.release_deploy)
         self.assertIn('"--env-file", str(self.env_file)', self.release_deploy)
         self.assertEqual(self.compose.count("${MADAR_ENV_FILE:-.env}"), 4)

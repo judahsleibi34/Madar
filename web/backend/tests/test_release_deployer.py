@@ -146,6 +146,8 @@ class ReleaseDeployerTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as root:
             self.deployer(root, FakeOperations()).deploy(SHA)
             operations = FakeOperations(fail_at="activate_workers")
+            operations.traffic = "green"
+            operations.workers = {"blue": "inactive", "green": "active"}
             with self.assertRaisesRegex(RuntimeError, "injected_activate_workers_failure"):
                 self.deployer(root, operations).deploy("b" * 40)
         self.assertFalse(any(call[0] == "switch_traffic" for call in operations.calls))
@@ -206,6 +208,8 @@ class ReleaseDeployerTests(unittest.TestCase):
             persisted = json.loads((Path(root) / "state.json").read_text())
             self.assertEqual(persisted["in_progress_release"]["phase"], "observation")
             resumed = FakeOperations()
+            resumed.traffic = "green"
+            resumed.workers = {"blue": "inactive", "green": "active"}
             result = self.deployer(root, resumed).deploy("b" * 40)
             state = json.loads((Path(root) / "state.json").read_text())
         self.assertEqual(result["status"], "known_good")
@@ -365,6 +369,7 @@ class SchemaRecoveryDeployerTests(unittest.TestCase):
                 self.deployer(root, first).recover_current_schema(SHA)
             resumed = FakeOperations(schema=96)
             resumed.traffic = "green"
+            resumed.workers = {"blue": "inactive", "green": "active"}
             result = self.deployer(root, resumed).recover_current_schema(SHA)
         self.assertEqual(result["status"], "known_good")
         self.assertEqual(resumed.traffic, "green")
@@ -378,6 +383,7 @@ class SchemaRecoveryDeployerTests(unittest.TestCase):
             before = Path(root, "state.json").read_bytes()
             second = FakeOperations(schema=96)
             second.traffic = "green"
+            second.workers = {"blue": "inactive", "green": "active"}
             result = self.deployer(root, second).recover_current_schema(SHA)
             after = Path(root, "state.json").read_bytes()
         self.assertEqual(result["status"], "already_recovered")
@@ -418,6 +424,7 @@ class SchemaRecoveryDeployerTests(unittest.TestCase):
             self.assertEqual(interrupted.traffic, "green")
             resumed = FakeOperations(schema=96)
             resumed.traffic = "green"
+            resumed.workers = {"blue": "inactive", "green": "active"}
             result = self.deployer(root, resumed).recover_current_schema(SHA)
         self.assertEqual(result["status"], "known_good")
         self.assertFalse(any(call == ("switch_traffic", "blue") for call in resumed.calls))
@@ -472,6 +479,7 @@ class SchemaRecoveryDeployerTests(unittest.TestCase):
             self.deployer(root, recovered).recover_current_schema(SHA)
             normal = Schema96Operations(schema=96)
             normal.traffic = "green"
+            normal.workers = {"blue": "inactive", "green": "active"}
             deployer = ReleaseDeployer(
                 state_root=Path(root),
                 compatibility=Compatibility(96, 99, 99, "expand-only", 96, 99),
@@ -499,7 +507,7 @@ class SchemaRecoveryDeployerTests(unittest.TestCase):
         self.assertEqual(operations.traffic, "green")
         self.assertEqual(operations.workers, {"blue": "inactive", "green": "active"})
         self.assertFalse(any(call[0] == "restore_workers" for call in operations.calls))
-        self.assertEqual(state["in_progress_release"]["worker_owner"], "none")
+        self.assertEqual(state["in_progress_release"]["worker_owner"], "candidate")
 
     def test_late_retained_worker_restart_aborts_before_switch_without_overlap(self):
         class LateRestart(FakeOperations):
@@ -587,6 +595,7 @@ class SchemaRecoveryDeployerTests(unittest.TestCase):
                 "previous_traffic_target": "blue",
                 "previous_known_good_release": old, "schema_recovery": True,
                 "schema": 96, "images": {}, "worker_owner": "none",
+                "phase": "post_switch_validation",
                 "recovery_id": hashlib.sha256(
                     f"{SHA}:96:{self.OLD_SHA}".encode()
                 ).hexdigest(),

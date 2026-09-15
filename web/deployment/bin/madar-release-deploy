@@ -22,7 +22,7 @@ import urllib.error
 import urllib.request
 from html.parser import HTMLParser
 from pathlib import Path
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from datetime import datetime, timedelta
 
 SCRIPT = Path(__file__).resolve()
@@ -37,6 +37,11 @@ from deployment.lib.control_plane_upgrade_authorization import (  # noqa: E402
 from deployment.lib.migration_executor import (  # noqa: E402
     LockedMigrationExecutor,
     MigrationManifest,
+)
+from deployment.lib.runtime_authority import (  # noqa: E402
+    load_worker_authority,
+    runtime_mutation_lock,
+    write_worker_authority,
 )
 
 
@@ -158,12 +163,17 @@ class DockerGitOperations:
         env_file: Path,
         compatibility: Compatibility,
         metadata_filename: str = "release.json",
+        *, compose_file: Path | None = None,
+        project_prefix: str = "madar", container_prefix: str = "madar",
     ):
         self.repo = repo
         self.state_root = state_root
         self.env_file = env_file
         self.compatibility = compatibility
         self.metadata_filename = metadata_filename
+        self.compose_file = compose_file
+        self.project_prefix = project_prefix
+        self.container_prefix = container_prefix
         self.release_root: Path | None = None
 
     @staticmethod
@@ -321,6 +331,79 @@ class DockerGitOperations:
                 return slot
         raise RuntimeError("active_proxy_target_unknown")
 
+    def _loaded_serving_slot(self) -> str:
+        """Resolve the loaded route without trusting a possibly stale file."""
+
+        try:
+            identity = self._json("http://127.0.0.1:8001/health/version")
+        except Exception as error:
+            raise RuntimeError("runtime_mutation_traffic_ambiguous") from error
+        slot = str(identity.get("release_slot") or "")
+        sha = str(identity.get("release_sha") or "")
+        if (
+            slot not in SLOT_PORTS
+            or len(sha) != 40
+            or any(character not in "0123456789abcdef" for character in sha)
+        ):
+            raise RuntimeError("runtime_mutation_traffic_ambiguous")
+        return slot
+
+    def _require_worker_authority(self, sha: str, slot: str) -> dict:
+        # Compatibility for direct inspection-only helpers in tests and legacy
+        # callers that cannot activate a release because they carry no SHA.
+        if not sha:
+            return {}
+        authority = load_worker_authority(self.state_root)
+        if authority is None:
+            raise RuntimeError("worker_authority_missing")
+        owner = authority["owner"]
+        identity = authority["old"] if owner == "OLD" else authority["candidate"]
+        if owner == "NONE" or identity != {"sha": sha, "slot": slot}:
+            raise RuntimeError("worker_activation_not_authorized")
+        if authority["generation"] != self._expected_worker_generation(sha, slot):
+            raise RuntimeError("worker_activation_stale_authority")
+        return authority
+
+    def _expected_worker_generation(self, sha: str, slot: str) -> str:
+        try:
+            state = json.loads((self.state_root / "state.json").read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            state = {}
+        in_progress = state.get("in_progress_release") or {}
+        identities = (
+            {
+                "sha": str(in_progress.get("release_sha") or ""),
+                "slot": str(in_progress.get("candidate_slot") or ""),
+            },
+            {
+                "sha": str((in_progress.get("previous_known_good_release") or {}).get("sha") or ""),
+                "slot": str((in_progress.get("previous_known_good_release") or {}).get("slot") or ""),
+            },
+        )
+        generation = str(in_progress.get("worker_generation") or "")
+        if {"sha": sha, "slot": slot} in identities and len(generation) == 64:
+            return generation
+        known_good = state.get("known_good_release") or {}
+        if (
+            known_good.get("sha") == sha
+            and known_good.get("slot") == slot
+            and len(str(known_good.get("worker_generation") or "")) == 64
+        ):
+            return str(known_good["worker_generation"])
+        try:
+            prepared = json.loads(
+                prepared_release_path(self.state_root).read_text(encoding="utf-8")
+            )
+        except (OSError, ValueError):
+            prepared = {}
+        if (
+            prepared.get("release_sha") == sha
+            and prepared.get("candidate_slot") == slot
+            and len(str(prepared.get("worker_generation") or "")) == 64
+        ):
+            return str(prepared["worker_generation"])
+        raise RuntimeError("worker_activation_generation_missing")
+
     def resolve_serving_slot(self, expected: dict[str, str]) -> str | None:
         """Resolve loaded stable traffic even when the target file is stale."""
         try:
@@ -418,6 +501,7 @@ class DockerGitOperations:
             "SCHEMA_COMPATIBLE_MIN": str(self.compatibility.schema_min),
             "SCHEMA_COMPATIBLE_MAX": str(self.compatibility.schema_max),
             "MADAR_RELEASE_WORKERS_ACTIVE": "true" if workers_active else "false",
+            "MADAR_CONTAINER_PREFIX": getattr(self, "container_prefix", "madar"),
             "NOTIFICATION_WORKER_REQUIRED": "true" if workers_active else "false",
             "DATA_DELETION_WORKER_REQUIRED": "true" if workers_active and self.schema_version() >= 83 else "false",
             "DATA_DELETION_WORKER_HEALTH_URL": "http://data-deletion-worker:8094/health",
@@ -445,17 +529,17 @@ class DockerGitOperations:
         if self.release_root is None:
             raise RuntimeError("release_source_not_prepared")
         web = self.release_root / "web"
-        files = ["-f", str(web / "docker-compose.yml")]
+        files = ["-f", str(self.compose_file or (web / "docker-compose.yml"))]
         override = os.getenv("MADAR_COMPOSE_OVERRIDE", "").strip()
         if override:
             files.extend(["-f", str(Path(override).resolve())])
-        else:
+        elif self.compose_file is None:
             files.extend(["-f", str(WEB_ROOT / "deployment" / "docker-compose.release.yml")])
         profiles = ["--profile", "workers"]
         if self.schema_version() >= 83:
             profiles.extend(["--profile", "deletion-worker"])
         self.run([
-            "docker", "compose", "--project-name", f"madar-{slot}",
+            "docker", "compose", "--project-name", f"{self.project_prefix}-{slot}",
             "--project-directory", str(web), "--env-file", str(self.env_file),
             *files, *profiles, *args,
         ], cwd=web, env=self._environment(sha, slot, images, workers_active=workers_active))
@@ -497,50 +581,62 @@ class DockerGitOperations:
     def start_candidate(self, sha: str, slot: str, images: dict[str, str]) -> None:
         # Queue consumers must not run in the inactive slot. Parser/remote
         # workers are slot-local and cannot see the active slot's Redis queue.
-        self._compose(
-            # The inactive slot may have been created by an older Compose
-            # topology. Recreate every candidate service so Docker cannot try
-            # to restart a retained container that still references a removed
-            # legacy project network.
-            sha, slot, images, "up", "-d", "--no-build", "--force-recreate", "--wait",
-            "--wait-timeout", "180", "redis", "parser-worker",
-            "remote-ingestion-worker", "backend", "frontend",
-        )
+        with runtime_mutation_lock(self.state_root):
+            if self._loaded_serving_slot() == slot:
+                raise RuntimeError("runtime_mutation_target_is_serving")
+            self._inhibit_worker_slot(slot)
+            self._compose(
+                # Stage the backend with its final worker requirements. Core
+                # validation tolerates the expected worker-only 503 until the
+                # authorized consumers start, so the serving backend never
+                # needs a handoff-time force recreation.
+                sha, slot, images, "up", "-d", "--no-build", "--force-recreate", "--wait",
+                "--wait-timeout", "180", "redis", "parser-worker",
+                "remote-ingestion-worker", "backend", "frontend",
+                workers_active=True,
+            )
 
     def activate_workers(self, sha: str, slot: str, images: dict[str, str]) -> None:
-        services = ["backend", "notification-worker", "calendar-sync-worker"]
+        self._require_worker_authority(sha, slot)
+        services = ["notification-worker", "calendar-sync-worker"]
         if self.schema_version() >= 83:
             services.append("data-deletion-worker")
-        self._compose(
-            sha, slot, images, "up", "-d", "--no-build", "--force-recreate",
-            "--wait", "--wait-timeout", "180", *services, workers_active=True,
-        )
+        with runtime_mutation_lock(self.state_root):
+            self._require_worker_authority(sha, slot)
+            self._require_other_worker_slot_inactive(slot)
+            self._compose(
+                sha, slot, images, "up", "-d", "--no-build", "--force-recreate",
+                "--wait", "--wait-timeout", "180", *services, workers_active=True,
+            )
+            self._require_worker_authority(sha, slot)
+            self._require_other_worker_slot_inactive(slot)
 
     def refresh_active_runtime_services(
         self, sha: str, slot: str, images: dict[str, str],
     ) -> None:
         """Recreate only active services whose runtime environment is mutable."""
 
-        services = [
-            "parser-worker",
-            "backend",
-            "notification-worker",
-            "calendar-sync-worker",
-        ]
+        self._require_worker_authority(sha, slot)
+        services = ["parser-worker", "notification-worker", "calendar-sync-worker"]
         if self.schema_version() >= 83:
             services.append("data-deletion-worker")
-        self._compose(
-            sha, slot, images, "up", "-d", "--no-build", "--force-recreate",
-            "--wait", "--wait-timeout", "180", *services,
-            workers_active=True,
-        )
+        with runtime_mutation_lock(self.state_root):
+            self._require_worker_authority(sha, slot)
+            self._require_other_worker_slot_inactive(slot)
+            self._compose(
+                sha, slot, images, "up", "-d", "--no-build", "--force-recreate",
+                "--wait", "--wait-timeout", "180", *services,
+                workers_active=True,
+            )
+            self._require_worker_authority(sha, slot)
+            self._require_other_worker_slot_inactive(slot)
 
-    @staticmethod
-    def _worker_names(slot: str) -> list[str]:
+    def _worker_names(self, slot: str) -> list[str]:
+        prefix = getattr(self, "container_prefix", "madar")
         return [
-            f"madar-{slot}-notification-worker",
-            f"madar-{slot}-calendar-sync-worker",
-            f"madar-{slot}-data-deletion-worker",
+            f"{prefix}-{slot}-notification-worker",
+            f"{prefix}-{slot}-calendar-sync-worker",
+            f"{prefix}-{slot}-data-deletion-worker",
         ]
 
     def deactivate_workers(self, release: dict) -> None:
@@ -554,6 +650,7 @@ class DockerGitOperations:
                 names.append(name)
         if not names:
             return
+        self.run(["docker", "update", "--restart=no", *names])
         self.run(["docker", "stop", *names])
         for observation in range(2):
             for name in names:
@@ -564,47 +661,87 @@ class DockerGitOperations:
                     raise RuntimeError(f"worker_failed_to_quiesce:{name}")
             if observation == 0:
                 time.sleep(0.2)
+        for name in names:
+            if self._container_restart_policy(name) != "no":
+                raise RuntimeError(f"worker_inhibition_unverified:{name}")
 
     def restore_workers(self, release: dict) -> None:
         slot = str(release.get("slot") or "")
         if slot not in SLOT_PORTS:
             raise RuntimeError("worker_release_slot_invalid")
-        existing: list[str] = []
-        for name in self._worker_names(slot):
-            if self._container_state(name) is not None:
-                existing.append(name)
-        if len(existing) != len(self._worker_names(slot)):
-            raise RuntimeError("retained_worker_containers_missing")
-        self.run(["docker", "start", *existing])
-        attempts = max(1, min(int(os.getenv("MADAR_WORKER_READY_ATTEMPTS", "40")), 120))
-        delay = max(0.1, min(float(os.getenv("MADAR_WORKER_READY_RETRY_SECONDS", "1")), 10.0))
-        for attempt in range(1, attempts + 1):
-            warming = False
-            for name in existing:
-                state = self._container_state(name)
-                if state is None:
-                    raise RuntimeError(f"retained_worker_restore_failed:{name}:absent")
-                _image, status, health = state
-                if status != "running":
-                    raise RuntimeError(
-                        f"retained_worker_restore_failed:{name}:{status}"
-                    )
-                if health == "unhealthy":
-                    raise RuntimeError(
-                        f"retained_worker_restore_failed:{name}:unhealthy"
-                    )
-                if health == "starting":
-                    warming = True
-                elif health != "none":
-                    if health != "healthy":
+        sha = str(release.get("sha") or "")
+        self._require_worker_authority(sha, slot)
+        lock = runtime_mutation_lock(self.state_root) if sha else nullcontext()
+        with lock:
+            self._require_worker_authority(sha, slot)
+            if sha:
+                self._require_other_worker_slot_inactive(slot)
+            existing: list[str] = []
+            for name in self._worker_names(slot):
+                if self._container_state(name) is not None:
+                    existing.append(name)
+            if len(existing) != len(self._worker_names(slot)):
+                raise RuntimeError("retained_worker_containers_missing")
+            self.run(["docker", "update", "--restart=unless-stopped", *existing])
+            self.run(["docker", "start", *existing])
+            attempts = max(
+                1, min(int(os.getenv("MADAR_WORKER_READY_ATTEMPTS", "40")), 120)
+            )
+            delay = max(
+                0.1,
+                min(float(os.getenv("MADAR_WORKER_READY_RETRY_SECONDS", "1")), 10.0),
+            )
+            for attempt in range(1, attempts + 1):
+                warming = False
+                for name in existing:
+                    state = self._container_state(name)
+                    if state is None:
+                        raise RuntimeError(
+                            f"retained_worker_restore_failed:{name}:absent"
+                        )
+                    _image, status, health = state
+                    if status != "running":
+                        raise RuntimeError(
+                            f"retained_worker_restore_failed:{name}:{status}"
+                        )
+                    if health == "unhealthy":
+                        raise RuntimeError(
+                            f"retained_worker_restore_failed:{name}:unhealthy"
+                        )
+                    if health == "starting":
+                        warming = True
+                    elif health != "none" and health != "healthy":
                         raise RuntimeError(
                             f"retained_worker_restore_failed:{name}:health_unknown"
                         )
-            if not warming:
-                return
-            if attempt < attempts:
-                time.sleep(delay)
+                if not warming:
+                    self._require_worker_authority(sha, slot)
+                    if sha:
+                        self._require_other_worker_slot_inactive(slot)
+                    return
+                if attempt < attempts:
+                    time.sleep(delay)
         raise RuntimeError("retained_worker_restore_timeout")
+
+    def _require_other_worker_slot_inactive(self, slot: str) -> None:
+        other = "green" if slot == "blue" else "blue"
+        for name in self._worker_names(other):
+            state = self._container_state(name)
+            if state is not None and state[1] not in {
+                "created", "exited", "dead", "removing",
+            }:
+                raise RuntimeError(f"worker_authority_runtime_contradiction:{name}")
+
+    def _inhibit_worker_slot(self, slot: str) -> None:
+        release = {"slot": slot}
+        self.deactivate_workers(release)
+        for name in self._worker_names(slot):
+            state = self._container_state(name)
+            if state is not None and (
+                state[1] not in {"created", "exited", "dead", "removing"}
+                or self._container_restart_policy(name) != "no"
+            ):
+                raise RuntimeError(f"worker_inhibition_unverified:{name}")
 
     def worker_ownership(self, retained: dict, candidate: dict) -> str:
         """Return the only positively established production-consumer owner."""
@@ -704,6 +841,15 @@ class DockerGitOperations:
         if len(parts) != 3:
             raise RuntimeError("active_runtime_container_state_invalid")
         return parts[0], parts[1], parts[2]
+
+    def _container_restart_policy(self, name: str) -> str:
+        completed = subprocess.run(
+            ["docker", "inspect", "--format", "{{.HostConfig.RestartPolicy.Name}}", name],
+            check=False, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        )
+        if completed.returncode != 0 or not completed.stdout.strip():
+            raise RuntimeError(f"worker_inhibition_unknown:{name}")
+        return completed.stdout.strip()
 
     @staticmethod
     def _recorded_image_id(images: dict[str, str], component: str) -> str:
@@ -862,6 +1008,39 @@ class DockerGitOperations:
                 time.sleep(delay)
         raise RuntimeError(f"candidate_deep_validation_failed:{last_failure}")
 
+    def validate_candidate_core(self, sha: str, slot: str) -> None:
+        """Validate runtime identity/core while consumers are intentionally off."""
+
+        ports = SLOT_PORTS[slot]
+        readiness = self._json_allow_unready(
+            f"http://127.0.0.1:{ports['backend']}/health/ready"
+        )
+        identity = self._json(f"http://127.0.0.1:{ports['backend']}/health/version")
+        if identity.get("release_sha") != sha:
+            raise RuntimeError("candidate_core_release_identity_mismatch")
+        if (
+            str(identity.get("schema_compatible_min")) != str(self.compatibility.schema_min)
+            or str(identity.get("schema_compatible_max")) != str(self.compatibility.schema_max)
+        ):
+            raise RuntimeError("candidate_core_schema_contract_mismatch")
+        components = readiness.get("components")
+        if not isinstance(components, dict):
+            raise RuntimeError("candidate_core_readiness_invalid")
+        allowed_worker_degradation = {
+            "notification_worker", "calendar_sync_worker", "data_deletion_worker",
+        }
+        degraded = {
+            name for name, value in components.items()
+            if value not in ACCEPTED_READINESS_STATES
+        }
+        if not degraded <= allowed_worker_degradation:
+            raise RuntimeError("candidate_core_readiness_failed")
+        frontend_base = f"http://127.0.0.1:{ports['frontend']}"
+        with urllib.request.urlopen(f"{frontend_base}/", timeout=5) as response:
+            if response.status != 200:
+                raise RuntimeError("candidate_core_frontend_unavailable")
+            self._validate_frontend_api_origin(frontend_base, response.read())
+
     def validate_rollback_target(self, release: dict, schema: int) -> dict[str, int]:
         slot = str(release.get("slot") or "")
         expected_sha = str(release.get("sha") or "")
@@ -902,40 +1081,40 @@ class DockerGitOperations:
     def stop_candidate(
         self, slot: str, *, expected_serving: dict[str, str] | None = None
     ) -> None:
-        if expected_serving is not None:
-            serving = self.resolve_serving_slot(expected_serving)
+        with runtime_mutation_lock(self.state_root):
+            if expected_serving is not None:
+                serving = self.resolve_serving_slot(expected_serving)
+            else:
+                serving = self._loaded_serving_slot()
             if serving is None:
                 raise RuntimeError("candidate_cleanup_traffic_ambiguous")
             if serving == slot:
                 raise RuntimeError("candidate_cleanup_target_is_serving")
-            # Take a second authoritative observation at the destructive
-            # boundary. This catches a route epoch change after the caller's
-            # reconciliation (or during this helper's first observation).
-            # A disagreement is uncertainty: preserve both runtimes.
-            confirmed = self.resolve_serving_slot(expected_serving)
-            if confirmed != serving:
-                raise RuntimeError("candidate_cleanup_traffic_changed")
-        if self.release_root is None:
-            return
+            if self.release_root is None:
+                return
+            self._stop_candidate_locked(slot)
+
+    def _stop_candidate_locked(self, slot: str) -> None:
         # Only the isolated inactive Compose project is removed. Images and the
         # retained active target are deliberately untouched.
-        files = ["-f", str(self.release_root / "web/docker-compose.yml")]
+        files = ["-f", str(self.compose_file or (self.release_root / "web/docker-compose.yml"))]
         override = os.getenv("MADAR_COMPOSE_OVERRIDE", "").strip()
         if override:
             files.extend(["-f", str(Path(override).resolve())])
-        else:
+        elif self.compose_file is None:
             files.extend(["-f", str(WEB_ROOT / "deployment" / "docker-compose.release.yml")])
         environment = dict(os.environ)
         subnets = SLOT_SUBNETS[slot]
         environment.update({
             "MADAR_SLOT": slot,
+            "MADAR_CONTAINER_PREFIX": self.container_prefix,
             "MADAR_DEFAULT_SUBNET": subnets["default"],
             "MADAR_PARSER_SUBNET": subnets["parser"],
             "MADAR_REMOTE_INTERNAL_SUBNET": subnets["remote_internal"],
             "MADAR_REMOTE_EGRESS_SUBNET": subnets["remote_egress"],
         })
         self.run([
-            "docker", "compose", "--project-name", f"madar-{slot}",
+            "docker", "compose", "--project-name", f"{self.project_prefix}-{slot}",
             "--project-directory", str(self.release_root / "web"),
             "--env-file", str(self.env_file), *files,
             "--profile", "workers", "--profile", "deletion-worker", "down", "--remove-orphans",
@@ -944,6 +1123,51 @@ class DockerGitOperations:
 
 def prepared_release_path(state_root: Path) -> Path:
     return state_root / "prepared-release.json"
+
+
+def plan_release_migrations(
+    *, sha: str, schema: int, compatibility: Compatibility,
+    operations: DockerGitOperations,
+) -> list[list[int]]:
+    """Derive and checksum-verify an ordinary candidate's manifest path."""
+
+    if getattr(operations, "release_root", None) is None:
+        # Lightweight state-machine fakes have no immutable worktree. Real
+        # DockerGitOperations always sets it in verify_source().
+        return []
+    release_root = operations.release_root
+    metadata_path = release_root / "web/deployment/releases" / operations.metadata_filename
+    metadata = _json_file(metadata_path, "candidate_release_contract_invalid")
+    if Compatibility.load(metadata_path) != compatibility:
+        raise RuntimeError("candidate_release_contract_mismatch")
+    if str(metadata.get("migration_policy") or "") != AUTOMATIC_MIGRATION_POLICY:
+        return []
+    manifest_name = str(metadata.get("migration_manifest") or "")
+    if (
+        Path(manifest_name).name != manifest_name
+        or not manifest_name.startswith("migrations-")
+        or not manifest_name.endswith(".json")
+    ):
+        raise RuntimeError("candidate_migration_manifest_invalid")
+    manifest = MigrationManifest.load(
+        release_root / "web/deployment/releases" / manifest_name, release_root,
+    )
+    if manifest.release_sha in {"CURRENT", "STAGING"}:
+        manifest = replace(manifest, release_sha=sha)
+    if manifest.release_sha != sha:
+        raise RuntimeError("candidate_migration_manifest_release_mismatch")
+    source = manifest.migrations[0].from_schema
+    target = manifest.migrations[-1].to_schema
+    if source != schema or target != compatibility.target_schema:
+        raise RuntimeError("candidate_migration_path_mismatch")
+    if not compatibility.schema_min <= source <= target <= compatibility.schema_max:
+        raise RuntimeError("candidate_migration_bridge_range_invalid")
+    LockedMigrationExecutor(
+        connection_factory=lambda: None, manifest=manifest,
+        state_file=Path("/nonexistent/rehearsal-execution.json"),
+        backup_dir=Path("/nonexistent"), backup_verifier=lambda _path: None,
+    ).verify_migrations()
+    return [[migration.from_schema, migration.to_schema] for migration in manifest.migrations]
 
 
 @contextmanager
@@ -968,6 +1192,10 @@ def prepare_release(
         schema = operations.schema_version()
         if not compatibility.schema_min <= schema <= compatibility.schema_max:
             raise RuntimeError("candidate_schema_incompatible")
+        migration_plan = plan_release_migrations(
+            sha=sha, schema=schema, compatibility=compatibility,
+            operations=operations,
+        )
         path = prepared_release_path(state_root)
         record: dict
         if path.exists():
@@ -979,6 +1207,7 @@ def prepare_release(
                 record.get("release_sha") != sha
                 or record.get("candidate_slot") != slot
                 or int(record.get("schema", -1)) != schema
+                or record.get("migration_plan") != migration_plan
                 or record.get("status") not in {
                     "preparing", "candidate_validated_workers_inactive",
                 }
@@ -987,7 +1216,11 @@ def prepare_release(
             images = record.get("images") or {}
             if record["status"] == "candidate_validated_workers_inactive":
                 operations.preflight(sha, slot, images, schema)
-                operations.validate_candidate(sha, slot)
+                validate_core = getattr(
+                    operations, "validate_candidate_core",
+                    operations.validate_candidate,
+                )
+                validate_core(sha, slot)
                 return record
         else:
             images = operations.build(sha, slot)
@@ -996,6 +1229,7 @@ def prepare_release(
                 "candidate_slot": slot,
                 "images": images,
                 "schema": schema,
+                "migration_plan": migration_plan,
                 "status": "preparing",
                 "prepared_at": utc_now().isoformat(),
                 "prepare_attempt": 0,
@@ -1006,7 +1240,11 @@ def prepare_release(
         try:
             operations.preflight(sha, slot, images, schema)
             operations.start_candidate(sha, slot, images)
-            operations.validate_candidate(sha, slot)
+            validate_core = getattr(
+                operations, "validate_candidate_core",
+                operations.validate_candidate,
+            )
+            validate_core(sha, slot)
         except Exception as error:
             record["prepare_attempt"] = int(record.get("prepare_attempt", 1)) + 1
             record["last_failure"] = type(error).__name__
@@ -1051,7 +1289,21 @@ def activate_prepared_release(
 ) -> dict:
     record = load_prepared_release(state_root, sha, slot)
     operations.verify_source(sha)
-    operations.validate_candidate(sha, slot)
+    validate_core = getattr(
+        operations, "validate_candidate_core", operations.validate_candidate,
+    )
+    validate_core(sha, slot)
+    other_slot = "green" if slot == "blue" else "blue"
+    generation = hashlib.sha256(
+        f"bootstrap:{sha}:{slot}:{record.get('prepared_at', '')}".encode()
+    ).hexdigest()
+    write_worker_authority(
+        state_root, generation=generation, owner="CANDIDATE",
+        old={"sha": sha, "slot": other_slot},
+        candidate={"sha": sha, "slot": slot},
+    )
+    record["worker_generation"] = generation
+    atomic_json(prepared_release_path(state_root), record)
     try:
         operations.activate_workers(sha, slot, record["images"])
         operations.validate_candidate(sha, slot)
@@ -1097,6 +1349,7 @@ def adopt_prepared_release(
         "slot": slot,
         "images": record["images"],
         "schema": schema,
+        "worker_generation": record["worker_generation"],
         "schema_compatible_min": compatibility.schema_min,
         "schema_compatible_max": compatibility.schema_max,
     }
@@ -1315,11 +1568,17 @@ def _establish_compatible_migration_fallback(
         and existing.get("slot") == fallback_slot
         and int(existing.get("schema", -1)) == schema
     ):
-        operations.validate_candidate(sha, fallback_slot)
+        validate_core = getattr(
+            operations, "validate_candidate_core", operations.validate_candidate,
+        )
+        validate_core(sha, fallback_slot)
         return existing
     images = known_good.get("images") or {}
     operations.start_candidate(sha, fallback_slot, images)
-    operations.validate_candidate(sha, fallback_slot)
+    validate_core = getattr(
+        operations, "validate_candidate_core", operations.validate_candidate,
+    )
+    validate_core(sha, fallback_slot)
     if operations.schema_version() != schema:
         raise RuntimeError("migration_fallback_schema_changed")
     fallback = {

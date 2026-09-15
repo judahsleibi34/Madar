@@ -514,7 +514,7 @@ The following are the mandatory design invariants. Test names are from
 | 10 | Final success after an executed transition waits for target schema, worker refresh, active application validation, and stable-route validation. | `automatic_migrate_known_good()` target check followed by actual `refresh_active_workers()`; transition completion write occurs last. A proven fresh `already_at_target` release has already passed promotion workers/observation and repeats stable validation before recording its nonexecuting result. | `test_successful_94_to_95_records_target_only_after_worker_and_route_validation`, `test_stable_route_failure_prevents_final_migration_success`, `test_prior_release_migrates_then_later_release_noops_idempotently`; `test_release_bootstrap.py :: test_post_migration_refresh_requires_exact_known_good_and_schema_83`. |
 | 11 | A later release accepted at an already-reached target neither borrows the prior release's backup nor bypasses a genuine current-release resume. | Fresh no-op requires no per-SHA state plus matching known-good and acceptance-time target observations. Any current-release state retains exact SHA/source backup attestation. | `test_prior_release_migrates_then_later_release_noops_idempotently`, `test_current_release_partial_state_without_backup_still_fails_closed`, `test_current_release_substituted_resume_backup_still_fails_closed`. |
 | 12 | The database cannot finish a normal automatic migration with every inactive fallback incompatible. | Before SQL, `_establish_compatible_migration_fallback()` recreates the inactive slot from the accepted bridge with consumers disabled. After SQL and active-worker validation, it revalidates that slot at target schema and records it as the compatible fallback. | `test_successful_97_to_98_records_target_only_after_worker_and_route_validation`, `test_automatic_migration_control_plane.py`; recovery/fallback failure injection in `test_release_deployer.py`. |
-| 13 | A pre-existing DB-ahead state is repaired only by exact-schema, zero-migration forward recovery. | The ordinary manifest remains authoritative for normal releases. `schema-96-recovery.json`, root-protected exact-SHA rehearsal evidence, local plus Node 1 backup verification, no-overlap worker cutover, atomic traffic switching, and compatible-fallback establishment are mandatory in the explicit recovery path. | `SchemaRecoveryDeployerTests`, schema-recovery coordinator and contract tests in `test_control_plane_upgrade.py`, and auto-deploy inaccessibility in `test_monorepo_deployment.py`. |
+| 13 | A pre-existing DB-ahead state is repaired only by exact-schema, zero-migration forward recovery. | The ordinary manifest remains authoritative for normal releases. `schema-96-recovery.json`, root-protected exact-SHA rehearsal evidence, generation-bound worker authority, Docker restart inhibition, shared routing/slot mutation exclusion, local plus Node 1 backup verification, no-overlap worker cutover, atomic traffic switching, and compatible-fallback establishment are mandatory in the explicit recovery path. | `SchemaRecoveryDeployerTests`, schema-recovery coordinator and contract tests in `test_control_plane_upgrade.py`, auto-deploy inaccessibility in `test_monorepo_deployment.py`, and the disposable real-runtime rehearsal. |
 
 Static orchestration tests in `test_monorepo_deployment.py` additionally verify
 that the installed wrappers contain the same-known-good recovery branch, the
@@ -522,6 +522,16 @@ post-promotion automatic invocation, the persistent timer, immutable control
 plane, and canonical production paths. Behavioral wrapper tests are preferred
 for ordering and zero-migration assertions because they execute the shell
 control flow rather than only matching source text.
+
+The unit suites remain state-machine evidence. Installed-runtime evidence comes
+from `web/scripts/rehearse_schema96_real_runtime.py`, executed in an empty,
+network-isolated Docker-in-Docker daemon with distinct project/container names,
+ports, state, proxy, storage, networks, and volumes. It uses actual
+`DockerGitOperations`, Docker Compose worker health/restart state, the file-proxy
+traffic switch, release-state files, and the ordinary release/manifest parser.
+After recovery it derives the normal migration path from the immutable
+candidate manifest and proves prepare plus interrupted retry without executing
+SQL. Sanitized output is retained outside the repository.
 
 ## 17. Change discipline
 

@@ -291,6 +291,99 @@ class ReleaseBootstrapTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "docker stop failed"):
             operations.deactivate_workers({"slot": "blue"})
 
+    def test_worker_quiescence_inhibits_restart_and_proves_policy(self):
+        operations = release_cli.DockerGitOperations.__new__(release_cli.DockerGitOperations)
+        operations._worker_names = lambda _slot: ["madar-blue-notification-worker"]
+        states = iter([
+            ("sha256:x", "running", "healthy"),
+            ("sha256:x", "exited", "none"),
+            ("sha256:x", "exited", "none"),
+        ])
+        operations._container_state = lambda _name: next(states)
+        operations._container_restart_policy = lambda _name: "no"
+        operations.run = unittest.mock.Mock()
+        with patch.object(release_cli.time, "sleep"):
+            operations.deactivate_workers({"slot": "blue"})
+        self.assertEqual(
+            operations.run.call_args_list,
+            [
+                unittest.mock.call([
+                    "docker", "update", "--restart=no",
+                    "madar-blue-notification-worker",
+                ]),
+                unittest.mock.call([
+                    "docker", "stop", "madar-blue-notification-worker",
+                ]),
+            ],
+        )
+
+    def test_stale_worker_authority_cannot_activate_consumers(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations = release_cli.DockerGitOperations.__new__(release_cli.DockerGitOperations)
+            operations.state_root = Path(root)
+            operations.schema_version = lambda: 96
+            operations._compose = unittest.mock.Mock()
+            (Path(root) / "state.json").write_text(json.dumps({
+                "active_slot": "green",
+                "known_good_release": {
+                    "sha": SHA, "slot": "green",
+                    "worker_generation": "2" * 64,
+                },
+            }))
+            release_cli.write_worker_authority(
+                Path(root), generation="1" * 64, owner="CANDIDATE",
+                old={"sha": "a" * 40, "slot": "blue"},
+                candidate={"sha": SHA, "slot": "green"},
+            )
+            with self.assertRaisesRegex(RuntimeError, "stale_authority"):
+                operations.activate_workers(SHA, "green", {})
+        operations._compose.assert_not_called()
+
+    def test_destructive_candidate_start_rechecks_loaded_route_under_lock(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations = release_cli.DockerGitOperations.__new__(release_cli.DockerGitOperations)
+            operations.state_root = Path(root)
+            operations._loaded_serving_slot = lambda: "green"
+            operations._inhibit_worker_slot = unittest.mock.Mock()
+            operations._compose = unittest.mock.Mock()
+            with self.assertRaisesRegex(RuntimeError, "target_is_serving"):
+                operations.start_candidate(SHA, "green", {})
+        operations._inhibit_worker_slot.assert_not_called()
+        operations._compose.assert_not_called()
+
+    def test_authority_never_overrides_contradictory_old_worker_state(self):
+        with tempfile.TemporaryDirectory() as root:
+            root_path = Path(root)
+            generation = "3" * 64
+            operations = release_cli.DockerGitOperations.__new__(release_cli.DockerGitOperations)
+            operations.state_root = root_path
+            operations.container_prefix = "madar"
+            operations.schema_version = lambda: 96
+            operations._compose = unittest.mock.Mock()
+            (root_path / "state.json").write_text(json.dumps({
+                "in_progress_release": {
+                    "release_sha": SHA, "candidate_slot": "green",
+                    "previous_known_good_release": {
+                        "sha": "a" * 40, "slot": "blue",
+                    },
+                    "worker_generation": generation,
+                },
+            }))
+            release_cli.write_worker_authority(
+                root_path, generation=generation, owner="CANDIDATE",
+                old={"sha": "a" * 40, "slot": "blue"},
+                candidate={"sha": SHA, "slot": "green"},
+            )
+            states = {
+                "madar-blue-notification-worker": (
+                    "sha256:x", "running", "healthy"
+                ),
+            }
+            operations._container_state = states.get
+            with self.assertRaisesRegex(RuntimeError, "runtime_contradiction"):
+                operations.activate_workers(SHA, "green", {})
+        operations._compose.assert_not_called()
+
     def test_worker_still_running_after_stop_is_fatal(self):
         operations = release_cli.DockerGitOperations.__new__(release_cli.DockerGitOperations)
         operations._container_state = lambda _name: ("sha256:x", "running", "healthy")
@@ -333,7 +426,7 @@ class ReleaseBootstrapTests(unittest.TestCase):
             "MADAR_WORKER_READY_RETRY_SECONDS": "0.1",
         }), patch.object(release_cli.time, "sleep"):
             operations.restore_workers({"slot": "blue"})
-        operations.run.assert_called_once()
+        self.assertEqual(operations.run.call_count, 2)
 
     def test_worker_starting_timeout_is_fatal(self):
         operations = release_cli.DockerGitOperations.__new__(release_cli.DockerGitOperations)
@@ -422,15 +515,16 @@ class ReleaseBootstrapTests(unittest.TestCase):
             operations.resolve_serving_slot({"blue": SHA, "green": SHA})
         )
 
-    def test_candidate_cleanup_aborts_when_route_changes_at_shutdown_boundary(self):
-        operations = release_cli.DockerGitOperations.__new__(release_cli.DockerGitOperations)
-        observations = iter(["blue", "green"])
-        operations.resolve_serving_slot = lambda _expected: next(observations)
-        operations.release_root = None
-        with self.assertRaisesRegex(RuntimeError, "candidate_cleanup_traffic_changed"):
-            operations.stop_candidate(
-                "green", expected_serving={"blue": "1" * 40, "green": SHA}
-            )
+    def test_candidate_cleanup_rejects_serving_target_inside_mutation_lock(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations = release_cli.DockerGitOperations.__new__(release_cli.DockerGitOperations)
+            operations.state_root = Path(root)
+            operations.resolve_serving_slot = lambda _expected: "green"
+            operations.release_root = None
+            with self.assertRaisesRegex(RuntimeError, "candidate_cleanup_target_is_serving"):
+                operations.stop_candidate(
+                    "green", expected_serving={"blue": "1" * 40, "green": SHA}
+                )
 
     def test_post_migration_refresh_requires_exact_known_good_and_schema_83(self):
         with tempfile.TemporaryDirectory() as root:

@@ -1,0 +1,88 @@
+services:
+  redis:
+    image: sha256:6ab0b6e7381779332f97b8ca76193e45b0756f38d4c0dcda72dbb3c32061ab99
+    container_name: ${MADAR_CONTAINER_PREFIX}-${MADAR_SLOT}-redis
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 1s
+      timeout: 1s
+      retries: 20
+  backend:
+    image: ${MADAR_BACKEND_IMAGE:-python:3.12-slim}
+    container_name: ${MADAR_CONTAINER_PREFIX}-${MADAR_SLOT}-backend
+    command: ["backend"]
+    environment:
+      MADAR_RELEASE_SHA: ${MADAR_RELEASE_SHA:-0000000000000000000000000000000000000000}
+      MADAR_RELEASE_SLOT: ${MADAR_RELEASE_SLOT:-blue}
+      MADAR_BUILD_TIMESTAMP: ${MADAR_BUILD_TIMESTAMP:-fixture}
+      SCHEMA_COMPATIBLE_MIN: ${SCHEMA_COMPATIBLE_MIN:-96}
+      SCHEMA_COMPATIBLE_MAX: ${SCHEMA_COMPATIBLE_MAX:-96}
+      NOTIFICATION_WORKER_REQUIRED: ${NOTIFICATION_WORKER_REQUIRED:-false}
+    ports: ["127.0.0.1:${MADAR_BACKEND_BIND_PORT:-8101}:8000"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/live')"]
+      interval: 1s
+      timeout: 1s
+      retries: 20
+    depends_on:
+      redis: {condition: service_healthy}
+      parser-worker: {condition: service_healthy}
+      remote-ingestion-worker: {condition: service_healthy}
+  frontend:
+    image: ${MADAR_FRONTEND_IMAGE:-python:3.12-slim}
+    container_name: ${MADAR_CONTAINER_PREFIX}-${MADAR_SLOT}-frontend
+    command: ["frontend"]
+    ports: ["127.0.0.1:${MADAR_FRONTEND_BIND_PORT:-3100}:8080"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/')"]
+      interval: 1s
+      timeout: 1s
+      retries: 20
+  parser-worker:
+    image: ${MADAR_BACKEND_IMAGE:-python:3.12-slim}
+    container_name: ${MADAR_CONTAINER_PREFIX}-${MADAR_SLOT}-parser-worker
+    command: ["aux"]
+    healthcheck: &worker_health
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8092/health')"]
+      interval: 1s
+      timeout: 1s
+      retries: 20
+  remote-ingestion-worker:
+    image: ${MADAR_BACKEND_IMAGE:-python:3.12-slim}
+    container_name: ${MADAR_CONTAINER_PREFIX}-${MADAR_SLOT}-remote-ingestion-worker
+    command: ["aux"]
+    healthcheck: *worker_health
+  notification-worker:
+    image: ${MADAR_BACKEND_IMAGE:-python:3.12-slim}
+    container_name: ${MADAR_CONTAINER_PREFIX}-${MADAR_SLOT}-notification-worker
+    command: ["notification"]
+    profiles: ["workers"]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8090/health')"]
+      interval: 1s
+      timeout: 1s
+      retries: 30
+  calendar-sync-worker:
+    image: ${MADAR_BACKEND_IMAGE:-python:3.12-slim}
+    container_name: ${MADAR_CONTAINER_PREFIX}-${MADAR_SLOT}-calendar-sync-worker
+    command: ["calendar"]
+    profiles: ["workers"]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8091/health')"]
+      interval: 1s
+      timeout: 1s
+      retries: 30
+  data-deletion-worker:
+    image: ${MADAR_BACKEND_IMAGE:-python:3.12-slim}
+    container_name: ${MADAR_CONTAINER_PREFIX}-${MADAR_SLOT}-data-deletion-worker
+    command: ["deletion"]
+    profiles: ["deletion-worker"]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8094/health')"]
+      interval: 1s
+      timeout: 1s
+      retries: 30

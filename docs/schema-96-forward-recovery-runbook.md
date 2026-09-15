@@ -110,13 +110,14 @@ SHA, schema, and reviewed rehearsal digest. Do not invoke an inner command.
 2. Candidate images are built immutably for the exact SHA.
 3. Inactive candidate starts without notification/calendar/deletion consumers.
 4. Candidate core health, schema, Auth, Storage, Redis, and frontend pass.
-5. Old queue consumers stop; actual state proves that neither slot owns queue
-   consumption and records `worker_owner: none` durably.
+5. The generation-bound worker authority advances `OLD` to `NONE`; old queue
+   consumers have Docker restart disabled, stop, and actual state proves that
+   neither slot owns queue consumption.
 6. State, schema, backup, authoritative loaded route, candidate, and zero-worker
    ownership are re-attested immediately before transition.
 7. Existing governed switch atomically routes to the candidate.
-8. Candidate consumers start only after the candidate is proven serving;
-   bounded health checks establish `worker_owner: candidate`.
+8. The authority advances to `CANDIDATE` only after the candidate is proven
+   serving; candidate consumers then start and bounded health checks pass.
 9. Post-switch health passes at schema 96.
 10. Former slot is recreated from the same candidate with consumers inactive.
 11. Durable state records the active bridge, compatible fallback, recovery ID,
@@ -141,6 +142,11 @@ diagnosis. After a proven switch, the old binary is never selected because it
 cannot serve schema 96. The timer remains disabled and the checkpoint requires
 forward repair.
 
+Traffic switching and inactive-slot stop/remove/force-recreate use the same
+durable runtime-mutation lock. After taking it, the controller resolves loaded
+traffic again; ambiguity or a fallback slot that has become serving mutates
+neither slot.
+
 Abort on stale or missing backup, missing Node 1 proof, schema other than 96,
 candidate contract drift, migration request, dirty checkout, changed proxy,
 changed durable state, image mismatch, worker overlap, health failure, missing
@@ -152,11 +158,14 @@ Rerun the exact same coordinator command, SHA, schema, and reviewed attestation
 after diagnosing the interruption. The durable recovery ID binds those values
 to the original known-good SHA. A different candidate, schema, origin, or
 operation is rejected. If the old slot is provably still routed, the state
-machine first discovers both slots' actual worker ownership, proves candidate
-consumers inactive, restores or waits boundedly for the old consumers,
-cleans the incomplete candidate, and restarts the guarded attempt. If the
-bridge is provably routed, it continues forward from the checkpoint and
-establishes the compatible fallback. If routing is ambiguous, it stops nothing.
+machine discovers traffic, both slot/container identities, old workers,
+candidate workers, and durable ownership/generation in that order. It then
+reconciles the checkpoint, proves candidate consumers inactive, restores or
+waits boundedly for the old consumers, cleans the incomplete candidate, and
+restarts the guarded attempt. If the bridge is provably routed, core validation
+may pass while ownership is `NONE` or candidate health is `starting`; workers
+are reconciled before final steady-state validation and compatible-fallback
+establishment. If routing is ambiguous, it stops nothing.
 A fully completed rerun validates both compatible slots and completes any
 pending governed checkout fast-forward without changing proxy or database.
 
@@ -184,6 +193,7 @@ same or another independently proven schema-96-compatible exact SHA.
 
 The compatible fallback does not turn later releases into recovery reruns.
 Normal deployment may stage a separately reviewed application supporting the
-96-to-target migration chain, validate the schema-96 fallback, and then follow
-the ordinary backup-first migration procedure. Recovery-specific authorization
-is never reused by that normal release.
+96-to-target migration chain, derive that chain from the candidate's checked
+release manifest, validate the schema-96 fallback, and then follow the ordinary
+backup-first migration procedure. Recovery-specific authorization is never
+reused by that normal release.

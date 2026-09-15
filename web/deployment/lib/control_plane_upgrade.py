@@ -988,6 +988,12 @@ class SystemOperations:
         serving_candidate = completed or (
             resume and traffic == interrupted.get("candidate_slot")
         )
+        candidate_handoff = serving_candidate and resume and str(
+            interrupted.get("phase") or ""
+        ) in {
+            "traffic_switch", "post_switch_validation",
+            "worker_ownership_reconciliation", "compatible_fallback_establishment",
+        }
         expected_serving_sha = candidate_sha if serving_candidate else production_sha
         identities = (
             self.http_json("http://127.0.0.1:8001/health/version"),
@@ -1014,10 +1020,22 @@ class SystemOperations:
         ):
             readiness = self.http_json_allow_503(url)
             components = readiness.get("components")
-            expected_ready = serving_candidate
-            if readiness.get("ready") is not expected_ready or not isinstance(components, dict):
+            if not isinstance(components, dict):
                 raise UpgradeError("recovery_origin_readiness_unexpected")
-            if not expected_ready:
+            ready = readiness.get("ready") is True
+            if serving_candidate and not ready:
+                degraded = {
+                    name for name, value in components.items()
+                    if value not in {"ok", "disabled", "configured", "not_required", "development"}
+                }
+                if not candidate_handoff or not degraded or not degraded <= {
+                    "notification_worker", "calendar_sync_worker",
+                    "data_deletion_worker",
+                }:
+                    raise UpgradeError("recovery_origin_readiness_unexpected")
+            elif not serving_candidate and ready:
+                raise UpgradeError("recovery_origin_readiness_unexpected")
+            if not serving_candidate:
                 degraded = {
                     name for name, value in components.items()
                     if value not in {"ok", "disabled", "configured", "not_required", "development"}

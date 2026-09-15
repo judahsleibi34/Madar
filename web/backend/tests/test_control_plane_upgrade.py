@@ -1683,6 +1683,71 @@ class ControlPlaneUpgradeTests(unittest.TestCase):
         self.assertEqual(result["migration"], "recovery_resume")
         self.assertEqual(result["schema"], 96)
 
+    def test_schema_recovery_preflight_accepts_candidate_worker_handoff_starting(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations = self.recovery_preflight_operations(root)
+            state_path = operations.state_root / "state.json"
+            state = json.loads(state_path.read_text())
+            old = state["known_good_release"]
+            state["in_progress_release"] = {
+                "schema_recovery": True,
+                "release_sha": self.SHA,
+                "candidate_slot": "green",
+                "previous_traffic_target": "blue",
+                "previous_known_good_release": old,
+                "schema": 96,
+                "phase": "post_switch_validation",
+                "worker_owner": "candidate",
+            }
+            state_path.write_text(json.dumps(state), encoding="utf-8")
+            operations.current_traffic_slot.return_value = "green"
+            operations.http_json.return_value = {
+                "release_sha": self.SHA,
+                "schema_compatible_min": 96,
+                "schema_compatible_max": 96,
+            }
+            operations.http_json_allow_503.return_value = {
+                "ready": False,
+                "components": {
+                    "schema": "ok", "database": "ok",
+                    "notification_worker": "unavailable",
+                    "calendar_sync_worker": "unavailable",
+                    "data_deletion_worker": "unavailable",
+                },
+            }
+            result = operations.current_recovery_preflight(candidate_sha=self.SHA)
+        self.assertEqual(result["migration"], "recovery_resume")
+        self.assertEqual(result["schema"], 96)
+
+    def test_completed_recovery_still_rejects_worker_degradation(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations = self.recovery_preflight_operations(root)
+            state_path = operations.state_root / "state.json"
+            state = json.loads(state_path.read_text())
+            state["active_slot"] = "green"
+            state["known_good_release"] = {
+                "sha": self.SHA, "slot": "green", "schema": 96,
+            }
+            state["compatible_fallback_release"] = {
+                "sha": self.SHA, "slot": "blue", "schema": 96,
+                "schema_compatible_min": 96, "schema_compatible_max": 96,
+            }
+            state_path.write_text(json.dumps(state), encoding="utf-8")
+            operations.current_traffic_slot.return_value = "green"
+            operations.http_json.return_value = {
+                "release_sha": self.SHA,
+                "schema_compatible_min": 96,
+                "schema_compatible_max": 96,
+            }
+            operations.http_json_allow_503.return_value = {
+                "ready": False,
+                "components": {"schema": "ok", "notification_worker": "unavailable"},
+            }
+            with self.assertRaisesRegex(
+                upgrade.UpgradeError, "recovery_origin_readiness_unexpected"
+            ):
+                operations.current_recovery_preflight(candidate_sha=self.SHA)
+
     def test_schema_recovery_preflight_accepts_completed_checkout_pending(self):
         with tempfile.TemporaryDirectory() as root:
             operations = self.recovery_preflight_operations(root)

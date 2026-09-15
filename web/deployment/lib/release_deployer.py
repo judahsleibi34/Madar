@@ -19,6 +19,11 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Protocol
 
+from deployment.lib.runtime_authority import (
+    load_worker_authority,
+    write_worker_authority,
+)
+
 
 def utc_now() -> datetime:
     return datetime.now(timezone.utc)
@@ -74,6 +79,7 @@ class Operations(Protocol):
     def preflight(self, sha: str, slot: str, images: dict[str, str], schema: int) -> None: ...
     def start_candidate(self, sha: str, slot: str, images: dict[str, str]) -> None: ...
     def validate_candidate(self, sha: str, slot: str) -> None: ...
+    def validate_candidate_core(self, sha: str, slot: str) -> None: ...
     def validate_rollback_target(self, release: dict[str, Any], schema: int) -> dict[str, int]: ...
     def activate_workers(self, sha: str, slot: str, images: dict[str, str]) -> None: ...
     def deactivate_workers(self, release: dict[str, Any]) -> None: ...
@@ -117,6 +123,79 @@ class ReleaseDeployer:
         state["in_progress_release"] = dict(release)
         atomic_json(self.state_file, state)
 
+    @staticmethod
+    def _worker_identity(release: dict[str, Any]) -> dict[str, str]:
+        return {
+            "sha": str(release.get("sha") or release.get("release_sha") or ""),
+            "slot": str(release.get("slot") or release.get("candidate_slot") or ""),
+        }
+
+    def _worker_generation(self, release: dict[str, Any]) -> str:
+        existing = str(release.get("worker_generation") or "")
+        if len(existing) == 64:
+            return existing
+        material = ":".join((
+            str(release.get("recovery_id") or "release"),
+            str(release.get("release_sha") or ""),
+            str(release.get("started_at") or ""),
+            str((release.get("previous_known_good_release") or {}).get("sha") or ""),
+        ))
+        generation = hashlib.sha256(material.encode()).hexdigest()
+        release["worker_generation"] = generation
+        return generation
+
+    def _set_worker_authority(
+        self, state: dict[str, Any], release: dict[str, Any], owner: str,
+        *, expected: set[str] | None = None,
+    ) -> None:
+        previous = release.get("previous_known_good_release")
+        if not isinstance(previous, dict):
+            raise RuntimeError("worker_authority_old_identity_invalid")
+        old = self._worker_identity(previous)
+        candidate = {
+            "sha": str(release.get("release_sha") or ""),
+            "slot": str(release.get("candidate_slot") or ""),
+        }
+        generation = self._worker_generation(release)
+        current = load_worker_authority(self.state_root)
+        if expected is not None and current is None and owner != "OLD":
+            raise RuntimeError("worker_authority_missing")
+        if expected is not None and current is not None:
+            current_identity = (
+                current["old"] if current["owner"] == "OLD"
+                else current["candidate"] if current["owner"] == "CANDIDATE"
+                else None
+            )
+            same_generation = current["generation"] == generation
+            rebased_old = owner == "OLD" and current_identity == old
+            if current["owner"] not in expected or not (same_generation or rebased_old):
+                raise RuntimeError("worker_authority_transition_invalid")
+        write_worker_authority(
+            self.state_root, generation=generation, owner=owner,
+            old=old, candidate=candidate,
+        )
+        release["worker_owner"] = owner.lower()
+        self._checkpoint(state, release)
+
+    def _require_worker_authority(
+        self, release: dict[str, Any], owner: str,
+    ) -> None:
+        current = load_worker_authority(self.state_root)
+        if current is None:
+            raise RuntimeError("worker_authority_missing")
+        if (
+            current["generation"] != self._worker_generation(release)
+            or current["owner"] != owner
+            or current["old"] != self._worker_identity(
+                release.get("previous_known_good_release") or {}
+            )
+            or current["candidate"] != {
+                "sha": str(release.get("release_sha") or ""),
+                "slot": str(release.get("candidate_slot") or ""),
+            }
+        ):
+            raise RuntimeError("worker_authority_mismatch")
+
     def _recover_interrupted(self, state: dict[str, Any]) -> None:
         interrupted = state.get("in_progress_release")
         if not isinstance(interrupted, dict):
@@ -126,22 +205,144 @@ class ReleaseDeployer:
         previous = str(interrupted.get("previous_traffic_target") or "")
         if len(sha) != 40 or slot not in {"blue", "green"} or previous not in {"blue", "green"}:
             raise RuntimeError("interrupted_release_state_invalid")
-        # Preparing the old release source gives the operations layer the
+        known_good = interrupted.get("previous_known_good_release")
+        if known_good is None:
+            # Legacy/uninitialized state has no old consumer identity to
+            # authorize. It may only quiesce and remove the interrupted
+            # candidate; bootstrap adoption is the supported activation path.
+            self.operations.verify_source(sha)
+            traffic = self.operations.current_traffic_slot()
+            if traffic == slot:
+                if not interrupted.get("rollback_required"):
+                    raise RuntimeError(
+                        "interrupted_release_operator_intervention:unexpected_candidate_traffic"
+                    )
+                self.operations.switch_traffic(previous)
+            elif traffic != previous:
+                raise RuntimeError(
+                    "interrupted_release_operator_intervention:traffic_ambiguous"
+                )
+            if interrupted.get("workers_cut_over"):
+                self.operations.deactivate_workers({
+                    "sha": sha, "slot": slot,
+                    "images": interrupted.get("images") or {},
+                })
+            self.operations.stop_candidate(slot)
+            interrupted.update(
+                status="interrupted_recovered", phase="recovered",
+                completed_at=utc_now().isoformat(),
+                failure_code="previous_process_interrupted",
+            )
+            state.pop("in_progress_release", None)
+            state.pop("rollback_failure", None)
+            self._record(state, interrupted)
+            return
+        if not isinstance(known_good, dict):
+            raise RuntimeError("interrupted_release_known_good_invalid")
+        candidate = {
+            "sha": sha, "slot": slot,
+            "images": interrupted.get("images") or {},
+        }
+        expected_serving = {
+            previous: str(known_good.get("sha") or ""), slot: sha,
+        }
+
+        # Discover traffic and both worker groups before interpreting the
+        # durable phase/authority.  Unknown or overlapping reality is never an
+        # instruction to activate either side.
+        traffic = self.operations.resolve_serving_slot(expected_serving)
+        if traffic is None:
+            raise RuntimeError("interrupted_release_operator_intervention:traffic_ambiguous")
+        ownership = self.operations.worker_ownership(known_good, candidate)
+        if ownership in {"overlap", "ambiguous"}:
+            raise RuntimeError(
+                "interrupted_release_operator_intervention:worker_state_ambiguous"
+            )
+
+        authority = load_worker_authority(self.state_root)
+        recorded_owner = str(interrupted.get("worker_owner") or "").upper()
+        if authority is None:
+            # Compatibility for an interruption before the first authority
+            # checkpoint on a controller upgraded from the legacy format.
+            if ownership != "old":
+                raise RuntimeError("worker_authority_missing")
+            self._set_worker_authority(state, interrupted, "OLD", expected=None)
+            recorded_owner = "OLD"
+        elif recorded_owner in {"OLD", "NONE", "CANDIDATE"}:
+            self._require_worker_authority(interrupted, recorded_owner)
+        elif (
+            authority.get("owner") == "CANDIDATE"
+            and authority.get("candidate") == self._worker_identity(known_good)
+        ):
+            # The last completed release's CANDIDATE becomes this generation's
+            # OLD only while actual workers still prove that identity owns work.
+            if ownership != "old":
+                raise RuntimeError("worker_authority_transition_invalid")
+            self._set_worker_authority(
+                state, interrupted, "OLD", expected={"CANDIDATE"},
+            )
+            recorded_owner = "OLD"
+        else:
+            raise RuntimeError("worker_authority_mismatch")
+
+        # Preparing the candidate source gives the operations layer the
         # immutable Compose definition needed to remove only that candidate.
         self.operations.verify_source(sha)
-        if interrupted.get("rollback_required"):
+        if traffic == slot:
+            if not interrupted.get("rollback_required"):
+                raise RuntimeError(
+                    "interrupted_release_operator_intervention:unexpected_candidate_traffic"
+                )
             self.operations.switch_traffic(previous)
-        if interrupted.get("workers_cut_over"):
-            self.operations.deactivate_workers({"sha": sha, "slot": slot, "images": interrupted.get("images") or {}})
-            known_good = interrupted.get("previous_known_good_release")
-            if isinstance(known_good, dict):
-                self.operations.restore_workers(known_good)
-        known_good = interrupted.get("previous_known_good_release") or {}
+            if self.operations.resolve_serving_slot(expected_serving) != previous:
+                raise RuntimeError(
+                    "interrupted_release_operator_intervention:rollback_unproven"
+                )
+        elif traffic != previous:
+            raise RuntimeError("interrupted_release_operator_intervention:traffic_ambiguous")
+
+        if ownership in {"candidate", "candidate_starting", "candidate_partial"}:
+            if recorded_owner != "CANDIDATE":
+                raise RuntimeError("worker_authority_mismatch")
+            self._set_worker_authority(
+                state, interrupted, "NONE", expected={"CANDIDATE"},
+            )
+            recorded_owner = "NONE"
+            self.operations.deactivate_workers(candidate)
+            ownership = self.operations.worker_ownership(known_good, candidate)
+        elif ownership == "old_starting":
+            if recorded_owner not in {"OLD", "NONE"}:
+                raise RuntimeError("worker_authority_mismatch")
+            if recorded_owner == "OLD":
+                self._set_worker_authority(
+                    state, interrupted, "NONE", expected={"OLD"},
+                )
+                recorded_owner = "NONE"
+            self.operations.deactivate_workers(known_good)
+            ownership = self.operations.worker_ownership(known_good, candidate)
+        elif ownership == "old" and recorded_owner != "OLD":
+            # NONE plus old-active is valid only at the persisted inhibition
+            # boundary; quiesce it before making any activation decision.
+            if recorded_owner != "NONE" or interrupted.get("phase") != "worker_cutover":
+                raise RuntimeError("worker_authority_mismatch")
+            self.operations.deactivate_workers(known_good)
+            ownership = self.operations.worker_ownership(known_good, candidate)
+
+        if ownership == "none":
+            if recorded_owner != "NONE":
+                self._set_worker_authority(
+                    state, interrupted, "NONE", expected={recorded_owner},
+                )
+            self._set_worker_authority(state, interrupted, "OLD", expected={"NONE"})
+            self.operations.restore_workers(known_good)
+            ownership = self.operations.worker_ownership(known_good, candidate)
+        if ownership != "old":
+            raise RuntimeError(
+                "interrupted_release_operator_intervention:retained_workers_unproven"
+            )
+
         self.operations.stop_candidate(
-            slot,
-            expected_serving={
-                previous: str(known_good.get("sha") or ""), slot: sha,
-            },
+            slot, expected_serving=expected_serving,
         )
         interrupted.update(
             status="interrupted_recovered",
@@ -226,21 +427,40 @@ class ReleaseDeployer:
                 self.operations.start_candidate(sha, candidate_slot, images)
                 release["phase"] = "deep_validation"
                 self._checkpoint(state, release)
-                self.operations.validate_candidate(sha, candidate_slot)
+                validate_core = getattr(
+                    self.operations, "validate_candidate_core",
+                    self.operations.validate_candidate,
+                )
+                validate_core(sha, candidate_slot)
                 release["phase"] = "worker_cutover"
                 self._checkpoint(state, release)
                 candidate_identity = {"sha": sha, "slot": candidate_slot, "images": images}
                 if known_good:
+                    if self.operations.worker_ownership(known_good, candidate_identity) != "old":
+                        raise RuntimeError("worker_ownership_initial_invalid")
+                    self._set_worker_authority(state, release, "OLD", expected={"OLD", "CANDIDATE"})
+                    self._set_worker_authority(state, release, "NONE", expected={"OLD"})
                     self.operations.deactivate_workers(known_good)
+                    if self.operations.worker_ownership(known_good, candidate_identity) != "none":
+                        raise RuntimeError("worker_quiescence_unverified")
                 try:
+                    if known_good:
+                        self._set_worker_authority(state, release, "CANDIDATE", expected={"NONE"})
                     self.operations.activate_workers(sha, candidate_slot, images)
                     self.operations.validate_candidate(sha, candidate_slot)
                     workers_cut_over = True
                     release["workers_cut_over"] = True
                     self._checkpoint(state, release)
                 except Exception:
+                    if known_good:
+                        self._set_worker_authority(
+                            state, release, "NONE", expected={"CANDIDATE", "NONE"}
+                        )
                     self.operations.deactivate_workers(candidate_identity)
                     if known_good:
+                        if self.operations.worker_ownership(known_good, candidate_identity) != "none":
+                            raise RuntimeError("candidate_worker_shutdown_unverified")
+                        self._set_worker_authority(state, release, "OLD", expected={"NONE"})
                         self.operations.restore_workers(known_good)
                     raise
                 release["phase"] = "traffic_switch"
@@ -255,6 +475,7 @@ class ReleaseDeployer:
                 state["active_slot"] = candidate_slot
                 state["known_good_release"] = {
                     "sha": sha, "slot": candidate_slot, "images": images, "schema": schema,
+                    "worker_generation": release.get("worker_generation"),
                     "schema_compatible_min": self.compatibility.schema_min,
                     "schema_compatible_max": self.compatibility.schema_max,
                 }
@@ -269,10 +490,21 @@ class ReleaseDeployer:
                 )
                 if switched:
                     release["rollback"] = "traffic_switch_to_retained_known_good"
+                    if known_good:
+                        self._set_worker_authority(
+                            state, release, "NONE", expected={"CANDIDATE", "NONE"}
+                        )
                     self.operations.deactivate_workers({
                         "sha": sha, "slot": candidate_slot, "images": release.get("images") or {},
                     })
                     if known_good:
+                        candidate_identity = {
+                            "sha": sha, "slot": candidate_slot,
+                            "images": release.get("images") or {},
+                        }
+                        if self.operations.worker_ownership(known_good, candidate_identity) != "none":
+                            raise RuntimeError("candidate_worker_shutdown_unverified")
+                        self._set_worker_authority(state, release, "OLD", expected={"NONE"})
                         self.operations.restore_workers(known_good)
                     try:
                         self.operations.switch_traffic(previous_slot)
@@ -297,10 +529,21 @@ class ReleaseDeployer:
                 else:
                     release["rollback"] = "not_required_active_target_untouched"
                     if workers_cut_over:
+                        if known_good:
+                            self._set_worker_authority(
+                                state, release, "NONE", expected={"CANDIDATE", "NONE"}
+                            )
                         self.operations.deactivate_workers({
                             "sha": sha, "slot": candidate_slot, "images": release.get("images") or {},
                         })
                         if known_good:
+                            candidate_identity = {
+                                "sha": sha, "slot": candidate_slot,
+                                "images": release.get("images") or {},
+                            }
+                            if self.operations.worker_ownership(known_good, candidate_identity) != "none":
+                                raise RuntimeError("candidate_worker_shutdown_unverified")
+                            self._set_worker_authority(state, release, "OLD", expected={"NONE"})
                             self.operations.restore_workers(known_good)
                 self.operations.stop_candidate(
                     candidate_slot,
@@ -375,9 +618,24 @@ class ReleaseDeployer:
             ):
                 self.operations.verify_source(sha)
                 self.operations.validate_candidate(sha, traffic)
-                self.operations.validate_candidate(sha, str(fallback["slot"]))
+                validate_core = getattr(
+                    self.operations, "validate_candidate_core",
+                    self.operations.validate_candidate,
+                )
+                validate_core(sha, str(fallback["slot"]))
                 if self.operations.schema_version() != schema:
                     raise RuntimeError("recovery_live_schema_changed")
+                authority = load_worker_authority(self.state_root)
+                active_identity = {"sha": sha, "slot": traffic}
+                if (
+                    authority is None
+                    or authority.get("owner") != "CANDIDATE"
+                    or authority.get("candidate") != active_identity
+                    or authority.get("generation") != known_good.get("worker_generation")
+                    or self.operations.worker_ownership(fallback, known_good)
+                    != "candidate"
+                ):
+                    raise RuntimeError("recovery_completed_worker_authority_invalid")
                 return {
                     "release_sha": sha,
                     "status": "already_recovered",
@@ -428,16 +686,67 @@ class ReleaseDeployer:
                 if traffic is None:
                     raise RuntimeError("recovery_operator_intervention_required:traffic_unknown")
                 ownership = self.operations.worker_ownership(previous, candidate_identity)
+                authority = load_worker_authority(self.state_root)
+                if authority is None:
+                    durable_owner = str(interrupted.get("worker_owner") or "unknown").upper()
+                    if durable_owner not in {"OLD", "NONE", "CANDIDATE"}:
+                        raise RuntimeError("worker_authority_missing")
+                    self._set_worker_authority(
+                        state, interrupted, durable_owner, expected=None,
+                    )
+                else:
+                    self._require_worker_authority(
+                        interrupted, str(interrupted.get("worker_owner") or "").upper()
+                    )
+                durable_owner = str(interrupted.get("worker_owner") or "").upper()
+                phase = str(interrupted.get("phase") or "")
+                if ownership in {"overlap", "ambiguous"}:
+                    raise RuntimeError(
+                        "recovery_operator_intervention_required:worker_state_ambiguous"
+                    )
+                if ownership == "candidate":
+                    if durable_owner != "CANDIDATE":
+                        raise RuntimeError(
+                            "recovery_operator_intervention_required:worker_authority_contradiction"
+                        )
+                elif ownership in {"candidate_starting", "candidate_partial"}:
+                    none_candidate_handoff = (
+                        durable_owner == "NONE"
+                        and traffic == candidate_slot
+                        and phase in {
+                            "traffic_switch", "post_switch_validation",
+                            "worker_ownership_reconciliation", "worker_cutover",
+                        }
+                    )
+                    if durable_owner != "CANDIDATE" and not none_candidate_handoff:
+                        raise RuntimeError(
+                            "recovery_operator_intervention_required:worker_authority_contradiction"
+                        )
+                elif ownership in {"old", "old_starting", "old_partial"}:
+                    none_inhibition_boundary = (
+                        durable_owner == "NONE"
+                        and phase in {"candidate_start_workers_inactive", "worker_cutover"}
+                    )
+                    if durable_owner != "OLD" and not none_inhibition_boundary:
+                        raise RuntimeError(
+                            "recovery_operator_intervention_required:worker_authority_contradiction"
+                        )
                 if traffic == candidate_slot:
                     # The schema-compatible candidate is already serving.  A
                     # database rollback and a switch to the old incompatible
                     # release are both forbidden; finish forward from here.
                     self.operations.verify_source(sha)
-                    self.operations.validate_candidate(sha, candidate_slot)
-                    if ownership in {
-                        "old", "old_starting", "old_partial", "overlap",
-                    }:
+                    validate_core = getattr(
+                        self.operations, "validate_candidate_core",
+                        self.operations.validate_candidate,
+                    )
+                    validate_core(sha, candidate_slot)
+                    if ownership in {"old", "old_starting", "old_partial"}:
                         try:
+                            self._set_worker_authority(
+                                state, interrupted, "NONE",
+                                expected={"OLD", "CANDIDATE", "NONE"},
+                            )
                             self.operations.deactivate_workers(previous)
                         except Exception as error:
                             interrupted.update(
@@ -454,8 +763,22 @@ class ReleaseDeployer:
                             previous, candidate_identity
                         )
                     if ownership in {"none", "candidate_starting", "candidate_partial"}:
-                        interrupted["worker_owner"] = "none"
-                        self._checkpoint(state, interrupted)
+                        if ownership != "none":
+                            self._set_worker_authority(
+                                state, interrupted, "NONE",
+                                expected={"CANDIDATE", "NONE"},
+                            )
+                            self.operations.deactivate_workers(candidate_identity)
+                            ownership = self.operations.worker_ownership(
+                                previous, candidate_identity
+                            )
+                        if ownership != "none":
+                            raise RuntimeError(
+                                "recovery_operator_intervention_required:candidate_workers_not_inactive"
+                            )
+                        self._set_worker_authority(
+                            state, interrupted, "CANDIDATE", expected={"NONE"},
+                        )
                         self.operations.activate_workers(sha, candidate_slot, images)
                         ownership = self.operations.worker_ownership(
                             previous, candidate_identity
@@ -483,10 +806,12 @@ class ReleaseDeployer:
                     )
                 if traffic != previous_slot:
                     raise RuntimeError("interrupted_recovery_traffic_unknown")
-                if ownership in {
-                    "candidate", "candidate_starting", "candidate_partial", "overlap",
-                }:
+                if ownership in {"candidate", "candidate_starting", "candidate_partial"}:
                     try:
+                        self._set_worker_authority(
+                            state, interrupted, "NONE",
+                            expected={"CANDIDATE", "NONE"},
+                        )
                         self.operations.deactivate_workers(candidate_identity)
                     except Exception as error:
                         interrupted.update(
@@ -511,9 +836,21 @@ class ReleaseDeployer:
                         "recovery_operator_intervention_required:candidate_workers_not_inactive"
                     )
                 if ownership in {"none", "old_starting"}:
-                    interrupted["worker_owner"] = "none"
-                    self._checkpoint(state, interrupted)
+                    if ownership == "old_starting":
+                        self._set_worker_authority(
+                            state, interrupted, "NONE", expected={"OLD", "NONE"},
+                        )
+                        self.operations.deactivate_workers(previous)
+                        if self.operations.worker_ownership(previous, candidate_identity) != "none":
+                            raise RuntimeError("recovery_retained_worker_inhibition_unverified")
+                    self._set_worker_authority(
+                        state, interrupted, "OLD", expected={"NONE"},
+                    )
                     self.operations.restore_workers(previous)
+                elif ownership == "old":
+                    self._set_worker_authority(
+                        state, interrupted, "OLD", expected={"NONE", "OLD"},
+                    )
                 if self.operations.worker_ownership(previous, candidate_identity) != "old":
                     raise RuntimeError("recovery_retained_worker_restore_unverified")
                 interrupted["worker_owner"] = "old"
@@ -585,12 +922,19 @@ class ReleaseDeployer:
                 release["phase"] = "candidate_start_workers_inactive"
                 self._checkpoint(state, release)
                 self.operations.start_candidate(sha, candidate_slot, images)
-                self.operations.validate_candidate(sha, candidate_slot)
+                validate_core = getattr(
+                    self.operations, "validate_candidate_core",
+                    self.operations.validate_candidate,
+                )
+                validate_core(sha, candidate_slot)
                 candidate_identity = {
                     "sha": sha, "slot": candidate_slot, "images": images,
                 }
                 if self.operations.worker_ownership(known_good, candidate_identity) != "old":
                     raise RuntimeError("recovery_initial_worker_ownership_invalid")
+                self._set_worker_authority(
+                    state, release, "OLD", expected={"OLD", "CANDIDATE"},
+                )
 
                 # Queue consumers never overlap. The durable handoff is old ->
                 # none here; candidate consumers start only after the stable
@@ -602,6 +946,7 @@ class ReleaseDeployer:
                 # inactive before issuing the operation so every pre-switch
                 # failure restores the complete retained worker set.
                 old_workers_may_be_inactive = True
+                self._set_worker_authority(state, release, "NONE", expected={"OLD"})
                 self.operations.deactivate_workers(known_good)
                 if self.operations.worker_ownership(known_good, candidate_identity) != "none":
                     raise RuntimeError("recovery_worker_quiescence_unverified")
@@ -628,7 +973,7 @@ class ReleaseDeployer:
                 # concurrent schema change during that check cannot slip past.
                 if self.operations.schema_version() != schema:
                     raise RuntimeError("recovery_pre_switch_state_changed")
-                self.operations.validate_candidate(sha, candidate_slot)
+                validate_core(sha, candidate_slot)
                 if self.operations.worker_ownership(known_good, candidate_identity) != "none":
                     raise RuntimeError("recovery_worker_ownership_changed_before_switch")
                 if self.operations.resolve_serving_slot({
@@ -665,6 +1010,15 @@ class ReleaseDeployer:
                     switched = True
                 release["phase"] = "post_switch_validation"
                 self._checkpoint(state, release)
+                # Traffic switching is outside Docker's restart-policy state.
+                # Reconcile the durable NONE authority and actual inhibition at
+                # the activation boundary; a retained restart starts nobody else.
+                if self.operations.worker_ownership(known_good, candidate_identity) != "none":
+                    raise RuntimeError("recovery_worker_ownership_changed_during_switch")
+                self._require_worker_authority(release, "NONE")
+                self._set_worker_authority(
+                    state, release, "CANDIDATE", expected={"NONE"},
+                )
                 self.operations.activate_workers(sha, candidate_slot, images)
                 if self.operations.worker_ownership(known_good, candidate_identity) != "candidate":
                     raise RuntimeError("recovery_candidate_worker_activation_unverified")
@@ -726,6 +1080,10 @@ class ReleaseDeployer:
                     if ownership in {
                         "candidate", "candidate_starting", "candidate_partial", "overlap",
                     }:
+                        self._set_worker_authority(
+                            state, release, "NONE",
+                            expected={"CANDIDATE", "NONE"},
+                        )
                         self.operations.deactivate_workers(candidate_identity)
                         ownership = self.operations.worker_ownership(
                             known_good, candidate_identity
@@ -744,8 +1102,20 @@ class ReleaseDeployer:
                     raise RuntimeError(
                         "recovery_operator_intervention_required:candidate_workers_not_inactive"
                     ) from error
-                if old_workers_may_be_inactive and ownership in {"none", "old_starting"}:
-                    self.operations.restore_workers(known_good)
+                if old_workers_may_be_inactive:
+                    if ownership in {"none", "old_starting"}:
+                        if ownership == "old_starting":
+                            self.operations.deactivate_workers(known_good)
+                            if self.operations.worker_ownership(known_good, candidate_identity) != "none":
+                                raise RuntimeError("recovery_retained_worker_inhibition_unverified")
+                        self._set_worker_authority(
+                            state, release, "OLD", expected={"NONE"},
+                        )
+                        self.operations.restore_workers(known_good)
+                    elif ownership == "old":
+                        self._set_worker_authority(
+                            state, release, "OLD", expected={"NONE", "OLD"},
+                        )
                     if self.operations.worker_ownership(
                         known_good,
                         {"sha": sha, "slot": candidate_slot, "images": release.get("images") or {}},
@@ -790,8 +1160,17 @@ class ReleaseDeployer:
 
         release["phase"] = "compatible_fallback_establishment"
         self._checkpoint(state, release)
+        if self.operations.resolve_serving_slot({
+            previous_slot: str((release.get("previous_known_good_release") or {}).get("sha") or ""),
+            candidate_slot: sha,
+        }) != candidate_slot:
+            raise RuntimeError("recovery_fallback_target_became_serving")
         self.operations.start_candidate(sha, previous_slot, images)
-        self.operations.validate_candidate(sha, previous_slot)
+        validate_core = getattr(
+            self.operations, "validate_candidate_core",
+            self.operations.validate_candidate,
+        )
+        validate_core(sha, previous_slot)
         if self.operations.worker_ownership(previous, candidate_identity) != "candidate":
             raise RuntimeError("recovery_fallback_worker_ownership_invalid")
         if (
@@ -811,6 +1190,7 @@ class ReleaseDeployer:
             "schema": schema,
             "schema_compatible_min": self.compatibility.schema_min,
             "schema_compatible_max": self.compatibility.schema_max,
+            "worker_generation": release.get("worker_generation"),
             "schema_recovery": True,
             "migration_result": "not_requested",
             "recovery_id": release.get("recovery_id"),

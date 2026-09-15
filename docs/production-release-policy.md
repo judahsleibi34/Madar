@@ -786,11 +786,14 @@ delay. It never attempts reverse SQL or a proxy switch.
 ## P. Interrupted deployment recovery
 
 Every phase checkpoints `in_progress_release`. At the start of the next locked
-deployment, a structurally valid interrupted record causes source restoration,
-prior traffic-target restoration when needed, candidate-worker deactivation,
-known-good worker restoration, and candidate cleanup. The archived history entry
-uses `status = interrupted_recovered` and clears the in-progress/rollback marker.
-Invalid interrupted state fails closed.
+deployment, a structurally valid interrupted record first discovers the loaded
+route, both worker groups, and the durable worker authority. It restores prior
+traffic when needed, publishes `NONE`, proves candidate consumers inactive,
+publishes `OLD`, restores known-good consumers, and only then cleans the
+non-serving candidate. Missing/stale authority, ambiguous traffic, overlap, or
+an authority/runtime contradiction outside a recorded inhibition boundary fails
+closed. The archived history entry uses `status = interrupted_recovered` and
+clears the in-progress/rollback marker. Invalid interrupted state fails closed.
 
 Implemented by `ReleaseDeployer._checkpoint()` and `_recover_interrupted()`.
 
@@ -988,13 +991,24 @@ disabled.
 The release controller then revalidates a fresh complete local backup, the
 matching read-only Node 1 replica, immutable image identities, and the pinned
 schema. Candidate queue consumers remain off while the inactive slot is
-checked. Old consumers are stopped and actual state must prove that neither
-slot owns queue work. The database, release state, authoritative loaded route,
-candidate, backup identity, and zero-worker ownership are checked again
-immediately before the governed atomic traffic switch. Candidate consumers
-start only after the candidate is proven serving and must become healthy within
-a bounded window. The durable ownership sequence is therefore `old` to `none`
-to `candidate`; the two slots never overlap. No migration or schema write occurs.
+checked. The controller atomically persists a release-generation-bound
+authority in `worker-ownership.json`, with the only values `OLD`, `NONE`, and
+`CANDIDATE`. Every consumer activation, restore, recovery resume, ordinary
+worker cutover, and active-runtime worker refresh must match that exact
+generation and slot/SHA identity. Old consumers have their Docker restart
+policy inhibited, are stopped, and are observed inactive before authority can
+advance from `NONE`; the reverse handoff applies before old consumers can be
+restored. The database, release state, authoritative loaded route, candidate,
+backup identity, and zero-worker ownership are checked again immediately before
+the governed atomic traffic switch. Candidate consumers start only after the
+candidate is proven serving and must become healthy within a bounded window.
+The two slots never overlap. No migration or schema write occurs.
+
+`runtime-mutation.lock` is the shared cross-process authority for the traffic
+switch and inactive-slot stop/remove/force-recreate operations. Within that
+lock, the controller resolves loaded traffic again and refuses ambiguity or a
+target that has become serving. This closes the routing/slot TOCTOU boundary
+without weakening the traffic switch's atomic rollback behavior.
 
 After the switch, the old binary is not a valid rollback target. Any failure is
 durably classified as forward repair and traffic is never sent back to the
@@ -1019,6 +1033,18 @@ Normal forward migrations establish an inactive copy of the accepted bridge
 before applying SQL and revalidate that copy at the target schema after worker
 refresh. Consequently the post-migration state has a proven compatible
 fallback rather than only an incompatible historical slot.
+
+Ordinary prepare parses the candidate's actual `release.json` and migration
+manifest after immutable source verification, verifies every listed checksum,
+derives and persists the contiguous source-to-target transition path, and
+requires an interrupted retry to reproduce that same path. A completed schema
+recovery record does not substitute for or rewrite the ordinary manifest.
+
+Mocked state-machine tests are not installed-runtime proof. The disposable
+`web/scripts/rehearse_schema96_real_runtime.py` rehearsal runs only in an empty,
+network-isolated Docker daemon and uses the real release CLI, Docker operations,
+Compose consumers, durable state, file-proxy switcher, and manifest parser.
+Its sanitized output belongs outside Git in the operator evidence directory.
 
 The operator procedure is
 [`schema-96-forward-recovery-runbook.md`](schema-96-forward-recovery-runbook.md).
