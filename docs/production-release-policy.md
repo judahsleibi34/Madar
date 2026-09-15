@@ -247,16 +247,17 @@ queried directly. Its SHA must match state and its reported compatibility range
 must contain the live schema. Candidate rollback bounds are descriptive metadata
 today; retained-target attestation is the operative rollback check.
 
-Current bridge contract after this policy update is schema range `81..98`, target
-`98`, class `expand-only`, rollback metadata `81..97`, and manifest
-`migrations-098.json`. It promotes and is accepted while schema 97 is live.
-Existing website and ecommerce behavior remains compatible during the bridge:
-public visit recording is best effort and dashboard visit metrics report an
-unavailable zero state until schema 098 is installed. Only then may the
-coordinator create a schema-97-bound verified backup and execute the pinned
-expand-only 97-to-98 transition. Migration 098 adds tenant-scoped atomic website
-and store opening counters. It stores aggregate counts only, without visitor
-identity, IP address, user agent, or other personal data.
+Current bridge contract after this policy update is schema range `81..99`, target
+`99`, class `expand-only`, rollback metadata `81..98`, and the
+checksum-pinned, contiguous `migrations-097-099.json`. It promotes and is
+accepted while schema 96 through 99 is live. Text-only product variants retain
+the legacy aggregate save path before schema 99, while color presentation saves
+fail clearly instead of silently discarding swatches. Only after bridge
+acceptance may the coordinator create a source-schema-bound verified backup and
+execute the needed 96-to-99 transitions. Migration 099 adds only constrained
+variant-attribute presentation metadata and a transactional V2 wrapper around
+the existing aggregate save; it does not change variant identity, SKU,
+inventory, checkout, restoration, snapshots, or order history.
 
 The preceding schema-097 bridge added verified-customer loyalty through atomic
 functions. Identity is `(store tenant_id, public.users.id)`; checkout email and

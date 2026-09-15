@@ -1789,6 +1789,9 @@
 .live-store-variant-options button { border:1px solid var(--store-muted); border-radius:999px; padding:8px 14px; background:var(--store-paper); color:var(--store-ink); }
 .live-store-variant-options button.is-active { border-color:var(--store-accent); background:var(--store-accent); color:#fff; }
 .live-store-variant-options button:disabled { opacity:.35; text-decoration:line-through; }
+.live-store-variant-options button.is-color { display:inline-flex; align-items:center; gap:8px; }
+.live-store-color-swatch { width:18px; height:18px; flex:0 0 18px; border:1px solid color-mix(in srgb,var(--store-ink) 25%,transparent); border-radius:50%; box-shadow:inset 0 0 0 2px var(--store-paper); }
+.live-store-variant-options button.is-color.is-active .live-store-color-swatch { box-shadow:inset 0 0 0 2px var(--store-accent); }
 .live-store-variant-help,.live-store-variant-meta { color:var(--store-muted); }
 .live-store-attributes { margin-top:24px; border-top:1px solid color-mix(in srgb,var(--store-muted) 25%,transparent); }
 .live-store-attributes div { display:grid; grid-template-columns:minmax(100px,1fr) 2fr; gap:18px; padding:10px 0; border-bottom:1px solid color-mix(in srgb,var(--store-muted) 20%,transparent); }

@@ -21,6 +21,22 @@ const size = { id: "option-size", code: "size", name: "Size", required: true, va
 afterEach(() => { cleanup(); vi.clearAllMocks(); localStorage.clear(); i18n.changeLanguage("en"); });
 
 describe("merchant-defined ecommerce variants", () => {
+  it("renders generic color presentation as accessible labeled swatches", async () => {
+    fetchPublicEcommerceProduct.mockResolvedValue({ site: { brand: "Store" }, product, category: null, tags: [], attributes: [], options: [{
+      ...color, display_type: "color", values: [
+        { id: "black", code: "black", value: "Black", color_hex: "#111111" },
+        { id: "white", code: "white", value: "White", color_hex: "#FFFFFF" },
+      ],
+    }], variants: [{ id: "black-only", sku: "BLACK", option_value_ids: ["black"], price: "20.00", in_stock: true, images: [] }] });
+    render(<MemoryRouter initialEntries={["/store/demo/product/shirt"]}><Routes><Route path="/store/:subdomain/*" element={<EcommerceStorefront />} /></Routes></MemoryRouter>);
+    const black = await screen.findByRole("button", { name: "Black" });
+    const white = screen.getByRole("button", { name: "White" });
+    expect(black.querySelector(".live-store-color-swatch").style.backgroundColor).toBe("rgb(17, 17, 17)");
+    expect(white.disabled).toBe(true);
+    fireEvent.click(black);
+    expect(black.getAttribute("aria-pressed")).toBe("true");
+  });
+
   it("requires an explicit valid combination and updates price, image, and cart identity", async () => {
     fetchPublicEcommerceProduct.mockResolvedValue({ site: { brand: "Store" }, product, category: null, tags: [], attributes: [{ id: "a1", name: "Material", value: "Cotton" }], options: [color, size], variants: [
       { id: "variant-black-small", sku: "SHIRT-B-S", option_value_ids: ["black", "small"], price: "20.00", in_stock: true, images: [] },

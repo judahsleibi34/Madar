@@ -32,7 +32,7 @@ function renderEditor(path = "/ecommerce/products/new") {
 }
 
 function addOption(name, values) {
-  const optionButton = screen.queryByRole("button", { name: "Add options" }) || screen.getByRole("button", { name: "Add another option" });
+  const optionButton = screen.getByRole("button", { name: "Add variant attribute" });
   fireEvent.click(optionButton);
   const nameInputs = screen.getAllByLabelText("English name");
   fireEvent.change(nameInputs.at(-1), { target: { value: name } });
@@ -56,7 +56,7 @@ describe("merchant product options and variants editor", () => {
     renderEditor();
 
     fireEvent.change(await screen.findByLabelText("Name (English)"), { target: { value: "Simple mug" } });
-    expect(screen.getByText("This product has no options")).toBeTruthy();
+    expect(screen.getByText("This is a simple product")).toBeTruthy();
     expect(screen.queryByRole("table")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Save product" }));
 
@@ -66,40 +66,46 @@ describe("merchant product options and variants editor", () => {
     expect(payload.variants).toEqual([]);
   });
 
-  it("enters shirt values quickly, previews 12 combinations, and persists only four selected variants", async () => {
+  it("uses the Size by Color matrix and persists only the seven available T-shirt combinations", async () => {
     fetchEcommerceCatalog.mockResolvedValue(catalog());
     saveEcommerceItem.mockResolvedValue({ id: "product-1" });
     renderEditor();
 
     fireEvent.change(await screen.findByLabelText("Name (English)"), { target: { value: "Shirt" } });
-    addOption("Size", ["S", "M", "L", "XL"]);
-    addOption("Color", ["Black", "White", "Blue"]);
+    addOption("Size", ["S", "M", "L"]);
+    addOption("Color", ["Red", "Green", "Blue"]);
+    fireEvent.change(screen.getAllByLabelText("Type").at(-1), { target: { value: "color" } });
+    [["Red", "#E53935"], ["Green", "#43A047"], ["Blue", "#1E88E5"]].forEach(([name, hex]) => {
+      fireEvent.click(screen.getByRole("button", { name }));
+      fireEvent.change(screen.getByLabelText("Color swatch"), { target: { value: hex } });
+    });
 
-    expect(screen.getByText("12 possible combinations")).toBeTruthy();
-    expect(screen.queryByRole("table")).toBeNull();
-    ["S / Black", "M / Black", "M / White", "XL / Blue"].forEach((name) => fireEvent.click(screen.getByRole("checkbox", { name })));
-    fireEvent.click(screen.getByRole("button", { name: "Create selected variants (4)" }));
-
-    expect(screen.getAllByRole("row")).toHaveLength(5);
-    expect(screen.queryByText("S / White")).toBeTruthy();
-    expect(screen.queryAllByText("S / White").some((node) => node.closest("tbody"))).toBe(false);
-    fireEvent.change(screen.getAllByLabelText("Price override")[0], { target: { value: "27" } });
-    fireEvent.change(screen.getAllByLabelText("Inventory")[0], { target: { value: "10" } });
-    fireEvent.click(screen.getAllByText("Let customers order when sold out")[0]);
+    expect(screen.getByText("9 possible combinations")).toBeTruthy();
+    const enabled = [["S", "Red", 10], ["S", "Green", 5], ["S", "Blue", 2], ["M", "Red", 8], ["M", "Green", 4], ["L", "Red", 3], ["L", "Blue", 6]];
+    enabled.forEach(([size, color, quantity]) => {
+      const label = `${size} / ${color}`;
+      fireEvent.click(screen.getByRole("checkbox", { name: `${label} availability` }));
+      fireEvent.change(screen.getByLabelText(`${label} quantity`), { target: { value: String(quantity) } });
+    });
+    fireEvent.change(screen.getByLabelText("S / Red price override"), { target: { value: "23" } });
     fireEvent.click(screen.getByRole("button", { name: "Save product" }));
 
     await waitFor(() => expect(saveEcommerceItem).toHaveBeenCalledOnce());
     const payload = saveEcommerceItem.mock.calls[0][2];
     expect(payload.options.map((option) => option.code)).toEqual(["size", "color"]);
-    expect(payload.options[0].values.map((value) => value.code)).toEqual(["s", "m", "l", "xl"]);
-    expect(payload.variants).toHaveLength(4);
-    expect(payload.variants[0]).toMatchObject({ price_override: 27, inventory_quantity: 10, allow_backorder: true });
+    expect(payload.options[0].values.map((value) => value.code)).toEqual(["s", "m", "l"]);
+    expect(payload.options[1]).toMatchObject({ display_type: "color" });
+    expect(payload.options[1].values.map((value) => value.color_hex)).toEqual(["#E53935", "#43A047", "#1E88E5"]);
+    expect(payload.variants).toHaveLength(7);
+    expect(payload.variants[0]).toMatchObject({ price_override: 23, inventory_quantity: 10 });
     expect(payload.variants[1].price_override).toBeNull();
     const labels = payload.variants.map((variant) => variant.option_value_ids.map((id) => {
       const value = payload.options.flatMap((option) => option.values).find((entry) => entry.id === id);
       return value.value_translations.en;
     }).join(" / "));
-    expect(labels).toEqual(["S / Black", "M / Black", "M / White", "XL / Blue"]);
+    expect(labels).toEqual(enabled.map(([size, color]) => `${size} / ${color}`));
+    expect(labels).not.toContain("M / Blue");
+    expect(labels).not.toContain("L / Green");
   });
 
   it("prevents duplicate values and keeps required options obvious", async () => {
@@ -108,6 +114,7 @@ describe("merchant product options and variants editor", () => {
     await screen.findByLabelText("Name (English)");
     addOption("Size", ["S"]);
 
+    fireEvent.click(screen.getByText("Advanced"));
     expect(screen.getByRole("checkbox", { name: "Require a value for Size" }).checked).toBe(true);
     const valueInput = screen.getByLabelText("New value for Size");
     fireEvent.change(valueInput, { target: { value: "s" } });
@@ -171,6 +178,55 @@ describe("merchant product options and variants editor", () => {
     });
   });
 
+  it("reloads the same variant and creates exactly one newly enabled combination", async () => {
+    const sizeOption = "11111111-1111-4111-8111-111111111111";
+    const colorOption = "22222222-2222-4222-8222-222222222222";
+    const small = "33333333-3333-4333-8333-333333333333";
+    const red = "44444444-4444-4444-8444-444444444444";
+    const green = "55555555-5555-4555-8555-555555555555";
+    const existingId = "66666666-6666-4666-8666-666666666666";
+    fetchEcommerceCatalog.mockResolvedValue(catalog([{
+      id: "product-1", slug: "shirt", sku: null, status: "draft", price: 20, currency: "ILS",
+      translations: { en: { name: "Classic T-Shirt", description: "" }, ar: { name: "قميص كلاسيكي", description: "" } },
+      attributes: [], images: [], tag_ids: [], options: [
+        { id: sizeOption, code: "size", name_translations: { en: "Size", ar: "المقاس" }, required: true, display_type: "text", sort_order: 0, values: [{ id: small, code: "s", value_translations: { en: "S" }, sort_order: 0, active: true }] },
+        { id: colorOption, code: "color", name_translations: { en: "Color", ar: "اللون" }, required: true, display_type: "color", sort_order: 1, values: [
+          { id: red, code: "red", value_translations: { en: "Red", ar: "أحمر" }, color_hex: "#E53935", sort_order: 0, active: true },
+          { id: green, code: "green", value_translations: { en: "Green", ar: "أخضر" }, color_hex: "#43A047", sort_order: 1, active: true },
+        ] },
+      ],
+      variants: [{ id: existingId, sku: "TSH-S-RED", barcode: "123", price_override: null, compare_at_price_override: null, track_inventory: true, inventory_quantity: 10, low_stock_threshold: 2, allow_backorder: false, images: ["https://example.com/red.webp"], active: true, option_value_ids: [small, red] }],
+    }]));
+    saveEcommerceItem.mockResolvedValue({ id: "product-1" });
+    renderEditor("/ecommerce/products/product-1/edit");
+
+    expect((await screen.findByLabelText("S / Red quantity")).value).toBe("10");
+    expect(screen.getByLabelText("S / Green quantity").disabled).toBe(true);
+    fireEvent.click(screen.getByRole("checkbox", { name: "S / Green availability" }));
+    fireEvent.change(screen.getByLabelText("S / Green quantity"), { target: { value: "4" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save product" }));
+
+    await waitFor(() => expect(saveEcommerceItem).toHaveBeenCalledOnce());
+    const variants = saveEcommerceItem.mock.calls[0][2].variants;
+    expect(variants).toHaveLength(2);
+    expect(variants[0]).toMatchObject({ id: existingId, sku: "TSH-S-RED", inventory_quantity: 10, images: ["https://example.com/red.webp"] });
+    expect(variants[1]).toMatchObject({ inventory_quantity: 4, option_value_ids: [small, green] });
+    expect(variants[1].id).not.toBe(existingId);
+  });
+
+  it("groups three dimensions by the first attribute without a wide spreadsheet", async () => {
+    fetchEcommerceCatalog.mockResolvedValue(catalog());
+    renderEditor();
+    await screen.findByLabelText("Name (English)");
+    addOption("Size", ["M"]);
+    addOption("Color", ["Red", "Blue"]);
+    addOption("Fit", ["Slim", "Regular"]);
+    expect(screen.getByRole("heading", { name: "Size: M" })).toBeTruthy();
+    expect(screen.getByRole("checkbox", { name: "M / Red / Slim availability" })).toBeTruthy();
+    expect(screen.getByRole("checkbox", { name: "M / Blue / Regular availability" })).toBeTruthy();
+    expect(screen.queryByRole("table")).toBeNull();
+  });
+
   it("uses Arabic labels and RTL direction", async () => {
     await appI18n.changeLanguage("ar");
     fetchEcommerceCatalog.mockResolvedValue(catalog());
@@ -178,6 +234,6 @@ describe("merchant product options and variants editor", () => {
     await screen.findByLabelText("الاسم بالإنجليزية");
     expect(container.querySelector("form").getAttribute("dir")).toBe("rtl");
     expect(screen.getByRole("heading", { name: "المواصفات" })).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "الخيارات والأنواع" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "خصائص الأنواع" })).toBeTruthy();
   });
 });

@@ -171,8 +171,8 @@ describe("EcommercePage", () => {
     expect(screen.queryByText("Loading product editor...")).toBeNull();
     expect(screen.getByRole("heading", { name: "New product" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Specifications" })).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "Options & Variants" })).toBeTruthy();
-    expect(screen.getByText("This product has no options")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Variant attributes" })).toBeTruthy();
+    expect(screen.getByText("This is a simple product")).toBeTruthy();
     expect(screen.getAllByRole("button", { name: "Save product" })).toHaveLength(1);
     expect(screen.queryByText("Full product editor")).toBeNull();
   });

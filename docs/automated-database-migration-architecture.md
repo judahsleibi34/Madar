@@ -461,20 +461,22 @@ health evidence, dirty/different release, checksum drift, missing predecessor,
 or a ledger already beyond target fails before mutation. No tenant/business
 table is queried or changed.
 
-### Current schema 098 bridge
+### Current schema 099 bridge
 
-The current release contract accepts schema `81..98` and targets `98` with the
-pinned `migrations-098.json` manifest. Migration 098 is an expand-only 97-to-98
-transition. The application may be promoted on schema 97: existing website and
-ecommerce paths remain compatible, public visit recording is best effort, and
-dashboard visit metrics expose an unavailable zero state until the new table
-and atomic function exist. After advancement, the retained schema-97 release is
-no longer an automatic rollback target.
+The current release contract accepts schema `81..99` and targets `99` with the
+pinned, contiguous `migrations-097-099.json` manifest. It can advance the
+reported production source at schema 96 through the already-reviewed 097 and
+098 transitions before applying the additive 98-to-99 presentation transition.
+The application may be promoted on schema 96 through 99. Text-only product
+aggregate saves fall back to the legacy RPC before schema 99; color presentation
+saves fail clearly until the V2 RPC exists, preventing silent metadata loss.
+After advancement beyond a retained release's compatible maximum, that release
+is no longer an automatic rollback target.
 
-Schema 098 stores only tenant-level aggregate opening counts for the published
-website and store. It does not persist visitor identity, IP address, user agent,
-or other personal data. Each public runtime mount makes one best-effort request;
-the database function atomically increments exactly one surface counter.
+Schema 099 adds constrained `display_type` and `color_hex` presentation
+metadata. Existing attributes default to text. Its V2 aggregate RPC invokes the
+existing identity-, inventory-, and archival-safe aggregate function within the
+same database transaction, then validates and stores presentation metadata.
 
 ### Earlier schema 097 bridge
 

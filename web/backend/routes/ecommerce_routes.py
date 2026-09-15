@@ -249,6 +249,7 @@ class ProductOptionValuePayload(BaseModel):
     value_translations: dict[str, str]
     sort_order: int = Field(default=0, ge=0, le=1_000_000)
     active: bool = True
+    color_hex: str | None = Field(default=None, pattern=r"^#[0-9A-Fa-f]{6}$")
 
     @field_validator("value_translations", mode="before")
     @classmethod
@@ -261,6 +262,7 @@ class ProductOptionPayload(BaseModel):
     code: str = Field(..., min_length=1, max_length=80, pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
     name_translations: dict[str, str]
     required: bool = True
+    display_type: Literal["text", "color"] = "text"
     sort_order: int = Field(default=0, ge=0, le=1_000_000)
     values: list[ProductOptionValuePayload] = Field(default_factory=list, max_length=50)
 
@@ -268,6 +270,15 @@ class ProductOptionPayload(BaseModel):
     @classmethod
     def validate_labels(cls, value):
         return _validate_localized_label(value, "name_translations")
+
+    @model_validator(mode="after")
+    def validate_presentation(self):
+        for value in self.values:
+            if self.display_type == "color" and value.active and not value.color_hex:
+                raise ValueError("Active color values require a hexadecimal swatch")
+            if self.display_type == "text" and value.color_hex is not None:
+                raise ValueError("Text values cannot contain a color swatch")
+        return self
 
 
 class ProductVariantPayload(BaseModel):
@@ -587,7 +598,18 @@ def _save_product_aggregate(tenant_id: int, product_id: str, payload: ProductPay
     if payload.attributes is None and payload.options is None and payload.variants is None:
         return
     aggregate = _product_aggregate_payload(payload)
-    service_supabase.rpc("save_ecommerce_product_aggregate_safe", {"p_tenant_id": tenant_id, "p_product_id": product_id, "p_attributes": aggregate["attributes"], "p_options": aggregate["options"], "p_variants": aggregate["variants"]}).execute()
+    params = {"p_tenant_id": tenant_id, "p_product_id": product_id, "p_attributes": aggregate["attributes"], "p_options": aggregate["options"], "p_variants": aggregate["variants"]}
+    try:
+        service_supabase.rpc("save_ecommerce_product_aggregate_v2_safe", params).execute()
+    except Exception as error:
+        message = str(error).lower()
+        missing_v2 = "save_ecommerce_product_aggregate_v2_safe" in message or "pgrst202" in message or "schema cache" in message
+        uses_color = any(option.display_type == "color" for option in (payload.options or []))
+        if not missing_v2:
+            raise
+        if uses_color:
+            raise HTTPException(status_code=503, detail="Color variant attributes require database migration 099") from error
+        service_supabase.rpc("save_ecommerce_product_aggregate_safe", params).execute()
 
 
 def _attach_product_aggregates(products: list[dict[str, Any]], tenant_id: int) -> list[dict[str, Any]]:

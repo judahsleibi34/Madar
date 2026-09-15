@@ -2230,9 +2230,24 @@ def _catalog_product_payload(
     attribute_rows = _optional_p1a_rows(service_supabase.table("ecommerce_product_attributes").select("id,name_translations,value_translations,sort_order").eq("tenant_id", tenant_id).eq("product_id", product_id).order("sort_order"))
     if attribute_rows is None:
         return {"product": product, "category": category, "tags": tags, "attributes": [], "options": [], "variants": []}
-    option_rows = rows(service_supabase.table("ecommerce_product_options").select("id,code,name_translations,required,sort_order").eq("tenant_id", tenant_id).eq("product_id", product_id).order("sort_order").execute())
+    try:
+        option_rows = rows(service_supabase.table("ecommerce_product_options").select("id,code,name_translations,required,sort_order,display_type").eq("tenant_id", tenant_id).eq("product_id", product_id).order("sort_order").execute())
+    except Exception as error:
+        if "display_type" not in str(error).lower() and "schema cache" not in str(error).lower():
+            raise
+        option_rows = rows(service_supabase.table("ecommerce_product_options").select("id,code,name_translations,required,sort_order").eq("tenant_id", tenant_id).eq("product_id", product_id).order("sort_order").execute())
+    for option in option_rows:
+        option["display_type"] = option.get("display_type") or "text"
     option_ids = [str(item["id"]) for item in option_rows]
-    value_rows = [] if not option_ids else rows(service_supabase.table("ecommerce_product_option_values").select("id,option_id,code,value_translations,sort_order").eq("tenant_id", tenant_id).eq("product_id", product_id).eq("active", True).in_("option_id", option_ids).order("sort_order").execute())
+    if not option_ids:
+        value_rows = []
+    else:
+        try:
+            value_rows = rows(service_supabase.table("ecommerce_product_option_values").select("id,option_id,code,value_translations,sort_order,color_hex").eq("tenant_id", tenant_id).eq("product_id", product_id).eq("active", True).in_("option_id", option_ids).order("sort_order").execute())
+        except Exception as error:
+            if "color_hex" not in str(error).lower() and "schema cache" not in str(error).lower():
+                raise
+            value_rows = rows(service_supabase.table("ecommerce_product_option_values").select("id,option_id,code,value_translations,sort_order").eq("tenant_id", tenant_id).eq("product_id", product_id).eq("active", True).in_("option_id", option_ids).order("sort_order").execute())
     variant_rows = rows(service_supabase.table("ecommerce_product_variants").select("id,sku,price_override,compare_at_price_override,track_inventory,inventory_quantity,allow_backorder,images").eq("tenant_id", tenant_id).eq("product_id", product_id).eq("active", True).execute())
     variant_ids = [str(item["id"]) for item in variant_rows]
     links = [] if not variant_ids else rows(service_supabase.table("ecommerce_variant_option_values").select("variant_id,option_id,option_value_id").eq("tenant_id", tenant_id).in_("variant_id", variant_ids).execute())

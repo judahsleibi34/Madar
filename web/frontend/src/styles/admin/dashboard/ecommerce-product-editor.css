@@ -557,6 +557,34 @@
 .ecommerce-editor-variant-panel-header button { width: 36px; min-height: 36px; padding: 0; border: 1px solid var(--theme-border); border-radius: 9px; color: var(--theme-text); background: transparent; }
 .ecommerce-editor-variant-panel .ecommerce-editor-checks { margin-top: 16px; }
 .ecommerce-editor-remove-unsaved { margin-top: 14px; color: var(--theme-text-muted); background: transparent; border: 1px solid var(--theme-border); }
+.ecommerce-editor-option-card.is-compact { padding:14px; }
+.ecommerce-editor-option-card.is-compact > header { align-items:end; }
+.ecommerce-editor-option-card.is-compact .ecommerce-editor-option-names { grid-template-columns:repeat(3,minmax(0,1fr)); margin:0; flex:1; }
+.ecommerce-editor-value-chips .ecommerce-color-swatch,
+.ecommerce-color-swatch { width:18px; height:18px; flex:0 0 18px; align-self:center; margin-inline-start:8px; border:1px solid var(--theme-border-strong); border-radius:50%; }
+.ecommerce-editor-value-edit input[type="color"] { min-height:42px; padding:4px; }
+.ecommerce-editor-attribute-advanced { margin-top:10px; color:var(--theme-text-muted); }
+.ecommerce-editor-attribute-advanced > summary { cursor:pointer; width:max-content; }
+.ecommerce-editor-attribute-advanced .ecommerce-editor-checkbox { margin-top:10px; }
+.ecommerce-variant-matrix { margin-top:20px; padding:18px; border:1px solid var(--theme-border); border-radius:13px; background:var(--theme-surface); }
+.ecommerce-variant-matrix > header { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
+.ecommerce-variant-matrix h3 { margin:0; font-size:1rem; }
+.ecommerce-variant-matrix header p { margin:5px 0 0; color:var(--theme-text-muted); }
+.ecommerce-variant-matrix header > strong { white-space:nowrap; padding:5px 9px; border-radius:999px; background:var(--theme-bg-soft); color:var(--theme-text-muted); font-size:var(--font-size-xs,.75rem); }
+.ecommerce-variant-matrix-groups { display:grid; gap:18px; margin-top:18px; }
+.ecommerce-variant-matrix-group { overflow:hidden; border:1px solid var(--theme-border); border-radius:11px; }
+.ecommerce-variant-matrix > .ecommerce-variant-matrix-group { margin-top:18px; }
+.ecommerce-variant-matrix-group h4 { margin:0; padding:10px 12px; background:var(--theme-bg-soft); font-size:.9rem; }
+.ecommerce-variant-matrix-row { display:grid; grid-template-columns:minmax(120px,1fr) 110px 110px minmax(150px,1fr) minmax(150px,1fr) auto; gap:10px; align-items:end; padding:10px 12px; opacity:.7; }
+.ecommerce-variant-matrix-row + .ecommerce-variant-matrix-row { border-top:1px solid var(--theme-border); }
+.ecommerce-variant-matrix-row.is-available { opacity:1; }
+.ecommerce-variant-matrix-name { display:flex; align-items:center; gap:8px; min-height:42px; }
+.ecommerce-variant-matrix-name .ecommerce-color-swatch { margin:0; }
+.ecommerce-variant-matrix-row > label:not(.ecommerce-editor-checkbox) { display:grid; gap:4px; }
+.ecommerce-variant-matrix-row > label > span { color:var(--theme-text-muted); font-size:var(--font-size-xs,.75rem); }
+.ecommerce-variant-matrix-row input { min-width:0; }
+.ecommerce-variant-matrix-row input:disabled { opacity:.45; }
+.ecommerce-variant-matrix-details-placeholder { align-self:center; color:var(--theme-text-muted); }
 
 .ecommerce-product-editor-modal-backdrop {
   position: fixed;
@@ -644,4 +672,10 @@
   .ecommerce-editor-variant-table td:first-child { position: absolute; inset-block-start: 15px; inset-inline-start: 0; width: 24px; }
   .ecommerce-editor-variant-table td[data-label]::before { content: attr(data-label) ": "; color: var(--theme-text-muted); }
   .ecommerce-editor-variant-panel { inset: 12px; padding: 18px; }
+  .ecommerce-editor-option-card.is-compact .ecommerce-editor-option-names { grid-template-columns:1fr; }
+  .ecommerce-variant-matrix > header { flex-direction:column; }
+  .ecommerce-variant-matrix-row { grid-template-columns:1fr 1fr; align-items:end; }
+  .ecommerce-variant-matrix-name { grid-column:1/-1; }
+  .ecommerce-variant-matrix-row > label:not(.ecommerce-editor-checkbox) { min-width:0; }
+  .ecommerce-editor-variant-details { justify-self:end; }
 }
