@@ -161,6 +161,45 @@ SELECT 'auth_users='||count(*) FROM auth.users;
         if migration:
             result['migration_sha256'] = hashlib.sha256(migration.read_bytes()).hexdigest()
             result['target_schema_verified'] = target_schema
+        if schema == 96:
+            projection = run(psql, phase="schema96_order_confirmation_projection", input="""
+BEGIN;
+DO $$
+DECLARE v_tenant integer; v_order uuid;
+BEGIN
+  SELECT tenant_id INTO v_tenant FROM public.tenants ORDER BY tenant_id LIMIT 1;
+  IF v_tenant IS NULL THEN RAISE EXCEPTION 'schema96_fixture_tenant_missing'; END IF;
+  INSERT INTO public.ecommerce_orders (
+    tenant_id,order_number,status,payment_status,payment_method,currency,
+    subtotal,discount_total,total,customer_name,customer_email,customer_phone,
+    address_line_1,city,country
+  ) VALUES (
+    v_tenant,'SCHEMA96-RECOVERY-FIXTURE','pending','unpaid','cash_on_delivery','ILS',
+    10,0,10,'Synthetic','synthetic@example.invalid','000','fixture','fixture','PS'
+  ) RETURNING id INTO v_order;
+  INSERT INTO public.ecommerce_order_items (
+    tenant_id,order_id,product_id,sku,product_name,quantity,unit_price,line_total,
+    product_slug,product_snapshot,list_unit_price,discount_amount,discount_source
+  ) VALUES (
+    v_tenant,v_order,NULL,'SCHEMA96-FIXTURE','Synthetic item',1,10,10,
+    'synthetic-item','{}'::jsonb,10,0,NULL
+  );
+END $$;
+SELECT count(*) FROM public.ecommerce_order_items
+WHERE sku='SCHEMA96-FIXTURE' AND product_snapshot='{}'::jsonb
+  AND unit_price=10 AND line_total=10;
+ROLLBACK;
+""").splitlines()
+            if projection != ["BEGIN", "DO", "1", "ROLLBACK"]:
+                raise RehearsalError("schema96_order_confirmation_projection_failed")
+            post96_column = run(psql, phase="schema96_post96_column_absence", input="""
+SELECT count(*) FROM information_schema.columns
+WHERE table_schema='public' AND table_name='ecommerce_order_items'
+  AND column_name='loyalty_entitlement_id';
+""").strip()
+            if post96_column != "0":
+                raise RehearsalError("schema96_unexpected_post96_column")
+            result["schema96_order_confirmation_projection"] = "passed"
         file_sets = {}
         with tempfile.TemporaryDirectory(prefix="madar-file-restore-") as scratch:
             for name_set in ("builder-assets", "private-uploads", "generated-artifacts", "avatars"):

@@ -58,6 +58,7 @@ class FakeOperations:
         self.interlock = False
         self.snapshot = {"state": "unchanged"}
         self.controller_compatibility = "normal_compatible"
+        self.recovery = False
 
     def _event(self, name):
         self.events.append(name)
@@ -74,6 +75,18 @@ class FakeOperations:
             "schema": self.schema,
             "migration": "already_at_target",
             "timer": dict(self.timer),
+        }
+
+    def current_recovery_preflight(self, *, candidate_sha=None, lock_deployment=True):
+        self._event("current_recovery_preflight")
+        self.events.append(f"deployment_lock={lock_deployment}")
+        return {
+            "installed_sha": self.installed,
+            "production_sha": self.production,
+            "slot": self.slot,
+            "schema": 96,
+            "migration": "out_of_band_schema_ahead",
+            "timer": {"enabled": "disabled", "active": "inactive"},
         }
 
     def resolve_candidate(self, sha, *, dry_run):
@@ -105,6 +118,15 @@ class FakeOperations:
         candidate.mkdir(parents=True)
         return transaction, candidate
 
+    def validate_rehearsal_attestation(self, path, sha, schema):
+        self._event("validate_rehearsal_attestation")
+        self.events.append(f"attestation:{path.name}:{sha}:{schema}")
+        return "a" * 64
+
+    def validate_recovery_candidate_contract(self, candidate, schema):
+        self._event("validate_recovery_candidate_contract")
+        self.events.append(f"recovery_contract:{schema}")
+
     def static_preflight(self, candidate):
         self._event("static_preflight")
         return "digest"
@@ -130,13 +152,21 @@ class FakeOperations:
         if self.installed != sha:
             raise upgrade.UpgradeError("installed_provenance_mismatch")
 
-    def run_deploy_service(self, label, sha):
+    def run_deploy_service(self, label, sha, *, recovery=False):
         self._event(label)
+        self.events.append(f"recovery={recovery}")
         if label == "controlled_candidate_deployment":
             self.production = sha
             self.slot = "blue"
+            self.recovery = recovery
+            if recovery:
+                self.schema = 96
 
-    def attest_serving(self, sha):
+    def advance_production_checkout(self, sha):
+        self._event("advance_production_checkout")
+        self.production = sha
+
+    def attest_serving(self, sha, *, recovery=False):
         self._event("attest_serving")
         if self.production != sha:
             raise upgrade.UpgradeError("not_promoted")
@@ -144,12 +174,18 @@ class FakeOperations:
             "sha": sha,
             "slot": self.slot,
             "schema": self.schema,
-            "migration": "already_at_target",
+            "migration": "not_requested" if recovery else "already_at_target",
         }
 
     def known_good_identity(self, sha):
-        if self.production == sha:
+        if self.production == sha and not self.recovery:
             return {"slot": self.slot, "schema": self.schema}
+        return None
+
+    def recovery_traffic_identity(self, sha):
+        self.events.append("recovery_traffic_identity")
+        if self.production == sha:
+            return {"slot": self.slot, "schema": 96}
         return None
 
     def idempotence_snapshot(self, sha):
@@ -1399,6 +1435,477 @@ class ControlPlaneUpgradeTests(unittest.TestCase):
         self.assertEqual(operations.timer, {"enabled": "enabled", "active": "active"})
         self.assertFalse(operations.interlock)
 
+    def test_schema_recovery_is_explicit_exact_schema_and_idempotent(self):
+        with tempfile.TemporaryDirectory() as root:
+            attestation = Path(root) / "schema96-attestation.json"
+            operations, record, _audit, coordinator = self.coordinator(root)
+            coordinator.execute(
+                dry_run=False,
+                recovery=True,
+                rehearsal_attestation=attestation,
+            )
+            coordinator.cleanup()
+        self.assertTrue(coordinator.success)
+        self.assertEqual(record.operation, "schema_recovery")
+        self.assertEqual(record.schema_before, 96)
+        self.assertEqual(record.schema_after, 96)
+        self.assertEqual(record.migration_result, "not_requested")
+        self.assertEqual(record.rehearsal_attestation_sha256, "a" * 64)
+        self.assertEqual(
+            operations.events.count("validate_recovery_candidate_contract"), 1
+        )
+        self.assertEqual(operations.events.count("recovery=True"), 2)
+        self.assertNotIn("recovery=False", operations.events)
+        self.assertLess(
+            operations.events.index("advance_production_checkout"),
+            operations.events.index("attest_serving"),
+        )
+        self.assertEqual(
+            operations.timer, {"enabled": "disabled", "active": "inactive"}
+        )
+
+    def test_schema_recovery_requires_rehearsal_before_quiesce(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations, _record, _audit, coordinator = self.coordinator(root)
+            with self.assertRaisesRegex(
+                upgrade.UpgradeError, "recovery_rehearsal_attestation_required"
+            ):
+                coordinator.execute(dry_run=False, recovery=True)
+            coordinator.cleanup()
+        self.assertNotIn("quiesce", operations.events)
+        self.assertNotIn("stage_candidate", operations.events)
+
+    def test_schema_recovery_candidate_contract_failure_never_deploys(self):
+        with tempfile.TemporaryDirectory() as root:
+            attestation = Path(root) / "schema96-attestation.json"
+            operations, record, _audit, coordinator = self.coordinator(
+                root, failure="validate_recovery_candidate_contract"
+            )
+            with self.assertRaises(upgrade.UpgradeError) as raised:
+                coordinator.execute(
+                    dry_run=False,
+                    recovery=True,
+                    rehearsal_attestation=attestation,
+                )
+            coordinator.handle_failure(raised.exception)
+            coordinator.cleanup()
+        self.assertFalse(record.application_promoted)
+        self.assertNotIn("controlled_candidate_deployment", operations.events)
+
+    def test_schema_recovery_contract_rejects_migrations_and_broad_ranges(self):
+        valid = {
+            "migration_policy": "schema-recovery-no-migration",
+            "schema": {
+                "compatible_min": 96,
+                "compatible_max": 96,
+                "target": 96,
+                "migration_class": "none",
+                "rollback_compatible_min": 96,
+                "rollback_compatible_max": 96,
+            },
+        }
+        with tempfile.TemporaryDirectory() as root:
+            release_dir = Path(root) / "web/deployment/releases"
+            release_dir.mkdir(parents=True)
+            contract = release_dir / "schema-96-recovery.json"
+            contract.write_text(json.dumps(valid), encoding="utf-8")
+            upgrade.SystemOperations.validate_recovery_candidate_contract(
+                Path(root), 96
+            )
+            for mutation in (
+                {"migration_manifest": "migrations-097.json"},
+                {"schema": {**valid["schema"], "compatible_min": 95}},
+                {"schema": {**valid["schema"], "migration_class": "expand-only"}},
+            ):
+                invalid = {**valid, **mutation}
+                contract.write_text(json.dumps(invalid), encoding="utf-8")
+                with self.assertRaisesRegex(
+                    upgrade.UpgradeError, "recovery_release_contract_invalid"
+                ):
+                    upgrade.SystemOperations.validate_recovery_candidate_contract(
+                        Path(root), 96
+                    )
+
+    def test_schema_recovery_attestation_is_exact_sha_schema_and_check_set(self):
+        checks = {
+            name: "passed" for name in {
+                "backend_authoritative", "backend_startup", "readiness",
+                "auth_tenant_mfa", "builder_forms_reservations_commerce",
+                "notifications_calendar_workers", "frontend_authoritative",
+                "frontend_production_build", "schema_96",
+                "invalid_indexes_zero", "rls_grants",
+                "browser_login_workspace_public",
+            }
+        }
+        with tempfile.TemporaryDirectory() as root:
+            path = Path(root) / "attestation.json"
+            document = {
+                "format": 1,
+                "status": "passed",
+                "candidate_sha": self.SHA,
+                "schema": 96,
+                "created_at": upgrade.datetime.now(
+                    upgrade.timezone.utc
+                ).isoformat(),
+                "checks": checks,
+            }
+            path.write_text(json.dumps(document), encoding="utf-8")
+            protected = SimpleNamespace(st_uid=0, st_mode=stat.S_IFREG | 0o600)
+            operations = object.__new__(upgrade.SystemOperations)
+            with mock.patch.object(
+                upgrade, "require_root_protected_ancestry"
+            ), mock.patch.object(Path, "stat", return_value=protected):
+                digest = operations.validate_rehearsal_attestation(
+                    path, self.SHA, 96
+                )
+                self.assertEqual(len(digest), 64)
+                document["candidate_sha"] = "b" * 40
+                path.write_text(json.dumps(document), encoding="utf-8")
+                with self.assertRaisesRegex(
+                    upgrade.UpgradeError,
+                    "recovery_rehearsal_attestation_mismatch",
+                ):
+                    operations.validate_rehearsal_attestation(path, self.SHA, 96)
+
+    def recovery_preflight_operations(self, root):
+        operations = object.__new__(upgrade.SystemOperations)
+        operations.state_root = Path(root) / "state"
+        operations.state_root.mkdir()
+        operations.storage_root = Path(root) / "storage"
+        operations.storage_root.mkdir()
+        operations.proxy_file = Path(root) / "proxy/active-upstreams.conf"
+        operations.proxy_file.parent.mkdir()
+        operations.proxy_file.write_text("fixture", encoding="utf-8")
+        operations.deploy_lock_descriptor = 1
+        old_sha = "1" * 40
+        (operations.state_root / "state.json").write_text(json.dumps({
+            "active_slot": "blue",
+            "known_good_release": {
+                "sha": old_sha,
+                "slot": "blue",
+                "schema": 93,
+                "images": {},
+            },
+        }), encoding="utf-8")
+        operations.repository_origin = mock.Mock(
+            return_value=upgrade.EXPECTED_CONTRACT["MADAR_CANONICAL_GIT_REMOTE"]
+        )
+        operations.require_clean_repository = mock.Mock()
+        operations.repository_head = mock.Mock(return_value=old_sha)
+        operations.installed_sha = mock.Mock(return_value="2" * 40)
+        operations.current_traffic_slot = mock.Mock(return_value="blue")
+        operations.live_schema = mock.Mock(return_value=96)
+        identity = {
+            "release_sha": old_sha,
+            "schema_compatible_min": 81,
+            "schema_compatible_max": 93,
+        }
+        operations.http_json = mock.Mock(return_value=identity)
+        operations.http_json_allow_503 = mock.Mock(return_value={
+            "ready": False,
+            "components": {"schema": "incompatible", "database": "ok"},
+        })
+        operations.http_ok = mock.Mock()
+        operations.attest_active_images = mock.Mock()
+        operations.systemctl_state = mock.Mock(side_effect=lambda unit: (
+            {"enabled": "disabled", "active": "inactive"}
+            if unit.endswith(".timer")
+            else {"enabled": "static", "active": "inactive"}
+        ))
+        return operations
+
+    def test_schema_recovery_origin_requires_database_ahead_and_no_fallback(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations = self.recovery_preflight_operations(root)
+            result = operations.current_recovery_preflight()
+            self.assertEqual(result["schema"], 96)
+
+            operations.live_schema.return_value = 93
+            with self.assertRaisesRegex(
+                upgrade.UpgradeError,
+                "recovery_origin_schema_not_ahead_of_state",
+            ):
+                operations.current_recovery_preflight()
+
+            operations.live_schema.return_value = 96
+            state_path = operations.state_root / "state.json"
+            state = json.loads(state_path.read_text(encoding="utf-8"))
+            state["compatible_fallback_release"] = {
+                "schema_compatible_min": 96,
+                "schema_compatible_max": 96,
+            }
+            state_path.write_text(json.dumps(state), encoding="utf-8")
+            with self.assertRaisesRegex(
+                upgrade.UpgradeError, "recovery_compatible_fallback_available"
+            ):
+                operations.current_recovery_preflight()
+
+    def test_schema_recovery_origin_rejects_unrelated_degradation(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations = self.recovery_preflight_operations(root)
+            operations.http_json_allow_503.return_value = {
+                "ready": False,
+                "components": {
+                    "schema": "incompatible",
+                    "database": "unavailable",
+                },
+            }
+            with self.assertRaisesRegex(
+                upgrade.UpgradeError, "recovery_origin_unrelated_degradation"
+            ):
+                operations.current_recovery_preflight()
+
+    def test_schema_recovery_preflight_accepts_exact_resume_after_switch(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations = self.recovery_preflight_operations(root)
+            state_path = operations.state_root / "state.json"
+            state = json.loads(state_path.read_text())
+            old = state["known_good_release"]
+            state["in_progress_release"] = {
+                "schema_recovery": True,
+                "release_sha": self.SHA,
+                "candidate_slot": "green",
+                "previous_traffic_target": "blue",
+                "previous_known_good_release": old,
+                "schema": 96,
+            }
+            state_path.write_text(json.dumps(state), encoding="utf-8")
+            operations.current_traffic_slot.return_value = "green"
+            operations.http_json.return_value = {
+                "release_sha": self.SHA,
+                "schema_compatible_min": 96,
+                "schema_compatible_max": 96,
+            }
+            operations.http_json_allow_503.return_value = {
+                "ready": True, "components": {"schema": "ok"},
+            }
+            result = operations.current_recovery_preflight(candidate_sha=self.SHA)
+        self.assertEqual(result["migration"], "recovery_resume")
+        self.assertEqual(result["schema"], 96)
+
+    def test_schema_recovery_preflight_accepts_candidate_worker_handoff_starting(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations = self.recovery_preflight_operations(root)
+            state_path = operations.state_root / "state.json"
+            state = json.loads(state_path.read_text())
+            old = state["known_good_release"]
+            state["in_progress_release"] = {
+                "schema_recovery": True,
+                "release_sha": self.SHA,
+                "candidate_slot": "green",
+                "previous_traffic_target": "blue",
+                "previous_known_good_release": old,
+                "schema": 96,
+                "phase": "post_switch_validation",
+                "worker_owner": "candidate",
+            }
+            state_path.write_text(json.dumps(state), encoding="utf-8")
+            operations.current_traffic_slot.return_value = "green"
+            operations.http_json.return_value = {
+                "release_sha": self.SHA,
+                "schema_compatible_min": 96,
+                "schema_compatible_max": 96,
+            }
+            operations.http_json_allow_503.return_value = {
+                "ready": False,
+                "components": {
+                    "schema": "ok", "database": "ok",
+                    "notification_worker": "unavailable",
+                    "calendar_sync_worker": "unavailable",
+                    "data_deletion_worker": "unavailable",
+                },
+            }
+            result = operations.current_recovery_preflight(candidate_sha=self.SHA)
+        self.assertEqual(result["migration"], "recovery_resume")
+        self.assertEqual(result["schema"], 96)
+
+    def test_completed_recovery_still_rejects_worker_degradation(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations = self.recovery_preflight_operations(root)
+            state_path = operations.state_root / "state.json"
+            state = json.loads(state_path.read_text())
+            state["active_slot"] = "green"
+            state["known_good_release"] = {
+                "sha": self.SHA, "slot": "green", "schema": 96,
+            }
+            state["compatible_fallback_release"] = {
+                "sha": self.SHA, "slot": "blue", "schema": 96,
+                "schema_compatible_min": 96, "schema_compatible_max": 96,
+            }
+            state_path.write_text(json.dumps(state), encoding="utf-8")
+            operations.current_traffic_slot.return_value = "green"
+            operations.http_json.return_value = {
+                "release_sha": self.SHA,
+                "schema_compatible_min": 96,
+                "schema_compatible_max": 96,
+            }
+            operations.http_json_allow_503.return_value = {
+                "ready": False,
+                "components": {"schema": "ok", "notification_worker": "unavailable"},
+            }
+            with self.assertRaisesRegex(
+                upgrade.UpgradeError, "recovery_origin_readiness_unexpected"
+            ):
+                operations.current_recovery_preflight(candidate_sha=self.SHA)
+
+    def test_schema_recovery_preflight_accepts_completed_checkout_pending(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations = self.recovery_preflight_operations(root)
+            state_path = operations.state_root / "state.json"
+            state = json.loads(state_path.read_text())
+            state["active_slot"] = "green"
+            state["known_good_release"] = {
+                "sha": self.SHA, "slot": "green", "schema": 96,
+            }
+            state["compatible_fallback_release"] = {
+                "sha": self.SHA, "slot": "blue", "schema": 96,
+                "schema_compatible_min": 96, "schema_compatible_max": 96,
+            }
+            state_path.write_text(json.dumps(state), encoding="utf-8")
+            operations.current_traffic_slot.return_value = "green"
+            operations.http_json.return_value = {
+                "release_sha": self.SHA,
+                "schema_compatible_min": 96,
+                "schema_compatible_max": 96,
+            }
+            operations.http_json_allow_503.return_value = {
+                "ready": True, "components": {"schema": "ok"},
+            }
+            result = operations.current_recovery_preflight(candidate_sha=self.SHA)
+        self.assertEqual(result["migration"], "recovery_complete_checkout_pending")
+
+    def test_normal_preflight_accepts_completed_zero_migration_recovery(self):
+        with tempfile.TemporaryDirectory() as root:
+            recovery_id = "b" * 64
+            operations = object.__new__(upgrade.SystemOperations)
+            operations.state_root = Path(root)
+            release_root = Path(root) / "releases" / self.SHA
+            (release_root / "web/deployment/releases").mkdir(parents=True)
+            (release_root / "web/deployment/releases/schema-96-recovery.json").write_text(
+                json.dumps({
+                    "migration_policy": "schema-recovery-no-migration",
+                    "schema": {
+                        "compatible_min": 96,
+                        "compatible_max": 96,
+                        "target": 96,
+                        "migration_class": "none",
+                        "rollback_compatible_min": 96,
+                        "rollback_compatible_max": 96,
+                    },
+                }),
+                encoding="utf-8",
+            )
+            (Path(root) / "state.json").write_text(json.dumps({
+                "active_slot": "green",
+                "known_good_release": {
+                    "sha": self.SHA,
+                    "slot": "green",
+                    "schema": 96,
+                    "schema_recovery": True,
+                    "migration_result": "not_requested",
+                    "recovery_id": recovery_id,
+                },
+                "compatible_fallback_release": {
+                    "sha": self.SHA, "slot": "blue", "schema": 96,
+                    "schema_recovery": True,
+                    "migration_result": "not_requested",
+                    "recovery_id": recovery_id,
+                },
+                "history": [{
+                    "release_sha": self.SHA, "schema_recovery": True,
+                    "status": "known_good", "phase": "complete",
+                    "recovery_id": recovery_id,
+                }],
+            }), encoding="utf-8")
+
+            self.assertEqual(
+                operations.migration_terminal(self.SHA, 96), "not_requested"
+            )
+
+    def test_normal_preflight_rejects_recovery_marker_without_completed_transaction(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations = object.__new__(upgrade.SystemOperations)
+            operations.state_root = Path(root)
+            release_root = Path(root) / "releases" / self.SHA
+            (release_root / "web/deployment/releases").mkdir(parents=True)
+            (release_root / "web/deployment/releases/schema-96-recovery.json").write_text(
+                json.dumps({
+                    "migration_policy": "schema-recovery-no-migration",
+                    "schema": {
+                        "compatible_min": 96, "compatible_max": 96,
+                        "target": 96, "migration_class": "none",
+                        "rollback_compatible_min": 96,
+                        "rollback_compatible_max": 96,
+                    },
+                })
+            )
+            (Path(root) / "state.json").write_text(json.dumps({
+                "active_slot": "green",
+                "known_good_release": {
+                    "sha": self.SHA, "slot": "green", "schema": 96,
+                    "schema_recovery": True, "migration_result": "not_requested",
+                    "recovery_id": "b" * 64,
+                },
+                "compatible_fallback_release": {
+                    "sha": self.SHA, "slot": "blue", "schema": 96,
+                    "schema_recovery": True, "migration_result": "not_requested",
+                    "recovery_id": "b" * 64,
+                },
+                "history": [],
+            }))
+            with self.assertRaisesRegex(
+                upgrade.UpgradeError, "recovery_known_good_state_invalid"
+            ):
+                operations.migration_terminal(self.SHA, 96)
+
+    def test_recovery_checkout_advance_is_fast_forward_only_and_verified(self):
+        operations = object.__new__(upgrade.SystemOperations)
+        old_sha = "1" * 40
+        operations.require_clean_repository = mock.Mock()
+        operations.repository_head = mock.Mock(side_effect=[old_sha, self.SHA])
+        operations.madar_git = mock.Mock(side_effect=[
+            subprocess.CompletedProcess([], 0),
+            subprocess.CompletedProcess([], 0),
+        ])
+        operations.advance_production_checkout(self.SHA)
+        self.assertEqual(operations.madar_git.call_args_list[0].args[1:3], (
+            "merge-base", "--is-ancestor",
+        ))
+        self.assertIn("--ff-only", operations.madar_git.call_args_list[1].args)
+        self.assertEqual(operations.require_clean_repository.call_count, 2)
+
+    def test_recovery_checkout_rejects_non_fast_forward(self):
+        operations = object.__new__(upgrade.SystemOperations)
+        operations.require_clean_repository = mock.Mock()
+        operations.repository_head = mock.Mock(return_value="1" * 40)
+        operations.madar_git = mock.Mock(return_value=subprocess.CompletedProcess([], 1))
+        with self.assertRaisesRegex(upgrade.UpgradeError, "not_fast_forward"):
+            operations.advance_production_checkout(self.SHA)
+
+    def test_schema_recovery_post_switch_attestation_failure_is_forward_only(self):
+        with tempfile.TemporaryDirectory() as root:
+            attestation = Path(root) / "schema96-attestation.json"
+            operations, record, _audit, coordinator = self.coordinator(
+                root, failure="attest_serving"
+            )
+            with self.assertRaises(upgrade.UpgradeError) as raised:
+                coordinator.execute(
+                    dry_run=False,
+                    recovery=True,
+                    rehearsal_attestation=attestation,
+                )
+            coordinator.handle_failure(raised.exception)
+            coordinator.cleanup()
+        self.assertEqual(operations.production, self.SHA)
+        self.assertTrue(record.application_promoted)
+        self.assertEqual(record.schema_after, 96)
+        self.assertEqual(
+            record.failure_semantics,
+            "post_promotion_forward_repair_timer_disabled",
+        )
+        self.assertIn("recovery_traffic_identity", operations.events)
+        self.assertNotIn("restore_timer", operations.events)
+
     def test_exact_controller_ahead_bridge_dry_run_is_non_mutating(self):
         production = "1" * 40
         approved = self.SHA
@@ -1732,6 +2239,50 @@ class ControlPlaneUpgradeTests(unittest.TestCase):
                         self.SHA, interlock=writable
                     )
 
+    def test_recovery_authorization_is_mandatory_and_bound(self):
+        with tempfile.TemporaryDirectory() as root:
+            marker = Path(root) / "in-progress.json"
+            with self.assertRaisesRegex(RuntimeError, "recovery_authorization_required"):
+                require_upgrade_authorization(
+                    self.SHA, interlock=marker,
+                    required_operation="schema_recovery", required_schema=96,
+                    require_rehearsal=True,
+                )
+            token = "one-use-recovery-token"
+            rehearsal = "a" * 64
+            document = {
+                "approved_sha": self.SHA,
+                "authorization_sha256": hashlib.sha256(token.encode()).hexdigest(),
+                "operation": "schema_recovery", "schema": 96,
+                "rehearsal_sha256": rehearsal,
+            }
+            marker.write_text(json.dumps(document), encoding="utf-8")
+            marker.chmod(0o644)
+            credentials = Path(root) / "credentials"
+            credentials.mkdir()
+            (credentials / "madar-control-plane-upgrade").write_text(json.dumps({
+                "approved_sha": self.SHA, "token": token,
+                "operation": "schema_recovery", "schema": 96,
+                "rehearsal_sha256": rehearsal,
+            }), encoding="utf-8")
+            root_stat = SimpleNamespace(st_uid=0, st_mode=stat.S_IFREG | 0o644)
+            with mock.patch.object(Path, "stat", return_value=root_stat), mock.patch.dict(
+                os.environ, {"CREDENTIALS_DIRECTORY": str(credentials)}, clear=True
+            ):
+                require_upgrade_authorization(
+                    self.SHA, interlock=marker,
+                    required_operation="schema_recovery", required_schema=96,
+                    require_rehearsal=True,
+                )
+                document["schema"] = 97
+                marker.write_text(json.dumps(document), encoding="utf-8")
+                with self.assertRaisesRegex(RuntimeError, "exclusive_interlock"):
+                    require_upgrade_authorization(
+                        self.SHA, interlock=marker,
+                        required_operation="schema_recovery", required_schema=96,
+                        require_rehearsal=True,
+                    )
+
     def test_installer_and_service_define_self_update_and_authorization_boundary(self):
         installer = INSTALLER_PATH.read_text(encoding="utf-8")
         service = SERVICE_PATH.read_text(encoding="utf-8")
@@ -1782,6 +2333,8 @@ class ControlPlaneUpgradeTests(unittest.TestCase):
         self.assertIn("--gid=madar", invocation)
         self.assertIn("--property=NoNewPrivileges=yes", invocation)
         self.assertIn("--property=TimeoutStartSec=45min", invocation)
+        self.assertIn("--property=EnvironmentFile=/etc/madar/backup.env", invocation)
+        self.assertIn("--property=EnvironmentFile=/etc/madar/node1-backup.env", invocation)
         self.assertIn("--property=LoadCredential=madar-control-plane-upgrade:", joined)
         self.assertNotIn("MADAR_CONTROL_PLANE_UPGRADE_TOKEN=", joined)
         self.assertNotIn("SUPABASE_SERVICE_KEY", joined)

@@ -786,11 +786,14 @@ delay. It never attempts reverse SQL or a proxy switch.
 ## P. Interrupted deployment recovery
 
 Every phase checkpoints `in_progress_release`. At the start of the next locked
-deployment, a structurally valid interrupted record causes source restoration,
-prior traffic-target restoration when needed, candidate-worker deactivation,
-known-good worker restoration, and candidate cleanup. The archived history entry
-uses `status = interrupted_recovered` and clears the in-progress/rollback marker.
-Invalid interrupted state fails closed.
+deployment, a structurally valid interrupted record first discovers the loaded
+route, both worker groups, and the durable worker authority. It restores prior
+traffic when needed, publishes `NONE`, proves candidate consumers inactive,
+publishes `OLD`, restores known-good consumers, and only then cleans the
+non-serving candidate. Missing/stale authority, ambiguous traffic, overlap, or
+an authority/runtime contradiction outside a recorded inhibition boundary fails
+closed. The archived history entry uses `status = interrupted_recovered` and
+clears the in-progress/rollback marker. Invalid interrupted state fails closed.
 
 Implemented by `ReleaseDeployer._checkpoint()` and `_recover_interrupted()`.
 
@@ -950,10 +953,10 @@ of this section and the architecture document.
 
 ## Maintenance validation safety
 
-Compose retains the legacy repository-root environment and persistent-file
-fallbacks (`../.env` and `../backend` relative to `web`). The governed deployer
-always overrides both with the canonical absolute configuration and storage
-paths. Frontend-only changes must not relocate these fallback data roots.
+Compose uses project-directory-relative development fallbacks (`.env` and
+`./backend` relative to `web`). The governed deployer always overrides both
+with the canonical absolute configuration and storage paths. Frontend-only
+changes must not relocate these fallback data roots.
 Authenticated browser rehearsals reject `madarportal.com` and all subdomains
 without relying on an optional operator-supplied production-host list.
 
@@ -966,6 +969,85 @@ configuration, credentials, grants, or full application readiness.
 Publication validation also requires standalone form IDs to be unique across
 the tenant lookup; bound-project preference cannot hide a duplicate and a
 truncated lookup cannot establish uniqueness.
+
+## Exceptional current-schema forward recovery
+
+An out-of-band schema advance can leave the live database newer than every
+retained serving binary. Ordinary deployment must continue to reject that
+state. It may be repaired only with the explicit
+`--recover-current-schema --rehearsal-attestation` control-plane operation and
+the separate `schema-96-recovery.json` contract. Neither auto-deploy nor the
+ordinary release manifest selects this operation.
+
+The recovery contract is exact: compatible minimum, maximum, target, and both
+rollback bounds all equal the live schema; migration class is `none`; and no
+migration manifest is allowed. The operator supplies an exact `origin/main`
+SHA and a recent, root-owned, mode-0600 rehearsal attestation for that same SHA
+and schema. Current preflight requires the database to be strictly ahead of the
+serving release, the only permitted readiness degradation to be schema plus an
+optional legacy notification-queue result, and auto-deploy to already be
+disabled.
+
+The release controller then revalidates a fresh complete local backup, the
+matching read-only Node 1 replica, immutable image identities, and the pinned
+schema. Candidate queue consumers remain off while the inactive slot is
+checked. The controller atomically persists a release-generation-bound
+authority in `worker-ownership.json`, with the only values `OLD`, `NONE`, and
+`CANDIDATE`. Every consumer activation, restore, recovery resume, ordinary
+worker cutover, and active-runtime worker refresh must match that exact
+generation and slot/SHA identity. Old consumers have their Docker restart
+policy inhibited, are stopped, and are observed inactive before authority can
+advance from `NONE`; the reverse handoff applies before old consumers can be
+restored. The database, release state, authoritative loaded route, candidate,
+backup identity, and zero-worker ownership are checked again immediately before
+the governed atomic traffic switch. Candidate consumers start only after the
+candidate is proven serving and must become healthy within a bounded window.
+The two slots never overlap. No migration or schema write occurs.
+
+`runtime-mutation.lock` is the shared cross-process authority for the traffic
+switch and inactive-slot stop/remove/force-recreate operations. Within that
+lock, the controller resolves loaded traffic again and refuses ambiguity or a
+target that has become serving. This closes the routing/slot TOCTOU boundary
+without weakening the traffic switch's atomic rollback behavior.
+
+After the switch, the old binary is not a valid rollback target. Any failure is
+durably classified as forward repair and traffic is never sent back to the
+incompatible release. Success requires the former active slot to be recreated
+and validated with the same exact-schema bridge, workers inactive, before it is
+recorded as `compatible_fallback_release`. The former release is retained only
+as `incompatible_pre_recovery_release` forensic history. A same-SHA rerun is
+byte-idempotent.
+
+Both recovered slot records are explicitly marked `schema_recovery: true` with
+`migration_result: not_requested` and the exact recovery ID. The normal release
+preflight may treat that terminal result as authoritative only when the
+canonical recovery history record is complete, names the same active exact SHA,
+schema, slot and recovery ID, the compatible fallback agrees, no recovery is in
+progress, and that SHA still
+has the exact zero-migration recovery contract. Missing, stale, inconsistent or
+ordinary-release records continue to fail closed. This narrow bridge lets the
+subsequent normal 96-to-target manifest enter its ordinary migration workflow
+without fabricating a migration terminal or reusing recovery authorization.
+
+Normal forward migrations establish an inactive copy of the accepted bridge
+before applying SQL and revalidate that copy at the target schema after worker
+refresh. Consequently the post-migration state has a proven compatible
+fallback rather than only an incompatible historical slot.
+
+Ordinary prepare parses the candidate's actual `release.json` and migration
+manifest after immutable source verification, verifies every listed checksum,
+derives and persists the contiguous source-to-target transition path, and
+requires an interrupted retry to reproduce that same path. A completed schema
+recovery record does not substitute for or rewrite the ordinary manifest.
+
+Mocked state-machine tests are not installed-runtime proof. The disposable
+`web/scripts/rehearse_schema96_real_runtime.py` rehearsal runs only in an empty,
+network-isolated Docker daemon and uses the real release CLI, Docker operations,
+Compose consumers, durable state, file-proxy switcher, and manifest parser.
+Its sanitized output belongs outside Git in the operator evidence directory.
+
+The operator procedure is
+[`schema-96-forward-recovery-runbook.md`](schema-96-forward-recovery-runbook.md).
 
 ## Commercial access schema 099 bridge (2026-09-14)
 

@@ -3078,7 +3078,9 @@ def get_public_order_confirmation(subdomain: str, confirmation_token: str, reque
     order_id = str(order.get("id"))
     item_rows = rows(
         service_supabase.table("ecommerce_order_items").select(
-            "id,sku,product_name,product_slug,product_snapshot,variant_snapshot,selected_options_snapshot,quantity,list_unit_price,discount_amount,discount_source,loyalty_entitlement_id,unit_price,line_total"
+            # Loyalty attribution is response metadata introduced by schema
+            # 097. Historical order truth at schema 096 lives in these fields.
+            "id,sku,product_name,product_slug,product_snapshot,variant_snapshot,selected_options_snapshot,quantity,list_unit_price,discount_amount,discount_source,unit_price,line_total"
         ).eq("tenant_id", tenant_id).eq("order_id", order_id).order("created_at").execute()
     )
     history_rows = rows(

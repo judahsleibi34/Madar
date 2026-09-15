@@ -1,6 +1,10 @@
 import os
+import base64
 import unittest
 from unittest.mock import patch
+
+from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
+from py_vapid import Vapid
 
 from services import (
     notification_delivery_queue_service,
@@ -28,12 +32,22 @@ class _RpcClient:
 
 
 class WebPushConfigurationTests(unittest.TestCase):
-    COMPLETE = {
-        "WEB_PUSH_ENABLED": "true",
-        "WEB_PUSH_VAPID_PUBLIC_KEY": "public",
-        "WEB_PUSH_VAPID_PRIVATE_KEY": "private",
-        "WEB_PUSH_VAPID_SUBJECT": "mailto:test@example.invalid",
-    }
+    @classmethod
+    def setUpClass(cls):
+        vapid = Vapid()
+        vapid.generate_keys()
+        cls.COMPLETE = {
+            "WEB_PUSH_ENABLED": "true",
+            "WEB_PUSH_VAPID_PUBLIC_KEY": base64.urlsafe_b64encode(
+                vapid.public_key.public_bytes(
+                    Encoding.X962, PublicFormat.UncompressedPoint
+                )
+            ).rstrip(b"=").decode("ascii"),
+            "WEB_PUSH_VAPID_PRIVATE_KEY": base64.urlsafe_b64encode(
+                vapid.private_key.private_numbers().private_value.to_bytes(32, "big")
+            ).rstrip(b"=").decode("ascii"),
+            "WEB_PUSH_VAPID_SUBJECT": "mailto:test@example.invalid",
+        }
 
     def test_administratively_disabled_is_not_public_or_queued(self):
         client = _RpcClient()
@@ -57,7 +71,14 @@ class WebPushConfigurationTests(unittest.TestCase):
             notification_delivery_queue_service.resolve_outbox_notification(
                 {"id": "00000000-0000-0000-0000-000000000001"}, client=client
             )
-        self.assertEqual(public, {"enabled": True, "status": "configured", "public_key": "public"})
+        self.assertEqual(
+            public,
+            {
+                "enabled": True,
+                "status": "configured",
+                "public_key": self.COMPLETE["WEB_PUSH_VAPID_PUBLIC_KEY"],
+            },
+        )
         self.assertEqual(readiness, "configured")
         self.assertTrue(client.payload["p_web_push_enabled"])
 
@@ -92,6 +113,18 @@ class WebPushConfigurationTests(unittest.TestCase):
         self.assertFalse(config.operational)
         self.assertIn("WEB_PUSH_VAPID_PRIVATE_KEY", config.missing_fields)
         self.assertEqual(readiness, "misconfigured")
+
+    def test_invalid_or_mismatched_global_keys_are_operationally_visible(self):
+        for changes in (
+            {"WEB_PUSH_VAPID_PRIVATE_KEY": "not-a-private-key"},
+            {"WEB_PUSH_VAPID_PUBLIC_KEY": "not-a-public-key"},
+        ):
+            with self.subTest(changes=changes), patch.dict(
+                os.environ, {**self.COMPLETE, **changes}, clear=True
+            ):
+                config = get_web_push_configuration()
+                self.assertFalse(config.operational)
+                self.assertEqual(readiness_service.check_notification_push(), "misconfigured")
 
     def test_disabled_delivery_is_terminal_without_dead_letter_noise(self):
         with patch.dict(os.environ, {"WEB_PUSH_ENABLED": "false"}, clear=True):

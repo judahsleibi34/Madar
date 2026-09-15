@@ -1,3 +1,4 @@
+import hashlib
 import json
 import sys
 import os
@@ -19,6 +20,8 @@ class FakeOperations:
         self.fail_at = fail_at
         self.schema = schema
         self.calls = []
+        self.traffic = "blue"
+        self.workers = {"blue": "active", "green": "inactive"}
 
     def _call(self, name, *args):
         self.calls.append((name, *args))
@@ -40,12 +43,47 @@ class FakeOperations:
         if self.fail_at == "rollback_schema":
             raise RuntimeError("known_good_rollback_schema_incompatible")
         return {"compatible_min": 81, "compatible_max": 83}
-    def activate_workers(self, sha, slot, images): self._call("activate_workers", sha, slot)
-    def deactivate_workers(self, release): self._call("deactivate_workers", release["slot"])
-    def restore_workers(self, release): self._call("restore_workers", release["slot"])
-    def switch_traffic(self, slot): self._call("switch_traffic", slot)
+    def activate_workers(self, sha, slot, images):
+        self._call("activate_workers", sha, slot)
+        self.workers[slot] = "active"
+    def deactivate_workers(self, release):
+        self._call("deactivate_workers", release["slot"])
+        self.workers[release["slot"]] = "inactive"
+    def restore_workers(self, release):
+        self._call("restore_workers", release["slot"])
+        self.workers[release["slot"]] = "active"
+    def switch_traffic(self, slot):
+        self._call("switch_traffic", slot)
+        self.traffic = slot
     def observe(self, sha, slot): self._call("observe", sha, slot)
-    def stop_candidate(self, slot): self._call("stop_candidate", slot)
+    def stop_candidate(self, slot, *, expected_serving=None):
+        self._call("stop_candidate", slot)
+        self.workers[slot] = "inactive"
+    def current_traffic_slot(self):
+        self._call("current_traffic_slot")
+        return self.traffic
+    def resolve_serving_slot(self, expected):
+        self._call("resolve_serving_slot", tuple(sorted(expected.items())))
+        return self.traffic if self.traffic in expected else None
+    def worker_ownership(self, retained, candidate):
+        self._call("worker_ownership", retained["slot"], candidate["slot"])
+        old = self.workers[retained["slot"]]
+        new = self.workers[candidate["slot"]]
+        if old == "active" and new == "active": return "overlap"
+        if old == "active" and new == "inactive": return "old"
+        if old == "starting" and new == "inactive": return "old_starting"
+        if old == "inactive" and new == "active": return "candidate"
+        if old == "inactive" and new == "starting": return "candidate_starting"
+        if old == "inactive" and new == "inactive": return "none"
+        return "ambiguous"
+    def validate_recovery_backup(self, schema):
+        self._call("validate_recovery_backup", schema)
+        return {
+            "backup_id": "madar-20260914T000000Z",
+            "schema": schema,
+            "manifest_sha256": "1" * 64,
+            "node1_sha256sums_sha256": "2" * 64,
+        }
 
 
 class ReleaseDeployerTests(unittest.TestCase):
@@ -108,6 +146,8 @@ class ReleaseDeployerTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as root:
             self.deployer(root, FakeOperations()).deploy(SHA)
             operations = FakeOperations(fail_at="activate_workers")
+            operations.traffic = "green"
+            operations.workers = {"blue": "inactive", "green": "active"}
             with self.assertRaisesRegex(RuntimeError, "injected_activate_workers_failure"):
                 self.deployer(root, operations).deploy("b" * 40)
         self.assertFalse(any(call[0] == "switch_traffic" for call in operations.calls))
@@ -168,12 +208,428 @@ class ReleaseDeployerTests(unittest.TestCase):
             persisted = json.loads((Path(root) / "state.json").read_text())
             self.assertEqual(persisted["in_progress_release"]["phase"], "observation")
             resumed = FakeOperations()
+            resumed.traffic = "green"
+            resumed.workers = {"blue": "inactive", "green": "active"}
             result = self.deployer(root, resumed).deploy("b" * 40)
             state = json.loads((Path(root) / "state.json").read_text())
         self.assertEqual(result["status"], "known_good")
         self.assertIn(("switch_traffic", "blue"), resumed.calls)
         self.assertIn(("stop_candidate", "green"), resumed.calls)
         self.assertTrue(any(row.get("status") == "interrupted_recovered" for row in state["history"]))
+
+
+class SchemaRecoveryDeployerTests(unittest.TestCase):
+    OLD_SHA = "1" * 40
+
+    @staticmethod
+    def compatibility():
+        return Compatibility(96, 96, 96, "none", 96, 96)
+
+    def seed(self, root):
+        state = {
+            "active_slot": "blue",
+            "known_good_release": {
+                "sha": self.OLD_SHA,
+                "slot": "blue",
+                "schema": 93,
+                "images": {
+                    "backend": "old@sha256:1",
+                    "frontend": "old@sha256:2",
+                    "worker": "old@sha256:3",
+                },
+            },
+            "history": [],
+            "failed_releases": {},
+        }
+        Path(root, "state.json").write_text(json.dumps(state))
+
+    def deployer(self, root, operations):
+        return ReleaseDeployer(
+            state_root=Path(root),
+            compatibility=self.compatibility(),
+            operations=operations,
+        )
+
+    def test_recovery_requires_exact_zero_migration_contract(self):
+        for compatibility, error in (
+            (Compatibility(95, 96, 96, "none", 95, 96), "not_exact_schema"),
+            (Compatibility(96, 96, 96, "expand-only", 96, 96), "requires_migration"),
+        ):
+            with self.subTest(error=error), tempfile.TemporaryDirectory() as root:
+                operations = FakeOperations(schema=96)
+                deployer = ReleaseDeployer(
+                    state_root=Path(root), compatibility=compatibility,
+                    operations=operations,
+                )
+                with self.assertRaisesRegex(RuntimeError, error):
+                    deployer.recover_current_schema(SHA)
+                self.assertEqual(operations.calls, [])
+
+    def test_recovery_establishes_active_and_inactive_schema96_targets(self):
+        with tempfile.TemporaryDirectory() as root:
+            self.seed(root)
+            operations = FakeOperations(schema=96)
+            result = self.deployer(root, operations).recover_current_schema(SHA)
+            state = json.loads(Path(root, "state.json").read_text())
+        self.assertEqual(result["status"], "known_good")
+        self.assertEqual(state["active_slot"], "green")
+        self.assertEqual(state["known_good_release"]["schema"], 96)
+        self.assertTrue(state["known_good_release"]["schema_recovery"])
+        self.assertEqual(
+            state["known_good_release"]["migration_result"], "not_requested"
+        )
+        self.assertEqual(state["compatible_fallback_release"]["slot"], "blue")
+        self.assertEqual(state["compatible_fallback_release"]["sha"], SHA)
+        self.assertTrue(state["compatible_fallback_release"]["schema_recovery"])
+        self.assertEqual(
+            state["known_good_release"]["recovery_id"],
+            state["compatible_fallback_release"]["recovery_id"],
+        )
+        self.assertEqual(
+            state["history"][-1]["recovery_id"],
+            state["known_good_release"]["recovery_id"],
+        )
+        self.assertEqual(operations.traffic, "green")
+        self.assertEqual(
+            [call for call in operations.calls if call[0] == "switch_traffic"],
+            [("switch_traffic", "green")],
+        )
+
+    def test_schema_change_aborts_before_switch(self):
+        class ChangingSchema(FakeOperations):
+            def validate_recovery_backup(self, schema):
+                result = super().validate_recovery_backup(schema)
+                if sum(call[0] == "validate_recovery_backup" for call in self.calls) == 2:
+                    self.schema = 97
+                return result
+
+        with tempfile.TemporaryDirectory() as root:
+            self.seed(root)
+            operations = ChangingSchema(schema=96)
+            with self.assertRaisesRegex(RuntimeError, "pre_switch_state_changed"):
+                self.deployer(root, operations).recover_current_schema(SHA)
+            state = json.loads(Path(root, "state.json").read_text())
+        self.assertEqual(operations.traffic, "blue")
+        self.assertNotIn("in_progress_release", state)
+
+    def test_candidate_failure_never_switches(self):
+        with tempfile.TemporaryDirectory() as root:
+            self.seed(root)
+            operations = FakeOperations(fail_at="validate_candidate", schema=96)
+            with self.assertRaisesRegex(RuntimeError, "injected_validate_candidate_failure"):
+                self.deployer(root, operations).recover_current_schema(SHA)
+        self.assertEqual(operations.traffic, "blue")
+
+    def test_retained_worker_stop_failure_keeps_single_old_owner_before_abort(self):
+        with tempfile.TemporaryDirectory() as root:
+            self.seed(root)
+            operations = FakeOperations(fail_at="deactivate_workers", schema=96)
+            with self.assertRaisesRegex(
+                RuntimeError, "injected_deactivate_workers_failure"
+            ):
+                self.deployer(root, operations).recover_current_schema(SHA)
+        self.assertEqual(operations.traffic, "blue")
+        self.assertEqual(operations.workers, {"blue": "active", "green": "inactive"})
+        self.assertFalse(any(call[0] == "switch_traffic" for call in operations.calls))
+
+    def test_missing_or_stale_backup_rejects_before_source_or_build(self):
+        with tempfile.TemporaryDirectory() as root:
+            self.seed(root)
+            operations = FakeOperations(
+                fail_at="validate_recovery_backup", schema=96
+            )
+            with self.assertRaisesRegex(
+                RuntimeError, "injected_validate_recovery_backup_failure"
+            ):
+                self.deployer(root, operations).recover_current_schema(SHA)
+        self.assertFalse(any(call[0] == "verify_source" for call in operations.calls))
+        self.assertFalse(any(call[0] == "build" for call in operations.calls))
+        self.assertEqual(operations.traffic, "blue")
+
+    def test_post_switch_failure_never_returns_to_incompatible_release(self):
+        with tempfile.TemporaryDirectory() as root:
+            self.seed(root)
+            operations = FakeOperations(fail_at="observe", schema=96)
+            with self.assertRaisesRegex(
+                RuntimeError, "recovery_post_switch_forward_repair_required"
+            ):
+                self.deployer(root, operations).recover_current_schema(SHA)
+            state = json.loads(Path(root, "state.json").read_text())
+        self.assertEqual(operations.traffic, "green")
+        self.assertEqual(state["in_progress_release"]["candidate_slot"], "green")
+        self.assertFalse(
+            any(call == ("switch_traffic", "blue") for call in operations.calls)
+        )
+
+    def test_interrupted_post_switch_recovery_resumes_forward(self):
+        with tempfile.TemporaryDirectory() as root:
+            self.seed(root)
+            first = FakeOperations(fail_at="observe", schema=96)
+            with self.assertRaises(RuntimeError):
+                self.deployer(root, first).recover_current_schema(SHA)
+            resumed = FakeOperations(schema=96)
+            resumed.traffic = "green"
+            resumed.workers = {"blue": "inactive", "green": "active"}
+            result = self.deployer(root, resumed).recover_current_schema(SHA)
+        self.assertEqual(result["status"], "known_good")
+        self.assertEqual(resumed.traffic, "green")
+        self.assertFalse(any(call[0] == "switch_traffic" for call in resumed.calls))
+
+    def test_completed_recovery_rerun_is_idempotent(self):
+        with tempfile.TemporaryDirectory() as root:
+            self.seed(root)
+            first = FakeOperations(schema=96)
+            self.deployer(root, first).recover_current_schema(SHA)
+            before = Path(root, "state.json").read_bytes()
+            second = FakeOperations(schema=96)
+            second.traffic = "green"
+            second.workers = {"blue": "inactive", "green": "active"}
+            result = self.deployer(root, second).recover_current_schema(SHA)
+            after = Path(root, "state.json").read_bytes()
+        self.assertEqual(result["status"], "already_recovered")
+        self.assertEqual(before, after)
+        self.assertFalse(any(call[0] == "switch_traffic" for call in second.calls))
+
+    def test_interrupted_pre_switch_recovery_cleans_candidate_then_retries(self):
+        class InterruptBeforeSwitch(FakeOperations):
+            def validate_candidate(self, sha, slot):
+                self._call("validate_candidate", sha, slot)
+                raise KeyboardInterrupt()
+
+        with tempfile.TemporaryDirectory() as root:
+            self.seed(root)
+            interrupted = InterruptBeforeSwitch(schema=96)
+            with self.assertRaises(KeyboardInterrupt):
+                self.deployer(root, interrupted).recover_current_schema(SHA)
+            self.assertEqual(interrupted.traffic, "blue")
+            resumed = FakeOperations(schema=96)
+            result = self.deployer(root, resumed).recover_current_schema(SHA)
+            state = json.loads(Path(root, "state.json").read_text())
+        self.assertEqual(result["status"], "known_good")
+        self.assertIn(("stop_candidate", "green"), resumed.calls)
+        self.assertEqual(resumed.workers["blue"], "inactive")
+        self.assertNotIn("in_progress_release", state)
+
+    def test_interrupted_post_switch_recovery_resumes_without_old_traffic(self):
+        class InterruptAfterSwitch(FakeOperations):
+            def observe(self, sha, slot):
+                self._call("observe", sha, slot)
+                raise KeyboardInterrupt()
+
+        with tempfile.TemporaryDirectory() as root:
+            self.seed(root)
+            interrupted = InterruptAfterSwitch(schema=96)
+            with self.assertRaises(KeyboardInterrupt):
+                self.deployer(root, interrupted).recover_current_schema(SHA)
+            self.assertEqual(interrupted.traffic, "green")
+            resumed = FakeOperations(schema=96)
+            resumed.traffic = "green"
+            resumed.workers = {"blue": "inactive", "green": "active"}
+            result = self.deployer(root, resumed).recover_current_schema(SHA)
+        self.assertEqual(result["status"], "known_good")
+        self.assertFalse(any(call == ("switch_traffic", "blue") for call in resumed.calls))
+
+    def test_lost_switch_ack_reconciles_serving_candidate(self):
+        class LostAck(FakeOperations):
+            def switch_traffic(self, slot):
+                self.calls.append(("switch_traffic", slot))
+                self.traffic = slot
+                raise RuntimeError("lost acknowledgement")
+
+        with tempfile.TemporaryDirectory() as root:
+            self.seed(root)
+            operations = LostAck(schema=96)
+            result = self.deployer(root, operations).recover_current_schema(SHA)
+        self.assertEqual(result["status"], "known_good")
+        self.assertEqual(operations.traffic, "green")
+        self.assertFalse(any(call == ("stop_candidate", "green") for call in operations.calls))
+
+    def test_ambiguous_switch_preserves_both_targets_and_checkpoint(self):
+        class Ambiguous(FakeOperations):
+            resolve_calls = 0
+            def switch_traffic(self, slot):
+                self.calls.append(("switch_traffic", slot))
+                raise RuntimeError("unknown switch outcome")
+            def resolve_serving_slot(self, expected):
+                self.calls.append(("resolve_serving_slot", tuple(sorted(expected.items()))))
+                self.resolve_calls += 1
+                return "blue" if self.resolve_calls == 1 else None
+
+        with tempfile.TemporaryDirectory() as root:
+            self.seed(root)
+            operations = Ambiguous(schema=96)
+            with self.assertRaisesRegex(RuntimeError, "recovery_traffic_state_ambiguous"):
+                self.deployer(root, operations).recover_current_schema(SHA)
+            state = json.loads(Path(root, "state.json").read_text())
+        self.assertIn("in_progress_release", state)
+        self.assertFalse(any(call[0] == "stop_candidate" for call in operations.calls))
+        self.assertFalse(any(call[0] == "restore_workers" for call in operations.calls))
+
+    def test_normal_release_is_accepted_after_schema96_recovery(self):
+        next_sha = "b" * 40
+
+        class Schema96Operations(FakeOperations):
+            def validate_rollback_target(self, release, schema):
+                self._call("validate_rollback_target", release["sha"], release["slot"], schema)
+                return {"compatible_min": 96, "compatible_max": 96}
+
+        with tempfile.TemporaryDirectory() as root:
+            self.seed(root)
+            recovered = Schema96Operations(schema=96)
+            self.deployer(root, recovered).recover_current_schema(SHA)
+            normal = Schema96Operations(schema=96)
+            normal.traffic = "green"
+            normal.workers = {"blue": "inactive", "green": "active"}
+            deployer = ReleaseDeployer(
+                state_root=Path(root),
+                compatibility=Compatibility(96, 99, 99, "expand-only", 96, 99),
+                operations=normal,
+            )
+            result = deployer.deploy(next_sha)
+        self.assertEqual(result["status"], "known_good")
+        self.assertIn(("validate_rollback_target", SHA, "green", 96), normal.calls)
+
+    def test_partial_candidate_activation_after_switch_never_restores_old_workers(self):
+        class PartialActivation(FakeOperations):
+            def activate_workers(self, sha, slot, images):
+                self._call("activate_workers", sha, slot)
+                self.workers[slot] = "active"
+                raise RuntimeError("synthetic_partial_activation_failure")
+
+        with tempfile.TemporaryDirectory() as root:
+            self.seed(root)
+            operations = PartialActivation(schema=96)
+            with self.assertRaisesRegex(
+                RuntimeError, "recovery_post_switch_forward_repair_required"
+            ):
+                self.deployer(root, operations).recover_current_schema(SHA)
+            state = json.loads(Path(root, "state.json").read_text())
+        self.assertEqual(operations.traffic, "green")
+        self.assertEqual(operations.workers, {"blue": "inactive", "green": "active"})
+        self.assertFalse(any(call[0] == "restore_workers" for call in operations.calls))
+        self.assertEqual(state["in_progress_release"]["worker_owner"], "candidate")
+
+    def test_late_retained_worker_restart_aborts_before_switch_without_overlap(self):
+        class LateRestart(FakeOperations):
+            backup_checks = 0
+            def validate_recovery_backup(self, schema):
+                result = super().validate_recovery_backup(schema)
+                self.backup_checks += 1
+                if self.backup_checks == 2:
+                    self.workers["blue"] = "active"
+                return result
+
+        with tempfile.TemporaryDirectory() as root:
+            self.seed(root)
+            operations = LateRestart(schema=96)
+            with self.assertRaisesRegex(
+                RuntimeError, "recovery_worker_ownership_changed_before_switch"
+            ):
+                self.deployer(root, operations).recover_current_schema(SHA)
+        self.assertEqual(operations.traffic, "blue")
+        self.assertEqual(operations.workers, {"blue": "active", "green": "inactive"})
+        self.assertFalse(any(call[0] == "switch_traffic" for call in operations.calls))
+
+    def test_preswitch_route_drift_preserves_serving_candidate(self):
+        class RouteDrift(FakeOperations):
+            validations = 0
+            def validate_candidate(self, sha, slot):
+                super().validate_candidate(sha, slot)
+                self.validations += 1
+                if self.validations == 2:
+                    self.traffic = slot
+
+        with tempfile.TemporaryDirectory() as root:
+            self.seed(root)
+            operations = RouteDrift(schema=96)
+            with self.assertRaisesRegex(
+                RuntimeError, "recovery_post_switch_forward_repair_required"
+            ):
+                self.deployer(root, operations).recover_current_schema(SHA)
+            state = json.loads(Path(root, "state.json").read_text())
+        self.assertEqual(operations.traffic, "green")
+        self.assertFalse(any(call[0] == "stop_candidate" for call in operations.calls))
+        self.assertIn("in_progress_release", state)
+
+    def test_resume_old_traffic_never_restores_old_when_candidate_stop_fails(self):
+        class Interrupted(FakeOperations):
+            def deactivate_workers(self, release):
+                self._call("deactivate_workers", release["slot"])
+                if release["slot"] == "green":
+                    raise RuntimeError("synthetic_candidate_stop_failure")
+                self.workers[release["slot"]] = "inactive"
+
+        with tempfile.TemporaryDirectory() as root:
+            self.seed(root)
+            state = json.loads(Path(root, "state.json").read_text())
+            old = state["known_good_release"]
+            state["in_progress_release"] = {
+                "release_sha": SHA, "candidate_slot": "green",
+                "previous_traffic_target": "blue",
+                "previous_known_good_release": old, "schema_recovery": True,
+                "schema": 96, "images": {}, "worker_owner": "candidate",
+                "recovery_id": hashlib.sha256(
+                    f"{SHA}:96:{self.OLD_SHA}".encode()
+                ).hexdigest(),
+            }
+            Path(root, "state.json").write_text(json.dumps(state))
+            operations = Interrupted(schema=96)
+            operations.workers = {"blue": "inactive", "green": "active"}
+            with self.assertRaisesRegex(RuntimeError, "candidate_workers_not_inactive"):
+                self.deployer(root, operations).recover_current_schema(SHA)
+            durable = json.loads(Path(root, "state.json").read_text())
+        self.assertEqual(operations.workers, {"blue": "inactive", "green": "active"})
+        self.assertFalse(any(call[0] == "restore_workers" for call in operations.calls))
+        self.assertEqual(
+            durable["in_progress_release"]["status"],
+            "operator_intervention_required",
+        )
+
+    def test_resume_candidate_serving_starting_workers_waits_via_governed_activation(self):
+        with tempfile.TemporaryDirectory() as root:
+            self.seed(root)
+            state = json.loads(Path(root, "state.json").read_text())
+            old = state["known_good_release"]
+            state["in_progress_release"] = {
+                "release_sha": SHA, "candidate_slot": "green",
+                "previous_traffic_target": "blue",
+                "previous_known_good_release": old, "schema_recovery": True,
+                "schema": 96, "images": {}, "worker_owner": "none",
+                "phase": "post_switch_validation",
+                "recovery_id": hashlib.sha256(
+                    f"{SHA}:96:{self.OLD_SHA}".encode()
+                ).hexdigest(),
+            }
+            Path(root, "state.json").write_text(json.dumps(state))
+            operations = FakeOperations(schema=96)
+            operations.traffic = "green"
+            operations.workers = {"blue": "inactive", "green": "starting"}
+            result = self.deployer(root, operations).recover_current_schema(SHA)
+        self.assertEqual(result["status"], "known_good")
+        self.assertIn(("activate_workers", SHA, "green"), operations.calls)
+        self.assertEqual(operations.workers["green"], "active")
+
+    def test_resume_candidate_serving_healthy_workers_does_not_restart_them(self):
+        with tempfile.TemporaryDirectory() as root:
+            self.seed(root)
+            state = json.loads(Path(root, "state.json").read_text())
+            old = state["known_good_release"]
+            state["in_progress_release"] = {
+                "release_sha": SHA, "candidate_slot": "green",
+                "previous_traffic_target": "blue",
+                "previous_known_good_release": old, "schema_recovery": True,
+                "schema": 96, "images": {}, "worker_owner": "candidate",
+                "recovery_id": hashlib.sha256(
+                    f"{SHA}:96:{self.OLD_SHA}".encode()
+                ).hexdigest(),
+            }
+            Path(root, "state.json").write_text(json.dumps(state))
+            operations = FakeOperations(schema=96)
+            operations.traffic = "green"
+            operations.workers = {"blue": "inactive", "green": "active"}
+            result = self.deployer(root, operations).recover_current_schema(SHA)
+        self.assertEqual(result["status"], "known_good")
+        self.assertFalse(any(call[0] == "activate_workers" for call in operations.calls))
 
 
 if __name__ == "__main__":

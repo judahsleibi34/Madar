@@ -22,7 +22,7 @@ import urllib.error
 import urllib.request
 from html.parser import HTMLParser
 from pathlib import Path
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from datetime import datetime, timedelta
 
 SCRIPT = Path(__file__).resolve()
@@ -37,6 +37,11 @@ from deployment.lib.control_plane_upgrade_authorization import (  # noqa: E402
 from deployment.lib.migration_executor import (  # noqa: E402
     LockedMigrationExecutor,
     MigrationManifest,
+)
+from deployment.lib.runtime_authority import (  # noqa: E402
+    load_worker_authority,
+    runtime_mutation_lock,
+    write_worker_authority,
 )
 
 
@@ -157,11 +162,18 @@ class DockerGitOperations:
         state_root: Path,
         env_file: Path,
         compatibility: Compatibility,
+        metadata_filename: str = "release.json",
+        *, compose_file: Path | None = None,
+        project_prefix: str = "madar", container_prefix: str = "madar",
     ):
         self.repo = repo
         self.state_root = state_root
         self.env_file = env_file
         self.compatibility = compatibility
+        self.metadata_filename = metadata_filename
+        self.compose_file = compose_file
+        self.project_prefix = project_prefix
+        self.container_prefix = container_prefix
         self.release_root: Path | None = None
 
     @staticmethod
@@ -305,6 +317,207 @@ class DockerGitOperations:
             raise RuntimeError("schema_state_missing")
         return int(rows[0]["schema_version"])
 
+    def current_traffic_slot(self) -> str:
+        path = Path(os.environ["MADAR_ACTIVE_UPSTREAMS_FILE"]).resolve()
+        if not path.is_file() or path.is_symlink():
+            raise RuntimeError("active_proxy_target_invalid")
+        content = path.read_text(encoding="utf-8")
+        for slot, ports in SLOT_PORTS.items():
+            expected = (
+                f"upstream madar_backend_active {{ server 127.0.0.1:{ports['backend']}; }}\n"
+                f"upstream madar_frontend_active {{ server 127.0.0.1:{ports['frontend']}; }}\n"
+            )
+            if content == expected:
+                return slot
+        raise RuntimeError("active_proxy_target_unknown")
+
+    def _loaded_serving_slot(self) -> str:
+        """Resolve loaded traffic without trusting a stale target file."""
+
+        try:
+            identity = self._json("http://127.0.0.1:8001/health/version")
+        except Exception as error:
+            raise RuntimeError("runtime_mutation_traffic_ambiguous") from error
+
+        slot = str(identity.get("release_slot") or "")
+        sha = str(identity.get("release_sha") or "")
+        if (
+            len(sha) != 40
+            or any(character not in "0123456789abcdef" for character in sha)
+        ):
+            raise RuntimeError("runtime_mutation_traffic_ambiguous")
+
+        # Current runtimes identify their serving slot explicitly. Do not
+        # authorize destructive mutation until the slot's direct backend also
+        # proves the stable route's exact release identity.
+        if slot:
+            if slot not in SLOT_PORTS:
+                raise RuntimeError("runtime_mutation_traffic_ambiguous")
+            try:
+                direct = self._json(
+                    f"http://127.0.0.1:"
+                    f"{SLOT_PORTS[slot]['backend']}/health/version"
+                )
+            except Exception as error:
+                raise RuntimeError(
+                    "runtime_mutation_traffic_ambiguous"
+                ) from error
+
+            direct_sha = str(direct.get("release_sha") or "")
+            direct_slot = str(direct.get("release_slot") or "")
+            if direct_sha != sha or (direct_slot and direct_slot != slot):
+                raise RuntimeError("runtime_mutation_traffic_ambiguous")
+            return slot
+
+        # The stranded schema-93-era production binary predates release_slot.
+        # Resolve that legacy runtime only when exactly one directly reachable
+        # slot proves the same SHA as the stable route. The proxy target file
+        # is deliberately not trusted here because a failed/reordered reload
+        # can leave it stale relative to loaded traffic.
+        matches: list[str] = []
+        for candidate_slot, ports in SLOT_PORTS.items():
+            try:
+                direct = self._json(
+                    f"http://127.0.0.1:{ports['backend']}/health/version"
+                )
+            except Exception:
+                continue
+
+            if str(direct.get("release_sha") or "") == sha:
+                matches.append(candidate_slot)
+
+        if len(matches) != 1:
+            raise RuntimeError("runtime_mutation_traffic_ambiguous")
+
+        return matches[0]
+
+    def _require_worker_authority(self, sha: str, slot: str) -> dict:
+        # Compatibility for direct inspection-only helpers in tests and legacy
+        # callers that cannot activate a release because they carry no SHA.
+        if not sha:
+            return {}
+        authority = load_worker_authority(self.state_root)
+        if authority is None:
+            raise RuntimeError("worker_authority_missing")
+        owner = authority["owner"]
+        identity = authority["old"] if owner == "OLD" else authority["candidate"]
+        if owner == "NONE" or identity != {"sha": sha, "slot": slot}:
+            raise RuntimeError("worker_activation_not_authorized")
+        if authority["generation"] != self._expected_worker_generation(sha, slot):
+            raise RuntimeError("worker_activation_stale_authority")
+        return authority
+
+    def _expected_worker_generation(self, sha: str, slot: str) -> str:
+        try:
+            state = json.loads((self.state_root / "state.json").read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            state = {}
+        in_progress = state.get("in_progress_release") or {}
+        identities = (
+            {
+                "sha": str(in_progress.get("release_sha") or ""),
+                "slot": str(in_progress.get("candidate_slot") or ""),
+            },
+            {
+                "sha": str((in_progress.get("previous_known_good_release") or {}).get("sha") or ""),
+                "slot": str((in_progress.get("previous_known_good_release") or {}).get("slot") or ""),
+            },
+        )
+        generation = str(in_progress.get("worker_generation") or "")
+        if {"sha": sha, "slot": slot} in identities and len(generation) == 64:
+            return generation
+        known_good = state.get("known_good_release") or {}
+        if (
+            known_good.get("sha") == sha
+            and known_good.get("slot") == slot
+            and len(str(known_good.get("worker_generation") or "")) == 64
+        ):
+            return str(known_good["worker_generation"])
+        try:
+            prepared = json.loads(
+                prepared_release_path(self.state_root).read_text(encoding="utf-8")
+            )
+        except (OSError, ValueError):
+            prepared = {}
+        if (
+            prepared.get("release_sha") == sha
+            and prepared.get("candidate_slot") == slot
+            and len(str(prepared.get("worker_generation") or "")) == 64
+        ):
+            return str(prepared["worker_generation"])
+        raise RuntimeError("worker_activation_generation_missing")
+
+    def resolve_serving_slot(self, expected: dict[str, str]) -> str | None:
+        """Resolve loaded stable traffic even when the target file is stale."""
+        try:
+            identity = self._json("http://127.0.0.1:8001/health/version")
+            stable_sha = str(identity.get("release_sha") or "")
+            stable_slot = str(identity.get("release_slot") or "")
+        except Exception:
+            return None
+        if stable_slot in expected and expected[stable_slot] == stable_sha:
+            return stable_slot
+        matches = [slot for slot, sha in expected.items() if sha and sha == stable_sha]
+        if len(matches) == 1:
+            return matches[0]
+        # Once both slots contain one SHA, a missing/invalid slot identity is
+        # genuinely ambiguous. The configured file is not proof of nginx's
+        # loaded route after a failed reload, so never use it to authorize a
+        # destructive action.
+        return None
+
+    def validate_recovery_backup(self, schema: int) -> dict:
+        """Require a fresh local backup and its read-only verified Node 1 copy."""
+
+        root = Path(os.environ["MADAR_BACKUP_DIR"]).resolve()
+        marker = Path(os.environ["MADAR_BACKUP_FRESHNESS_MARKER"]).resolve()
+        scripts = self.recovery_helper_root()
+        latest = Path(self.run(
+            [sys.executable, str(scripts / "backup_support.py"), "latest", str(marker)],
+            capture=True,
+        )).resolve()
+        if latest.parent != root or not latest.is_dir() or latest.is_symlink():
+            raise RuntimeError("recovery_backup_path_invalid")
+        try:
+            manifest = json.loads((latest / "manifest.json").read_text(encoding="utf-8"))
+            backup_schema = int((manifest.get("database") or {})["schema_version"])
+        except (OSError, ValueError, KeyError, TypeError) as error:
+            raise RuntimeError("recovery_backup_manifest_invalid") from error
+        if backup_schema != schema:
+            raise RuntimeError("recovery_backup_schema_mismatch")
+        raw = self.run(
+            [sys.executable, str(scripts / "replicate_latest_node1.py"), "--verify-only"],
+            capture=True,
+        )
+        try:
+            node1 = json.loads(raw)
+        except ValueError as error:
+            raise RuntimeError("recovery_node1_receipt_invalid") from error
+        if node1.get("status") != "verified_existing" or node1.get("backup_id") != latest.name:
+            raise RuntimeError("recovery_node1_receipt_invalid")
+        marker_state = Path("/var/lib/madar/backup-state/latest.json")
+        try:
+            published = json.loads(marker_state.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as error:
+            raise RuntimeError("recovery_backup_state_invalid") from error
+        if published.get("verified") is not True or published.get("backup_id") != latest.name:
+            raise RuntimeError("recovery_backup_state_invalid")
+        return {
+            "backup_id": latest.name,
+            "schema": schema,
+            "manifest_sha256": published.get("manifest_sha256"),
+            "node1_sha256sums_sha256": node1.get("sha256sums_sha256"),
+        }
+
+    @staticmethod
+    def recovery_helper_root() -> Path:
+        installed_scripts = SCRIPT.parents[1] / "scripts"
+        scripts = installed_scripts if installed_scripts.is_dir() else WEB_ROOT / "scripts"
+        required = ("backup_support.py", "replicate_latest_node1.py")
+        if any(not (scripts / name).is_file() for name in required):
+            raise RuntimeError("recovery_backup_helpers_unavailable")
+        return scripts
+
     def _environment(
         self, sha: str, slot: str, images: dict[str, str], *, workers_active: bool = False,
     ) -> dict[str, str]:
@@ -316,6 +529,7 @@ class DockerGitOperations:
         env.update({
             "MADAR_ENV_FILE": str(self.env_file),
             "MADAR_SLOT": slot,
+            "MADAR_RELEASE_SLOT": slot,
             "MADAR_RELEASE_SHA": sha,
             "MADAR_BUILD_TIMESTAMP": images["build_timestamp"],
             "MADAR_BACKEND_IMAGE": images["backend"].split("@", 1)[0],
@@ -330,6 +544,7 @@ class DockerGitOperations:
             "SCHEMA_COMPATIBLE_MIN": str(self.compatibility.schema_min),
             "SCHEMA_COMPATIBLE_MAX": str(self.compatibility.schema_max),
             "MADAR_RELEASE_WORKERS_ACTIVE": "true" if workers_active else "false",
+            "MADAR_CONTAINER_PREFIX": getattr(self, "container_prefix", "madar"),
             "NOTIFICATION_WORKER_REQUIRED": "true" if workers_active else "false",
             "DATA_DELETION_WORKER_REQUIRED": "true" if workers_active and self.schema_version() >= 83 else "false",
             "DATA_DELETION_WORKER_HEALTH_URL": "http://data-deletion-worker:8094/health",
@@ -357,17 +572,17 @@ class DockerGitOperations:
         if self.release_root is None:
             raise RuntimeError("release_source_not_prepared")
         web = self.release_root / "web"
-        files = ["-f", str(web / "docker-compose.yml")]
+        files = ["-f", str(self.compose_file or (web / "docker-compose.yml"))]
         override = os.getenv("MADAR_COMPOSE_OVERRIDE", "").strip()
         if override:
             files.extend(["-f", str(Path(override).resolve())])
-        else:
+        elif self.compose_file is None:
             files.extend(["-f", str(WEB_ROOT / "deployment" / "docker-compose.release.yml")])
         profiles = ["--profile", "workers"]
         if self.schema_version() >= 83:
             profiles.extend(["--profile", "deletion-worker"])
         self.run([
-            "docker", "compose", "--project-name", f"madar-{slot}",
+            "docker", "compose", "--project-name", f"{self.project_prefix}-{slot}",
             "--project-directory", str(web), "--env-file", str(self.env_file),
             *files, *profiles, *args,
         ], cwd=web, env=self._environment(sha, slot, images, workers_active=workers_active))
@@ -377,7 +592,7 @@ class DockerGitOperations:
             raise RuntimeError("release_source_not_prepared")
 
         candidate_compatibility = Compatibility.load(
-            self.release_root / "web/deployment/releases/release.json"
+            self.release_root / "web/deployment/releases" / self.metadata_filename
         )
         if candidate_compatibility != self.compatibility:
             raise RuntimeError("control_plane_release_contract_mismatch")
@@ -409,76 +624,220 @@ class DockerGitOperations:
     def start_candidate(self, sha: str, slot: str, images: dict[str, str]) -> None:
         # Queue consumers must not run in the inactive slot. Parser/remote
         # workers are slot-local and cannot see the active slot's Redis queue.
-        self._compose(
-            # The inactive slot may have been created by an older Compose
-            # topology. Recreate every candidate service so Docker cannot try
-            # to restart a retained container that still references a removed
-            # legacy project network.
-            sha, slot, images, "up", "-d", "--no-build", "--force-recreate", "--wait",
-            "--wait-timeout", "180", "redis", "parser-worker",
-            "remote-ingestion-worker", "backend", "frontend",
-        )
+        with runtime_mutation_lock(self.state_root):
+            if self._loaded_serving_slot() == slot:
+                raise RuntimeError("runtime_mutation_target_is_serving")
+            self._inhibit_worker_slot(slot)
+            self._compose(
+                # Stage the backend with its final worker requirements. Core
+                # validation tolerates the expected worker-only 503 until the
+                # authorized consumers start, so the serving backend never
+                # needs a handoff-time force recreation.
+                sha, slot, images, "up", "-d", "--no-build", "--force-recreate", "--wait",
+                "--wait-timeout", "180", "redis", "parser-worker",
+                "remote-ingestion-worker", "backend", "frontend",
+                workers_active=True,
+            )
 
     def activate_workers(self, sha: str, slot: str, images: dict[str, str]) -> None:
-        services = ["backend", "notification-worker", "calendar-sync-worker"]
+        self._require_worker_authority(sha, slot)
+        services = ["notification-worker", "calendar-sync-worker"]
         if self.schema_version() >= 83:
             services.append("data-deletion-worker")
-        self._compose(
-            sha, slot, images, "up", "-d", "--no-build", "--force-recreate",
-            "--wait", "--wait-timeout", "180", *services, workers_active=True,
-        )
+        with runtime_mutation_lock(self.state_root):
+            self._require_worker_authority(sha, slot)
+            self._require_other_worker_slot_inactive(slot)
+            self._compose(
+                sha, slot, images, "up", "-d", "--no-build", "--force-recreate",
+                "--wait", "--wait-timeout", "180", *services, workers_active=True,
+            )
+            self._require_worker_authority(sha, slot)
+            self._require_other_worker_slot_inactive(slot)
 
     def refresh_active_runtime_services(
         self, sha: str, slot: str, images: dict[str, str],
     ) -> None:
         """Recreate only active services whose runtime environment is mutable."""
 
-        services = [
-            "parser-worker",
-            "backend",
-            "notification-worker",
-            "calendar-sync-worker",
-        ]
+        self._require_worker_authority(sha, slot)
+        services = ["parser-worker", "notification-worker", "calendar-sync-worker"]
         if self.schema_version() >= 83:
             services.append("data-deletion-worker")
-        self._compose(
-            sha, slot, images, "up", "-d", "--no-build", "--force-recreate",
-            "--wait", "--wait-timeout", "180", *services,
-            workers_active=True,
-        )
+        with runtime_mutation_lock(self.state_root):
+            self._require_worker_authority(sha, slot)
+            self._require_other_worker_slot_inactive(slot)
+            self._compose(
+                sha, slot, images, "up", "-d", "--no-build", "--force-recreate",
+                "--wait", "--wait-timeout", "180", *services,
+                workers_active=True,
+            )
+            self._require_worker_authority(sha, slot)
+            self._require_other_worker_slot_inactive(slot)
 
-    @staticmethod
-    def _worker_names(slot: str) -> list[str]:
+    def _worker_names(self, slot: str) -> list[str]:
+        prefix = getattr(self, "container_prefix", "madar")
         return [
-            f"madar-{slot}-notification-worker",
-            f"madar-{slot}-calendar-sync-worker",
-            f"madar-{slot}-data-deletion-worker",
+            f"{prefix}-{slot}-notification-worker",
+            f"{prefix}-{slot}-calendar-sync-worker",
+            f"{prefix}-{slot}-data-deletion-worker",
         ]
 
     def deactivate_workers(self, release: dict) -> None:
         slot = str(release.get("slot") or "")
         if slot not in SLOT_PORTS:
             raise RuntimeError("worker_release_slot_invalid")
-        subprocess.run(
-            ["docker", "stop", *self._worker_names(slot)], check=False,
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-        )
+        names = []
+        for name in self._worker_names(slot):
+            state = self._container_state(name)
+            if state is not None:
+                names.append(name)
+        if not names:
+            return
+        self.run(["docker", "update", "--restart=no", *names])
+        self.run(["docker", "stop", *names])
+        for observation in range(2):
+            for name in names:
+                state = self._container_state(name)
+                if state is not None and state[1] not in {
+                    "created", "exited", "dead", "removing",
+                }:
+                    raise RuntimeError(f"worker_failed_to_quiesce:{name}")
+            if observation == 0:
+                time.sleep(0.2)
+        for name in names:
+            if self._container_restart_policy(name) != "no":
+                raise RuntimeError(f"worker_inhibition_unverified:{name}")
 
     def restore_workers(self, release: dict) -> None:
         slot = str(release.get("slot") or "")
         if slot not in SLOT_PORTS:
             raise RuntimeError("worker_release_slot_invalid")
-        existing: list[str] = []
-        for name in self._worker_names(slot):
-            inspected = subprocess.run(
-                ["docker", "inspect", name], check=False,
-                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        sha = str(release.get("sha") or "")
+        self._require_worker_authority(sha, slot)
+        lock = runtime_mutation_lock(self.state_root) if sha else nullcontext()
+        with lock:
+            self._require_worker_authority(sha, slot)
+            if sha:
+                self._require_other_worker_slot_inactive(slot)
+            existing: list[str] = []
+            for name in self._worker_names(slot):
+                if self._container_state(name) is not None:
+                    existing.append(name)
+            if len(existing) != len(self._worker_names(slot)):
+                raise RuntimeError("retained_worker_containers_missing")
+            self.run(["docker", "update", "--restart=unless-stopped", *existing])
+            self.run(["docker", "start", *existing])
+            attempts = max(
+                1, min(int(os.getenv("MADAR_WORKER_READY_ATTEMPTS", "40")), 120)
             )
-            if inspected.returncode == 0:
-                existing.append(name)
-        if not existing:
-            raise RuntimeError("retained_worker_containers_missing")
-        self.run(["docker", "start", *existing])
+            delay = max(
+                0.1,
+                min(float(os.getenv("MADAR_WORKER_READY_RETRY_SECONDS", "1")), 10.0),
+            )
+            for attempt in range(1, attempts + 1):
+                warming = False
+                for name in existing:
+                    state = self._container_state(name)
+                    if state is None:
+                        raise RuntimeError(
+                            f"retained_worker_restore_failed:{name}:absent"
+                        )
+                    _image, status, health = state
+                    if status != "running":
+                        raise RuntimeError(
+                            f"retained_worker_restore_failed:{name}:{status}"
+                        )
+                    if health == "unhealthy":
+                        raise RuntimeError(
+                            f"retained_worker_restore_failed:{name}:unhealthy"
+                        )
+                    if health == "starting":
+                        warming = True
+                    elif health != "none" and health != "healthy":
+                        raise RuntimeError(
+                            f"retained_worker_restore_failed:{name}:health_unknown"
+                        )
+                if not warming:
+                    self._require_worker_authority(sha, slot)
+                    if sha:
+                        self._require_other_worker_slot_inactive(slot)
+                    return
+                if attempt < attempts:
+                    time.sleep(delay)
+        raise RuntimeError("retained_worker_restore_timeout")
+
+    def _require_other_worker_slot_inactive(self, slot: str) -> None:
+        other = "green" if slot == "blue" else "blue"
+        for name in self._worker_names(other):
+            state = self._container_state(name)
+            if state is not None and state[1] not in {
+                "created", "exited", "dead", "removing",
+            }:
+                raise RuntimeError(f"worker_authority_runtime_contradiction:{name}")
+
+    def _inhibit_worker_slot(self, slot: str) -> None:
+        release = {"slot": slot}
+        self.deactivate_workers(release)
+        for name in self._worker_names(slot):
+            state = self._container_state(name)
+            if state is not None and (
+                state[1] not in {"created", "exited", "dead", "removing"}
+                or self._container_restart_policy(name) != "no"
+            ):
+                raise RuntimeError(f"worker_inhibition_unverified:{name}")
+
+    def worker_ownership(self, retained: dict, candidate: dict) -> str:
+        """Return the only positively established production-consumer owner."""
+
+        def group(slot: str) -> str:
+            states = [self._container_state(name) for name in self._worker_names(slot)]
+            running = [
+                state for state in states
+                if state is not None and state[1] in {"running", "restarting", "paused"}
+            ]
+            inactive = [
+                state is None or state[1] in {"created", "exited", "dead", "removing"}
+                for state in states
+            ]
+            if all(inactive):
+                return "inactive"
+            if len(running) == len(states) and all(
+                state[1] == "running"
+                and state[2] in {"healthy", "none", "starting"}
+                for state in running
+            ):
+                return (
+                    "starting"
+                    if any(state[2] == "starting" for state in running)
+                    else "active"
+                )
+            return "partial"
+
+        retained_slot = str(retained.get("slot") or "")
+        candidate_slot = str(candidate.get("slot") or "")
+        if {retained_slot, candidate_slot} != {"blue", "green"}:
+            raise RuntimeError("worker_ownership_slots_invalid")
+        retained_state = group(retained_slot)
+        candidate_state = group(candidate_slot)
+        retained_present = retained_state != "inactive"
+        candidate_present = candidate_state != "inactive"
+        if retained_present and candidate_present:
+            return "overlap"
+        if retained_state == "active" and not candidate_present:
+            return "old"
+        if retained_state == "starting" and not candidate_present:
+            return "old_starting"
+        if retained_state == "partial" and not candidate_present:
+            return "old_partial"
+        if candidate_state == "active" and not retained_present:
+            return "candidate"
+        if candidate_state == "starting" and not retained_present:
+            return "candidate_starting"
+        if candidate_state == "partial" and not retained_present:
+            return "candidate_partial"
+        if not retained_present and not candidate_present:
+            return "none"
+        return "ambiguous"
 
     def _json(self, url: str) -> dict:
         with urllib.request.urlopen(url, timeout=5) as response:
@@ -500,15 +859,40 @@ class DockerGitOperations:
                 name,
             ],
             check=False, text=True, stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
         )
         if completed.returncode != 0:
+            # `inspect` cannot distinguish an absent object from a daemon or
+            # authorization failure by exit status. A successful exact-name
+            # inventory is required before absence may be trusted.
+            inventory = subprocess.run(
+                [
+                    "docker", "ps", "-a", "--filter", f"name=^/{name}$",
+                    "--format", "{{.Names}}",
+                ],
+                check=False, text=True, stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+            if inventory.returncode != 0:
+                raise RuntimeError(f"worker_state_unknown:{name}")
+            found = [value.strip() for value in inventory.stdout.splitlines() if value.strip()]
+            if found:
+                raise RuntimeError(f"worker_state_unknown:{name}")
             return None
         value = completed.stdout.strip()
         parts = value.split("|", 2)
         if len(parts) != 3:
             raise RuntimeError("active_runtime_container_state_invalid")
         return parts[0], parts[1], parts[2]
+
+    def _container_restart_policy(self, name: str) -> str:
+        completed = subprocess.run(
+            ["docker", "inspect", "--format", "{{.HostConfig.RestartPolicy.Name}}", name],
+            check=False, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        )
+        if completed.returncode != 0 or not completed.stdout.strip():
+            raise RuntimeError(f"worker_inhibition_unknown:{name}")
+        return completed.stdout.strip()
 
     @staticmethod
     def _recorded_image_id(images: dict[str, str], component: str) -> str:
@@ -667,6 +1051,39 @@ class DockerGitOperations:
                 time.sleep(delay)
         raise RuntimeError(f"candidate_deep_validation_failed:{last_failure}")
 
+    def validate_candidate_core(self, sha: str, slot: str) -> None:
+        """Validate runtime identity/core while consumers are intentionally off."""
+
+        ports = SLOT_PORTS[slot]
+        readiness = self._json_allow_unready(
+            f"http://127.0.0.1:{ports['backend']}/health/ready"
+        )
+        identity = self._json(f"http://127.0.0.1:{ports['backend']}/health/version")
+        if identity.get("release_sha") != sha:
+            raise RuntimeError("candidate_core_release_identity_mismatch")
+        if (
+            str(identity.get("schema_compatible_min")) != str(self.compatibility.schema_min)
+            or str(identity.get("schema_compatible_max")) != str(self.compatibility.schema_max)
+        ):
+            raise RuntimeError("candidate_core_schema_contract_mismatch")
+        components = readiness.get("components")
+        if not isinstance(components, dict):
+            raise RuntimeError("candidate_core_readiness_invalid")
+        allowed_worker_degradation = {
+            "notification_worker", "calendar_sync_worker", "data_deletion_worker",
+        }
+        degraded = {
+            name for name, value in components.items()
+            if value not in ACCEPTED_READINESS_STATES
+        }
+        if not degraded <= allowed_worker_degradation:
+            raise RuntimeError("candidate_core_readiness_failed")
+        frontend_base = f"http://127.0.0.1:{ports['frontend']}"
+        with urllib.request.urlopen(f"{frontend_base}/", timeout=5) as response:
+            if response.status != 200:
+                raise RuntimeError("candidate_core_frontend_unavailable")
+            self._validate_frontend_api_origin(frontend_base, response.read())
+
     def validate_rollback_target(self, release: dict, schema: int) -> dict[str, int]:
         slot = str(release.get("slot") or "")
         expected_sha = str(release.get("sha") or "")
@@ -704,36 +1121,96 @@ class DockerGitOperations:
             self.validate_candidate(sha, slot)
             time.sleep(5)
 
-    def stop_candidate(self, slot: str) -> None:
-        if self.release_root is None:
-            return
+    def stop_candidate(
+        self, slot: str, *, expected_serving: dict[str, str] | None = None
+    ) -> None:
+        with runtime_mutation_lock(self.state_root):
+            if expected_serving is not None:
+                serving = self.resolve_serving_slot(expected_serving)
+            else:
+                serving = self._loaded_serving_slot()
+            if serving is None:
+                raise RuntimeError("candidate_cleanup_traffic_ambiguous")
+            if serving == slot:
+                raise RuntimeError("candidate_cleanup_target_is_serving")
+            if self.release_root is None:
+                return
+            self._stop_candidate_locked(slot)
+
+    def _stop_candidate_locked(self, slot: str) -> None:
         # Only the isolated inactive Compose project is removed. Images and the
         # retained active target are deliberately untouched.
-        files = ["-f", str(self.release_root / "web/docker-compose.yml")]
+        files = ["-f", str(self.compose_file or (self.release_root / "web/docker-compose.yml"))]
         override = os.getenv("MADAR_COMPOSE_OVERRIDE", "").strip()
         if override:
             files.extend(["-f", str(Path(override).resolve())])
-        else:
+        elif self.compose_file is None:
             files.extend(["-f", str(WEB_ROOT / "deployment" / "docker-compose.release.yml")])
         environment = dict(os.environ)
         subnets = SLOT_SUBNETS[slot]
         environment.update({
             "MADAR_SLOT": slot,
+            "MADAR_CONTAINER_PREFIX": self.container_prefix,
             "MADAR_DEFAULT_SUBNET": subnets["default"],
             "MADAR_PARSER_SUBNET": subnets["parser"],
             "MADAR_REMOTE_INTERNAL_SUBNET": subnets["remote_internal"],
             "MADAR_REMOTE_EGRESS_SUBNET": subnets["remote_egress"],
         })
-        subprocess.run([
-            "docker", "compose", "--project-name", f"madar-{slot}",
+        self.run([
+            "docker", "compose", "--project-name", f"{self.project_prefix}-{slot}",
             "--project-directory", str(self.release_root / "web"),
             "--env-file", str(self.env_file), *files,
             "--profile", "workers", "--profile", "deletion-worker", "down", "--remove-orphans",
-        ], check=False, env=environment)
+        ], env=environment)
 
 
 def prepared_release_path(state_root: Path) -> Path:
     return state_root / "prepared-release.json"
+
+
+def plan_release_migrations(
+    *, sha: str, schema: int, compatibility: Compatibility,
+    operations: DockerGitOperations,
+) -> list[list[int]]:
+    """Derive and checksum-verify an ordinary candidate's manifest path."""
+
+    if getattr(operations, "release_root", None) is None:
+        # Lightweight state-machine fakes have no immutable worktree. Real
+        # DockerGitOperations always sets it in verify_source().
+        return []
+    release_root = operations.release_root
+    metadata_path = release_root / "web/deployment/releases" / operations.metadata_filename
+    metadata = _json_file(metadata_path, "candidate_release_contract_invalid")
+    if Compatibility.load(metadata_path) != compatibility:
+        raise RuntimeError("candidate_release_contract_mismatch")
+    if str(metadata.get("migration_policy") or "") != AUTOMATIC_MIGRATION_POLICY:
+        return []
+    manifest_name = str(metadata.get("migration_manifest") or "")
+    if (
+        Path(manifest_name).name != manifest_name
+        or not manifest_name.startswith("migrations-")
+        or not manifest_name.endswith(".json")
+    ):
+        raise RuntimeError("candidate_migration_manifest_invalid")
+    manifest = MigrationManifest.load(
+        release_root / "web/deployment/releases" / manifest_name, release_root,
+    )
+    if manifest.release_sha in {"CURRENT", "STAGING"}:
+        manifest = replace(manifest, release_sha=sha)
+    if manifest.release_sha != sha:
+        raise RuntimeError("candidate_migration_manifest_release_mismatch")
+    source = manifest.migrations[0].from_schema
+    target = manifest.migrations[-1].to_schema
+    if source != schema or target != compatibility.target_schema:
+        raise RuntimeError("candidate_migration_path_mismatch")
+    if not compatibility.schema_min <= source <= target <= compatibility.schema_max:
+        raise RuntimeError("candidate_migration_bridge_range_invalid")
+    LockedMigrationExecutor(
+        connection_factory=lambda: None, manifest=manifest,
+        state_file=Path("/nonexistent/rehearsal-execution.json"),
+        backup_dir=Path("/nonexistent"), backup_verifier=lambda _path: None,
+    ).verify_migrations()
+    return [[migration.from_schema, migration.to_schema] for migration in manifest.migrations]
 
 
 @contextmanager
@@ -755,29 +1232,84 @@ def prepare_release(
         raise RuntimeError("candidate_slot_invalid")
     with deployment_lock(state_root):
         operations.verify_source(sha)
-        images = operations.build(sha, slot)
-        if any("@sha256:" not in str(images.get(name) or "") for name in ("backend", "frontend", "worker")):
-            raise RuntimeError("immutable_image_digest_missing")
         schema = operations.schema_version()
         if not compatibility.schema_min <= schema <= compatibility.schema_max:
             raise RuntimeError("candidate_schema_incompatible")
-        record = {
-            "release_sha": sha,
-            "candidate_slot": slot,
-            "images": images,
-            "schema": schema,
-            "status": "preparing",
-            "prepared_at": utc_now().isoformat(),
-        }
+        migration_plan = plan_release_migrations(
+            sha=sha, schema=schema, compatibility=compatibility,
+            operations=operations,
+        )
+        path = prepared_release_path(state_root)
+        record: dict
+        if path.exists():
+            try:
+                record = json.loads(path.read_text(encoding="utf-8"))
+            except ValueError as error:
+                raise RuntimeError("prepared_release_missing_or_invalid") from error
+            if (
+                record.get("release_sha") != sha
+                or record.get("candidate_slot") != slot
+                or int(record.get("schema", -1)) != schema
+                or record.get("migration_plan") != migration_plan
+                or record.get("status") not in {
+                    "preparing", "candidate_validated_workers_inactive",
+                }
+            ):
+                raise RuntimeError("prepared_release_identity_mismatch")
+            images = record.get("images") or {}
+            if record["status"] == "candidate_validated_workers_inactive":
+                operations.preflight(sha, slot, images, schema)
+                validate_core = getattr(
+                    operations, "validate_candidate_core",
+                    operations.validate_candidate,
+                )
+                validate_core(sha, slot)
+                return record
+        else:
+            images = operations.build(sha, slot)
+            record = {
+                "release_sha": sha,
+                "candidate_slot": slot,
+                "images": images,
+                "schema": schema,
+                "migration_plan": migration_plan,
+                "status": "preparing",
+                "prepared_at": utc_now().isoformat(),
+                "prepare_attempt": 0,
+            }
+            atomic_json(path, record)
+        if any("@sha256:" not in str(images.get(name) or "") for name in ("backend", "frontend", "worker")):
+            raise RuntimeError("immutable_image_digest_missing")
         try:
             operations.preflight(sha, slot, images, schema)
             operations.start_candidate(sha, slot, images)
-            operations.validate_candidate(sha, slot)
-        except Exception:
-            operations.stop_candidate(slot)
+            validate_core = getattr(
+                operations, "validate_candidate_core",
+                operations.validate_candidate,
+            )
+            validate_core(sha, slot)
+        except Exception as error:
+            record["prepare_attempt"] = int(record.get("prepare_attempt", 1)) + 1
+            record["last_failure"] = type(error).__name__
+            atomic_json(path, record)
+            expected_serving = None
+            try:
+                state = json.loads((state_root / "state.json").read_text(encoding="utf-8"))
+                known = state.get("known_good_release") or {}
+                active = str(state.get("active_slot") or "")
+                if active in SLOT_PORTS and known.get("slot") == active:
+                    expected_serving = {
+                        active: str(known.get("sha") or ""), slot: sha,
+                    }
+            except (OSError, ValueError):
+                pass
+            if expected_serving is not None:
+                operations.stop_candidate(slot, expected_serving=expected_serving)
             raise
         record["status"] = "candidate_validated_workers_inactive"
-        atomic_json(prepared_release_path(state_root), record)
+        record["validated_at"] = utc_now().isoformat()
+        record.pop("last_failure", None)
+        atomic_json(path, record)
         return record
 
 
@@ -800,7 +1332,21 @@ def activate_prepared_release(
 ) -> dict:
     record = load_prepared_release(state_root, sha, slot)
     operations.verify_source(sha)
-    operations.validate_candidate(sha, slot)
+    validate_core = getattr(
+        operations, "validate_candidate_core", operations.validate_candidate,
+    )
+    validate_core(sha, slot)
+    other_slot = "green" if slot == "blue" else "blue"
+    generation = hashlib.sha256(
+        f"bootstrap:{sha}:{slot}:{record.get('prepared_at', '')}".encode()
+    ).hexdigest()
+    write_worker_authority(
+        state_root, generation=generation, owner="CANDIDATE",
+        old={"sha": sha, "slot": other_slot},
+        candidate={"sha": sha, "slot": slot},
+    )
+    record["worker_generation"] = generation
+    atomic_json(prepared_release_path(state_root), record)
     try:
         operations.activate_workers(sha, slot, record["images"])
         operations.validate_candidate(sha, slot)
@@ -846,6 +1392,7 @@ def adopt_prepared_release(
         "slot": slot,
         "images": record["images"],
         "schema": schema,
+        "worker_generation": record["worker_generation"],
         "schema_compatible_min": compatibility.schema_min,
         "schema_compatible_max": compatibility.schema_max,
     }
@@ -1046,6 +1593,52 @@ def _attest_migration_backup(
         raise RuntimeError("automatic_migration_backup_identity_mismatch")
 
 
+def _establish_compatible_migration_fallback(
+    *, sha: str, slot: str, schema: int, state_root: Path,
+    operations: DockerGitOperations,
+) -> dict:
+    """Replace the old inactive runtime with the accepted bridge itself."""
+
+    state_file = state_root / "state.json"
+    state = _json_file(state_file, "release_state_missing_or_invalid")
+    known_good = state.get("known_good_release") or {}
+    if known_good.get("sha") != sha or known_good.get("slot") != slot:
+        raise RuntimeError("migration_fallback_active_identity_mismatch")
+    fallback_slot = "green" if slot == "blue" else "blue"
+    existing = state.get("compatible_fallback_release") or {}
+    if (
+        existing.get("sha") == sha
+        and existing.get("slot") == fallback_slot
+        and int(existing.get("schema", -1)) == schema
+    ):
+        validate_core = getattr(
+            operations, "validate_candidate_core", operations.validate_candidate,
+        )
+        validate_core(sha, fallback_slot)
+        return existing
+    images = known_good.get("images") or {}
+    operations.start_candidate(sha, fallback_slot, images)
+    validate_core = getattr(
+        operations, "validate_candidate_core", operations.validate_candidate,
+    )
+    validate_core(sha, fallback_slot)
+    if operations.schema_version() != schema:
+        raise RuntimeError("migration_fallback_schema_changed")
+    fallback = {
+        "sha": sha,
+        "slot": fallback_slot,
+        "images": images,
+        "schema": schema,
+        "schema_compatible_min": operations.compatibility.schema_min,
+        "schema_compatible_max": operations.compatibility.schema_max,
+        "workers_active": False,
+        "established_at": utc_now().isoformat(),
+    }
+    state["compatible_fallback_release"] = fallback
+    atomic_json(state_file, state)
+    return fallback
+
+
 def automatic_migrate_known_good(
     *, sha: str, state_root: Path, compatibility: Compatibility,
     operations: DockerGitOperations,
@@ -1175,11 +1768,16 @@ def automatic_migrate_known_good(
             <= compatibility.rollback_schema_max
         ):
             raise RuntimeError("automatic_migration_rollback_contract_invalid")
-        retained = (
-            acceptance.get("previous_known_good_release")
-            if isinstance(acceptance, dict)
-            else None
-        )
+        # Recovery may have deliberately replaced the historical incompatible
+        # rollback process with a schema-compatible copy of the bridge. That
+        # durable topology is authoritative for later migration retries.
+        retained = state.get("compatible_fallback_release")
+        if not isinstance(retained, dict):
+            retained = (
+                acceptance.get("previous_known_good_release")
+                if isinstance(acceptance, dict)
+                else None
+            )
         if not isinstance(retained, dict):
             raise RuntimeError("automatic_migration_retained_rollback_attestation_missing")
         retained_sha = str(retained.get("sha") or "")
@@ -1328,6 +1926,13 @@ def automatic_migrate_known_good(
         _attest_migration_backup(
             backup, release_sha=sha, source_schema=source_schema,
         )
+        fallback = _establish_compatible_migration_fallback(
+            sha=sha,
+            slot=slot,
+            schema=current_schema,
+            state_root=state_root,
+            operations=operations,
+        )
         executor = LockedMigrationExecutor(
             connection_factory=lambda: psycopg.connect(
                 os.getenv("MADAR_MIGRATION_DATABASE_URL", "")
@@ -1347,6 +1952,19 @@ def automatic_migrate_known_good(
         refresh_event = refresh_active_workers(
             sha=sha, slot=slot, state_root=state_root, operations=operations,
         )
+        operations.validate_candidate(sha, str(fallback["slot"]))
+        state_after = _json_file(
+            state_file, "release_state_missing_or_invalid"
+        )
+        persisted_fallback = state_after.get("compatible_fallback_release") or {}
+        if (
+            persisted_fallback.get("sha") != sha
+            or persisted_fallback.get("slot") != fallback.get("slot")
+        ):
+            raise RuntimeError("migration_fallback_state_missing")
+        persisted_fallback["schema"] = target_schema
+        persisted_fallback["validated_at"] = utc_now().isoformat()
+        atomic_json(state_file, state_after)
         result = {
             "release_sha": sha,
             "source_schema": source_schema,
@@ -1395,6 +2013,10 @@ def main() -> int:
         help="Safely apply environment changes to the exact active known-good release",
     )
     mode.add_argument("--automatic-migrate", action="store_true", help="Run an opted-in migration only after this SHA is known-good")
+    mode.add_argument(
+        "--recover-current-schema", action="store_true",
+        help="Explicit forward-only recovery when every retained release is schema-incompatible",
+    )
     parser.add_argument("--slot", choices=tuple(SLOT_PORTS), default="green")
     args = parser.parse_args()
     normalized_sha = args.sha.lower()
@@ -1409,8 +2031,38 @@ def main() -> int:
         load_active_runtime_environment(env_file)
     else:
         load_environment_file(env_file)
-    compatibility = Compatibility.load(WEB_ROOT / "deployment/releases/release.json")
-    operations = DockerGitOperations(repo, state_root, env_file, compatibility)
+    metadata_path = WEB_ROOT / "deployment/releases/release.json"
+    if args.recover_current_schema:
+        metadata_path = WEB_ROOT / "deployment/releases/schema-96-recovery.json"
+    compatibility = Compatibility.load(metadata_path)
+    operations = DockerGitOperations(
+        repo, state_root, env_file, compatibility,
+        metadata_filename=metadata_path.name,
+    )
+    if args.recover_current_schema:
+        require_upgrade_authorization(
+            normalized_sha,
+            required_operation="schema_recovery",
+            required_schema=compatibility.target_schema,
+            require_rehearsal=True,
+        )
+        metadata = _json_file(
+            metadata_path,
+            "recovery_release_metadata_invalid",
+        )
+        if (
+            metadata.get("migration_policy") != "schema-recovery-no-migration"
+            or "migration_manifest" in metadata
+        ):
+            raise RuntimeError("recovery_release_migration_contract_invalid")
+        deployer = ReleaseDeployer(
+            state_root=state_root,
+            compatibility=compatibility,
+            operations=operations,
+        )
+        result = deployer.recover_current_schema(normalized_sha)
+        print(json.dumps(result, indent=2, sort_keys=True))
+        return 0
     if args.automatic_migrate:
         with deployment_lock(state_root):
             result = automatic_migrate_known_good(

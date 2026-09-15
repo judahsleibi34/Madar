@@ -1,0 +1,13 @@
+{
+  "release_metadata_version": 1,
+  "schema": {
+    "compatible_min": 96,
+    "compatible_max": 96,
+    "target": 96,
+    "migration_class": "none",
+    "rollback_compatible_min": 96,
+    "rollback_compatible_max": 96
+  },
+  "migration_policy": "schema-recovery-no-migration",
+  "notes": "Explicit schema-096 forward-recovery contract. This operation applies no migration and is available only through the separately authorized current-schema recovery controller after exact-SHA rehearsal and backup attestation. Normal deployment and auto-deploy continue to use release.json and cannot select this contract."
+}

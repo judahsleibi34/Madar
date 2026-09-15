@@ -507,6 +507,16 @@ def _deliver_web_push(row: dict[str, Any]) -> None:
             raise DeliveryError("web_push_provider_unavailable") from error
         raise DeliveryError("web_push_delivery_failed") from error
     except (TypeError, ValueError) as error:
+        # pywebpush parses the shared VAPID signing key inside webpush(). Prove
+        # that shared configuration before blaming a recipient key.
+        try:
+            from py_vapid import Vapid
+
+            Vapid.from_string(private_key=private_key)
+        except (TypeError, ValueError, OSError) as configuration_error:
+            raise DeliveryError(
+                "web_push_provider_configuration_invalid", retryable=False
+            ) from configuration_error
         service_supabase.table("web_push_subscriptions").update(
             {"revoked_at": datetime.now(timezone.utc).isoformat()}
         ).eq("id", subscription.get("id")).execute()

@@ -95,18 +95,51 @@ def receive(backup_id: str, sums: str, expected_uuid: str, keep: int, *, stream=
                 shutil.rmtree(staging)
 
 
+def verify_existing(backup_id: str, sums: str, expected_uuid: str) -> dict:
+    """Read-only attestation of one already-published Node 1 replica."""
+
+    root = DESTINATION
+    validate_destination(root, expected_uuid)
+    if not backup.BACKUP_ID.fullmatch(backup_id) or not re.fullmatch('[0-9a-f]{64}', sums):
+        raise backup.BackupError('node1_request_invalid')
+    final = root / backup_id
+    manifest = backup.verify(final, dump=False)
+    if manifest.get('backup_id') != backup_id:
+        raise backup.BackupError('node1_backup_identity_mismatch')
+    if backup.digest(final / 'SHA256SUMS') != sums:
+        raise backup.BackupError('node1_existing_backup_differs')
+    return {
+        'status': 'verified_existing',
+        'backup_id': backup_id,
+        'sha256sums_sha256': sums,
+        'destination': str(root),
+    }
+
+
 def remote_command(backup_id: str, sums: str, uuid: str, keep: int) -> str:
     # Transfer reviewed code in the SSH command; no executable/state installation
     # on Node 1 and no remote paths beyond DESTINATION are needed.
     support = Path(backup.__file__).read_bytes()
     receiver = Path(__file__).read_bytes()
-    bootstrap = ('import base64,sys,types; '
+    bootstrap = ('import base64,json,sys,types; '
                  'm=types.ModuleType("backup_support");sys.modules["backup_support"]=m; '
                  f'exec(base64.b64decode({base64.b64encode(support).decode()!r}),m.__dict__); '
                  'n={"__name__":"node1_receiver"}; '
                  f'exec(base64.b64decode({base64.b64encode(receiver).decode()!r}),n); '
                  'n["receiver_main"](*sys.argv[1:])')
     return shlex.join(['python3', '-c', bootstrap, backup_id, sums, uuid, str(keep)])
+
+
+def remote_verify_command(backup_id: str, sums: str, uuid: str) -> str:
+    support = Path(backup.__file__).read_bytes()
+    receiver = Path(__file__).read_bytes()
+    bootstrap = ('import base64,json,sys,types; '
+                 'm=types.ModuleType("backup_support");sys.modules["backup_support"]=m; '
+                 f'exec(base64.b64decode({base64.b64encode(support).decode()!r}),m.__dict__); '
+                 'n={"__name__":"node1_receiver"}; '
+                 f'exec(base64.b64decode({base64.b64encode(receiver).decode()!r}),n); '
+                 'print(json.dumps(n["verify_existing"](*sys.argv[1:])))')
+    return shlex.join(['python3', '-c', bootstrap, backup_id, sums, uuid])
 
 
 def receiver_main(backup_id: str, sums: str, uuid: str, keep: str) -> None:
@@ -157,9 +190,48 @@ def replicate() -> dict:
         return response
 
 
+def verify_replica() -> dict:
+    """Verify that the fresh local backup has an identical Node 1 copy."""
+
+    root = Path(os.environ['MADAR_BACKUP_DIR'])
+    backup.real_path(root)
+    source = backup.latest(
+        Path(os.environ['MADAR_BACKUP_FRESHNESS_MARKER']), root,
+        int(os.environ.get('MADAR_BACKUP_MAX_AGE_SECONDS', '129600')),
+    )
+    sums = backup.digest(source / 'SHA256SUMS')
+    host = os.environ.get('MADAR_NODE1_SSH_HOST', 'madar-node1-lan')
+    if host not in ('madar-node1-lan', 'madar-node1'):
+        raise backup.BackupError('node1_ssh_alias_not_authorized')
+    uuid = os.environ['MADAR_NODE1_FILESYSTEM_UUID']
+    result = subprocess.run(
+        [
+            'ssh', '-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=yes',
+            '-o', 'ConnectTimeout=15', '-o', 'ConnectionAttempts=2',
+            host, remote_verify_command(source.name, sums, uuid),
+        ],
+        capture_output=True, text=True, timeout=300,
+    )
+    if result.returncode:
+        raise backup.BackupError('node1_verification_failed')
+    response = json.loads(result.stdout)
+    if (
+        response.get('status') != 'verified_existing'
+        or response.get('backup_id') != source.name
+        or response.get('sha256sums_sha256') != sums
+    ):
+        raise backup.BackupError('node1_receipt_mismatch')
+    return response
+
+
 if __name__ == '__main__':
     try:
-        print(json.dumps(replicate()))
+        if sys.argv[1:] == ['--verify-only']:
+            print(json.dumps(verify_replica()))
+        elif sys.argv[1:]:
+            raise backup.BackupError('unsupported_argument')
+        else:
+            print(json.dumps(replicate()))
     except Exception as error:
         print('ERROR: ' + (str(error) if isinstance(error, backup.BackupError) else type(error).__name__), file=sys.stderr)
         raise SystemExit(1)

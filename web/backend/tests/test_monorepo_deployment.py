@@ -53,6 +53,23 @@ class MonorepoDeploymentTests(unittest.TestCase):
         self.assertIn('MADAR_PROVIDER_BACKUP_REQUIRED=true', unit)
         self.assertIn('OnFailure=madar-ops-alert@%n.service', unit)
 
+    def test_schema_recovery_is_installed_but_not_auto_deploy_reachable(self):
+        installer = INSTALLER.read_text(encoding="utf-8")
+        automatic = WRAPPER.read_text(encoding="utf-8")
+        release = RELEASE_DEPLOY.read_text(encoding="utf-8")
+        recovery_contract = (
+            WEB_ROOT / "deployment/releases/schema-96-recovery.json"
+        ).read_text(encoding="utf-8")
+        self.assertIn("releases/schema-96-recovery.json", installer)
+        self.assertIn("lib/runtime_authority.py", installer)
+        self.assertTrue(
+            (WEB_ROOT / "deployment/lib/runtime_authority.py").is_file()
+        )
+        self.assertIn("--recover-current-schema", release)
+        self.assertNotIn("--recover-current-schema", automatic)
+        self.assertIn('"migration_class": "none"', recovery_contract)
+        self.assertNotIn("migration_manifest", recovery_contract)
+
     def setUp(self):
         self.deploy = DEPLOY.read_text(encoding="utf-8")
         self.wrapper = WRAPPER.read_text(encoding="utf-8")
@@ -89,7 +106,11 @@ class MonorepoDeploymentTests(unittest.TestCase):
 
     def test_release_deployer_uses_explicit_compose_and_environment_roots(self):
         self.assertIn('"MADAR_ENV_FILE": str(self.env_file)', self.release_deploy)
-        self.assertIn('"docker", "compose", "--project-name", f"madar-{slot}"', self.release_deploy)
+        self.assertIn(
+            '"docker", "compose", "--project-name", f"{self.project_prefix}-{slot}"',
+            self.release_deploy,
+        )
+        self.assertIn('project_prefix: str = "madar"', self.release_deploy)
         self.assertIn('"--project-directory", str(web)', self.release_deploy)
         self.assertIn('"--env-file", str(self.env_file)', self.release_deploy)
         self.assertEqual(self.compose.count("${MADAR_ENV_FILE:-.env}"), 4)
@@ -131,7 +152,9 @@ class MonorepoDeploymentTests(unittest.TestCase):
         self.assertIn("known_bad_release_suppressed", self.release_library)
         self.assertIn("/health/ready", self.release_deploy)
         self.assertIn("retained_worker_containers_missing", self.release_deploy)
-        self.assertIn('["docker", "inspect", name]', self.release_deploy)
+        self.assertIn('"docker", "inspect", "--format"', self.release_deploy)
+        self.assertIn('"docker", "ps", "-a", "--filter"', self.release_deploy)
+        self.assertIn("worker_state_unknown", self.release_deploy)
 
     def test_persistent_bind_mounts_keep_their_pre_move_host_paths(self):
         for path in (
@@ -209,6 +232,7 @@ class MonorepoDeploymentTests(unittest.TestCase):
         self.assertIn("MADAR_STABLE_BACKEND_URL", self.switch)
         self.assertIn("_atomic_bytes(target, previous)", self.switch)
         self.assertIn("_reload(driver, container)", self.switch)
+        self.assertIn("os.chmod(target.parent, 0o755)", self.switch)
         self.assertIn("listen 127.0.0.1:8001", self.proxy_config)
         self.assertIn("listen 127.0.0.1:3000", self.proxy_config)
         self.assertIn('cap_drop: ["ALL"]', self.proxy_compose)

@@ -343,6 +343,72 @@ fabricate a new controller backup. Its controlled deployment promotes the
 application through the canonical immutable release machinery, runs same-SHA
 validation, and restores the timer's captured state.
 
+## DB-ahead recovery operation
+
+`--recover-current-schema` is an explicit operator mode and is absent from
+`madar-auto-deploy`. It uses a distinct current-production preflight because
+the ordinary preflight correctly refuses an incompatible serving binary. This
+special preflight accepts only a clean and coherent known-good/proxy origin,
+an auto-deploy timer already disabled, an actual live schema strictly above
+the serving binary maximum, and no degradation beyond schema incompatibility
+plus the known legacy notification-queue classification.
+
+The paired `--rehearsal-attestation` file must be absolute, nonsymlinked,
+root-owned, mode 0400 or 0600, no older than seven days, and bind the exact
+approved SHA and live schema to all required backend, frontend, browser,
+database, worker, RLS, and readiness checks. Candidate staging then validates
+the separate exact-schema, no-migration recovery contract before any
+installation or application deployment.
+
+The installed controller invokes `madar-release-deploy <SHA>
+--recover-current-schema` only through the same one-use systemd credential and
+interlock boundary used by governed upgrades. The release state machine stages
+the inactive slot with queue consumers disabled, quiesces the old consumers,
+durably records a generation-bound `OLD` -> `NONE` -> `CANDIDATE` authority,
+inhibits Docker restart policy, rechecks actual worker state plus
+state/schema/backup/routing identity, uses the existing atomic switch, and only
+then starts candidate consumers with a bounded health wait. Consumer activation
+and restoration in recovery, ordinary deployment, bootstrap, and active-runtime
+refresh all require that exact authority identity. It builds a second compatible
+bridge slot with consumers inactive before success. After routing has changed,
+failure handling detects the actual routed candidate even if durable known-good
+finalization was interrupted and records forward-repair semantics. It never
+routes to the incompatible historical release.
+
+Traffic mutation and destructive inactive-slot mutation take the same
+`runtime-mutation.lock`. After acquiring it, a slot operation resolves the
+loaded serving identity again and refuses ambiguity or a target that is now
+serving. The check and the force-recreate/remove therefore share one critical
+section with `madar-switch-traffic`.
+
+Recovery resume treats durable worker ownership as a claim to verify, not an
+instruction to replay. Discovery order is loaded traffic, both slot/container
+identities, old workers, candidate workers, then durable ownership/generation.
+Only after that evidence is reconciled with the durable phase does validation
+run. Candidate-serving handoff phases use core runtime validation before worker
+reconciliation, so `NONE` and Docker `starting` are resumable states; final
+steady-state validation remains unchanged. Candidate shutdown must be positively
+proven before retained consumers may restart; unknown container state, partial
+shutdown, overlap, or ambiguous routing persists an operator-intervention
+checkpoint and starts no competing consumers. A normal Docker `starting` health
+state receives a bounded wait, while terminal or timed-out startup fails closed.
+
+Successful finalization marks the canonical active and compatible-fallback
+records as schema-recovery artifacts and records `migration_result` as
+`not_requested`. A later ordinary control-plane inspection recognizes that
+terminal only when the completed recovery record, active slot/SHA/schema and
+the exact zero-migration recovery contract all agree. It otherwise reports a
+missing or invalid migration terminal and stops. Recovery credentials and the
+recovery entrypoint are never accepted by that later normal release.
+
+Because an installed controller that predates this mode cannot parse the new
+flags, the first use requires the already-documented exact-SHA, root-protected
+manual controller bootstrap. That bootstrap installs controller code only; it
+does not switch application traffic or alter schema. The separately reviewed
+recovery command then performs the application transition. Exact commands and
+abort conditions are in
+[`schema-96-forward-recovery-runbook.md`](schema-96-forward-recovery-runbook.md).
+
 ## Implementation and test map
 
 - orchestration, staging, audit, attestation, failure boundaries:

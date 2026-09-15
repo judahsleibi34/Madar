@@ -142,6 +142,22 @@ class BackupOperationsTests(unittest.TestCase):
                 self.assertFalse(list(destination.glob('.*.incomplete.*')))
                 support.verify(destination / source.name, dump=False)
 
+    def test_node1_existing_replica_attestation_is_read_only_and_exact(self):
+        with tempfile.TemporaryDirectory() as root:
+            source, _ = self.make_backup(root)
+            destination = Path(root) / 'remote'; destination.mkdir(mode=0o700)
+            sums = support.digest(source / 'SHA256SUMS')
+            with mock.patch.object(node1, 'DESTINATION', destination), mock.patch.object(node1, 'validate_destination'), mock.patch.object(node1.shutil, 'disk_usage', return_value=mock.Mock(free=100*1024**3)):
+                node1.receive(source.name, sums, 'test', 90, stream=self.archive(source))
+                before = support.inventory(destination / source.name)
+                result = node1.verify_existing(source.name, sums, 'test')
+                after = support.inventory(destination / source.name)
+                self.assertEqual(result['status'], 'verified_existing')
+                self.assertEqual(result['backup_id'], source.name)
+                self.assertEqual(before, after)
+                with self.assertRaisesRegex(support.BackupError, 'existing_backup_differs'):
+                    node1.verify_existing(source.name, '0' * 64, 'test')
+
     def test_node1_rejects_wrong_filesystem_before_writes(self):
         with tempfile.TemporaryDirectory() as root:
             path = Path(root)
@@ -166,6 +182,16 @@ class BackupOperationsTests(unittest.TestCase):
         self.assertEqual(args[:2], ['python3', '-c'])
         compile(args[2], '<receiver>', 'exec')
         self.assertEqual(args[-4:], ['madar-20260720T000000Z', 'a'*64, 'uuid', '90'])
+
+    def test_remote_verify_command_is_quoted_and_has_no_transfer_mode(self):
+        args = shlex.split(node1.remote_verify_command(
+            'madar-20260720T000000Z', 'a' * 64, 'uuid'
+        ))
+        self.assertEqual(args[:2], ['python3', '-c'])
+        compile(args[2], '<receiver-verify>', 'exec')
+        self.assertEqual(
+            args[-3:], ['madar-20260720T000000Z', 'a' * 64, 'uuid']
+        )
 
     def test_provider_change_during_snapshot_fails_closed(self):
         with tempfile.TemporaryDirectory() as root:
