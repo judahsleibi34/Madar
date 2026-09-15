@@ -515,6 +515,76 @@ class ReleaseBootstrapTests(unittest.TestCase):
             operations.resolve_serving_slot({"blue": SHA, "green": SHA})
         )
 
+    def test_loaded_serving_slot_supports_legacy_runtime_without_slot_identity(self):
+        operations = release_cli.DockerGitOperations.__new__(
+            release_cli.DockerGitOperations
+        )
+        other_sha = "d" * 40
+        identities = {
+            "http://127.0.0.1:8001/health/version": {
+                "release_sha": SHA,
+            },
+            "http://127.0.0.1:8101/health/version": {
+                "release_sha": SHA,
+            },
+            "http://127.0.0.1:8201/health/version": {
+                "release_sha": other_sha,
+                "release_slot": "green",
+            },
+        }
+        operations._json = identities.__getitem__
+
+        self.assertEqual(
+            operations._loaded_serving_slot(),
+            "blue",
+        )
+
+    def test_loaded_serving_slot_rejects_legacy_same_sha_ambiguity(self):
+        operations = release_cli.DockerGitOperations.__new__(
+            release_cli.DockerGitOperations
+        )
+        identities = {
+            "http://127.0.0.1:8001/health/version": {
+                "release_sha": SHA,
+            },
+            "http://127.0.0.1:8101/health/version": {
+                "release_sha": SHA,
+            },
+            "http://127.0.0.1:8201/health/version": {
+                "release_sha": SHA,
+            },
+        }
+        operations._json = identities.__getitem__
+
+        with self.assertRaisesRegex(
+            RuntimeError,
+            "runtime_mutation_traffic_ambiguous",
+        ):
+            operations._loaded_serving_slot()
+
+    def test_loaded_serving_slot_rejects_explicit_slot_direct_identity_mismatch(self):
+        operations = release_cli.DockerGitOperations.__new__(
+            release_cli.DockerGitOperations
+        )
+        other_sha = "d" * 40
+        identities = {
+            "http://127.0.0.1:8001/health/version": {
+                "release_sha": SHA,
+                "release_slot": "blue",
+            },
+            "http://127.0.0.1:8101/health/version": {
+                "release_sha": other_sha,
+                "release_slot": "blue",
+            },
+        }
+        operations._json = identities.__getitem__
+
+        with self.assertRaisesRegex(
+            RuntimeError,
+            "runtime_mutation_traffic_ambiguous",
+        ):
+            operations._loaded_serving_slot()
+
     def test_candidate_cleanup_rejects_serving_target_inside_mutation_lock(self):
         with tempfile.TemporaryDirectory() as root:
             operations = release_cli.DockerGitOperations.__new__(release_cli.DockerGitOperations)

@@ -332,21 +332,64 @@ class DockerGitOperations:
         raise RuntimeError("active_proxy_target_unknown")
 
     def _loaded_serving_slot(self) -> str:
-        """Resolve the loaded route without trusting a possibly stale file."""
+        """Resolve loaded traffic without trusting a stale target file."""
 
         try:
             identity = self._json("http://127.0.0.1:8001/health/version")
         except Exception as error:
             raise RuntimeError("runtime_mutation_traffic_ambiguous") from error
+
         slot = str(identity.get("release_slot") or "")
         sha = str(identity.get("release_sha") or "")
         if (
-            slot not in SLOT_PORTS
-            or len(sha) != 40
+            len(sha) != 40
             or any(character not in "0123456789abcdef" for character in sha)
         ):
             raise RuntimeError("runtime_mutation_traffic_ambiguous")
-        return slot
+
+        # Current runtimes identify their serving slot explicitly. Do not
+        # authorize destructive mutation until the slot's direct backend also
+        # proves the stable route's exact release identity.
+        if slot:
+            if slot not in SLOT_PORTS:
+                raise RuntimeError("runtime_mutation_traffic_ambiguous")
+            try:
+                direct = self._json(
+                    f"http://127.0.0.1:"
+                    f"{SLOT_PORTS[slot]['backend']}/health/version"
+                )
+            except Exception as error:
+                raise RuntimeError(
+                    "runtime_mutation_traffic_ambiguous"
+                ) from error
+
+            direct_sha = str(direct.get("release_sha") or "")
+            direct_slot = str(direct.get("release_slot") or "")
+            if direct_sha != sha or (direct_slot and direct_slot != slot):
+                raise RuntimeError("runtime_mutation_traffic_ambiguous")
+            return slot
+
+        # The stranded schema-93-era production binary predates release_slot.
+        # Resolve that legacy runtime only when exactly one directly reachable
+        # slot proves the same SHA as the stable route. The proxy target file
+        # is deliberately not trusted here because a failed/reordered reload
+        # can leave it stale relative to loaded traffic.
+        matches: list[str] = []
+        for candidate_slot, ports in SLOT_PORTS.items():
+            try:
+                direct = self._json(
+                    f"http://127.0.0.1:{ports['backend']}/health/version"
+                )
+            except Exception:
+                continue
+
+            if str(direct.get("release_sha") or "") == sha:
+                matches.append(candidate_slot)
+
+        if len(matches) != 1:
+            raise RuntimeError("runtime_mutation_traffic_ambiguous")
+
+        return matches[0]
 
     def _require_worker_authority(self, sha: str, slot: str) -> dict:
         # Compatibility for direct inspection-only helpers in tests and legacy

@@ -212,13 +212,26 @@ class Harness:
         self.set_target("blue")
         old = self.operations(self.OLD_SHA, self.recovery)
         old.release_root = Path(self.args.source)
-        old._compose(
-            self.OLD_SHA, "blue", images, "up", "-d", "--no-build",
-            "--force-recreate", "--wait", "--wait-timeout", "60",
-            "redis", "parser-worker", "remote-ingestion-worker", "backend", "frontend",
-            "notification-worker", "calendar-sync-worker", "data-deletion-worker",
-            workers_active=True,
-        )
+
+        # Match the actual stranded production binary: it predates the
+        # release_slot field in /health/version.
+        previous_omit_slot = os.environ.get("MADAR_OMIT_RELEASE_SLOT")
+        os.environ["MADAR_OMIT_RELEASE_SLOT"] = "true"
+        try:
+            old._compose(
+                self.OLD_SHA, "blue", images, "up", "-d", "--no-build",
+                "--force-recreate", "--wait", "--wait-timeout", "60",
+                "redis", "parser-worker", "remote-ingestion-worker",
+                "backend", "frontend", "notification-worker",
+                "calendar-sync-worker", "data-deletion-worker",
+                workers_active=True,
+            )
+        finally:
+            if previous_omit_slot is None:
+                os.environ.pop("MADAR_OMIT_RELEASE_SLOT", None)
+            else:
+                os.environ["MADAR_OMIT_RELEASE_SLOT"] = previous_omit_slot
+
         self.start_proxy()
         old.validate_candidate(self.OLD_SHA, "blue")
         self.sample_workers("seed")

@@ -62,13 +62,21 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json(200, {"live": True})
             return
         if self.path == "/health/version":
-            self.send_json(200, {
+            identity = {
                 "release_sha": os.environ["MADAR_RELEASE_SHA"],
-                "release_slot": os.environ["MADAR_RELEASE_SLOT"],
                 "build_timestamp": os.getenv("MADAR_BUILD_TIMESTAMP", "fixture"),
-                "schema_compatible_min": int(os.environ["SCHEMA_COMPATIBLE_MIN"]),
-                "schema_compatible_max": int(os.environ["SCHEMA_COMPATIBLE_MAX"]),
-            })
+                "schema_compatible_min": int(
+                    os.environ["SCHEMA_COMPATIBLE_MIN"]
+                ),
+                "schema_compatible_max": int(
+                    os.environ["SCHEMA_COMPATIBLE_MAX"]
+                ),
+            }
+            if os.getenv(
+                "MADAR_OMIT_RELEASE_SLOT", "false"
+            ).lower() != "true":
+                identity["release_slot"] = os.environ["MADAR_RELEASE_SLOT"]
+            self.send_json(200, identity)
             return
         if self.path == "/health/ready":
             required = os.getenv("NOTIFICATION_WORKER_REQUIRED", "false") == "true"
