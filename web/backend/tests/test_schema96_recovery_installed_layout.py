@@ -160,14 +160,28 @@ def _run_installed_harness(control: Path, runtime: Path, candidate: str) -> int:
             if any(active for other, active in value["workers"].items() if other != slot):
                 raise RuntimeError("consumer_overlap")
             value["workers"][slot] = True; self.save(value)
+        def worker_ownership(self, retained, candidate):
+            value = self.actual()
+            old = bool(value["workers"].get(retained["slot"]))
+            new = bool(value["workers"].get(candidate["slot"]))
+            if old and new: return "overlap"
+            if old: return "old"
+            if new: return "candidate"
+            return "none"
         def switch_traffic(self, slot):
             value = self.actual(); value["traffic"] = slot; self.save(value)
         def observe(self, _sha, _slot):
             if self.interrupt:
                 self.interrupt = False
                 raise KeyboardInterrupt()
-        def stop_candidate(self, slot):
+        def stop_candidate(self, slot, *, expected_serving=None):
             value = self.actual()
+            if expected_serving is not None and (
+                value["traffic"] == slot
+                or expected_serving.get(value["traffic"])
+                != value["slots"].get(value["traffic"])
+            ):
+                raise RuntimeError("cannot_stop_unverified_or_serving_slot")
             if value["traffic"] == slot: raise RuntimeError("cannot_stop_serving_slot")
             value["slots"].pop(slot, None); value["workers"][slot] = False; self.save(value)
         def current_traffic_slot(self): return str(self.actual()["traffic"])

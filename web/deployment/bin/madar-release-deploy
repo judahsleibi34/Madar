@@ -334,11 +334,11 @@ class DockerGitOperations:
         matches = [slot for slot, sha in expected.items() if sha and sha == stable_sha]
         if len(matches) == 1:
             return matches[0]
-        try:
-            configured = self.current_traffic_slot()
-        except RuntimeError:
-            return None
-        return configured if configured in matches else None
+        # Once both slots contain one SHA, a missing/invalid slot identity is
+        # genuinely ambiguous. The configured file is not proof of nginx's
+        # loaded route after a failed reload, so never use it to authorize a
+        # destructive action.
+        return None
 
     def validate_recovery_backup(self, schema: int) -> dict:
         """Require a fresh local backup and its read-only verified Node 1 copy."""
@@ -547,17 +547,20 @@ class DockerGitOperations:
         slot = str(release.get("slot") or "")
         if slot not in SLOT_PORTS:
             raise RuntimeError("worker_release_slot_invalid")
-        names = [
-            name for name in self._worker_names(slot)
-            if self._container_state(name) is not None
-        ]
+        names = []
+        for name in self._worker_names(slot):
+            state = self._container_state(name)
+            if state is not None:
+                names.append(name)
         if not names:
             return
         self.run(["docker", "stop", *names])
         for observation in range(2):
             for name in names:
                 state = self._container_state(name)
-                if state is not None and state[1] == "running":
+                if state is not None and state[1] not in {
+                    "created", "exited", "dead", "removing",
+                }:
                     raise RuntimeError(f"worker_failed_to_quiesce:{name}")
             if observation == 0:
                 time.sleep(0.2)
@@ -568,19 +571,93 @@ class DockerGitOperations:
             raise RuntimeError("worker_release_slot_invalid")
         existing: list[str] = []
         for name in self._worker_names(slot):
-            inspected = subprocess.run(
-                ["docker", "inspect", name], check=False,
-                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-            )
-            if inspected.returncode == 0:
+            if self._container_state(name) is not None:
                 existing.append(name)
-        if not existing:
+        if len(existing) != len(self._worker_names(slot)):
             raise RuntimeError("retained_worker_containers_missing")
         self.run(["docker", "start", *existing])
-        for name in existing:
-            state = self._container_state(name)
-            if state is None or state[1] != "running" or state[2] not in {"healthy", "none"}:
-                raise RuntimeError(f"retained_worker_restore_failed:{name}")
+        attempts = max(1, min(int(os.getenv("MADAR_WORKER_READY_ATTEMPTS", "40")), 120))
+        delay = max(0.1, min(float(os.getenv("MADAR_WORKER_READY_RETRY_SECONDS", "1")), 10.0))
+        for attempt in range(1, attempts + 1):
+            warming = False
+            for name in existing:
+                state = self._container_state(name)
+                if state is None:
+                    raise RuntimeError(f"retained_worker_restore_failed:{name}:absent")
+                _image, status, health = state
+                if status != "running":
+                    raise RuntimeError(
+                        f"retained_worker_restore_failed:{name}:{status}"
+                    )
+                if health == "unhealthy":
+                    raise RuntimeError(
+                        f"retained_worker_restore_failed:{name}:unhealthy"
+                    )
+                if health == "starting":
+                    warming = True
+                elif health != "none":
+                    if health != "healthy":
+                        raise RuntimeError(
+                            f"retained_worker_restore_failed:{name}:health_unknown"
+                        )
+            if not warming:
+                return
+            if attempt < attempts:
+                time.sleep(delay)
+        raise RuntimeError("retained_worker_restore_timeout")
+
+    def worker_ownership(self, retained: dict, candidate: dict) -> str:
+        """Return the only positively established production-consumer owner."""
+
+        def group(slot: str) -> str:
+            states = [self._container_state(name) for name in self._worker_names(slot)]
+            running = [
+                state for state in states
+                if state is not None and state[1] in {"running", "restarting", "paused"}
+            ]
+            inactive = [
+                state is None or state[1] in {"created", "exited", "dead", "removing"}
+                for state in states
+            ]
+            if all(inactive):
+                return "inactive"
+            if len(running) == len(states) and all(
+                state[1] == "running"
+                and state[2] in {"healthy", "none", "starting"}
+                for state in running
+            ):
+                return (
+                    "starting"
+                    if any(state[2] == "starting" for state in running)
+                    else "active"
+                )
+            return "partial"
+
+        retained_slot = str(retained.get("slot") or "")
+        candidate_slot = str(candidate.get("slot") or "")
+        if {retained_slot, candidate_slot} != {"blue", "green"}:
+            raise RuntimeError("worker_ownership_slots_invalid")
+        retained_state = group(retained_slot)
+        candidate_state = group(candidate_slot)
+        retained_present = retained_state != "inactive"
+        candidate_present = candidate_state != "inactive"
+        if retained_present and candidate_present:
+            return "overlap"
+        if retained_state == "active" and not candidate_present:
+            return "old"
+        if retained_state == "starting" and not candidate_present:
+            return "old_starting"
+        if retained_state == "partial" and not candidate_present:
+            return "old_partial"
+        if candidate_state == "active" and not retained_present:
+            return "candidate"
+        if candidate_state == "starting" and not retained_present:
+            return "candidate_starting"
+        if candidate_state == "partial" and not retained_present:
+            return "candidate_partial"
+        if not retained_present and not candidate_present:
+            return "none"
+        return "ambiguous"
 
     def _json(self, url: str) -> dict:
         with urllib.request.urlopen(url, timeout=5) as response:
@@ -602,9 +679,25 @@ class DockerGitOperations:
                 name,
             ],
             check=False, text=True, stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
         )
         if completed.returncode != 0:
+            # `inspect` cannot distinguish an absent object from a daemon or
+            # authorization failure by exit status. A successful exact-name
+            # inventory is required before absence may be trusted.
+            inventory = subprocess.run(
+                [
+                    "docker", "ps", "-a", "--filter", f"name=^/{name}$",
+                    "--format", "{{.Names}}",
+                ],
+                check=False, text=True, stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+            if inventory.returncode != 0:
+                raise RuntimeError(f"worker_state_unknown:{name}")
+            found = [value.strip() for value in inventory.stdout.splitlines() if value.strip()]
+            if found:
+                raise RuntimeError(f"worker_state_unknown:{name}")
             return None
         value = completed.stdout.strip()
         parts = value.split("|", 2)
@@ -806,7 +899,22 @@ class DockerGitOperations:
             self.validate_candidate(sha, slot)
             time.sleep(5)
 
-    def stop_candidate(self, slot: str) -> None:
+    def stop_candidate(
+        self, slot: str, *, expected_serving: dict[str, str] | None = None
+    ) -> None:
+        if expected_serving is not None:
+            serving = self.resolve_serving_slot(expected_serving)
+            if serving is None:
+                raise RuntimeError("candidate_cleanup_traffic_ambiguous")
+            if serving == slot:
+                raise RuntimeError("candidate_cleanup_target_is_serving")
+            # Take a second authoritative observation at the destructive
+            # boundary. This catches a route epoch change after the caller's
+            # reconciliation (or during this helper's first observation).
+            # A disagreement is uncertainty: preserve both runtimes.
+            confirmed = self.resolve_serving_slot(expected_serving)
+            if confirmed != serving:
+                raise RuntimeError("candidate_cleanup_traffic_changed")
         if self.release_root is None:
             return
         # Only the isolated inactive Compose project is removed. Images and the
@@ -826,12 +934,12 @@ class DockerGitOperations:
             "MADAR_REMOTE_INTERNAL_SUBNET": subnets["remote_internal"],
             "MADAR_REMOTE_EGRESS_SUBNET": subnets["remote_egress"],
         })
-        subprocess.run([
+        self.run([
             "docker", "compose", "--project-name", f"madar-{slot}",
             "--project-directory", str(self.release_root / "web"),
             "--env-file", str(self.env_file), *files,
             "--profile", "workers", "--profile", "deletion-worker", "down", "--remove-orphans",
-        ], check=False, env=environment)
+        ], env=environment)
 
 
 def prepared_release_path(state_root: Path) -> Path:
@@ -857,29 +965,70 @@ def prepare_release(
         raise RuntimeError("candidate_slot_invalid")
     with deployment_lock(state_root):
         operations.verify_source(sha)
-        images = operations.build(sha, slot)
-        if any("@sha256:" not in str(images.get(name) or "") for name in ("backend", "frontend", "worker")):
-            raise RuntimeError("immutable_image_digest_missing")
         schema = operations.schema_version()
         if not compatibility.schema_min <= schema <= compatibility.schema_max:
             raise RuntimeError("candidate_schema_incompatible")
-        record = {
-            "release_sha": sha,
-            "candidate_slot": slot,
-            "images": images,
-            "schema": schema,
-            "status": "preparing",
-            "prepared_at": utc_now().isoformat(),
-        }
+        path = prepared_release_path(state_root)
+        record: dict
+        if path.exists():
+            try:
+                record = json.loads(path.read_text(encoding="utf-8"))
+            except ValueError as error:
+                raise RuntimeError("prepared_release_missing_or_invalid") from error
+            if (
+                record.get("release_sha") != sha
+                or record.get("candidate_slot") != slot
+                or int(record.get("schema", -1)) != schema
+                or record.get("status") not in {
+                    "preparing", "candidate_validated_workers_inactive",
+                }
+            ):
+                raise RuntimeError("prepared_release_identity_mismatch")
+            images = record.get("images") or {}
+            if record["status"] == "candidate_validated_workers_inactive":
+                operations.preflight(sha, slot, images, schema)
+                operations.validate_candidate(sha, slot)
+                return record
+        else:
+            images = operations.build(sha, slot)
+            record = {
+                "release_sha": sha,
+                "candidate_slot": slot,
+                "images": images,
+                "schema": schema,
+                "status": "preparing",
+                "prepared_at": utc_now().isoformat(),
+                "prepare_attempt": 0,
+            }
+            atomic_json(path, record)
+        if any("@sha256:" not in str(images.get(name) or "") for name in ("backend", "frontend", "worker")):
+            raise RuntimeError("immutable_image_digest_missing")
         try:
             operations.preflight(sha, slot, images, schema)
             operations.start_candidate(sha, slot, images)
             operations.validate_candidate(sha, slot)
-        except Exception:
-            operations.stop_candidate(slot)
+        except Exception as error:
+            record["prepare_attempt"] = int(record.get("prepare_attempt", 1)) + 1
+            record["last_failure"] = type(error).__name__
+            atomic_json(path, record)
+            expected_serving = None
+            try:
+                state = json.loads((state_root / "state.json").read_text(encoding="utf-8"))
+                known = state.get("known_good_release") or {}
+                active = str(state.get("active_slot") or "")
+                if active in SLOT_PORTS and known.get("slot") == active:
+                    expected_serving = {
+                        active: str(known.get("sha") or ""), slot: sha,
+                    }
+            except (OSError, ValueError):
+                pass
+            if expected_serving is not None:
+                operations.stop_candidate(slot, expected_serving=expected_serving)
             raise
         record["status"] = "candidate_validated_workers_inactive"
-        atomic_json(prepared_release_path(state_root), record)
+        record["validated_at"] = utc_now().isoformat()
+        record.pop("last_failure", None)
+        atomic_json(path, record)
         return record
 
 

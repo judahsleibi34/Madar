@@ -110,23 +110,31 @@ SHA, schema, and reviewed rehearsal digest. Do not invoke an inner command.
 2. Candidate images are built immutably for the exact SHA.
 3. Inactive candidate starts without notification/calendar/deletion consumers.
 4. Candidate core health, schema, Auth, Storage, Redis, and frontend pass.
-5. Old queue consumers stop; candidate consumers start and pass.
-6. State, schema, backup, proxy, and candidate are re-attested.
+5. Old queue consumers stop; actual state proves that neither slot owns queue
+   consumption and records `worker_owner: none` durably.
+6. State, schema, backup, authoritative loaded route, candidate, and zero-worker
+   ownership are re-attested immediately before transition.
 7. Existing governed switch atomically routes to the candidate.
-8. Post-switch health passes at schema 96.
-9. Former slot is recreated from the same candidate with consumers inactive.
-10. Durable state records the active bridge, compatible fallback, and old
+8. Candidate consumers start only after the candidate is proven serving;
+   bounded health checks establish `worker_owner: candidate`.
+9. Post-switch health passes at schema 96.
+10. Former slot is recreated from the same candidate with consumers inactive.
+11. Durable state records the active bridge, compatible fallback, recovery ID,
+    and old
     incompatible release as forensic history.
-11. The coordinator advances the canonical production checkout using its
+12. The coordinator advances the canonical production checkout using its
     governed verified fast-forward-only operation; it never pulls or resets it.
-12. A second exact-SHA invocation proves byte-idempotence.
+13. A second exact-SHA invocation proves byte-idempotence.
 
 ## Abort conditions
 
-Before the switch, any failure stops/removes the candidate only after the
-stable serving identity proves the old target is still routed, restores old
-consumers if they were stopped, leaves old traffic unchanged, and records the
-failure. If a switch returns an error or times out, the controller reads the
+Before the switch, cleanup first rediscovers the stable serving SHA and slot.
+It stops/removes the candidate only when the old target is positively proven
+routed and candidate consumers are positively proven inactive. Retained
+consumers are restored only after that proof. Failed or ambiguous candidate
+shutdown keeps retained consumers stopped and records operator intervention;
+availability degradation is preferred to duplicate effects. If a switch
+returns an error or times out, the controller reads the
 stable runtime's SHA and release-slot identity. If it cannot determine the
 serving slot, it stops neither target and preserves the checkpoint for operator
 diagnosis. After a proven switch, the old binary is never selected because it
@@ -144,7 +152,8 @@ Rerun the exact same coordinator command, SHA, schema, and reviewed attestation
 after diagnosing the interruption. The durable recovery ID binds those values
 to the original known-good SHA. A different candidate, schema, origin, or
 operation is rejected. If the old slot is provably still routed, the state
-machine first proves candidate consumers inactive, restores the old consumers,
+machine first discovers both slots' actual worker ownership, proves candidate
+consumers inactive, restores or waits boundedly for the old consumers,
 cleans the incomplete candidate, and restarts the guarded attempt. If the
 bridge is provably routed, it continues forward from the checkpoint and
 establishes the compatible fallback. If routing is ambiguous, it stops nothing.

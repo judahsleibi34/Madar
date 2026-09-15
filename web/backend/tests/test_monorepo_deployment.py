@@ -144,7 +144,9 @@ class MonorepoDeploymentTests(unittest.TestCase):
         self.assertIn("known_bad_release_suppressed", self.release_library)
         self.assertIn("/health/ready", self.release_deploy)
         self.assertIn("retained_worker_containers_missing", self.release_deploy)
-        self.assertIn('["docker", "inspect", name]', self.release_deploy)
+        self.assertIn('"docker", "inspect", "--format"', self.release_deploy)
+        self.assertIn('"docker", "ps", "-a", "--filter"', self.release_deploy)
+        self.assertIn("worker_state_unknown", self.release_deploy)
 
     def test_persistent_bind_mounts_keep_their_pre_move_host_paths(self):
         for path in (

@@ -1711,6 +1711,7 @@ class ControlPlaneUpgradeTests(unittest.TestCase):
 
     def test_normal_preflight_accepts_completed_zero_migration_recovery(self):
         with tempfile.TemporaryDirectory() as root:
+            recovery_id = "b" * 64
             operations = object.__new__(upgrade.SystemOperations)
             operations.state_root = Path(root)
             release_root = Path(root) / "releases" / self.SHA
@@ -1730,17 +1731,67 @@ class ControlPlaneUpgradeTests(unittest.TestCase):
                 encoding="utf-8",
             )
             (Path(root) / "state.json").write_text(json.dumps({
+                "active_slot": "green",
                 "known_good_release": {
                     "sha": self.SHA,
+                    "slot": "green",
                     "schema": 96,
                     "schema_recovery": True,
                     "migration_result": "not_requested",
+                    "recovery_id": recovery_id,
                 },
+                "compatible_fallback_release": {
+                    "sha": self.SHA, "slot": "blue", "schema": 96,
+                    "schema_recovery": True,
+                    "migration_result": "not_requested",
+                    "recovery_id": recovery_id,
+                },
+                "history": [{
+                    "release_sha": self.SHA, "schema_recovery": True,
+                    "status": "known_good", "phase": "complete",
+                    "recovery_id": recovery_id,
+                }],
             }), encoding="utf-8")
 
             self.assertEqual(
                 operations.migration_terminal(self.SHA, 96), "not_requested"
             )
+
+    def test_normal_preflight_rejects_recovery_marker_without_completed_transaction(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations = object.__new__(upgrade.SystemOperations)
+            operations.state_root = Path(root)
+            release_root = Path(root) / "releases" / self.SHA
+            (release_root / "web/deployment/releases").mkdir(parents=True)
+            (release_root / "web/deployment/releases/schema-96-recovery.json").write_text(
+                json.dumps({
+                    "migration_policy": "schema-recovery-no-migration",
+                    "schema": {
+                        "compatible_min": 96, "compatible_max": 96,
+                        "target": 96, "migration_class": "none",
+                        "rollback_compatible_min": 96,
+                        "rollback_compatible_max": 96,
+                    },
+                })
+            )
+            (Path(root) / "state.json").write_text(json.dumps({
+                "active_slot": "green",
+                "known_good_release": {
+                    "sha": self.SHA, "slot": "green", "schema": 96,
+                    "schema_recovery": True, "migration_result": "not_requested",
+                    "recovery_id": "b" * 64,
+                },
+                "compatible_fallback_release": {
+                    "sha": self.SHA, "slot": "blue", "schema": 96,
+                    "schema_recovery": True, "migration_result": "not_requested",
+                    "recovery_id": "b" * 64,
+                },
+                "history": [],
+            }))
+            with self.assertRaisesRegex(
+                upgrade.UpgradeError, "recovery_known_good_state_invalid"
+            ):
+                operations.migration_terminal(self.SHA, 96)
 
     def test_recovery_checkout_advance_is_fast_forward_only_and_verified(self):
         operations = object.__new__(upgrade.SystemOperations)

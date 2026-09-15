@@ -363,12 +363,22 @@ installation or application deployment.
 The installed controller invokes `madar-release-deploy <SHA>
 --recover-current-schema` only through the same one-use systemd credential and
 interlock boundary used by governed upgrades. The release state machine stages
-the inactive slot with queue consumers disabled, performs a no-overlap worker
-handoff, rechecks state/schema/backup identity, uses the existing atomic switch,
-and builds a second compatible bridge slot before success. After routing has
+the inactive slot with queue consumers disabled, quiesces the old consumers,
+durably records that no slot owns queue work, rechecks actual worker state plus
+state/schema/backup/routing identity, uses the existing atomic switch, and only
+then starts candidate consumers with a bounded health wait. It builds a second
+compatible bridge slot with consumers inactive before success. After routing has
 changed, failure handling detects the actual routed candidate even if durable
 known-good finalization was interrupted and records forward-repair semantics.
 It never routes to the incompatible historical release.
+
+Recovery resume treats durable worker ownership as a claim to verify, not an
+instruction to replay. It discovers both slots first. Candidate shutdown must
+be positively proven before retained consumers may restart; unknown container
+state, partial shutdown, overlap, or ambiguous routing persists an
+operator-intervention checkpoint and starts no competing consumers. A normal
+Docker `starting` health state receives a bounded wait, while terminal or timed
+out startup fails closed.
 
 Successful finalization marks the canonical active and compatible-fallback
 records as schema-recovery artifacts and records `migration_result` as

@@ -625,13 +625,45 @@ class SystemOperations:
         )
         known_good = release_state.get("known_good_release") or {}
         if known_good.get("sha") == sha and known_good.get("schema_recovery") is True:
+            active_slot = str(release_state.get("active_slot") or "")
+            fallback_value = release_state.get("compatible_fallback_release")
+            fallback = fallback_value if isinstance(fallback_value, dict) else {}
+            recovery_id = str(known_good.get("recovery_id") or "")
+            history_value = release_state.get("history")
+            history = history_value if isinstance(history_value, list) else []
+            completed = next(
+                (
+                    item for item in reversed(history)
+                    if isinstance(item, dict)
+                    and item.get("schema_recovery") is True
+                    and item.get("release_sha") == sha
+                    and item.get("status") == "known_good"
+                    and item.get("phase") == "complete"
+                    and item.get("recovery_id") == recovery_id
+                ),
+                None,
+            )
             try:
                 recorded_schema = int(known_good.get("schema", -1))
+                fallback_schema = int(fallback.get("schema", -1))
             except (TypeError, ValueError) as error:
                 raise UpgradeError("recovery_known_good_state_invalid") from error
             if (
                 recorded_schema != schema
                 or known_good.get("migration_result") != "not_requested"
+                or active_slot not in SLOT_PORTS
+                or known_good.get("slot") != active_slot
+                or not re.fullmatch(r"[0-9a-f]{64}", recovery_id)
+                or release_state.get("in_progress_release")
+                or not isinstance(fallback_value, dict)
+                or not isinstance(history_value, list)
+                or fallback.get("sha") != sha
+                or fallback.get("slot") not in ({"blue", "green"} - {active_slot})
+                or fallback_schema != schema
+                or fallback.get("schema_recovery") is not True
+                or fallback.get("migration_result") != "not_requested"
+                or fallback.get("recovery_id") != recovery_id
+                or completed is None
             ):
                 raise UpgradeError("recovery_known_good_state_invalid")
             self.validate_recovery_candidate_contract(
@@ -728,6 +760,11 @@ class SystemOperations:
         for identity in (stable_version, active_version):
             if identity.get("release_sha") != expected_sha:
                 raise UpgradeError("serving_release_identity_mismatch")
+            reported_slot = str(identity.get("release_slot") or "")
+            if (reported_slot and reported_slot != slot) or (
+                recovery and reported_slot != slot
+            ):
+                raise UpgradeError("serving_release_slot_mismatch")
             try:
                 minimum = int(identity["schema_compatible_min"])
                 maximum = int(identity["schema_compatible_max"])
@@ -921,7 +958,7 @@ class SystemOperations:
             traffic = stable_slot
         elif len(matching_slots) == 1:
             traffic = matching_slots[0]
-        elif configured_traffic not in matching_slots:
+        elif len(matching_slots) != 1:
             raise UpgradeError("recovery_origin_traffic_ambiguous")
         if not (resume or completed or initial):
             raise UpgradeError("recovery_origin_state_invalid")

@@ -2,6 +2,7 @@ import importlib.machinery
 import importlib.util
 import json
 import os
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -55,7 +56,8 @@ class FakeOperations:
         self.calls.append(("refresh_active_runtime_services", sha, slot))
     def validate_stable_candidate(self, sha):
         self.calls.append(("validate_stable_candidate", sha))
-    def stop_candidate(self, slot): self.calls.append(("stop_candidate", slot))
+    def stop_candidate(self, slot, *, expected_serving=None):
+        self.calls.append(("stop_candidate", slot))
     def activate_workers(self, sha, slot, images): self.calls.append(("activate_workers", sha, slot))
     def deactivate_workers(self, release): self.calls.append(("deactivate_workers", release["slot"]))
     def _json(self, url):
@@ -94,6 +96,116 @@ class ReleaseBootstrapTests(unittest.TestCase):
         self.assertEqual(record["status"], "candidate_validated_workers_inactive")
         self.assertEqual(persisted["release_sha"], SHA)
         self.assertFalse(any(call[0] == "activate_workers" for call in operations.calls))
+
+    def test_normal_prepare_retry_is_idempotent_after_completed_recovery(self):
+        with tempfile.TemporaryDirectory() as root:
+            root_path = Path(root)
+            recovery_state = {
+                "active_slot": "green",
+                "known_good_release": {
+                    "sha": "a" * 40, "slot": "green", "schema": 96,
+                    "schema_recovery": True, "migration_result": "not_requested",
+                },
+                "compatible_fallback_release": {
+                    "sha": "a" * 40, "slot": "blue", "schema": 96,
+                    "schema_recovery": True, "migration_result": "not_requested",
+                },
+                "history": [{"schema_recovery": True, "phase": "complete"}],
+            }
+            state_path = root_path / "state.json"
+            state_path.write_text(json.dumps(recovery_state), encoding="utf-8")
+            before = state_path.read_bytes()
+            operations = FakeOperations()
+            operations.schema_version = lambda: 96
+            compatibility = release_cli.Compatibility(96, 99, 99, "expand-only", 96, 99)
+            first = release_cli.prepare_release(
+                sha=SHA, slot="blue", state_root=root_path,
+                compatibility=compatibility, operations=operations,
+            )
+            second = release_cli.prepare_release(
+                sha=SHA, slot="blue", state_root=root_path,
+                compatibility=compatibility, operations=operations,
+            )
+            state_unchanged = before == state_path.read_bytes()
+        self.assertEqual(first, second)
+        self.assertEqual(sum(call[0] == "build" for call in operations.calls), 1)
+        self.assertEqual(sum(call[0] == "start_candidate" for call in operations.calls), 1)
+        self.assertTrue(state_unchanged)
+
+    def test_interrupted_normal_prepare_reuses_images_and_retries_normally(self):
+        class InterruptOnce(FakeOperations):
+            failures = 1
+            def start_candidate(self, sha, slot, images):
+                self.calls.append(("start_candidate", sha, slot))
+                if self.failures:
+                    self.failures -= 1
+                    raise RuntimeError("synthetic_prepare_interruption")
+
+        with tempfile.TemporaryDirectory() as root:
+            root_path = Path(root)
+            state_path = root_path / "state.json"
+            state_path.write_text(json.dumps({
+                "active_slot": "green",
+                "known_good_release": {"sha": "a" * 40, "slot": "green"},
+                "history": [{"schema_recovery": True, "phase": "complete"}],
+            }))
+            operations = InterruptOnce()
+            operations.schema_version = lambda: 96
+            compatibility = release_cli.Compatibility(96, 99, 99, "expand-only", 96, 99)
+            with self.assertRaisesRegex(RuntimeError, "synthetic_prepare_interruption"):
+                release_cli.prepare_release(
+                    sha=SHA, slot="blue", state_root=root_path,
+                    compatibility=compatibility, operations=operations,
+                )
+            prepared = json.loads(
+                release_cli.prepared_release_path(root_path).read_text()
+            )
+            self.assertEqual(prepared["status"], "preparing")
+            result = release_cli.prepare_release(
+                sha=SHA, slot="blue", state_root=root_path,
+                compatibility=compatibility, operations=operations,
+            )
+        self.assertEqual(result["status"], "candidate_validated_workers_inactive")
+        self.assertEqual(sum(call[0] == "build" for call in operations.calls), 1)
+        self.assertEqual(sum(call[0] == "start_candidate" for call in operations.calls), 2)
+
+    def test_normal_prepare_rejects_incompatible_candidate_after_recovery(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations = FakeOperations()
+            operations.schema_version = lambda: 96
+            with self.assertRaisesRegex(RuntimeError, "candidate_schema_incompatible"):
+                release_cli.prepare_release(
+                    sha=SHA, slot="blue", state_root=Path(root),
+                    compatibility=release_cli.Compatibility(
+                        97, 99, 99, "expand-only", 97, 99
+                    ),
+                    operations=operations,
+                )
+        self.assertFalse(any(call[0] == "build" for call in operations.calls))
+
+    def test_stale_recovery_identity_does_not_hijack_normal_prepare(self):
+        with tempfile.TemporaryDirectory() as root:
+            root_path = Path(root)
+            (root_path / "state.json").write_text(json.dumps({
+                "active_slot": "green",
+                "known_good_release": {
+                    "sha": "a" * 40, "slot": "green", "schema": 96,
+                },
+                "history": [{
+                    "schema_recovery": True, "phase": "complete",
+                    "recovery_id": "stale-history-only",
+                }],
+            }))
+            operations = FakeOperations()
+            operations.schema_version = lambda: 96
+            result = release_cli.prepare_release(
+                sha=SHA, slot="blue", state_root=root_path,
+                compatibility=release_cli.Compatibility(
+                    96, 99, 99, "expand-only", 96, 99
+                ),
+                operations=operations,
+            )
+        self.assertEqual(result["status"], "candidate_validated_workers_inactive")
 
     def test_activate_requires_exact_prepared_identity(self):
         with tempfile.TemporaryDirectory() as root:
@@ -200,6 +312,77 @@ class ReleaseBootstrapTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "worker_failed_to_quiesce"):
                 operations.deactivate_workers({"slot": "blue"})
 
+    def test_worker_inspection_error_is_not_treated_as_absence(self):
+        operations = release_cli.DockerGitOperations.__new__(release_cli.DockerGitOperations)
+        failure = subprocess.CompletedProcess([], 1, "", "synthetic daemon error")
+        with patch.object(release_cli.subprocess, "run", return_value=failure):
+            with self.assertRaisesRegex(RuntimeError, "worker_state_unknown"):
+                operations.deactivate_workers({"slot": "blue"})
+
+    def test_worker_starting_becomes_healthy_within_bounded_wait(self):
+        operations = release_cli.DockerGitOperations.__new__(release_cli.DockerGitOperations)
+        calls = {}
+        def state(name):
+            calls[name] = calls.get(name, 0) + 1
+            health = "starting" if calls[name] == 2 else "healthy"
+            return ("sha256:x", "running", health)
+        operations._container_state = state
+        operations.run = unittest.mock.Mock()
+        with patch.dict(os.environ, {
+            "MADAR_WORKER_READY_ATTEMPTS": "2",
+            "MADAR_WORKER_READY_RETRY_SECONDS": "0.1",
+        }), patch.object(release_cli.time, "sleep"):
+            operations.restore_workers({"slot": "blue"})
+        operations.run.assert_called_once()
+
+    def test_worker_starting_timeout_is_fatal(self):
+        operations = release_cli.DockerGitOperations.__new__(release_cli.DockerGitOperations)
+        operations._container_state = lambda _name: (
+            "sha256:x", "running", "starting"
+        )
+        operations.run = unittest.mock.Mock()
+        with patch.dict(os.environ, {
+            "MADAR_WORKER_READY_ATTEMPTS": "2",
+            "MADAR_WORKER_READY_RETRY_SECONDS": "0.1",
+        }), patch.object(release_cli.time, "sleep"), self.assertRaisesRegex(
+            RuntimeError, "retained_worker_restore_timeout"
+        ):
+            operations.restore_workers({"slot": "blue"})
+
+    def test_worker_terminal_failure_is_immediately_fatal(self):
+        operations = release_cli.DockerGitOperations.__new__(release_cli.DockerGitOperations)
+        calls = 0
+        def state(_name):
+            nonlocal calls
+            calls += 1
+            return (
+                ("sha256:x", "running", "healthy")
+                if calls <= 3 else ("sha256:x", "exited", "unhealthy")
+            )
+        operations._container_state = state
+        operations.run = unittest.mock.Mock()
+        with self.assertRaisesRegex(RuntimeError, ":exited"):
+            operations.restore_workers({"slot": "blue"})
+
+    def test_worker_ownership_uses_actual_state_not_stale_metadata(self):
+        operations = release_cli.DockerGitOperations.__new__(release_cli.DockerGitOperations)
+        states = {
+            "madar-blue-notification-worker": ("x", "exited", "none"),
+            "madar-blue-calendar-sync-worker": ("x", "exited", "none"),
+            "madar-blue-data-deletion-worker": ("x", "exited", "none"),
+            "madar-green-notification-worker": ("x", "running", "healthy"),
+            "madar-green-calendar-sync-worker": ("x", "running", "healthy"),
+            "madar-green-data-deletion-worker": ("x", "running", "healthy"),
+        }
+        operations._container_state = states.get
+        self.assertEqual(
+            operations.worker_ownership(
+                {"slot": "blue", "workers_active": True},
+                {"slot": "green", "workers_active": False},
+            ),
+            "candidate",
+        )
+
     def test_installed_recovery_helpers_resolve_inside_installed_control_root(self):
         with tempfile.TemporaryDirectory() as root:
             installed = Path(root) / "deployment"
@@ -230,6 +413,24 @@ class ReleaseBootstrapTests(unittest.TestCase):
         self.assertIsNone(
             operations.resolve_serving_slot({"blue": SHA, "green": SHA})
         )
+
+    def test_same_sha_missing_slot_does_not_trust_proxy_file(self):
+        operations = release_cli.DockerGitOperations.__new__(release_cli.DockerGitOperations)
+        operations._json = lambda _url: {"release_sha": SHA, "release_slot": ""}
+        operations.current_traffic_slot = lambda: "blue"
+        self.assertIsNone(
+            operations.resolve_serving_slot({"blue": SHA, "green": SHA})
+        )
+
+    def test_candidate_cleanup_aborts_when_route_changes_at_shutdown_boundary(self):
+        operations = release_cli.DockerGitOperations.__new__(release_cli.DockerGitOperations)
+        observations = iter(["blue", "green"])
+        operations.resolve_serving_slot = lambda _expected: next(observations)
+        operations.release_root = None
+        with self.assertRaisesRegex(RuntimeError, "candidate_cleanup_traffic_changed"):
+            operations.stop_candidate(
+                "green", expected_serving={"blue": "1" * 40, "green": SHA}
+            )
 
     def test_post_migration_refresh_requires_exact_known_good_and_schema_83(self):
         with tempfile.TemporaryDirectory() as root:

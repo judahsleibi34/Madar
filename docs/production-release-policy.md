@@ -988,10 +988,13 @@ disabled.
 The release controller then revalidates a fresh complete local backup, the
 matching read-only Node 1 replica, immutable image identities, and the pinned
 schema. Candidate queue consumers remain off while the inactive slot is
-checked. Old consumers are stopped before candidate consumers start; they
-never overlap. The database, release state, proxy target, candidate, and backup
-identity are checked again immediately before the governed atomic traffic
-switch. No migration or schema write occurs.
+checked. Old consumers are stopped and actual state must prove that neither
+slot owns queue work. The database, release state, authoritative loaded route,
+candidate, backup identity, and zero-worker ownership are checked again
+immediately before the governed atomic traffic switch. Candidate consumers
+start only after the candidate is proven serving and must become healthy within
+a bounded window. The durable ownership sequence is therefore `old` to `none`
+to `candidate`; the two slots never overlap. No migration or schema write occurs.
 
 After the switch, the old binary is not a valid rollback target. Any failure is
 durably classified as forward repair and traffic is never sent back to the
@@ -1002,9 +1005,11 @@ as `incompatible_pre_recovery_release` forensic history. A same-SHA rerun is
 byte-idempotent.
 
 Both recovered slot records are explicitly marked `schema_recovery: true` with
-`migration_result: not_requested`. The normal release preflight may treat that
-terminal result as authoritative only when the canonical recovery record is
-complete, names the same active exact SHA, schema and slot, and that SHA still
+`migration_result: not_requested` and the exact recovery ID. The normal release
+preflight may treat that terminal result as authoritative only when the
+canonical recovery history record is complete, names the same active exact SHA,
+schema, slot and recovery ID, the compatible fallback agrees, no recovery is in
+progress, and that SHA still
 has the exact zero-migration recovery contract. Missing, stale, inconsistent or
 ordinary-release records continue to fail closed. This narrow bridge lets the
 subsequent normal 96-to-target manifest enter its ordinary migration workflow
