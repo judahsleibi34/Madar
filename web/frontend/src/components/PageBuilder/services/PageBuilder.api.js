@@ -544,14 +544,27 @@ export const uploadBuilderAsset = async (file) => {
   return data?.asset_url || data?.url || "";
 };
 
-export const fetchWebsiteSettings = async () => {
-  const response = await apiFetch(getApiUrl("/website/settings"), {
+const WEBSITE_SETTINGS_CACHE_MS = 45_000;
+const websiteSettingsCache = new Map();
+const websiteSettingsRequests = new Map();
+
+export const fetchWebsiteSettings = async (scope = "authenticated", { force = false } = {}) => {
+  const cacheKey = String(scope || "authenticated");
+  const cached = websiteSettingsCache.get(cacheKey);
+  if (!force && cached && Date.now() - cached.cachedAt <= WEBSITE_SETTINGS_CACHE_MS) return cached.data;
+  if (!force && websiteSettingsRequests.has(cacheKey)) return websiteSettingsRequests.get(cacheKey);
+
+  const pending = apiFetch(getApiUrl("/website/settings"), {
     method: "GET",
     cache: "no-store",
-  });
-
-  const data = await parseJsonResponse(response);
-  return data?.website || null;
+  }).then(async (response) => {
+    const data = await parseJsonResponse(response);
+    const website = data?.website || null;
+    websiteSettingsCache.set(cacheKey, { cachedAt: Date.now(), data: website });
+    return website;
+  }).finally(() => websiteSettingsRequests.delete(cacheKey));
+  websiteSettingsRequests.set(cacheKey, pending);
+  return pending;
 };
 
 export const updateWebsiteSettings = async (settings) => {
@@ -562,6 +575,8 @@ export const updateWebsiteSettings = async (settings) => {
   });
 
   const data = await parseJsonResponse(response);
+  websiteSettingsCache.clear();
+  websiteSettingsRequests.clear();
   return data?.website || null;
 };
 

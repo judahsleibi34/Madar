@@ -110,7 +110,7 @@ export function buildStorefrontSeo({
     }
   }
 
-  const rawImage = product?.images?.[0] || site?.logo_url || site?.loading_image_url;
+  const rawImage = product?.images?.find((item) => !/\.(?:mp4|webm)(?:[?#].*)?$/i.test(String(item || ""))) || site?.logo_url || site?.loading_image_url;
   const image = safePublicUrl(rawImage, origin);
   if (product && canonical) {
     structuredData = productStructuredData({ product, variants: productDetail?.variants, canonical, image });

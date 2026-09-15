@@ -105,6 +105,30 @@ class StorageQuotaTests(unittest.TestCase):
         self.assertEqual(client.calls[0][1]["p_tenant_quota"], 5 * 1024 * 1024 * 1024)
         self.assertEqual(client.calls[0][1]["p_user_quota"], 1024 * 1024 * 1024)
 
+    def test_explicit_tenant_quota_does_not_require_a_commercial_plan(self):
+        client = Client(result="reservation-1")
+        with tempfile.TemporaryDirectory() as root, patch.object(
+            storage_quota_service,
+            "ensure_disk_capacity",
+            return_value=10**9,
+        ), patch.object(
+            storage_quota_service,
+            "get_storage_quota_bytes",
+            side_effect=AssertionError("commercial quota must not be queried"),
+        ):
+            result = storage_quota_service.reserve_storage(
+                tenant_id=7,
+                user_id=9,
+                category="ecommerce_product_media",
+                size_bytes=10,
+                storage_root=Path(root),
+                client=client,
+                tenant_quota_bytes=5 * 1024 * 1024 * 1024,
+            )
+
+        self.assertEqual(result, "reservation-1")
+        self.assertEqual(client.calls[0][1]["p_tenant_quota"], 5 * 1024 * 1024 * 1024)
+
     def test_tenant_and_user_scopes_report_once_and_quota_sync_updates_only_tenant(self):
         gib = 1024 * 1024 * 1024
         rows = [

@@ -655,6 +655,7 @@
 }
 
 .live-store-detail-main-image img,
+.live-store-detail-main-image video,
 .live-store-detail-main-image > div {
   width: 100%;
   height: 100%;
@@ -684,7 +685,8 @@
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--store-accent) 20%, transparent);
 }
 
-.live-store-detail-thumbnails img {
+.live-store-detail-thumbnails img,
+.live-store-detail-thumbnails video {
   width: 100%;
   height: 100%;
   object-fit: contain;

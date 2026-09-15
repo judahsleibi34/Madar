@@ -9,7 +9,7 @@ const STOREFRONT_ORIGIN = String(
   import.meta.env.VITE_STOREFRONT_URL || import.meta.env.VITE_PUBLIC_APP_URL || "https://madarportal.com"
 ).replace(/\/$/, "");
 
-export default function EcommerceStorePage() {
+export default function EcommerceStorePage({ user }) {
   const location = useLocation();
   const { t, locale, direction } = useCommerceI18n();
   const draftPreview = new URLSearchParams(location.search).get("preview") === "draft";
@@ -18,10 +18,11 @@ export default function EcommerceStorePage() {
   const [error, setError] = useState("");
   const [frameVersion, setFrameVersion] = useState(0);
   const [frameReady, setFrameReady] = useState(false);
+  const cacheScope = user?.tenant_id || user?.id ? `commerce-${user?.tenant_id || user?.id}` : "authenticated";
 
   useEffect(() => {
     let cancelled = false;
-    fetchWebsiteSettings()
+    fetchWebsiteSettings(cacheScope)
       .then((result) => {
         if (!cancelled) setWebsite(result || null);
       })
@@ -36,7 +37,7 @@ export default function EcommerceStorePage() {
     return () => {
       cancelled = true;
     };
-  }, [t]);
+  }, [cacheScope, t]);
 
   const subdomain = String(website?.subdomain || "").trim();
   const livePath = subdomain

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Gift, LoaderCircle, Save } from "lucide-react";
 
 import AuthToast from "../AuthPages/AuthToast";
+import EcommerceOperationsSkeleton from "./EcommerceOperationsSkeleton";
 import { fetchEcommerceCatalog, fetchEcommerceLoyalty, saveEcommerceLoyalty } from "../../services/ecommerceApi";
 import { useCommerceI18n } from "../../utils/commerceI18n";
 
@@ -15,7 +16,7 @@ const EMPTY = {
   validity_days: "",
 };
 
-export default function EcommerceLoyaltyPage() {
+export default function EcommerceLoyaltyPage({ user }) {
   const { t, locale, direction, localize } = useCommerceI18n();
   const [form, setForm] = useState(EMPTY);
   const [saved, setSaved] = useState(EMPTY);
@@ -24,10 +25,11 @@ export default function EcommerceLoyaltyPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState(null);
+  const cacheScope = user?.tenant_id || user?.id ? `commerce-${user?.tenant_id || user?.id}` : "authenticated";
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([fetchEcommerceLoyalty(), fetchEcommerceCatalog()])
+    Promise.all([fetchEcommerceLoyalty({ scope: cacheScope }), fetchEcommerceCatalog({ scope: cacheScope })])
       .then(([loyalty, catalog]) => {
         if (cancelled) return;
         const next = loyalty?.rule ? {
@@ -43,7 +45,7 @@ export default function EcommerceLoyaltyPage() {
       .catch((error) => setToast({ type: "error", title: t("loyalty.loadError"), message: error.message }))
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [t]);
+  }, [cacheScope, t]);
 
   const dirty = useMemo(() => JSON.stringify(form) !== JSON.stringify(saved), [form, saved]);
   useEffect(() => {
@@ -65,7 +67,7 @@ export default function EcommerceLoyaltyPage() {
         validity_mode: form.validity_mode,
         validity_days: form.validity_mode === "fixed_period" ? Number(form.validity_days) : null,
       };
-      const result = await saveEcommerceLoyalty(payload);
+      const result = await saveEcommerceLoyalty(payload, { scope: cacheScope });
       const next = { ...EMPTY, ...result.rule, validity_days: result.rule.validity_days ?? "" };
       setForm(next);
       setSaved(next);
@@ -86,7 +88,7 @@ export default function EcommerceLoyaltyPage() {
         </button>
       </header>
       <section className="ecommerce-operations-card">
-        {loading ? <div className="ecommerce-operations-state"><LoaderCircle className="is-spinning" />{t("common.loading")}</div> : (
+        {loading ? <EcommerceOperationsSkeleton variant="loyalty" label={t("common.loading")} /> : (
           <div className="ecommerce-form-grid">
             <label><span>{t("loyalty.enabled")}</span><input type="checkbox" checked={Boolean(form.enabled)} onChange={(event) => update("enabled", event.target.checked)} /></label>
             <label><span>{t("common.currency")}</span><input value={currency} readOnly /></label>

@@ -23,6 +23,7 @@ afterEach(() => {
 });
 
 beforeEach(() => {
+  window.localStorage.clear();
   vi.clearAllMocks();
   fetchEcommerceCatalog.mockResolvedValue({ tags: [], categories: [], products: [] });
   saveEcommerceItem.mockResolvedValue({});
@@ -31,6 +32,42 @@ beforeEach(() => {
 });
 
 describe("EcommercePage", () => {
+  it("shows cards for every catalog status", async () => {
+    fetchEcommerceCatalog.mockResolvedValue({
+      tags: [
+        { id: "tag-draft", slug: "draft", status: "draft", translations: { en: { name: "Draft tag" } } },
+        { id: "tag-active", slug: "active", status: "active", translations: { en: { name: "Active tag" } } },
+        { id: "tag-inactive", slug: "inactive", status: "inactive", translations: { en: { name: "Inactive tag" } } },
+        { id: "tag-archived", slug: "archived", status: "archived", translations: { en: { name: "Archived tag" } } },
+      ],
+      categories: [],
+      products: [],
+    });
+
+    const { container } = render(<EcommercePage section="tags" />);
+    await screen.findByText("Draft tag");
+    const cards = [...container.querySelectorAll(".ecommerce-summary-card")];
+    expect(cards.map((card) => card.textContent)).toEqual([
+      "Total tags4",
+      "Draft1",
+      "Active1",
+      "Inactive1",
+      "Archived1",
+    ]);
+  });
+
+  it("lets users hide and restore overview cards", async () => {
+    render(<EcommercePage section="tags" />);
+    await screen.findByText("No tags yet");
+    fireEvent.click(screen.getByRole("button", { name: "Customize tag cards" }));
+    expect(screen.getByText("Tag cards")).toBeTruthy();
+    fireEvent.click(screen.getByRole("checkbox", { name: "Archived" }));
+    expect(document.querySelectorAll(".ecommerce-summary-card")).toHaveLength(4);
+    expect(JSON.parse(window.localStorage.getItem("madar-ecommerce-summary-cards-v1:authenticated:tags"))).toEqual(["archived"]);
+    fireEvent.click(screen.getByRole("button", { name: "Show all" }));
+    expect(document.querySelectorAll(".ecommerce-summary-card")).toHaveLength(5);
+  });
+
   it("shows cached products immediately while refreshing in the background", () => {
     writeEcommerceCatalogCache("authenticated", {
       tags: [],
@@ -66,6 +103,22 @@ describe("EcommercePage", () => {
     expect(screen.getByText("Enter english name before saving.")).toBeTruthy();
     expect(saveEcommerceItem).not.toHaveBeenCalled();
   });
+
+  it("generates the slug from the English name until it is manually edited", async () => {
+    render(<EcommercePage section="tags" />);
+    await screen.findByText("No tags yet");
+
+    fireEvent.click(screen.getByRole("button", { name: "Add tag" }));
+    const englishName = screen.getAllByLabelText("Name")[0];
+    const slug = screen.getByLabelText("Slug");
+    fireEvent.change(englishName, { target: { value: "Summer & Self Care" } });
+    expect(slug.value).toBe("summer-self-care");
+
+    fireEvent.change(slug, { target: { value: "seasonal" } });
+    fireEvent.change(englishName, { target: { value: "Summer Essentials" } });
+    expect(slug.value).toBe("seasonal");
+  });
+
   it("creates a tag with English and Arabic translations", async () => {
     render(<EcommercePage section="tags" />);
     await screen.findByText("No tags yet");
@@ -92,7 +145,7 @@ describe("EcommercePage", () => {
     );
   });
 
-  it("offers parent categories and complete product data groups", async () => {
+  it("offers parent categories and routes product creation to the full editor", async () => {
     fetchEcommerceCatalog.mockResolvedValue({
       tags: [{ id: "tag-1", slug: "summer", status: "active", translations: { en: { name: "Summer" } } }],
       categories: [{ id: "category-1", slug: "clothes", status: "active", translations: { en: { name: "Clothes" } } }],
@@ -100,6 +153,7 @@ describe("EcommercePage", () => {
     });
 
     const { rerender } = render(<EcommercePage section="categories" />);
+    expect(await screen.findByRole("button", { name: "Customize category cards" })).toBeTruthy();
     fireEvent.click(await screen.findByRole("button", { name: "Add category" }));
     expect(screen.getByLabelText("Parent category")).toBeTruthy();
     expect(screen.getByLabelText("Display position").value).toBe("");
@@ -111,40 +165,16 @@ describe("EcommercePage", () => {
     expect(screen.queryByPlaceholderText("generated-from-name")).toBeNull();
 
     rerender(<EcommercePage key="products" section="products" />);
+    expect(await screen.findByRole("button", { name: "Customize product cards" })).toBeTruthy();
     fireEvent.click(await screen.findByRole("button", { name: "Add product" }));
-    expect(screen.getByText("Pricing")).toBeTruthy();
-    expect(screen.getByText("Inventory")).toBeTruthy();
-    expect(screen.getByText("Images and weight")).toBeTruthy();
-    expect(screen.queryByText("SEO")).toBeNull();
-    expect(screen.getByLabelText("Regular price").value).toBe("");
-    expect(screen.getByLabelText(/Discounted price/).value).toBe("");
-    expect(screen.queryByLabelText("Cost price")).toBeNull();
-    expect(screen.queryByLabelText("Compare-at price")).toBeNull();
-    expect(screen.getByLabelText("Currency").value).toBe("");
-    expect(screen.getByLabelText("Product type").value).toBe("");
-    expect(screen.getByLabelText("SKU").required).toBe(false);
-    expect(screen.getByLabelText("Barcode").required).toBe(false);
-    expect(screen.getByText("Leave empty and Madar will generate a unique product code.")).toBeTruthy();
-    expect(screen.getByText("Enter the printed barcode only when the product has one.")).toBeTruthy();
-    expect(screen.getByLabelText("Status").querySelector('option[value="inactive"]')?.textContent).toBe("Inactive");
-    expect(screen.getByLabelText(/Current stock/).value).toBe("");
-    expect(screen.getByLabelText(/Warn me when stock reaches/).value).toBe("");
-    expect(screen.getByText("How many items are available now.")).toBeTruthy();
-    expect(screen.getByText("Madar will show a low-stock warning at this number or below.")).toBeTruthy();
-    expect(screen.getByLabelText("Track inventory").closest(".ecommerce-check-row")).toBeTruthy();
-    expect(screen.getByLabelText(/Let customers order when sold out/).closest(".ecommerce-check-row")).toBeTruthy();
-    expect(screen.queryByLabelText("Requires shipping")).toBeNull();
-    expect(screen.queryByLabelText("Taxable")).toBeNull();
-    expect(screen.getByLabelText("Unit").value).toBe("");
-    expect(screen.queryByPlaceholderText("generated-from-name")).toBeNull();
-    expect(screen.queryByText("Image URLs (one per line)")).toBeNull();
-    expect(screen.getByText("The first image will be the main product image.")).toBeTruthy();
-    const productImage = new File(["image"], "product.webp", { type: "image/webp" });
-    fireEvent.change(screen.getByLabelText("Upload product images"), { target: { files: [productImage] } });
-    expect(await screen.findByAltText("Product image 1")).toBeTruthy();
-    expect(uploadEcommerceProductImage).toHaveBeenCalledWith(productImage);
-    fireEvent.click(screen.getByRole("button", { name: "Remove product image 1" }));
-    expect(screen.queryByAltText("Product image 1")).toBeNull();
+    expect(await screen.findByRole("dialog", { name: "New product" })).toBeTruthy();
+    expect(screen.queryByText("Loading product editor...")).toBeNull();
+    expect(screen.getByRole("heading", { name: "New product" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Specifications" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Options & Variants" })).toBeTruthy();
+    expect(screen.getByText("This product has no options")).toBeTruthy();
+    expect(screen.getAllByRole("button", { name: "Save product" })).toHaveLength(1);
+    expect(screen.queryByText("Full product editor")).toBeNull();
   });
 });
   it("shows aggregate stock counts and filters simple and variant products", async () => {

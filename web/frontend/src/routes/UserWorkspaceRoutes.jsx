@@ -1,7 +1,8 @@
-import { lazy } from "react";
+import { lazy, useEffect } from "react";
 import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 
 import RouteSuspense from "../components/common/RouteSuspense";
+import EcommerceRouteSkeleton from "../components/DashboardBuilder/EcommerceRouteSkeleton";
 import { getBuilderProjectIdFromPath } from "../components/PageBuilder/core/PageBuilder.workspaceRouting";
 import { appShellContent } from "../content";
 import { DASHBOARD_ROUTES } from "../config/routes";
@@ -12,14 +13,30 @@ const SettingsPage = lazy(() => import("../components/DashboardBuilder/SettingsP
 const UserDashboard = lazy(() => import("../components/DashboardBuilder/UserDashboard"));
 const MyPlanPage = lazy(() => import("../components/DashboardBuilder/MyPlanPage"));
 const NotificationsPage = lazy(() => import("../components/DashboardBuilder/NotificationsPage"));
-const EcommerceProductEditorPage = lazy(() => import("../components/DashboardBuilder/EcommerceProductEditorPage"));
+const loadEcommerceProductEditorPage = () => import("../components/DashboardBuilder/EcommerceProductEditorPage");
+const loadEcommercePage = () => import("../components/DashboardBuilder/EcommercePage");
+const loadEcommerceDeliveryPage = () => import("../components/DashboardBuilder/EcommerceDeliveryPage");
+const loadEcommerceOrdersPage = () => import("../components/DashboardBuilder/EcommerceOrdersPage");
+const loadEcommerceLoyaltyPage = () => import("../components/DashboardBuilder/EcommerceLoyaltyPage");
+const loadEcommerceThemePage = () => import("../components/DashboardBuilder/EcommerceThemePage");
+const loadEcommerceStorePage = () => import("../components/DashboardBuilder/EcommerceStorePage");
+const ecommerceRouteLoaders = [
+  loadEcommercePage,
+  loadEcommerceDeliveryPage,
+  loadEcommerceOrdersPage,
+  loadEcommerceLoyaltyPage,
+  loadEcommerceThemePage,
+  loadEcommerceStorePage,
+  loadEcommerceProductEditorPage,
+];
+const EcommerceProductEditorPage = lazy(loadEcommerceProductEditorPage);
 const ArchivePage = lazy(() => import("../components/DashboardBuilder/ArchivePage"));
-const EcommercePage = lazy(() => import("../components/DashboardBuilder/EcommercePage"));
-const EcommerceDeliveryPage = lazy(() => import("../components/DashboardBuilder/EcommerceDeliveryPage"));
-const EcommerceOrdersPage = lazy(() => import("../components/DashboardBuilder/EcommerceOrdersPage"));
-const EcommerceLoyaltyPage = lazy(() => import("../components/DashboardBuilder/EcommerceLoyaltyPage"));
-const EcommerceThemePage = lazy(() => import("../components/DashboardBuilder/EcommerceThemePage"));
-const EcommerceStorePage = lazy(() => import("../components/DashboardBuilder/EcommerceStorePage"));
+const EcommercePage = lazy(loadEcommercePage);
+const EcommerceDeliveryPage = lazy(loadEcommerceDeliveryPage);
+const EcommerceOrdersPage = lazy(loadEcommerceOrdersPage);
+const EcommerceLoyaltyPage = lazy(loadEcommerceLoyaltyPage);
+const EcommerceThemePage = lazy(loadEcommerceThemePage);
+const EcommerceStorePage = lazy(loadEcommerceStorePage);
 const CvRerankPage = lazy(() => import("../components/DashboardBuilder/CvRerankPage"));
 const ReservationCalendarPage = lazy(() =>
   import("../components/DashboardBuilder/ReservationCalendarPage")
@@ -68,6 +85,22 @@ export default function UserWorkspaceRoutes({
     location.pathname.startsWith("/calendar") ||
     location.pathname.startsWith("/agenda") ||
     location.pathname.startsWith("/archive");
+  const isEcommerceLoadingPath = location.pathname.startsWith("/ecommerce");
+
+  useEffect(() => {
+    if (!location.pathname.startsWith("/dashboard") && !isEcommerceLoadingPath) return undefined;
+    const preload = () => {
+      ecommerceRouteLoaders.forEach((loader) => {
+        loader().catch(() => {});
+      });
+    };
+    if (typeof window.requestIdleCallback === "function") {
+      const idleId = window.requestIdleCallback(preload, { timeout: 1200 });
+      return () => window.cancelIdleCallback(idleId);
+    }
+    const timeoutId = window.setTimeout(preload, 250);
+    return () => window.clearTimeout(timeoutId);
+  }, [isEcommerceLoadingPath, location.pathname]);
 
   const renderShell = (children, options = {}) => (
     <DashboardShell
@@ -106,10 +139,13 @@ export default function UserWorkspaceRoutes({
                 lang: location.pathname.startsWith("/page-builder") ? "en" : lang,
               }
             )
-          : <DashboardLoadingElement pathname={location.pathname} lang={lang} />
+          : isEcommerceLoadingPath
+            ? renderShell(<EcommerceRouteSkeleton pathname={location.pathname} />)
+            : <DashboardLoadingElement pathname={location.pathname} lang={lang} />
       }
       lang={lang}
       variant={isBuilderLoadingPath ? "builder" : "dashboard"}
+      delay={isEcommerceLoadingPath ? 0 : undefined}
     >
       <Routes>
       <Route

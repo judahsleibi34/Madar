@@ -163,6 +163,9 @@ def schema_contains_element_type(value: Any, element_type: str) -> bool:
 BUILDER_ASSET_MAX_BYTES = int(os.getenv("BUILDER_ASSET_MAX_BYTES", str(25 * 1024 * 1024)))
 BUILDER_VIDEO_MAX_BYTES = int(os.getenv("BUILDER_VIDEO_MAX_BYTES", str(250 * 1024 * 1024)))
 BUILDER_DOCUMENT_MAX_BYTES = int(os.getenv("BUILDER_DOCUMENT_MAX_BYTES", str(50 * 1024 * 1024)))
+ECOMMERCE_PRODUCT_MEDIA_QUOTA_BYTES = int(
+    os.getenv("ECOMMERCE_PRODUCT_MEDIA_QUOTA_BYTES", str(5 * 1024 * 1024 * 1024))
+)
 BUILDER_ASSET_COPY_CHUNK_BYTES = 1024 * 1024
 BUILDER_ASSET_UPLOAD_DIR = get_public_uploads_dir()
 BUILDER_CLIENT_CONTRACT = "cloud-draft-v1"
@@ -1653,14 +1656,34 @@ def publish_project_atomically(
     return rows[0]
 
 
+@router.post("/ecommerce/product-media/upload")
+async def upload_ecommerce_product_media(
+    request: Request,
+    response: Response,
+    file: UploadFile = File(...),
+):
+    request.scope["madar_asset_usage"] = "ecommerce_product_media"
+    return await upload_builder_asset(request=request, response=response, file=file)
+
+
 @router.post("/builder/assets/upload")
 async def upload_builder_asset(
     request: Request,
     response: Response,
     file: UploadFile = File(...),
 ):
-    context = require_builder_context(request, response, require_builder_write_access)
-    require_entitlement(context.tenant_id, "image_uploads")
+    ecommerce_product_media = request.scope.get("madar_asset_usage") == "ecommerce_product_media"
+    if ecommerce_product_media:
+        context = require_active_tenant_member(
+            request,
+            response,
+            allow_admin_account_access=False,
+        )
+        if str(context.role or "").lower() not in {"owner", "admin", "member"}:
+            raise HTTPException(status_code=403, detail="Ecommerce access required")
+    else:
+        context = require_builder_context(request, response, require_builder_write_access)
+        require_entitlement(context.tenant_id, "image_uploads")
     enforce_builder_asset_upload_rate_limit(request, context.user_id, context.tenant_id)
 
     declared_content_type = (file.content_type or "").split(";", 1)[0].strip().lower()
@@ -1674,6 +1697,12 @@ async def upload_builder_asset(
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     } or (not declared_content_type and source_extension in {".pdf", ".doc", ".docx"})
     asset_kind = "video" if is_declared_video else "document" if is_declared_document else "image"
+
+    if ecommerce_product_media and asset_kind not in {"image", "video"}:
+        raise HTTPException(
+            status_code=400,
+            detail="Product media must be a PNG, JPG, WebP, MP4, or WebM file",
+        )
 
     if declared_content_type and declared_content_type not in BUILDER_ASSET_EXTENSIONS:
         detail = (
@@ -1766,14 +1795,18 @@ async def upload_builder_asset(
     extension = BUILDER_ASSET_EXTENSIONS[detected_content_type]
     filename = f"{uuid4().hex}{extension}"
     target_dir, target_path, tenant_dir = get_builder_asset_target(context.tenant_id, filename)
+    storage_category = "ecommerce_product_media" if ecommerce_product_media else "builder_asset"
 
     try:
         storage_reservation_id = reserve_storage(
             tenant_id=context.tenant_id,
             user_id=context.user_id,
-            category="builder_asset",
+            category=storage_category,
             size_bytes=file_size,
             storage_root=BUILDER_ASSET_UPLOAD_DIR,
+            tenant_quota_bytes=ECOMMERCE_PRODUCT_MEDIA_QUOTA_BYTES
+            if ecommerce_product_media
+            else None,
         )
     except StorageSafetyError as error:
         raise HTTPException(
@@ -1939,7 +1972,7 @@ async def upload_builder_asset(
             try:
                 release_storage(
                     tenant_id=context.tenant_id,
-                    category="builder_asset",
+                    category=storage_category,
                     storage_key=storage_key,
                 )
             except Exception as accounting_error:
@@ -1960,8 +1993,8 @@ async def upload_builder_asset(
         request=request,
         tenant_id=context.tenant_id,
         actor_user_id=context.user_id,
-        action="builder.asset_uploaded",
-        target_type="builder_asset",
+        action="ecommerce.product_media_uploaded" if ecommerce_product_media else "builder.asset_uploaded",
+        target_type="ecommerce_product_media" if ecommerce_product_media else "builder_asset",
         target_id=filename,
         metadata={
             "asset_url": asset_url,

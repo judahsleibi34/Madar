@@ -47,7 +47,7 @@ describe("merchant ecommerce operations", () => {
     fireEvent.click(screen.getByRole("checkbox", { name: /Nablus/ }));
     expect(screen.getByText("2 enabled")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: /Save delivery areas/ }));
-    await waitFor(() => expect(saveEcommerceDeliveryAreas).toHaveBeenCalledWith(areas.map((area) => area.id)));
+    await waitFor(() => expect(saveEcommerceDeliveryAreas).toHaveBeenCalledWith(areas.map((area) => area.id), { scope: "authenticated" }));
   });
 
   it("renders tenant-filtered orders and sends date and service-area filters", async () => {
@@ -65,7 +65,7 @@ describe("merchant ecommerce operations", () => {
     await waitFor(() => expect(fetchEcommerceOrders).toHaveBeenCalledWith(expect.objectContaining({
       service_area_id: areas[0].id,
       date_from: "2026-09-01",
-    })));
+    }), { scope: "authenticated" }));
   });
 
   it("keeps order status and COD collection as separate commands", async () => {

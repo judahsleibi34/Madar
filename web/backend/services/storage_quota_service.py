@@ -39,12 +39,27 @@ def ensure_disk_capacity(path: Path, *, incoming_bytes: int = 0) -> int:
     return free
 
 
-def reserve_storage(*, tenant_id: int, user_id: int | None, category: str, size_bytes: int, storage_root: Path, client=None) -> str:
+def reserve_storage(
+    *,
+    tenant_id: int,
+    user_id: int | None,
+    category: str,
+    size_bytes: int,
+    storage_root: Path,
+    client=None,
+    tenant_quota_bytes: int | None = None,
+) -> str:
     if size_bytes <= 0:
         raise StorageSafetyError("storage_reservation_invalid")
     ensure_disk_capacity(storage_root, incoming_bytes=size_bytes)
     database_client = client or service_supabase
-    tenant_quota = get_storage_quota_bytes(tenant_id)
+    tenant_quota = (
+        int(tenant_quota_bytes)
+        if tenant_quota_bytes is not None
+        else get_storage_quota_bytes(tenant_id)
+    )
+    if tenant_quota <= 0:
+        raise StorageSafetyError("storage_configuration_invalid")
     try:
         response = database_client.rpc("reserve_storage_bytes", {
             "p_tenant_id": int(tenant_id),
