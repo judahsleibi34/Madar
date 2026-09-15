@@ -116,6 +116,27 @@ describe("merchant product options and variants editor", () => {
     expect(screen.getAllByRole("button", { name: "S" })).toHaveLength(1);
   });
 
+  it("allows incomplete option work to be saved as a draft", async () => {
+    fetchEcommerceCatalog.mockResolvedValue(catalog());
+    saveEcommerceItem.mockResolvedValue({ id: "product-1" });
+    renderEditor();
+    fireEvent.change(await screen.findByLabelText("Name (English)"), { target: { value: "Draft shirt" } });
+    addOption("Size", ["S"]);
+    fireEvent.click(screen.getByRole("button", { name: "Save product" }));
+    await waitFor(() => expect(saveEcommerceItem).toHaveBeenCalledOnce());
+  });
+
+  it("blocks publishing an option product without a sellable variant", async () => {
+    fetchEcommerceCatalog.mockResolvedValue(catalog());
+    renderEditor();
+    fireEvent.change(await screen.findByLabelText("Name (English)"), { target: { value: "Active shirt" } });
+    addOption("Size", ["S"]);
+    fireEvent.change(screen.getByLabelText("Status"), { target: { value: "active" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save product" }));
+    expect(screen.getByRole("alert").textContent).toBe("Create and activate at least one variant before publishing this product.");
+    expect(saveEcommerceItem).not.toHaveBeenCalled();
+  });
+
   it("archives a referenced value and preserves the existing variant identity and data", async () => {
     const valueId = "11111111-1111-4111-8111-111111111111";
     const optionId = "22222222-2222-4222-8222-222222222222";

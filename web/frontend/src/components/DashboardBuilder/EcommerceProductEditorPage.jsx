@@ -250,6 +250,7 @@ export function EcommerceProductEditor({ user, productId, embedded = false, init
     const skus = form.variants.map((variant) => String(variant.sku || "").trim().toLocaleLowerCase());
     if (skus.some((sku) => !sku)) return t("admin.validationVariantSku");
     if (new Set(skus).size !== skus.length) return t("admin.validationUniqueSku");
+    if (form.status === "active" && form.options.length && !form.variants.some((variant) => variant.active)) return t("admin.validationSellableVariant");
     for (const variant of form.variants) {
       const selected = new Set(variant.option_value_ids);
       if (variant.active && form.options.some((option) => option.required && !(option.values || []).some((value) => selected.has(value.id)))) {
