@@ -36,6 +36,7 @@ from control_plane_filesystem import (
     require_root_protected_directory,
     require_root_protected_ancestry,
 )
+from migration_executor import MigrationManifest
 
 
 SHA_RE = re.compile(r"^[0-9a-fA-F]{40}$")
@@ -46,6 +47,37 @@ AUTOMATIC_MIGRATION_POLICY = (
 SUCCESSFUL_MIGRATION_PHASES = {
     "already_at_target",
     "post_migration_validation_complete",
+}
+FORWARD_REPAIR_MIGRATION_PHASES = {
+    "backup_creation_failed",
+    "migration_execution_failed",
+    "post_migration_validation_failed",
+}
+INTERRUPTED_MIGRATION_PHASES = {
+    "backup_creation",
+    "migration_execution",
+    "post_migration_validation",
+}
+FORWARD_REPAIR_ACCEPTED_READINESS = {
+    "ok",
+    "disabled",
+    "configured",
+    "not_required",
+    "development",
+}
+FORWARD_REPAIR_REFRESHABLE_COMPONENTS = {
+    "notification_worker",
+    "calendar_sync_worker",
+    "data_deletion_worker",
+    "parser_isolation",
+}
+FORWARD_REPAIR_CORE_COMPONENTS = {
+    "environment",
+    "database",
+    "redis",
+    "auth",
+    "storage",
+    "schema",
 }
 REQUIRED_PRODUCTION_READINESS = {
     "schema", "notification_worker", "calendar_sync_worker",
@@ -700,8 +732,434 @@ class SystemOperations:
             raise UpgradeError("migration_automation_not_terminal")
         return str(state.get("phase"))
 
+    def automatic_migration_contract(
+        self, sha: str,
+    ) -> dict[str, int]:
+        """Validate the immutable automatic-migration contract for ``sha``."""
+
+        release_root = self.state_root / "releases" / sha
+        releases_root = release_root / "web/deployment/releases"
+        release = json_file(
+            releases_root / "release.json",
+            "known_good_release_contract_missing",
+        )
+        if str(release.get("migration_policy") or "") != AUTOMATIC_MIGRATION_POLICY:
+            raise UpgradeError("migration_pending_contract_invalid")
+
+        schema_contract = release.get("schema")
+        if not isinstance(schema_contract, dict):
+            raise UpgradeError("migration_pending_contract_invalid")
+
+        try:
+            compatible_min = int(schema_contract["compatible_min"])
+            compatible_max = int(schema_contract["compatible_max"])
+            target = int(schema_contract["target"])
+            rollback_min = int(schema_contract["rollback_compatible_min"])
+            rollback_max = int(schema_contract["rollback_compatible_max"])
+        except (KeyError, TypeError, ValueError) as error:
+            raise UpgradeError("migration_pending_contract_invalid") from error
+
+        if schema_contract.get("migration_class") not in {
+            "expand-only",
+            "forward-compatible",
+        }:
+            raise UpgradeError("migration_pending_contract_invalid")
+
+        manifest_name = str(release.get("migration_manifest") or "").strip()
+        if (
+            not manifest_name.startswith("migrations-")
+            or not manifest_name.endswith(".json")
+            or Path(manifest_name).name != manifest_name
+        ):
+            raise UpgradeError("migration_pending_contract_invalid")
+
+        manifest_path = releases_root / manifest_name
+        try:
+            manifest = MigrationManifest.load(manifest_path, release_root)
+        except (OSError, KeyError, TypeError, ValueError) as error:
+            raise UpgradeError("migration_pending_manifest_invalid") from error
+
+        if manifest.release_sha not in {"CURRENT", "STAGING", sha}:
+            raise UpgradeError("migration_pending_manifest_invalid")
+
+        source = manifest.migrations[0].from_schema
+        manifest_target = manifest.migrations[-1].to_schema
+
+        if (
+            manifest_target != target
+            or not compatible_min <= source <= manifest_target <= compatible_max
+            or not rollback_min <= source <= rollback_max
+        ):
+            raise UpgradeError("migration_pending_contract_invalid")
+
+        try:
+            for migration in manifest.migrations:
+                if (
+                    not migration.path.is_file()
+                    or sha256_file(migration.path) != migration.sha256
+                ):
+                    raise UpgradeError("migration_pending_checksum_invalid")
+        except OSError as error:
+            raise UpgradeError("migration_pending_checksum_invalid") from error
+
+        return {
+            "source": source,
+            "target": manifest_target,
+        }
+
+    def migration_origin_state(
+        self,
+        sha: str,
+        recorded_schema: int,
+        live_schema: int,
+    ) -> str:
+        """Classify migration state only for the already-serving upgrade origin.
+
+        Final serving attestation remains strict.  Current-origin preflight may
+        additionally accept either a provably never-started automatic migration
+        or a durable, internally consistent forward-repair checkpoint whose
+        bounded retry deadline has elapsed.
+        """
+
+        terminal_error: str | None = None
+        try:
+            terminal = self.migration_terminal(sha, recorded_schema)
+        except UpgradeError as error:
+            terminal_error = str(error)
+            if terminal_error not in {
+                "migration_automation_terminal_missing",
+                "migration_automation_not_terminal",
+                "migration_execution_not_terminal",
+            }:
+                raise
+        else:
+            if live_schema != recorded_schema:
+                raise UpgradeError("migration_terminal_schema_mismatch")
+            return terminal
+
+        migration_dir = self.state_root / "migrations" / sha
+        automation = migration_dir / "automation.json"
+        execution = migration_dir / "execution.json"
+
+        if migration_dir.is_symlink():
+            raise UpgradeError("migration_pending_state_ambiguous")
+
+        # --------------------------------------------------------------
+        # Durable forward repair.
+        # --------------------------------------------------------------
+        if automation.exists() or automation.is_symlink():
+            if (
+                automation.is_symlink()
+                or not automation.is_file()
+                or not migration_dir.is_dir()
+            ):
+                raise UpgradeError("migration_forward_repair_state_invalid")
+
+            contract = self.automatic_migration_contract(sha)
+            source = contract["source"]
+            target = contract["target"]
+
+            state = json_file(
+                automation,
+                "migration_automation_state_invalid",
+            )
+
+            try:
+                automation_source = int(state["source_schema"])
+                automation_target = int(state["target_schema"])
+            except (KeyError, TypeError, ValueError) as error:
+                raise UpgradeError(
+                    "migration_forward_repair_state_invalid"
+                ) from error
+
+            status = str(state.get("status") or "")
+            phase = str(state.get("phase") or "")
+
+            failed_repair = (
+                status == "failed_forward_repair_required"
+                and phase in FORWARD_REPAIR_MIGRATION_PHASES
+            )
+            interrupted_repair = (
+                status == "running"
+                and phase in INTERRUPTED_MIGRATION_PHASES
+            )
+
+            if (
+                state.get("release_sha") != sha
+                or not (failed_repair or interrupted_repair)
+                or state.get("failure_semantics") != "forward_repair_only"
+                or automation_source != source
+                or automation_target != target
+            ):
+                raise UpgradeError("migration_forward_repair_state_invalid")
+
+            if failed_repair:
+                retry_raw = str(state.get("retry_after") or "")
+                try:
+                    retry_at = datetime.fromisoformat(retry_raw)
+                except (TypeError, ValueError) as error:
+                    raise UpgradeError(
+                        "migration_forward_repair_retry_invalid"
+                    ) from error
+
+                if retry_at.tzinfo is None:
+                    raise UpgradeError(
+                        "migration_forward_repair_retry_invalid"
+                    )
+
+                if (
+                    retry_at.astimezone(timezone.utc)
+                    > datetime.now(timezone.utc)
+                ):
+                    raise UpgradeError(
+                        "migration_forward_repair_retry_suppressed"
+                    )
+
+            release_state = json_file(
+                self.state_root / "state.json",
+                "release_state_invalid",
+            )
+            known_good = release_state.get("known_good_release") or {}
+
+            try:
+                known_schema = int(known_good.get("schema", -1))
+            except (TypeError, ValueError) as error:
+                raise UpgradeError(
+                    "migration_forward_repair_known_good_invalid"
+                ) from error
+
+            if (
+                known_good.get("sha") != sha
+                or known_schema not in {source, target}
+                or not source <= live_schema <= target
+                or (
+                    known_schema == target
+                    and live_schema != target
+                )
+            ):
+                raise UpgradeError(
+                    "migration_forward_repair_known_good_invalid"
+                )
+
+            history = release_state.get("history")
+            if not isinstance(history, list):
+                raise UpgradeError(
+                    "migration_forward_repair_acceptance_invalid"
+                )
+
+            acceptance = next(
+                (
+                    item
+                    for item in reversed(history)
+                    if isinstance(item, dict)
+                    and item.get("release_sha") == sha
+                    and item.get("status") == "known_good"
+                    and item.get("phase") == "complete"
+                ),
+                None,
+            )
+            acceptance_schema = (
+                acceptance.get("schema")
+                if isinstance(acceptance, dict)
+                else None
+            )
+            if not isinstance(acceptance_schema, dict):
+                raise UpgradeError(
+                    "migration_forward_repair_acceptance_invalid"
+                )
+
+            try:
+                accepted_source = int(acceptance_schema["observed"])
+                accepted_target = int(acceptance_schema["target"])
+            except (KeyError, TypeError, ValueError) as error:
+                raise UpgradeError(
+                    "migration_forward_repair_acceptance_invalid"
+                ) from error
+
+            if accepted_source != source or accepted_target != target:
+                raise UpgradeError(
+                    "migration_forward_repair_acceptance_invalid"
+                )
+
+            backup = state.get("backup")
+
+            if phase in {"backup_creation", "backup_creation_failed"}:
+                if backup not in {None, ""}:
+                    raise UpgradeError(
+                        "migration_forward_repair_backup_invalid"
+                    )
+                if execution.exists() or execution.is_symlink():
+                    raise UpgradeError(
+                        "migration_forward_repair_execution_invalid"
+                    )
+            else:
+                backup_path = str(backup or "")
+                if not backup_path or not Path(backup_path).is_absolute():
+                    raise UpgradeError(
+                        "migration_forward_repair_backup_invalid"
+                    )
+
+                if execution.is_symlink():
+                    raise UpgradeError(
+                        "migration_forward_repair_execution_invalid"
+                    )
+
+                if execution.exists():
+                    if not execution.is_file():
+                        raise UpgradeError(
+                            "migration_forward_repair_execution_invalid"
+                        )
+
+                    execution_state = json_file(
+                        execution,
+                        "migration_execution_state_invalid",
+                    )
+
+                    execution_status = str(
+                        execution_state.get("status") or ""
+                    )
+                    if phase in {
+                        "post_migration_validation",
+                        "post_migration_validation_failed",
+                    }:
+                        expected_statuses = {"completed"}
+                    elif (
+                        status == "running"
+                        and phase == "migration_execution"
+                    ):
+                        expected_statuses = {
+                            "running",
+                            "failed",
+                            "completed",
+                        }
+                    else:
+                        expected_statuses = {"failed"}
+
+                    execution_backup = (
+                        execution_state.get("backup")
+                        if isinstance(
+                            execution_state.get("backup"),
+                            dict,
+                        )
+                        else {}
+                    )
+
+                    if (
+                        execution_state.get("release_sha") != sha
+                        or execution_status not in expected_statuses
+                        or execution_backup.get("verified") is not True
+                        or str(execution_backup.get("path") or "")
+                        != backup_path
+                    ):
+                        raise UpgradeError(
+                            "migration_forward_repair_execution_invalid"
+                        )
+
+                    if "observed_schema" in execution_state:
+                        try:
+                            execution_schema = int(
+                                execution_state["observed_schema"]
+                            )
+                        except (TypeError, ValueError) as error:
+                            raise UpgradeError(
+                                "migration_forward_repair_execution_invalid"
+                            ) from error
+                        if not source <= execution_schema <= target:
+                            raise UpgradeError(
+                                "migration_forward_repair_execution_invalid"
+                            )
+
+                elif phase in {
+                    "post_migration_validation",
+                    "post_migration_validation_failed",
+                }:
+                    raise UpgradeError(
+                        "migration_forward_repair_execution_invalid"
+                    )
+                elif live_schema > source:
+                    # Schema advancement cannot exist without an executor
+                    # checkpoint carrying the verified backup identity.
+                    raise UpgradeError(
+                        "migration_forward_repair_execution_invalid"
+                    )
+
+            return "forward_repair_pending"
+
+        # --------------------------------------------------------------
+        # No durable automation exists.  Only the exact never-started
+        # condition may continue.
+        # --------------------------------------------------------------
+        if terminal_error != "migration_automation_terminal_missing":
+            raise UpgradeError(
+                terminal_error or "migration_origin_state_invalid"
+            )
+
+        # Complete absence of the migration state directory is part of the
+        # proof. Even an empty directory remains ambiguous.
+        if migration_dir.exists():
+            raise UpgradeError("migration_pending_state_ambiguous")
+
+        contract = self.automatic_migration_contract(sha)
+        source = contract["source"]
+        target = contract["target"]
+
+        if live_schema != source or recorded_schema != source:
+            raise UpgradeError("migration_pending_schema_not_source")
+
+        state = json_file(
+            self.state_root / "state.json",
+            "release_state_invalid",
+        )
+        known_good = state.get("known_good_release") or {}
+
+        try:
+            known_schema = int(known_good.get("schema", -1))
+        except (TypeError, ValueError) as error:
+            raise UpgradeError("migration_pending_known_good_invalid") from error
+
+        if known_good.get("sha") != sha or known_schema != source:
+            raise UpgradeError("migration_pending_known_good_invalid")
+
+        history = state.get("history")
+        if not isinstance(history, list):
+            raise UpgradeError("migration_pending_acceptance_missing")
+
+        acceptance = next(
+            (
+                item
+                for item in reversed(history)
+                if isinstance(item, dict)
+                and item.get("release_sha") == sha
+                and item.get("status") == "known_good"
+                and item.get("phase") == "complete"
+            ),
+            None,
+        )
+        acceptance_schema = (
+            acceptance.get("schema")
+            if isinstance(acceptance, dict)
+            else None
+        )
+        if not isinstance(acceptance_schema, dict):
+            raise UpgradeError("migration_pending_acceptance_missing")
+
+        try:
+            observed = int(acceptance_schema["observed"])
+            accepted_target = int(acceptance_schema["target"])
+        except (KeyError, TypeError, ValueError) as error:
+            raise UpgradeError("migration_pending_acceptance_invalid") from error
+
+        if observed != source or accepted_target != target:
+            raise UpgradeError("migration_pending_acceptance_invalid")
+
+        return "pre_mutation_pending"
+
     def attest_active_images(
-        self, slot: str, known_good: dict[str, Any]
+        self,
+        slot: str,
+        known_good: dict[str, Any],
+        *,
+        allow_refreshable_workers: bool = False,
     ) -> None:
         images = known_good.get("images") or {}
         if not isinstance(images, dict):
@@ -713,33 +1171,88 @@ class SystemOperations:
                 raise UpgradeError("known_good_image_state_invalid")
             return "sha256:" + value.rsplit("@sha256:", 1)[1]
 
-        expected = {
+        worker_id = image_id("worker")
+        required = {
             f"madar-{slot}-backend": image_id("backend"),
             f"madar-{slot}-frontend": image_id("frontend"),
         }
-        worker_id = image_id("worker")
-        for service in (
-            "parser-worker", "remote-ingestion-worker", "notification-worker",
-            "calendar-sync-worker", "data-deletion-worker",
-        ):
-            expected[f"madar-{slot}-{service}"] = worker_id
-        for container, expected_id in expected.items():
+
+        if allow_refreshable_workers:
+            required[f"madar-{slot}-remote-ingestion-worker"] = worker_id
+            optional = {
+                f"madar-{slot}-parser-worker",
+                f"madar-{slot}-notification-worker",
+                f"madar-{slot}-calendar-sync-worker",
+                f"madar-{slot}-data-deletion-worker",
+            }
+        else:
+            optional = set()
+            for service in (
+                "parser-worker",
+                "remote-ingestion-worker",
+                "notification-worker",
+                "calendar-sync-worker",
+                "data-deletion-worker",
+            ):
+                required[f"madar-{slot}-{service}"] = worker_id
+
+        for container, expected_id in required.items():
             actual = self.command(
                 "running_image_identity",
                 [
-                    "/usr/bin/docker", "inspect", "--format", "{{.Image}}",
+                    "/usr/bin/docker",
+                    "inspect",
+                    "--format",
+                    "{{.Image}}",
                     container,
                 ],
             ).stdout
             if actual != expected_id:
                 raise UpgradeError("running_image_identity_mismatch")
 
+        for container in sorted(optional):
+            result = self.command(
+                "repairable_worker_image_identity",
+                [
+                    "/usr/bin/docker",
+                    "inspect",
+                    "--format",
+                    "{{.Image}}",
+                    container,
+                ],
+                check=False,
+            )
+            if result.returncode == 0:
+                if result.stdout != worker_id:
+                    raise UpgradeError("running_image_identity_mismatch")
+                continue
+
+            missing_container = (
+                result.returncode == 1
+                and (
+                    "No such object:" in result.stderr
+                    or "No such container:" in result.stderr
+                )
+            )
+            if not missing_container:
+                raise UpgradeError(
+                    "repairable_worker_inspection_failed"
+                )
+
     def attest_serving(
-        self, expected_sha: str, *, recovery: bool = False
+        self,
+        expected_sha: str,
+        *,
+        recovery: bool = False,
+        current_origin: bool = False,
     ) -> dict[str, Any]:
-        state = json_file(self.state_root / "state.json", "release_state_invalid")
+        state = json_file(
+            self.state_root / "state.json",
+            "release_state_invalid",
+        )
         known = state.get("known_good_release") or {}
         slot = str(state.get("active_slot") or "")
+
         if (
             slot not in SLOT_PORTS
             or known.get("slot") != slot
@@ -748,75 +1261,171 @@ class SystemOperations:
             or state.get("rollback_failure")
         ):
             raise UpgradeError("release_state_incoherent")
+
         try:
             schema = int(known["schema"])
         except (KeyError, TypeError, ValueError) as error:
             raise UpgradeError("known_good_schema_invalid") from error
-        stable_version = self.http_json("http://127.0.0.1:8001/health/version")
-        stable_ready = self.http_json("http://127.0.0.1:8001/health/ready")
+
+        observed_schema = (
+            self.live_schema(slot)
+            if current_origin
+            else schema
+        )
+
+        origin_migration: str | None = None
+        forward_repair = False
+        if current_origin and not recovery:
+            origin_migration = self.migration_origin_state(
+                expected_sha,
+                schema,
+                observed_schema,
+            )
+            forward_repair = (
+                origin_migration == "forward_repair_pending"
+            )
+
+        stable_version = self.http_json(
+            "http://127.0.0.1:8001/health/version"
+        )
         port = SLOT_PORTS[slot]["backend"]
-        active_version = self.http_json(f"http://127.0.0.1:{port}/health/version")
-        active_ready = self.http_json(f"http://127.0.0.1:{port}/health/ready")
+        active_version = self.http_json(
+            f"http://127.0.0.1:{port}/health/version"
+        )
+
+        ready_reader = (
+            self.http_json_allow_503
+            if forward_repair
+            else self.http_json
+        )
+        stable_ready = ready_reader(
+            "http://127.0.0.1:8001/health/ready"
+        )
+        active_ready = ready_reader(
+            f"http://127.0.0.1:{port}/health/ready"
+        )
+
         for identity in (stable_version, active_version):
             if identity.get("release_sha") != expected_sha:
                 raise UpgradeError("serving_release_identity_mismatch")
+
             reported_slot = str(identity.get("release_slot") or "")
-            if (reported_slot and reported_slot != slot) or (
-                recovery and reported_slot != slot
+            if (
+                (reported_slot and reported_slot != slot)
+                or (recovery and reported_slot != slot)
             ):
                 raise UpgradeError("serving_release_slot_mismatch")
+
             try:
                 minimum = int(identity["schema_compatible_min"])
                 maximum = int(identity["schema_compatible_max"])
             except (KeyError, TypeError, ValueError) as error:
-                raise UpgradeError("serving_schema_contract_invalid") from error
-            if not minimum <= schema <= maximum:
+                raise UpgradeError(
+                    "serving_schema_contract_invalid"
+                ) from error
+
+            if not minimum <= observed_schema <= maximum:
                 raise UpgradeError("serving_schema_incompatible")
+
         for readiness in (stable_ready, active_ready):
-            if readiness.get("ready") is not True:
-                raise UpgradeError("serving_readiness_degraded")
             components = readiness.get("components")
-            if not isinstance(components, dict) or components.get("schema") != "ok":
+            if not isinstance(components, dict):
                 raise UpgradeError("serving_readiness_invalid")
-            if any(
-                components.get(component) != "ok"
-                for component in REQUIRED_PRODUCTION_READINESS
-            ):
-                raise UpgradeError("required_production_component_not_ready")
+
+            if forward_repair:
+                if any(
+                    components.get(component) != "ok"
+                    for component in FORWARD_REPAIR_CORE_COMPONENTS
+                ):
+                    raise UpgradeError(
+                        "forward_repair_core_readiness_degraded"
+                    )
+
+                unrelated = sorted(
+                    name
+                    for name, value in components.items()
+                    if value not in FORWARD_REPAIR_ACCEPTED_READINESS
+                    and name not in FORWARD_REPAIR_REFRESHABLE_COMPONENTS
+                )
+                if unrelated:
+                    raise UpgradeError(
+                        "forward_repair_unrelated_readiness_degraded"
+                    )
+            else:
+                if readiness.get("ready") is not True:
+                    raise UpgradeError("serving_readiness_degraded")
+
+                if components.get("schema") != "ok":
+                    raise UpgradeError("serving_readiness_invalid")
+
+                if any(
+                    components.get(component) != "ok"
+                    for component in REQUIRED_PRODUCTION_READINESS
+                ):
+                    raise UpgradeError(
+                        "required_production_component_not_ready"
+                    )
+
         self.http_ok("http://127.0.0.1:3000/")
-        self.http_ok(f"http://127.0.0.1:{SLOT_PORTS[slot]['frontend']}/")
+        self.http_ok(
+            f"http://127.0.0.1:{SLOT_PORTS[slot]['frontend']}/"
+        )
+
         if not self.proxy_file.is_file() or self.proxy_file.is_symlink():
             raise UpgradeError("traffic_target_file_invalid")
+
         proxy = self.proxy_file.read_text(encoding="utf-8")
         if (
             f"127.0.0.1:{SLOT_PORTS[slot]['backend']}" not in proxy
             or f"127.0.0.1:{SLOT_PORTS[slot]['frontend']}" not in proxy
         ):
             raise UpgradeError("traffic_target_slot_mismatch")
-        self.attest_active_images(slot, known)
+
+        self.attest_active_images(
+            slot,
+            known,
+            allow_refreshable_workers=forward_repair,
+        )
+
         if recovery:
             self.validate_recovery_candidate_contract(
-                self.state_root / "releases" / expected_sha, schema
+                self.state_root / "releases" / expected_sha,
+                schema,
             )
             fallback = state.get("compatible_fallback_release") or {}
             try:
                 fallback_schema = int(fallback.get("schema", -1))
             except (TypeError, ValueError) as error:
-                raise UpgradeError("recovery_compatible_fallback_invalid") from error
+                raise UpgradeError(
+                    "recovery_compatible_fallback_invalid"
+                ) from error
+
             if (
                 fallback.get("sha") != expected_sha
-                or fallback.get("slot") not in ({"blue", "green"} - {slot})
+                or fallback.get("slot")
+                not in ({"blue", "green"} - {slot})
                 or fallback_schema != schema
                 or fallback.get("workers_active") is not False
             ):
-                raise UpgradeError("recovery_compatible_fallback_invalid")
+                raise UpgradeError(
+                    "recovery_compatible_fallback_invalid"
+                )
             migration = "not_requested"
+        elif current_origin:
+            migration = origin_migration
+            if migration is None:
+                raise UpgradeError("migration_origin_state_invalid")
         else:
-            migration = self.migration_terminal(expected_sha, schema)
+            migration = self.migration_terminal(
+                expected_sha,
+                schema,
+            )
+
         return {
             "sha": expected_sha,
             "slot": slot,
-            "schema": schema,
+            "schema": observed_schema,
+            "recorded_schema": schema,
             "migration": migration,
             "state": state,
         }
@@ -876,7 +1485,10 @@ class SystemOperations:
         self.require_clean_repository()
         production_sha = self.repository_head()
         installed_sha = self.installed_sha()
-        serving = self.attest_serving(production_sha)
+        serving = self.attest_serving(
+            production_sha,
+            current_origin=True,
+        )
         timer = self.systemctl_state("madar-auto-deploy.timer")
         service = self.systemctl_state("madar-auto-deploy.service")
         if service["active"] != "inactive":
@@ -1663,8 +2275,16 @@ class SystemOperations:
             pass
 
     def run_deploy_service(
-        self, label: str, approved_sha: str, *, recovery: bool = False
+        self,
+        label: str,
+        approved_sha: str,
+        *,
+        recovery: bool = False,
+        migration_repair: bool = False,
     ) -> None:
+        if recovery and migration_repair:
+            raise UpgradeError("deployment_operation_mode_invalid")
+
         self.write_authorization(
             approved_sha,
             recovery=recovery,
@@ -1677,15 +2297,22 @@ class SystemOperations:
         unit = f"madar-control-plane-upgrade-{os.getpid()}-{label}"
         started = time.time()
         try:
-            entrypoint = (
-                [
+            if recovery:
+                entrypoint = [
                     str(self.control_root / "bin/madar-release-deploy"),
                     approved_sha,
                     "--recover-current-schema",
                 ]
-                if recovery
-                else [str(self.control_root / "bin/madar-auto-deploy")]
-            )
+            elif migration_repair:
+                entrypoint = [
+                    str(self.control_root / "bin/madar-release-deploy"),
+                    approved_sha,
+                    "--automatic-migrate",
+                ]
+            else:
+                entrypoint = [
+                    str(self.control_root / "bin/madar-auto-deploy"),
+                ]
             start_result = self.command(
                 label,
                 [
@@ -1766,6 +2393,7 @@ class UpgradeCoordinator:
         self.quiesced = False
         self.success = False
         self.recovery = False
+        self.forward_repair = False
 
     def execute(
         self, *, dry_run: bool, recovery: bool = False,
@@ -1791,48 +2419,122 @@ class UpgradeCoordinator:
         self.record.active_slot_before = before["slot"]
         self.record.schema_before = before["schema"]
         self.record.timer_state_before = before["timer"]
+        self.forward_repair = (
+            not recovery
+            and before.get("migration") == "forward_repair_pending"
+        )
         self.audit.persist()
 
-        self.audit.phase("candidate_resolution")
-        self.operations.resolve_candidate(self.record.approved_sha, dry_run=dry_run)
-        self.record.candidate_sha = self.record.approved_sha
-        if recovery:
-            if rehearsal_attestation is None:
-                raise UpgradeError("recovery_rehearsal_attestation_required")
-            self.audit.phase("recovery_rehearsal_attestation")
-            self.record.rehearsal_attestation_sha256 = (
-                self.operations.validate_rehearsal_attestation(
-                    rehearsal_attestation,
+        if self.forward_repair:
+            self.record.candidate_sha = self.record.approved_sha
+
+            if (
+                before["production_sha"] != self.record.approved_sha
+                or before["installed_sha"] != self.record.approved_sha
+            ):
+                raise UpgradeError(
+                    "forward_repair_exact_same_sha_required"
+                )
+
+            self.record.controller_compatibility = (
+                "forward_repair_same_sha"
+            )
+            self.record.controller_preinstalled = False
+            self.record.controller_installation_required = False
+
+            if not dry_run:
+                # The application was durably promoted by an earlier
+                # transaction. This invocation owns migration repair only.
+                self.record.application_promoted = True
+                self.record.active_slot_after = before["slot"]
+                self.record.schema_after = before["schema"]
+
+            self.audit.phase(
+                "forward_repair_control_plane_attestation"
+            )
+            self.operations.verify_installed_controller(
+                self.record.approved_sha
+            )
+            self.audit.persist()
+
+            if dry_run:
+                self.record.status = "dry_run_complete"
+                self.record.phase = "dry_run_complete"
+                self.record.completed_at = utc_now()
+                self.record.timer_state_after = before["timer"]
+                self.success = True
+                self.audit.persist()
+                return
+
+        else:
+            self.audit.phase("candidate_resolution")
+            self.operations.resolve_candidate(
+                self.record.approved_sha,
+                dry_run=dry_run,
+            )
+            self.record.candidate_sha = self.record.approved_sha
+
+            if recovery:
+                if rehearsal_attestation is None:
+                    raise UpgradeError(
+                        "recovery_rehearsal_attestation_required"
+                    )
+                self.audit.phase(
+                    "recovery_rehearsal_attestation"
+                )
+                self.record.rehearsal_attestation_sha256 = (
+                    self.operations.validate_rehearsal_attestation(
+                        rehearsal_attestation,
+                        self.record.approved_sha,
+                        before["schema"],
+                    )
+                )
+                self.operations.recovery_schema = before["schema"]
+                self.operations.recovery_rehearsal_sha256 = (
+                    self.record.rehearsal_attestation_sha256
+                )
+
+            self.audit.persist()
+
+            self.audit.phase("controller_compatibility")
+            controller_compatibility = (
+                self.operations.validate_controller_compatibility(
                     self.record.approved_sha,
-                    before["schema"],
+                    before,
                 )
             )
-            self.operations.recovery_schema = before["schema"]
-            self.operations.recovery_rehearsal_sha256 = (
-                self.record.rehearsal_attestation_sha256
+            self.record.controller_compatibility = (
+                controller_compatibility
             )
-        self.audit.persist()
-
-        self.audit.phase("controller_compatibility")
-        controller_compatibility = self.operations.validate_controller_compatibility(
-            self.record.approved_sha, before
-        )
-        self.record.controller_compatibility = controller_compatibility
-        self.record.controller_preinstalled = (
-            controller_compatibility == "controller_ahead_bridge"
-        )
-        self.record.controller_installation_required = not (
-            self.record.controller_preinstalled
-        )
-        self.audit.persist()
+            self.record.controller_preinstalled = (
+                controller_compatibility
+                == "controller_ahead_bridge"
+            )
+            self.record.controller_installation_required = not (
+                self.record.controller_preinstalled
+            )
+            self.audit.persist()
 
         self.audit.phase("protected_change_detection")
-        protected_change = self.operations.protected_change_required(
-            self.record.approved_sha
+        protected_change = (
+            False
+            if self.forward_repair
+            else self.operations.protected_change_required(
+                self.record.approved_sha
+            )
         )
         if self.record.controller_preinstalled and protected_change:
             raise UpgradeError("preinstalled_controller_identity_drift")
-        if not recovery and not self.record.controller_preinstalled and not protected_change:
+
+        if self.forward_repair and protected_change:
+            raise UpgradeError("forward_repair_control_plane_drift")
+
+        if (
+            not recovery
+            and not self.record.controller_preinstalled
+            and not self.forward_repair
+            and not protected_change
+        ):
             self.record.controller_installation_required = False
             self.record.status = "not_required"
             self.record.failure_semantics = "ordinary_auto_deploy_required"
@@ -1852,47 +2554,51 @@ class UpgradeCoordinator:
             # authorized systemd cycle can acquire its normal lock later.
             self.operations.release_deployment_lock()
 
-        self.audit.phase("candidate_staging")
-        self.transaction, self.candidate = self.operations.stage_candidate(
-            self.record.approved_sha
-        )
-        if recovery:
-            self.audit.phase("recovery_candidate_contract")
-            self.operations.validate_recovery_candidate_contract(
-                self.candidate, before["schema"]
+        if not self.forward_repair:
+            self.audit.phase("candidate_staging")
+            self.transaction, self.candidate = self.operations.stage_candidate(
+                self.record.approved_sha
             )
-        self.audit.phase("candidate_static_preflight")
-        candidate_digest = self.operations.static_preflight(self.candidate)
-        stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-        backup = self.operations.backup_root / (
-            f"pre-{self.record.approved_sha[:12]}-{stamp}"
-        )
-        if backup.exists() or backup.is_symlink():
-            raise UpgradeError("control_plane_backup_path_already_exists")
-        if self.record.controller_installation_required:
-            self.record.backup_path = str(backup)
-        self.audit.persist()
-
-        self.audit.phase("installer_dry_run")
-        self.operations.installer_dry_run(self.candidate, backup)
-        if self.operations.protected_tree_digest(self.candidate) != candidate_digest:
-            raise UpgradeError("candidate_changed_after_dry_run")
-        if self.record.controller_preinstalled:
-            self.audit.phase("preinstalled_control_plane_attestation")
-            self.operations.verify_installed_controller(self.record.approved_sha)
-        if dry_run:
-            self.audit.phase("candidate_cleanup")
-            self.operations.cleanup_staging(self.transaction)
-            self.transaction = None
-            self.record.status = "dry_run_complete"
-            self.record.phase = "dry_run_complete"
-            self.record.completed_at = utc_now()
-            self.record.timer_state_after = before["timer"]
-            self.success = True
+            if recovery:
+                self.audit.phase("recovery_candidate_contract")
+                self.operations.validate_recovery_candidate_contract(
+                    self.candidate, before["schema"]
+                )
+            self.audit.phase("candidate_static_preflight")
+            candidate_digest = self.operations.static_preflight(self.candidate)
+            stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+            backup = self.operations.backup_root / (
+                f"pre-{self.record.approved_sha[:12]}-{stamp}"
+            )
+            if backup.exists() or backup.is_symlink():
+                raise UpgradeError("control_plane_backup_path_already_exists")
+        if not self.forward_repair:
+            if self.record.controller_installation_required:
+                self.record.backup_path = str(backup)
             self.audit.persist()
-            return
 
-        if not self.record.controller_preinstalled:
+            self.audit.phase("installer_dry_run")
+            self.operations.installer_dry_run(self.candidate, backup)
+            if self.operations.protected_tree_digest(self.candidate) != candidate_digest:
+                raise UpgradeError("candidate_changed_after_dry_run")
+            if self.record.controller_preinstalled:
+                self.audit.phase("preinstalled_control_plane_attestation")
+                self.operations.verify_installed_controller(
+                    self.record.approved_sha
+                )
+            if dry_run:
+                self.audit.phase("candidate_cleanup")
+                self.operations.cleanup_staging(self.transaction)
+                self.transaction = None
+                self.record.status = "dry_run_complete"
+                self.record.phase = "dry_run_complete"
+                self.record.completed_at = utc_now()
+                self.record.timer_state_after = before["timer"]
+                self.success = True
+                self.audit.persist()
+                return
+
+        if self.record.controller_installation_required:
             self.audit.phase("control_plane_install")
             try:
                 self.operations.installer_apply(
@@ -1912,16 +2618,27 @@ class UpgradeCoordinator:
             self.audit.phase("control_plane_install_attestation")
             self.operations.verify_install(self.record.approved_sha, backup)
 
-        self.audit.phase("controlled_candidate_deployment")
+        self.audit.phase(
+            "forward_repair_migration"
+            if self.forward_repair
+            else "controlled_candidate_deployment"
+        )
         if recovery:
             self.operations.run_deploy_service(
                 "controlled_candidate_deployment", self.record.approved_sha,
                 recovery=True,
             )
             self.operations.advance_production_checkout(self.record.approved_sha)
+        elif self.forward_repair:
+            self.operations.run_deploy_service(
+                "forward_repair_migration",
+                self.record.approved_sha,
+                migration_repair=True,
+            )
         else:
             self.operations.run_deploy_service(
-                "controlled_candidate_deployment", self.record.approved_sha
+                "controlled_candidate_deployment",
+                self.record.approved_sha,
             )
         serving = self.operations.attest_serving(
             self.record.approved_sha, recovery=recovery
@@ -1941,9 +2658,16 @@ class UpgradeCoordinator:
                 "same_sha_idempotence", self.record.approved_sha,
                 recovery=True,
             )
+        elif self.forward_repair:
+            self.operations.run_deploy_service(
+                "forward_repair_idempotence",
+                self.record.approved_sha,
+                migration_repair=True,
+            )
         else:
             self.operations.run_deploy_service(
-                "same_sha_idempotence", self.record.approved_sha
+                "same_sha_idempotence",
+                self.record.approved_sha,
             )
         confirmed = self.operations.attest_serving(
             self.record.approved_sha, recovery=recovery
@@ -2036,7 +2760,11 @@ class UpgradeCoordinator:
                     self.record.failure_semantics = (
                         "pre_install_restore_not_attested_timer_disabled"
                     )
-        if self.record.controller_installed or self.record.controller_preinstalled:
+        if (
+            self.record.controller_installed
+            or self.record.controller_preinstalled
+            or self.forward_repair
+        ):
             try:
                 self.operations.disable_automation_for_failure()
                 self.operations.arm_interlock(self.record.approved_sha)
@@ -2056,9 +2784,14 @@ class UpgradeCoordinator:
             self.operations.clear_authorization()
         self.operations.close_locks()
         if not self.record.dry_run and (
-            self.success or not (
-                self.record.controller_installed
-                or self.record.controller_preinstalled
+            self.success
+            or (
+                self.quiesced
+                and not (
+                    self.record.controller_installed
+                    or self.record.controller_preinstalled
+                    or self.forward_repair
+                )
             )
         ):
             self.operations.clear_interlock()
