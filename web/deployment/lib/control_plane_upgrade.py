@@ -253,6 +253,29 @@ def parse_contract(path: Path) -> dict[str, str]:
     return values
 
 
+BACKUP_TIMERS = (
+    "madar-backup.timer",
+    "madar-backup-verify.timer",
+    "madar-node1-backup.timer",
+    "madar-offhost-backup.timer",
+)
+BACKUP_BUSY_STATES = ("active", "activating", "deactivating", "reloading")
+
+
+def validate_backup_timer_states(value: Any) -> dict[str, dict[str, str]]:
+    if not isinstance(value, dict) or set(value) != set(BACKUP_TIMERS):
+        raise UpgradeError("backup_timer_states_invalid")
+    for name, state in value.items():
+        if (
+            not isinstance(state, dict)
+            or set(state) != {"enabled", "active"}
+            or state["enabled"] not in ("enabled", "disabled")
+            or state["active"] not in ("active", "inactive")
+        ):
+            raise UpgradeError(f"backup_timer_state_invalid:{name}")
+    return {name: dict(value[name]) for name in BACKUP_TIMERS}
+
+
 def atomic_json(path: Path, value: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     descriptor, temporary = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
@@ -1805,16 +1828,71 @@ class SystemOperations:
             raise UpgradeError("protected_control_plane_diff_failed")
         return result.returncode == 1
 
-    def quiesce(self) -> None:
-        self.backup_timer_states = {}
-        for name in ('madar-backup', 'madar-backup-verify', 'madar-node1-backup', 'madar-offhost-backup'):
-            service = self.systemctl_state(name + '.service')
-            if service['active'] in ('active', 'activating', 'deactivating', 'reloading'):
-                raise UpgradeError('backup_operation_running_retry_after_completion')
-            state = self.systemctl_state(name + '.timer')
-            self.backup_timer_states[name + '.timer'] = state
-            if state['active'] == 'active':
-                self.command('backup_timer_stop', ['/usr/bin/systemctl', 'stop', name + '.timer'])
+    def interlock_backup_states(
+        self, approved_sha: str
+    ) -> dict[str, dict[str, str]] | None:
+        if not LOWER_SHA_RE.fullmatch(approved_sha):
+            raise UpgradeError("approved_sha_must_be_exact_40_hex")
+        try:
+            metadata = self.interlock_file.lstat()
+        except FileNotFoundError:
+            return None
+        if (
+            not stat.S_ISREG(metadata.st_mode)
+            or metadata.st_uid != 0
+            or metadata.st_mode & 0o022
+        ):
+            raise UpgradeError("control_plane_upgrade_interlock_invalid")
+        try:
+            document = json.loads(self.interlock_file.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as error:
+            raise UpgradeError("control_plane_upgrade_interlock_invalid") from error
+        if not isinstance(document, dict):
+            raise UpgradeError("control_plane_upgrade_interlock_invalid")
+        snapshot = None
+        if "backup_timer_states" in document:
+            snapshot = validate_backup_timer_states(document["backup_timer_states"])
+        if document.get("approved_sha") != approved_sha:
+            raise UpgradeError("control_plane_upgrade_interlock_sha_mismatch")
+        return snapshot
+
+    def durable_quiesce_snapshot_exists(self, approved_sha: str) -> bool:
+        return self.interlock_backup_states(approved_sha) is not None
+
+    def interlock_document(self, approved_sha: str, **fields: Any) -> dict[str, Any]:
+        snapshot = self.interlock_backup_states(approved_sha)
+        if (
+            snapshot is None
+            and getattr(self, "backup_timer_sha", None) == approved_sha
+        ):
+            snapshot = validate_backup_timer_states(self.backup_timer_states)
+        document = {"version": 2, "approved_sha": approved_sha, **fields}
+        if snapshot is not None:
+            document["backup_timer_states"] = snapshot
+        return document
+
+    def quiesce(self, approved_sha: str) -> None:
+        # Inspect the entire set before any timer or interlock mutation.
+        services = {
+            name: self.systemctl_state(name.replace(".timer", ".service"))
+            for name in BACKUP_TIMERS
+        }
+        current = {name: self.systemctl_state(name) for name in BACKUP_TIMERS}
+        if any(state["active"] in BACKUP_BUSY_STATES for state in services.values()):
+            raise UpgradeError("backup_operation_running_retry_after_completion")
+        if any(state["active"] not in ("inactive", "failed") for state in services.values()):
+            raise UpgradeError("backup_service_state_invalid")
+        current = validate_backup_timer_states(current)
+        original = self.interlock_backup_states(approved_sha)
+        self.backup_timer_states = original if original is not None else current
+        self.backup_timer_sha = approved_sha
+        self.arm_interlock(approved_sha)
+        for name, state in current.items():
+            if state["active"] == "active":
+                self.command("backup_timer_stop", ["/usr/bin/systemctl", "stop", name])
+        for name in BACKUP_TIMERS:
+            if self.systemctl_state(name)["active"] != "inactive":
+                raise UpgradeError(f"backup_timer_not_quiesced:{name}")
         self.command(
             "timer_disable_now",
             ["/usr/bin/systemctl", "disable", "--now", "madar-auto-deploy.timer"],
@@ -1845,11 +1923,9 @@ class SystemOperations:
         require_root_directory(self.runtime_root, create=True, mode=0o711)
         atomic_json(
             self.interlock_file,
-            {
-                "approved_sha": approved_sha,
-                "authorization_sha256": None,
-                "status": "quiesced",
-            },
+            self.interlock_document(
+                approved_sha, authorization_sha256=None, status="quiesced",
+            ),
         )
         os.chmod(self.interlock_file, 0o644)
 
@@ -1864,7 +1940,80 @@ class SystemOperations:
         except FileNotFoundError:
             pass
 
+    def restore_backup_timers(self) -> None:
+        approved_sha = getattr(self, "backup_timer_sha", None)
+        if approved_sha is None:
+            raise UpgradeError("backup_timer_states_missing")
+        snapshot = self.interlock_backup_states(approved_sha)
+        if snapshot is None:
+            raise UpgradeError("backup_timer_states_missing")
+        for name, state in snapshot.items():
+            self.command(
+                "backup_timer_restore_enabled",
+                [
+                    "/usr/bin/systemctl",
+                    "enable" if state["enabled"] == "enabled" else "disable",
+                    name,
+                ],
+            )
+            self.command(
+                "backup_timer_restore",
+                [
+                    "/usr/bin/systemctl",
+                    "start" if state["active"] == "active" else "stop",
+                    name,
+                ],
+            )
+        for name, intended in snapshot.items():
+            if self.systemctl_state(name) != intended:
+                raise UpgradeError(f"backup_timer_restore_failed:{name}")
+
+    def requiesce_backup_timers_for_failure(self) -> None:
+        current = {name: self.systemctl_state(name) for name in BACKUP_TIMERS}
+        for name, state in current.items():
+            if state.get("active") not in ("active", "inactive"):
+                raise UpgradeError(
+                    f"backup_timer_failure_requiesce_failed:{name}"
+                )
+        stop_failures = []
+        for name, state in current.items():
+            if state["active"] == "active":
+                try:
+                    self.command(
+                        "backup_timer_failure_stop",
+                        ["/usr/bin/systemctl", "stop", name],
+                    )
+                except UpgradeError:
+                    stop_failures.append(name)
+        final = {
+            name: self.systemctl_state(name).get("active")
+            for name in BACKUP_TIMERS
+        }
+        for name in BACKUP_TIMERS:
+            if name in stop_failures or final[name] != "inactive":
+                raise UpgradeError(
+                    f"backup_timer_failure_requiesce_failed:{name}"
+                )
+
     def restore_timer(self, original: dict[str, str]) -> dict[str, str]:
+        try:
+            self.restore_backup_timers()
+            return self.restore_auto_deploy_timer(original)
+        except UpgradeError as restoration_error:
+            automation_error = None
+            try:
+                self.disable_automation_for_failure()
+            except UpgradeError as error:
+                automation_error = error
+            try:
+                self.requiesce_backup_timers_for_failure()
+            except UpgradeError as requiesce_error:
+                raise requiesce_error from restoration_error
+            if automation_error is not None:
+                raise automation_error from restoration_error
+            raise
+
+    def restore_auto_deploy_timer(self, original: dict[str, str]) -> dict[str, str]:
         if original.get("enabled") == "enabled":
             self.command(
                 "timer_enable",
@@ -1892,9 +2041,6 @@ class SystemOperations:
         expected_active = "active" if original.get("active") == "active" else "inactive"
         if restored != {"enabled": expected_enabled, "active": expected_active}:
             raise UpgradeError("auto_deploy_timer_restore_failed")
-        for name, state in getattr(self, 'backup_timer_states', {}).items():
-            if state['active'] == 'active':
-                self.command('backup_timer_restore', ['/usr/bin/systemctl', 'start', name])
         return restored
 
     def disable_automation_for_failure(self) -> None:
@@ -2231,6 +2377,7 @@ class SystemOperations:
         schema: int | None = None, rehearsal_sha256: str | None = None,
     ) -> None:
         require_root_directory(self.runtime_root, mode=0o711)
+        document = self.interlock_document(approved_sha)
         token = secrets.token_urlsafe(32)
         descriptor, temporary = tempfile.mkstemp(prefix=".authorized.", dir=self.runtime_root)
         try:
@@ -2252,16 +2399,16 @@ class SystemOperations:
             os.replace(temporary, self.authorization_file)
             atomic_json(
                 self.interlock_file,
-                {
-                    "approved_sha": approved_sha,
-                    "authorization_sha256": hashlib.sha256(
+                dict(
+                    document,
+                    authorization_sha256=hashlib.sha256(
                         token.encode("utf-8")
                     ).hexdigest(),
-                    "status": "authorized_cycle",
-                    "operation": "schema_recovery" if recovery else "release",
-                    "schema": schema,
-                    "rehearsal_sha256": rehearsal_sha256,
-                },
+                    status="authorized_cycle",
+                    operation="schema_recovery" if recovery else "release",
+                    schema=schema,
+                    rehearsal_sha256=rehearsal_sha256,
+                ),
             )
             os.chmod(self.interlock_file, 0o644)
         finally:
@@ -2566,9 +2713,18 @@ class UpgradeCoordinator:
 
         if not dry_run:
             self.audit.phase("automation_quiesce")
+            try:
+                self.operations.quiesce(self.record.approved_sha)
+            except Exception:
+                # Only the protected exact-SHA interlock proves that quiesce
+                # reached its process-durable boundary.
+                self.quiesced = (
+                    self.operations.durable_quiesce_snapshot_exists(
+                        self.record.approved_sha
+                    )
+                )
+                raise
             self.quiesced = True
-            self.operations.quiesce()
-            self.operations.arm_interlock(self.record.approved_sha)
             # The root-owned interlock now blocks every ordinary/manual
             # controller entrypoint. Release deploy.lock so the explicitly
             # authorized systemd cycle can acquire its normal lock later.
@@ -2702,8 +2858,8 @@ class UpgradeCoordinator:
         self.operations.cleanup_staging(self.transaction)
         self.transaction = None
         self.audit.phase("automation_restore")
-        self.operations.clear_interlock()
         self.record.timer_state_after = self.operations.restore_timer(before["timer"])
+        self.operations.clear_interlock()
         self.record.status = "success"
         self.record.phase = "complete"
         self.record.failure_semantics = "complete"
@@ -2768,11 +2924,13 @@ class UpgradeCoordinator:
                     restore_safe = False
                 if restore_safe:
                     try:
-                        self.operations.clear_interlock()
                         self.record.timer_state_after = self.operations.restore_timer(
                             self.record.timer_state_before
                         )
+                        self.operations.clear_interlock()
                     except UpgradeError:
+                        self.operations.disable_automation_for_failure()
+                        self.operations.arm_interlock(self.record.approved_sha)
                         self.record.failure_semantics = (
                             "pre_install_timer_restore_failed_manual_intervention"
                         )
@@ -2803,18 +2961,6 @@ class UpgradeCoordinator:
         if not self.record.dry_run:
             self.operations.clear_authorization()
         self.operations.close_locks()
-        if not self.record.dry_run and (
-            self.success
-            or (
-                self.quiesced
-                and not (
-                    self.record.controller_installed
-                    or self.record.controller_preinstalled
-                    or self.forward_repair
-                )
-            )
-        ):
-            self.operations.clear_interlock()
         try:
             self.operations.cleanup_staging(self.transaction)
         except UpgradeError as error:

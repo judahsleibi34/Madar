@@ -57,6 +57,15 @@ class FakeOperations:
         self.schema = 93
         self.timer = {"enabled": "enabled", "active": "active"}
         self.interlock = False
+        self.backup_timer_states = None
+        self.durable_backup_timer_states = None
+        self.backup_timers = {
+            name: {"enabled": "enabled", "active": "active"}
+            for name in upgrade.BACKUP_TIMERS
+        }
+        self.backup_timers[upgrade.BACKUP_TIMERS[-1]] = {
+            "enabled": "disabled", "active": "inactive",
+        }
         self.snapshot = {"state": "unchanged"}
         self.controller_compatibility = "normal_compatible"
         self.recovery = False
@@ -101,9 +110,26 @@ class FakeOperations:
         self._event("protected_change_required")
         return self.protected
 
-    def quiesce(self):
+    def quiesce(self, sha):
         self._event("quiesce")
+        if self.backup_timer_states is None:
+            self.backup_timer_states = {
+                name: dict(state)
+                for name, state in self.backup_timers.items()
+            }
+        self.durable_backup_timer_states = {
+            name: dict(state)
+            for name, state in self.backup_timer_states.items()
+        }
+        self.arm_interlock(sha)
+        self._event("quiesce_after_snapshot")
+        for state in self.backup_timers.values():
+            state["active"] = "inactive"
         self.timer = {"enabled": "disabled", "active": "inactive"}
+
+    def durable_quiesce_snapshot_exists(self, sha):
+        self.events.append("durable_quiesce_snapshot_exists")
+        return self.interlock and self.durable_backup_timer_states is not None
 
     def arm_interlock(self, sha):
         self._event("arm_interlock")
@@ -203,6 +229,10 @@ class FakeOperations:
 
     def restore_timer(self, original):
         self._event("restore_timer")
+        self.backup_timers = {
+            name: dict(state)
+            for name, state in self.backup_timer_states.items()
+        }
         self.timer = dict(original)
         return dict(self.timer)
 
@@ -226,6 +256,257 @@ class FakeOperations:
     def preinstall_restore_safe(self, previous_sha, production_sha):
         self.events.append("preinstall_restore_safe")
         return self.installed == previous_sha and self.production == production_sha
+
+
+class DurableBackupTimerTests(unittest.TestCase):
+    SHA = "a" * 40
+
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+        self.root = Path(self.temporary.name)
+        self.operations = object.__new__(upgrade.SystemOperations)
+        self.operations.runtime_root = self.root / "runtime"
+        self.operations.runtime_root.mkdir()
+        self.operations.interlock_file = self.operations.runtime_root / "in-progress.json"
+        self.operations.authorization_file = self.operations.runtime_root / "authorized.json"
+        self.states = {
+            name: {"enabled": "enabled", "active": "active"}
+            for name in upgrade.BACKUP_TIMERS
+        }
+        self.states[upgrade.BACKUP_TIMERS[-1]] = {
+            "enabled": "disabled", "active": "inactive",
+        }
+        self.original = {name: dict(state) for name, state in self.states.items()}
+        self.states["madar-auto-deploy.timer"] = {
+            "enabled": "enabled", "active": "active",
+        }
+        self.events = []
+        self.busy = None
+        self.wrong_restore = None
+        self.fail_backup_restore = None
+        self.operations.systemctl_state = mock.Mock(side_effect=self.state)
+        self.operations.command = mock.Mock(side_effect=self.command)
+        self.addCleanup(mock.patch.stopall)
+        mock.patch.object(upgrade, "require_root_directory").start()
+        original_atomic = upgrade.atomic_json
+
+        def write(path, value):
+            self.events.append(("persist", json.loads(json.dumps(value))))
+            original_atomic(path, value)
+
+        mock.patch.object(upgrade, "atomic_json", side_effect=write).start()
+        # Fixtures may be owned by the test user; production ownership checks
+        # remain real and are separately exercised below.
+        original_lstat = Path.lstat
+
+        def lstat(path):
+            value = original_lstat(path)
+            if path == self.operations.interlock_file:
+                return SimpleNamespace(st_uid=0, st_mode=value.st_mode)
+            return value
+
+        mock.patch.object(Path, "lstat", lstat).start()
+
+    def state(self, name):
+        self.events.append(("state", name))
+        if name.endswith(".service"):
+            return {
+                "enabled": "disabled",
+                "active": "active" if name == self.busy else "inactive",
+            }
+        state = dict(self.states[name])
+        if self.wrong_restore == name and any(event[0] == "backup_timer_restore" for event in self.events):
+            state["active"] = "inactive"
+        return state
+
+    def command(self, label, argv, **kwargs):
+        self.events.append((label, argv[-1]))
+        action, name = argv[1], argv[-1]
+        if label == "backup_timer_restore" and name == self.fail_backup_restore:
+            raise upgrade.UpgradeError(f"failed:{label}:{name}")
+        if name.endswith(".timer"):
+            state = self.states[name]
+            if action in ("enable", "disable"):
+                state["enabled"] = "enabled" if action == "enable" else "disabled"
+            if action in ("start", "stop") or "--now" in argv:
+                state["active"] = "active" if action == "start" else "inactive"
+
+    def document(self):
+        return json.loads(self.operations.interlock_file.read_text())
+
+    def test_two_pass_late_busy_service_stops_zero_timers(self):
+        self.busy = "madar-node1-backup.service"
+        with self.assertRaisesRegex(
+            upgrade.UpgradeError,
+            "backup_operation_running_retry_after_completion",
+        ):
+            self.operations.quiesce(self.SHA)
+        self.assertFalse(self.operations.command.called)
+        self.assertFalse(self.operations.interlock_file.exists())
+        for name in upgrade.BACKUP_TIMERS:
+            self.operations.systemctl_state.assert_any_call(name)
+
+    def test_snapshot_is_durable_before_first_stop(self):
+        self.operations.quiesce(self.SHA)
+        labels = [event[0] for event in self.events]
+        self.assertLess(labels.index("persist"), labels.index("backup_timer_stop"))
+        self.assertEqual(self.document()["backup_timer_states"], self.original)
+        self.assertEqual(self.document()["version"], 2)
+        self.assertEqual(self.operations.interlock_file.stat().st_mode & 0o777, 0o644)
+        self.assertEqual(labels.count("backup_timer_stop"), 3)
+
+    def test_authorization_and_failure_rearm_preserve_original(self):
+        self.operations.quiesce(self.SHA)
+        self.operations.write_authorization(
+            self.SHA, recovery=True, schema=96,
+            rehearsal_sha256="b" * 64,
+        )
+        document = self.document()
+        credential = json.loads(self.operations.authorization_file.read_text())
+        self.assertEqual(document["backup_timer_states"], self.original)
+        self.assertEqual(document["status"], "authorized_cycle")
+        self.assertEqual(document["operation"], "schema_recovery")
+        self.assertEqual(document["schema"], 96)
+        self.assertEqual(document["rehearsal_sha256"], "b" * 64)
+        self.assertEqual(
+            document["authorization_sha256"],
+            hashlib.sha256(credential["token"].encode()).hexdigest(),
+        )
+        self.assertNotIn("token", document)
+        self.operations.arm_interlock(self.SHA)
+        self.assertEqual(self.document()["backup_timer_states"], self.original)
+        self.assertIsNone(self.document()["authorization_sha256"])
+
+    def test_wrong_sha_cannot_donate_or_erase_snapshot(self):
+        self.operations.quiesce(self.SHA)
+        before = self.operations.interlock_file.read_bytes()
+        self.operations.command.reset_mock()
+        with self.assertRaisesRegex(upgrade.UpgradeError, "interlock_sha_mismatch"):
+            self.operations.quiesce("b" * 40)
+        self.assertFalse(self.operations.command.called)
+        self.assertEqual(self.operations.interlock_file.read_bytes(), before)
+
+    def test_fresh_process_inherits_and_restores_exact_original(self):
+        self.states[upgrade.BACKUP_TIMERS[1]]["active"] = "inactive"
+        self.original[upgrade.BACKUP_TIMERS[1]]["active"] = "inactive"
+        self.operations.quiesce(self.SHA)
+        fresh = object.__new__(upgrade.SystemOperations)
+        for attribute in ("runtime_root", "interlock_file", "authorization_file", "command", "systemctl_state"):
+            setattr(fresh, attribute, getattr(self.operations, attribute))
+        fresh.quiesce(self.SHA)
+        self.assertEqual(fresh.backup_timer_states, self.original)
+        fresh.restore_timer({"enabled": "enabled", "active": "active"})
+        self.assertEqual(
+            {name: self.states[name] for name in upgrade.BACKUP_TIMERS},
+            self.original,
+        )
+        self.assertTrue(fresh.interlock_file.exists())
+        fresh.clear_interlock()
+        self.assertFalse(fresh.interlock_file.exists())
+
+    def test_restore_attestation_failure_retains_snapshot_and_disables_automation(self):
+        self.operations.quiesce(self.SHA)
+        self.wrong_restore = upgrade.BACKUP_TIMERS[0]
+        with self.assertRaisesRegex(
+            upgrade.UpgradeError,
+            "backup_timer_restore_failed:madar-backup.timer",
+        ):
+            self.operations.restore_timer({"enabled": "enabled", "active": "active"})
+        self.assertEqual(self.document()["backup_timer_states"], self.original)
+        self.assertEqual(
+            self.states["madar-auto-deploy.timer"],
+            {"enabled": "disabled", "active": "inactive"},
+        )
+
+    def test_auto_deploy_restore_failure_requiesces_backup_timers(self):
+        self.operations.quiesce(self.SHA)
+        snapshot = self.document()["backup_timer_states"]
+        self.operations.restore_auto_deploy_timer = mock.Mock(
+            side_effect=upgrade.UpgradeError(
+                "auto_deploy_timer_restore_failed"
+            )
+        )
+        with self.assertRaisesRegex(
+            upgrade.UpgradeError, "auto_deploy_timer_restore_failed"
+        ):
+            self.operations.restore_timer(
+                {"enabled": "enabled", "active": "active"}
+            )
+        self.assertTrue(all(
+            self.states[name]["active"] == "inactive"
+            for name in upgrade.BACKUP_TIMERS
+        ))
+        self.assertEqual(
+            self.states["madar-auto-deploy.timer"],
+            {"enabled": "disabled", "active": "inactive"},
+        )
+        self.assertTrue(self.operations.interlock_file.exists())
+        self.assertEqual(
+            self.document()["backup_timer_states"], snapshot
+        )
+
+    def test_partial_backup_restore_failure_requiesces_started_timers(self):
+        self.operations.quiesce(self.SHA)
+        snapshot = self.document()["backup_timer_states"]
+        self.fail_backup_restore = upgrade.BACKUP_TIMERS[1]
+        with self.assertRaisesRegex(
+            upgrade.UpgradeError, "failed:backup_timer_restore"
+        ):
+            self.operations.restore_timer(
+                {"enabled": "enabled", "active": "active"}
+            )
+        self.assertIn(
+            ("backup_timer_failure_stop", upgrade.BACKUP_TIMERS[0]),
+            self.events,
+        )
+        self.assertTrue(all(
+            self.states[name]["active"] == "inactive"
+            for name in upgrade.BACKUP_TIMERS
+        ))
+        self.assertEqual(
+            self.document()["backup_timer_states"], snapshot
+        )
+        self.assertTrue(self.operations.interlock_file.exists())
+
+    def test_malformed_snapshot_fails_without_mutation(self):
+        self.operations.quiesce(self.SHA)
+        invalid_state = {
+            **self.original,
+            upgrade.BACKUP_TIMERS[0]: {
+                "enabled": "unknown", "active": "inactive",
+            },
+        }
+        for bad in (None, {}, invalid_state):
+            with self.subTest(bad=bad):
+                document = {"approved_sha": self.SHA, "backup_timer_states": bad}
+                self.operations.interlock_file.write_text(json.dumps(document))
+                self.operations.command.reset_mock()
+                with self.assertRaisesRegex(upgrade.UpgradeError, "backup_timer_state"):
+                    self.operations.quiesce(self.SHA)
+                self.assertFalse(self.operations.command.called)
+
+    def test_unknown_current_state_fails_before_persist_or_stop(self):
+        self.states[upgrade.BACKUP_TIMERS[0]]["enabled"] = "unknown"
+        with self.assertRaisesRegex(upgrade.UpgradeError, "backup_timer_state_invalid"):
+            self.operations.quiesce(self.SHA)
+        self.assertFalse(self.operations.command.called)
+        self.assertFalse(self.operations.interlock_file.exists())
+
+    def test_interlock_symlink_and_writable_state_rejected(self):
+        target = self.root / "target"
+        target.write_text(json.dumps({
+            "approved_sha": self.SHA,
+            "backup_timer_states": self.original,
+        }))
+        self.operations.interlock_file.symlink_to(target)
+        with self.assertRaisesRegex(upgrade.UpgradeError, "interlock_invalid"):
+            self.operations.arm_interlock(self.SHA)
+        self.operations.interlock_file.unlink()
+        self.operations.interlock_file.write_text(target.read_text())
+        self.operations.interlock_file.chmod(0o666)
+        with self.assertRaisesRegex(upgrade.UpgradeError, "interlock_invalid"):
+            self.operations.arm_interlock(self.SHA)
 
 
 class ControlPlaneUpgradeTests(unittest.TestCase):
@@ -2990,6 +3271,11 @@ class ControlPlaneUpgradeTests(unittest.TestCase):
         self.assertEqual(operations.production, self.SHA)
         self.assertEqual(operations.installed, newer_controller)
         self.assertIn("clear_interlock", operations.events)
+        self.assertLess(
+            operations.events.index("restore_timer"),
+            operations.events.index("clear_interlock"),
+        )
+        self.assertEqual(operations.backup_timers, operations.backup_timer_states)
         self.assertFalse(operations.interlock)
         self.assertEqual(
             operations.timer,
@@ -3046,6 +3332,11 @@ class ControlPlaneUpgradeTests(unittest.TestCase):
         self.assertNotIn("installer_dry_run", operations.events)
         self.assertNotIn("installer_apply", operations.events)
         self.assertIn("clear_interlock", operations.events)
+        self.assertLess(
+            operations.events.index("restore_timer"),
+            operations.events.index("clear_interlock"),
+        )
+        self.assertEqual(operations.backup_timers, operations.backup_timer_states)
         self.assertFalse(operations.interlock)
         self.assertEqual(
             operations.timer,
@@ -3096,6 +3387,42 @@ class ControlPlaneUpgradeTests(unittest.TestCase):
             "disable_automation_for_failure",
             operations.events,
         )
+
+    def test_quiesce_failure_before_snapshot_is_not_durable(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations, _record, _audit, coordinator = self.coordinator(
+                root, failure="quiesce"
+            )
+            self.assertIsNone(operations.backup_timer_states)
+            with self.assertRaises(upgrade.UpgradeError) as raised:
+                coordinator.execute(dry_run=False)
+            coordinator.handle_failure(raised.exception)
+            coordinator.cleanup()
+        self.assertFalse(coordinator.quiesced)
+        self.assertIn(
+            "durable_quiesce_snapshot_exists", operations.events
+        )
+        self.assertNotIn("restore_timer", operations.events)
+        self.assertFalse(operations.interlock)
+
+    def test_quiesce_failure_after_snapshot_is_durably_handled(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations, _record, _audit, coordinator = self.coordinator(
+                root, failure="quiesce_after_snapshot"
+            )
+            with self.assertRaises(upgrade.UpgradeError) as raised:
+                coordinator.execute(dry_run=False)
+            coordinator.handle_failure(raised.exception)
+            coordinator.cleanup()
+        self.assertTrue(coordinator.quiesced)
+        self.assertIn(
+            "durable_quiesce_snapshot_exists", operations.events
+        )
+        self.assertIn("restore_timer", operations.events)
+        self.assertEqual(
+            operations.backup_timers, operations.backup_timer_states
+        )
+        self.assertFalse(operations.interlock)
 
     def test_preflight_failure_does_not_clear_preexisting_interlock(self):
         with tempfile.TemporaryDirectory() as root:
@@ -3364,6 +3691,11 @@ class ControlPlaneUpgradeTests(unittest.TestCase):
         )
         self.assertNotIn("preinstall_restore_safe", operations.events)
         self.assertNotIn("restore_timer", operations.events)
+        self.assertIsNotNone(operations.backup_timer_states)
+        self.assertTrue(all(
+            state["active"] == "inactive"
+            for state in operations.backup_timers.values()
+        ))
         self.assertTrue(operations.interlock)
         self.assertEqual(
             operations.timer, {"enabled": "disabled", "active": "inactive"}
@@ -3388,6 +3720,11 @@ class ControlPlaneUpgradeTests(unittest.TestCase):
             "post_promotion_forward_repair_timer_disabled",
         )
         self.assertNotIn("restore_timer", operations.events)
+        self.assertIsNotNone(operations.backup_timer_states)
+        self.assertTrue(all(
+            state["active"] == "inactive"
+            for state in operations.backup_timers.values()
+        ))
         self.assertTrue(operations.interlock)
 
     def test_failed_bridge_dry_run_never_mutates_automation_or_interlock(self):
@@ -3477,6 +3814,11 @@ class ControlPlaneUpgradeTests(unittest.TestCase):
             "post_install_manual_intervention_timer_disabled",
         )
         self.assertNotIn("restore_timer", operations.events)
+        self.assertIsNotNone(operations.backup_timer_states)
+        self.assertTrue(all(
+            state["active"] == "inactive"
+            for state in operations.backup_timers.values()
+        ))
         self.assertTrue(operations.interlock)
 
     def test_postpromotion_failure_is_forward_repair_and_never_restores_timer(self):
@@ -3494,6 +3836,11 @@ class ControlPlaneUpgradeTests(unittest.TestCase):
             "post_promotion_forward_repair_timer_disabled",
         )
         self.assertNotIn("restore_timer", operations.events)
+        self.assertIsNotNone(operations.backup_timer_states)
+        self.assertTrue(all(
+            state["active"] == "inactive"
+            for state in operations.backup_timers.values()
+        ))
         self.assertTrue(operations.interlock)
 
     def test_timer_restore_failure_requiesces_and_rearms_interlock(self):
@@ -3519,6 +3866,11 @@ class ControlPlaneUpgradeTests(unittest.TestCase):
             marker.write_text(json.dumps({
                 "approved_sha": self.SHA,
                 "authorization_sha256": hashlib.sha256(token.encode()).hexdigest(),
+                "version": 2,
+                "backup_timer_states": {
+                    name: {"enabled": "disabled", "active": "inactive"}
+                    for name in upgrade.BACKUP_TIMERS
+                },
             }), encoding="utf-8")
             marker.chmod(0o644)
             credentials = Path(root) / "credentials"

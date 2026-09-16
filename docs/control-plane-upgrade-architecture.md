@@ -196,7 +196,8 @@ transaction. During current-production preflight it also acquires the normal
 `/var/lib/madar/releases/deploy.lock`, proving no release or migration is
 active.
 
-After systemd is quiesced, root writes an `in-progress.json` interlock below
+Before the first backup timer stop, root writes an `in-progress.json` interlock
+below
 `/run/madar/control-plane-upgrade`, then releases `deploy.lock` so the canonical
 release controller can acquire it. Every `madar-release-deploy` invocation
 checks this interlock before any release operation. It rejects the invocation
@@ -205,7 +206,19 @@ fresh random bearer token through `LoadCredential`, whose SHA-256 digest
 matches the root-owned interlock. The source credential is mode 0600, is copied
 into systemd's per-unit credential boundary rather than a process environment,
 is removed when each cycle returns, and is regenerated for the second cycle.
-The public interlock contains only the SHA and one-way digest.
+The public version-2 interlock contains the approved SHA, authorization digest,
+status and operation bindings, plus `backup_timer_states`: the exact enabled and
+active values for all four protected backup timers. No bearer token is public.
+All backup services and timers are inspected before mutation; a running backup
+aborts without stopping any timer. Unknown timer states fail closed. A valid
+same-SHA snapshot is authoritative across authorization, failure re-arm, and a
+fresh forward-repair process; another SHA cannot donate or overwrite it.
+Successful completion restores and attests every backup timer's enabled/activity
+state, then restores auto-deploy, then clears the interlock. Any restoration
+failure disables auto-deploy, stops and attests every backup timer again, and
+retains the original snapshot; unresolved pre-install
+failure cleanup also retains it. This durability is limited to `/run`, so reboot
+recovery is outside this contract.
 
 The timer stays disabled throughout. Thus an auto-deploy cycle cannot start,
 manual controller entrypoints cannot pass the interlock, and the authorized
@@ -225,7 +238,7 @@ switches remain authorized inside the credential-bearing transient unit.
 | 2 | `candidate_resolution` | Ordinary upgrade only: least-privileged fetch/read-only remote check; exact origin/main, commit, canonical remote and forward ancestry checks. Same-SHA forward repair skips candidate resolution entirely. |
 | 3 | `controller_compatibility` | Run the current guard and classify only `normal_compatible` or the fully attested `controller_ahead_bridge` described above. |
 | 4 | `protected_change_detection` | In normal state, no protected diff returns `not_required`; ordinary auto-deploy remains responsible. An authorized controller-ahead bridge continues even though installed provenance already equals the candidate. |
-| 5 | `automation_quiesce` | Capture timer state, disable/stop timer, stop service, arm interlock, release normal deploy lock. |
+| 5 | `automation_quiesce` | Inspect all backups, persist original timer states in interlock, stop backup timers, disable/stop auto-deploy, release normal deploy lock. |
 | 6 | `candidate_staging` | Ordinary upgrade only: create the protected exact-SHA Git bundle and detached root-owned tree. Same-SHA forward repair has no candidate tree. |
 | 7 | `candidate_static_preflight` | Required-path, symlink, digest, syntax, contract, ownership, ACL, filesystem capability and capacity validation. |
 | 8 | `installer_dry_run` | Ordinary upgrade only: execute the candidate installer's complete read-only preflight without apply, including the same deterministic filesystem, source, production-path, timer/service and backup checks used by apply; verify the protected-tree digest is unchanged. Same-SHA forward repair never executes candidate installer code. |
@@ -233,7 +246,7 @@ switches remain authorized inside the credential-bearing transient unit.
 | 10 | `controlled_candidate_deployment` / `forward_repair_migration` | Ordinary upgrade issues a one-cycle credential and runs the exact ordinary auto-deploy entrypoint. Forward repair instead issues a one-cycle credential and runs the already-installed `madar-release-deploy <same SHA> --automatic-migrate` directly. Repair cannot resolve, stage, install, promote a different application SHA, or advance production Git. |
 | 11 | serving attestation | Require production HEAD, installed provenance, active/known-good state, stable and slot SHA/readiness, schema range, workers, frontend and proxy target to agree. Require a terminal migration outcome. |
 | 12 | `same_sha_idempotence` | Run the same systemd path with a new token. Require stable health and byte-identical release state, proxy target and migration automation state: no rebuild, switch, SQL, backup, or identity mutation. |
-| 13 | `automation_restore` | Remove interlock and restore the captured timer enabled/active state exactly. An initially disabled timer stays disabled. |
+| 13 | `automation_restore` | Restore and attest captured backup and auto-deploy enabled/active states exactly, then remove interlock. An initially disabled timer stays disabled. |
 | 14 | cleanup | Remove only this transaction staging tree; retain backup and audit history. |
 | 15 | `complete` | Print the concise non-secret operator result. |
 
