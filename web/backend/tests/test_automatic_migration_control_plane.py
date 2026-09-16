@@ -57,6 +57,9 @@ class FakeOperations:
     def validate_candidate(self, sha: str, slot: str) -> None:
         self.events.append(f"validate:{sha}:{slot}")
 
+    def validate_candidate_core(self, sha: str, slot: str) -> None:
+        self.events.append(f"validate-core:{sha}:{slot}")
+
     def start_candidate(self, sha: str, slot: str, _images: dict) -> None:
         self.events.append(f"fallback:{sha}:{slot}")
 
@@ -637,8 +640,30 @@ class AutomaticMigrationControlPlaneTests(unittest.TestCase):
         pre_refresh_validation = events.index(f"pre-refresh:{self.sha}:green")
         worker_activation = events.index(f"workers:{self.sha}:green")
         full_validation = events.index(f"validate:{self.sha}:green")
+        fallback_core_validations = [
+            index
+            for index, event in enumerate(events)
+            if event == f"validate-core:{self.sha}:blue"
+        ]
+
         self.assertLess(pre_refresh_validation, worker_activation)
         self.assertLess(worker_activation, full_validation)
+
+        # The passive fallback intentionally has singleton consumers off.
+        # It must receive core validation, never full worker-aware readiness.
+        self.assertGreaterEqual(len(fallback_core_validations), 2)
+        self.assertLess(
+            full_validation,
+            fallback_core_validations[-1],
+        )
+        self.assertNotIn(
+            f"validate:{self.sha}:blue",
+            events,
+        )
+        self.assertFalse(
+            state["compatible_fallback_release"]["workers_active"]
+        )
+
         self.assertIn(
             "http:http://127.0.0.1:8001/health/version", events
         )

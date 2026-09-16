@@ -2779,12 +2779,222 @@ class ControlPlaneUpgradeTests(unittest.TestCase):
 
             with self.assertRaisesRegex(
                 upgrade.UpgradeError,
-                "forward_repair_exact_same_sha_required",
+                "forward_repair_exact_release_sha_required",
             ):
                 coordinator.execute(dry_run=True)
             coordinator.cleanup()
 
         self.assertNotIn("installer_apply", operations.events)
+
+    def test_forward_repair_dry_run_accepts_attested_controller_ahead(self):
+        newer_controller = "2" * 40
+
+        with tempfile.TemporaryDirectory() as root:
+            operations, record, _audit, coordinator = self.coordinator(
+                root,
+                protected=False,
+            )
+            operations.production = self.SHA
+            operations.installed = newer_controller
+            operations.controller_compatibility = "controller_ahead_bridge"
+            operations.timer = {
+                "enabled": "disabled",
+                "active": "inactive",
+            }
+
+            original_preflight = operations.current_preflight
+
+            def repair_preflight(*, lock_deployment=True):
+                result = original_preflight(
+                    lock_deployment=lock_deployment
+                )
+                result["migration"] = "forward_repair_pending"
+                return result
+
+            operations.current_preflight = repair_preflight
+
+            coordinator.execute(dry_run=True)
+            coordinator.cleanup()
+
+        self.assertTrue(coordinator.success)
+        self.assertEqual(
+            record.controller_compatibility,
+            "forward_repair_controller_ahead",
+        )
+        self.assertTrue(record.controller_preinstalled)
+        self.assertFalse(record.controller_installation_required)
+        self.assertFalse(record.controller_installation_performed)
+
+        self.assertIn(
+            "validate_controller_compatibility",
+            operations.events,
+        )
+        self.assertIn(
+            "verify_installed_controller",
+            operations.events,
+        )
+
+        for forbidden in (
+            "resolve_candidate",
+            "stage_candidate",
+            "static_preflight",
+            "installer_dry_run",
+            "installer_apply",
+            "quiesce",
+            "arm_interlock",
+            "forward_repair_migration",
+            "forward_repair_idempotence",
+            "clear_interlock",
+        ):
+            self.assertNotIn(forbidden, operations.events)
+
+        self.assertEqual(operations.production, self.SHA)
+        self.assertEqual(operations.installed, newer_controller)
+        self.assertEqual(
+            operations.timer,
+            {"enabled": "disabled", "active": "inactive"},
+        )
+
+    def test_forward_repair_rejects_unattested_controller_ahead(self):
+        newer_controller = "2" * 40
+
+        with tempfile.TemporaryDirectory() as root:
+            operations, _record, _audit, coordinator = self.coordinator(
+                root,
+                protected=False,
+            )
+            operations.production = self.SHA
+            operations.installed = newer_controller
+            operations.controller_compatibility = "normal_compatible"
+            operations.timer = {
+                "enabled": "disabled",
+                "active": "inactive",
+            }
+
+            original_preflight = operations.current_preflight
+
+            def repair_preflight(*, lock_deployment=True):
+                result = original_preflight(
+                    lock_deployment=lock_deployment
+                )
+                result["migration"] = "forward_repair_pending"
+                return result
+
+            operations.current_preflight = repair_preflight
+
+            with self.assertRaisesRegex(
+                upgrade.UpgradeError,
+                "forward_repair_controller_ahead_bridge_invalid",
+            ):
+                coordinator.execute(dry_run=True)
+
+            coordinator.cleanup()
+
+        self.assertIn(
+            "validate_controller_compatibility",
+            operations.events,
+        )
+        self.assertNotIn(
+            "verify_installed_controller",
+            operations.events,
+        )
+
+        for forbidden in (
+            "resolve_candidate",
+            "stage_candidate",
+            "installer_dry_run",
+            "installer_apply",
+            "quiesce",
+            "arm_interlock",
+            "forward_repair_migration",
+            "clear_interlock",
+        ):
+            self.assertNotIn(forbidden, operations.events)
+
+        self.assertEqual(operations.production, self.SHA)
+        self.assertEqual(operations.installed, newer_controller)
+
+    def test_forward_repair_apply_with_controller_ahead_skips_reinstall(self):
+        newer_controller = "2" * 40
+
+        with tempfile.TemporaryDirectory() as root:
+            operations, record, _audit, coordinator = self.coordinator(
+                root,
+                protected=False,
+            )
+            operations.production = self.SHA
+            operations.installed = newer_controller
+            operations.controller_compatibility = "controller_ahead_bridge"
+            operations.timer = {
+                "enabled": "disabled",
+                "active": "inactive",
+            }
+
+            original_preflight = operations.current_preflight
+
+            def repair_preflight(*, lock_deployment=True):
+                result = original_preflight(
+                    lock_deployment=lock_deployment
+                )
+                result["migration"] = "forward_repair_pending"
+                return result
+
+            operations.current_preflight = repair_preflight
+
+            coordinator.execute(dry_run=False)
+            coordinator.cleanup()
+
+        self.assertTrue(coordinator.success)
+        self.assertTrue(record.application_promoted)
+        self.assertEqual(
+            record.controller_compatibility,
+            "forward_repair_controller_ahead",
+        )
+        self.assertTrue(record.controller_preinstalled)
+        self.assertFalse(record.controller_installation_required)
+        self.assertFalse(record.controller_installation_performed)
+
+        self.assertIn(
+            "validate_controller_compatibility",
+            operations.events,
+        )
+        self.assertIn(
+            "verify_installed_controller",
+            operations.events,
+        )
+        self.assertIn(
+            "forward_repair_migration",
+            operations.events,
+        )
+        self.assertIn(
+            "forward_repair_idempotence",
+            operations.events,
+        )
+
+        self.assertEqual(
+            operations.events.count("migration_repair=True"),
+            2,
+        )
+
+        for forbidden in (
+            "resolve_candidate",
+            "stage_candidate",
+            "static_preflight",
+            "installer_dry_run",
+            "installer_apply",
+            "verify_install",
+            "controlled_candidate_deployment",
+        ):
+            self.assertNotIn(forbidden, operations.events)
+
+        self.assertEqual(operations.production, self.SHA)
+        self.assertEqual(operations.installed, newer_controller)
+        self.assertIn("clear_interlock", operations.events)
+        self.assertFalse(operations.interlock)
+        self.assertEqual(
+            operations.timer,
+            {"enabled": "disabled", "active": "inactive"},
+        )
 
     def test_forward_repair_apply_uses_existing_controller_and_same_sha_cycles(self):
         with tempfile.TemporaryDirectory() as root:
