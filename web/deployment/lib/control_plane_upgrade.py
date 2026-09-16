@@ -2428,18 +2428,38 @@ class UpgradeCoordinator:
         if self.forward_repair:
             self.record.candidate_sha = self.record.approved_sha
 
-            if (
-                before["production_sha"] != self.record.approved_sha
-                or before["installed_sha"] != self.record.approved_sha
-            ):
+            # Forward repair always targets the exact already-promoted
+            # application SHA supplied by the operator. The installed
+            # controller may either be that exact SHA or a separately
+            # attested canonical controller-ahead bridge.
+            if before["production_sha"] != self.record.approved_sha:
                 raise UpgradeError(
-                    "forward_repair_exact_same_sha_required"
+                    "forward_repair_exact_release_sha_required"
                 )
 
-            self.record.controller_compatibility = (
-                "forward_repair_same_sha"
-            )
-            self.record.controller_preinstalled = False
+            repair_controller_sha = before["installed_sha"]
+
+            if repair_controller_sha == self.record.approved_sha:
+                self.record.controller_compatibility = (
+                    "forward_repair_same_sha"
+                )
+                self.record.controller_preinstalled = False
+            else:
+                controller_compatibility = (
+                    self.operations.validate_controller_compatibility(
+                        repair_controller_sha,
+                        before,
+                    )
+                )
+                if controller_compatibility != "controller_ahead_bridge":
+                    raise UpgradeError(
+                        "forward_repair_controller_ahead_bridge_invalid"
+                    )
+                self.record.controller_compatibility = (
+                    "forward_repair_controller_ahead"
+                )
+                self.record.controller_preinstalled = True
+
             self.record.controller_installation_required = False
 
             if not dry_run:
@@ -2453,7 +2473,7 @@ class UpgradeCoordinator:
                 "forward_repair_control_plane_attestation"
             )
             self.operations.verify_installed_controller(
-                self.record.approved_sha
+                repair_controller_sha
             )
             self.audit.persist()
 

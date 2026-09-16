@@ -1985,7 +1985,15 @@ def automatic_migrate_known_good(
         refresh_event = refresh_active_workers(
             sha=sha, slot=slot, state_root=state_root, operations=operations,
         )
-        operations.validate_candidate(sha, str(fallback["slot"]))
+        # The compatible fallback is deliberately passive: singleton
+        # consumers belong only to the active worker owner. Validate its
+        # runtime/core identity without requiring those consumers to run.
+        validate_fallback = getattr(
+            operations,
+            "validate_candidate_core",
+            operations.validate_candidate,
+        )
+        validate_fallback(sha, str(fallback["slot"]))
         state_after = _json_file(
             state_file, "release_state_missing_or_invalid"
         )
