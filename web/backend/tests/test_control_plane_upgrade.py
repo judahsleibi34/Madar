@@ -12,6 +12,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from datetime import timedelta
 from dataclasses import replace
 from pathlib import Path
 from unittest import mock
@@ -152,9 +153,18 @@ class FakeOperations:
         if self.installed != sha:
             raise upgrade.UpgradeError("installed_provenance_mismatch")
 
-    def run_deploy_service(self, label, sha, *, recovery=False):
+    def run_deploy_service(
+        self,
+        label,
+        sha,
+        *,
+        recovery=False,
+        migration_repair=False,
+    ):
         self._event(label)
         self.events.append(f"recovery={recovery}")
+        if migration_repair:
+            self.events.append("migration_repair=True")
         if label == "controlled_candidate_deployment":
             self.production = sha
             self.slot = "blue"
@@ -1773,6 +1783,1130 @@ class ControlPlaneUpgradeTests(unittest.TestCase):
             }
             result = operations.current_recovery_preflight(candidate_sha=self.SHA)
         self.assertEqual(result["migration"], "recovery_complete_checkout_pending")
+
+    def automatic_pending_operations(self, root):
+        """Build a real immutable 96->99 automatic-migration origin fixture."""
+
+        operations = object.__new__(upgrade.SystemOperations)
+        operations.state_root = Path(root) / "state"
+        operations.state_root.mkdir()
+
+        release_root = operations.state_root / "releases" / self.SHA
+        releases = release_root / "web/deployment/releases"
+        migrations = release_root / "web/database/migrations"
+        releases.mkdir(parents=True)
+        migrations.mkdir(parents=True)
+
+        entries = []
+        for number, previous in ((97, 96), (98, 97), (99, 98)):
+            relative = (
+                f"web/database/migrations/"
+                f"{number:03d}_test_migration.sql"
+            )
+            migration = release_root / relative
+            migration.write_text(
+                f"-- fixture migration {number}\nselect {number};\n",
+                encoding="utf-8",
+            )
+            entries.append({
+                "number": number,
+                "path": relative,
+                "sha256": hashlib.sha256(
+                    migration.read_bytes()
+                ).hexdigest(),
+                "from_schema": previous,
+                "to_schema": number,
+                "compatibility": "expand-only",
+            })
+
+        (releases / "migrations-099.json").write_text(
+            json.dumps({
+                "release_sha": "CURRENT",
+                "migrations": entries,
+            }),
+            encoding="utf-8",
+        )
+
+        (releases / "release.json").write_text(
+            json.dumps({
+                "release_metadata_version": 1,
+                "schema": {
+                    "compatible_min": 81,
+                    "compatible_max": 99,
+                    "target": 99,
+                    "migration_class": "expand-only",
+                    "rollback_compatible_min": 81,
+                    "rollback_compatible_max": 98,
+                },
+                "migration_policy": upgrade.AUTOMATIC_MIGRATION_POLICY,
+                "migration_manifest": "migrations-099.json",
+            }),
+            encoding="utf-8",
+        )
+
+        state = {
+            "active_slot": "blue",
+            "known_good_release": {
+                "sha": self.SHA,
+                "slot": "blue",
+                "schema": 96,
+                "images": {},
+                "schema_compatible_min": 81,
+                "schema_compatible_max": 99,
+            },
+            "history": [{
+                "release_sha": self.SHA,
+                "candidate_slot": "blue",
+                "status": "known_good",
+                "phase": "complete",
+                "schema": {
+                    "observed": 96,
+                    "compatible_min": 81,
+                    "compatible_max": 99,
+                    "target": 99,
+                    "migration_class": "expand-only",
+                },
+            }],
+        }
+        (operations.state_root / "state.json").write_text(
+            json.dumps(state),
+            encoding="utf-8",
+        )
+        return operations
+
+    def test_origin_accepts_proven_never_started_automatic_migration(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations = self.automatic_pending_operations(root)
+
+            migration_dir = (
+                operations.state_root / "migrations" / self.SHA
+            )
+            self.assertFalse(migration_dir.exists())
+
+            self.assertEqual(
+                operations.migration_origin_state(
+                    self.SHA,
+                    96,
+                    96,
+                ),
+                "pre_mutation_pending",
+            )
+
+            # Final/steady-state semantics remain strict.
+            with self.assertRaisesRegex(
+                upgrade.UpgradeError,
+                "migration_automation_terminal_missing",
+            ):
+                operations.migration_terminal(self.SHA, 96)
+
+    def test_origin_rejects_empty_migration_state_directory(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations = self.automatic_pending_operations(root)
+            (
+                operations.state_root / "migrations" / self.SHA
+            ).mkdir(parents=True)
+
+            with self.assertRaisesRegex(
+                upgrade.UpgradeError,
+                "migration_pending_state_ambiguous",
+            ):
+                operations.migration_origin_state(
+                    self.SHA,
+                    96,
+                    96,
+                )
+
+    def test_origin_rejects_schema_advance_without_migration_state(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations = self.automatic_pending_operations(root)
+
+            with self.assertRaisesRegex(
+                upgrade.UpgradeError,
+                "migration_pending_schema_not_source",
+            ):
+                operations.migration_origin_state(
+                    self.SHA,
+                    96,
+                    97,
+                )
+
+    def test_origin_rejects_recorded_schema_drift_without_migration_state(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations = self.automatic_pending_operations(root)
+
+            with self.assertRaisesRegex(
+                upgrade.UpgradeError,
+                "migration_pending_schema_not_source",
+            ):
+                operations.migration_origin_state(
+                    self.SHA,
+                    97,
+                    96,
+                )
+
+    def test_origin_rejects_missing_acceptance_evidence(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations = self.automatic_pending_operations(root)
+            state_path = operations.state_root / "state.json"
+            state = json.loads(state_path.read_text(encoding="utf-8"))
+            state["history"] = []
+            state_path.write_text(
+                json.dumps(state),
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(
+                upgrade.UpgradeError,
+                "migration_pending_acceptance_missing",
+            ):
+                operations.migration_origin_state(
+                    self.SHA,
+                    96,
+                    96,
+                )
+
+    def test_origin_rejects_acceptance_schema_mismatch(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations = self.automatic_pending_operations(root)
+            state_path = operations.state_root / "state.json"
+            state = json.loads(state_path.read_text(encoding="utf-8"))
+            state["history"][-1]["schema"]["observed"] = 97
+            state_path.write_text(
+                json.dumps(state),
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(
+                upgrade.UpgradeError,
+                "migration_pending_acceptance_invalid",
+            ):
+                operations.migration_origin_state(
+                    self.SHA,
+                    96,
+                    96,
+                )
+
+    def test_origin_rejects_manifest_target_mismatch(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations = self.automatic_pending_operations(root)
+            release_path = (
+                operations.state_root
+                / "releases"
+                / self.SHA
+                / "web/deployment/releases/release.json"
+            )
+            release = json.loads(
+                release_path.read_text(encoding="utf-8")
+            )
+            release["schema"]["target"] = 100
+            release_path.write_text(
+                json.dumps(release),
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(
+                upgrade.UpgradeError,
+                "migration_pending_contract_invalid",
+            ):
+                operations.migration_origin_state(
+                    self.SHA,
+                    96,
+                    96,
+                )
+
+    def test_origin_rejects_migration_checksum_drift(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations = self.automatic_pending_operations(root)
+            migration = (
+                operations.state_root
+                / "releases"
+                / self.SHA
+                / "web/database/migrations/097_test_migration.sql"
+            )
+            migration.write_text(
+                "-- tampered\nselect 999;\n",
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(
+                upgrade.UpgradeError,
+                "migration_pending_checksum_invalid",
+            ):
+                operations.migration_origin_state(
+                    self.SHA,
+                    96,
+                    96,
+                )
+
+    def test_origin_rejects_execution_state_without_automation(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations = self.automatic_pending_operations(root)
+            migration_dir = (
+                operations.state_root / "migrations" / self.SHA
+            )
+            migration_dir.mkdir(parents=True)
+            (migration_dir / "execution.json").write_text(
+                json.dumps({
+                    "release_sha": self.SHA,
+                    "status": "completed",
+                    "observed_schema": 96,
+                }),
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(
+                upgrade.UpgradeError,
+                "migration_pending_state_ambiguous",
+            ):
+                operations.migration_origin_state(
+                    self.SHA,
+                    96,
+                    96,
+                )
+
+    def test_attest_serving_relaxes_only_current_origin(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations = self.automatic_pending_operations(root)
+
+            proxy = Path(root) / "proxy/active-upstreams.conf"
+            proxy.parent.mkdir()
+            proxy.write_text(
+                "backend 127.0.0.1:8101;\n"
+                "frontend 127.0.0.1:3100;\n",
+                encoding="utf-8",
+            )
+            operations.proxy_file = proxy
+            operations.live_schema = mock.Mock(return_value=96)
+
+            version = {
+                "release_sha": self.SHA,
+                "release_slot": "blue",
+                "schema_compatible_min": 81,
+                "schema_compatible_max": 99,
+            }
+            readiness = {
+                "ready": True,
+                "components": {
+                    "schema": "ok",
+                    "notification_worker": "ok",
+                    "calendar_sync_worker": "ok",
+                    "data_deletion_worker": "ok",
+                    "parser_isolation": "ok",
+                },
+            }
+
+            operations.http_json = mock.Mock(
+                side_effect=lambda url: (
+                    readiness
+                    if url.endswith("/health/ready")
+                    else version
+                )
+            )
+            operations.http_ok = mock.Mock()
+            operations.attest_active_images = mock.Mock()
+
+            current = operations.attest_serving(
+                self.SHA,
+                current_origin=True,
+            )
+            self.assertEqual(
+                current["migration"],
+                "pre_mutation_pending",
+            )
+            self.assertEqual(current["schema"], 96)
+            self.assertEqual(current["recorded_schema"], 96)
+
+            with self.assertRaisesRegex(
+                upgrade.UpgradeError,
+                "migration_automation_terminal_missing",
+            ):
+                operations.attest_serving(self.SHA)
+
+    def test_current_preflight_requests_origin_migration_classification(self):
+        operations = object.__new__(upgrade.SystemOperations)
+        operations.deploy_lock_descriptor = 1
+        operations.state_root = Path("/tmp/state")
+        operations.storage_root = Path("/tmp/storage")
+        operations.proxy_file = Path("/tmp/proxy/active-upstreams.conf")
+        operations.control_root = Path("/tmp/control")
+
+        operations.repository_origin = mock.Mock(
+            return_value=upgrade.EXPECTED_CONTRACT[
+                "MADAR_CANONICAL_GIT_REMOTE"
+            ]
+        )
+        operations.require_clean_repository = mock.Mock()
+        operations.repository_head = mock.Mock(return_value=self.SHA)
+        operations.installed_sha = mock.Mock(return_value=self.SHA)
+        operations.attest_serving = mock.Mock(return_value={
+            "slot": "blue",
+            "schema": 96,
+            "migration": "pre_mutation_pending",
+        })
+        operations.systemctl_state = mock.Mock(
+            return_value={
+                "enabled": "disabled",
+                "active": "inactive",
+            }
+        )
+
+        with (
+            mock.patch.object(Path, "exists", return_value=True),
+            mock.patch.object(Path, "is_symlink", return_value=False),
+            mock.patch.object(Path, "is_file", return_value=True),
+            mock.patch.object(
+                upgrade.os,
+                "access",
+                return_value=True,
+            ),
+        ):
+            result = operations.current_preflight()
+
+        operations.attest_serving.assert_called_once_with(
+            self.SHA,
+            current_origin=True,
+        )
+        self.assertEqual(
+            result["migration"],
+            "pre_mutation_pending",
+        )
+
+    def write_forward_repair_state(
+        self,
+        operations,
+        *,
+        phase="migration_execution_failed",
+        retry_due=True,
+        execution_status="failed",
+        live_schema=97,
+    ):
+        migration_dir = operations.state_root / "migrations" / self.SHA
+        migration_dir.mkdir(parents=True, exist_ok=True)
+
+        backup = Path(operations.state_root) / "fixture-backups" / "madar-20260916T120000Z"
+        backup.mkdir(parents=True, exist_ok=True)
+
+        retry_at = (
+            upgrade.datetime.now(upgrade.timezone.utc)
+            - timedelta(minutes=1)
+            if retry_due
+            else upgrade.datetime.now(upgrade.timezone.utc)
+            + timedelta(minutes=10)
+        )
+
+        automation = {
+            "release_sha": self.SHA,
+            "source_schema": 96,
+            "target_schema": 99,
+            "backup": (
+                None
+                if phase == "backup_creation_failed"
+                else str(backup)
+            ),
+            "started_at": "2026-09-16T10:00:00+00:00",
+            "attempted_at": "2026-09-16T10:01:00+00:00",
+            "phase": phase,
+            "status": "failed_forward_repair_required",
+            "failure_semantics": "forward_repair_only",
+            "retry_after": retry_at.isoformat(),
+            "failure_code": "fixture_failure",
+        }
+        (migration_dir / "automation.json").write_text(
+            json.dumps(automation),
+            encoding="utf-8",
+        )
+
+        if phase != "backup_creation_failed":
+            execution = {
+                "release_sha": self.SHA,
+                "backup": {
+                    "path": str(backup),
+                    "verified": True,
+                },
+                "status": execution_status,
+                "phase": (
+                    "complete"
+                    if execution_status == "completed"
+                    else "migration_97"
+                ),
+                "observed_schema": live_schema,
+                "migrations": [],
+            }
+            (migration_dir / "execution.json").write_text(
+                json.dumps(execution),
+                encoding="utf-8",
+            )
+
+        return migration_dir
+
+    def test_origin_accepts_due_forward_repair_migration_failure(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations = self.automatic_pending_operations(root)
+            self.write_forward_repair_state(
+                operations,
+                phase="migration_execution_failed",
+                execution_status="failed",
+                live_schema=97,
+            )
+
+            self.assertEqual(
+                operations.migration_origin_state(
+                    self.SHA,
+                    96,
+                    97,
+                ),
+                "forward_repair_pending",
+            )
+
+    def test_origin_accepts_due_forward_repair_post_validation_failure(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations = self.automatic_pending_operations(root)
+            self.write_forward_repair_state(
+                operations,
+                phase="post_migration_validation_failed",
+                execution_status="completed",
+                live_schema=99,
+            )
+
+            self.assertEqual(
+                operations.migration_origin_state(
+                    self.SHA,
+                    96,
+                    99,
+                ),
+                "forward_repair_pending",
+            )
+
+    def test_origin_accepts_due_forward_repair_backup_creation_failure(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations = self.automatic_pending_operations(root)
+            self.write_forward_repair_state(
+                operations,
+                phase="backup_creation_failed",
+                live_schema=96,
+            )
+
+            self.assertEqual(
+                operations.migration_origin_state(
+                    self.SHA,
+                    96,
+                    96,
+                ),
+                "forward_repair_pending",
+            )
+
+    def test_origin_rejects_forward_repair_before_retry_deadline(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations = self.automatic_pending_operations(root)
+            self.write_forward_repair_state(
+                operations,
+                retry_due=False,
+            )
+
+            with self.assertRaisesRegex(
+                upgrade.UpgradeError,
+                "migration_forward_repair_retry_suppressed",
+            ):
+                operations.migration_origin_state(
+                    self.SHA,
+                    96,
+                    97,
+                )
+
+    def test_origin_rejects_forward_repair_wrong_executor_status(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations = self.automatic_pending_operations(root)
+            self.write_forward_repair_state(
+                operations,
+                phase="migration_execution_failed",
+                execution_status="completed",
+            )
+
+            with self.assertRaisesRegex(
+                upgrade.UpgradeError,
+                "migration_forward_repair_execution_invalid",
+            ):
+                operations.migration_origin_state(
+                    self.SHA,
+                    96,
+                    97,
+                )
+
+    def test_origin_rejects_post_validation_without_completed_execution(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations = self.automatic_pending_operations(root)
+            self.write_forward_repair_state(
+                operations,
+                phase="post_migration_validation_failed",
+                execution_status="failed",
+                live_schema=99,
+            )
+
+            with self.assertRaisesRegex(
+                upgrade.UpgradeError,
+                "migration_forward_repair_execution_invalid",
+            ):
+                operations.migration_origin_state(
+                    self.SHA,
+                    96,
+                    99,
+                )
+
+    def test_origin_rejects_forward_repair_schema_outside_manifest(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations = self.automatic_pending_operations(root)
+            self.write_forward_repair_state(
+                operations,
+                live_schema=97,
+            )
+
+            with self.assertRaisesRegex(
+                upgrade.UpgradeError,
+                "migration_forward_repair_known_good_invalid",
+            ):
+                operations.migration_origin_state(
+                    self.SHA,
+                    96,
+                    100,
+                )
+
+    def forward_repair_image_operations(self):
+        operations = object.__new__(upgrade.SystemOperations)
+
+        backend_id = "sha256:" + "1" * 64
+        frontend_id = "sha256:" + "2" * 64
+        worker_id = "sha256:" + "3" * 64
+
+        known_good = {
+            "images": {
+                "backend": f"backend@{backend_id}",
+                "frontend": f"frontend@{frontend_id}",
+                "worker": f"worker@{worker_id}",
+            },
+        }
+
+        identities = {
+            "madar-blue-backend": backend_id,
+            "madar-blue-frontend": frontend_id,
+            "madar-blue-remote-ingestion-worker": worker_id,
+        }
+
+        return operations, known_good, identities, worker_id
+
+    def test_forward_repair_image_attestation_allows_explicitly_missing_worker(self):
+        operations, known_good, identities, _worker_id = (
+            self.forward_repair_image_operations()
+        )
+
+        def command(_label, args, check=True, **_kwargs):
+            container = args[-1]
+            if container in identities:
+                return upgrade.CommandResult(
+                    identities[container],
+                    "",
+                    0,
+                )
+            return upgrade.CommandResult(
+                "",
+                f"Error: No such object: {container}",
+                1,
+            )
+
+        operations.command = mock.Mock(side_effect=command)
+
+        operations.attest_active_images(
+            "blue",
+            known_good,
+            allow_refreshable_workers=True,
+        )
+
+    def test_forward_repair_image_attestation_rejects_inspection_failure(self):
+        operations, known_good, identities, _worker_id = (
+            self.forward_repair_image_operations()
+        )
+
+        def command(_label, args, check=True, **_kwargs):
+            container = args[-1]
+            if container in identities:
+                return upgrade.CommandResult(
+                    identities[container],
+                    "",
+                    0,
+                )
+            return upgrade.CommandResult(
+                "",
+                "Cannot connect to the Docker daemon",
+                1,
+            )
+
+        operations.command = mock.Mock(side_effect=command)
+
+        with self.assertRaisesRegex(
+            upgrade.UpgradeError,
+            "repairable_worker_inspection_failed",
+        ):
+            operations.attest_active_images(
+                "blue",
+                known_good,
+                allow_refreshable_workers=True,
+            )
+
+    def test_forward_repair_image_attestation_rejects_wrong_optional_image(self):
+        operations, known_good, identities, _worker_id = (
+            self.forward_repair_image_operations()
+        )
+
+        def command(_label, args, check=True, **_kwargs):
+            container = args[-1]
+            if container in identities:
+                return upgrade.CommandResult(
+                    identities[container],
+                    "",
+                    0,
+                )
+            if container == "madar-blue-parser-worker":
+                return upgrade.CommandResult(
+                    "sha256:" + "9" * 64,
+                    "",
+                    0,
+                )
+            return upgrade.CommandResult(
+                "",
+                f"Error: No such object: {container}",
+                1,
+            )
+
+        operations.command = mock.Mock(side_effect=command)
+
+        with self.assertRaisesRegex(
+            upgrade.UpgradeError,
+            "running_image_identity_mismatch",
+        ):
+            operations.attest_active_images(
+                "blue",
+                known_good,
+                allow_refreshable_workers=True,
+            )
+
+    def test_origin_accepts_interrupted_backup_creation(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations = self.automatic_pending_operations(root)
+            migration_dir = (
+                operations.state_root / "migrations" / self.SHA
+            )
+            migration_dir.mkdir(parents=True)
+
+            (migration_dir / "automation.json").write_text(
+                json.dumps({
+                    "release_sha": self.SHA,
+                    "source_schema": 96,
+                    "target_schema": 99,
+                    "backup": None,
+                    "started_at": "2026-09-16T10:00:00+00:00",
+                    "attempted_at": "2026-09-16T10:01:00+00:00",
+                    "phase": "backup_creation",
+                    "status": "running",
+                    "failure_semantics": "forward_repair_only",
+                }),
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                operations.migration_origin_state(
+                    self.SHA, 96, 96
+                ),
+                "forward_repair_pending",
+            )
+
+    def test_origin_accepts_interrupted_executor_running(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations = self.automatic_pending_operations(root)
+            migration_dir = (
+                operations.state_root / "migrations" / self.SHA
+            )
+            migration_dir.mkdir(parents=True)
+
+            backup = (
+                operations.state_root
+                / "fixture-backups/madar-20260916T120000Z"
+            )
+            backup.mkdir(parents=True)
+
+            (migration_dir / "automation.json").write_text(
+                json.dumps({
+                    "release_sha": self.SHA,
+                    "source_schema": 96,
+                    "target_schema": 99,
+                    "backup": str(backup),
+                    "started_at": "2026-09-16T10:00:00+00:00",
+                    "attempted_at": "2026-09-16T10:01:00+00:00",
+                    "phase": "migration_execution",
+                    "status": "running",
+                    "failure_semantics": "forward_repair_only",
+                }),
+                encoding="utf-8",
+            )
+
+            (migration_dir / "execution.json").write_text(
+                json.dumps({
+                    "release_sha": self.SHA,
+                    "backup": {
+                        "path": str(backup),
+                        "verified": True,
+                    },
+                    "status": "running",
+                    "phase": "migration_97",
+                    "observed_schema": 97,
+                    "migrations": [],
+                }),
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                operations.migration_origin_state(
+                    self.SHA, 96, 97
+                ),
+                "forward_repair_pending",
+            )
+
+    def test_origin_accepts_interrupted_post_validation(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations = self.automatic_pending_operations(root)
+            migration_dir = (
+                operations.state_root / "migrations" / self.SHA
+            )
+            migration_dir.mkdir(parents=True)
+
+            backup = (
+                operations.state_root
+                / "fixture-backups/madar-20260916T120000Z"
+            )
+            backup.mkdir(parents=True)
+
+            (migration_dir / "automation.json").write_text(
+                json.dumps({
+                    "release_sha": self.SHA,
+                    "source_schema": 96,
+                    "target_schema": 99,
+                    "backup": str(backup),
+                    "started_at": "2026-09-16T10:00:00+00:00",
+                    "attempted_at": "2026-09-16T10:01:00+00:00",
+                    "phase": "post_migration_validation",
+                    "status": "running",
+                    "failure_semantics": "forward_repair_only",
+                }),
+                encoding="utf-8",
+            )
+
+            (migration_dir / "execution.json").write_text(
+                json.dumps({
+                    "release_sha": self.SHA,
+                    "backup": {
+                        "path": str(backup),
+                        "verified": True,
+                    },
+                    "status": "completed",
+                    "phase": "complete",
+                    "observed_schema": 99,
+                    "migrations": [],
+                }),
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                operations.migration_origin_state(
+                    self.SHA, 96, 99
+                ),
+                "forward_repair_pending",
+            )
+
+    def test_interrupted_schema_advance_requires_execution_checkpoint(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations = self.automatic_pending_operations(root)
+            migration_dir = (
+                operations.state_root / "migrations" / self.SHA
+            )
+            migration_dir.mkdir(parents=True)
+
+            backup = (
+                operations.state_root
+                / "fixture-backups/madar-20260916T120000Z"
+            )
+            backup.mkdir(parents=True)
+
+            (migration_dir / "automation.json").write_text(
+                json.dumps({
+                    "release_sha": self.SHA,
+                    "source_schema": 96,
+                    "target_schema": 99,
+                    "backup": str(backup),
+                    "phase": "migration_execution",
+                    "status": "running",
+                    "failure_semantics": "forward_repair_only",
+                }),
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(
+                upgrade.UpgradeError,
+                "migration_forward_repair_execution_invalid",
+            ):
+                operations.migration_origin_state(
+                    self.SHA, 96, 97
+                )
+
+    def test_forward_repair_service_uses_exact_release_deployer(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations = object.__new__(upgrade.SystemOperations)
+            operations.audit = None
+            operations.repo = Path("/srv/madar/production")
+            operations.control_root = Path(
+                "/opt/madar/control-plane/deployment"
+            )
+            operations.contract_path = (
+                operations.control_root / "production-paths.conf"
+            )
+            operations.authorization_file = (
+                Path(root) / "authorized.credential"
+            )
+
+            operations.write_authorization = mock.Mock()
+            operations.clear_authorization = mock.Mock()
+
+            def command(label, args, **_kwargs):
+                return upgrade.CommandResult("", "", 0)
+
+            operations.command = mock.Mock(side_effect=command)
+
+            operations.run_deploy_service(
+                "forward_repair_migration",
+                self.SHA,
+                migration_repair=True,
+            )
+
+            calls = [
+                call
+                for call in operations.command.call_args_list
+                if call.args[0] == "forward_repair_migration"
+            ]
+            self.assertEqual(len(calls), 1)
+
+            argv = calls[0].args[1]
+            release_deployer = str(
+                operations.control_root
+                / "bin/madar-release-deploy"
+            )
+            auto_deployer = str(
+                operations.control_root
+                / "bin/madar-auto-deploy"
+            )
+
+            index = argv.index(release_deployer)
+            self.assertEqual(
+                argv[index:index + 3],
+                [
+                    release_deployer,
+                    self.SHA,
+                    "--automatic-migrate",
+                ],
+            )
+            self.assertNotIn(auto_deployer, argv)
+
+    def test_forward_repair_dry_run_requires_exact_same_sha_and_no_install(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations, record, _audit, coordinator = self.coordinator(
+                root,
+                protected=False,
+            )
+            operations.production = self.SHA
+            operations.installed = self.SHA
+            operations.timer = {
+                "enabled": "disabled",
+                "active": "inactive",
+            }
+
+            original_preflight = operations.current_preflight
+
+            def repair_preflight(*, lock_deployment=True):
+                result = original_preflight(
+                    lock_deployment=lock_deployment
+                )
+                result["migration"] = "forward_repair_pending"
+                return result
+
+            operations.current_preflight = repair_preflight
+            coordinator.execute(dry_run=True)
+            coordinator.cleanup()
+
+        self.assertTrue(coordinator.success)
+        self.assertFalse(record.controller_installation_required)
+        self.assertFalse(record.controller_installation_performed)
+        self.assertFalse(record.controller_installed)
+        self.assertFalse(record.application_promoted)
+        self.assertIn(
+            "verify_installed_controller",
+            operations.events,
+        )
+        self.assertNotIn("resolve_candidate", operations.events)
+        self.assertNotIn("stage_candidate", operations.events)
+        self.assertNotIn("installer_dry_run", operations.events)
+        self.assertNotIn("installer_apply", operations.events)
+        self.assertNotIn(
+            "controlled_candidate_deployment",
+            operations.events,
+        )
+        self.assertNotIn("clear_interlock", operations.events)
+
+    def test_forward_repair_rejects_different_production_sha(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations, _record, _audit, coordinator = self.coordinator(
+                root,
+                protected=False,
+            )
+            operations.production = "1" * 40
+            operations.installed = self.SHA
+
+            original_preflight = operations.current_preflight
+
+            def repair_preflight(*, lock_deployment=True):
+                result = original_preflight(
+                    lock_deployment=lock_deployment
+                )
+                result["migration"] = "forward_repair_pending"
+                return result
+
+            operations.current_preflight = repair_preflight
+
+            with self.assertRaisesRegex(
+                upgrade.UpgradeError,
+                "forward_repair_exact_same_sha_required",
+            ):
+                coordinator.execute(dry_run=True)
+            coordinator.cleanup()
+
+        self.assertNotIn("installer_apply", operations.events)
+
+    def test_forward_repair_apply_uses_existing_controller_and_same_sha_cycles(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations, record, _audit, coordinator = self.coordinator(
+                root,
+                protected=False,
+            )
+            operations.production = self.SHA
+            operations.installed = self.SHA
+            operations.timer = {
+                "enabled": "disabled",
+                "active": "inactive",
+            }
+
+            original_preflight = operations.current_preflight
+
+            def repair_preflight(*, lock_deployment=True):
+                result = original_preflight(
+                    lock_deployment=lock_deployment
+                )
+                result["migration"] = "forward_repair_pending"
+                return result
+
+            operations.current_preflight = repair_preflight
+
+            coordinator.execute(dry_run=False)
+            coordinator.cleanup()
+
+        self.assertTrue(coordinator.success)
+        self.assertTrue(record.application_promoted)
+        self.assertFalse(record.controller_installation_required)
+        self.assertFalse(record.controller_installation_performed)
+        self.assertNotIn("installer_apply", operations.events)
+        self.assertIn(
+            "forward_repair_migration",
+            operations.events,
+        )
+        self.assertIn(
+            "forward_repair_idempotence",
+            operations.events,
+        )
+        self.assertEqual(
+            operations.events.count("migration_repair=True"),
+            2,
+        )
+        self.assertNotIn("resolve_candidate", operations.events)
+        self.assertNotIn("stage_candidate", operations.events)
+        self.assertNotIn("static_preflight", operations.events)
+        self.assertNotIn("installer_dry_run", operations.events)
+        self.assertNotIn("installer_apply", operations.events)
+        self.assertIn("clear_interlock", operations.events)
+        self.assertFalse(operations.interlock)
+        self.assertEqual(
+            operations.timer,
+            {"enabled": "disabled", "active": "inactive"},
+        )
+
+    def test_failed_forward_repair_keeps_interlock_and_timer_disabled(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations, record, _audit, coordinator = self.coordinator(
+                root,
+                protected=False,
+                failure="forward_repair_migration",
+            )
+            operations.production = self.SHA
+            operations.installed = self.SHA
+            operations.timer = {
+                "enabled": "disabled",
+                "active": "inactive",
+            }
+
+            original_preflight = operations.current_preflight
+
+            def repair_preflight(*, lock_deployment=True):
+                result = original_preflight(
+                    lock_deployment=lock_deployment
+                )
+                result["migration"] = "forward_repair_pending"
+                return result
+
+            operations.current_preflight = repair_preflight
+
+            with self.assertRaises(upgrade.UpgradeError) as raised:
+                coordinator.execute(dry_run=False)
+            coordinator.handle_failure(raised.exception)
+            coordinator.cleanup()
+
+        self.assertTrue(record.application_promoted)
+        self.assertEqual(
+            record.failure_semantics,
+            "post_promotion_forward_repair_timer_disabled",
+        )
+        self.assertTrue(operations.interlock)
+        self.assertEqual(
+            operations.timer,
+            {"enabled": "disabled", "active": "inactive"},
+        )
+        self.assertIn(
+            "disable_automation_for_failure",
+            operations.events,
+        )
+
+    def test_preflight_failure_does_not_clear_preexisting_interlock(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations, _record, _audit, coordinator = self.coordinator(
+                root,
+                protected=False,
+                failure="current_preflight",
+            )
+            operations.interlock = True
+            operations.timer = {
+                "enabled": "disabled",
+                "active": "inactive",
+            }
+
+            with self.assertRaises(upgrade.UpgradeError) as raised:
+                coordinator.execute(dry_run=False)
+            coordinator.handle_failure(raised.exception)
+            coordinator.cleanup()
+
+        self.assertTrue(operations.interlock)
+        self.assertNotIn("clear_interlock", operations.events)
 
     def test_normal_preflight_accepts_completed_zero_migration_recovery(self):
         with tempfile.TemporaryDirectory() as root:

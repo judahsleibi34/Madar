@@ -40,9 +40,12 @@ provide automatic downgrade SQL.
 Protected control-plane releases may be authorized through the root-owned
 one-command workflow described in
 [`control-plane-upgrade-architecture.md`](control-plane-upgrade-architecture.md).
-That bootstrapper synchronously invokes this same ordinary auto-deploy path and
-requires this coordinator to reach an existing successful terminal state; it
-does not add a migration mode, bypass backup/manifest gates, or alter the
+For an ordinary protected upgrade, that bootstrapper synchronously invokes the
+same ordinary auto-deploy path. For an already-promoted exact SHA in an attested
+forward-repair state, it instead invokes the installed
+`madar-release-deploy <SHA> --automatic-migrate` directly under the same
+root-owned one-use credential boundary. The privileged coordinator does not
+implement SQL migration itself, bypass backup/manifest gates, or alter the
 bridge-first state machine.
 
 ## 2. Architectural goals
@@ -171,6 +174,18 @@ defaults to 15 minutes and is clamped to 5 through 1,440 minutes. Read-only
 precondition failures that occur before `automation.json` is started do not
 receive that durable backoff and are retried at the timer cadence.
 
+The privileged same-SHA repair path is deliberately independent of a mutable
+branch head. If another commit reaches `origin/main` while an already-promoted
+release is waiting for forward repair, the operator can still authorize the
+exact serving SHA as long as it also equals installed controller provenance and
+all durable migration/serving attestations remain coherent. Repair does not
+stage or deploy the newer branch head.
+
+Likewise, process or host interruption need not manufacture a failure record.
+A coherent `status=running` checkpoint may be resumed through the same exact-SHA
+repair path. The database schema and durable executor state determine which
+already-committed transitions are skipped; SQL is not blindly replayed.
+
 After a reboot, `Persistent=true` causes the timer to run a missed activation.
 The same-known-good branch re-enters the idempotent migration phase. If a
 documentation-only commit is ahead of an application-equivalent known-good
@@ -221,6 +236,8 @@ this table does not invent persistence states.
 | --- | --- |
 | `bridge_known_good` | `state.json.known_good_release.sha` equals the requested SHA, its slot equals `active_slot`, there is no in-progress/rollback failure, and release history contains `status=known_good`, `phase=complete`. Stable candidate/backend/frontend validation must also pass. |
 | `migration_pending` | Derived: exact automatic policy and manifest are valid, live schema is within the bridge range and below manifest target, and no matching completed `automation.json` covers the target. No literal `migration_pending` value is stored. |
+| `pre_mutation_pending` | Privileged-upgrader derived state only, not written to migration state. Exact automatic policy/manifest/checksums validate; the migration directory is completely absent; live and recorded schema equal the manifest source; known-good state and that SHA's completed acceptance event agree on source and target. Final serving attestation does not treat this as terminal. |
+| `forward_repair_pending` | Privileged-upgrader derived state only. Durable state is either a due `failed_forward_repair_required` checkpoint or a coherent interrupted `status=running` checkpoint in backup creation, migration execution, or post-migration validation. Exact immutable contract, acceptance, backup/executor identity, known-good SHA, and live schema bounds must agree. |
 | `backup_required` | `automation.json` has `status=running`, `phase=backup_creation`, and no backup path. |
 | `backup_verified` | The backup scripts pass, its complete manifest matches the release SHA and source schema, and `execution.json.backup.verified=true`. There is no standalone `backup_verified` phase; the next durable executor phase is `acquiring_lock`. |
 | `migration_running` | `automation.json` phase is `migration_execution`; `execution.json` is `status=running` in `acquiring_lock`, `schema_validation`, or `migration_N`. |
@@ -238,6 +255,20 @@ and source-schema rollback-attestation failures happen before mutation-phase
 state is created. They make no database change and require correction of the
 release, environment, or retained target rather than manufacturing a migration
 failure record.
+
+### Privileged current-origin interpretation
+
+The ordinary timer path still follows the unattended rules above. The
+root-owned upgrader additionally needs to distinguish a legitimate origin that
+needs migration work from corrupt state before it can authorize a protected
+controller/application transition.
+
+This interpretation is origin-only. It must never make final serving
+attestation permissive. `pre_mutation_pending` and `forward_repair_pending`
+therefore authorize only entry into the existing canonical migration machinery;
+success still requires `already_at_target` or
+`post_migration_validation_complete` (or `not_requested` where automatic
+migration does not apply).
 
 ## 8. Migration opt-in and manifest contract
 

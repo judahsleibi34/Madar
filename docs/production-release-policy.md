@@ -190,6 +190,23 @@ The immutable release state must already contain a full
 - a still-suppressed failed SHA: no retry;
 - otherwise: invoke the immutable production deployer.
 
+A root-authorized forward repair is a separate exact-SHA governance path, not a
+new automatic candidate-selection rule. If current production has already
+promoted an automatic-migration bridge and the privileged current-origin
+attestation classifies it as `forward_repair_pending`, repair requires the
+explicitly approved SHA to equal both production checkout HEAD and installed
+control-plane provenance. That repair does not require the SHA to remain
+`origin/main`, does not stage a candidate, does not install a controller, and
+cannot advance production Git. It invokes only the installed exact-SHA release
+deployer's existing `--automatic-migrate` mode under the root-owned one-use
+credential and interlock.
+
+A second origin-only state, `pre_mutation_pending`, covers the narrower case
+where automatic migration provably never began: the migration state directory
+is absent, live/recorded schema remain exactly at the immutable manifest source,
+and known-good plus completed acceptance evidence match that source and target.
+Neither state is considered terminal during final serving attestation.
+
 Watched runtime paths are exactly:
 
 ```text
@@ -283,16 +300,28 @@ queried directly. Its SHA must match state and its reported compatibility range
 must contain the live schema. Candidate rollback bounds are descriptive metadata
 today; retained-target attestation is the operative rollback check.
 
-Current bridge contract after this policy update is schema range `81..98`, target
-`98`, class `expand-only`, rollback metadata `81..97`, and manifest
-`migrations-098.json`. It promotes and is accepted while schema 97 is live.
-Existing website and ecommerce behavior remains compatible during the bridge:
-public visit recording is best effort and dashboard visit metrics report an
-unavailable zero state until schema 098 is installed. Only then may the
-coordinator create a schema-97-bound verified backup and execute the pinned
-expand-only 97-to-98 transition. Migration 098 adds tenant-scoped atomic website
-and store opening counters. It stores aggregate counts only, without visitor
-identity, IP address, user agent, or other personal data.
+Current bridge contract after this policy update is schema range `81..99`,
+target `99`, class `expand-only`, rollback metadata `81..98`, and manifest
+`migrations-099.json`. It promotes and is accepted while schema 96 is live. The
+manifest contains the contiguous automatic chain 96-to-97-to-98-to-99 so a host
+at schema 96 cannot skip the intervening reviewed transitions.
+
+Before the first schema transition, the coordinator must attest the retained
+source-schema rollback target, create and independently verify the governed
+schema-96 backup, and establish the accepted bridge itself as the inactive
+same-SHA migration fallback. The migration executor then applies only the
+contiguous manifest entries whose `from_schema` matches the authoritative live
+schema, validating each pinned SQL checksum and resulting schema transition.
+
+Migration 097 adds the verified-customer loyalty foundation. Migration 098 adds
+tenant-scoped aggregate visit counters. Migration 099 adds the review-required
+commercial access state and append-only manual financial/access ledger. It does
+not itself activate production commercial enforcement.
+
+After any committed forward transition, repair proceeds forward using the
+accepted bridge, verified backup, executor state, and same-SHA fallback. The
+controller must not switch traffic back to a binary whose compatibility range
+does not include the observed schema.
 
 The preceding schema-097 bridge added verified-customer loyalty through atomic
 functions. Identity is `(store tenant_id, public.users.id)`; checkout email and

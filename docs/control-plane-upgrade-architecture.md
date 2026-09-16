@@ -18,9 +18,19 @@ protected control-plane path is intentionally blocked by
 sudo madar-control-plane-upgrade <exact-40-character-sha>
 ```
 
-The explicit `sudo` plus exact SHA is the approval boundary. This command does
-not grant the non-root deployer permission to install future commits and does
-not turn the upgrader into a general application deployment path.
+The explicit `sudo` plus exact SHA is the approval boundary. For an ordinary
+protected controller/application upgrade, that SHA must still be the freshly
+resolved immutable `origin/main` commit and satisfy the normal forward-ancestry
+rules. For an already-promoted release whose automatic migration is in an
+attested forward-repair state, the same command has a narrower repair meaning:
+the approved SHA must exactly equal both the installed controller provenance and
+the currently serving production checkout. That same-SHA repair does not require
+the failed release to remain `origin/main`, because a later merge must not strand
+an already-serving schema transition.
+
+The command does not grant the non-root deployer permission to install future
+commits and does not turn the upgrader into a general application deployment
+path.
 
 ## Components and trust boundaries
 
@@ -49,7 +59,7 @@ creation metadata and is mounted read-only for release/refresh/rollback.
 | Replaceable controller | `/opt/madar/control-plane/deployment` | Canonical release, migration, proxy, guard, installer, and systemd implementation. |
 | Path/remote trust contract | `/opt/madar/control-plane/deployment/production-paths.conf` | Root-owned canonical production paths and expected Git remote identity. |
 | Installer | `bin/madar-install-control-plane` | Backs up the old controller, atomically publishes the exact staged controller, installs units and the next-invocation launcher, and leaves automation stopped. |
-| Authorized transient unit | `madar-control-plane-upgrade-<pid>-<cycle>.service` | Runs the exact `madar-auto-deploy` entrypoint as `madar` with the ordinary path/backup environment, hardening properties, and a systemd `LoadCredential` visible only inside that cycle. |
+| Authorized transient unit | `madar-control-plane-upgrade-<pid>-<cycle>.service` | Runs as `madar` with the ordinary path/backup environment, hardening properties, and a systemd `LoadCredential` visible only inside that cycle. Ordinary upgrades invoke the exact `madar-auto-deploy` entrypoint; governed same-SHA migration repair invokes the installed `madar-release-deploy <SHA> --automatic-migrate` entrypoint directly. |
 
 No `NOPASSWD` rule or automatic invocation is added. The `madar` account
 cannot invoke the root upgrader. The bootstrapper never reads security-sensitive
@@ -113,6 +123,26 @@ requires an exact protected-path diff, canonical candidate identity, forward
 ancestry, clean repository, exact installed provenance, and a successful guard
 against the approved SHA. A context or Git failure therefore remains
 fail-closed without changing the ordinary deployers' guard semantics.
+
+### Same-SHA forward-repair authorization
+
+Forward repair is intentionally not candidate authentication. When
+current-production preflight proves `forward_repair_pending`, the coordinator
+does not fetch or resolve a candidate, does not require the supplied SHA to
+remain current `origin/main`, and does not create a staging tree. Instead it
+requires:
+
+1. the explicitly approved SHA is a full immutable SHA;
+2. production checkout HEAD equals that SHA;
+3. installed control-plane provenance equals that SHA;
+4. current known-good release state and live serving identity equal that SHA;
+5. the immutable automatic-migration contract and its SQL checksums validate;
+6. durable migration state is an attested failed or interrupted forward-repair
+   checkpoint.
+
+The installed controller is attested before mutation. The repair cycle then
+uses a fresh one-use authorization credential bound to that same SHA. This is
+not permission to deploy a newer, older, arbitrary, or rewritten commit.
 
 ## Privileged staging and TOCTOU boundary
 
@@ -191,16 +221,16 @@ switches remain authorized inside the credential-bearing transient unit.
 | Phase | Audit name | Mutation boundary and result |
 | --- | --- | --- |
 | 0 | `exclusive_lock` | Root-only upgrade lock; a second invocation fails before mutation. |
-| 1 | `current_production_preflight` | Validate caller, installed provenance, clean production HEAD, release state, active/stable identity/readiness, schema compatibility, migration terminal state, workers/frontend/proxy, canonical paths, service and timer. Existing degradation stops the run. This phase does not trust the CLI SHA to authorize a bridge. |
-| 2 | `candidate_resolution` | Least-privileged fetch/read-only remote check; exact origin/main, commit, canonical remote and forward ancestry checks. |
+| 1 | `current_production_preflight` | Validate caller, installed provenance, clean production HEAD, release state, active/stable identity/readiness, schema compatibility, workers/frontend/proxy, canonical paths, service and timer. Migration origin is classified as terminal, provably `pre_mutation_pending`, or attested `forward_repair_pending`; every other nonterminal or ambiguous state fails closed. This phase does not trust the CLI SHA to authorize a bridge or a repair. |
+| 2 | `candidate_resolution` | Ordinary upgrade only: least-privileged fetch/read-only remote check; exact origin/main, commit, canonical remote and forward ancestry checks. Same-SHA forward repair skips candidate resolution entirely. |
 | 3 | `controller_compatibility` | Run the current guard and classify only `normal_compatible` or the fully attested `controller_ahead_bridge` described above. |
 | 4 | `protected_change_detection` | In normal state, no protected diff returns `not_required`; ordinary auto-deploy remains responsible. An authorized controller-ahead bridge continues even though installed provenance already equals the candidate. |
 | 5 | `automation_quiesce` | Capture timer state, disable/stop timer, stop service, arm interlock, release normal deploy lock. |
-| 6 | `candidate_staging` | Create the protected exact-SHA Git bundle and detached root-owned tree. |
+| 6 | `candidate_staging` | Ordinary upgrade only: create the protected exact-SHA Git bundle and detached root-owned tree. Same-SHA forward repair has no candidate tree. |
 | 7 | `candidate_static_preflight` | Required-path, symlink, digest, syntax, contract, ownership, ACL, filesystem capability and capacity validation. |
-| 8 | `installer_dry_run` | Execute the candidate installer's complete read-only preflight without apply, including the same deterministic filesystem, source, production-path, timer/service and backup checks used by apply; verify the protected-tree digest is unchanged. |
+| 8 | `installer_dry_run` | Ordinary upgrade only: execute the candidate installer's complete read-only preflight without apply, including the same deterministic filesystem, source, production-path, timer/service and backup checks used by apply; verify the protected-tree digest is unchanged. Same-SHA forward repair never executes candidate installer code. |
 | 9 | `control_plane_install` / `control_plane_install_attestation` | Normally create a protected backup and atomically install, then attest provenance, guard, modes, units, paths, backup hashes and absence of legacy authority. For `controller_ahead_bridge`, skip publication and backup creation and instead use `preinstalled_control_plane_attestation` to verify the already-installed exact candidate controller. |
-| 10 | `controlled_candidate_deployment` | Issue a one-cycle systemd credential and synchronously run the exact ordinary auto-deploy entrypoint in a hardened transient unit while the timer remains disabled. The canonical controller alone may build, migrate, promote or advance production Git. |
+| 10 | `controlled_candidate_deployment` / `forward_repair_migration` | Ordinary upgrade issues a one-cycle credential and runs the exact ordinary auto-deploy entrypoint. Forward repair instead issues a one-cycle credential and runs the already-installed `madar-release-deploy <same SHA> --automatic-migrate` directly. Repair cannot resolve, stage, install, promote a different application SHA, or advance production Git. |
 | 11 | serving attestation | Require production HEAD, installed provenance, active/known-good state, stable and slot SHA/readiness, schema range, workers, frontend and proxy target to agree. Require a terminal migration outcome. |
 | 12 | `same_sha_idempotence` | Run the same systemd path with a new token. Require stable health and byte-identical release state, proxy target and migration automation state: no rebuild, switch, SQL, backup, or identity mutation. |
 | 13 | `automation_restore` | Remove interlock and restore the captured timer enabled/active state exactly. An initially disabled timer stays disabled. |
@@ -223,6 +253,54 @@ when its coordinator is terminal: `already_at_target` or
 `post_migration_validation_complete`. A release without automatic migration
 policy may return `not_requested`. Incomplete or forward-repair-required state
 fails the upgrade and leaves automation disabled for diagnosis.
+
+### Current-origin migration classification
+
+Final/post-deploy serving attestation remains strict: automatic migration must
+be terminal before the privileged transaction can report success. Current
+origin preflight has two narrow additional classifications so the privileged
+controller cannot deadlock itself before reaching the repair machinery.
+
+`pre_mutation_pending` is derived only when the exact automatic migration
+contract and manifest validate, every SQL checksum matches, the per-release
+migration directory does not exist at all, live and recorded schema both equal
+the manifest source schema, the current known-good record names the same SHA and
+source schema, and that SHA's completed acceptance history observed the same
+source and target. An empty or partial migration directory is not equivalent to
+"never started" and fails closed.
+
+`forward_repair_pending` is derived only from coherent durable migration state.
+It accepts either:
+
+- `failed_forward_repair_required` in the reviewed backup, execution, or
+  post-validation failure phases after its bounded retry deadline; or
+- an interrupted `status=running` checkpoint in backup creation, migration
+  execution, or post-migration validation.
+
+The immutable contract, acceptance provenance, backup identity, executor state,
+observed schema bounds, and known-good identity must agree. Schema advancement
+without the corresponding verified executor checkpoint is rejected.
+
+During this origin-only repair classification, core readiness remains mandatory.
+Refreshable worker degradation or absence is tolerated only where the canonical
+post-migration refresh path can recreate it; any present worker must still use
+the recorded immutable image. Docker inspection errors are never treated as
+container absence.
+
+A real forward-repair invocation requires:
+
+```text
+approved SHA
+  = production checkout SHA
+  = installed control-plane provenance SHA
+```
+
+It skips `origin/main` resolution, candidate staging, static candidate
+preflight, installer dry-run, and controller installation. It quiesces
+automation, retains the exact-SHA interlock, invokes the installed release
+deployer in `--automatic-migrate` mode, requires strict terminal serving
+attestation, repeats a same-SHA migration idempotence cycle, and restores the
+captured timer state only after success.
 
 ## Failure semantics and point of no return
 
