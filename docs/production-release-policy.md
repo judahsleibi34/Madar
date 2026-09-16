@@ -1,6 +1,6 @@
 # Madar production release acceptance policy
 
-Last implementation review: 2026-09-14
+Last implementation review: 2026-09-16
 
 ## A. Purpose and authority
 
@@ -447,6 +447,16 @@ query):
   recorded compatibility contains that source schema; immediately before the
   forward phase, the coordinator re-attests that retained process's SHA and
   source-schema compatibility directly from its running version endpoint.
+
+A compatible recovery/migration-retry fallback is preferred only after full
+attestation. If an older controller left a stale `compatible_fallback_release`,
+the coordinator may instead use the exact previous known-good target from this
+SHA's latest completed acceptance. Both candidates independently require a
+full lowercase SHA, the slot opposite the active bridge, recorded source-schema
+compatibility and `validate_rollback_target()` success proving exact live SHA
+and live compatibility. No target is inferred from a slot name or discovered
+runtime. If both fail, no migration coordinator/executor state, backup, executor
+connection or SQL starts; release state remains unchanged.
 
 The systemd auto-deploy service loads `/etc/madar/backup.env` before the
 canonical path contract; the former supplies protected libpq `PG*`
@@ -1017,6 +1027,17 @@ and validated with the same exact-schema bridge, workers inactive, before it is
 recorded as `compatible_fallback_release`. The former release is retained only
 as `incompatible_pre_recovery_release` forensic history. A same-SHA rerun is
 byte-idempotent.
+
+A successful subsequent ordinary promotion atomically removes that preceding
+operation's fallback when it records the new active/known-good release and
+completed acceptance. Promotion reuses the former fallback slot; the newly
+retained target is the attested previous known-good on the opposite slot in
+acceptance history. Recovery history remains forensic evidence. The previous
+binary is not rebound as a migration fallback: after retained attestation and
+a fresh verified backup, the normal coordinator establishes a same-SHA copy
+of the accepted bridge before transactional contiguous SQL, validates target
+schema, refreshes workers, validates active/stable health and the fallback,
+and only then records completion.
 
 Both recovered slot records are explicitly marked `schema_recovery: true` with
 `migration_result: not_requested` and the exact recovery ID. The normal release

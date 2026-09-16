@@ -1,6 +1,6 @@
 # Automated database migration architecture
 
-Last implementation review: 2026-09-14
+Last implementation review: 2026-09-16
 
 ## 1. Purpose, authority, and scope
 
@@ -202,6 +202,14 @@ candidate. A rollback failure is preserved for manual intervention. None of
 these release failures can fall through to migration invocation because the
 first command returns nonzero.
 
+Successful ordinary promotion retires `compatible_fallback_release` in the
+same atomic write as active/known-good acceptance. That record belongs to the
+preceding recovery or migration operation, whose inactive slot is reused by
+promotion. The new acceptance event retains the attested previous known-good
+release on the opposite slot. It does not relabel that prior binary as a
+target-schema migration fallback; after a fresh verified backup, migration
+automation separately establishes the accepted bridge itself on that slot.
+
 ## 7. Migration state machine and durable representation
 
 Some names in the following table are architectural predicates requested for
@@ -396,6 +404,19 @@ attested old SHA, be running, and declare compatibility with the current source
 schema. This is the last traffic-rollback assurance before an irreversible
 forward-only phase begins.
 
+A recovery or migration-retry `compatible_fallback_release` takes precedence
+only when it passes the same gates. For states written by older controllers,
+a stale fallback cannot mask the exact `previous_known_good_release` in this
+SHA's latest completed acceptance event. The coordinator tries that acceptance
+target if fallback attestation fails. Each candidate independently requires a
+full lowercase SHA, the opposite active slot, recorded source-schema
+compatibility, and successful `validate_rollback_target()` against its live
+version endpoint (exact SHA and live source-schema compatibility). It never
+invents a target by swapping slots or accepting whichever process responds.
+If neither target attests, it fails before coordinator state, backup creation,
+the executor connection, or SQL. Read-only selection does not repair durable
+state; the backup-first same-SHA fallback step establishes the new topology.
+
 The point of no return is the first committed schema transition that moves the
 database beyond the previous release's compatibility maximum. From then on:
 
@@ -515,6 +536,7 @@ The following are the mandatory design invariants. Test names are from
 | 11 | A later release accepted at an already-reached target neither borrows the prior release's backup nor bypasses a genuine current-release resume. | Fresh no-op requires no per-SHA state plus matching known-good and acceptance-time target observations. Any current-release state retains exact SHA/source backup attestation. | `test_prior_release_migrates_then_later_release_noops_idempotently`, `test_current_release_partial_state_without_backup_still_fails_closed`, `test_current_release_substituted_resume_backup_still_fails_closed`. |
 | 12 | The database cannot finish a normal automatic migration with every inactive fallback incompatible. | Before SQL, `_establish_compatible_migration_fallback()` recreates the inactive slot from the accepted bridge with consumers disabled. After SQL and active-worker validation, it revalidates that slot at target schema and records it as the compatible fallback. | `test_successful_97_to_98_records_target_only_after_worker_and_route_validation`, `test_automatic_migration_control_plane.py`; recovery/fallback failure injection in `test_release_deployer.py`. |
 | 13 | A pre-existing DB-ahead state is repaired only by exact-schema, zero-migration forward recovery. | The ordinary manifest remains authoritative for normal releases. `schema-96-recovery.json`, root-protected exact-SHA rehearsal evidence, generation-bound worker authority, Docker restart inhibition, shared routing/slot mutation exclusion, local plus Node 1 backup verification, no-overlap worker cutover, atomic traffic switching, and compatible-fallback establishment are mandatory in the explicit recovery path. | `SchemaRecoveryDeployerTests`, schema-recovery coordinator and contract tests in `test_control_plane_upgrade.py`, auto-deploy inaccessibility in `test_monorepo_deployment.py`, and the disposable real-runtime rehearsal. |
+| 14 | Ordinary promotion retires the preceding operation's fallback; stale historical fallback claims cannot bypass or mask an attested retained acceptance target. | Atomic promotion removes `compatible_fallback_release`; source-schema migration selection independently attests fallback then exact acceptance target before mutation. | `test_ordinary_promotion_retires_prior_operation_fallback`, `test_stale_recovery_fallback_uses_only_exact_live_acceptance_target`, `test_stale_recovery_fallback_invalid_acceptance_targets_fail_pre_mutation`, and `test_schema96_recovery_installed_layout.py :: test_installed_layout_interruption_resume_and_next_release` through migrations 097/098/099, verified fresh backup, inactive same-SHA fallback, worker refresh and byte-idempotent completion. |
 
 Static orchestration tests in `test_monorepo_deployment.py` additionally verify
 that the installed wrappers contain the same-known-good recovery branch, the
