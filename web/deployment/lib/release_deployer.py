@@ -479,6 +479,10 @@ class ReleaseDeployer:
                     "schema_compatible_min": self.compatibility.schema_min,
                     "schema_compatible_max": self.compatibility.schema_max,
                 }
+                # Recovery/migration fallbacks describe the prior operation's
+                # topology. Ordinary promotion reuses that slot; its retained
+                # target is now the attested previous known-good in history.
+                state.pop("compatible_fallback_release", None)
                 state.setdefault("failed_releases", {}).pop(sha, None)
                 state.pop("in_progress_release", None)
                 self._record(state, release)

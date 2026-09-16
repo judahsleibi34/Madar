@@ -50,6 +50,11 @@ SLOT_PORTS = {
     "green": {"backend": "8201", "frontend": "3200", "redis": "6382"},
 }
 
+
+class RollbackTargetAttestationError(RuntimeError):
+    """An expected retained-runtime identity or compatibility rejection."""
+
+
 SLOT_SUBNETS = {
     "blue": {
         "default": "10.252.0.0/24",
@@ -1088,14 +1093,23 @@ class DockerGitOperations:
         slot = str(release.get("slot") or "")
         expected_sha = str(release.get("sha") or "")
         if slot not in SLOT_PORTS or len(expected_sha) != 40:
-            raise RuntimeError("known_good_release_identity_invalid")
-        identity = self._json(f"http://127.0.0.1:{SLOT_PORTS[slot]['backend']}/health/version")
-        minimum = int(identity.get("schema_compatible_min", -1))
-        maximum = int(identity.get("schema_compatible_max", -1))
+            raise RollbackTargetAttestationError("known_good_release_identity_invalid")
+        try:
+            identity = self._json(
+                f"http://127.0.0.1:{SLOT_PORTS[slot]['backend']}/health/version"
+            )
+            minimum = int(identity.get("schema_compatible_min", -1))
+            maximum = int(identity.get("schema_compatible_max", -1))
+        except (OSError, TypeError, ValueError) as error:
+            raise RollbackTargetAttestationError(
+                "known_good_release_attestation_unavailable"
+            ) from error
         if identity.get("release_sha") != expected_sha:
-            raise RuntimeError("known_good_release_identity_mismatch")
+            raise RollbackTargetAttestationError("known_good_release_identity_mismatch")
         if not minimum <= schema <= maximum:
-            raise RuntimeError("known_good_rollback_schema_incompatible")
+            raise RollbackTargetAttestationError(
+                "known_good_rollback_schema_incompatible"
+            )
         return {"compatible_min": minimum, "compatible_max": maximum}
 
     def switch_traffic(self, slot: str) -> None:
@@ -1768,33 +1782,52 @@ def automatic_migrate_known_good(
             <= compatibility.rollback_schema_max
         ):
             raise RuntimeError("automatic_migration_rollback_contract_invalid")
-        # Recovery may have deliberately replaced the historical incompatible
-        # rollback process with a schema-compatible copy of the bridge. That
-        # durable topology is authoritative for later migration retries.
-        retained = state.get("compatible_fallback_release")
-        if not isinstance(retained, dict):
-            retained = (
-                acceptance.get("previous_known_good_release")
-                if isinstance(acceptance, dict)
-                else None
-            )
-        if not isinstance(retained, dict):
+        # A valid recovery or migration-retry fallback takes precedence, but
+        # older controllers may have left one behind after reusing its slot.
+        # Only the exact acceptance target may replace that stale claim, and
+        # either choice must independently pass every rollback gate.
+        retained_targets = [
+            state.get("compatible_fallback_release"),
+            acceptance.get("previous_known_good_release")
+            if isinstance(acceptance, dict) else None,
+        ]
+        retained_targets = [target for target in retained_targets if isinstance(target, dict)]
+        if not retained_targets:
             raise RuntimeError("automatic_migration_retained_rollback_attestation_missing")
-        retained_sha = str(retained.get("sha") or "")
-        if (
-            len(retained_sha) != 40
-            or any(char not in "0123456789abcdef" for char in retained_sha)
-            or retained.get("slot") == slot
-            or int(retained.get("schema_compatible_min", current_schema + 1))
-            > current_schema
-            or int(retained.get("schema_compatible_max", current_schema - 1))
-            < current_schema
-        ):
-            raise RuntimeError("automatic_migration_retained_rollback_attestation_invalid")
-        # Promotion recorded the attestation, but the retained process must
-        # still be alive, identify as that exact SHA, and support the source
-        # schema immediately before an irreversible forward-only phase starts.
-        operations.validate_rollback_target(retained, current_schema)
+        opposite_slot = "green" if slot == "blue" else "blue"
+        for retained in retained_targets:
+            retained_sha = str(retained.get("sha") or "")
+            try:
+                try:
+                    retained_minimum = int(
+                        retained.get("schema_compatible_min", current_schema + 1)
+                    )
+                    retained_maximum = int(
+                        retained.get("schema_compatible_max", current_schema - 1)
+                    )
+                except (TypeError, ValueError) as error:
+                    raise RollbackTargetAttestationError(
+                        "automatic_migration_retained_rollback_attestation_invalid"
+                    ) from error
+                if (
+                    len(retained_sha) != 40
+                    or any(char not in "0123456789abcdef" for char in retained_sha)
+                    or retained.get("slot") != opposite_slot
+                    or retained_minimum > current_schema
+                    or retained_maximum < current_schema
+                ):
+                    raise RollbackTargetAttestationError(
+                        "automatic_migration_retained_rollback_attestation_invalid"
+                    )
+                # Read the live endpoint: history alone cannot prove that this
+                # exact process is still running or source-schema compatible.
+                operations.validate_rollback_target(retained, current_schema)
+            except RollbackTargetAttestationError as error:
+                attestation_error = error
+                continue
+            break
+        else:
+            raise RuntimeError("automatic_migration_retained_rollback_attestation_invalid") from attestation_error
 
     migration_root = state_root / "migrations" / sha
     automation_file = migration_root / "automation.json"

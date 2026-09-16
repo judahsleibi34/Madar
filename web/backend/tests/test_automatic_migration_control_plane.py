@@ -412,6 +412,167 @@ class AutomaticMigrationControlPlaneTests(unittest.TestCase):
         self.assertIn(f"rollback:{self.sha}:96", retry_events)
         self.assertNotIn(f"rollback:{'b' * 40}:96", retry_events)
 
+    def stale_production_fixture(self, root, variant="valid", stale_variant="same_slot"):
+        self.sha = "f8e9c7e3c20c5e74e5a0b130e19ec2051512cc7a"
+        retained_sha = "f7dd5ea134f567018d2c0b46c1b752c57d692822"
+        state_root, operations, compatibility, events = self.fixture(root)
+        state_file = state_root / "state.json"
+        state = json.loads(state_file.read_text())
+        state["active_slot"] = "blue"
+        state["known_good_release"]["slot"] = "blue"
+        retained = {
+            "sha": retained_sha, "slot": "green", "schema": 96,
+            "schema_compatible_min": 96, "schema_compatible_max": 96,
+        }
+        state["history"][-1]["previous_known_good_release"] = retained
+        state["compatible_fallback_release"] = {**retained, "slot": "blue"}
+        if stale_variant == "wrong_sha":
+            state["compatible_fallback_release"].update(slot="green", sha="c" * 40)
+        if variant == "missing":
+            state["history"][-1].pop("previous_known_good_release")
+        elif variant == "wrong_sha":
+            retained["sha"] = "d" * 40
+        elif variant == "invalid_sha":
+            retained["sha"] = "f7dd"
+        elif variant == "same_slot":
+            retained["slot"] = "blue"
+        elif variant == "unknown_slot":
+            retained["slot"] = "red"
+        elif variant == "incompatible":
+            retained["schema_compatible_max"] = 95
+        elif variant == "malformed_range":
+            retained["schema_compatible_max"] = None
+        state_file.write_text(json.dumps(state))
+
+        def live_identity(url):
+            events.append(f"live:{url}")
+            self.assertEqual(url, "http://127.0.0.1:8201/health/version")
+            if variant in {"dead", "missing_runtime"}:
+                raise OSError("retained_runtime_unavailable")
+            return {
+                "release_sha": retained_sha,
+                "schema_compatible_min": 96,
+                "schema_compatible_max": 95 if variant == "live_incompatible" else 96,
+            }
+
+        operations._json = live_identity
+        # Exercise the real direct-slot SHA and live compatibility attestation,
+        # including connection failure for a stopped/absent retained process.
+        operations.validate_rollback_target = lambda release, schema: (
+            self.module.DockerGitOperations.validate_rollback_target(operations, release, schema)
+        )
+        return state_root, operations, compatibility, events
+
+    def test_stale_recovery_fallback_uses_only_exact_live_acceptance_target(self):
+        for stale_variant in ("same_slot", "wrong_sha"):
+            with self.subTest(stale_variant=stale_variant), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                state_root, operations, compatibility, events = self.stale_production_fixture(
+                    root, stale_variant=stale_variant,
+                )
+                backup = root / "backups/madar-20260916T000000Z"
+
+                def create_backup(**_kwargs):
+                    self.assertTrue(any(event.startswith("live:") for event in events))
+                    backup.mkdir(parents=True)
+                    (backup / "manifest.json").write_text(json.dumps({
+                        "format_version": 3, "status": "complete", "backup_id": backup.name,
+                        "release": {"git_sha": self.sha}, "database": {"schema_version": 96},
+                    }))
+                    return backup
+
+                class Executor:
+                    def __init__(_self, **_kwargs): pass
+                    def verify_migrations(_self): pass
+                    def run(_self):
+                        operations.schema = 99
+                        return {"status": "completed"}
+
+                with (
+                    patch.object(self.module, "_validate_stable_known_good"),
+                    patch.object(self.module, "_create_verified_migration_backup", side_effect=create_backup),
+                    patch.object(self.module, "LockedMigrationExecutor", Executor),
+                    patch.object(operations, "validate_stable_candidate"),
+                ):
+                    result = self.module.automatic_migrate_known_good(
+                        sha=self.sha, state_root=state_root,
+                        compatibility=compatibility, operations=operations,
+                    )
+                state = json.loads((state_root / "state.json").read_text())
+                self.assertEqual(result["observed_schema"], 99)
+                self.assertEqual(state["known_good_release"]["schema"], 99)
+                self.assertEqual(state["compatible_fallback_release"]["sha"], self.sha)
+                self.assertEqual(state["compatible_fallback_release"]["slot"], "green")
+                self.assertEqual(state["compatible_fallback_release"]["schema"], 99)
+                self.assertFalse(any(event.startswith("traffic:") for event in events))
+
+    def test_stale_recovery_fallback_invalid_acceptance_targets_fail_pre_mutation(self):
+        for variant in (
+            "missing", "wrong_sha", "invalid_sha", "same_slot", "unknown_slot",
+            "incompatible", "malformed_range", "live_incompatible", "dead", "missing_runtime",
+        ):
+            with self.subTest(variant=variant), tempfile.TemporaryDirectory() as directory:
+                state_root, operations, compatibility, _events = self.stale_production_fixture(
+                    Path(directory), variant,
+                )
+                state_before = (state_root / "state.json").read_bytes()
+                with (
+                    patch.object(self.module, "_validate_stable_known_good"),
+                    patch.object(self.module, "_create_verified_migration_backup") as backup,
+                    patch.object(self.module, "_attest_migration_backup") as attest,
+                    patch.object(self.module, "_establish_compatible_migration_fallback") as fallback,
+                    patch("psycopg.connect") as connect,
+                    patch.object(self.module.LockedMigrationExecutor, "run") as execute,
+                ):
+                    with self.assertRaisesRegex(RuntimeError, "retained_rollback_attestation_invalid"):
+                        self.module.automatic_migrate_known_good(
+                            sha=self.sha, state_root=state_root,
+                            compatibility=compatibility, operations=operations,
+                        )
+                    for mutation in (backup, attest, fallback, connect, execute):
+                        mutation.assert_not_called()
+                self.assertFalse((state_root / "migrations").exists())
+                self.assertEqual((state_root / "state.json").read_bytes(), state_before)
+
+    def test_unexpected_rollback_validator_failure_propagates_pre_mutation(self):
+        with tempfile.TemporaryDirectory() as directory:
+            state_root, operations, compatibility, _events = self.stale_production_fixture(
+                Path(directory), stale_variant="wrong_sha",
+            )
+            state_before = (state_root / "state.json").read_bytes()
+            validation_calls = []
+
+            def unexpected_validator(release, schema):
+                validation_calls.append(release["sha"])
+                if release["sha"] == "c" * 40:
+                    raise RuntimeError("unexpected_validator_internal_failure")
+                return self.module.DockerGitOperations.validate_rollback_target(
+                    operations, release, schema,
+                )
+
+            operations.validate_rollback_target = unexpected_validator
+            with (
+                patch.object(self.module, "_validate_stable_known_good"),
+                patch.object(self.module, "_create_verified_migration_backup") as backup,
+                patch.object(self.module, "_attest_migration_backup") as attest,
+                patch.object(self.module, "_establish_compatible_migration_fallback") as fallback,
+                patch("psycopg.connect") as connect,
+                patch.object(self.module.LockedMigrationExecutor, "run") as execute,
+            ):
+                with self.assertRaisesRegex(
+                    RuntimeError, "unexpected_validator_internal_failure",
+                ):
+                    self.module.automatic_migrate_known_good(
+                        sha=self.sha, state_root=state_root,
+                        compatibility=compatibility, operations=operations,
+                    )
+                for mutation in (backup, attest, fallback, connect, execute):
+                    mutation.assert_not_called()
+
+            self.assertEqual(validation_calls, ["c" * 40])
+            self.assertFalse((state_root / "migrations").exists())
+            self.assertEqual((state_root / "state.json").read_bytes(), state_before)
+
     def test_successful_96_to_99_records_target_only_after_worker_and_route_validation(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

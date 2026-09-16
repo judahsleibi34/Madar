@@ -103,6 +103,29 @@ class ReleaseDeployerTests(unittest.TestCase):
         self.assertEqual(state["active_slot"], "green")
         self.assertEqual(state["known_good_release"]["schema_compatible_max"], 82)
 
+    def test_ordinary_promotion_retires_prior_operation_fallback(self):
+        for recovery in (False, True):
+            with self.subTest(recovery=recovery), tempfile.TemporaryDirectory() as root:
+                self.deployer(root, FakeOperations()).deploy(SHA)
+                state_file = Path(root) / "state.json"
+                state = json.loads(state_file.read_text())
+                state["compatible_fallback_release"] = {
+                    **state["known_good_release"], "slot": "blue",
+                    "schema_recovery": recovery,
+                }
+                state_file.write_text(json.dumps(state))
+                operations = FakeOperations()
+                operations.traffic = "green"
+                operations.workers = {"blue": "inactive", "green": "active"}
+                result = self.deployer(root, operations).deploy("b" * 40)
+                state = json.loads(state_file.read_text())
+                self.assertEqual(state["active_slot"], "blue")
+                self.assertEqual(state["known_good_release"]["sha"], "b" * 40)
+                self.assertNotIn("compatible_fallback_release", state)
+                self.assertEqual(result["previous_known_good_release"]["sha"], SHA)
+                self.assertEqual(result["previous_known_good_release"]["slot"], "green")
+                self.assertIn(("validate_rollback_target", SHA, "green", 82), operations.calls)
+
     def test_every_pre_switch_failure_leaves_active_target_untouched(self):
         for phase in ("verify_source", "build", "schema_version", "preflight", "start_candidate", "validate_candidate"):
             with self.subTest(phase=phase), tempfile.TemporaryDirectory() as root:
