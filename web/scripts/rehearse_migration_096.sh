@@ -116,4 +116,21 @@ do $$ declare v_variant_order uuid; v_simple_order uuid; v_snapshot jsonb; begin
 end $$;
 SQL
 
+if [[ "${MADAR_REHEARSE_TO_099:-false}" == true ]]; then
+  docker exec -i "$CONTAINER_NAME" psql -U postgres -v ON_ERROR_STOP=1 -q < "$WEB_ROOT/database/verification/099_preservation_seed.sql"
+  for number in 097 098 099; do
+    files=("$WEB_ROOT"/database/migrations/"${number}"_*.sql)
+    docker exec -i "$CONTAINER_NAME" psql -U postgres -v ON_ERROR_STOP=1 -q < "${files[0]}"
+    docker exec -i "$CONTAINER_NAME" psql -U postgres -v ON_ERROR_STOP=1 -q -v expected="$((10#$number))" <<'SQL'
+select schema_version = :expected as correct from public.application_schema_state where contract_key='core' \gset
+\if :correct
+\else
+\quit 1
+\endif
+SQL
+  done
+  docker exec -i "$CONTAINER_NAME" psql -U postgres -v ON_ERROR_STOP=1 -q < "$WEB_ROOT/database/verification/099_preservation_assertions.sql"
+  echo "096 -> 097 -> 098 -> 099 preservation and functional rehearsal passed"
+fi
+
 echo "migration 096 rehearsal passed on PostgreSQL 17"

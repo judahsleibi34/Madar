@@ -4,7 +4,7 @@
     {
       "number": 98,
       "path": "web/database/migrations/098_create_site_visit_counters.sql",
-      "sha256": "28f0f8c2fc6b47501dc5d8622897a0ebd6cb2b6185b2d89dd7cedffdf09f9b8b",
+      "sha256": "8366d2dc74458888d0f470faf2b8e3318aacb57bc4cc421a93382ccffe25511f",
       "from_schema": 97,
       "to_schema": 98,
       "compatibility": "expand-only"

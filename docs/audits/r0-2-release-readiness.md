@@ -2,6 +2,13 @@
 
 Date: 2026-09-14
 
+Historical record: R0.2 targeted schema 097 with `migrations-097.json`.
+Its commands and results describe that release, not the current candidate.
+The operator-reported current production source and CLI ledger are both 096;
+097, 098, and 099 objects are absent. The current candidate targets 099 with
+pending sequence 097, 098, 099 in `migrations-097-099.json`.
+No production access was performed to prepare this correction.
+
 Decision: **NOT READY**. No production mutation was performed. The linked
 Supabase project was not used as a staging substitute.
 
@@ -116,8 +123,8 @@ reviewed operator evidence and must never be guessed.
 9. Dry-run and then execute guarded ledger-only reconciliation:
 
        cd /srv/madar/production
-       python3 web/deployment/lib/supabase_ledger_reconciliation.py --release-sha <approved-full-sha> --repository-root /srv/madar/production --state-root /var/lib/madar/releases --dry-run
-       python3 web/deployment/lib/supabase_ledger_reconciliation.py --release-sha <approved-full-sha> --repository-root /srv/madar/production --state-root /var/lib/madar/releases --confirm 097:<pinned-sha256>
+       python3 web/deployment/lib/supabase_ledger_reconciliation.py --migration-version 097 --release-sha <approved-full-sha> --repository-root /srv/madar/production --state-root /var/lib/madar/releases --dry-run
+       python3 web/deployment/lib/supabase_ledger_reconciliation.py --migration-version 097 --release-sha <approved-full-sha> --repository-root /srv/madar/production --state-root /var/lib/madar/releases --confirm 097:<pinned-sha256>
 
    Verify the ledger contains 097 and retain
    /var/lib/madar/releases/ledger-reconciliations/097.json. Repeat must report

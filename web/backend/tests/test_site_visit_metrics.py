@@ -115,6 +115,8 @@ class SiteVisitMetricsTests(unittest.TestCase):
         sql = database.read_text(encoding="utf-8").lower()
         self.assertIn("record_public_site_visit_safe", sql)
         self.assertIn("on conflict (tenant_id)", sql)
+        self.assertIn("tenant.lifecycle_state = 'active'", sql)
+        self.assertIn("p_surface is null", sql)
         self.assertIn("schema_version = 98", sql)
         self.assertNotIn("visitor_id", sql)
         self.assertNotIn("ip_address", sql)

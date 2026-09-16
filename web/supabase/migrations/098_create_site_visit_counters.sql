@@ -21,7 +21,7 @@ security definer
 set search_path = public
 as $$
 begin
-  if p_surface not in ('website', 'store') then
+  if p_surface is null or p_surface not in ('website', 'store') then
     raise exception using
       errcode = 'P0001',
       message = 'site_visit_surface_invalid';
@@ -31,7 +31,7 @@ begin
     select 1
     from public.tenants tenant
     where tenant.tenant_id = p_tenant_id
-      and tenant.status = 'active'
+      and tenant.lifecycle_state = 'active'
   ) then
     raise exception using
       errcode = 'P0002',

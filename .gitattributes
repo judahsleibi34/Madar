@@ -10,3 +10,7 @@ Dockerfile text eol=lf
 web/deployment/bin/* text eol=lf
 web/deployment/*.conf text eol=lf
 web/deployment/systemd/* text eol=lf
+
+# Checksum-pinned SQL and release metadata must retain canonical bytes.
+*.sql text eol=lf
+web/deployment/releases/*.json text eol=lf

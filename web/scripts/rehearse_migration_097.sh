@@ -121,12 +121,14 @@ docker exec "$CONTAINER_NAME" psql -U postgres -v ON_ERROR_STOP=1 -q -c "select 
 first_pid=$!
 docker exec "$CONTAINER_NAME" psql -U postgres -v ON_ERROR_STOP=1 -q -c "select public.transition_ecommerce_order_status_safe(971,'$CONCURRENT_ORDER_ID','delivered',$MERCHANT_ACTOR_ID,'',repeat('5',64))" >/dev/null &
 second_pid=$!
-wait "$first_pid" "$second_pid"
-docker exec -e PGOPTIONS='-c client_min_messages=warning' -i "$CONTAINER_NAME" psql -U postgres -v ON_ERROR_STOP=1 -q <<SQL
-do \$\$ begin
-  if (select count(*) from public.ecommerce_loyalty_transactions where order_id='$CONCURRENT_ORDER_ID' and transaction_type='earn')<>1 then raise exception 'concurrent_earning_not_exactly_once'; end if;
+wait "$first_pid"
+wait "$second_pid"
+docker exec -e PGOPTIONS='-c client_min_messages=warning' -i "$CONTAINER_NAME" psql -U postgres -v ON_ERROR_STOP=1 -q -v order_id="$CONCURRENT_ORDER_ID" <<'SQL'
+select set_config('rehearsal.order_id', :'order_id', false);
+do $$ begin
+  if (select count(*) from public.ecommerce_loyalty_transactions where order_id=current_setting('rehearsal.order_id')::uuid and transaction_type='earn')<>1 then raise exception 'concurrent_earning_not_exactly_once'; end if;
   if (select sum(points_delta) from public.ecommerce_loyalty_transactions where tenant_id=971)<>(select current_balance from public.ecommerce_loyalty_accounts where tenant_id=971) then raise exception 'concurrent_projection_mismatch'; end if;
-end \$\$;
+end $$;
 SQL
 
 echo "migration 097 loyalty rehearsal passed on PostgreSQL 17"

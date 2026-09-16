@@ -489,7 +489,7 @@ available after migration 097.
 
 ### Earlier schema 095 bridge
 
-The current release contract accepts schema `81..95` and targets `95` with the
+That earlier release contract accepted schema `81..95` and targets `95` with the
 pinned `migrations-095.json` manifest. Migration 095 is an expand-only `94→95`
 transition. The application may be promoted on schema 94, but structured public
 checkout and merchant delivery/order operations fail closed until their RPCs and
@@ -532,3 +532,28 @@ blueprint and `production-release-policy.md` in the same change. Tests must map
 new or changed invariants to executable behavior. A main-targeting change is not
 ready while any locally executable mandatory gate fails or any untested safety
 claim is represented as proven.
+
+### Sequential schema-099 ledger reconciliation
+
+The operator-reported current production source and CLI ledger are 096; the
+current target is 099 and pending sequence is 097, 098, 099. After the entire
+candidate coordinator completes at 099, reconcile each version separately in
+that order with `--migration-version 097`, then `098`, then `099`. Each apply
+requires `--release-sha <candidate-sha>` and `--confirm NNN:<manifest-sha256>`.
+Dry-run also requires an explicit version. Each version must be a canonical,
+byte-identical database/Supabase migration pinned by the candidate manifest and
+recorded applied/already-applied with the same checksum in completed execution.
+Known-good identity, final target schema, worker completion, linked project,
+and live stable identity/readiness must agree. The immediate predecessor and
+all earlier manifest versions must be in the CLI ledger; gaps, out-of-order
+repair, and versions beyond the final target fail closed. Repeating a version
+revalidates all guards and preserves its private atomic audit timestamp. Audit
+identity includes candidate SHA, version, checksum, final schema, and project.
+This tool only repairs the CLI ledger; it never applies SQL or deploys.
+
+The unapplied 098 visit RPC uses the existing `tenants.lifecycle_state` active
+gate (there is no `tenants.status` column) and rejects null surfaces. Its
+reviewed checksum is repinned in both applicable manifests.
+
+Ledger reconciliation holds the existing nonblocking host `deploy.lock` for
+all validation, repair, and auditing, excluding release/migration races.

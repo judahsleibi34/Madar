@@ -525,6 +525,7 @@ single version with:
 
 ```bash
 python3 web/deployment/lib/supabase_ledger_reconciliation.py \
+  --migration-version 097 \
   --release-sha <exact-40-character-sha> \
   --repository-root /srv/madar/production \
   --state-root /var/lib/madar/releases \
@@ -899,3 +900,28 @@ Implemented by:
 
 Any change to these files or the protected-path set requires same-change review
 of this section and the architecture document.
+
+### Sequential schema-099 ledger reconciliation
+
+The operator-reported current production source and CLI ledger are 096; the
+current target is 099 and pending sequence is 097, 098, 099. After the entire
+candidate coordinator completes at 099, reconcile each version separately in
+that order with `--migration-version 097`, then `098`, then `099`. Each apply
+requires `--release-sha <candidate-sha>` and `--confirm NNN:<manifest-sha256>`.
+Dry-run also requires an explicit version. Each version must be a canonical,
+byte-identical database/Supabase migration pinned by the candidate manifest and
+recorded applied/already-applied with the same checksum in completed execution.
+Known-good identity, final target schema, worker completion, linked project,
+and live stable identity/readiness must agree. The immediate predecessor and
+all earlier manifest versions must be in the CLI ledger; gaps, out-of-order
+repair, and versions beyond the final target fail closed. Repeating a version
+revalidates all guards and preserves its private atomic audit timestamp. Audit
+identity includes candidate SHA, version, checksum, final schema, and project.
+This tool only repairs the CLI ledger; it never applies SQL or deploys.
+
+The unapplied 098 visit RPC uses the existing `tenants.lifecycle_state` active
+gate (there is no `tenants.status` column) and rejects null surfaces. Its
+reviewed checksum is repinned in both applicable manifests.
+
+Ledger reconciliation holds the existing nonblocking host `deploy.lock` for
+all validation, repair, and auditing, excluding release/migration races.

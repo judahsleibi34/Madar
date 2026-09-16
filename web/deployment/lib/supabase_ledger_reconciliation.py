@@ -18,7 +18,7 @@ from urllib.parse import urlsplit
 
 
 SHA = re.compile(r"^[0-9a-f]{40}$")
-LEDGER_ROW = re.compile(r"^\s*(\d+)\s*\|\s*(\d*)\s*\|", re.MULTILINE)
+LEDGER_ROW = re.compile(r"^\s*(\d*)\s*\|\s*(\d*)\s*\|", re.MULTILINE)
 
 
 def load_json(path: Path, code: str) -> dict:
@@ -32,7 +32,7 @@ def load_json(path: Path, code: str) -> dict:
 
 
 def atomic_json(path: Path, value: dict) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
+    path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     descriptor, temporary = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
     try:
         with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
@@ -57,7 +57,7 @@ def default_json_reader(url: str, headers: dict[str, str]) -> object:
         return json.loads(response.read())
 
 
-def run(
+def _run(
     *,
     release_sha: str,
     repository_root: Path,
@@ -65,6 +65,7 @@ def run(
     supabase_bin: str,
     confirmation: str | None,
     dry_run: bool,
+    migration_version: int | None = None,
     environ: dict[str, str] | None = None,
     runner: Callable = subprocess.run,
     json_reader: Callable = default_json_reader,
@@ -95,26 +96,43 @@ def run(
     release = load_json(web_root / "deployment/releases/release.json", "ledger_reconciliation_release_contract_invalid")
     target = int(release.get("schema", {}).get("target", -1))
     manifest_name = str(release.get("migration_manifest") or "")
-    if target != 98 or Path(manifest_name).name != manifest_name:
+    version = target if migration_version is None else migration_version
+    if target not in {97, 98, 99} or version not in {97, 98, 99} or version > target or not manifest_name or Path(manifest_name).name != manifest_name:
         raise RuntimeError("ledger_reconciliation_release_contract_invalid")
     manifest = load_json(web_root / "deployment/releases" / manifest_name, "ledger_reconciliation_manifest_invalid")
     manifest_release = str(manifest.get("release_sha") or "")
     if manifest_release not in {release_sha, "CURRENT", "STAGING"}:
         raise RuntimeError("ledger_reconciliation_manifest_release_mismatch")
-    matching = [item for item in manifest.get("migrations", []) if int(item.get("number", -1)) == target]
-    if len(matching) != 1 or int(matching[0].get("from_schema", -1)) != target - 1 or int(matching[0].get("to_schema", -1)) != target:
+    entries = manifest.get("migrations", [])
+    numbers = [item.get("number") for item in entries]
+    if not numbers or numbers != list(range(numbers[0], target + 1)):
+        raise RuntimeError("ledger_reconciliation_manifest_transition_invalid")
+    for item in entries:
+        number = item.get("number")
+        if number not in {97, 98, 99} or item.get("from_schema") != number - 1 or item.get("to_schema") != number:
+            raise RuntimeError("ledger_reconciliation_manifest_transition_invalid")
+    matching = [item for item in entries if item.get("number") == version]
+    if len(matching) != 1 or int(matching[0].get("from_schema", -1)) != version - 1 or int(matching[0].get("to_schema", -1)) != version:
         raise RuntimeError("ledger_reconciliation_manifest_transition_invalid")
     migration = (repository_root / str(matching[0].get("path", ""))).resolve()
     try:
         migration.relative_to(repository_root)
     except ValueError as error:
         raise RuntimeError("ledger_reconciliation_migration_escape") from error
+    canonical = list((web_root / "database/migrations").glob(f"{version:03d}_*.sql"))
+    if len(canonical) != 1 or migration != canonical[0].resolve():
+        raise RuntimeError("ledger_reconciliation_migration_path_invalid")
+    mirror = web_root / "supabase/migrations" / migration.name
+    if not mirror.is_file() or mirror.read_bytes() != migration.read_bytes():
+        raise RuntimeError("ledger_reconciliation_migration_checksum_mismatch")
     expected_checksum = str(matching[0].get("sha256") or "").lower()
     actual_checksum = hashlib.sha256(migration.read_bytes()).hexdigest() if migration.is_file() else ""
     if not re.fullmatch(r"[0-9a-f]{64}", expected_checksum) or actual_checksum != expected_checksum:
         raise RuntimeError("ledger_reconciliation_migration_checksum_mismatch")
 
     state = load_json(state_root / "state.json", "ledger_reconciliation_release_state_invalid")
+    if state.get("in_progress_release") or state.get("rollback_failure"):
+        raise RuntimeError("ledger_reconciliation_release_in_progress")
     known_good = state.get("known_good_release") or {}
     if known_good.get("sha") != release_sha or int(known_good.get("schema", -1)) != target or known_good.get("slot") != state.get("active_slot"):
         raise RuntimeError("ledger_reconciliation_known_good_not_at_target")
@@ -127,7 +145,7 @@ def run(
         raise RuntimeError("ledger_reconciliation_automation_not_complete")
     if execution.get("status") != "completed" or execution.get("phase") != "complete" or int(execution.get("observed_schema", -1)) != target:
         raise RuntimeError("ledger_reconciliation_execution_not_complete")
-    executed = [item for item in execution.get("migrations", []) if int(item.get("number", -1)) == target]
+    executed = [item for item in execution.get("migrations", []) if int(item.get("number", -1)) == version]
     if len(executed) != 1 or executed[0].get("status") not in {"applied", "already_applied"} or executed[0].get("checksum") != expected_checksum:
         raise RuntimeError("ledger_reconciliation_execution_checksum_mismatch")
 
@@ -146,7 +164,7 @@ def run(
     if not expected_project_ref or linked_ref != expected_project_ref:
         raise RuntimeError("ledger_reconciliation_linked_project_mismatch")
     headers = {"apikey": service_key, "Authorization": f"Bearer {service_key}"}
-    rows = json_reader(f"{supabase_url}/rest/v1/application_schema_state?select=schema_version&contract_key=eq.core&limit=1", headers)
+    rows = json_reader(f"{supabase_url}/rest/v1/application_schema_state?select=schema_version&contract_key=eq.core", headers)
     if not isinstance(rows, list) or len(rows) != 1 or int(rows[0].get("schema_version", -1)) != target:
         raise RuntimeError("ledger_reconciliation_live_schema_not_at_target")
     backend = environment.get("MADAR_STABLE_BACKEND_URL", "http://127.0.0.1:8001").rstrip("/")
@@ -159,41 +177,47 @@ def run(
     before = migration_ledger(command(list_command).stdout)
     if any(version > target for version in before):
         raise RuntimeError("ledger_reconciliation_remote_ledger_ahead")
-    if target not in before and target - 1 not in before:
+    if version - 1 not in before or any(number < version and number not in before for number in numbers):
         raise RuntimeError("ledger_reconciliation_remote_predecessor_missing")
-    audit = state_root / "ledger-reconciliations" / f"{target:03d}.json"
+    if version not in before and any(number > version for number in before):
+        raise RuntimeError("ledger_reconciliation_remote_order_invalid")
+    audit = state_root / "ledger-reconciliations" / f"{version:03d}.json"
     prior_audit = load_json(audit, "ledger_reconciliation_audit_invalid") if audit.exists() else None
     if prior_audit is not None:
         expected_identity = {
             "release_sha": release_sha,
-            "migration": target,
+            "migration": version,
             "migration_sha256": expected_checksum,
             "schema": target,
+            "project_ref": expected_project_ref,
         }
         if any(prior_audit.get(key) != value for key, value in expected_identity.items()):
             raise RuntimeError("ledger_reconciliation_audit_identity_mismatch")
-        if target not in before:
+        if version not in before:
             raise RuntimeError("ledger_reconciliation_audit_ledger_drift")
-    action = "already_reconciled" if target in before else "would_reconcile" if dry_run else "reconciled"
-    if target not in before and not dry_run:
-        if confirmation != f"{target:03d}:{expected_checksum}":
+    action = "already_reconciled" if version in before else "would_reconcile" if dry_run else "reconciled"
+    if version not in before and not dry_run:
+        if confirmation != f"{version:03d}:{expected_checksum}":
             raise RuntimeError("ledger_reconciliation_confirmation_mismatch")
-        command([supabase_bin, "--workdir", str(web_root), "migration", "repair", "--linked", "--status", "applied", f"{target:03d}"])
+        command([supabase_bin, "--workdir", str(web_root), "migration", "repair", "--linked", "--status", "applied", f"{version:03d}"])
         after = migration_ledger(command(list_command).stdout)
-        if target not in after:
+        if after != before | {version}:
             raise RuntimeError("ledger_reconciliation_postcondition_failed")
 
     result = {
         "status": "validated" if dry_run else "completed",
         "action": action,
         "release_sha": release_sha,
-        "migration": target,
+        "migration": version,
         "migration_sha256": expected_checksum,
         "schema": target,
+        "project_ref": expected_project_ref,
         "tenant_data_touched": False,
         "completed_at": datetime.now(timezone.utc).isoformat(),
     }
     if not dry_run:
+        if confirmation != f"{version:03d}:{expected_checksum}":
+            raise RuntimeError("ledger_reconciliation_confirmation_mismatch")
         if prior_audit is not None:
             result["completed_at"] = prior_audit.get("completed_at")
             result["action"] = "already_reconciled"
@@ -202,8 +226,30 @@ def run(
     return result
 
 
+
+def run(*, state_root: Path, **arguments) -> dict:
+    """Serialize ledger changes with the same host lock as release/migration work."""
+    if not state_root.is_absolute() or not state_root.is_dir():
+        raise RuntimeError("ledger_reconciliation_absolute_roots_required")
+    descriptor = os.open(state_root / "deploy.lock", os.O_CREAT | os.O_RDWR | getattr(os, "O_NOFOLLOW", 0), 0o600)
+    try:
+        if os.name == "nt":
+            import msvcrt
+            if os.fstat(descriptor).st_size == 0:
+                os.write(descriptor, b"0")
+            os.lseek(descriptor, 0, os.SEEK_SET)
+            msvcrt.locking(descriptor, msvcrt.LK_NBLCK, 1)
+        else:
+            import fcntl
+            fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        return _run(state_root=state_root, **arguments)
+    finally:
+        os.close(descriptor)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Reconcile a coordinator-verified migration into the Supabase CLI ledger.")
+    parser.add_argument("--migration-version", required=True, choices=("097", "098", "099"))
     parser.add_argument("--release-sha", required=True)
     parser.add_argument("--repository-root", required=True, type=Path)
     parser.add_argument("--state-root", required=True, type=Path)
@@ -212,7 +258,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args(argv)
     try:
-        result = run(release_sha=args.release_sha.lower(), repository_root=args.repository_root, state_root=args.state_root, supabase_bin=args.supabase_bin, confirmation=args.confirm, dry_run=args.dry_run)
+        result = run(migration_version=int(args.migration_version), release_sha=args.release_sha.lower(), repository_root=args.repository_root, state_root=args.state_root, supabase_bin=args.supabase_bin, confirmation=args.confirm, dry_run=args.dry_run)
     except Exception as error:
         print(f"ledger reconciliation failed: {error}", file=sys.stderr)
         return 1
