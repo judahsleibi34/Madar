@@ -129,8 +129,11 @@ helper scripts and `backup_support.py` are provenance-protected by the guard
 and privileged upgrader. Replaced helpers/units are included in the protected
 installer backup and filesystem preflight. Timers are never enabled by install.
 The upgrader stops existing backup timers, refuses a running backup operation,
-and restores their previous activity only after successful governed completion
-or safe pre-install recovery. A direct installer requires quiescence as well.
+and durably records their original enabled/activity states in the exact-SHA
+root-owned `/run` interlock before stopping any timer. Authorization and failure
+re-arm preserve that snapshot for later forward repair. Exact restoration and
+attestation precede interlock removal after successful governed completion or
+safe pre-install recovery. A direct installer requires quiescence as well.
 
 Scheduled backups load canonical host storage paths after backup.env and obtain
 only provider credentials from a systemd `LoadCredential` copy of production.env;
