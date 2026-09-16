@@ -3004,7 +3004,7 @@ def create_public_store_order(
     customer_id = None
     if request.cookies.get("madar_access_token") or request.cookies.get("madar_refresh_token"):
         try:
-            customer = get_authenticated_user_row(
+            _, customer = get_authenticated_user_row(
                 request, response,
                 allow_admin_account_access=False,
                 reject_admin_account_access=True,
@@ -3113,7 +3113,7 @@ def get_public_store_loyalty(subdomain: str, request: Request, response: Respons
     clean_subdomain = normalize_subdomain(subdomain)
     settings = resolve_public_store_settings(clean_subdomain, request=request)
     tenant_id = resolve_tenant_id(settings)
-    customer = get_authenticated_user_row(
+    _, customer = get_authenticated_user_row(
         request, response,
         allow_admin_account_access=False,
         reject_admin_account_access=True,
