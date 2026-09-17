@@ -82,19 +82,26 @@ describe("EcommerceThemePage", () => {
     expect(saveEcommerceTheme).not.toHaveBeenCalled();
   });
 
-  it("loads and explicitly saves localized SEO and merchandising settings", async () => {
+  it("shows only color settings without loading or saving merchandising", async () => {
     render(<EcommerceThemePage />);
-    fireEvent.change(await screen.findByLabelText("Store SEO title (English)"), { target: { value: "Olive shop" } });
-    fireEvent.change(screen.getByLabelText("Announcement (Arabic)"), { target: { value: "توصيل محلي" } });
-    fireEvent.click(screen.getByLabelText("Show announcement banner"));
-    const featuredProducts = screen.getByLabelText("Featured products");
-    featuredProducts.options[0].selected = true;
-    fireEvent.change(featuredProducts);
-    fireEvent.click(screen.getByRole("button", { name: "Save SEO and merchandising" }));
+    await screen.findByLabelText("Store colors");
+    expect(screen.queryByRole("tablist")).toBeNull();
+    expect(screen.queryByText("SEO")).toBeNull();
+    expect(screen.queryByText("Announcement")).toBeNull();
+    expect(screen.queryByText("Featured")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Save SEO and merchandising" })).toBeNull();
+    expect(fetchEcommerceGrowth).not.toHaveBeenCalled();
+    expect(fetchEcommerceCatalog).not.toHaveBeenCalled();
+    expect(saveEcommerceGrowth).not.toHaveBeenCalled();
+  });
 
-    await waitFor(() => expect(saveEcommerceGrowth).toHaveBeenCalledWith(expect.objectContaining({
-      seo_title_en: "Olive shop", announcement_enabled: true, announcement_text_ar: "توصيل محلي", featured_product_ids: ["product-1"],
-    })));
-    expect(await screen.findByText("Storefront growth settings saved")).toBeTruthy();
+  it("switches preview viewports without publishing and places publishing at the end", async () => {
+    render(<EcommerceThemePage />);
+    const frame = await screen.findByTitle("Exact draft storefront preview");
+    expect(frame.style.width).toBe("1120px");
+    fireEvent.click(screen.getByRole("button", {name:"Mobile"}));
+    expect(frame.style.width).toBe("390px");
+    expect(screen.getByRole("button", {name:"Publish changes"}).closest("footer")).toBeTruthy();
+    expect(saveEcommerceTheme).not.toHaveBeenCalled();
   });
 });

@@ -1,0 +1,10 @@
+[Unit]
+Description=Schedule Madar host-capacity checks
+
+[Timer]
+OnCalendar=hourly
+Persistent=true
+Unit=madar-host-capacity.service
+
+[Install]
+WantedBy=timers.target

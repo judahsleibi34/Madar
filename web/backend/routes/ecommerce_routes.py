@@ -18,7 +18,6 @@ from services.ecommerce_cache_service import (
     invalidate_ecommerce_cache,
 )
 from services.tenant_service import require_active_tenant_member
-from services.entitlement_service import require_entitlement
 
 
 router = APIRouter(prefix="/ecommerce", tags=["Ecommerce"])
@@ -180,6 +179,31 @@ class StoreCurrencyPayload(BaseModel):
         return cleaned
 
 
+class CustomDeliveryAreaCreate(BaseModel):
+    country: str = Field(min_length=1, max_length=100)
+    levels: list[str] = Field(default_factory=list, max_length=5)
+    name_ar: str = Field(default="", max_length=650)
+
+    @field_validator("country", "name_ar")
+    @classmethod
+    def clean_name(cls, value):
+        return value.strip()
+
+    @field_validator("levels")
+    @classmethod
+    def clean_levels(cls, value):
+        cleaned = [level.strip() for level in value]
+        if any(not level or len(level) > 100 for level in cleaned):
+            raise ValueError("Each location level must contain 1 to 100 characters")
+        return cleaned
+
+    @model_validator(mode="after")
+    def require_country(self):
+        if not self.country:
+            raise ValueError("Country is required")
+        return self
+
+
 class DeliveryAreasUpdate(BaseModel):
     enabled_service_area_ids: list[UUID] = Field(default_factory=list, max_length=100)
 
@@ -195,16 +219,42 @@ class OrderStatusUpdate(BaseModel):
     idempotency_key: str = Field(..., min_length=16, max_length=128)
 
 
+class LoyaltyDiscountCondition(BaseModel):
+    audience: Literal["normal", "loyalty"]
+    product_ids: list[UUID] = Field(..., min_length=1, max_length=100)
+    discount_basis_points: int = Field(..., ge=1, le=10000)
+    validity_mode: Literal["fixed_period", "lifetime"] = "lifetime"
+    validity_days: int | None = Field(default=None, ge=1, le=3650)
+
+    @model_validator(mode="after")
+    def validate_condition(self):
+        if len(set(self.product_ids)) != len(self.product_ids):
+            raise ValueError("Reward products must be unique")
+        if self.validity_mode == "fixed_period" and self.validity_days is None:
+            raise ValueError("Validity days are required for a fixed period")
+        if self.validity_mode == "lifetime" and self.validity_days is not None:
+            raise ValueError("Lifetime rewards cannot have validity days")
+        return self
+
+
 class LoyaltyRulePayload(BaseModel):
     enabled: bool = False
     earning_rate_basis_points: int = Field(default=500, ge=1, le=10000)
     threshold_points: int = Field(..., ge=1, le=10_000_000_000)
-    reward_product_id: UUID
+    reward_product_id: UUID | None = None
+    discount_conditions: list[LoyaltyDiscountCondition] | None = Field(default=None, min_length=1, max_length=10)
     validity_mode: Literal["fixed_period", "lifetime"] = "lifetime"
     validity_days: int | None = Field(default=None, ge=1, le=3650)
 
     @model_validator(mode="after")
     def validate_validity(self):
+        if self.discount_conditions is not None:
+            if not any(condition.audience == "loyalty" for condition in self.discount_conditions):
+                raise ValueError("At least one loyalty reward condition is required")
+            if self.reward_product_id is not None:
+                raise ValueError("Use either discount conditions or a legacy reward product")
+        elif self.reward_product_id is None:
+            raise ValueError("A reward product is required")
         if self.validity_mode == "fixed_period" and self.validity_days is None:
             raise ValueError("Validity days are required for a fixed period")
         if self.validity_mode == "lifetime" and self.validity_days is not None:
@@ -440,9 +490,6 @@ def _require_ecommerce_access(request: Request, response: Response):
     )
     if str(context.role or "").lower() not in {"owner", "admin", "member"}:
         raise HTTPException(status_code=403, detail="Ecommerce access required")
-    entitlements = require_entitlement(context.tenant_id, "ecommerce_management")
-    request.state.commercial_revision = entitlements.get("entitlement_revision", "operator")
-    response.headers["Cache-Control"] = "private, no-store"
     return context
 
 def _require_role(context) -> None:
@@ -612,7 +659,7 @@ def _save_product_aggregate(tenant_id: int, product_id: str, payload: ProductPay
         if not missing_v2:
             raise
         if uses_color:
-            raise HTTPException(status_code=503, detail="Color variant attributes require database migration 101") from error
+            raise HTTPException(status_code=503, detail="Color variant attributes require database migration 099") from error
         service_supabase.rpc("save_ecommerce_product_aggregate_safe", params).execute()
 
 
@@ -815,10 +862,39 @@ def update_store_settings(payload: StoreCurrencyPayload, request: Request, respo
     return {"currency": settings.get("ecommerce_currency"), "currency_locked": _store_currency_locked(context.tenant_id)}
 
 
+def _delivery_area_belongs_to_tenant(area: dict, tenant_id: int) -> bool:
+    # Custom codes are server-generated ownership keys in the existing catalog.
+    # Shared seeded areas have no custom prefix; clients never supply a code.
+    code = str(area.get("code") or "")
+    return not code.startswith("custom-") or code.startswith(f"custom-{int(tenant_id)}-")
+
+
+@router.post("/delivery-areas/custom", status_code=201)
+def create_custom_delivery_area(payload: CustomDeliveryAreaCreate, request: Request, response: Response):
+    context = _require_ecommerce_access(request, response)
+    _require_role(context)
+    prefix = f"custom-{int(context.tenant_id)}-"
+    existing = _rows(service_supabase.table("ecommerce_service_areas").select("id,name_en").like("code", f"{prefix}%"))
+    if len(existing) >= 100:
+        raise HTTPException(status_code=400, detail="A store can have at most 100 custom locations")
+    name = " / ".join([payload.country, *payload.levels])
+    if any(str(area.get("name_en", "")).casefold() == name.casefold() for area in existing):
+        raise HTTPException(status_code=409, detail="This custom location already exists")
+    area = {
+        "id": str(uuid4()), "code": f"{prefix}{uuid4().hex}",
+        "name_en": name, "name_ar": payload.name_ar or name,
+        "active": True, "sort_order": 1000 + len(existing),
+    }
+    _rows(service_supabase.table("ecommerce_service_areas").insert(area))
+    invalidate_ecommerce_cache(context.tenant_id)
+    return {"area": {**area, "enabled": False}}
+
+
 @router.get("/delivery-areas")
 def get_delivery_areas(request: Request, response: Response):
     context = _require_ecommerce_access(request, response)
-    areas = _rows(service_supabase.table("ecommerce_service_areas").select("id,code,name_en,name_ar,active,sort_order").eq("active", True).order("sort_order"))
+    areas = _rows(service_supabase.table("ecommerce_service_areas").select("id,code,name_en,name_ar,active,sort_order").eq("active", True).or_(f"code.not.like.custom-%,code.like.custom-{int(context.tenant_id)}-%").order("sort_order"))
+    areas = [area for area in areas if _delivery_area_belongs_to_tenant(area, context.tenant_id)]
     enabled_rows = _rows(service_supabase.table("ecommerce_tenant_service_areas").select("service_area_id").eq("tenant_id", context.tenant_id).eq("enabled", True))
     enabled = {str(row.get("service_area_id")) for row in enabled_rows}
     return {"areas": [{**area, "enabled": str(area.get("id")) in enabled} for area in areas], "enabled_count": len(enabled)}
@@ -828,6 +904,11 @@ def get_delivery_areas(request: Request, response: Response):
 def update_delivery_areas(payload: DeliveryAreasUpdate, request: Request, response: Response):
     context = _require_ecommerce_access(request, response)
     _require_role(context)
+    requested = [str(area_id) for area_id in payload.enabled_service_area_ids]
+    if requested:
+        areas = _rows(service_supabase.table("ecommerce_service_areas").select("id,code").in_("id", requested).eq("active", True))
+        if len(areas) != len(requested) or any(not _delivery_area_belongs_to_tenant(area, context.tenant_id) for area in areas):
+            raise HTTPException(status_code=400, detail="One or more delivery areas are unavailable")
     try:
         result = _rpc_data(service_supabase.rpc("set_ecommerce_delivery_areas_safe", {
             "p_tenant_id": int(context.tenant_id),
@@ -858,7 +939,7 @@ def get_loyalty_rule(request: Request, response: Response):
         entitlements = _rows(service_supabase.table("ecommerce_loyalty_entitlements").select("*").eq("tenant_id", context.tenant_id).order("created_at", desc=True).limit(100))
     except Exception as error:
         message = str(error).lower()
-        if "pgrst205" in message or "schema cache" in message or "could not find the table" in message:
+        if "pgrst205" in message or "42p01" in message or "could not find the table" in message:
             raise HTTPException(status_code=503, detail="Loyalty settings require database migration 097") from error
         raise
     return {
@@ -874,6 +955,35 @@ def update_loyalty_rule(payload: LoyaltyRulePayload, request: Request, response:
     context = _require_ecommerce_access(request, response)
     _require_role(context)
     try:
+        if payload.discount_conditions is not None:
+            try:
+                rule = _rpc_data(service_supabase.rpc("save_ecommerce_loyalty_rule_v2_safe", {
+                    "p_tenant_id": int(context.tenant_id), "p_actor_id": int(context.user_id),
+                    "p_enabled": payload.enabled,
+                    "p_earning_rate_basis_points": payload.earning_rate_basis_points,
+                    "p_threshold_points": payload.threshold_points,
+                    "p_conditions": [condition.model_dump(mode="json") for condition in payload.discount_conditions],
+                }).execute())
+            except Exception as error:
+                message = str(error).lower()
+                missing_v2 = "pgrst202" in message or "could not find the function" in message
+                condition = payload.discount_conditions[0]
+                legacy_compatible = (
+                    len(payload.discount_conditions) == 1 and condition.audience == "loyalty"
+                    and len(condition.product_ids) == 1 and condition.discount_basis_points == 1000
+                )
+                if not missing_v2:
+                    raise
+                if not legacy_compatible:
+                    raise HTTPException(status_code=503, detail="Multiple reward products and discount conditions require database migration 100") from error
+                rule = _rpc_data(service_supabase.rpc("save_ecommerce_loyalty_rule_safe", {
+                    "p_tenant_id": int(context.tenant_id), "p_actor_id": int(context.user_id),
+                    "p_enabled": payload.enabled, "p_earning_rate_basis_points": payload.earning_rate_basis_points,
+                    "p_threshold_points": payload.threshold_points, "p_reward_product_id": str(condition.product_ids[0]),
+                    "p_validity_mode": condition.validity_mode, "p_validity_days": condition.validity_days,
+                }).execute())
+            invalidate_ecommerce_cache(context.tenant_id)
+            return {"rule": rule}
         rule = _rpc_data(service_supabase.rpc("save_ecommerce_loyalty_rule_safe", {
             "p_tenant_id": int(context.tenant_id), "p_actor_id": int(context.user_id),
             "p_enabled": payload.enabled, "p_earning_rate_basis_points": payload.earning_rate_basis_points,
@@ -886,7 +996,10 @@ def update_loyalty_rule(payload: LoyaltyRulePayload, request: Request, response:
         message = str(error).lower()
         if "reward_product_invalid" in message or "rule_invalid" in message:
             raise HTTPException(status_code=400, detail="The loyalty rule is invalid") from error
-        raise HTTPException(status_code=503, detail="Loyalty settings require database migration 097") from error
+        if any(code in message for code in ("pgrst202", "pgrst205", "42p01")):
+            raise HTTPException(status_code=503, detail="Loyalty settings require database migration 097") from error
+        raise HTTPException(status_code=503, detail="Loyalty settings are temporarily unavailable") from error
+    invalidate_ecommerce_cache(context.tenant_id)
     return {"rule": rule}
 
 
@@ -1014,7 +1127,7 @@ def collect_order_payment(order_id: UUID, request: Request, response: Response):
 def get_catalog(request: Request, response: Response):
     context = _require_ecommerce_access(request, response)
     try:
-        cache_key = ecommerce_cache_key(context.tenant_id, "authenticated-catalog-v3", revision=getattr(request.state, "commercial_revision", "unresolved"), user_id=context.user_id, role=context.role)
+        cache_key = ecommerce_cache_key(context.tenant_id, "authenticated-catalog-v2")
         catalog, _cache_hit = get_or_create_ecommerce_cache(
             cache_key,
             context.tenant_id,

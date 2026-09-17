@@ -172,9 +172,25 @@ describe("EcommercePage", () => {
     expect(screen.getByRole("heading", { name: "New product" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Specifications" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Variant attributes" })).toBeTruthy();
-    expect(screen.getByText("This is a simple product")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Add variant attribute" })).toBeTruthy();
     expect(screen.getAllByRole("button", { name: "Save product" })).toHaveLength(1);
     expect(screen.queryByText("Full product editor")).toBeNull();
+  });
+  it("opens product editing in a popup and resets the editor for creation", async () => {
+    fetchEcommerceCatalog.mockResolvedValue({ tags: [], categories: [], products: [{
+      id: "product-1", slug: "shirt", sku: "SHIRT", price: 20, currency: "USD", status: "draft",
+      translations: { en: { name: "Shirt", description: "" }, ar: { name: "", description: "" } },
+      options: [], variants: [], attributes: [], images: [], tag_ids: [],
+    }] });
+    render(<EcommercePage section="products" />);
+    fireEvent.click(await screen.findByRole("button", { name: "Open full editor for Shirt" }));
+    expect(await screen.findByRole("dialog", { name: "Edit product" })).toBeTruthy();
+    await waitFor(() => expect(screen.getByLabelText("Name (English)").value).toBe("Shirt"));
+    fireEvent.click(screen.getByRole("button", { name: "Close", exact: true }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Add product" }));
+    expect(await screen.findByRole("dialog", { name: "New product" })).toBeTruthy();
+    expect(screen.getByLabelText("Name (English)").value).toBe("");
   });
 });
   it("shows aggregate stock counts and filters simple and variant products", async () => {
@@ -207,4 +223,47 @@ describe("EcommercePage", () => {
     expect(screen.getByText("Out simple")).toBeTruthy();
     expect(screen.getByText("Mixed variants")).toBeTruthy();
     expect(screen.queryByText("Low simple")).toBeNull();
+  });
+
+  it.each(["tags", "categories", "products"])("hides backend exception details when reading %s", async (section) => {
+    fetchEcommerceCatalog.mockRejectedValue(new Error("SUPABASE_SERVICE_KEY=secret; SQL internal_catalog failed"));
+    render(<EcommercePage section={section} />);
+    expect(await screen.findByRole("alert")).toBeTruthy();
+    expect(document.body.textContent).not.toContain("SUPABASE_SERVICE_KEY");
+    expect(document.body.textContent).not.toContain("internal_catalog");
+  });
+
+  it("uses safe toast text after a failed create and keeps the form open", async () => {
+    saveEcommerceItem.mockRejectedValue(new Error("DATABASE_URL=postgres://secret; internal_insert failed"));
+    render(<EcommercePage section="tags" />);
+    await screen.findByText("No tags yet");
+    fireEvent.click(screen.getByRole("button", { name: "Add tag" }));
+    fireEvent.change(screen.getAllByLabelText("Name")[0], { target: { value: "Summer" } });
+    fireEvent.change(screen.getByLabelText("Status"), { target: { value: "active" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect((await screen.findByRole("alert")).textContent).toContain("Could not save");
+    expect(document.body.textContent).not.toContain("DATABASE_URL");
+    expect(screen.getByRole("button", { name: "Save" })).toBeTruthy();
+  });
+
+  it.each(["update", "delete"])("hides backend details after a failed %s", async (operation) => {
+    const tag = { id: "tag-1", slug: "summer", status: "active", translations: { en: { name: "Summer" } } };
+    fetchEcommerceCatalog.mockResolvedValue({ tags: [tag], categories: [], products: [] });
+    saveEcommerceItem.mockRejectedValue(new Error("SUPABASE_SERVICE_KEY=secret internal_update"));
+    deleteEcommerceItem.mockRejectedValue(new Error("SUPABASE_SERVICE_KEY=secret internal_delete"));
+    render(<EcommercePage section="tags" />);
+    await screen.findByText("Summer");
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+    try {
+      if (operation === "delete") {
+        fireEvent.click(screen.getByRole("button", { name: "Delete Summer" }));
+      } else {
+        fireEvent.click(screen.getByRole("button", { name: "Quick edit Summer" }));
+        fireEvent.click(screen.getByRole("button", { name: "Save" }));
+      }
+      expect((await screen.findByRole("alert")).textContent).toContain("Could not");
+      expect(document.body.textContent).not.toContain("SUPABASE_SERVICE_KEY");
+      expect(document.body.textContent).not.toContain("internal_");
+      expect(screen.getAllByText("Summer").length).toBeGreaterThan(0);
+    } finally { confirm.mockRestore(); }
   });

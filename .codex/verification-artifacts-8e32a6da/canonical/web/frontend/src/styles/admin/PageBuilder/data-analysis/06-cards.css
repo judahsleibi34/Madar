@@ -1,0 +1,42 @@
+/* ============================================================
+   Cards
+   ============================================================ */
+
+.page-builder .daw-card {
+  min-width: 0;
+  border: 1px solid var(--daw-card-border);
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, rgba(var(--theme-text-inverse-rgb), 0.96), rgba(var(--theme-text-inverse-rgb), 0.88)),
+    var(--daw-card-bg);
+  box-shadow: 0 24px 70px rgba(var(--theme-shadow-rgb), 0.09);
+}
+
+.page-builder .daw-section-card,
+.page-builder .daw-assistant-card,
+.page-builder .daw-report-canvas {
+  padding: 20px;
+}
+
+.page-builder .daw-section-heading {
+  margin-bottom: 18px;
+}
+
+.page-builder .daw-section-heading h3,
+.page-builder .daw-report-header h3 {
+  margin: 0;
+  color: var(--daw-text);
+  font-size: 22px;
+  font-weight: 950;
+  line-height: 1.12;
+  letter-spacing: -0.035em;
+}
+
+.page-builder .daw-section-heading p,
+.page-builder .daw-report-header p,
+.page-builder .daw-source-body p {
+  margin: 8px 0 0;
+  color: var(--daw-muted);
+  font-size: 13px;
+  line-height: 1.55;
+}

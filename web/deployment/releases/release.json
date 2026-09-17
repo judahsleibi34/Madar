@@ -2,13 +2,13 @@
   "release_metadata_version": 1,
   "schema": {
     "compatible_min": 81,
-    "compatible_max": 101,
-    "target": 101,
+    "compatible_max": 100,
+    "target": 100,
     "migration_class": "expand-only",
     "rollback_compatible_min": 81,
     "rollback_compatible_max": 99
   },
   "migration_policy": "automatic-after-known-good-backup-first-forward-repair",
-  "notes": "Production schema-099 bridge: preserve immutable 001-099 including the commercial access ledger. After governed source-schema backup, migrate 99->100 to correct only the visit RPC, then 100->101 for text/color variant presentation. Serve schema 99 with text-only fallback; color saves require 101. Preserve commercial enforcement and ledger data. After either transition, use forward repair when the retained schema-099 binary is incompatible.",
-  "migration_manifest": "migrations-100-101.json"
+  "notes": "Compatibility bridge for schema 100. Promote and accept on schema 096 through 100 before separately locked backup-first automation applies the pinned contiguous 097 through 100 migrations as needed. Legacy single-product 10% loyalty settings retain their schema-097 RPC fallback; multi-product or conditional discounts fail clearly until schema 100. Schema 100 adds immutable reward-condition snapshots and server-authoritative per-product maximum normal/loyalty discounts without stacking, while retaining inventory allocation, verified identity and order idempotency. Retained releases capped at schema 099 cannot be traffic rollback targets after schema 100 commits; forward repair is required.",
+  "migration_manifest": "migrations-097-100.json"
 }

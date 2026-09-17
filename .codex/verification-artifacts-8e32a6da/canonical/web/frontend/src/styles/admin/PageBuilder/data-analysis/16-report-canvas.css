@@ -1,0 +1,483 @@
+/* ============================================================
+   Report canvas
+   ============================================================ */
+
+.page-builder .daw-report-canvas {
+  display: grid;
+  gap: 18px;
+  min-height: 680px;
+}
+
+.page-builder .daw-report-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.page-builder .daw-dataset-stats,
+.page-builder .daw-kpi-grid,
+.page-builder .daw-object-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.page-builder .daw-dataset-stats article,
+.page-builder .daw-kpi-grid article,
+.page-builder .daw-object-grid article {
+  min-width: 0;
+  border: 1px solid var(--daw-card-border);
+  border-radius: 18px;
+  padding: 16px;
+  background: var(--daw-soft-bg);
+}
+
+.page-builder .daw-dataset-stats span,
+.page-builder .daw-kpi-grid span,
+.page-builder .daw-object-grid span {
+  display: block;
+  color: var(--daw-muted);
+  font-size: 12px;
+  font-weight: 950;
+}
+
+.page-builder .daw-dataset-stats strong,
+.page-builder .daw-kpi-grid strong,
+.page-builder .daw-object-grid strong {
+  display: block;
+  margin-top: 8px;
+  color: var(--daw-text);
+  font-size: 28px;
+  font-weight: 950;
+  line-height: 1.05;
+  overflow-wrap: anywhere;
+}
+
+.page-builder .daw-kpi-grid small {
+  display: block;
+  margin-top: 4px;
+  color: var(--daw-muted);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.page-builder .daw-report-result {
+  display: grid;
+  gap: 16px;
+}
+
+.page-builder .daw-review-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+.page-builder .daw-review-summary-grid article,
+.page-builder .daw-friendly-panel {
+  min-width: 0;
+  border: 1px solid var(--daw-card-border);
+  border-radius: 14px;
+  padding: 14px;
+  background: var(--theme-surface);
+}
+
+.page-builder .daw-review-summary-grid article.tone-good {
+  border-color: rgba(29, 128, 82, 0.24);
+  background: rgba(29, 128, 82, 0.07);
+}
+
+.page-builder .daw-review-summary-grid article.tone-warn {
+  border-color: rgba(var(--theme-primary-rgb), 0.24);
+  background: rgba(var(--theme-primary-rgb), 0.07);
+}
+
+.page-builder .daw-review-summary-grid span {
+  display: block;
+  color: var(--daw-muted);
+  font-size: 12px;
+  font-weight: 950;
+}
+
+.page-builder .daw-review-summary-grid strong {
+  display: block;
+  margin-top: 6px;
+  color: var(--daw-text);
+  font-size: 26px;
+  font-weight: 950;
+  line-height: 1;
+  overflow-wrap: anywhere;
+}
+
+.page-builder .daw-review-summary-grid small {
+  display: block;
+  margin-top: 7px;
+  color: var(--daw-muted);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.4;
+}
+
+.page-builder .daw-report-summary,
+.page-builder .daw-report-block,
+.page-builder .daw-warning-list {
+  border: 1px solid var(--daw-card-border);
+  border-radius: 14px;
+  padding: 14px;
+  background: var(--theme-surface);
+}
+
+.page-builder .daw-report-summary span,
+.page-builder .daw-report-block h4,
+.page-builder .daw-warning-list h4,
+.page-builder .daw-friendly-panel h4 {
+  display: block;
+  margin: 0 0 8px;
+  color: var(--daw-text);
+  font-size: 15px;
+  font-weight: 950;
+}
+
+.page-builder .daw-report-summary p,
+.page-builder .daw-warning-list p {
+  margin: 0;
+  color: var(--daw-muted);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.page-builder .daw-friendly-panel ul {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-inline-start: 20px;
+  color: var(--daw-text);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.page-builder .daw-report-block-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.page-builder .daw-report-block-header h4 {
+  margin: 0;
+}
+
+.page-builder .daw-report-block-header span {
+  flex: 0 0 auto;
+  color: var(--daw-muted);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.page-builder .daw-qualitative-values {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+}
+
+.page-builder .daw-qualitative-card {
+  min-width: 0;
+  border: 1px solid var(--daw-card-border);
+  border-radius: 14px;
+  padding: 14px;
+  background: var(--theme-surface);
+}
+
+.page-builder .daw-qualitative-card header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--daw-card-border);
+}
+
+.page-builder .daw-qualitative-card header > div {
+  min-width: 0;
+}
+
+.page-builder .daw-qualitative-card header span {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--daw-muted);
+  font-size: 11px;
+  font-weight: 950;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.page-builder .daw-qualitative-card h4 {
+  margin: 0;
+  color: var(--daw-text);
+  font-size: 15px;
+  font-weight: 950;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.page-builder .daw-qualitative-card header strong {
+  flex: 0 0 auto;
+  max-width: 120px;
+  color: var(--daw-red);
+  font-size: 12px;
+  font-weight: 950;
+  line-height: 1.35;
+  text-align: end;
+}
+
+.page-builder .daw-qualitative-card dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.page-builder .daw-qualitative-card dl div {
+  min-width: 0;
+  border-radius: 10px;
+  padding: 9px 10px;
+  background: rgba(var(--theme-shadow-rgb), 0.045);
+}
+
+.page-builder .daw-qualitative-card dt {
+  margin: 0;
+  color: var(--daw-muted);
+  font-size: 10px;
+  font-weight: 950;
+}
+
+.page-builder .daw-qualitative-card dd {
+  margin: 4px 0 0;
+  color: var(--daw-text);
+  font-size: 15px;
+  font-weight: 950;
+}
+
+.page-builder .daw-unique-value-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  max-height: 190px;
+  overflow: auto;
+  padding-inline-end: 2px;
+}
+
+.page-builder .daw-unique-value-list span {
+  max-width: 100%;
+  border: 1px solid rgba(var(--theme-primary-rgb), 0.18);
+  border-radius: 999px;
+  padding: 6px 9px;
+  background: rgba(var(--theme-primary-rgb), 0.06);
+  color: var(--daw-text);
+  font-size: 11px;
+  font-weight: 850;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.page-builder .daw-unique-value-list em {
+  color: var(--daw-muted);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.page-builder .daw-compact-table-scroll {
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  border: 1px solid var(--daw-card-border);
+  border-radius: 12px;
+  overscroll-behavior-x: contain;
+}
+
+.page-builder .daw-compact-table {
+  width: 100%;
+  min-width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.page-builder .daw-compact-table-wide {
+  min-width: 1580px;
+}
+
+.page-builder .daw-compact-col-label {
+  width: 190px;
+}
+
+.page-builder .daw-compact-col-number {
+  width: 170px;
+}
+
+.page-builder .daw-compact-col-sample {
+  width: 420px;
+}
+
+.page-builder .daw-compact-table th,
+.page-builder .daw-compact-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--daw-card-border);
+  color: var(--daw-text);
+  font-size: 12px;
+  line-height: 1.35;
+  text-align: center;
+  vertical-align: top;
+  overflow-wrap: normal;
+}
+
+.page-builder .daw-compact-table td > span {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+.page-builder .daw-compact-table th {
+  background: rgba(var(--theme-shadow-rgb), 0.045);
+  color: var(--daw-muted);
+  font-weight: 950;
+  white-space: nowrap;
+}
+
+.page-builder .daw-compact-cell-label {
+  font-weight: 900;
+  text-align: center;
+}
+
+.page-builder .daw-compact-cell-number {
+  text-align: center;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.page-builder .daw-compact-cell-text,
+.page-builder .daw-compact-cell-label {
+  white-space: nowrap;
+}
+
+.page-builder .daw-compact-cell-sample {
+  min-width: 240px;
+}
+
+.page-builder .daw-compact-table td.daw-compact-cell-sample > span {
+  border-radius: 10px;
+  padding: 8px 10px;
+  background: rgba(var(--theme-shadow-rgb), 0.045);
+  line-height: 1.45;
+  text-align: center;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+
+.page-builder .daw-compact-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.page-builder .daw-compact-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 10px;
+  color: var(--daw-muted);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.page-builder .daw-compact-pagination div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.page-builder .daw-compact-pagination button {
+  min-height: 34px;
+  border: 1px solid var(--daw-card-border);
+  border-radius: 10px;
+  padding: 0 12px;
+  background: var(--theme-surface);
+  color: var(--daw-text);
+  font-size: 12px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.page-builder .daw-compact-pagination button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.page-builder .daw-warning-list {
+  border-color: rgba(var(--theme-primary-rgb), 0.24);
+  background: rgba(var(--theme-primary-rgb), 0.07);
+}
+
+.page-builder .daw-insight-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-inline-start: 20px;
+  color: var(--daw-text);
+}
+
+.page-builder .daw-insight-list li {
+  line-height: 1.55;
+}
+
+.page-builder .daw-chart-list {
+  display: grid;
+  gap: 10px;
+}
+
+.page-builder .daw-chart-list article {
+  border-radius: 14px;
+  padding: 12px;
+  background: rgba(var(--theme-shadow-rgb), 0.055);
+}
+
+.page-builder .daw-chart-list strong {
+  color: var(--daw-text);
+  font-weight: 950;
+}
+
+.page-builder .daw-chart-list p {
+  margin: 5px 0 0;
+  color: var(--daw-muted);
+}
+
+.page-builder .daw-chart-list .daw-chart-fallback-note {
+  margin-top: 8px;
+  color: var(--daw-muted);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.page-builder .daw-chart-list img {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  margin-top: 10px;
+  border: 1px solid var(--daw-card-border);
+  border-radius: 10px;
+  background: var(--theme-surface);
+}
+
+.page-builder .daw-pygwalker-frame {
+  display: block;
+  width: 100%;
+  min-height: 680px;
+  margin-top: 12px;
+  border: 1px solid var(--daw-card-border);
+  border-radius: 12px;
+  background: var(--theme-surface);
+}

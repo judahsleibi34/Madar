@@ -1,0 +1,12 @@
+[Unit]
+Description=Verify freshness and integrity of latest Madar backup
+OnFailure=madar-ops-alert@%n.service
+
+[Service]
+Type=oneshot
+User=madar
+Group=madar
+UMask=0077
+EnvironmentFile=/etc/madar/backup.env
+ExecStart=/usr/local/lib/madar/verify_latest_backup.sh
+NoNewPrivileges=true

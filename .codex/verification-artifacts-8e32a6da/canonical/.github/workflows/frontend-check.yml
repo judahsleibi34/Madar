@@ -1,0 +1,47 @@
+name: Frontend Check
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+jobs:
+  build-frontend:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/frontend/package-lock.json
+
+      - name: Verify dependency locks
+        run: python3 web/scripts/check_dependency_locks.py
+
+      - name: Install frontend dependencies
+        working-directory: web/frontend
+        run: npm ci
+
+      - name: Lint frontend
+        working-directory: web/frontend
+        run: npm run lint
+
+      - name: Test frontend
+        working-directory: web/frontend
+        run: npm test
+
+      - name: Build frontend
+        working-directory: web/frontend
+        run: npm run build
+
+      - name: Audit shipped frontend dependencies
+        working-directory: web/frontend
+        run: npm audit --omit=dev --audit-level=high

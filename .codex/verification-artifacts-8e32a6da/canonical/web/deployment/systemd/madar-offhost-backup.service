@@ -1,0 +1,14 @@
+[Unit]
+Description=Replicate latest Madar backup to verified encrypted offline media
+ConditionPathExists=/etc/madar/offhost-backup.env
+OnFailure=madar-ops-alert@%n.service
+
+[Service]
+Type=oneshot
+User=madar
+Group=madar
+UMask=0077
+EnvironmentFile=/etc/madar/backup.env
+EnvironmentFile=/etc/madar/offhost-backup.env
+ExecStart=/usr/local/lib/madar/replicate_latest_offhost.sh
+NoNewPrivileges=true

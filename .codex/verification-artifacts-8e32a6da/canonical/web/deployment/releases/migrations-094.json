@@ -1,0 +1,13 @@
+{
+  "release_sha": "CURRENT",
+  "migrations": [
+    {
+      "number": 94,
+      "path": "web/database/migrations/094_create_ecommerce_transaction_core.sql",
+      "sha256": "ebb567cb0eba8d32698f99409d36c9f7c103d53317d58a31fe048cb42a4b8a3c",
+      "from_schema": 93,
+      "to_schema": 94,
+      "compatibility": "expand-only"
+    }
+  ]
+}

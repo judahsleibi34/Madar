@@ -993,3 +993,56 @@ img.admin-sidebar-avatar {
 .admin-sidebar .admin-sidebar-brand:focus-visible {
   transform: none !important;
 }
+
+
+.dashboard-sidebar-skeleton { display: none; }
+
+.admin-dashboard-layout:has(.authenticated-main :is(
+  .ecommerce-page-skeleton,
+  .ecommerce-route-skeleton-header,
+  .ecommerce-operations-skeleton,
+  .ecommerce-theme-skeleton,
+  .ecommerce-store-page-skeleton
+)) .dashboard-sidebar > :not(.dashboard-sidebar-skeleton) {
+  visibility: hidden;
+}
+
+.admin-dashboard-layout:has(.authenticated-main :is(
+  .ecommerce-page-skeleton,
+  .ecommerce-route-skeleton-header,
+  .ecommerce-operations-skeleton,
+  .ecommerce-theme-skeleton,
+  .ecommerce-store-page-skeleton
+)) .dashboard-sidebar-skeleton {
+  display: block;
+  position: absolute;
+  inset: 28px 18px 18px;
+  pointer-events: none;
+}
+
+.dashboard-sidebar-skeleton-brand,
+.dashboard-sidebar-skeleton-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.dashboard-sidebar-skeleton-brand { height: 48px; margin-bottom: 38px; padding-inline: 10px; }
+.dashboard-sidebar-skeleton-row { height: 48px; margin-bottom: 8px; padding-inline: 14px; }
+.dashboard-sidebar-skeleton-row.is-nested { padding-inline-start: 32px; }
+.dashboard-sidebar-skeleton i {
+  display: block;
+  flex-shrink: 0;
+  border-radius: 6px;
+  background: linear-gradient(100deg, rgba(var(--theme-primary-rgb), 0.08) 20%, rgba(var(--theme-primary-rgb), 0.18) 42%, rgba(var(--theme-primary-rgb), 0.08) 64%);
+  background-size: 220% 100%;
+  animation: dashboard-sidebar-skeleton-wave 1.35s ease-in-out infinite;
+}
+.dashboard-sidebar-skeleton-brand i:first-child { width: 40px; height: 40px; border-radius: 10px; }
+.dashboard-sidebar-skeleton-brand i:last-child { width: 76px; height: 16px; }
+.dashboard-sidebar-skeleton-row i:first-child { width: 18px; height: 18px; }
+.dashboard-sidebar-skeleton-row i:last-child { width: 65%; max-width: 108px; height: 14px; }
+.dashboard-sidebar-skeleton-row:nth-child(3n) i:last-child { width: 48%; }
+@keyframes dashboard-sidebar-skeleton-wave { to { background-position-x: -220%; } }
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-sidebar-skeleton i { animation: none; }
+}

@@ -1,0 +1,161 @@
+.page-builder .responses-workspace-toolbar {
+  position: relative;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.page-builder .responses-workspace-toolbar .responses-view-tabs {
+  grid-column: auto;
+  grid-row: auto;
+  grid-template-columns: repeat(2, minmax(108px, 1fr));
+  justify-self: start;
+}
+
+.page-builder .responses-workspace-toolbar .responses-table-controls {
+  grid-column: auto;
+  grid-row: auto;
+  justify-self: end;
+}
+
+.page-builder .responses-settings-menu {
+  position: relative;
+  z-index: 30;
+  justify-self: end;
+}
+
+.page-builder .responses-settings-trigger {
+  display: inline-grid;
+  align-content: center;
+  justify-items: center;
+  gap: 4px;
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  border: 1px solid var(--madar-border-strong);
+  border-radius: var(--app-radius-control, 10px);
+  background: var(--madar-surface);
+  color: var(--madar-text);
+  cursor: pointer;
+  box-shadow: var(--app-control-shadow);
+}
+
+.page-builder .responses-settings-trigger > span {
+  display: block;
+  width: 18px;
+  height: 2px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.page-builder .responses-settings-trigger:hover:not(:disabled),
+.page-builder .responses-settings-trigger[aria-expanded="true"] {
+  border-color: var(--color-accent-text);
+  background: var(--theme-primary-soft);
+  color: var(--color-accent-text);
+}
+
+.page-builder .responses-settings-trigger:focus-visible {
+  outline: none;
+  box-shadow: var(--app-focus-ring);
+}
+
+.page-builder .responses-settings-trigger:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.page-builder .responses-settings-popover {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  width: min(420px, calc(100vw - 48px));
+  overflow: hidden;
+  border: 1px solid var(--madar-border-strong);
+  border-radius: var(--app-radius-card, 14px);
+  background: var(--madar-surface);
+  box-shadow: 0 22px 60px rgba(var(--theme-shadow-rgb), 0.32);
+}
+
+.page-builder .responses-settings-popover .response-settings-panel {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.page-builder .responses-settings-popover .response-settings-header {
+  padding: 16px 18px 12px;
+  background: var(--madar-surface-soft);
+}
+
+.page-builder .responses-settings-popover .response-settings-header h2 {
+  font-size: 15px;
+  line-height: 1.25;
+}
+
+.page-builder .responses-settings-popover .response-settings-header p {
+  margin-top: 5px;
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.page-builder .responses-settings-popover .response-setting-row {
+  gap: 16px;
+  margin: 0;
+  padding: 16px 18px;
+  border: 0;
+  border-radius: 0;
+  background: var(--madar-surface);
+}
+
+.page-builder .responses-settings-popover .response-setting-row strong {
+  font-size: 12px;
+}
+
+.page-builder .responses-settings-popover .response-setting-row p {
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.page-builder .responses-settings-popover .response-setting-switch .sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+
+@media (max-width: 780px) {
+  .page-builder .responses-workspace-toolbar {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .page-builder .responses-workspace-toolbar .responses-view-tabs {
+    grid-column: 1;
+    grid-row: 1;
+    justify-self: stretch;
+  }
+
+  .page-builder .responses-settings-menu {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .page-builder .responses-workspace-toolbar .responses-table-controls {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    justify-self: stretch;
+  }
+}
+
+@media (max-width: 520px) {
+  .page-builder .responses-settings-popover {
+    position: fixed;
+    top: auto;
+    right: 12px;
+    bottom: 12px;
+    left: 12px;
+    width: auto;
+  }
+}

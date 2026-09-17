@@ -1,0 +1,207 @@
+.weekly-screen-time-panel {
+  width: 100%;
+  overflow: hidden;
+  border: 1px solid var(--theme-border);
+  border-radius: 14px;
+  background: var(--theme-surface);
+  box-shadow: 0 8px 24px rgba(var(--theme-shadow-rgb), 0.05);
+}
+
+.weekly-screen-time-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 17px 19px 14px;
+  border-bottom: 1px solid var(--theme-border);
+}
+
+.weekly-screen-time-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--color-accent-text);
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.weekly-screen-time-header h2 {
+  margin: 5px 0 2px;
+  color: var(--theme-text);
+  font-size: 1.25rem;
+  line-height: 1.15;
+}
+
+.weekly-screen-time-header p,
+.weekly-screen-time-total span,
+.weekly-screen-time-total small {
+  margin: 0;
+  color: var(--theme-text-muted);
+}
+
+.weekly-screen-time-header p {
+  font-size: 0.82rem;
+}
+
+.weekly-screen-time-period {
+  min-width: 310px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 5px;
+  padding: 4px;
+  border: 0;
+  border-radius: 0;
+  background: var(--color-surface);
+}
+
+.weekly-screen-time-period button {
+  min-height: 34px;
+  padding: 6px 10px;
+  border: 1px solid var(--color-border-control);
+  border-radius: 7px;
+  color: var(--theme-text-muted);
+  background: var(--color-surface);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 750;
+  cursor: pointer;
+  transition:
+    color 160ms ease,
+    border-color 160ms ease,
+    background-color 160ms ease;
+}
+
+.weekly-screen-time-period button.is-active {
+  border-color: var(--theme-primary);
+  color: var(--theme-text-inverse);
+  background: var(--theme-primary);
+}
+
+.weekly-screen-time-content {
+  display: grid;
+  grid-template-columns: 190px minmax(0, 1fr);
+  align-items: stretch;
+}
+
+.weekly-screen-time-total {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+  padding: 16px 19px;
+  border-inline-end: 1px solid var(--theme-border);
+}
+
+.weekly-screen-time-total strong {
+  color: var(--theme-text);
+  font-size: clamp(1.8rem, 2.6vw, 2.35rem);
+  font-weight: 800;
+  letter-spacing: -0.045em;
+  line-height: 1;
+}
+
+.weekly-screen-time-total span,
+.weekly-screen-time-total small {
+  font-size: 0.75rem;
+}
+
+.weekly-screen-time-bars {
+  min-width: 0;
+  max-height: 190px;
+  overflow-y: auto;
+  display: grid;
+  align-content: center;
+  gap: 12px;
+  padding: 16px 19px;
+}
+
+.weekly-screen-time-user {
+  min-width: 0;
+}
+
+.weekly-screen-time-user-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 6px;
+}
+
+.weekly-screen-time-user-heading > div {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.weekly-screen-time-user-heading strong {
+  overflow: hidden;
+  color: var(--theme-text);
+  font-size: 0.85rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.weekly-screen-time-user-heading span {
+  color: var(--theme-text-muted);
+  font-size: 0.68rem;
+  text-transform: capitalize;
+}
+
+.weekly-screen-time-user-heading b {
+  flex: 0 0 auto;
+  color: var(--theme-text);
+  font-size: 0.8rem;
+}
+
+.weekly-screen-time-track {
+  height: 7px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--theme-surface-elevated);
+}
+
+.weekly-screen-time-track > span {
+  display: block;
+  height: 100%;
+  min-width: 2px;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--theme-primary), var(--theme-primary-hover));
+  transition: width 220ms ease;
+}
+
+.weekly-screen-time-empty {
+  margin: 4px 0;
+  color: var(--theme-text-muted);
+  font-size: 0.82rem;
+  text-align: center;
+}
+
+@media (max-width: 760px) {
+  .weekly-screen-time-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .weekly-screen-time-period {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .weekly-screen-time-content {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .weekly-screen-time-total {
+    border-inline-end: 0;
+    border-bottom: 1px solid var(--theme-border);
+  }
+
+  .weekly-screen-time-user-heading > div {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 2px;
+  }
+}

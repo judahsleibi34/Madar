@@ -1,6 +1,6 @@
 # Automated database migration architecture
 
-Last implementation review: 2026-09-16
+Last implementation review: 2026-09-14
 
 ## 1. Purpose, authority, and scope
 
@@ -40,12 +40,9 @@ provide automatic downgrade SQL.
 Protected control-plane releases may be authorized through the root-owned
 one-command workflow described in
 [`control-plane-upgrade-architecture.md`](control-plane-upgrade-architecture.md).
-For an ordinary protected upgrade, that bootstrapper synchronously invokes the
-same ordinary auto-deploy path. For an already-promoted exact SHA in an attested
-forward-repair state, it instead invokes the installed
-`madar-release-deploy <SHA> --automatic-migrate` directly under the same
-root-owned one-use credential boundary. The privileged coordinator does not
-implement SQL migration itself, bypass backup/manifest gates, or alter the
+That bootstrapper synchronously invokes this same ordinary auto-deploy path and
+requires this coordinator to reach an existing successful terminal state; it
+does not add a migration mode, bypass backup/manifest gates, or alter the
 bridge-first state machine.
 
 ## 2. Architectural goals
@@ -174,18 +171,6 @@ defaults to 15 minutes and is clamped to 5 through 1,440 minutes. Read-only
 precondition failures that occur before `automation.json` is started do not
 receive that durable backoff and are retried at the timer cadence.
 
-The privileged same-SHA repair path is deliberately independent of a mutable
-branch head. If another commit reaches `origin/main` while an already-promoted
-release is waiting for forward repair, the operator can still authorize the
-exact serving SHA as long as it also equals installed controller provenance and
-all durable migration/serving attestations remain coherent. Repair does not
-stage or deploy the newer branch head.
-
-Likewise, process or host interruption need not manufacture a failure record.
-A coherent `status=running` checkpoint may be resumed through the same exact-SHA
-repair path. The database schema and durable executor state determine which
-already-committed transitions are skipped; SQL is not blindly replayed.
-
 After a reboot, `Persistent=true` causes the timer to run a missed activation.
 The same-known-good branch re-enters the idempotent migration phase. If a
 documentation-only commit is ahead of an application-equivalent known-good
@@ -217,14 +202,6 @@ candidate. A rollback failure is preserved for manual intervention. None of
 these release failures can fall through to migration invocation because the
 first command returns nonzero.
 
-Successful ordinary promotion retires `compatible_fallback_release` in the
-same atomic write as active/known-good acceptance. That record belongs to the
-preceding recovery or migration operation, whose inactive slot is reused by
-promotion. The new acceptance event retains the attested previous known-good
-release on the opposite slot. It does not relabel that prior binary as a
-target-schema migration fallback; after a fresh verified backup, migration
-automation separately establishes the accepted bridge itself on that slot.
-
 ## 7. Migration state machine and durable representation
 
 Some names in the following table are architectural predicates requested for
@@ -236,8 +213,6 @@ this table does not invent persistence states.
 | --- | --- |
 | `bridge_known_good` | `state.json.known_good_release.sha` equals the requested SHA, its slot equals `active_slot`, there is no in-progress/rollback failure, and release history contains `status=known_good`, `phase=complete`. Stable candidate/backend/frontend validation must also pass. |
 | `migration_pending` | Derived: exact automatic policy and manifest are valid, live schema is within the bridge range and below manifest target, and no matching completed `automation.json` covers the target. No literal `migration_pending` value is stored. |
-| `pre_mutation_pending` | Privileged-upgrader derived state only, not written to migration state. Exact automatic policy/manifest/checksums validate; the migration directory is completely absent; live and recorded schema equal the manifest source; known-good state and that SHA's completed acceptance event agree on source and target. Final serving attestation does not treat this as terminal. |
-| `forward_repair_pending` | Privileged-upgrader derived state only. Durable state is either a due `failed_forward_repair_required` checkpoint or a coherent interrupted `status=running` checkpoint in backup creation, migration execution, or post-migration validation. Exact immutable contract, acceptance, backup/executor identity, known-good SHA, and live schema bounds must agree. |
 | `backup_required` | `automation.json` has `status=running`, `phase=backup_creation`, and no backup path. |
 | `backup_verified` | The backup scripts pass, its complete manifest matches the release SHA and source schema, and `execution.json.backup.verified=true`. There is no standalone `backup_verified` phase; the next durable executor phase is `acquiring_lock`. |
 | `migration_running` | `automation.json` phase is `migration_execution`; `execution.json` is `status=running` in `acquiring_lock`, `schema_validation`, or `migration_N`. |
@@ -255,20 +230,6 @@ and source-schema rollback-attestation failures happen before mutation-phase
 state is created. They make no database change and require correction of the
 release, environment, or retained target rather than manufacturing a migration
 failure record.
-
-### Privileged current-origin interpretation
-
-The ordinary timer path still follows the unattended rules above. The
-root-owned upgrader additionally needs to distinguish a legitimate origin that
-needs migration work from corrupt state before it can authorize a protected
-controller/application transition.
-
-This interpretation is origin-only. It must never make final serving
-attestation permissive. `pre_mutation_pending` and `forward_repair_pending`
-therefore authorize only entry into the existing canonical migration machinery;
-success still requires `already_at_target` or
-`post_migration_validation_complete` (or `not_requested` where automatic
-migration does not apply).
 
 ## 8. Migration opt-in and manifest contract
 
@@ -435,19 +396,6 @@ attested old SHA, be running, and declare compatibility with the current source
 schema. This is the last traffic-rollback assurance before an irreversible
 forward-only phase begins.
 
-A recovery or migration-retry `compatible_fallback_release` takes precedence
-only when it passes the same gates. For states written by older controllers,
-a stale fallback cannot mask the exact `previous_known_good_release` in this
-SHA's latest completed acceptance event. The coordinator tries that acceptance
-target if fallback attestation fails. Each candidate independently requires a
-full lowercase SHA, the opposite active slot, recorded source-schema
-compatibility, and successful `validate_rollback_target()` against its live
-version endpoint (exact SHA and live source-schema compatibility). It never
-invents a target by swapping slots or accepting whichever process responds.
-If neither target attests, it fails before coordinator state, backup creation,
-the executor connection, or SQL. Read-only selection does not repair durable
-state; the backup-first same-SHA fallback step establishes the new topology.
-
 The point of no return is the first committed schema transition that moves the
 database beyond the previous release's compatibility maximum. From then on:
 
@@ -513,20 +461,49 @@ health evidence, dirty/different release, checksum drift, missing predecessor,
 or a ledger already beyond target fails before mutation. No tenant/business
 table is queried or changed.
 
-### Current schema 098 bridge
+### Current schema 100 bridge
 
-The current release contract accepts schema `81..98` and targets `98` with the
-pinned `migrations-098.json` manifest. Migration 098 is an expand-only 97-to-98
-transition. The application may be promoted on schema 97: existing website and
-ecommerce paths remain compatible, public visit recording is best effort, and
-dashboard visit metrics expose an unavailable zero state until the new table
-and atomic function exist. After advancement, the retained schema-97 release is
-no longer an automatic rollback target.
+The release contract accepts schema `81..100` and targets `100` using the
+pinned contiguous `migrations-097-100.json` manifest. The existing controller,
+backup gates, locking, bridge-first acceptance and forward-repair semantics are
+unchanged. Migration 100 is a 99-to-100 expansion that preserves legacy scalar
+loyalty fields and old entitlements while adding rule-condition and entitlement
+snapshots. A V2 save RPC reuses legacy actor validation, currency validation,
+tenant rule locking and versioning before atomically saving all conditions.
 
-Schema 098 stores only tenant-level aggregate opening counts for the published
-website and store. It does not persist visitor identity, IP address, user agent,
-or other personal data. Each public runtime mount makes one best-effort request;
-the database function atomically increments exactly one surface counter.
+Checkout keeps its existing idempotency, product/variant locks, inventory
+allocation and order snapshots. It compares normal offers with all eligible
+verified-customer reward conditions per product, taking one maximum percentage.
+Mixed validity is evaluated independently; the outer entitlement expires at the
+latest fixed expiry, or never when a lifetime condition exists. Rule changes do
+not change existing reward conditions. Earn-once checks are order-bound across
+rule versions. `rehearse_migration_100.sh` proves legacy behavior plus bundle
+issuance, multi-product checkout, higher normal/loyalty selection, expiry,
+revocation and tenant isolation on disposable PostgreSQL.
+
+Source-schema saves fall back only for a single-product 10% loyalty condition.
+Multi-product or additional conditions require schema 100 and fail clearly
+before it exists. A retained release capped at 99 cannot be used for traffic
+rollback after 100 commits. Updating this manifest/release contract remains a
+protected control-plane change subject to provenance-aware upgrade gates;
+no installed controller or production database is changed by these source edits.
+
+### Earlier schema 099 bridge
+
+The current release contract accepts schema `81..99` and targets `99` with the
+pinned, contiguous `migrations-097-099.json` manifest. It can advance the
+reported production source at schema 96 through the already-reviewed 097 and
+098 transitions before applying the additive 98-to-99 presentation transition.
+The application may be promoted on schema 96 through 99. Text-only product
+aggregate saves fall back to the legacy RPC before schema 99; color presentation
+saves fail clearly until the V2 RPC exists, preventing silent metadata loss.
+After advancement beyond a retained release's compatible maximum, that release
+is no longer an automatic rollback target.
+
+Schema 099 adds constrained `display_type` and `color_hex` presentation
+metadata. Existing attributes default to text. Its V2 aggregate RPC invokes the
+existing identity-, inventory-, and archival-safe aggregate function within the
+same database transaction, then validates and stores presentation metadata.
 
 ### Earlier schema 097 bridge
 
@@ -565,9 +542,6 @@ The following are the mandatory design invariants. Test names are from
 | 9 | Reverse SQL migrations are not automatically attempted. | Manifests require one-step forward transitions; executor skips reached targets and has no reverse executor; coordinator failure semantics are forward-repair-only. | `test_committed_transition_reuses_backup_without_old_release_rollback`; `test_migration_executor.py :: test_resume_from_schema_82_skips_first_migration`. |
 | 10 | Final success after an executed transition waits for target schema, worker refresh, active application validation, and stable-route validation. | `automatic_migrate_known_good()` target check followed by actual `refresh_active_workers()`; transition completion write occurs last. A proven fresh `already_at_target` release has already passed promotion workers/observation and repeats stable validation before recording its nonexecuting result. | `test_successful_94_to_95_records_target_only_after_worker_and_route_validation`, `test_stable_route_failure_prevents_final_migration_success`, `test_prior_release_migrates_then_later_release_noops_idempotently`; `test_release_bootstrap.py :: test_post_migration_refresh_requires_exact_known_good_and_schema_83`. |
 | 11 | A later release accepted at an already-reached target neither borrows the prior release's backup nor bypasses a genuine current-release resume. | Fresh no-op requires no per-SHA state plus matching known-good and acceptance-time target observations. Any current-release state retains exact SHA/source backup attestation. | `test_prior_release_migrates_then_later_release_noops_idempotently`, `test_current_release_partial_state_without_backup_still_fails_closed`, `test_current_release_substituted_resume_backup_still_fails_closed`. |
-| 12 | The database cannot finish a normal automatic migration with every inactive fallback incompatible. | Before SQL, `_establish_compatible_migration_fallback()` recreates the inactive slot from the accepted bridge with consumers disabled. After SQL and active-worker validation, it revalidates that slot at target schema and records it as the compatible fallback. | `test_successful_97_to_98_records_target_only_after_worker_and_route_validation`, `test_automatic_migration_control_plane.py`; recovery/fallback failure injection in `test_release_deployer.py`. |
-| 13 | A pre-existing DB-ahead state is repaired only by exact-schema, zero-migration forward recovery. | The ordinary manifest remains authoritative for normal releases. `schema-96-recovery.json`, root-protected exact-SHA rehearsal evidence, generation-bound worker authority, Docker restart inhibition, shared routing/slot mutation exclusion, local plus Node 1 backup verification, no-overlap worker cutover, atomic traffic switching, and compatible-fallback establishment are mandatory in the explicit recovery path. | `SchemaRecoveryDeployerTests`, schema-recovery coordinator and contract tests in `test_control_plane_upgrade.py`, auto-deploy inaccessibility in `test_monorepo_deployment.py`, and the disposable real-runtime rehearsal. |
-| 14 | Ordinary promotion retires the preceding operation's fallback; stale historical fallback claims cannot bypass or mask an attested retained acceptance target. | Atomic promotion removes `compatible_fallback_release`; source-schema migration selection independently attests fallback then exact acceptance target before mutation. | `test_ordinary_promotion_retires_prior_operation_fallback`, `test_stale_recovery_fallback_uses_only_exact_live_acceptance_target`, `test_stale_recovery_fallback_invalid_acceptance_targets_fail_pre_mutation`, and `test_schema96_recovery_installed_layout.py :: test_installed_layout_interruption_resume_and_next_release` through migrations 097/098/099, verified fresh backup, inactive same-SHA fallback, worker refresh and byte-idempotent completion. |
 
 Static orchestration tests in `test_monorepo_deployment.py` additionally verify
 that the installed wrappers contain the same-known-good recovery branch, the
@@ -575,16 +549,6 @@ post-promotion automatic invocation, the persistent timer, immutable control
 plane, and canonical production paths. Behavioral wrapper tests are preferred
 for ordering and zero-migration assertions because they execute the shell
 control flow rather than only matching source text.
-
-The unit suites remain state-machine evidence. Installed-runtime evidence comes
-from `web/scripts/rehearse_schema96_real_runtime.py`, executed in an empty,
-network-isolated Docker-in-Docker daemon with distinct project/container names,
-ports, state, proxy, storage, networks, and volumes. It uses actual
-`DockerGitOperations`, Docker Compose worker health/restart state, the file-proxy
-traffic switch, release-state files, and the ordinary release/manifest parser.
-After recovery it derives the normal migration path from the immutable
-candidate manifest and proves prepare plus interrupted retry without executing
-SQL. Sanitized output is retained outside the repository.
 
 ## 17. Change discipline
 
@@ -595,94 +559,3 @@ blueprint and `production-release-policy.md` in the same change. Tests must map
 new or changed invariants to executable behavior. A main-targeting change is not
 ready while any locally executable mandatory gate fails or any untested safety
 claim is represented as proven.
-
-The current-schema recovery operation is not a migration coordinator shortcut.
-It rejects candidates requiring SQL, never invokes `LockedMigrationExecutor`,
-and leaves the schema unchanged. Its only purpose is restoring compatible
-application and fallback targets around an already-advanced database. See the
-dedicated recovery runbook for its distinct approval and interruption model.
-
-## Historical commercial access schema 099 bridge (2026-09-14)
-
-The production-baseline release used `web/deployment/releases/migrations-099.json`.
-That release was compatible with schemas 081 through 099; its target was 099.
-The release manifest contains the contiguous 096→097→098→099 chain so a host
-that has not deployed the intervening mainline releases cannot skip their
-schema changes. Before the target exists, the commercial snapshot service
-accepts the existing resolver only after independently verifying schema 098.
-Missing RPCs at any other schema fail closed. Manual-ledger administration
-remains unavailable until migration 099 completes.
-
-The existing controller first accepts the backwards-compatible application,
-creates and verifies its governed pre-migration backup, then applies the exact
-ordered migration checksums and revalidates the serving release. Migration 099
-adds the tenant review state and append-only manual financial/access ledger.
-It seeds review-required rows only: no tenant plan assignment, historical payment
-backfill, production enforcement activation, provider activation, or database
-endpoint change. Financial deletion guards reject before any account/workspace
-freeze or file purge when retention review is needed.
-
-Rollback to the retained schema-098 binary is allowed only before the migration
-advances the schema. After 099, use governed forward repair. The privileged
-exact-SHA controller upgrade is required because the release metadata and
-manifest are protected control-plane files; its procedure is unchanged.
-
-The synthetic `rehearse_migration_099.sh` gate applies all canonical migrations
-on a pinned disposable PostgreSQL image, runs concurrency/isolation tests and
-the exact RLS/grants verifier, and restores a dump containing commercial receipt,
-period, revision and audit records. It does not replace the required fresh
-production backup and Node 1 round-trip after deployment.
-
-
-## Current production-based forward schema-101 release
-
-The release base is `1e6b739a43759309a45ede2dff28a859209e4a64`, with
-production schema 099. All 198 migration files numbered 001 through 099 remain
-byte-identical to that baseline, including the original visit-counter migration
-098 and `099_commercial_access_ledger.sql`. The historical 004/005 mirror swap
-is retained. `production-001-099.json` pins every baseline file; migration
-validation rejects changes, replacements, deletions, and historical additions.
-
-The current manifest is `migrations-100-101.json`, ordered 099->100->101.
-Migration 100 replaces only `record_public_site_visit_safe`: null/invalid
-surfaces are rejected and the active tenant gate uses `lifecycle_state`.
-Counters, keys, RLS, and existing visit totals are retained. Migration 101 adds
-`display_type`, `color_hex`, their constraints, and the V2 variant aggregate
-RPC. Existing option rows default to text; existing swatches remain null.
-Product identity, SKU, inventory, order history, and the commercial financial
-ledger are preserved. Schema 099 identifies the commercial ledger; variant
-presentation requires schema 101, and color saves fail explicitly before its
-RPC exists while legacy text saves continue through the existing aggregate.
-
-The bridge remains compatible with schemas 081..101 for ordinary application
-behavior, but this migration manifest accepts only the production source 099
-through target 101. Its retained-release rollback range is 081..099. The
-source-099 release must be accepted before the governed source-schema-bound
-backup and locked forward execution. After advancement beyond a retained
-binary's range, recovery is forward-only. No older manifest is substituted to
-skip source-schema validation.
-
-Reconciliation requires an explicit manifest version (100, then 101), exact
-candidate SHA, canonical checksum/mirror, linked-project identity, live schema
-101, and exact serving identity/readiness. Each non-dry-run confirmation is
-`NNN:<manifest-sha256>`. Completed SQL execution uses its real execution record;
-a fresh later release accepted at 101 can use the canonical coordinator
-`already_at_target` record only with target acceptance evidence and no execution
-file. Reconciliation never manufactures execution evidence. Ordering, host lock,
-private atomic audits, audit identity/drift checks, and timestamp-preserving
-idempotent repeats remain mandatory.
-
-`check_forward_release.py` validates this current lineage, bridge, namespace,
-manifest ordering, and checksums. `rehearse_migration_101.py` uses only a new
-network-isolated PostgreSQL 17 container, restores a seeded source-099 custom
-dump, proves financial/counter/product/variant/order/inventory preservation,
-checks constraints and V2 atomic saves, and separately replays 001..101 fresh.
-It destroys only its own disposable target. Historical schema-096 recovery
-regressions retain an explicit historical 096->099 metadata fixture; they do
-not change the current 099->101 transition.
-
-Source qualification does not attest production configuration, an operational
-backup/off-host copy, live runtime acceptance, or a production ledger repair.
-Those operator gates remain separate; this candidate must qualify in an
-isolated environment with the canonical production migration lineage before
-any production action.

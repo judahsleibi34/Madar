@@ -1,0 +1,49 @@
+/* ============================================================
+   Header
+   ============================================================ */
+
+.page-builder .daw-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 24px;
+  margin-bottom: 22px;
+}
+
+.page-builder .daw-kicker,
+.page-builder .daw-section-heading > span,
+.page-builder .daw-report-header span {
+  display: inline-flex;
+  width: fit-content;
+  margin-bottom: 8px;
+  color: var(--action-primary, var(--theme-primary));
+  font-size: 13px;
+  font-weight: 950;
+  line-height: 1.2;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.page-builder .daw-page[dir="rtl"] .daw-kicker,
+.page-builder .daw-page[dir="rtl"] .daw-section-heading > span,
+.page-builder .daw-page[dir="rtl"] .daw-report-header span {
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.page-builder .daw-header h1 {
+  margin: 0;
+  color: var(--daw-text);
+  font-size: clamp(28px, 4vw, 44px);
+  font-weight: 950;
+  line-height: 1.04;
+  letter-spacing: -0.05em;
+}
+
+.page-builder .daw-header p {
+  max-width: 760px;
+  margin: 12px 0 0;
+  color: var(--daw-muted);
+  font-size: 15px;
+  line-height: 1.65;
+}

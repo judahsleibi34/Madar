@@ -13,6 +13,7 @@ vi.mock("../../services/ecommerceApi", () => ({
   fetchPublicEcommerceDeliveryAreas: vi.fn(),
   fetchPublicEcommerceOrderConfirmation: vi.fn(),
   fetchPublicEcommerceLoyalty: vi.fn(() => Promise.reject(new Error("guest"))),
+  fetchPublicEcommerceDiscounts: vi.fn(() => Promise.resolve({ conditions:[] })),
   fetchPublicEcommerceProduct: vi.fn(),
   fetchPublicEcommerceProfile: vi.fn(),
   createPublicEcommerceOrder: vi.fn(),
@@ -464,8 +465,10 @@ describe("EcommerceStorefront", () => {
     expect(await screen.findByRole("heading", { level: 1, name: "Chair" })).toBeTruthy();
     await waitFor(() => expect(received.filter((item) => item.event === "view_item")).toHaveLength(1));
     fireEvent.click(screen.getByRole("button", { name: "Add to cart" }));
+    expect(screen.getByRole("status").textContent).toContain("Added to cart");
     fireEvent.click(screen.getByRole("button", { name: "Open cart, 1 item" }));
     fireEvent.click(await screen.findByRole("button", { name: "Remove Chair" }));
+    expect(screen.getByRole("status").textContent).toContain("Item removed");
 
     await waitFor(() => {
       expect(received.map((item) => item.event)).toEqual(expect.arrayContaining(["view_item", "add_to_cart", "view_cart", "remove_from_cart"]));
@@ -515,4 +518,26 @@ describe("EcommerceStorefront", () => {
     await waitFor(() => expect(received.map((item) => item.event)).toEqual(expect.arrayContaining(["promotion_view", "promotion_click"])));
     window.removeEventListener("madar:commerce", listener);
   });
+});
+
+it("uses safe visible feedback when a public product request fails", async () => {
+  fetchPublicEcommerceProduct.mockRejectedValue(new Error("SUPABASE_SERVICE_KEY=private-key; SQL internal_product failed"));
+  render(<MemoryRouter initialEntries={["/store/demo/product/chair"]}><Routes><Route path="/store/:subdomain/*" element={<EcommerceStorefront />} /></Routes></MemoryRouter>);
+  expect((await screen.findByRole("alert")).textContent).toContain("Could not load the live store");
+  expect(document.body.textContent).not.toContain("SUPABASE_SERVICE_KEY");
+  expect(document.body.textContent).not.toContain("internal_product");
+});
+
+it("shows a safe cart error instead of success when browser storage rejects an add", async () => {
+  fetchPublicEcommerceProduct.mockResolvedValue({ site: { brand: "Store" }, product: { id: "product-1", slug: "chair", name: "Chair", price: "20", currency: "ILS", in_stock: true, images: [] }, category: null, tags: [], attributes: [], options: [], variants: [] });
+  render(<MemoryRouter initialEntries={["/store/demo/product/chair"]}><Routes><Route path="/store/:subdomain/*" element={<EcommerceStorefront />} /></Routes></MemoryRouter>);
+  await screen.findByRole("heading", { level: 1, name: "Chair" });
+  const storage = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw new Error("internal_storage secret"); });
+  try {
+    fireEvent.click(screen.getByRole("button", { name: "Add to cart" }));
+    expect(screen.getByRole("alert").textContent).toContain("Could not update your cart");
+    expect(screen.queryByRole("status")).toBeNull();
+    expect(document.body.textContent).not.toContain("internal_storage");
+    expect(screen.getByRole("button", { name: "Open cart, 0 items" })).toBeTruthy();
+  } finally { storage.mockRestore(); }
 });

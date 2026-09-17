@@ -532,6 +532,7 @@ export function DashboardShell({
   openMenuLabel,
   closeMenuLabel,
   shellLang,
+  showNotifications = true,
   themeMode,
   user,
 }) {
@@ -585,7 +586,7 @@ export function DashboardShell({
         onThemeModeChange={onThemeModeChange}
         compact={useCompactBuilderSidebar}
         onNavigate={onNavigate}
-        showNotifications
+        showNotifications={showNotifications}
       />
 
       <main

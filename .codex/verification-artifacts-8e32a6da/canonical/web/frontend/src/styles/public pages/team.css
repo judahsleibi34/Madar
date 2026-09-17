@@ -1,0 +1,600 @@
+/* NOTE: original CSS had two TEAM PAGE blocks. Both are kept in cascade order for compatibility. Review and remove the older duplicate after visual QA. */
+
+/* ============================================================
+   TEAM PAGE
+   ============================================================ */
+
+.team-page {
+  flex: 1;
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 60px 5% 90px;
+  color: var(--theme-text);
+}
+
+.team-hero {
+  text-align: center;
+  max-width: 760px;
+  margin: 0 auto 52px;
+}
+
+.team-hero :is(h1, h2) {
+  margin: 0 0 14px;
+  color: var(--theme-text);
+  font-size: 42px;
+  font-weight: 800;
+  font-family: inherit;
+}
+
+.team-hero p {
+  margin: 0;
+  color: var(--theme-text-soft);
+  font-size: 17px;
+  line-height: 1.8;
+}
+
+.team-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(360px, 1fr));
+  gap: 32px;
+  align-items: stretch;
+}
+
+.team-profile-card {
+  position: relative;
+  overflow: hidden;
+  border-radius: 24px;
+  background: var(--theme-surface);
+  border: 1px solid rgba(var(--theme-shadow-rgb), 0.12);
+  box-shadow: 0 18px 45px rgba(var(--theme-shadow-rgb), 0.08);
+  display: flex;
+  flex-direction: column;
+  transition:
+    transform 0.25s ease,
+    box-shadow 0.25s ease,
+    border-color 0.25s ease;
+}
+.team-profile-card:hover {
+  transform: translateY(-10px) scale(1.02);
+  border-color: var(--color-accent-text);
+  box-shadow: 0 28px 60px rgba(var(--theme-primary-rgb), 0.18);
+}
+
+.profile-glow {
+  position: absolute;
+  width: 180px;
+  height: 180px;
+  top: -70px;
+  right: -70px;
+  border-radius: 50%;
+  background: rgba(var(--theme-primary-rgb), 0.16);
+  filter: blur(8px);
+  pointer-events: none;
+}
+
+.profile-avatar {
+  position: relative;
+  width: 100%;
+  height: 280px;
+  border-radius: 0;
+  background: var(--theme-text);
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.profile-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  display: block;
+}
+
+.profile-content {
+  position: relative;
+  margin-top: 34px;
+}
+
+.profile-content :is(h2, h3) {
+  margin: 0 0 8px;
+  color: var(--theme-text);
+  font-size: 26px;
+  font-weight: 800;
+}
+
+.profile-role {
+  margin: 0 0 18px;
+  color: var(--color-accent-text);
+  font-size: 14px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.profile-description {
+  margin: 0;
+  color: var(--theme-text-soft);
+  font-size: 15px;
+  line-height: 1.8;
+}
+
+html[dir="rtl"] .team-page {
+  text-align: right;
+}
+
+html[dir="rtl"] .team-hero {
+  text-align: center;
+}
+
+html[dir="rtl"] .profile-glow {
+  right: auto;
+  left: -70px;
+}
+
+@media (max-width: 900px) {
+  .team-grid {
+    grid-template-columns: 1fr;
+    max-width: 520px;
+    margin: 0 auto;
+  }
+
+  .team-hero :is(h1, h2) {
+    font-size: 34px;
+  }
+}
+
+@media (max-width: 600px) {
+  .team-page {
+    padding: 40px 5% 70px;
+  }
+
+  .team-profile-card {
+    min-height: 320px;
+    padding: 28px;
+  }
+
+  .profile-content :is(h2, h3) {
+    font-size: 23px;
+  }
+}
+
+/* ============================================================
+   TEAM PAGE
+   ============================================================ */
+
+.team-page {
+  flex: 1;
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 60px 5% 90px;
+  color: var(--theme-text);
+}
+
+.team-hero {
+  text-align: center;
+  max-width: 760px;
+  margin: 0 auto 52px;
+}
+
+.team-hero :is(h1, h2) {
+  margin: 0 0 14px;
+  color: var(--theme-text);
+  font-size: 42px;
+  font-weight: 800;
+  font-family: inherit;
+}
+
+.team-hero p {
+  margin: 0;
+  color: var(--theme-text-soft);
+  font-size: 17px;
+  line-height: 1.8;
+}
+
+.team-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(360px, 1fr));
+  gap: 32px;
+  align-items: stretch;
+}
+
+.team-profile-card {
+  position: relative;
+  overflow: hidden;
+  border-radius: 24px;
+  background: var(--theme-surface);
+  border: 1px solid rgba(var(--theme-shadow-rgb), 0.12);
+  box-shadow: 0 18px 45px rgba(var(--theme-shadow-rgb), 0.08);
+  display: flex;
+  flex-direction: column;
+  transition:
+    transform 0.25s ease,
+    box-shadow 0.25s ease,
+    border-color 0.25s ease;
+}
+
+.team-profile-card:hover {
+  transform: translateY(-10px) scale(1.02);
+  border-color: var(--color-accent-text);
+  box-shadow: 0 28px 60px rgba(var(--theme-primary-rgb), 0.18);
+}
+
+.profile-glow {
+  position: absolute;
+  width: 180px;
+  height: 180px;
+  top: -70px;
+  right: -70px;
+  border-radius: 50%;
+  background: rgba(var(--theme-primary-rgb), 0.16);
+  filter: blur(8px);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.profile-avatar {
+  position: relative;
+  width: 100%;
+  height: 300px;
+  border-radius: 0;
+  background: var(--theme-text);
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.profile-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  display: block;
+}
+
+.profile-avatar span {
+  color: var(--theme-text-inverse);
+  font-size: 34px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.profile-content {
+  position: relative;
+  margin-top: 0;
+  padding: 28px 30px 32px;
+  z-index: 2;
+}
+
+.profile-content :is(h2, h3) {
+  margin: 0 0 8px;
+  color: var(--theme-text);
+  font-size: 26px;
+  font-weight: 800;
+}
+
+.profile-role {
+  margin: 0 0 18px;
+  color: var(--color-accent-text);
+  font-size: 14px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.profile-description {
+  margin: 0;
+  color: var(--theme-text-soft);
+  font-size: 15px;
+  line-height: 1.8;
+}
+
+.profile-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.profile-icon-link {
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  border: 1px solid rgba(var(--theme-primary-rgb), 0.22);
+  background: rgba(var(--theme-primary-rgb), 0.06);
+  color: var(--color-accent-text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease,
+    border-color 0.2s ease,
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.profile-icon-link svg {
+  width: 19px;
+  height: 19px;
+  fill: currentColor;
+}
+
+.profile-icon-link:hover {
+  background: var(--theme-primary);
+  color: var(--theme-text-inverse);
+  border-color: var(--color-accent-text);
+  transform: translateY(-3px);
+  box-shadow: 0 10px 22px rgba(var(--theme-primary-rgb), 0.22);
+}
+
+html[dir="rtl"] .team-page {
+  text-align: right;
+}
+
+html[dir="rtl"] .team-hero {
+  text-align: center;
+}
+
+html[dir="rtl"] .profile-glow {
+  right: auto;
+  left: -70px;
+}
+
+html[dir="rtl"] .profile-links {
+  justify-content: center;
+}
+
+@media (max-width: 900px) {
+  .team-grid {
+    grid-template-columns: 1fr;
+    max-width: 620px;
+    margin: 0 auto;
+  }
+
+  .profile-avatar {
+    height: 320px;
+  }
+
+  .team-hero :is(h1, h2) {
+    font-size: 34px;
+  }
+}
+
+@media (max-width: 600px) {
+  .team-page {
+    padding: 40px 5% 70px;
+  }
+
+  .team-grid {
+    max-width: 100%;
+  }
+
+  .profile-avatar {
+    height: 260px;
+  }
+
+  .profile-content {
+    padding: 24px;
+  }
+
+  .profile-content :is(h2, h3) {
+    font-size: 23px;
+  }
+
+  .profile-icon-link {
+    width: 40px;
+    height: 40px;
+  }
+
+  .profile-icon-link svg {
+    width: 18px;
+    height: 18px;
+  }
+}
+
+html[dir="rtl"] .profile-content {
+  text-align: right;
+}
+
+html[dir="rtl"] .profile-role {
+  direction: rtl;
+}
+
+html[dir="rtl"] .profile-description {
+  text-align: right;
+}
+
+html[dir="rtl"] .profile-links {
+  justify-content: center;
+}
+
+
+
+/* ============================================================
+   GLOBAL MADAR GRADIENT BUTTON SYSTEM
+   Applies to main buttons across the whole website
+   ============================================================ */
+
+:root {
+  --madar-bg: var(--theme-bg-soft);
+  --madar-navy: var(--theme-text);
+  --madar-navy-dark: var(--theme-bg);
+  --madar-red: var(--theme-primary);
+  --madar-red-dark: var(--theme-primary-hover);
+  --madar-cream: var(--theme-bg-soft);
+  --madar-gradient: var(--theme-gradient);
+  --madar-gradient-hover: var(--theme-gradient-hover);
+  --madar-button-shadow: 0 10px 24px rgba(var(--theme-primary-rgb), 0.22);
+  --madar-button-shadow-hover: 0 14px 30px rgba(var(--theme-primary-rgb), 0.3);
+}
+
+/* Main action buttons across pages */
+.btn-signup,
+.register-submit,
+.login-submit,
+.forgot-card button,
+.contact-form button,
+.plan-btn.primary,
+.pricing-card:hover .plan-btn,
+.primary-action,
+.small-action {
+  border: none;
+  background: var(--madar-gradient);
+  color: var(--theme-text-inverse);
+  box-shadow: var(--madar-button-shadow);
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    background 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease;
+}
+
+.btn-signup:hover,
+.register-submit:hover,
+.login-submit:hover,
+.forgot-card button:hover,
+.contact-form button:hover,
+.plan-btn.primary:hover,
+.pricing-card:hover .plan-btn:hover,
+.primary-action:hover,
+.small-action:hover {
+  background: var(--madar-gradient-hover);
+  color: var(--theme-text-inverse);
+  transform: translateY(-2px);
+  box-shadow: var(--madar-button-shadow-hover);
+}
+
+/* Outline/secondary buttons: gradient on hover */
+.btn-login,
+.plan-btn,
+.secondary-action,
+.lang-toggle {
+  background: transparent;
+  color: var(--madar-navy);
+  border: 1.5px solid rgba(var(--theme-shadow-rgb), 0.25);
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    background 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease;
+}
+
+.btn-login:hover,
+.plan-btn:hover,
+.secondary-action:hover,
+.lang-toggle:hover {
+  background: var(--madar-gradient);
+  border-color: transparent;
+  color: var(--theme-text-inverse);
+  transform: translateY(-2px);
+  box-shadow: var(--madar-button-shadow-hover);
+}
+
+/* Mobile language/auth buttons */
+.lang-mobile-btn,
+.mobile-menu-auth .btn-login,
+.mobile-menu-auth .btn-signup {
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    background 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease;
+}
+
+.lang-mobile-btn:hover,
+.lang-mobile-btn.active,
+.mobile-menu-auth .btn-login:hover,
+.mobile-menu-auth .btn-signup:hover {
+  background: var(--madar-gradient);
+  border-color: transparent;
+  color: var(--theme-text-inverse);
+  transform: translateY(-2px);
+  box-shadow: var(--madar-button-shadow);
+}
+
+/* Icon/social buttons */
+.profile-icon-link:hover {
+  background: var(--madar-gradient);
+  color: var(--theme-text-inverse);
+  border-color: transparent;
+  box-shadow: var(--madar-button-shadow-hover);
+}
+
+/* Avoid weird gradient on tiny dropdown language choices */
+.lang-dropdown button:hover,
+.lang-dropdown button.active {
+  background: rgba(var(--theme-primary-rgb), 0.07);
+  color: var(--color-accent-text);
+  transform: none;
+  box-shadow: none;
+}
+
+html[data-theme="dark"] .team-page,
+body.theme-dark .team-page {
+  color: var(--theme-text);
+}
+
+html[data-theme="dark"] .team-hero :is(h1, h2),
+body.theme-dark .team-hero :is(h1, h2) {
+  color: var(--theme-text);
+}
+
+html[data-theme="dark"] .team-hero p,
+body.theme-dark .team-hero p {
+  color: var(--theme-text-muted);
+}
+
+html[data-theme="dark"] .team-profile-card,
+body.theme-dark .team-profile-card {
+  background: var(--theme-surface);
+  border-color: var(--theme-border);
+  color: var(--theme-text);
+  box-shadow: 0 22px 56px rgba(var(--theme-black-rgb), 0.24);
+}
+
+html[data-theme="dark"] .team-profile-card:hover,
+body.theme-dark .team-profile-card:hover {
+  border-color: rgba(var(--theme-primary-rgb), 0.48);
+  box-shadow: 0 28px 64px rgba(var(--theme-black-rgb), 0.34);
+}
+
+html[data-theme="dark"] .profile-content :is(h2, h3),
+body.theme-dark .profile-content :is(h2, h3) {
+  color: var(--theme-text);
+}
+
+html[data-theme="dark"] .profile-role,
+body.theme-dark .profile-role {
+  color: var(--color-accent-text);
+}
+
+html[data-theme="dark"] .profile-role .gradient-text,
+body.theme-dark .profile-role .gradient-text {
+  background: none !important;
+  -webkit-text-fill-color: currentColor !important;
+  color: var(--color-accent-text) !important;
+}
+
+html[data-theme="dark"] .profile-description,
+body.theme-dark .profile-description {
+  color: var(--theme-text-soft);
+}
+
+html[data-theme="dark"] .profile-icon-link,
+body.theme-dark .profile-icon-link {
+  background: var(--theme-surface-2);
+  border-color: var(--theme-border);
+  color: var(--color-accent-text);
+}

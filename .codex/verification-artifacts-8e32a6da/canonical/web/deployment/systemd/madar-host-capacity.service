@@ -1,0 +1,11 @@
+[Unit]
+Description=Check Madar host disk, inode and Docker build-cache thresholds
+OnFailure=madar-ops-alert@%n.service
+
+[Service]
+Type=oneshot
+User=madar
+Group=madar
+EnvironmentFile=-/etc/madar/alerts.env
+ExecStart=/usr/local/lib/madar/check_host_capacity.sh
+NoNewPrivileges=true

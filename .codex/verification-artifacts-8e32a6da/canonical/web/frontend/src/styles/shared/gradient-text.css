@@ -1,0 +1,41 @@
+.gradient-text {
+  display: inline;
+  color: var(--gradient-text-color, var(--color-accent-text));
+  background-image: none;
+  animation: none;
+}
+
+.gradient-text-yoyo {
+  animation-direction: alternate;
+}
+
+.gradient-text-pause-hover:hover {
+  animation-play-state: paused;
+}
+
+.gradient-text-bordered {
+  border: 1px solid rgba(var(--theme-primary-rgb), 0.24);
+  border-radius: 999px;
+  padding: 0.02em 0.24em;
+}
+
+[data-theme="dark"] .gradient-text,
+body.theme-dark .gradient-text {
+  --gradient-text-color: var(--color-accent-text);
+}
+
+@keyframes gradientTextMove {
+  from {
+    background-position: 0% 50%;
+  }
+  to {
+    background-position: 100% 50%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gradient-text {
+    animation: none;
+    background-position: 50% 50%;
+  }
+}

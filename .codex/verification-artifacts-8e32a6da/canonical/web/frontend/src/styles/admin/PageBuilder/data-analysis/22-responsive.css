@@ -1,0 +1,170 @@
+﻿/* ============================================================
+   Responsive
+   ============================================================ */
+
+@media (max-width: 1180px) {
+  .page-builder .daw-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .page-builder .daw-advanced-cleaning-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .page-builder .daw-step-report .daw-step-content {
+    grid-template-columns: 1fr;
+  }
+
+  .page-builder .daw-variable-builder {
+    grid-template-columns: 1fr;
+  }
+
+  .page-builder .daw-canvas-column {
+    position: static;
+  }
+
+  .page-builder .daw-report-canvas {
+    min-height: auto;
+  }
+}
+
+@media (max-width: 820px) {
+  .page-builder .daw-column-picker {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  }
+
+  .page-builder .daw-save-dataframe-row,
+  .page-builder .daw-generate-metrics-row,
+  .page-builder .daw-cleaning-confirm,
+  .page-builder .daw-analysis-generator-heading,
+  .page-builder .daw-analysis-generator-action {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .page-builder .daw-save-dataframe-row .daw-primary,
+  .page-builder .daw-generate-metrics-row .daw-primary,
+  .page-builder .daw-cleaning-confirm .daw-confirm-button,
+  .page-builder .daw-analysis-generator-action .daw-primary {
+    width: 100%;
+  }
+
+  .page-builder .daw-dataframe-download-actions {
+    width: 100%;
+    flex-direction: column;
+  }
+
+  .page-builder .daw-dataframe-download-actions .daw-secondary {
+    width: 100%;
+  }
+
+  .page-builder .daw-header {
+    flex-direction: column;
+  }
+
+  .page-builder .daw-header .daw-primary {
+    width: 100%;
+  }
+
+  .page-builder .daw-stepper {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .page-builder .daw-review-shell,
+  .page-builder .daw-review-summary-grid,
+  .page-builder .daw-cleaning-grid,
+  .page-builder .daw-advanced-cleaning-grid,
+  .page-builder .daw-cleaning-tool-wide .daw-form-grid,
+  .page-builder .daw-dataset-stats,
+  .page-builder .daw-kpi-grid,
+  .page-builder .daw-object-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .page-builder .daw-review-sidebar {
+    position: static;
+  }
+
+  .page-builder .daw-inspection-box {
+    max-height: none;
+    overflow: visible;
+  }
+
+  .page-builder .daw-data-grid-toolbar,
+  .page-builder .daw-pagination {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .page-builder .daw-data-grid-toolbar input,
+  .page-builder .daw-column-menu,
+  .page-builder .daw-column-menu summary,
+  .page-builder .daw-pagination button {
+    width: 100%;
+  }
+
+  .page-builder .daw-source-tabs {
+    flex-direction: column;
+  }
+
+  .page-builder .daw-source-tabs button {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .page-builder .daw-column-menu-panel {
+    inset-inline: 0;
+    width: 100%;
+  }
+
+  .page-builder .daw-flow-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .page-builder .daw-step-back,
+  .page-builder .daw-step-next,
+  .page-builder .daw-page[dir="rtl"] .daw-step-back,
+  .page-builder .daw-page[dir="rtl"] .daw-step-next {
+    width: 100%;
+  }
+
+  .page-builder .daw-report-submit-row,
+  .page-builder .daw-page[dir="rtl"] .daw-report-submit-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .page-builder .daw-report-submit-row .daw-primary {
+    width: 100%;
+  }
+}
+
+@media (max-width: 560px) {
+  .page-builder .daw-column-picker {
+    grid-template-columns: 1fr;
+  }
+
+.page-builder .daw-section-card,
+  .page-builder .daw-assistant-card,
+  .page-builder .daw-report-canvas {
+    padding: 16px;
+    border-radius: 16px;
+  }
+
+  .page-builder .daw-stepper {
+    grid-template-columns: 1fr;
+  }
+
+  .page-builder .daw-stepper button {
+    min-height: 44px;
+  }
+
+  .page-builder .daw-normal-slider {
+    width: 14px;
+  }
+
+  .page-builder .daw-normal-slider-thumb {
+    width: 8px;
+  }
+}

@@ -1,0 +1,2917 @@
+/* ============================================================
+   MADAR GLOBAL DARK THEME
+   Works with:
+   - document.documentElement.dataset.theme = "dark"
+   - document/body class "theme-dark"
+   ============================================================ */
+
+:root[data-theme="dark"],
+.theme-dark {
+  color-scheme: dark;
+}
+
+:root[data-theme="dark"] body,
+body.theme-dark {
+  background: var(--theme-bg);
+  color: var(--theme-text);
+}
+
+/* ============================================================
+   DASHBOARD LAYOUT DARK
+   ============================================================ */
+
+[data-theme="dark"] .dashboard-skeleton-layout,
+.theme-dark .dashboard-skeleton-layout {
+  background: var(--theme-bg) !important;
+}
+
+[data-theme="dark"] .dashboard-skeleton-sidebar,
+.theme-dark .dashboard-skeleton-sidebar {
+  background: var(--theme-bg) !important;
+  border-right-color: var(--theme-border) !important;
+  box-shadow: none;
+}
+
+[data-theme="dark"] .dashboard-skeleton-page,
+.theme-dark .dashboard-skeleton-page {
+  background: var(--theme-bg) !important;
+}
+
+[data-theme="dark"] .skeleton-circle,
+[data-theme="dark"] .skeleton-line,
+[data-theme="dark"] .skeleton-card,
+[data-theme="dark"] .skeleton-panel,
+.theme-dark .skeleton-circle,
+.theme-dark .skeleton-line,
+.theme-dark .skeleton-card,
+.theme-dark .skeleton-panel {
+  background: linear-gradient(
+    90deg,
+    rgba(var(--theme-text-inverse-rgb), 0.1),
+    rgba(var(--theme-primary-rgb), 0.16),
+    rgba(var(--theme-text-inverse-rgb), 0.1)
+  ) !important;
+  background-size: 220% 100% !important;
+}
+
+[data-theme="dark"] .skeleton-card,
+[data-theme="dark"] .skeleton-panel,
+.theme-dark .skeleton-card,
+.theme-dark .skeleton-panel {
+  background: var(--theme-surface) !important;
+  border-color: var(--theme-border) !important;
+  box-shadow: 0 22px 56px rgba(var(--theme-black-rgb), 0.26);
+}
+
+[data-theme="dark"] .auth-page,
+[data-theme="dark"] .login-page,
+[data-theme="dark"] .already-signed-page,
+.theme-dark .auth-page,
+.theme-dark .login-page,
+.theme-dark .already-signed-page {
+  background: var(--theme-bg) !important;
+  color: var(--theme-text) !important;
+}
+
+[data-theme="dark"] .auth-skeleton-card,
+.theme-dark .auth-skeleton-card {
+  background: var(--theme-surface) !important;
+  border-color: var(--theme-border) !important;
+  box-shadow: 0 22px 56px rgba(var(--theme-black-rgb), 0.26) !important;
+}
+
+[data-theme="dark"] .auth-skeleton-card::after,
+.theme-dark .auth-skeleton-card::after {
+  background: var(--theme-primary-hover) !important;
+  opacity: 0.08 !important;
+}
+
+[data-theme="dark"] .auth-skeleton-line,
+[data-theme="dark"] .auth-skeleton-button,
+.theme-dark .auth-skeleton-line,
+.theme-dark .auth-skeleton-button {
+  background: linear-gradient(
+    90deg,
+    rgba(var(--theme-text-inverse-rgb), 0.1),
+    rgba(var(--theme-primary-rgb), 0.16),
+    rgba(var(--theme-text-inverse-rgb), 0.1)
+  ) !important;
+  background-size: 220% 100% !important;
+}
+
+[data-theme="dark"] .admin-dashboard-layout,
+.theme-dark .admin-dashboard-layout {
+  background: var(--theme-bg) !important;
+}
+
+[data-theme="dark"] .admin-dashboard-page,
+.theme-dark .admin-dashboard-page {
+  color: var(--theme-text) !important;
+  background: var(--theme-bg) !important;
+}
+
+[data-theme="dark"] .admin-dashboard-shell,
+.theme-dark .admin-dashboard-shell {
+  color: var(--theme-text);
+}
+
+[data-theme="dark"] .admin-dashboard-header h1,
+.theme-dark .admin-dashboard-header h1,
+[data-theme="dark"] .admin-dashboard-header h2,
+.theme-dark .admin-dashboard-header h2 {
+  color: var(--theme-text) !important;
+}
+
+[data-theme="dark"] .admin-dashboard-header p,
+.theme-dark .admin-dashboard-header p {
+  color: var(--theme-text-soft) !important;
+}
+
+[data-theme="dark"] .overview-card,
+[data-theme="dark"] .dashboard-panel,
+.theme-dark .overview-card,
+.theme-dark .dashboard-panel {
+  background:
+    linear-gradient(145deg, rgba(var(--theme-text-inverse-rgb), 0.08), rgba(var(--theme-text-inverse-rgb), 0.04)) padding-box,
+    linear-gradient(135deg, var(--theme-border-strong), rgba(var(--theme-primary-rgb), 0.18)) border-box !important;
+  border: 1px solid transparent !important;
+  color: var(--theme-text) !important;
+  box-shadow: 0 24px 70px rgba(var(--theme-black-rgb), 0.28) !important;
+}
+
+[data-theme="dark"] .overview-card p,
+[data-theme="dark"] .dashboard-panel p,
+[data-theme="dark"] .dashboard-panel small,
+.theme-dark .overview-card p,
+.theme-dark .dashboard-panel p,
+.theme-dark .dashboard-panel small {
+  color: var(--theme-text-soft) !important;
+}
+
+[data-theme="dark"] .overview-card h2,
+[data-theme="dark"] .dashboard-panel h2,
+[data-theme="dark"] .dashboard-panel h3,
+[data-theme="dark"] .server-info-list strong,
+[data-theme="dark"] .metric-row-header strong,
+.theme-dark .overview-card h2,
+.theme-dark .dashboard-panel h2,
+.theme-dark .dashboard-panel h3,
+.theme-dark .server-info-list strong,
+.theme-dark .metric-row-header strong {
+  color: var(--theme-text-inverse) !important;
+}
+
+[data-theme="dark"] .overview-sub,
+.theme-dark .overview-sub {
+  color: var(--theme-text-soft) !important;
+}
+
+[data-theme="dark"] .overview-icon,
+[data-theme="dark"] .panel-icon,
+.theme-dark .overview-icon,
+.theme-dark .panel-icon {
+  background: var(--theme-gradient) !important;
+  color: var(--theme-text-inverse) !important;
+  box-shadow: 0 14px 30px rgba(var(--theme-primary-rgb), 0.18) !important;
+}
+
+[data-theme="dark"] .metric-track,
+.theme-dark .metric-track {
+  background: rgba(var(--theme-text-inverse-rgb), 0.12) !important;
+}
+
+[data-theme="dark"] .metric-track > div,
+.theme-dark .metric-track > div {
+  background: var(--theme-primary) !important;
+}
+
+[data-theme="dark"] .cash-bar,
+.theme-dark .cash-bar {
+  background: var(--theme-primary) !important;
+  box-shadow: 0 14px 30px rgba(var(--theme-primary-rgb), 0.18) !important;
+}
+
+[data-theme="dark"] .cash-bar span,
+.theme-dark .cash-bar span {
+  color: var(--theme-text-inverse) !important;
+}
+
+[data-theme="dark"] .cash-bar-item small,
+.theme-dark .cash-bar-item small {
+  color: var(--theme-text-soft) !important;
+}
+
+[data-theme="dark"] .server-info-list div,
+.theme-dark .server-info-list div {
+  background: rgba(var(--theme-text-inverse-rgb), 0.05) !important;
+  border-color: rgba(var(--theme-text-inverse-rgb), 0.12) !important;
+}
+
+[data-theme="dark"] .server-info-list span,
+[data-theme="dark"] .metric-row-header span,
+.theme-dark .server-info-list span,
+.theme-dark .metric-row-header span {
+  color: var(--theme-text-soft) !important;
+}
+
+[data-theme="dark"] .uptime-circle,
+.theme-dark .uptime-circle {
+  background:
+    radial-gradient(circle, rgba(var(--theme-primary-rgb), 0.18), transparent 58%),
+    rgba(var(--theme-text-inverse-rgb), 0.04) !important;
+  border-color: rgba(var(--theme-primary-rgb), 0.32) !important;
+}
+
+[data-theme="dark"] .uptime-circle strong,
+.theme-dark .uptime-circle strong {
+  color: var(--theme-text-inverse) !important;
+}
+
+[data-theme="dark"] .uptime-circle span,
+.theme-dark .uptime-circle span {
+  color: var(--theme-text-soft) !important;
+}
+
+/* ============================================================
+   SIDEBAR DARK POLISH
+   ============================================================ */
+
+[data-theme="dark"] .admin-sidebar,
+.theme-dark .admin-sidebar {
+  background: var(--theme-surface) !important;
+  border-color: rgba(var(--theme-text-inverse-rgb), 0.12) !important;
+}
+
+[data-theme="dark"] .admin-sidebar-brand,
+.theme-dark .admin-sidebar-brand {
+  background: transparent !important;
+  border: none !important;
+}
+
+[data-theme="dark"] .admin-sidebar-brand:hover,
+.theme-dark .admin-sidebar-brand:hover {
+  background: rgba(var(--theme-text-inverse-rgb), 0.06) !important;
+}
+
+[data-theme="dark"] .admin-sidebar-brand strong,
+[data-theme="dark"] .admin-sidebar-user-info strong,
+.theme-dark .admin-sidebar-brand strong,
+.theme-dark .admin-sidebar-user-info strong {
+  color: var(--theme-text) !important;
+}
+
+[data-theme="dark"] .admin-sidebar-brand-text > span,
+[data-theme="dark"] .admin-sidebar-user-info span,
+.theme-dark .admin-sidebar-brand-text > span,
+.theme-dark .admin-sidebar-user-info span {
+  color: var(--theme-text-soft) !important;
+}
+
+[data-theme="dark"] .admin-sidebar-nav button,
+[data-theme="dark"] .admin-sidebar-nav a,
+.theme-dark .admin-sidebar-nav button,
+.theme-dark .admin-sidebar-nav a {
+  color: var(--theme-text) !important;
+}
+
+[data-theme="dark"] .admin-sidebar-nav button:hover,
+[data-theme="dark"] .admin-sidebar-nav button.active,
+[data-theme="dark"] .admin-sidebar-nav a:hover,
+[data-theme="dark"] .admin-sidebar-nav a.active,
+.theme-dark .admin-sidebar-nav button:hover,
+.theme-dark .admin-sidebar-nav button.active,
+.theme-dark .admin-sidebar-nav a:hover,
+.theme-dark .admin-sidebar-nav a.active {
+  background: rgba(var(--theme-text-inverse-rgb), 0.08) !important;
+  color: var(--theme-text-inverse) !important;
+}
+
+[data-theme="dark"] .admin-sidebar-theme-row,
+.theme-dark .admin-sidebar-theme-row {
+  color: var(--theme-text) !important;
+}
+
+[data-theme="dark"] .admin-sidebar-theme-row:hover,
+.theme-dark .admin-sidebar-theme-row:hover {
+  background: rgba(var(--theme-text-inverse-rgb), 0.08) !important;
+  color: var(--theme-text-inverse) !important;
+}
+
+[data-theme="dark"] .admin-sidebar-lang,
+.theme-dark .admin-sidebar-lang {
+  background: transparent !important;
+  color: var(--theme-text) !important;
+  border-color: transparent !important;
+}
+
+[data-theme="dark"] .admin-sidebar-lang:hover,
+.theme-dark .admin-sidebar-lang:hover {
+  background: rgba(var(--theme-text-inverse-rgb), 0.08) !important;
+  border-color: transparent !important;
+}
+
+[data-theme="dark"] .admin-sidebar-logout,
+.theme-dark .admin-sidebar-logout {
+  color: var(--theme-text) !important;
+}
+
+[data-theme="dark"] .admin-sidebar-logout svg,
+.theme-dark .admin-sidebar-logout svg {
+  color: var(--theme-text) !important;
+}
+
+[data-theme="dark"] .admin-sidebar-logout:hover,
+.theme-dark .admin-sidebar-logout:hover {
+  background: rgba(var(--theme-primary-rgb), 0.14) !important;
+  color: var(--theme-text-inverse) !important;
+}
+
+[data-theme="dark"] .admin-sidebar-logout:hover svg,
+.theme-dark .admin-sidebar-logout:hover svg {
+  color: var(--theme-text-inverse) !important;
+}
+
+[data-theme="dark"] .admin-sidebar-user,
+.theme-dark .admin-sidebar-user {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+/* ============================================================
+   SETTINGS PAGE DARK
+   ============================================================ */
+
+[data-theme="dark"] .settings-page,
+.theme-dark .settings-page {
+  color: var(--theme-text) !important;
+}
+
+[data-theme="dark"] .settings-header p,
+.theme-dark .settings-header p {
+  color: var(--color-accent-text) !important;
+}
+
+[data-theme="dark"] .settings-header h1,
+.theme-dark .settings-header h1,
+[data-theme="dark"] .settings-profile-summary h2,
+.theme-dark .settings-profile-summary h2 {
+  color: var(--theme-text-inverse) !important;
+}
+
+[data-theme="dark"] .settings-header span,
+.theme-dark .settings-header span,
+[data-theme="dark"] .settings-profile-summary p,
+.theme-dark .settings-profile-summary p {
+  color: var(--theme-text-soft) !important;
+}
+
+[data-theme="dark"] .settings-card,
+.theme-dark .settings-card {
+  background:
+    linear-gradient(145deg, rgba(var(--theme-text-inverse-rgb), 0.08), rgba(var(--theme-text-inverse-rgb), 0.04)) padding-box,
+    linear-gradient(135deg, var(--theme-border-strong), rgba(var(--theme-primary-rgb), 0.18)) border-box !important;
+  border: 1px solid transparent !important;
+  color: var(--theme-text) !important;
+  box-shadow: 0 24px 70px rgba(var(--theme-black-rgb), 0.28) !important;
+}
+
+[data-theme="dark"] .settings-profile-cover,
+.theme-dark .settings-profile-cover {
+  background:
+    radial-gradient(circle at 16% 20%, rgba(var(--theme-text-inverse-rgb), 0.16), transparent 28%),
+    radial-gradient(circle at 84% 26%, rgba(var(--theme-text-inverse-rgb), 0.1), transparent 26%),
+    linear-gradient(135deg, var(--theme-bg) 0%, var(--theme-surface) 48%, var(--theme-surface-2) 100%) !important;
+}
+
+[data-theme="dark"] .settings-profile-avatar,
+[data-theme="dark"] .settings-website-card .settings-profile-avatar,
+.theme-dark .settings-profile-avatar,
+.theme-dark .settings-website-card .settings-profile-avatar {
+  background: var(--theme-surface) !important;
+  box-shadow: 0 18px 36px rgba(var(--theme-black-rgb), 0.32) !important;
+}
+
+[data-theme="dark"] .settings-card label,
+.theme-dark .settings-card label {
+  color: var(--theme-text) !important;
+}
+
+[data-theme="dark"] .settings-card input,
+[data-theme="dark"] .settings-card textarea,
+.theme-dark .settings-card input,
+.theme-dark .settings-card textarea {
+  background: rgba(var(--theme-shadow-rgb), 0.92) !important;
+  color: var(--theme-text) !important;
+  border-color: rgba(var(--theme-text-inverse-rgb), 0.16) !important;
+}
+
+[data-theme="dark"] .settings-card input::placeholder,
+[data-theme="dark"] .settings-card textarea::placeholder,
+.theme-dark .settings-card input::placeholder,
+.theme-dark .settings-card textarea::placeholder {
+  color: var(--theme-text-muted) !important;
+}
+
+[data-theme="dark"] .settings-card input:focus,
+[data-theme="dark"] .settings-card textarea:focus,
+.theme-dark .settings-card input:focus,
+.theme-dark .settings-card textarea:focus {
+  border-color: rgba(var(--theme-primary-rgb), 0.7) !important;
+  box-shadow: 0 0 0 4px rgba(var(--theme-primary-rgb), 0.16) !important;
+}
+
+[data-theme="dark"] .settings-file-button,
+.theme-dark .settings-file-button {
+  background: rgba(var(--theme-primary-rgb), 0.14) !important;
+  border-color: rgba(var(--theme-primary-rgb), 0.42) !important;
+  color: var(--theme-text) !important;
+}
+
+[data-theme="dark"] .settings-reset-password-button,
+.theme-dark .settings-reset-password-button {
+  background: rgba(var(--theme-text-inverse-rgb), 0.07) !important;
+  border-color: rgba(var(--theme-text-inverse-rgb), 0.16) !important;
+  color: var(--theme-text) !important;
+}
+
+[data-theme="dark"] .settings-reset-password-button:hover,
+.theme-dark .settings-reset-password-button:hover {
+  background: rgba(var(--theme-primary-rgb), 0.14) !important;
+  border-color: rgba(var(--theme-primary-rgb), 0.4) !important;
+  color: var(--theme-text-inverse) !important;
+}
+
+[data-theme="dark"] .settings-toast,
+.theme-dark .settings-toast {
+  background: var(--theme-surface) !important;
+  border-color: rgba(var(--theme-text-inverse-rgb), 0.14) !important;
+  box-shadow: 0 20px 56px rgba(var(--theme-black-rgb), 0.32) !important;
+}
+
+[data-theme="dark"] .settings-toast span,
+.theme-dark .settings-toast span {
+  color: var(--theme-text) !important;
+}
+
+[data-theme="dark"] .settings-toast button,
+.theme-dark .settings-toast button {
+  background: rgba(var(--theme-text-inverse-rgb), 0.08) !important;
+  color: var(--theme-text) !important;
+}
+
+/* ============================================================
+   MY PLAN PAGE DARK
+   ============================================================ */
+
+[data-theme="dark"] .my-plan-page,
+.theme-dark .my-plan-page {
+  color: var(--theme-text) !important;
+}
+
+[data-theme="dark"] .my-plan-kicker,
+.theme-dark .my-plan-kicker {
+  color: var(--color-accent-text) !important;
+}
+
+[data-theme="dark"] .my-plan-hero h1,
+[data-theme="dark"] .my-plan-section-header h2,
+[data-theme="dark"] .my-plan-price-row h2,
+[data-theme="dark"] .my-plan-builder-card h3,
+.theme-dark .my-plan-hero h1,
+.theme-dark .my-plan-section-header h2,
+.theme-dark .my-plan-price-row h2,
+.theme-dark .my-plan-builder-card h3 {
+  color: var(--theme-text-inverse) !important;
+}
+
+[data-theme="dark"] .my-plan-hero p,
+[data-theme="dark"] .my-plan-current-card > p,
+[data-theme="dark"] .my-plan-price-row div span,
+[data-theme="dark"] .my-plan-meta-grid span,
+[data-theme="dark"] .my-plan-usage-card span,
+[data-theme="dark"] .my-plan-builder-card p,
+.theme-dark .my-plan-hero p,
+.theme-dark .my-plan-current-card > p,
+.theme-dark .my-plan-price-row div span,
+.theme-dark .my-plan-meta-grid span,
+.theme-dark .my-plan-usage-card span,
+.theme-dark .my-plan-builder-card p {
+  color: var(--theme-text-soft) !important;
+}
+
+[data-theme="dark"] .my-plan-current-card,
+[data-theme="dark"] .my-plan-usage-card,
+[data-theme="dark"] .my-plan-builder-card,
+.theme-dark .my-plan-current-card,
+.theme-dark .my-plan-usage-card,
+.theme-dark .my-plan-builder-card {
+  background:
+    linear-gradient(145deg, rgba(var(--theme-text-inverse-rgb), 0.08), rgba(var(--theme-text-inverse-rgb), 0.04)) padding-box,
+    linear-gradient(135deg, var(--theme-border-strong), rgba(var(--theme-primary-rgb), 0.18)) border-box !important;
+  border: 1px solid transparent !important;
+  color: var(--theme-text) !important;
+  box-shadow: 0 24px 70px rgba(var(--theme-black-rgb), 0.28) !important;
+}
+
+[data-theme="dark"] .my-plan-feature-card,
+.theme-dark .my-plan-feature-card {
+  border-color: rgba(var(--theme-text-inverse-rgb), 0.12) !important;
+  box-shadow: 0 24px 70px rgba(var(--theme-black-rgb), 0.32) !important;
+}
+
+[data-theme="dark"] .my-plan-secondary-btn,
+.theme-dark .my-plan-secondary-btn {
+  background: rgba(var(--theme-text-inverse-rgb), 0.07) !important;
+  border-color: rgba(var(--theme-text-inverse-rgb), 0.16) !important;
+  color: var(--theme-text) !important;
+}
+
+[data-theme="dark"] .my-plan-secondary-btn:hover,
+.theme-dark .my-plan-secondary-btn:hover {
+  background: rgba(var(--theme-primary-rgb), 0.14) !important;
+  border-color: rgba(var(--theme-primary-rgb), 0.4) !important;
+}
+
+[data-theme="dark"] .my-plan-card-top span,
+.theme-dark .my-plan-card-top span {
+  color: var(--theme-text-muted) !important;
+}
+
+[data-theme="dark"] .my-plan-card-top strong,
+[data-theme="dark"] .my-plan-builder-card-top strong,
+.theme-dark .my-plan-card-top strong,
+.theme-dark .my-plan-builder-card-top strong {
+  background: rgba(var(--theme-primary-rgb), 0.16) !important;
+  color: var(--theme-text) !important;
+}
+
+[data-theme="dark"] .my-plan-price-row div strong,
+[data-theme="dark"] .my-plan-builder-footer em,
+.theme-dark .my-plan-price-row div strong,
+.theme-dark .my-plan-builder-footer em {
+  color: var(--color-accent-text) !important;
+}
+
+[data-theme="dark"] .my-plan-meta-grid div,
+.theme-dark .my-plan-meta-grid div {
+  background: rgba(var(--theme-text-inverse-rgb), 0.06) !important;
+  border-color: rgba(var(--theme-text-inverse-rgb), 0.12) !important;
+}
+
+[data-theme="dark"] .my-plan-meta-grid strong,
+[data-theme="dark"] .my-plan-usage-card strong,
+[data-theme="dark"] .my-plan-builder-footer span,
+.theme-dark .my-plan-meta-grid strong,
+.theme-dark .my-plan-usage-card strong,
+.theme-dark .my-plan-builder-footer span {
+  color: var(--theme-text-inverse) !important;
+}
+
+[data-theme="dark"] .my-plan-progress-track,
+.theme-dark .my-plan-progress-track {
+  background: rgba(var(--theme-text-inverse-rgb), 0.12) !important;
+}
+
+[data-theme="dark"] .my-plan-progress-track span,
+.theme-dark .my-plan-progress-track span {
+  background: linear-gradient(90deg, var(--theme-primary-hover) 0%, var(--theme-primary) 100%) !important;
+}
+
+[data-theme="dark"] .my-plan-builder-card.active,
+.theme-dark .my-plan-builder-card.active {
+  border-color: rgba(var(--theme-primary-rgb), 0.46) !important;
+  box-shadow: 0 22px 56px rgba(var(--theme-primary-rgb), 0.12) !important;
+}
+
+/* ============================================================
+   PAGE BUILDER GLOBAL DARK VARIABLES
+   This is important because existing builder CSS uses .page-builder.theme-dark,
+   while dashboard theme toggle sets [data-theme="dark"].
+   ============================================================ */
+
+[data-theme="dark"] .page-builder,
+.theme-dark .page-builder,
+.page-builder.theme-dark {
+  --madar-bg: var(--theme-bg);
+  --madar-surface: var(--theme-surface);
+  --madar-surface-soft: var(--theme-surface-2);
+  --madar-text: var(--theme-text);
+  --madar-muted: var(--theme-text-soft);
+  --madar-navy: var(--theme-text);
+  --madar-red: var(--theme-primary-hover);
+  --madar-red-dark: var(--theme-primary);
+  --madar-border: rgba(var(--theme-text-inverse-rgb), 0.12);
+  --madar-border-strong: rgba(var(--theme-text-inverse-rgb), 0.2);
+  --madar-gradient: var(--theme-gradient);
+  --madar-gradient-hover: var(--theme-gradient-hover);
+  --madar-shadow-sm: var(--app-shadow-sm);
+  --madar-shadow-md: var(--app-shadow-md);
+  --madar-red-shadow: var(--app-primary-shadow);
+
+  background: var(--madar-bg) !important;
+  color: var(--madar-text) !important;
+}
+
+[data-theme="dark"] .page-builder .builder-topbar,
+[data-theme="dark"] .page-builder .builder-subbar,
+[data-theme="dark"] .page-builder .preview-device-toolbar,
+.theme-dark .page-builder .builder-topbar,
+.theme-dark .page-builder .builder-subbar,
+.theme-dark .page-builder .preview-device-toolbar {
+  background: var(--theme-surface) !important;
+  color: var(--madar-text) !important;
+  border-color: var(--madar-border) !important;
+}
+
+[data-theme="dark"] .page-builder .builder-layout,
+.theme-dark .page-builder .builder-layout {
+  background: var(--madar-bg) !important;
+}
+
+[data-theme="dark"] .page-builder .builder-sidebar,
+[data-theme="dark"] .page-builder .builder-inspector,
+[data-theme="dark"] .page-builder .workspace-header,
+[data-theme="dark"] .page-builder .object-list,
+[data-theme="dark"] .page-builder .form-editor,
+[data-theme="dark"] .page-builder .form-side-settings,
+[data-theme="dark"] .page-builder .responses-page-card,
+[data-theme="dark"] .page-builder .dashboard-panel,
+[data-theme="dark"] .page-builder .publish-card,
+[data-theme="dark"] .page-builder .automation-card,
+[data-theme="dark"] .page-builder .role-card,
+[data-theme="dark"] .page-builder .theme-control,
+[data-theme="dark"] .page-builder .builder-modal,
+[data-theme="dark"] .page-builder .results-form-list,
+[data-theme="dark"] .page-builder .results-table-card,
+[data-theme="dark"] .page-builder .analytics-card,
+.theme-dark .page-builder .builder-sidebar,
+.theme-dark .page-builder .builder-inspector,
+.theme-dark .page-builder .workspace-header,
+.theme-dark .page-builder .object-list,
+.theme-dark .page-builder .form-editor,
+.theme-dark .page-builder .form-side-settings,
+.theme-dark .page-builder .responses-page-card,
+.theme-dark .page-builder .dashboard-panel,
+.theme-dark .page-builder .publish-card,
+.theme-dark .page-builder .automation-card,
+.theme-dark .page-builder .role-card,
+.theme-dark .page-builder .theme-control,
+.theme-dark .page-builder .builder-modal,
+.theme-dark .page-builder .results-form-list,
+.theme-dark .page-builder .results-table-card,
+.theme-dark .page-builder .analytics-card {
+  background: var(--madar-surface) !important;
+  color: var(--madar-text) !important;
+  border-color: var(--madar-border) !important;
+}
+
+[data-theme="dark"] .page-builder .workspace-page,
+.theme-dark .page-builder .workspace-page,
+[data-theme="dark"] .page-builder .responses-results-page,
+[data-theme="dark"] .page-builder .analytics-dashboard-page,
+.theme-dark .page-builder .responses-results-page,
+.theme-dark .page-builder .analytics-dashboard-page {
+  background: var(--madar-bg) !important;
+}
+
+[data-theme="dark"] .page-builder input:not(.builder-canvas *),
+[data-theme="dark"] .page-builder textarea:not(.builder-canvas *),
+[data-theme="dark"] .page-builder select:not(.builder-canvas *),
+.theme-dark .page-builder input:not(.builder-canvas *),
+.theme-dark .page-builder textarea:not(.builder-canvas *),
+.theme-dark .page-builder select:not(.builder-canvas *) {
+  background: var(--theme-bg) !important;
+  color: var(--madar-text) !important;
+  border-color: var(--madar-border-strong) !important;
+}
+
+[data-theme="dark"] .page-builder input:not(.builder-canvas *)::placeholder,
+[data-theme="dark"] .page-builder textarea:not(.builder-canvas *)::placeholder,
+.theme-dark .page-builder input:not(.builder-canvas *)::placeholder,
+.theme-dark .page-builder textarea:not(.builder-canvas *)::placeholder {
+  color: var(--theme-text-muted) !important;
+}
+
+[data-theme="dark"] .page-builder details:not(.builder-canvas *),
+.theme-dark .page-builder details:not(.builder-canvas *) {
+  background: rgba(var(--theme-text-inverse-rgb), 0.035) !important;
+  border-color: var(--madar-border) !important;
+}
+
+[data-theme="dark"] .page-builder .workspace-tabs,
+[data-theme="dark"] .page-builder .viewport-switcher,
+.theme-dark .page-builder .workspace-tabs,
+.theme-dark .page-builder .viewport-switcher {
+  background: rgba(var(--theme-text-inverse-rgb), 0.06) !important;
+  border-color: var(--madar-border) !important;
+}
+
+[data-theme="dark"] .page-builder .workspace-tabs button,
+[data-theme="dark"] .page-builder .viewport-switcher button,
+[data-theme="dark"] .page-builder .builder-topbar-actions > button,
+[data-theme="dark"] .page-builder .compact-actions button,
+[data-theme="dark"] .page-builder .workspace-header button,
+[data-theme="dark"] .page-builder .question-type-buttons button,
+[data-theme="dark"] .page-builder .responses-page-header button,
+[data-theme="dark"] .page-builder .publish-actions button,
+[data-theme="dark"] .page-builder .editor-card-header button,
+[data-theme="dark"] .page-builder .builder-modal button,
+.theme-dark .page-builder .workspace-tabs button,
+.theme-dark .page-builder .viewport-switcher button,
+.theme-dark .page-builder .builder-topbar-actions > button,
+.theme-dark .page-builder .compact-actions button,
+.theme-dark .page-builder .workspace-header button,
+.theme-dark .page-builder .question-type-buttons button,
+.theme-dark .page-builder .responses-page-header button,
+.theme-dark .page-builder .publish-actions button,
+.theme-dark .page-builder .editor-card-header button,
+.theme-dark .page-builder .builder-modal button {
+  background: rgba(var(--theme-text-inverse-rgb), 0.08) !important;
+  color: var(--madar-text) !important;
+}
+
+[data-theme="dark"] .page-builder .workspace-tabs button.active,
+[data-theme="dark"] .page-builder .viewport-switcher button.active,
+.theme-dark .page-builder .workspace-tabs button.active,
+.theme-dark .page-builder .viewport-switcher button.active {
+  background: var(--madar-gradient) !important;
+  color: var(--theme-text-inverse) !important;
+}
+
+[data-theme="dark"] .page-builder .panel-mode-select,
+[data-theme="dark"] .page-builder .row-editor-card,
+[data-theme="dark"] .page-builder .field-row,
+[data-theme="dark"] .page-builder .user-row,
+[data-theme="dark"] .page-builder .page-kind-summary,
+[data-theme="dark"] .page-builder .section-card,
+[data-theme="dark"] .page-builder .starter-card,
+[data-theme="dark"] .page-builder .page-create-card,
+[data-theme="dark"] .page-builder .form-info-grid article,
+[data-theme="dark"] .page-builder .analysis-result-grid article,
+[data-theme="dark"] .page-builder .backend-route-list div,
+.theme-dark .page-builder .panel-mode-select,
+.theme-dark .page-builder .row-editor-card,
+.theme-dark .page-builder .field-row,
+.theme-dark .page-builder .user-row,
+.theme-dark .page-builder .page-kind-summary,
+.theme-dark .page-builder .section-card,
+.theme-dark .page-builder .starter-card,
+.theme-dark .page-builder .page-create-card,
+.theme-dark .page-builder .form-info-grid article,
+.theme-dark .page-builder .analysis-result-grid article,
+.theme-dark .page-builder .backend-route-list div {
+  background: var(--madar-surface-soft) !important;
+  color: var(--madar-text) !important;
+  border-color: var(--madar-border) !important;
+}
+
+[data-theme="dark"] .page-builder .results-data-table,
+[data-theme="dark"] .page-builder .data-grid-table,
+.theme-dark .page-builder .results-data-table,
+.theme-dark .page-builder .data-grid-table {
+  background: var(--madar-surface) !important;
+  color: var(--madar-text) !important;
+}
+
+[data-theme="dark"] .page-builder .results-data-table th,
+[data-theme="dark"] .page-builder .results-data-table td,
+[data-theme="dark"] .page-builder .data-grid-table th,
+[data-theme="dark"] .page-builder .data-grid-table td,
+.theme-dark .page-builder .results-data-table th,
+.theme-dark .page-builder .results-data-table td,
+.theme-dark .page-builder .data-grid-table th,
+.theme-dark .page-builder .data-grid-table td {
+  background: transparent !important;
+  color: var(--madar-text) !important;
+  border-color: var(--madar-border) !important;
+}
+
+[data-theme="dark"] .page-builder .results-data-table th,
+[data-theme="dark"] .page-builder .data-grid-table th,
+.theme-dark .page-builder .results-data-table th,
+.theme-dark .page-builder .data-grid-table th {
+  background: rgba(var(--theme-text-inverse-rgb), 0.06) !important;
+  color: var(--madar-muted) !important;
+}
+
+[data-theme="dark"] .page-builder .results-table-wrap,
+[data-theme="dark"] .page-builder .data-grid-scroll,
+[data-theme="dark"] .page-builder .analysis-column-picker,
+.theme-dark .page-builder .results-table-wrap,
+.theme-dark .page-builder .data-grid-scroll,
+.theme-dark .page-builder .analysis-column-picker {
+  background: var(--madar-surface) !important;
+  border-color: var(--madar-border) !important;
+}
+
+[data-theme="dark"] .page-builder .analysis-file-dropzone,
+.theme-dark .page-builder .analysis-file-dropzone {
+  background:
+    linear-gradient(180deg, var(--theme-surface), rgba(var(--theme-shadow-rgb), 0.92)),
+    rgba(var(--theme-text-inverse-rgb), 0.04) !important;
+  border-color: rgba(var(--theme-text-inverse-rgb), 0.18) !important;
+}
+
+[data-theme="dark"] .page-builder .analysis-json-output.friendly,
+.theme-dark .page-builder .analysis-json-output.friendly {
+  background: var(--madar-surface-soft) !important;
+  color: var(--madar-text) !important;
+}
+
+[data-theme="dark"] .page-builder .analysis-field textarea,
+[data-theme="dark"] .page-builder .analysis-assistant-thread article,
+.theme-dark .page-builder .analysis-field textarea,
+.theme-dark .page-builder .analysis-assistant-thread article {
+  background: var(--madar-surface) !important;
+  color: var(--madar-text) !important;
+  border-color: var(--madar-border) !important;
+}
+
+[data-theme="dark"] .page-builder .builder-toast,
+.theme-dark .page-builder .builder-toast {
+  background: var(--madar-surface) !important;
+  color: var(--madar-text) !important;
+  border-color: var(--madar-border) !important;
+}
+
+[data-theme="dark"] .page-builder .page-delete-modal,
+.theme-dark .page-builder .page-delete-modal {
+  background: var(--madar-surface) !important;
+  color: var(--madar-text) !important;
+  border-color: rgba(var(--theme-primary-rgb), 0.28) !important;
+}
+
+/* ============================================================
+   PAGE BUILDER DASHBOARD COMPACT OUTER SIDEBAR DARK
+   ============================================================ */
+
+[data-theme="dark"] .admin-dashboard-layout:has(.page-builder) .admin-sidebar-lang::after,
+.theme-dark .admin-dashboard-layout:has(.page-builder) .admin-sidebar-lang::after {
+  color: var(--theme-text) !important;
+}
+
+[data-theme="dark"] .admin-dashboard-layout:has(.page-builder) .admin-sidebar-bottom .admin-sidebar-lang,
+.theme-dark .admin-dashboard-layout:has(.page-builder) .admin-sidebar-bottom .admin-sidebar-lang {
+  background: transparent !important;
+}
+
+/* ============================================================
+   GENERIC SAFETY FOR ADMIN CARDS
+   ============================================================ */
+
+[data-theme="dark"] .settings-save-button,
+[data-theme="dark"] .my-plan-primary-btn,
+.theme-dark .settings-save-button,
+.theme-dark .my-plan-primary-btn {
+  background: var(--theme-gradient) !important;
+  color: var(--theme-text-inverse) !important;
+  box-shadow: 0 14px 30px rgba(var(--theme-primary-rgb), 0.18) !important;
+}
+
+/* ============================================================
+   PAGE BUILDER DEEP SURFACE COMPLETION
+   Some builder modules use older hard-coded light surfaces.
+   ============================================================ */
+
+[data-theme="dark"] .page-builder .builder-panel,
+[data-theme="dark"] .page-builder .builder-panel-section,
+[data-theme="dark"] .page-builder .builder-panel-card,
+[data-theme="dark"] .page-builder .builder-card,
+[data-theme="dark"] .page-builder .editor-card,
+[data-theme="dark"] .page-builder .content-card,
+[data-theme="dark"] .page-builder .settings-card,
+[data-theme="dark"] .page-builder .workspace-card,
+[data-theme="dark"] .page-builder .component-card,
+[data-theme="dark"] .page-builder .empty-state-card,
+[data-theme="dark"] .page-builder .go-live-card,
+[data-theme="dark"] .page-builder .subdomain-card,
+[data-theme="dark"] .page-builder .auth-block-card,
+[data-theme="dark"] .page-builder .form-question-card,
+[data-theme="dark"] .page-builder .form-preview-card,
+[data-theme="dark"] .page-builder .form-response-card,
+[data-theme="dark"] .page-builder .question-card,
+[data-theme="dark"] .page-builder .quiz-question-card,
+[data-theme="dark"] .page-builder .data-source-card,
+[data-theme="dark"] .page-builder .data-table-card,
+[data-theme="dark"] .page-builder .records-card,
+[data-theme="dark"] .page-builder .page-card,
+[data-theme="dark"] .page-builder .page-list-card,
+[data-theme="dark"] .page-builder .page-row,
+[data-theme="dark"] .page-builder .branch-page-card,
+[data-theme="dark"] .page-builder .responsive-preview-frame,
+[data-theme="dark"] .page-builder .preview-shell,
+[data-theme="dark"] .page-builder .builder-drawer,
+[data-theme="dark"] .page-builder .form-builder-drawer,
+.theme-dark .page-builder .builder-panel,
+.theme-dark .page-builder .builder-panel-section,
+.theme-dark .page-builder .builder-panel-card,
+.theme-dark .page-builder .builder-card,
+.theme-dark .page-builder .editor-card,
+.theme-dark .page-builder .content-card,
+.theme-dark .page-builder .settings-card,
+.theme-dark .page-builder .workspace-card,
+.theme-dark .page-builder .component-card,
+.theme-dark .page-builder .empty-state-card,
+.theme-dark .page-builder .go-live-card,
+.theme-dark .page-builder .subdomain-card,
+.theme-dark .page-builder .auth-block-card,
+.theme-dark .page-builder .form-question-card,
+.theme-dark .page-builder .form-preview-card,
+.theme-dark .page-builder .form-response-card,
+.theme-dark .page-builder .question-card,
+.theme-dark .page-builder .quiz-question-card,
+.theme-dark .page-builder .data-source-card,
+.theme-dark .page-builder .data-table-card,
+.theme-dark .page-builder .records-card,
+.theme-dark .page-builder .page-card,
+.theme-dark .page-builder .page-list-card,
+.theme-dark .page-builder .page-row,
+.theme-dark .page-builder .branch-page-card,
+.theme-dark .page-builder .responsive-preview-frame,
+.theme-dark .page-builder .preview-shell,
+.theme-dark .page-builder .builder-drawer,
+.theme-dark .page-builder .form-builder-drawer {
+  background: var(--madar-surface) !important;
+  color: var(--madar-text) !important;
+  border-color: var(--madar-border) !important;
+}
+
+[data-theme="dark"] .page-builder .builder-panel-muted,
+[data-theme="dark"] .page-builder .builder-muted-panel,
+[data-theme="dark"] .page-builder .option-row,
+[data-theme="dark"] .page-builder .choice-row,
+[data-theme="dark"] .page-builder .logic-row,
+[data-theme="dark"] .page-builder .rule-row,
+[data-theme="dark"] .page-builder .data-row,
+[data-theme="dark"] .page-builder .property-row,
+[data-theme="dark"] .page-builder .style-control-row,
+[data-theme="dark"] .page-builder .color-control,
+[data-theme="dark"] .page-builder .toolbar-group,
+[data-theme="dark"] .page-builder .section-item,
+[data-theme="dark"] .page-builder .element-item,
+[data-theme="dark"] .page-builder .object-list-item,
+[data-theme="dark"] .page-builder .canvas-empty-state,
+[data-theme="dark"] .page-builder .drop-zone,
+.theme-dark .page-builder .builder-panel-muted,
+.theme-dark .page-builder .builder-muted-panel,
+.theme-dark .page-builder .option-row,
+.theme-dark .page-builder .choice-row,
+.theme-dark .page-builder .logic-row,
+.theme-dark .page-builder .rule-row,
+.theme-dark .page-builder .data-row,
+.theme-dark .page-builder .property-row,
+.theme-dark .page-builder .style-control-row,
+.theme-dark .page-builder .color-control,
+.theme-dark .page-builder .toolbar-group,
+.theme-dark .page-builder .section-item,
+.theme-dark .page-builder .element-item,
+.theme-dark .page-builder .object-list-item,
+.theme-dark .page-builder .canvas-empty-state,
+.theme-dark .page-builder .drop-zone {
+  background: var(--madar-surface-soft) !important;
+  color: var(--madar-text) !important;
+  border-color: var(--madar-border) !important;
+}
+
+[data-theme="dark"] .page-builder p:not(.builder-canvas *),
+[data-theme="dark"] .page-builder small:not(.builder-canvas *),
+[data-theme="dark"] .page-builder span:not(.builder-canvas *),
+[data-theme="dark"] .page-builder label:not(.builder-canvas *),
+[data-theme="dark"] .page-builder legend:not(.builder-canvas *),
+[data-theme="dark"] .page-builder .muted,
+[data-theme="dark"] .page-builder .helper-text,
+[data-theme="dark"] .page-builder .field-help,
+[data-theme="dark"] .page-builder .empty-copy,
+.theme-dark .page-builder p:not(.builder-canvas *),
+.theme-dark .page-builder small:not(.builder-canvas *),
+.theme-dark .page-builder span:not(.builder-canvas *),
+.theme-dark .page-builder label:not(.builder-canvas *),
+.theme-dark .page-builder legend:not(.builder-canvas *),
+.theme-dark .page-builder .muted,
+.theme-dark .page-builder .helper-text,
+.theme-dark .page-builder .field-help,
+.theme-dark .page-builder .empty-copy {
+  color: var(--madar-muted) !important;
+}
+
+[data-theme="dark"] .page-builder h1:not(.builder-canvas *),
+[data-theme="dark"] .page-builder h2:not(.builder-canvas *),
+[data-theme="dark"] .page-builder h3:not(.builder-canvas *),
+[data-theme="dark"] .page-builder h4:not(.builder-canvas *),
+[data-theme="dark"] .page-builder strong:not(.builder-canvas *),
+.theme-dark .page-builder h1:not(.builder-canvas *),
+.theme-dark .page-builder h2:not(.builder-canvas *),
+.theme-dark .page-builder h3:not(.builder-canvas *),
+.theme-dark .page-builder h4:not(.builder-canvas *),
+.theme-dark .page-builder strong:not(.builder-canvas *) {
+  color: var(--madar-text) !important;
+}
+
+[data-theme="dark"] .page-builder table:not(.builder-canvas *),
+[data-theme="dark"] .page-builder thead:not(.builder-canvas *),
+[data-theme="dark"] .page-builder tbody:not(.builder-canvas *),
+[data-theme="dark"] .page-builder tr:not(.builder-canvas *),
+.theme-dark .page-builder table:not(.builder-canvas *),
+.theme-dark .page-builder thead:not(.builder-canvas *),
+.theme-dark .page-builder tbody:not(.builder-canvas *),
+.theme-dark .page-builder tr:not(.builder-canvas *) {
+  background: transparent !important;
+  color: var(--madar-text) !important;
+}
+
+/* ============================================================
+   QUIETER LOGO-LED ADMIN DARK THEME
+   Red is reserved for actions; surfaces lean navy/ink.
+   ============================================================ */
+
+:root[data-theme="dark"],
+.theme-dark {
+  --admin-bg: var(--theme-bg);
+  --admin-surface: var(--theme-surface);
+  --admin-surface-2: var(--theme-surface-2);
+  --admin-surface-3: var(--theme-surface-3);
+  --admin-border: var(--theme-border);
+  --admin-border-strong: var(--theme-border-strong);
+  --admin-text: var(--theme-text);
+  --admin-muted: var(--theme-text-soft);
+  --admin-soft: var(--theme-text-muted);
+  --admin-cyan: var(--theme-primary-hover);
+  --admin-navy: var(--theme-surface-3);
+  --admin-red: var(--theme-primary);
+  --admin-red-bright: var(--theme-primary-hover);
+  --admin-gradient: var(--theme-gradient);
+}
+
+[data-theme="dark"] .admin-dashboard-layout,
+.theme-dark .admin-dashboard-layout {
+  background: var(--theme-bg) !important;
+}
+
+[data-theme="dark"] .admin-dashboard-page,
+.theme-dark .admin-dashboard-page {
+  background:
+    radial-gradient(circle at top right, rgba(var(--theme-primary-rgb), 0.12), transparent 30%),
+    linear-gradient(135deg, var(--theme-bg) 0%, var(--theme-bg-soft) 58%, var(--theme-bg) 100%) !important;
+}
+
+[data-theme="dark"] .admin-sidebar,
+.theme-dark .admin-sidebar {
+  background: var(--theme-bg) !important;
+  border-color: var(--theme-border) !important;
+}
+
+[data-theme="dark"] .overview-card,
+[data-theme="dark"] .dashboard-panel,
+[data-theme="dark"] .settings-card,
+[data-theme="dark"] .my-plan-current-card,
+[data-theme="dark"] .my-plan-usage-card,
+[data-theme="dark"] .my-plan-builder-card,
+.theme-dark .overview-card,
+.theme-dark .dashboard-panel,
+.theme-dark .settings-card,
+.theme-dark .my-plan-current-card,
+.theme-dark .my-plan-usage-card,
+.theme-dark .my-plan-builder-card {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(var(--theme-primary-rgb), 0.08), transparent 28%),
+    linear-gradient(145deg, var(--theme-surface), var(--theme-surface-2)) !important;
+  border: 1px solid var(--theme-border) !important;
+  color: var(--theme-text) !important;
+  box-shadow: 0 22px 56px rgba(var(--theme-black-rgb), 0.26) !important;
+}
+
+[data-theme="dark"] .overview-icon,
+[data-theme="dark"] .panel-icon,
+.theme-dark .overview-icon,
+.theme-dark .panel-icon {
+  background:
+    linear-gradient(135deg, rgba(var(--theme-primary-rgb), 0.18), rgba(var(--theme-primary-rgb), 0.82)) !important;
+  box-shadow: 0 12px 26px rgba(var(--theme-black-rgb), 0.22) !important;
+}
+
+[data-theme="dark"] .cash-bar,
+.theme-dark .cash-bar,
+[data-theme="dark"] .metric-track > div,
+.theme-dark .metric-track > div,
+[data-theme="dark"] .my-plan-progress-track span,
+.theme-dark .my-plan-progress-track span {
+  background: linear-gradient(180deg, var(--theme-primary-hover) 0%, var(--theme-primary) 100%) !important;
+  box-shadow: 0 12px 24px rgba(var(--theme-black-rgb), 0.2) !important;
+}
+
+[data-theme="dark"] .settings-header p,
+[data-theme="dark"] .my-plan-kicker,
+[data-theme="dark"] .my-plan-price-row div strong,
+[data-theme="dark"] .my-plan-builder-footer em,
+.theme-dark .settings-header p,
+.theme-dark .my-plan-kicker,
+.theme-dark .my-plan-price-row div strong,
+.theme-dark .my-plan-builder-footer em {
+  color: var(--color-accent-text) !important;
+}
+
+[data-theme="dark"] .admin-sidebar-nav button:hover,
+[data-theme="dark"] .admin-sidebar-nav button.active,
+[data-theme="dark"] .admin-sidebar-nav a:hover,
+[data-theme="dark"] .admin-sidebar-nav a.active,
+.theme-dark .admin-sidebar-nav button:hover,
+.theme-dark .admin-sidebar-nav button.active,
+.theme-dark .admin-sidebar-nav a:hover,
+.theme-dark .admin-sidebar-nav a.active {
+  background: rgba(var(--theme-primary-rgb), 0.11) !important;
+  color: var(--theme-text) !important;
+}
+
+[data-theme="dark"] .settings-card input:focus,
+[data-theme="dark"] .settings-card textarea:focus,
+.theme-dark .settings-card input:focus,
+.theme-dark .settings-card textarea:focus {
+  border-color: rgba(var(--theme-primary-rgb), 0.58) !important;
+  box-shadow: 0 0 0 4px rgba(var(--theme-primary-rgb), 0.16) !important;
+}
+
+[data-theme="dark"] .settings-save-button,
+[data-theme="dark"] .my-plan-primary-btn,
+.theme-dark .settings-save-button,
+.theme-dark .my-plan-primary-btn {
+  background: var(--theme-gradient) !important;
+  box-shadow: 0 14px 28px rgba(var(--theme-black-rgb), 0.22) !important;
+}
+
+[data-theme="dark"] .page-builder,
+.theme-dark .page-builder,
+.page-builder.theme-dark {
+  --madar-bg: var(--theme-bg);
+  --madar-surface: var(--theme-surface);
+  --madar-surface-soft: var(--theme-surface-2);
+  --madar-text: var(--theme-text);
+  --madar-muted: var(--theme-text-soft);
+  --madar-navy: var(--theme-surface-3);
+  --madar-red: var(--theme-primary-hover);
+  --madar-red-dark: var(--theme-primary);
+  --madar-border: var(--theme-border);
+  --madar-border-strong: var(--theme-border-strong);
+  --madar-gradient: var(--theme-gradient);
+  --madar-gradient-hover: var(--theme-gradient-hover);
+  --madar-red-shadow: 0 12px 28px rgba(var(--theme-black-rgb), 0.22);
+}
+
+[data-theme="dark"] .page-builder .workspace-page,
+.theme-dark .page-builder .workspace-page,
+[data-theme="dark"] .page-builder .responses-results-page,
+[data-theme="dark"] .page-builder .analytics-dashboard-page,
+.theme-dark .page-builder .responses-results-page,
+.theme-dark .page-builder .analytics-dashboard-page {
+  background: var(--theme-bg) !important;
+}
+
+/* ============================================================
+   DARK MODE TEAL TEMPLATE FOR ADMIN
+   Removes red from dark-mode dashboard and builder accents.
+   ============================================================ */
+
+:root[data-theme="dark"],
+.theme-dark {
+  --admin-cyan: var(--theme-primary-hover);
+  --admin-red: var(--theme-primary-hover);
+  --admin-red-bright: var(--theme-primary-hover);
+  --admin-gradient: var(--theme-gradient);
+}
+
+[data-theme="dark"] .overview-icon,
+[data-theme="dark"] .panel-icon,
+[data-theme="dark"] .settings-save-button,
+[data-theme="dark"] .my-plan-primary-btn,
+[data-theme="dark"] .workspace-tabs button.active,
+[data-theme="dark"] .viewport-switcher button.active,
+[data-theme="dark"] .page-builder .workspace-tabs button.active,
+[data-theme="dark"] .page-builder .viewport-switcher button.active,
+.theme-dark .overview-icon,
+.theme-dark .panel-icon,
+.theme-dark .settings-save-button,
+.theme-dark .my-plan-primary-btn,
+.theme-dark .workspace-tabs button.active,
+.theme-dark .viewport-switcher button.active,
+.theme-dark .page-builder .workspace-tabs button.active,
+.theme-dark .page-builder .viewport-switcher button.active {
+  background: var(--theme-gradient) !important;
+  color: var(--theme-text-inverse) !important;
+  border-color: rgba(var(--theme-primary-rgb), 0.42) !important;
+  box-shadow: 0 14px 28px rgba(var(--theme-primary-rgb), 0.18) !important;
+}
+
+[data-theme="dark"] .cash-bar,
+.theme-dark .cash-bar,
+[data-theme="dark"] .metric-track > div,
+.theme-dark .metric-track > div,
+[data-theme="dark"] .my-plan-progress-track span,
+.theme-dark .my-plan-progress-track span {
+  background: linear-gradient(180deg, var(--theme-primary-hover) 0%, var(--theme-primary) 100%) !important;
+  box-shadow: 0 12px 24px rgba(var(--theme-primary-rgb), 0.18) !important;
+}
+
+[data-theme="dark"] .settings-header p,
+[data-theme="dark"] .my-plan-kicker,
+[data-theme="dark"] .my-plan-price-row div strong,
+[data-theme="dark"] .my-plan-builder-footer em,
+[data-theme="dark"] .overview-sub,
+[data-theme="dark"] .page-builder .muted,
+[data-theme="dark"] .page-builder .helper-text,
+.theme-dark .settings-header p,
+.theme-dark .my-plan-kicker,
+.theme-dark .my-plan-price-row div strong,
+.theme-dark .my-plan-builder-footer em,
+.theme-dark .overview-sub,
+.theme-dark .page-builder .muted,
+.theme-dark .page-builder .helper-text {
+  color: var(--color-accent-text) !important;
+}
+
+[data-theme="dark"] .settings-file-button,
+[data-theme="dark"] .settings-reset-password-button:hover,
+[data-theme="dark"] .my-plan-secondary-btn:hover,
+[data-theme="dark"] .my-plan-card-top strong,
+[data-theme="dark"] .my-plan-builder-card-top strong,
+.theme-dark .settings-file-button,
+.theme-dark .settings-reset-password-button:hover,
+.theme-dark .my-plan-secondary-btn:hover,
+.theme-dark .my-plan-card-top strong,
+.theme-dark .my-plan-builder-card-top strong {
+  background: rgba(var(--theme-primary-rgb), 0.14) !important;
+  border-color: rgba(var(--theme-primary-rgb), 0.28) !important;
+  color: var(--theme-text-muted) !important;
+}
+
+[data-theme="dark"] .my-plan-builder-card.active,
+.theme-dark .my-plan-builder-card.active,
+[data-theme="dark"] .page-builder .page-delete-modal,
+.theme-dark .page-builder .page-delete-modal {
+  border-color: rgba(var(--theme-primary-rgb), 0.42) !important;
+  box-shadow: 0 24px 58px rgba(var(--theme-primary-rgb), 0.12) !important;
+}
+
+[data-theme="dark"] .admin-sidebar-user,
+.theme-dark .admin-sidebar-user {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+[data-theme="dark"] .admin-sidebar-logout:hover,
+.theme-dark .admin-sidebar-logout:hover {
+  background: rgba(var(--theme-primary-rgb), 0.12) !important;
+  color: var(--theme-text-inverse) !important;
+}
+
+[data-theme="dark"] .page-builder,
+.theme-dark .page-builder,
+.page-builder.theme-dark {
+  --madar-red: var(--theme-primary-hover);
+  --madar-red-dark: var(--theme-primary);
+  --madar-gradient: var(--theme-gradient);
+  --madar-gradient-hover: var(--theme-gradient-hover);
+  --madar-red-shadow: 0 12px 28px rgba(var(--theme-primary-rgb), 0.18);
+}
+
+/* ============================================================
+   DARK MODE ADMIN RED PURGE
+   Final guard for old dashboard/PageBuilder hard-coded red.
+   ============================================================ */
+
+[data-theme="dark"] .admin-dashboard-page .gradient-text,
+[data-theme="dark"] .page-builder .gradient-text,
+.theme-dark .admin-dashboard-page .gradient-text,
+.theme-dark .page-builder .gradient-text {
+  --gradient-text-colors: var(--theme-primary-hover), var(--theme-primary-hover), var(--theme-surface) !important;
+}
+
+[data-theme="dark"] .admin-dashboard-page .primary-action,
+[data-theme="dark"] .admin-dashboard-page .small-action,
+[data-theme="dark"] .admin-dashboard-page .settings-save-button,
+[data-theme="dark"] .admin-dashboard-page .settings-file-button,
+[data-theme="dark"] .admin-dashboard-page .change-password-submit,
+[data-theme="dark"] .admin-dashboard-page .change-password-primary,
+[data-theme="dark"] .page-builder .primary-action,
+[data-theme="dark"] .page-builder .small-action,
+[data-theme="dark"] .page-builder :is(.workspace-page, .builder-sidebar, .builder-inspector, .builder-modal) button[type="submit"],
+[data-theme="dark"] .page-builder .builder-primary-button,
+[data-theme="dark"] .page-builder .publish-button,
+[data-theme="dark"] .page-builder .go-live-button,
+.theme-dark .admin-dashboard-page .primary-action,
+.theme-dark .admin-dashboard-page .small-action,
+.theme-dark .admin-dashboard-page .settings-save-button,
+.theme-dark .admin-dashboard-page .settings-file-button,
+.theme-dark .admin-dashboard-page .change-password-submit,
+.theme-dark .admin-dashboard-page .change-password-primary,
+.theme-dark .page-builder .primary-action,
+.theme-dark .page-builder .small-action,
+.theme-dark .page-builder :is(.workspace-page, .builder-sidebar, .builder-inspector, .builder-modal) button[type="submit"],
+.theme-dark .page-builder .builder-primary-button,
+.theme-dark .page-builder .publish-button,
+.theme-dark .page-builder .go-live-button {
+  background: var(--theme-gradient) !important;
+  border-color: rgba(var(--theme-primary-rgb), 0.42) !important;
+  color: var(--theme-text-inverse) !important;
+  box-shadow: 0 14px 28px rgba(var(--theme-primary-rgb), 0.18) !important;
+}
+
+[data-theme="dark"] .admin-dashboard-page .change-password-kicker,
+[data-theme="dark"] .admin-dashboard-page .change-password-card h2,
+[data-theme="dark"] .admin-dashboard-page .settings-file-hint,
+[data-theme="dark"] .admin-dashboard-page .page-builder-empty-icon,
+[data-theme="dark"] .admin-dashboard-page .admin-sidebar-nav button.active,
+[data-theme="dark"] .admin-dashboard-page .admin-sidebar-nav a.active,
+[data-theme="dark"] .page-builder .page-kind-label,
+[data-theme="dark"] .page-builder .section-kicker,
+[data-theme="dark"] .page-builder .field-type-label,
+[data-theme="dark"] .page-builder .analysis-kicker,
+.theme-dark .admin-dashboard-page .change-password-kicker,
+.theme-dark .admin-dashboard-page .change-password-card h2,
+.theme-dark .admin-dashboard-page .settings-file-hint,
+.theme-dark .admin-dashboard-page .page-builder-empty-icon,
+.theme-dark .admin-dashboard-page .admin-sidebar-nav button.active,
+.theme-dark .admin-dashboard-page .admin-sidebar-nav a.active,
+.theme-dark .page-builder .page-kind-label,
+.theme-dark .page-builder .section-kicker,
+.theme-dark .page-builder .field-type-label,
+.theme-dark .page-builder .analysis-kicker {
+  color: var(--color-accent-text) !important;
+}
+
+[data-theme="dark"] .admin-dashboard-page .change-password-card,
+[data-theme="dark"] .admin-dashboard-page .change-password-form,
+[data-theme="dark"] .admin-dashboard-page .settings-upload-zone,
+[data-theme="dark"] .page-builder .form-auth-card,
+[data-theme="dark"] .page-builder .subdomain-card,
+[data-theme="dark"] .page-builder .builder-modal,
+.theme-dark .admin-dashboard-page .change-password-card,
+.theme-dark .admin-dashboard-page .change-password-form,
+.theme-dark .admin-dashboard-page .settings-upload-zone,
+.theme-dark .page-builder .form-auth-card,
+.theme-dark .page-builder .subdomain-card,
+.theme-dark .page-builder .builder-modal {
+  border-color: rgba(var(--theme-primary-rgb), 0.2) !important;
+  background:
+    radial-gradient(circle at 100% 0%, rgba(var(--theme-primary-rgb), 0.08), transparent 28%),
+    linear-gradient(145deg, var(--theme-surface), var(--theme-surface-2)) !important;
+  box-shadow: 0 22px 56px rgba(var(--theme-black-rgb), 0.24) !important;
+}
+
+[data-theme="dark"] .admin-dashboard-page input:focus,
+[data-theme="dark"] .admin-dashboard-page textarea:focus,
+[data-theme="dark"] .page-builder input:not(.builder-canvas *):focus,
+[data-theme="dark"] .page-builder textarea:not(.builder-canvas *):focus,
+[data-theme="dark"] .page-builder select:not(.builder-canvas *):focus,
+.theme-dark .admin-dashboard-page input:focus,
+.theme-dark .admin-dashboard-page textarea:focus,
+.theme-dark .page-builder input:not(.builder-canvas *):focus,
+.theme-dark .page-builder textarea:not(.builder-canvas *):focus,
+.theme-dark .page-builder select:not(.builder-canvas *):focus {
+  border-color: rgba(var(--theme-primary-rgb), 0.58) !important;
+  box-shadow: 0 0 0 4px rgba(var(--theme-primary-rgb), 0.16) !important;
+}
+
+[data-theme="dark"] .admin-dashboard-page [style*="var(--theme-primary)"],
+[data-theme="dark"] .page-builder [style*="var(--theme-primary)"]:not(.builder-canvas *),
+.theme-dark .admin-dashboard-page [style*="var(--theme-primary)"],
+.theme-dark .page-builder [style*="var(--theme-primary)"]:not(.builder-canvas *) {
+  color: var(--color-accent-text) !important;
+  background: rgba(var(--theme-primary-rgb), 0.12) !important;
+  border-color: rgba(var(--theme-primary-rgb), 0.32) !important;
+  box-shadow: none !important;
+}
+
+[data-theme="dark"] .admin-dashboard-page .gradient-text,
+[data-theme="dark"] .admin-dashboard-page .gradient-text[style*="var(--theme-primary)"],
+[data-theme="dark"] .page-builder .gradient-text,
+[data-theme="dark"] .page-builder .gradient-text[style*="var(--theme-primary)"],
+.theme-dark .admin-dashboard-page .gradient-text,
+.theme-dark .admin-dashboard-page .gradient-text[style*="var(--theme-primary)"],
+.theme-dark .page-builder .gradient-text,
+.theme-dark .page-builder .gradient-text[style*="var(--theme-primary)"] {
+  color: transparent !important;
+  background-color: transparent !important;
+  background-image: linear-gradient(
+    var(--gradient-text-angle, 90deg),
+    var(--gradient-text-colors, var(--theme-primary-hover), var(--theme-primary-hover), var(--theme-surface))
+  ) !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+}
+
+/* ============================================================
+   DASHBOARD RED PURGE: PAGE-SPECIFIC PANELS
+   Covers My Plan, Settings, sidebar badges, and remaining cards.
+   ============================================================ */
+
+[data-theme="dark"] .my-plan-feature-card,
+[data-theme="dark"] .my-plan-page[dir="rtl"] .my-plan-feature-card,
+[data-theme="dark"] .settings-profile-cover,
+[data-theme="dark"] .settings-card .settings-profile-cover,
+.theme-dark .my-plan-feature-card,
+.theme-dark .my-plan-page[dir="rtl"] .my-plan-feature-card,
+.theme-dark .settings-profile-cover,
+.theme-dark .settings-card .settings-profile-cover {
+  background:
+    radial-gradient(circle at 84% 20%, rgba(var(--theme-primary-rgb), 0.2), transparent 28%),
+    radial-gradient(circle at 12% 18%, rgba(var(--theme-primary-rgb), 0.22), transparent 30%),
+    linear-gradient(135deg, var(--theme-surface) 0%, var(--theme-surface-2) 52%, var(--theme-primary-hover) 100%) !important;
+  border-color: rgba(var(--theme-primary-rgb), 0.22) !important;
+  color: var(--theme-text-inverse) !important;
+  box-shadow: 0 22px 56px rgba(var(--theme-black-rgb), 0.24) !important;
+}
+
+[data-theme="dark"] .my-plan-current-card::after,
+.theme-dark .my-plan-current-card::after {
+  background: var(--theme-primary-hover) !important;
+  opacity: 0.12 !important;
+}
+
+[data-theme="dark"] .my-plan-builder-icon,
+[data-theme="dark"] .my-plan-builder-mini-icon,
+[data-theme="dark"] .settings-profile-avatar span,
+[data-theme="dark"] .settings-website-card .settings-profile-avatar span,
+[data-theme="dark"] .admin-sidebar-avatar,
+[data-theme="dark"] .admin-sidebar-icon,
+[data-theme="dark"] .admin-sidebar-brand-logo,
+[data-theme="dark"] .overview-icon,
+[data-theme="dark"] .panel-icon,
+.theme-dark .my-plan-builder-icon,
+.theme-dark .my-plan-builder-mini-icon,
+.theme-dark .settings-profile-avatar span,
+.theme-dark .settings-website-card .settings-profile-avatar span,
+.theme-dark .admin-sidebar-avatar,
+.theme-dark .admin-sidebar-icon,
+.theme-dark .admin-sidebar-brand-logo,
+.theme-dark .overview-icon,
+.theme-dark .panel-icon {
+  background:
+    radial-gradient(circle at 28% 12%, rgba(var(--theme-text-inverse-rgb), 0.2), transparent 36%),
+    var(--theme-gradient) !important;
+  color: var(--theme-bg) !important;
+  border-color: rgba(var(--theme-primary-rgb), 0.32) !important;
+  box-shadow: 0 12px 26px rgba(var(--theme-primary-rgb), 0.18) !important;
+}
+
+[data-theme="dark"] .admin-sidebar-icon,
+.theme-dark .admin-sidebar-icon {
+  color: var(--theme-text-inverse) !important;
+}
+
+[data-theme="dark"] .admin-sidebar-avatar,
+.theme-dark .admin-sidebar-avatar,
+body.theme-dark .admin-sidebar-avatar {
+  color: var(--theme-text-inverse) !important;
+}
+
+[data-theme="dark"] .my-plan-card-top strong,
+[data-theme="dark"] .my-plan-builder-card-top strong,
+[data-theme="dark"] .my-plan-price-row div,
+[data-theme="dark"] .my-plan-price-row div strong,
+[data-theme="dark"] .my-plan-builder-footer em,
+[data-theme="dark"] .settings-header p,
+[data-theme="dark"] .settings-field-error,
+[data-theme="dark"] .settings-toast-error span,
+[data-theme="dark"] .page-builder-empty-icon,
+[data-theme="dark"] .admin-sidebar-user-info strong,
+.theme-dark .my-plan-card-top strong,
+.theme-dark .my-plan-builder-card-top strong,
+.theme-dark .my-plan-price-row div,
+.theme-dark .my-plan-price-row div strong,
+.theme-dark .my-plan-builder-footer em,
+.theme-dark .settings-header p,
+.theme-dark .settings-field-error,
+.theme-dark .settings-toast-error span,
+.theme-dark .page-builder-empty-icon,
+.theme-dark .admin-sidebar-user-info strong {
+  color: var(--color-accent-text) !important;
+}
+
+[data-theme="dark"] .my-plan-card-top strong,
+[data-theme="dark"] .my-plan-builder-card-top strong,
+[data-theme="dark"] .settings-file-button,
+[data-theme="dark"] .settings-reset-password-button,
+[data-theme="dark"] .settings-toast-error,
+.theme-dark .my-plan-card-top strong,
+.theme-dark .my-plan-builder-card-top strong,
+.theme-dark .settings-file-button,
+.theme-dark .settings-reset-password-button,
+.theme-dark .settings-toast-error {
+  background: rgba(var(--theme-primary-rgb), 0.12) !important;
+  border-color: rgba(var(--theme-primary-rgb), 0.28) !important;
+  color: var(--theme-text-muted) !important;
+  box-shadow: none !important;
+}
+
+[data-theme="dark"] .my-plan-builder-card.active,
+[data-theme="dark"] .settings-card input.field-has-error,
+[data-theme="dark"] .settings-card textarea.field-has-error,
+.theme-dark .my-plan-builder-card.active,
+.theme-dark .settings-card input.field-has-error,
+.theme-dark .settings-card textarea.field-has-error {
+  border-color: rgba(var(--theme-primary-rgb), 0.48) !important;
+  background: rgba(var(--theme-primary-rgb), 0.08) !important;
+  box-shadow: 0 0 0 4px rgba(var(--theme-primary-rgb), 0.12) !important;
+}
+
+[data-theme="dark"] .my-plan-progress-track span,
+[data-theme="dark"] .settings-toast-success .settings-toast-content::before,
+.theme-dark .my-plan-progress-track span,
+.theme-dark .settings-toast-success .settings-toast-content::before {
+  background: var(--theme-gradient-hover) !important;
+  box-shadow: 0 8px 18px rgba(var(--theme-primary-rgb), 0.16) !important;
+}
+
+/* ============================================================
+   PAGE BUILDER DARK HOVERS
+   Keeps modal cards and builder controls on the blue template.
+   ============================================================ */
+
+[data-theme="dark"] .page-builder .builder-modal .starter-card:hover,
+[data-theme="dark"] .page-builder .builder-modal .starter-card:focus-visible,
+[data-theme="dark"] .page-builder .builder-modal .section-card:hover,
+[data-theme="dark"] .page-builder .builder-modal .section-card:focus-visible,
+.theme-dark .page-builder .builder-modal .starter-card:hover,
+.theme-dark .page-builder .builder-modal .starter-card:focus-visible,
+.theme-dark .page-builder .builder-modal .section-card:hover,
+.theme-dark .page-builder .builder-modal .section-card:focus-visible,
+.page-builder.theme-dark .builder-modal .starter-card:hover,
+.page-builder.theme-dark .builder-modal .starter-card:focus-visible,
+.page-builder.theme-dark .builder-modal .section-card:hover,
+.page-builder.theme-dark .builder-modal .section-card:focus-visible {
+  background:
+    radial-gradient(circle at 88% 12%, rgba(var(--theme-primary-rgb), 0.22), transparent 32%),
+    linear-gradient(135deg, var(--theme-surface) 0%, var(--theme-surface-2) 100%) !important;
+  border-color: rgba(var(--theme-primary-rgb), 0.58) !important;
+  color: var(--theme-text-inverse) !important;
+  box-shadow:
+    0 18px 42px rgba(var(--theme-primary-rgb), 0.18),
+    inset 0 1px 0 rgba(var(--theme-text-inverse-rgb), 0.08) !important;
+  transform: translateY(-2px) !important;
+}
+
+[data-theme="dark"] .page-builder .builder-modal .starter-card:hover span,
+[data-theme="dark"] .page-builder .builder-modal .starter-card:focus-visible span,
+[data-theme="dark"] .page-builder .builder-modal .section-card:hover span,
+[data-theme="dark"] .page-builder .builder-modal .section-card:focus-visible span,
+.theme-dark .page-builder .builder-modal .starter-card:hover span,
+.theme-dark .page-builder .builder-modal .starter-card:focus-visible span,
+.theme-dark .page-builder .builder-modal .section-card:hover span,
+.theme-dark .page-builder .builder-modal .section-card:focus-visible span,
+.page-builder.theme-dark .builder-modal .starter-card:hover span,
+.page-builder.theme-dark .builder-modal .starter-card:focus-visible span,
+.page-builder.theme-dark .builder-modal .section-card:hover span,
+.page-builder.theme-dark .builder-modal .section-card:focus-visible span {
+  color: var(--color-accent-text) !important;
+}
+
+[data-theme="dark"] .page-builder .builder-modal .starter-card:hover p,
+[data-theme="dark"] .page-builder .builder-modal .starter-card:focus-visible p,
+[data-theme="dark"] .page-builder .builder-modal .section-card:hover p,
+[data-theme="dark"] .page-builder .builder-modal .section-card:focus-visible p,
+.theme-dark .page-builder .builder-modal .starter-card:hover p,
+.theme-dark .page-builder .builder-modal .starter-card:focus-visible p,
+.theme-dark .page-builder .builder-modal .section-card:hover p,
+.theme-dark .page-builder .builder-modal .section-card:focus-visible p,
+.page-builder.theme-dark .builder-modal .starter-card:hover p,
+.page-builder.theme-dark .builder-modal .starter-card:focus-visible p,
+.page-builder.theme-dark .builder-modal .section-card:hover p,
+.page-builder.theme-dark .builder-modal .section-card:focus-visible p {
+  color: var(--theme-text-muted) !important;
+}
+
+[data-theme="dark"] .page-builder .builder-modal .starter-card:hover i,
+[data-theme="dark"] .page-builder .builder-modal .starter-card:focus-visible i,
+.theme-dark .page-builder .builder-modal .starter-card:hover i,
+.theme-dark .page-builder .builder-modal .starter-card:focus-visible i,
+.page-builder.theme-dark .builder-modal .starter-card:hover i,
+.page-builder.theme-dark .builder-modal .starter-card:focus-visible i {
+  background: rgba(var(--theme-primary-rgb), 0.14) !important;
+  border-color: rgba(var(--theme-primary-rgb), 0.34) !important;
+  color: var(--theme-text-inverse) !important;
+}
+
+[data-theme="dark"] .page-builder .builder-topbar-actions > button:hover,
+[data-theme="dark"] .page-builder .compact-actions button:hover,
+[data-theme="dark"] .page-builder .workspace-header button:hover,
+[data-theme="dark"] .page-builder .question-type-buttons button:hover,
+[data-theme="dark"] .page-builder .responses-page-header button:hover,
+[data-theme="dark"] .page-builder .publish-actions button:hover,
+[data-theme="dark"] .page-builder .editor-card-header button:hover,
+[data-theme="dark"] .page-builder .builder-modal > .modal-header button:hover,
+.theme-dark .page-builder .builder-topbar-actions > button:hover,
+.theme-dark .page-builder .compact-actions button:hover,
+.theme-dark .page-builder .workspace-header button:hover,
+.theme-dark .page-builder .question-type-buttons button:hover,
+.theme-dark .page-builder .responses-page-header button:hover,
+.theme-dark .page-builder .publish-actions button:hover,
+.theme-dark .page-builder .editor-card-header button:hover,
+.theme-dark .page-builder .builder-modal > .modal-header button:hover,
+.page-builder.theme-dark .builder-topbar-actions > button:hover,
+.page-builder.theme-dark .compact-actions button:hover,
+.page-builder.theme-dark .workspace-header button:hover,
+.page-builder.theme-dark .question-type-buttons button:hover,
+.page-builder.theme-dark .responses-page-header button:hover,
+.page-builder.theme-dark .publish-actions button:hover,
+.page-builder.theme-dark .editor-card-header button:hover,
+.page-builder.theme-dark .builder-modal > .modal-header button:hover {
+  background: rgba(var(--theme-primary-rgb), 0.14) !important;
+  border-color: rgba(var(--theme-primary-rgb), 0.3) !important;
+  color: var(--color-accent-text) !important;
+  box-shadow: 0 12px 24px rgba(var(--theme-primary-rgb), 0.12) !important;
+}
+
+/* ============================================================
+   DASHBOARD UPTIME RING
+   Removes the last red circular status accent in dark mode.
+   ============================================================ */
+
+[data-theme="dark"] .uptime-panel,
+.theme-dark .uptime-panel {
+  background:
+    radial-gradient(circle at 50% 20%, rgba(var(--theme-primary-rgb), 0.1), transparent 42%),
+    linear-gradient(145deg, var(--theme-surface), var(--theme-surface-2)) !important;
+  border-color: rgba(var(--theme-primary-rgb), 0.22) !important;
+}
+
+[data-theme="dark"] .uptime-circle,
+.theme-dark .uptime-circle {
+  background:
+    linear-gradient(var(--theme-surface), var(--theme-surface)) padding-box,
+    conic-gradient(var(--theme-primary-hover) 0 99.98%, rgba(var(--theme-primary-rgb), 0.18) 99.98% 100%) border-box !important;
+  border-color: transparent !important;
+  box-shadow:
+    0 0 0 1px rgba(var(--theme-primary-rgb), 0.1),
+    0 18px 42px rgba(var(--theme-primary-rgb), 0.14),
+    inset 0 0 34px rgba(var(--theme-primary-rgb), 0.08) !important;
+}
+
+[data-theme="dark"] .uptime-circle strong,
+.theme-dark .uptime-circle strong {
+  color: var(--theme-text-inverse) !important;
+  text-shadow: 0 0 18px rgba(var(--theme-primary-rgb), 0.2) !important;
+}
+
+[data-theme="dark"] .uptime-circle span,
+[data-theme="dark"] .uptime-panel p,
+.theme-dark .uptime-circle span,
+.theme-dark .uptime-panel p {
+  color: var(--theme-text-muted) !important;
+}
+
+[data-theme="dark"] .uptime-panel h2,
+.theme-dark .uptime-panel h2 {
+  color: var(--color-accent-text) !important;
+}
+
+/* ============================================================
+   DARK MODE BLUE CONSISTENCY FINAL PASS
+   Keeps every dashboard/PageBuilder route on the same blue
+   template. This intentionally comes last because older files
+   still contain red/brown dark-mode paint.
+   ============================================================ */
+
+:root[data-theme="dark"],
+body.theme-dark,
+.theme-dark {
+  --admin-bg: var(--theme-bg);
+  --admin-surface: var(--theme-surface);
+  --admin-surface-2: var(--theme-surface-2);
+  --admin-surface-3: var(--theme-surface-3);
+  --admin-border: var(--theme-border);
+  --admin-border-strong: var(--theme-border-strong);
+  --admin-text: var(--theme-text);
+  --admin-muted: var(--theme-text-soft);
+  --admin-soft: var(--theme-text-muted);
+  --admin-cyan: var(--theme-primary-hover);
+  --admin-navy: var(--theme-surface-3);
+  --admin-red: var(--theme-primary-hover);
+  --admin-red-bright: var(--theme-primary-hover);
+  --admin-gradient: var(--theme-gradient);
+  --madar-bg: var(--theme-bg);
+  --madar-surface: var(--theme-surface);
+  --madar-surface-soft: var(--theme-surface-2);
+  --madar-text: var(--theme-text);
+  --madar-muted: var(--theme-text-soft);
+  --madar-navy: var(--theme-surface-3);
+  --madar-red: var(--theme-primary-hover);
+  --madar-red-dark: var(--theme-primary);
+  --madar-border: var(--theme-border);
+  --madar-border-strong: var(--theme-border-strong);
+  --madar-gradient: var(--theme-gradient);
+  --madar-gradient-hover: var(--theme-gradient-hover);
+  --madar-button-shadow: 0 14px 28px rgba(var(--theme-primary-rgb), 0.18);
+  --madar-button-shadow-hover: 0 18px 34px rgba(var(--theme-primary-rgb), 0.22);
+  --madar-red-shadow: 0 12px 28px rgba(var(--theme-primary-rgb), 0.18);
+}
+
+[data-theme="dark"] .admin-dashboard-layout,
+body.theme-dark .admin-dashboard-layout,
+.theme-dark .admin-dashboard-layout,
+[data-theme="dark"] .page-builder,
+body.theme-dark .page-builder,
+.theme-dark .page-builder,
+.page-builder.theme-dark {
+  background: var(--theme-bg) !important;
+  color: var(--theme-text) !important;
+}
+
+[data-theme="dark"] .admin-dashboard-page,
+body.theme-dark .admin-dashboard-page,
+.theme-dark .admin-dashboard-page,
+[data-theme="dark"] .page-builder .workspace-page,
+body.theme-dark .page-builder .workspace-page,
+.theme-dark .page-builder .workspace-page,
+.page-builder.theme-dark .workspace-page,
+[data-theme="dark"] .page-builder .daw-page,
+body.theme-dark .page-builder .daw-page,
+.theme-dark .page-builder .daw-page {
+  background:
+    radial-gradient(circle at top right, rgba(var(--theme-primary-rgb), 0.12), transparent 30%),
+    linear-gradient(135deg, var(--theme-bg) 0%, var(--theme-bg-soft) 58%, var(--theme-bg) 100%) !important;
+  color: var(--theme-text) !important;
+}
+
+[data-theme="dark"] .page-builder,
+body.theme-dark .page-builder,
+.theme-dark .page-builder,
+.page-builder.theme-dark {
+  --daw-primary-bg: var(--theme-gradient);
+  --daw-primary-bg-hover: var(--theme-gradient-hover);
+  --daw-primary-shadow: var(--app-primary-shadow);
+  --daw-secondary-bg: var(--theme-surface-2);
+  --daw-secondary-bg-hover: var(--theme-primary-soft);
+  --daw-secondary-border: var(--theme-border);
+  --daw-secondary-text: var(--theme-text-muted);
+  --daw-tab-bg: var(--theme-surface-2);
+  --daw-tab-border: var(--theme-border);
+  --daw-tab-active-bg: var(--theme-primary-soft);
+  --daw-tab-active-border: rgba(var(--theme-primary-rgb), 0.38);
+  --daw-tab-active-text: var(--theme-primary-hover);
+  --daw-card-bg: var(--theme-surface);
+  --daw-card-border: var(--theme-border);
+  --daw-soft-bg: var(--theme-surface-2);
+  --daw-text: var(--theme-text);
+  --daw-muted: var(--theme-text-soft);
+  --daw-red: var(--theme-primary-hover);
+  --daw-red-dark: var(--theme-primary);
+}
+
+[data-theme="dark"] .overview-card,
+[data-theme="dark"] .dashboard-panel,
+[data-theme="dark"] .settings-card,
+[data-theme="dark"] .my-plan-current-card,
+[data-theme="dark"] .my-plan-usage-card,
+[data-theme="dark"] .my-plan-builder-card,
+[data-theme="dark"] .page-builder .builder-sidebar,
+[data-theme="dark"] .page-builder .builder-inspector,
+[data-theme="dark"] .page-builder .workspace-header,
+[data-theme="dark"] .page-builder .object-list,
+[data-theme="dark"] .page-builder .form-editor,
+[data-theme="dark"] .page-builder .form-side-settings,
+[data-theme="dark"] .page-builder .responses-page-card,
+[data-theme="dark"] .page-builder .dashboard-panel,
+[data-theme="dark"] .page-builder .publish-card,
+[data-theme="dark"] .page-builder .automation-card,
+[data-theme="dark"] .page-builder .role-card,
+[data-theme="dark"] .page-builder .theme-control,
+[data-theme="dark"] .page-builder .daw-card,
+[data-theme="dark"] .page-builder .daw-stepper button,
+[data-theme="dark"] .page-builder .daw-source-tabs button,
+[data-theme="dark"] .page-builder .daw-review-sidebar button,
+[data-theme="dark"] .page-builder .daw-group-grid button,
+[data-theme="dark"] .page-builder .daw-flow-actions,
+[data-theme="dark"] .page-builder .daw-report-submit-row,
+[data-theme="dark"] .page-builder .daw-flow-toast,
+[data-theme="dark"] .page-builder .daw-inspection-box,
+[data-theme="dark"] .page-builder .daw-report-summary,
+[data-theme="dark"] .page-builder .daw-report-block,
+[data-theme="dark"] .page-builder .daw-friendly-panel,
+[data-theme="dark"] .page-builder .daw-review-summary-grid article,
+[data-theme="dark"] .page-builder .daw-dataset-stats article,
+[data-theme="dark"] .page-builder .daw-kpi-grid article,
+[data-theme="dark"] .page-builder .daw-object-grid article,
+[data-theme="dark"] .page-builder .daw-chart-list article,
+body.theme-dark .overview-card,
+body.theme-dark .dashboard-panel,
+body.theme-dark .settings-card,
+body.theme-dark .my-plan-current-card,
+body.theme-dark .my-plan-usage-card,
+body.theme-dark .my-plan-builder-card,
+body.theme-dark .page-builder .builder-sidebar,
+body.theme-dark .page-builder .builder-inspector,
+body.theme-dark .page-builder .workspace-header,
+body.theme-dark .page-builder .object-list,
+body.theme-dark .page-builder .form-editor,
+body.theme-dark .page-builder .form-side-settings,
+body.theme-dark .page-builder .responses-page-card,
+body.theme-dark .page-builder .dashboard-panel,
+body.theme-dark .page-builder .publish-card,
+body.theme-dark .page-builder .automation-card,
+body.theme-dark .page-builder .role-card,
+body.theme-dark .page-builder .theme-control,
+body.theme-dark .page-builder .daw-card,
+body.theme-dark .page-builder .daw-stepper button,
+body.theme-dark .page-builder .daw-source-tabs button,
+body.theme-dark .page-builder .daw-review-sidebar button,
+body.theme-dark .page-builder .daw-group-grid button,
+body.theme-dark .page-builder .daw-flow-actions,
+body.theme-dark .page-builder .daw-report-submit-row,
+body.theme-dark .page-builder .daw-flow-toast,
+body.theme-dark .page-builder .daw-inspection-box,
+body.theme-dark .page-builder .daw-report-summary,
+body.theme-dark .page-builder .daw-report-block,
+body.theme-dark .page-builder .daw-friendly-panel,
+body.theme-dark .page-builder .daw-review-summary-grid article,
+body.theme-dark .page-builder .daw-dataset-stats article,
+body.theme-dark .page-builder .daw-kpi-grid article,
+body.theme-dark .page-builder .daw-object-grid article,
+body.theme-dark .page-builder .daw-chart-list article,
+.theme-dark .overview-card,
+.theme-dark .dashboard-panel,
+.theme-dark .settings-card,
+.theme-dark .my-plan-current-card,
+.theme-dark .my-plan-usage-card,
+.theme-dark .my-plan-builder-card,
+.theme-dark .page-builder .builder-sidebar,
+.theme-dark .page-builder .builder-inspector,
+.theme-dark .page-builder .workspace-header,
+.theme-dark .page-builder .object-list,
+.theme-dark .page-builder .form-editor,
+.theme-dark .page-builder .form-side-settings,
+.theme-dark .page-builder .responses-page-card,
+.theme-dark .page-builder .dashboard-panel,
+.theme-dark .page-builder .publish-card,
+.theme-dark .page-builder .automation-card,
+.theme-dark .page-builder .role-card,
+.theme-dark .page-builder .theme-control,
+.theme-dark .page-builder .daw-card,
+.theme-dark .page-builder .daw-stepper button,
+.theme-dark .page-builder .daw-source-tabs button,
+.theme-dark .page-builder .daw-review-sidebar button,
+.theme-dark .page-builder .daw-group-grid button,
+.theme-dark .page-builder .daw-flow-actions,
+.theme-dark .page-builder .daw-report-submit-row,
+.theme-dark .page-builder .daw-flow-toast,
+.theme-dark .page-builder .daw-inspection-box,
+.theme-dark .page-builder .daw-report-summary,
+.theme-dark .page-builder .daw-report-block,
+.theme-dark .page-builder .daw-friendly-panel,
+.theme-dark .page-builder .daw-review-summary-grid article,
+.theme-dark .page-builder .daw-dataset-stats article,
+.theme-dark .page-builder .daw-kpi-grid article,
+.theme-dark .page-builder .daw-object-grid article,
+.theme-dark .page-builder .daw-chart-list article {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(var(--theme-primary-rgb), 0.08), transparent 28%),
+    linear-gradient(145deg, var(--theme-surface), var(--theme-surface-2)) !important;
+  border-color: var(--theme-border) !important;
+  color: var(--theme-text) !important;
+  box-shadow: 0 22px 56px rgba(var(--theme-black-rgb), 0.24) !important;
+}
+
+[data-theme="dark"] .page-builder .daw-flow-actions button.primary,
+[data-theme="dark"] .page-builder .daw-flow-actions button[type="submit"],
+[data-theme="dark"] .page-builder .daw-primary,
+body.theme-dark .page-builder .daw-flow-actions button.primary,
+body.theme-dark .page-builder .daw-flow-actions button[type="submit"],
+body.theme-dark .page-builder .daw-primary,
+.theme-dark .page-builder .daw-flow-actions button.primary,
+.theme-dark .page-builder .daw-flow-actions button[type="submit"],
+.theme-dark .page-builder .daw-primary {
+  background: var(--theme-gradient) !important;
+  border-color: rgba(var(--theme-primary-rgb), 0.42) !important;
+  color: var(--theme-text-inverse) !important;
+  box-shadow: 0 14px 28px rgba(var(--theme-primary-rgb), 0.18) !important;
+}
+
+[data-theme="dark"] .page-builder .daw-source-tabs button.active,
+[data-theme="dark"] .page-builder .daw-review-sidebar button.active,
+[data-theme="dark"] .page-builder .daw-group-grid button.active,
+[data-theme="dark"] .page-builder .daw-stepper button.active,
+body.theme-dark .page-builder .daw-source-tabs button.active,
+body.theme-dark .page-builder .daw-review-sidebar button.active,
+body.theme-dark .page-builder .daw-group-grid button.active,
+body.theme-dark .page-builder .daw-stepper button.active,
+.theme-dark .page-builder .daw-source-tabs button.active,
+.theme-dark .page-builder .daw-review-sidebar button.active,
+.theme-dark .page-builder .daw-group-grid button.active,
+.theme-dark .page-builder .daw-stepper button.active {
+  background: var(--theme-surface-2) !important;
+  border-color: var(--theme-border-strong) !important;
+  color: var(--theme-text) !important;
+  box-shadow: inset 3px 0 0 var(--theme-primary) !important;
+}
+
+[data-theme="dark"] .page-builder .daw-stepper button.active span,
+body.theme-dark .page-builder .daw-stepper button.active span,
+.theme-dark .page-builder .daw-stepper button.active span {
+  background: rgba(var(--theme-shadow-rgb), 0.34) !important;
+  color: var(--theme-text-inverse) !important;
+}
+
+[data-theme="dark"] .page-builder .daw-row-index-head,
+[data-theme="dark"] .page-builder .daw-row-index-cell,
+[data-theme="dark"] .page-builder .daw-warning-list,
+body.theme-dark .page-builder .daw-row-index-head,
+body.theme-dark .page-builder .daw-row-index-cell,
+body.theme-dark .page-builder .daw-warning-list,
+.theme-dark .page-builder .daw-row-index-head,
+.theme-dark .page-builder .daw-row-index-cell,
+.theme-dark .page-builder .daw-warning-list {
+  background: rgba(var(--theme-primary-rgb), 0.1) !important;
+  border-color: rgba(var(--theme-primary-rgb), 0.24) !important;
+  color: var(--theme-text-muted) !important;
+}
+
+[data-theme="dark"] .admin-dashboard-page [style*="var(--theme-primary)"],
+[data-theme="dark"] .admin-dashboard-page [style*="var(--theme-primary-hover)"],
+[data-theme="dark"] .page-builder [style*="var(--theme-primary)"]:not(.builder-canvas *),
+[data-theme="dark"] .page-builder [style*="var(--theme-primary-hover)"]:not(.builder-canvas *),
+body.theme-dark .admin-dashboard-page [style*="var(--theme-primary)"],
+body.theme-dark .admin-dashboard-page [style*="var(--theme-primary-hover)"],
+body.theme-dark .page-builder [style*="var(--theme-primary)"]:not(.builder-canvas *),
+body.theme-dark .page-builder [style*="var(--theme-primary-hover)"]:not(.builder-canvas *) {
+  color: var(--color-accent-text) !important;
+  background: rgba(var(--theme-primary-rgb), 0.12) !important;
+  border-color: rgba(var(--theme-primary-rgb), 0.32) !important;
+  box-shadow: none !important;
+}
+
+/* ============================================================
+   RESPONSIVE ADMIN DARK THEME
+   ============================================================ */
+
+[data-theme="dark"] .dashboard-mobile-menu-button,
+body.theme-dark .dashboard-mobile-menu-button,
+.theme-dark .dashboard-mobile-menu-button {
+  background:
+    linear-gradient(145deg, var(--theme-surface), var(--theme-surface-2)) !important;
+  border: 1px solid var(--theme-border-strong) !important;
+  color: var(--theme-text-muted) !important;
+  box-shadow:
+    0 14px 30px rgba(var(--theme-black-rgb), 0.28),
+    inset 0 1px 0 rgba(var(--theme-text-inverse-rgb), 0.06) !important;
+}
+
+[data-theme="dark"] .dashboard-mobile-menu-button:hover,
+[data-theme="dark"] .dashboard-mobile-menu-button:focus-visible,
+body.theme-dark .dashboard-mobile-menu-button:hover,
+body.theme-dark .dashboard-mobile-menu-button:focus-visible,
+.theme-dark .dashboard-mobile-menu-button:hover,
+.theme-dark .dashboard-mobile-menu-button:focus-visible {
+  background: rgba(var(--theme-primary-rgb), 0.14) !important;
+  border-color: rgba(var(--theme-primary-rgb), 0.34) !important;
+  color: var(--theme-text-inverse) !important;
+}
+
+[data-theme="dark"] .dashboard-sidebar-backdrop,
+body.theme-dark .dashboard-sidebar-backdrop,
+.theme-dark .dashboard-sidebar-backdrop {
+  background: rgba(var(--theme-shadow-rgb), 0.68) !important;
+}
+
+[data-theme="dark"] .admin-sidebar,
+body.theme-dark .admin-sidebar,
+.theme-dark .admin-sidebar {
+  background: var(--theme-bg) !important;
+  border-color: var(--theme-border) !important;
+}
+
+[data-theme="dark"] .admin-sidebar-admin-badge,
+body.theme-dark .admin-sidebar-admin-badge,
+.theme-dark .admin-sidebar-admin-badge {
+  background: rgba(var(--theme-primary-rgb), 0.14) !important;
+  border: 1px solid rgba(var(--theme-primary-rgb), 0.26) !important;
+  color: var(--color-accent-text) !important;
+  box-shadow: none !important;
+}
+
+[data-theme="dark"] .admin-sidebar-admin-badge svg,
+body.theme-dark .admin-sidebar-admin-badge svg,
+.theme-dark .admin-sidebar-admin-badge svg {
+  color: var(--color-accent-text) !important;
+}
+
+@media (max-width: 700px) {
+  [data-theme="dark"] .admin-sidebar,
+  body.theme-dark .admin-sidebar,
+  .theme-dark .admin-sidebar {
+    background: var(--theme-bg) !important;
+    border-right-color: var(--theme-border) !important;
+    border-left-color: var(--theme-border) !important;
+  }
+
+  [data-theme="dark"] .admin-dashboard-page,
+  body.theme-dark .admin-dashboard-page,
+  .theme-dark .admin-dashboard-page {
+    background:
+      radial-gradient(circle at top right, rgba(var(--theme-primary-rgb), 0.12), transparent 30%),
+      linear-gradient(135deg, var(--theme-bg) 0%, var(--theme-bg-soft) 58%, var(--theme-bg) 100%) !important;
+  }
+}
+
+[data-theme="dark"] .admin-sidebar-theme-row,
+[data-theme="dark"] .admin-dashboard-layout:has(.page-builder) .admin-sidebar-theme-row,
+body.theme-dark .admin-sidebar-theme-row,
+body.theme-dark .admin-dashboard-layout:has(.page-builder) .admin-sidebar-theme-row,
+.theme-dark .admin-sidebar-theme-row,
+.theme-dark .admin-dashboard-layout:has(.page-builder) .admin-sidebar-theme-row {
+  color: var(--theme-text-muted) !important;
+}
+
+[data-theme="dark"] .admin-sidebar-theme-row:hover,
+[data-theme="dark"] .admin-dashboard-layout:has(.page-builder) .admin-sidebar-theme-row:hover,
+body.theme-dark .admin-sidebar-theme-row:hover,
+body.theme-dark .admin-dashboard-layout:has(.page-builder) .admin-sidebar-theme-row:hover,
+.theme-dark .admin-sidebar-theme-row:hover,
+.theme-dark .admin-dashboard-layout:has(.page-builder) .admin-sidebar-theme-row:hover {
+  background: rgba(var(--theme-primary-rgb), 0.12) !important;
+  color: var(--theme-text-inverse) !important;
+}
+
+[data-theme="dark"] .admin-sidebar-theme-row .theme-toggle-label,
+[data-theme="dark"] .admin-dashboard-layout:has(.page-builder) .admin-sidebar-theme-row .theme-toggle-label,
+body.theme-dark .admin-sidebar-theme-row .theme-toggle-label,
+body.theme-dark .admin-dashboard-layout:has(.page-builder) .admin-sidebar-theme-row .theme-toggle-label,
+.theme-dark .admin-sidebar-theme-row .theme-toggle-label,
+.theme-dark .admin-dashboard-layout:has(.page-builder) .admin-sidebar-theme-row .theme-toggle-label {
+  color: var(--theme-text-muted) !important;
+}
+
+[data-theme="dark"] .admin-sidebar-theme-row .theme-toggle-icon,
+[data-theme="dark"] .admin-dashboard-layout:has(.page-builder) .admin-sidebar-theme-row .theme-toggle-icon,
+body.theme-dark .admin-sidebar-theme-row .theme-toggle-icon,
+body.theme-dark .admin-dashboard-layout:has(.page-builder) .admin-sidebar-theme-row .theme-toggle-icon,
+.theme-dark .admin-sidebar-theme-row .theme-toggle-icon,
+.theme-dark .admin-dashboard-layout:has(.page-builder) .admin-sidebar-theme-row .theme-toggle-icon {
+  color: var(--color-accent-text) !important;
+}
+
+[data-theme="dark"] .admin-sidebar-theme-row .theme-toggle-switch,
+[data-theme="dark"] .theme-toggle.is-dark .theme-toggle-switch,
+body.theme-dark .admin-sidebar-theme-row .theme-toggle-switch,
+body.theme-dark .theme-toggle.is-dark .theme-toggle-switch,
+.theme-dark .admin-sidebar-theme-row .theme-toggle-switch,
+.theme-dark .theme-toggle.is-dark .theme-toggle-switch {
+  background: rgba(var(--theme-primary-rgb), 0.18) !important;
+  border-color: rgba(var(--theme-primary-rgb), 0.38) !important;
+}
+
+[data-theme="dark"] .admin-sidebar-theme-row .theme-toggle-thumb,
+[data-theme="dark"] .theme-toggle.is-dark .theme-toggle-thumb,
+body.theme-dark .admin-sidebar-theme-row .theme-toggle-thumb,
+body.theme-dark .theme-toggle.is-dark .theme-toggle-thumb,
+.theme-dark .admin-sidebar-theme-row .theme-toggle-thumb,
+.theme-dark .theme-toggle.is-dark .theme-toggle-thumb {
+  background: var(--theme-primary-hover) !important;
+  box-shadow: 0 4px 10px rgba(var(--theme-primary-rgb), 0.28) !important;
+}
+
+/* ============================================================
+   FINAL ADMIN DARK RED PURGE
+   Keeps the dashboard fully on the centralized dark red palette.
+   ============================================================ */
+
+:root[data-theme="dark"],
+body.theme-dark,
+.theme-dark {
+  --madar-red: var(--theme-primary-hover) !important;
+  --madar-red-dark: var(--theme-primary) !important;
+  --madar-gradient: var(--theme-gradient);
+  --madar-gradient-hover: var(--theme-gradient-hover);
+  --madar-button-shadow: 0 12px 28px rgba(var(--theme-primary-rgb), 0.2) !important;
+  --madar-button-shadow-hover: 0 16px 34px rgba(var(--theme-primary-rgb), 0.26) !important;
+  --admin-red: var(--theme-primary-hover) !important;
+  --admin-red-bright: var(--theme-primary-hover) !important;
+  --admin-gradient: var(--theme-gradient) !important;
+}
+
+[data-theme="dark"] .admin-dashboard-page,
+body.theme-dark .admin-dashboard-page,
+.theme-dark .admin-dashboard-page {
+  background:
+    radial-gradient(circle at top left, rgba(var(--theme-primary-rgb), 0.12), transparent 34%),
+    radial-gradient(circle at top right, rgba(var(--theme-primary-rgb), 0.18), transparent 36%),
+    linear-gradient(135deg, var(--theme-bg) 0%, var(--theme-bg-soft) 58%, var(--theme-bg) 100%) !important;
+}
+
+[data-theme="dark"] .overview-card,
+[data-theme="dark"] .dashboard-panel,
+body.theme-dark .overview-card,
+body.theme-dark .dashboard-panel,
+.theme-dark .overview-card,
+.theme-dark .dashboard-panel {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(var(--theme-primary-rgb), 0.08), transparent 28%),
+    linear-gradient(145deg, var(--theme-surface), var(--theme-surface-2)) !important;
+  border: 0 !important;
+  box-shadow: 0 22px 56px rgba(var(--theme-black-rgb), 0.2) !important;
+}
+
+[data-theme="dark"] .overview-card::after,
+[data-theme="dark"] .overview-card.navy::after,
+[data-theme="dark"] .overview-card.red::after,
+[data-theme="dark"] .overview-card.olive::after,
+body.theme-dark .overview-card::after,
+body.theme-dark .overview-card.navy::after,
+body.theme-dark .overview-card.red::after,
+body.theme-dark .overview-card.olive::after,
+.theme-dark .overview-card::after,
+.theme-dark .overview-card.navy::after,
+.theme-dark .overview-card.red::after,
+.theme-dark .overview-card.olive::after {
+  background:
+    radial-gradient(circle, rgba(var(--theme-primary-rgb), 0.9), rgba(var(--theme-primary-rgb), 0.35) 58%, transparent 72%) !important;
+  opacity: 0.18 !important;
+}
+
+[data-theme="dark"] .overview-card p,
+body.theme-dark .overview-card p,
+.theme-dark .overview-card p {
+  color: var(--theme-text-muted) !important;
+}
+
+[data-theme="dark"] .overview-sub,
+body.theme-dark .overview-sub,
+.theme-dark .overview-sub,
+[data-theme="dark"] .overview-sub svg,
+body.theme-dark .overview-sub svg,
+.theme-dark .overview-sub svg {
+  color: var(--color-accent-text) !important;
+}
+
+[data-theme="dark"] .overview-icon,
+[data-theme="dark"] .panel-icon,
+[data-theme="dark"] .my-plan-plan-icon,
+[data-theme="dark"] .settings-profile-avatar,
+[data-theme="dark"] .settings-file-button,
+[data-theme="dark"] .settings-save-button,
+[data-theme="dark"] .admin-dashboard-page .settings-save-button,
+[data-theme="dark"] .admin-dashboard-page .settings-file-button,
+body.theme-dark .overview-icon,
+body.theme-dark .panel-icon,
+body.theme-dark .my-plan-plan-icon,
+body.theme-dark .settings-profile-avatar,
+body.theme-dark .settings-file-button,
+body.theme-dark .settings-save-button,
+body.theme-dark .admin-dashboard-page .settings-save-button,
+body.theme-dark .admin-dashboard-page .settings-file-button,
+.theme-dark .overview-icon,
+.theme-dark .panel-icon,
+.theme-dark .my-plan-plan-icon,
+.theme-dark .settings-profile-avatar,
+.theme-dark .settings-file-button,
+.theme-dark .settings-save-button,
+.theme-dark .admin-dashboard-page .settings-save-button,
+.theme-dark .admin-dashboard-page .settings-file-button {
+  background: var(--theme-gradient) !important;
+  border-color: rgba(var(--theme-primary-rgb), 0.34) !important;
+  color: var(--theme-text-inverse) !important;
+  box-shadow: 0 14px 30px rgba(var(--theme-primary-rgb), 0.18) !important;
+}
+
+[data-theme="dark"] .metric-track > div,
+[data-theme="dark"] .cash-bar,
+[data-theme="dark"] .uptime-circle,
+[data-theme="dark"] .my-plan-progress-fill,
+[data-theme="dark"] .my-plan-current-card::before,
+[data-theme="dark"] .my-plan-builder-button,
+[data-theme="dark"] .user-management-primary,
+body.theme-dark .metric-track > div,
+body.theme-dark .cash-bar,
+body.theme-dark .uptime-circle,
+body.theme-dark .my-plan-progress-fill,
+body.theme-dark .my-plan-current-card::before,
+body.theme-dark .my-plan-builder-button,
+body.theme-dark .user-management-primary,
+.theme-dark .metric-track > div,
+.theme-dark .cash-bar,
+.theme-dark .uptime-circle,
+.theme-dark .my-plan-progress-fill,
+.theme-dark .my-plan-current-card::before,
+.theme-dark .my-plan-builder-button,
+.theme-dark .user-management-primary {
+  background: linear-gradient(135deg, var(--theme-primary) 0%, var(--theme-primary-hover) 100%) !important;
+  box-shadow: 0 14px 30px rgba(var(--theme-primary-rgb), 0.18) !important;
+}
+
+[data-theme="dark"] .settings-header span,
+[data-theme="dark"] .settings-field-error,
+[data-theme="dark"] .my-plan-kicker,
+[data-theme="dark"] .my-plan-feature-pill,
+[data-theme="dark"] .my-plan-usage-card strong,
+[data-theme="dark"] .page-builder-dashboard-card span,
+body.theme-dark .settings-header span,
+body.theme-dark .settings-field-error,
+body.theme-dark .my-plan-kicker,
+body.theme-dark .my-plan-feature-pill,
+body.theme-dark .my-plan-usage-card strong,
+body.theme-dark .page-builder-dashboard-card span,
+.theme-dark .settings-header span,
+.theme-dark .settings-field-error,
+.theme-dark .my-plan-kicker,
+.theme-dark .my-plan-feature-pill,
+.theme-dark .my-plan-usage-card strong,
+.theme-dark .page-builder-dashboard-card span {
+  background: rgba(var(--theme-primary-rgb), 0.14) !important;
+  border-color: rgba(var(--theme-primary-rgb), 0.28) !important;
+  color: var(--color-accent-text) !important;
+  box-shadow: none !important;
+}
+
+[data-theme="dark"] .admin-dashboard-page a,
+[data-theme="dark"] .admin-dashboard-page .gradient-text,
+body.theme-dark .admin-dashboard-page a,
+body.theme-dark .admin-dashboard-page .gradient-text,
+.theme-dark .admin-dashboard-page a,
+.theme-dark .admin-dashboard-page .gradient-text {
+  --gradient-text-colors: var(--theme-primary-hover), var(--theme-primary-hover), var(--theme-surface) !important;
+}
+
+/* ============================================================
+   FINAL ADMIN DARK BORDER REMOVAL
+   ============================================================ */
+
+[data-theme="dark"] .overview-card,
+[data-theme="dark"] .dashboard-panel,
+[data-theme="dark"] .server-info-list div,
+[data-theme="dark"] .metric-track,
+[data-theme="dark"] .admin-sidebar,
+[data-theme="dark"] .admin-sidebar-user,
+[data-theme="dark"] .admin-sidebar-admin-badge,
+[data-theme="dark"] .admin-dashboard-page .settings-card,
+[data-theme="dark"] .my-plan-current-card,
+[data-theme="dark"] .my-plan-usage-card,
+[data-theme="dark"] .my-plan-builder-card,
+[data-theme="dark"] .user-management-stats article,
+[data-theme="dark"] .user-management-row,
+[data-theme="dark"] .user-management-toolbar,
+body.theme-dark .overview-card,
+body.theme-dark .dashboard-panel,
+body.theme-dark .server-info-list div,
+body.theme-dark .metric-track,
+body.theme-dark .admin-sidebar,
+body.theme-dark .admin-sidebar-user,
+body.theme-dark .admin-sidebar-admin-badge,
+body.theme-dark .admin-dashboard-page .settings-card,
+body.theme-dark .my-plan-current-card,
+body.theme-dark .my-plan-usage-card,
+body.theme-dark .my-plan-builder-card,
+body.theme-dark .user-management-stats article,
+body.theme-dark .user-management-row,
+body.theme-dark .user-management-toolbar,
+.theme-dark .overview-card,
+.theme-dark .dashboard-panel,
+.theme-dark .server-info-list div,
+.theme-dark .metric-track,
+.theme-dark .admin-sidebar,
+.theme-dark .admin-sidebar-user,
+.theme-dark .admin-sidebar-admin-badge,
+.theme-dark .admin-dashboard-page .settings-card,
+.theme-dark .my-plan-current-card,
+.theme-dark .my-plan-usage-card,
+.theme-dark .my-plan-builder-card,
+.theme-dark .user-management-stats article,
+.theme-dark .user-management-row,
+.theme-dark .user-management-toolbar {
+  border: 0 !important;
+  border-color: transparent !important;
+}
+
+[data-theme="dark"] .server-info-list div,
+body.theme-dark .server-info-list div,
+.theme-dark .server-info-list div,
+[data-theme="dark"] .metric-track,
+body.theme-dark .metric-track,
+.theme-dark .metric-track {
+  box-shadow: none !important;
+}
+
+@media (max-width: 700px) {
+  [data-theme="dark"] .admin-sidebar,
+  body.theme-dark .admin-sidebar,
+  .theme-dark .admin-sidebar {
+    border: 0 !important;
+  }
+}
+
+/* ============================================================
+   CENTRALIZED DARK THEME TOKEN BRIDGE
+   Keep new dark colors mapped through core/tokens.css.
+   ============================================================ */
+
+[data-theme="dark"] body,
+body.theme-dark,
+.theme-dark body {
+  background: var(--theme-bg) !important;
+  color: var(--theme-text) !important;
+}
+
+[data-theme="dark"] .dashboard-skeleton-layout,
+[data-theme="dark"] .admin-dashboard-layout,
+body.theme-dark .dashboard-skeleton-layout,
+body.theme-dark .admin-dashboard-layout,
+.theme-dark .dashboard-skeleton-layout,
+.theme-dark .admin-dashboard-layout {
+  background: var(--theme-bg) !important;
+  color: var(--theme-text) !important;
+}
+
+[data-theme="dark"] .dashboard-skeleton-page,
+[data-theme="dark"] .auth-page,
+[data-theme="dark"] .login-page,
+[data-theme="dark"] .already-signed-page,
+[data-theme="dark"] .admin-dashboard-page,
+[data-theme="dark"] .admin-dashboard-layout:has(.page-builder) .admin-dashboard-page:not(.page-builder-dashboard-page),
+body.theme-dark .dashboard-skeleton-page,
+body.theme-dark .auth-page,
+body.theme-dark .login-page,
+body.theme-dark .already-signed-page,
+body.theme-dark .admin-dashboard-page,
+body.theme-dark .admin-dashboard-layout:has(.page-builder) .admin-dashboard-page:not(.page-builder-dashboard-page),
+.theme-dark .dashboard-skeleton-page,
+.theme-dark .auth-page,
+.theme-dark .login-page,
+.theme-dark .already-signed-page,
+.theme-dark .admin-dashboard-page,
+.theme-dark .admin-dashboard-layout:has(.page-builder) .admin-dashboard-page:not(.page-builder-dashboard-page) {
+  background:
+    radial-gradient(circle at top left, rgba(var(--theme-primary-rgb), 0.16), transparent 34%),
+    radial-gradient(circle at top right, rgba(var(--theme-secondary-rgb), 0.13), transparent 36%),
+    linear-gradient(135deg, var(--theme-bg) 0%, var(--theme-bg-soft) 56%, var(--theme-surface) 100%) !important;
+  color: var(--theme-text) !important;
+}
+
+[data-theme="dark"] .admin-sidebar,
+[data-theme="dark"] .dashboard-skeleton-sidebar,
+body.theme-dark .admin-sidebar,
+body.theme-dark .dashboard-skeleton-sidebar,
+.theme-dark .admin-sidebar,
+.theme-dark .dashboard-skeleton-sidebar {
+  background: var(--theme-bg-soft) !important;
+  border-color: var(--theme-border) !important;
+}
+
+[data-theme="dark"] .overview-card,
+[data-theme="dark"] .dashboard-panel,
+[data-theme="dark"] .auth-skeleton-card,
+[data-theme="dark"] .skeleton-card,
+[data-theme="dark"] .skeleton-panel,
+[data-theme="dark"] .admin-sidebar-user,
+[data-theme="dark"] .admin-sidebar-admin-badge,
+[data-theme="dark"] .admin-dashboard-page .settings-card,
+[data-theme="dark"] .my-plan-current-card,
+[data-theme="dark"] .my-plan-usage-card,
+[data-theme="dark"] .my-plan-builder-card,
+[data-theme="dark"] .user-management-stats article,
+[data-theme="dark"] .user-management-row,
+[data-theme="dark"] .user-management-toolbar,
+body.theme-dark .overview-card,
+body.theme-dark .dashboard-panel,
+body.theme-dark .auth-skeleton-card,
+body.theme-dark .skeleton-card,
+body.theme-dark .skeleton-panel,
+body.theme-dark .admin-sidebar-user,
+body.theme-dark .admin-sidebar-admin-badge,
+body.theme-dark .admin-dashboard-page .settings-card,
+body.theme-dark .my-plan-current-card,
+body.theme-dark .my-plan-usage-card,
+body.theme-dark .my-plan-builder-card,
+body.theme-dark .user-management-stats article,
+body.theme-dark .user-management-row,
+body.theme-dark .user-management-toolbar,
+.theme-dark .overview-card,
+.theme-dark .dashboard-panel,
+.theme-dark .auth-skeleton-card,
+.theme-dark .skeleton-card,
+.theme-dark .skeleton-panel,
+.theme-dark .admin-sidebar-user,
+.theme-dark .admin-sidebar-admin-badge,
+.theme-dark .admin-dashboard-page .settings-card,
+.theme-dark .my-plan-current-card,
+.theme-dark .my-plan-usage-card,
+.theme-dark .my-plan-builder-card,
+.theme-dark .user-management-stats article,
+.theme-dark .user-management-row,
+.theme-dark .user-management-toolbar {
+  background:
+    linear-gradient(145deg, rgba(var(--theme-text-inverse-rgb), 0.055), rgba(var(--theme-text-inverse-rgb), 0.025)) padding-box,
+    linear-gradient(135deg, var(--theme-border-strong), rgba(var(--theme-primary-rgb), 0.2)) border-box !important;
+  border: 1px solid transparent !important;
+  color: var(--theme-text) !important;
+  box-shadow: var(--theme-shadow) !important;
+}
+
+[data-theme="dark"] .admin-dashboard-header h1,
+[data-theme="dark"] .admin-dashboard-header h2,
+[data-theme="dark"] .overview-card h2,
+[data-theme="dark"] .dashboard-panel h2,
+[data-theme="dark"] .dashboard-panel h3,
+[data-theme="dark"] .server-info-list strong,
+[data-theme="dark"] .metric-row-header strong,
+[data-theme="dark"] .admin-sidebar-brand strong,
+[data-theme="dark"] .admin-sidebar-user-info strong,
+body.theme-dark .admin-dashboard-header h1,
+body.theme-dark .admin-dashboard-header h2,
+body.theme-dark .overview-card h2,
+body.theme-dark .dashboard-panel h2,
+body.theme-dark .dashboard-panel h3,
+body.theme-dark .server-info-list strong,
+body.theme-dark .metric-row-header strong,
+body.theme-dark .admin-sidebar-brand strong,
+body.theme-dark .admin-sidebar-user-info strong,
+.theme-dark .admin-dashboard-header h1,
+.theme-dark .admin-dashboard-header h2,
+.theme-dark .overview-card h2,
+.theme-dark .dashboard-panel h2,
+.theme-dark .dashboard-panel h3,
+.theme-dark .server-info-list strong,
+.theme-dark .metric-row-header strong,
+.theme-dark .admin-sidebar-brand strong,
+.theme-dark .admin-sidebar-user-info strong {
+  color: var(--theme-text) !important;
+}
+
+[data-theme="dark"] .admin-dashboard-header p,
+[data-theme="dark"] .overview-card p,
+[data-theme="dark"] .dashboard-panel p,
+[data-theme="dark"] .dashboard-panel small,
+[data-theme="dark"] .server-info-list span,
+[data-theme="dark"] .metric-row-header span,
+[data-theme="dark"] .cash-bar-item small,
+[data-theme="dark"] .uptime-circle span,
+[data-theme="dark"] .admin-sidebar-brand-text > span,
+[data-theme="dark"] .admin-sidebar-user-info span,
+body.theme-dark .admin-dashboard-header p,
+body.theme-dark .overview-card p,
+body.theme-dark .dashboard-panel p,
+body.theme-dark .dashboard-panel small,
+body.theme-dark .server-info-list span,
+body.theme-dark .metric-row-header span,
+body.theme-dark .cash-bar-item small,
+body.theme-dark .uptime-circle span,
+body.theme-dark .admin-sidebar-brand-text > span,
+body.theme-dark .admin-sidebar-user-info span,
+.theme-dark .admin-dashboard-header p,
+.theme-dark .overview-card p,
+.theme-dark .dashboard-panel p,
+.theme-dark .dashboard-panel small,
+.theme-dark .server-info-list span,
+.theme-dark .metric-row-header span,
+.theme-dark .cash-bar-item small,
+.theme-dark .uptime-circle span,
+.theme-dark .admin-sidebar-brand-text > span,
+.theme-dark .admin-sidebar-user-info span {
+  color: var(--theme-text-muted) !important;
+}
+
+[data-theme="dark"] .overview-sub,
+[data-theme="dark"] .overview-sub svg,
+[data-theme="dark"] .settings-header span,
+[data-theme="dark"] .settings-field-error,
+[data-theme="dark"] .my-plan-kicker,
+[data-theme="dark"] .my-plan-feature-pill,
+[data-theme="dark"] .my-plan-usage-card strong,
+[data-theme="dark"] .page-builder-dashboard-card span,
+body.theme-dark .overview-sub,
+body.theme-dark .overview-sub svg,
+body.theme-dark .settings-header span,
+body.theme-dark .settings-field-error,
+body.theme-dark .my-plan-kicker,
+body.theme-dark .my-plan-feature-pill,
+body.theme-dark .my-plan-usage-card strong,
+body.theme-dark .page-builder-dashboard-card span,
+.theme-dark .overview-sub,
+.theme-dark .overview-sub svg,
+.theme-dark .settings-header span,
+.theme-dark .settings-field-error,
+.theme-dark .my-plan-kicker,
+.theme-dark .my-plan-feature-pill,
+.theme-dark .my-plan-usage-card strong,
+.theme-dark .page-builder-dashboard-card span {
+  background: var(--theme-primary-soft) !important;
+  border-color: rgba(var(--theme-primary-rgb), 0.28) !important;
+  color: var(--color-accent-text) !important;
+  box-shadow: none !important;
+}
+
+[data-theme="dark"] .overview-icon,
+[data-theme="dark"] .panel-icon,
+[data-theme="dark"] .my-plan-plan-icon,
+[data-theme="dark"] .settings-profile-avatar,
+[data-theme="dark"] .settings-file-button,
+[data-theme="dark"] .settings-save-button,
+[data-theme="dark"] .admin-dashboard-page .settings-save-button,
+[data-theme="dark"] .admin-dashboard-page .settings-file-button,
+body.theme-dark .overview-icon,
+body.theme-dark .panel-icon,
+body.theme-dark .my-plan-plan-icon,
+body.theme-dark .settings-profile-avatar,
+body.theme-dark .settings-file-button,
+body.theme-dark .settings-save-button,
+body.theme-dark .admin-dashboard-page .settings-save-button,
+body.theme-dark .admin-dashboard-page .settings-file-button,
+.theme-dark .overview-icon,
+.theme-dark .panel-icon,
+.theme-dark .my-plan-plan-icon,
+.theme-dark .settings-profile-avatar,
+.theme-dark .settings-file-button,
+.theme-dark .settings-save-button,
+.theme-dark .admin-dashboard-page .settings-save-button,
+.theme-dark .admin-dashboard-page .settings-file-button {
+  background: var(--theme-gradient) !important;
+  border-color: rgba(var(--theme-primary-rgb), 0.34) !important;
+  color: var(--theme-text-inverse) !important;
+  box-shadow: 0 14px 30px rgba(var(--theme-primary-rgb), 0.2) !important;
+}
+
+[data-theme="dark"] .metric-track,
+[data-theme="dark"] .server-info-list div,
+body.theme-dark .metric-track,
+body.theme-dark .server-info-list div,
+.theme-dark .metric-track,
+.theme-dark .server-info-list div {
+  background: rgba(var(--theme-text-inverse-rgb), 0.055) !important;
+  border-color: var(--theme-border) !important;
+  box-shadow: none !important;
+}
+
+[data-theme="dark"] .metric-track > div,
+[data-theme="dark"] .cash-bar,
+[data-theme="dark"] .my-plan-progress-fill,
+[data-theme="dark"] .my-plan-current-card::before,
+[data-theme="dark"] .my-plan-builder-button,
+[data-theme="dark"] .user-management-primary,
+body.theme-dark .metric-track > div,
+body.theme-dark .cash-bar,
+body.theme-dark .my-plan-progress-fill,
+body.theme-dark .my-plan-current-card::before,
+body.theme-dark .my-plan-builder-button,
+body.theme-dark .user-management-primary,
+.theme-dark .metric-track > div,
+.theme-dark .cash-bar,
+.theme-dark .my-plan-progress-fill,
+.theme-dark .my-plan-current-card::before,
+.theme-dark .my-plan-builder-button,
+.theme-dark .user-management-primary {
+  background: linear-gradient(135deg, var(--theme-primary) 0%, var(--theme-primary-hover) 100%) !important;
+  box-shadow: 0 14px 30px rgba(var(--theme-primary-rgb), 0.2) !important;
+}
+
+[data-theme="dark"] .uptime-circle,
+body.theme-dark .uptime-circle,
+.theme-dark .uptime-circle {
+  background:
+    radial-gradient(circle, rgba(var(--theme-primary-rgb), 0.18), transparent 58%),
+    rgba(var(--theme-text-inverse-rgb), 0.04) !important;
+  border-color: rgba(var(--theme-primary-rgb), 0.32) !important;
+}
+
+[data-theme="dark"] .admin-dashboard-page a,
+[data-theme="dark"] .admin-dashboard-page .gradient-text,
+body.theme-dark .admin-dashboard-page a,
+body.theme-dark .admin-dashboard-page .gradient-text,
+.theme-dark .admin-dashboard-page a,
+.theme-dark .admin-dashboard-page .gradient-text {
+  --gradient-text-colors: var(--theme-primary-hover), var(--theme-secondary), var(--theme-text) !important;
+  color: var(--color-accent-text) !important;
+}
+
+/* ============================================================
+   INTERNAL DARK THEME CONSISTENCY
+   Final admin pass: no navy panels, no pale gradients.
+   ============================================================ */
+
+:root[data-theme="dark"],
+html.theme-dark,
+body.theme-dark {
+  --admin-bg: var(--theme-bg) !important;
+  --admin-surface: var(--theme-surface) !important;
+  --admin-surface-2: var(--theme-surface-2) !important;
+  --admin-surface-3: var(--theme-surface-3) !important;
+  --admin-border: var(--theme-border) !important;
+  --admin-border-strong: var(--theme-border-strong) !important;
+  --admin-text: var(--theme-text) !important;
+  --admin-muted: var(--theme-text-muted) !important;
+  --admin-soft: var(--theme-text-soft) !important;
+  --admin-gradient: var(--theme-gradient) !important;
+  --madar-gradient: var(--theme-gradient) !important;
+  --madar-gradient-hover: var(--theme-gradient-hover) !important;
+}
+
+[data-theme="dark"] .admin-dashboard-layout,
+[data-theme="dark"] .admin-dashboard-page,
+body.theme-dark .admin-dashboard-layout,
+body.theme-dark .admin-dashboard-page,
+.theme-dark .admin-dashboard-layout,
+.theme-dark .admin-dashboard-page {
+  background:
+    radial-gradient(circle at top left, rgba(var(--theme-primary-rgb), 0.09), transparent 32%),
+    linear-gradient(180deg, var(--theme-bg) 0%, var(--theme-bg) 100%) !important;
+  color: var(--theme-text) !important;
+}
+
+[data-theme="dark"] .admin-sidebar,
+body.theme-dark .admin-sidebar,
+.theme-dark .admin-sidebar {
+  background: var(--theme-bg-soft) !important;
+  border-color: var(--theme-border) !important;
+  color: var(--theme-text) !important;
+}
+
+[data-theme="dark"] .overview-card,
+[data-theme="dark"] .dashboard-panel,
+[data-theme="dark"] .admin-sidebar-user,
+[data-theme="dark"] .admin-sidebar-admin-badge,
+[data-theme="dark"] .admin-dashboard-page .settings-card,
+[data-theme="dark"] .my-plan-current-card,
+[data-theme="dark"] .my-plan-feature-card,
+[data-theme="dark"] .my-plan-usage-card,
+[data-theme="dark"] .my-plan-builder-card,
+[data-theme="dark"] .user-management-stats article,
+[data-theme="dark"] .user-management-row,
+[data-theme="dark"] .user-management-toolbar,
+body.theme-dark .overview-card,
+body.theme-dark .dashboard-panel,
+body.theme-dark .admin-sidebar-user,
+body.theme-dark .admin-sidebar-admin-badge,
+body.theme-dark .admin-dashboard-page .settings-card,
+body.theme-dark .my-plan-current-card,
+body.theme-dark .my-plan-feature-card,
+body.theme-dark .my-plan-usage-card,
+body.theme-dark .my-plan-builder-card,
+body.theme-dark .user-management-stats article,
+body.theme-dark .user-management-row,
+body.theme-dark .user-management-toolbar,
+.theme-dark .overview-card,
+.theme-dark .dashboard-panel,
+.theme-dark .admin-sidebar-user,
+.theme-dark .admin-sidebar-admin-badge,
+.theme-dark .admin-dashboard-page .settings-card,
+.theme-dark .my-plan-current-card,
+.theme-dark .my-plan-feature-card,
+.theme-dark .my-plan-usage-card,
+.theme-dark .my-plan-builder-card,
+.theme-dark .user-management-stats article,
+.theme-dark .user-management-row,
+.theme-dark .user-management-toolbar {
+  background: var(--theme-surface) !important;
+  border: 1px solid var(--theme-border) !important;
+  color: var(--theme-text) !important;
+  box-shadow: 0 22px 56px rgba(var(--theme-black-rgb), 0.24) !important;
+}
+
+[data-theme="dark"] .admin-dashboard-page h1,
+[data-theme="dark"] .admin-dashboard-page h2,
+[data-theme="dark"] .admin-dashboard-page h3,
+[data-theme="dark"] .admin-dashboard-page strong,
+body.theme-dark .admin-dashboard-page h1,
+body.theme-dark .admin-dashboard-page h2,
+body.theme-dark .admin-dashboard-page h3,
+body.theme-dark .admin-dashboard-page strong,
+.theme-dark .admin-dashboard-page h1,
+.theme-dark .admin-dashboard-page h2,
+.theme-dark .admin-dashboard-page h3,
+.theme-dark .admin-dashboard-page strong {
+  color: var(--theme-text) !important;
+}
+
+[data-theme="dark"] .admin-dashboard-page p,
+[data-theme="dark"] .admin-dashboard-page small,
+[data-theme="dark"] .admin-dashboard-page span,
+body.theme-dark .admin-dashboard-page p,
+body.theme-dark .admin-dashboard-page small,
+body.theme-dark .admin-dashboard-page span,
+.theme-dark .admin-dashboard-page p,
+.theme-dark .admin-dashboard-page small,
+.theme-dark .admin-dashboard-page span {
+  color: var(--theme-text-muted);
+}
+
+[data-theme="dark"] .overview-icon,
+[data-theme="dark"] .panel-icon,
+[data-theme="dark"] .settings-profile-avatar,
+[data-theme="dark"] .settings-save-button,
+[data-theme="dark"] .settings-file-button,
+[data-theme="dark"] .my-plan-builder-icon,
+[data-theme="dark"] .my-plan-builder-mini-icon,
+[data-theme="dark"] .user-management-primary,
+body.theme-dark .overview-icon,
+body.theme-dark .panel-icon,
+body.theme-dark .settings-profile-avatar,
+body.theme-dark .settings-save-button,
+body.theme-dark .settings-file-button,
+body.theme-dark .my-plan-builder-icon,
+body.theme-dark .my-plan-builder-mini-icon,
+body.theme-dark .user-management-primary,
+.theme-dark .overview-icon,
+.theme-dark .panel-icon,
+.theme-dark .settings-profile-avatar,
+.theme-dark .settings-save-button,
+.theme-dark .settings-file-button,
+.theme-dark .my-plan-builder-icon,
+.theme-dark .my-plan-builder-mini-icon,
+.theme-dark .user-management-primary {
+  background: var(--theme-gradient) !important;
+  border-color: rgba(var(--theme-primary-rgb), 0.34) !important;
+  color: var(--theme-text-inverse) !important;
+  box-shadow: 0 14px 30px rgba(var(--theme-primary-rgb), 0.2) !important;
+}
+
+[data-theme="dark"] .metric-track > div,
+[data-theme="dark"] .cash-bar,
+[data-theme="dark"] .my-plan-progress-track span,
+[data-theme="dark"] .my-plan-current-card::after,
+body.theme-dark .metric-track > div,
+body.theme-dark .cash-bar,
+body.theme-dark .my-plan-progress-track span,
+body.theme-dark .my-plan-current-card::after,
+.theme-dark .metric-track > div,
+.theme-dark .cash-bar,
+.theme-dark .my-plan-progress-track span,
+.theme-dark .my-plan-current-card::after {
+  background: var(--theme-gradient) !important;
+  box-shadow: none !important;
+}
+
+/* Final sidebar cleanup: no boxed language switcher or user footer card. */
+[data-theme="dark"] .admin-sidebar-bottom .admin-sidebar-lang-switcher.language-toggle-button,
+body.theme-dark .admin-sidebar-bottom .admin-sidebar-lang-switcher.language-toggle-button,
+.theme-dark .admin-sidebar-bottom .admin-sidebar-lang-switcher.language-toggle-button {
+  width: 100% !important;
+  min-width: 0 !important;
+  height: 54px !important;
+  min-height: 54px !important;
+  grid-template-columns: 38px minmax(0, 1fr) 8px !important;
+  column-gap: 12px !important;
+  border-color: transparent !important;
+  border-radius: 0 !important;
+  padding: 8px 12px !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+[data-theme="dark"] .admin-dashboard-layout.is-rtl .admin-sidebar-bottom .admin-sidebar-lang-switcher.language-toggle-button,
+[data-theme="dark"] .admin-dashboard-layout[dir="rtl"] .admin-sidebar-bottom .admin-sidebar-lang-switcher.language-toggle-button,
+body.theme-dark .admin-dashboard-layout.is-rtl .admin-sidebar-bottom .admin-sidebar-lang-switcher.language-toggle-button,
+body.theme-dark .admin-dashboard-layout[dir="rtl"] .admin-sidebar-bottom .admin-sidebar-lang-switcher.language-toggle-button,
+.theme-dark .admin-dashboard-layout.is-rtl .admin-sidebar-bottom .admin-sidebar-lang-switcher.language-toggle-button,
+.theme-dark .admin-dashboard-layout[dir="rtl"] .admin-sidebar-bottom .admin-sidebar-lang-switcher.language-toggle-button {
+  direction: rtl !important;
+  grid-template-columns: 8px minmax(0, 1fr) 38px !important;
+  text-align: start !important;
+}
+
+[data-theme="dark"] .admin-dashboard-layout.is-rtl .admin-sidebar-bottom .admin-sidebar-lang-switcher .language-toggle-animation,
+[data-theme="dark"] .admin-dashboard-layout[dir="rtl"] .admin-sidebar-bottom .admin-sidebar-lang-switcher .language-toggle-animation,
+body.theme-dark .admin-dashboard-layout.is-rtl .admin-sidebar-bottom .admin-sidebar-lang-switcher .language-toggle-animation,
+body.theme-dark .admin-dashboard-layout[dir="rtl"] .admin-sidebar-bottom .admin-sidebar-lang-switcher .language-toggle-animation,
+.theme-dark .admin-dashboard-layout.is-rtl .admin-sidebar-bottom .admin-sidebar-lang-switcher .language-toggle-animation,
+.theme-dark .admin-dashboard-layout[dir="rtl"] .admin-sidebar-bottom .admin-sidebar-lang-switcher .language-toggle-animation {
+  grid-column: 3 !important;
+}
+
+[data-theme="dark"] .admin-dashboard-layout.is-rtl .admin-sidebar-bottom .admin-sidebar-lang-switcher .language-toggle-current,
+[data-theme="dark"] .admin-dashboard-layout[dir="rtl"] .admin-sidebar-bottom .admin-sidebar-lang-switcher .language-toggle-current,
+body.theme-dark .admin-dashboard-layout.is-rtl .admin-sidebar-bottom .admin-sidebar-lang-switcher .language-toggle-current,
+body.theme-dark .admin-dashboard-layout[dir="rtl"] .admin-sidebar-bottom .admin-sidebar-lang-switcher .language-toggle-current,
+.theme-dark .admin-dashboard-layout.is-rtl .admin-sidebar-bottom .admin-sidebar-lang-switcher .language-toggle-current,
+.theme-dark .admin-dashboard-layout[dir="rtl"] .admin-sidebar-bottom .admin-sidebar-lang-switcher .language-toggle-current {
+  grid-column: 2 !important;
+  justify-self: start !important;
+  text-align: start !important;
+}
+
+[data-theme="dark"] .admin-sidebar-bottom .admin-sidebar-lang-switcher.language-toggle-button:hover,
+body.theme-dark .admin-sidebar-bottom .admin-sidebar-lang-switcher.language-toggle-button:hover,
+.theme-dark .admin-sidebar-bottom .admin-sidebar-lang-switcher.language-toggle-button:hover {
+  transform: none !important;
+  background: rgba(var(--theme-text-inverse-rgb), 0.055) !important;
+  box-shadow: none !important;
+}
+
+[data-theme="dark"] .admin-sidebar.is-compact .admin-sidebar-bottom .admin-sidebar-lang-switcher.language-toggle-button,
+body.theme-dark .admin-sidebar.is-compact .admin-sidebar-bottom .admin-sidebar-lang-switcher.language-toggle-button,
+.theme-dark .admin-sidebar.is-compact .admin-sidebar-bottom .admin-sidebar-lang-switcher.language-toggle-button {
+  width: 46px !important;
+  min-width: 46px !important;
+  height: 46px !important;
+  min-height: 46px !important;
+  grid-template-columns: 36px !important;
+  justify-content: center !important;
+  padding: 5px !important;
+}
+
+[data-theme="dark"] .admin-sidebar-bottom .admin-sidebar-lang-switcher .language-toggle-animation,
+body.theme-dark .admin-sidebar-bottom .admin-sidebar-lang-switcher .language-toggle-animation,
+.theme-dark .admin-sidebar-bottom .admin-sidebar-lang-switcher .language-toggle-animation {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+[data-theme="dark"] .admin-sidebar-bottom .admin-sidebar-lang-switcher .language-toggle-dot,
+body.theme-dark .admin-sidebar-bottom .admin-sidebar-lang-switcher .language-toggle-dot,
+.theme-dark .admin-sidebar-bottom .admin-sidebar-lang-switcher .language-toggle-dot {
+  display: none !important;
+}
+
+[data-theme="dark"] .admin-sidebar-bottom .admin-sidebar-user,
+body.theme-dark .admin-sidebar-bottom .admin-sidebar-user,
+.theme-dark .admin-sidebar-bottom .admin-sidebar-user,
+[data-theme="dark"] .admin-dashboard-layout:has(.page-builder) .admin-sidebar-bottom .admin-sidebar-user,
+body.theme-dark .admin-dashboard-layout:has(.page-builder) .admin-sidebar-bottom .admin-sidebar-user,
+.theme-dark .admin-dashboard-layout:has(.page-builder) .admin-sidebar-bottom .admin-sidebar-user {
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+/* Admin dashboard polish overrides */
+[data-theme="dark"] .admin-dashboard-header-meta span,
+body.theme-dark .admin-dashboard-header-meta span,
+.theme-dark .admin-dashboard-header-meta span,
+[data-theme="dark"] .dashboard-panel-meta,
+body.theme-dark .dashboard-panel-meta,
+.theme-dark .dashboard-panel-meta {
+  background: rgba(var(--theme-text-inverse-rgb), 0.055) !important;
+  border-color: rgba(var(--theme-text-inverse-rgb), 0.1) !important;
+  color: var(--theme-text-muted) !important;
+  box-shadow: none !important;
+}
+
+[data-theme="dark"] .admin-dashboard-header-meta span:first-child,
+body.theme-dark .admin-dashboard-header-meta span:first-child,
+.theme-dark .admin-dashboard-header-meta span:first-child,
+[data-theme="dark"] .dashboard-panel-meta strong,
+body.theme-dark .dashboard-panel-meta strong,
+.theme-dark .dashboard-panel-meta strong {
+  color: var(--color-accent-text) !important;
+}
+
+[data-theme="dark"] .dashboard-panel-meta span,
+body.theme-dark .dashboard-panel-meta span,
+.theme-dark .dashboard-panel-meta span {
+  color: var(--theme-text-muted) !important;
+}
+
+[data-theme="dark"] .server-status-healthy::before,
+body.theme-dark .server-status-healthy::before,
+.theme-dark .server-status-healthy::before {
+  background: var(--app-success-strong) !important;
+  box-shadow: 0 0 0 4px rgba(var(--app-success-strong-rgb), 0.14) !important;
+}
+
+[data-theme="dark"] .admin-dashboard-hero,
+body.theme-dark .admin-dashboard-hero,
+.theme-dark .admin-dashboard-hero {
+  background:
+    radial-gradient(circle at 18% 0%, rgba(var(--theme-text-inverse-rgb), 0.1), transparent 30%),
+    linear-gradient(135deg, var(--theme-success) 0%, var(--theme-secondary) 46%, var(--theme-bg) 100%) !important;
+  border-color: rgba(var(--theme-text-inverse-rgb), 0.1) !important;
+  box-shadow: 0 24px 58px rgba(var(--theme-black-rgb), 0.28) !important;
+}
+
+[data-theme="dark"] .admin-dashboard-hero h1,
+[data-theme="dark"] .admin-dashboard-hero p,
+[data-theme="dark"] .admin-dashboard-hero span,
+[data-theme="dark"] .admin-dashboard-hero button,
+body.theme-dark .admin-dashboard-hero h1,
+body.theme-dark .admin-dashboard-hero p,
+body.theme-dark .admin-dashboard-hero span,
+body.theme-dark .admin-dashboard-hero button,
+.theme-dark .admin-dashboard-hero h1,
+.theme-dark .admin-dashboard-hero p,
+.theme-dark .admin-dashboard-hero span,
+.theme-dark .admin-dashboard-hero button {
+  color: var(--theme-text-inverse) !important;
+}
+
+[data-theme="dark"] .admin-signal-card,
+body.theme-dark .admin-signal-card,
+.theme-dark .admin-signal-card {
+  background: rgba(var(--theme-text-inverse-rgb), 0.055) !important;
+  border-color: rgba(var(--theme-text-inverse-rgb), 0.1) !important;
+}
+
+[data-theme="dark"] .admin-signal-card strong,
+body.theme-dark .admin-signal-card strong,
+.theme-dark .admin-signal-card strong {
+  color: var(--theme-text) !important;
+}
+
+[data-theme="dark"] .admin-signal-card span,
+body.theme-dark .admin-signal-card span,
+.theme-dark .admin-signal-card span {
+  color: var(--theme-text-muted) !important;
+}
+
+[data-theme="dark"] .admin-signal-card em,
+body.theme-dark .admin-signal-card em,
+.theme-dark .admin-signal-card em {
+  color: var(--app-success-strong) !important;
+}

@@ -1,3 +1,4 @@
+import AuthToast from "../AuthPages/AuthToast";
 import { useEffect, useMemo, useState } from "react";
 import { ExternalLink, RefreshCw, Settings } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
@@ -16,6 +17,7 @@ export default function EcommerceStorePage({ user }) {
   const [website, setWebsite] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [toast, setToast] = useState(null);
   const [frameVersion, setFrameVersion] = useState(0);
   const [frameReady, setFrameReady] = useState(false);
   const cacheScope = user?.tenant_id || user?.id ? `commerce-${user?.tenant_id || user?.id}` : "authenticated";
@@ -26,9 +28,10 @@ export default function EcommerceStorePage({ user }) {
       .then((result) => {
         if (!cancelled) setWebsite(result || null);
       })
-      .catch((requestError) => {
+      .catch(() => {
         if (!cancelled) {
-          setError(requestError?.message || t("admin.loadSettingsError"));
+          setError(t("admin.loadSettingsError"));
+          setToast({ type: "error", title: t("admin.loadSettingsError"), message: t("admin.tryAgain") });
         }
       })
       .finally(() => {
@@ -98,10 +101,12 @@ export default function EcommerceStorePage({ user }) {
             src={previewPath}
             title={draftPreview ? t("admin.draftStoreTitle") : t("admin.publishedStoreTitle")}
             className="ecommerce-store-frame"
-            onLoad={() => setFrameReady(true)}
+            onLoad={() => { setFrameReady(true); if (frameVersion > 0) setToast({ type: "success", title: t("feedback.previewRefreshed"), message: t("feedback.previewRefreshedBody") }); }}
+            onError={() => { setFrameReady(true); setToast({ type: "error", title: t("admin.previewUnavailable"), message: t("admin.tryAgain") }); }}
           />
         </section>
       )}
+      <AuthToast {...toast} dir={direction} onDismiss={() => setToast(null)} />
     </main>
   );
 }

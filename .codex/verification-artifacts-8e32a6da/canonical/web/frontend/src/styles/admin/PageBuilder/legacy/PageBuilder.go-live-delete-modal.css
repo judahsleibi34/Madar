@@ -1,0 +1,107 @@
+/* ============================================================
+   Page Builder — Go Live + Delete Modal fixes
+   Paste at the bottom of src/styles/admin/PageBuilder/PageBuilder.app.css
+   ============================================================ */
+
+.page-builder .go-live-action {
+  background: var(--theme-gradient) !important;
+  color: var(--theme-text-inverse) !important;
+  box-shadow: 0 14px 30px rgba(var(--theme-primary-rgb), 0.24) !important;
+}
+
+.page-builder .go-live-action:hover {
+  transform: translateY(-1px);
+  background: linear-gradient(135deg, var(--theme-bg) 0%, var(--theme-primary-hover) 100%) !important;
+  color: var(--theme-text-inverse) !important;
+}
+
+.page-builder .page-actions-grid .danger-lite,
+.page-builder .compact-actions .danger-lite {
+  grid-column: 1 / -1;
+  justify-self: center;
+  width: min(170px, 100%);
+  text-align: center;
+}
+
+.page-builder .page-delete-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(var(--theme-shadow-rgb), 0.58);
+  backdrop-filter: blur(7px);
+}
+
+.page-builder .page-delete-modal {
+  width: min(430px, 100%);
+  display: grid;
+  justify-items: center;
+  gap: 16px;
+  border-radius: 28px;
+  padding: 26px;
+  background: var(--theme-surface);
+  border: 1px solid rgba(var(--theme-primary-rgb), 0.18);
+  color: var(--madar-text);
+  text-align: center;
+  box-shadow: 0 30px 90px rgba(var(--theme-shadow-rgb), 0.28);
+}
+
+.page-builder .page-delete-modal-icon {
+  width: 56px;
+  height: 56px;
+  display: grid;
+  place-items: center;
+  border-radius: 20px;
+  background: rgba(var(--theme-primary-rgb), 0.1);
+  color: var(--madar-red);
+  font-size: 28px;
+  line-height: 1;
+  font-weight: 950;
+}
+
+.page-builder .page-delete-modal-copy h2 {
+  margin: 0;
+  color: var(--madar-text);
+  font-size: 28px;
+  line-height: 1.1;
+  font-weight: 950;
+  letter-spacing: -0.04em;
+}
+
+.page-builder .page-delete-modal-copy p {
+  margin: 10px 0 0;
+  color: var(--madar-muted);
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+.page-builder .page-delete-modal-copy strong {
+  color: var(--madar-text);
+}
+
+.page-builder .page-delete-modal-actions {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.page-builder .page-delete-modal-actions button {
+  min-height: 48px;
+  border-radius: 14px;
+  padding: 0 16px;
+  font-weight: 950;
+}
+
+.page-builder .page-delete-modal-secondary {
+  background: rgba(var(--theme-shadow-rgb), 0.08) !important;
+  color: var(--madar-text) !important;
+}
+
+.page-builder .page-delete-modal-danger {
+  background: var(--madar-red) !important;
+  color: var(--theme-text-inverse) !important;
+  box-shadow: 0 14px 30px rgba(var(--theme-primary-rgb), 0.22) !important;
+}

@@ -1,0 +1,124 @@
+{
+  "common": {
+    "products": "المنتجات", "categories": "التصنيفات", "tags": "الوسوم", "delivery": "التوصيل", "orders": "الطلبات",
+    "save": "حفظ", "cancel": "إلغاء", "remove": "إزالة", "search": "بحث", "loading": "جارٍ التحميل…", "retry": "إعادة المحاولة",
+    "quantity": "الكمية", "subtotal": "المجموع الفرعي", "discount": "الخصم", "total": "الإجمالي", "currency": "العملة",
+    "sku": "رمز المنتج", "barcode": "الباركود", "price": "السعر", "status": "الحالة", "active": "نشط", "inactive": "غير نشط",
+    "draft": "مسودة", "archived": "مؤرشف", "yes": "نعم", "no": "لا", "viewAll": "عرض الكل", "back": "رجوع"
+  },
+  "nav": { "home": "الرئيسية", "shop": "المتجر", "categories": "التصنيفات", "contact": "تواصل معنا", "cart": "السلة", "searchStore": "البحث في المتجر", "openCart_one": "فتح السلة، عنصر واحد", "openCart_two": "فتح السلة، عنصران", "openCart_few": "فتح السلة، {{count}} عناصر", "openCart_many": "فتح السلة، {{count}} عنصرًا", "openCart_other": "فتح السلة، {{count}} عنصر", "navigation": "التنقل في المتجر" },
+  "landing": {
+    "browse": "تصفح المنتجات", "shopCategory": "تسوق من {{name}}", "products": "المنتجات", "collections": "التصنيفات",
+    "featured": "مختار لك", "noFeatured": "لا يوجد منتج مميز", "noPublished": "لا توجد منتجات منشورة"
+  },
+  "catalog": {
+    "title": "المنتجات", "searchPlaceholder": "ابحث عن المنتجات…", "searchProducts": "البحث في المنتجات", "showing": "عرض {{count}} نتائج",
+    "latest": "أحدث المنتجات", "priceLow": "السعر: من الأقل إلى الأعلى", "priceHigh": "السعر: من الأعلى إلى الأقل", "name": "الاسم",
+    "emptyTitle": "لم يتم العثور على منتجات", "emptyBody": "جرّب تصنيفًا أو وسمًا أو عبارة بحث أخرى.", "pages": "صفحات المنتجات",
+    "allCategories": "كل التصنيفات", "chooseCategory": "اختر تصنيفًا لعرض المنتجات المتاحة فيه."
+  },
+  "categories": { "browse": "تصفح المتجر", "emptyTitle": "لا توجد تصنيفات بعد", "emptyBody": "ستظهر التصنيفات الجديدة هنا عند نشرها." },
+  "contact": { "title": "كيف يمكننا مساعدتك؟", "subtitle": "تواصل معنا", "fallback": "تواصل مع {{brand}}، يسعدنا سماعك.", "empty": "ستظهر بيانات التواصل هنا عندما ينشرها صاحب المتجر." },
+  "loading": { "home": "جارٍ تحميل الصفحة الرئيسية", "categories": "جارٍ تحميل التصنيفات", "contact": "جارٍ تحميل صفحة التواصل", "product": "جارٍ تحميل تفاصيل المنتج", "catalog": "جارٍ تحميل المنتجات", "checkout": "جارٍ تحميل إتمام الطلب", "confirmation": "جارٍ تحميل التأكيد" },
+  "product": {
+    "addToCart": "أضف إلى السلة", "chooseOptions": "اختر الخيارات", "outOfStock": "نفدت الكمية", "lowStock": "مخزون منخفض",
+    "available": "متوفر", "back": "العودة إلى المتجر", "requiredHelp": "اختر القيم المطلوبة وحدد الخيارات الاختيارية حتى يتطابق اختيارك مع منتج متوفر.",
+    "specifications": "المواصفات", "variantMeta": "رمز المنتج {{sku}} · {{availability}}", "noImage": "لا توجد صورة للمنتج", "showImage": "عرض صورة المنتج {{count}}",
+    "removeImage": "إزالة الصورة", "showMedia": "عرض وسائط المنتج {{count}}", "compareAt": "السعر الأصلي"
+  },
+  "cart": {
+    "selection": "اختياراتك", "title": "سلة التسوق", "emptyTitle": "سلتك فارغة", "emptyBody": "أضف منتجًا وسيظهر هنا.",
+    "checkout": "إتمام الطلب", "continue": "متابعة التسوق", "remove": "إزالة {{name}}", "quantityFor": "كمية {{name}}",
+    "decrease": "تقليل كمية {{name}}", "increase": "زيادة كمية {{name}}", "changed": "تغيّرت محتويات السلة. راجع العناصر أو الكميات غير المتاحة قبل إتمام الطلب.",
+    "priceChanged": "تغيّرت أسعار السلة. راجع الإجمالي المحدّث ثم أرسل الطلب مرة أخرى.", "close": "إغلاق السلة"
+  },
+  "checkout": {
+    "title": "إتمام الطلب", "contact": "بيانات العميل", "delivery": "عنوان التوصيل", "review": "مراجعة الطلب", "name": "اسم العميل",
+    "email": "البريد الإلكتروني", "phone": "رقم الهاتف", "serviceArea": "منطقة التوصيل", "chooseArea": "اختر منطقة التوصيل", "street": "الشارع",
+    "building": "المبنى", "floor": "الطابق / الشقة", "description": "معلم قريب / وصف العنوان", "notes": "ملاحظات التوصيل",
+    "payment": "طريقة الدفع", "cod": "الدفع عند الاستلام", "placeOrder": "إرسال الطلب", "placing": "جارٍ إرسال الطلب…",
+    "noAreas": "لا تتوفر مناطق توصيل لهذا المتجر حاليًا.", "empty": "سلتك فارغة.", "validation": "أكمل حقول الطلب المطلوبة.", "subtitle": "أدخل بيانات التوصيل وراجع طلبك.", "loadingAreas": "جارٍ تحميل مناطق التوصيل…", "deliveryFeeNote": "سيؤكد المتجر أي رسوم توصيل عند وجودها."
+  },
+  "confirmation": {
+    "title": "تم تأكيد الطلب", "thankYou": "شكرًا لك. تم استلام طلبك.", "orderNumber": "رقم الطلب", "orderDate": "تاريخ الطلب",
+    "customer": "العميل", "delivery": "التوصيل", "items": "المنتجات", "payment": "الدفع", "unitPrice": "سعر الوحدة",
+    "paymentMethod": "طريقة الدفع", "paymentStatus": "حالة الدفع", "orderStatus": "حالة الطلب", "backToShop": "العودة إلى المتجر"
+  },
+  "merchant": {
+    "commerce": "التجارة الإلكترونية", "store": "واجهة المتجر", "productsTitle": "المنتجات", "productsSubtitle": "إدارة المنتجات والتصنيفات والوسوم والأسعار والمخزون.",
+    "newProduct": "منتج جديد", "editProduct": "تعديل المنتج", "saveProduct": "حفظ المنتج", "saving": "جارٍ الحفظ…", "loadingProduct": "جارٍ تحميل محرر المنتج…",
+    "basic": "المعلومات الأساسية", "organizationMedia": "التنظيم والصور", "pricing": "التسعير", "attributes": "المواصفات",
+    "options": "الخيارات", "optionsVariants": "الخيارات والأنواع", "variantAttributes": "خصائص الأنواع", "variantsInventory": "الأنواع والمخزون", "variants": "الأنواع", "variantMedia": "صور النوع", "variantDetails": "سعر ومخزون النوع", "inventory": "المخزون",
+    "displayOrder": "ترتيب العرض", "addAttribute": "إضافة مواصفة", "addOption": "إضافة خيار", "addOptions": "إضافة خيارات", "addAnotherOption": "إضافة خيار آخر", "addVariantAttribute": "إضافة خاصية نوع", "addValue": "إضافة قيمة", "addVariant": "إضافة نوع",
+    "removeVariant": "إزالة النوع", "nameEnglish": "الاسم بالإنجليزية", "nameArabic": "الاسم بالعربية", "descriptionEnglish": "الوصف بالإنجليزية",
+    "descriptionArabic": "الوصف بالعربية", "slug": "المعرّف النصي", "productSku": "رمز المنتج", "brand": "العلامة التجارية", "brandHelp": "اسم العلامة التجارية.", "category": "التصنيف", "noCategory": "بدون تصنيف", "noTags": "اختر الوسوم", "searchCategories": "ابحث في التصنيفات", "searchTags": "ابحث في الوسوم", "noSearchResults": "لا توجد نتائج", "tagsSelected": "{{count}} وسوم محددة",
+    "basePrice": "السعر الأساسي", "comparePrice": "سعر الخصم", "storeCurrency": "عملة المتجر", "media": "الوسائط", "addImages": "إضافة صور", "addMedia": "إضافة صور أو فيديوهات", "uploading": "جارٍ الرفع…",
+    "required": "مطلوب", "optionNameEnglish": "اسم الخيار بالإنجليزية", "optionNameArabic": "اسم الخيار بالعربية", "valueEnglish": "القيمة بالإنجليزية", "valueArabic": "القيمة بالعربية",
+    "variantSku": "رمز النوع", "priceOverride": "سعر خاص للنوع", "compareOverride": "سعر النوع قبل الخصم", "inheritBase": "استخدام السعر الأساسي", "trackInventory": "تتبع المخزون",
+    "currentStock": "المخزون الحالي", "lowThreshold": "حد تنبيه انخفاض المخزون", "allowBackorder": "السماح بالطلب عند النفاد", "variantInventoryHelp": "مخزون النوع هو المعتمد عند الشراء.",
+    "allStock": "كل حالات المخزون", "lowStock": "مخزون منخفض", "outOfStock": "نفدت الكمية", "lowCount": "{{count}} عناصر منخفضة المخزون", "outCount": "{{count}} عناصر نافدة",
+    "deliveryTitle": "مناطق التوصيل", "deliverySubtitle": "اختر المناطق التي يمكن للعملاء طلب التوصيل إليها.", "searchAreas": "البحث في مناطق التوصيل", "enabledCount": "{{count}} مفعّلة",
+    "saveDelivery": "حفظ مناطق التوصيل", "ordersTitle": "الطلبات", "orderDetail": "تفاصيل الطلب", "customer": "العميل", "items": "العناصر", "payment": "الدفع",
+    "statusHistory": "سجل الحالة", "markCollected": "تسجيل تحصيل الدفع عند الاستلام", "filters": "عوامل التصفية", "noOrders": "لا توجد طلبات", "loadingOrders": "جارٍ تحميل الطلبات…"
+  },
+  "admin": {
+    "productSingular": "منتج", "productsSingular": "منتج", "categoriesSingular": "تصنيف", "tagsSingular": "وسم",
+    "add": "إضافة {{item}}", "fullProductEditor": "إضافة منتج", "manage": "إدارة {{items}}", "search": "البحث في {{items}}",
+    "stockFilter": "تصفية المنتجات حسب المخزون", "noMatching": "لا توجد نتائج مطابقة", "tryDifferent": "جرّب بحثًا أو تصفية مخزون مختلفة.",
+    "tagsCards": "بطاقات الوسوم", "categoriesCards": "بطاقات التصنيفات", "productsCards": "بطاقات المنتجات",
+    "customizeTagsCards": "تخصيص بطاقات الوسوم", "customizeCategoriesCards": "تخصيص بطاقات التصنيفات", "customizeProductsCards": "تخصيص بطاقات المنتجات",
+    "variantStockCounts": "{{low}} منخفض · {{out}} نافد", "serviceArea": "منطقة التوصيل", "allDeliveryAreas": "كل مناطق التوصيل",
+    "from": "من", "to": "إلى", "ordersFrom": "الطلبات من تاريخ", "ordersTo": "الطلبات حتى تاريخ",
+    "orderNotFound": "الطلب غير موجود.", "orderUpdated": "تم تحديث الطلب", "codRecorded": "تم تسجيل تحصيل الدفع عند الاستلام.", "statusChanged": "تغيّرت الحالة إلى {{status}}.",
+    "listPrice": "السعر الأصلي", "unitPrice": "سعر الوحدة", "variant": "النوع", "all": "الكل", "enabled": "مفعّلة", "disabled": "معطّلة",
+    "deliverySaved": "تم حفظ نطاق التوصيل", "deliverySavedBody": "يمكن للعملاء الآن الاختيار من {{count}} مناطق توصيل مفعّلة.",
+    "loadingDelivery": "جارٍ تحميل مناطق التوصيل…", "loadDelivery": "تعذر تحميل مناطق التوصيل", "saveDeliveryError": "تعذر حفظ نطاق التوصيل",
+    "quickEdit": "تعديل سريع لـ {{name}}", "openEditor": "فتح المحرر الكامل لـ {{name}}", "delete": "حذف {{name}}", "close": "إغلاق", "under": "ضمن {{name}}", "loadingCatalog": "جارٍ تحميل كتالوج المتجر الإلكتروني", "loadCatalog": "تعذر تحميل الكتالوج.", "loadCommerce": "تعذر تحميل المتجر الإلكتروني", "completeRequired": "أكمل الحقول المطلوبة", "enter": "أدخل", "choose": "اختر", "requiredBeforeSave": "{{action}} {{field}} قبل الحفظ.", "savedTitle": "تم حفظ {{item}}", "changesSaved": "تم حفظ تغييراتك بنجاح.", "createdSuccessfully": "تم إنشاء {{item}} الجديد بنجاح.", "saveFailedTitle": "تعذر حفظ {{item}}", "saveFailed": "تعذر حفظ {{item}}.", "deleteConfirm": "هل تريد حذف {{name}}؟", "deletedTitle": "تم حذف {{item}}", "deletedBody": "تمت إزالة {{name}}.", "deleteFailedTitle": "تعذر حذف {{item}}", "deleteFailed": "تعذر حذف {{item}}.",
+    "create": "إنشاء", "edit": "تعديل", "newItem": "{{item}} جديد", "editItem": "تعديل {{item}}", "translations": "الترجمات",
+    "english": "الإنجليزية", "arabic": "العربية", "name": "الاسم", "description": "الوصف", "chooseStatus": "اختر الحالة",
+    "hierarchy": "التسلسل الهرمي", "parentCategory": "التصنيف الأعلى", "topLevel": "المستوى الأعلى", "displayPosition": "موضع العرض", "displayOrderHelp": "تظهر الأرقام الأصغر أولًا. استخدم 0 للموضع الأول.",
+    "identityOrganization": "الهوية والتنظيم", "automatic": "تلقائي", "optional": "اختياري", "skuHelp": "اتركه فارغًا ليُنشئ مدار رمز منتج فريدًا.", "skuMovedToVariants": "أصبح لكل نوع قابل للبيع رمز خاص به.", "barcodeHelp": "أدخل الباركود المطبوع فقط إذا كان للمنتج باركود.",
+    "productType": "نوع المنتج", "chooseProductType": "اختر نوع المنتج", "physical": "مادي", "digital": "رقمي", "service": "خدمة", "uncategorized": "بدون تصنيف",
+    "regularPrice": "السعر الأصلي", "discountedPrice": "السعر بعد الخصم", "discountHelp": "اتركه فارغًا إذا لم يكن المنتج مخفضًا.", "chooseCurrency": "اختر العملة", "ils": "شيكل إسرائيلي (ILS)", "usd": "دولار أمريكي (USD)", "jod": "دينار أردني (JOD)", "eur": "يورو (EUR)",
+    "stockHelp": "عدد العناصر المتوفرة حاليًا.", "thresholdHelp": "يعرض مدار تنبيه انخفاض المخزون عند هذا العدد أو أقل.", "backorderHelp": "يبقى بإمكان العملاء إرسال طلب عند وصول المخزون إلى صفر.",
+    "imagesWeight": "الصور والوزن", "productGallery": "وسائط المنتج", "galleryHelp": "سيكون العنصر الأول هو الوسائط الرئيسية للمنتج.", "imageCount": "{{count}} من 4", "mediaCount": "{{count}} من 10", "productImage": "صورة المنتج {{count}}", "productMedia": "وسائط المنتج {{count}}", "mainImage": "الصورة الرئيسية", "mainMedia": "الوسائط الرئيسية", "image": "الصورة {{count}}", "media": "وسائط {{count}}", "addAnotherImage": "إضافة صورة أخرى", "addAnotherMedia": "إضافة وسائط أخرى", "uploadProgress": "جارٍ رفع {{current}} من {{total}}", "keepOpen": "أبقِ هذه النافذة مفتوحة.", "dragBrowse": "اسحب وأفلت، أو انقر للاختيار", "imageRequirements": "PNG أو JPG أو WebP · بحد أقصى 25 ميغابايت", "mediaRequirements": "PNG أو JPG أو WebP ‏(25 ميغابايت) · MP4 أو WebM ‏(250 ميغابايت) · حتى 10 عناصر", "uploadProductMedia": "رفع وسائط المنتج", "removeMedia": "إزالة الوسائط {{count}}", "variantMediaLabel": "وسائط النوع {{count}}", "weight": "الوزن", "unit": "الوحدة", "chooseUnit": "اختر الوحدة",
+    "attributesHelp": "أضف معلومات وصفية عن المنتج مثل الخامة أو الأبعاد أو تعليمات العناية أو المكونات أو التفاصيل التقنية.", "optionsHelp": "خيارات يحددها التاجر لاختيار العميل. تؤرشف القيمة المرتبطة عند إزالتها ثم الحفظ.", "displayOrderDescription": "رتّب المواصفات والخيارات والقيم كما ينبغي أن يراها العملاء.",
+    "variantsHelp": "يمكن شراء التركيبات المضافة هنا فقط، ولا يتم إنشاء تركيبات تلقائية.", "variantMediaHelp": "تتقدم وسائط النوع على وسائط المنتج في واجهة المتجر.", "chooseValue": "اختر قيمة", "incompleteCombination": "تركيبة غير مكتملة", "value": "القيمة",
+    "optionsVariantsHelp": "أضف الخيارات التي يختارها العميل، ثم حدد التركيبات التي تبيعها فعلاً. لا يمكن شراء إلا الأنواع التي تنشئها.", "variantAttributesHelp": "عرّف اختيارات مثل المقاس أو اللون أو التشطيب. أضف جميع القيم هنا قبل إدارة المخزون.", "variantsInventoryHelp": "فعّل فقط التركيبات التي تبيعها. يُدار المخزون لكل نوع، ولا تُنشأ التركيبات غير المتاحة.",
+    "noOptionsTitle": "هذا المنتج بلا خيارات", "noOptionsHelp": "يستخدم رمز المنتج وسعره ومخزونه ووسائطه أعلاه. أضف خيارات فقط عندما يحتاج العميل للاختيار، مثل المقاس أو اللون.", "noVariantAttributesTitle": "هذا منتج بسيط", "noVariantAttributesHelp": "يستخدم رمز المنتج وسعره ومخزونه. أضف خصائص الأنواع فقط عندما يختار العميل قيماً مثل المقاس أو التشطيب.",
+    "specification": "المواصفة", "specificationValue": "القيمة", "englishName": "الاسم بالإنجليزية", "arabicName": "الاسم بالعربية", "englishValue": "القيمة بالإنجليزية", "arabicValue": "القيمة بالعربية", "removeSpecification": "إزالة المواصفة",
+    "untitledOption": "خاصية النوع {{count}}", "removeOption": "إزالة خاصية النوع", "customerMustChoose": "يجب على العميل اختيار قيمة", "requiredOptionLabel": "إلزام اختيار قيمة لـ {{option}}", "values": "القيم", "presentationType": "النوع", "textType": "نص", "colorType": "لون", "colorSwatch": "عينة اللون", "advanced": "متقدم",
+    "valueEntryPlaceholder": "اكتب قيمة واضغط Enter", "newValueForOption": "قيمة جديدة لـ {{option}}", "removeOptionValue": "إزالة {{value}}", "addAtLeastOneValue": "أضف قيمة واحدة على الأقل إلى {{option}}.",
+    "duplicateOptionValue": "هذه القيمة موجودة بالفعل في {{option}}.", "referencedValueArchived": "القيمة {{value}} مستخدمة في نوع موجود، لذلك أُرشفت بدلاً من حذفها.", "optionUsedByVariant": "هذا الخيار مستخدم في نوع موجود. عطّل أنواعه قبل تغيير بنية الخيار.",
+    "chooseSellableCombinations": "اختر التركيبات التي تبيعها", "combinationPreviewHelp": "راجع التركيبات الممكنة وحدد فقط ما يمكن للعملاء شراؤه. لن يتم إنشاء أي شيء تلقائياً.", "possibleCombinations": "{{count}} تركيبات ممكنة",
+    "selectAllAvailable": "تحديد كل المتاح", "clearSelection": "مسح التحديد", "alreadyCreated": "تم الإنشاء", "completeOptionValues": "أضف قيمة واحدة على الأقل لكل خيار لمعاينة التركيبات.", "createSelectedVariants": "إنشاء الأنواع المحددة ({{count}})",
+    "variantsCreated": "تم إنشاء {{count}} أنواع. أضف الرمز والسعر والمخزون أدناه.", "manageVariants": "إدارة الأنواع", "variantManagementHelp": "ينتقل رمز المنتج ومخزونه إلى هذه الأنواع الصريحة. افتح الصف للحقول المتقدمة والوسائط.", "variantCount": "{{count}} أنواع",
+    "selectedVariants": "{{count}} محددة", "activate": "تفعيل", "deactivate": "تعطيل", "inheritBasePrice": "استخدام السعر الأساسي", "enableBackorders": "تفعيل الطلب عند النفاد", "disableBackorders": "تعطيل الطلب عند النفاد", "variantsUpdated": "تم تحديث {{count}} أنواع.",
+    "actions": "الإجراءات", "editDetails": "تعديل التفاصيل", "closeVariantDetails": "إغلاق تفاصيل النوع", "selectAllVariants": "تحديد كل الأنواع", "selectVariant": "تحديد {{variant}}", "inheritPrice": "السعر الأساسي {{price}} {{currency}}", "removeUnsavedVariant": "إزالة النوع غير المحفوظ", "available": "متاح", "quantity": "الكمية", "variantAvailabilityLabel": "توفر {{variant}}", "variantQuantityLabel": "كمية {{variant}}", "variantSkuLabel": "رمز {{variant}}", "variantPriceLabel": "سعر {{variant}} الخاص", "completeVariantAttributeValues": "أضف قيمة واحدة على الأقل لكل خاصية نوع لإدارة التركيبات.",
+    "validationProductName": "أدخل اسم المنتج بالإنجليزية.", "validationOptionName": "أدخل اسماً إنجليزياً لكل خاصية نوع.", "validationDuplicateOption": "يجب أن تكون أسماء خصائص الأنواع فريدة.", "validationValueName": "أدخل اسماً إنجليزياً لكل قيمة في {{option}}.", "validationColorSwatch": "اختر عينة لون لكل قيمة فعالة في {{option}}.", "validationDuplicateCombination": "هذه التركيبة موجودة بالفعل.", "validationVariantSku": "أدخل رمزاً لكل نوع.", "validationUniqueSku": "يجب أن تكون رموز الأنواع فريدة.", "validationSellableVariant": "أنشئ وفعّل نوعاً واحداً على الأقل قبل نشر هذا المنتج.", "validationRequiredOptions": "اختر قيمة لكل خيار مطلوب.",
+    "attributeNameEnglish": "اسم السمة بالإنجليزية", "attributeValueEnglish": "قيمة السمة بالإنجليزية", "attributeNameArabic": "اسم السمة بالعربية", "attributeValueArabic": "قيمة السمة بالعربية",
+    "moveAttributeUp": "نقل السمة لأعلى", "moveAttributeDown": "نقل السمة لأسفل", "moveOptionUp": "نقل الخيار لأعلى", "moveOptionDown": "نقل الخيار لأسفل", "moveValueUp": "نقل القيمة لأعلى", "moveValueDown": "نقل القيمة لأسفل",
+    "variantImage": "النوع {{variant}}، الصورة {{image}}",
+    "noDeliveryAreas": "لا تتوفر مناطق توصيل حاليًا.", "deliveryRequired": "يبقى إتمام الطلب غير متاح حتى تفعيل منطقة توصيل واحدة على الأقل وحفظها.",
+    "storeDesign": "تصميم المتجر", "storeDesignSubtitle": "صمّم بأمان، وعاين المسودة محليًا، ثم انشرها عندما تصبح جاهزة.", "openFullPreview": "فتح المعاينة الكاملة", "publishing": "جارٍ النشر…", "publishChanges": "نشر التغييرات", "loadingStoreDesign": "جارٍ تحميل تصميم المتجر", "storeColors": "ألوان المتجر", "restoreColors": "استعادة الألوان الأصلية",
+    "mainColor": "اللون الرئيسي", "mainColorHelp": "الأزرار والروابط والعناصر البارزة", "pageBackground": "خلفية الصفحة", "pageBackgroundHelp": "الخلفية الرئيسية للمتجر", "cardsSections": "البطاقات والأقسام", "cardsSectionsHelp": "بطاقات المنتجات واللوحات الثانوية", "mainText": "النص الرئيسي", "mainTextHelp": "العناوين والمعلومات المهمة", "secondaryText": "النص الثانوي", "secondaryTextHelp": "الأوصاف والمعلومات المساندة", "colorPicker": "منتقي لون {{label}}",
+    "loadColorsError": "تعذر تحميل ألوان المتجر", "saveColorsError": "تعذر حفظ ألوان المتجر", "tryAgain": "حاول مرة أخرى بعد قليل.", "checkColors": "تحقق من الألوان", "fixColors": "صحح قيم الألوان غير الصالحة قبل فتح معاينة المسودة.", "colorFormat": "يجب أن تكون قيمة كل لون مكتملة من ست خانات، مثل #852c21.", "addressNeeded": "عنوان المتجر مطلوب", "chooseAddress": "اختر عنوان المتجر من الإعدادات قبل فتح المعاينة.", "designPublished": "تم نشر تصميم المتجر", "designPublishedBody": "أصبحت الألوان الجديدة منشورة في متجرك الإلكتروني.",
+    "exactPreview": "معاينة واجهة المتجر الفعلية", "customerPreview": "معاينة العميل", "previewUpdates": "واجهة المتجر الفعلية · تتحدث أثناء التعديل", "loadingExactPreview": "جارٍ تحميل معاينة واجهة المتجر", "setAddress": "عيّن عنوان المتجر للمعاينة", "openSettingsAddress": "افتح الإعدادات واختر عنوانًا عامًا لمتجرك الإلكتروني.", "draftPreviewTitle": "المعاينة الفعلية لمسودة المتجر",
+    "loadSettingsError": "تعذر تحميل إعدادات الموقع.", "draftPreview": "معاينة المسودة", "publishedStore": "المتجر المنشور", "draftPreviewBody": "تستخدم هذه المعاينة الخاصة مسودة التصميم غير المنشورة، ولا يظهر شيء منها للعملاء بعد.", "publishedStoreBody": "راجع تجربة العميل المتاحة حاليًا في المتجر المنشور.",
+    "openPreview": "فتح المعاينة", "openPublishedStore": "فتح المتجر المنشور", "loadingStorePreview": "جارٍ تحميل معاينة المتجر", "previewUnavailable": "معاينة المتجر غير متاحة", "setAddressFirst": "عيّن عنوان متجرك أولًا", "chooseAddressBeforeLive": "اختر عنوانًا عامًا للمتجر من الإعدادات قبل فتحه.", "openStoreSettings": "فتح إعدادات المتجر", "loadingStorefront": "جارٍ تحميل واجهة المتجر",
+    "growthTitle": "تحسين الظهور والعرض", "growthHelp": "حسّن اكتشاف المتجر وعرض المنتجات دون تغيير الأسعار.", "seoTitleEnglish": "عنوان المتجر لمحركات البحث (بالإنجليزية)", "seoTitleArabic": "عنوان المتجر لمحركات البحث (بالعربية)", "seoDescriptionEnglish": "وصف محركات البحث (بالإنجليزية)", "seoDescriptionArabic": "وصف محركات البحث (بالعربية)",
+    "announcementEnabled": "إظهار شريط الإعلان", "announcementEnglish": "الإعلان (بالإنجليزية)", "announcementArabic": "الإعلان (بالعربية)", "announcementLink": "رابط آمن اختياري", "featuredProducts": "المنتجات المميزة", "featuredCategories": "التصنيفات المميزة", "featuredSelectionHelp": "استخدم Ctrl/Cmd لاختيار عدة عناصر نشطة. يُحفظ ترتيب الكتالوج.",
+    "saveGrowth": "حفظ إعدادات الظهور والعرض", "growthSaved": "تم حفظ إعدادات نمو المتجر", "growthSavedBody": "أصبحت تغييرات الظهور والعرض منشورة الآن.", "growthLoadError": "تعذر تحميل إعدادات الظهور والعرض", "growthSaveError": "تعذر حفظ إعدادات الظهور والعرض",
+    "draftStoreTitle": "معاينة مسودة المتجر الإلكتروني", "publishedStoreTitle": "المتجر الإلكتروني المنشور"
+  },
+  "loyalty": {
+    "title": "ولاء العملاء", "subtitle": "كافئ العملاء الموثقين بعد تسليم الطلب وتحصيل الدفع.", "enabled": "تفعيل مكافآت الولاء", "earningRate": "نسبة كسب النقاط (%)", "threshold": "النقاط المطلوبة للمكافأة", "rewardProduct": "منتج المكافأة", "chooseProduct": "اختر منتجاً", "discount": "خصم المكافأة", "validity": "صلاحية المكافأة", "lifetime": "مدى الحياة", "fixedPeriod": "مدة محددة", "validityDays": "عدد أيام الصلاحية", "earningExplanation": "تُمنح النقاط مرة واحدة فقط بعد التسليم وتحصيل الدفع معاً. تطبق المكافأة تلقائياً على جميع خيارات المنتج المحدد.", "saved": "تم حفظ إعدادات الولاء", "savedBody": "سيطبق الإصدار الجديد على عمليات الكسب المستقبلية، وتحتفظ المكافآت الحالية بشروطها الأصلية.", "loadError": "تعذر تحميل إعدادات الولاء", "saveError": "تعذر حفظ إعدادات الولاء", "balance": "نقاطك", "activeReward": "مكافأة فعالة", "expires": "تنتهي {{date}}", "rewardLifetime": "بلا انتهاء", "appliedDiscount": "مكافأة الولاء (10%)"
+  },
+  "status": {
+    "pending": "قيد الانتظار", "confirmed": "مؤكد", "preparing": "قيد التجهيز", "out_for_delivery": "خرج للتوصيل", "delivered": "تم التوصيل",
+    "cancelled": "ملغي", "rejected": "مرفوض", "fulfilled": "مكتمل"
+  },
+  "payment": { "unpaid": "غير مدفوع", "collected": "تم التحصيل", "paid": "مدفوع", "cash_on_delivery": "الدفع عند الاستلام" },
+  "stock": { "healthy": "متوفر", "low_stock": "مخزون منخفض", "out_of_stock": "نفدت الكمية", "backorder": "الطلب عند النفاد مفعّل", "untracked": "المخزون غير متتبّع" },
+  "errors": { "storeUnavailable": "المتجر غير متاح", "loadStore": "تعذر تحميل المتجر", "loadProduct": "تعذر تحميل المنتج.", "productNotFound": "لم يتم العثور على المنتج.", "saveProduct": "تعذر حفظ المنتج.", "uploadImage": "تعذر رفع الصورة.", "uploadMedia": "تعذر رفع الوسائط.", "imageLimit": "يمكنك إضافة {{count}} صورة إضافية.", "variantImageLimit": "يمكن أن يحتوي المنتج أو النوع على أربع صور كحد أقصى.", "mediaLimit": "يمكن أن يحتوي المنتج أو النوع على 10 عناصر وسائط كحد أقصى.", "invalidImageType": "اختر صور PNG أو JPG أو WebP فقط.", "invalidMediaType": "اختر ملفات PNG أو JPG أو WebP أو MP4 أو WebM فقط.", "mediaFileTooLarge": "يجب ألا يتجاوز حجم الصورة 25 ميغابايت وحجم الفيديو 250 ميغابايت.", "unusableImage": "لم تُرجع عملية الرفع صورة صالحة.", "confirmationUnavailable": "تعذر فتح تأكيد الطلب.", "placeOrder": "تعذر إرسال طلبك.", "loadOrders": "تعذر تحميل الطلبات", "updateOrder": "تعذر تحديث الطلب" }
+}

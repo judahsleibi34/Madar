@@ -233,9 +233,6 @@ export const createSiteChromeRenderers = ({
         onClick={(event) => {
           event.stopPropagation();
           if (!preview) setSelected({ type: "siteFooter", id: "site-footer" });
-          if (event.target.closest(".powered-by-madar")) {
-            window.location.href = MADAR_ATTRIBUTION_URL;
-          }
         }}
       >
         {footerSectionCount > 0 && (
@@ -333,7 +330,7 @@ export const createSiteChromeRenderers = ({
 
         <div className="ecommerce-footer-bottom">
           <p>© 2026{footerBrand ? ` ${footerBrand}.` : ""}{footerRights ? ` ${footerRights}` : ""}</p>
-          <button type="button" className="powered-by-madar">Powered by Madar</button>
+          <a href={MADAR_ATTRIBUTION_URL} className="powered-by-madar" onClick={(event) => event.stopPropagation()}>Powered by Madar</a>
         </div>
       </footer>
     );

@@ -1,0 +1,66 @@
+﻿/* ============================================================
+   Source tabs and source body
+   ============================================================ */
+
+.page-builder .daw-source-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.page-builder .daw-source-tabs button,
+.page-builder .daw-review-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  padding: 0 14px;
+  border: 1px solid var(--daw-tab-border);
+  border-radius: 10px;
+  background: var(--daw-tab-bg);
+  color: var(--daw-text);
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1.1;
+  text-align: center;
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease,
+    transform 0.2s ease;
+}
+
+.page-builder .daw-source-tabs button {
+  min-width: 168px;
+  width: auto;
+}
+
+.page-builder .daw-source-tabs button:hover,
+.page-builder .daw-review-actions button:hover {
+  background: rgba(var(--theme-primary-rgb), 0.08);
+  border-color: rgba(var(--theme-primary-rgb), 0.18);
+  color: var(--daw-red);
+  transform: translateY(-1px);
+}
+
+.page-builder .daw-source-tabs button.active,
+.page-builder .daw-review-actions button.active {
+  background: var(--daw-tab-active-bg);
+  border-color: var(--daw-tab-active-border);
+  color: var(--daw-tab-active-text);
+  box-shadow: inset 0 0 0 1px rgba(var(--theme-primary-rgb), 0.05);
+}
+
+.page-builder .daw-source-body {
+  display: grid;
+  gap: 16px;
+}
+
+.page-builder .daw-source-body h4 {
+  margin: 0;
+  color: var(--daw-text);
+  font-size: 17px;
+  font-weight: 950;
+}

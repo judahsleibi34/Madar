@@ -1,0 +1,94 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Dependencies and environments
+node_modules/
+.venv/
+venv/
+env/
+backend/madar_back/
+backend/madar_backend_env/
+.env.test.local
+
+# Build output
+dist/
+dist-ssr/
+build/
+.next/
+
+# Runtime data
+uploads/
+generated_charts/
+avatar_uploads/
+backend/uploads/
+backend/generated_charts/
+backend/avatar_uploads/
+
+# Secrets and local config
+.env
+*.env
+*.local
+.env.local
+.env.test
+.env.*.local
+backend/.env
+
+# Browser-test credentials and authentication state
+playwright/.auth/
+**/playwright/.auth/
+.auth/
+**/.auth/
+test-results/
+**/test-results/
+playwright-report/
+**/playwright-report/
+blob-report/
+**/blob-report/
+*auth-state*.json
+*storage-state*.json
+*cookies*.json
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# AI environment files
+backend/.env.ai
+backend/.env.ai.local
+
+# AI env files
+backend/.env.ai
+backend/.env.ai.dev
+backend/.env.ai.production
+backend/.env.ai.local
+
+# Local env backups
+.env.backup*
+.env.*.backup*
+
+# Private uploaded user data
+backend/private_uploads/
+backend/private_generated_charts/
+
+# One-time local environment input
+env13-8
+
+# Temporary Codex build validation output
+frontend/.codex-build-check/

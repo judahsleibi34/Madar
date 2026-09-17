@@ -1,0 +1,185 @@
+/* ============================================================
+   RESPONSIVE — 900px
+   ============================================================ */
+
+@media (max-width: 900px) {
+  .site-header {
+    grid-template-columns: minmax(0, 1fr) auto;
+    min-height: auto;
+    padding: 20px;
+    column-gap: 14px;
+    overflow: hidden;
+  }
+
+  .brand {
+    grid-column: 1;
+    min-width: 0;
+  }
+
+  .brand-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .header-right {
+    grid-column: 2;
+    justify-self: end;
+    min-width: max-content;
+  }
+
+  .header-right .lang-switcher {
+    display: none;
+  }
+
+  .nav-menu {
+    display: none;
+  }
+
+  .hamburger {
+    display: flex;
+  }
+
+  .mobile-menu {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+    grid-column: 1 / -1;
+    width: 100%;
+    background: rgba(var(--theme-text-inverse-rgb), 0.97);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(var(--theme-shadow-rgb), 0.1);
+    border-radius: 16px;
+    padding: 8px 0;
+    margin-top: 4px;
+    box-shadow: 0 16px 40px rgba(var(--theme-shadow-rgb), 0.12);
+  }
+
+  .hero-section {
+    flex-direction: column;
+    align-items: flex-start;
+    min-height: auto;
+    padding: 32px 5% 64px;
+  }
+
+  .hero-content   { flex: none; width: 100%; }
+  .hero-visual    { flex: none; width: 100%; margin-top: 24px; padding: 10px; }
+
+  .orbit-wrapper  { width: 300px; height: 300px; }
+  .center-core    { width: 105px; height: 105px; }
+  .center-core span { font-size: 16px; }
+  .orbit-one      { width: 145px; height: 145px; }
+  .orbit-two      { width: 215px; height: 215px; }
+  .orbit-three    { width: 290px; height: 290px; }
+  .orbit-dot      { font-size: 11px; padding: 7px 10px; }
+
+  .about-section,
+  html[dir="rtl"] .about-section {
+    margin-left: 20px;
+    margin-right: 20px;
+    max-width: none;
+  }
+
+  .contact-content  { grid-template-columns: 1fr; }
+  .contact-page     { padding: 40px 5% 60px; }
+  .contact-hero h1  { font-size: 32px; }
+
+  /* Footer: stack columns vertically on mobile (both LTR & RTL) */
+  .footer-content {
+    grid-template-columns: 1fr;
+    gap: 28px;
+  }
+
+  html[dir="rtl"] .footer-content {
+    flex-direction: column;
+    align-items: center;
+    gap: 28px;
+  }
+
+  html[dir="rtl"] .footer-brand,
+  html[dir="rtl"] .footer-links,
+  html[dir="rtl"] .footer-contact {
+    order: unset;
+    max-width: 100%;
+    width: 100%;
+  }
+
+  .site-footer {
+    padding: 40px 5% 22px;
+  }
+
+  /* Auth buttons in mobile menu */
+  .mobile-menu-auth {
+    display: flex;
+    gap: 10px;
+    padding: 12px 24px;
+    width: 100%;
+    justify-content: center;
+    border-top: 1px solid rgba(var(--theme-shadow-rgb), 0.07);
+  }
+
+  .mobile-menu-auth .btn-login {
+    flex: 1;
+    justify-content: center;
+    font-size: 14px;
+    padding: 10px 16px;
+    border-color: rgba(var(--theme-shadow-rgb), 0.3);
+    color: var(--theme-text);
+    background: transparent;
+  }
+
+  .mobile-menu-auth .btn-login:hover {
+    border-color: var(--color-accent-text);
+    color: var(--color-accent-text);
+    background: rgba(var(--theme-primary-rgb), 0.04);
+  }
+
+  .mobile-menu-auth .btn-signup {
+    flex: 1;
+    justify-content: center;
+    font-size: 14px;
+    padding: 10px 16px;
+    color: var(--theme-text-inverse);
+  }
+
+  /* Lang buttons on white bg */
+  .mobile-menu-lang .lang-mobile-btn {
+    border-color: rgba(var(--theme-shadow-rgb), 0.3);
+    color: var(--theme-text);
+    background: transparent;
+  }
+
+  .mobile-menu-lang .lang-mobile-btn.active,
+  .mobile-menu-lang .lang-mobile-btn:hover {
+    border-color: var(--color-accent-text);
+    color: var(--color-accent-text);
+    background: rgba(var(--theme-primary-rgb), 0.05);
+  }
+
+  /* Hide desktop auth buttons on mobile */
+  .header-right .btn-login,
+  .header-right .btn-signup {
+    display: none;
+  }
+}
+
+/* ============================================================
+   RESPONSIVE — 600px
+   ============================================================ */
+
+@media (max-width: 600px) {
+  .logo             { width: 48px; }
+  .brand-name       { font-size: 17px; }
+  .hero-title       { font-size: 28px; }
+  .hero-subtitle    { font-size: 20px; }
+  .hero-description { font-size: 15px; }
+
+  .orbit-wrapper  { width: 260px; height: 260px; }
+  .center-core    { width: 90px;  height: 90px; }
+  .center-core span { font-size: 14px; }
+  .orbit-one      { width: 125px; height: 125px; }
+  .orbit-two      { width: 185px; height: 185px; }
+  .orbit-three    { width: 245px; height: 245px; }
+  .orbit-dot      { font-size: 10px; padding: 6px 9px; }
+}

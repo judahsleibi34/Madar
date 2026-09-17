@@ -1,0 +1,22 @@
+/* ============================================================
+   APP SHELL
+   ============================================================ */
+
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.app-main {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+html,
+body,
+#root {
+  scroll-behavior: auto !important;
+  overflow-anchor: none;
+}

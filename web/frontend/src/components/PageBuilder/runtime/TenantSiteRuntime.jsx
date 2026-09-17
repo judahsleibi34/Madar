@@ -89,7 +89,7 @@ import {
 } from "../core/PageBuilder.styles";
 
 const runtimeFallbackCopy = getTenantRuntimeContent("en");
-const MADAR_ATTRIBUTION_URL = "https://madar.app/";
+const MADAR_ATTRIBUTION_URL = "https://madarportal.com/";
 const TENANT_BRAND_CACHE_PREFIX = "madar:tenant-brand:";
 const PUBLICATION_VERSION_POLL_MS = 30_000;
 
@@ -2558,6 +2558,8 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
     <div
       className={`tenant-site-runtime ${draftPreview ? "tenant-site-draft-preview" : ""} ${standaloneFormId ? "tenant-site-standalone-form" : ""}`}
       style={getPageBuilderThemeVars(project?.theme)}
+      dir={runtimeDirection}
+      lang={runtimeDirection === "rtl" ? "ar" : "en"}
     >
       {draftPreview && (
         <div className="tenant-draft-preview-bar">

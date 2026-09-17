@@ -1,0 +1,86 @@
+name: madar-stage-control
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: madar-stage-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_HOST_AUTH_METHOD: trust
+    tmpfs:
+      - /var/lib/postgresql/data:rw,noexec,nosuid,size=1536m
+    ports:
+      - "127.0.0.1:15432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+    mem_limit: 768m
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "2"}
+
+  postgrest:
+    image: postgrest/postgrest:v14.14@sha256:d2009b5c9deffc210c8a5592698472fede14fd9f6ca89823c8474ca54d58c012
+    container_name: madar-stage-postgrest
+    restart: unless-stopped
+    environment:
+      PGRST_DB_URI: postgres://authenticator:staging-only@postgres:5432/postgres
+      PGRST_DB_SCHEMAS: public
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_JWT_SECRET: ${STAGING_JWT_SECRET}
+    ports:
+      - "127.0.0.1:15431:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "postgrest", "--dump-config"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    mem_limit: 256m
+
+  gateway:
+    image: ${MADAR_STAGING_BACKEND_IMAGE:-madar-backend:development}
+    container_name: madar-stage-gateway
+    restart: unless-stopped
+    read_only: true
+    user: "65534:65534"
+    environment:
+      PORT: 5430
+      POSTGREST_URL: http://postgrest:3000
+      PGRST_JWT_SECRET: ${STAGING_JWT_SECRET}
+    command: ["python", "/staging/supabase_gateway.py"]
+    volumes:
+      - .:/staging:ro
+    ports:
+      - "127.0.0.1:15430:5430"
+    depends_on:
+      postgrest:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5430/health',timeout=2)"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    mem_limit: 256m
+
+  redis:
+    image: redis:7-alpine@sha256:6ab0b6e7381779332f97b8ca76193e45b0756f38d4c0dcda72dbb3c32061ab99
+    container_name: madar-stage-shared-redis
+    restart: unless-stopped
+    read_only: true
+    user: "999:1000"
+    command: ["redis-server", "--save", "", "--appendonly", "no", "--maxmemory", "48mb", "--maxmemory-policy", "noeviction"]
+    tmpfs:
+      - /data:rw,noexec,nosuid,uid=999,gid=1000,size=64m
+    ports:
+      - "127.0.0.1:15479:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 2s
+      retries: 20
+    mem_limit: 256m

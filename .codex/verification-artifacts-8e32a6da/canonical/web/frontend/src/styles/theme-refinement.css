@@ -1,0 +1,498 @@
+/* Formal brand theme refinement.
+   CSS-only visual polish: no content, route, image, or behavior changes. */
+
+:root {
+  --brand-navy: var(--theme-text);
+  --brand-red: var(--theme-primary);
+  --brand-olive: var(--theme-secondary);
+  --surface-alpha: var(--app-surface-alpha);
+  --focus-ring: var(--app-focus-ring);
+}
+
+:root[data-theme="dark"],
+html.theme-dark,
+body.theme-dark {
+  --brand-navy: var(--theme-text);
+  --brand-red: var(--theme-primary);
+  --brand-olive: var(--theme-secondary);
+  --surface-alpha: var(--app-surface-alpha);
+  --focus-ring: var(--app-focus-ring);
+}
+
+body {
+  background: var(--theme-bg-soft);
+  color: var(--theme-text);
+  font-feature-settings: "cv02", "cv03", "cv04";
+  text-rendering: optimizeLegibility;
+}
+
+.page-builder {
+  --madar-bg: var(--theme-bg);
+  --madar-surface: var(--theme-surface);
+  --madar-surface-soft: var(--theme-surface-2);
+  --madar-text: var(--theme-text);
+  --madar-muted: var(--theme-text-soft);
+  --madar-navy: var(--theme-text);
+  --madar-red: var(--theme-primary);
+  --madar-red-dark: var(--theme-primary-hover);
+  --madar-border: var(--theme-border);
+  --madar-border-strong: var(--theme-border-strong);
+  --madar-gradient: var(--theme-gradient);
+  --madar-gradient-hover: var(--theme-gradient-hover);
+  --madar-shadow-sm: var(--app-shadow-sm);
+  --madar-shadow-md: var(--app-shadow-md);
+  --madar-red-shadow: var(--app-primary-shadow);
+}
+
+:root[data-theme="dark"] .page-builder,
+body.theme-dark .page-builder {
+  --madar-bg: var(--theme-bg);
+  --madar-surface: var(--theme-surface);
+  --madar-surface-soft: var(--theme-surface-2);
+  --madar-text: var(--theme-text);
+  --madar-muted: var(--theme-text-soft);
+  --madar-navy: var(--theme-text);
+  --madar-red: var(--theme-primary);
+  --madar-red-dark: var(--theme-primary-hover);
+  --madar-border: var(--theme-border);
+  --madar-border-strong: var(--theme-border-strong);
+  --madar-shadow-sm: var(--app-shadow-sm);
+  --madar-shadow-md: var(--app-shadow-md);
+  --madar-red-shadow: var(--app-primary-shadow);
+}
+
+:root[data-theme="dark"] body,
+body.theme-dark {
+  background: var(--theme-bg) !important;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  color: var(--theme-text);
+  letter-spacing: 0;
+}
+
+p,
+small,
+label,
+li {
+  color: inherit;
+}
+
+a,
+.gradient-text,
+.arabic-name {
+  color: var(--color-accent-text);
+}
+
+.gradient-text {
+  background-image: none;
+}
+
+button,
+a,
+input,
+select,
+textarea {
+  transition:
+    background-color 0.18s ease,
+    border-color 0.18s ease,
+    color 0.18s ease,
+    box-shadow 0.18s ease,
+    transform 0.18s ease;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring) !important;
+}
+
+input,
+select,
+textarea,
+.login-card input,
+.register-card input,
+.auth-card input,
+.signup-card input,
+.forgot-card input,
+.reset-card input,
+.workspace-page input,
+.workspace-page select,
+.workspace-page textarea,
+.page-builder input,
+.page-builder select,
+.page-builder textarea {
+  border-color: var(--color-border-control) !important;
+  background: var(--theme-surface) !important;
+  color: var(--theme-text) !important;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--theme-text-muted) !important;
+}
+
+input:hover,
+select:hover,
+textarea:hover {
+  border-color: var(--color-border-control) !important;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: var(--color-accent-text) !important;
+  box-shadow: var(--focus-ring) !important;
+}
+
+.site-header,
+.tenant-site-header,
+.builder-topbar,
+.builder-subbar,
+.preview-device-toolbar {
+  background: var(--app-chrome-translucent) !important;
+  border-color: var(--theme-border) !important;
+  box-shadow: var(--app-header-shadow) !important;
+}
+
+:root[data-theme="dark"] .site-header,
+:root[data-theme="dark"] .tenant-site-header,
+:root[data-theme="dark"] .builder-topbar,
+:root[data-theme="dark"] .builder-subbar,
+:root[data-theme="dark"] .preview-device-toolbar,
+body.theme-dark .site-header,
+body.theme-dark .tenant-site-header,
+body.theme-dark .builder-topbar,
+body.theme-dark .builder-subbar,
+body.theme-dark .preview-device-toolbar {
+  background: var(--app-chrome-translucent) !important;
+  box-shadow: var(--app-header-shadow) !important;
+}
+
+.brand-name,
+.nav-menu a,
+.tenant-site-brand,
+.tenant-site-nav button,
+.builder-brand h1 {
+  color: var(--theme-text) !important;
+}
+
+.nav-menu a:hover,
+.nav-menu a.active,
+.tenant-site-nav button:hover,
+.tenant-site-nav button.active,
+.btn-login:hover,
+.login-signup-text a,
+.forgot-link {
+  color: var(--color-accent-text) !important;
+}
+
+.nav-menu a::after {
+  background: var(--theme-primary) !important;
+  box-shadow: none !important;
+}
+
+.btn-signup,
+.btn-primary,
+.features-demo-cta,
+.primary-action,
+.runtime-submit,
+.tenant-site-cta,
+.form-command-button-primary,
+.workspace-header button,
+.builder-topbar-actions > button.primary-action,
+.full-width-action,
+.reservation-mode-switch button.active {
+  background: var(--theme-primary) !important;
+  color: var(--theme-text-inverse) !important;
+  border-color: var(--color-accent-text) !important;
+  box-shadow: 0 12px 26px rgba(var(--theme-primary-rgb), 0.2) !important;
+}
+
+.btn-signup:hover,
+.btn-primary:hover,
+.features-demo-cta:hover,
+.primary-action:hover,
+.runtime-submit:hover,
+.tenant-site-cta:hover,
+.form-command-button-primary:hover,
+.workspace-header button:hover,
+.builder-topbar-actions > button.primary-action:hover,
+.full-width-action:hover {
+  background: var(--theme-primary-hover) !important;
+  border-color: var(--color-accent-text) !important;
+  transform: translateY(-1px);
+  box-shadow: 0 16px 32px rgba(var(--theme-primary-rgb), 0.24) !important;
+}
+
+.btn-login,
+.lang-toggle,
+.workspace-tabs,
+.workspace-tabs button,
+.form-command-button,
+.page-preview-action,
+.page-delete-action {
+  border-color: var(--color-border-control) !important;
+  background: var(--theme-surface) !important;
+  color: var(--theme-text) !important;
+}
+
+.btn-login:hover,
+.lang-toggle:hover,
+.workspace-tabs button:hover {
+  background: var(--theme-primary-soft) !important;
+  border-color: rgba(var(--theme-primary-rgb), 0.28) !important;
+}
+
+.header-theme-toggle,
+.mobile-theme-toggle,
+.header-theme-toggle:hover,
+.mobile-theme-toggle:hover {
+  border-color: transparent !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.workspace-tabs button.active,
+.add-group button:hover,
+.object-list button:hover,
+.object-list button.active,
+.builder-tool-button.active,
+.design-panel-options button.active {
+  background: var(--theme-primary) !important;
+  color: var(--theme-text-inverse) !important;
+  box-shadow: 0 10px 22px rgba(var(--theme-primary-rgb), 0.18) !important;
+}
+
+.features-page,
+.pricing-page,
+.team-page,
+.contact-page,
+.auth-page,
+.login-page,
+.register-page,
+.already-signed-page,
+.admin-dashboard-page,
+.workspace-page,
+.tenant-site-runtime,
+.tenant-runtime-main,
+.page-builder {
+  background: var(--theme-bg-soft) !important;
+  color: var(--theme-text) !important;
+}
+
+:root[data-theme="dark"] .features-page,
+:root[data-theme="dark"] .pricing-page,
+:root[data-theme="dark"] .team-page,
+:root[data-theme="dark"] .contact-page,
+:root[data-theme="dark"] .auth-page,
+:root[data-theme="dark"] .login-page,
+:root[data-theme="dark"] .register-page,
+:root[data-theme="dark"] .already-signed-page,
+:root[data-theme="dark"] .admin-dashboard-page,
+:root[data-theme="dark"] .workspace-page,
+:root[data-theme="dark"] .tenant-site-runtime,
+:root[data-theme="dark"] .tenant-runtime-main,
+:root[data-theme="dark"] .page-builder,
+body.theme-dark .features-page,
+body.theme-dark .pricing-page,
+body.theme-dark .team-page,
+body.theme-dark .contact-page,
+body.theme-dark .auth-page,
+body.theme-dark .login-page,
+body.theme-dark .register-page,
+body.theme-dark .already-signed-page,
+body.theme-dark .admin-dashboard-page,
+body.theme-dark .workspace-page,
+body.theme-dark .tenant-site-runtime,
+body.theme-dark .tenant-runtime-main,
+body.theme-dark .page-builder {
+  background: var(--theme-bg) !important;
+}
+
+.features-demo-panel,
+.feature-card,
+.pricing-card,
+.team-card,
+.contact-card,
+.login-card,
+.register-card,
+.auth-card,
+.forgot-card,
+.reset-card,
+.overview-card,
+.dashboard-panel,
+.settings-card,
+.form-editor,
+.form-side-settings,
+.object-list,
+.publish-card,
+.automation-card,
+.role-card,
+.workspace-header,
+.builder-panel,
+.builder-inspector,
+.builder-sidebar,
+.builder-modal-content,
+.reservation-settings-section,
+.reservation-editor-preview-block {
+  background: var(--theme-surface) !important;
+  border-color: var(--theme-border) !important;
+  color: var(--theme-text) !important;
+  box-shadow: 0 16px 38px rgba(var(--theme-shadow-rgb), 0.08) !important;
+}
+
+:root[data-theme="dark"] .features-demo-panel,
+:root[data-theme="dark"] .feature-card,
+:root[data-theme="dark"] .pricing-card,
+:root[data-theme="dark"] .team-card,
+:root[data-theme="dark"] .contact-card,
+:root[data-theme="dark"] .login-card,
+:root[data-theme="dark"] .register-card,
+:root[data-theme="dark"] .auth-card,
+:root[data-theme="dark"] .forgot-card,
+:root[data-theme="dark"] .reset-card,
+:root[data-theme="dark"] .overview-card,
+:root[data-theme="dark"] .dashboard-panel,
+:root[data-theme="dark"] .settings-card,
+:root[data-theme="dark"] .form-editor,
+:root[data-theme="dark"] .form-side-settings,
+:root[data-theme="dark"] .object-list,
+:root[data-theme="dark"] .publish-card,
+:root[data-theme="dark"] .automation-card,
+:root[data-theme="dark"] .role-card,
+:root[data-theme="dark"] .workspace-header,
+:root[data-theme="dark"] .builder-panel,
+:root[data-theme="dark"] .builder-inspector,
+:root[data-theme="dark"] .builder-sidebar,
+:root[data-theme="dark"] .builder-modal-content,
+:root[data-theme="dark"] .reservation-settings-section,
+:root[data-theme="dark"] .reservation-editor-preview-block,
+body.theme-dark .features-demo-panel,
+body.theme-dark .feature-card,
+body.theme-dark .pricing-card,
+body.theme-dark .team-card,
+body.theme-dark .contact-card,
+body.theme-dark .login-card,
+body.theme-dark .register-card,
+body.theme-dark .auth-card,
+body.theme-dark .forgot-card,
+body.theme-dark .reset-card,
+body.theme-dark .overview-card,
+body.theme-dark .dashboard-panel,
+body.theme-dark .settings-card,
+body.theme-dark .form-editor,
+body.theme-dark .form-side-settings,
+body.theme-dark .object-list,
+body.theme-dark .publish-card,
+body.theme-dark .automation-card,
+body.theme-dark .role-card,
+body.theme-dark .workspace-header,
+body.theme-dark .builder-panel,
+body.theme-dark .builder-inspector,
+body.theme-dark .builder-sidebar,
+body.theme-dark .builder-modal-content,
+body.theme-dark .reservation-settings-section,
+body.theme-dark .reservation-editor-preview-block {
+  background: var(--theme-surface) !important;
+  border-color: var(--theme-border) !important;
+  box-shadow: var(--app-panel-shadow) !important;
+}
+
+.features-hero h1,
+.features-demo-copy h2,
+.feature-card h2,
+.hero-title,
+.hero-subtitle,
+.overview-card h2,
+.dashboard-panel h2,
+.dashboard-panel h3,
+.login-heading h1,
+.register-card h1,
+.workspace-header h2,
+.workspace-header h3,
+.builder-brand h1 {
+  color: var(--theme-text) !important;
+}
+
+.features-hero p,
+.features-demo-copy p,
+.features-demo-list,
+.feature-card p,
+.hero-description,
+.overview-card p,
+.overview-sub,
+.dashboard-panel p,
+.dashboard-panel small,
+.login-heading p,
+.login-signup-text,
+.builder-brand p,
+.workspace-header p,
+.builder-note,
+.panel-help {
+  color: var(--theme-text-soft) !important;
+}
+
+.features-hero > span,
+.workspace-kicker,
+.overview-sub,
+.reservation-bullet-row > svg,
+.reservation-date-picker-grid button svg,
+.reservation-calendar-mode-preview > svg {
+  color: var(--theme-secondary) !important;
+}
+
+.features-demo-icon,
+.feature-card-icon,
+.overview-icon,
+.panel-icon,
+.tenant-logo-fallback {
+  background: var(--theme-primary) !important;
+  box-shadow: 0 12px 26px rgba(var(--theme-primary-rgb), 0.18) !important;
+}
+
+.overview-card::after {
+  opacity: 0.1 !important;
+}
+
+.overview-card.olive::after,
+.reservation-bullet-dot {
+  background: var(--theme-secondary) !important;
+}
+
+.metric-track,
+.progress-track,
+.reservation-calendar-mode-preview,
+.reservation-bullet-row,
+.reservation-date-picker-grid button,
+.google-question-card,
+.google-section-card,
+.google-form-title-card {
+  background: var(--theme-surface-2) !important;
+  border-color: var(--theme-border) !important;
+}
+
+.danger-button,
+.page-delete-action {
+  color: var(--color-accent-text) !important;
+  border-color: rgba(var(--theme-primary-rgb), 0.28) !important;
+}
+
+.danger-button:hover,
+.page-delete-action:hover {
+  background: var(--theme-primary) !important;
+  color: var(--theme-text-inverse) !important;
+}
+
+::selection {
+  background: rgba(var(--theme-primary-rgb), 0.24);
+  color: var(--theme-text);
+}

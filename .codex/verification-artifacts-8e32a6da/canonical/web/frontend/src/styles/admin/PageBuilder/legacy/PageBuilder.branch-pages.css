@@ -1,0 +1,25 @@
+/* Branch / Main page buttons in Page Builder */
+.page-builder .page-type-actions {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.page-builder .page-type-actions button:first-child,
+.page-builder .page-type-actions button:nth-child(2) {
+  background: var(--madar-gradient) !important;
+  color: var(--theme-text-inverse) !important;
+  box-shadow: var(--madar-red-shadow) !important;
+}
+
+.page-builder .page-type-actions .danger-lite {
+  grid-column: span 2;
+}
+
+@media (max-width: 1240px) {
+  .page-builder .page-type-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .page-builder .page-type-actions .danger-lite {
+    grid-column: auto;
+  }
+}

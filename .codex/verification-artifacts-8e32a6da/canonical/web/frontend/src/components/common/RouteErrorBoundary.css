@@ -1,0 +1,172 @@
+.route-error {
+  box-sizing: border-box;
+  color: var(--theme-text, #162033);
+  display: grid;
+  isolation: isolate;
+  min-height: 100vh;
+  min-height: 100dvh;
+  overflow: hidden;
+  padding: clamp(1.5rem, 5vw, 4rem);
+  place-items: center;
+  position: relative;
+  width: 100%;
+  background:
+    radial-gradient(circle at 14% 12%, rgba(var(--theme-primary-rgb, 133, 44, 33), 0.12), transparent 28rem),
+    radial-gradient(circle at 88% 86%, rgba(var(--theme-secondary-rgb, 107, 118, 84), 0.1), transparent 26rem),
+    linear-gradient(180deg, var(--theme-surface, #fffdfa) 0%, var(--theme-bg, #f4f0e8) 100%);
+}
+
+.route-error::before,
+.route-error::after {
+  border: 1px solid rgba(var(--theme-primary-rgb, 133, 44, 33), 0.12);
+  border-radius: 50%;
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  z-index: -1;
+}
+
+.route-error::before {
+  height: clamp(14rem, 28vw, 24rem);
+  left: clamp(-8rem, -7vw, -4rem);
+  top: clamp(-8rem, -6vw, -3rem);
+  width: clamp(14rem, 28vw, 24rem);
+}
+
+.route-error::after {
+  bottom: clamp(-9rem, -7vw, -4rem);
+  height: clamp(16rem, 30vw, 27rem);
+  right: clamp(-9rem, -7vw, -4rem);
+  width: clamp(16rem, 30vw, 27rem);
+}
+
+.route-error__card {
+  background: var(--theme-surface, #fffdfa);
+  border: 1px solid var(--theme-border, #ddd6ca);
+  border-radius: var(--app-radius-panel, 22px);
+  box-shadow: var(--app-modal-shadow, 0 28px 80px rgba(27, 42, 74, 0.16));
+  box-sizing: border-box;
+  max-width: 42rem;
+  padding: clamp(2rem, 5vw, 3.5rem);
+  text-align: center;
+  width: min(100%, 42rem);
+}
+
+.route-error__eyebrow {
+  align-items: center;
+  background: var(--theme-primary-soft, rgba(133, 44, 33, 0.1));
+  border-radius: 999px;
+  color: var(--theme-primary, #852c21);
+  display: inline-flex;
+  font-size: 0.75rem;
+  font-weight: 950;
+  justify-content: center;
+  letter-spacing: 0.1em;
+  margin: 0 0 1rem;
+  padding: 0.45rem 0.8rem;
+  text-transform: uppercase;
+}
+
+.route-error__card h1 {
+  color: var(--theme-text, #162033);
+  font-size: clamp(2rem, 5vw, 3.25rem);
+  font-weight: 950;
+  letter-spacing: -0.045em;
+  line-height: 1.05;
+  margin: 0;
+}
+
+.route-error__card > p:not(.route-error__eyebrow):not(.route-error__note) {
+  color: var(--theme-text-soft, #465066);
+  font-size: clamp(1rem, 2vw, 1.08rem);
+  line-height: 1.65;
+  margin: 1rem auto 0;
+  max-width: 32rem;
+}
+
+.route-error__note,
+.route-error__reference {
+  color: var(--theme-text-muted, #6f7787);
+  font-size: 0.9rem;
+  margin: 0.8rem auto 0;
+}
+
+.route-error__reference code {
+  overflow-wrap: anywhere;
+}
+
+.route-error__actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+  justify-content: center;
+  margin-top: 1.75rem;
+}
+
+.route-error__actions button,
+.route-error__actions a {
+  align-items: center;
+  border-radius: var(--app-radius-control, 14px);
+  box-sizing: border-box;
+  cursor: pointer;
+  display: inline-flex;
+  font: inherit;
+  font-weight: 900;
+  justify-content: center;
+  min-height: 3rem;
+  padding: 0.78rem 1.15rem;
+  text-decoration: none;
+  transition: transform 160ms ease, background-color 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.route-error__actions button {
+  background: var(--theme-gradient, #852c21);
+  border: 1px solid var(--theme-primary, #852c21);
+  box-shadow: var(--app-primary-shadow, 0 12px 28px rgba(133, 44, 33, 0.18));
+  color: var(--theme-text-inverse, #fff);
+}
+
+.route-error__actions a {
+  background: var(--theme-surface-2, #f8f4ed);
+  border: 1px solid var(--theme-border-strong, #c8bfb1);
+  color: var(--theme-text, #162033);
+}
+
+.route-error__actions button:hover,
+.route-error__actions button:active {
+  background: var(--theme-gradient-hover, #6f241b);
+  border-color: var(--theme-primary-hover, #6f241b);
+  box-shadow: var(--madar-button-shadow-hover, 0 16px 32px rgba(133, 44, 33, 0.24));
+  transform: translateY(-1px);
+}
+
+.route-error__actions a:hover,
+.route-error__actions a:active {
+  background: var(--theme-primary-soft, rgba(133, 44, 33, 0.1));
+  border-color: rgba(var(--theme-primary-rgb, 133, 44, 33), 0.35);
+  color: var(--theme-primary-hover, #6f241b);
+}
+
+.route-error__actions button:focus-visible,
+.route-error__actions a:focus-visible {
+  box-shadow: var(--app-focus-ring, 0 0 0 4px rgba(133, 44, 33, 0.2));
+  outline: none;
+}
+
+@media (max-width: 34rem) {
+  .route-error__actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .route-error__actions :is(button, a) {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .route-error__actions :is(button, a) {
+    transition: none;
+  }
+}

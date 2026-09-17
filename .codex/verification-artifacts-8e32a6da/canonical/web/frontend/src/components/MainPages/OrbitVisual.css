@@ -1,0 +1,93 @@
+.orbit-visual-container {
+  position: relative;
+  width: 100%;
+  height: 700px;
+  overflow: visible;
+  border-radius: 16px;
+  background: transparent;
+  flex-shrink: 0;
+}
+
+.orbit-visual-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.orbit-visual-labels {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.orbit-label {
+  position: absolute;
+  padding: 5px 14px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+  background: transparent;
+  color: var(--theme-text);
+  border: none;
+  box-shadow: none;
+  backdrop-filter: none;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  transition: opacity 0.3s;
+  text-shadow: 0 1px 4px color-mix(in srgb, var(--theme-surface) 70%, transparent);
+}
+
+.orbit-label--core {
+  background: transparent;
+  color: var(--theme-primary);
+  border: none;
+  box-shadow: none;
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  text-shadow: 0 1px 4px color-mix(in srgb, var(--theme-surface) 70%, transparent);
+}
+
+:root[data-theme="dark"] .orbit-label,
+html.theme-dark .orbit-label,
+body.theme-dark .orbit-label {
+  background: transparent;
+  color: var(--theme-text);
+  border: none;
+  box-shadow: none;
+  text-shadow: 0 1px 6px rgba(var(--theme-black-rgb), 0.8);
+}
+
+:root[data-theme="dark"] .orbit-label--core,
+html.theme-dark .orbit-label--core,
+body.theme-dark .orbit-label--core {
+  background: transparent;
+  color: var(--theme-text);
+  border: none;
+  box-shadow: none;
+  text-shadow: 0 1px 8px rgba(var(--theme-black-rgb), 0.8);
+}
+
+@media (max-width: 1100px) {
+  .orbit-visual-container {
+    height: 580px;
+  }
+}
+
+@media (max-width: 640px) {
+  .orbit-visual-container {
+    height: 420px;
+  }
+}
+
+@media (max-width: 400px) {
+  .orbit-visual-container {
+    height: 360px;
+  }
+}

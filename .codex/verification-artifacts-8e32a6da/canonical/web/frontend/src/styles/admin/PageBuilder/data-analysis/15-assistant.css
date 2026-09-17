@@ -1,0 +1,31 @@
+/* ============================================================
+   Assistant
+   ============================================================ */
+
+.page-builder .daw-assistant-card {
+  background:
+    linear-gradient(145deg, rgba(var(--theme-shadow-rgb), 0.05), rgba(var(--theme-primary-rgb), 0.05)),
+    rgba(var(--theme-text-inverse-rgb), 0.88);
+}
+
+.page-builder .daw-assistant-card .daw-primary {
+  width: auto;
+  min-width: 108px;
+  margin-top: 12px;
+}
+
+.page-builder .daw-assistant-card > .daw-primary {
+  display: flex;
+  margin-inline-start: auto;
+}
+
+.page-builder .daw-page[dir="rtl"] .daw-assistant-card > .daw-primary {
+  margin-inline-start: 0;
+  margin-inline-end: auto;
+}
+
+.page-builder .daw-assistant-result {
+  margin-top: 16px;
+  border-top: 1px solid var(--daw-card-border);
+  padding-top: 16px;
+}

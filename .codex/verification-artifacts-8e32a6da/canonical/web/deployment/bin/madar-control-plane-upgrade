@@ -1,0 +1,33 @@
+#!/usr/bin/python3 -I
+"""Minimal installed launcher for the root-owned upgrade bootstrapper."""
+
+import os
+import sys
+
+
+SAFE_ENVIRONMENT = {
+    "PATH": "/usr/sbin:/usr/bin:/sbin:/bin",
+    "HOME": "/root",
+    "LANG": "C.UTF-8",
+    "LC_ALL": "C.UTF-8",
+}
+IMPLEMENTATION = (
+    "/opt/madar/control-plane/deployment/lib/control_plane_upgrade.py"
+)
+
+
+def main() -> None:
+    # Python isolated mode is active before this file is read. Replace the
+    # entire caller environment so Git, Docker, dynamic-loader, Python and
+    # Madar path overrides cannot cross the sudo boundary.
+    os.environ.clear()
+    os.environ.update(SAFE_ENVIRONMENT)
+    os.execve(
+        "/usr/bin/python3",
+        ["/usr/bin/python3", "-I", IMPLEMENTATION, *sys.argv[1:]],
+        dict(SAFE_ENVIRONMENT),
+    )
+
+
+if __name__ == "__main__":
+    main()
