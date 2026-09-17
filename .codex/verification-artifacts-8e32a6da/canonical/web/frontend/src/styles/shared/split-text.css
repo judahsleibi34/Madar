@@ -1,0 +1,49 @@
+.split-text {
+  display: inline-flex;
+  align-items: baseline;
+  color: var(--color-accent-text);
+  font: inherit;
+  font-weight: inherit;
+  letter-spacing: 0;
+  line-height: inherit;
+  white-space: nowrap;
+  transition: transform 0.2s ease;
+}
+
+.split-text-character {
+  display: inline-block;
+  transform: translateY(0.32em);
+  opacity: 0;
+  animation: splitTextReveal var(--split-text-duration, 0.42s) cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation-delay: calc(var(--split-text-index) * var(--split-text-delay, 0.035s));
+}
+
+.split-text:hover {
+  transform: translateY(-0.04em);
+}
+
+@keyframes splitTextReveal {
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes splitTextLift {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  45% {
+    transform: translateY(-0.12em);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .split-text-character {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+}

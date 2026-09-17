@@ -1,0 +1,210 @@
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { ArrowLeft, Eye, EyeOff, KeyRound } from "lucide-react";
+
+import { apiFetch, readApiError } from "../../utils/apiClient";
+import { meetsMinimumPasswordPolicy, PASSWORD_MIN_LENGTH } from "../AuthPages/passwordPolicy";
+import { getChangePasswordContent } from "../../content";
+
+const API_URL = import.meta.env.VITE_API_URL || "/api";
+
+export default function ChangePasswordPage({ lang = "en" }) {
+  const navigate = useNavigate();
+  const isArabic = lang === "ar";
+  const t = getChangePasswordContent(lang);
+
+  const [form, setForm] = useState({
+    currentPassword: "",
+    newPassword: "",
+    confirmNewPassword: "",
+  });
+
+  const [visibleFields, setVisibleFields] = useState({
+    currentPassword: false,
+    newPassword: false,
+    confirmNewPassword: false,
+  });
+
+  const [status, setStatus] = useState("");
+  const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const updateField = (field, value) => {
+    setForm((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+
+    setStatus("");
+    setError("");
+  };
+
+  const togglePasswordVisibility = (field) => {
+    setVisibleFields((prev) => ({
+      ...prev,
+      [field]: !prev[field],
+    }));
+  };
+
+  const renderPasswordField = ({
+    field,
+    label,
+    autoComplete,
+  }) => {
+    const isVisible = visibleFields[field];
+
+    return (
+      <label>
+        {label}
+
+        <div className="change-password-input-wrap">
+          <input
+            type={isVisible ? "text" : "password"}
+            value={form[field]}
+            onChange={(event) => updateField(field, event.target.value)}
+            autoComplete={autoComplete}
+            minLength={field === "currentPassword" ? undefined : PASSWORD_MIN_LENGTH}
+          />
+
+          <button
+            type="button"
+            className="change-password-eye"
+            onClick={() => togglePasswordVisibility(field)}
+            aria-label={isVisible ? t.hidePassword : t.showPassword}
+            title={isVisible ? t.hidePassword : t.showPassword}
+          >
+            {isVisible ? <EyeOff size={18} /> : <Eye size={18} />}
+          </button>
+        </div>
+      </label>
+    );
+  };
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+
+    const currentPassword = form.currentPassword.trim();
+    const newPassword = form.newPassword.trim();
+    const confirmNewPassword = form.confirmNewPassword.trim();
+
+    if (!currentPassword || !newPassword || !confirmNewPassword) {
+      setError(t.passwordFieldsRequired);
+      return;
+    }
+
+    if (!meetsMinimumPasswordPolicy(newPassword)) {
+      setError(t.passwordTooShort);
+      return;
+    }
+
+    if (newPassword !== confirmNewPassword) {
+      setError(t.passwordMismatch);
+      return;
+    }
+
+    setIsSubmitting(true);
+    setStatus("");
+    setError("");
+
+    try {
+      const response = await apiFetch(`${API_URL}/auth/password/change`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          current_password: currentPassword,
+          new_password: newPassword,
+        }),
+      });
+
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(readApiError(data, t.passwordUpdateError));
+      }
+
+      setForm({
+        currentPassword: "",
+        newPassword: "",
+        confirmNewPassword: "",
+      });
+
+      setVisibleFields({
+        currentPassword: false,
+        newPassword: false,
+        confirmNewPassword: false,
+      });
+
+      setStatus(data.message || t.passwordUpdated);
+    } catch (submitError) {
+      setError(submitError.message || t.passwordUpdateError);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <section className="change-password-page" dir={isArabic ? "rtl" : "ltr"}>
+      <div className="change-password-card">
+        <button
+          className="change-password-back"
+          type="button"
+          onClick={() => navigate("/settings")}
+        >
+          <ArrowLeft size={18} />
+          {t.backToSettings}
+        </button>
+
+        <header className="change-password-heading app-page-intro">
+
+          <h1>{t.title}</h1>
+          <p>{t.subtitle}</p>
+        </header>
+
+        {status && <div className="change-password-status">{status}</div>}
+        {error && <div className="change-password-error">{error}</div>}
+
+        <form className="change-password-form" onSubmit={handleSubmit}>
+          {renderPasswordField({
+            field: "currentPassword",
+            label: t.currentPassword,
+            autoComplete: "current-password",
+          })}
+
+          {renderPasswordField({
+            field: "newPassword",
+            label: t.newPassword,
+            autoComplete: "new-password",
+          })}
+
+          {renderPasswordField({
+            field: "confirmNewPassword",
+            label: t.confirmNewPassword,
+            autoComplete: "new-password",
+          })}
+
+          <div className="change-password-actions">
+            <button
+              className="change-password-cancel"
+              type="button"
+              onClick={() => navigate("/settings")}
+              disabled={isSubmitting}
+            >
+              {t.cancel}
+            </button>
+
+            <button
+              className="change-password-submit"
+              type="submit"
+              disabled={isSubmitting}
+            >
+              <KeyRound size={18} />
+              {isSubmitting ? t.updatingPassword : t.updatePassword}
+            </button>
+          </div>
+        </form>
+      </div>
+    </section>
+  );
+}

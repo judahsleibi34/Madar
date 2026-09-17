@@ -1,3 +1,4 @@
+import { notifyCommerceAction } from "../../utils/commerceActionToast";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   Archive,
@@ -278,10 +279,12 @@ function ProductFields({ form, setForm, catalog, t, language }) {
     if (!files.length) return;
     if (files.length > 4 - productImages.length) {
       setImageUploadError(t("commerce:errors.imageLimit", { count: 4 - productImages.length }));
+      notifyCommerceAction({ type: "error", title: t("commerce:errors.uploadImage"), message: t("commerce:errors.imageLimit", { count: 4 - productImages.length }) });
       return;
     }
     if (files.some((file) => !["image/png", "image/jpeg", "image/webp"].includes(file.type))) {
       setImageUploadError(t("commerce:errors.invalidImageType"));
+      notifyCommerceAction({ type: "error", title: t("commerce:errors.uploadImage"), message: t("commerce:errors.invalidImageType") });
       return;
     }
     setImageUploadBusy(true);
@@ -294,8 +297,10 @@ function ProductFields({ form, setForm, catalog, t, language }) {
           images: [...(Array.isArray(current.images) ? current.images : []), imageUrl].slice(0, 4),
         }));
       }
-    } catch (uploadError) {
-      setImageUploadError(uploadError.message || t("commerce:errors.uploadImage"));
+      notifyCommerceAction({ type: "success", title: t("commerce:feedback.mediaUploaded"), message: t("commerce:feedback.mediaUploadedBody") });
+    } catch {
+      setImageUploadError(t("commerce:errors.uploadImage"));
+      notifyCommerceAction({ type: "error", title: t("commerce:errors.uploadImage"), message: t("commerce:admin.tryAgain") });
     } finally {
       setImageUploadBusy(false);
     }
@@ -453,6 +458,7 @@ export default function EcommercePage({ section = "products", user }) {
   const [form, setForm] = useState(() => blankForm(section));
   const [formOpen, setFormOpen] = useState(false);
   const [productEditorOpen, setProductEditorOpen] = useState(false);
+  const [productEditorId, setProductEditorId] = useState(null);
   const [slugManuallyEdited, setSlugManuallyEdited] = useState(false);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState(null);
@@ -511,12 +517,13 @@ export default function EcommercePage({ section = "products", user }) {
       const data = await fetchEcommerceCatalog({ scope: cacheScope, force: Boolean(cached?.isStale) });
       setCatalog({ tags: data?.tags || [], categories: data?.categories || [], products: data?.products || [], stock_summary: data?.stock_summary || { low_stock: 0, out_of_stock: 0 }, commerce_currency: data?.commerce_currency || null });
       setStatus("ready");
-    } catch (loadError) {
+    } catch {
       if (cached) {
         setStatus("ready");
+        showToast({ type: "error", title: t("commerce:admin.loadCommerce"), message: t("commerce:feedback.cachedCatalog") });
         return;
       }
-      const message = loadError.message || t("commerce:admin.loadCatalog");
+      const message = t("commerce:admin.loadCatalog");
       setStatus("error");
       showToast({ type: "error", title: t("commerce:admin.loadCommerce"), message });
     }
@@ -593,8 +600,8 @@ export default function EcommercePage({ section = "products", user }) {
         title: t("commerce:admin.savedTitle", { item: t(`commerce:admin.${sectionKey}Singular`) }),
         message: wasEditing ? t("commerce:admin.changesSaved") : t("commerce:admin.createdSuccessfully", { item: t(`commerce:admin.${sectionKey}Singular`).toLocaleLowerCase(language) }),
       });
-    } catch (saveError) {
-      const message = saveError.message || t("commerce:admin.saveFailed", { item: t(`commerce:admin.${sectionKey}Singular`).toLocaleLowerCase(language) });
+    } catch {
+      const message = t("commerce:admin.saveFailed", { item: t(`commerce:admin.${sectionKey}Singular`).toLocaleLowerCase(language) });
       showToast({ type: "error", title: t("commerce:admin.saveFailedTitle", { item: t(`commerce:admin.${sectionKey}Singular`).toLocaleLowerCase(language) }), message });
     } finally {
       setSaving(false);
@@ -614,8 +621,8 @@ export default function EcommercePage({ section = "products", user }) {
         title: t("commerce:admin.deletedTitle", { item: t(`commerce:admin.${sectionKey}Singular`) }),
         message: t("commerce:admin.deletedBody", { name: translatedName(item, language) }),
       });
-    } catch (deleteError) {
-      const message = deleteError.message || t("commerce:admin.deleteFailed", { item: t(`commerce:admin.${sectionKey}Singular`).toLocaleLowerCase(language) });
+    } catch {
+      const message = t("commerce:admin.deleteFailed", { item: t(`commerce:admin.${sectionKey}Singular`).toLocaleLowerCase(language) });
       showToast({ type: "error", title: t("commerce:admin.deleteFailedTitle", { item: t(`commerce:admin.${sectionKey}Singular`).toLocaleLowerCase(language) }), message });
     }
   };
@@ -656,8 +663,6 @@ export default function EcommercePage({ section = "products", user }) {
           <h1 id={`ecommerce-${section}-title`}>{t(`dashboard:ecommercePages.${sectionKey}.title`)}</h1>
           <p>{t(`dashboard:ecommercePages.${sectionKey}.description`)}</p>
         </div>
-        {section !== "products" && <button type="button" className="ecommerce-primary-button" onClick={openCreate}><Plus size={18} />{t("commerce:admin.add", { item: t(`commerce:admin.${sectionKey}Singular`) })}</button>}
-        {section === "products" && <button type="button" className="ecommerce-primary-button" onClick={() => setProductEditorOpen(true)}><Plus size={18} />{t("commerce:admin.add", { item: t("commerce:admin.productsSingular") })}</button>}
       </header>
 
       <div className="ecommerce-summary-toolbar">
@@ -675,6 +680,8 @@ export default function EcommercePage({ section = "products", user }) {
             </div>
           )}
         </div>
+        {section !== "products" && <button type="button" className="ecommerce-primary-button" onClick={openCreate}><Plus size={18} />{t("commerce:admin.add", { item: t(`commerce:admin.${sectionKey}Singular`) })}</button>}
+        {section === "products" && <button type="button" className="ecommerce-primary-button" onClick={() => { setProductEditorId(null); setProductEditorOpen(true); }}><Plus size={18} />{t("commerce:admin.add", { item: t("commerce:admin.productsSingular") })}</button>}
       </div>
 
       <div className="ecommerce-summary-grid" aria-label={t("dashboard:ecommercePages.overview")}>
@@ -715,7 +722,7 @@ export default function EcommercePage({ section = "products", user }) {
                   <div className="ecommerce-record-main"><strong>{translatedName(item, language)}</strong><span>{section === "products" ? <><bdi>{item.sku}</bdi> · <bdi>{formatCommerceMoney(item.price, item.currency, language)}</bdi></> : item.slug}</span>{section === "products" && <span className={`ecommerce-stock-indicator is-${commerceProductStock(item).state}`}>{t(`commerce:stock.${commerceProductStock(item).state}`)}{item.options?.length ? ` · ${t("commerce:admin.variantStockCounts", { low: item.low_stock_count || 0, out: item.out_of_stock_count || 0 })}` : ""}</span>}</div>
                   <div className="ecommerce-record-meta">{parent ? t("commerce:admin.under", { name: translatedName(parent, language) }) : category ? translatedName(category, language) : section === "categories" ? t("commerce:admin.topLevel") : ""}</div>
                   <span className={`ecommerce-status is-${item.status}`}>{t(`commerce:status.${item.status}`, { defaultValue: item.status })}</span>
-                  <div className="ecommerce-record-actions">{section === "products" ? <a href={`/ecommerce/products/${item.id}/edit`} aria-label={t("commerce:admin.openEditor", { name: translatedName(item, language) })}><Pencil size={16} /></a> : <button type="button" onClick={() => openEdit(item)} aria-label={t("commerce:admin.quickEdit", { name: translatedName(item, language) })}><Pencil size={16} /></button>}<button type="button" onClick={() => remove(item)} aria-label={t("commerce:admin.delete", { name: translatedName(item, language) })}><Trash2 size={16} /></button></div>
+                  <div className="ecommerce-record-actions">{section === "products" ? <button type="button" onClick={() => { setProductEditorId(item.id); setProductEditorOpen(true); }} aria-label={t("commerce:admin.openEditor", { name: translatedName(item, language) })}><Pencil size={16} /></button> : <button type="button" onClick={() => openEdit(item)} aria-label={t("commerce:admin.quickEdit", { name: translatedName(item, language) })}><Pencil size={16} /></button>}<button type="button" onClick={() => remove(item)} aria-label={t("commerce:admin.delete", { name: translatedName(item, language) })}><Trash2 size={16} /></button></div>
                 </article>
               );
             })}
@@ -739,10 +746,11 @@ export default function EcommercePage({ section = "products", user }) {
       )}
       {productEditorOpen && (
         <div className="ecommerce-product-editor-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setProductEditorOpen(false); }}>
-          <section className="ecommerce-product-editor-modal" role="dialog" aria-modal="true" aria-label={t("commerce:merchant.newProduct")}>
+          <section className="ecommerce-product-editor-modal" role="dialog" aria-modal="true" aria-label={t(productEditorId ? "commerce:merchant.editProduct" : "commerce:merchant.newProduct")}>
             <button type="button" className="ecommerce-product-editor-modal-close" onClick={() => setProductEditorOpen(false)} aria-label={t("commerce:admin.close")}><X size={20} /></button>
             <EcommerceProductEditor
               user={user}
+              productId={productEditorId}
               embedded
               initialCatalog={catalog}
               onClose={() => setProductEditorOpen(false)}

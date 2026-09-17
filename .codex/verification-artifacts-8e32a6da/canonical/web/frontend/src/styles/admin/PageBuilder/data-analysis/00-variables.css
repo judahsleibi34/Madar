@@ -1,0 +1,36 @@
+/* ============================================================
+   Data Analysis Workspace
+   Clean guided data/report flow
+   ============================================================ */
+
+.page-builder {
+  --daw-btn-height: 38px;
+  --daw-btn-radius: 12px;
+  --daw-btn-padding: 0 14px;
+  --daw-btn-font-size: 12px;
+  --daw-btn-font-weight: 900;
+
+  --daw-primary-bg: var(--theme-primary);
+  --daw-primary-bg-hover: var(--theme-primary-hover);
+  --daw-primary-text: var(--theme-surface);
+  --daw-primary-shadow: 0 14px 28px rgba(var(--theme-primary-rgb), 0.18);
+
+  --daw-secondary-bg: var(--theme-surface-2);
+  --daw-secondary-bg-hover: var(--theme-primary-soft);
+  --daw-secondary-border: var(--theme-border);
+  --daw-secondary-text: var(--theme-text);
+
+  --daw-tab-bg: var(--theme-surface-2);
+  --daw-tab-border: var(--theme-border);
+  --daw-tab-active-bg: var(--theme-primary-soft);
+  --daw-tab-active-border: rgba(var(--theme-primary-rgb), 0.28);
+  --daw-tab-active-text: var(--theme-primary);
+
+  --daw-card-bg: var(--theme-surface);
+  --daw-card-border: var(--theme-border);
+  --daw-soft-bg: var(--theme-surface-2);
+  --daw-text: var(--theme-text);
+  --daw-muted: var(--theme-text-soft);
+  --daw-red: var(--madar-red, var(--theme-primary));
+  --daw-red-dark: var(--madar-red-dark, var(--theme-primary-hover));
+}

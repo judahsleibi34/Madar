@@ -7,6 +7,7 @@ import i18n from "../../i18n";
 import EcommerceOrdersPage from "./EcommerceOrdersPage";
 import {
   collectEcommerceOrderPayment,
+  createEcommerceDeliveryLocation,
   fetchEcommerceDeliveryAreas,
   fetchEcommerceOrder,
   fetchEcommerceOrders,
@@ -16,6 +17,7 @@ import {
 
 vi.mock("../../services/ecommerceApi", () => ({
   collectEcommerceOrderPayment: vi.fn(),
+  createEcommerceDeliveryLocation: vi.fn(),
   fetchEcommerceDeliveryAreas: vi.fn(),
   fetchEcommerceOrder: vi.fn(),
   fetchEcommerceOrders: vi.fn(),
@@ -50,6 +52,68 @@ describe("merchant ecommerce operations", () => {
     await waitFor(() => expect(saveEcommerceDeliveryAreas).toHaveBeenCalledWith(areas.map((area) => area.id), { scope: "authenticated" }));
   });
 
+  it("creates a custom hierarchy and includes it in the next coverage save", async () => {
+    fetchEcommerceDeliveryAreas.mockResolvedValue({ areas });
+    const custom = { id: "custom-id", code: "custom-7-private", name_en: "Jordan / Amman / Downtown", name_ar: "Jordan / Amman / Downtown", enabled: false };
+    createEcommerceDeliveryLocation.mockResolvedValue({ area: custom });
+    saveEcommerceDeliveryAreas.mockResolvedValue({});
+    render(<EcommerceDeliveryPage />);
+    fireEvent.click(await screen.findByRole("button", { name: "Add custom location" }));
+    expect(screen.getByRole("dialog", { name: "Add custom location" })).toBeTruthy();
+    fireEvent.change(screen.getByRole("textbox", { name: "Country", exact: true }), { target: { value: "Jordan" } });
+    fireEvent.change(screen.getByLabelText("State / province / region (optional)"), { target: { value: "Amman" } });
+    fireEvent.change(screen.getByLabelText("Country — Arabic (optional)"), { target: { value: "الأردن" } });
+    fireEvent.change(screen.getByLabelText("State / province / region — Arabic (optional)"), { target: { value: "عمان" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add another location level" }));
+    fireEvent.change(screen.getByLabelText("District / other level (optional)"), { target: { value: "Downtown" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add location", exact: true }));
+    await waitFor(() => expect(createEcommerceDeliveryLocation).toHaveBeenCalledWith({ country: "Jordan", levels: ["Amman", "Downtown"], name_ar: "الأردن / عمان / Downtown" }, { scope: "authenticated" }));
+    expect(await screen.findByText(custom.name_en)).toBeTruthy();
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(saveEcommerceDeliveryAreas).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: /Save delivery areas/ }));
+    await waitFor(() => expect(saveEcommerceDeliveryAreas).toHaveBeenCalledWith([areas[0].id, custom.id], { scope: "authenticated" }));
+  });
+
+  it("removes extra hierarchy fields while preserving the other values", async () => {
+    fetchEcommerceDeliveryAreas.mockResolvedValue({ areas });
+    render(<EcommerceDeliveryPage />);
+    fireEvent.click(await screen.findByRole("button", { name: "Add custom location" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Country", exact: true }), { target: { value: "Canada" } });
+    const addLevel = screen.getByRole("button", { name: "Add another location level" });
+    fireEvent.click(addLevel);
+    fireEvent.click(addLevel);
+    fireEvent.click(addLevel);
+    expect(addLevel.disabled).toBe(true);
+    const extras = screen.getAllByLabelText("District / other level (optional)");
+    fireEvent.change(extras[1], { target: { value: "Keep me" } });
+    fireEvent.click(screen.getByRole("button", { name: "Remove location level 3" }));
+    expect(screen.getAllByLabelText("District / other level (optional)")).toHaveLength(2);
+    expect(screen.getAllByLabelText("District / other level (optional)")[0].value).toBe("Keep me");
+    expect(screen.getByRole("textbox", { name: "Country", exact: true }).value).toBe("Canada");
+    expect(addLevel.disabled).toBe(false);
+  });
+
+  it("loads saved custom locations without exposing their internal ownership code", async () => {
+    fetchEcommerceDeliveryAreas.mockResolvedValue({ areas: [{ id: "custom-id", code: "custom-7-private", name_en: "Canada / Ontario / Toronto", name_ar: "Canada / Ontario / Toronto", enabled: true }] });
+    render(<EcommerceDeliveryPage />);
+    expect(await screen.findByRole("checkbox", { name: "Canada / Ontario / Toronto" })).toHaveProperty("checked", true);
+    expect(screen.queryByText("custom-7-private")).toBeNull();
+  });
+
+  it("keeps the custom-location form open when creation fails", async () => {
+    fetchEcommerceDeliveryAreas.mockResolvedValue({ areas });
+    createEcommerceDeliveryLocation.mockRejectedValue(new Error("SUPABASE_SERVICE_KEY=private-key; SQL relation internal_table failed"));
+    render(<EcommerceDeliveryPage />);
+    fireEvent.click(await screen.findByRole("button", { name: "Add custom location" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Country", exact: true }), { target: { value: "Jordan" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add location", exact: true }));
+    expect((await screen.findByRole("alert")).textContent).toContain("Could not save delivery coverage");
+    expect(document.body.textContent).not.toContain("SUPABASE_SERVICE_KEY");
+    expect(document.body.textContent).not.toContain("internal_table");
+    expect(screen.getByRole("dialog")).toBeTruthy();
+  });
+
   it("renders tenant-filtered orders and sends date and service-area filters", async () => {
     fetchEcommerceDeliveryAreas.mockResolvedValue({ areas });
     fetchEcommerceOrders.mockResolvedValue({ orders: [{
@@ -60,6 +124,9 @@ describe("merchant ecommerce operations", () => {
     render(<MemoryRouter initialEntries={["/ecommerce/orders"]}><EcommerceOrdersPage /></MemoryRouter>);
 
     expect(await screen.findByText("MD-1001")).toBeTruthy();
+    expect(screen.getByLabelText("Service area").closest("aside")).not.toBeNull();
+    expect(screen.getByLabelText("Orders from date").closest("aside")).not.toBeNull();
+    expect(screen.getByLabelText("Customer").closest("aside")).toBeNull();
     fireEvent.change(await screen.findByLabelText("Service area"), { target: { value: areas[0].id } });
     fireEvent.change(screen.getByLabelText("Orders from date"), { target: { value: "2026-09-01" } });
     await waitFor(() => expect(fetchEcommerceOrders).toHaveBeenCalledWith(expect.objectContaining({

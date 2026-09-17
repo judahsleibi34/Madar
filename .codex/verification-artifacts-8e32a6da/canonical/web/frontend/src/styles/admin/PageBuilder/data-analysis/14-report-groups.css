@@ -1,0 +1,53 @@
+/* ============================================================
+   Report group buttons
+   ============================================================ */
+
+.page-builder .daw-group-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.page-builder .daw-group-grid button {
+  display: grid;
+  gap: 6px;
+  align-content: center;
+  min-height: 78px;
+  padding: 14px 16px;
+  border: 1px solid var(--daw-tab-border);
+  border-radius: 16px;
+  background: rgba(var(--theme-shadow-rgb), 0.04);
+  color: var(--daw-text);
+  text-align: start;
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease,
+    transform 0.2s ease;
+}
+
+.page-builder .daw-group-grid button:hover {
+  background: rgba(var(--theme-primary-rgb), 0.08);
+  border-color: rgba(var(--theme-primary-rgb), 0.18);
+  transform: translateY(-1px);
+}
+
+.page-builder .daw-group-grid button.active {
+  background: rgba(var(--theme-primary-rgb), 0.1);
+  border-color: rgba(var(--theme-primary-rgb), 0.24);
+  color: var(--daw-red);
+}
+
+.page-builder .daw-group-grid button strong {
+  font-size: 14px;
+  font-weight: 950;
+  color: inherit;
+}
+
+.page-builder .daw-group-grid button span {
+  font-size: 12px;
+  line-height: 1.45;
+  color: inherit;
+  opacity: 0.78;
+}

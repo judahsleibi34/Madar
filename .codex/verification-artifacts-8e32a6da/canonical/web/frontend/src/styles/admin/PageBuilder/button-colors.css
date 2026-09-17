@@ -1,0 +1,83 @@
+.builder-element-button.has-button-background-color {
+  background: var(--button-background-color) !important;
+  background-color: var(--button-background-color) !important;
+}
+
+.builder-element-button.has-button-text-color {
+  color: var(--button-text-color) !important;
+  -webkit-text-fill-color: var(--button-text-color) !important;
+}
+
+.builder-element-button.has-button-border-color {
+  border: 1px solid var(--button-border-color) !important;
+}
+
+.builder-element-button.has-button-hover-background-color:hover:not(:disabled):not([aria-disabled="true"]) {
+  background: var(--button-hover-background-color) !important;
+  background-color: var(--button-hover-background-color) !important;
+}
+
+.builder-element-button.has-button-hover-text-color:hover:not(:disabled):not([aria-disabled="true"]) {
+  color: var(--button-hover-text-color) !important;
+  -webkit-text-fill-color: var(--button-hover-text-color) !important;
+}
+
+.builder-element-button:disabled,
+.builder-element-button[aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.55 !important;
+  transform: none !important;
+}
+
+.button-color-controls {
+  min-width: 0;
+  margin: 12px 0 0;
+  padding: 12px;
+  border: 1px solid var(--color-border-control);
+  border-radius: 8px;
+}
+
+.button-color-controls legend {
+  padding: 0 4px;
+  font-weight: 850;
+}
+
+.button-color-control + .button-color-control {
+  margin-top: 10px;
+}
+
+.button-color-inputs {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) auto;
+  gap: 6px;
+  align-items: center;
+}
+
+.button-color-inputs input[type="color"] {
+  width: 44px;
+}
+
+.button-color-inputs button {
+  min-height: 44px;
+}
+
+.button-color-error,
+.button-contrast-warning {
+  color: var(--color-status-danger-text);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.button-contrast-warning p {
+  margin: 8px 0 0;
+}
+
+@media (max-width: 560px) {
+  .button-color-inputs {
+    grid-template-columns: 44px minmax(0, 1fr);
+  }
+
+  .button-color-inputs button {
+    grid-column: 1 / -1;
+  }
+}

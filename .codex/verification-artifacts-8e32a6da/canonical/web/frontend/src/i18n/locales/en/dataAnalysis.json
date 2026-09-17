@@ -1,0 +1,9 @@
+{
+  "reports": {
+    "createReport": "Create report",
+    "reportBuilder": "Report builder"
+  },
+  "workspace": {
+    "loading": "Loading data analysis workspace"
+  }
+}

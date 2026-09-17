@@ -1,0 +1,47 @@
+{
+  "expo": {
+    "name": "Madar Portal",
+    "slug": "mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icons/app-icon.png",
+    "scheme": "madarportal",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "bundleIdentifier": "com.madarportal.app"
+    },
+    "android": {
+      "package": "com.madarportal.app",
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "output": "static",
+      "favicon": "./assets/icons/app-icon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#F3EEE4",
+          "image": "./assets/icons/app-icon.png",
+          "imageWidth": 220,
+          "resizeMode": "contain"
+        }
+      ],
+      "expo-image",
+      "expo-web-browser"
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "0f9c68aa-2a00-45cf-aa00-4946f844d329"
+      }
+    },
+    "owner": "jus34s-team"
+  }
+}

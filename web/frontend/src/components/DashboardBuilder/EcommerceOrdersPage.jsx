@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, CheckCircle2, PackageCheck, RefreshCw, Search } from "lucide-react";
+import { ArrowLeft, CheckCircle2, PackageCheck, RefreshCw, Search, SlidersHorizontal } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 
 import AuthToast from "../AuthPages/AuthToast";
@@ -31,7 +31,7 @@ function OrderDetail({ cacheScope, orderId }) {
     let cancelled = false;
     fetchEcommerceOrder(orderId, { scope: cacheScope })
       .then((result) => { if (!cancelled) setData(result); })
-      .catch((error) => { if (!cancelled) setToast({ type: "error", title: t("errors.loadOrders"), message: error.message }); })
+      .catch(() => { if (!cancelled) setToast({ type: "error", title: t("errors.loadOrders"), message: t("admin.tryAgain") }); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [cacheScope, orderId, t]);
@@ -41,11 +41,11 @@ function OrderDetail({ cacheScope, orderId }) {
       const result = action === "collect" ? await collectEcommerceOrderPayment(orderId) : await transitionEcommerceOrder(orderId, action, "");
       setData(result);
       setToast({ type: "success", title: t("admin.orderUpdated"), message: action === "collect" ? t("admin.codRecorded") : t("admin.statusChanged", { status: statusLabel(action) }) });
-    } catch (error) { setToast({ type: "error", title: t("errors.updateOrder"), message: error.message }); }
+    } catch { setToast({ type: "error", title: t("errors.updateOrder"), message: t("admin.tryAgain") }); }
     finally { setBusy(false); }
   };
   if (loading) return <main className="ecommerce-page ecommerce-operations-page" dir={direction} lang={locale}><EcommerceOperationsSkeleton variant="order-detail" label={t("merchant.loadingOrders")} /></main>;
-  if (!data?.order) return <main className="ecommerce-page ecommerce-operations-page" dir={direction} lang={locale}><button onClick={() => navigate("/ecommerce/orders")}>{t("common.back")}</button><p>{t("admin.orderNotFound")}</p><AuthToast {...toast} /></main>;
+  if (!data?.order) return <main className="ecommerce-page ecommerce-operations-page" dir={direction} lang={locale}><button onClick={() => navigate("/ecommerce/orders")}>{t("common.back")}</button><p>{t("admin.orderNotFound")}</p><AuthToast {...toast} dir={direction} onDismiss={() => setToast(null)} /></main>;
   const { order, items = [], status_history: history = [] } = data;
   return (
     <main className="ecommerce-page ecommerce-operations-page" dir={direction} lang={locale}>
@@ -80,7 +80,7 @@ function OrderDetail({ cacheScope, orderId }) {
         })}</div>
       </section>
       <section className="ecommerce-operations-card"><h2>{t("merchant.statusHistory")}</h2><ol className="ecommerce-status-history">{history.map((entry) => <li key={entry.id || `${entry.new_status}-${entry.created_at}`}><PackageCheck size={17} /><span><strong>{statusLabel(entry.new_status)}</strong><small>{dateTime(entry.created_at)}{entry.note ? ` · ${entry.note}` : ""}</small></span></li>)}</ol></section>
-      <AuthToast key={toast?.id} type={toast?.type} title={toast?.title} message={toast?.message} onDismiss={() => setToast(null)} />
+      <AuthToast dir={direction} key={toast?.id} type={toast?.type} title={toast?.title} message={toast?.message} onDismiss={() => setToast(null)} />
     </main>
   );
 }
@@ -94,36 +94,55 @@ export default function EcommerceOrdersPage({ user }) {
   const [filters, setFilters] = useState({ order_number: "", customer_name: "", phone: "", status: "", payment_status: "", date_from: "", date_to: "", service_area_id: "" });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [toast, setToast] = useState(null);
   const cacheScope = user?.tenant_id || user?.id ? `commerce-${user?.tenant_id || user?.id}` : "authenticated";
   const query = useMemo(() => filters, [filters]);
-  const load = () => { setLoading(true); setError(""); fetchEcommerceOrders(query, { scope: cacheScope, force: true }).then((result) => setOrders(result?.orders || [])).catch((failure) => setError(failure.message)).finally(() => setLoading(false)); };
+  const load = () => { setLoading(true); setError(""); fetchEcommerceOrders(query, { scope: cacheScope, force: true }).then((result) => { setOrders(result?.orders || []); setToast({ type: "success", title: t("feedback.ordersRefreshed"), message: t("feedback.ordersRefreshedBody") }); }).catch(() => { setError(t("errors.loadOrders")); setToast({ type: "error", title: t("errors.loadOrders"), message: t("admin.tryAgain") }); }).finally(() => setLoading(false)); };
   useEffect(() => {
     let cancelled = false;
-    fetchEcommerceDeliveryAreas({ scope: cacheScope }).then((result) => { if (!cancelled) setAreas(result?.areas || []); }).catch(() => {});
+    fetchEcommerceDeliveryAreas({ scope: cacheScope }).then((result) => { if (!cancelled) setAreas(result?.areas || []); }).catch(() => { if (!cancelled) setToast({ type: "error", title: t("admin.loadDelivery"), message: t("admin.tryAgain") }); });
     return () => { cancelled = true; };
-  }, [cacheScope]);
+  }, [cacheScope, t]);
   useEffect(() => {
     let cancelled = false;
     fetchEcommerceOrders(query, { scope: cacheScope })
       .then((result) => { if (!cancelled) setOrders(result?.orders || []); })
-      .catch((failure) => { if (!cancelled) setError(failure.message); })
+      .catch(() => { if (!cancelled) { setError(t("errors.loadOrders")); setToast({ type: "error", title: t("errors.loadOrders"), message: t("admin.tryAgain") }); } })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [cacheScope, query]);
+  }, [cacheScope, query, t]);
   if (orderId) return <OrderDetail cacheScope={cacheScope} orderId={orderId} />;
   const update = (key, value) => setFilters((current) => ({ ...current, [key]: value }));
   return (
-    <main className="ecommerce-page ecommerce-operations-page" dir={direction} lang={locale}>
-      <header className="ecommerce-page-header app-page-intro"><div><h1>{t("merchant.ordersTitle")}</h1></div><button className="ecommerce-secondary-button" onClick={load}><RefreshCw size={17} />{t("common.retry")}</button></header>
-      <section className="ecommerce-operations-card">
-        <div className="ecommerce-order-filters"><label><Search size={16} /><input aria-label={t("confirmation.orderNumber")} placeholder={t("confirmation.orderNumber")} value={filters.order_number} onChange={(event) => update("order_number", event.target.value)} /></label><input aria-label={t("merchant.customer")} placeholder={t("merchant.customer")} value={filters.customer_name} onChange={(event) => update("customer_name", event.target.value)} /><input aria-label={t("checkout.phone")} placeholder={t("checkout.phone")} value={filters.phone} onChange={(event) => update("phone", event.target.value)} dir="ltr" /><select aria-label={t("common.status")} value={filters.status} onChange={(event) => update("status", event.target.value)}><option value="">{t("merchant.filters")}</option>{["pending","confirmed","preparing","out_for_delivery","delivered","fulfilled","cancelled","rejected"].map((value) => <option key={value} value={value}>{statusLabel(value)}</option>)}</select><select aria-label={t("confirmation.paymentStatus")} value={filters.payment_status} onChange={(event) => update("payment_status", event.target.value)}><option value="">{t("merchant.filters")}</option>{["unpaid","collected","paid","refunded"].map((value) => <option key={value} value={value}>{paymentLabel(value)}</option>)}</select></div>
-        <div className="ecommerce-order-filters ecommerce-order-filters-secondary">
-          <select aria-label={t("admin.serviceArea")} value={filters.service_area_id} onChange={(event) => update("service_area_id", event.target.value)}><option value="">{t("admin.allDeliveryAreas")}</option>{areas.map((area) => <option key={area.id} value={area.id}>{locale === "ar" ? area.name_ar || area.name_en : area.name_en || area.name_ar}</option>)}</select>
-          <label><span>{t("admin.from")}</span><input aria-label={t("admin.ordersFrom")} type="date" value={filters.date_from} onChange={(event) => update("date_from", event.target.value)} /></label>
-          <label><span>{t("admin.to")}</span><input aria-label={t("admin.ordersTo")} type="date" value={filters.date_to} onChange={(event) => update("date_to", event.target.value)} /></label>
-        </div>
-        {loading ? <EcommerceOperationsSkeleton variant="orders" label={t("merchant.loadingOrders")} /> : error ? <div className="ecommerce-operations-state is-error">{error}<button onClick={load}>{t("common.retry")}</button></div> : !orders.length ? <div className="ecommerce-operations-state">{t("merchant.noOrders")}</div> : <div className="ecommerce-orders-table" role="table">{orders.map((order) => <Link key={order.id} to={`/ecommerce/orders/${order.id}`} role="row"><span><strong dir="ltr">{order.order_number}</strong><small>{dateTime(order.created_at)}</small></span><span>{order.customer_name}<small dir="ltr">{order.customer_phone}</small></span><span>{locale === "ar" ? order.service_area_name_ar || order.service_area_name_en : order.service_area_name_en || order.service_area_name_ar}</span><span>{money(order.total, order.currency)}</span><span>{statusLabel(order.status)}</span><span>{paymentLabel(order.payment_status)}</span></Link>)}</div>}
+    <main className="ecommerce-page ecommerce-operations-page ecommerce-orders-page" dir={direction} lang={locale}>
+      <header className="ecommerce-page-header app-page-intro"><div><h1>{t("merchant.ordersTitle")}</h1><p>{t("merchant.ordersSubtitle")}</p></div></header>
+      <div className="ecommerce-orders-workspace">
+        <aside className="ecommerce-operations-card ecommerce-orders-sidebar" aria-labelledby="orders-metadata-title">
+          <header className="ecommerce-orders-filter-toolbar"><h2 id="orders-metadata-title"><SlidersHorizontal size={18} />{t("merchant.filters")}</h2></header>
+      <div className="ecommerce-orders-panel-actions"><button type="button" className="ecommerce-secondary-button ecommerce-order-clear-filters" disabled={!Object.values(filters).some(Boolean)} onClick={() => setFilters({ order_number: "", customer_name: "", phone: "", status: "", payment_status: "", date_from: "", date_to: "", service_area_id: "" })}>{t("merchant.clearOrderFilters")}</button><button type="button" className="ecommerce-primary-button" disabled={loading} onClick={load}><RefreshCw size={17} />{t("common.refresh")}</button></div>
+          <div className="ecommerce-order-filters">
+          <label><span>{t("common.status")}</span><select aria-label={t("common.status")} value={filters.status} onChange={(event) => update("status", event.target.value)}><option value="">{t("merchant.allOrderStatuses")}</option>{["pending","confirmed","preparing","out_for_delivery","delivered","fulfilled","cancelled","rejected"].map((value) => <option key={value} value={value}>{statusLabel(value)}</option>)}</select></label>
+          <label><span>{t("confirmation.paymentStatus")}</span><select aria-label={t("confirmation.paymentStatus")} value={filters.payment_status} onChange={(event) => update("payment_status", event.target.value)}><option value="">{t("merchant.allPaymentStatuses")}</option>{["unpaid","collected","paid","refunded"].map((value) => <option key={value} value={value}>{paymentLabel(value)}</option>)}</select></label>
+          <label><span>{t("admin.serviceArea")}</span><select aria-label={t("admin.serviceArea")} value={filters.service_area_id} onChange={(event) => update("service_area_id", event.target.value)}><option value="">{t("admin.allDeliveryAreas")}</option>{areas.map((area) => <option key={area.id} value={area.id}>{locale === "ar" ? area.name_ar || area.name_en : area.name_en || area.name_ar}</option>)}</select></label>
+          <label><span>{t("admin.ordersFrom")}</span><input aria-label={t("admin.ordersFrom")} type="date"  value={filters.date_from} onChange={(event) => update("date_from", event.target.value)} /></label>
+          <label><span>{t("admin.ordersTo")}</span><input aria-label={t("admin.ordersTo")} type="date"  value={filters.date_to} onChange={(event) => update("date_to", event.target.value)} /></label>
+          </div>
+        </aside>
+        <div className="ecommerce-orders-main">
+          <section className="ecommerce-operations-card ecommerce-orders-search-card" aria-label={t("common.search")}>
+            <div className="ecommerce-order-filters">
+          <label><span>{t("confirmation.orderNumber")}</span><span className="ecommerce-search"><Search size={17} /><input aria-label={t("confirmation.orderNumber")} type="text" placeholder={t("confirmation.orderNumber")} value={filters.order_number} onChange={(event) => update("order_number", event.target.value)} /></span></label>
+          <label><span>{t("merchant.customer")}</span><input aria-label={t("merchant.customer")} type="text" placeholder={t("merchant.customer")} value={filters.customer_name} onChange={(event) => update("customer_name", event.target.value)} /></label>
+          <label><span>{t("checkout.phone")}</span><input aria-label={t("checkout.phone")} type="text" placeholder={t("checkout.phone")} value={filters.phone} onChange={(event) => update("phone", event.target.value)} dir="ltr"/></label>
+            </div>
+          </section>
+      <section className="ecommerce-operations-card ecommerce-orders-results">
+        <header className="ecommerce-orders-results-header"><h2>{t("merchant.ordersTitle")}</h2><span>{t("merchant.orderResultsCount", { count: orders.length })}</span></header>
+        {loading ? <EcommerceOperationsSkeleton variant="orders" label={t("merchant.loadingOrders")} /> : error ? <div className="ecommerce-operations-state is-error">{error}<button onClick={load}>{t("common.retry")}</button></div> : !orders.length ? <div className="ecommerce-operations-state ecommerce-orders-empty"><span className="ecommerce-orders-empty-icon"><PackageCheck size={28} /></span><h3>{t("merchant.noOrders")}</h3><p>{t(Object.values(filters).some(Boolean) ? "merchant.noMatchingOrdersHelp" : "merchant.noOrdersHelp")}</p></div> : <div className="ecommerce-orders-table" role="table">{orders.map((order) => <Link key={order.id} to={`/ecommerce/orders/${order.id}`} role="row"><span><strong dir="ltr">{order.order_number}</strong><small>{dateTime(order.created_at)}</small></span><span>{order.customer_name}<small dir="ltr">{order.customer_phone}</small></span><span>{locale === "ar" ? order.service_area_name_ar || order.service_area_name_en : order.service_area_name_en || order.service_area_name_ar}</span><span>{money(order.total, order.currency)}</span><span>{statusLabel(order.status)}</span><span>{paymentLabel(order.payment_status)}</span></Link>)}</div>}
       </section>
+        </div>
+      </div>
+      <AuthToast {...toast} dir={direction} onDismiss={() => setToast(null)} />
     </main>
   );
 }

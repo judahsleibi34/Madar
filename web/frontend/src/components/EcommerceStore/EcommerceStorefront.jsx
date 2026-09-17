@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, ArrowRight, CheckCircle2, ChevronRight, Gift, Mail, Menu, Minus, Phone, Plus, Search, ShieldCheck, ShoppingBag, ShoppingCart, Trash2, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -13,11 +13,13 @@ import {
   fetchPublicEcommerceDeliveryAreas,
   fetchPublicEcommerceOrderConfirmation,
   fetchPublicEcommerceLoyalty,
+  fetchPublicEcommerceDiscounts,
 } from "../../services/ecommerceApi";
 import StorefrontSeo, { safePublicUrl } from "./StorefrontSeo";
 import { getResponsiveMediaProps, isVideoMediaUrl, resolveMediaUrl } from "../../utils/media";
 import { normalizeStoreTheme } from "../../utils/ecommerceTheme";
 import { formatCommerceMoney, normalizeCommerceLocale } from "../../utils/commerceI18n";
+import { estimateCartDiscount } from "../../utils/ecommerceDiscounts";
 import { trackCommerceEvent, trackPurchaseOnce } from "../../services/commerceAnalytics";
 import { recordPublicSiteVisit } from "../../services/siteVisitApi";
 import "../../styles/public/ecommerce-storefront.css";
@@ -35,6 +37,28 @@ const formatPrice = formatCommerceMoney;
 const c = (key, values) => i18n.t(`commerce:${key}`, values);
 
 const activeLocale = () => normalizeCommerceLocale(i18n.resolvedLanguage || i18n.language);
+
+class StorefrontActionError extends Error {
+  constructor(messageKey) {
+    super("Storefront action could not complete");
+    this.messageKey = messageKey;
+  }
+}
+
+function StoreActionToast({ notification, onDismiss, locale }) {
+  useEffect(() => {
+    if (!notification) return undefined;
+    const timer = window.setTimeout(onDismiss, 4200);
+    return () => window.clearTimeout(timer);
+  }, [notification, onDismiss]);
+  if (!notification) return null;
+  return <div className={`live-store-action-toast is-${notification.type}`} role={notification.type === "error" ? "alert" : "status"} aria-live={notification.type === "error" ? "assertive" : "polite"} dir={locale === "ar" ? "rtl" : "ltr"}>
+    <span aria-hidden="true">{notification.type === "error" ? "!" : <CheckCircle2 size={18} />}</span>
+    <div><strong>{notification.title}</strong>{notification.message && <p>{notification.message}</p>}</div>
+    <button type="button" onClick={onDismiss} aria-label={c("admin.close")}><X size={16} /></button>
+  </div>;
+}
+
 const readCart = (key) => {
   try {
     const value = JSON.parse(localStorage.getItem(key) || "[]");
@@ -162,16 +186,14 @@ function StoreCart({ open, items, homePath, checkoutPath, onClose, onQuantityCha
   );
 }
 
-function StoreCheckout({ items, loyalty, shopPath, storePath, subdomain, onPlaceOrder }) {
+function StoreCheckout({ items, loyalty, normalDiscounts, shopPath, storePath, subdomain, onPlaceOrder, onNotify }) {
   const navigate = useNavigate();
   const [status, setStatus] = useState({ saving: false, error: "" });
   const [delivery, setDelivery] = useState({ loading: true, error: "", areas: [] });
   const [selectedAreaId, setSelectedAreaId] = useState("");
   const currency = items[0]?.currency || "USD";
   const subtotal = items.reduce((total, item) => total + Number(item.price || 0) * Number(item.quantity || 0), 0);
-  const activeReward = (loyalty?.entitlements || []).find((item) => item.status === "active" && (!item.expires_at || new Date(item.expires_at) > new Date()));
-  const estimatedDiscount = activeReward ? items.filter((item) => String(item.id) === String(activeReward.reward_product_id))
-    .reduce((total, item) => total + Number(item.price || 0) * Number(item.quantity || 0) * 0.1, 0) : 0;
+  const estimatedDiscount = estimateCartDiscount(items, normalDiscounts, loyalty?.entitlements || []);
   const estimatedTotal = subtotal - estimatedDiscount;
 
   const checkoutTracked = useRef(false);
@@ -189,11 +211,15 @@ function StoreCheckout({ items, loyalty, shopPath, storePath, subdomain, onPlace
       const areas = result?.areas || [];
       setDelivery({ loading: false, error: "", areas });
       setSelectedAreaId((current) => current || areas[0]?.id || "");
-    }).catch((error) => {
-      if (!cancelled) setDelivery({ loading: false, error: error.message || c("errors.loadStore"), areas: [] });
+      if (!areas.length) onNotify({ type: "error", title: c("storeFeedback.noDelivery"), message: c("checkout.noAreas") });
+    }).catch(() => {
+      if (!cancelled) {
+        setDelivery({ loading: false, error: c("storeFeedback.deliveryUnavailable"), areas: [] });
+        onNotify({ type: "error", title: c("storeFeedback.deliveryUnavailable"), message: c("admin.tryAgain") });
+      }
     });
     return () => { cancelled = true; };
-  }, [subdomain]);
+  }, [subdomain, onNotify]);
   const selectedArea = delivery.areas.find((area) => area.id === selectedAreaId);
 
   if (!items.length) {
@@ -209,6 +235,12 @@ function StoreCheckout({ items, loyalty, shopPath, storePath, subdomain, onPlace
 
   const submit = async (event) => {
     event.preventDefault();
+    const invalidField = Array.from(event.currentTarget.elements).find((field) => field.willValidate && !field.validity.valid);
+    if (invalidField) {
+      onNotify({ type: "error", title: c("storeFeedback.completeFields"), message: c("storeFeedback.completeFieldsBody") });
+      invalidField.focus();
+      return;
+    }
     setStatus({ saving: true, error: "" });
     const form = new FormData(event.currentTarget);
     try {
@@ -226,9 +258,12 @@ function StoreCheckout({ items, loyalty, shopPath, storePath, subdomain, onPlace
         items: items.map((item) => ({ product_id: item.id, ...(item.variant_id ? { variant_id: item.variant_id } : {}), quantity: item.quantity })),
       });
       if (!result?.confirmation_token) throw new Error(c("errors.confirmationUnavailable"));
+      onNotify({ type: "success", title: c("storeFeedback.orderPlaced"), message: c("storeFeedback.orderPlacedBody") });
       navigate(`${storePath}/confirmation/${result.confirmation_token}`, { replace: true });
     } catch (error) {
-      setStatus({ saving: false, error: error?.message || c("errors.placeOrder") });
+      const message = error instanceof StorefrontActionError ? c(error.messageKey) : c("errors.placeOrder");
+      setStatus({ saving: false, error: message });
+      onNotify({ type: "error", title: message, message: c("admin.tryAgain") });
     }
   };
 
@@ -239,7 +274,7 @@ function StoreCheckout({ items, loyalty, shopPath, storePath, subdomain, onPlace
         <h1>{c("checkout.title")}</h1>
         <p>{c("checkout.subtitle")}</p>
       </header>
-      <form onSubmit={submit}>
+      <form onSubmit={submit} noValidate>
         <div className="live-store-checkout-form">
           <section>
             <h2>{c("checkout.contact")}</h2>
@@ -274,7 +309,7 @@ function StoreCheckout({ items, loyalty, shopPath, storePath, subdomain, onPlace
             {items.map((item) => <article key={cartLineKey(item)}><ProductImage product={item} /><div><strong>{item.name}</strong>{item.selected_options?.length > 0 && <small>{optionSnapshotText(item.selected_options)}</small>}<span>{c("common.quantity")} {item.quantity}</span></div><b>{formatPrice(Number(item.price || 0) * item.quantity, item.currency, activeLocale())}</b></article>)}
           </div>
           <div className="live-store-checkout-total"><span>{c("common.subtotal")}</span><strong>{formatPrice(subtotal, currency, activeLocale())}</strong></div>
-          {estimatedDiscount > 0 && <div className="live-store-checkout-total"><span>{c("loyalty.appliedDiscount")}</span><strong>-{formatPrice(estimatedDiscount, currency, activeLocale())}</strong></div>}
+          {estimatedDiscount > 0 && <div className="live-store-checkout-total"><span>{c("common.discount")}</span><strong>-{formatPrice(estimatedDiscount, currency, activeLocale())}</strong></div>}
           {estimatedDiscount > 0 && <div className="live-store-checkout-total"><span>{c("common.total")}</span><strong>{formatPrice(estimatedTotal, currency, activeLocale())}</strong></div>}
           {selectedArea && <p>{c("checkout.serviceArea")}: <strong>{activeLocale() === "ar" ? selectedArea.name_ar || selectedArea.name_en : selectedArea.name_en || selectedArea.name_ar}</strong></p>}
           <p>{c("checkout.deliveryFeeNote")}</p>
@@ -666,6 +701,7 @@ export default function EcommerceStorefront({ subdomain: suppliedSubdomain = "",
   const [productDetail, setProductDetail] = useState(null);
   const [confirmation, setConfirmation] = useState(null);
   const [loyalty, setLoyalty] = useState(null);
+  const [normalDiscounts, setNormalDiscounts] = useState([]);
   const [requestStatus, setRequestStatus] = useState({
     key: "",
     loading: true,
@@ -674,6 +710,9 @@ export default function EcommerceStorefront({ subdomain: suppliedSubdomain = "",
   const cartKey = `madar-store-cart:${subdomain}`;
   const [cart, setCart] = useState(() => readCart(cartKey));
   const [cartOpen, setCartOpen] = useState(false);
+  const [notification, setNotification] = useState(null);
+  const notify = useCallback((value) => setNotification({ ...value }), []);
+  const dismissNotification = useCallback(() => setNotification(null), []);
   const orderAttemptRef = useRef({ fingerprint: "", key: "" });
   const analyticsViewsRef = useRef(new Set());
   const recordedVisitRef = useRef("");
@@ -712,6 +751,7 @@ export default function EcommerceStorefront({ subdomain: suppliedSubdomain = "",
     contactRoute,
     checkoutRoute,
     confirmationToken,
+    notify,
   ]);
   const loading = requestStatus.key !== requestKey || requestStatus.loading;
   const error = requestStatus.key === requestKey ? requestStatus.error : "";
@@ -750,13 +790,14 @@ export default function EcommerceStorefront({ subdomain: suppliedSubdomain = "",
         }
         setRequestStatus({ key: requestKey, loading: false, error: "" });
       })
-      .catch((requestError) => {
+      .catch(() => {
         if (!cancelled) {
           setRequestStatus({
             key: requestKey,
             loading: false,
-            error: requestError?.message || c("errors.loadStore"),
+            error: c("errors.loadStore"),
           });
+          notify({ type: "error", title: c("errors.loadStore"), message: c("admin.tryAgain") });
         }
       });
     return () => {
@@ -775,6 +816,7 @@ export default function EcommerceStorefront({ subdomain: suppliedSubdomain = "",
     filters.category,
     filters.tag,
     confirmationToken,
+    notify,
   ]);
 
   useEffect(() => {
@@ -782,8 +824,11 @@ export default function EcommerceStorefront({ subdomain: suppliedSubdomain = "",
     fetchPublicEcommerceLoyalty(subdomain)
       .then((result) => { if (!cancelled) setLoyalty(result); })
       .catch(() => { if (!cancelled) setLoyalty(null); });
+    fetchPublicEcommerceDiscounts(subdomain)
+      .then((result) => { if (!cancelled) setNormalDiscounts(result?.conditions || []); })
+      .catch(() => { if (!cancelled) { setNormalDiscounts([]); notify({ type: "error", title: c("storeFeedback.discountsUnavailable"), message: c("storeFeedback.discountsUnavailableBody") }); } });
     return () => { cancelled = true; };
-  }, [subdomain, confirmationToken]);
+  }, [subdomain, confirmationToken, notify]);
 
   useEffect(() => {
     if (loading || error || !productDetail?.product) return;
@@ -838,12 +883,22 @@ export default function EcommerceStorefront({ subdomain: suppliedSubdomain = "",
   const cartCount = cartItems.reduce((total, item) => total + item.quantity, 0);
 
   const saveCart = (next) => {
-    setCart(next);
-    localStorage.setItem(cartKey, JSON.stringify(next));
+    try {
+      localStorage.setItem(cartKey, JSON.stringify(next));
+      setCart(next);
+      return true;
+    } catch {
+      notify({ type: "error", title: c("storeFeedback.cartUnavailable"), message: c("storeFeedback.cartUnavailableBody") });
+      return false;
+    }
   };
 
   const addToCart = (product) => {
     const identity = cartLineKey(product); const existing = cartItems.find((item) => cartLineKey(item) === identity);
+    if (existing?.quantity >= 99) {
+      notify({ type: "error", title: c("storeFeedback.quantityLimit"), message: c("storeFeedback.quantityLimitBody") });
+      return;
+    }
     const nextItem = {
       id: product.id,
       slug: product.slug,
@@ -856,13 +911,13 @@ export default function EcommerceStorefront({ subdomain: suppliedSubdomain = "",
       images: product.images || [],
     };
     trackCommerceEvent("add_to_cart", { product_id: product.id, variant_id: product.variant_id || null, quantity: 1, amount: Number(product.price || 0), currency: product.currency, locale, selected_options: (product.selected_options || []).map((item) => ({ option_code: item.option_code, value_code: item.value_code })) });
-    saveCart([...cartItems.filter((item) => cartLineKey(item) !== identity), nextItem]);
+    if (saveCart([...cartItems.filter((item) => cartLineKey(item) !== identity), nextItem])) notify({ type: "success", title: c("storeFeedback.added"), message: c("storeFeedback.addedBody", { name: product.name }) });
   };
 
   const removeCartItem = (id) => {
     const removed = cartItems.find((item) => cartLineKey(item) === id);
     if (removed) trackCommerceEvent("remove_from_cart", { product_id: removed.id, variant_id: removed.variant_id || null, quantity: removed.quantity, currency: removed.currency, locale });
-    saveCart(cartItems.filter((item) => cartLineKey(item) !== id));
+    if (saveCart(cartItems.filter((item) => cartLineKey(item) !== id))) notify({ type: "success", title: c("storeFeedback.removed"), message: c("storeFeedback.removedBody") });
   };
   const openCart = () => {
     trackCommerceEvent("view_cart", { item_count: cartCount, subtotal: cartItems.reduce((sum, item) => sum + Number(item.price || 0) * item.quantity, 0), currency: cartItems[0]?.currency || site?.commerce_currency, locale });
@@ -871,18 +926,22 @@ export default function EcommerceStorefront({ subdomain: suppliedSubdomain = "",
 
   const changeCartQuantity = (id, quantity) => {
     if (quantity < 1) {
-      saveCart(cartItems.filter((item) => cartLineKey(item) !== id));
+      removeCartItem(id);
       return;
     }
       const removed = cartItems.find((item) => cartLineKey(item) === id);
       if (removed) trackCommerceEvent("remove_from_cart", { product_id: removed.id, variant_id: removed.variant_id || null, quantity: removed.quantity, currency: removed.currency, locale });
-    saveCart(cartItems.map((item) => cartLineKey(item) === id ? { ...item, quantity: Math.min(99, quantity) } : item));
+    if (quantity > 99) {
+      notify({ type: "error", title: c("storeFeedback.quantityLimit"), message: c("storeFeedback.quantityLimitBody") });
+      return;
+    }
+    if (saveCart(cartItems.map((item) => cartLineKey(item) === id ? { ...item, quantity } : item))) notify({ type: "success", title: c("storeFeedback.quantityUpdated"), message: c("storeFeedback.quantityUpdatedBody") });
   };
 
   const placeOrder = async (payload) => {
     const reconciliation = await reconcilePublicEcommerceCart(subdomain, payload.items);
     if (!reconciliation?.valid) {
-      throw new Error(c("cart.changed"));
+      throw new StorefrontActionError("cart.changed");
     }
     const reconciledById = new Map((reconciliation.items || []).map((item) => [`${item.product_id}:${item.variant_id || "simple"}`, item]));
     const refreshedCart = cartItems.map((item) => {
@@ -894,7 +953,7 @@ export default function EcommerceStorefront({ subdomain: suppliedSubdomain = "",
     );
     if (pricesChanged) {
       saveCart(refreshedCart);
-      throw new Error(c("cart.priceChanged"));
+      throw new StorefrontActionError("cart.priceChanged");
     }
     const fingerprint = JSON.stringify(payload);
     if (orderAttemptRef.current.fingerprint !== fingerprint) {
@@ -907,6 +966,7 @@ export default function EcommerceStorefront({ subdomain: suppliedSubdomain = "",
       ...payload,
       idempotency_key: orderAttemptRef.current.key,
     });
+    if (!result?.confirmation_token) throw new StorefrontActionError("errors.confirmationUnavailable");
     orderAttemptRef.current = { fingerprint: "", key: "" };
     saveCart([]);
     return result;
@@ -948,6 +1008,7 @@ export default function EcommerceStorefront({ subdomain: suppliedSubdomain = "",
       <StorefrontSeo origin={window.location.origin} storePath={canonicalStorePath} locale={locale} site={site} productDetail={productDetail} category={activeCategory} view={seoView} />
       <StoreHeader brand={brand} logoUrl={site?.logo_url} cartCount={cartCount} shopPath={shopPath} homePath={homePath} categoriesPath={categoriesPath} contactPath={contactPath} onCartOpen={openCart} />
       {site?.growth?.announcement_enabled && announcementText && <div className="live-store-announcement" role="status">{announcementLink ? <a href={announcementLink} onClick={() => trackCommerceEvent("promotion_click", { store: subdomain, locale, placement: "announcement" })}>{announcementText}</a> : <span>{announcementText}</span>}</div>}
+      <StoreActionToast notification={notification} onDismiss={dismissNotification} locale={locale} />
       <StoreCart open={cartOpen} items={cartItems} homePath={homePath} checkoutPath={checkoutPath} onClose={() => setCartOpen(false)} onQuantityChange={changeCartQuantity} onRemove={removeCartItem} />
       {loyalty && <section className="live-store-loyalty" aria-label={c("loyalty.title")}>
         <Gift size={20} aria-hidden="true" />
@@ -979,7 +1040,7 @@ export default function EcommerceStorefront({ subdomain: suppliedSubdomain = "",
         )}
 
         {!loading && !error && checkoutRoute && (
-          <StoreCheckout items={cartItems} loyalty={loyalty} shopPath={shopPath} storePath={storePath} subdomain={subdomain} onPlaceOrder={placeOrder} />
+          <StoreCheckout items={cartItems} loyalty={loyalty} normalDiscounts={normalDiscounts} shopPath={shopPath} storePath={storePath} subdomain={subdomain} onPlaceOrder={placeOrder} onNotify={notify} />
         )}
 
         {!loading && !error && confirmationRoute && (

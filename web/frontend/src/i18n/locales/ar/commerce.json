@@ -1,5 +1,8 @@
 {
+  "storeFeedback": {"noDelivery": "التوصيل غير متاح حاليًا", "discountsUnavailable": "تعذر تحميل الخصومات المتاحة", "discountsUnavailableBody": "تعذر التحقق من الخصومات. حاول مجددًا قبل تقديم طلبك.", "completeFields": "تحقق من تفاصيل الطلب", "completeFieldsBody": "أكمل الحقول المطلوبة وأدخل عنوان بريد إلكتروني صالحًا قبل تقديم طلبك.", "added": "تمت الإضافة إلى السلة", "addedBody": "تمت إضافة {{name}} إلى سلتك.", "removed": "تمت إزالة المنتج", "removedBody": "تمت إزالة المنتج من سلتك.", "quantityUpdated": "تم تحديث الكمية", "quantityUpdatedBody": "تم تحديث الكمية في سلتك.", "quantityLimit": "تم بلوغ الحد الأقصى للكمية", "quantityLimitBody": "يمكنك إضافة ما يصل إلى 99 قطعة من كل منتج.", "cartUnavailable": "تعذر تحديث سلتك", "cartUnavailableBody": "تحقق من أذونات التخزين في المتصفح وحاول مجددًا.", "deliveryUnavailable": "تعذر تحميل خيارات التوصيل", "orderPlaced": "تم تقديم الطلب", "orderPlacedBody": "تم استلام طلبك. جارٍ فتح التأكيد."},
+  "feedback": {"draftUnavailable": "تعذر الاحتفاظ بمسودة المعاينة المحلية", "draftUnavailableBody": "تحقق من أذونات التخزين في المتصفح ثم حاول مجددًا. لم يتغير التصميم المنشور.", "mediaUploaded": "تم رفع الوسائط", "mediaUploadedBody": "تمت إضافة الوسائط. احفظ المنتج للاحتفاظ بهذه التغييرات.", "locationCreated": "تمت إضافة موقع التوصيل", "locationCreatedBody": "احفظ إعدادات التوصيل لإتاحة هذا الموقع للعملاء.", "ordersRefreshed": "تم تحديث الطلبات", "ordersRefreshedBody": "تظهر الآن أحدث الطلبات.", "previewRefreshed": "تم تحديث معاينة المتجر", "previewRefreshedBody": "اكتمل تحميل معاينة المتجر.", "cachedCatalog": "تعذر تحديث الكتالوج. يتم عرض العناصر التي تم تحميلها سابقًا."},
   "common": {
+    "refresh": "تحديث",
     "products": "المنتجات", "categories": "التصنيفات", "tags": "الوسوم", "delivery": "التوصيل", "orders": "الطلبات",
     "save": "حفظ", "cancel": "إلغاء", "remove": "إزالة", "search": "بحث", "loading": "جارٍ التحميل…", "retry": "إعادة المحاولة",
     "quantity": "الكمية", "subtotal": "المجموع الفرعي", "discount": "الخصم", "total": "الإجمالي", "currency": "العملة",
@@ -45,6 +48,12 @@
     "paymentMethod": "طريقة الدفع", "paymentStatus": "حالة الدفع", "orderStatus": "حالة الطلب", "backToShop": "العودة إلى المتجر"
   },
   "merchant": {
+    "orderResultsCount": "{{count}} نتائج", "noOrdersHelp": "ستظهر طلبات العملاء الجديدة هنا.", "noMatchingOrdersHelp": "جرّب فلاتر مختلفة أو امسحها لعرض المزيد من الطلبات.",
+    "ordersSubtitle": "إدارة طلبات العملاء والمدفوعات وحالة التوصيل.", "allOrderStatuses": "كل حالات الطلب", "allPaymentStatuses": "كل حالات الدفع", "clearOrderFilters": "مسح الفلاتر",
+    "locationDetails": "تفاصيل الموقع", "locationArabicLanguage": "العربية (اختياري)", "locationRegionShort": "المحافظة / المنطقة", "locationCityShort": "المدينة / البلدة", "locationOtherShort": "الحي / مستوى آخر",
+    "locationCountryArabic": "الدولة بالعربية (اختياري)", "locationRegionArabic": "الولاية / المحافظة / المنطقة بالعربية (اختياري)", "locationCityArabic": "المدينة / البلدة بالعربية (اختياري)", "locationOtherArabic": "الحي / مستوى آخر بالعربية (اختياري)",
+    "removeLocationLevel": "إزالة مستوى الموقع {{number}}",
+    "addCustomLocation": "إضافة موقع مخصص", "locationCountry": "الدولة", "locationCountryExample": "مثال: الأردن", "locationRegion": "الولاية / المحافظة / المنطقة (اختياري)", "locationCity": "المدينة / البلدة (اختياري)", "locationOther": "الحي / مستوى آخر (اختياري)", "addLocationLevel": "إضافة مستوى آخر للموقع", "locationArabic": "اسم الموقع بالعربية (اختياري)", "addLocation": "إضافة الموقع",
     "commerce": "التجارة الإلكترونية", "store": "واجهة المتجر", "productsTitle": "المنتجات", "productsSubtitle": "إدارة المنتجات والتصنيفات والوسوم والأسعار والمخزون.",
     "newProduct": "منتج جديد", "editProduct": "تعديل المنتج", "saveProduct": "حفظ المنتج", "saving": "جارٍ الحفظ…", "loadingProduct": "جارٍ تحميل محرر المنتج…",
     "basic": "المعلومات الأساسية", "organizationMedia": "التنظيم والصور", "pricing": "التسعير", "attributes": "المواصفات",
@@ -62,6 +71,12 @@
     "statusHistory": "سجل الحالة", "markCollected": "تسجيل تحصيل الدفع عند الاستلام", "filters": "عوامل التصفية", "noOrders": "لا توجد طلبات", "loadingOrders": "جارٍ تحميل الطلبات…"
   },
   "admin": {
+    "searchAppearance": "تحسين البحث",
+    "announcementTab": "الإعلان",
+    "featuredTab": "المميزة",
+    "previewDevice": "جهاز المعاينة",
+    "desktopPreview": "حاسوب",
+    "mobilePreview": "هاتف",
     "productSingular": "منتج", "productsSingular": "منتج", "categoriesSingular": "تصنيف", "tagsSingular": "وسم",
     "add": "إضافة {{item}}", "fullProductEditor": "إضافة منتج", "manage": "إدارة {{items}}", "search": "البحث في {{items}}",
     "stockFilter": "تصفية المنتجات حسب المخزون", "noMatching": "لا توجد نتائج مطابقة", "tryDifferent": "جرّب بحثًا أو تصفية مخزون مختلفة.",
@@ -86,15 +101,15 @@
     "variantsHelp": "يمكن شراء التركيبات المضافة هنا فقط، ولا يتم إنشاء تركيبات تلقائية.", "variantMediaHelp": "تتقدم وسائط النوع على وسائط المنتج في واجهة المتجر.", "chooseValue": "اختر قيمة", "incompleteCombination": "تركيبة غير مكتملة", "value": "القيمة",
     "optionsVariantsHelp": "أضف الخيارات التي يختارها العميل، ثم حدد التركيبات التي تبيعها فعلاً. لا يمكن شراء إلا الأنواع التي تنشئها.", "variantAttributesHelp": "عرّف اختيارات مثل المقاس أو اللون أو التشطيب. أضف جميع القيم هنا قبل إدارة المخزون.", "variantsInventoryHelp": "فعّل فقط التركيبات التي تبيعها. يُدار المخزون لكل نوع، ولا تُنشأ التركيبات غير المتاحة.",
     "noOptionsTitle": "هذا المنتج بلا خيارات", "noOptionsHelp": "يستخدم رمز المنتج وسعره ومخزونه ووسائطه أعلاه. أضف خيارات فقط عندما يحتاج العميل للاختيار، مثل المقاس أو اللون.", "noVariantAttributesTitle": "هذا منتج بسيط", "noVariantAttributesHelp": "يستخدم رمز المنتج وسعره ومخزونه. أضف خصائص الأنواع فقط عندما يختار العميل قيماً مثل المقاس أو التشطيب.",
-    "specification": "المواصفة", "specificationValue": "القيمة", "englishName": "الاسم بالإنجليزية", "arabicName": "الاسم بالعربية", "englishValue": "القيمة بالإنجليزية", "arabicValue": "القيمة بالعربية", "removeSpecification": "إزالة المواصفة",
-    "untitledOption": "خاصية النوع {{count}}", "removeOption": "إزالة خاصية النوع", "customerMustChoose": "يجب على العميل اختيار قيمة", "requiredOptionLabel": "إلزام اختيار قيمة لـ {{option}}", "values": "القيم", "presentationType": "النوع", "textType": "نص", "colorType": "لون", "colorSwatch": "عينة اللون", "advanced": "متقدم",
-    "valueEntryPlaceholder": "اكتب قيمة واضغط Enter", "newValueForOption": "قيمة جديدة لـ {{option}}", "removeOptionValue": "إزالة {{value}}", "addAtLeastOneValue": "أضف قيمة واحدة على الأقل إلى {{option}}.",
+    "specification": "المواصفة", "specificationValue": "القيمة", "specificationNameHelp": "سمِّ تفاصيل المنتج، مثل الخامة أو القَصّة أو تعليمات العناية.", "specificationValueHelp": "أدخل المعلومات المقابلة، مثل قطن 100٪ أو عادية أو غسيل آلي بارد.", "specificationNameExampleEnglish": "Example: Material", "specificationNameExampleArabic": "مثال: الخامة", "specificationValueExampleEnglish": "Example: 100% Cotton", "specificationValueExampleArabic": "مثال: قطن \u2066100%\u2069", "englishName": "الاسم بالإنجليزية", "arabicName": "الاسم بالعربية", "englishValue": "القيمة بالإنجليزية", "arabicValue": "القيمة بالعربية", "removeSpecification": "إزالة المواصفة",
+    "untitledOption": "خاصية النوع {{count}}", "removeOption": "إزالة خاصية النوع", "customerMustChoose": "يجب على العميل اختيار قيمة", "requiredOptionLabel": "إلزام اختيار قيمة لـ {{option}}", "values": "القيم", "optionName": "اسم الخاصية", "optionNameHelp": "سمِّ الخيار الذي يحدده العميل، مثل المقاس أو اللون أو التشطيب.", "optionNameExampleEnglish": "Example: Size", "optionNameExampleArabic": "مثال: المقاس", "presentationType": "النوع", "presentationTypeHelp": "استخدم النص لخيارات مثل صغير، واستخدم اللون عندما ينبغي عرض عينات ألوان.", "textType": "نص", "colorType": "لون", "colorSwatch": "عينة اللون", "advanced": "متقدم",
+    "valueEntryPlaceholder": "اكتب قيمة واضغط Enter", "optionValuesHelp": "أضف خيارًا واحدًا للعميل في كل مرة، واضغط Enter بعد كل قيمة.", "optionValueExample": "Example: Small", "editOptionValue": "تعديل القيمة", "editOptionValueHelp": "حدّث الترجمات والمظهر للقيمة {{value}}.", "closeValueEditor": "إغلاق محرر القيمة", "newValueForOption": "قيمة جديدة لـ {{option}}", "removeOptionValue": "إزالة {{value}}", "addAtLeastOneValue": "أضف قيمة واحدة على الأقل إلى {{option}}.",
     "duplicateOptionValue": "هذه القيمة موجودة بالفعل في {{option}}.", "referencedValueArchived": "القيمة {{value}} مستخدمة في نوع موجود، لذلك أُرشفت بدلاً من حذفها.", "optionUsedByVariant": "هذا الخيار مستخدم في نوع موجود. عطّل أنواعه قبل تغيير بنية الخيار.",
     "chooseSellableCombinations": "اختر التركيبات التي تبيعها", "combinationPreviewHelp": "راجع التركيبات الممكنة وحدد فقط ما يمكن للعملاء شراؤه. لن يتم إنشاء أي شيء تلقائياً.", "possibleCombinations": "{{count}} تركيبات ممكنة",
     "selectAllAvailable": "تحديد كل المتاح", "clearSelection": "مسح التحديد", "alreadyCreated": "تم الإنشاء", "completeOptionValues": "أضف قيمة واحدة على الأقل لكل خيار لمعاينة التركيبات.", "createSelectedVariants": "إنشاء الأنواع المحددة ({{count}})",
     "variantsCreated": "تم إنشاء {{count}} أنواع. أضف الرمز والسعر والمخزون أدناه.", "manageVariants": "إدارة الأنواع", "variantManagementHelp": "ينتقل رمز المنتج ومخزونه إلى هذه الأنواع الصريحة. افتح الصف للحقول المتقدمة والوسائط.", "variantCount": "{{count}} أنواع",
     "selectedVariants": "{{count}} محددة", "activate": "تفعيل", "deactivate": "تعطيل", "inheritBasePrice": "استخدام السعر الأساسي", "enableBackorders": "تفعيل الطلب عند النفاد", "disableBackorders": "تعطيل الطلب عند النفاد", "variantsUpdated": "تم تحديث {{count}} أنواع.",
-    "actions": "الإجراءات", "editDetails": "تعديل التفاصيل", "closeVariantDetails": "إغلاق تفاصيل النوع", "selectAllVariants": "تحديد كل الأنواع", "selectVariant": "تحديد {{variant}}", "inheritPrice": "السعر الأساسي {{price}} {{currency}}", "removeUnsavedVariant": "إزالة النوع غير المحفوظ", "available": "متاح", "quantity": "الكمية", "variantAvailabilityLabel": "توفر {{variant}}", "variantQuantityLabel": "كمية {{variant}}", "variantSkuLabel": "رمز {{variant}}", "variantPriceLabel": "سعر {{variant}} الخاص", "completeVariantAttributeValues": "أضف قيمة واحدة على الأقل لكل خاصية نوع لإدارة التركيبات.",
+    "actions": "الإجراءات", "combination": "التركيبة", "editDetails": "تعديل التفاصيل", "editVariantLabel": "تعديل تفاصيل {{variant}}", "removeVariantLabel": "إزالة نوع {{variant}}", "closeVariantDetails": "إغلاق تفاصيل النوع", "selectAllVariants": "تحديد كل الأنواع", "selectVariant": "تحديد {{variant}}", "inheritPrice": "{{price}} {{currency}}", "removeUnsavedVariant": "إزالة النوع غير المحفوظ", "available": "متاح", "quantity": "الكمية", "variantAvailabilityLabel": "توفر {{variant}}", "variantQuantityLabel": "كمية {{variant}}", "variantSkuLabel": "رمز {{variant}}", "variantPriceLabel": "سعر {{variant}} الخاص", "completeVariantAttributeValues": "أضف قيمة واحدة على الأقل لكل خاصية نوع لإدارة التركيبات.",
     "validationProductName": "أدخل اسم المنتج بالإنجليزية.", "validationOptionName": "أدخل اسماً إنجليزياً لكل خاصية نوع.", "validationDuplicateOption": "يجب أن تكون أسماء خصائص الأنواع فريدة.", "validationValueName": "أدخل اسماً إنجليزياً لكل قيمة في {{option}}.", "validationColorSwatch": "اختر عينة لون لكل قيمة فعالة في {{option}}.", "validationDuplicateCombination": "هذه التركيبة موجودة بالفعل.", "validationVariantSku": "أدخل رمزاً لكل نوع.", "validationUniqueSku": "يجب أن تكون رموز الأنواع فريدة.", "validationSellableVariant": "أنشئ وفعّل نوعاً واحداً على الأقل قبل نشر هذا المنتج.", "validationRequiredOptions": "اختر قيمة لكل خيار مطلوب.",
     "attributeNameEnglish": "اسم السمة بالإنجليزية", "attributeValueEnglish": "قيمة السمة بالإنجليزية", "attributeNameArabic": "اسم السمة بالعربية", "attributeValueArabic": "قيمة السمة بالعربية",
     "moveAttributeUp": "نقل السمة لأعلى", "moveAttributeDown": "نقل السمة لأسفل", "moveOptionUp": "نقل الخيار لأعلى", "moveOptionDown": "نقل الخيار لأسفل", "moveValueUp": "نقل القيمة لأعلى", "moveValueDown": "نقل القيمة لأسفل",
@@ -112,7 +127,22 @@
     "draftStoreTitle": "معاينة مسودة المتجر الإلكتروني", "publishedStoreTitle": "المتجر الإلكتروني المنشور"
   },
   "loyalty": {
-    "title": "ولاء العملاء", "subtitle": "كافئ العملاء الموثقين بعد تسليم الطلب وتحصيل الدفع.", "enabled": "تفعيل مكافآت الولاء", "earningRate": "نسبة كسب النقاط (%)", "threshold": "النقاط المطلوبة للمكافأة", "rewardProduct": "منتج المكافأة", "chooseProduct": "اختر منتجاً", "discount": "خصم المكافأة", "validity": "صلاحية المكافأة", "lifetime": "مدى الحياة", "fixedPeriod": "مدة محددة", "validityDays": "عدد أيام الصلاحية", "earningExplanation": "تُمنح النقاط مرة واحدة فقط بعد التسليم وتحصيل الدفع معاً. تطبق المكافأة تلقائياً على جميع خيارات المنتج المحدد.", "saved": "تم حفظ إعدادات الولاء", "savedBody": "سيطبق الإصدار الجديد على عمليات الكسب المستقبلية، وتحتفظ المكافآت الحالية بشروطها الأصلية.", "loadError": "تعذر تحميل إعدادات الولاء", "saveError": "تعذر حفظ إعدادات الولاء", "balance": "نقاطك", "activeReward": "مكافأة فعالة", "expires": "تنتهي {{date}}", "rewardLifetime": "بلا انتهاء", "appliedDiscount": "مكافأة الولاء (10%)"
+    "conditions": "شروط الخصم",
+    "highestDiscount": "يطبق أعلى خصم مستحق لكل منتج محدد، دون جمع الخصومات.",
+    "conditionNumber": "الشرط {{number}}",
+    "removeCondition": "حذف الشرط {{number}}",
+    "audience": "استحقاق العميل",
+    "loyaltyAudience": "الولاء — الوصول إلى حد النقاط",
+    "normalAudience": "عادي — دون اشتراط نقاط",
+    "discountPercent": "الخصم (%)",
+    "rewardProducts": "منتجات المكافأة",
+    "selectedProducts": "تم تحديد {{count}}",
+    "searchProducts": "البحث عن المنتجات",
+    "noProducts": "لم يتم العثور على منتجات",
+    "addCondition": "إضافة شرط خصم",
+    "normalPeriodHint": "تبدأ المدة عند حفظ هذه الإعدادات.",
+    "loyaltyPeriodHint": "تبدأ المدة عندما يفتح العميل مكافأة الولاء.",
+    "title": "ولاء العملاء", "subtitle": "كافئ العملاء الموثقين بعد تسليم الطلب وتحصيل الدفع.", "enabled": "تفعيل مكافآت الولاء", "earningRate": "نسبة كسب النقاط (%)", "threshold": "النقاط المطلوبة للمكافأة", "rewardProduct": "منتج المكافأة", "chooseProduct": "اختر منتجاً", "discount": "خصم المكافأة", "validity": "صلاحية المكافأة", "lifetime": "مدى الحياة", "fixedPeriod": "مدة محددة", "validityDays": "عدد أيام الصلاحية", "earningExplanation": "تُمنح النقاط مرة واحدة فقط بعد التسليم وتحصيل الدفع معاً. تطبق المكافأة تلقائياً على جميع خيارات المنتج المحدد.", "saved": "تم حفظ إعدادات الولاء", "savedBody": "سيطبق الإصدار الجديد على عمليات الكسب المستقبلية، وتحتفظ المكافآت الحالية بشروطها الأصلية.", "loadError": "تعذر تحميل إعدادات الولاء", "saveError": "تعذر حفظ إعدادات الولاء", "balance": "نقاطك", "activeReward": "مكافأة فعالة", "expires": "تنتهي {{date}}", "rewardLifetime": "بلا انتهاء", "appliedDiscount": "مكافأة الولاء"
   },
   "status": {
     "pending": "قيد الانتظار", "confirmed": "مؤكد", "preparing": "قيد التجهيز", "out_for_delivery": "خرج للتوصيل", "delivered": "تم التوصيل",

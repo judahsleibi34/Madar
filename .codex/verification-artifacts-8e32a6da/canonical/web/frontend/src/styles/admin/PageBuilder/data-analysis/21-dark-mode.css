@@ -1,0 +1,328 @@
+/* ============================================================
+   Dark mode
+   ============================================================ */
+
+.theme-dark .page-builder,
+[data-theme="dark"] .page-builder {
+  --daw-secondary-bg: rgba(var(--theme-text-inverse-rgb), 0.06);
+  --daw-secondary-bg-hover: rgba(var(--theme-primary-rgb), 0.2);
+  --daw-secondary-border: rgba(var(--theme-text-inverse-rgb), 0.12);
+  --daw-secondary-text: var(--theme-text);
+
+  --daw-tab-bg: rgba(var(--theme-text-inverse-rgb), 0.05);
+  --daw-tab-border: rgba(var(--theme-text-inverse-rgb), 0.12);
+  --daw-tab-active-bg: rgba(var(--theme-primary-rgb), 0.24);
+  --daw-tab-active-border: rgba(var(--theme-primary-rgb), 0.34);
+  --daw-tab-active-text: var(--theme-surface);
+
+  --daw-card-border: rgba(var(--theme-text-inverse-rgb), 0.12);
+  --daw-soft-bg: rgba(var(--theme-text-inverse-rgb), 0.055);
+  --daw-text: var(--theme-text);
+  --daw-muted: var(--theme-text-soft);
+}
+
+.theme-dark .page-builder .daw-page,
+[data-theme="dark"] .page-builder .daw-page {
+  color: var(--theme-text);
+}
+
+.theme-dark .page-builder .daw-header h1,
+.theme-dark .page-builder .daw-section-heading h3,
+.theme-dark .page-builder .daw-report-header h3,
+.theme-dark .page-builder .daw-source-body h4,
+.theme-dark .page-builder .daw-empty strong,
+.theme-dark .page-builder .daw-toggle > span,
+.theme-dark .page-builder .daw-field > span,
+.theme-dark .page-builder .daw-dataset-stats strong,
+.theme-dark .page-builder .daw-kpi-grid strong,
+.theme-dark .page-builder .daw-object-grid strong,
+.theme-dark .page-builder .daw-report-summary span,
+.theme-dark .page-builder .daw-report-block h4,
+.theme-dark .page-builder .daw-warning-list h4,
+.theme-dark .page-builder .daw-insight-list,
+.theme-dark .page-builder .daw-chart-list strong,
+[data-theme="dark"] .page-builder .daw-header h1,
+[data-theme="dark"] .page-builder .daw-section-heading h3,
+[data-theme="dark"] .page-builder .daw-report-header h3,
+[data-theme="dark"] .page-builder .daw-source-body h4,
+[data-theme="dark"] .page-builder .daw-empty strong,
+[data-theme="dark"] .page-builder .daw-toggle > span,
+[data-theme="dark"] .page-builder .daw-field > span,
+[data-theme="dark"] .page-builder .daw-dataset-stats strong,
+[data-theme="dark"] .page-builder .daw-kpi-grid strong,
+[data-theme="dark"] .page-builder .daw-object-grid strong,
+[data-theme="dark"] .page-builder .daw-report-summary span,
+[data-theme="dark"] .page-builder .daw-report-block h4,
+[data-theme="dark"] .page-builder .daw-warning-list h4,
+[data-theme="dark"] .page-builder .daw-insight-list,
+[data-theme="dark"] .page-builder .daw-chart-list strong {
+  color: var(--theme-text-inverse);
+}
+
+.theme-dark .page-builder .daw-kicker,
+[data-theme="dark"] .page-builder .daw-kicker {
+  color: var(--action-primary, var(--theme-primary));
+}
+
+.theme-dark .page-builder .daw-header p,
+.theme-dark .page-builder .daw-section-heading p,
+.theme-dark .page-builder .daw-report-header p,
+.theme-dark .page-builder .daw-source-body p,
+.theme-dark .page-builder .daw-empty p,
+.theme-dark .page-builder .daw-field small,
+.theme-dark .page-builder .daw-file-dropzone span,
+.theme-dark .page-builder .daw-data-grid-meta,
+.theme-dark .page-builder .daw-pagination span,
+.theme-dark .page-builder .daw-dataset-stats span,
+.theme-dark .page-builder .daw-kpi-grid span,
+.theme-dark .page-builder .daw-kpi-grid small,
+.theme-dark .page-builder .daw-object-grid span,
+.theme-dark .page-builder .daw-report-summary p,
+.theme-dark .page-builder .daw-warning-list p,
+.theme-dark .page-builder .daw-chart-list p,
+[data-theme="dark"] .page-builder .daw-header p,
+[data-theme="dark"] .page-builder .daw-section-heading p,
+[data-theme="dark"] .page-builder .daw-report-header p,
+[data-theme="dark"] .page-builder .daw-source-body p,
+[data-theme="dark"] .page-builder .daw-empty p,
+[data-theme="dark"] .page-builder .daw-field small,
+[data-theme="dark"] .page-builder .daw-file-dropzone span,
+[data-theme="dark"] .page-builder .daw-data-grid-meta,
+[data-theme="dark"] .page-builder .daw-pagination span,
+[data-theme="dark"] .page-builder .daw-dataset-stats span,
+[data-theme="dark"] .page-builder .daw-kpi-grid span,
+[data-theme="dark"] .page-builder .daw-kpi-grid small,
+[data-theme="dark"] .page-builder .daw-object-grid span,
+[data-theme="dark"] .page-builder .daw-report-summary p,
+[data-theme="dark"] .page-builder .daw-warning-list p,
+[data-theme="dark"] .page-builder .daw-chart-list p {
+  color: var(--theme-text-soft);
+}
+
+.theme-dark .page-builder .daw-card,
+.theme-dark .page-builder .daw-stepper button,
+[data-theme="dark"] .page-builder .daw-card,
+[data-theme="dark"] .page-builder .daw-stepper button {
+  background:
+    linear-gradient(145deg, rgba(var(--theme-text-inverse-rgb), 0.08), rgba(var(--theme-text-inverse-rgb), 0.04)) padding-box,
+    linear-gradient(135deg, rgba(var(--theme-text-inverse-rgb), 0.14), rgba(var(--theme-primary-rgb), 0.28)) border-box;
+  border: 1px solid transparent;
+  color: var(--theme-text);
+  box-shadow: 0 24px 70px rgba(var(--theme-black-rgb), 0.28);
+}
+
+.theme-dark .page-builder .daw-source-tabs button,
+.theme-dark .page-builder .daw-review-sidebar button,
+.theme-dark .page-builder .daw-group-grid button,
+.theme-dark .page-builder .daw-flow-actions button,
+.theme-dark .page-builder .daw-pagination button,
+.theme-dark .page-builder .daw-compact-pagination button,
+.theme-dark .page-builder .daw-column-menu summary,
+.theme-dark .page-builder .daw-column-menu-panel button,
+.theme-dark .page-builder .daw-cleaning-option,
+.theme-dark .page-builder .daw-cleaning-tool,
+.theme-dark .page-builder .daw-cleaning-stack details,
+.theme-dark .page-builder .daw-report-customize,
+.theme-dark .page-builder .daw-flow-actions,
+.theme-dark .page-builder .daw-report-submit-row,
+.theme-dark .page-builder .daw-flow-toast,
+.theme-dark .page-builder .daw-inspection-box,
+.theme-dark .page-builder .daw-report-summary,
+.theme-dark .page-builder .daw-report-block,
+.theme-dark .page-builder .daw-qualitative-card,
+.theme-dark .page-builder .daw-dataset-stats article,
+.theme-dark .page-builder .daw-kpi-grid article,
+.theme-dark .page-builder .daw-object-grid article,
+.theme-dark .page-builder .daw-chart-list article,
+[data-theme="dark"] .page-builder .daw-source-tabs button,
+[data-theme="dark"] .page-builder .daw-review-sidebar button,
+[data-theme="dark"] .page-builder .daw-group-grid button,
+[data-theme="dark"] .page-builder .daw-flow-actions button,
+[data-theme="dark"] .page-builder .daw-pagination button,
+[data-theme="dark"] .page-builder .daw-compact-pagination button,
+[data-theme="dark"] .page-builder .daw-column-menu summary,
+[data-theme="dark"] .page-builder .daw-column-menu-panel button,
+[data-theme="dark"] .page-builder .daw-cleaning-option,
+[data-theme="dark"] .page-builder .daw-cleaning-tool,
+[data-theme="dark"] .page-builder .daw-cleaning-stack details,
+[data-theme="dark"] .page-builder .daw-report-customize,
+[data-theme="dark"] .page-builder .daw-flow-actions,
+[data-theme="dark"] .page-builder .daw-report-submit-row,
+[data-theme="dark"] .page-builder .daw-flow-toast,
+[data-theme="dark"] .page-builder .daw-inspection-box,
+[data-theme="dark"] .page-builder .daw-report-summary,
+[data-theme="dark"] .page-builder .daw-report-block,
+[data-theme="dark"] .page-builder .daw-qualitative-card,
+[data-theme="dark"] .page-builder .daw-friendly-panel,
+[data-theme="dark"] .page-builder .daw-review-summary-grid article,
+[data-theme="dark"] .page-builder .daw-dataset-stats article,
+[data-theme="dark"] .page-builder .daw-kpi-grid article,
+[data-theme="dark"] .page-builder .daw-object-grid article,
+[data-theme="dark"] .page-builder .daw-chart-list article {
+  background: rgba(var(--theme-text-inverse-rgb), 0.055);
+  border-color: rgba(var(--theme-text-inverse-rgb), 0.12);
+  color: var(--theme-text);
+}
+
+.theme-dark .page-builder .daw-compact-pagination,
+[data-theme="dark"] .page-builder .daw-compact-pagination {
+  color: var(--theme-text-soft);
+}
+
+.theme-dark .page-builder .daw-compact-pagination button,
+[data-theme="dark"] .page-builder .daw-compact-pagination button {
+  background: var(--theme-surface);
+  border-color: var(--color-border-control);
+  color: var(--theme-text);
+}
+
+.theme-dark .page-builder .daw-compact-pagination button:not(:disabled):hover,
+[data-theme="dark"] .page-builder .daw-compact-pagination button:not(:disabled):hover {
+  background: rgba(var(--theme-primary-rgb), 0.16);
+  border-color: rgba(var(--theme-primary-rgb), 0.42);
+  color: var(--theme-text-inverse);
+}
+
+.theme-dark .page-builder .daw-compact-pagination button:disabled,
+[data-theme="dark"] .page-builder .daw-compact-pagination button:disabled {
+  background: var(--theme-surface-2);
+  border-color: var(--color-border-control);
+  color: var(--theme-text-muted);
+  opacity: 1;
+}
+
+.theme-dark .page-builder .daw-inspection-box,
+[data-theme="dark"] .page-builder .daw-inspection-box {
+  scrollbar-color: var(--theme-primary-hover) var(--theme-surface-2);
+}
+
+.theme-dark .page-builder .daw-inspection-box::-webkit-scrollbar-track,
+[data-theme="dark"] .page-builder .daw-inspection-box::-webkit-scrollbar-track {
+  background: var(--theme-surface-2);
+}
+
+.theme-dark .page-builder .daw-inspection-box::-webkit-scrollbar-thumb,
+[data-theme="dark"] .page-builder .daw-inspection-box::-webkit-scrollbar-thumb {
+  border: 2px solid var(--theme-surface);
+  background: var(--theme-primary-hover);
+}
+
+.theme-dark .page-builder .daw-inspection-box::-webkit-scrollbar-thumb:hover,
+[data-theme="dark"] .page-builder .daw-inspection-box::-webkit-scrollbar-thumb:hover {
+  background: var(--theme-primary-hover);
+}
+
+.theme-dark .page-builder .daw-source-tabs button.active,
+.theme-dark .page-builder .daw-review-sidebar button.active,
+.theme-dark .page-builder .daw-group-grid button.active,
+.theme-dark .page-builder .daw-stepper button.active,
+[data-theme="dark"] .page-builder .daw-source-tabs button.active,
+[data-theme="dark"] .page-builder .daw-review-sidebar button.active,
+[data-theme="dark"] .page-builder .daw-group-grid button.active,
+[data-theme="dark"] .page-builder .daw-stepper button.active {
+  background: var(--theme-surface-2);
+  border-color: rgba(var(--theme-primary-rgb), 0.38);
+  color: var(--theme-text-inverse);
+}
+
+.theme-dark .page-builder .daw-stepper button span,
+[data-theme="dark"] .page-builder .daw-stepper button span {
+  background: rgba(var(--theme-text-inverse-rgb), 0.08);
+  color: var(--theme-text);
+}
+
+.theme-dark .page-builder .daw-stepper button.active span,
+[data-theme="dark"] .page-builder .daw-stepper button.active span {
+  background: var(--daw-primary-bg);
+  color: var(--theme-text-inverse);
+}
+
+.theme-dark .page-builder .daw-field input,
+.theme-dark .page-builder .daw-field select,
+.theme-dark .page-builder .daw-field textarea,
+.theme-dark .page-builder .daw-data-grid-toolbar input,
+.theme-dark .page-builder .daw-column-picker,
+.theme-dark .page-builder .daw-column-menu-panel,
+.theme-dark .page-builder .daw-data-grid,
+.theme-dark .page-builder .daw-file-dropzone,
+[data-theme="dark"] .page-builder .daw-field input,
+[data-theme="dark"] .page-builder .daw-field select,
+[data-theme="dark"] .page-builder .daw-field textarea,
+[data-theme="dark"] .page-builder .daw-data-grid-toolbar input,
+[data-theme="dark"] .page-builder .daw-column-picker,
+[data-theme="dark"] .page-builder .daw-column-menu-panel,
+[data-theme="dark"] .page-builder .daw-data-grid,
+[data-theme="dark"] .page-builder .daw-file-dropzone {
+  background: var(--theme-surface);
+  border-color: rgba(var(--theme-text-inverse-rgb), 0.12);
+  color: var(--theme-text);
+}
+
+.theme-dark .page-builder .daw-column-picker label,
+.theme-dark .page-builder .daw-column-menu-panel label,
+[data-theme="dark"] .page-builder .daw-column-picker label,
+[data-theme="dark"] .page-builder .daw-column-menu-panel label {
+  background: transparent;
+  color: var(--theme-text);
+}
+
+.theme-dark .page-builder .daw-table th,
+[data-theme="dark"] .page-builder .daw-table th {
+  background: rgba(var(--theme-text-inverse-rgb), 0.07);
+  color: var(--theme-text-soft);
+}
+
+.theme-dark .page-builder .daw-table td,
+.theme-dark .page-builder .daw-compact-table td,
+[data-theme="dark"] .page-builder .daw-table td,
+[data-theme="dark"] .page-builder .daw-compact-table td {
+  color: var(--theme-text);
+}
+
+.theme-dark .page-builder .daw-compact-table th,
+[data-theme="dark"] .page-builder .daw-compact-table th {
+  background: rgba(var(--theme-text-inverse-rgb), 0.07);
+  color: var(--theme-text-soft);
+}
+
+.theme-dark .page-builder .daw-table th,
+.theme-dark .page-builder .daw-table td,
+.theme-dark .page-builder .daw-compact-table th,
+.theme-dark .page-builder .daw-compact-table td,
+.theme-dark .page-builder .daw-compact-table-scroll,
+.theme-dark .page-builder .daw-data-grid-meta,
+.theme-dark .page-builder .daw-pagination,
+.theme-dark .page-builder .daw-data-grid-toolbar,
+[data-theme="dark"] .page-builder .daw-table th,
+[data-theme="dark"] .page-builder .daw-table td,
+[data-theme="dark"] .page-builder .daw-compact-table th,
+[data-theme="dark"] .page-builder .daw-compact-table td,
+[data-theme="dark"] .page-builder .daw-compact-table-scroll,
+[data-theme="dark"] .page-builder .daw-data-grid-meta,
+[data-theme="dark"] .page-builder .daw-pagination,
+[data-theme="dark"] .page-builder .daw-data-grid-toolbar {
+  border-color: rgba(var(--theme-text-inverse-rgb), 0.12);
+}
+
+.theme-dark .page-builder .daw-row-index-head,
+.theme-dark .page-builder .daw-row-index-cell,
+[data-theme="dark"] .page-builder .daw-row-index-head,
+[data-theme="dark"] .page-builder .daw-row-index-cell {
+  background: var(--theme-surface);
+  color: var(--theme-text-soft);
+  border-color: rgba(var(--theme-primary-rgb), 0.28);
+  box-shadow: 8px 0 16px rgba(var(--theme-black-rgb), 0.22);
+}
+
+.theme-dark .page-builder .daw-page[dir="rtl"] .daw-row-index-head,
+.theme-dark .page-builder .daw-page[dir="rtl"] .daw-row-index-cell,
+[data-theme="dark"] .page-builder .daw-page[dir="rtl"] .daw-row-index-head,
+[data-theme="dark"] .page-builder .daw-page[dir="rtl"] .daw-row-index-cell {
+  box-shadow: -8px 0 16px rgba(var(--theme-black-rgb), 0.22);
+}
+
+.theme-dark .page-builder .daw-warning-list,
+[data-theme="dark"] .page-builder .daw-warning-list {
+  background: rgba(var(--theme-primary-rgb), 0.18);
+  border-color: rgba(var(--theme-primary-rgb), 0.28);
+}

@@ -1,0 +1,3034 @@
+.reservation-calendar-page {
+  position: relative;
+  width: min(100%, 1580px);
+  margin: 0 auto;
+  padding: 28px;
+  color: var(--theme-text);
+}
+
+.reservation-calendar-toolbar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 20px;
+}
+
+.reservation-calendar-eyebrow {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--color-accent-text);
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.075em;
+  text-transform: uppercase;
+}
+
+.reservation-calendar-toolbar h1 {
+  margin: 0;
+  color: var(--theme-text);
+  font-size: clamp(2rem, 3vw, 3rem);
+  letter-spacing: -0.045em;
+  line-height: 1;
+}
+
+.reservation-calendar-toolbar p {
+  margin: 9px 0 0;
+  color: var(--theme-text-muted);
+  font-weight: 600;
+}
+
+.reservation-calendar-toolbar-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.reservation-calendar-toolbar button,
+.reservation-calendar-sidebar button,
+.reservation-calendar-surface button,
+.reservation-calendar-detail button {
+  font: inherit;
+}
+
+.reservation-calendar-today,
+.reservation-calendar-period-controls,
+.reservation-calendar-view-switch {
+  border: 1px solid var(--theme-border);
+  border-radius: 12px;
+}
+
+.reservation-calendar-today {
+  min-height: 42px;
+  padding: 0 18px;
+  color: var(--theme-text);
+  background: var(--theme-surface);
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.reservation-calendar-period-controls {
+  display: flex;
+  overflow: hidden;
+}
+
+.reservation-calendar-period-controls button {
+  width: 40px;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--theme-text-muted);
+  background: var(--theme-surface);
+  border: 0;
+  cursor: pointer;
+}
+
+.reservation-calendar-period-controls button + button {
+  border-inline-start: 1px solid var(--color-border-control);
+}
+
+.reservation-calendar-period-label {
+  min-width: 190px;
+  color: var(--theme-text);
+  font-size: 1rem;
+  text-align: center;
+}
+
+.reservation-calendar-view-switch {
+  display: flex;
+  padding: 3px;
+  background: var(--theme-surface);
+}
+
+.reservation-calendar-view-switch button {
+  min-height: 34px;
+  padding: 0 13px;
+  color: var(--theme-text-muted);
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.reservation-calendar-view-switch button.is-active {
+  border: 1px solid var(--theme-primary);
+  color: var(--theme-text-inverse);
+  background: var(--theme-primary);
+}
+
+.reservation-calendar-layout {
+  min-height: 720px;
+  display: grid;
+  grid-template-columns: 238px minmax(0, 1fr);
+  overflow: hidden;
+  background: var(--theme-surface);
+  border: 1px solid var(--theme-border);
+  border-radius: 18px;
+  box-shadow: 0 12px 34px rgba(var(--theme-shadow-rgb), 0.06);
+}
+
+.reservation-calendar-sidebar {
+  padding: 18px;
+  background: var(--theme-surface-elevated);
+  border-inline-end: 1px solid var(--theme-border);
+}
+
+.reservation-calendar-search {
+  height: 42px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 0 12px;
+  color: var(--theme-text-muted);
+  background: var(--theme-surface);
+  border: 1px solid var(--theme-border);
+  border-radius: 11px;
+}
+
+.reservation-calendar-search input {
+  width: 100%;
+  min-width: 0;
+  color: var(--theme-text);
+  background: transparent;
+  border: 0;
+  outline: 0;
+  font: inherit;
+  font-size: 0.85rem;
+}
+
+.reservation-calendar-mini {
+  margin-top: 24px;
+}
+
+.reservation-calendar-mini > strong {
+  display: block;
+  margin-bottom: 14px;
+  font-size: 0.9rem;
+}
+
+.reservation-calendar-mini-weekdays,
+.reservation-calendar-mini-days {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 3px;
+}
+
+.reservation-calendar-mini-weekdays span {
+  padding-bottom: 6px;
+  color: var(--theme-text-muted);
+  font-size: 0.66rem;
+  font-weight: 800;
+  text-align: center;
+}
+
+.reservation-calendar-mini-days button {
+  aspect-ratio: 1;
+  padding: 0;
+  color: var(--theme-text);
+  background: transparent;
+  border: 0;
+  border-radius: 50%;
+  font-size: 0.73rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.reservation-calendar-mini-days button:hover {
+  background: var(--theme-surface);
+}
+
+.reservation-calendar-mini-days button.is-outside {
+  color: color-mix(in srgb, var(--theme-text-muted) 48%, transparent);
+}
+
+.reservation-calendar-mini-days button.is-selected {
+  color: var(--theme-text-inverse);
+  background: var(--theme-primary);
+}
+
+.reservation-calendar-mini-days button.is-today:not(.is-selected) {
+  color: var(--color-accent-text);
+  outline: 1px solid var(--theme-primary);
+}
+
+.reservation-calendar-filters {
+  margin-top: 28px;
+}
+
+.reservation-calendar-section-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  font-size: 0.86rem;
+}
+
+.reservation-calendar-section-title span {
+  color: var(--theme-text-muted);
+  font-size: 0.73rem;
+}
+
+.reservation-calendar-filters label {
+  display: grid;
+  grid-template-columns: 18px 1fr auto;
+  align-items: center;
+  gap: 9px;
+  min-height: 36px;
+  color: var(--theme-text);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.reservation-calendar-filters label > button {
+  width: 17px;
+  height: 17px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  color: var(--theme-text-inverse);
+  background: transparent;
+  border: 1px solid var(--theme-border-strong);
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.reservation-calendar-filters label > button.is-enabled {
+  background: var(--calendar-status-color);
+  border-color: var(--calendar-status-color);
+}
+
+.reservation-calendar-filters small {
+  color: var(--theme-text-muted);
+}
+
+.reservation-calendar-unscheduled {
+  display: flex;
+  gap: 10px;
+  margin-top: 24px;
+  padding: 12px;
+  color: var(--color-accent-text);
+  background: rgba(var(--theme-primary-rgb), 0.08);
+  border: 1px solid rgba(var(--theme-primary-rgb), 0.16);
+  border-radius: 12px;
+}
+
+.reservation-calendar-unscheduled div {
+  min-width: 0;
+}
+
+.reservation-calendar-unscheduled strong,
+.reservation-calendar-unscheduled span {
+  display: block;
+}
+
+.reservation-calendar-unscheduled strong {
+  color: var(--theme-text);
+  font-size: 0.78rem;
+}
+
+.reservation-calendar-unscheduled span {
+  margin-top: 3px;
+  color: var(--theme-text-muted);
+  font-size: 0.7rem;
+  line-height: 1.35;
+}
+
+.reservation-calendar-surface {
+  position: relative;
+  min-width: 0;
+  overflow: auto;
+  background: var(--theme-surface);
+}
+
+.reservation-calendar-loading,
+.reservation-calendar-error {
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--theme-border);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.reservation-calendar-loading {
+  color: var(--theme-text-muted);
+}
+
+.reservation-calendar-error {
+  color: var(--color-status-danger-text);
+  background: rgba(var(--theme-danger-rgb), 0.08);
+}
+
+.reservation-calendar-week {
+  min-width: 980px;
+}
+
+.reservation-calendar-week-header {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: grid;
+  grid-template-columns: 70px repeat(7, minmax(125px, 1fr));
+  background: var(--theme-surface);
+  border-bottom: 1px solid var(--theme-border);
+}
+
+.reservation-calendar-timezone {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0 6px 12px;
+  color: var(--theme-text-muted);
+  font-size: 0.63rem;
+  font-weight: 700;
+}
+
+.reservation-calendar-week-header > button {
+  min-height: 82px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--theme-text);
+  background: transparent;
+  border: 0;
+  border-inline-start: 1px solid var(--color-border-control);
+  cursor: pointer;
+}
+
+.reservation-calendar-week-header > button span {
+  color: var(--theme-text-muted);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.045em;
+  text-transform: uppercase;
+}
+
+.reservation-calendar-week-header > button strong {
+  width: 38px;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 5px;
+  border-radius: 50%;
+  font-size: 1.25rem;
+}
+
+.reservation-calendar-week-header > button.is-today span {
+  color: var(--color-accent-text);
+}
+
+.reservation-calendar-week-header > button.is-today strong {
+  color: var(--theme-text-inverse);
+  background: var(--theme-primary);
+}
+
+.reservation-calendar-week-body {
+  display: grid;
+  grid-template-columns: 70px repeat(7, minmax(125px, 1fr));
+  min-height: 896px;
+}
+
+.reservation-calendar-hours {
+  display: grid;
+  grid-template-rows: repeat(14, 64px);
+}
+
+.reservation-calendar-hours span {
+  padding: 0 10px;
+  color: var(--theme-text-muted);
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-align: end;
+  transform: translateY(-7px);
+}
+
+.reservation-calendar-day-column {
+  position: relative;
+  height: 896px;
+  border-inline-start: 1px solid var(--theme-border);
+}
+
+.reservation-calendar-hour-line {
+  height: 64px;
+  border-bottom: 1px solid var(--theme-border);
+}
+
+.reservation-calendar-event {
+  position: absolute;
+  inset-inline: 5px;
+  z-index: 2;
+  overflow: hidden;
+  padding: 7px 8px;
+  color: var(--theme-text);
+  background: color-mix(in srgb, var(--theme-primary) 17%, var(--theme-surface));
+  border: 0;
+  border-inline-start: 4px solid var(--theme-primary);
+  border-radius: 7px;
+  text-align: start;
+  cursor: pointer;
+}
+
+.reservation-calendar-event strong,
+.reservation-calendar-event span,
+.reservation-calendar-event small {
+  display: block;
+  overflow: hidden;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reservation-calendar-event strong {
+  font-size: 0.76rem;
+}
+
+.reservation-calendar-event span,
+.reservation-calendar-event small {
+  margin-top: 2px;
+  color: var(--theme-text-muted);
+  font-size: 0.66rem;
+}
+
+.reservation-calendar-event--confirmed,
+.reservation-calendar-month-event--confirmed {
+  background: color-mix(in srgb, var(--theme-success) 17%, var(--theme-surface));
+  border-color: var(--color-status-success-text);
+}
+
+.reservation-calendar-event--completed,
+.reservation-calendar-month-event--completed {
+  background: color-mix(in srgb, var(--theme-info) 15%, var(--theme-surface));
+  border-color: var(--theme-info);
+}
+
+.reservation-calendar-event--cancelled,
+.reservation-calendar-month-event--cancelled {
+  opacity: 0.65;
+  background: var(--theme-surface-elevated);
+  border-color: var(--theme-text-muted);
+}
+
+.reservation-calendar-event--rejected,
+.reservation-calendar-month-event--rejected {
+  background: color-mix(in srgb, var(--theme-danger) 14%, var(--theme-surface));
+  border-color: var(--color-status-danger-text);
+}
+
+.reservation-calendar-month {
+  min-width: 860px;
+}
+
+.reservation-calendar-month-weekdays,
+.reservation-calendar-month-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(120px, 1fr));
+}
+
+.reservation-calendar-month-weekdays {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  background: var(--theme-surface);
+  border-bottom: 1px solid var(--theme-border);
+}
+
+.reservation-calendar-month-weekdays span {
+  padding: 14px 10px;
+  color: var(--theme-text-muted);
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.reservation-calendar-month-grid > section {
+  min-height: 128px;
+  padding: 8px;
+  border-inline-end: 1px solid var(--theme-border);
+  border-bottom: 1px solid var(--theme-border);
+}
+
+.reservation-calendar-month-grid > section.is-outside {
+  background: var(--theme-surface-elevated);
+  opacity: 0.55;
+}
+
+.reservation-calendar-month-grid > section > button {
+  width: 29px;
+  height: 29px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-inline-start: auto;
+  color: var(--theme-text);
+  background: transparent;
+  border: 0;
+  border-radius: 50%;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.reservation-calendar-month-grid > section.is-today > button {
+  color: var(--theme-text-inverse);
+  background: var(--theme-primary);
+}
+
+.reservation-calendar-month-event {
+  width: 100%;
+  display: block;
+  overflow: hidden;
+  margin-top: 4px;
+  padding: 5px 6px;
+  color: var(--theme-text);
+  background: color-mix(in srgb, var(--theme-primary) 14%, var(--theme-surface));
+  border: 0;
+  border-inline-start: 3px solid var(--theme-primary);
+  border-radius: 5px;
+  font-size: 0.67rem;
+  font-weight: 700;
+  text-align: start;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.reservation-calendar-month-event span {
+  margin-inline-end: 5px;
+  color: var(--theme-text-muted);
+  font-size: 0.61rem;
+}
+
+.reservation-calendar-month-grid section small {
+  display: block;
+  margin-top: 6px;
+  color: var(--theme-text-muted);
+  font-size: 0.66rem;
+  text-align: center;
+}
+
+.reservation-calendar-empty {
+  position: absolute;
+  top: 135px;
+  left: 50%;
+  z-index: 8;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 260px;
+  padding: 22px;
+  color: var(--theme-text-muted);
+  background: color-mix(in srgb, var(--theme-surface) 94%, transparent);
+  border: 1px solid var(--theme-border);
+  border-radius: 14px;
+  text-align: center;
+  transform: translateX(-50%);
+}
+
+.reservation-calendar-empty strong {
+  margin-top: 10px;
+  color: var(--theme-text);
+}
+
+.reservation-calendar-empty span {
+  margin-top: 5px;
+  font-size: 0.78rem;
+}
+
+.reservation-calendar-detail {
+  position: fixed;
+  top: 92px;
+  inset-inline-end: 24px;
+  z-index: 80;
+  width: min(360px, calc(100vw - 32px));
+  padding: 24px;
+  color: var(--theme-text);
+  background: var(--theme-surface);
+  border: 1px solid var(--theme-border);
+  border-radius: 16px;
+  box-shadow: 0 22px 60px rgba(var(--theme-shadow-rgb), 0.2);
+}
+
+.reservation-calendar-detail-close {
+  position: absolute;
+  top: 14px;
+  inset-inline-end: 14px;
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--theme-text-muted);
+  background: var(--theme-surface-elevated);
+  border: 1px solid var(--theme-border);
+  border-radius: 9px;
+  cursor: pointer;
+}
+
+.reservation-calendar-status {
+  display: inline-flex;
+  padding: 5px 9px;
+  color: var(--color-accent-text);
+  background: rgba(var(--theme-primary-rgb), 0.1);
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: capitalize;
+}
+
+.reservation-calendar-status--confirmed {
+  color: var(--color-status-success-text);
+  background: rgba(var(--theme-success-rgb), 0.1);
+}
+
+.reservation-calendar-status--rejected,
+.reservation-calendar-status--cancelled {
+  color: var(--color-status-danger-text);
+  background: rgba(var(--theme-danger-rgb), 0.1);
+}
+
+.reservation-calendar-detail h2 {
+  margin: 18px 40px 20px 0;
+  font-size: 1.45rem;
+  overflow-wrap: anywhere;
+}
+
+.reservation-calendar-detail-list {
+  display: grid;
+  gap: 14px;
+}
+
+.reservation-calendar-detail-list p {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+  margin: 0;
+  color: var(--theme-text-muted);
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+.reservation-calendar-detail-list a {
+  color: var(--color-accent-text);
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 1100px) {
+  .reservation-calendar-page {
+    padding: 22px;
+  }
+
+  .reservation-calendar-toolbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .reservation-calendar-toolbar-actions {
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .reservation-calendar-layout {
+    grid-template-columns: 210px minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 760px) {
+  .reservation-calendar-page {
+    padding: 16px;
+  }
+
+  .reservation-calendar-layout {
+    display: block;
+  }
+
+  .reservation-calendar-sidebar {
+    border-inline-end: 0;
+    border-bottom: 1px solid var(--theme-border);
+  }
+
+  .reservation-calendar-mini {
+    display: none;
+  }
+
+  .reservation-calendar-filters {
+    margin-top: 18px;
+  }
+
+  .reservation-calendar-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 16px;
+  }
+
+  .reservation-calendar-section-title {
+    width: 100%;
+  }
+
+  .reservation-calendar-filters label {
+    grid-template-columns: 18px auto auto;
+  }
+
+  .reservation-calendar-unscheduled {
+    display: none;
+  }
+
+  .reservation-calendar-period-label {
+    order: -1;
+    width: 100%;
+    min-width: 0;
+    text-align: start;
+  }
+}
+
+/* Unified calendar workspace */
+.calendar-new-event,
+.calendar-export,
+.calendar-icon-action {
+  min-height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 0 15px;
+  border: 1px solid var(--theme-border);
+  border-radius: 11px;
+  color: var(--theme-text);
+  background: var(--theme-surface);
+  font-weight: 800;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.calendar-icon-action { width: 42px; padding: 0; }
+.calendar-import { cursor: pointer; }
+.calendar-import input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.calendar-new-event { border-color: var(--color-accent-text); color: white; background: var(--theme-primary); }
+
+.calendar-control-bar {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 14px;
+  padding: 10px;
+  border: 1px solid var(--theme-border);
+  border-radius: 14px;
+  background: var(--theme-surface);
+}
+
+.calendar-control-bar > button {
+  min-height: 38px;
+  padding: 0 13px;
+  border: 1px solid var(--color-border-control);
+  border-radius: 9px;
+  color: var(--theme-text);
+  background: var(--theme-surface-elevated, var(--theme-bg));
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.calendar-control-bar > strong { margin-inline-start: 7px; }
+.calendar-control-bar > span { flex: 1; }
+.calendar-control-bar .reservation-calendar-view-switch button { text-transform: capitalize; }
+
+.calendar-workspace-notice {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 12px;
+  padding: 11px 14px;
+  border: 1px solid color-mix(in srgb, var(--theme-warning) 45%, var(--theme-border));
+  border-radius: 11px;
+  color: var(--theme-text);
+  background: color-mix(in srgb, var(--theme-warning) 10%, var(--theme-surface));
+}
+
+.calendar-workspace-notice button { margin-inline-start: auto; border: 0; color: inherit; background: none; cursor: pointer; }
+.calendar-workspace-page .reservation-calendar-layout { min-height: 720px; }
+.calendar-workspace-sidebar { display: flex; flex-direction: column; gap: 22px; }
+.calendar-workspace-sidebar section { display: grid; gap: 8px; }
+.calendar-section-heading { color: var(--theme-text); font-size: 0.83rem; text-transform: uppercase; letter-spacing: 0.05em; }
+
+.calendar-source-toggle {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 31px;
+  color: var(--theme-text);
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.calendar-source-toggle input { position: absolute; opacity: 0; }
+.calendar-source-toggle i { width: 11px; height: 11px; border-radius: 3px; opacity: 0.35; box-shadow: 0 0 0 2px var(--theme-surface), 0 0 0 3px var(--theme-border); }
+.calendar-source-toggle input:checked + i { opacity: 1; }
+.calendar-source-toggle span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.calendar-source-toggle small { margin-inline-start: auto; color: var(--theme-text-muted); font-size: 0.67rem; text-transform: uppercase; }
+
+.calendar-section-title { display: flex; align-items: center; justify-content: space-between; }
+.calendar-section-title strong { display: flex; align-items: center; gap: 7px; }
+.calendar-section-title > span { min-width: 24px; padding: 2px 7px; border-radius: 99px; color: var(--theme-text-muted); background: var(--theme-surface-elevated, var(--theme-bg)); font-size: 0.72rem; text-align: center; }
+.calendar-task-panel form { display: flex; align-items: stretch; border: 1px solid var(--theme-border); border-radius: 9px; overflow: hidden; }
+.calendar-task-quick-fields { min-width: 0; flex: 1; display: grid; }
+.calendar-task-panel form input { min-width: 0; width: 100%; padding: 9px 10px; border: 0; outline: 0; color: var(--theme-text); background: transparent; }
+.calendar-task-quick-fields > label { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 5px; padding-inline-start: 10px; border-top: 1px solid var(--theme-border); color: var(--theme-text-muted); font-size: 0.62rem; }
+.calendar-task-quick-fields > label input { padding-inline-start: 2px; font-size: 0.66rem; }
+.calendar-task-panel form button { width: 34px; border: 0; color: var(--color-accent-text); background: transparent; cursor: pointer; }
+.calendar-task { width: 100%; display: grid; grid-template-columns: 7px minmax(0, 1fr) auto; align-items: center; gap: 7px; min-height: 28px; padding: 0; border: 0; color: var(--theme-text); background: transparent; font-size: 0.8rem; text-align: start; cursor: pointer; }
+.calendar-task i { width: 7px; height: 7px; border-radius: 50%; background: var(--theme-text-muted); }
+.calendar-task i.priority-high { background: var(--theme-warning); }
+.calendar-task i.priority-urgent { background: var(--theme-danger); }
+.calendar-task span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
+.calendar-task small { color: var(--theme-text-muted); text-transform: capitalize; }
+
+.calendar-sync-row { width: 100%; display: grid; grid-template-columns: 17px minmax(0, 1fr) auto; align-items: center; gap: 7px; padding: 3px 0; border: 0; color: var(--theme-text); background: transparent; font-size: 0.78rem; text-align: start; }
+.calendar-sync-row svg { color: var(--color-status-warning-text); }
+.calendar-sync-row.is-connected svg { color: var(--color-status-success-text); }
+.calendar-sync-row span { font-weight: 750; }
+.calendar-sync-row small { color: var(--theme-text-muted); text-transform: capitalize; }
+.calendar-sync-actions { grid-column: 2 / -1; display: flex; justify-content: flex-end; gap: 5px; }
+.calendar-sync-actions button { padding: 4px 7px; border: 1px solid var(--color-border-control); border-radius: 6px; color: var(--theme-text); background: var(--theme-surface); font-size: 0.65rem; font-weight: 750; cursor: pointer; }
+.calendar-sync-actions button.is-danger { color: var(--color-status-danger-text); }
+.calendar-sync-actions button:disabled { cursor: wait; opacity: 0.6; }
+.calendar-connect-actions { display: flex; gap: 5px; flex-wrap: wrap; }
+.calendar-connect-actions button { padding: 5px 8px; border: 1px solid var(--color-border-control); border-radius: 7px; color: var(--theme-text); background: transparent; font-size: 0.7rem; font-weight: 750; cursor: pointer; }
+.calendar-sync-direction { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--theme-text-muted); font-size: 0.68rem; }
+.calendar-sync-direction select { min-height: 28px; padding: 3px 6px; border: 1px solid var(--color-border-control); border-radius: 6px; color: var(--theme-text); background: var(--theme-bg); font-size: 0.68rem; }
+.calendar-workload-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 8px; font-size: 0.72rem; }
+.calendar-workload-row > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 750; }
+.calendar-workload-row > strong { color: var(--color-accent-text); }
+.calendar-workload-row > div { height: 5px; overflow: hidden; border-radius: 99px; background: var(--theme-border); }
+.calendar-workload-row > div i { display: block; height: 100%; border-radius: inherit; background: var(--theme-primary); }
+.calendar-workload-row > small { color: var(--theme-text-muted); text-align: end; }
+.calendar-invitation-review { display: grid; gap: 4px; padding: 8px; border: 1px solid color-mix(in srgb, var(--theme-danger) 25%, var(--theme-border)); border-radius: 8px; background: color-mix(in srgb, var(--theme-danger) 6%, transparent); font-size: 0.7rem; }
+.calendar-invitation-review > span { color: var(--theme-text-muted); text-transform: capitalize; }
+.calendar-invitation-review > div { display: flex; gap: 5px; }
+.calendar-invitation-review button { padding: 3px 6px; border: 1px solid var(--color-border-control); border-radius: 5px; color: var(--theme-text); background: var(--theme-surface); font-size: 0.65rem; cursor: pointer; }
+.calendar-privacy-note { display: flex; gap: 9px; padding: 10px; border-radius: 10px; color: var(--theme-text-muted); background: color-mix(in srgb, var(--theme-success) 8%, transparent); font-size: 0.74rem; }
+.calendar-privacy-note svg { flex: 0 0 auto; color: var(--color-status-success-text); }
+.calendar-privacy-note span { display: grid; gap: 2px; }
+.calendar-privacy-note strong { color: var(--theme-text); }
+
+.calendar-workspace-surface { min-width: 0; overflow: auto; }
+.calendar-time-grid { min-width: 760px; background: var(--theme-surface); }
+.calendar-time-grid.is-day { min-width: 520px; }
+.calendar-grid-header { display: grid; grid-template-columns: 68px repeat(7, minmax(90px, 1fr)); position: sticky; top: 0; z-index: 4; border-bottom: 1px solid var(--theme-border); background: var(--theme-surface); }
+.calendar-time-grid.is-day .calendar-grid-header { grid-template-columns: 68px minmax(400px, 1fr); }
+.calendar-grid-header > span { display: grid; place-items: center; color: var(--theme-text-muted); font-size: 0.68rem; }
+.calendar-grid-header button { display: grid; justify-items: center; gap: 2px; padding: 9px; border: 0; border-inline-start: 1px solid var(--color-border-control); color: var(--theme-text); background: transparent; cursor: pointer; }
+.calendar-grid-header button small { color: var(--theme-text-muted); text-transform: uppercase; }
+.calendar-grid-header button strong { width: 29px; height: 29px; display: grid; place-items: center; border-radius: 50%; }
+.calendar-grid-header button.is-today strong { color: white; background: var(--theme-primary); }
+.calendar-grid-body { display: grid; grid-template-columns: 68px minmax(0, 1fr); }
+.calendar-grid-hours { display: grid; grid-template-rows: repeat(24, 48px); }
+.calendar-grid-hours span { position: static; display: flex; align-items: flex-start; justify-content: flex-end; padding: 8px 8px 0; border-top: 1px solid color-mix(in srgb, var(--theme-border) 70%, transparent); color: var(--theme-text-muted); background: var(--theme-surface); font-size: 0.65rem; line-height: 1; text-align: end; }
+.calendar-grid-hours span:last-child { border-bottom: 1px solid color-mix(in srgb, var(--theme-border) 70%, transparent); }
+.calendar-grid-body > .calendar-grid-day { grid-column: auto; }
+.calendar-grid-body { grid-template-columns: 68px repeat(7, minmax(90px, 1fr)); }
+.calendar-time-grid.is-day .calendar-grid-body { grid-template-columns: 68px minmax(400px, 1fr); }
+.calendar-grid-day { position: relative; height: 1152px; border-inline-start: 1px solid var(--theme-border); }
+.calendar-grid-slot { width: 100%; height: 48px; display: block; padding: 0; border: 0; border-top: 1px solid color-mix(in srgb, var(--theme-border) 70%, transparent); border-radius: 0; background: transparent; cursor: pointer; }
+.calendar-grid-slot:hover,
+.calendar-grid-slot:focus-visible { outline: 0; background: color-mix(in srgb, var(--theme-primary) 9%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--theme-primary) 38%, transparent); }
+.calendar-grid-event { position: absolute; inset-inline: 4px; z-index: 2; display: grid; align-content: start; gap: 1px; overflow: hidden; padding: 5px 7px; border: 0; border-inline-start: 3px solid var(--event-color); border-radius: 6px; color: var(--theme-text); background: color-mix(in srgb, var(--event-color) 18%, var(--theme-surface)); text-align: start; cursor: pointer; }
+.calendar-grid-event strong { overflow: hidden; font-size: 0.74rem; text-overflow: ellipsis; white-space: nowrap; }
+.calendar-grid-event span, .calendar-grid-event small { overflow: hidden; color: var(--theme-text-muted); font-size: 0.62rem; text-overflow: ellipsis; white-space: nowrap; }
+.calendar-grid-event.is-reservation { border-style: dashed; }
+.calendar-grid-event.is-task { border-inline-start-style: dotted; }
+
+.calendar-month-grid { display: grid; grid-template-columns: repeat(7, minmax(110px, 1fr)); min-width: 800px; }
+.calendar-month-grid > section { min-height: 125px; padding: 6px; border-inline-end: 1px solid var(--theme-border); border-bottom: 1px solid var(--theme-border); }
+.calendar-month-grid > section.is-outside { opacity: 0.42; }
+.calendar-month-grid > section > button:first-child { width: 27px; height: 27px; display: grid; place-items: center; margin-bottom: 3px; border: 0; border-radius: 50%; color: var(--theme-text); background: transparent; cursor: pointer; }
+.calendar-month-grid > section > button:first-child:hover,
+.calendar-month-grid > section > button:first-child:focus-visible { color: white; background: var(--theme-primary); outline: 0; }
+.calendar-month-event { width: 100%; display: flex; gap: 4px; overflow: hidden; margin: 2px 0; padding: 3px 5px; border: 0; border-inline-start: 3px solid var(--event-color); border-radius: 4px; color: var(--theme-text); background: color-mix(in srgb, var(--event-color) 13%, transparent); font-size: 0.67rem; font-weight: 700; text-align: start; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+.calendar-month-event span { color: var(--theme-text-muted); }
+.calendar-month-event.is-task { border-inline-start-style: dotted; }
+.calendar-month-event.is-task svg { flex: 0 0 auto; }
+
+.calendar-agenda { display: grid; }
+.calendar-agenda > button { display: grid; grid-template-columns: 58px 5px minmax(0, 1fr) auto; align-items: center; gap: 14px; min-height: 74px; padding: 10px 16px; border: 0; border-bottom: 1px solid var(--color-border-control); color: var(--theme-text); background: transparent; text-align: start; cursor: pointer; }
+.calendar-agenda > button:hover { background: var(--theme-surface-elevated, var(--theme-bg)); }
+.calendar-agenda time { display: grid; justify-items: center; }
+.calendar-agenda time strong { font-size: 1.35rem; }
+.calendar-agenda time span { color: var(--theme-text-muted); font-size: 0.65rem; text-transform: uppercase; }
+.calendar-agenda > button > i { width: 5px; height: 36px; border-radius: 8px; }
+.calendar-agenda > button > div { display: grid; gap: 4px; }
+.calendar-agenda > button > div span { display: flex; align-items: center; gap: 5px; color: var(--theme-text-muted); font-size: 0.76rem; }
+.calendar-agenda > button > small { color: var(--theme-text-muted); text-transform: capitalize; }
+
+.calendar-agenda-task-row { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: stretch; border-bottom: 1px solid var(--theme-border); }
+.calendar-agenda-task-row > .calendar-agenda-task { min-width: 0; min-height: 74px; display: grid; grid-template-columns: 58px 5px minmax(0, 1fr) auto; align-items: center; gap: 14px; padding: 10px 16px; border: 0; color: var(--theme-text); background: transparent; text-align: start; cursor: pointer; }
+.calendar-agenda-task-row > .calendar-agenda-task:hover { background: var(--theme-surface-elevated, var(--theme-bg)); }
+.calendar-agenda-task-row > .calendar-agenda-task > i { width: 5px; height: 36px; border-radius: 8px; }
+.calendar-agenda-task-row > .calendar-agenda-task > div { min-width: 0; display: grid; gap: 4px; }
+.calendar-agenda-task-row > .calendar-agenda-task > div span { display: flex; align-items: center; gap: 5px; color: var(--theme-text-muted); font-size: 0.76rem; }
+.calendar-agenda-task-row > .calendar-agenda-task > small { color: var(--theme-text-muted); text-transform: capitalize; }
+.calendar-agenda-task-actions { align-self: center; display: flex; align-items: center; gap: 6px; margin: 8px 12px 8px 4px; }
+.calendar-agenda-task-actions > button { width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; padding: 0; border: 1px solid var(--color-border-control); border-radius: 8px; color: var(--theme-text-muted); background: var(--theme-surface); font: inherit; cursor: pointer; transition: border-color 150ms ease, color 150ms ease, background-color 150ms ease; }
+.calendar-agenda-task-actions > button span { display: none; }
+.calendar-agenda-task-actions > .calendar-agenda-archive:hover,
+.calendar-agenda-task-actions > .calendar-agenda-archive:focus-visible { border-color: rgba(var(--theme-primary-rgb), 0.22); color: var(--color-accent-text); background: var(--theme-primary-soft); outline: 0; }
+.calendar-agenda-task-actions > .calendar-agenda-delete:hover,
+.calendar-agenda-task-actions > .calendar-agenda-delete:focus-visible { border-color: color-mix(in srgb, var(--theme-danger) 42%, var(--theme-border)); color: var(--color-status-danger-text); background: color-mix(in srgb, var(--theme-danger) 9%, transparent); outline: 0; }
+.calendar-agenda-task-actions > button:disabled { opacity: 0.5; cursor: wait; }
+
+@media (max-width: 680px) {
+  .calendar-agenda-task-row > .calendar-agenda-task { grid-template-columns: 46px 4px minmax(0, 1fr); gap: 9px; padding-inline: 10px; }
+  .calendar-agenda-task-row > .calendar-agenda-task > small { display: none; }
+  .calendar-agenda-task-actions { gap: 5px; margin-inline-end: 8px; }
+  .calendar-agenda-task-actions > button { width: 32px; height: 34px; }
+}
+
+.calendar-modal-backdrop { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; padding: 20px; background: var(--app-backdrop); backdrop-filter: blur(4px); }
+.calendar-modal { width: min(680px, 100%); max-height: calc(100vh - 40px); display: grid; gap: 13px; overflow: auto; padding: 22px; border: 1px solid var(--theme-border); border-radius: 18px; color: var(--theme-text); background: var(--theme-surface); box-shadow: var(--app-modal-shadow); }
+.calendar-modal header { display: flex; justify-content: space-between; align-items: flex-start; }
+.calendar-modal header span { color: var(--color-accent-text); font-size: 0.72rem; font-weight: 800; text-transform: uppercase; }
+.calendar-modal header h2 { margin: 3px 0 0; }
+.calendar-modal header button { width: 34px; height: 34px; display: grid; place-items: center; border: 0; border-radius: 8px; color: var(--theme-text-muted); background: var(--theme-surface-elevated, var(--theme-bg)); cursor: pointer; }
+.calendar-modal label { display: grid; gap: 5px; color: var(--theme-text-muted); font-size: 0.74rem; font-weight: 750; }
+.calendar-modal input, .calendar-modal select, .calendar-modal textarea { width: 100%; min-height: 40px; padding: 8px 10px; border: 1px solid var(--color-border-control); border-radius: 8px; outline: 0; color: var(--theme-text); background: var(--theme-bg); font: inherit; }
+.calendar-modal textarea { resize: vertical; }
+.calendar-modal input:focus, .calendar-modal select:focus, .calendar-modal textarea:focus { border-color: var(--color-accent-text); box-shadow: 0 0 0 3px color-mix(in srgb, var(--theme-primary) 15%, transparent); }
+.calendar-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 11px; }
+.calendar-checkbox { display: flex !important; grid-template-columns: 18px 1fr; align-items: center; }
+.calendar-checkbox input { width: 16px; min-height: 16px; }
+.calendar-conflict-warning { display: flex; gap: 9px; padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--theme-danger) 35%, var(--theme-border)); border-radius: 9px; color: var(--color-status-danger-text); background: color-mix(in srgb, var(--theme-danger) 8%, transparent); }
+.calendar-conflict-warning div { display: grid; gap: 2px; }
+.calendar-conflict-warning span { color: var(--theme-text-muted); font-size: 0.76rem; }
+.calendar-recurrence-scope { display: grid; gap: 8px; padding: 11px; border: 1px solid var(--theme-border); border-radius: 10px; background: var(--theme-surface-elevated, var(--theme-bg)); }
+.calendar-recurrence-scope > div { display: flex; gap: 14px; flex-wrap: wrap; }
+.calendar-recurrence-scope label { display: flex; align-items: center; gap: 5px; color: var(--theme-text); cursor: pointer; }
+.calendar-recurrence-scope input { width: 15px; min-height: 15px; }
+.calendar-recurrence-scope small { color: var(--theme-text-muted); }
+.calendar-modal-actions { display: grid; grid-template-columns: auto 1fr auto auto; gap: 8px; padding-top: 5px; }
+.calendar-modal-actions button { min-height: 39px; display: inline-flex; align-items: center; gap: 6px; padding: 0 13px; border: 1px solid var(--color-border-control); border-radius: 8px; color: var(--theme-text); background: transparent; font-weight: 800; cursor: pointer; }
+.calendar-modal-actions button.is-primary { border-color: var(--color-accent-text); color: var(--theme-text-inverse); background: var(--theme-primary); }
+.calendar-modal-actions button.is-primary:hover:not(:disabled),
+.calendar-modal-actions button.is-primary:focus-visible { border-color: var(--color-accent-text); color: var(--theme-text-inverse); background: var(--theme-primary-hover); outline: 0; }
+.calendar-modal-actions button.is-danger { color: var(--color-status-danger-text); }
+
+.calendar-date-action-backdrop { position: fixed; inset: 0; z-index: 990; display: grid; place-items: center; padding: 20px; background: rgb(0 0 0 / 0.36); backdrop-filter: blur(2px); }
+.calendar-date-action { width: min(470px, 100%); padding: 20px; border: 1px solid var(--theme-border); border-radius: 18px; color: var(--theme-text); background: var(--theme-surface); box-shadow: 0 24px 70px rgb(0 0 0 / 0.3); }
+.calendar-date-action header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.calendar-date-action header span { color: var(--color-accent-text); font-size: 0.72rem; font-weight: 800; text-transform: uppercase; }
+.calendar-date-action header h2 { margin: 4px 0 0; font-size: 1.25rem; }
+.calendar-date-action header > button { width: 34px; height: 34px; flex: 0 0 auto; display: grid; place-items: center; border: 0; border-radius: 8px; color: var(--theme-text-muted); background: var(--theme-surface-elevated, var(--theme-bg)); cursor: pointer; }
+.calendar-date-action-options { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 20px; }
+.calendar-date-action-options > button { min-width: 0; display: grid; grid-template-columns: 42px minmax(0, 1fr); gap: 3px 11px; padding: 14px; border: 1px solid var(--color-border-control); border-radius: 13px; color: var(--theme-text); background: var(--theme-bg); font: inherit; text-align: start; cursor: pointer; transition: border-color 150ms ease, transform 150ms ease, box-shadow 150ms ease; }
+.calendar-date-action-options > button:hover,
+.calendar-date-action-options > button:focus-visible { border-color: var(--color-accent-text); outline: 0; box-shadow: 0 8px 24px color-mix(in srgb, var(--theme-primary) 16%, transparent); transform: translateY(-1px); }
+.calendar-date-action-options > button > span { grid-row: 1 / 3; width: 42px; height: 42px; display: grid; place-items: center; border-radius: 11px; color: var(--color-accent-text); background: color-mix(in srgb, var(--theme-primary) 14%, transparent); }
+.calendar-date-action-options > button > span.is-reservation { color: var(--color-status-success-text); background: color-mix(in srgb, var(--theme-success) 14%, transparent); }
+.calendar-date-action-options strong { align-self: end; font-size: 0.86rem; }
+.calendar-date-action-options small { color: var(--theme-text-muted); font-size: 0.67rem; line-height: 1.35; }
+.calendar-date-open-day { display: block; margin: 14px auto 0; padding: 6px 10px; border: 0; color: var(--color-accent-text); background: transparent; font: inherit; font-size: 0.74rem; font-weight: 800; cursor: pointer; }
+
+@media (max-width: 520px) {
+  .calendar-date-action-options { grid-template-columns: 1fr; }
+}
+.calendar-history-drawer { position: fixed; inset-inline-end: 22px; bottom: 22px; z-index: 1001; width: min(320px, calc(100vw - 44px)); max-height: 260px; overflow: auto; padding: 13px; border: 1px solid var(--theme-border); border-radius: 13px; color: var(--theme-text); background: var(--theme-surface); box-shadow: 0 18px 50px rgb(0 0 0 / 0.25); }
+.calendar-history-drawer header { display: flex; align-items: center; gap: 7px; margin-bottom: 8px; }
+.calendar-history-drawer > div { display: flex; justify-content: space-between; gap: 8px; padding: 7px 0; border-top: 1px solid var(--theme-border); font-size: 0.72rem; }
+.calendar-history-drawer span { color: var(--theme-text-muted); }
+
+@media (max-width: 900px) {
+  .calendar-control-bar { flex-wrap: wrap; }
+  .calendar-control-bar > strong { order: -1; width: 100%; }
+  .calendar-workspace-page .reservation-calendar-layout { display: block; }
+  .calendar-workspace-sidebar { border-bottom: 1px solid var(--theme-border); }
+}
+
+@media (max-width: 620px) {
+  .calendar-export { display: none; }
+  .calendar-form-grid { grid-template-columns: 1fr; }
+  .calendar-modal-actions { grid-template-columns: 1fr 1fr; }
+  .calendar-modal-actions span { display: none; }
+  .calendar-control-bar .reservation-calendar-view-switch { width: 100%; }
+  .calendar-control-bar .reservation-calendar-view-switch button { flex: 1; }
+}
+
+/* Calendar header and controls need their own containment rules because the
+   dashboard shell exposes broad header/div layout styles. */
+.calendar-workspace-page {
+  min-width: 0;
+  overflow-x: clip;
+}
+
+.calendar-workspace-page > .reservation-calendar-toolbar {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) max-content;
+  align-items: end;
+  gap: 20px;
+}
+
+.calendar-toolbar-copy {
+  min-width: 0;
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+  justify-items: start;
+  gap: 0;
+}
+
+.calendar-toolbar-copy > .reservation-calendar-eyebrow,
+.calendar-toolbar-copy > h1,
+.calendar-toolbar-copy > p {
+  width: 100%;
+  display: block;
+  min-width: 0;
+}
+
+.calendar-toolbar-copy > h1 {
+  margin: 0;
+  overflow-wrap: normal;
+  white-space: nowrap;
+}
+
+.calendar-toolbar-copy > p {
+  max-width: 720px;
+  margin: 9px 0 0;
+  line-height: 1.45;
+}
+
+.calendar-workspace-page > .reservation-calendar-toolbar > .reservation-calendar-toolbar-actions {
+  min-width: max-content;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: nowrap;
+  gap: 8px;
+}
+
+.calendar-workspace-page .calendar-icon-action,
+.calendar-workspace-page .calendar-export,
+.calendar-workspace-page .calendar-new-event {
+  flex: 0 0 auto;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.calendar-workspace-page .calendar-new-event {
+  min-width: 126px;
+}
+
+.calendar-control-bar {
+  min-width: 0;
+}
+
+.calendar-control-bar > strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 1240px) {
+  .calendar-workspace-page > .reservation-calendar-toolbar {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .calendar-workspace-page > .reservation-calendar-toolbar > .reservation-calendar-toolbar-actions {
+    min-width: 0;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 900px) {
+  .calendar-workspace-page {
+    padding: 18px;
+  }
+
+  .calendar-control-bar {
+    display: grid;
+    grid-template-columns: auto auto auto minmax(0, 1fr);
+    align-items: center;
+  }
+
+  .calendar-control-bar > strong {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    width: 100%;
+    margin: 0 0 4px;
+  }
+
+  .calendar-control-spacer {
+    display: none;
+  }
+
+  .calendar-control-bar > .reservation-calendar-view-switch {
+    justify-self: end;
+  }
+
+  .calendar-workspace-sidebar {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+  }
+
+  .calendar-workspace-sidebar > .reservation-calendar-search,
+  .calendar-workspace-sidebar > .calendar-privacy-note {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 680px) {
+  .calendar-workspace-page {
+    padding: 12px;
+  }
+
+  .calendar-toolbar-copy > h1 {
+    font-size: clamp(2rem, 11vw, 2.7rem);
+  }
+
+  .calendar-toolbar-copy > p {
+    font-size: 0.86rem;
+  }
+
+  .calendar-workspace-page > .reservation-calendar-toolbar > .reservation-calendar-toolbar-actions {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 42px repeat(2, minmax(0, 1fr));
+  }
+
+  .calendar-workspace-page .calendar-export {
+    min-width: 0;
+    display: inline-flex;
+    padding-inline: 9px;
+  }
+
+  .calendar-workspace-page .calendar-new-event {
+    grid-column: 1 / -1;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .calendar-control-bar {
+    grid-template-columns: repeat(3, auto) minmax(0, 1fr);
+    padding: 8px;
+  }
+
+  .calendar-control-bar > .reservation-calendar-view-switch {
+    grid-column: 1 / -1;
+    width: 100%;
+    margin-top: 3px;
+  }
+
+  .calendar-control-bar > .reservation-calendar-view-switch button {
+    min-width: 0;
+    flex: 1;
+    padding-inline: 6px;
+    font-size: 0.78rem;
+  }
+
+  .calendar-workspace-sidebar {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .calendar-workspace-sidebar > .reservation-calendar-search,
+  .calendar-workspace-sidebar > .calendar-privacy-note {
+    grid-column: auto;
+  }
+
+  .calendar-agenda > button {
+    grid-template-columns: 46px 4px minmax(0, 1fr);
+    gap: 9px;
+    padding-inline: 10px;
+  }
+
+  .calendar-agenda > button > small {
+    display: none;
+  }
+}
+
+@media (max-width: 420px) {
+  .calendar-workspace-page > .reservation-calendar-toolbar > .reservation-calendar-toolbar-actions {
+    grid-template-columns: 42px minmax(0, 1fr);
+  }
+
+  .calendar-workspace-page .calendar-import {
+    grid-column: 2;
+  }
+
+  .calendar-workspace-page .calendar-export:not(.calendar-import) {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+
+  .calendar-control-bar {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .calendar-control-bar > button {
+    min-width: 0;
+    padding-inline: 8px;
+  }
+}
+
+/* Authoritative Calendar theme parity layer. Keep this last. */
+.calendar-workspace-page .reservation-calendar-layout {
+  grid-template-columns: 280px minmax(0, 1fr);
+  align-items: start;
+  gap: 14px;
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.calendar-workspace-page .calendar-workspace-sidebar {
+  gap: 0;
+  padding: 14px;
+  border: 1px solid var(--theme-border);
+  border-radius: 10px;
+  background: var(--theme-surface);
+  box-shadow: none;
+}
+
+.calendar-workspace-page .calendar-workspace-surface {
+  min-height: 720px;
+  border: 1px solid var(--theme-border);
+  border-radius: 10px;
+  background: var(--theme-surface);
+  box-shadow: none;
+}
+
+.calendar-workspace-page .reservation-calendar-toolbar-actions > .calendar-toolbar-action {
+  height: 38px;
+  min-height: 38px;
+  border-radius: 8px;
+  font-size: 0.76rem;
+}
+
+.calendar-workspace-page .reservation-calendar-toolbar-actions > .calendar-toolbar-action.is-icon-only {
+  width: 38px;
+}
+
+.calendar-workspace-page .reservation-calendar-toolbar-actions > .calendar-toolbar-action.is-primary {
+  min-width: 116px;
+  box-shadow: none;
+}
+
+@media (max-width: 1100px) and (min-width: 901px) {
+  .calendar-workspace-page .reservation-calendar-layout {
+    grid-template-columns: 250px minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 900px) {
+  .calendar-workspace-page .reservation-calendar-layout {
+    display: block;
+  }
+
+  .calendar-workspace-page .calendar-workspace-sidebar {
+    margin-bottom: 14px;
+    padding: 14px;
+  }
+}
+
+@media (max-width: 680px) {
+  .calendar-workspace-page .calendar-workspace-sidebar {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Task editor follows the shared Calendar modal and action patterns. */
+.calendar-task-section {
+  min-width: 0;
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 11px;
+  border: 1px solid var(--theme-border);
+  border-radius: 10px;
+  background: var(--theme-surface-elevated, var(--theme-bg));
+}
+
+.calendar-task-section-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.calendar-task-section-heading strong {
+  color: var(--theme-text);
+  font-size: 0.78rem;
+}
+
+.calendar-task-section-heading small {
+  color: var(--theme-text-muted);
+  font-size: 0.68rem;
+  font-weight: 650;
+}
+
+.calendar-task-section > p {
+  margin: -2px 0 0;
+  color: var(--theme-text-muted);
+  font-size: 0.7rem;
+  line-height: 1.4;
+}
+
+.calendar-task-date-grid {
+  grid-template-columns: 1fr;
+}
+
+.calendar-task-date-time-field {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.calendar-task-date-time-field > legend {
+  margin-bottom: 6px;
+  padding: 0;
+  color: var(--theme-text);
+  font-size: 0.74rem;
+  font-weight: 750;
+}
+
+.calendar-task-date-time-field > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(104px, 0.42fr);
+  gap: 8px;
+}
+
+.calendar-task-date-time-field label {
+  font-size: 0.66rem;
+}
+
+.calendar-task-date-time-field input:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.calendar-task-end-toggle {
+  width: fit-content;
+  max-width: 100%;
+  gap: 8px;
+  justify-content: flex-start;
+  padding: 2px 0;
+  color: var(--theme-text);
+  font-size: 0.72rem;
+  font-weight: 650;
+  line-height: 1.3;
+  cursor: pointer;
+}
+
+.calendar-modal .calendar-task-end-toggle input[type="checkbox"] {
+  appearance: auto;
+  -webkit-appearance: checkbox;
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+  min-height: 16px;
+  margin: 0;
+  padding: 0;
+  border-radius: 4px;
+  box-shadow: none;
+  accent-color: var(--color-accent-text);
+}
+
+.calendar-task-end-toggle span {
+  white-space: nowrap;
+}
+
+.calendar-task-schedule-tools {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.calendar-task-schedule-tools > button {
+  min-height: 30px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 7px;
+  color: var(--theme-text-muted);
+  background: transparent;
+  font: inherit;
+  font-size: 0.7rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.calendar-task-schedule-tools > button:hover:not(:disabled),
+.calendar-task-schedule-tools > button:focus-visible {
+  color: var(--color-accent-text);
+  background: var(--theme-primary-soft);
+  outline: 0;
+}
+
+.calendar-task-schedule-tools > button:disabled,
+.calendar-task-editor-actions button:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+.calendar-task-editor-actions {
+  grid-template-columns: auto auto 1fr auto auto;
+}
+
+.calendar-task-editor-actions > span {
+  grid-column: 3;
+}
+
+@media (max-width: 680px) {
+  .calendar-task-editor-actions {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .calendar-task-editor-actions > span {
+    display: none;
+  }
+}
+/* Shared warning block adapted to the Calendar theme. */
+.calendar-task-confirmation .page-delete-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: color-mix(in srgb, var(--theme-black) 64%, transparent);
+  backdrop-filter: blur(6px);
+}
+
+.calendar-task-confirmation .page-delete-modal {
+  width: min(430px, 100%);
+  display: grid;
+  justify-items: center;
+  gap: 16px;
+  padding: 26px;
+  border: 1px solid color-mix(in srgb, var(--theme-danger) 32%, var(--theme-border));
+  border-radius: 28px;
+  color: var(--theme-text);
+  background: var(--theme-surface);
+  text-align: center;
+  box-shadow: 0 24px 70px color-mix(in srgb, var(--theme-black) 38%, transparent);
+}
+
+.calendar-task-confirmation .page-delete-modal-icon {
+  width: 56px;
+  height: 56px;
+  display: grid;
+  place-items: center;
+  border-radius: 20px;
+  color: var(--color-status-danger-text);
+  background: color-mix(in srgb, var(--theme-danger) 11%, transparent);
+}
+
+.calendar-task-confirmation.is-archive .page-delete-modal-icon {
+  color: var(--color-status-danger-text);
+  background: color-mix(in srgb, var(--theme-danger) 11%, transparent);
+}
+
+.calendar-task-confirmation .page-delete-modal-copy h2 {
+  margin: 0;
+  color: var(--theme-text);
+  font-size: 1.75rem;
+  line-height: 1.1;
+  font-weight: 950;
+  letter-spacing: -0.04em;
+}
+
+.calendar-task-confirmation .page-delete-modal-copy p {
+  margin: 8px 0 0;
+  color: var(--theme-text-muted);
+  font-size: 0.94rem;
+  line-height: 1.55;
+}
+
+.calendar-task-confirmation .page-delete-modal-copy strong {
+  color: var(--theme-text);
+}
+
+.calendar-task-confirmation .page-delete-modal-actions {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.calendar-task-confirmation .page-delete-modal-actions button {
+  min-height: 48px;
+  padding: 0 16px;
+  border: 1px solid var(--color-border-control);
+  border-radius: 14px;
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 950;
+  cursor: pointer;
+}
+
+.calendar-task-confirmation .page-delete-modal-secondary {
+  color: var(--theme-text);
+  background: var(--theme-surface-elevated);
+}
+
+.calendar-task-confirmation .page-delete-modal-danger {
+  border-color: var(--color-status-danger-text);
+  color: var(--theme-text-inverse);
+  background: var(--theme-danger);
+}
+
+.calendar-task-confirmation .page-delete-modal-actions button:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+@media (max-width: 520px) {
+  .calendar-task-confirmation .page-delete-modal {
+    padding: 20px;
+  }
+
+  .calendar-task-confirmation .page-delete-modal-copy h2 {
+    font-size: 1.45rem;
+  }
+}
+
+.calendar-workspace-page .calendar-agenda-section-title {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--theme-border);
+  color: var(--color-accent-text);
+  background: var(--theme-surface-elevated);
+  font-family: inherit;
+  font-size: 0.72rem;
+}
+
+.calendar-workspace-page .calendar-agenda-section-title span {
+  min-width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  margin-inline-start: auto;
+  border: 1px solid var(--theme-border);
+  border-radius: 999px;
+  color: var(--theme-text-muted);
+  background: var(--theme-surface);
+  font-size: 0.62rem;
+}
+
+.calendar-workspace-page .calendar-agenda-task > i {
+  background: var(--theme-primary);
+}
+
+.calendar-workspace-page .calendar-agenda-task.is-unscheduled > i {
+  background: var(--theme-text-muted);
+}
+
+.calendar-workspace-page .calendar-agenda-task.is-unscheduled time {
+  color: var(--theme-text-muted);
+}
+
+.calendar-workspace-page .calendar-agenda-task.is-unscheduled time svg {
+  margin-top: 2px;
+}
+
+.calendar-workspace-page .calendar-task-editor input,
+.calendar-workspace-page .calendar-task-editor select,
+.calendar-workspace-page .calendar-task-editor textarea,
+.calendar-workspace-page .calendar-task-editor button {
+  font-family: inherit;
+}
+
+/* Calendar sidebar information hierarchy — keep this after the parity layer. */
+.calendar-workspace-page .calendar-workspace-sidebar {
+  padding: 16px 14px;
+}
+
+.calendar-workspace-page .calendar-sidebar-category {
+  display: flex;
+  margin: 4px 0 0;
+  color: var(--theme-text-muted);
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+}
+
+.calendar-workspace-page .calendar-sidebar-category:first-child {
+  margin-top: 0;
+}
+
+.calendar-workspace-page .calendar-workspace-sidebar .calendar-sidebar-group,
+.calendar-workspace-page .calendar-workspace-sidebar .calendar-invitation-panel {
+  padding: 13px 0 17px;
+}
+
+.calendar-workspace-page .calendar-sidebar-group-heading {
+  min-height: 30px;
+}
+
+.calendar-workspace-page .calendar-sidebar-group-heading strong {
+  font-size: 0.8rem;
+}
+
+.calendar-workspace-page .calendar-count-badge {
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border: 1px solid var(--theme-border);
+  border-radius: 999px;
+  background: var(--theme-surface-elevated);
+}
+
+.calendar-workspace-page .calendar-connected-list {
+  display: grid;
+  gap: 6px;
+}
+
+.calendar-workspace-page .calendar-sync-row {
+  width: 100%;
+  min-height: 54px;
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 9px;
+  border: 1px solid var(--theme-border);
+  border-radius: 8px;
+  background: var(--theme-bg);
+  text-align: start;
+}
+
+.calendar-workspace-page .calendar-sync-row:hover {
+  border-color: color-mix(in srgb, var(--theme-primary) 45%, var(--theme-border));
+  background: var(--theme-surface-elevated);
+}
+
+.calendar-workspace-page .calendar-sync-provider-icon {
+  display: grid;
+  place-items: center;
+  color: var(--color-status-warning-text);
+}
+
+.calendar-workspace-page .calendar-sync-row.is-connected .calendar-sync-provider-icon {
+  color: var(--color-status-success-text);
+}
+
+.calendar-workspace-page .calendar-sync-account {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.calendar-workspace-page .calendar-sync-account strong {
+  overflow: hidden;
+  color: var(--theme-text);
+  font-size: 0.76rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.calendar-workspace-page .calendar-sync-account small {
+  color: var(--theme-text-muted);
+  font-size: 0.62rem;
+  text-transform: capitalize;
+}
+
+.calendar-workspace-page .calendar-sync-status {
+  max-width: 88px;
+  padding: 4px 6px;
+  border-radius: 999px;
+  color: var(--theme-text-muted);
+  background: var(--theme-surface-elevated);
+  font-size: 0.58rem;
+  line-height: 1.15;
+  text-align: center;
+  text-transform: capitalize;
+}
+
+.calendar-workspace-page .calendar-no-connections {
+  margin: 0;
+  padding: 10px;
+  border: 1px dashed var(--theme-border);
+  border-radius: 8px;
+  color: var(--theme-text-muted);
+  font-size: 0.7rem;
+  text-align: center;
+}
+
+.calendar-workspace-page .calendar-new-connection {
+  gap: 11px;
+  margin-top: 2px;
+  padding-top: 13px;
+}
+
+.calendar-workspace-page .calendar-new-connection-heading {
+  display: grid;
+  gap: 2px;
+}
+
+.calendar-workspace-page .calendar-new-connection-heading strong {
+  color: var(--theme-text);
+  font-size: 0.75rem;
+}
+
+.calendar-workspace-page .calendar-new-connection-heading small,
+.calendar-workspace-page .calendar-connection-help {
+  color: var(--theme-text-muted);
+  font-size: 0.62rem;
+  line-height: 1.4;
+}
+
+.calendar-workspace-page .calendar-new-connection .calendar-sync-direction {
+  grid-template-columns: minmax(0, 1fr) 128px;
+  align-items: center;
+}
+
+.calendar-workspace-page .calendar-new-connection .calendar-sync-direction > span {
+  color: var(--theme-text-muted);
+  font-size: 0.66rem;
+  font-weight: 700;
+}
+
+.calendar-workspace-page .calendar-connect-actions button {
+  font-size: 0.66rem;
+  font-weight: 750;
+}
+
+.calendar-workspace-page .calendar-privacy-note {
+  margin-top: 15px;
+  padding-top: 15px;
+  border-top: 1px solid var(--theme-border);
+}
+
+@media (max-width: 900px) {
+  .calendar-workspace-page .calendar-sidebar-category,
+  .calendar-workspace-page .calendar-privacy-note {
+    grid-column: 1 / -1;
+  }
+}
+
+/* Scroll the timeline independently so every hour remains reachable. */
+.calendar-workspace-page .calendar-workspace-surface {
+  height: var(--calendar-sidebar-height, 640px);
+  min-height: 0;
+  overflow-x: auto;
+  overflow-y: scroll !important;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  scrollbar-width: auto;
+  scrollbar-color: var(--theme-text-muted) var(--theme-surface-elevated);
+}
+
+.calendar-workspace-page .calendar-workspace-surface::-webkit-scrollbar {
+  width: 14px;
+  height: 14px;
+}
+
+.calendar-workspace-page .calendar-workspace-surface::-webkit-scrollbar-track {
+  border-inline-start: 1px solid var(--theme-border);
+  background: var(--theme-surface-elevated);
+}
+
+.calendar-workspace-page .calendar-workspace-surface::-webkit-scrollbar-thumb {
+  min-height: 52px;
+  border: 3px solid var(--theme-surface-elevated);
+  border-radius: 999px;
+  background: var(--theme-text-muted);
+}
+
+.calendar-workspace-page .calendar-workspace-surface::-webkit-scrollbar-thumb:hover {
+  background: var(--theme-primary);
+}
+
+.calendar-workspace-page .calendar-grid-header {
+  position: sticky;
+  top: 0;
+  z-index: 6;
+}
+
+@media (max-height: 700px) {
+  .calendar-workspace-page .calendar-workspace-surface {
+    height: 480px;
+  }
+}
+
+@media (max-width: 680px) {
+  .calendar-workspace-page .calendar-workspace-surface {
+    height: 65dvh;
+    min-height: 440px;
+  }
+}
+
+/* Final Madar dashboard parity: mirrors the Responses workspace hierarchy. */
+.calendar-workspace-page.reservation-calendar-page {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 28px;
+  background: var(--theme-bg);
+}
+
+.calendar-workspace-page > .reservation-calendar-toolbar {
+  align-items: flex-end;
+  margin-bottom: 22px;
+}
+
+.calendar-workspace-page .reservation-calendar-eyebrow {
+  margin-bottom: 8px;
+  color: var(--color-accent-text);
+  font-size: 0.72rem;
+  font-weight: 950;
+  letter-spacing: 0.06em;
+}
+
+.calendar-workspace-page .calendar-toolbar-copy > h1 {
+  font-size: clamp(2rem, 2.5vw, 2.4rem);
+  line-height: 1.08;
+  font-weight: 950;
+  letter-spacing: -0.04em;
+}
+
+.calendar-workspace-page .calendar-toolbar-copy > p {
+  margin-top: 7px;
+  color: var(--theme-text-muted);
+  font-size: 0.86rem;
+  line-height: 1.5;
+  font-weight: 500;
+}
+
+.calendar-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 0 0 14px;
+}
+
+.calendar-summary-grid article {
+  min-width: 0;
+  padding: 10px 14px 12px;
+  border-inline-end: 1px solid var(--theme-border);
+}
+
+.calendar-summary-grid article:first-child {
+  padding-inline-start: 0;
+}
+
+.calendar-summary-grid article:last-child {
+  border-inline-end: 0;
+}
+
+.calendar-summary-grid span {
+  display: block;
+  color: var(--theme-text-muted);
+  font-size: 0.68rem;
+  font-weight: 850;
+}
+
+.calendar-summary-grid strong {
+  display: block;
+  margin-top: 6px;
+  color: var(--theme-text);
+  font-size: 1.65rem;
+  line-height: 1;
+  font-weight: 950;
+  letter-spacing: -0.04em;
+}
+
+.calendar-workspace-page .calendar-control-bar {
+  min-height: 58px;
+  margin-bottom: 14px;
+  padding: 8px 10px;
+  border: 1px solid var(--theme-border);
+  border-radius: 10px;
+  background: var(--theme-surface);
+  box-shadow: none;
+}
+
+.calendar-workspace-page .calendar-control-bar > button {
+  min-width: 42px;
+  height: 38px;
+  border-radius: 8px;
+  background: var(--theme-surface-elevated);
+}
+
+.calendar-workspace-page .calendar-control-bar > strong {
+  font-size: 0.88rem;
+  font-weight: 900;
+}
+
+.calendar-workspace-page .reservation-calendar-view-switch {
+  border-radius: 8px;
+  background: var(--theme-bg);
+}
+
+.calendar-workspace-page .reservation-calendar-view-switch button {
+  min-height: 32px;
+  border-radius: 6px;
+  font-size: 0.76rem;
+}
+
+.calendar-workspace-page .reservation-calendar-layout {
+  min-height: 720px;
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  align-items: start;
+  gap: 14px;
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.calendar-workspace-page .calendar-workspace-sidebar {
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--theme-border);
+  border-radius: 10px;
+  background: var(--theme-surface);
+  box-shadow: none;
+}
+
+.calendar-workspace-page .calendar-workspace-surface {
+  min-height: 720px;
+  border: 1px solid var(--theme-border);
+  border-radius: 10px;
+  background: var(--theme-surface);
+  box-shadow: none;
+}
+
+.calendar-workspace-page .calendar-workspace-sidebar .reservation-calendar-search {
+  height: 40px;
+  border-radius: 7px;
+  background: var(--theme-bg);
+}
+
+.calendar-workspace-page .calendar-sidebar-search-wrap {
+  padding-bottom: 14px;
+}
+
+.calendar-workspace-page .calendar-workspace-sidebar .calendar-sidebar-group,
+.calendar-workspace-page .calendar-workspace-sidebar .calendar-invitation-panel {
+  padding: 14px 0;
+}
+
+.calendar-workspace-page .calendar-sidebar-group-heading strong,
+.calendar-workspace-page .calendar-source-toggle span,
+.calendar-workspace-page .calendar-new-connection > span,
+.calendar-workspace-page .calendar-privacy-note strong {
+  font-size: 0.76rem;
+  font-weight: 900;
+}
+
+.calendar-workspace-page .calendar-sidebar-group-heading small,
+.calendar-workspace-page .calendar-source-toggle small,
+.calendar-workspace-page .calendar-sync-direction,
+.calendar-workspace-page .calendar-privacy-note {
+  font-size: 0.66rem;
+}
+
+.calendar-workspace-page .calendar-sidebar-icon {
+  color: var(--theme-text-muted);
+}
+
+.calendar-workspace-page .calendar-task-panel form,
+.calendar-workspace-page .calendar-sync-direction select,
+.calendar-workspace-page .calendar-connect-actions button {
+  border-radius: 7px;
+}
+
+.calendar-workspace-page .calendar-privacy-note svg {
+  color: var(--color-accent-text);
+}
+
+.calendar-workspace-page .calendar-time-grid,
+.calendar-workspace-page .calendar-grid-header,
+.calendar-workspace-page .calendar-grid-day {
+  background-color: var(--theme-surface);
+}
+
+.calendar-workspace-page .calendar-grid-header {
+  border-radius: 10px 10px 0 0;
+}
+
+.calendar-workspace-page .reservation-calendar-toolbar-actions > .calendar-toolbar-action {
+  height: 38px;
+  min-height: 38px;
+  border-radius: 8px;
+  font-size: 0.76rem;
+}
+
+.calendar-workspace-page .reservation-calendar-toolbar-actions > .calendar-toolbar-action.is-icon-only {
+  width: 38px;
+}
+
+.calendar-workspace-page .reservation-calendar-toolbar-actions > .calendar-toolbar-action.is-primary {
+  min-width: 116px;
+  box-shadow: none;
+}
+
+@media (max-width: 1100px) and (min-width: 901px) {
+  .calendar-workspace-page .reservation-calendar-layout {
+    grid-template-columns: 250px minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 900px) {
+  .calendar-workspace-page.reservation-calendar-page {
+    padding: 20px;
+  }
+
+  .calendar-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .calendar-summary-grid article:nth-child(2) {
+    border-inline-end: 0;
+  }
+
+  .calendar-summary-grid article:nth-child(n + 3) {
+    border-top: 1px solid var(--theme-border);
+  }
+
+  .calendar-workspace-page .reservation-calendar-layout {
+    display: block;
+  }
+
+  .calendar-workspace-page .calendar-workspace-sidebar {
+    margin-bottom: 14px;
+  }
+}
+
+@media (max-width: 600px) {
+  .calendar-workspace-page.reservation-calendar-page {
+    padding: 14px;
+  }
+
+  .calendar-summary-grid article {
+    padding: 10px;
+  }
+
+  .calendar-summary-grid article:nth-child(odd) {
+    padding-inline-start: 0;
+  }
+
+  .calendar-summary-grid strong {
+    font-size: 1.4rem;
+  }
+}
+
+/* Structured calendar workspace sidebar */
+.calendar-workspace-page .reservation-calendar-layout {
+  grid-template-columns: 286px minmax(0, 1fr);
+}
+
+.calendar-workspace-page .calendar-workspace-sidebar {
+  gap: 14px;
+  padding: 16px;
+  background: color-mix(in srgb, var(--theme-surface-elevated) 92%, var(--theme-bg));
+}
+
+.calendar-sidebar-search-wrap {
+  padding-bottom: 2px;
+}
+
+.calendar-workspace-sidebar .reservation-calendar-search {
+  height: 44px;
+  border-radius: 12px;
+  background: var(--theme-surface);
+  box-shadow: 0 1px 0 rgba(var(--theme-shadow-rgb), 0.03);
+}
+
+.calendar-workspace-sidebar .reservation-calendar-search:focus-within {
+  border-color: color-mix(in srgb, var(--theme-primary) 52%, var(--theme-border));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--theme-primary) 12%, transparent);
+}
+
+.calendar-sidebar-category {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 4px 0 -2px;
+  color: var(--theme-text-muted);
+  font-size: 0.64rem;
+  font-weight: 850;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.calendar-sidebar-category::after {
+  content: "";
+  height: 1px;
+  flex: 1;
+  background: var(--theme-border);
+}
+
+.calendar-workspace-sidebar .calendar-sidebar-group,
+.calendar-workspace-sidebar .calendar-invitation-panel {
+  display: grid;
+  gap: 11px;
+  padding: 13px;
+  border: 1px solid var(--theme-border);
+  border-radius: 13px;
+  background: color-mix(in srgb, var(--theme-surface) 82%, transparent);
+}
+
+.calendar-sidebar-group-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.calendar-sidebar-group-heading > div {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.calendar-sidebar-group-heading > div > span:last-child {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.calendar-sidebar-group-heading strong {
+  overflow: hidden;
+  color: var(--theme-text);
+  font-size: 0.86rem;
+  line-height: 1.15;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.calendar-sidebar-group-heading small {
+  overflow: hidden;
+  color: var(--theme-text-muted);
+  font-size: 0.67rem;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.calendar-sidebar-icon {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  color: var(--color-accent-text);
+  background: color-mix(in srgb, var(--theme-primary) 11%, transparent);
+}
+
+.calendar-count-badge {
+  min-width: 26px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  padding: 0 7px;
+  border: 1px solid var(--theme-border);
+  border-radius: 999px;
+  color: var(--theme-text-muted);
+  background: var(--theme-surface-elevated);
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+.calendar-source-list {
+  display: grid;
+  gap: 3px;
+}
+
+.calendar-workspace-sidebar .calendar-source-toggle {
+  min-height: 34px;
+  padding: 0 7px;
+  border-radius: 8px;
+  transition: background-color 150ms ease;
+}
+
+.calendar-workspace-sidebar .calendar-source-toggle:hover {
+  background: var(--theme-surface-elevated);
+}
+
+.calendar-workspace-sidebar .calendar-task-panel form {
+  min-height: 39px;
+  background: var(--theme-bg);
+}
+
+.calendar-workspace-sidebar .calendar-task-panel form button {
+  width: 39px;
+  border-inline-start: 1px solid var(--color-border-control);
+}
+
+.calendar-new-connection {
+  display: grid;
+  gap: 9px;
+  padding-top: 11px;
+  border-top: 1px solid var(--theme-border);
+}
+
+.calendar-new-connection > span {
+  color: var(--theme-text);
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.calendar-new-connection .calendar-sync-direction {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 126px;
+}
+
+.calendar-new-connection .calendar-sync-direction select {
+  width: 100%;
+  min-height: 34px;
+}
+
+.calendar-workspace-sidebar .calendar-connect-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.calendar-workspace-sidebar .calendar-connect-actions button {
+  min-height: 36px;
+  padding: 0 9px;
+  background: var(--theme-surface-elevated);
+  font-size: 0.72rem;
+}
+
+.calendar-workspace-sidebar .calendar-connect-actions button:last-child {
+  grid-column: 1 / -1;
+}
+
+.calendar-workspace-sidebar .calendar-privacy-note {
+  margin-top: 2px;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--theme-success) 20%, var(--theme-border));
+  border-radius: 12px;
+}
+
+@media (max-width: 1200px) and (min-width: 901px) {
+  .calendar-workspace-page .reservation-calendar-layout {
+    grid-template-columns: 260px minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 900px) {
+  .calendar-workspace-page .calendar-workspace-sidebar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .calendar-sidebar-search-wrap,
+  .calendar-sidebar-category,
+  .calendar-workspace-sidebar > .calendar-privacy-note {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 680px) {
+  .calendar-workspace-page .calendar-workspace-sidebar {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 12px;
+  }
+
+  .calendar-sidebar-search-wrap,
+  .calendar-sidebar-category,
+  .calendar-workspace-sidebar > .calendar-privacy-note {
+    grid-column: auto;
+  }
+}
+
+.calendar-workspace-page .calendar-toolbar-action:disabled,
+.calendar-workspace-page .calendar-toolbar-action.is-disabled,
+.calendar-workspace-sidebar input:disabled,
+.calendar-workspace-sidebar select:disabled,
+.calendar-workspace-sidebar button:disabled {
+  opacity: 0.48;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* Keep the workspace sidebar aligned with the dashboard's flat theme. */
+.calendar-workspace-page .calendar-workspace-sidebar {
+  gap: 0;
+  padding: 18px;
+  background: var(--theme-surface);
+}
+
+.calendar-sidebar-search-wrap {
+  padding: 0 0 18px;
+  border-bottom: 1px solid var(--theme-border);
+}
+
+.calendar-workspace-sidebar .reservation-calendar-search {
+  border-radius: 8px;
+  background: var(--theme-bg);
+  box-shadow: none;
+}
+
+.calendar-sidebar-category {
+  display: none;
+}
+
+.calendar-workspace-sidebar .calendar-sidebar-group,
+.calendar-workspace-sidebar .calendar-invitation-panel {
+  gap: 10px;
+  padding: 18px 0;
+  border: 0;
+  border-bottom: 1px solid var(--theme-border);
+  border-radius: 0;
+  background: transparent;
+}
+
+.calendar-sidebar-group-heading > div {
+  gap: 8px;
+}
+
+.calendar-sidebar-icon {
+  width: 20px;
+  height: 20px;
+  color: var(--color-accent-text);
+  background: transparent;
+}
+
+.calendar-sidebar-group-heading strong {
+  font-size: 0.82rem;
+}
+
+.calendar-sidebar-group-heading small {
+  font-size: 0.65rem;
+}
+
+.calendar-count-badge {
+  min-width: auto;
+  height: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  color: var(--theme-text-muted);
+  background: transparent;
+}
+
+.calendar-workspace-sidebar .calendar-source-toggle {
+  min-height: 30px;
+  padding: 0;
+}
+
+.calendar-workspace-sidebar .calendar-source-toggle:hover {
+  color: var(--color-accent-text);
+  background: transparent;
+}
+
+.calendar-workspace-sidebar .calendar-task-panel form {
+  min-height: 38px;
+  border-radius: 8px;
+  background: var(--theme-bg);
+}
+
+.calendar-workspace-sidebar .calendar-task-panel form button:hover {
+  color: var(--theme-text-inverse);
+  background: var(--theme-primary);
+}
+
+.calendar-new-connection {
+  gap: 10px;
+  padding-top: 10px;
+}
+
+.calendar-new-connection > span {
+  color: var(--theme-text-muted);
+  font-size: 0.67rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.calendar-new-connection .calendar-sync-direction {
+  grid-template-columns: minmax(0, 1fr) 128px;
+}
+
+.calendar-workspace-sidebar .calendar-connect-actions {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.calendar-workspace-sidebar .calendar-connect-actions button,
+.calendar-workspace-sidebar .calendar-connect-actions button:last-child {
+  grid-column: auto;
+  min-width: 0;
+  min-height: 34px;
+  padding: 0 5px;
+  border-radius: 7px;
+  background: transparent;
+  font-size: 0.67rem;
+}
+
+.calendar-workspace-sidebar .calendar-connect-actions button:hover {
+  border-color: var(--color-accent-text);
+  color: var(--color-accent-text);
+  background: var(--theme-primary-soft);
+}
+
+.calendar-workspace-sidebar .calendar-privacy-note {
+  margin: 18px 0 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  color: var(--theme-text-muted);
+  background: transparent;
+}
+
+.calendar-workspace-sidebar .calendar-privacy-note svg {
+  color: var(--color-accent-text);
+}
+
+@media (max-width: 900px) {
+  .calendar-workspace-page .calendar-workspace-sidebar {
+    gap: 0 18px;
+    padding: 18px;
+  }
+
+  .calendar-sidebar-search-wrap {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 680px) {
+  .calendar-workspace-page .calendar-workspace-sidebar {
+    gap: 0;
+    padding: 14px;
+  }
+
+  .calendar-sidebar-search-wrap {
+    grid-column: auto;
+  }
+}
+
+/* Calendar toolbar action group */
+.calendar-workspace-page .reservation-calendar-toolbar-actions > .calendar-toolbar-action {
+  width: auto;
+  min-width: 0;
+  height: 44px;
+  min-height: 44px;
+  box-sizing: border-box;
+  display: inline-flex !important;
+  flex: 0 0 auto;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px;
+  margin: 0;
+  padding: 0 16px;
+  border: 1px solid var(--theme-border);
+  border-radius: 11px;
+  color: var(--theme-text);
+  background: var(--theme-surface-elevated, var(--theme-surface));
+  box-shadow: 0 1px 0 rgb(255 255 255 / 0.03);
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 800;
+  line-height: 1 !important;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: border-color 150ms ease, background-color 150ms ease, color 150ms ease, transform 150ms ease;
+}
+
+.calendar-workspace-page .reservation-calendar-toolbar-actions > .calendar-toolbar-action:hover {
+  border-color: color-mix(in srgb, var(--theme-primary) 45%, var(--theme-border));
+  background: color-mix(in srgb, var(--theme-primary) 7%, var(--theme-surface));
+}
+
+.calendar-workspace-page .reservation-calendar-toolbar-actions > .calendar-toolbar-action:active {
+  transform: translateY(1px);
+}
+
+.calendar-workspace-page .reservation-calendar-toolbar-actions > .calendar-toolbar-action:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--theme-primary) 24%, transparent);
+  outline-offset: 2px;
+}
+
+.calendar-workspace-page .calendar-toolbar-action > svg {
+  width: 17px;
+  height: 17px;
+  display: block;
+  flex: 0 0 auto;
+  margin: 0;
+}
+
+.calendar-workspace-page .calendar-toolbar-action > span {
+  display: block;
+  line-height: 1;
+}
+
+.calendar-workspace-page .reservation-calendar-toolbar-actions > .calendar-toolbar-action.is-icon-only {
+  width: 44px;
+  padding: 0;
+  color: var(--theme-text-muted);
+}
+
+.calendar-workspace-page .reservation-calendar-toolbar-actions > .calendar-toolbar-action.is-primary {
+  min-width: 128px;
+  border-color: var(--color-accent-text);
+  color: var(--theme-text-inverse);
+  background: var(--theme-primary);
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--theme-primary) 23%, transparent);
+}
+
+.calendar-workspace-page .reservation-calendar-toolbar-actions > .calendar-toolbar-action.is-primary:hover {
+  border-color: color-mix(in srgb, var(--theme-primary) 82%, white);
+  color: var(--theme-text-inverse);
+  background: color-mix(in srgb, var(--theme-primary) 88%, white);
+}
+
+.calendar-workspace-page .calendar-toolbar-action.calendar-import {
+  position: relative;
+}
+
+.calendar-workspace-page .calendar-toolbar-action.calendar-import > input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+@media (max-width: 680px) {
+  .calendar-workspace-page > .reservation-calendar-toolbar > .reservation-calendar-toolbar-actions {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .calendar-workspace-page .reservation-calendar-toolbar-actions > .calendar-toolbar-action:not(.calendar-notification-action) {
+    display: none !important;
+  }
+
+  .calendar-workspace-page .reservation-calendar-toolbar-actions > .calendar-toolbar-action.calendar-notification-action {
+    width: 100%;
+    padding-inline: 10px;
+  }
+
+  .calendar-workspace-page .calendar-summary-grid,
+  .calendar-workspace-page .calendar-workspace-sidebar {
+    display: none;
+  }
+
+  .calendar-workspace-page .reservation-calendar-layout {
+    display: block;
+  }
+
+  .calendar-workspace-page .calendar-workspace-surface {
+    height: auto;
+    min-height: 50dvh;
+  }
+}
+
+.calendar-push-guidance {
+  margin: -10px 0 18px;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--theme-primary) 34%, var(--theme-border));
+  border-radius: 10px;
+  color: var(--theme-text);
+  background: var(--theme-primary-soft);
+  font-size: 0.78rem;
+  font-weight: 650;
+  line-height: 1.45;
+}
+
+@media (max-width: 420px) {
+  .calendar-workspace-page > .reservation-calendar-toolbar > .reservation-calendar-toolbar-actions {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Authoritative Calendar theme parity layer — intentionally last. */
+.calendar-workspace-page .calendar-control-bar {
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  font-family: inherit;
+  font-size: 0.78rem;
+  line-height: 1.2;
+}
+
+.calendar-workspace-page .calendar-control-bar button,
+.calendar-workspace-page .calendar-control-bar strong {
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+}
+
+.calendar-workspace-page .calendar-control-bar > strong {
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.calendar-workspace-page .calendar-control-bar > button {
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.calendar-workspace-page .calendar-workspace-sidebar {
+  font-family: inherit;
+  font-size: 0.75rem;
+  line-height: 1.35;
+}
+
+.calendar-workspace-page .calendar-workspace-sidebar button,
+.calendar-workspace-page .calendar-workspace-sidebar input,
+.calendar-workspace-page .calendar-workspace-sidebar select {
+  font-family: inherit;
+}
+
+.calendar-workspace-page .calendar-sidebar-category {
+  color: var(--color-accent-text);
+  font-size: 0.625rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.calendar-workspace-page .calendar-sidebar-group-heading strong,
+.calendar-workspace-page .calendar-source-toggle span,
+.calendar-workspace-page .calendar-task span,
+.calendar-workspace-page .calendar-workload-row > span,
+.calendar-workspace-page .calendar-sync-account strong,
+.calendar-workspace-page .calendar-new-connection-heading strong,
+.calendar-workspace-page .calendar-privacy-note strong {
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.calendar-workspace-page .calendar-sidebar-group-heading small,
+.calendar-workspace-page .calendar-source-toggle small,
+.calendar-workspace-page .calendar-task small,
+.calendar-workspace-page .calendar-workload-row small,
+.calendar-workspace-page .calendar-sync-account small,
+.calendar-workspace-page .calendar-new-connection-heading small,
+.calendar-workspace-page .calendar-connection-help,
+.calendar-workspace-page .calendar-privacy-note {
+  font-size: 0.65rem;
+  font-weight: 400;
+  line-height: 1.35;
+}
+
+.calendar-workspace-page .calendar-count-badge,
+.calendar-workspace-page .calendar-sync-status {
+  font-size: 0.625rem;
+  font-weight: 600;
+}
+
+.calendar-workspace-page .calendar-task,
+.calendar-workspace-page .calendar-workload-row {
+  font-size: 0.7rem;
+}
+
+.calendar-workspace-page .calendar-task-panel form input,
+.calendar-workspace-page .calendar-sync-direction select {
+  font-size: 0.75rem;
+  font-weight: 400;
+}
+
+.calendar-workspace-page .calendar-sync-direction > span,
+.calendar-workspace-page .calendar-connect-actions button {
+  font-size: 0.675rem;
+  font-weight: 600;
+}
+
+.calendar-workspace-page .calendar-calendars-panel .calendar-sidebar-group-heading strong,
+.calendar-workspace-page .calendar-task-panel .calendar-sidebar-group-heading strong,
+.calendar-workspace-page .calendar-workload-panel .calendar-sidebar-group-heading strong,
+.calendar-workspace-page .calendar-sync-panel > .calendar-sidebar-group-heading strong,
+.calendar-workspace-page .calendar-new-connection-heading strong {
+  color: var(--theme-text);
+}
+
+.calendar-workspace-page .calendar-sidebar-group-heading {
+  width: 100%;
+  padding: 0;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  text-align: start;
+  cursor: pointer;
+}
+
+.calendar-workspace-page .calendar-sidebar-heading-main {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.calendar-workspace-page .calendar-sidebar-heading-main > span:last-child {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.calendar-workspace-page .calendar-sidebar-heading-actions {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.calendar-workspace-page .calendar-sidebar-chevron {
+  flex: 0 0 auto;
+  color: var(--theme-text-muted);
+  transform: rotate(-90deg);
+  transition: transform 160ms ease, color 160ms ease;
+}
+
+.calendar-workspace-page [aria-expanded="true"] > .calendar-sidebar-heading-actions .calendar-sidebar-chevron,
+.calendar-workspace-page .calendar-new-connection-toggle[aria-expanded="true"] > .calendar-sidebar-chevron {
+  transform: rotate(0);
+}
+
+.calendar-workspace-page .calendar-sidebar-group-heading:hover .calendar-sidebar-chevron,
+.calendar-workspace-page .calendar-new-connection-toggle:hover .calendar-sidebar-chevron {
+  color: var(--color-accent-text);
+}
+
+.calendar-workspace-page .calendar-sidebar-section-content {
+  display: grid;
+  gap: 10px;
+}
+
+/* Keep the expanded task panel compact inside the narrow workspace sidebar. */
+.calendar-workspace-page .calendar-task-panel .calendar-sidebar-section-content {
+  gap: 4px;
+}
+
+.calendar-workspace-page .calendar-workspace-sidebar .calendar-task-panel form {
+  min-height: 36px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 108px 34px;
+  align-items: stretch;
+}
+
+.calendar-workspace-page .calendar-task-panel .calendar-task-quick-fields {
+  display: contents;
+}
+
+.calendar-workspace-page .calendar-task-panel .calendar-task-quick-fields > input {
+  min-width: 0;
+  padding: 7px 9px;
+}
+
+.calendar-workspace-page .calendar-task-panel .calendar-task-quick-fields > label {
+  display: contents;
+}
+
+.calendar-workspace-page .calendar-task-panel .calendar-task-quick-fields > label > span {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.calendar-workspace-page .calendar-task-panel .calendar-task-quick-fields > label input {
+  min-width: 0;
+  padding: 6px;
+  border-top: 0;
+  border-inline-start: 1px solid var(--color-border-control);
+  font-size: 0.65rem;
+}
+
+.calendar-workspace-page .calendar-workspace-sidebar .calendar-task-panel form button {
+  width: 34px;
+}
+
+.calendar-workspace-page .calendar-task-panel .calendar-task {
+  min-height: 24px;
+  padding: 2px 1px;
+  line-height: 1.2;
+}
+
+.calendar-workspace-page .calendar-task-panel .calendar-task i {
+  width: 6px;
+  height: 6px;
+}
+
+.calendar-workspace-page .calendar-new-connection-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  text-align: start;
+  cursor: pointer;
+}
+
+.calendar-workspace-page .reservation-calendar-layout {
+  grid-template-columns: 280px minmax(0, 1fr);
+  align-items: start;
+  gap: 14px;
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.calendar-workspace-page .calendar-workspace-sidebar {
+  gap: 0;
+  padding: 14px;
+  border: 1px solid var(--theme-border);
+  border-radius: 10px;
+  background: var(--theme-surface);
+  box-shadow: none;
+}
+
+.calendar-workspace-page .calendar-workspace-surface {
+  height: clamp(720px, calc(100dvh - 120px), 920px);
+  min-height: 0;
+  overflow-x: auto;
+  overflow-y: scroll !important;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  scrollbar-width: auto;
+  scrollbar-color: var(--theme-text-muted) var(--theme-surface-elevated);
+  border: 1px solid var(--theme-border);
+  border-radius: 10px;
+  background: var(--theme-surface);
+  box-shadow: none;
+}
+
+.calendar-workspace-page .calendar-workspace-surface::-webkit-scrollbar {
+  width: 14px;
+  height: 14px;
+}
+
+.calendar-workspace-page .calendar-workspace-surface::-webkit-scrollbar-track {
+  border-inline-start: 1px solid var(--theme-border);
+  background: var(--theme-surface-elevated);
+}
+
+.calendar-workspace-page .calendar-workspace-surface::-webkit-scrollbar-thumb {
+  min-height: 52px;
+  border: 3px solid var(--theme-surface-elevated);
+  border-radius: 999px;
+  background: var(--theme-text-muted);
+}
+
+.calendar-workspace-page .calendar-workspace-surface::-webkit-scrollbar-thumb:hover {
+  background: var(--theme-primary);
+}
+
+.calendar-workspace-page .calendar-grid-header {
+  position: sticky;
+  top: 0;
+  z-index: 6;
+}
+
+.calendar-workspace-page .reservation-calendar-toolbar-actions > .calendar-toolbar-action {
+  height: 38px;
+  min-height: 38px;
+  border-radius: 8px;
+  font-size: 0.76rem;
+}
+
+.calendar-workspace-page .reservation-calendar-toolbar-actions > .calendar-toolbar-action.is-icon-only {
+  width: 38px;
+}
+
+.calendar-workspace-page .reservation-calendar-toolbar-actions > .calendar-toolbar-action.is-primary {
+  min-width: 116px;
+  box-shadow: none;
+}
+
+@media (max-width: 1100px) and (min-width: 901px) {
+  .calendar-workspace-page .reservation-calendar-layout {
+    grid-template-columns: 250px minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 900px) {
+  .calendar-workspace-page .reservation-calendar-layout {
+    display: block;
+  }
+
+  .calendar-workspace-page .calendar-workspace-sidebar {
+    margin-bottom: 14px;
+    padding: 14px;
+  }
+
+  .calendar-workspace-page .calendar-workspace-surface {
+    height: clamp(560px, calc(100dvh - 110px), 760px);
+    min-height: 0;
+  }
+}
+
+@media (max-width: 680px) {
+  .calendar-workspace-page .calendar-workspace-sidebar {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Structured reservation records beside the calendar Agenda view. */
+.calendar-reservations-view {
+  container: calendar-reservations / inline-size;
+  min-width: 0;
+  padding: clamp(16px, 2vw, 24px);
+  color: var(--theme-text);
+  font-family: var(--font-main);
+}
+
+.calendar-reservations-view :is(input, select, button, table) { font-family: inherit; }
+
+.calendar-reservations-header {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 18px;
+}
+
+.calendar-reservations-header > div { min-width: 0; }
+.calendar-reservations-header span { color: var(--color-accent-text); font-size: 0.68rem; font-weight: 900; letter-spacing: 0.08em; text-transform: uppercase; }
+.calendar-reservations-header h2 { margin: 3px 0; font-size: clamp(1.35rem, 2.4vw, 2rem); }
+.calendar-reservations-header p { margin: 0; color: var(--theme-text-muted); font-size: 0.82rem; }
+.calendar-reservations-header > strong { flex: 0 0 auto; border-radius: 999px; padding: 7px 11px; background: var(--theme-primary-soft); color: var(--color-accent-text); font-size: 0.72rem; }
+
+.calendar-reservations-tools {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(170px, 220px) minmax(112px, max-content);
+  align-items: end;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.calendar-reservations-tools label { min-width: 0; display: grid; gap: 5px; color: var(--theme-text-muted); font-size: 0.7rem; font-weight: 850; }
+.calendar-reservations-search { position: relative; }
+.calendar-reservations-search svg { position: absolute; inset-inline-start: 13px; top: 50%; transform: translateY(-50%); color: var(--theme-text-muted); pointer-events: none; }
+.calendar-reservations-tools :is(input, select, button) { width: 100%; min-width: 0; min-height: 40px; border: 1px solid var(--color-border-control); border-radius: 8px; background: var(--theme-surface-elevated); color: var(--theme-text); font: inherit; }
+.calendar-reservations-tools input { padding: 9px 12px; padding-inline-start: 40px; font-weight: var(--font-weight-medium); }
+.calendar-reservations-tools input::placeholder { color: var(--theme-text-muted); font-weight: var(--font-weight-medium); opacity: 1; }
+.calendar-reservations-tools select { padding: 8px 10px; }
+.calendar-reservations-tools button { width: auto; display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 8px 13px; cursor: pointer; font-weight: var(--font-weight-bold); white-space: nowrap; }
+.calendar-reservations-tools button svg { flex: 0 0 auto; }
+
+.calendar-reservations-error,
+.calendar-reservations-state { min-height: 180px; display: flex; align-items: center; justify-content: center; gap: 8px; border: 1px dashed var(--theme-border); border-radius: 10px; color: var(--theme-text-muted); }
+.calendar-reservations-state { flex-direction: column; text-align: center; }
+.calendar-reservations-state strong { color: var(--theme-text); }
+
+.calendar-reservations-table-wrap { min-width: 0; overflow-x: auto; border: 1px solid var(--theme-border); border-radius: 10px; }
+.calendar-reservations-table { width: 100%; min-width: 760px; border-collapse: collapse; table-layout: fixed; background: var(--theme-surface); }
+.calendar-reservations-table th { position: sticky; top: 0; z-index: 2; padding: 11px 12px; border-bottom: 1px solid var(--theme-border); background: var(--theme-surface-elevated); color: var(--theme-text-muted); font-size: 0.66rem; font-weight: var(--font-weight-bold); text-align: start; text-transform: uppercase; letter-spacing: 0.05em; }
+.calendar-reservations-table th:nth-child(1) { width: 19%; }
+.calendar-reservations-table th:nth-child(2) { width: 14%; }
+.calendar-reservations-table th:nth-child(3) { width: 21%; }
+.calendar-reservations-table th:nth-child(4) { width: 19%; }
+.calendar-reservations-table th:nth-child(5) { width: 11%; }
+.calendar-reservations-table th:nth-child(6) { width: 16%; }
+.calendar-reservations-table td { min-width: 0; padding: clamp(8px, calc(12px * var(--ui-layout-scale, 1)), 12px); border-bottom: 1px solid var(--theme-border); vertical-align: top; color: var(--theme-text); font-size: var(--ui-text-small, 0.76rem); overflow-wrap: anywhere; }
+.calendar-reservations-table tbody > tr:hover { background: var(--theme-primary-soft); }
+.calendar-reservations-table td > :is(strong, small, a, span) { display: block; }
+.calendar-reservations-table td > small { margin-top: 4px; color: var(--theme-text-muted); }
+.calendar-reservations-table td > a { color: var(--color-accent-text); text-decoration: none; }
+
+.calendar-reservation-status { width: fit-content; border-radius: 999px; padding: 5px 8px; background: var(--theme-surface-elevated); text-transform: capitalize; font-size: 0.68rem; font-weight: 900; }
+.calendar-reservation-status.is-new { background: var(--theme-primary-soft); color: var(--color-accent-text); }
+.calendar-reservation-status.is-confirmed,
+.calendar-reservation-status.is-completed { background: color-mix(in srgb, var(--theme-success) 12%, transparent); color: var(--color-status-success-text); }
+.calendar-reservation-status.is-cancelled,
+.calendar-reservation-status.is-rejected { background: color-mix(in srgb, var(--theme-danger) 10%, transparent); color: var(--color-status-danger-text); }
+
+
+@container calendar-reservations (max-width: 760px) {
+  .calendar-reservations-view { padding: 12px; }
+  .calendar-reservations-header { align-items: start; flex-direction: column; gap: 10px; }
+  .calendar-reservations-tools { grid-template-columns: minmax(0, 1fr); }
+  .calendar-reservations-tools button { width: 100%; }
+  .calendar-reservations-table-wrap { overflow: visible; border: 0; }
+  .calendar-reservations-table { min-width: 0; border-collapse: separate; border-spacing: 0 10px; background: transparent; }
+  .calendar-reservations-table thead { display: none; }
+  .calendar-reservations-table tbody,
+  .calendar-reservations-table tr,
+  .calendar-reservations-table td { display: block; width: 100%; }
+  .calendar-reservations-table tbody > tr { border: 1px solid var(--theme-border); border-radius: 10px; padding: 6px 12px; background: var(--theme-surface); }
+  .calendar-reservations-table td { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--theme-border); }
+  .calendar-reservations-table td::before { content: attr(data-label); color: var(--theme-text-muted); font-size: 0.66rem; font-weight: 900; text-transform: uppercase; }
+}

@@ -1,0 +1,46 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules/
+.vite/
+dist/
+dist-ssr/
+*.local
+.env
+.env.local
+.env.test
+.env.*.local
+
+# Playwright output and authenticated browser state
+playwright/.auth/
+.auth/
+test-results/
+playwright-report/
+blob-report/
+*auth-state*.json
+*storage-state*.json
+*cookies*.json
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Local frontend environment overrides
+.env
+.env.local
+.env.*.local
+.env.development
+.env.production

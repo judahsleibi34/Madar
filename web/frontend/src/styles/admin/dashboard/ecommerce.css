@@ -108,6 +108,9 @@
   min-height: 42px;
   margin-bottom: 12px;
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
   justify-content: flex-end;
 }
 
@@ -1364,11 +1367,25 @@
 .ecommerce-theme-color-row input[type="color"] {
   width: 42px;
   height: 42px;
-  padding: 3px;
-  border: 1px solid var(--color-border-control);
+  padding: 0;
+  border: 0;
   border-radius: 10px;
-  background: var(--theme-surface);
+  background: transparent;
   cursor: pointer;
+}
+
+.ecommerce-theme-color-row input[type="color"]::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.ecommerce-theme-color-row input[type="color"]::-webkit-color-swatch {
+  border: 0;
+  border-radius: 10px;
+}
+
+.ecommerce-theme-color-row input[type="color"]::-moz-color-swatch {
+  border: 0;
+  border-radius: 10px;
 }
 
 .ecommerce-theme-color-row > span {
@@ -1647,3 +1664,39 @@
 .ecommerce-growth-controls select[multiple] { min-height: 8rem; }
 .ecommerce-growth-toggle { display: flex; align-items: center; gap: 0.65rem; font-weight: 700; }
 .ecommerce-growth-toggle input { width: auto; }
+/* Store-design controls use dashboard tokens; the iframe keeps storefront tokens. */
+.ecommerce-theme-page .ecommerce-theme-controls, .ecommerce-theme-page .ecommerce-theme-preview { min-width:0; font-family:var(--font-family-base); font-size:var(--font-size-sm,.875rem); }
+.ecommerce-theme-settings-tabs { display:flex; flex-wrap:wrap; gap:6px; padding-bottom:18px; margin-bottom:20px; border-bottom:1px solid var(--theme-border); }
+.ecommerce-theme-settings-tabs > button, .ecommerce-theme-device-controls > button { display:inline-flex; align-items:center; justify-content:center; gap:7px; min-height:38px; padding:8px 12px; border:1px solid transparent !important; border-radius:9px; background:transparent !important; color:var(--theme-text-muted) !important; font:inherit; font-weight:600; cursor:pointer; box-shadow:none !important; }
+.ecommerce-theme-settings-tabs > button[aria-selected="true"], .ecommerce-theme-device-controls > button[aria-pressed="true"] { background:var(--theme-bg-soft) !important; color:var(--theme-text) !important; border-color:var(--theme-border) !important; }
+.ecommerce-theme-page :is(input,textarea,select,button):focus { outline:none !important; box-shadow:none !important; }
+.ecommerce-theme-page :is(input,textarea,select,button):focus-visible { outline:1px solid var(--theme-text-muted) !important; outline-offset:2px; }
+.ecommerce-theme-section-title, .ecommerce-theme-page .ecommerce-growth-controls h2 { margin:0; color:var(--theme-text); font-size:var(--font-size-lg,1.125rem); font-weight:600; }
+.ecommerce-theme-page .ecommerce-theme-color-list { margin-top:18px; gap:12px; }
+.ecommerce-theme-page .ecommerce-theme-color-row { padding:14px; gap:12px !important; grid-template-columns:42px minmax(0,1fr) 112px; background:var(--theme-surface); }
+.ecommerce-theme-page .ecommerce-theme-color-row strong { font-size:var(--font-size-sm,.875rem); font-weight:600; }
+.ecommerce-theme-page .ecommerce-theme-color-row small { font-size:var(--font-size-xs,.75rem); line-height:1.5; font-weight:400; }
+.ecommerce-theme-page .ecommerce-theme-color-row > input:last-child { width:112px; min-height:42px; font-size:var(--font-size-sm,.875rem) !important; font-weight:400 !important; }
+.ecommerce-theme-page .ecommerce-theme-reset { min-height:38px; padding:8px 0; border:0 !important; border-radius:8px; font:inherit; font-weight:400; background:transparent !important; box-shadow:none !important; }
+.ecommerce-theme-page .ecommerce-growth-controls { grid-template-columns:repeat(2,minmax(0,1fr)); margin:0; padding:0; border:0; gap:18px 16px; }
+.ecommerce-theme-page .ecommerce-growth-controls > div, .ecommerce-theme-page .ecommerce-growth-controls > small, .ecommerce-theme-page .ecommerce-growth-toggle { grid-column:1/-1; }
+.ecommerce-theme-page .ecommerce-growth-controls > div p, .ecommerce-theme-page .ecommerce-growth-controls > small { color:var(--theme-text-muted); font-size:var(--font-size-sm,.875rem); line-height:1.6; }
+.ecommerce-theme-page .ecommerce-growth-controls label:not(.ecommerce-growth-toggle) { min-width:0; font-weight:400; color:var(--theme-text-muted); }
+.ecommerce-theme-page .ecommerce-growth-controls :is(input:not([type="checkbox"]),textarea,select) { min-width:0; min-height:44px; color:var(--theme-text); background:var(--theme-surface); border-color:var(--color-border-control); font-size:var(--font-size-sm,.875rem) !important; font-weight:400 !important; }
+.ecommerce-theme-page .ecommerce-growth-toggle { font-weight:400; }
+.ecommerce-theme-page .ecommerce-growth-toggle input { appearance:auto !important; width:18px !important; height:18px !important; min-height:18px !important; padding:0 !important; margin:0; accent-color:var(--theme-primary); }
+.ecommerce-theme-settings-footer { display:flex; justify-content:flex-end; margin-top:24px; padding-top:20px; border-top:1px solid var(--theme-border); }
+.ecommerce-theme-page .ecommerce-primary-button { background:var(--accent) !important; color:var(--color-accent-text) !important; font-size:var(--font-size-sm,.875rem) !important; font-weight:600 !important; }
+.ecommerce-theme-page .ecommerce-secondary-button { font-size:var(--font-size-sm,.875rem) !important; font-weight:600 !important; }
+.ecommerce-theme-page .ecommerce-theme-preview-label { flex-wrap:wrap; gap:8px; font-size:var(--font-size-sm,.875rem); font-weight:600; color:var(--theme-text); }
+.ecommerce-theme-preview-label small { font-size:var(--font-size-xs,.75rem); font-weight:400; color:var(--theme-text-muted); }
+.ecommerce-theme-preview-toolbar { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:12px; margin-bottom:16px; }
+.ecommerce-theme-device-controls { display:flex; gap:4px; }
+.ecommerce-theme-page .ecommerce-theme-live-shell { min-height:0; background:var(--theme-bg-soft); }
+.ecommerce-theme-frame-viewport { position:relative; margin:0 auto; overflow:hidden; }
+.ecommerce-theme-live-shell .ecommerce-theme-frame-viewport iframe { position:absolute; inset:0; max-width:none; transform-origin:top left; background:var(--theme-surface); }
+@media (max-width:620px) {
+  .ecommerce-theme-page .ecommerce-theme-color-row { grid-template-columns:42px minmax(0,1fr); }
+  .ecommerce-theme-page .ecommerce-theme-color-row > input:last-child { width:100%; }
+  .ecommerce-theme-page .ecommerce-growth-controls { grid-template-columns:1fr; }
+}

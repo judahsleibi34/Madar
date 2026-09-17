@@ -1,0 +1,634 @@
+/* ===== PageBuilder.css | chunk 6/7 | lines 3001-3600 ===== */
+.page-builder .builder-inspector h2,
+.page-builder .builder-inspector h3 {
+  color: var(--madar-text) !important;
+}
+
+.page-builder .builder-brand p,
+.page-builder .panel-help,
+.page-builder .workspace-header p,
+.page-builder .inspector-help-text {
+  color: var(--madar-muted) !important;
+}
+
+/* Unified inputs, selects, and textareas. */
+.page-builder input,
+.page-builder textarea,
+.page-builder select {
+  background: var(--madar-surface) !important;
+  color: var(--madar-text) !important;
+  border: 1px solid var(--color-border-control) !important;
+  border-radius: 12px !important;
+  box-shadow: none !important;
+  font-weight: 750;
+}
+
+.page-builder input:focus,
+.page-builder textarea:focus,
+.page-builder select:focus {
+  outline: none !important;
+  border-color: var(--madar-red) !important;
+  box-shadow: 0 0 0 4px rgba(var(--theme-primary-rgb), 0.1) !important;
+}
+
+/* Unified neutral buttons. */
+.page-builder button {
+  font-weight: 900;
+}
+
+.page-builder .workspace-tabs,
+.page-builder .viewport-switcher {
+  background: var(--madar-soft) !important;
+  border: 1px solid var(--madar-border) !important;
+  border-radius: 16px !important;
+}
+
+.page-builder .workspace-tabs button,
+.page-builder .viewport-switcher button,
+.page-builder .compact-actions button,
+.page-builder .question-actions button,
+.page-builder .automation-template-actions button,
+.page-builder .responses-page-header button,
+.page-builder .reset-position-button {
+  background: transparent !important;
+  color: var(--madar-text) !important;
+  border: 0 !important;
+  border-radius: 12px !important;
+}
+
+.page-builder .workspace-tabs button.active,
+.page-builder .viewport-switcher button.active {
+  background: var(--madar-navy) !important;
+  color: var(--theme-text-inverse) !important;
+}
+
+/* Unified primary actions. */
+.page-builder .builder-topbar-actions > button.primary-action,
+.page-builder .full-width-action,
+.page-builder .workspace-header button,
+.page-builder .runtime-submit,
+.page-builder .add-section-inline,
+.page-builder .add-section-tool,
+.page-builder .upload-image-button,
+.page-builder .builder-modal .starter-card button,
+.page-builder .builder-modal .section-card button {
+  background: var(--madar-gradient) !important;
+  color: var(--theme-text-inverse) !important;
+  box-shadow: 0 12px 26px rgba(var(--theme-primary-rgb), 0.2) !important;
+}
+
+/* Unified danger actions. */
+.page-builder .danger-button {
+  background: var(--madar-danger) !important;
+  color: var(--theme-text-inverse) !important;
+  border: 0 !important;
+}
+
+.page-builder .danger-lite {
+  background: rgba(159, 29, 29, 0.1) !important;
+  color: var(--madar-danger) !important;
+  border: 1px solid rgba(159, 29, 29, 0.18) !important;
+}
+
+/* New compact panel selector replaces the horizontal mini-tabs. */
+.page-builder .sidebar-tabs {
+  display: none !important;
+}
+
+.page-builder .panel-mode-select {
+  margin-bottom: 18px;
+  padding: 12px;
+  border: 1px solid var(--color-border-control);
+  border-radius: 18px;
+  background: var(--madar-soft);
+}
+
+.page-builder .panel-mode-select label {
+  display: grid;
+  gap: 8px;
+  color: var(--madar-muted);
+  font-size: 12px;
+  font-weight: 950;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.page-builder .panel-mode-select select {
+  min-height: 42px;
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 900;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+/* Left-panel list buttons. */
+.page-builder .add-group button,
+.page-builder .layer-tree button,
+.page-builder .forms-list button,
+.page-builder .compact-form-list button,
+.page-builder .floating-question-buttons button,
+.page-builder .quick-question-list button,
+.page-builder .question-type-list button {
+  background: var(--madar-soft) !important;
+  color: var(--madar-text) !important;
+  border: 1px solid transparent !important;
+  border-radius: 14px !important;
+}
+
+.page-builder .add-group button:hover,
+.page-builder .layer-tree button:hover,
+.page-builder .forms-list button:hover,
+.page-builder .compact-form-list button:hover,
+.page-builder .floating-question-buttons button:hover,
+.page-builder .quick-question-list button:hover,
+.page-builder .question-type-list button:hover {
+  background: var(--madar-gradient) !important;
+  color: var(--theme-text-inverse) !important;
+}
+
+.page-builder .forms-list button.active,
+.page-builder .compact-form-list button.active {
+  background: var(--madar-gradient) !important;
+  color: var(--theme-text-inverse) !important;
+}
+
+/* Canvas remains clean and light. */
+.page-builder .builder-canvas-shell {
+  background: linear-gradient(180deg, var(--theme-surface) 0%, var(--madar-bg) 100%) !important;
+}
+
+.page-builder .builder-canvas {
+  background: var(--theme-surface) !important;
+  color: var(--madar-text) !important;
+  border: 1px solid var(--madar-border) !important;
+  box-shadow: var(--madar-shadow) !important;
+}
+
+.page-builder .site-section,
+.page-builder .site-column,
+.page-builder .builder-element {
+  color: var(--madar-text);
+}
+
+.page-builder .site-section.is-selected,
+.page-builder .site-column.is-selected,
+.page-builder .builder-element.is-selected,
+.page-builder .google-question-card.active,
+.page-builder .clean-question-card.active,
+.page-builder .form-section-card.active {
+  border-color: var(--madar-red) !important;
+  box-shadow: 0 0 0 4px rgba(var(--theme-primary-rgb), 0.08) !important;
+}
+
+/* Built website header: keep user-owned, clean and centered. */
+.page-builder .built-site-header {
+  background: var(--theme-surface) !important;
+  color: var(--madar-text) !important;
+  border-bottom: 1px solid var(--madar-border) !important;
+}
+
+.page-builder .built-site-nav button {
+  color: var(--madar-muted) !important;
+}
+
+.page-builder .built-site-nav button.active,
+.page-builder .built-site-nav button:hover {
+  background: var(--madar-soft) !important;
+  color: var(--madar-text) !important;
+}
+
+.page-builder .built-site-cta {
+  background: var(--madar-gradient) !important;
+  color: var(--theme-text-inverse) !important;
+}
+
+/* Footer: light default, matching the main Madar site footer. */
+.page-builder .ecommerce-style-footer {
+  background: var(--theme-surface) !important;
+  color: var(--theme-text) !important;
+}
+
+.page-builder .ecommerce-footer-grid {
+  background: var(--theme-surface) !important;
+}
+
+.page-builder .ecommerce-payment-block h4,
+.page-builder .ecommerce-footer-column h4 {
+  color: var(--theme-text) !important;
+}
+
+.page-builder .ecommerce-footer-column button,
+.page-builder .ecommerce-footer-contact,
+.page-builder .ecommerce-footer-contact p,
+.page-builder .ecommerce-footer-bottom,
+.page-builder .powered-by-madar {
+  color: var(--theme-surface) !important;
+}
+
+.page-builder .ecommerce-footer-column button:hover,
+.page-builder .powered-by-madar:hover {
+  color: var(--theme-primary) !important;
+}
+
+.page-builder .ecommerce-payment-row span,
+.page-builder .ecommerce-social-row button {
+  border-color: rgba(var(--theme-shadow-rgb), 0.16) !important;
+  color: var(--theme-text) !important;
+  background: var(--theme-surface) !important;
+}
+
+.page-builder .ecommerce-footer-logo {
+  background: var(--theme-surface) !important;
+}
+
+.page-builder .footer-language-pill strong {
+  color: var(--theme-text) !important;
+}
+
+/* Keep main tabs centered. Viewport selector only appears in Preview from v3.4.9+. */
+.page-builder .builder-subbar {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.page-builder .builder-subbar .viewport-switcher {
+  display: none !important;
+}
+
+.page-builder .preview-device-toolbar {
+  background: rgba(var(--theme-text-inverse-rgb), 0.96) !important;
+  border-bottom: 1px solid var(--madar-border) !important;
+  display: flex !important;
+  justify-content: center !important;
+}
+
+/* Dark-mode browser/app safety. */
+.page-builder .builder-sidebar *,
+.page-builder .builder-inspector *,
+.page-builder .workspace-page *,
+.page-builder .forms-builder-page * {
+  border-color: inherit;
+}
+
+@media (max-width: 1240px) {
+  .page-builder .builder-subbar {
+    justify-content: center !important;
+    flex-wrap: wrap !important;
+  }
+}
+
+/* ============================================================
+   FINAL PAGE BUILDER CONSISTENCY PATCH
+   Madar unified UI + compact builder workspace
+   ============================================================ */
+
+.page-builder {
+  --madar-bg: var(--theme-bg-soft);
+  --madar-surface: var(--theme-surface);
+  --madar-surface-soft: var(--theme-surface-2);
+  --madar-navy: var(--theme-text);
+  --madar-navy-dark: var(--theme-bg);
+  --madar-red: var(--theme-primary);
+  --madar-red-dark: var(--theme-primary-hover);
+  --madar-border: rgba(var(--theme-shadow-rgb), 0.12);
+  --madar-border-strong: rgba(var(--theme-shadow-rgb), 0.22);
+  --madar-muted: var(--theme-text-muted);
+  --madar-text: var(--theme-text);
+  --madar-danger: var(--theme-primary);
+  --madar-gradient: var(--theme-gradient);
+  --madar-gradient-hover: var(--theme-gradient-hover);
+  --madar-shadow-sm: 0 10px 24px rgba(var(--theme-shadow-rgb), 0.06);
+  --madar-shadow-md: 0 18px 45px rgba(var(--theme-shadow-rgb), 0.08);
+  --madar-red-shadow: 0 12px 28px rgba(var(--theme-primary-rgb), 0.22);
+
+  background: var(--madar-bg) !important;
+  color: var(--madar-text) !important;
+}
+
+.page-builder .builder-layout {
+  grid-template-columns: 240px minmax(0, 1fr) 300px !important;
+  background: var(--madar-bg) !important;
+}
+
+.page-builder.preview-mode .builder-layout {
+  grid-template-columns: 1fr !important;
+}
+
+.page-builder .builder-sidebar,
+.page-builder .builder-inspector {
+  padding: 14px !important;
+  background: var(--madar-surface) !important;
+  color: var(--madar-text) !important;
+  border-color: var(--madar-border) !important;
+}
+
+.page-builder .builder-canvas-shell {
+  padding: 18px !important;
+  background: linear-gradient(180deg, var(--theme-surface) 0%, var(--madar-bg) 100%) !important;
+}
+
+.page-builder .builder-canvas {
+  background: var(--theme-surface) !important;
+  color: var(--madar-text) !important;
+  border: 1px solid var(--madar-border) !important;
+  box-shadow: var(--madar-shadow-md) !important;
+}
+
+.page-builder .builder-topbar,
+.page-builder .builder-subbar,
+.page-builder .preview-device-toolbar {
+  background: rgba(var(--theme-text-inverse-rgb), 0.96) !important;
+  color: var(--madar-text) !important;
+  border-color: var(--madar-border) !important;
+  backdrop-filter: blur(14px);
+}
+
+.page-builder .builder-brand h1,
+.page-builder .builder-panel h2,
+.page-builder .workspace-header h2,
+.page-builder .inspector-title h2,
+.page-builder .inspector-group h3,
+.page-builder summary {
+  color: var(--madar-text) !important;
+}
+
+.page-builder .builder-brand p,
+.page-builder .panel-help,
+.page-builder .workspace-header p,
+.page-builder .inspector-help-text,
+.page-builder .builder-note {
+  color: var(--madar-muted) !important;
+}
+
+.page-builder .workspace-tabs,
+.page-builder .viewport-switcher {
+  background: var(--theme-surface-2) !important;
+  border: 1px solid var(--madar-border) !important;
+  border-radius: 16px !important;
+  padding: 5px !important;
+}
+
+.page-builder .workspace-tabs button,
+.page-builder .viewport-switcher button {
+  background: transparent !important;
+  color: var(--madar-text) !important;
+  border-radius: 12px !important;
+  box-shadow: none !important;
+}
+
+.page-builder .workspace-tabs button.active,
+.page-builder .viewport-switcher button.active {
+  background: var(--madar-navy) !important;
+  color: var(--theme-text-inverse) !important;
+  box-shadow: 0 8px 20px rgba(var(--theme-shadow-rgb), 0.18) !important;
+}
+
+.page-builder input,
+.page-builder textarea,
+.page-builder select {
+  background: var(--theme-surface) !important;
+  color: var(--madar-text) !important;
+  border: 1px solid var(--color-border-control) !important;
+  border-radius: 12px !important;
+  box-shadow: none !important;
+  font-weight: 700 !important;
+}
+
+.page-builder input:focus,
+.page-builder textarea:focus,
+.page-builder select:focus {
+  outline: none !important;
+  border-color: var(--madar-red) !important;
+  box-shadow: 0 0 0 4px rgba(var(--theme-primary-rgb), 0.1) !important;
+}
+
+.page-builder button {
+  font-weight: 900;
+}
+
+.page-builder .builder-topbar-actions > button,
+.page-builder .compact-actions button,
+.page-builder .section-card-actions button,
+.page-builder .reset-position-button,
+.page-builder .automation-template-actions button,
+.page-builder .responses-page-header button {
+  background: rgba(var(--theme-shadow-rgb), 0.08) !important;
+  color: var(--madar-text) !important;
+  border: 1px solid transparent !important;
+  box-shadow: none !important;
+}
+
+.page-builder .builder-topbar-actions > button:hover,
+.page-builder .compact-actions button:hover,
+.page-builder .section-card-actions button:hover,
+.page-builder .reset-position-button:hover {
+  background: rgba(var(--theme-primary-rgb), 0.09) !important;
+  color: var(--madar-red) !important;
+}
+
+.page-builder .builder-topbar-actions > button.primary-action,
+.page-builder .full-width-action,
+.page-builder .workspace-header button,
+.page-builder .runtime-submit,
+.page-builder .add-section-inline,
+.page-builder .add-section-tool,
+.page-builder .upload-image-button,
+.page-builder .builder-modal .starter-card button,
+.page-builder .builder-modal .section-card button {
+  background: var(--madar-gradient) !important;
+  color: var(--theme-text-inverse) !important;
+  border: none !important;
+  box-shadow: var(--madar-red-shadow) !important;
+}
+
+.page-builder .builder-topbar-actions > button.primary-action:hover,
+.page-builder .full-width-action:hover,
+.page-builder .workspace-header button:hover,
+.page-builder .runtime-submit:hover,
+.page-builder .add-section-inline:hover,
+.page-builder .add-section-tool:hover,
+.page-builder .upload-image-button:hover {
+  background: var(--madar-gradient-hover) !important;
+}
+
+.page-builder .danger-button {
+  background: var(--madar-red) !important;
+  color: var(--theme-text-inverse) !important;
+  border: none !important;
+  box-shadow: 0 12px 26px rgba(var(--theme-primary-rgb), 0.18) !important;
+}
+
+.page-builder .danger-button:hover {
+  background: var(--madar-red-dark) !important;
+}
+
+.page-builder .danger-lite {
+  background: rgba(var(--theme-primary-rgb), 0.08) !important;
+  color: var(--madar-red) !important;
+  border: 1px solid rgba(var(--theme-primary-rgb), 0.18) !important;
+}
+
+.page-builder .panel-mode-select {
+  margin-bottom: 14px !important;
+  padding: 12px !important;
+  border: 1px solid var(--color-border-control) !important;
+  border-radius: 18px !important;
+  background: var(--theme-surface-2) !important;
+}
+
+.page-builder .panel-mode-select label {
+  display: grid;
+  gap: 8px;
+  color: var(--madar-muted) !important;
+  font-size: 11px;
+  font-weight: 950;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.page-builder .panel-mode-select select {
+  min-height: 42px;
+  font-size: 14px;
+  font-weight: 900 !important;
+  text-transform: none;
+}
+
+.page-builder .add-group button,
+.page-builder .layer-tree button,
+.page-builder .forms-list button,
+.page-builder .compact-form-list button,
+.page-builder .floating-question-buttons button,
+.page-builder .quick-question-list button,
+.page-builder .question-type-list button {
+  background: var(--theme-surface-2) !important;
+  color: var(--madar-text) !important;
+  border: 1px solid transparent !important;
+  border-radius: 14px !important;
+  box-shadow: none !important;
+}
+
+.page-builder .add-group button:hover,
+.page-builder .layer-tree button:hover,
+.page-builder .forms-list button:hover,
+.page-builder .compact-form-list button:hover,
+.page-builder .floating-question-buttons button:hover,
+.page-builder .quick-question-list button:hover,
+.page-builder .question-type-list button:hover {
+  background: var(--madar-gradient) !important;
+  color: var(--theme-text-inverse) !important;
+}
+
+.page-builder .forms-list button.active,
+.page-builder .compact-form-list button.active,
+.page-builder .layer-tree button.active {
+  background: var(--madar-gradient) !important;
+  color: var(--theme-text-inverse) !important;
+}
+
+.page-builder .site-section.is-selected,
+.page-builder .site-column.is-selected,
+.page-builder .builder-element.is-selected,
+.page-builder .google-question-card.active,
+.page-builder .clean-question-card.active,
+.page-builder .form-section-card.active,
+.page-builder .automation-card.active,
+.page-builder .role-card.active {
+  border-color: var(--madar-red) !important;
+  box-shadow: 0 0 0 4px rgba(var(--theme-primary-rgb), 0.08) !important;
+}
+
+.page-builder .site-column .builder-element-heading,
+.page-builder .site-column .builder-element-text,
+.page-builder .site-column .builder-element-card,
+.page-builder .site-column .builder-element-metric,
+.page-builder .site-column .builder-element-formBlock,
+.page-builder .site-column .builder-element-responsesTable,
+.page-builder .site-column .builder-element-button,
+.page-builder .site-column .builder-element-image {
+  resize: none !important;
+  overflow: visible !important;
+  cursor: pointer !important;
+}
+
+.page-builder .free-canvas-section .builder-element {
+  resize: both !important;
+  overflow: auto !important;
+  cursor: move !important;
+}
+
+.page-builder .built-site-header {
+  background: var(--theme-surface) !important;
+  color: var(--madar-text) !important;
+  border-bottom: 1px solid var(--madar-border) !important;
+}
+
+.page-builder .built-site-brand,
+.page-builder .built-site-brand span {
+  color: var(--madar-text) !important;
+}
+
+.page-builder .built-site-nav button {
+  color: var(--madar-muted) !important;
+}
+
+.page-builder .built-site-nav button.active,
+.page-builder .built-site-nav button:hover {
+  background: rgba(var(--theme-shadow-rgb), 0.08) !important;
+  color: var(--madar-text) !important;
+}
+
+.page-builder .built-site-cta {
+  background: var(--madar-gradient) !important;
+  color: var(--theme-text-inverse) !important;
+  box-shadow: var(--madar-red-shadow) !important;
+}
+
+/* Footer: final light override, matching the main Madar site footer. */
+.page-builder .ecommerce-style-footer {
+  background: var(--theme-surface) !important;
+  color: var(--theme-text) !important;
+}
+
+.page-builder .ecommerce-footer-grid {
+  background: var(--theme-surface) !important;
+}
+
+.page-builder .ecommerce-payment-block h4,
+.page-builder .ecommerce-footer-column h4 {
+  color: var(--theme-text) !important;
+}
+
+.page-builder .ecommerce-footer-column button,
+.page-builder .ecommerce-footer-contact,
+.page-builder .ecommerce-footer-contact p,
+.page-builder .ecommerce-footer-bottom,
+.page-builder .powered-by-madar {
+  color: var(--theme-surface) !important;
+}
+
+.page-builder .ecommerce-footer-column button:hover,
+.page-builder .powered-by-madar:hover {
+  color: var(--theme-primary) !important;
+}
+
+.page-builder .ecommerce-payment-row span,
+.page-builder .ecommerce-social-row button {
+  border-color: rgba(var(--theme-shadow-rgb), 0.16) !important;
+  color: var(--theme-text) !important;
+  background: var(--theme-surface) !important;
+}
+
+.page-builder .ecommerce-footer-logo {
+  background: var(--theme-surface) !important;
+}
+
+.page-builder .footer-language-pill strong {
+  color: var(--theme-text) !important;
+}
+
+.page-builder .forms-builder-page,
+.page-builder .workspace-page {
+  background: linear-gradient(180deg, var(--theme-surface) 0%, var(--madar-bg) 100%) !important;
+}

@@ -2,6 +2,7 @@ import { lazy, useCallback, useEffect, useState } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
+import CommerceActionToast from "./components/DashboardBuilder/CommerceActionToast";
 import ScrollToTop from "./components/DashboardBuilder/ScrollToTop";
 import EcommerceRouteSkeleton from "./components/DashboardBuilder/EcommerceRouteSkeleton";
 import PageSkeleton from "./components/common/PageSkeleton";
@@ -9,7 +10,7 @@ import RouteErrorBoundary from "./components/common/RouteErrorBoundary";
 import RouteSuspense from "./components/common/RouteSuspense";
 import { appShellContent } from "./content";
 import { getCurrentLanguage, setAppLanguage } from "./i18n/language";
-import { DashboardLoadingElement } from "./routes/shared";
+import { DashboardLoadingElement, DashboardShell } from "./routes/shared";
 import UserWorkspaceRoutes from "./routes/UserWorkspaceRoutes";
 import { getRouteErrorSurface } from "./routes/routeErrorSurface";
 import {
@@ -21,7 +22,6 @@ import {
 import {
   apiFetch,
   clearCsrfToken,
-  setSelectedTenantId,
   syncCsrfTokenFromResponseData,
 } from "./utils/apiClient";
 import { applyThemeMode, readStoredThemeMode, transitionThemeMode } from "./utils/themeMode";
@@ -251,10 +251,7 @@ export default function App() {
   }, [themeMode]);
 
   useEffect(() => {
-    if (authChecked && !isLoggedIn) {
-      clearAllCalendarWorkspaceCaches();
-      setSelectedTenantId(null);
-    }
+    if (authChecked && !isLoggedIn) clearAllCalendarWorkspaceCaches();
   }, [authChecked, isLoggedIn]);
 
   useEffect(() => {
@@ -584,7 +581,6 @@ export default function App() {
       setAuthChecked(true);
       setUser(null);
       clearCsrfToken();
-      setSelectedTenantId(null);
 
       applyThemeMode(themeMode);
 
@@ -639,10 +635,12 @@ export default function App() {
   };
 
   const ecommerceLoadingFallback = (
-    <EcommerceRouteSkeleton
-      pathname={location.pathname}
-      label={t("common:actions.loading")}
-    />
+    <DashboardShell {...shellProps} showNotifications={false}>
+      <EcommerceRouteSkeleton
+        pathname={location.pathname}
+        label={t("common:actions.loading")}
+      />
+    </DashboardShell>
   );
 
   const routeFallback = isEcommerceRoute ? ecommerceLoadingFallback : isDashboardRoute ? (
@@ -722,6 +720,7 @@ export default function App() {
   return (
     <>
       <ScrollToTop />
+      <CommerceActionToast />
       <RouteSuspense fallback={routeFallback} lang={lang} variant="public-page" delay={isTenantSiteRoute || isEcommerceRoute ? 0 : undefined}>
         <RouteErrorBoundary
           key={errorSurface}
@@ -733,8 +732,10 @@ export default function App() {
           {isDashboardRoute
             && authChecked
             && isLoggedIn
-            && (user?.id || user?.auth_id) ? (
-              <NotificationProvider user={user?.tenant_id && isMadarPwaHost(window.location) ? user : null}>
+            && user?.tenant_id
+            && (user?.id || user?.auth_id)
+            && isMadarPwaHost(window.location) ? (
+              <NotificationProvider user={user}>
                 {routeContent}
                 <NotificationToastViewport />
               </NotificationProvider>

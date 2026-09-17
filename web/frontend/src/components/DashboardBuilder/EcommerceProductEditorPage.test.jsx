@@ -56,7 +56,9 @@ describe("merchant product options and variants editor", () => {
     renderEditor();
 
     fireEvent.change(await screen.findByLabelText("Name (English)"), { target: { value: "Simple mug" } });
-    expect(screen.getByText("This is a simple product")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Add variant attribute" })).toBeTruthy();
+    expect(screen.queryByText("This is a simple product")).toBeNull();
+    expect(screen.getByRole("heading", { name: "Inventory", exact: true })).toBeTruthy();
     expect(screen.queryByRole("table")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Save product" }));
 
@@ -74,19 +76,25 @@ describe("merchant product options and variants editor", () => {
     fireEvent.change(await screen.findByLabelText("Name (English)"), { target: { value: "Shirt" } });
     addOption("Size", ["S", "M", "L"]);
     addOption("Color", ["Red", "Green", "Blue"]);
+    expect(screen.queryByRole("heading", { name: "Inventory", exact: true })).toBeNull();
     fireEvent.change(screen.getAllByLabelText("Type").at(-1), { target: { value: "color" } });
     [["Red", "#E53935"], ["Green", "#43A047"], ["Blue", "#1E88E5"]].forEach(([name, hex]) => {
       fireEvent.click(screen.getByRole("button", { name }));
       fireEvent.change(screen.getByLabelText("Color swatch"), { target: { value: hex } });
     });
 
-    expect(screen.getByText("9 possible combinations")).toBeTruthy();
+    expect(screen.getAllByRole("checkbox", { name: / availability$/ })).toHaveLength(9);
+    expect(screen.getAllByRole("checkbox", { name: / availability$/ }).every((checkbox) => checkbox.checked)).toBe(true);
     const enabled = [["S", "Red", 10], ["S", "Green", 5], ["S", "Blue", 2], ["M", "Red", 8], ["M", "Green", 4], ["L", "Red", 3], ["L", "Blue", 6]];
+    ["M / Blue", "L / Green"].forEach((label) => {
+      fireEvent.click(screen.getByRole("checkbox", { name: `${label} availability` }));
+    });
     enabled.forEach(([size, color, quantity]) => {
       const label = `${size} / ${color}`;
-      fireEvent.click(screen.getByRole("checkbox", { name: `${label} availability` }));
       fireEvent.change(screen.getByLabelText(`${label} quantity`), { target: { value: String(quantity) } });
     });
+    expect(screen.queryByRole("button", { name: "Edit S / Red details" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Remove S / Red variant" })).toBeTruthy();
     fireEvent.change(screen.getByLabelText("S / Red price override"), { target: { value: "23" } });
     fireEvent.click(screen.getByRole("button", { name: "Save product" }));
 
@@ -108,14 +116,14 @@ describe("merchant product options and variants editor", () => {
     expect(labels).not.toContain("L / Green");
   });
 
-  it("prevents duplicate values and keeps required options obvious", async () => {
+  it("prevents duplicate values and hides the redundant required-option control", async () => {
     fetchEcommerceCatalog.mockResolvedValue(catalog());
     renderEditor();
     await screen.findByLabelText("Name (English)");
     addOption("Size", ["S"]);
 
-    fireEvent.click(screen.getByText("Advanced"));
-    expect(screen.getByRole("checkbox", { name: "Require a value for Size" }).checked).toBe(true);
+    expect(screen.queryByText("Advanced")).toBeNull();
+    expect(screen.queryByRole("checkbox", { name: "Require a value for Size" })).toBeNull();
     const valueInput = screen.getByLabelText("New value for Size");
     fireEvent.change(valueInput, { target: { value: "s" } });
     fireEvent.keyDown(valueInput, { key: "Enter" });
@@ -133,15 +141,17 @@ describe("merchant product options and variants editor", () => {
     await waitFor(() => expect(saveEcommerceItem).toHaveBeenCalledOnce());
   });
 
-  it("blocks publishing an option product without a sellable variant", async () => {
+  it("makes a generated variant available by default when publishing", async () => {
     fetchEcommerceCatalog.mockResolvedValue(catalog());
+    saveEcommerceItem.mockResolvedValue({ id: "product-1" });
     renderEditor();
     fireEvent.change(await screen.findByLabelText("Name (English)"), { target: { value: "Active shirt" } });
     addOption("Size", ["S"]);
     fireEvent.change(screen.getByLabelText("Status"), { target: { value: "active" } });
     fireEvent.click(screen.getByRole("button", { name: "Save product" }));
-    expect(screen.getByRole("alert").textContent).toBe("Create and activate at least one variant before publishing this product.");
-    expect(saveEcommerceItem).not.toHaveBeenCalled();
+    await waitFor(() => expect(saveEcommerceItem).toHaveBeenCalledOnce());
+    expect(saveEcommerceItem.mock.calls[0][2].variants).toHaveLength(1);
+    expect(saveEcommerceItem.mock.calls[0][2].variants[0]).toMatchObject({ active: true, inventory_quantity: 0 });
   });
 
   it("archives a referenced value and preserves the existing variant identity and data", async () => {
@@ -214,14 +224,15 @@ describe("merchant product options and variants editor", () => {
     expect(variants[1].id).not.toBe(existingId);
   });
 
-  it("groups three dimensions by the first attribute without a wide spreadsheet", async () => {
+  it("shows the full combination in each row for three dimensions", async () => {
     fetchEcommerceCatalog.mockResolvedValue(catalog());
     renderEditor();
     await screen.findByLabelText("Name (English)");
     addOption("Size", ["M"]);
     addOption("Color", ["Red", "Blue"]);
     addOption("Fit", ["Slim", "Regular"]);
-    expect(screen.getByRole("heading", { name: "Size: M" })).toBeTruthy();
+    expect(screen.getByText("M / Red / Slim")).toBeTruthy();
+    expect(screen.getByText("M / Blue / Regular")).toBeTruthy();
     expect(screen.getByRole("checkbox", { name: "M / Red / Slim availability" })).toBeTruthy();
     expect(screen.getByRole("checkbox", { name: "M / Blue / Regular availability" })).toBeTruthy();
     expect(screen.queryByRole("table")).toBeNull();

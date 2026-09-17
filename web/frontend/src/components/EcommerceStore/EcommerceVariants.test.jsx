@@ -11,6 +11,7 @@ vi.mock("../../services/ecommerceApi", () => ({
   fetchPublicEcommerceProfile: vi.fn(), fetchPublicEcommerceDeliveryAreas: vi.fn(),
   fetchPublicEcommerceOrderConfirmation: vi.fn(), createPublicEcommerceOrder: vi.fn(),
   fetchPublicEcommerceLoyalty: vi.fn(() => Promise.reject(new Error("guest"))),
+  fetchPublicEcommerceDiscounts: vi.fn(() => Promise.resolve({ conditions:[] })),
   reconcilePublicEcommerceCart: vi.fn(),
 }));
 

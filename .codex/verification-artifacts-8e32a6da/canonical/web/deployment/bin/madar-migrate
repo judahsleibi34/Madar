@@ -1,0 +1,213 @@
+#!/usr/bin/env python3
+"""Run a reviewed Madar migration manifest with backup and DB locks."""
+
+from __future__ import annotations
+
+import argparse
+from dataclasses import replace
+import json
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+import psycopg
+
+SCRIPT = Path(__file__).resolve()
+WEB_ROOT = SCRIPT.parents[2]
+sys.path.insert(0, str(WEB_ROOT))
+
+from deployment.lib.migration_executor import (  # noqa: E402
+    LockedMigrationExecutor,
+    MigrationManifest,
+)
+from deployment.lib.control_plane_upgrade_authorization import (  # noqa: E402
+    require_upgrade_authorization,
+)
+
+
+def git_output(repository_root: Path, *args: str) -> str:
+    return subprocess.run(
+        ["git", *args],
+        cwd=repository_root,
+        check=True,
+        text=True,
+        stdout=subprocess.PIPE,
+    ).stdout.strip()
+
+
+def main() -> int:
+    require_upgrade_authorization(None)
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument(
+        "--repository-root",
+        type=Path,
+        default=Path(
+            os.getenv(
+                "MADAR_MIGRATION_REPOSITORY_ROOT",
+                os.getenv(
+                    "MADAR_PRODUCTION_REPO",
+                    "/srv/madar/production",
+                ),
+            )
+        ),
+    )
+    parser.add_argument("--manifest", type=Path)
+    parser.add_argument("--backup", type=Path, required=True)
+    parser.add_argument("--state-file", type=Path, required=True)
+    parser.add_argument(
+        "--database-url",
+        default=os.getenv(
+            "MADAR_MIGRATION_DATABASE_URL",
+            "",
+        ),
+    )
+    parser.add_argument(
+        "--expected-sha",
+        default=os.getenv(
+            "MADAR_EXPECTED_RELEASE_SHA",
+            "",
+        ),
+    )
+    parser.add_argument("--verify-script", type=Path)
+
+    args = parser.parse_args()
+
+    if not args.database_url:
+        raise SystemExit(
+            "MADAR_MIGRATION_DATABASE_URL or --database-url is required"
+        )
+
+    if not args.expected_sha:
+        raise SystemExit(
+            "MADAR_EXPECTED_RELEASE_SHA or --expected-sha is required"
+        )
+
+    repository_root = args.repository_root.resolve()
+
+    actual_root = Path(
+        git_output(
+            repository_root,
+            "rev-parse",
+            "--show-toplevel",
+        )
+    ).resolve()
+
+    if actual_root != repository_root:
+        raise SystemExit(
+            "migration repository root does not match Git top-level"
+        )
+
+    dirty = git_output(
+        repository_root,
+        "status",
+        "--porcelain",
+        "--untracked-files=normal",
+    )
+
+    if dirty:
+        raise SystemExit(
+            "migration release worktree must be clean"
+        )
+
+    actual_sha = git_output(
+        repository_root,
+        "rev-parse",
+        "HEAD",
+    ).lower()
+
+    expected_sha = args.expected_sha.strip().lower()
+
+    if actual_sha != expected_sha:
+        raise SystemExit(
+            "migration release identity does not match expected SHA"
+        )
+
+    release_path = (
+        repository_root
+        / "web/deployment/releases/release.json"
+    )
+
+    release_metadata = json.loads(
+        release_path.read_text(encoding="utf-8")
+    )
+
+    if args.manifest is not None:
+        manifest_path = args.manifest.resolve()
+    else:
+        manifest_name = str(
+            release_metadata.get("migration_manifest")
+            or ""
+        ).strip()
+
+        if (
+            not manifest_name.startswith("migrations-")
+            or not manifest_name.endswith(".json")
+            or Path(manifest_name).name != manifest_name
+        ):
+            raise SystemExit(
+                "release migration_manifest is missing or invalid"
+            )
+
+        manifest_path = (
+            repository_root
+            / "web/deployment/releases"
+            / manifest_name
+        ).resolve()
+
+    manifest = MigrationManifest.load(
+        manifest_path,
+        repository_root,
+    )
+
+    if manifest.release_sha in {"CURRENT", "STAGING"}:
+        manifest = replace(
+            manifest,
+            release_sha=actual_sha,
+        )
+    elif manifest.release_sha != actual_sha:
+        raise SystemExit(
+            "migration manifest does not match checked-out release"
+        )
+
+    verify_script = (
+        args.verify_script.resolve()
+        if args.verify_script is not None
+        else (
+            repository_root
+            / "web/scripts/verify_backup.sh"
+        ).resolve()
+    )
+
+    def verify(path: Path) -> None:
+        subprocess.run(
+            [
+                str(verify_script),
+                str(path.resolve()),
+            ],
+            check=True,
+        )
+
+    executor = LockedMigrationExecutor(
+        connection_factory=lambda: psycopg.connect(
+            args.database_url
+        ),
+        manifest=manifest,
+        state_file=args.state_file.resolve(),
+        backup_dir=args.backup.resolve(),
+        backup_verifier=verify,
+    )
+
+    result = executor.run()
+
+    print(
+        "Madar migration completed: "
+        f"schema {result['observed_schema']}"
+    )
+
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

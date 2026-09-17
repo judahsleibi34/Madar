@@ -1,0 +1,134 @@
+/* ============================================================
+   Pages Panel — Main / Branch UI + Inline Delete
+   ============================================================ */
+
+.page-builder .page-kind-summary {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid var(--color-border-control);
+  border-radius: 16px;
+  background: var(--madar-surface-soft);
+}
+
+.page-builder .page-kind-summary small {
+  color: var(--madar-muted);
+  font-size: 12px;
+  line-height: 1.4;
+  font-weight: 750;
+}
+
+.page-builder .page-kind-pill {
+  width: fit-content;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 950;
+}
+
+.page-builder .page-kind-pill.main {
+  background: rgba(var(--theme-shadow-rgb), 0.09);
+  color: var(--madar-navy);
+}
+
+.page-builder .page-kind-pill.branch {
+  background: rgba(var(--theme-primary-rgb), 0.1);
+  color: var(--madar-red);
+}
+
+.page-builder .page-create-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.page-builder .page-create-card {
+  width: 100%;
+  min-height: 72px;
+  display: grid;
+  gap: 4px;
+  text-align: left;
+  border-radius: 18px;
+  padding: 14px;
+  border: 1px solid var(--madar-border) !important;
+  background: var(--theme-surface) !important;
+  color: var(--madar-text) !important;
+  box-shadow: 0 10px 22px rgba(var(--theme-shadow-rgb), 0.045) !important;
+}
+
+.page-builder .page-create-card strong {
+  font-size: 15px;
+  font-weight: 950;
+}
+
+.page-builder .page-create-card span {
+  color: var(--madar-muted);
+  font-size: 12px;
+  line-height: 1.35;
+  font-weight: 750;
+}
+
+.page-builder .page-create-card:hover {
+  transform: translateY(-1px);
+  border-color: rgba(var(--theme-primary-rgb), 0.28) !important;
+  box-shadow: 0 14px 30px rgba(var(--theme-primary-rgb), 0.12) !important;
+}
+
+.page-builder .page-create-card.main:hover {
+  background: rgba(var(--theme-shadow-rgb), 0.04) !important;
+}
+
+.page-builder .page-create-card.branch:hover {
+  background: rgba(var(--theme-primary-rgb), 0.055) !important;
+}
+
+.page-builder .page-secondary-actions {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.page-builder .page-secondary-actions .danger-lite {
+  grid-column: 1 / -1;
+}
+
+.page-builder .page-delete-card {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(var(--theme-primary-rgb), 0.22);
+  background: rgba(var(--theme-primary-rgb), 0.065);
+}
+
+.page-builder .page-delete-card strong {
+  color: var(--madar-red);
+  font-size: 15px;
+  font-weight: 950;
+}
+
+.page-builder .page-delete-card p {
+  margin: 0;
+  color: var(--madar-text);
+  font-size: 13px;
+  line-height: 1.45;
+  font-weight: 750;
+}
+
+.page-builder .page-delete-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.page-builder .page-delete-actions button {
+  min-height: 40px;
+  border-radius: 12px;
+  padding: 0 12px;
+  font-weight: 950;
+}
+
+.page-builder .danger-confirm-button {
+  background: var(--madar-red) !important;
+  color: var(--theme-text-inverse) !important;
+  box-shadow: 0 12px 24px rgba(var(--theme-primary-rgb), 0.18) !important;
+}

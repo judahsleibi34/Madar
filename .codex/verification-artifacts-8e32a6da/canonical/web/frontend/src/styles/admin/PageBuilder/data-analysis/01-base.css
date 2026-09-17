@@ -1,0 +1,40 @@
+﻿/* ============================================================
+   Page base
+   ============================================================ */
+
+.page-builder .daw-page {
+  width: 100%;
+  margin: 0;
+  color: var(--daw-text);
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  overflow-y: auto !important;
+}
+
+.page-builder .daw-page *,
+.page-builder .daw-page *::before,
+.page-builder .daw-page *::after {
+  box-sizing: border-box;
+}
+
+.page-builder .daw-page button,
+.page-builder .daw-page summary,
+.page-builder .daw-page input,
+.page-builder .daw-page select,
+.page-builder .daw-page textarea {
+  font-family: inherit;
+}
+
+.page-builder .daw-page button,
+.page-builder .daw-page summary {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.page-builder .daw-page button:disabled,
+.page-builder .daw-page summary:disabled,
+.page-builder .daw-stepper button:disabled {
+  opacity: 0.52;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none !important;
+}

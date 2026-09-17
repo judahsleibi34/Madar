@@ -1,0 +1,11 @@
+# Copy to .env.test.local. Never commit real credentials.
+MADAR_E2E_CONFIRM_ISOLATED=YES
+MADAR_E2E_BASE_URL=http://127.0.0.1:5173
+MADAR_E2E_DATABASE_ID=madar_e2e_local_unique_run
+MADAR_E2E_RUN_ID=replace_with_unique_run_id
+MADAR_E2E_MIGRATIONS_APPLIED_FROM_CLEAN=YES
+MADAR_E2E_EXTERNAL_DELIVERY_DISABLED=YES
+MADAR_E2E_PRODUCTION_HOSTS=production.example.com
+TEST_USER_EMAIL=isolated-fixture@example.invalid
+TEST_USER_PASSWORD=replace-with-isolated-secret
+PUBLISHED_FORM_PATH=/forms/isolated-subdomain/isolated-form-id

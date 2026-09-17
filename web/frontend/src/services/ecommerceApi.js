@@ -102,6 +102,15 @@ export const saveEcommerceSettings = (currency) => request("/ecommerce/settings"
 export const fetchEcommerceDeliveryAreas = ({ scope, force = false } = {}) =>
   loadEcommerceAdminResource(scope, "delivery-areas", () => request("/ecommerce/delivery-areas"), { force });
 
+export const createEcommerceDeliveryLocation = async (location, { scope } = {}) => {
+  const result = await request("/ecommerce/delivery-areas/custom", {
+    method: "POST",
+    body: JSON.stringify(location),
+  });
+  clearEcommerceAdminCache(scope, "delivery-areas");
+  return result;
+};
+
 export const saveEcommerceDeliveryAreas = async (enabledServiceAreaIds, { scope } = {}) => {
   const result = await request("/ecommerce/delivery-areas", {
     method: "PUT",
@@ -304,6 +313,9 @@ export const fetchPublicEcommerceDeliveryAreas = (subdomain) =>
 
 export const fetchPublicEcommerceLoyalty = (subdomain) =>
   request(`/public/sites/${encodeURIComponent(subdomain)}/loyalty/me`);
+
+export const fetchPublicEcommerceDiscounts = (subdomain) =>
+  request(`/public/sites/${encodeURIComponent(subdomain)}/discounts`);
 
 export const fetchPublicEcommerceOrderConfirmation = (subdomain, token) =>
   request(`/public/sites/${encodeURIComponent(subdomain)}/orders/confirmation/${encodeURIComponent(token)}`);

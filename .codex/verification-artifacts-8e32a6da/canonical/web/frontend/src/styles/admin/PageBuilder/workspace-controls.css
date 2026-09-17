@@ -1,0 +1,75 @@
+/* Compact command groups: one shared surface, no nested button boxes. */
+.page-builder .builder-subbar-actions {
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.page-builder .builder-subbar-actions :is(.builder-history-controls, .artboard-camera-controls) {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 2px;
+  height: 40px;
+  padding: 3px;
+  box-sizing: border-box;
+  border: 1px solid var(--pb-border);
+  border-radius: 10px;
+  background: var(--pb-surface) !important;
+  box-shadow: none;
+  direction: ltr;
+}
+.page-builder .builder-subbar-actions :is(.builder-history-controls, .artboard-camera-controls) > button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 32px;
+  height: 32px;
+  min-height: 32px;
+  margin: 0;
+  padding: 0 10px;
+  border: 0 !important;
+  border-radius: 6px;
+  background: transparent !important;
+  color: var(--pb-text) !important;
+  -webkit-text-fill-color: currentColor !important;
+  box-shadow: none;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+.page-builder .builder-subbar-actions .artboard-camera-controls > button {
+  padding-inline: 8px;
+}
+.page-builder .builder-subbar-actions .artboard-camera-controls > .builder-zoom-value {
+  min-width: 60px;
+  font-variant-numeric: tabular-nums;
+}
+.page-builder .builder-subbar-actions :is(.builder-history-controls, .artboard-camera-controls) > button:hover:not(:disabled) {
+  background: var(--pb-hover) !important;
+  color: var(--color-accent-text) !important;
+}
+.page-builder .builder-subbar-actions :is(.builder-history-controls, .artboard-camera-controls) > button:disabled {
+  opacity: 1;
+  color: var(--pb-muted) !important;
+  cursor: default;
+}
+.page-builder .builder-subbar-actions :is(.builder-history-controls, .artboard-camera-controls) > button:disabled svg {
+  opacity: 0.55;
+}
+.page-builder .builder-subbar-actions :is(.builder-history-controls, .artboard-camera-controls) > button:focus-visible {
+  outline: 2px solid var(--color-accent-text);
+  outline-offset: 1px;
+}
+@media (pointer: coarse) {
+  .page-builder .builder-subbar-actions :is(.builder-history-controls, .artboard-camera-controls) {
+    height: 50px;
+  }
+  .page-builder .builder-subbar-actions :is(.builder-history-controls, .artboard-camera-controls) > button {
+    min-height: 42px;
+    min-width: 42px;
+  }
+}

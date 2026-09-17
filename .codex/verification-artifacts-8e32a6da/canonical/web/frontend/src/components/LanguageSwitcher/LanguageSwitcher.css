@@ -1,0 +1,337 @@
+.lang-switcher.language-toggle-button,
+.language-toggle-button {
+  width: 100%;
+  height: 54px;
+  min-height: 54px;
+
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) 8px;
+  align-items: center;
+  column-gap: 12px;
+
+  border: 1px solid rgba(var(--theme-shadow-rgb), 0.08);
+  border-radius: 18px;
+  padding: 8px 12px;
+
+  color: var(--theme-text);
+  background:
+    linear-gradient(
+      180deg,
+      rgba(var(--theme-text-inverse-rgb), 0.98),
+      rgba(250, 248, 247, 0.96)
+    );
+
+  font: inherit;
+  cursor: pointer;
+
+  direction: ltr;
+  text-align: left;
+
+  box-shadow:
+    0 14px 34px rgba(var(--theme-shadow-rgb), 0.06),
+    inset 0 1px 0 rgba(var(--theme-text-inverse-rgb), 0.95);
+
+  transition:
+    transform 160ms ease,
+    box-shadow 160ms ease,
+    border-color 160ms ease,
+    background 160ms ease;
+}
+
+.lang-switcher.language-toggle-button:hover,
+.language-toggle-button:hover {
+  transform: translateY(-1px);
+  border-color: rgba(var(--theme-primary-rgb), 0.18);
+
+  background:
+    linear-gradient(
+      180deg,
+      rgba(var(--theme-text-inverse-rgb), 1),
+      rgba(252, 248, 246, 0.98)
+    );
+
+  box-shadow:
+    0 18px 42px rgba(var(--theme-shadow-rgb), 0.1),
+    inset 0 1px 0 rgba(var(--theme-text-inverse-rgb), 1);
+}
+
+.lang-switcher.language-toggle-button:active,
+.language-toggle-button:active {
+  transform: translateY(0);
+
+  box-shadow:
+    0 10px 24px rgba(var(--theme-shadow-rgb), 0.07),
+    inset 0 1px 0 rgba(var(--theme-text-inverse-rgb), 0.9);
+}
+
+.lang-switcher.language-toggle-button:focus-visible,
+.language-toggle-button:focus-visible {
+  outline: 3px solid rgba(var(--theme-primary-rgb), 0.16);
+  outline-offset: 3px;
+}
+
+.language-toggle-animation {
+  grid-column: 1;
+
+  width: 38px;
+  height: 38px;
+
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+
+  border-radius: 14px;
+  color: var(--theme-text);
+
+  background:
+    radial-gradient(
+      circle at 35% 25%,
+      rgba(var(--theme-text-inverse-rgb), 0.95),
+      transparent 45%
+    ),
+    linear-gradient(
+      135deg,
+      rgba(var(--theme-shadow-rgb), 0.1),
+      rgba(var(--theme-primary-rgb), 0.08)
+    );
+
+  box-shadow:
+    inset 0 1px 0 rgba(var(--theme-text-inverse-rgb), 0.9),
+    0 10px 20px rgba(var(--theme-shadow-rgb), 0.06);
+}
+
+.language-toggle-animation svg {
+  width: 21px;
+  height: 21px;
+  stroke-width: 2.3;
+}
+
+.language-toggle-current {
+  grid-column: 2;
+  justify-self: start;
+
+  min-width: 0;
+  max-width: 100%;
+
+  color: var(--theme-text);
+  font-size: 0.98rem;
+  font-weight: 900;
+  letter-spacing: -0.025em;
+  line-height: 1;
+
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.language-toggle-current[dir="rtl"] {
+  direction: rtl;
+  unicode-bidi: isolate;
+  text-align: start;
+  font-size: 1rem;
+  letter-spacing: 0;
+}
+
+.language-toggle-dot {
+  grid-column: 3;
+  justify-self: end;
+
+  width: 7px;
+  height: 7px;
+
+  border-radius: 999px;
+
+  background: rgba(var(--theme-primary-rgb), 0.42);
+  box-shadow: 0 0 0 4px rgba(var(--theme-primary-rgb), 0.08);
+}
+
+.language-toggle-button::after {
+  display: none !important;
+}
+
+/* ============================================================
+   SIDEBAR RTL VERSION
+   The LanguageSwitcher is grid, so RTL needs grid columns.
+   ============================================================ */
+
+.admin-sidebar[dir="rtl"] .admin-sidebar-lang-switcher.language-toggle-button,
+.admin-sidebar.is-rtl .admin-sidebar-lang-switcher.language-toggle-button,
+.admin-dashboard-layout.is-rtl .admin-sidebar-lang-switcher.language-toggle-button,
+.admin-dashboard-layout[dir="rtl"] .admin-sidebar-lang-switcher.language-toggle-button {
+  direction: rtl;
+  grid-template-columns: 8px minmax(0, 1fr) 38px;
+  text-align: start;
+}
+
+.admin-sidebar[dir="rtl"] .admin-sidebar-lang-switcher .language-toggle-animation,
+.admin-sidebar.is-rtl .admin-sidebar-lang-switcher .language-toggle-animation,
+.admin-dashboard-layout.is-rtl .admin-sidebar-lang-switcher .language-toggle-animation,
+.admin-dashboard-layout[dir="rtl"] .admin-sidebar-lang-switcher .language-toggle-animation {
+  grid-column: 3;
+}
+
+.admin-sidebar[dir="rtl"] .admin-sidebar-lang-switcher .language-toggle-current,
+.admin-sidebar.is-rtl .admin-sidebar-lang-switcher .language-toggle-current,
+.admin-dashboard-layout.is-rtl .admin-sidebar-lang-switcher .language-toggle-current,
+.admin-dashboard-layout[dir="rtl"] .admin-sidebar-lang-switcher .language-toggle-current {
+  grid-column: 2;
+  justify-self: start;
+  text-align: start;
+}
+
+.admin-sidebar[dir="rtl"] .admin-sidebar-lang-switcher .language-toggle-dot,
+.admin-sidebar.is-rtl .admin-sidebar-lang-switcher .language-toggle-dot,
+.admin-dashboard-layout.is-rtl .admin-sidebar-lang-switcher .language-toggle-dot,
+.admin-dashboard-layout[dir="rtl"] .admin-sidebar-lang-switcher .language-toggle-dot {
+  grid-column: 1;
+  justify-self: start;
+}
+
+/* ============================================================
+   COMPACT
+   ============================================================ */
+
+.language-toggle-button.is-compact {
+  width: auto;
+  min-width: 48px;
+  height: 48px;
+  min-height: 48px;
+
+  grid-template-columns: 36px;
+  justify-content: center;
+  padding: 6px;
+}
+
+.language-toggle-button.is-compact .language-toggle-current,
+.language-toggle-button.is-compact .language-toggle-dot {
+  display: none;
+}
+
+.language-toggle-button.is-compact .language-toggle-animation {
+  width: 36px;
+  height: 36px;
+}
+
+/* Sidebar compact override */
+.admin-sidebar.is-compact .admin-sidebar-lang-switcher.language-toggle-button,
+.admin-dashboard-layout-builder .admin-sidebar-lang-switcher.language-toggle-button {
+  width: 46px !important;
+  min-width: 46px !important;
+  height: 46px !important;
+  min-height: 46px !important;
+
+  grid-template-columns: 36px !important;
+  justify-content: center !important;
+
+  padding: 5px !important;
+  margin-inline: auto !important;
+}
+
+.admin-sidebar.is-compact .admin-sidebar-lang-switcher .language-toggle-animation,
+.admin-dashboard-layout-builder .admin-sidebar-lang-switcher .language-toggle-animation {
+  grid-column: 1 !important;
+  width: 36px;
+  height: 36px;
+}
+
+.admin-sidebar.is-compact .admin-sidebar-lang-switcher .language-toggle-current,
+.admin-sidebar.is-compact .admin-sidebar-lang-switcher .language-toggle-dot,
+.admin-dashboard-layout-builder .admin-sidebar-lang-switcher .language-toggle-current,
+.admin-dashboard-layout-builder .admin-sidebar-lang-switcher .language-toggle-dot {
+  display: none !important;
+}
+
+/* ============================================================
+   DARK MODE
+   ============================================================ */
+
+[data-theme="dark"] .language-toggle-button,
+.dark .language-toggle-button,
+.theme-dark .language-toggle-button {
+  border-color: rgba(var(--theme-text-inverse-rgb), 0.1);
+  color: var(--theme-surface-2);
+
+  background:
+    linear-gradient(
+      180deg,
+      rgba(18, 24, 38, 0.96),
+      rgba(var(--theme-shadow-rgb), 0.94)
+    );
+
+  box-shadow:
+    0 16px 36px rgba(var(--theme-black-rgb), 0.24),
+    inset 0 1px 0 rgba(var(--theme-text-inverse-rgb), 0.06);
+}
+
+[data-theme="dark"] .language-toggle-button:hover,
+.dark .language-toggle-button:hover,
+.theme-dark .language-toggle-button:hover {
+  border-color: rgba(var(--theme-danger-rgb), 0.22);
+
+  background:
+    linear-gradient(
+      180deg,
+      rgba(24, 31, 48, 0.98),
+      rgba(var(--theme-shadow-rgb), 0.96)
+    );
+}
+
+[data-theme="dark"] .language-toggle-animation,
+.dark .language-toggle-animation,
+.theme-dark .language-toggle-animation {
+  color: var(--theme-surface-2);
+
+  background:
+    radial-gradient(
+      circle at 35% 25%,
+      rgba(var(--theme-text-inverse-rgb), 0.12),
+      transparent 45%
+    ),
+    linear-gradient(
+      135deg,
+      rgba(var(--theme-danger-rgb), 0.14),
+      rgba(var(--theme-shadow-rgb), 0.26)
+    );
+
+  box-shadow:
+    inset 0 1px 0 rgba(var(--theme-text-inverse-rgb), 0.08),
+    0 10px 20px rgba(var(--theme-black-rgb), 0.18);
+}
+
+[data-theme="dark"] .language-toggle-current,
+.dark .language-toggle-current,
+.theme-dark .language-toggle-current {
+  color: var(--theme-surface-2);
+}
+
+[data-theme="dark"] .language-toggle-dot,
+.dark .language-toggle-dot,
+.theme-dark .language-toggle-dot {
+  background: rgba(var(--theme-danger-rgb), 0.7);
+  box-shadow: 0 0 0 4px rgba(var(--theme-danger-rgb), 0.12);
+}
+
+/* Sidebar dark cleanup */
+[data-theme="dark"] .admin-sidebar-bottom .admin-sidebar-lang-switcher.language-toggle-button,
+.theme-dark .admin-sidebar-bottom .admin-sidebar-lang-switcher.language-toggle-button,
+body.theme-dark .admin-sidebar-bottom .admin-sidebar-lang-switcher.language-toggle-button {
+  box-shadow: none;
+}
+
+.admin-sidebar-bottom .admin-sidebar-lang-switcher.language-toggle-button,
+.admin-sidebar-bottom .admin-sidebar-lang-switcher.language-toggle-button:hover,
+.admin-sidebar-bottom .admin-sidebar-lang-switcher .language-toggle-animation,
+.admin-sidebar-bottom .admin-sidebar-lang-switcher.language-toggle-button:hover .language-toggle-animation,
+[data-theme="dark"] .admin-sidebar-bottom .admin-sidebar-lang-switcher.language-toggle-button,
+[data-theme="dark"] .admin-sidebar-bottom .admin-sidebar-lang-switcher.language-toggle-button:hover,
+[data-theme="dark"] .admin-sidebar-bottom .admin-sidebar-lang-switcher .language-toggle-animation,
+.theme-dark .admin-sidebar-bottom .admin-sidebar-lang-switcher.language-toggle-button,
+.theme-dark .admin-sidebar-bottom .admin-sidebar-lang-switcher.language-toggle-button:hover,
+.theme-dark .admin-sidebar-bottom .admin-sidebar-lang-switcher .language-toggle-animation,
+body.theme-dark .admin-sidebar-bottom .admin-sidebar-lang-switcher.language-toggle-button,
+body.theme-dark .admin-sidebar-bottom .admin-sidebar-lang-switcher.language-toggle-button:hover,
+body.theme-dark .admin-sidebar-bottom .admin-sidebar-lang-switcher .language-toggle-animation {
+  background: transparent !important;
+  box-shadow: none !important;
+}

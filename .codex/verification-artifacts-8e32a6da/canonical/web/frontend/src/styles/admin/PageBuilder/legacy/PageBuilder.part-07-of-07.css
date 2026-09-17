@@ -1,0 +1,48 @@
+/* ===== PageBuilder.css | chunk 7/7 | lines 3601-3646 ===== */
+.page-builder .rail-card,
+.page-builder .floating-tools-card,
+.page-builder .google-form-title-card,
+.page-builder .google-question-card,
+.page-builder .form-section-card,
+.page-builder .workspace-header,
+.page-builder .responses-page-card,
+.page-builder .automation-card,
+.page-builder .role-card,
+.page-builder .publish-card,
+.page-builder .starter-card,
+.page-builder .section-card {
+  background: var(--theme-surface) !important;
+  color: var(--madar-text) !important;
+  border-color: var(--madar-border) !important;
+  box-shadow: var(--madar-shadow-sm) !important;
+}
+
+.page-builder .simple-form-title,
+.page-builder .google-form-title-card {
+  border-top-color: var(--madar-red) !important;
+}
+
+.page-builder .section-index,
+.page-builder .question-index,
+.page-builder .then-step b,
+.page-builder .submit-flow-card span,
+.page-builder .simple-flow span {
+  background: var(--madar-gradient) !important;
+  color: var(--theme-text-inverse) !important;
+}
+
+@media (max-width: 1380px) {
+  .page-builder .builder-layout {
+    grid-template-columns: 220px minmax(0, 1fr) 280px !important;
+  }
+}
+
+@media (max-width: 1240px) {
+  .page-builder .builder-layout {
+    grid-template-columns: 220px minmax(0, 1fr) !important;
+  }
+
+  .page-builder .builder-inspector {
+    grid-column: span 2;
+  }
+}

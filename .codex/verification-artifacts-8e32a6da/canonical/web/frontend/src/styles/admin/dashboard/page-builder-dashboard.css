@@ -1,0 +1,355 @@
+/* ============================================================
+   PAGE BUILDER INSIDE DASHBOARD
+   File: src/styles/admin/dashboard/page-builder-dashboard.css
+   ============================================================ */
+
+.page-builder-dashboard-page {
+  padding: 0;
+}
+
+.page-builder-dashboard-page .builder,
+.page-builder-dashboard-page .page-builder {
+  width: 100%;
+  min-height: 100vh;
+}
+
+.page-builder-dashboard-page .canvas-wrapper,
+.page-builder-dashboard-page .inspector,
+.page-builder-dashboard-page .sidebar,
+.page-builder-dashboard-page .builder-sidebar,
+.page-builder-dashboard-page .builder-inspector {
+  min-width: 0;
+}
+
+/* ============================================================
+   PAGE BUILDER ROUTE: COMPACT DASHBOARD SIDEBAR
+   This applies to:
+   /page-builder
+   /builder-responses
+   /builder-data
+   ============================================================ */
+
+.admin-dashboard-layout:has(.page-builder) .admin-sidebar {
+  flex: 0 0 84px;
+  width: 84px;
+  min-width: 84px;
+  max-width: 84px;
+  padding: 22px 12px;
+  align-items: center;
+  overflow-x: hidden;
+}
+
+/* Prevent clipped brand text */
+.admin-dashboard-layout:has(.page-builder) .admin-sidebar-brand {
+  width: 56px;
+  min-width: 56px;
+  height: 56px;
+  min-height: 56px;
+  justify-content: center;
+  padding: 5px;
+  margin: 0 auto 22px;
+  border-radius: 18px;
+}
+
+/* Hide ONLY the brand text, not every span */
+.admin-dashboard-layout:has(.page-builder) .admin-sidebar-brand-text {
+  display: none !important;
+}
+
+.admin-dashboard-layout:has(.page-builder) .admin-sidebar-icon {
+  width: 46px;
+  height: 46px;
+  min-width: 46px;
+  border-radius: 16px;
+}
+
+/* Nav column */
+.admin-dashboard-layout:has(.page-builder) .admin-sidebar-nav {
+  width: 100%;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Normal nav buttons become icon-only */
+.admin-dashboard-layout:has(.page-builder) .admin-sidebar-nav > button {
+  width: 56px;
+  min-width: 56px;
+  height: 52px;
+  min-height: 52px;
+  padding: 0;
+  justify-content: center;
+  border-radius: 16px;
+  gap: 0;
+  margin-inline: auto;
+}
+
+/* Hide labels of normal nav buttons only */
+.admin-dashboard-layout:has(.page-builder)
+  .admin-sidebar-nav
+  > button:not(.admin-sidebar-theme-row)
+  > span {
+  display: none !important;
+}
+
+/* Keep SVG icons visible */
+.admin-dashboard-layout:has(.page-builder) .admin-sidebar-nav > button svg {
+  width: 19px;
+  height: 19px;
+  min-width: 19px;
+  display: block;
+}
+
+/* Active compact icon */
+.admin-dashboard-layout:has(.page-builder) .admin-sidebar-nav > button.active {
+  background: rgba(var(--theme-primary-rgb), 0.1);
+  color: var(--color-accent-text);
+}
+
+html.theme-light .admin-dashboard-layout:has(.page-builder) .admin-sidebar-nav > button.active,
+html[data-theme="light"] .admin-dashboard-layout:has(.page-builder) .admin-sidebar-nav > button.active,
+body.theme-light .admin-dashboard-layout:has(.page-builder) .admin-sidebar-nav > button.active,
+.theme-light .admin-dashboard-layout-builder .admin-sidebar .admin-sidebar-nav > button.active,
+[data-theme="light"] .admin-dashboard-layout-builder .admin-sidebar .admin-sidebar-nav > button.active,
+body.theme-light .admin-dashboard-layout-builder .admin-sidebar .admin-sidebar-nav > button.active {
+  background: rgba(var(--theme-shadow-rgb), 0.08) !important;
+  color: var(--theme-text) !important;
+}
+
+html.theme-light .admin-dashboard-layout:has(.page-builder) .admin-sidebar-nav > button.active svg,
+html[data-theme="light"] .admin-dashboard-layout:has(.page-builder) .admin-sidebar-nav > button.active svg,
+body.theme-light .admin-dashboard-layout:has(.page-builder) .admin-sidebar-nav > button.active svg,
+.theme-light .admin-dashboard-layout-builder .admin-sidebar .admin-sidebar-nav > button.active svg,
+[data-theme="light"] .admin-dashboard-layout-builder .admin-sidebar .admin-sidebar-nav > button.active svg,
+body.theme-light .admin-dashboard-layout-builder .admin-sidebar .admin-sidebar-nav > button.active svg {
+  color: var(--theme-text) !important;
+  stroke: currentColor !important;
+  opacity: 1 !important;
+}
+
+/* ============================================================
+   COMPACT THEME ICON
+   Important: previous CSS hid every span, which also hid the icon.
+   ============================================================ */
+
+.admin-dashboard-layout:has(.page-builder) .admin-sidebar-theme-row {
+  width: 56px !important;
+  min-width: 56px !important;
+  height: 52px !important;
+  min-height: 52px !important;
+  padding: 0 !important;
+  justify-content: center !important;
+  border: 0 !important;
+  border-radius: 16px !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  margin-inline: auto !important;
+  gap: 0 !important;
+}
+
+.admin-dashboard-layout:has(.page-builder)
+  .admin-sidebar-theme-row
+  .theme-toggle-left {
+  display: inline-grid !important;
+  place-items: center !important;
+  gap: 0 !important;
+}
+
+.admin-dashboard-layout:has(.page-builder)
+  .admin-sidebar-theme-row
+  .theme-toggle-icon {
+  width: 20px !important;
+  height: 20px !important;
+  min-width: 20px !important;
+  display: inline-grid !important;
+  place-items: center !important;
+  color: currentColor !important;
+}
+
+.admin-dashboard-layout:has(.page-builder)
+  .admin-sidebar-theme-row
+  .theme-toggle-icon
+  svg {
+  width: 19px !important;
+  height: 19px !important;
+  display: block !important;
+}
+
+.admin-dashboard-layout:has(.page-builder)
+  .admin-sidebar-theme-row
+  .theme-toggle-label,
+.admin-dashboard-layout:has(.page-builder)
+  .admin-sidebar-theme-row
+  .theme-toggle-switch {
+  display: none !important;
+}
+
+/* ============================================================
+   COMPACT SIDEBAR BOTTOM
+   ============================================================ */
+
+.admin-dashboard-layout:has(.page-builder) .admin-sidebar-bottom {
+  width: 100%;
+  align-items: center;
+  gap: 10px;
+  margin-top: auto;
+  padding-top: 18px;
+}
+
+/* Language becomes AR / EN block */
+.admin-dashboard-layout:has(.page-builder) .admin-sidebar-lang {
+  width: 56px;
+  min-width: 56px;
+  height: 52px;
+  min-height: 52px;
+  padding: 0;
+  justify-content: center;
+  border-radius: 16px;
+  direction: ltr;
+  text-align: center;
+}
+
+.admin-dashboard-layout:has(.page-builder) .admin-sidebar-lang svg,
+.admin-dashboard-layout:has(.page-builder) .admin-sidebar-lang span {
+  display: none !important;
+}
+
+.admin-dashboard-layout:has(.page-builder) .admin-sidebar-lang::after {
+  content: "AR";
+  display: block;
+  width: 100%;
+  color: var(--theme-text);
+  font-size: 14px;
+  font-weight: 950;
+  letter-spacing: 0;
+  line-height: 1;
+  text-align: center;
+}
+
+.admin-dashboard-layout.is-rtl:has(.page-builder)
+  .admin-sidebar-lang::after,
+.admin-dashboard-layout[dir="rtl"]:has(.page-builder)
+  .admin-sidebar-lang::after {
+  content: "EN";
+}
+
+/* User card becomes avatar only */
+.admin-dashboard-layout:has(.page-builder) .admin-sidebar-user {
+  width: 56px;
+  min-width: 56px;
+  height: 56px;
+  min-height: 56px;
+  padding: 5px;
+  justify-content: center;
+  margin-inline: auto;
+  border-radius: 18px;
+  order: 2;
+}
+
+.admin-dashboard-layout:has(.page-builder) .admin-sidebar-user-info {
+  display: none !important;
+}
+
+.admin-dashboard-layout:has(.page-builder) .admin-sidebar-avatar {
+  width: 46px;
+  height: 46px;
+  min-width: 46px;
+  border-radius: 16px;
+}
+
+/* Logout icon only */
+.admin-dashboard-layout:has(.page-builder) .admin-sidebar-logout {
+  width: 56px;
+  min-width: 56px;
+  height: 52px;
+  min-height: 52px;
+  padding: 0;
+  justify-content: center;
+  border-radius: 16px;
+  gap: 0;
+  margin-inline: auto;
+  order: 3;
+}
+
+.admin-dashboard-layout:has(.page-builder) .admin-sidebar-logout span {
+  display: none !important;
+}
+
+.admin-dashboard-layout:has(.page-builder) .admin-sidebar-logout svg {
+  width: 19px;
+  height: 19px;
+  min-width: 19px;
+  display: block;
+}
+
+/* Content flush beside compact sidebar */
+.admin-dashboard-layout:has(.page-builder) .page-builder-dashboard-page,
+.admin-dashboard-layout:has(.page-builder) .admin-dashboard-page {
+  padding: 0;
+}
+
+/* ============================================================
+   DARK MODE FOR COMPACT SIDEBAR
+   ============================================================ */
+
+[data-theme="dark"]
+  .admin-dashboard-layout:has(.page-builder)
+  .admin-sidebar-nav
+  > button.active,
+.theme-dark
+  .admin-dashboard-layout:has(.page-builder)
+  .admin-sidebar-nav
+  > button.active {
+  background: rgba(var(--theme-text-inverse-rgb), 0.1);
+  color: var(--theme-text-inverse);
+}
+
+[data-theme="dark"]
+  .admin-dashboard-layout:has(.page-builder)
+  .admin-sidebar-lang::after,
+.theme-dark
+  .admin-dashboard-layout:has(.page-builder)
+  .admin-sidebar-lang::after {
+  color: var(--theme-text);
+}
+
+[data-theme="dark"]
+  .admin-dashboard-layout:has(.page-builder)
+  .admin-sidebar-theme-row,
+.theme-dark
+  .admin-dashboard-layout:has(.page-builder)
+  .admin-sidebar-theme-row {
+  color: rgba(248, 250, 252, 0.86) !important;
+}
+
+[data-theme="dark"]
+  .admin-dashboard-layout:has(.page-builder)
+  .admin-sidebar-theme-row:hover,
+.theme-dark
+  .admin-dashboard-layout:has(.page-builder)
+  .admin-sidebar-theme-row:hover {
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  color: var(--theme-text-inverse) !important;
+}
+
+/* ============================================================
+   RESPONSIVE
+   ============================================================ */
+
+@media (max-width: 768px) {
+  .admin-dashboard-layout:has(.page-builder) .dashboard-mobile-menu-button,
+  .admin-dashboard-layout:has(.page-builder) .dashboard-sidebar-backdrop,
+  .admin-dashboard-layout:has(.page-builder) .admin-sidebar {
+    display: none !important;
+  }
+
+  .page-builder-dashboard-page {
+    padding: 0;
+  }
+
+  .page-builder-dashboard-page .builder,
+  .page-builder-dashboard-page .page-builder {
+    min-height: auto;
+  }
+}

@@ -1,0 +1,56 @@
+﻿/* ============================================================
+   RTL
+   ============================================================ */
+
+.page-builder .daw-page[dir="rtl"] {
+  text-align: right;
+}
+
+.page-builder .daw-page[dir="rtl"] .daw-header,
+.page-builder .daw-page[dir="rtl"] .daw-report-header {
+  direction: rtl;
+  flex-direction: row;
+  text-align: right;
+}
+
+.page-builder .daw-page[dir="rtl"] .daw-header > div,
+.page-builder .daw-page[dir="rtl"] .daw-report-header > div {
+  text-align: right;
+}
+
+.page-builder .daw-page[dir="rtl"] .daw-stepper button,
+.page-builder .daw-page[dir="rtl"] .daw-group-grid button,
+.page-builder .daw-page[dir="rtl"] .daw-review-sidebar button,
+.page-builder .daw-page[dir="rtl"] .daw-field,
+.page-builder .daw-page[dir="rtl"] .daw-report-block,
+.page-builder .daw-page[dir="rtl"] .daw-friendly-panel,
+.page-builder .daw-page[dir="rtl"] .daw-review-summary-grid article {
+  text-align: right;
+}
+
+.page-builder .daw-page[dir="rtl"] .daw-insight-list,
+.page-builder .daw-page[dir="rtl"] .daw-friendly-panel ul {
+  padding-inline-start: 0;
+  padding-inline-end: 20px;
+}
+
+.page-builder .daw-page[dir="rtl"] .daw-report-block-header {
+  direction: rtl;
+}
+
+.page-builder .daw-page[dir="rtl"] .daw-table th,
+.page-builder .daw-page[dir="rtl"] .daw-table td {
+  text-align: right;
+}
+
+.page-builder .daw-page[dir="rtl"] .daw-compact-table th,
+.page-builder .daw-page[dir="rtl"] .daw-compact-table td,
+.page-builder .daw-page[dir="rtl"] .daw-compact-table td > span {
+  text-align: center;
+}
+
+.page-builder .daw-page[dir="rtl"] .daw-data-grid-toolbar,
+.page-builder .daw-page[dir="rtl"] .daw-data-grid-meta,
+.page-builder .daw-page[dir="rtl"] .daw-pagination {
+  direction: rtl;
+}

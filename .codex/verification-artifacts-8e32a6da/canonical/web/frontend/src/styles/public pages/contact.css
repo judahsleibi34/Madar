@@ -1,0 +1,224 @@
+/* ============================================================
+   CONTACT PAGE
+   ============================================================ */
+
+.contact-page {
+  flex: 1;
+  max-width: 1060px;
+  margin: 0 auto;
+  padding: 60px 5% 80px;
+  width: 100%;
+}
+
+.contact-hero {
+  margin-bottom: 48px;
+}
+
+.contact-hero h1 {
+  margin: 0 0 12px 0;
+  color: var(--theme-text);
+  font-size: 42px;
+  font-weight: 800;
+  font-family: inherit;
+}
+
+.contact-hero p {
+  margin: 0;
+  color: var(--theme-text-soft);
+  font-size: 18px;
+  line-height: 1.8;
+}
+
+.contact-content {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 48px;
+  align-items: start;
+}
+
+.contact-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.contact-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: var(--theme-text);
+  font-size: 15px;
+  font-weight: 700;
+  font-family: inherit;
+}
+
+.contact-form input,
+.contact-form textarea {
+  padding: 12px 16px;
+  border: 1px solid rgba(var(--theme-shadow-rgb), 0.18);
+  border-radius: 10px;
+  font-size: 15px;
+  font-family: Inter, "IBM Plex Sans Arabic", sans-serif;
+  color: var(--theme-text);
+  background: var(--theme-surface);
+  outline: none;
+  transition: border-color 0.2s ease;
+  resize: vertical;
+}
+
+.contact-form input:focus,
+.contact-form textarea:focus {
+  border-color: var(--color-accent-text);
+}
+
+.contact-form button {
+  align-self: center;
+  padding: 12px 32px;
+  background: var(--theme-primary);
+  color: var(--theme-text-inverse);
+  font-size: 16px;
+  font-weight: 700;
+  font-family: inherit;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.contact-form button:hover {
+  background: var(--theme-primary-hover);
+}
+
+.contact-form button:disabled {
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
+.contact-form-status {
+  margin: -4px 0 2px;
+  font-size: 14px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.contact-form-status-success {
+  color: var(--color-status-success-text);
+}
+
+.contact-form-status-error {
+  color: var(--color-status-danger-text);
+}
+
+.contact-info-card {
+  background: var(--theme-surface);
+  border: 1px solid rgba(var(--theme-shadow-rgb), 0.08);
+  border-radius: 16px;
+  padding: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  text-align: center;
+  align-items: center;
+}
+
+.contact-info-card h2 {
+  margin: 0;
+  color: var(--theme-text);
+  font-size: 20px;
+  font-weight: 800;
+  font-family: inherit;
+}
+
+.contact-info-card strong {
+  display: block;
+  color: var(--color-accent-text);
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 4px;
+}
+
+.contact-info-card p {
+  margin: 0;
+  color: var(--theme-text-soft);
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+/* direction:ltr keeps the number rendering correctly in both LTR & RTL contexts;
+   text-align is intentionally NOT set here so it inherits from the parent
+   (.footer-contact is centered; .contact-info-card flows naturally). */
+.phone-number {
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
+html[data-theme="dark"] .contact-page,
+body.theme-dark .contact-page {
+  color: var(--theme-text);
+}
+
+html[data-theme="dark"] .contact-hero h1,
+body.theme-dark .contact-hero h1 {
+  color: var(--theme-text);
+}
+
+html[data-theme="dark"] .contact-hero p,
+body.theme-dark .contact-hero p {
+  color: var(--theme-text-muted);
+}
+
+html[data-theme="dark"] .contact-form label,
+body.theme-dark .contact-form label {
+  color: var(--theme-text-soft);
+}
+
+html[data-theme="dark"] .contact-form input,
+html[data-theme="dark"] .contact-form textarea,
+body.theme-dark .contact-form input,
+body.theme-dark .contact-form textarea {
+  background: var(--theme-surface);
+  border-color: var(--theme-border);
+  color: var(--theme-text);
+  box-shadow: inset 0 1px 0 rgba(244, 240, 232, 0.04);
+}
+
+html[data-theme="dark"] .contact-form input:focus,
+html[data-theme="dark"] .contact-form textarea:focus,
+body.theme-dark .contact-form input:focus,
+body.theme-dark .contact-form textarea:focus {
+  border-color: rgba(var(--theme-primary-rgb), 0.68);
+  box-shadow:
+    0 0 0 4px rgba(var(--theme-primary-rgb), 0.12),
+    inset 0 1px 0 rgba(244, 240, 232, 0.05);
+}
+
+html[data-theme="dark"] .contact-form button,
+body.theme-dark .contact-form button {
+  background: var(--theme-gradient);
+  box-shadow: 0 14px 30px rgba(var(--theme-primary-rgb), 0.22);
+}
+
+html[data-theme="dark"] .contact-form button:hover,
+body.theme-dark .contact-form button:hover {
+  background: var(--theme-gradient-hover);
+}
+
+html[data-theme="dark"] .contact-info-card,
+body.theme-dark .contact-info-card {
+  background: var(--theme-surface);
+  border-color: var(--theme-border);
+  color: var(--theme-text);
+  box-shadow: 0 22px 56px rgba(var(--theme-black-rgb), 0.24);
+}
+
+html[data-theme="dark"] .contact-info-card h2,
+body.theme-dark .contact-info-card h2 {
+  color: var(--theme-text);
+}
+
+html[data-theme="dark"] .contact-info-card p,
+body.theme-dark .contact-info-card p {
+  color: var(--theme-text-soft);
+}

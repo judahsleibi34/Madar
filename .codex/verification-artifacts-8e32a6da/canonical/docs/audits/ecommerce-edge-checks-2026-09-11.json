@@ -1,0 +1,45 @@
+{
+  "malformedCartBody": "We could not open this page\n\nSomething interrupted the page while it was loading. You can try again safely.\n\nTry again\nReturn home",
+  "checkoutWidths": [
+    {
+      "width": 390,
+      "scrollWidth": 390,
+      "storeScrollWidth": 390
+    },
+    {
+      "width": 768,
+      "scrollWidth": 768,
+      "storeScrollWidth": 768
+    },
+    {
+      "width": 1440,
+      "scrollWidth": 1440,
+      "storeScrollWidth": 1440
+    }
+  ],
+  "previewOrderPosts": 1,
+  "storageFailureAfterOrderBody": "Your cart is empty\n\nAdd products before continuing to checkout.\n\nBrowse products",
+  "galleryBrokenImage": [
+    {
+      "complete": true,
+      "naturalWidth": 0
+    }
+  ],
+  "productWidths": [
+    {
+      "width": 390,
+      "scrollWidth": 390,
+      "storeScrollWidth": 390
+    },
+    {
+      "width": 768,
+      "scrollWidth": 768,
+      "storeScrollWidth": 768
+    },
+    {
+      "width": 1440,
+      "scrollWidth": 1440,
+      "storeScrollWidth": 1440
+    }
+  ]
+}

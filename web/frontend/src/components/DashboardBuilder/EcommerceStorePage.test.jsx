@@ -1,6 +1,6 @@
-import { render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import EcommerceStorePage from "./EcommerceStorePage";
 import { fetchWebsiteSettings } from "../PageBuilder/services/PageBuilder.api";
@@ -31,4 +31,14 @@ describe("EcommerceStorePage", () => {
     expect((await screen.findByTitle("Draft online store preview")).getAttribute("src")).toBe("/site/olive-house/shop?preview=draft");
     expect(screen.getByText("Nothing here is live yet.", { exact: false })).toBeTruthy();
   });
+});
+
+afterEach(() => { cleanup(); vi.clearAllMocks(); });
+
+it("shows safe toast and inline feedback when the store preview cannot load", async () => {
+  fetchWebsiteSettings.mockRejectedValue(new Error("DATABASE_URL=secret; internal_settings SQL exception"));
+  render(<MemoryRouter><EcommerceStorePage /></MemoryRouter>);
+  expect((await screen.findByRole("alert")).textContent).toContain("Could not load website settings");
+  expect(document.body.textContent).not.toContain("DATABASE_URL");
+  expect(document.body.textContent).not.toContain("internal_settings");
 });

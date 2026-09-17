@@ -1,0 +1,108 @@
+.page-builder .responses-record-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
+.page-builder .responses-record-status,
+.page-builder .responses-record-actions button,
+.page-builder .responses-record-editor-footer button {
+  min-height: 30px;
+  border: 1px solid var(--color-border-control);
+  border-radius: var(--app-radius-control, 8px);
+  padding: 6px 10px;
+  background: var(--madar-surface-soft);
+  color: var(--madar-text);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 850;
+  line-height: 1;
+}
+
+.page-builder .responses-record-status {
+  display: inline-flex;
+  align-items: center;
+  border-color: transparent;
+  color: var(--madar-muted);
+}
+
+.page-builder .responses-record-actions button,
+.page-builder .responses-record-editor-footer button {
+  cursor: pointer;
+}
+
+.page-builder .responses-record-actions button:hover:not(:disabled),
+.page-builder .responses-record-editor-footer button:hover:not(:disabled) {
+  border-color: var(--color-accent-text);
+  color: var(--color-accent-text);
+}
+
+.page-builder .responses-record-actions button.danger {
+  border-color: rgba(214, 69, 50, 0.35);
+  color: var(--color-accent-text);
+}
+
+.page-builder .responses-record-actions button:disabled,
+.page-builder .responses-record-editor-footer button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.page-builder .responses-answer-grid.editing article {
+  padding: 10px;
+}
+
+.page-builder .responses-answer-grid textarea {
+  display: block;
+  width: 100%;
+  min-height: 54px;
+  margin-top: 7px;
+  resize: vertical;
+  border: 1px solid var(--color-border-control);
+  border-radius: var(--app-radius-control, 8px);
+  padding: 8px 9px;
+  background: var(--madar-surface);
+  color: var(--madar-text);
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.page-builder .responses-answer-grid textarea:focus {
+  outline: none;
+  border-color: var(--color-accent-text);
+  box-shadow: var(--app-focus-ring);
+}
+
+.page-builder .responses-record-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  color: var(--madar-text);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.page-builder .responses-record-checkbox span {
+  color: inherit;
+  font-size: inherit;
+}
+
+.page-builder .responses-record-editor-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 0 14px 14px;
+}
+
+.page-builder .responses-record-editor-footer button.primary {
+  border-color: var(--color-accent-text);
+  background: var(--madar-red);
+  color: var(--theme-text-inverse);
+}
+
+@media (max-width: 620px) {
+  .page-builder .responses-browser-heading {

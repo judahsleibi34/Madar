@@ -26,7 +26,6 @@ import {
   PanelLeftOpen,
 } from "lucide-react";
 
-import { useWorkspaceCapabilities, workspaceRouteCapabilities } from "../../commercial/capabilityContext";
 import LanguageSwitcher from "../LanguageSwitcher";
 import ThemeToggle from "../ThemeChanger/ThemeToggle";
 import NotificationBell from "./NotificationBell";
@@ -223,11 +222,6 @@ export default function DashboardSidebar({
 
   const userRole = useMemo(() => getUserRole(user), [user]);
   const isAdminUser = userRole === "admin";
-  const { can } = useWorkspaceCapabilities();
-  const visibleItem = (item) => {
-    const required = workspaceRouteCapabilities(item.path);
-    return isAdminUser || !required.length || required.some(can);
-  };
 
   const avatarLetter = displayName.trim().slice(0, 1).toUpperCase() || "M";
 
@@ -450,6 +444,14 @@ export default function DashboardSidebar({
       aria-label={t("sidebar.aria")}
       data-user-role={userRole}
     >
+      <div className="dashboard-sidebar-skeleton" aria-hidden="true">
+        <div className="dashboard-sidebar-skeleton-brand"><i /><i /></div>
+        {Array.from({ length: 13 }, (_, index) => (
+          <div key={index} className={`dashboard-sidebar-skeleton-row ${index >= 5 && index <= 11 ? "is-nested" : ""}`}>
+            <i /><i />
+          </div>
+        ))}
+      </div>
       <div className="admin-sidebar-top">
         <div className="admin-sidebar-brand-row">
           <button
@@ -556,7 +558,7 @@ export default function DashboardSidebar({
                   className="admin-sidebar-subnav"
                   id="dashboard-sidebar-workspace"
                 >
-                  {workspaceItems.filter(visibleItem).map((item) => {
+                  {workspaceItems.map((item) => {
                     const Icon = item.icon;
                     const active = isActive(item.path);
 
@@ -578,7 +580,7 @@ export default function DashboardSidebar({
               )}
           </div>
 
-          {(isAdminUser || can("ecommerce_management")) && <div className="admin-sidebar-group">
+          <div className="admin-sidebar-group">
             <SidebarRow
               active={ecommerceRouteActive}
               activeClassName="active-parent"
@@ -634,9 +636,9 @@ export default function DashboardSidebar({
                 })}
               </div>
             )}
-          </div>}
+          </div>
 
-          {primaryNavItems.slice(2).filter(visibleItem).map((item) => {
+          {primaryNavItems.slice(2).map((item) => {
             const active = isActive(item.path);
 
             return (

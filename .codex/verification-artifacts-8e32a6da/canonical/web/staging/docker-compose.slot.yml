@@ -1,0 +1,79 @@
+services:
+  redis:
+    # Slot-local Redis preserves blue/green isolation. The control Redis exists
+    # only for explicit failure/pressure drills.
+    ports: !override []
+
+  backend:
+    user: "65534:1000"
+    networks: [default, parser_internal, remote_ingestion_internal, stage_control]
+    environment:
+      APP_ENV: staging
+      SUPABASE_URL: http://madar-stage-gateway:5430
+      SUPABASE_ANON_KEY: ${STAGING_ANON_JWT}
+      SUPABASE_SERVICE_KEY: ${STAGING_SERVICE_JWT}
+      REDIS_URL: redis://madar-${MADAR_SLOT}-redis:6379/0
+      FRONTEND_URLS: http://127.0.0.1:13000
+      CSRF_TRUSTED_ORIGINS: http://127.0.0.1:13000
+      COOKIE_SECURE: "true"
+      COOKIE_SAMESITE: lax
+      ADMIN_MFA_LOGIN_ENFORCEMENT: "true"
+      EMAIL_CHANNEL_ENABLED: "false"
+      CALENDAR_FEATURE_ENABLED: "false"
+      ALLOW_REMOTE_DATASET_URLS: "false"
+      NOTIFICATION_WORKER_REQUIRED: ${NOTIFICATION_WORKER_REQUIRED:-false}
+      NOTIFICATION_WORKER_ENABLED: ${MADAR_RELEASE_WORKERS_ACTIVE:-false}
+      NOTIFICATION_WORKER_HEALTH_URL: http://notification-worker:8090/health
+      DATA_DELETION_WORKER_REQUIRED: ${DATA_DELETION_WORKER_REQUIRED:-false}
+      DATA_DELETION_WORKER_ENABLED: ${MADAR_RELEASE_WORKERS_ACTIVE:-false}
+      DATA_DELETION_WORKER_HEALTH_URL: http://data-deletion-worker:8094/health
+      PARSER_ISOLATED_WORKER_ENABLED: "true"
+      STORAGE_DISK_FREE_FLOOR_BYTES: 104857600
+
+  notification-worker:
+    networks: [default, stage_control]
+    environment:
+      SUPABASE_URL: http://madar-stage-gateway:5430
+      SUPABASE_SERVICE_KEY: ${STAGING_SERVICE_JWT}
+      REDIS_URL: redis://madar-${MADAR_SLOT}-redis:6379/0
+      EMAIL_CHANNEL_ENABLED: "false"
+      NOTIFICATION_WORKER_ENABLED: ${MADAR_RELEASE_WORKERS_ACTIVE:-false}
+
+  data-deletion-worker:
+    user: "65534:1000"
+    networks: [default, stage_control]
+    environment:
+      SUPABASE_URL: http://madar-stage-gateway:5430
+      SUPABASE_SERVICE_KEY: ${STAGING_SERVICE_JWT}
+      REDIS_URL: redis://madar-${MADAR_SLOT}-redis:6379/0
+      DATA_DELETION_WORKER_ENABLED: ${MADAR_RELEASE_WORKERS_ACTIVE:-false}
+
+  calendar-sync-worker:
+    networks: [default, stage_control]
+    environment:
+      SUPABASE_URL: http://madar-stage-gateway:5430
+      SUPABASE_SERVICE_KEY: ${STAGING_SERVICE_JWT}
+      REDIS_URL: redis://madar-${MADAR_SLOT}-redis:6379/0
+      CALENDAR_SYNC_WORKER_ENABLED: ${MADAR_RELEASE_WORKERS_ACTIVE:-false}
+
+  frontend:
+    environment:
+      MADAR_CSP_CONNECT_SRC: http://127.0.0.1:18001
+      MADAR_HSTS: ""
+
+networks:
+  default:
+    external: true
+    name: madar-stage-${MADAR_SLOT}-default
+  parser_internal:
+    external: true
+    name: madar-stage-${MADAR_SLOT}-parser-internal
+  remote_ingestion_egress:
+    external: true
+    name: madar-stage-${MADAR_SLOT}-remote-egress
+  remote_ingestion_internal:
+    external: true
+    name: madar-stage-${MADAR_SLOT}-remote-internal
+  stage_control:
+    external: true
+    name: madar-stage-control_default

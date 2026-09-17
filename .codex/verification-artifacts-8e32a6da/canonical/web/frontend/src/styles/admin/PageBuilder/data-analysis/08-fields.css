@@ -1,0 +1,67 @@
+/* ============================================================
+   Fields
+   ============================================================ */
+
+.page-builder .daw-field {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.page-builder .daw-field.wide {
+  grid-column: 1 / -1;
+}
+
+.page-builder .daw-field > span,
+.page-builder .daw-toggle > span {
+  color: var(--daw-text);
+  font-size: 13px;
+  font-weight: 950;
+}
+
+.page-builder .daw-field input,
+.page-builder .daw-field select,
+.page-builder .daw-field textarea {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid var(--daw-card-border);
+  border-radius: 14px;
+  padding: 0 13px;
+  background: var(--theme-surface);
+  color: var(--daw-text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 850;
+  outline: none;
+}
+
+.page-builder .daw-field input[type="checkbox"] {
+  width: 18px;
+  min-width: 18px;
+  height: 18px;
+  min-height: 18px;
+  border-radius: 5px;
+  padding: 0;
+  accent-color: var(--daw-red);
+}
+
+.page-builder .daw-field textarea {
+  min-height: 112px;
+  padding: 12px 13px;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.page-builder .daw-field input:focus,
+.page-builder .daw-field select:focus,
+.page-builder .daw-field textarea:focus,
+.page-builder .daw-data-grid-toolbar input:focus {
+  border-color: rgba(var(--theme-primary-rgb), 0.45);
+  box-shadow: 0 0 0 4px rgba(var(--theme-primary-rgb), 0.1);
+}
+
+.page-builder .daw-field small {
+  color: var(--daw-muted);
+  font-size: 12px;
+  font-weight: 750;
+}
