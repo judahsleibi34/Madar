@@ -243,8 +243,32 @@ def check_tenant_relationship_debt(
             )
 
 
+
+def check_production_lineage(errors: list[str]) -> None:
+    import json
+    pin = REPO_ROOT / "deployment/releases/production-001-099.json"
+    try:
+        frozen = json.loads(pin.read_text(encoding="utf-8"))
+        if frozen["production_baseline"] != "1e6b739a43759309a45ede2dff28a859209e4a64" or len(frozen["files"]) != 198:
+            raise ValueError("invalid immutable lineage manifest")
+        for relative, checksum in frozen["files"].items():
+            path = REPO_ROOT.parent / relative
+            if not path.is_file() or digest(path) != checksum:
+                errors.append(f"immutable production migration changed: {relative}")
+        for tree in TREE_PATHS.values():
+            for path in tree.glob("*.sql"):
+                number = int(path.name.split("_", 1)[0])
+                relative = path.relative_to(REPO_ROOT.parent).as_posix()
+                if number <= 99 and relative not in frozen["files"]:
+                    errors.append(f"unexpected historical migration: {relative}")
+                if number > 101:
+                    errors.append(f"unexpected migration beyond release target 101: {relative}")
+    except (OSError, KeyError, ValueError, TypeError) as error:
+        errors.append(f"production lineage manifest invalid: {type(error).__name__}")
+
 def main() -> int:
     errors: list[str] = []
+    check_production_lineage(errors)
     warnings: list[str] = []
     trees = {
         label: collect_tree(label, path, errors)

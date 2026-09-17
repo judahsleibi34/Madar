@@ -105,6 +105,11 @@ class BuilderAssetUploadTests(unittest.TestCase):
             ),
             patch.object(
                 builder_routes,
+                "require_active_tenant_member",
+                return_value=fake_context(),
+            ),
+            patch.object(
+                builder_routes,
                 "enforce_builder_asset_upload_rate_limit",
                 return_value=None,
             ),
@@ -141,6 +146,57 @@ class BuilderAssetUploadTests(unittest.TestCase):
             "/builder/assets/upload",
             files={"file": (filename, content, content_type)},
             headers=headers,
+        )
+
+    def post_product_media(self, content, filename="asset.png", content_type="image/png"):
+        return self.client.post(
+            "/ecommerce/product-media/upload",
+            files={"file": (filename, content, content_type)},
+        )
+
+    def test_ecommerce_product_media_does_not_require_builder_upload_entitlement(self):
+        builder_routes.reserve_storage.reset_mock()
+        def ecommerce_only(_tenant, feature):
+            if feature != "ecommerce_management":
+                raise HTTPException(status_code=402, detail="Builder upload entitlement required")
+            return {}
+        with patch.object(
+            builder_routes,
+            "require_entitlement",
+            side_effect=ecommerce_only,
+        ) as entitlement:
+            response = self.post_product_media(PNG_BYTES)
+            entitlement.assert_called_once_with(1, "ecommerce_management")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertRegex(
+            response.json()["asset_url"],
+            r"^/uploads/tenant_1/builder_assets/[a-f0-9]{32}\.png$",
+        )
+        self.assertEqual(
+            builder_routes.reserve_storage.call_args.kwargs["category"],
+            "ecommerce_product_media",
+        )
+        self.assertEqual(
+            builder_routes.reserve_storage.call_args.kwargs["tenant_quota_bytes"],
+            5 * 1024 * 1024 * 1024,
+        )
+
+    def test_ecommerce_product_media_requires_commercial_ecommerce_access(self):
+        builder_routes.reserve_storage.reset_mock()
+        with patch.object(builder_routes, "require_entitlement",
+                          side_effect=HTTPException(status_code=402, detail="Ecommerce entitlement required")):
+            response = self.post_product_media(PNG_BYTES)
+        self.assertEqual(response.status_code, 402)
+        builder_routes.reserve_storage.assert_not_called()
+
+    def test_ecommerce_product_media_rejects_documents(self):
+        response = self.post_product_media(PDF_BYTES, "guide.pdf", "application/pdf")
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(
+            response.json()["detail"],
+            "Product media must be a PNG, JPG, WebP, MP4, or WebM file",
         )
 
     def test_unauthenticated_upload_is_rejected(self):

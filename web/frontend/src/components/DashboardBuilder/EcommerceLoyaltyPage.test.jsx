@@ -31,7 +31,7 @@ describe("EcommerceLoyaltyPage", () => {
       reward_product_id: product.id,
       validity_mode: "lifetime",
       validity_days: null,
-    })));
+    }), { scope: "authenticated" }));
     expect(screen.getByDisplayValue("10%").readOnly).toBe(true);
     expect(screen.getByDisplayValue("ILS").readOnly).toBe(true);
   });

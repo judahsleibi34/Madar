@@ -10,3 +10,10 @@ Dockerfile text eol=lf
 web/deployment/bin/* text eol=lf
 web/deployment/*.conf text eol=lf
 web/deployment/systemd/* text eol=lf
+
+# Preserve canonical migration and manifest bytes on every platform.
+*.sql text eol=lf
+# Historical Git blobs are immutable, including their original line endings.
+web/database/migrations/0*.sql -text
+web/supabase/migrations/0*.sql -text
+*.json text eol=lf

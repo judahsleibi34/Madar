@@ -31,9 +31,49 @@
 .ecommerce-status-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .ecommerce-status-actions button, .ecommerce-back-link { min-height: 38px; padding: 0 12px; display: inline-flex; align-items: center; gap: 7px; border: 1px solid var(--theme-border); border-radius: 9px; color: var(--theme-text); background: var(--theme-surface); text-decoration: none; text-transform: capitalize; }
 
+.ecommerce-operations-skeleton { width: 100%; }
+.ecommerce-operations-skeleton i { display: block; border-radius: 8px; }
+.ecommerce-route-skeleton-header { min-height: 112px; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+.ecommerce-route-skeleton-header > div { display: grid; gap: 12px; }
+.ecommerce-route-skeleton-header > div i:first-child { width: min(260px, 58vw); height: 34px; }
+.ecommerce-route-skeleton-header > div i:last-child { width: min(430px, 72vw); height: 15px; }
+.ecommerce-route-skeleton-header > i { width: 150px; height: 42px; border-radius: 11px; }
+.ecommerce-route-skeleton-filters { margin-bottom: 18px; display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 12px; }
+.ecommerce-route-skeleton-filters i { height: 42px; border-radius: 10px; }
+.ecommerce-skeleton-delivery-grid { margin-top: 20px; display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; }
+.ecommerce-skeleton-delivery-card { min-height: 72px; border-radius: 12px !important; }
+.ecommerce-skeleton-field-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+.ecommerce-skeleton-field-grid > div { display: grid; gap: 8px; }
+.ecommerce-skeleton-field-grid > div i:first-child { width: 42%; height: 12px; }
+.ecommerce-skeleton-field-grid > div i:last-child { width: 100%; height: 42px; border-radius: 10px; }
+.ecommerce-skeleton-order-list { margin-top: 18px; display: grid; }
+.ecommerce-skeleton-order-row { min-height: 69px; padding: 14px 10px; display: grid; grid-template-columns: 1.1fr 1.2fr 1fr .8fr .8fr .8fr; gap: 12px; align-items: center; border-top: 1px solid var(--theme-border); }
+.ecommerce-skeleton-order-row i { width: min(100%, 112px); height: 13px; }
+.ecommerce-skeleton-order-row i:nth-child(4),
+.ecommerce-skeleton-order-row i:nth-child(5),
+.ecommerce-skeleton-order-row i:nth-child(6) { width: min(100%, 72px); }
+.ecommerce-operations-skeleton.is-order-detail { display: grid; gap: 22px; }
+.ecommerce-skeleton-detail-header { min-height: 112px; display: grid; align-content: center; gap: 10px; }
+.ecommerce-skeleton-detail-header i:first-child { width: 130px; height: 13px; }
+.ecommerce-skeleton-detail-header i:nth-child(2) { width: min(280px, 68vw); height: 34px; }
+.ecommerce-skeleton-detail-header i:last-child { width: 180px; height: 14px; }
+.ecommerce-skeleton-detail-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.ecommerce-skeleton-detail-grid > div { min-height: 150px; padding: 20px; display: grid; align-content: start; gap: 14px; border: 1px solid var(--theme-border); border-radius: 14px; background: var(--theme-surface); }
+.ecommerce-skeleton-detail-grid i:first-child { width: 34%; height: 18px; }
+.ecommerce-skeleton-detail-grid i:nth-child(2) { width: 72%; height: 14px; }
+.ecommerce-skeleton-detail-grid i:last-child { width: 55%; height: 14px; }
+.ecommerce-skeleton-detail-panel { padding: 22px; display: grid; gap: 16px; border: 1px solid var(--theme-border); border-radius: 16px; background: var(--theme-surface); }
+.ecommerce-skeleton-detail-panel i:first-child { width: 110px; height: 21px; }
+.ecommerce-skeleton-detail-panel i:not(:first-child) { width: 100%; height: 54px; }
+
 @media (max-width: 800px) {
   .ecommerce-order-detail-grid { grid-template-columns: 1fr; }
   .ecommerce-orders-table > a { grid-template-columns: 1fr 1fr; }
+  .ecommerce-skeleton-field-grid,
+  .ecommerce-skeleton-detail-grid { grid-template-columns: 1fr; }
+  .ecommerce-skeleton-order-row { grid-template-columns: 1fr 1fr; }
+  .ecommerce-route-skeleton-header > i { display: none; }
+  .ecommerce-route-skeleton-filters { grid-template-columns: 1fr; }
 }
 .ecommerce-operations-page bdi, .ecommerce-operations-page [dir="ltr"] { unicode-bidi:isolate; }
 .ecommerce-operations-page :where(input,select,button) { text-align:start; }

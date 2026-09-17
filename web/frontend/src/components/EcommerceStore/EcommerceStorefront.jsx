@@ -15,7 +15,7 @@ import {
   fetchPublicEcommerceLoyalty,
 } from "../../services/ecommerceApi";
 import StorefrontSeo, { safePublicUrl } from "./StorefrontSeo";
-import { getResponsiveMediaProps } from "../../utils/media";
+import { getResponsiveMediaProps, isVideoMediaUrl, resolveMediaUrl } from "../../utils/media";
 import { normalizeStoreTheme } from "../../utils/ecommerceTheme";
 import { formatCommerceMoney, normalizeCommerceLocale } from "../../utils/commerceI18n";
 import { trackCommerceEvent, trackPurchaseOnce } from "../../services/commerceAnalytics";
@@ -58,7 +58,7 @@ const readThemePreview = () => {
 
 function ProductImage({ product, className = "", eager = false }) {
   const [failedSource, setFailedSource] = useState("");
-  const source = product?.images?.[0];
+  const source = product?.images?.find((item) => !isVideoMediaUrl(item));
   const mediaProps = getResponsiveMediaProps(source, { sizes: "(max-width: 700px) 100vw, 33vw" });
   if (source && mediaProps.src && failedSource !== mediaProps.src) {
     return <img className={className} {...mediaProps} alt={product.name} loading={eager ? "eager" : "lazy"} decoding="async" fetchPriority={eager ? "high" : "auto"} onError={() => setFailedSource(mediaProps.src)} />;
@@ -474,21 +474,24 @@ function CategoryList({ categories, activeSlug, onSelect }) {
 }
 
 function ProductGallery({ product }) {
-  const images = Array.isArray(product?.images) ? product.images.slice(0, 4) : [];
-  const [selectedImage, setSelectedImage] = useState("");
+  const media = Array.isArray(product?.images) ? product.images.slice(0, 10) : [];
+  const [selectedMedia, setSelectedMedia] = useState("");
 
-  if (!images.length) {
+  if (!media.length) {
     return <div className="live-store-detail-gallery"><div className="live-store-detail-main-image"><ProductImage product={product} /></div></div>;
   }
 
-  const activeImage = images.includes(selectedImage) ? selectedImage : images[0];
-  const selectedIndex = images.indexOf(activeImage);
+  const activeMedia = media.includes(selectedMedia) ? selectedMedia : media[0];
+  const selectedIndex = media.indexOf(activeMedia);
+  const activeUrl = resolveMediaUrl(activeMedia);
   return (
     <div className="live-store-detail-gallery">
       <div className="live-store-detail-main-image">
-        <img {...getResponsiveMediaProps(activeImage, { sizes: "(max-width: 760px) 100vw, 58vw" })} alt={`${product.name} ${selectedIndex + 1}`} />
+        {isVideoMediaUrl(activeMedia)
+          ? <video src={activeUrl} controls playsInline preload="metadata" aria-label={`${product.name} ${selectedIndex + 1}`} />
+          : <img {...getResponsiveMediaProps(activeMedia, { sizes: "(max-width: 760px) 100vw, 58vw" })} alt={`${product.name} ${selectedIndex + 1}`} decoding="async" />}
       </div>
-      {images.length > 1 && <div className="live-store-detail-thumbnails">{images.map((image, index) => <button type="button" className={index === selectedIndex ? "is-active" : ""} key={image} onClick={() => setSelectedImage(image)} aria-label={c("product.showImage", { count: index + 1 })}><img {...getResponsiveMediaProps(image, { fallbackWidth: 320, sizes: "120px" })} alt="" /></button>)}</div>}
+      {media.length > 1 && <div className="live-store-detail-thumbnails">{media.map((item, index) => { const video = isVideoMediaUrl(item); return <button type="button" className={index === selectedIndex ? "is-active" : ""} key={item} onClick={() => setSelectedMedia(item)} aria-label={c(video ? "product.showMedia" : "product.showImage", { count: index + 1 })}>{video ? <video src={resolveMediaUrl(item)} muted playsInline preload="metadata" /> : <img {...getResponsiveMediaProps(item, { fallbackWidth: 320, sizes: "120px" })} alt="" loading="lazy" decoding="async" />}</button>; })}</div>}
     </div>
   );
 }
@@ -522,7 +525,7 @@ function StoreProductDetail({ detail, locale, shopPath, onAdd }) {
         <div className="live-store-detail-price">{formatPrice(displayProduct.price, product.currency, locale)}</div>
         {displayProduct.compare_at_price && <del className="live-store-detail-compare-price">{formatPrice(displayProduct.compare_at_price, product.currency, locale)}</del>}
         {product.description && <p>{product.description}</p>}
-        {options.length > 0 && <div className="live-store-variant-options">{options.map((option) => <fieldset key={option.id}><legend>{option.name}{option.required ? " *" : ""}</legend><div>{option.values.map((value) => { const enabled = possible(option.id, value.id); return <button type="button" key={value.id} disabled={!enabled} className={selection[option.id] === value.id ? "is-active" : ""} onClick={() => setSelection((current) => ({ ...current, [option.id]: value.id }))}>{value.value}</button>; })}</div></fieldset>)}</div>}
+        {options.length > 0 && <div className="live-store-variant-options">{options.map((option) => <fieldset key={option.id}><legend>{option.name}{option.required ? " *" : ""}</legend><div>{option.values.map((value) => { const enabled = possible(option.id, value.id); return <button type="button" key={value.id} disabled={!enabled} className={`${selection[option.id] === value.id ? "is-active" : ""}${option.display_type === "color" ? " is-color" : ""}`} aria-label={value.value} aria-pressed={selection[option.id] === value.id} onClick={() => setSelection((current) => ({ ...current, [option.id]: value.id }))}>{option.display_type === "color" && value.color_hex && <span className="live-store-color-swatch" style={{ backgroundColor: value.color_hex }} aria-hidden="true" />}<span>{value.value}</span></button>; })}</div></fieldset>)}</div>}
         {options.length > 0 && !resolved && <p className="live-store-variant-help">{c("product.requiredHelp")}</p>}
         {resolved && <p className="live-store-variant-meta"><bdi>{c("common.sku")} {resolved.sku}</bdi> · {resolved.in_stock ? c("product.available") : c("product.outOfStock")}</p>}
         <button type="button" disabled={!canAdd} onClick={() => onAdd({ ...displayProduct, variant_id: resolved?.id, selected_options: selectedOptions })}><ShoppingBag size={18} />{canAdd ? c("product.addToCart") : resolved ? c("product.outOfStock") : options.length ? c("product.chooseOptions") : c("product.outOfStock")}</button>

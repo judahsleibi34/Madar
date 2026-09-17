@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, CheckCircle2, LoaderCircle, PackageCheck, RefreshCw, Search } from "lucide-react";
+import { ArrowLeft, CheckCircle2, PackageCheck, RefreshCw, Search } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 
 import AuthToast from "../AuthPages/AuthToast";
+import EcommerceOperationsSkeleton from "./EcommerceOperationsSkeleton";
 import { collectEcommerceOrderPayment, fetchEcommerceDeliveryAreas, fetchEcommerceOrder, fetchEcommerceOrders, transitionEcommerceOrder } from "../../services/ecommerceApi";
 
 import { useCommerceI18n } from "../../utils/commerceI18n";
@@ -19,7 +20,7 @@ const snapshotText = (snapshot, locale) => (snapshot?.items || []).map((entry) =
   return option && value ? `${option}: ${value}` : "";
 }).filter(Boolean).join(" · ");
 
-function OrderDetail({ orderId }) {
+function OrderDetail({ cacheScope, orderId }) {
   const { t, locale, direction, money, dateTime, status: statusLabel, payment: paymentLabel } = useCommerceI18n();
   const navigate = useNavigate();
   const [data, setData] = useState(null);
@@ -28,12 +29,12 @@ function OrderDetail({ orderId }) {
   const [toast, setToast] = useState(null);
   useEffect(() => {
     let cancelled = false;
-    fetchEcommerceOrder(orderId)
+    fetchEcommerceOrder(orderId, { scope: cacheScope })
       .then((result) => { if (!cancelled) setData(result); })
       .catch((error) => { if (!cancelled) setToast({ type: "error", title: t("errors.loadOrders"), message: error.message }); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [orderId, t]);
+  }, [cacheScope, orderId, t]);
   const act = async (action) => {
     setBusy(true);
     try {
@@ -43,7 +44,7 @@ function OrderDetail({ orderId }) {
     } catch (error) { setToast({ type: "error", title: t("errors.updateOrder"), message: error.message }); }
     finally { setBusy(false); }
   };
-  if (loading) return <main className="ecommerce-page ecommerce-operations-page" dir={direction}><div className="ecommerce-operations-state"><LoaderCircle className="is-spinning" />{t("merchant.loadingOrders")}</div></main>;
+  if (loading) return <main className="ecommerce-page ecommerce-operations-page" dir={direction} lang={locale}><EcommerceOperationsSkeleton variant="order-detail" label={t("merchant.loadingOrders")} /></main>;
   if (!data?.order) return <main className="ecommerce-page ecommerce-operations-page" dir={direction} lang={locale}><button onClick={() => navigate("/ecommerce/orders")}>{t("common.back")}</button><p>{t("admin.orderNotFound")}</p><AuthToast {...toast} /></main>;
   const { order, items = [], status_history: history = [] } = data;
   return (
@@ -84,7 +85,7 @@ function OrderDetail({ orderId }) {
   );
 }
 
-export default function EcommerceOrdersPage() {
+export default function EcommerceOrdersPage({ user }) {
   const location = useLocation();
   const { t, locale, direction, money, dateTime, status: statusLabel, payment: paymentLabel } = useCommerceI18n();
   const orderId = location.pathname.match(/\/ecommerce\/orders\/([^/]+)/)?.[1];
@@ -93,22 +94,23 @@ export default function EcommerceOrdersPage() {
   const [filters, setFilters] = useState({ order_number: "", customer_name: "", phone: "", status: "", payment_status: "", date_from: "", date_to: "", service_area_id: "" });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const cacheScope = user?.tenant_id || user?.id ? `commerce-${user?.tenant_id || user?.id}` : "authenticated";
   const query = useMemo(() => filters, [filters]);
-  const load = () => { setLoading(true); setError(""); fetchEcommerceOrders(query).then((result) => setOrders(result?.orders || [])).catch((failure) => setError(failure.message)).finally(() => setLoading(false)); };
+  const load = () => { setLoading(true); setError(""); fetchEcommerceOrders(query, { scope: cacheScope, force: true }).then((result) => setOrders(result?.orders || [])).catch((failure) => setError(failure.message)).finally(() => setLoading(false)); };
   useEffect(() => {
     let cancelled = false;
-    fetchEcommerceDeliveryAreas().then((result) => { if (!cancelled) setAreas(result?.areas || []); }).catch(() => {});
+    fetchEcommerceDeliveryAreas({ scope: cacheScope }).then((result) => { if (!cancelled) setAreas(result?.areas || []); }).catch(() => {});
     return () => { cancelled = true; };
-  }, []);
+  }, [cacheScope]);
   useEffect(() => {
     let cancelled = false;
-    fetchEcommerceOrders(query)
+    fetchEcommerceOrders(query, { scope: cacheScope })
       .then((result) => { if (!cancelled) setOrders(result?.orders || []); })
       .catch((failure) => { if (!cancelled) setError(failure.message); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [query]);
-  if (orderId) return <OrderDetail orderId={orderId} />;
+  }, [cacheScope, query]);
+  if (orderId) return <OrderDetail cacheScope={cacheScope} orderId={orderId} />;
   const update = (key, value) => setFilters((current) => ({ ...current, [key]: value }));
   return (
     <main className="ecommerce-page ecommerce-operations-page" dir={direction} lang={locale}>
@@ -120,7 +122,7 @@ export default function EcommerceOrdersPage() {
           <label><span>{t("admin.from")}</span><input aria-label={t("admin.ordersFrom")} type="date" value={filters.date_from} onChange={(event) => update("date_from", event.target.value)} /></label>
           <label><span>{t("admin.to")}</span><input aria-label={t("admin.ordersTo")} type="date" value={filters.date_to} onChange={(event) => update("date_to", event.target.value)} /></label>
         </div>
-        {loading ? <div className="ecommerce-operations-state"><LoaderCircle className="is-spinning" />{t("merchant.loadingOrders")}</div> : error ? <div className="ecommerce-operations-state is-error">{error}<button onClick={load}>{t("common.retry")}</button></div> : !orders.length ? <div className="ecommerce-operations-state">{t("merchant.noOrders")}</div> : <div className="ecommerce-orders-table" role="table">{orders.map((order) => <Link key={order.id} to={`/ecommerce/orders/${order.id}`} role="row"><span><strong dir="ltr">{order.order_number}</strong><small>{dateTime(order.created_at)}</small></span><span>{order.customer_name}<small dir="ltr">{order.customer_phone}</small></span><span>{locale === "ar" ? order.service_area_name_ar || order.service_area_name_en : order.service_area_name_en || order.service_area_name_ar}</span><span>{money(order.total, order.currency)}</span><span>{statusLabel(order.status)}</span><span>{paymentLabel(order.payment_status)}</span></Link>)}</div>}
+        {loading ? <EcommerceOperationsSkeleton variant="orders" label={t("merchant.loadingOrders")} /> : error ? <div className="ecommerce-operations-state is-error">{error}<button onClick={load}>{t("common.retry")}</button></div> : !orders.length ? <div className="ecommerce-operations-state">{t("merchant.noOrders")}</div> : <div className="ecommerce-orders-table" role="table">{orders.map((order) => <Link key={order.id} to={`/ecommerce/orders/${order.id}`} role="row"><span><strong dir="ltr">{order.order_number}</strong><small>{dateTime(order.created_at)}</small></span><span>{order.customer_name}<small dir="ltr">{order.customer_phone}</small></span><span>{locale === "ar" ? order.service_area_name_ar || order.service_area_name_en : order.service_area_name_en || order.service_area_name_ar}</span><span>{money(order.total, order.currency)}</span><span>{statusLabel(order.status)}</span><span>{paymentLabel(order.payment_status)}</span></Link>)}</div>}
       </section>
     </main>
   );

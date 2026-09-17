@@ -28,6 +28,16 @@ class InstalledLayoutRecoveryTests(unittest.TestCase):
             control = root / "control"
             shutil.copytree(WEB_ROOT / "deployment", control / "deployment")
             shutil.copytree(WEB_ROOT / "scripts", control / "deployment/scripts")
+            # Freeze this historical 096->099 recovery fixture independently of
+            # the current production-based 099->101 release contract.
+            metadata_path = control / "deployment/releases/release.json"
+            metadata = json.loads(metadata_path.read_text())
+            metadata["schema"].update(compatible_min=81, compatible_max=99, target=99,
+                                      rollback_compatible_min=81, rollback_compatible_max=98)
+            metadata["migration_manifest"] = "migrations-099.json"
+            metadata["notes"] = "Historical schema-096 to commercial schema-099 test fixture."
+            metadata_path.write_text(json.dumps(metadata), encoding="utf-8")
+
             runtime = root / "runtime"
             candidate = os.getenv("MADAR_REHEARSAL_CANDIDATE_SHA", "a" * 40)
             completed = subprocess.run(

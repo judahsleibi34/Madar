@@ -602,10 +602,10 @@ and leaves the schema unchanged. Its only purpose is restoring compatible
 application and fallback targets around an already-advanced database. See the
 dedicated recovery runbook for its distinct approval and interruption model.
 
-## Commercial access schema 099 bridge (2026-09-14)
+## Historical commercial access schema 099 bridge (2026-09-14)
 
-The current release manifest is `web/deployment/releases/migrations-099.json`.
-The application is compatible with schemas 081 through 099; the target is 099.
+The production-baseline release used `web/deployment/releases/migrations-099.json`.
+That release was compatible with schemas 081 through 099; its target was 099.
 The release manifest contains the contiguous 096→097→098→099 chain so a host
 that has not deployed the intervening mainline releases cannot skip their
 schema changes. Before the target exists, the commercial snapshot service
@@ -632,3 +632,57 @@ on a pinned disposable PostgreSQL image, runs concurrency/isolation tests and
 the exact RLS/grants verifier, and restores a dump containing commercial receipt,
 period, revision and audit records. It does not replace the required fresh
 production backup and Node 1 round-trip after deployment.
+
+
+## Current production-based forward schema-101 release
+
+The release base is `1e6b739a43759309a45ede2dff28a859209e4a64`, with
+production schema 099. All 198 migration files numbered 001 through 099 remain
+byte-identical to that baseline, including the original visit-counter migration
+098 and `099_commercial_access_ledger.sql`. The historical 004/005 mirror swap
+is retained. `production-001-099.json` pins every baseline file; migration
+validation rejects changes, replacements, deletions, and historical additions.
+
+The current manifest is `migrations-100-101.json`, ordered 099->100->101.
+Migration 100 replaces only `record_public_site_visit_safe`: null/invalid
+surfaces are rejected and the active tenant gate uses `lifecycle_state`.
+Counters, keys, RLS, and existing visit totals are retained. Migration 101 adds
+`display_type`, `color_hex`, their constraints, and the V2 variant aggregate
+RPC. Existing option rows default to text; existing swatches remain null.
+Product identity, SKU, inventory, order history, and the commercial financial
+ledger are preserved. Schema 099 identifies the commercial ledger; variant
+presentation requires schema 101, and color saves fail explicitly before its
+RPC exists while legacy text saves continue through the existing aggregate.
+
+The bridge remains compatible with schemas 081..101 for ordinary application
+behavior, but this migration manifest accepts only the production source 099
+through target 101. Its retained-release rollback range is 081..099. The
+source-099 release must be accepted before the governed source-schema-bound
+backup and locked forward execution. After advancement beyond a retained
+binary's range, recovery is forward-only. No older manifest is substituted to
+skip source-schema validation.
+
+Reconciliation requires an explicit manifest version (100, then 101), exact
+candidate SHA, canonical checksum/mirror, linked-project identity, live schema
+101, and exact serving identity/readiness. Each non-dry-run confirmation is
+`NNN:<manifest-sha256>`. Completed SQL execution uses its real execution record;
+a fresh later release accepted at 101 can use the canonical coordinator
+`already_at_target` record only with target acceptance evidence and no execution
+file. Reconciliation never manufactures execution evidence. Ordering, host lock,
+private atomic audits, audit identity/drift checks, and timestamp-preserving
+idempotent repeats remain mandatory.
+
+`check_forward_release.py` validates this current lineage, bridge, namespace,
+manifest ordering, and checksums. `rehearse_migration_101.py` uses only a new
+network-isolated PostgreSQL 17 container, restores a seeded source-099 custom
+dump, proves financial/counter/product/variant/order/inventory preservation,
+checks constraints and V2 atomic saves, and separately replays 001..101 fresh.
+It destroys only its own disposable target. Historical schema-096 recovery
+regressions retain an explicit historical 096->099 metadata fixture; they do
+not change the current 099->101 transition.
+
+Source qualification does not attest production configuration, an operational
+backup/off-host copy, live runtime acceptance, or a production ledger repair.
+Those operator gates remain separate; this candidate must qualify in an
+isolated environment with the canonical production migration lineage before
+any production action.

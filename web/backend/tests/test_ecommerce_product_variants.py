@@ -1,8 +1,10 @@
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from pydantic import ValidationError
 
+from routes import ecommerce_routes
 from routes.ecommerce_routes import ProductPayload
 from routes.public_site_routes import PublicStoreOrderCreate
 
@@ -10,6 +12,8 @@ from routes.public_site_routes import PublicStoreOrderCreate
 WEB_ROOT = Path(__file__).resolve().parents[2]
 MIGRATION = WEB_ROOT / "database" / "migrations" / "096_create_ecommerce_product_variants.sql"
 MIRROR = WEB_ROOT / "supabase" / "migrations" / "096_create_ecommerce_product_variants.sql"
+PRESENTATION_MIGRATION = WEB_ROOT / "database" / "migrations" / "101_add_variant_attribute_presentation.sql"
+PRESENTATION_MIRROR = WEB_ROOT / "supabase" / "migrations" / "101_add_variant_attribute_presentation.sql"
 PRODUCT_ID = "11111111-1111-1111-1111-111111111111"
 OPTION_ID = "22222222-2222-2222-2222-222222222222"
 VALUE_ID = "33333333-3333-3333-3333-333333333333"
@@ -39,6 +43,61 @@ class EcommerceProductVariantTests(unittest.TestCase):
         ))
         self.assertEqual(product.options[0].name_translations["en"], "Finish")
         self.assertEqual(product.variants[0].option_value_ids[0], product.options[0].values[0].id)
+        self.assertEqual(product.options[0].display_type, "text")
+        self.assertIsNone(product.options[0].values[0].color_hex)
+
+    def test_generic_color_presentation_requires_and_preserves_real_swatch(self):
+        product = ProductPayload(**product_payload(
+            options=[{"id": OPTION_ID, "code": "finish", "display_type": "color", "name_translations": {"en": "Finish", "ar": "التشطيب"}, "values": [
+                {"id": VALUE_ID, "code": "matte-red", "value_translations": {"en": "Matte red", "ar": "أحمر مطفي"}, "color_hex": "#E53935"},
+            ]}],
+            variants=[{"id": VARIANT_ID, "sku": "SHIRT-MATTE-RED", "option_value_ids": [VALUE_ID]}],
+        ))
+        self.assertEqual(product.options[0].display_type, "color")
+        self.assertEqual(product.options[0].values[0].color_hex, "#E53935")
+
+        with self.assertRaises(ValidationError):
+            ProductPayload(**product_payload(options=[{
+                "id": OPTION_ID, "code": "finish", "display_type": "color",
+                "name_translations": {"en": "Finish"},
+                "values": [{"id": VALUE_ID, "code": "matte", "value_translations": {"en": "Matte"}}],
+            }], variants=[]))
+
+    def test_color_metadata_is_sent_through_the_v2_aggregate_rpc(self):
+        product = ProductPayload(**product_payload(
+            options=[{"id": OPTION_ID, "code": "finish", "display_type": "color", "name_translations": {"en": "Finish"}, "values": [
+                {"id": VALUE_ID, "code": "red", "value_translations": {"en": "Red"}, "color_hex": "#E53935"},
+            ]}],
+            variants=[{"id": VARIANT_ID, "sku": "SHIRT-RED", "option_value_ids": [VALUE_ID]}],
+        ))
+
+        class Query:
+            def execute(self):
+                return type("Result", (), {"data": {"saved": True}})()
+
+        class Service:
+            def __init__(self):
+                self.calls = []
+
+            def rpc(self, name, params):
+                self.calls.append((name, params))
+                return Query()
+
+        service = Service()
+        with patch.object(ecommerce_routes, "service_supabase", service):
+            ecommerce_routes._save_product_aggregate(7, PRODUCT_ID, product)
+
+        self.assertEqual(service.calls[0][0], "save_ecommerce_product_aggregate_v2_safe")
+        option = service.calls[0][1]["p_options"][0]
+        self.assertEqual(option["display_type"], "color")
+        self.assertEqual(option["values"][0]["color_hex"], "#E53935")
+
+        with self.assertRaises(ValidationError):
+            ProductPayload(**product_payload(options=[{
+                "id": OPTION_ID, "code": "size", "display_type": "text",
+                "name_translations": {"en": "Size"},
+                "values": [{"id": VALUE_ID, "code": "s", "value_translations": {"en": "S"}, "color_hex": "#FFFFFF"}],
+            }], variants=[]))
 
     def test_duplicate_option_and_value_names_are_rejected(self):
         duplicate_options = [
@@ -98,6 +157,17 @@ class EcommerceProductVariantTests(unittest.TestCase):
         self.assertIn("set inventory_quantity=inventory_quantity+v_item.inventory_allocated_quantity", sql)
         self.assertIn("v_schema_version<>95", sql)
         self.assertIn("set schema_version = 96", sql)
+
+    def test_presentation_extension_is_mirrored_forward_only_and_wraps_atomic_save(self):
+        self.assertEqual(PRESENTATION_MIGRATION.read_bytes(), PRESENTATION_MIRROR.read_bytes())
+        sql = PRESENTATION_MIGRATION.read_text(encoding="utf-8").lower()
+        self.assertIn("add column display_type text not null default 'text'", sql)
+        self.assertIn("add column color_hex text", sql)
+        self.assertIn("save_ecommerce_product_aggregate_v2_safe", sql)
+        self.assertIn("perform public.save_ecommerce_product_aggregate_safe", sql)
+        self.assertIn("v_schema_version<>100", sql)
+        self.assertIn("schema_version=101", sql)
+        self.assertNotIn("drop table", sql)
 
 
 if __name__ == "__main__":

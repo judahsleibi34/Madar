@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
+  Archive,
   Boxes,
   CheckCircle2,
+  Clock3,
   FolderTree,
   ImagePlus,
   LoaderCircle,
@@ -9,12 +11,14 @@ import {
   Pencil,
   Plus,
   Search,
+  SlidersHorizontal,
   Tag,
   Trash2,
   X,
 } from "lucide-react";
 
 import AuthToast from "../AuthPages/AuthToast";
+import { EcommerceProductEditor } from "./EcommerceProductEditorPage";
 
 import {
   deleteEcommerceItem,
@@ -48,10 +52,30 @@ const SECTION_CONFIG = {
   },
 };
 
+const SUMMARY_VISIBILITY_STORAGE_KEY = "madar-ecommerce-summary-cards-v1";
+
+function readHiddenSummaryCards(storageKey) {
+  try {
+    const value = JSON.parse(window.localStorage.getItem(storageKey) || "[]");
+    return Array.isArray(value) ? value.filter((item) => typeof item === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
 const blankTranslations = () => ({
   en: { name: "", description: "" },
   ar: { name: "", description: "" },
 });
+
+function ecommerceSlug(value = "") {
+  return String(value)
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80);
+}
 
 function blankForm(section) {
   const shared = { slug: "", status: "", translations: blankTranslations() };
@@ -108,7 +132,7 @@ function translatedName(item, language = "en") {
 
 function payloadFromForm(section, form) {
   const shared = {
-    slug: form.slug.trim() || null,
+    slug: ecommerceSlug(form.slug || form.translations.en.name) || null,
     status: form.status,
     translations: {
       en: {
@@ -152,10 +176,28 @@ function payloadFromForm(section, form) {
   };
 }
 
-function TranslationFields({ form, setForm, descriptions = false, t }) {
+function AutoGrowingTextarea({ value, onChange, ...props }) {
+  const textareaRef = useRef(null);
+
+  useLayoutEffect(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    const minimumHeight = 48;
+    const maximumHeight = 144;
+    textarea.style.height = "auto";
+    const contentHeight = Math.max(textarea.scrollHeight, minimumHeight);
+    textarea.style.height = `${Math.min(contentHeight, maximumHeight)}px`;
+    textarea.style.overflowY = contentHeight > maximumHeight ? "auto" : "hidden";
+  }, [value]);
+
+  return <textarea ref={textareaRef} value={value} onChange={onChange} {...props} />;
+}
+
+function TranslationFields({ form, setForm, descriptions = false, autoGenerateSlug = false, t }) {
   const update = (locale, field, value) => {
     setForm((current) => ({
       ...current,
+      ...(autoGenerateSlug && locale === "en" && field === "name" ? { slug: ecommerceSlug(value) } : {}),
       translations: {
         ...current.translations,
         [locale]: { ...current.translations[locale], [field]: value },
@@ -164,8 +206,7 @@ function TranslationFields({ form, setForm, descriptions = false, t }) {
   };
 
   return (
-    <fieldset className="ecommerce-form-section">
-      <legend>{t("commerce:admin.translations")}</legend>
+    <fieldset className="ecommerce-form-section" aria-label={t("commerce:admin.translations")}>
       <div className="ecommerce-translation-grid">
         {[
           ["en", t("commerce:admin.english"), "ltr"],
@@ -185,10 +226,9 @@ function TranslationFields({ form, setForm, descriptions = false, t }) {
             {descriptions && (
               <label>
                 {t("commerce:admin.description")}
-                <textarea
+                <AutoGrowingTextarea
                   value={form.translations[locale].description}
                   onChange={(event) => update(locale, "description", event.target.value)}
-                  rows={4}
                   maxLength={10000}
                 />
               </label>
@@ -200,12 +240,12 @@ function TranslationFields({ form, setForm, descriptions = false, t }) {
   );
 }
 
-function CommonFields({ form, setForm, t }) {
+function CommonFields({ form, setForm, onSlugChange, t }) {
   return (
     <div className="ecommerce-field-grid">
       <label>
         {t("commerce:merchant.slug")}
-        <input value={form.slug} onChange={(event) => setForm({ ...form, slug: event.target.value })} required />
+        <input value={form.slug} onChange={(event) => { onSlugChange?.(); setForm((current) => ({ ...current, slug: event.target.value })); }} required />
       </label>
       <label>
         {t("commerce:common.status")}
@@ -400,6 +440,10 @@ export default function EcommercePage({ section = "products", user }) {
   const config = SECTION_CONFIG[section] || SECTION_CONFIG.products;
   const Icon = config.icon;
   const cacheScope = user?.id ? `user-${user.id}` : "authenticated";
+  const summaryStorageKey = `${SUMMARY_VISIBILITY_STORAGE_KEY}:${cacheScope}:${section}`;
+  const summaryCustomizerRef = useRef(null);
+  const [summaryCustomizerOpen, setSummaryCustomizerOpen] = useState(false);
+  const [hiddenSummaryCardIds, setHiddenSummaryCardIds] = useState(() => readHiddenSummaryCards(summaryStorageKey));
   const initialCatalogSnapshot = useMemo(() => readEcommerceCatalogCacheSnapshot(cacheScope), [cacheScope]);
   const [catalog, setCatalog] = useState(() => initialCatalogSnapshot?.catalog || { tags: [], categories: [], products: [], stock_summary: { low_stock: 0, out_of_stock: 0 } });
   const [status, setStatus] = useState(() => initialCatalogSnapshot ? "ready" : "loading");
@@ -408,8 +452,48 @@ export default function EcommercePage({ section = "products", user }) {
   const [stockFilter, setStockFilter] = useState("all");
   const [form, setForm] = useState(() => blankForm(section));
   const [formOpen, setFormOpen] = useState(false);
+  const [productEditorOpen, setProductEditorOpen] = useState(false);
+  const [slugManuallyEdited, setSlugManuallyEdited] = useState(false);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState(null);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(summaryStorageKey, JSON.stringify(hiddenSummaryCardIds));
+    } catch {
+      // Keep the current selection for this session if storage is unavailable.
+    }
+  }, [hiddenSummaryCardIds, summaryStorageKey]);
+
+  useEffect(() => {
+    if (!summaryCustomizerOpen) return undefined;
+    const closeOnOutsidePress = (event) => {
+      if (!summaryCustomizerRef.current?.contains(event.target)) setSummaryCustomizerOpen(false);
+    };
+    const closeOnEscape = (event) => {
+      if (event.key === "Escape") setSummaryCustomizerOpen(false);
+    };
+    document.addEventListener("pointerdown", closeOnOutsidePress);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutsidePress);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [summaryCustomizerOpen]);
+
+  useEffect(() => {
+    if (!productEditorOpen) return undefined;
+    const previousOverflow = document.body.style.overflow;
+    const closeOnEscape = (event) => {
+      if (event.key === "Escape") setProductEditorOpen(false);
+    };
+    document.body.style.overflow = "hidden";
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [productEditorOpen]);
 
   const showToast = useCallback(({ type = "error", title, message }) => {
     setToast({ id: Date.now(), type, title, message });
@@ -456,11 +540,13 @@ export default function EcommercePage({ section = "products", user }) {
   const openCreate = () => {
     setEditing(null);
     setForm(blankForm(section));
+    setSlugManuallyEdited(false);
     setFormOpen(true);
   };
   const openEdit = (item) => {
     setEditing(item);
     setForm(itemToForm(section, item));
+    setSlugManuallyEdited(true);
     setFormOpen(true);
   };
   const closeForm = () => { if (!saving) setFormOpen(false); };
@@ -535,10 +621,29 @@ export default function EcommercePage({ section = "products", user }) {
   };
   const activeCount = items.filter((item) => item.status === "active").length;
   const inactiveCount = items.filter((item) => item.status === "inactive").length;
+  const draftCount = items.filter((item) => item.status === "draft").length;
+  const archivedCount = items.filter((item) => item.status === "archived").length;
   const stockSummary = catalog.stock_summary || {};
   const lowStockCount = Number(stockSummary.low_stock ?? items.reduce((count, item) => count + Number(item.low_stock_count || 0), 0));
   const outOfStockCount = Number(stockSummary.out_of_stock ?? items.reduce((count, item) => count + Number(item.out_of_stock_count || 0), 0));
   const sectionKey = section === "categories" ? "categories" : section === "tags" ? "tags" : "products";
+  const summaryCards = [
+    { id: "total", label: t(`dashboard:ecommercePages.${sectionKey}.totalLabel`), value: items.length, icon: Icon },
+    { id: "draft", label: t("commerce:common.draft"), value: draftCount, icon: Clock3 },
+    { id: "active", label: t("commerce:common.active"), value: activeCount, icon: CheckCircle2 },
+    { id: "inactive", label: t("commerce:common.inactive"), value: inactiveCount, icon: Boxes },
+    { id: "archived", label: t("commerce:common.archived"), value: archivedCount, icon: Archive },
+    ...(section === "products" ? [
+      { id: "low-stock", label: t("commerce:merchant.lowStock"), value: lowStockCount, icon: Package },
+      { id: "out-of-stock", label: t("commerce:merchant.outOfStock"), value: outOfStockCount, icon: Boxes },
+    ] : []),
+  ];
+  const visibleSummaryCards = summaryCards.filter((card) => !hiddenSummaryCardIds.includes(card.id));
+  const toggleSummaryCard = (cardId) => {
+    setHiddenSummaryCardIds((current) => (
+      current.includes(cardId) ? current.filter((id) => id !== cardId) : [...current, cardId]
+    ));
+  };
 
   if (status === "loading") {
     return <section className="ecommerce-page"><EcommercePageSkeleton label={t("commerce:admin.loadingCatalog")} /></section>;
@@ -551,27 +656,50 @@ export default function EcommercePage({ section = "products", user }) {
           <h1 id={`ecommerce-${section}-title`}>{t(`dashboard:ecommercePages.${sectionKey}.title`)}</h1>
           <p>{t(`dashboard:ecommercePages.${sectionKey}.description`)}</p>
         </div>
-        <button type="button" className="ecommerce-primary-button" onClick={openCreate}><Plus size={18} />{t("commerce:admin.add", { item: t(`commerce:admin.${sectionKey}Singular`) })}</button>
-        {section === "products" && <a className="ecommerce-secondary-button" href="/ecommerce/products/new">{t("commerce:admin.fullProductEditor")}</a>}
+        {section !== "products" && <button type="button" className="ecommerce-primary-button" onClick={openCreate}><Plus size={18} />{t("commerce:admin.add", { item: t(`commerce:admin.${sectionKey}Singular`) })}</button>}
+        {section === "products" && <button type="button" className="ecommerce-primary-button" onClick={() => setProductEditorOpen(true)}><Plus size={18} />{t("commerce:admin.add", { item: t("commerce:admin.productsSingular") })}</button>}
       </header>
 
+      <div className="ecommerce-summary-toolbar">
+        <div className="ecommerce-summary-customizer" ref={summaryCustomizerRef}>
+          <button type="button" className="ecommerce-summary-customizer-toggle" aria-expanded={summaryCustomizerOpen} aria-controls="ecommerce-summary-card-checklist" onClick={() => setSummaryCustomizerOpen((current) => !current)}>
+            <SlidersHorizontal size={18} aria-hidden="true" />
+            <span>{t(`commerce:admin.customize${sectionKey[0].toUpperCase() + sectionKey.slice(1)}Cards`)}</span>
+          </button>
+          {summaryCustomizerOpen && (
+            <div className="ecommerce-summary-customizer-menu" id="ecommerce-summary-card-checklist">
+              <header><div><strong>{t(`commerce:admin.${sectionKey}Cards`)}</strong><span>{t("commerce:admin.chooseCards", { defaultValue: "Choose what you want to see" })}</span></div><button type="button" className="ecommerce-summary-customizer-reset" onClick={() => setHiddenSummaryCardIds([])} disabled={!hiddenSummaryCardIds.length}>{t("commerce:admin.showAll", { defaultValue: "Show all" })}</button></header>
+              <div className="ecommerce-summary-customizer-list">
+                {summaryCards.map((card) => <label key={card.id}><input type="checkbox" checked={!hiddenSummaryCardIds.includes(card.id)} onChange={() => toggleSummaryCard(card.id)} /><span>{card.label}</span></label>)}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
       <div className="ecommerce-summary-grid" aria-label={t("dashboard:ecommercePages.overview")}>
-        {[[t(`dashboard:ecommercePages.${sectionKey}.totalLabel`), items.length, Icon], [t("commerce:common.active"), activeCount, CheckCircle2], [t("commerce:common.inactive"), inactiveCount, Boxes],
-          ...(section === "products" ? [[t("commerce:merchant.lowStock"), lowStockCount, Package], [t("commerce:merchant.outOfStock"), outOfStockCount, Boxes]] : [])].map(([label, value, SummaryIcon]) => (
-          <article className="ecommerce-summary-card" key={label}><span className="ecommerce-summary-icon"><SummaryIcon size={20} /></span><div><strong>{value}</strong><span>{label}</span></div></article>
+        {visibleSummaryCards.map(({ id, label, value, icon: SummaryIcon }) => (
+          <article className="ecommerce-summary-card" key={id}><span className="ecommerce-summary-icon"><SummaryIcon size={20} /></span><div><span>{label}</span><strong>{value}</strong></div></article>
         ))}
+        {!visibleSummaryCards.length && <p className="ecommerce-summary-empty">{t("commerce:admin.noCardsSelected", { defaultValue: "No cards selected. Use Customize cards to add them." })}</p>}
       </div>
 
       <section className="ecommerce-list-card" aria-labelledby={`ecommerce-${section}-list-title`}>
         <header className="ecommerce-list-header">
-          <div><h2 id={`ecommerce-${section}-list-title`}>{t("commerce:admin.manage", { items: t(`dashboard:ecommercePages.${sectionKey}.title`) })}</h2></div>
-          <label className="ecommerce-search"><Search size={17} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("commerce:admin.search", { items: t(`dashboard:ecommercePages.${sectionKey}.title`) })} /></label>
-        {section === "products" && <div className="ecommerce-stock-filters" role="group" aria-label={t("commerce:admin.stockFilter")}>
-          {["all", "low_stock", "out_of_stock"].map((value) => <button type="button" key={value} className={stockFilter === value ? "is-active" : ""} aria-pressed={stockFilter === value} onClick={() => setStockFilter(value)}>
-            {value === "all" ? t("commerce:merchant.allStock") : value === "low_stock" ? t("commerce:merchant.lowStock") : t("commerce:merchant.outOfStock")}
-          </button>)}
-        </div>}
-
+          <div className="ecommerce-list-heading">
+            <h2 id={`ecommerce-${section}-list-title`}>{t("commerce:admin.manage", { items: t(`dashboard:ecommercePages.${sectionKey}.title`) })}</h2>
+            {section === "products" && <div className="ecommerce-stock-filter-panel">
+              <span className="ecommerce-stock-filter-label"><SlidersHorizontal size={15} aria-hidden="true" />{t("commerce:admin.stockFilter")}</span>
+              <div className="ecommerce-stock-filters" role="group" aria-label={t("commerce:admin.stockFilter")}>
+                {["all", "low_stock", "out_of_stock"].map((value) => <button type="button" key={value} className={stockFilter === value ? "is-active" : ""} aria-pressed={stockFilter === value} onClick={() => setStockFilter(value)}>
+                  {value === "all" ? t("commerce:merchant.allStock") : value === "low_stock" ? t("commerce:merchant.lowStock") : t("commerce:merchant.outOfStock")}
+                </button>)}
+              </div>
+            </div>}
+          </div>
+          <div className="ecommerce-list-controls">
+            <label className="ecommerce-search"><Search size={17} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("commerce:admin.search", { items: t(`dashboard:ecommercePages.${sectionKey}.title`) })} /></label>
+          </div>
         </header>
 
         {filteredItems.length === 0 ? (
@@ -587,7 +715,7 @@ export default function EcommercePage({ section = "products", user }) {
                   <div className="ecommerce-record-main"><strong>{translatedName(item, language)}</strong><span>{section === "products" ? <><bdi>{item.sku}</bdi> · <bdi>{formatCommerceMoney(item.price, item.currency, language)}</bdi></> : item.slug}</span>{section === "products" && <span className={`ecommerce-stock-indicator is-${commerceProductStock(item).state}`}>{t(`commerce:stock.${commerceProductStock(item).state}`)}{item.options?.length ? ` · ${t("commerce:admin.variantStockCounts", { low: item.low_stock_count || 0, out: item.out_of_stock_count || 0 })}` : ""}</span>}</div>
                   <div className="ecommerce-record-meta">{parent ? t("commerce:admin.under", { name: translatedName(parent, language) }) : category ? translatedName(category, language) : section === "categories" ? t("commerce:admin.topLevel") : ""}</div>
                   <span className={`ecommerce-status is-${item.status}`}>{t(`commerce:status.${item.status}`, { defaultValue: item.status })}</span>
-                  <div className="ecommerce-record-actions">{section === "products" && <a href={`/ecommerce/products/${item.id}/edit`} aria-label={t("commerce:admin.openEditor", { name: translatedName(item, language) })}><Pencil size={16} /></a>}<button type="button" onClick={() => openEdit(item)} aria-label={t("commerce:admin.quickEdit", { name: translatedName(item, language) })}><Pencil size={16} /></button><button type="button" onClick={() => remove(item)} aria-label={t("commerce:admin.delete", { name: translatedName(item, language) })}><Trash2 size={16} /></button></div>
+                  <div className="ecommerce-record-actions">{section === "products" ? <a href={`/ecommerce/products/${item.id}/edit`} aria-label={t("commerce:admin.openEditor", { name: translatedName(item, language) })}><Pencil size={16} /></a> : <button type="button" onClick={() => openEdit(item)} aria-label={t("commerce:admin.quickEdit", { name: translatedName(item, language) })}><Pencil size={16} /></button>}<button type="button" onClick={() => remove(item)} aria-label={t("commerce:admin.delete", { name: translatedName(item, language) })}><Trash2 size={16} /></button></div>
                 </article>
               );
             })}
@@ -600,12 +728,29 @@ export default function EcommercePage({ section = "products", user }) {
           <section className="ecommerce-modal" role="dialog" aria-modal="true" aria-labelledby="ecommerce-form-title">
             <header><div><span>{editing ? t("commerce:admin.edit") : t("commerce:admin.create")}</span><h2 id="ecommerce-form-title">{editing ? t("commerce:admin.editItem", { item: t(`commerce:admin.${sectionKey}Singular`) }) : t("commerce:admin.newItem", { item: t(`commerce:admin.${sectionKey}Singular`) })}</h2></div><button type="button" onClick={closeForm} aria-label={t("commerce:admin.close")}><X size={20} /></button></header>
             <form onSubmit={submit} noValidate>
-              <TranslationFields form={form} setForm={setForm} descriptions={section !== "tags"} t={t} />
-              {section === "tags" && <CommonFields form={form} setForm={setForm} t={t} />}
-              {section === "categories" && <><CommonFields form={form} setForm={setForm} t={t} /><fieldset className="ecommerce-form-section"><legend>{t("commerce:admin.hierarchy")}</legend><div className="ecommerce-field-grid"><label>{t("commerce:admin.parentCategory")}<select value={form.parent_id || ""} onChange={(event) => setForm({ ...form, parent_id: event.target.value })}><option value="">{t("commerce:admin.topLevel")}</option>{catalog.categories.filter((category) => category.id !== editing?.id).map((category) => <option key={category.id} value={category.id}>{translatedName(category, language)}</option>)}</select></label><label><span>{t("commerce:admin.displayPosition")}</span><input type="number" min="0" step="1" inputMode="numeric" value={form.sort_order} required aria-label={t("commerce:admin.displayPosition")} aria-describedby="category-display-position-help" onChange={(event) => setForm({ ...form, sort_order: event.target.value })} /><small id="category-display-position-help" className="ecommerce-field-help">{t("commerce:admin.displayOrderHelp")}</small></label></div></fieldset></>}
+              <TranslationFields form={form} setForm={setForm} descriptions={section !== "tags"} autoGenerateSlug={!editing && !slugManuallyEdited} t={t} />
+              {section === "tags" && <CommonFields form={form} setForm={setForm} onSlugChange={() => setSlugManuallyEdited(true)} t={t} />}
+              {section === "categories" && <><CommonFields form={form} setForm={setForm} onSlugChange={() => setSlugManuallyEdited(true)} t={t} /><fieldset className="ecommerce-form-section ecommerce-hierarchy-section" aria-label={t("commerce:admin.hierarchy")}><small id="category-display-position-help" className="ecommerce-field-help">{t("commerce:admin.displayOrderHelp")}</small><div className="ecommerce-field-grid"><label>{t("commerce:admin.parentCategory")}<select value={form.parent_id || ""} onChange={(event) => setForm({ ...form, parent_id: event.target.value })}><option value="">{t("commerce:admin.topLevel")}</option>{catalog.categories.filter((category) => category.id !== editing?.id).map((category) => <option key={category.id} value={category.id}>{translatedName(category, language)}</option>)}</select></label><label><span>{t("commerce:admin.displayPosition")}</span><input type="number" min="0" step="1" inputMode="numeric" value={form.sort_order} required aria-label={t("commerce:admin.displayPosition")} aria-describedby="category-display-position-help" onChange={(event) => setForm({ ...form, sort_order: event.target.value })} /></label></div></fieldset></>}
               {section === "products" && <><div className="ecommerce-field-grid"><label>{t("commerce:merchant.slug")}<input value={form.slug} onChange={(event) => setForm({ ...form, slug: event.target.value })} required /></label></div><ProductFields form={form} setForm={setForm} catalog={catalog} t={t} language={language} /></>}
               <footer><button type="button" className="ecommerce-secondary-button" onClick={closeForm}>{t("commerce:common.cancel")}</button><button type="submit" className="ecommerce-primary-button" disabled={saving}>{saving && <LoaderCircle size={17} className="is-spinning" />}{saving ? t("commerce:merchant.saving") : t("commerce:common.save")}</button></footer>
             </form>
+          </section>
+        </div>
+      )}
+      {productEditorOpen && (
+        <div className="ecommerce-product-editor-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setProductEditorOpen(false); }}>
+          <section className="ecommerce-product-editor-modal" role="dialog" aria-modal="true" aria-label={t("commerce:merchant.newProduct")}>
+            <button type="button" className="ecommerce-product-editor-modal-close" onClick={() => setProductEditorOpen(false)} aria-label={t("commerce:admin.close")}><X size={20} /></button>
+            <EcommerceProductEditor
+              user={user}
+              embedded
+              initialCatalog={catalog}
+              onClose={() => setProductEditorOpen(false)}
+              onSaved={() => {
+                setProductEditorOpen(false);
+                void loadCatalog();
+              }}
+            />
           </section>
         </div>
       )}

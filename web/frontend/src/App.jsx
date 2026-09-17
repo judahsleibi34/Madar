@@ -3,12 +3,14 @@ import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
 import ScrollToTop from "./components/DashboardBuilder/ScrollToTop";
+import EcommerceRouteSkeleton from "./components/DashboardBuilder/EcommerceRouteSkeleton";
 import PageSkeleton from "./components/common/PageSkeleton";
 import RouteErrorBoundary from "./components/common/RouteErrorBoundary";
 import RouteSuspense from "./components/common/RouteSuspense";
 import { appShellContent } from "./content";
 import { getCurrentLanguage, setAppLanguage } from "./i18n/language";
 import { DashboardLoadingElement } from "./routes/shared";
+import UserWorkspaceRoutes from "./routes/UserWorkspaceRoutes";
 import { getRouteErrorSurface } from "./routes/routeErrorSurface";
 import {
   getSafePostLoginPath,
@@ -40,7 +42,6 @@ const API_URL = import.meta.env.VITE_API_URL || "/api";
 const AdminRoutes = lazy(() => import("./routes/AdminRoutes"));
 const PublicRoutes = lazy(() => import("./routes/PublicRoutes"));
 const TenantSiteRoutes = lazy(() => import("./routes/TenantSiteRoutes"));
-const UserWorkspaceRoutes = lazy(() => import("./routes/UserWorkspaceRoutes"));
 
 let authBootstrapPromise = null;
 
@@ -61,6 +62,7 @@ export default function App() {
   const isAdminUser = normalizedUserType === "admin";
   const isTenantSiteRoute = isTenantSiteRoutePath(location.pathname);
   const isDashboardRoute = isDashboardRoutePath(location.pathname);
+  const isEcommerceRoute = location.pathname.startsWith("/ecommerce");
   const errorSurface = getRouteErrorSurface(location.pathname, { isAdminUser });
   const weeklyScreenTimeSeconds = useWeeklyScreenTime(isLoggedIn ? user : null);
 
@@ -622,7 +624,28 @@ export default function App() {
     settings: t("dashboard:loading.settings"),
   };
 
-  const routeFallback = isDashboardRoute ? (
+  const shellProps = {
+    closeMenuLabel: t("common:navigation.closeMenu"),
+    lang,
+    onLanguageChange: handleLanguageChange,
+    onLogout: handleLogout,
+    onNavigate: () => setDashboardSidebarOpen(false),
+    onSidebarToggle: () => setDashboardSidebarOpen((open) => !open),
+    onThemeModeChange: handleThemeModeChange,
+    open: dashboardSidebarOpen,
+    openMenuLabel: t("common:navigation.openMenu"),
+    themeMode,
+    user,
+  };
+
+  const ecommerceLoadingFallback = (
+    <EcommerceRouteSkeleton
+      pathname={location.pathname}
+      label={t("common:actions.loading")}
+    />
+  );
+
+  const routeFallback = isEcommerceRoute ? ecommerceLoadingFallback : isDashboardRoute ? (
     <DashboardLoadingElement
       pathname={location.pathname}
       labels={dashboardLoadingLabels}
@@ -638,27 +661,13 @@ export default function App() {
     <PageSkeleton label={t("common:actions.loading")} lang={lang} variant="public-page" />
   );
 
-  const shellProps = {
-    closeMenuLabel: t("common:navigation.closeMenu"),
-    lang,
-    onLanguageChange: handleLanguageChange,
-    onLogout: handleLogout,
-    onNavigate: () => setDashboardSidebarOpen(false),
-    onSidebarToggle: () => setDashboardSidebarOpen((open) => !open),
-    onThemeModeChange: handleThemeModeChange,
-    open: dashboardSidebarOpen,
-    openMenuLabel: t("common:navigation.openMenu"),
-    themeMode,
-    user,
-  };
-
   let routeContent;
 
   if (isTenantSiteRoute) {
     routeContent = <TenantSiteRoutes />;
   } else if (isDashboardRoute) {
     if (!authChecked) {
-      routeContent = (
+      routeContent = isEcommerceRoute ? ecommerceLoadingFallback : (
         <DashboardLoadingElement
           pathname={location.pathname}
           labels={dashboardLoadingLabels}
@@ -713,7 +722,7 @@ export default function App() {
   return (
     <>
       <ScrollToTop />
-      <RouteSuspense fallback={routeFallback} lang={lang} variant="public-page" delay={isTenantSiteRoute ? 0 : undefined}>
+      <RouteSuspense fallback={routeFallback} lang={lang} variant="public-page" delay={isTenantSiteRoute || isEcommerceRoute ? 0 : undefined}>
         <RouteErrorBoundary
           key={errorSurface}
           surface={errorSurface}

@@ -2,10 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 import { LoaderCircle, MapPin, RotateCcw, Save, Search } from "lucide-react";
 
 import AuthToast from "../AuthPages/AuthToast";
+import EcommerceOperationsSkeleton from "./EcommerceOperationsSkeleton";
 import { fetchEcommerceDeliveryAreas, saveEcommerceDeliveryAreas } from "../../services/ecommerceApi";
 import { useCommerceI18n } from "../../utils/commerceI18n";
 
-export default function EcommerceDeliveryPage() {
+export default function EcommerceDeliveryPage({ user }) {
   const { t, locale, direction } = useCommerceI18n();
   const [areas, setAreas] = useState([]);
   const [savedIds, setSavedIds] = useState([]);
@@ -14,10 +15,11 @@ export default function EcommerceDeliveryPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState(null);
+  const cacheScope = user?.tenant_id || user?.id ? `commerce-${user?.tenant_id || user?.id}` : "authenticated";
 
   const load = () => {
     setLoading(true);
-    fetchEcommerceDeliveryAreas()
+    fetchEcommerceDeliveryAreas({ scope: cacheScope, force: true })
       .then((result) => {
         const nextAreas = result?.areas || [];
         const enabled = nextAreas.filter((area) => area.enabled).map((area) => area.id);
@@ -31,7 +33,7 @@ export default function EcommerceDeliveryPage() {
 
   useEffect(() => {
     let cancelled = false;
-    fetchEcommerceDeliveryAreas()
+    fetchEcommerceDeliveryAreas({ scope: cacheScope })
       .then((result) => {
         if (cancelled) return;
         const nextAreas = result?.areas || [];
@@ -43,7 +45,7 @@ export default function EcommerceDeliveryPage() {
       .catch((error) => { if (!cancelled) setToast({ type: "error", title: t("admin.loadDelivery"), message: error.message }); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [t]);
+  }, [cacheScope, t]);
   const dirty = useMemo(() => [...selectedIds].sort().join() !== [...savedIds].sort().join(), [selectedIds, savedIds]);
   useEffect(() => {
     if (!dirty) return undefined;
@@ -61,7 +63,7 @@ export default function EcommerceDeliveryPage() {
   const save = async () => {
     setSaving(true);
     try {
-      await saveEcommerceDeliveryAreas(selectedIds);
+      await saveEcommerceDeliveryAreas(selectedIds, { scope: cacheScope });
       setSavedIds(selectedIds);
       setToast({ type: "success", title: t("admin.deliverySaved"), message: t("admin.deliverySavedBody", { count: selectedIds.length }) });
     } catch (error) {
@@ -86,7 +88,7 @@ export default function EcommerceDeliveryPage() {
           <label><Search size={17} /><input aria-label={t("merchant.searchAreas")} value={search} onChange={(event) => setSearch(event.target.value)} placeholder={t("merchant.searchAreas")} /></label>
           <strong>{t("merchant.enabledCount", { count: selectedIds.length })}</strong>
         </div>
-        {loading ? <div className="ecommerce-operations-state" role="status"><LoaderCircle className="is-spinning" />{t("admin.loadingDelivery")}</div> : (
+        {loading ? <EcommerceOperationsSkeleton variant="delivery" label={t("admin.loadingDelivery")} /> : (
           <div className="ecommerce-delivery-grid">
             {visible.map((area) => (
               <label key={area.id} className={selectedIds.includes(area.id) ? "is-enabled" : ""}>

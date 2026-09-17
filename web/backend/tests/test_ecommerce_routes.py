@@ -143,23 +143,23 @@ class EcommerceRoutesTests(unittest.TestCase):
             )
 
 
-    def test_product_accepts_up_to_four_managed_images_from_its_workspace(self):
-        images = [
-            f"/uploads/tenant_7/builder_assets/{index:032x}.webp"
-            for index in range(1, 5)
+    def test_product_accepts_up_to_ten_managed_media_from_its_workspace(self):
+        media = [
+            f"/uploads/tenant_7/builder_assets/{index:032x}.{'mp4' if index == 10 else 'webp'}"
+            for index in range(1, 11)
         ]
-        payload = ProductPayload(translations=translations(), images=images)
+        payload = ProductPayload(translations=translations(), images=media)
 
         with patch("routes.ecommerce_routes._store_currency_for_tenant", return_value=None):
             data, _tag_ids = _product_data(payload, type("Context", (), {"tenant_id": 7})())
 
-        self.assertEqual(data["images"], images)
+        self.assertEqual(data["images"], media)
 
-    def test_product_rejects_more_than_four_images(self):
+    def test_product_rejects_more_than_ten_media_items(self):
         with self.assertRaises(ValidationError):
             ProductPayload(
                 translations=translations(),
-                images=[f"https://example.com/{index}.webp" for index in range(5)],
+                images=[f"https://example.com/{index}.webp" for index in range(11)],
             )
 
     def test_product_rejects_another_workspaces_managed_image(self):
