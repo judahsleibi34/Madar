@@ -1,9 +1,0 @@
-{
-  "reports": {
-    "createReport": "إنشاء تقرير",
-    "reportBuilder": "منشئ التقارير"
-  },
-  "workspace": {
-    "loading": "جار تحميل مساحة تحليل البيانات"
-  }
-}
