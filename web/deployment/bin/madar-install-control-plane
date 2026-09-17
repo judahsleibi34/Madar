@@ -50,7 +50,9 @@ declare -a tracked_files=(
   lib/control_plane_upgrade_authorization.py
   lib/migration_executor.py
   lib/release_deployer.py
+  lib/runtime_authority.py
   releases/release.json
+  releases/schema-96-recovery.json
   proxy/docker-compose.yml
   proxy/nginx.conf
 )
@@ -67,6 +69,19 @@ declare -a units=(
   madar-auto-deploy.timer
   madar-release-proxy.service
   madar-ops-alert@.service
+  madar-backup.service
+  madar-backup.timer
+  madar-backup-verify.service
+  madar-backup-verify.timer
+  madar-node1-backup.service
+  madar-node1-backup.timer
+  madar-offhost-backup.service
+  madar-offhost-backup.timer
+)
+declare -a backup_scripts=(
+  backup_madar.sh verify_backup.sh verify_latest_backup.sh backup_support.py
+  replicate_latest_node1.py replicate_latest_offhost.sh replicate_backup_offhost.sh
+  restore_madar.sh rehearse_backup.py
 )
 
 [[ $EUID -eq 0 ]] || { echo "control-plane installer requires root" >&2; exit 1; }
@@ -127,6 +142,20 @@ if [[ -d "$backup_root" && -n "$(find "$backup_root" -mindepth 1 -maxdepth 1 -pr
   exit 1
 fi
 
+# Timers must be quiesced by the governed upgrader before operational files
+# change. Never interrupt a running backup, verification, or replication.
+for name in madar-backup madar-backup-verify madar-node1-backup madar-offhost-backup; do
+  if systemctl is-active --quiet "$name.timer" || systemctl is-active --quiet "$name.service"; then
+    echo "backup operations must be quiesced before installation: $name" >&2
+    exit 1
+  fi
+done
+for script in "${backup_scripts[@]}"; do
+  [[ -f "$web_root/scripts/$script" && ! -L "$web_root/scripts/$script" ]] || {
+    echo "canonical backup helper missing or symlinked: $script" >&2; exit 1;
+  }
+done
+
 if (( ! apply )); then
   printf 'control-plane static preflight PASS\n'
   printf 'would install immutable Madar control plane under %s\n' "$install_root"
@@ -166,6 +195,14 @@ for specification in \
     cp -a -- "$current" "$backup_root/$backup_name"
   fi
 done
+for script in "${backup_scripts[@]}"; do
+  current="/usr/local/lib/madar/$script"
+  if [[ -e "$current" ]]; then cp -a -- "$current" "$backup_root/$script"; fi
+done
+for unit in "${units[@]}"; do
+  current="/etc/systemd/system/$unit"
+  if [[ -e "$current" ]]; then cp -a -- "$current" "$backup_root/$unit"; fi
+done
 (
   cd -- "$backup_root"
   find . -mindepth 1 -type f ! -name SHA256SUMS -print0 \
@@ -198,7 +235,7 @@ for relative in "${tracked_files[@]}"; do
   install -D -o root -g root -m "$mode" "$source_path" "$stage_root/$relative"
 done
 install -d -o root -g madar -m 0750 "$stage_root/scripts"
-for script in backup_madar.sh verify_backup.sh; do
+for script in "${backup_scripts[@]}"; do
   install -o root -g root -m 0755 \
     "$web_root/scripts/$script" "$stage_root/scripts/$script"
 done
@@ -245,11 +282,19 @@ else
   mv -T -- "$stage_root" "$install_root"
 fi
 trap - EXIT
+for script in "${backup_scripts[@]}"; do
+  install -o root -g root -m 0755 "$web_root/scripts/$script" "/usr/local/lib/madar/$script"
+  cmp --silent "$web_root/scripts/$script" "/usr/local/lib/madar/$script"
+done
+# Application-owned nonsecret state, created without root write authority over
+# an application-owned path. Backups themselves stay private mode 0700.
+runuser -u madar -- /usr/bin/python3 -I -c 'from pathlib import Path; p=Path("/var/lib/madar/backup-state"); assert not p.is_symlink(); p.mkdir(mode=0o755,exist_ok=True); p.chmod(0o755)'
 install -o root -g root -m 0755 \
   "$alert_hook_source" /usr/local/lib/madar/madar_alert_hook.sh
 for unit in "${units[@]}"; do
   install -o root -g root -m 0644 \
     "$deployment_root/systemd/$unit" "/etc/systemd/system/$unit"
+  cmp --silent "$deployment_root/systemd/$unit" "/etc/systemd/system/$unit"
 done
 
 # Install the next-invocation bootstrap wrapper only after the controller tree

@@ -14,7 +14,10 @@ UPGRADE_INTERLOCK = Path("/run/madar/control-plane-upgrade/in-progress.json")
 
 
 def require_upgrade_authorization(
-    sha: str | None, *, interlock: Path = UPGRADE_INTERLOCK
+    sha: str | None, *, interlock: Path = UPGRADE_INTERLOCK,
+    required_operation: str | None = None,
+    required_schema: int | None = None,
+    require_rehearsal: bool = False,
 ) -> None:
     """Reject deployment races while a root upgrader owns orchestration.
 
@@ -23,6 +26,8 @@ def require_upgrade_authorization(
     one-way digest, never the bearer token.
     """
 
+    if not interlock.exists() and required_operation is not None:
+        raise RuntimeError("control_plane_recovery_authorization_required")
     if not interlock.exists():
         return
     if interlock.is_symlink():
@@ -56,5 +61,16 @@ def require_upgrade_authorization(
         or not token
         or not re.fullmatch(r"[0-9a-f]{64}", expected_digest)
         or not hmac.compare_digest(actual_digest, expected_digest)
+        or (required_operation is not None and state.get("operation") != required_operation)
+        or (required_operation is not None and authorization.get("operation") != required_operation)
+        or (required_schema is not None and state.get("schema") != required_schema)
+        or (required_schema is not None and authorization.get("schema") != required_schema)
+        or (
+            require_rehearsal
+            and (
+                not re.fullmatch(r"[0-9a-f]{64}", str(state.get("rehearsal_sha256") or ""))
+                or authorization.get("rehearsal_sha256") != state.get("rehearsal_sha256")
+            )
+        )
     ):
         raise RuntimeError("control_plane_upgrade_exclusive_interlock")

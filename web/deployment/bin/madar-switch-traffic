@@ -11,6 +11,7 @@ import tempfile
 import time
 from datetime import datetime, timezone
 import urllib.request
+import urllib.error
 from pathlib import Path
 
 SCRIPT = Path(__file__).resolve()
@@ -20,6 +21,10 @@ sys.path.insert(0, str(WEB_ROOT))
 from deployment.lib.control_plane_upgrade_authorization import (  # noqa: E402
     require_upgrade_authorization,
 )
+from deployment.lib.runtime_authority import (  # noqa: E402
+    load_worker_authority,
+    runtime_mutation_lock,
+)
 
 PORTS = {"blue": (8101, 3100), "green": (8201, 3200)}
 
@@ -27,6 +32,15 @@ PORTS = {"blue": (8101, 3100), "green": (8201, 3200)}
 def _read_json(url: str) -> dict:
     with urllib.request.urlopen(url, timeout=5) as response:
         return json.loads(response.read())
+
+
+def _read_ready(url: str) -> dict:
+    try:
+        return _read_json(url)
+    except urllib.error.HTTPError as error:
+        if error.code != 503:
+            raise
+        return json.loads(error.read())
 
 
 def _atomic_bytes(target: Path, content: bytes, mode: int = 0o644) -> None:
@@ -74,15 +88,45 @@ def main() -> int:
     if len(sys.argv) != 2 or sys.argv[1] not in PORTS:
         raise SystemExit("usage: madar-switch-traffic blue|green")
     slot = sys.argv[1]
+    state_root = Path(os.environ["MADAR_DEPLOY_STATE_ROOT"]).resolve()
+    if not state_root.is_dir() or state_root == Path("/"):
+        raise RuntimeError("deploy_state_root_invalid")
+    with runtime_mutation_lock(state_root):
+        return _switch_locked(slot)
+
+
+def _switch_locked(slot: str) -> int:
     backend, frontend = PORTS[slot]
-    for url in (f"http://127.0.0.1:{backend}/health/ready", f"http://127.0.0.1:{frontend}/"):
-        with urllib.request.urlopen(url, timeout=5) as response:
-            if response.status != 200:
-                raise RuntimeError(f"candidate target is not ready: {slot}")
+    readiness = _read_ready(f"http://127.0.0.1:{backend}/health/ready")
+    components = readiness.get("components")
+    if not isinstance(components, dict):
+        raise RuntimeError(f"candidate target is not ready: {slot}")
+    degraded = {
+        name for name, value in components.items()
+        if value not in {"ok", "disabled", "configured", "not_required", "development"}
+    }
+    worker_handoff = readiness.get("ready") is not True
+    if worker_handoff and (
+        not degraded or not degraded <= {
+            "notification_worker", "calendar_sync_worker", "data_deletion_worker",
+        }
+    ):
+        raise RuntimeError(f"candidate target is not ready: {slot}")
+    with urllib.request.urlopen(f"http://127.0.0.1:{frontend}/", timeout=5) as response:
+        if response.status != 200:
+            raise RuntimeError(f"candidate target is not ready: {slot}")
     expected_identity = _read_json(f"http://127.0.0.1:{backend}/health/version")
     expected_sha = str(expected_identity.get("release_sha") or "")
     if len(expected_sha) != 40 or any(character not in "0123456789abcdef" for character in expected_sha):
         raise RuntimeError("candidate release identity is invalid")
+    if worker_handoff:
+        authority = load_worker_authority(Path(os.environ["MADAR_DEPLOY_STATE_ROOT"]))
+        if (
+            authority is None
+            or authority.get("owner") != "NONE"
+            or authority.get("candidate") != {"sha": expected_sha, "slot": slot}
+        ):
+            raise RuntimeError("candidate worker handoff is not authorized")
     require_upgrade_authorization(None)
     driver = os.getenv("MADAR_TRAFFIC_SWITCH_DRIVER", "nginx").strip().lower()
     if driver == "file-proxy":
@@ -113,7 +157,12 @@ def main() -> int:
     if driver not in {"nginx", "docker-nginx"}:
         raise RuntimeError("unsupported traffic switch driver")
     target = Path(os.getenv("MADAR_ACTIVE_UPSTREAMS_FILE", "/var/lib/madar/proxy/active-upstreams.conf"))
-    target.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    # The hardened Docker proxy runs as UID 101 and bind-mounts this directory
+    # read-only.  The upstream file is non-secret, so the directory must be
+    # traversable by that unprivileged process.  mkdir's mode is ignored for an
+    # existing directory; enforce the installed contract on every switch.
+    target.parent.mkdir(parents=True, exist_ok=True, mode=0o755)
+    os.chmod(target.parent, 0o755)
     upstream_host = "127.0.0.1"
     content = (
         f"upstream madar_backend_active {{ server {upstream_host}:{backend}; }}\n"
