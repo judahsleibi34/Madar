@@ -95,3 +95,6 @@ mobile/android/
 # One-time/local tooling output
 env13-8
 **/.codex-build-check/
+
+# Local Codex working/verification artifacts
+.codex/
