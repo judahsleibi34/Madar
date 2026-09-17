@@ -3,7 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 WEB_ROOT="$(cd -- "$SCRIPT_DIR/.." && pwd)"
-CONTAINER_NAME="madar-100-rehearsal-$RANDOM-$$"
+CONTAINER_NAME="madar-102-rehearsal-$RANDOM-$$"
 POSTGRES_IMAGE="${POSTGRES_IMAGE:-postgres:17-alpine}"
 cleanup() { docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true; }
 trap cleanup EXIT
@@ -133,7 +133,7 @@ SQL
 
 
 # Upgrade the proven legacy fixture without editing historical migrations.
-for number in 098 099 100; do
+for number in 098 099 100 101 102; do
   for migration in "$WEB_ROOT"/database/migrations/"$number"_*.sql; do
     docker exec -i "$CONTAINER_NAME" psql -U postgres -v ON_ERROR_STOP=1 -q < "$migration"
   done
@@ -200,4 +200,4 @@ do $$ declare actor integer; cid integer; oid uuid; earned integer; rule jsonb; 
   if (select count(*) from public.ecommerce_loyalty_transactions where entitlement_id=ent and transaction_type='reward_unlock_reversal')<>1 then raise exception 'bundle_restore_not_once'; end if;
 end $$;
 SQL
-echo "migration 100 conditional discounts rehearsal passed on PostgreSQL 17"
+echo "migration 102 conditional discounts rehearsal passed on PostgreSQL 17"

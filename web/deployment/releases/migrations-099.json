@@ -19,8 +19,8 @@
     },
     {
       "number": 99,
-      "path": "web/database/migrations/099_add_variant_attribute_presentation.sql",
-      "sha256": "8fe9d429149d397a90e5a1420d9133d0fcd731f59159d811fe81336d1f59b7a0",
+      "path": "web/database/migrations/099_commercial_access_ledger.sql",
+      "sha256": "a94a58c0aa112946ebc1abe00d2438ff354e64448c3ceef4b9115c2ed588294f",
       "from_schema": 98,
       "to_schema": 99,
       "compatibility": "expand-only"
