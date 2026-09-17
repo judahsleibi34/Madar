@@ -2,6 +2,8 @@ import unittest
 import tempfile
 import os
 import time
+import json
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -10,6 +12,28 @@ from services import readiness_service
 
 
 class ReadinessServiceTests(unittest.TestCase):
+    def test_backup_missing_fresh_stale_and_atomic_replacement(self):
+        with tempfile.TemporaryDirectory() as root:
+            marker = Path(root) / 'latest.json'
+            with patch.dict(os.environ, {'BACKUP_FRESHNESS_REQUIRED':'true', 'BACKUP_FRESHNESS_MARKER':str(marker), 'BACKUP_MAX_AGE_SECONDS':'3600'}):
+                self.assertEqual(readiness_service.check_backup_freshness(), 'missing')
+                now = datetime.now(timezone.utc)
+                def publish(created):
+                    timestamp = created.strftime('%Y%m%dT%H%M%SZ')
+                    temp = marker.with_suffix('.tmp')
+                    temp.write_text(json.dumps({'format':1,'verified':True,'created_at':timestamp,
+                                               'backup_id':'madar-'+timestamp,'manifest_sha256':'a'*64}))
+                    temp.chmod(0o644)
+                    os.replace(temp, marker)
+                publish(now - timedelta(days=3))
+                self.assertEqual(readiness_service.check_backup_freshness(), 'stale')
+                with marker.open() as old_inode:
+                    publish(now)
+                    self.assertNotEqual(os.fstat(old_inode.fileno()).st_ino, marker.stat().st_ino)
+                    self.assertEqual(readiness_service.check_backup_freshness(), 'ok')
+                marker.write_text(json.dumps({'verified':False}))
+                self.assertEqual(readiness_service.check_backup_freshness(), 'invalid')
+
     def tearDown(self):
         readiness_service.clear_readiness_cache()
 

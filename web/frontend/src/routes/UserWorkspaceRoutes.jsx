@@ -1,6 +1,8 @@
 import { lazy, useEffect } from "react";
+import { WorkspaceCapabilitiesProvider, WorkspaceRouteAccess } from "../commercial/WorkspaceCapabilities";
 import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 
+import TenantSwitcher from "../commercial/TenantSwitcher";
 import RouteSuspense from "../components/common/RouteSuspense";
 import EcommerceRouteSkeleton from "../components/DashboardBuilder/EcommerceRouteSkeleton";
 import { getBuilderProjectIdFromPath } from "../components/PageBuilder/core/PageBuilder.workspaceRouting";
@@ -67,7 +69,7 @@ function BuilderWorkspaceEntry({ workspace = "page-builder", ...pageBuilderProps
   return <PageBuilder key={`${workspace}:${projectId}`} {...pageBuilderProps} />;
 }
 
-export default function UserWorkspaceRoutes({
+function UserWorkspaceRoutesContent({
   lang,
   onGoToDashboard,
   onUserUpdated,
@@ -110,6 +112,7 @@ export default function UserWorkspaceRoutes({
       isPageBuilderShell={options.isPageBuilderShell}
       shellLang={options.lang}
     >
+      <TenantSwitcher user={user} onUserUpdated={onUserUpdated} />
       {children}
     </DashboardShell>
   );
@@ -345,4 +348,10 @@ export default function UserWorkspaceRoutes({
       </Routes>
     </RouteSuspense>
   );
+}
+
+export default function UserWorkspaceRoutes(props) {
+  return <WorkspaceCapabilitiesProvider user={props.user}>
+    <WorkspaceRouteAccess><UserWorkspaceRoutesContent key={props.user?.tenant_id} {...props} /></WorkspaceRouteAccess>
+  </WorkspaceCapabilitiesProvider>;
 }

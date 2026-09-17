@@ -190,8 +190,8 @@ class AdminAccountAccessHardeningTests(unittest.TestCase):
                 detail="Admin account access is not allowed for this route",
             ),
         ) as get_user, patch.object(
-            mfa_routes.supabase.auth.mfa,
-            "list_factors",
+            mfa_routes,
+            "get_request_mfa_client",
         ) as list_factors:
             response = client.get("/auth/mfa/status")
 

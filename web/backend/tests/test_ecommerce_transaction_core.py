@@ -65,6 +65,14 @@ class RpcOnlyClient:
 
 
 class EcommerceTransactionCoreTests(unittest.TestCase):
+    def test_schema96_confirmation_query_excludes_schema97_loyalty_column(self):
+        source = Path(public_site_routes.__file__).read_text(encoding="utf-8")
+        confirmation = source.split("def get_public_order_confirmation", 1)[1].split(
+            "def get_public_store_loyalty", 1
+        )[0]
+        self.assertNotIn("loyalty_entitlement_id", confirmation)
+        self.assertIn("product_snapshot", confirmation)
+
     def test_order_requires_idempotency_key(self):
         with self.assertRaises(ValidationError):
             PublicStoreOrderCreate(**order_payload(idempotency_key=None))

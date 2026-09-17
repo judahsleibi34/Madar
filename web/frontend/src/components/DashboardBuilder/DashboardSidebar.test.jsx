@@ -1,3 +1,5 @@
+import { WorkspaceContext } from "../../commercial/capabilityContext";
+import matrix from "../../commercial/planMatrix.generated.json";
 import {
   cleanup,
   fireEvent,
@@ -86,7 +88,7 @@ function renderSidebar(pathname = "/dashboard") {
 
   render(
     <MemoryRouter initialEntries={[pathname]}>
-      <DashboardSidebar {...props} />
+      <WorkspaceContext.Provider value={{ ready: true, can: (cap) => matrix.plans.business_plus[cap] === true }}><DashboardSidebar {...props} /></WorkspaceContext.Provider>
     </MemoryRouter>,
   );
 

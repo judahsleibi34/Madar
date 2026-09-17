@@ -39,8 +39,6 @@ from services.account_lifecycle_service import synchronize_verified_account
 from services.ecommerce_cache_service import (
     ecommerce_cache_key,
     get_or_create_ecommerce_cache,
-    read_ecommerce_cache,
-    write_ecommerce_cache,
 )
 from services.screen_time_service import record_screen_time
 from services.site_permission_service import (
@@ -52,6 +50,7 @@ from services.entitlement_service import (
     increment_operational_usage,
     require_branded_subdomain,
     require_public_runtime_entitlement,
+    require_entitlement,
 )
 from services.tenant_lifecycle_service import tenant_is_active
 from services.hosted_address_service import (
@@ -775,8 +774,8 @@ def get_published_form_for_site(settings: dict, form_id: str):
     """Resolve a published form without requiring its project to be the live website.
 
     Standalone form links belong to the tenant site, not necessarily to the project
-    currently bound as the site's homepage. Prefer the live project when possible,
-    then look through the tenant's other published snapshots. Draft schemas are
+    currently bound as the site's homepage. Require one unambiguous matching
+    published snapshot across the bounded tenant lookup. Draft schemas are
     deliberately never considered here.
     """
 
@@ -784,6 +783,7 @@ def get_published_form_for_site(settings: dict, form_id: str):
     bound_project_id = str(settings.get("published_project_id") or "").strip()
 
     bound_project_error = None
+    bound_match = None
     if bound_project_id:
         try:
             project = get_bound_published_project(settings, require_pages=False)
@@ -800,7 +800,7 @@ def get_published_form_for_site(settings: dict, form_id: str):
                     if exc.status_code != 404:
                         raise
                 else:
-                    return project, form, published_schema
+                    bound_match = (project, form, published_schema)
 
     projects_response = (
         service_supabase.table("builder_projects")
@@ -816,8 +816,12 @@ def get_published_form_for_site(settings: dict, form_id: str):
         .execute()
     )
 
-    matches = []
-    for candidate in projects_response.data or []:
+    candidates = projects_response.data or []
+    # A truncated search cannot establish globally unique form identity.
+    if len(candidates) >= 101:
+        raise api_error(409, "publication_form_ambiguous", "The published form lookup is incomplete.")
+    matches = [bound_match[0]] if bound_match else []
+    for candidate in candidates:
         if str(candidate.get("id") or "") == bound_project_id:
             continue
         schema = candidate.get("published_schema")
@@ -1877,21 +1881,11 @@ def resolve_tenant_id(settings: dict):
 
 
 def resolve_public_store_settings(site_identifier: str, *, request: Request) -> dict:
-    """Reuse public store identity/profile lookups without sharing data across tenants."""
-    branded = _request_uses_branded_address(request, site_identifier)
-    cache_key = ecommerce_cache_key(
-        0,
-        "public-store-settings-v1",
-        site_identifier=site_identifier,
-        branded=branded,
-    )
-    cached = read_ecommerce_cache(cache_key)
-    if isinstance(cached, dict):
-        return cached
+    """Verify the current host binding and commercial access before any cache."""
     settings = resolve_website_settings(site_identifier, request=request)
     tenant_id = resolve_tenant_id(settings)
-    write_ecommerce_cache(cache_key, tenant_id, settings, ttl_seconds=30)
-    return settings
+    state = require_entitlement(tenant_id, "ecommerce_publish")
+    return {**settings, "_commercial_revision": state.get("entitlement_revision", "operator")}
 
 
 def _localized_catalog_text(translations: Any, locale: str) -> dict[str, str]:
@@ -2654,15 +2648,15 @@ def get_public_store_profile(subdomain: str, request: Request, response: Respons
         "etag": f'"store-profile-{hashlib.sha256(canonical.encode("utf-8")).hexdigest()}"'
     }
     apply_public_cache_headers(response, metadata)
-    response.headers["Cache-Control"] = "public, max-age=30, stale-while-revalidate=300"
-    response.headers["CDN-Cache-Control"] = "public, s-maxage=60, stale-while-revalidate=600"
+    response.headers["Cache-Control"] = "private, no-store"
+    response.headers["CDN-Cache-Control"] = "no-store"
     if request_etag_matches(request, metadata):
         return Response(
             status_code=304,
             headers={
                 "ETag": metadata["etag"],
-                "Cache-Control": "public, max-age=30, stale-while-revalidate=300",
-                "CDN-Cache-Control": "public, s-maxage=60, stale-while-revalidate=600",
+                "Cache-Control": "private, no-store",
+                "CDN-Cache-Control": "no-store",
             },
         )
     return {"success": True, "site": site_profile}
@@ -2732,7 +2726,8 @@ def get_public_catalog(
     growth = _public_store_growth(settings.get("ecommerce_theme") if isinstance(settings.get("ecommerce_theme"), dict) else {})
     cache_key = ecommerce_cache_key(
         tenant_id,
-        "catalog-v1",
+        "catalog-v2",
+        entitlement_revision=settings.get("_commercial_revision"),
         locale=locale_value,
         search=search_value,
         category=category_value,
@@ -2778,16 +2773,16 @@ def get_public_catalog(
         "etag": f'"catalog-{hashlib.sha256(canonical.encode("utf-8")).hexdigest()}"'
     }
     apply_public_cache_headers(response, metadata)
-    response.headers["Cache-Control"] = "public, max-age=30, stale-while-revalidate=300"
-    response.headers["CDN-Cache-Control"] = "public, s-maxage=60, stale-while-revalidate=600"
+    response.headers["Cache-Control"] = "private, no-store"
+    response.headers["CDN-Cache-Control"] = "no-store"
     response.headers["X-Ecommerce-Cache"] = "HIT" if cache_hit else "MISS"
     if request_etag_matches(request, metadata):
         return Response(
             status_code=304,
             headers={
                 "ETag": metadata["etag"],
-                "Cache-Control": "public, max-age=30, stale-while-revalidate=300",
-                "CDN-Cache-Control": "public, s-maxage=60, stale-while-revalidate=600",
+                "Cache-Control": "private, no-store",
+                "CDN-Cache-Control": "no-store",
                 "X-Ecommerce-Cache": "HIT" if cache_hit else "MISS",
             },
         )
@@ -2820,7 +2815,8 @@ def get_public_catalog_product(
     locale_value = str(locale or "en")[:16]
     cache_key = ecommerce_cache_key(
         tenant_id,
-        "product-v1",
+        "product-v2",
+        entitlement_revision=settings.get("_commercial_revision"),
         locale=locale_value,
         slug=clean_slug,
     )
@@ -2839,16 +2835,16 @@ def get_public_catalog_product(
         "etag": f'"product-{hashlib.sha256(canonical.encode("utf-8")).hexdigest()}"'
     }
     apply_public_cache_headers(response, metadata)
-    response.headers["Cache-Control"] = "public, max-age=30, stale-while-revalidate=300"
-    response.headers["CDN-Cache-Control"] = "public, s-maxage=60, stale-while-revalidate=600"
+    response.headers["Cache-Control"] = "private, no-store"
+    response.headers["CDN-Cache-Control"] = "no-store"
     response.headers["X-Ecommerce-Cache"] = "HIT" if cache_hit else "MISS"
     if request_etag_matches(request, metadata):
         return Response(
             status_code=304,
             headers={
                 "ETag": metadata["etag"],
-                "Cache-Control": "public, max-age=30, stale-while-revalidate=300",
-                "CDN-Cache-Control": "public, s-maxage=60, stale-while-revalidate=600",
+                "Cache-Control": "private, no-store",
+                "CDN-Cache-Control": "no-store",
                 "X-Ecommerce-Cache": "HIT" if cache_hit else "MISS",
             },
         )
@@ -3004,7 +3000,7 @@ def create_public_store_order(
     customer_id = None
     if request.cookies.get("madar_access_token") or request.cookies.get("madar_refresh_token"):
         try:
-            customer = get_authenticated_user_row(
+            _, customer = get_authenticated_user_row(
                 request, response,
                 allow_admin_account_access=False,
                 reject_admin_account_access=True,
@@ -3097,7 +3093,9 @@ def get_public_order_confirmation(subdomain: str, confirmation_token: str, reque
     order_id = str(order.get("id"))
     item_rows = rows(
         service_supabase.table("ecommerce_order_items").select(
-            "id,sku,product_name,product_slug,product_snapshot,variant_snapshot,selected_options_snapshot,quantity,list_unit_price,discount_amount,discount_source,loyalty_entitlement_id,unit_price,line_total"
+            # Loyalty attribution is response metadata introduced by schema
+            # 097. Historical order truth at schema 096 lives in these fields.
+            "id,sku,product_name,product_slug,product_snapshot,variant_snapshot,selected_options_snapshot,quantity,list_unit_price,discount_amount,discount_source,unit_price,line_total"
         ).eq("tenant_id", tenant_id).eq("order_id", order_id).order("created_at").execute()
     )
     history_rows = rows(
@@ -3113,7 +3111,7 @@ def get_public_store_loyalty(subdomain: str, request: Request, response: Respons
     clean_subdomain = normalize_subdomain(subdomain)
     settings = resolve_public_store_settings(clean_subdomain, request=request)
     tenant_id = resolve_tenant_id(settings)
-    customer = get_authenticated_user_row(
+    _, customer = get_authenticated_user_row(
         request, response,
         allow_admin_account_access=False,
         reject_admin_account_access=True,
@@ -3277,6 +3275,7 @@ def get_member_site_page(
         f"{clean_subdomain}:{clean_page_reference}",
     )
     settings = resolve_website_settings(clean_subdomain, request=request)
+    require_public_runtime_entitlement(settings, "website_publish")
     project = get_bound_published_project(settings)
     schema, page, auth_destination_ids = find_published_page(project, clean_page_reference)
     if page_access_kind(page, auth_destination_ids) == "unsupported_role":

@@ -67,6 +67,7 @@ CONFIG_CLASSIFICATION.update({name: "production-only" for name in (
     "TRUSTED_PROXY_IPS", "WEB_PUSH_VAPID_SUBJECT",
 )})
 CONFIG_CLASSIFICATION.update({name: "development-only" for name in (
+    "COMMERCIAL_ACCESS_TEST_LOOKUPS", "COMMERCIAL_SYNTHETIC_DATABASE_DSN",
     "COMMERCIAL_ENTITLEMENT_TEST_LOOKUPS", "MADAR_TEST_REPOSITORY_ROOT",
     "MADAR_TEST_TENANT_LIFECYCLE_LOOKUPS", "POSTGRES_TEST_URL",
 )})
@@ -80,7 +81,8 @@ CONFIG_CLASSIFICATION.update({name: "optional" for name in (
     "CSRF_TOKEN_MAX_AGE_SECONDS", "CSRF_TRUSTED_ORIGINS", "DATA_UPLOAD_DIR",
     "LOG_LEVEL", "MADAR_ALERT_HOOK", "MADAR_MIGRATIONS_DIR",
     "MADAR_UPLOAD_WORKSPACE_DIR", "MAX_DATASET_UPLOAD_BYTES", "MAX_REMOTE_DATA_BYTES",
-    "MAX_UPLOAD_BYTES", "NOTIFICATION_EMAIL_MAX_DEAD",
+    "MAX_UPLOAD_BYTES", "NOTIFICATION_DEAD_READINESS_WINDOW_SECONDS",
+    "NOTIFICATION_EMAIL_MAX_DEAD",
     "NOTIFICATION_QUEUE_MAX_AGE_SECONDS", "NOTIFICATION_QUEUE_MAX_DEAD",
     "NOTIFICATION_QUEUE_MAX_DEPTH", "PRIVATE_CHARTS_DIR", "PUBLIC_UPLOADS_DIR",
     "READINESS_CACHE_SECONDS", "READINESS_TIMEOUT_SECONDS",
@@ -204,11 +206,13 @@ def validate_runtime_configuration() -> RuntimeConfiguration:
         if email_enabled and not all(os.getenv(name, "").strip() for name in ("SMTP_HOST", "SMTP_FROM_EMAIL")):
             raise RuntimeError("enabled email channel is missing SMTP configuration")
         web_push = get_web_push_configuration()
-        if web_push.administratively_enabled and not web_push.configured:
-            raise RuntimeError(
-                "enabled Web Push channel is missing VAPID configuration: "
-                + ",".join(web_push.missing_fields)
-            )
+        if web_push.administratively_enabled and not web_push.operational:
+            if web_push.missing_fields:
+                raise RuntimeError(
+                    "enabled Web Push channel is missing VAPID configuration: "
+                    + ",".join(web_push.missing_fields)
+                )
+            raise RuntimeError("enabled Web Push channel has invalid VAPID configuration")
         if not re.fullmatch(r"[0-9a-f]{40}", release_sha):
             raise RuntimeError("production release identity is missing")
         origins = os.getenv("CSRF_TRUSTED_ORIGINS", "").strip() or os.getenv("FRONTEND_URLS", "")

@@ -1532,9 +1532,13 @@ def assert_context_user(context: TenantContext, user_id: int | str | None) -> No
         raise HTTPException(status_code=403, detail="User id does not match session")
 
 
-def require_builder_context(request: Request, response: Response, access_checker) -> TenantContext:
+def require_builder_context(request: Request, response: Response, access_checker, *, commercial: bool = True) -> TenantContext:
     context = access_checker(request, response)
     assert_context_user(context, request.path_params.get("user_id"))
+    if context.tenant_id is None:
+        raise HTTPException(status_code=403, detail="Active tenant membership required")
+    if commercial:
+        require_any_entitlement(context.tenant_id, {"forms", "page_builder"}, message="This workspace requires an active Forms or Website capability.")
     return context
 
 
@@ -1548,6 +1552,7 @@ def require_builder_context_without_admin_account_access(
         allow_admin_account_access=False,
     )
     assert_context_user(context, request.path_params.get("user_id"))
+    require_any_entitlement(context.tenant_id, {"forms", "page_builder"}, message="This workspace requires an active Forms or Website capability.")
     return context
 
 
@@ -1556,6 +1561,36 @@ def first_row(response):
         raise HTTPException(status_code=500, detail="Builder project was not saved")
 
     return response.data[0]
+
+
+def require_builder_schema_capabilities(tenant_id: int, schema: dict, previous: dict | None = None) -> None:
+    """Authorize document changes even when callers bypass editor navigation.
+
+    Existing website content survives a downgrade and can be carried unchanged
+    through a Forms save. It cannot be edited through that shared save endpoint.
+    Theme and form presentation remain shared document data; public website
+    delivery independently requires website_publish.
+    """
+    prior = previous or {}
+    for field in ("pages", "roles", "users"):
+        if (schema.get(field) or []) != (prior.get(field) or []):
+            require_entitlement(tenant_id, "page_builder")
+    if previous is not None:
+        for field in ("siteChrome", "defaultPageId"):
+            if schema.get(field) != prior.get(field):
+                require_entitlement(tenant_id, "page_builder")
+    if (schema.get("forms") or []) != (prior.get("forms") or []):
+        require_entitlement(tenant_id, "forms")
+    # A reservation block can be embedded inside a form as well as a page.
+    def reservation_blocks(value):
+        if isinstance(value, dict):
+            found = [value] if value.get("type") == "reservationBlock" else []
+            return found + [block for child in value.values() for block in reservation_blocks(child)]
+        if isinstance(value, list):
+            return [block for child in value for block in reservation_blocks(child)]
+        return []
+    if reservation_blocks(schema) != reservation_blocks(prior):
+        require_entitlement(tenant_id, "reservations")
 
 
 def publish_project_atomically(
@@ -1681,6 +1716,9 @@ async def upload_builder_asset(
         )
         if str(context.role or "").lower() not in {"owner", "admin", "member"}:
             raise HTTPException(status_code=403, detail="Ecommerce access required")
+        entitlements = require_entitlement(context.tenant_id, "ecommerce_management")
+        request.state.commercial_revision = entitlements.get("entitlement_revision", "operator")
+        response.headers["Cache-Control"] = "private, no-store"
     else:
         context = require_builder_context(request, response, require_builder_write_access)
         require_entitlement(context.tenant_id, "image_uploads")
@@ -2213,7 +2251,7 @@ def create_screen_time_heartbeat(
     request: Request,
     response: Response,
 ):
-    context = require_builder_context(request, response, require_active_tenant_member)
+    context = require_builder_context(request, response, require_active_tenant_member, commercial=False)
     record_screen_time(
         tenant_id=context.tenant_id,
         user_id=context.user_id,
@@ -2229,7 +2267,7 @@ def read_weekly_screen_time(
     project_id: Optional[str] = Query(default=None),
     period: str = Query(default="week", pattern="^(today|week|month)$"),
 ):
-    context = require_builder_context(request, response, require_active_tenant_member)
+    context = require_builder_context(request, response, require_active_tenant_member, commercial=False)
     if project_id:
         get_project_for_tenant(project_id, context.tenant_id)
     return {
@@ -2319,6 +2357,7 @@ def create_builder_project(
     )
 
     draft_schema = assert_json_object(project.draft_schema)
+    require_builder_schema_capabilities(context.tenant_id, draft_schema)
     require_schema_asset_tenant(draft_schema, context.tenant_id)
     payload = {
         "tenant_id": context.tenant_id,
@@ -2363,6 +2402,7 @@ def get_builder_project(project_id: str, request: Request, response: Response):
 @router.get("/builder/projects/{project_id}/site-members")
 def list_builder_site_members(project_id: str, request: Request, response: Response):
     context = require_builder_context(request, response, require_builder_admin_access)
+    require_entitlement(context.tenant_id, "page_builder")
     get_project_for_tenant(project_id, context.tenant_id)
     return {
         "success": True,
@@ -2378,6 +2418,7 @@ def create_builder_site_member(
     response: Response,
 ):
     context = require_builder_context(request, response, require_builder_admin_access)
+    require_entitlement(context.tenant_id, "page_builder")
     project = get_project_for_tenant(project_id, context.tenant_id)
     clean_email = str(member.email).strip().lower()
     clean_name = member.full_name.strip()
@@ -2532,6 +2573,7 @@ def update_builder_site_member(
     response: Response,
 ):
     context = require_builder_context(request, response, require_builder_admin_access)
+    require_entitlement(context.tenant_id, "page_builder")
     project = get_project_for_tenant(project_id, context.tenant_id)
     update_payload = {}
     role = None
@@ -2602,6 +2644,7 @@ def delete_builder_site_member(
     response: Response,
 ):
     context = require_builder_context(request, response, require_builder_admin_access)
+    require_entitlement(context.tenant_id, "page_builder")
     get_project_for_tenant(project_id, context.tenant_id)
     membership_response = (
         service_supabase.table("tenant_site_memberships")
@@ -2699,6 +2742,7 @@ def update_builder_project(
 
     if project.draft_schema is not None:
         update_payload["draft_schema"] = assert_json_object(project.draft_schema)
+        require_builder_schema_capabilities(context.tenant_id, update_payload["draft_schema"], existing_project.get("draft_schema") or {})
         require_schema_asset_tenant(update_payload["draft_schema"], context.tenant_id)
 
     if not update_payload:
@@ -3285,7 +3329,7 @@ def publish_builder_project(
         require_entitlement(
             context.tenant_id,
             "reservations",
-            message="Business Plus is required to publish reservation blocks.",
+            message="A reservations capability is required to publish reservation blocks.",
         )
     project_for_publish = {**project, "draft_schema": validated_schema}
     published_project = publish_project_atomically(

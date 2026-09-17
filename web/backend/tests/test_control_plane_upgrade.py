@@ -5,12 +5,14 @@ import errno
 import io
 import json
 import os
+import shutil
 import stat
 import struct
 import subprocess
 import sys
 import tempfile
 import unittest
+from datetime import timedelta
 from dataclasses import replace
 from pathlib import Path
 from unittest import mock
@@ -55,8 +57,18 @@ class FakeOperations:
         self.schema = 93
         self.timer = {"enabled": "enabled", "active": "active"}
         self.interlock = False
+        self.backup_timer_states = None
+        self.durable_backup_timer_states = None
+        self.backup_timers = {
+            name: {"enabled": "enabled", "active": "active"}
+            for name in upgrade.BACKUP_TIMERS
+        }
+        self.backup_timers[upgrade.BACKUP_TIMERS[-1]] = {
+            "enabled": "disabled", "active": "inactive",
+        }
         self.snapshot = {"state": "unchanged"}
         self.controller_compatibility = "normal_compatible"
+        self.recovery = False
 
     def _event(self, name):
         self.events.append(name)
@@ -75,6 +87,18 @@ class FakeOperations:
             "timer": dict(self.timer),
         }
 
+    def current_recovery_preflight(self, *, candidate_sha=None, lock_deployment=True):
+        self._event("current_recovery_preflight")
+        self.events.append(f"deployment_lock={lock_deployment}")
+        return {
+            "installed_sha": self.installed,
+            "production_sha": self.production,
+            "slot": self.slot,
+            "schema": 96,
+            "migration": "out_of_band_schema_ahead",
+            "timer": {"enabled": "disabled", "active": "inactive"},
+        }
+
     def resolve_candidate(self, sha, *, dry_run):
         self._event("resolve_candidate")
 
@@ -86,9 +110,26 @@ class FakeOperations:
         self._event("protected_change_required")
         return self.protected
 
-    def quiesce(self):
+    def quiesce(self, sha):
         self._event("quiesce")
+        if self.backup_timer_states is None:
+            self.backup_timer_states = {
+                name: dict(state)
+                for name, state in self.backup_timers.items()
+            }
+        self.durable_backup_timer_states = {
+            name: dict(state)
+            for name, state in self.backup_timer_states.items()
+        }
+        self.arm_interlock(sha)
+        self._event("quiesce_after_snapshot")
+        for state in self.backup_timers.values():
+            state["active"] = "inactive"
         self.timer = {"enabled": "disabled", "active": "inactive"}
+
+    def durable_quiesce_snapshot_exists(self, sha):
+        self.events.append("durable_quiesce_snapshot_exists")
+        return self.interlock and self.durable_backup_timer_states is not None
 
     def arm_interlock(self, sha):
         self._event("arm_interlock")
@@ -103,6 +144,15 @@ class FakeOperations:
         candidate = transaction / "repository"
         candidate.mkdir(parents=True)
         return transaction, candidate
+
+    def validate_rehearsal_attestation(self, path, sha, schema):
+        self._event("validate_rehearsal_attestation")
+        self.events.append(f"attestation:{path.name}:{sha}:{schema}")
+        return "a" * 64
+
+    def validate_recovery_candidate_contract(self, candidate, schema):
+        self._event("validate_recovery_candidate_contract")
+        self.events.append(f"recovery_contract:{schema}")
 
     def static_preflight(self, candidate):
         self._event("static_preflight")
@@ -129,13 +179,30 @@ class FakeOperations:
         if self.installed != sha:
             raise upgrade.UpgradeError("installed_provenance_mismatch")
 
-    def run_deploy_service(self, label, sha):
+    def run_deploy_service(
+        self,
+        label,
+        sha,
+        *,
+        recovery=False,
+        migration_repair=False,
+    ):
         self._event(label)
+        self.events.append(f"recovery={recovery}")
+        if migration_repair:
+            self.events.append("migration_repair=True")
         if label == "controlled_candidate_deployment":
             self.production = sha
             self.slot = "blue"
+            self.recovery = recovery
+            if recovery:
+                self.schema = 96
 
-    def attest_serving(self, sha):
+    def advance_production_checkout(self, sha):
+        self._event("advance_production_checkout")
+        self.production = sha
+
+    def attest_serving(self, sha, *, recovery=False):
         self._event("attest_serving")
         if self.production != sha:
             raise upgrade.UpgradeError("not_promoted")
@@ -143,12 +210,18 @@ class FakeOperations:
             "sha": sha,
             "slot": self.slot,
             "schema": self.schema,
-            "migration": "already_at_target",
+            "migration": "not_requested" if recovery else "already_at_target",
         }
 
     def known_good_identity(self, sha):
-        if self.production == sha:
+        if self.production == sha and not self.recovery:
             return {"slot": self.slot, "schema": self.schema}
+        return None
+
+    def recovery_traffic_identity(self, sha):
+        self.events.append("recovery_traffic_identity")
+        if self.production == sha:
+            return {"slot": self.slot, "schema": 96}
         return None
 
     def idempotence_snapshot(self, sha):
@@ -156,6 +229,10 @@ class FakeOperations:
 
     def restore_timer(self, original):
         self._event("restore_timer")
+        self.backup_timers = {
+            name: dict(state)
+            for name, state in self.backup_timer_states.items()
+        }
         self.timer = dict(original)
         return dict(self.timer)
 
@@ -179,6 +256,257 @@ class FakeOperations:
     def preinstall_restore_safe(self, previous_sha, production_sha):
         self.events.append("preinstall_restore_safe")
         return self.installed == previous_sha and self.production == production_sha
+
+
+class DurableBackupTimerTests(unittest.TestCase):
+    SHA = "a" * 40
+
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+        self.root = Path(self.temporary.name)
+        self.operations = object.__new__(upgrade.SystemOperations)
+        self.operations.runtime_root = self.root / "runtime"
+        self.operations.runtime_root.mkdir()
+        self.operations.interlock_file = self.operations.runtime_root / "in-progress.json"
+        self.operations.authorization_file = self.operations.runtime_root / "authorized.json"
+        self.states = {
+            name: {"enabled": "enabled", "active": "active"}
+            for name in upgrade.BACKUP_TIMERS
+        }
+        self.states[upgrade.BACKUP_TIMERS[-1]] = {
+            "enabled": "disabled", "active": "inactive",
+        }
+        self.original = {name: dict(state) for name, state in self.states.items()}
+        self.states["madar-auto-deploy.timer"] = {
+            "enabled": "enabled", "active": "active",
+        }
+        self.events = []
+        self.busy = None
+        self.wrong_restore = None
+        self.fail_backup_restore = None
+        self.operations.systemctl_state = mock.Mock(side_effect=self.state)
+        self.operations.command = mock.Mock(side_effect=self.command)
+        self.addCleanup(mock.patch.stopall)
+        mock.patch.object(upgrade, "require_root_directory").start()
+        original_atomic = upgrade.atomic_json
+
+        def write(path, value):
+            self.events.append(("persist", json.loads(json.dumps(value))))
+            original_atomic(path, value)
+
+        mock.patch.object(upgrade, "atomic_json", side_effect=write).start()
+        # Fixtures may be owned by the test user; production ownership checks
+        # remain real and are separately exercised below.
+        original_lstat = Path.lstat
+
+        def lstat(path):
+            value = original_lstat(path)
+            if path == self.operations.interlock_file:
+                return SimpleNamespace(st_uid=0, st_mode=value.st_mode)
+            return value
+
+        mock.patch.object(Path, "lstat", lstat).start()
+
+    def state(self, name):
+        self.events.append(("state", name))
+        if name.endswith(".service"):
+            return {
+                "enabled": "disabled",
+                "active": "active" if name == self.busy else "inactive",
+            }
+        state = dict(self.states[name])
+        if self.wrong_restore == name and any(event[0] == "backup_timer_restore" for event in self.events):
+            state["active"] = "inactive"
+        return state
+
+    def command(self, label, argv, **kwargs):
+        self.events.append((label, argv[-1]))
+        action, name = argv[1], argv[-1]
+        if label == "backup_timer_restore" and name == self.fail_backup_restore:
+            raise upgrade.UpgradeError(f"failed:{label}:{name}")
+        if name.endswith(".timer"):
+            state = self.states[name]
+            if action in ("enable", "disable"):
+                state["enabled"] = "enabled" if action == "enable" else "disabled"
+            if action in ("start", "stop") or "--now" in argv:
+                state["active"] = "active" if action == "start" else "inactive"
+
+    def document(self):
+        return json.loads(self.operations.interlock_file.read_text())
+
+    def test_two_pass_late_busy_service_stops_zero_timers(self):
+        self.busy = "madar-node1-backup.service"
+        with self.assertRaisesRegex(
+            upgrade.UpgradeError,
+            "backup_operation_running_retry_after_completion",
+        ):
+            self.operations.quiesce(self.SHA)
+        self.assertFalse(self.operations.command.called)
+        self.assertFalse(self.operations.interlock_file.exists())
+        for name in upgrade.BACKUP_TIMERS:
+            self.operations.systemctl_state.assert_any_call(name)
+
+    def test_snapshot_is_durable_before_first_stop(self):
+        self.operations.quiesce(self.SHA)
+        labels = [event[0] for event in self.events]
+        self.assertLess(labels.index("persist"), labels.index("backup_timer_stop"))
+        self.assertEqual(self.document()["backup_timer_states"], self.original)
+        self.assertEqual(self.document()["version"], 2)
+        self.assertEqual(self.operations.interlock_file.stat().st_mode & 0o777, 0o644)
+        self.assertEqual(labels.count("backup_timer_stop"), 3)
+
+    def test_authorization_and_failure_rearm_preserve_original(self):
+        self.operations.quiesce(self.SHA)
+        self.operations.write_authorization(
+            self.SHA, recovery=True, schema=96,
+            rehearsal_sha256="b" * 64,
+        )
+        document = self.document()
+        credential = json.loads(self.operations.authorization_file.read_text())
+        self.assertEqual(document["backup_timer_states"], self.original)
+        self.assertEqual(document["status"], "authorized_cycle")
+        self.assertEqual(document["operation"], "schema_recovery")
+        self.assertEqual(document["schema"], 96)
+        self.assertEqual(document["rehearsal_sha256"], "b" * 64)
+        self.assertEqual(
+            document["authorization_sha256"],
+            hashlib.sha256(credential["token"].encode()).hexdigest(),
+        )
+        self.assertNotIn("token", document)
+        self.operations.arm_interlock(self.SHA)
+        self.assertEqual(self.document()["backup_timer_states"], self.original)
+        self.assertIsNone(self.document()["authorization_sha256"])
+
+    def test_wrong_sha_cannot_donate_or_erase_snapshot(self):
+        self.operations.quiesce(self.SHA)
+        before = self.operations.interlock_file.read_bytes()
+        self.operations.command.reset_mock()
+        with self.assertRaisesRegex(upgrade.UpgradeError, "interlock_sha_mismatch"):
+            self.operations.quiesce("b" * 40)
+        self.assertFalse(self.operations.command.called)
+        self.assertEqual(self.operations.interlock_file.read_bytes(), before)
+
+    def test_fresh_process_inherits_and_restores_exact_original(self):
+        self.states[upgrade.BACKUP_TIMERS[1]]["active"] = "inactive"
+        self.original[upgrade.BACKUP_TIMERS[1]]["active"] = "inactive"
+        self.operations.quiesce(self.SHA)
+        fresh = object.__new__(upgrade.SystemOperations)
+        for attribute in ("runtime_root", "interlock_file", "authorization_file", "command", "systemctl_state"):
+            setattr(fresh, attribute, getattr(self.operations, attribute))
+        fresh.quiesce(self.SHA)
+        self.assertEqual(fresh.backup_timer_states, self.original)
+        fresh.restore_timer({"enabled": "enabled", "active": "active"})
+        self.assertEqual(
+            {name: self.states[name] for name in upgrade.BACKUP_TIMERS},
+            self.original,
+        )
+        self.assertTrue(fresh.interlock_file.exists())
+        fresh.clear_interlock()
+        self.assertFalse(fresh.interlock_file.exists())
+
+    def test_restore_attestation_failure_retains_snapshot_and_disables_automation(self):
+        self.operations.quiesce(self.SHA)
+        self.wrong_restore = upgrade.BACKUP_TIMERS[0]
+        with self.assertRaisesRegex(
+            upgrade.UpgradeError,
+            "backup_timer_restore_failed:madar-backup.timer",
+        ):
+            self.operations.restore_timer({"enabled": "enabled", "active": "active"})
+        self.assertEqual(self.document()["backup_timer_states"], self.original)
+        self.assertEqual(
+            self.states["madar-auto-deploy.timer"],
+            {"enabled": "disabled", "active": "inactive"},
+        )
+
+    def test_auto_deploy_restore_failure_requiesces_backup_timers(self):
+        self.operations.quiesce(self.SHA)
+        snapshot = self.document()["backup_timer_states"]
+        self.operations.restore_auto_deploy_timer = mock.Mock(
+            side_effect=upgrade.UpgradeError(
+                "auto_deploy_timer_restore_failed"
+            )
+        )
+        with self.assertRaisesRegex(
+            upgrade.UpgradeError, "auto_deploy_timer_restore_failed"
+        ):
+            self.operations.restore_timer(
+                {"enabled": "enabled", "active": "active"}
+            )
+        self.assertTrue(all(
+            self.states[name]["active"] == "inactive"
+            for name in upgrade.BACKUP_TIMERS
+        ))
+        self.assertEqual(
+            self.states["madar-auto-deploy.timer"],
+            {"enabled": "disabled", "active": "inactive"},
+        )
+        self.assertTrue(self.operations.interlock_file.exists())
+        self.assertEqual(
+            self.document()["backup_timer_states"], snapshot
+        )
+
+    def test_partial_backup_restore_failure_requiesces_started_timers(self):
+        self.operations.quiesce(self.SHA)
+        snapshot = self.document()["backup_timer_states"]
+        self.fail_backup_restore = upgrade.BACKUP_TIMERS[1]
+        with self.assertRaisesRegex(
+            upgrade.UpgradeError, "failed:backup_timer_restore"
+        ):
+            self.operations.restore_timer(
+                {"enabled": "enabled", "active": "active"}
+            )
+        self.assertIn(
+            ("backup_timer_failure_stop", upgrade.BACKUP_TIMERS[0]),
+            self.events,
+        )
+        self.assertTrue(all(
+            self.states[name]["active"] == "inactive"
+            for name in upgrade.BACKUP_TIMERS
+        ))
+        self.assertEqual(
+            self.document()["backup_timer_states"], snapshot
+        )
+        self.assertTrue(self.operations.interlock_file.exists())
+
+    def test_malformed_snapshot_fails_without_mutation(self):
+        self.operations.quiesce(self.SHA)
+        invalid_state = {
+            **self.original,
+            upgrade.BACKUP_TIMERS[0]: {
+                "enabled": "unknown", "active": "inactive",
+            },
+        }
+        for bad in (None, {}, invalid_state):
+            with self.subTest(bad=bad):
+                document = {"approved_sha": self.SHA, "backup_timer_states": bad}
+                self.operations.interlock_file.write_text(json.dumps(document))
+                self.operations.command.reset_mock()
+                with self.assertRaisesRegex(upgrade.UpgradeError, "backup_timer_state"):
+                    self.operations.quiesce(self.SHA)
+                self.assertFalse(self.operations.command.called)
+
+    def test_unknown_current_state_fails_before_persist_or_stop(self):
+        self.states[upgrade.BACKUP_TIMERS[0]]["enabled"] = "unknown"
+        with self.assertRaisesRegex(upgrade.UpgradeError, "backup_timer_state_invalid"):
+            self.operations.quiesce(self.SHA)
+        self.assertFalse(self.operations.command.called)
+        self.assertFalse(self.operations.interlock_file.exists())
+
+    def test_interlock_symlink_and_writable_state_rejected(self):
+        target = self.root / "target"
+        target.write_text(json.dumps({
+            "approved_sha": self.SHA,
+            "backup_timer_states": self.original,
+        }))
+        self.operations.interlock_file.symlink_to(target)
+        with self.assertRaisesRegex(upgrade.UpgradeError, "interlock_invalid"):
+            self.operations.arm_interlock(self.SHA)
+        self.operations.interlock_file.unlink()
+        self.operations.interlock_file.write_text(target.read_text())
+        self.operations.interlock_file.chmod(0o666)
+        with self.assertRaisesRegex(upgrade.UpgradeError, "interlock_invalid"):
+            self.operations.arm_interlock(self.SHA)
 
 
 class ControlPlaneUpgradeTests(unittest.TestCase):
@@ -230,6 +558,43 @@ class ControlPlaneUpgradeTests(unittest.TestCase):
             "-C", source, "update-ref", "refs/remotes/origin/main", approved
         )
         return source, approved
+
+    def static_preflight_candidate(self, root):
+        fixture_root = Path(root)
+        candidate = fixture_root / "candidate"
+        shutil.copytree(
+            WEB_ROOT / "deployment",
+            candidate / "web/deployment",
+            ignore=shutil.ignore_patterns("__pycache__", "*.pyc", "*.pyo"),
+        )
+        scripts = candidate / "web/scripts"
+        scripts.mkdir(parents=True)
+        for name in (
+            "madar_alert_hook.sh", "backup_madar.sh", "verify_backup.sh",
+            "backup_support.py", "verify_latest_backup.sh", "replicate_latest_node1.py",
+            "replicate_latest_offhost.sh", "replicate_backup_offhost.sh",
+            "restore_madar.sh", "rehearse_backup.py",
+        ):
+            shutil.copy2(WEB_ROOT / "scripts" / name, scripts / name)
+
+        operations = object.__new__(upgrade.SystemOperations)
+        operations.audit = None
+        operations.contract = dict(upgrade.EXPECTED_CONTRACT)
+        operations.staging_root = fixture_root / "staging"
+        operations.backup_root = fixture_root / "backups"
+        operations.staging_root.mkdir()
+        operations.backup_root.mkdir()
+        return operations, candidate
+
+    def run_static_preflight(self, operations, candidate):
+        capacity = SimpleNamespace(free=2 * 1024 * 1024 * 1024)
+        with (
+            mock.patch.object(
+                upgrade, "parse_contract", return_value=operations.contract
+            ),
+            mock.patch.object(upgrade.shutil, "disk_usage", return_value=capacity),
+        ):
+            return operations.static_preflight(candidate)
 
     @staticmethod
     def real_stage_operations(source, staging):
@@ -831,6 +1196,195 @@ class ControlPlaneUpgradeTests(unittest.TestCase):
             self.assertNotIn("installer_dry_run", operations.events)
             self.assertNotIn("installer_apply", operations.events)
 
+    def test_static_preflight_is_non_mutating_and_creates_no_bytecode(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations, candidate = self.static_preflight_candidate(root)
+            digest_before = operations.protected_tree_digest(candidate)
+            artifacts_before = {
+                path.relative_to(candidate)
+                for pattern in ("__pycache__", "*.pyc", "*.pyo")
+                for path in candidate.rglob(pattern)
+            }
+
+            returned_digest = self.run_static_preflight(operations, candidate)
+
+            self.assertEqual(returned_digest, digest_before)
+            self.assertEqual(
+                operations.protected_tree_digest(candidate), digest_before
+            )
+            artifacts_after = {
+                path.relative_to(candidate)
+                for pattern in ("__pycache__", "*.pyc", "*.pyo")
+                for path in candidate.rglob(pattern)
+            }
+            self.assertEqual(artifacts_after, artifacts_before)
+            self.assertEqual(artifacts_after, set())
+
+    def test_static_preflight_accepts_source_encoding_without_bytecode(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations, candidate = self.static_preflight_candidate(root)
+            encoded = candidate / "web/deployment/lib/encoded_source.py"
+            encoded.write_bytes(
+                b"# coding: latin-1\nvalue = 'caf\xe9'\n"
+            )
+
+            digest = self.run_static_preflight(operations, candidate)
+
+            self.assertEqual(
+                operations.protected_tree_digest(candidate), digest
+            )
+            self.assertFalse(any(candidate.rglob("*.pyc")))
+            self.assertFalse(any(candidate.rglob("*.pyo")))
+            self.assertFalse(any(candidate.rglob("__pycache__")))
+
+    def test_static_preflight_invalid_python_fails_closed_without_bytecode(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations, candidate = self.static_preflight_candidate(root)
+            invalid = candidate / "web/deployment/lib/invalid_source.py"
+            invalid.write_text("def invalid(:\n", encoding="utf-8")
+
+            with self.assertRaisesRegex(
+                upgrade.UpgradeError, "candidate_python_syntax_failed"
+            ):
+                self.run_static_preflight(operations, candidate)
+
+            self.assertFalse(any(candidate.rglob("*.pyc")))
+            self.assertFalse(any(candidate.rglob("*.pyo")))
+            self.assertFalse(any(candidate.rglob("__pycache__")))
+
+    def test_static_preflight_uses_isolated_bytecode_free_compile(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations, candidate = self.static_preflight_candidate(root)
+            candidate_interpreter = candidate / "web/deployment/bin/python3"
+            candidate_interpreter.write_text(
+                "#!/bin/sh\nexit 99\n", encoding="utf-8"
+            )
+            candidate_interpreter.chmod(0o755)
+            real_run = subprocess.run
+            commands = []
+
+            def record_run(args, **kwargs):
+                commands.append((list(args), dict(kwargs)))
+                return real_run(args, **kwargs)
+
+            with (
+                mock.patch.object(
+                    upgrade.subprocess, "run", side_effect=record_run
+                ),
+                mock.patch.dict(
+                    os.environ,
+                    {
+                        "PATH": str(candidate_interpreter.parent),
+                        "PYTHONPATH": str(candidate),
+                        "PYTHONHOME": str(candidate),
+                    },
+                    clear=False,
+                ),
+            ):
+                self.run_static_preflight(operations, candidate)
+
+            python_commands = [
+                (args, kwargs)
+                for args, kwargs in commands
+                if upgrade.PYTHON_SYNTAX_VALIDATOR in args
+            ]
+            self.assertEqual(len(python_commands), 1)
+            args, kwargs = python_commands[0]
+            self.assertEqual(args[0], str(Path(sys.executable).resolve()))
+            self.assertNotEqual(args[0], str(candidate_interpreter))
+            self.assertNotEqual(args[0], "/usr/bin/env")
+            self.assertEqual(args[1:4], ["-I", "-B", "-c"])
+            self.assertIn("compile(source.read()", args[4])
+            self.assertNotIn("py_compile", args)
+            self.assertNotIn("PYTHONPYCACHEPREFIX", kwargs["env"])
+            self.assertNotIn("PYTHONPATH", kwargs["env"])
+            self.assertNotIn("PYTHONHOME", kwargs["env"])
+
+    def test_trusted_python_interpreter_rejects_candidate_and_invalid_paths(self):
+        with tempfile.TemporaryDirectory() as root:
+            candidate = Path(root) / "candidate"
+            candidate.mkdir()
+            controlled = candidate / "python3"
+            controlled.write_text("not an interpreter\n", encoding="utf-8")
+            controlled.chmod(0o755)
+
+            for value in ("", "python3", str(controlled)):
+                with (
+                    self.subTest(value=value),
+                    mock.patch.object(upgrade.sys, "executable", value),
+                    self.assertRaisesRegex(
+                        upgrade.UpgradeError,
+                        "candidate_python_interpreter_untrusted",
+                    ),
+                ):
+                    upgrade.trusted_python_executable(candidate)
+
+    def test_installer_dry_run_sequence_preserves_static_preflight_digest(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations, candidate = self.static_preflight_candidate(root)
+            digest_before = self.run_static_preflight(operations, candidate)
+            backup = operations.backup_root / "pre-candidate"
+            operations.command = mock.Mock(
+                return_value=upgrade.CommandResult("", "", 0)
+            )
+
+            operations.installer_dry_run(candidate, backup)
+
+            self.assertEqual(
+                operations.protected_tree_digest(candidate), digest_before
+            )
+            operations.command.assert_called_once()
+            self.assertEqual(
+                operations.command.call_args.args[0], "installer_dry_run"
+            )
+
+    def test_real_protected_mutation_changes_post_dry_run_digest(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations, candidate = self.static_preflight_candidate(root)
+            digest_before = self.run_static_preflight(operations, candidate)
+            operations.command = mock.Mock(
+                return_value=upgrade.CommandResult("", "", 0)
+            )
+            operations.installer_dry_run(
+                candidate, operations.backup_root / "pre-candidate"
+            )
+            tamper = candidate / "web/deployment/tampered_after_dry_run"
+            tamper.write_text("tampered\n", encoding="utf-8")
+
+            self.assertNotEqual(
+                operations.protected_tree_digest(candidate), digest_before
+            )
+
+            tamper.unlink()
+            protected = candidate / "web/deployment/production-paths.conf"
+            original = protected.read_bytes()
+            protected.write_text(
+                protected.read_text(encoding="utf-8") + "# changed\n",
+                encoding="utf-8",
+            )
+            self.assertNotEqual(
+                operations.protected_tree_digest(candidate), digest_before
+            )
+
+            protected.write_bytes(original)
+            hidden = candidate / "web/deployment/.hidden-tamper"
+            hidden.write_text("hidden\n", encoding="utf-8")
+            self.assertNotEqual(
+                operations.protected_tree_digest(candidate), digest_before
+            )
+
+    def test_post_dry_run_protected_mutation_remains_fail_closed(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations, _record, _audit, coordinator = self.coordinator(root)
+            operations.protected_tree_digest = mock.Mock(
+                return_value="tampered-protected-tree"
+            )
+
+            with self.assertRaisesRegex(
+                upgrade.UpgradeError, "candidate_changed_after_dry_run"
+            ):
+                coordinator.execute(dry_run=True)
+
     def test_wrong_canonical_remote_fails_before_fetch(self):
         operations = object.__new__(upgrade.SystemOperations)
         operations.repository_origin = mock.Mock(return_value="file:///tmp/evil")
@@ -1172,6 +1726,1857 @@ class ControlPlaneUpgradeTests(unittest.TestCase):
         self.assertEqual(operations.timer, {"enabled": "enabled", "active": "active"})
         self.assertFalse(operations.interlock)
 
+    def test_schema_recovery_is_explicit_exact_schema_and_idempotent(self):
+        with tempfile.TemporaryDirectory() as root:
+            attestation = Path(root) / "schema96-attestation.json"
+            operations, record, _audit, coordinator = self.coordinator(root)
+            coordinator.execute(
+                dry_run=False,
+                recovery=True,
+                rehearsal_attestation=attestation,
+            )
+            coordinator.cleanup()
+        self.assertTrue(coordinator.success)
+        self.assertEqual(record.operation, "schema_recovery")
+        self.assertEqual(record.schema_before, 96)
+        self.assertEqual(record.schema_after, 96)
+        self.assertEqual(record.migration_result, "not_requested")
+        self.assertEqual(record.rehearsal_attestation_sha256, "a" * 64)
+        self.assertEqual(
+            operations.events.count("validate_recovery_candidate_contract"), 1
+        )
+        self.assertEqual(operations.events.count("recovery=True"), 2)
+        self.assertNotIn("recovery=False", operations.events)
+        self.assertLess(
+            operations.events.index("advance_production_checkout"),
+            operations.events.index("attest_serving"),
+        )
+        self.assertEqual(
+            operations.timer, {"enabled": "disabled", "active": "inactive"}
+        )
+
+    def test_schema_recovery_requires_rehearsal_before_quiesce(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations, _record, _audit, coordinator = self.coordinator(root)
+            with self.assertRaisesRegex(
+                upgrade.UpgradeError, "recovery_rehearsal_attestation_required"
+            ):
+                coordinator.execute(dry_run=False, recovery=True)
+            coordinator.cleanup()
+        self.assertNotIn("quiesce", operations.events)
+        self.assertNotIn("stage_candidate", operations.events)
+
+    def test_schema_recovery_candidate_contract_failure_never_deploys(self):
+        with tempfile.TemporaryDirectory() as root:
+            attestation = Path(root) / "schema96-attestation.json"
+            operations, record, _audit, coordinator = self.coordinator(
+                root, failure="validate_recovery_candidate_contract"
+            )
+            with self.assertRaises(upgrade.UpgradeError) as raised:
+                coordinator.execute(
+                    dry_run=False,
+                    recovery=True,
+                    rehearsal_attestation=attestation,
+                )
+            coordinator.handle_failure(raised.exception)
+            coordinator.cleanup()
+        self.assertFalse(record.application_promoted)
+        self.assertNotIn("controlled_candidate_deployment", operations.events)
+
+    def test_schema_recovery_contract_rejects_migrations_and_broad_ranges(self):
+        valid = {
+            "migration_policy": "schema-recovery-no-migration",
+            "schema": {
+                "compatible_min": 96,
+                "compatible_max": 96,
+                "target": 96,
+                "migration_class": "none",
+                "rollback_compatible_min": 96,
+                "rollback_compatible_max": 96,
+            },
+        }
+        with tempfile.TemporaryDirectory() as root:
+            release_dir = Path(root) / "web/deployment/releases"
+            release_dir.mkdir(parents=True)
+            contract = release_dir / "schema-96-recovery.json"
+            contract.write_text(json.dumps(valid), encoding="utf-8")
+            upgrade.SystemOperations.validate_recovery_candidate_contract(
+                Path(root), 96
+            )
+            for mutation in (
+                {"migration_manifest": "migrations-097.json"},
+                {"schema": {**valid["schema"], "compatible_min": 95}},
+                {"schema": {**valid["schema"], "migration_class": "expand-only"}},
+            ):
+                invalid = {**valid, **mutation}
+                contract.write_text(json.dumps(invalid), encoding="utf-8")
+                with self.assertRaisesRegex(
+                    upgrade.UpgradeError, "recovery_release_contract_invalid"
+                ):
+                    upgrade.SystemOperations.validate_recovery_candidate_contract(
+                        Path(root), 96
+                    )
+
+    def test_schema_recovery_attestation_is_exact_sha_schema_and_check_set(self):
+        checks = {
+            name: "passed" for name in {
+                "backend_authoritative", "backend_startup", "readiness",
+                "auth_tenant_mfa", "builder_forms_reservations_commerce",
+                "notifications_calendar_workers", "frontend_authoritative",
+                "frontend_production_build", "schema_96",
+                "invalid_indexes_zero", "rls_grants",
+                "browser_login_workspace_public",
+            }
+        }
+        with tempfile.TemporaryDirectory() as root:
+            path = Path(root) / "attestation.json"
+            document = {
+                "format": 1,
+                "status": "passed",
+                "candidate_sha": self.SHA,
+                "schema": 96,
+                "created_at": upgrade.datetime.now(
+                    upgrade.timezone.utc
+                ).isoformat(),
+                "checks": checks,
+            }
+            path.write_text(json.dumps(document), encoding="utf-8")
+            protected = SimpleNamespace(st_uid=0, st_mode=stat.S_IFREG | 0o600)
+            operations = object.__new__(upgrade.SystemOperations)
+            with mock.patch.object(
+                upgrade, "require_root_protected_ancestry"
+            ), mock.patch.object(Path, "stat", return_value=protected):
+                digest = operations.validate_rehearsal_attestation(
+                    path, self.SHA, 96
+                )
+                self.assertEqual(len(digest), 64)
+                document["candidate_sha"] = "b" * 40
+                path.write_text(json.dumps(document), encoding="utf-8")
+                with self.assertRaisesRegex(
+                    upgrade.UpgradeError,
+                    "recovery_rehearsal_attestation_mismatch",
+                ):
+                    operations.validate_rehearsal_attestation(path, self.SHA, 96)
+
+    def recovery_preflight_operations(self, root):
+        operations = object.__new__(upgrade.SystemOperations)
+        operations.state_root = Path(root) / "state"
+        operations.state_root.mkdir()
+        operations.storage_root = Path(root) / "storage"
+        operations.storage_root.mkdir()
+        operations.proxy_file = Path(root) / "proxy/active-upstreams.conf"
+        operations.proxy_file.parent.mkdir()
+        operations.proxy_file.write_text("fixture", encoding="utf-8")
+        operations.deploy_lock_descriptor = 1
+        old_sha = "1" * 40
+        (operations.state_root / "state.json").write_text(json.dumps({
+            "active_slot": "blue",
+            "known_good_release": {
+                "sha": old_sha,
+                "slot": "blue",
+                "schema": 93,
+                "images": {},
+            },
+        }), encoding="utf-8")
+        operations.repository_origin = mock.Mock(
+            return_value=upgrade.EXPECTED_CONTRACT["MADAR_CANONICAL_GIT_REMOTE"]
+        )
+        operations.require_clean_repository = mock.Mock()
+        operations.repository_head = mock.Mock(return_value=old_sha)
+        operations.installed_sha = mock.Mock(return_value="2" * 40)
+        operations.current_traffic_slot = mock.Mock(return_value="blue")
+        operations.live_schema = mock.Mock(return_value=96)
+        identity = {
+            "release_sha": old_sha,
+            "schema_compatible_min": 81,
+            "schema_compatible_max": 93,
+        }
+        operations.http_json = mock.Mock(return_value=identity)
+        operations.http_json_allow_503 = mock.Mock(return_value={
+            "ready": False,
+            "components": {"schema": "incompatible", "database": "ok"},
+        })
+        operations.http_ok = mock.Mock()
+        operations.attest_active_images = mock.Mock()
+        operations.systemctl_state = mock.Mock(side_effect=lambda unit: (
+            {"enabled": "disabled", "active": "inactive"}
+            if unit.endswith(".timer")
+            else {"enabled": "static", "active": "inactive"}
+        ))
+        return operations
+
+    def test_schema_recovery_origin_requires_database_ahead_and_no_fallback(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations = self.recovery_preflight_operations(root)
+            result = operations.current_recovery_preflight()
+            self.assertEqual(result["schema"], 96)
+
+            operations.live_schema.return_value = 93
+            with self.assertRaisesRegex(
+                upgrade.UpgradeError,
+                "recovery_origin_schema_not_ahead_of_state",
+            ):
+                operations.current_recovery_preflight()
+
+            operations.live_schema.return_value = 96
+            state_path = operations.state_root / "state.json"
+            state = json.loads(state_path.read_text(encoding="utf-8"))
+            state["compatible_fallback_release"] = {
+                "schema_compatible_min": 96,
+                "schema_compatible_max": 96,
+            }
+            state_path.write_text(json.dumps(state), encoding="utf-8")
+            with self.assertRaisesRegex(
+                upgrade.UpgradeError, "recovery_compatible_fallback_available"
+            ):
+                operations.current_recovery_preflight()
+
+    def test_schema_recovery_origin_rejects_unrelated_degradation(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations = self.recovery_preflight_operations(root)
+            operations.http_json_allow_503.return_value = {
+                "ready": False,
+                "components": {
+                    "schema": "incompatible",
+                    "database": "unavailable",
+                },
+            }
+            with self.assertRaisesRegex(
+                upgrade.UpgradeError, "recovery_origin_unrelated_degradation"
+            ):
+                operations.current_recovery_preflight()
+
+    def test_schema_recovery_preflight_accepts_exact_resume_after_switch(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations = self.recovery_preflight_operations(root)
+            state_path = operations.state_root / "state.json"
+            state = json.loads(state_path.read_text())
+            old = state["known_good_release"]
+            state["in_progress_release"] = {
+                "schema_recovery": True,
+                "release_sha": self.SHA,
+                "candidate_slot": "green",
+                "previous_traffic_target": "blue",
+                "previous_known_good_release": old,
+                "schema": 96,
+            }
+            state_path.write_text(json.dumps(state), encoding="utf-8")
+            operations.current_traffic_slot.return_value = "green"
+            operations.http_json.return_value = {
+                "release_sha": self.SHA,
+                "schema_compatible_min": 96,
+                "schema_compatible_max": 96,
+            }
+            operations.http_json_allow_503.return_value = {
+                "ready": True, "components": {"schema": "ok"},
+            }
+            result = operations.current_recovery_preflight(candidate_sha=self.SHA)
+        self.assertEqual(result["migration"], "recovery_resume")
+        self.assertEqual(result["schema"], 96)
+
+    def test_schema_recovery_preflight_accepts_candidate_worker_handoff_starting(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations = self.recovery_preflight_operations(root)
+            state_path = operations.state_root / "state.json"
+            state = json.loads(state_path.read_text())
+            old = state["known_good_release"]
+            state["in_progress_release"] = {
+                "schema_recovery": True,
+                "release_sha": self.SHA,
+                "candidate_slot": "green",
+                "previous_traffic_target": "blue",
+                "previous_known_good_release": old,
+                "schema": 96,
+                "phase": "post_switch_validation",
+                "worker_owner": "candidate",
+            }
+            state_path.write_text(json.dumps(state), encoding="utf-8")
+            operations.current_traffic_slot.return_value = "green"
+            operations.http_json.return_value = {
+                "release_sha": self.SHA,
+                "schema_compatible_min": 96,
+                "schema_compatible_max": 96,
+            }
+            operations.http_json_allow_503.return_value = {
+                "ready": False,
+                "components": {
+                    "schema": "ok", "database": "ok",
+                    "notification_worker": "unavailable",
+                    "calendar_sync_worker": "unavailable",
+                    "data_deletion_worker": "unavailable",
+                },
+            }
+            result = operations.current_recovery_preflight(candidate_sha=self.SHA)
+        self.assertEqual(result["migration"], "recovery_resume")
+        self.assertEqual(result["schema"], 96)
+
+    def test_completed_recovery_still_rejects_worker_degradation(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations = self.recovery_preflight_operations(root)
+            state_path = operations.state_root / "state.json"
+            state = json.loads(state_path.read_text())
+            state["active_slot"] = "green"
+            state["known_good_release"] = {
+                "sha": self.SHA, "slot": "green", "schema": 96,
+            }
+            state["compatible_fallback_release"] = {
+                "sha": self.SHA, "slot": "blue", "schema": 96,
+                "schema_compatible_min": 96, "schema_compatible_max": 96,
+            }
+            state_path.write_text(json.dumps(state), encoding="utf-8")
+            operations.current_traffic_slot.return_value = "green"
+            operations.http_json.return_value = {
+                "release_sha": self.SHA,
+                "schema_compatible_min": 96,
+                "schema_compatible_max": 96,
+            }
+            operations.http_json_allow_503.return_value = {
+                "ready": False,
+                "components": {"schema": "ok", "notification_worker": "unavailable"},
+            }
+            with self.assertRaisesRegex(
+                upgrade.UpgradeError, "recovery_origin_readiness_unexpected"
+            ):
+                operations.current_recovery_preflight(candidate_sha=self.SHA)
+
+    def test_schema_recovery_preflight_accepts_completed_checkout_pending(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations = self.recovery_preflight_operations(root)
+            state_path = operations.state_root / "state.json"
+            state = json.loads(state_path.read_text())
+            state["active_slot"] = "green"
+            state["known_good_release"] = {
+                "sha": self.SHA, "slot": "green", "schema": 96,
+            }
+            state["compatible_fallback_release"] = {
+                "sha": self.SHA, "slot": "blue", "schema": 96,
+                "schema_compatible_min": 96, "schema_compatible_max": 96,
+            }
+            state_path.write_text(json.dumps(state), encoding="utf-8")
+            operations.current_traffic_slot.return_value = "green"
+            operations.http_json.return_value = {
+                "release_sha": self.SHA,
+                "schema_compatible_min": 96,
+                "schema_compatible_max": 96,
+            }
+            operations.http_json_allow_503.return_value = {
+                "ready": True, "components": {"schema": "ok"},
+            }
+            result = operations.current_recovery_preflight(candidate_sha=self.SHA)
+        self.assertEqual(result["migration"], "recovery_complete_checkout_pending")
+
+    def automatic_pending_operations(self, root):
+        """Build a real immutable 96->99 automatic-migration origin fixture."""
+
+        operations = object.__new__(upgrade.SystemOperations)
+        operations.state_root = Path(root) / "state"
+        operations.state_root.mkdir()
+
+        release_root = operations.state_root / "releases" / self.SHA
+        releases = release_root / "web/deployment/releases"
+        migrations = release_root / "web/database/migrations"
+        releases.mkdir(parents=True)
+        migrations.mkdir(parents=True)
+
+        entries = []
+        for number, previous in ((97, 96), (98, 97), (99, 98)):
+            relative = (
+                f"web/database/migrations/"
+                f"{number:03d}_test_migration.sql"
+            )
+            migration = release_root / relative
+            migration.write_text(
+                f"-- fixture migration {number}\nselect {number};\n",
+                encoding="utf-8",
+            )
+            entries.append({
+                "number": number,
+                "path": relative,
+                "sha256": hashlib.sha256(
+                    migration.read_bytes()
+                ).hexdigest(),
+                "from_schema": previous,
+                "to_schema": number,
+                "compatibility": "expand-only",
+            })
+
+        (releases / "migrations-099.json").write_text(
+            json.dumps({
+                "release_sha": "CURRENT",
+                "migrations": entries,
+            }),
+            encoding="utf-8",
+        )
+
+        (releases / "release.json").write_text(
+            json.dumps({
+                "release_metadata_version": 1,
+                "schema": {
+                    "compatible_min": 81,
+                    "compatible_max": 99,
+                    "target": 99,
+                    "migration_class": "expand-only",
+                    "rollback_compatible_min": 81,
+                    "rollback_compatible_max": 98,
+                },
+                "migration_policy": upgrade.AUTOMATIC_MIGRATION_POLICY,
+                "migration_manifest": "migrations-099.json",
+            }),
+            encoding="utf-8",
+        )
+
+        state = {
+            "active_slot": "blue",
+            "known_good_release": {
+                "sha": self.SHA,
+                "slot": "blue",
+                "schema": 96,
+                "images": {},
+                "schema_compatible_min": 81,
+                "schema_compatible_max": 99,
+            },
+            "history": [{
+                "release_sha": self.SHA,
+                "candidate_slot": "blue",
+                "status": "known_good",
+                "phase": "complete",
+                "schema": {
+                    "observed": 96,
+                    "compatible_min": 81,
+                    "compatible_max": 99,
+                    "target": 99,
+                    "migration_class": "expand-only",
+                },
+            }],
+        }
+        (operations.state_root / "state.json").write_text(
+            json.dumps(state),
+            encoding="utf-8",
+        )
+        return operations
+
+    def test_origin_accepts_proven_never_started_automatic_migration(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations = self.automatic_pending_operations(root)
+
+            migration_dir = (
+                operations.state_root / "migrations" / self.SHA
+            )
+            self.assertFalse(migration_dir.exists())
+
+            self.assertEqual(
+                operations.migration_origin_state(
+                    self.SHA,
+                    96,
+                    96,
+                ),
+                "pre_mutation_pending",
+            )
+
+            # Final/steady-state semantics remain strict.
+            with self.assertRaisesRegex(
+                upgrade.UpgradeError,
+                "migration_automation_terminal_missing",
+            ):
+                operations.migration_terminal(self.SHA, 96)
+
+    def test_origin_rejects_empty_migration_state_directory(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations = self.automatic_pending_operations(root)
+            (
+                operations.state_root / "migrations" / self.SHA
+            ).mkdir(parents=True)
+
+            with self.assertRaisesRegex(
+                upgrade.UpgradeError,
+                "migration_pending_state_ambiguous",
+            ):
+                operations.migration_origin_state(
+                    self.SHA,
+                    96,
+                    96,
+                )
+
+    def test_origin_rejects_schema_advance_without_migration_state(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations = self.automatic_pending_operations(root)
+
+            with self.assertRaisesRegex(
+                upgrade.UpgradeError,
+                "migration_pending_schema_not_source",
+            ):
+                operations.migration_origin_state(
+                    self.SHA,
+                    96,
+                    97,
+                )
+
+    def test_origin_rejects_recorded_schema_drift_without_migration_state(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations = self.automatic_pending_operations(root)
+
+            with self.assertRaisesRegex(
+                upgrade.UpgradeError,
+                "migration_pending_schema_not_source",
+            ):
+                operations.migration_origin_state(
+                    self.SHA,
+                    97,
+                    96,
+                )
+
+    def test_origin_rejects_missing_acceptance_evidence(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations = self.automatic_pending_operations(root)
+            state_path = operations.state_root / "state.json"
+            state = json.loads(state_path.read_text(encoding="utf-8"))
+            state["history"] = []
+            state_path.write_text(
+                json.dumps(state),
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(
+                upgrade.UpgradeError,
+                "migration_pending_acceptance_missing",
+            ):
+                operations.migration_origin_state(
+                    self.SHA,
+                    96,
+                    96,
+                )
+
+    def test_origin_rejects_acceptance_schema_mismatch(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations = self.automatic_pending_operations(root)
+            state_path = operations.state_root / "state.json"
+            state = json.loads(state_path.read_text(encoding="utf-8"))
+            state["history"][-1]["schema"]["observed"] = 97
+            state_path.write_text(
+                json.dumps(state),
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(
+                upgrade.UpgradeError,
+                "migration_pending_acceptance_invalid",
+            ):
+                operations.migration_origin_state(
+                    self.SHA,
+                    96,
+                    96,
+                )
+
+    def test_origin_rejects_manifest_target_mismatch(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations = self.automatic_pending_operations(root)
+            release_path = (
+                operations.state_root
+                / "releases"
+                / self.SHA
+                / "web/deployment/releases/release.json"
+            )
+            release = json.loads(
+                release_path.read_text(encoding="utf-8")
+            )
+            release["schema"]["target"] = 100
+            release_path.write_text(
+                json.dumps(release),
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(
+                upgrade.UpgradeError,
+                "migration_pending_contract_invalid",
+            ):
+                operations.migration_origin_state(
+                    self.SHA,
+                    96,
+                    96,
+                )
+
+    def test_origin_rejects_migration_checksum_drift(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations = self.automatic_pending_operations(root)
+            migration = (
+                operations.state_root
+                / "releases"
+                / self.SHA
+                / "web/database/migrations/097_test_migration.sql"
+            )
+            migration.write_text(
+                "-- tampered\nselect 999;\n",
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(
+                upgrade.UpgradeError,
+                "migration_pending_checksum_invalid",
+            ):
+                operations.migration_origin_state(
+                    self.SHA,
+                    96,
+                    96,
+                )
+
+    def test_origin_rejects_execution_state_without_automation(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations = self.automatic_pending_operations(root)
+            migration_dir = (
+                operations.state_root / "migrations" / self.SHA
+            )
+            migration_dir.mkdir(parents=True)
+            (migration_dir / "execution.json").write_text(
+                json.dumps({
+                    "release_sha": self.SHA,
+                    "status": "completed",
+                    "observed_schema": 96,
+                }),
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(
+                upgrade.UpgradeError,
+                "migration_pending_state_ambiguous",
+            ):
+                operations.migration_origin_state(
+                    self.SHA,
+                    96,
+                    96,
+                )
+
+    def test_attest_serving_relaxes_only_current_origin(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations = self.automatic_pending_operations(root)
+
+            proxy = Path(root) / "proxy/active-upstreams.conf"
+            proxy.parent.mkdir()
+            proxy.write_text(
+                "backend 127.0.0.1:8101;\n"
+                "frontend 127.0.0.1:3100;\n",
+                encoding="utf-8",
+            )
+            operations.proxy_file = proxy
+            operations.live_schema = mock.Mock(return_value=96)
+
+            version = {
+                "release_sha": self.SHA,
+                "release_slot": "blue",
+                "schema_compatible_min": 81,
+                "schema_compatible_max": 99,
+            }
+            readiness = {
+                "ready": True,
+                "components": {
+                    "schema": "ok",
+                    "notification_worker": "ok",
+                    "calendar_sync_worker": "ok",
+                    "data_deletion_worker": "ok",
+                    "parser_isolation": "ok",
+                },
+            }
+
+            operations.http_json = mock.Mock(
+                side_effect=lambda url: (
+                    readiness
+                    if url.endswith("/health/ready")
+                    else version
+                )
+            )
+            operations.http_ok = mock.Mock()
+            operations.attest_active_images = mock.Mock()
+
+            current = operations.attest_serving(
+                self.SHA,
+                current_origin=True,
+            )
+            self.assertEqual(
+                current["migration"],
+                "pre_mutation_pending",
+            )
+            self.assertEqual(current["schema"], 96)
+            self.assertEqual(current["recorded_schema"], 96)
+
+            with self.assertRaisesRegex(
+                upgrade.UpgradeError,
+                "migration_automation_terminal_missing",
+            ):
+                operations.attest_serving(self.SHA)
+
+    def test_current_preflight_requests_origin_migration_classification(self):
+        operations = object.__new__(upgrade.SystemOperations)
+        operations.deploy_lock_descriptor = 1
+        operations.state_root = Path("/tmp/state")
+        operations.storage_root = Path("/tmp/storage")
+        operations.proxy_file = Path("/tmp/proxy/active-upstreams.conf")
+        operations.control_root = Path("/tmp/control")
+
+        operations.repository_origin = mock.Mock(
+            return_value=upgrade.EXPECTED_CONTRACT[
+                "MADAR_CANONICAL_GIT_REMOTE"
+            ]
+        )
+        operations.require_clean_repository = mock.Mock()
+        operations.repository_head = mock.Mock(return_value=self.SHA)
+        operations.installed_sha = mock.Mock(return_value=self.SHA)
+        operations.attest_serving = mock.Mock(return_value={
+            "slot": "blue",
+            "schema": 96,
+            "migration": "pre_mutation_pending",
+        })
+        operations.systemctl_state = mock.Mock(
+            return_value={
+                "enabled": "disabled",
+                "active": "inactive",
+            }
+        )
+
+        with (
+            mock.patch.object(Path, "exists", return_value=True),
+            mock.patch.object(Path, "is_symlink", return_value=False),
+            mock.patch.object(Path, "is_file", return_value=True),
+            mock.patch.object(
+                upgrade.os,
+                "access",
+                return_value=True,
+            ),
+        ):
+            result = operations.current_preflight()
+
+        operations.attest_serving.assert_called_once_with(
+            self.SHA,
+            current_origin=True,
+        )
+        self.assertEqual(
+            result["migration"],
+            "pre_mutation_pending",
+        )
+
+    def write_forward_repair_state(
+        self,
+        operations,
+        *,
+        phase="migration_execution_failed",
+        retry_due=True,
+        execution_status="failed",
+        live_schema=97,
+    ):
+        migration_dir = operations.state_root / "migrations" / self.SHA
+        migration_dir.mkdir(parents=True, exist_ok=True)
+
+        backup = Path(operations.state_root) / "fixture-backups" / "madar-20260916T120000Z"
+        backup.mkdir(parents=True, exist_ok=True)
+
+        retry_at = (
+            upgrade.datetime.now(upgrade.timezone.utc)
+            - timedelta(minutes=1)
+            if retry_due
+            else upgrade.datetime.now(upgrade.timezone.utc)
+            + timedelta(minutes=10)
+        )
+
+        automation = {
+            "release_sha": self.SHA,
+            "source_schema": 96,
+            "target_schema": 99,
+            "backup": (
+                None
+                if phase == "backup_creation_failed"
+                else str(backup)
+            ),
+            "started_at": "2026-09-16T10:00:00+00:00",
+            "attempted_at": "2026-09-16T10:01:00+00:00",
+            "phase": phase,
+            "status": "failed_forward_repair_required",
+            "failure_semantics": "forward_repair_only",
+            "retry_after": retry_at.isoformat(),
+            "failure_code": "fixture_failure",
+        }
+        (migration_dir / "automation.json").write_text(
+            json.dumps(automation),
+            encoding="utf-8",
+        )
+
+        if phase != "backup_creation_failed":
+            execution = {
+                "release_sha": self.SHA,
+                "backup": {
+                    "path": str(backup),
+                    "verified": True,
+                },
+                "status": execution_status,
+                "phase": (
+                    "complete"
+                    if execution_status == "completed"
+                    else "migration_97"
+                ),
+                "observed_schema": live_schema,
+                "migrations": [],
+            }
+            (migration_dir / "execution.json").write_text(
+                json.dumps(execution),
+                encoding="utf-8",
+            )
+
+        return migration_dir
+
+    def test_origin_accepts_due_forward_repair_migration_failure(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations = self.automatic_pending_operations(root)
+            self.write_forward_repair_state(
+                operations,
+                phase="migration_execution_failed",
+                execution_status="failed",
+                live_schema=97,
+            )
+
+            self.assertEqual(
+                operations.migration_origin_state(
+                    self.SHA,
+                    96,
+                    97,
+                ),
+                "forward_repair_pending",
+            )
+
+    def test_origin_accepts_due_forward_repair_post_validation_failure(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations = self.automatic_pending_operations(root)
+            self.write_forward_repair_state(
+                operations,
+                phase="post_migration_validation_failed",
+                execution_status="completed",
+                live_schema=99,
+            )
+
+            self.assertEqual(
+                operations.migration_origin_state(
+                    self.SHA,
+                    96,
+                    99,
+                ),
+                "forward_repair_pending",
+            )
+
+    def test_origin_accepts_due_forward_repair_backup_creation_failure(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations = self.automatic_pending_operations(root)
+            self.write_forward_repair_state(
+                operations,
+                phase="backup_creation_failed",
+                live_schema=96,
+            )
+
+            self.assertEqual(
+                operations.migration_origin_state(
+                    self.SHA,
+                    96,
+                    96,
+                ),
+                "forward_repair_pending",
+            )
+
+    def test_origin_rejects_forward_repair_before_retry_deadline(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations = self.automatic_pending_operations(root)
+            self.write_forward_repair_state(
+                operations,
+                retry_due=False,
+            )
+
+            with self.assertRaisesRegex(
+                upgrade.UpgradeError,
+                "migration_forward_repair_retry_suppressed",
+            ):
+                operations.migration_origin_state(
+                    self.SHA,
+                    96,
+                    97,
+                )
+
+    def test_origin_rejects_forward_repair_wrong_executor_status(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations = self.automatic_pending_operations(root)
+            self.write_forward_repair_state(
+                operations,
+                phase="migration_execution_failed",
+                execution_status="completed",
+            )
+
+            with self.assertRaisesRegex(
+                upgrade.UpgradeError,
+                "migration_forward_repair_execution_invalid",
+            ):
+                operations.migration_origin_state(
+                    self.SHA,
+                    96,
+                    97,
+                )
+
+    def test_origin_rejects_post_validation_without_completed_execution(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations = self.automatic_pending_operations(root)
+            self.write_forward_repair_state(
+                operations,
+                phase="post_migration_validation_failed",
+                execution_status="failed",
+                live_schema=99,
+            )
+
+            with self.assertRaisesRegex(
+                upgrade.UpgradeError,
+                "migration_forward_repair_execution_invalid",
+            ):
+                operations.migration_origin_state(
+                    self.SHA,
+                    96,
+                    99,
+                )
+
+    def test_origin_rejects_forward_repair_schema_outside_manifest(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations = self.automatic_pending_operations(root)
+            self.write_forward_repair_state(
+                operations,
+                live_schema=97,
+            )
+
+            with self.assertRaisesRegex(
+                upgrade.UpgradeError,
+                "migration_forward_repair_known_good_invalid",
+            ):
+                operations.migration_origin_state(
+                    self.SHA,
+                    96,
+                    100,
+                )
+
+    def forward_repair_image_operations(self):
+        operations = object.__new__(upgrade.SystemOperations)
+
+        backend_id = "sha256:" + "1" * 64
+        frontend_id = "sha256:" + "2" * 64
+        worker_id = "sha256:" + "3" * 64
+
+        known_good = {
+            "images": {
+                "backend": f"backend@{backend_id}",
+                "frontend": f"frontend@{frontend_id}",
+                "worker": f"worker@{worker_id}",
+            },
+        }
+
+        identities = {
+            "madar-blue-backend": backend_id,
+            "madar-blue-frontend": frontend_id,
+            "madar-blue-remote-ingestion-worker": worker_id,
+        }
+
+        return operations, known_good, identities, worker_id
+
+    def test_forward_repair_image_attestation_allows_explicitly_missing_worker(self):
+        operations, known_good, identities, _worker_id = (
+            self.forward_repair_image_operations()
+        )
+
+        def command(_label, args, check=True, **_kwargs):
+            container = args[-1]
+            if container in identities:
+                return upgrade.CommandResult(
+                    identities[container],
+                    "",
+                    0,
+                )
+            return upgrade.CommandResult(
+                "",
+                f"Error: No such object: {container}",
+                1,
+            )
+
+        operations.command = mock.Mock(side_effect=command)
+
+        operations.attest_active_images(
+            "blue",
+            known_good,
+            allow_refreshable_workers=True,
+        )
+
+    def test_forward_repair_image_attestation_rejects_inspection_failure(self):
+        operations, known_good, identities, _worker_id = (
+            self.forward_repair_image_operations()
+        )
+
+        def command(_label, args, check=True, **_kwargs):
+            container = args[-1]
+            if container in identities:
+                return upgrade.CommandResult(
+                    identities[container],
+                    "",
+                    0,
+                )
+            return upgrade.CommandResult(
+                "",
+                "Cannot connect to the Docker daemon",
+                1,
+            )
+
+        operations.command = mock.Mock(side_effect=command)
+
+        with self.assertRaisesRegex(
+            upgrade.UpgradeError,
+            "repairable_worker_inspection_failed",
+        ):
+            operations.attest_active_images(
+                "blue",
+                known_good,
+                allow_refreshable_workers=True,
+            )
+
+    def test_forward_repair_image_attestation_rejects_wrong_optional_image(self):
+        operations, known_good, identities, _worker_id = (
+            self.forward_repair_image_operations()
+        )
+
+        def command(_label, args, check=True, **_kwargs):
+            container = args[-1]
+            if container in identities:
+                return upgrade.CommandResult(
+                    identities[container],
+                    "",
+                    0,
+                )
+            if container == "madar-blue-parser-worker":
+                return upgrade.CommandResult(
+                    "sha256:" + "9" * 64,
+                    "",
+                    0,
+                )
+            return upgrade.CommandResult(
+                "",
+                f"Error: No such object: {container}",
+                1,
+            )
+
+        operations.command = mock.Mock(side_effect=command)
+
+        with self.assertRaisesRegex(
+            upgrade.UpgradeError,
+            "running_image_identity_mismatch",
+        ):
+            operations.attest_active_images(
+                "blue",
+                known_good,
+                allow_refreshable_workers=True,
+            )
+
+    def test_origin_accepts_interrupted_backup_creation(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations = self.automatic_pending_operations(root)
+            migration_dir = (
+                operations.state_root / "migrations" / self.SHA
+            )
+            migration_dir.mkdir(parents=True)
+
+            (migration_dir / "automation.json").write_text(
+                json.dumps({
+                    "release_sha": self.SHA,
+                    "source_schema": 96,
+                    "target_schema": 99,
+                    "backup": None,
+                    "started_at": "2026-09-16T10:00:00+00:00",
+                    "attempted_at": "2026-09-16T10:01:00+00:00",
+                    "phase": "backup_creation",
+                    "status": "running",
+                    "failure_semantics": "forward_repair_only",
+                }),
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                operations.migration_origin_state(
+                    self.SHA, 96, 96
+                ),
+                "forward_repair_pending",
+            )
+
+    def test_origin_accepts_interrupted_executor_running(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations = self.automatic_pending_operations(root)
+            migration_dir = (
+                operations.state_root / "migrations" / self.SHA
+            )
+            migration_dir.mkdir(parents=True)
+
+            backup = (
+                operations.state_root
+                / "fixture-backups/madar-20260916T120000Z"
+            )
+            backup.mkdir(parents=True)
+
+            (migration_dir / "automation.json").write_text(
+                json.dumps({
+                    "release_sha": self.SHA,
+                    "source_schema": 96,
+                    "target_schema": 99,
+                    "backup": str(backup),
+                    "started_at": "2026-09-16T10:00:00+00:00",
+                    "attempted_at": "2026-09-16T10:01:00+00:00",
+                    "phase": "migration_execution",
+                    "status": "running",
+                    "failure_semantics": "forward_repair_only",
+                }),
+                encoding="utf-8",
+            )
+
+            (migration_dir / "execution.json").write_text(
+                json.dumps({
+                    "release_sha": self.SHA,
+                    "backup": {
+                        "path": str(backup),
+                        "verified": True,
+                    },
+                    "status": "running",
+                    "phase": "migration_97",
+                    "observed_schema": 97,
+                    "migrations": [],
+                }),
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                operations.migration_origin_state(
+                    self.SHA, 96, 97
+                ),
+                "forward_repair_pending",
+            )
+
+    def test_origin_accepts_interrupted_post_validation(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations = self.automatic_pending_operations(root)
+            migration_dir = (
+                operations.state_root / "migrations" / self.SHA
+            )
+            migration_dir.mkdir(parents=True)
+
+            backup = (
+                operations.state_root
+                / "fixture-backups/madar-20260916T120000Z"
+            )
+            backup.mkdir(parents=True)
+
+            (migration_dir / "automation.json").write_text(
+                json.dumps({
+                    "release_sha": self.SHA,
+                    "source_schema": 96,
+                    "target_schema": 99,
+                    "backup": str(backup),
+                    "started_at": "2026-09-16T10:00:00+00:00",
+                    "attempted_at": "2026-09-16T10:01:00+00:00",
+                    "phase": "post_migration_validation",
+                    "status": "running",
+                    "failure_semantics": "forward_repair_only",
+                }),
+                encoding="utf-8",
+            )
+
+            (migration_dir / "execution.json").write_text(
+                json.dumps({
+                    "release_sha": self.SHA,
+                    "backup": {
+                        "path": str(backup),
+                        "verified": True,
+                    },
+                    "status": "completed",
+                    "phase": "complete",
+                    "observed_schema": 99,
+                    "migrations": [],
+                }),
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                operations.migration_origin_state(
+                    self.SHA, 96, 99
+                ),
+                "forward_repair_pending",
+            )
+
+    def test_interrupted_schema_advance_requires_execution_checkpoint(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations = self.automatic_pending_operations(root)
+            migration_dir = (
+                operations.state_root / "migrations" / self.SHA
+            )
+            migration_dir.mkdir(parents=True)
+
+            backup = (
+                operations.state_root
+                / "fixture-backups/madar-20260916T120000Z"
+            )
+            backup.mkdir(parents=True)
+
+            (migration_dir / "automation.json").write_text(
+                json.dumps({
+                    "release_sha": self.SHA,
+                    "source_schema": 96,
+                    "target_schema": 99,
+                    "backup": str(backup),
+                    "phase": "migration_execution",
+                    "status": "running",
+                    "failure_semantics": "forward_repair_only",
+                }),
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(
+                upgrade.UpgradeError,
+                "migration_forward_repair_execution_invalid",
+            ):
+                operations.migration_origin_state(
+                    self.SHA, 96, 97
+                )
+
+    def test_forward_repair_service_uses_exact_release_deployer(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations = object.__new__(upgrade.SystemOperations)
+            operations.audit = None
+            operations.repo = Path("/srv/madar/production")
+            operations.control_root = Path(
+                "/opt/madar/control-plane/deployment"
+            )
+            operations.contract_path = (
+                operations.control_root / "production-paths.conf"
+            )
+            operations.authorization_file = (
+                Path(root) / "authorized.credential"
+            )
+
+            operations.write_authorization = mock.Mock()
+            operations.clear_authorization = mock.Mock()
+
+            def command(label, args, **_kwargs):
+                return upgrade.CommandResult("", "", 0)
+
+            operations.command = mock.Mock(side_effect=command)
+
+            operations.run_deploy_service(
+                "forward_repair_migration",
+                self.SHA,
+                migration_repair=True,
+            )
+
+            calls = [
+                call
+                for call in operations.command.call_args_list
+                if call.args[0] == "forward_repair_migration"
+            ]
+            self.assertEqual(len(calls), 1)
+
+            argv = calls[0].args[1]
+            release_deployer = str(
+                operations.control_root
+                / "bin/madar-release-deploy"
+            )
+            auto_deployer = str(
+                operations.control_root
+                / "bin/madar-auto-deploy"
+            )
+
+            index = argv.index(release_deployer)
+            self.assertEqual(
+                argv[index:index + 3],
+                [
+                    release_deployer,
+                    self.SHA,
+                    "--automatic-migrate",
+                ],
+            )
+            self.assertNotIn(auto_deployer, argv)
+
+    def test_forward_repair_dry_run_requires_exact_same_sha_and_no_install(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations, record, _audit, coordinator = self.coordinator(
+                root,
+                protected=False,
+            )
+            operations.production = self.SHA
+            operations.installed = self.SHA
+            operations.timer = {
+                "enabled": "disabled",
+                "active": "inactive",
+            }
+
+            original_preflight = operations.current_preflight
+
+            def repair_preflight(*, lock_deployment=True):
+                result = original_preflight(
+                    lock_deployment=lock_deployment
+                )
+                result["migration"] = "forward_repair_pending"
+                return result
+
+            operations.current_preflight = repair_preflight
+            coordinator.execute(dry_run=True)
+            coordinator.cleanup()
+
+        self.assertTrue(coordinator.success)
+        self.assertFalse(record.controller_installation_required)
+        self.assertFalse(record.controller_installation_performed)
+        self.assertFalse(record.controller_installed)
+        self.assertFalse(record.application_promoted)
+        self.assertIn(
+            "verify_installed_controller",
+            operations.events,
+        )
+        self.assertNotIn("resolve_candidate", operations.events)
+        self.assertNotIn("stage_candidate", operations.events)
+        self.assertNotIn("installer_dry_run", operations.events)
+        self.assertNotIn("installer_apply", operations.events)
+        self.assertNotIn(
+            "controlled_candidate_deployment",
+            operations.events,
+        )
+        self.assertNotIn("clear_interlock", operations.events)
+
+    def test_forward_repair_rejects_different_production_sha(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations, _record, _audit, coordinator = self.coordinator(
+                root,
+                protected=False,
+            )
+            operations.production = "1" * 40
+            operations.installed = self.SHA
+
+            original_preflight = operations.current_preflight
+
+            def repair_preflight(*, lock_deployment=True):
+                result = original_preflight(
+                    lock_deployment=lock_deployment
+                )
+                result["migration"] = "forward_repair_pending"
+                return result
+
+            operations.current_preflight = repair_preflight
+
+            with self.assertRaisesRegex(
+                upgrade.UpgradeError,
+                "forward_repair_exact_release_sha_required",
+            ):
+                coordinator.execute(dry_run=True)
+            coordinator.cleanup()
+
+        self.assertNotIn("installer_apply", operations.events)
+
+    def test_forward_repair_dry_run_accepts_attested_controller_ahead(self):
+        newer_controller = "2" * 40
+
+        with tempfile.TemporaryDirectory() as root:
+            operations, record, _audit, coordinator = self.coordinator(
+                root,
+                protected=False,
+            )
+            operations.production = self.SHA
+            operations.installed = newer_controller
+            operations.controller_compatibility = "controller_ahead_bridge"
+            operations.timer = {
+                "enabled": "disabled",
+                "active": "inactive",
+            }
+
+            original_preflight = operations.current_preflight
+
+            def repair_preflight(*, lock_deployment=True):
+                result = original_preflight(
+                    lock_deployment=lock_deployment
+                )
+                result["migration"] = "forward_repair_pending"
+                return result
+
+            operations.current_preflight = repair_preflight
+
+            coordinator.execute(dry_run=True)
+            coordinator.cleanup()
+
+        self.assertTrue(coordinator.success)
+        self.assertEqual(
+            record.controller_compatibility,
+            "forward_repair_controller_ahead",
+        )
+        self.assertTrue(record.controller_preinstalled)
+        self.assertFalse(record.controller_installation_required)
+        self.assertFalse(record.controller_installation_performed)
+
+        self.assertIn(
+            "validate_controller_compatibility",
+            operations.events,
+        )
+        self.assertIn(
+            "verify_installed_controller",
+            operations.events,
+        )
+
+        for forbidden in (
+            "resolve_candidate",
+            "stage_candidate",
+            "static_preflight",
+            "installer_dry_run",
+            "installer_apply",
+            "quiesce",
+            "arm_interlock",
+            "forward_repair_migration",
+            "forward_repair_idempotence",
+            "clear_interlock",
+        ):
+            self.assertNotIn(forbidden, operations.events)
+
+        self.assertEqual(operations.production, self.SHA)
+        self.assertEqual(operations.installed, newer_controller)
+        self.assertEqual(
+            operations.timer,
+            {"enabled": "disabled", "active": "inactive"},
+        )
+
+    def test_forward_repair_rejects_unattested_controller_ahead(self):
+        newer_controller = "2" * 40
+
+        with tempfile.TemporaryDirectory() as root:
+            operations, _record, _audit, coordinator = self.coordinator(
+                root,
+                protected=False,
+            )
+            operations.production = self.SHA
+            operations.installed = newer_controller
+            operations.controller_compatibility = "normal_compatible"
+            operations.timer = {
+                "enabled": "disabled",
+                "active": "inactive",
+            }
+
+            original_preflight = operations.current_preflight
+
+            def repair_preflight(*, lock_deployment=True):
+                result = original_preflight(
+                    lock_deployment=lock_deployment
+                )
+                result["migration"] = "forward_repair_pending"
+                return result
+
+            operations.current_preflight = repair_preflight
+
+            with self.assertRaisesRegex(
+                upgrade.UpgradeError,
+                "forward_repair_controller_ahead_bridge_invalid",
+            ):
+                coordinator.execute(dry_run=True)
+
+            coordinator.cleanup()
+
+        self.assertIn(
+            "validate_controller_compatibility",
+            operations.events,
+        )
+        self.assertNotIn(
+            "verify_installed_controller",
+            operations.events,
+        )
+
+        for forbidden in (
+            "resolve_candidate",
+            "stage_candidate",
+            "installer_dry_run",
+            "installer_apply",
+            "quiesce",
+            "arm_interlock",
+            "forward_repair_migration",
+            "clear_interlock",
+        ):
+            self.assertNotIn(forbidden, operations.events)
+
+        self.assertEqual(operations.production, self.SHA)
+        self.assertEqual(operations.installed, newer_controller)
+
+    def test_forward_repair_apply_with_controller_ahead_skips_reinstall(self):
+        newer_controller = "2" * 40
+
+        with tempfile.TemporaryDirectory() as root:
+            operations, record, _audit, coordinator = self.coordinator(
+                root,
+                protected=False,
+            )
+            operations.production = self.SHA
+            operations.installed = newer_controller
+            operations.controller_compatibility = "controller_ahead_bridge"
+            operations.timer = {
+                "enabled": "disabled",
+                "active": "inactive",
+            }
+
+            original_preflight = operations.current_preflight
+
+            def repair_preflight(*, lock_deployment=True):
+                result = original_preflight(
+                    lock_deployment=lock_deployment
+                )
+                result["migration"] = "forward_repair_pending"
+                return result
+
+            operations.current_preflight = repair_preflight
+
+            coordinator.execute(dry_run=False)
+            coordinator.cleanup()
+
+        self.assertTrue(coordinator.success)
+        self.assertTrue(record.application_promoted)
+        self.assertEqual(
+            record.controller_compatibility,
+            "forward_repair_controller_ahead",
+        )
+        self.assertTrue(record.controller_preinstalled)
+        self.assertFalse(record.controller_installation_required)
+        self.assertFalse(record.controller_installation_performed)
+
+        self.assertIn(
+            "validate_controller_compatibility",
+            operations.events,
+        )
+        self.assertIn(
+            "verify_installed_controller",
+            operations.events,
+        )
+        self.assertIn(
+            "forward_repair_migration",
+            operations.events,
+        )
+        self.assertIn(
+            "forward_repair_idempotence",
+            operations.events,
+        )
+
+        self.assertEqual(
+            operations.events.count("migration_repair=True"),
+            2,
+        )
+
+        for forbidden in (
+            "resolve_candidate",
+            "stage_candidate",
+            "static_preflight",
+            "installer_dry_run",
+            "installer_apply",
+            "verify_install",
+            "controlled_candidate_deployment",
+        ):
+            self.assertNotIn(forbidden, operations.events)
+
+        self.assertEqual(operations.production, self.SHA)
+        self.assertEqual(operations.installed, newer_controller)
+        self.assertIn("clear_interlock", operations.events)
+        self.assertLess(
+            operations.events.index("restore_timer"),
+            operations.events.index("clear_interlock"),
+        )
+        self.assertEqual(operations.backup_timers, operations.backup_timer_states)
+        self.assertFalse(operations.interlock)
+        self.assertEqual(
+            operations.timer,
+            {"enabled": "disabled", "active": "inactive"},
+        )
+
+    def test_forward_repair_apply_uses_existing_controller_and_same_sha_cycles(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations, record, _audit, coordinator = self.coordinator(
+                root,
+                protected=False,
+            )
+            operations.production = self.SHA
+            operations.installed = self.SHA
+            operations.timer = {
+                "enabled": "disabled",
+                "active": "inactive",
+            }
+
+            original_preflight = operations.current_preflight
+
+            def repair_preflight(*, lock_deployment=True):
+                result = original_preflight(
+                    lock_deployment=lock_deployment
+                )
+                result["migration"] = "forward_repair_pending"
+                return result
+
+            operations.current_preflight = repair_preflight
+
+            coordinator.execute(dry_run=False)
+            coordinator.cleanup()
+
+        self.assertTrue(coordinator.success)
+        self.assertTrue(record.application_promoted)
+        self.assertFalse(record.controller_installation_required)
+        self.assertFalse(record.controller_installation_performed)
+        self.assertNotIn("installer_apply", operations.events)
+        self.assertIn(
+            "forward_repair_migration",
+            operations.events,
+        )
+        self.assertIn(
+            "forward_repair_idempotence",
+            operations.events,
+        )
+        self.assertEqual(
+            operations.events.count("migration_repair=True"),
+            2,
+        )
+        self.assertNotIn("resolve_candidate", operations.events)
+        self.assertNotIn("stage_candidate", operations.events)
+        self.assertNotIn("static_preflight", operations.events)
+        self.assertNotIn("installer_dry_run", operations.events)
+        self.assertNotIn("installer_apply", operations.events)
+        self.assertIn("clear_interlock", operations.events)
+        self.assertLess(
+            operations.events.index("restore_timer"),
+            operations.events.index("clear_interlock"),
+        )
+        self.assertEqual(operations.backup_timers, operations.backup_timer_states)
+        self.assertFalse(operations.interlock)
+        self.assertEqual(
+            operations.timer,
+            {"enabled": "disabled", "active": "inactive"},
+        )
+
+    def test_failed_forward_repair_keeps_interlock_and_timer_disabled(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations, record, _audit, coordinator = self.coordinator(
+                root,
+                protected=False,
+                failure="forward_repair_migration",
+            )
+            operations.production = self.SHA
+            operations.installed = self.SHA
+            operations.timer = {
+                "enabled": "disabled",
+                "active": "inactive",
+            }
+
+            original_preflight = operations.current_preflight
+
+            def repair_preflight(*, lock_deployment=True):
+                result = original_preflight(
+                    lock_deployment=lock_deployment
+                )
+                result["migration"] = "forward_repair_pending"
+                return result
+
+            operations.current_preflight = repair_preflight
+
+            with self.assertRaises(upgrade.UpgradeError) as raised:
+                coordinator.execute(dry_run=False)
+            coordinator.handle_failure(raised.exception)
+            coordinator.cleanup()
+
+        self.assertTrue(record.application_promoted)
+        self.assertEqual(
+            record.failure_semantics,
+            "post_promotion_forward_repair_timer_disabled",
+        )
+        self.assertTrue(operations.interlock)
+        self.assertEqual(
+            operations.timer,
+            {"enabled": "disabled", "active": "inactive"},
+        )
+        self.assertIn(
+            "disable_automation_for_failure",
+            operations.events,
+        )
+
+    def test_quiesce_failure_before_snapshot_is_not_durable(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations, _record, _audit, coordinator = self.coordinator(
+                root, failure="quiesce"
+            )
+            self.assertIsNone(operations.backup_timer_states)
+            with self.assertRaises(upgrade.UpgradeError) as raised:
+                coordinator.execute(dry_run=False)
+            coordinator.handle_failure(raised.exception)
+            coordinator.cleanup()
+        self.assertFalse(coordinator.quiesced)
+        self.assertIn(
+            "durable_quiesce_snapshot_exists", operations.events
+        )
+        self.assertNotIn("restore_timer", operations.events)
+        self.assertFalse(operations.interlock)
+
+    def test_quiesce_failure_after_snapshot_is_durably_handled(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations, _record, _audit, coordinator = self.coordinator(
+                root, failure="quiesce_after_snapshot"
+            )
+            with self.assertRaises(upgrade.UpgradeError) as raised:
+                coordinator.execute(dry_run=False)
+            coordinator.handle_failure(raised.exception)
+            coordinator.cleanup()
+        self.assertTrue(coordinator.quiesced)
+        self.assertIn(
+            "durable_quiesce_snapshot_exists", operations.events
+        )
+        self.assertIn("restore_timer", operations.events)
+        self.assertEqual(
+            operations.backup_timers, operations.backup_timer_states
+        )
+        self.assertFalse(operations.interlock)
+
+    def test_preflight_failure_does_not_clear_preexisting_interlock(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations, _record, _audit, coordinator = self.coordinator(
+                root,
+                protected=False,
+                failure="current_preflight",
+            )
+            operations.interlock = True
+            operations.timer = {
+                "enabled": "disabled",
+                "active": "inactive",
+            }
+
+            with self.assertRaises(upgrade.UpgradeError) as raised:
+                coordinator.execute(dry_run=False)
+            coordinator.handle_failure(raised.exception)
+            coordinator.cleanup()
+
+        self.assertTrue(operations.interlock)
+        self.assertNotIn("clear_interlock", operations.events)
+
+    def test_normal_preflight_accepts_completed_zero_migration_recovery(self):
+        with tempfile.TemporaryDirectory() as root:
+            recovery_id = "b" * 64
+            operations = object.__new__(upgrade.SystemOperations)
+            operations.state_root = Path(root)
+            release_root = Path(root) / "releases" / self.SHA
+            (release_root / "web/deployment/releases").mkdir(parents=True)
+            (release_root / "web/deployment/releases/schema-96-recovery.json").write_text(
+                json.dumps({
+                    "migration_policy": "schema-recovery-no-migration",
+                    "schema": {
+                        "compatible_min": 96,
+                        "compatible_max": 96,
+                        "target": 96,
+                        "migration_class": "none",
+                        "rollback_compatible_min": 96,
+                        "rollback_compatible_max": 96,
+                    },
+                }),
+                encoding="utf-8",
+            )
+            (Path(root) / "state.json").write_text(json.dumps({
+                "active_slot": "green",
+                "known_good_release": {
+                    "sha": self.SHA,
+                    "slot": "green",
+                    "schema": 96,
+                    "schema_recovery": True,
+                    "migration_result": "not_requested",
+                    "recovery_id": recovery_id,
+                },
+                "compatible_fallback_release": {
+                    "sha": self.SHA, "slot": "blue", "schema": 96,
+                    "schema_recovery": True,
+                    "migration_result": "not_requested",
+                    "recovery_id": recovery_id,
+                },
+                "history": [{
+                    "release_sha": self.SHA, "schema_recovery": True,
+                    "status": "known_good", "phase": "complete",
+                    "recovery_id": recovery_id,
+                }],
+            }), encoding="utf-8")
+
+            self.assertEqual(
+                operations.migration_terminal(self.SHA, 96), "not_requested"
+            )
+
+    def test_normal_preflight_rejects_recovery_marker_without_completed_transaction(self):
+        with tempfile.TemporaryDirectory() as root:
+            operations = object.__new__(upgrade.SystemOperations)
+            operations.state_root = Path(root)
+            release_root = Path(root) / "releases" / self.SHA
+            (release_root / "web/deployment/releases").mkdir(parents=True)
+            (release_root / "web/deployment/releases/schema-96-recovery.json").write_text(
+                json.dumps({
+                    "migration_policy": "schema-recovery-no-migration",
+                    "schema": {
+                        "compatible_min": 96, "compatible_max": 96,
+                        "target": 96, "migration_class": "none",
+                        "rollback_compatible_min": 96,
+                        "rollback_compatible_max": 96,
+                    },
+                })
+            )
+            (Path(root) / "state.json").write_text(json.dumps({
+                "active_slot": "green",
+                "known_good_release": {
+                    "sha": self.SHA, "slot": "green", "schema": 96,
+                    "schema_recovery": True, "migration_result": "not_requested",
+                    "recovery_id": "b" * 64,
+                },
+                "compatible_fallback_release": {
+                    "sha": self.SHA, "slot": "blue", "schema": 96,
+                    "schema_recovery": True, "migration_result": "not_requested",
+                    "recovery_id": "b" * 64,
+                },
+                "history": [],
+            }))
+            with self.assertRaisesRegex(
+                upgrade.UpgradeError, "recovery_known_good_state_invalid"
+            ):
+                operations.migration_terminal(self.SHA, 96)
+
+    def test_recovery_checkout_advance_is_fast_forward_only_and_verified(self):
+        operations = object.__new__(upgrade.SystemOperations)
+        old_sha = "1" * 40
+        operations.require_clean_repository = mock.Mock()
+        operations.repository_head = mock.Mock(side_effect=[old_sha, self.SHA])
+        operations.madar_git = mock.Mock(side_effect=[
+            subprocess.CompletedProcess([], 0),
+            subprocess.CompletedProcess([], 0),
+        ])
+        operations.advance_production_checkout(self.SHA)
+        self.assertEqual(operations.madar_git.call_args_list[0].args[1:3], (
+            "merge-base", "--is-ancestor",
+        ))
+        self.assertIn("--ff-only", operations.madar_git.call_args_list[1].args)
+        self.assertEqual(operations.require_clean_repository.call_count, 2)
+
+    def test_recovery_checkout_rejects_non_fast_forward(self):
+        operations = object.__new__(upgrade.SystemOperations)
+        operations.require_clean_repository = mock.Mock()
+        operations.repository_head = mock.Mock(return_value="1" * 40)
+        operations.madar_git = mock.Mock(return_value=subprocess.CompletedProcess([], 1))
+        with self.assertRaisesRegex(upgrade.UpgradeError, "not_fast_forward"):
+            operations.advance_production_checkout(self.SHA)
+
+    def test_schema_recovery_post_switch_attestation_failure_is_forward_only(self):
+        with tempfile.TemporaryDirectory() as root:
+            attestation = Path(root) / "schema96-attestation.json"
+            operations, record, _audit, coordinator = self.coordinator(
+                root, failure="attest_serving"
+            )
+            with self.assertRaises(upgrade.UpgradeError) as raised:
+                coordinator.execute(
+                    dry_run=False,
+                    recovery=True,
+                    rehearsal_attestation=attestation,
+                )
+            coordinator.handle_failure(raised.exception)
+            coordinator.cleanup()
+        self.assertEqual(operations.production, self.SHA)
+        self.assertTrue(record.application_promoted)
+        self.assertEqual(record.schema_after, 96)
+        self.assertEqual(
+            record.failure_semantics,
+            "post_promotion_forward_repair_timer_disabled",
+        )
+        self.assertIn("recovery_traffic_identity", operations.events)
+        self.assertNotIn("restore_timer", operations.events)
+
     def test_exact_controller_ahead_bridge_dry_run_is_non_mutating(self):
         production = "1" * 40
         approved = self.SHA
@@ -1286,6 +3691,11 @@ class ControlPlaneUpgradeTests(unittest.TestCase):
         )
         self.assertNotIn("preinstall_restore_safe", operations.events)
         self.assertNotIn("restore_timer", operations.events)
+        self.assertIsNotNone(operations.backup_timer_states)
+        self.assertTrue(all(
+            state["active"] == "inactive"
+            for state in operations.backup_timers.values()
+        ))
         self.assertTrue(operations.interlock)
         self.assertEqual(
             operations.timer, {"enabled": "disabled", "active": "inactive"}
@@ -1310,6 +3720,11 @@ class ControlPlaneUpgradeTests(unittest.TestCase):
             "post_promotion_forward_repair_timer_disabled",
         )
         self.assertNotIn("restore_timer", operations.events)
+        self.assertIsNotNone(operations.backup_timer_states)
+        self.assertTrue(all(
+            state["active"] == "inactive"
+            for state in operations.backup_timers.values()
+        ))
         self.assertTrue(operations.interlock)
 
     def test_failed_bridge_dry_run_never_mutates_automation_or_interlock(self):
@@ -1399,6 +3814,11 @@ class ControlPlaneUpgradeTests(unittest.TestCase):
             "post_install_manual_intervention_timer_disabled",
         )
         self.assertNotIn("restore_timer", operations.events)
+        self.assertIsNotNone(operations.backup_timer_states)
+        self.assertTrue(all(
+            state["active"] == "inactive"
+            for state in operations.backup_timers.values()
+        ))
         self.assertTrue(operations.interlock)
 
     def test_postpromotion_failure_is_forward_repair_and_never_restores_timer(self):
@@ -1416,6 +3836,11 @@ class ControlPlaneUpgradeTests(unittest.TestCase):
             "post_promotion_forward_repair_timer_disabled",
         )
         self.assertNotIn("restore_timer", operations.events)
+        self.assertIsNotNone(operations.backup_timer_states)
+        self.assertTrue(all(
+            state["active"] == "inactive"
+            for state in operations.backup_timers.values()
+        ))
         self.assertTrue(operations.interlock)
 
     def test_timer_restore_failure_requiesces_and_rearms_interlock(self):
@@ -1441,6 +3866,11 @@ class ControlPlaneUpgradeTests(unittest.TestCase):
             marker.write_text(json.dumps({
                 "approved_sha": self.SHA,
                 "authorization_sha256": hashlib.sha256(token.encode()).hexdigest(),
+                "version": 2,
+                "backup_timer_states": {
+                    name: {"enabled": "disabled", "active": "inactive"}
+                    for name in upgrade.BACKUP_TIMERS
+                },
             }), encoding="utf-8")
             marker.chmod(0o644)
             credentials = Path(root) / "credentials"
@@ -1505,6 +3935,50 @@ class ControlPlaneUpgradeTests(unittest.TestCase):
                         self.SHA, interlock=writable
                     )
 
+    def test_recovery_authorization_is_mandatory_and_bound(self):
+        with tempfile.TemporaryDirectory() as root:
+            marker = Path(root) / "in-progress.json"
+            with self.assertRaisesRegex(RuntimeError, "recovery_authorization_required"):
+                require_upgrade_authorization(
+                    self.SHA, interlock=marker,
+                    required_operation="schema_recovery", required_schema=96,
+                    require_rehearsal=True,
+                )
+            token = "one-use-recovery-token"
+            rehearsal = "a" * 64
+            document = {
+                "approved_sha": self.SHA,
+                "authorization_sha256": hashlib.sha256(token.encode()).hexdigest(),
+                "operation": "schema_recovery", "schema": 96,
+                "rehearsal_sha256": rehearsal,
+            }
+            marker.write_text(json.dumps(document), encoding="utf-8")
+            marker.chmod(0o644)
+            credentials = Path(root) / "credentials"
+            credentials.mkdir()
+            (credentials / "madar-control-plane-upgrade").write_text(json.dumps({
+                "approved_sha": self.SHA, "token": token,
+                "operation": "schema_recovery", "schema": 96,
+                "rehearsal_sha256": rehearsal,
+            }), encoding="utf-8")
+            root_stat = SimpleNamespace(st_uid=0, st_mode=stat.S_IFREG | 0o644)
+            with mock.patch.object(Path, "stat", return_value=root_stat), mock.patch.dict(
+                os.environ, {"CREDENTIALS_DIRECTORY": str(credentials)}, clear=True
+            ):
+                require_upgrade_authorization(
+                    self.SHA, interlock=marker,
+                    required_operation="schema_recovery", required_schema=96,
+                    require_rehearsal=True,
+                )
+                document["schema"] = 97
+                marker.write_text(json.dumps(document), encoding="utf-8")
+                with self.assertRaisesRegex(RuntimeError, "exclusive_interlock"):
+                    require_upgrade_authorization(
+                        self.SHA, interlock=marker,
+                        required_operation="schema_recovery", required_schema=96,
+                        require_rehearsal=True,
+                    )
+
     def test_installer_and_service_define_self_update_and_authorization_boundary(self):
         installer = INSTALLER_PATH.read_text(encoding="utf-8")
         service = SERVICE_PATH.read_text(encoding="utf-8")
@@ -1555,6 +4029,8 @@ class ControlPlaneUpgradeTests(unittest.TestCase):
         self.assertIn("--gid=madar", invocation)
         self.assertIn("--property=NoNewPrivileges=yes", invocation)
         self.assertIn("--property=TimeoutStartSec=45min", invocation)
+        self.assertIn("--property=EnvironmentFile=/etc/madar/backup.env", invocation)
+        self.assertIn("--property=EnvironmentFile=/etc/madar/node1-backup.env", invocation)
         self.assertIn("--property=LoadCredential=madar-control-plane-upgrade:", joined)
         self.assertNotIn("MADAR_CONTROL_PLANE_UPGRADE_TOKEN=", joined)
         self.assertNotIn("SUPABASE_SERVICE_KEY", joined)

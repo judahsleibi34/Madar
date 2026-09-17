@@ -1,6 +1,6 @@
 import unittest
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -28,6 +28,12 @@ def auth_context():
 
 
 class MfaRoutesTests(unittest.TestCase):
+    def setUp(self):
+        self.mfa_client = MagicMock()
+        factory = patch.object(mfa_routes, "get_request_mfa_client", return_value=self.mfa_client)
+        factory.start()
+        self.addCleanup(factory.stop)
+
     def test_status_returns_safe_settings_and_factors(self):
         client = build_client()
         factors_response = SimpleNamespace(
@@ -45,7 +51,7 @@ class MfaRoutesTests(unittest.TestCase):
 
         with patch.object(mfa_routes, "get_authenticated_user_row", return_value=auth_context()), \
              patch.object(mfa_routes, "get_user_security_settings", return_value={"mfa_required": True, "last_aal2_at": "now"}), \
-             patch.object(mfa_routes.supabase.auth.mfa, "list_factors", return_value=factors_response), \
+             patch.object(self.mfa_client.auth.mfa, "list_factors", return_value=factors_response), \
              patch.object(mfa_routes, "get_authenticator_assurance_level", return_value={"current_level": "aal1"}):
             response = client.get("/auth/mfa/status")
 
@@ -73,7 +79,7 @@ class MfaRoutesTests(unittest.TestCase):
 
         with patch.object(mfa_routes, "get_authenticated_user_row", return_value=auth_context()), \
              patch.object(mfa_routes, "get_user_security_settings", return_value={"mfa_required": True}), \
-             patch.object(mfa_routes.supabase.auth.mfa, "enroll", return_value=enroll_response) as enroll, \
+             patch.object(self.mfa_client.auth.mfa, "enroll", return_value=enroll_response) as enroll, \
              patch.object(mfa_routes, "record_mfa_event") as record_mfa_event:
             response = client.post("/auth/mfa/enroll", json={"friendly_name": "Admin phone"})
 
@@ -92,8 +98,8 @@ class MfaRoutesTests(unittest.TestCase):
 
         with patch.object(mfa_routes, "get_authenticated_user_row", return_value=auth_context()), \
              patch.object(mfa_routes, "get_user_security_settings", return_value={"mfa_required": True}), \
-             patch.object(mfa_routes.supabase.auth.mfa, "challenge", return_value=challenge_response) as challenge, \
-             patch.object(mfa_routes.supabase.auth.mfa, "verify", return_value=SimpleNamespace(data={})) as verify, \
+             patch.object(self.mfa_client.auth.mfa, "challenge", return_value=challenge_response) as challenge, \
+             patch.object(self.mfa_client.auth.mfa, "verify", return_value=SimpleNamespace(data={})) as verify, \
              patch.object(mfa_routes, "get_authenticator_assurance_level", return_value={"current_level": "aal2"}), \
              patch.object(mfa_routes, "mark_aal2_verified") as mark_aal2_verified, \
              patch.object(mfa_routes, "record_mfa_event") as record_mfa_event:
@@ -120,8 +126,8 @@ class MfaRoutesTests(unittest.TestCase):
 
         with patch.object(mfa_routes, "get_authenticated_user_row", return_value=auth_context()), \
              patch.object(mfa_routes, "get_user_security_settings", return_value={"mfa_required": True}), \
-             patch.object(mfa_routes.supabase.auth.mfa, "challenge", return_value=challenge_response), \
-             patch.object(mfa_routes.supabase.auth.mfa, "verify", return_value=verify_response), \
+             patch.object(self.mfa_client.auth.mfa, "challenge", return_value=challenge_response), \
+             patch.object(self.mfa_client.auth.mfa, "verify", return_value=verify_response), \
              patch.object(mfa_routes, "get_authenticator_assurance_level", return_value={"current_level": "aal2"}), \
              patch.object(mfa_routes, "set_auth_cookies", return_value="csrf") as set_auth_cookies, \
              patch.object(mfa_routes, "mark_aal2_verified"), \
@@ -140,7 +146,7 @@ class MfaRoutesTests(unittest.TestCase):
 
         with patch.object(mfa_routes, "get_authenticated_user_row", return_value=auth_context()), \
              patch.object(mfa_routes, "get_user_security_settings", return_value={"mfa_required": True}), \
-             patch.object(mfa_routes.supabase.auth.mfa, "challenge", side_effect=RuntimeError("bad code")), \
+             patch.object(self.mfa_client.auth.mfa, "challenge", side_effect=RuntimeError("bad code")), \
              patch.object(mfa_routes, "record_mfa_event") as record_mfa_event:
             response = client.post(
                 "/auth/mfa/enroll/verify",
@@ -156,8 +162,8 @@ class MfaRoutesTests(unittest.TestCase):
         challenge_response = SimpleNamespace(data=SimpleNamespace(id="challenge-1"))
         with patch.object(mfa_routes, "get_authenticated_user_row", return_value=auth_context()), \
              patch.object(mfa_routes, "get_user_security_settings", return_value={"mfa_required": True}), \
-             patch.object(mfa_routes.supabase.auth.mfa, "challenge", return_value=challenge_response), \
-             patch.object(mfa_routes.supabase.auth.mfa, "verify", return_value=SimpleNamespace(data={})), \
+             patch.object(self.mfa_client.auth.mfa, "challenge", return_value=challenge_response), \
+             patch.object(self.mfa_client.auth.mfa, "verify", return_value=SimpleNamespace(data={})), \
              patch.object(mfa_routes, "get_authenticator_assurance_level", return_value={}), \
              patch.object(mfa_routes, "mark_aal2_verified") as mark_aal2_verified, \
              patch.object(mfa_routes, "record_mfa_event"):
@@ -171,8 +177,8 @@ class MfaRoutesTests(unittest.TestCase):
         with patch.object(mfa_routes, "get_authenticated_user_row", return_value=auth_context()), \
              patch.object(mfa_routes, "get_user_security_settings", return_value={"mfa_required": True}), \
              patch.object(mfa_routes, "get_authenticator_assurance_level", return_value={"current_level": "aal2"}), \
-             patch.object(mfa_routes.supabase.auth.mfa, "list_factors", return_value=factors), \
-             patch.object(mfa_routes.supabase.auth.mfa, "unenroll") as unenroll:
+             patch.object(self.mfa_client.auth.mfa, "list_factors", return_value=factors), \
+             patch.object(self.mfa_client.auth.mfa, "unenroll") as unenroll:
             response = client.delete("/auth/mfa/factors/factor-1")
         self.assertEqual(response.status_code, 409)
         unenroll.assert_not_called()
@@ -183,7 +189,7 @@ class MfaRoutesTests(unittest.TestCase):
 
         with patch.object(mfa_routes, "get_authenticated_user_row", return_value=auth_context()), \
              patch.object(mfa_routes, "get_user_security_settings", return_value={"mfa_required": False}), \
-             patch.object(mfa_routes.supabase.auth.mfa, "list_factors", return_value=factors_response):
+             patch.object(self.mfa_client.auth.mfa, "list_factors", return_value=factors_response):
             response = client.get("/auth/mfa/factors")
 
         self.assertEqual(response.status_code, 200)
@@ -196,7 +202,7 @@ class MfaRoutesTests(unittest.TestCase):
         with patch.object(mfa_routes, "get_authenticated_user_row", return_value=auth_context()), \
              patch.object(mfa_routes, "get_user_security_settings", return_value={"mfa_required": True}), \
              patch.object(mfa_routes, "get_authenticator_assurance_level", return_value={"current_level": "aal1"}), \
-             patch.object(mfa_routes.supabase.auth.mfa, "unenroll") as unenroll:
+             patch.object(self.mfa_client.auth.mfa, "unenroll") as unenroll:
             response = client.delete("/auth/mfa/factors/factor-1")
 
         self.assertEqual(response.status_code, 403)
@@ -208,7 +214,7 @@ class MfaRoutesTests(unittest.TestCase):
         with patch.object(mfa_routes, "get_authenticated_user_row", return_value=auth_context()), \
              patch.object(mfa_routes, "get_user_security_settings", return_value={"mfa_required": True}), \
              patch.object(mfa_routes, "get_authenticator_assurance_level", return_value={}), \
-             patch.object(mfa_routes.supabase.auth.mfa, "unenroll") as unenroll:
+             patch.object(self.mfa_client.auth.mfa, "unenroll") as unenroll:
             response = client.delete("/auth/mfa/factors/factor-1")
         self.assertEqual(response.status_code, 403)
         unenroll.assert_not_called()
@@ -219,8 +225,8 @@ class MfaRoutesTests(unittest.TestCase):
         with patch.object(mfa_routes, "get_authenticated_user_row", return_value=auth_context()), \
              patch.object(mfa_routes, "get_user_security_settings", return_value={"mfa_required": True}), \
              patch.object(mfa_routes, "get_authenticator_assurance_level", return_value={"current_level": "aal2"}), \
-             patch.object(mfa_routes.supabase.auth.mfa, "list_factors", return_value=SimpleNamespace(data=SimpleNamespace(totp=[{"id": "factor-1", "status": "verified"}, {"id": "factor-2", "status": "verified"}]))), \
-             patch.object(mfa_routes.supabase.auth.mfa, "unenroll", return_value=SimpleNamespace(data={})) as unenroll, \
+             patch.object(self.mfa_client.auth.mfa, "list_factors", return_value=SimpleNamespace(data=SimpleNamespace(totp=[{"id": "factor-1", "status": "verified"}, {"id": "factor-2", "status": "verified"}]))), \
+             patch.object(self.mfa_client.auth.mfa, "unenroll", return_value=SimpleNamespace(data={})) as unenroll, \
              patch.object(mfa_routes, "record_mfa_event") as record_mfa_event:
             response = client.delete("/auth/mfa/factors/factor-1")
 
@@ -240,8 +246,8 @@ class MfaRoutesTests(unittest.TestCase):
         with patch.object(mfa_routes, "get_authenticated_user_row", return_value=auth_context()), \
              patch.object(mfa_routes, "get_user_security_settings", return_value={"mfa_required": True}), \
              patch.object(mfa_routes, "get_authenticator_assurance_level", return_value={"current_level": "aal2"}), \
-             patch.object(mfa_routes.supabase.auth.mfa, "list_factors", return_value=SimpleNamespace(data=SimpleNamespace(totp=[{"id": "factor-1", "status": "verified"}, {"id": "factor-2", "status": "verified"}]))), \
-             patch.object(mfa_routes.supabase.auth.mfa, "unenroll", side_effect=SupabaseError("token should not appear")), \
+             patch.object(self.mfa_client.auth.mfa, "list_factors", return_value=SimpleNamespace(data=SimpleNamespace(totp=[{"id": "factor-1", "status": "verified"}, {"id": "factor-2", "status": "verified"}]))), \
+             patch.object(self.mfa_client.auth.mfa, "unenroll", side_effect=SupabaseError("token should not appear")), \
              patch.object(mfa_routes.logger, "warning") as warning:
             response = client.delete("/auth/mfa/factors/factor-1")
 
@@ -251,8 +257,8 @@ class MfaRoutesTests(unittest.TestCase):
         extra = warning.call_args.kwargs["extra"]
         self.assertEqual(extra["error_type"], "SupabaseError")
         self.assertEqual(extra["status"], "400")
-        self.assertEqual(extra["code"], "insufficient_aal")
-        self.assertEqual(extra["message"], "AAL2 required")
+        self.assertNotIn("code", extra)
+        self.assertNotIn("message", extra)
         self.assertNotIn("token should not appear", str(extra))
 
 

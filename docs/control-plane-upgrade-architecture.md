@@ -18,11 +18,38 @@ protected control-plane path is intentionally blocked by
 sudo madar-control-plane-upgrade <exact-40-character-sha>
 ```
 
-The explicit `sudo` plus exact SHA is the approval boundary. This command does
-not grant the non-root deployer permission to install future commits and does
-not turn the upgrader into a general application deployment path.
+The explicit `sudo` plus exact SHA is the approval boundary. For an ordinary
+protected controller/application upgrade, that SHA must still be the freshly
+resolved immutable `origin/main` commit and satisfy the normal forward-ancestry
+rules. For an already-promoted release whose automatic migration is in an
+attested forward-repair state, the same command has a narrower repair meaning:
+the approved SHA must exactly equal both the installed controller provenance and
+the currently serving production checkout. That same-SHA repair does not require
+the failed release to remain `origin/main`, because a later merge must not strand
+an already-serving schema transition.
+
+The command does not grant the non-root deployer permission to install future
+commits and does not turn the upgrader into a general application deployment
+path.
 
 ## Components and trust boundaries
+
+Backup operations are part of the exact-SHA installation boundary. In addition
+to the original migration backup scripts, the guard protects `backup_support.py`,
+`verify_latest_backup.sh`, `replicate_latest_node1.py`, both existing removable
+replication helpers, `restore_madar.sh`, and `rehearse_backup.py`. The installer
+backs up, checks source identity, installs, and compares all operational helpers
+and local/verification/Node 1/removable systemd units. Their target files join
+the shared root-ownership, mode and symlink preflight. The installed controller
+retains identical helper copies for provenance attestation.
+
+Before installation, existing operational timers are stopped and running backup
+services cause a safe refusal; active backup jobs are not killed. Successful
+completion or safely attested pre-install recovery restores captured timer
+activity. Installation never enables these timers. New backup-state storage is
+created as the unprivileged `madar` identity, not through root writes into an
+application-owned tree. The minimal state directory contains only verified
+creation metadata and is mounted read-only for release/refresh/rollback.
 
 | Component | Installed location | Responsibility |
 | --- | --- | --- |
@@ -32,7 +59,7 @@ not turn the upgrader into a general application deployment path.
 | Replaceable controller | `/opt/madar/control-plane/deployment` | Canonical release, migration, proxy, guard, installer, and systemd implementation. |
 | Path/remote trust contract | `/opt/madar/control-plane/deployment/production-paths.conf` | Root-owned canonical production paths and expected Git remote identity. |
 | Installer | `bin/madar-install-control-plane` | Backs up the old controller, atomically publishes the exact staged controller, installs units and the next-invocation launcher, and leaves automation stopped. |
-| Authorized transient unit | `madar-control-plane-upgrade-<pid>-<cycle>.service` | Runs the exact `madar-auto-deploy` entrypoint as `madar` with the ordinary path/backup environment, hardening properties, and a systemd `LoadCredential` visible only inside that cycle. |
+| Authorized transient unit | `madar-control-plane-upgrade-<pid>-<cycle>.service` | Runs as `madar` with the ordinary path/backup environment, hardening properties, and a systemd `LoadCredential` visible only inside that cycle. Ordinary upgrades invoke the exact `madar-auto-deploy` entrypoint; governed same-SHA migration repair invokes the installed `madar-release-deploy <SHA> --automatic-migrate` entrypoint directly. |
 
 No `NOPASSWD` rule or automatic invocation is added. The `madar` account
 cannot invoke the root upgrader. The bootstrapper never reads security-sensitive
@@ -97,6 +124,26 @@ ancestry, clean repository, exact installed provenance, and a successful guard
 against the approved SHA. A context or Git failure therefore remains
 fail-closed without changing the ordinary deployers' guard semantics.
 
+### Same-SHA forward-repair authorization
+
+Forward repair is intentionally not candidate authentication. When
+current-production preflight proves `forward_repair_pending`, the coordinator
+does not fetch or resolve a candidate, does not require the supplied SHA to
+remain current `origin/main`, and does not create a staging tree. Instead it
+requires:
+
+1. the explicitly approved SHA is a full immutable SHA;
+2. production checkout HEAD equals that SHA;
+3. installed control-plane provenance equals that SHA;
+4. current known-good release state and live serving identity equal that SHA;
+5. the immutable automatic-migration contract and its SQL checksums validate;
+6. durable migration state is an attested failed or interrupted forward-repair
+   checkpoint.
+
+The installed controller is attested before mutation. The repair cycle then
+uses a fresh one-use authorization credential bound to that same SHA. This is
+not permission to deploy a newer, older, arbitrary, or rewritten commit.
+
 ## Privileged staging and TOCTOU boundary
 
 After fetching, root creates a unique mode-0700 transaction below
@@ -118,9 +165,18 @@ production repository's refs and worktree are never changed by staging.
 
 Before candidate code executes, the bootstrapper verifies required paths,
 rejects symlinks anywhere in protected paths, hashes the complete protected
-tree, validates the exact canonical path contract, compiles Python, checks all
-deployment shell syntax, checks ownership/state-root conditions, and requires
-at least 1 GiB free in staging and backup filesystems. The installer uses one
+tree, validates the exact canonical path contract, syntax-compiles every
+deployment Python source in an isolated `python3 -I -B` process using built-in
+`compile()` on the source bytes, checks all deployment shell syntax, checks
+ownership/state-root conditions, and requires at least 1 GiB free in staging
+and backup filesystems. Syntax validation writes no bytecode and does not depend
+on ignored `PYTHON*` environment variables. Its child interpreter is the
+resolved absolute `sys.executable` of the already-running trusted bootstrapper,
+not a candidate path, `PATH` lookup, `/usr/bin/env`, or distribution-specific
+filename. The original and resolved executable paths must exist beneath
+non-writable real directories; the target must be executable and not
+group/world writable, and root execution additionally requires root ownership.
+The installer uses one
 shared read-only filesystem preflight before both dry-run success and apply. It
 walks every existing privileged source/destination component without following
 symlinks; requires root ownership with no group/world write bit or effective
@@ -140,7 +196,8 @@ transaction. During current-production preflight it also acquires the normal
 `/var/lib/madar/releases/deploy.lock`, proving no release or migration is
 active.
 
-After systemd is quiesced, root writes an `in-progress.json` interlock below
+Before the first backup timer stop, root writes an `in-progress.json` interlock
+below
 `/run/madar/control-plane-upgrade`, then releases `deploy.lock` so the canonical
 release controller can acquire it. Every `madar-release-deploy` invocation
 checks this interlock before any release operation. It rejects the invocation
@@ -149,7 +206,19 @@ fresh random bearer token through `LoadCredential`, whose SHA-256 digest
 matches the root-owned interlock. The source credential is mode 0600, is copied
 into systemd's per-unit credential boundary rather than a process environment,
 is removed when each cycle returns, and is regenerated for the second cycle.
-The public interlock contains only the SHA and one-way digest.
+The public version-2 interlock contains the approved SHA, authorization digest,
+status and operation bindings, plus `backup_timer_states`: the exact enabled and
+active values for all four protected backup timers. No bearer token is public.
+All backup services and timers are inspected before mutation; a running backup
+aborts without stopping any timer. Unknown timer states fail closed. A valid
+same-SHA snapshot is authoritative across authorization, failure re-arm, and a
+fresh forward-repair process; another SHA cannot donate or overwrite it.
+Successful completion restores and attests every backup timer's enabled/activity
+state, then restores auto-deploy, then clears the interlock. Any restoration
+failure disables auto-deploy, stops and attests every backup timer again, and
+retains the original snapshot; unresolved pre-install
+failure cleanup also retains it. This durability is limited to `/run`, so reboot
+recovery is outside this contract.
 
 The timer stays disabled throughout. Thus an auto-deploy cycle cannot start,
 manual controller entrypoints cannot pass the interlock, and the authorized
@@ -165,19 +234,19 @@ switches remain authorized inside the credential-bearing transient unit.
 | Phase | Audit name | Mutation boundary and result |
 | --- | --- | --- |
 | 0 | `exclusive_lock` | Root-only upgrade lock; a second invocation fails before mutation. |
-| 1 | `current_production_preflight` | Validate caller, installed provenance, clean production HEAD, release state, active/stable identity/readiness, schema compatibility, migration terminal state, workers/frontend/proxy, canonical paths, service and timer. Existing degradation stops the run. This phase does not trust the CLI SHA to authorize a bridge. |
-| 2 | `candidate_resolution` | Least-privileged fetch/read-only remote check; exact origin/main, commit, canonical remote and forward ancestry checks. |
+| 1 | `current_production_preflight` | Validate caller, installed provenance, clean production HEAD, release state, active/stable identity/readiness, schema compatibility, workers/frontend/proxy, canonical paths, service and timer. Migration origin is classified as terminal, provably `pre_mutation_pending`, or attested `forward_repair_pending`; every other nonterminal or ambiguous state fails closed. This phase does not trust the CLI SHA to authorize a bridge or a repair. |
+| 2 | `candidate_resolution` | Ordinary upgrade only: least-privileged fetch/read-only remote check; exact origin/main, commit, canonical remote and forward ancestry checks. Same-SHA forward repair skips candidate resolution entirely. |
 | 3 | `controller_compatibility` | Run the current guard and classify only `normal_compatible` or the fully attested `controller_ahead_bridge` described above. |
 | 4 | `protected_change_detection` | In normal state, no protected diff returns `not_required`; ordinary auto-deploy remains responsible. An authorized controller-ahead bridge continues even though installed provenance already equals the candidate. |
-| 5 | `automation_quiesce` | Capture timer state, disable/stop timer, stop service, arm interlock, release normal deploy lock. |
-| 6 | `candidate_staging` | Create the protected exact-SHA Git bundle and detached root-owned tree. |
+| 5 | `automation_quiesce` | Inspect all backups, persist original timer states in interlock, stop backup timers, disable/stop auto-deploy, release normal deploy lock. |
+| 6 | `candidate_staging` | Ordinary upgrade only: create the protected exact-SHA Git bundle and detached root-owned tree. Same-SHA forward repair has no candidate tree. |
 | 7 | `candidate_static_preflight` | Required-path, symlink, digest, syntax, contract, ownership, ACL, filesystem capability and capacity validation. |
-| 8 | `installer_dry_run` | Execute the candidate installer's complete read-only preflight without apply, including the same deterministic filesystem, source, production-path, timer/service and backup checks used by apply; verify the protected-tree digest is unchanged. |
+| 8 | `installer_dry_run` | Ordinary upgrade only: execute the candidate installer's complete read-only preflight without apply, including the same deterministic filesystem, source, production-path, timer/service and backup checks used by apply; verify the protected-tree digest is unchanged. Same-SHA forward repair never executes candidate installer code. |
 | 9 | `control_plane_install` / `control_plane_install_attestation` | Normally create a protected backup and atomically install, then attest provenance, guard, modes, units, paths, backup hashes and absence of legacy authority. For `controller_ahead_bridge`, skip publication and backup creation and instead use `preinstalled_control_plane_attestation` to verify the already-installed exact candidate controller. |
-| 10 | `controlled_candidate_deployment` | Issue a one-cycle systemd credential and synchronously run the exact ordinary auto-deploy entrypoint in a hardened transient unit while the timer remains disabled. The canonical controller alone may build, migrate, promote or advance production Git. |
+| 10 | `controlled_candidate_deployment` / `forward_repair_migration` | Ordinary upgrade issues a one-cycle credential and runs the exact ordinary auto-deploy entrypoint. Forward repair instead issues a one-cycle credential and runs the already-installed `madar-release-deploy <same SHA> --automatic-migrate` directly. Repair cannot resolve, stage, install, promote a different application SHA, or advance production Git. |
 | 11 | serving attestation | Require production HEAD, installed provenance, active/known-good state, stable and slot SHA/readiness, schema range, workers, frontend and proxy target to agree. Require a terminal migration outcome. |
 | 12 | `same_sha_idempotence` | Run the same systemd path with a new token. Require stable health and byte-identical release state, proxy target and migration automation state: no rebuild, switch, SQL, backup, or identity mutation. |
-| 13 | `automation_restore` | Remove interlock and restore the captured timer enabled/active state exactly. An initially disabled timer stays disabled. |
+| 13 | `automation_restore` | Restore and attest captured backup and auto-deploy enabled/active states exactly, then remove interlock. An initially disabled timer stays disabled. |
 | 14 | cleanup | Remove only this transaction staging tree; retain backup and audit history. |
 | 15 | `complete` | Print the concise non-secret operator result. |
 
@@ -197,6 +266,54 @@ when its coordinator is terminal: `already_at_target` or
 `post_migration_validation_complete`. A release without automatic migration
 policy may return `not_requested`. Incomplete or forward-repair-required state
 fails the upgrade and leaves automation disabled for diagnosis.
+
+### Current-origin migration classification
+
+Final/post-deploy serving attestation remains strict: automatic migration must
+be terminal before the privileged transaction can report success. Current
+origin preflight has two narrow additional classifications so the privileged
+controller cannot deadlock itself before reaching the repair machinery.
+
+`pre_mutation_pending` is derived only when the exact automatic migration
+contract and manifest validate, every SQL checksum matches, the per-release
+migration directory does not exist at all, live and recorded schema both equal
+the manifest source schema, the current known-good record names the same SHA and
+source schema, and that SHA's completed acceptance history observed the same
+source and target. An empty or partial migration directory is not equivalent to
+"never started" and fails closed.
+
+`forward_repair_pending` is derived only from coherent durable migration state.
+It accepts either:
+
+- `failed_forward_repair_required` in the reviewed backup, execution, or
+  post-validation failure phases after its bounded retry deadline; or
+- an interrupted `status=running` checkpoint in backup creation, migration
+  execution, or post-migration validation.
+
+The immutable contract, acceptance provenance, backup identity, executor state,
+observed schema bounds, and known-good identity must agree. Schema advancement
+without the corresponding verified executor checkpoint is rejected.
+
+During this origin-only repair classification, core readiness remains mandatory.
+Refreshable worker degradation or absence is tolerated only where the canonical
+post-migration refresh path can recreate it; any present worker must still use
+the recorded immutable image. Docker inspection errors are never treated as
+container absence.
+
+A real forward-repair invocation requires:
+
+```text
+approved SHA
+  = production checkout SHA
+  = installed control-plane provenance SHA
+```
+
+It skips `origin/main` resolution, candidate staging, static candidate
+preflight, installer dry-run, and controller installation. It quiesces
+automation, retains the exact-SHA interlock, invokes the installed release
+deployer in `--automatic-migrate` mode, requires strict terminal serving
+attestation, repeats a same-SHA migration idempotence cycle, and restores the
+captured timer state only after success.
 
 ## Failure semantics and point of no return
 
@@ -316,6 +433,72 @@ attestation, but does not reinstall or downgrade the controller and does not
 fabricate a new controller backup. Its controlled deployment promotes the
 application through the canonical immutable release machinery, runs same-SHA
 validation, and restores the timer's captured state.
+
+## DB-ahead recovery operation
+
+`--recover-current-schema` is an explicit operator mode and is absent from
+`madar-auto-deploy`. It uses a distinct current-production preflight because
+the ordinary preflight correctly refuses an incompatible serving binary. This
+special preflight accepts only a clean and coherent known-good/proxy origin,
+an auto-deploy timer already disabled, an actual live schema strictly above
+the serving binary maximum, and no degradation beyond schema incompatibility
+plus the known legacy notification-queue classification.
+
+The paired `--rehearsal-attestation` file must be absolute, nonsymlinked,
+root-owned, mode 0400 or 0600, no older than seven days, and bind the exact
+approved SHA and live schema to all required backend, frontend, browser,
+database, worker, RLS, and readiness checks. Candidate staging then validates
+the separate exact-schema, no-migration recovery contract before any
+installation or application deployment.
+
+The installed controller invokes `madar-release-deploy <SHA>
+--recover-current-schema` only through the same one-use systemd credential and
+interlock boundary used by governed upgrades. The release state machine stages
+the inactive slot with queue consumers disabled, quiesces the old consumers,
+durably records a generation-bound `OLD` -> `NONE` -> `CANDIDATE` authority,
+inhibits Docker restart policy, rechecks actual worker state plus
+state/schema/backup/routing identity, uses the existing atomic switch, and only
+then starts candidate consumers with a bounded health wait. Consumer activation
+and restoration in recovery, ordinary deployment, bootstrap, and active-runtime
+refresh all require that exact authority identity. It builds a second compatible
+bridge slot with consumers inactive before success. After routing has changed,
+failure handling detects the actual routed candidate even if durable known-good
+finalization was interrupted and records forward-repair semantics. It never
+routes to the incompatible historical release.
+
+Traffic mutation and destructive inactive-slot mutation take the same
+`runtime-mutation.lock`. After acquiring it, a slot operation resolves the
+loaded serving identity again and refuses ambiguity or a target that is now
+serving. The check and the force-recreate/remove therefore share one critical
+section with `madar-switch-traffic`.
+
+Recovery resume treats durable worker ownership as a claim to verify, not an
+instruction to replay. Discovery order is loaded traffic, both slot/container
+identities, old workers, candidate workers, then durable ownership/generation.
+Only after that evidence is reconciled with the durable phase does validation
+run. Candidate-serving handoff phases use core runtime validation before worker
+reconciliation, so `NONE` and Docker `starting` are resumable states; final
+steady-state validation remains unchanged. Candidate shutdown must be positively
+proven before retained consumers may restart; unknown container state, partial
+shutdown, overlap, or ambiguous routing persists an operator-intervention
+checkpoint and starts no competing consumers. A normal Docker `starting` health
+state receives a bounded wait, while terminal or timed-out startup fails closed.
+
+Successful finalization marks the canonical active and compatible-fallback
+records as schema-recovery artifacts and records `migration_result` as
+`not_requested`. A later ordinary control-plane inspection recognizes that
+terminal only when the completed recovery record, active slot/SHA/schema and
+the exact zero-migration recovery contract all agree. It otherwise reports a
+missing or invalid migration terminal and stops. Recovery credentials and the
+recovery entrypoint are never accepted by that later normal release.
+
+Because an installed controller that predates this mode cannot parse the new
+flags, the first use requires the already-documented exact-SHA, root-protected
+manual controller bootstrap. That bootstrap installs controller code only; it
+does not switch application traffic or alter schema. The separately reviewed
+recovery command then performs the application transition. Exact commands and
+abort conditions are in
+[`schema-96-forward-recovery-runbook.md`](schema-96-forward-recovery-runbook.md).
 
 ## Implementation and test map
 

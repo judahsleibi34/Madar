@@ -262,19 +262,38 @@ class ActiveRuntimeRefreshTests(unittest.TestCase):
             )
 
     def test_runtime_recreation_uses_only_existing_images_and_required_services(self):
-        operations = release_cli.DockerGitOperations.__new__(
-            release_cli.DockerGitOperations
-        )
-        operations.schema_version = lambda: 93
-        operations._compose = Mock()
-        operations.refresh_active_runtime_services(SHA, "green", IMAGES)
+        with tempfile.TemporaryDirectory() as root:
+            root_path = Path(root)
+            generation = "4" * 64
+            operations = release_cli.DockerGitOperations.__new__(
+                release_cli.DockerGitOperations
+            )
+            operations.state_root = root_path
+            operations.container_prefix = "madar"
+            operations.schema_version = lambda: 93
+            operations._container_state = lambda _name: None
+            operations._compose = Mock()
+            (root_path / "state.json").write_text(json.dumps({
+                "active_slot": "green",
+                "known_good_release": {
+                    "sha": SHA, "slot": "green",
+                    "worker_generation": generation,
+                },
+            }))
+            release_cli.write_worker_authority(
+                root_path, generation=generation, owner="CANDIDATE",
+                old={"sha": "a" * 40, "slot": "blue"},
+                candidate={"sha": SHA, "slot": "green"},
+            )
+            operations.refresh_active_runtime_services(SHA, "green", IMAGES)
         args = operations._compose.call_args.args
         self.assertEqual(args[:3], (SHA, "green", IMAGES))
         for value in (
-            "--no-build", "parser-worker", "backend", "notification-worker",
+            "--no-build", "parser-worker", "notification-worker",
             "calendar-sync-worker", "data-deletion-worker",
         ):
             self.assertIn(value, args)
+        self.assertNotIn("backend", args)
         self.assertNotIn("build", args)
         self.assertNotIn("down", args)
         self.assertNotIn("madar-switch-traffic", args)

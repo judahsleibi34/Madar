@@ -2,7 +2,23 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { WorkspaceContext } from "../../commercial/capabilityContext";
+import matrix from "../../commercial/planMatrix.generated.json";
 import UserDashboard from "./UserDashboard";
+
+const fullCapabilities = {
+  ready: true,
+  revision: "test-business-plus",
+  can: (capability) => matrix.plans.business_plus[capability] === true,
+};
+
+const renderDashboard = (user) => render(
+  <WorkspaceContext.Provider value={fullCapabilities}>
+    <MemoryRouter>
+      <UserDashboard user={user} />
+    </MemoryRouter>
+  </WorkspaceContext.Provider>,
+);
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
@@ -41,11 +57,7 @@ afterEach(() => {
 
 describe("UserDashboard shortcuts", () => {
   it("opens the website and store on their production URLs", async () => {
-    render(
-      <MemoryRouter>
-        <UserDashboard user={{ id: 3, name: "Madar" }} />
-      </MemoryRouter>,
-    );
+    renderDashboard({ id: 3, name: "Madar" });
 
     const websiteLink = await screen.findByRole("link", { name: "View website" });
     expect(websiteLink.getAttribute("href")).toBe(
@@ -97,22 +109,14 @@ describe("UserDashboard shortcuts", () => {
       },
     }));
 
-    render(
-      <MemoryRouter>
-        <UserDashboard user={{ id: 3, tenant_id: 7, name: "Madar" }} />
-      </MemoryRouter>,
-    );
+    renderDashboard({ id: 3, tenant_id: 7, name: "Madar" });
 
     expect(screen.getByText("Website visits")).toBeTruthy();
     expect(screen.getByText("Store visits")).toBeTruthy();
   });
 
   it("customizes visible cards and remembers hidden cards", async () => {
-    render(
-      <MemoryRouter>
-        <UserDashboard user={{ id: 3, name: "Madar" }} />
-      </MemoryRouter>,
-    );
+    renderDashboard({ id: 3, name: "Madar" });
 
     fireEvent.click(screen.getByRole("button", { name: "Customize dashboard" }));
     const storeCheckbox = screen.getByRole("checkbox", { name: "Store visits" });

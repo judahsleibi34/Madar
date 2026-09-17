@@ -25,6 +25,15 @@ class NotificationChannelReadinessTests(unittest.TestCase):
         ):
             self.assertEqual(readiness_service.check_notification_email(), "degraded")
 
+    def test_terminal_email_recipient_outcome_does_not_permanently_degrade_channel(self):
+        environment = {"EMAIL_CHANNEL_ENABLED": "true", "SMTP_HOST": "smtp.invalid", "SMTP_FROM_EMAIL": "sender@example.invalid"}
+        with patch.dict(os.environ, environment, clear=True), patch.object(
+            readiness_service,
+            "get_delivery_channel_metrics",
+            return_value={"email": {"dead": 4, "actionable_dead": 0, "terminal_dead": 4}},
+        ):
+            self.assertEqual(readiness_service.check_notification_email(), "configured")
+
 
 if __name__ == "__main__":
     unittest.main()

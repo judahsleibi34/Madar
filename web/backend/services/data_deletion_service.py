@@ -90,6 +90,7 @@ def _provider_absent(error: Exception) -> bool:
 def _rpc_error(error: Exception) -> HTTPException:
     text = str(error).lower()
     mappings = {
+        "commercial_financial_retention_review_required": (409, "commercial_financial_retention_review_required", "Commercial financial records require a retention review before account or workspace deletion. No deletion has been scheduled."),
         "deletion_target_not_found": (404, "deletion_target_not_found", "Deletion target was not found."),
         "tenant_owner_requires_tenant_deletion": (409, "tenant_owner_requires_tenant_deletion", "Transfer ownership or request tenant deletion."),
         "admin_deletion_requires_break_glass": (409, "admin_deletion_requires_break_glass", "Administrator deletion requires the break-glass procedure."),

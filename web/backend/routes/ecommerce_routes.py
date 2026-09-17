@@ -18,6 +18,7 @@ from services.ecommerce_cache_service import (
     invalidate_ecommerce_cache,
 )
 from services.tenant_service import require_active_tenant_member
+from services.entitlement_service import require_entitlement
 
 
 router = APIRouter(prefix="/ecommerce", tags=["Ecommerce"])
@@ -439,6 +440,9 @@ def _require_ecommerce_access(request: Request, response: Response):
     )
     if str(context.role or "").lower() not in {"owner", "admin", "member"}:
         raise HTTPException(status_code=403, detail="Ecommerce access required")
+    entitlements = require_entitlement(context.tenant_id, "ecommerce_management")
+    request.state.commercial_revision = entitlements.get("entitlement_revision", "operator")
+    response.headers["Cache-Control"] = "private, no-store"
     return context
 
 def _require_role(context) -> None:
@@ -608,7 +612,7 @@ def _save_product_aggregate(tenant_id: int, product_id: str, payload: ProductPay
         if not missing_v2:
             raise
         if uses_color:
-            raise HTTPException(status_code=503, detail="Color variant attributes require database migration 099") from error
+            raise HTTPException(status_code=503, detail="Color variant attributes require database migration 101") from error
         service_supabase.rpc("save_ecommerce_product_aggregate_safe", params).execute()
 
 
@@ -849,8 +853,14 @@ PAYMENT_STATUSES = {"unpaid", "collected", "paid", "refunded"}
 @router.get("/loyalty")
 def get_loyalty_rule(request: Request, response: Response):
     context = _require_ecommerce_access(request, response)
-    rules = _rows(service_supabase.table("ecommerce_loyalty_rules").select("*").eq("tenant_id", context.tenant_id).eq("is_current", True).limit(1))
-    entitlements = _rows(service_supabase.table("ecommerce_loyalty_entitlements").select("*").eq("tenant_id", context.tenant_id).order("created_at", desc=True).limit(100))
+    try:
+        rules = _rows(service_supabase.table("ecommerce_loyalty_rules").select("*").eq("tenant_id", context.tenant_id).eq("is_current", True).limit(1))
+        entitlements = _rows(service_supabase.table("ecommerce_loyalty_entitlements").select("*").eq("tenant_id", context.tenant_id).order("created_at", desc=True).limit(100))
+    except Exception as error:
+        message = str(error).lower()
+        if "pgrst205" in message or "schema cache" in message or "could not find the table" in message:
+            raise HTTPException(status_code=503, detail="Loyalty settings require database migration 097") from error
+        raise
     return {
         "rule": rules[0] if rules else None,
         "defaults": {"enabled": False, "earning_rate_basis_points": 500, "reward_discount_basis_points": 1000, "validity_mode": "lifetime"},
@@ -1004,7 +1014,7 @@ def collect_order_payment(order_id: UUID, request: Request, response: Response):
 def get_catalog(request: Request, response: Response):
     context = _require_ecommerce_access(request, response)
     try:
-        cache_key = ecommerce_cache_key(context.tenant_id, "authenticated-catalog-v2")
+        cache_key = ecommerce_cache_key(context.tenant_id, "authenticated-catalog-v3", revision=getattr(request.state, "commercial_revision", "unresolved"), user_id=context.user_id, role=context.role)
         catalog, _cache_hit = get_or_create_ecommerce_cache(
             cache_key,
             context.tenant_id,

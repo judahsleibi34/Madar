@@ -15,6 +15,7 @@ from shutil import disk_usage
 from uuid import uuid4
 
 from database import service_supabase
+from services.commercial_metrics import commercial_metric_snapshot
 from services.notification_outbox_service import get_queue_metrics
 from services.data_deletion_service import get_deletion_metrics
 from services.upload_config import get_data_upload_dir, get_private_charts_dir, get_public_uploads_dir
@@ -126,6 +127,9 @@ def prometheus_metrics() -> str:
         labels = {"method": method, "route": route}
         lines.append(_metric("madar_http_request_duration_seconds_count", labels, value))
         lines.append(_metric("madar_http_request_duration_seconds_sum", labels, round(sums[(method, route)], 6)))
+    for key, value in sorted(commercial_metric_snapshot().items()):
+        lines.append(f"# TYPE madar_{key} counter")
+        lines.append(f"madar_{key} {value}")
     for key, value in sorted(operational_snapshot().items()):
         lines.append(f"madar_{key} {value}")
     return "\n".join(lines) + "\n"

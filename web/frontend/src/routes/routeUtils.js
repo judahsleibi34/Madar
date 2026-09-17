@@ -27,6 +27,7 @@ export function isDashboardRoutePath(pathname) {
     pathname.startsWith(DASHBOARD_ROUTES.notifications) ||
     pathname.startsWith(DASHBOARD_ROUTES.myPlan) ||
     pathname.startsWith(DASHBOARD_ROUTES.adminUsers) ||
+    pathname.startsWith("/admin/commercial") ||
     pathname.startsWith(DASHBOARD_ROUTES.adminAccountAccess) ||
     pathname.startsWith(DASHBOARD_ROUTES.settings)
   );
@@ -42,6 +43,7 @@ export function getSafePostLoginPath(userInfo, returnTo) {
       : POST_LOGIN_FALLBACK_ROUTE;
 
   const adminOnlyPaths = [
+    "/admin/commercial",
     DASHBOARD_ROUTES.adminUsers,
     DASHBOARD_ROUTES.adminAccountAccess,
   ];

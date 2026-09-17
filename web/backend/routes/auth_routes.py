@@ -17,6 +17,7 @@ from services.auth_service import (
     mark_local_email_verified,
     normalize_user_type,
     SessionRefreshUnavailable,
+    revoke_verified_auth_session,
 )
 from services.account_lifecycle_service import (
     ACTIVE_ACCOUNT_STATUS,
@@ -1068,6 +1069,15 @@ def login(user: LogIn, response: Response, request: Request):
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
 
+@router.get("/tenants")
+def available_tenants(request: Request, response: Response):
+    from services.auth_service import require_regular_user
+    from services.tenant_selection_service import list_user_tenants
+    _, user = require_regular_user(request, response, allow_admin_account_access=False)
+    response.headers["Cache-Control"] = "private, no-store"
+    return {"tenants": list_user_tenants(user), "current_tenant_id": user.get("tenant_id")}
+
+
 @router.get("/user_status")
 def user_status(request: Request, response: Response):
     try:
@@ -1291,12 +1301,15 @@ def log_out(
     response: Response,
     logout: LogoutRequest | None = None,
 ):
+    authenticated = False
+    provider_revocation_failed = False
     try:
         _, user = get_authenticated_user_row(
             request,
             response,
             allow_admin_account_access=False,
         )
+        authenticated = True
         if user.get("id") is not None:
             cleanup_scoped = bool(
                 logout and (logout.installation_id or logout.push_endpoint)
@@ -1335,7 +1348,31 @@ def log_out(
             "auth.logout.push_revocation_failed",
             extra={"error_type": type(error).__name__},
         )
+
+    if authenticated:
+        try:
+            revoke_verified_auth_session(request)
+        except Exception as error:
+            provider_revocation_failed = True
+            logger.warning(
+                "auth.logout.session_revocation_failed",
+                extra={"error_type": type(error).__name__},
+            )
+
     delete_auth_cookies(response)
+
+    if provider_revocation_failed:
+        unavailable = JSONResponse(
+            status_code=503,
+            content={
+                "detail": {
+                    "code": "session_revocation_unavailable",
+                    "message": "The session could not be revoked. Sign in again before retrying.",
+                }
+            },
+        )
+        delete_auth_cookies(unavailable)
+        return unavailable
 
     return {
         "message": "Logged out successfully",

@@ -67,6 +67,13 @@ class InstallFilesystemLayout:
             self.systemd_parent / "madar-auto-deploy.timer",
             self.systemd_parent / "madar-release-proxy.service",
             self.systemd_parent / "madar-ops-alert@.service",
+            *(self.alert_parent / name for name in (
+                "backup_madar.sh", "verify_backup.sh", "verify_latest_backup.sh", "backup_support.py",
+                "replicate_latest_node1.py", "replicate_latest_offhost.sh", "replicate_backup_offhost.sh",
+                "restore_madar.sh", "rehearse_backup.py")),
+            *(self.systemd_parent / (name + suffix) for name in (
+                "madar-backup", "madar-backup-verify", "madar-node1-backup", "madar-offhost-backup")
+                for suffix in (".service", ".timer")),
         )
 
 

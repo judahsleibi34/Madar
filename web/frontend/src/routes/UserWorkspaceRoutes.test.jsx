@@ -1,6 +1,7 @@
+import matrix from "../commercial/planMatrix.generated.json";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../components/common/RouteSuspense", () => ({
   default: ({ children }) => children,
@@ -47,7 +48,15 @@ vi.mock("../components/PageBuilder/workspace/BuilderProjectChooser", () => ({
 
 import UserWorkspaceRoutes from "./UserWorkspaceRoutes";
 
-afterEach(cleanup);
+let selectedTestTenant = 7;
+beforeEach(() => {
+  selectedTestTenant = 7;
+  vi.stubGlobal("fetch", vi.fn(async (url) => {
+    if (String(url).endsWith("/billing/entitlements")) return new Response(JSON.stringify({entitlements:{tenant_id:selectedTestTenant,capabilities:matrix.capabilities}}),{headers:{"Content-Type":"application/json"}});
+    return new Response(JSON.stringify({tenants:[],catalog:{tags:[],categories:[],products:[]}}),{headers:{"Content-Type":"application/json"}});
+  }));
+});
+afterEach(() => {cleanup();vi.unstubAllGlobals();});
 
 const routeProps = {
   lang: "en",
@@ -55,7 +64,7 @@ const routeProps = {
   onUserUpdated: vi.fn(),
   shellProps: {},
   themeMode: "light",
-  user: { id: 3 },
+  user: { id: 3, tenant_id: 7 },
 };
 
 describe("workspace settings routes", () => {
@@ -124,23 +133,24 @@ describe("workspace settings routes", () => {
       <MemoryRouter initialEntries={["/calendar"]}>
         <UserWorkspaceRoutes
           {...routeProps}
-          user={{ id: 3, tenant_id: "tenant-a" }}
+          user={{ id: 3, tenant_id: 7 }}
         />
       </MemoryRouter>
     );
-    expect(await screen.findByText("Calendar mounted for tenant-a in calendar view")).toBeTruthy();
+    expect(await screen.findByText("Calendar mounted for 7 in calendar view")).toBeTruthy();
 
+    selectedTestTenant = 8;
     rerender(
       <MemoryRouter initialEntries={["/calendar"]}>
         <UserWorkspaceRoutes
           {...routeProps}
-          user={{ id: 3, tenant_id: "tenant-b" }}
+          user={{ id: 3, tenant_id: 8 }}
         />
       </MemoryRouter>
     );
 
-    expect(await screen.findByText("Calendar mounted for tenant-b in calendar view")).toBeTruthy();
-    expect(screen.queryByText("Calendar mounted for tenant-a in calendar view")).toBeNull();
+    expect(await screen.findByText("Calendar mounted for 8 in calendar view")).toBeTruthy();
+    expect(screen.queryByText("Calendar mounted for 7 in calendar view")).toBeNull();
   });
 
   it("opens Agenda directly on its own refresh-safe route", async () => {
@@ -150,7 +160,7 @@ describe("workspace settings routes", () => {
       </MemoryRouter>
     );
 
-    expect(await screen.findByText("Calendar mounted for missing in agenda view")).toBeTruthy();
+    expect(await screen.findByText("Calendar mounted for 7 in agenda view")).toBeTruthy();
   });
 
   it("navigates from calendar to the refresh-safe agenda route", async () => {
@@ -161,6 +171,6 @@ describe("workspace settings routes", () => {
     );
 
     fireEvent.click(await screen.findByRole("button", { name: "Open agenda" }));
-    expect(await screen.findByText("Calendar mounted for missing in agenda view")).toBeTruthy();
+    expect(await screen.findByText("Calendar mounted for 7 in agenda view")).toBeTruthy();
   });
 });

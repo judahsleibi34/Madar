@@ -1,10 +1,11 @@
 ﻿import { lazy } from "react";
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 
 import RouteSuspense from "../components/common/RouteSuspense";
 import { appShellContent } from "../content";
 import { DashboardLoadingElement, DashboardShell, RestrictedAccessWindow } from "./shared";
 
+const AdminCommercialAccessPage = lazy(() => import("../commercial/AdminCommercialAccessPage"));
 const Dashboard = lazy(() => import("../components/DashboardBuilder/Dashboard"));
 const AdminAccountAccessPage = lazy(() =>
   import("../components/DashboardBuilder/AdminAccountAccessPage")
@@ -26,6 +27,7 @@ export default function AdminRoutes({
   user,
   weeklyScreenTimeSeconds = 0,
 }) {
+  const { pathname } = useLocation();
   const renderShell = (children, options = {}) => (
     <DashboardShell
       {...shellProps}
@@ -55,6 +57,8 @@ export default function AdminRoutes({
       variant="dashboard"
     >
       <Routes>
+        <Route path="/admin/commercial" element={renderShell(<AdminCommercialAccessPage key={pathname} />)} />
+        <Route path="/admin/commercial/:tenantId" element={renderShell(<AdminCommercialAccessPage key={pathname} />)} />
         <Route
           path="/dashboard/*"
           element={renderShell(

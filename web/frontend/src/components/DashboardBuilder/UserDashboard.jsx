@@ -1,3 +1,4 @@
+import { useWorkspaceCapabilities } from "../../commercial/capabilityContext";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
@@ -16,7 +17,6 @@ import {
   SlidersHorizontal,
   Users,
 } from "lucide-react";
-import { STORAGE_KEY } from "../PageBuilder/core/PageBuilder.constants";
 import { getProductionTenantUrl } from "../PageBuilder/core/PageBuilder.routing";
 import { getBuilderWorkspacePath } from "../PageBuilder/core/PageBuilder.workspaceRouting";
 import WeeklyScreenTimePanel from "./WeeklyScreenTimePanel";
@@ -120,14 +120,6 @@ function parseProjectSchema(record) {
   return typeof source === "object" ? source : null;
 }
 
-function getLocalProject() {
-  try {
-    return parseProjectSchema(JSON.parse(localStorage.getItem(STORAGE_KEY) || "null"));
-  } catch {
-    return null;
-  }
-}
-
 function countReservationForms(project) {
   let count = 0;
   const inspect = (element) => {
@@ -194,7 +186,14 @@ async function loadAllReservations() {
 
 function UserDashboardContent({ user, weeklyScreenTimeSeconds = 0, cacheScope = "" }) {
   const { t } = useTranslation();
-  const visibilityScope = cacheScope || `user:${user?.id || user?.email || "default"}`;
+  const { ready, can, state: commercialState } = useWorkspaceCapabilities();
+  const mayBuild = can("forms") || can("page_builder");
+  const mayUseForms = can("forms") || can("response_management");
+  const mayReserve = can("reservation_management");
+  const mayWebsite = can("page_builder");
+  const mayCommerce = can("ecommerce_management");
+  const visibilityScope =
+    getDashboardCacheScope(user) || `user:${user?.id || user?.email || "default"}`;
   const customizerRef = useRef(null);
   const [customizerOpen, setCustomizerOpen] = useState(false);
   const [hiddenCardIds, setHiddenCardIds] = useState(() =>
@@ -243,17 +242,26 @@ function UserDashboardContent({ user, weeklyScreenTimeSeconds = 0, cacheScope = 
     t("userDashboard.fallbackName", { defaultValue: "there" });
 
   const planLabel = formatPlanLabel(
-    user?.plan,
+    commercialState?.plan_id || user?.plan,
     user?.subscription_type,
     user?.builder_type,
     t
   );
-  const planStatus = formatStatus(user?.payment_status, t);
+  const planStatus = formatStatus(
+    commercialState?.commercial_status || user?.payment_status,
+    t,
+  );
 
   useEffect(() => {
     let cancelled = false;
 
     const loadMetrics = async () => {
+      if (!ready) return;
+      if (!mayBuild) {
+        setMetrics(EMPTY_METRICS);
+        setLoading(false);
+        return;
+      }
       const cachedMetrics = readDashboardMetricsCache(cacheScope);
       if (cachedMetrics) {
         setMetrics(normalizeDashboardMetrics(cachedMetrics));
@@ -270,13 +278,7 @@ function UserDashboardContent({ user, weeklyScreenTimeSeconds = 0, cacheScope = 
       }
 
       const remoteProjects = records.map(parseProjectSchema).filter(Boolean);
-      const localProject = getLocalProject();
-      const projects =
-        remoteProjects.length > 0
-          ? remoteProjects
-          : localProject
-            ? [localProject]
-            : [];
+      const projects = remoteProjects;
       const primaryProject = projects[0] || null;
       const primaryRecord = records[0] || null;
       const projectId = String(
@@ -285,19 +287,21 @@ function UserDashboardContent({ user, weeklyScreenTimeSeconds = 0, cacheScope = 
 
       const [storage, reservations, memberGroups, visitMetrics] = await Promise.all([
         fetchBuilderStorageUsage().catch(() => null),
-        loadAllReservations().catch(() => []),
+        mayReserve ? loadAllReservations().catch(() => []) : Promise.resolve([]),
         Promise.all(
-          records.map((record) => {
+          (mayWebsite ? records : []).map((record) => {
             const projectId = record?.id || record?.project_id;
             return projectId
               ? fetchBuilderSiteMembers(projectId).catch(() => [])
               : Promise.resolve([]);
           })
         ),
-        fetchSiteVisitMetrics().catch(() => ({
-          website_visits: 0,
-          store_visits: 0,
-        })),
+        mayWebsite
+          ? fetchSiteVisitMetrics().catch(() => ({
+              website_visits: 0,
+              store_visits: 0,
+            }))
+          : Promise.resolve({ website_visits: 0, store_visits: 0 }),
       ]);
 
       if (cancelled) return;
@@ -333,8 +337,14 @@ function UserDashboardContent({ user, weeklyScreenTimeSeconds = 0, cacheScope = 
         permittedUsers: uniqueMembers.size,
         permissionTypes: getPermissionTypes(projects),
         projectId,
-        storeUrl: primaryProject ? getProductionTenantUrl(primaryProject, "/shop") : "",
-        websiteUrl: primaryProject ? getProductionTenantUrl(primaryProject) : "",
+        storeUrl:
+          mayCommerce && primaryProject
+            ? getProductionTenantUrl(primaryProject, "/shop")
+            : "",
+        websiteUrl:
+          mayWebsite && primaryProject
+            ? getProductionTenantUrl(primaryProject)
+            : "",
       };
       writeDashboardMetricsCache(cacheScope, nextMetrics);
       setMetrics(nextMetrics);
@@ -345,7 +355,7 @@ function UserDashboardContent({ user, weeklyScreenTimeSeconds = 0, cacheScope = 
     return () => {
       cancelled = true;
     };
-  }, [cacheScope]);
+  }, [cacheScope, ready, mayBuild, mayReserve, mayWebsite, mayCommerce]);
 
   const cards = useMemo(() => {
     const projectNote =
@@ -445,7 +455,18 @@ function UserDashboardContent({ user, weeklyScreenTimeSeconds = 0, cacheScope = 
   const responsesPath = metrics.projectId
     ? getBuilderWorkspacePath(metrics.projectId, "responses", "builder-responses")
     : "/builder-responses";
-  const visibleCards = cards.filter((card) => !hiddenCardIds.includes(card.id));
+  const capabilityVisibleCards = cards.filter((card) => {
+    if (["forms"].includes(card.id)) return mayUseForms;
+    if (card.id.startsWith("reservation-")) return mayReserve;
+    if (["permitted-users", "permission-types", "website-visits"].includes(card.id)) {
+      return mayWebsite;
+    }
+    if (card.id === "store-visits") return mayCommerce;
+    return true;
+  });
+  const visibleCards = capabilityVisibleCards.filter(
+    (card) => !hiddenCardIds.includes(card.id),
+  );
 
   const toggleCardVisibility = (cardId) => {
     setHiddenCardIds((current) =>
@@ -473,15 +494,19 @@ function UserDashboardContent({ user, weeklyScreenTimeSeconds = 0, cacheScope = 
       </header>
 
       <nav className="user-dashboard-quick-actions" aria-label="Form, website, and store shortcuts">
-        <Link to={responsesPath + "/incomplete"}>
-          <ListRestart size={18} aria-hidden="true" />
-          <span>Incomplete forms</span>
-        </Link>
-        <Link to={responsesPath + "/completed"}>
-          <CircleCheckBig size={18} aria-hidden="true" />
-          <span>Completed forms</span>
-        </Link>
-        {metrics.websiteUrl && (
+        {mayUseForms && (
+          <>
+            <Link to={responsesPath + "/incomplete"}>
+              <ListRestart size={18} aria-hidden="true" />
+              <span>Incomplete forms</span>
+            </Link>
+            <Link to={responsesPath + "/completed"}>
+              <CircleCheckBig size={18} aria-hidden="true" />
+              <span>Completed forms</span>
+            </Link>
+          </>
+        )}
+        {mayWebsite && metrics.websiteUrl && (
           <a
             className="is-primary"
             href={metrics.websiteUrl}
@@ -492,7 +517,7 @@ function UserDashboardContent({ user, weeklyScreenTimeSeconds = 0, cacheScope = 
             <span>View website</span>
           </a>
         )}
-        {metrics.storeUrl && (
+        {mayCommerce && metrics.storeUrl && (
           <a
             className="is-primary"
             href={metrics.storeUrl}
@@ -534,7 +559,7 @@ function UserDashboardContent({ user, weeklyScreenTimeSeconds = 0, cacheScope = 
                 </button>
               </div>
               <div className="user-dashboard-customizer-list">
-                {cards.map((card) => (
+                {capabilityVisibleCards.map((card) => (
                   <label key={card.id}>
                     <input
                       type="checkbox"
@@ -612,7 +637,8 @@ function UserDashboardContent({ user, weeklyScreenTimeSeconds = 0, cacheScope = 
 }
 
 export default function UserDashboard(props) {
-  const cacheScope = getDashboardCacheScope(props.user);
+  const { revision } = useWorkspaceCapabilities();
+  const cacheScope = `${getDashboardCacheScope(props.user)}:${revision}`;
   return (
     <UserDashboardContent
       key={cacheScope || "uncached"}

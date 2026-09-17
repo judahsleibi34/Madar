@@ -8,12 +8,13 @@ from pydantic import BaseModel
 from data_analysis import services as data_services
 from data_analysis.ai import service as ai_service
 from data_analysis.ai import usage as ai_usage
-from data_analysis.ai.settings import get_model_config_for_plan, normalize_plan_name
+from data_analysis.ai.settings import get_model_config_for_plan
 from data_analysis.ai import token_metering
 from data_analysis.routes.data_routes import get_storage_scope
-from services.auth_service import require_regular_user_id
+from services import entitlement_service
 from services.entitlement_service import require_entitlement
 from services.rate_limit_service import enforce_data_workspace_rate_limit
+from services.tenant_service import require_active_tenant_user_id
 
 
 router = APIRouter(
@@ -47,19 +48,16 @@ class AIAnalysisRequest(BaseModel):
     dataset_name: str | None = None
 
 
-def _resolve_ai_plan(user_data: dict[str, Any]) -> str:
-    user_type = str(user_data.get("user_type") or "user").strip().lower()
-
-    if user_type == "admin":
-        return "enterprise"
-
-    payment_status = str(user_data.get("payment_status") or "").strip().lower()
-    plan = str(user_data.get("plan") or user_data.get("subscription_type") or "").strip().lower()
-
-    if payment_status == "active" and plan:
-        return normalize_plan_name("pro" if plan not in {"free", "pro", "enterprise"} else plan)
-
-    return "free"
+def _resolve_ai_plan(tenant_id: int | str) -> str:
+    # These are internal execution profiles, not commercial plan identifiers.
+    # Business already maps to "pro" in the AI runtime; its canonical expanded
+    # analysis capability carries that behavior to Business Plus centrally.
+    entitlements = entitlement_service.get_tenant_entitlements(tenant_id)
+    return (
+        "pro"
+        if "expanded_data_analysis" in entitlements.get("capabilities", [])
+        else "free"
+    )
 
 
 def _get_ai_context(
@@ -67,9 +65,12 @@ def _get_ai_context(
     request: Request,
     response: Response,
 ) -> tuple[str, str, dict[str, Any]]:
-    _, user_data = require_regular_user_id(user_id, request, response)
-    tenant_id = user_data.get("tenant_id")
-    scoped_user_id = user_data.get("id")
+    context = require_active_tenant_user_id(user_id, request, response)
+    require_entitlement(context.tenant_id, "standard_data_analysis")
+    require_entitlement(context.tenant_id, "ai_analytics")
+    user_data = context.user
+    tenant_id = context.tenant_id
+    scoped_user_id = context.user_id
 
     if tenant_id is None or scoped_user_id is None:
         raise HTTPException(status_code=400, detail="User storage scope is not available.")
@@ -194,7 +195,7 @@ def ai_analysis(user_id: int, request: AIAnalysisRequest, fastapi_request: Reque
             tenant_id=tenant_id,
         )
 
-        user_plan = _resolve_ai_plan(user_data)
+        user_plan = _resolve_ai_plan(tenant_id)
         df = data_services.read_dataset(
             request.input_path,
             tenant_id=tenant_id,

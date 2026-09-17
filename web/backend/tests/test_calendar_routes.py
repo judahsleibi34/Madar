@@ -134,7 +134,7 @@ class CalendarRouteTests(unittest.TestCase):
         self.assertEqual(raised.exception.status_code, 503)
         self.assertEqual(raised.exception.detail["code"], "calendar_schema_unavailable")
 
-    def test_enabled_calendar_bootstrap_reuses_private_user_range_cache(self):
+    def test_enabled_calendar_bootstrap_reauthorizes_private_data_on_every_request(self):
         context = SimpleNamespace(
             tenant_id=7, user_id=12, role="member", membership_status="active",
             user={"timezone": "UTC"},
@@ -163,12 +163,12 @@ class CalendarRouteTests(unittest.TestCase):
             second = calendar_routes.calendar_bootstrap(object(), second_response, start, end)
 
         self.assertEqual(first, second)
-        self.assertEqual(loader.call_count, 1)
+        self.assertEqual(loader.call_count, 2)
         self.assertEqual(first_response.headers["X-Calendar-Cache"], "miss")
-        self.assertEqual(second_response.headers["X-Calendar-Cache"], "hit")
+        self.assertEqual(second_response.headers["X-Calendar-Cache"], "miss")
         self.assertEqual(second_response.headers["Cache-Control"], "private, no-store")
 
-    def test_cached_bootstrap_refreshes_reservations_on_every_request(self):
+    def test_bootstrap_refreshes_reservations_on_every_request(self):
         context = SimpleNamespace(
             tenant_id=7, user_id=12, role="member", membership_status="active",
             user={"timezone": "UTC"},
@@ -207,8 +207,8 @@ class CalendarRouteTests(unittest.TestCase):
 
         self.assertEqual(first["events"], [])
         self.assertEqual(second["events"], [reservation])
-        self.assertEqual(loader.call_count, 1)
-        self.assertEqual(second_response.headers["X-Calendar-Cache"], "hit")
+        self.assertEqual(loader.call_count, 2)
+        self.assertEqual(second_response.headers["X-Calendar-Cache"], "miss")
 
         bypass_response = SimpleNamespace(headers={})
         bypass_request = SimpleNamespace(

@@ -1,3 +1,4 @@
+from tests.entitlement_test_support import installed_business_fixture
 import tempfile
 import unittest
 from io import BytesIO
@@ -90,6 +91,7 @@ class FakeSupabase:
 
 class BuilderAssetUploadTests(unittest.TestCase):
     def setUp(self):
+        self.enterContext(installed_business_fixture(1))
         self.client = build_client()
         self.temp_dir = tempfile.TemporaryDirectory()
         self.upload_dir = Path(self.temp_dir.name).resolve()
@@ -154,12 +156,17 @@ class BuilderAssetUploadTests(unittest.TestCase):
 
     def test_ecommerce_product_media_does_not_require_builder_upload_entitlement(self):
         builder_routes.reserve_storage.reset_mock()
+        def ecommerce_only(_tenant, feature):
+            if feature != "ecommerce_management":
+                raise HTTPException(status_code=402, detail="Builder upload entitlement required")
+            return {}
         with patch.object(
             builder_routes,
             "require_entitlement",
-            side_effect=HTTPException(status_code=402, detail="Builder upload entitlement required"),
-        ):
+            side_effect=ecommerce_only,
+        ) as entitlement:
             response = self.post_product_media(PNG_BYTES)
+            entitlement.assert_called_once_with(1, "ecommerce_management")
 
         self.assertEqual(response.status_code, 200)
         self.assertRegex(
@@ -174,6 +181,14 @@ class BuilderAssetUploadTests(unittest.TestCase):
             builder_routes.reserve_storage.call_args.kwargs["tenant_quota_bytes"],
             5 * 1024 * 1024 * 1024,
         )
+
+    def test_ecommerce_product_media_requires_commercial_ecommerce_access(self):
+        builder_routes.reserve_storage.reset_mock()
+        with patch.object(builder_routes, "require_entitlement",
+                          side_effect=HTTPException(status_code=402, detail="Ecommerce entitlement required")):
+            response = self.post_product_media(PNG_BYTES)
+        self.assertEqual(response.status_code, 402)
+        builder_routes.reserve_storage.assert_not_called()
 
     def test_ecommerce_product_media_rejects_documents(self):
         response = self.post_product_media(PDF_BYTES, "guide.pdf", "application/pdf")

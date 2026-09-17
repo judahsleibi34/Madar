@@ -1,3 +1,4 @@
+from tests.entitlement_test_support import installed_business_fixture
 import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -62,6 +63,9 @@ def context(tenant_id=7, role="member"):
 
 
 class EcommerceAuthorizationTests(unittest.TestCase):
+    def setUp(self):
+        self.enterContext(installed_business_fixture(7))
+
     def test_every_private_ecommerce_route_uses_the_authorization_gate(self):
         private_routes = [
             route

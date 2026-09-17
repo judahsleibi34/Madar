@@ -126,6 +126,9 @@ def assign_plan(
     reason: str,
     idempotency_key: str,
 ) -> dict[str, Any]:
+    from services.commercial_access_service import read_commercial_snapshot
+    if read_commercial_snapshot(tenant_id) is not None:
+        raise HTTPException(status_code=409, detail={"code": "commercial_ledger_required", "message": "Use the reviewed commercial access workflow to record a payment or grant."})
     product = _require_product(plan_id, "base_plan")
     response = service_supabase.rpc(
         "assign_commercial_subscription",

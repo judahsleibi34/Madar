@@ -26,7 +26,7 @@ class EntitlementTestBoundaryTests(unittest.TestCase):
             allowed = self.client().get("/tenant/tenant-a/data")
             denied = self.client().get("/tenant/tenant-b/data")
         self.assertEqual(allowed.status_code, 200)
-        self.assertEqual(denied.status_code, 402)
+        self.assertEqual(denied.status_code, 403)
         self.assertEqual(denied.json()["detail"]["code"], "entitlement_required")
 
     def test_unconfigured_tenant_remains_fail_closed(self):

@@ -7,6 +7,9 @@ umask 077
 die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 log() { printf '%s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*" >&2; }
 require() { command -v "$1" >/dev/null 2>&1 || die "required command not found: $1"; }
+support="$(dirname "$0")/backup_support.py"
+: "${MADAR_PROVIDER_BACKUP_REQUIRED:=true}"
+export MADAR_PROVIDER_BACKUP_REQUIRED
 
 DRY_RUN=0
 [[ "${1:-}" == "--dry-run" ]] && DRY_RUN=1
@@ -30,10 +33,10 @@ work_path="${MADAR_BACKUP_DIR%/}/.${backup_name}.incomplete.$$"
 [[ ! -e "$work_path" ]] || die "backup staging destination already exists: $work_path"
 
 paths=(
-  "builder-assets:${MADAR_BUILDER_ASSETS_DIR:-/app/builder-assets}"
-  "private-uploads:${MADAR_PRIVATE_UPLOADS_DIR:-/app/private-uploads}"
-  "generated-artifacts:${MADAR_GENERATED_ARTIFACTS_DIR:-/app/private_generated_charts}"
-  "avatars:${MADAR_AVATARS_DIR:-/app/avatars}"
+  "builder-assets:${MADAR_BUILDER_ASSETS_DIR:-${MADAR_STORAGE_ROOT:-/app}/uploads}"
+  "private-uploads:${MADAR_PRIVATE_UPLOADS_DIR:-${MADAR_STORAGE_ROOT:-/app}/private_uploads}"
+  "generated-artifacts:${MADAR_GENERATED_ARTIFACTS_DIR:-${MADAR_STORAGE_ROOT:-/app}/private_generated_charts}"
+  "avatars:${MADAR_AVATARS_DIR:-${MADAR_STORAGE_ROOT:-/app}/avatar_uploads}"
 )
 
 if (( DRY_RUN )); then
@@ -52,7 +55,26 @@ require psql
 require sha256sum
 require cp
 require python3
+require flock
+# Validate all sources before dumping; never manufacture a missing file set.
+for entry in "${paths[@]}"; do
+  [[ -d "${entry#*:}" ]] || die "required backup source is not a directory: ${entry%%:*}"
+  python3 "$support" inventory "${entry#*:}"
+done
+[[ "${MADAR_PROVIDER_BACKUP_REQUIRED:-false}" =~ ^(true|false)$ ]] || die "invalid provider backup policy"
+if [[ "${MADAR_PROVIDER_BACKUP_REQUIRED:-false}" == true ]]; then
+  [[ -n "${SUPABASE_URL:-}" && -n "${SUPABASE_SERVICE_KEY:-}" ]] || die "provider backup credentials required"
+fi
 mkdir -p "$MADAR_BACKUP_DIR"
+python3 - "$MADAR_BACKUP_DIR" "$support" <<'PY'
+import importlib.util, pathlib, sys
+spec = importlib.util.spec_from_file_location('backup_support', sys.argv[2])
+m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+m.real_path(pathlib.Path(sys.argv[1]))
+PY
+[[ ! -L "$MADAR_BACKUP_DIR/.backup.lock" ]] || die "backup lock must not be a symlink"
+exec 9>"$MADAR_BACKUP_DIR/.backup.lock"
+flock -n 9 || die "another backup or replication is running"
 mkdir -p "$work_path/files"
 cleanup_incomplete() {
   if [[ -d "$work_path" ]]; then
@@ -61,6 +83,9 @@ cleanup_incomplete() {
 }
 trap cleanup_incomplete EXIT
 log "backup.start destination=$backup_path"
+if [[ "${MADAR_PROVIDER_BACKUP_REQUIRED:-false}" == true ]]; then
+  python3 "$support" provider-before "$work_path"
+fi
 pg_dump --format=custom --no-owner --no-acl \
   --file="$work_path/database.dump"
 pg_restore --list "$work_path/database.dump" >/dev/null
@@ -73,8 +98,13 @@ for entry in "${paths[@]}"; do
   cp -a "$source_path/". "$work_path/files/$name/"
 done
 
+if [[ "${MADAR_PROVIDER_BACKUP_REQUIRED:-false}" == true ]]; then
+  python3 "$support" provider-after "$work_path" "$backup_name"
+fi
 database_version="$(psql --no-psqlrc --tuples-only --no-align --command='show server_version')"
 schema_version="$(psql --no-psqlrc --tuples-only --no-align --command="select schema_version from public.application_schema_state where contract_key='core'")"
+public_tables="$(psql --no-psqlrc --tuples-only --no-align --command="select count(*) from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relkind='r'")"
+export MADAR_BACKUP_PUBLIC_TABLES="$public_tables"
 release_sha="${MADAR_RELEASE_SHA:-unknown}"
 build_timestamp="${MADAR_BUILD_TIMESTAMP:-unknown}"
 cat >"$work_path/backup.env" <<EOF
@@ -83,7 +113,7 @@ MADAR_BACKUP_CREATED_AT=${timestamp}
 MADAR_BACKUP_CONTENTS=database,builder-assets,private-uploads,generated-artifacts,avatars
 EOF
 python3 - "$work_path/manifest.json" "$backup_name" "$timestamp" "$release_sha" "$build_timestamp" "$database_version" "$schema_version" <<'PY'
-import json,sys
+import json,sys,os
 manifest = {
   "backup_id": sys.argv[2],
   "created_at": sys.argv[3],
@@ -95,6 +125,13 @@ manifest = {
   "file_sets": ["builder-assets", "private-uploads", "generated-artifacts", "avatars"],
   "configuration": {"values_included": False, "required_inventory": "CONFIGURATION-INVENTORY.txt"},
   "checksums": "SHA256SUMS"
+}
+manifest['retention_managed'] = True
+manifest['database']['public_tables'] = int(os.environ['MADAR_BACKUP_PUBLIC_TABLES'])
+manifest['recovery'] = {
+  'provider_objects_required': os.getenv('MADAR_PROVIDER_BACKUP_REQUIRED') == 'true',
+  'platform_recovery_proven': False,
+  'local_builder_assets_meaning': 'legacy public uploads; provider objects are separate',
 }
 with open(sys.argv[1], "x", encoding="utf-8") as handle:
     json.dump(manifest, handle, indent=2, sort_keys=True)
@@ -123,14 +160,13 @@ printf 'completed_at=%s\n' "$timestamp" >"$work_path/BACKUP_COMPLETE"
   find . -type f ! -name SHA256SUMS -print0 | LC_ALL=C sort -z | xargs -0 sha256sum >SHA256SUMS
   sha256sum --check --strict SHA256SUMS >/dev/null
 )
+python3 "$support" verify "$work_path"
 mv -T "$work_path" "$backup_path"
 trap - EXIT
 log "backup.complete destination=$backup_path"
 if [[ -n "${MADAR_BACKUP_FRESHNESS_MARKER:-}" ]]; then
   [[ "$MADAR_BACKUP_FRESHNESS_MARKER" = /* ]] || die "MADAR_BACKUP_FRESHNESS_MARKER must be an absolute path"
-  mkdir -p "$(dirname "$MADAR_BACKUP_FRESHNESS_MARKER")"
-  marker_tmp="${MADAR_BACKUP_FRESHNESS_MARKER}.tmp.$$"
-  printf '%s %s\n' "$timestamp" "$backup_path" >"$marker_tmp"
-  mv "$marker_tmp" "$MADAR_BACKUP_FRESHNESS_MARKER"
+  python3 "$support" publish "$backup_path"
 fi
+python3 "$support" retain "$MADAR_BACKUP_DIR" "$backup_path" >&2
 printf '%s\n' "$backup_path"

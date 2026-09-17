@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import base64
 import os
 from dataclasses import dataclass
+from urllib.parse import urlsplit
 
 
 _TRUE_VALUES = {"1", "true", "yes", "on"}
@@ -41,14 +43,43 @@ class WebPushConfiguration:
         return not self.missing_fields
 
     @property
+    def validation_error(self) -> str | None:
+        """Return a redaction-safe error for shared provider configuration."""
+
+        if self.missing_fields:
+            return "missing_fields"
+        try:
+            from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
+            from py_vapid import Vapid
+
+            vapid = Vapid.from_string(private_key=self.private_key)
+            derived = base64.urlsafe_b64encode(
+                vapid.public_key.public_bytes(
+                    Encoding.X962, PublicFormat.UncompressedPoint
+                )
+            ).rstrip(b"=").decode("ascii")
+            Vapid.from_raw_public(self.public_key.encode("ascii"))
+            if derived != self.public_key.rstrip("="):
+                return "key_pair_mismatch"
+        except (ImportError, TypeError, ValueError, OSError):
+            return "invalid_key_material"
+        parsed_subject = urlsplit(self.subject)
+        if not (
+            (parsed_subject.scheme == "mailto" and bool(parsed_subject.path))
+            or (parsed_subject.scheme in {"https", "http"} and bool(parsed_subject.hostname))
+        ):
+            return "invalid_subject"
+        return None
+
+    @property
     def operational(self) -> bool:
-        return self.administratively_enabled and self.configured
+        return self.administratively_enabled and self.validation_error is None
 
     @property
     def status(self) -> str:
         if not self.administratively_enabled:
             return "disabled"
-        return "configured" if self.configured else "misconfigured"
+        return "configured" if self.validation_error is None else "misconfigured"
 
     def public_config(self) -> dict[str, str | bool]:
         return {

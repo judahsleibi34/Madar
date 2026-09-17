@@ -2,13 +2,13 @@
   "release_metadata_version": 1,
   "schema": {
     "compatible_min": 81,
-    "compatible_max": 99,
-    "target": 99,
+    "compatible_max": 101,
+    "target": 101,
     "migration_class": "expand-only",
     "rollback_compatible_min": 81,
-    "rollback_compatible_max": 98
+    "rollback_compatible_max": 99
   },
   "migration_policy": "automatic-after-known-good-backup-first-forward-repair",
-  "notes": "Compatibility bridge for schema 099. Promote and accept on schema 096 through 099. Text variant attributes keep the schema-096 save path during the bridge; color presentation saves fail clearly until schema 099 instead of losing metadata. Only after this bridge is known-good may separately locked automation create and verify the source-schema backup, apply the pinned contiguous expand-only 097 through 099 migrations as needed, and revalidate the active release. Schema 099 adds generic text/color presentation metadata without changing explicit variant identity, inventory, checkout, or order history. The retained schema-098 release remains a traffic rollback target only until migration 099 begins; after schema advances, forward repair is required by policy.",
-  "migration_manifest": "migrations-097-099.json"
+  "notes": "Production schema-099 bridge: preserve immutable 001-099 including the commercial access ledger. After governed source-schema backup, migrate 99->100 to correct only the visit RPC, then 100->101 for text/color variant presentation. Serve schema 99 with text-only fallback; color saves require 101. Preserve commercial enforcement and ledger data. After either transition, use forward repair when the retained schema-099 binary is incompatible.",
+  "migration_manifest": "migrations-100-101.json"
 }

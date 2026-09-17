@@ -15,13 +15,33 @@ jobs:
 
       - name: Verify deterministic release preflight checks
         run: |
+          python3 web/scripts/generate_commercial_contract.py --check
+          python3 web/scripts/check_privileged_inventory.py
           python3 web/scripts/check_dependency_locks.py
           python3 web/scripts/check_migrations.py
           python3 web/scripts/check_migration_transitions.py
+          python3 web/scripts/check_forward_release.py
           python3 web/scripts/check_secret_hygiene.py
 
-      - name: Build locked backend test image
-        run: docker build --target test -t madar-backend-test web/backend
+      - name: Build locked backend runtime and test images
+        run: |
+          docker build --target runtime -t madar-backend-runtime-test web/backend
+          docker build --target test -t madar-backend-test web/backend
+
+      - name: Verify Git is confined to the CI-only backend image
+        run: |
+          docker run --rm madar-backend-runtime-test sh -ceu '
+            test "$(id -u)" = "65534"
+            test "$(id -g)" = "65534"
+            ! command -v git >/dev/null 2>&1
+          '
+
+          docker run --rm madar-backend-test sh -ceu '
+            test "$(id -u)" = "65534"
+            test "$(id -g)" = "65534"
+            test "$(command -v git)" = "/usr/bin/git"
+            git --version
+          '
 
       - name: Run backend tests
         run: |
@@ -58,3 +78,12 @@ jobs:
 
       - name: Verify installed dependency consistency
         run: docker run --rm madar-backend-test python -m pip check
+
+      - name: Rehearse commercial migration, isolation and restore
+        run: bash web/scripts/rehearse_migration_099.sh
+
+      - name: Rehearse immutable production 099 to forward target 101
+        run: python3 web/scripts/rehearse_migration_101.py
+
+      - name: Rehearse authenticated checkout, COD, inventory and loyalty replay
+        run: python3 web/scripts/rehearse_authenticated_checkout.py

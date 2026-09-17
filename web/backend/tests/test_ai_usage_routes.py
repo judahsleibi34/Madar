@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 
 from data_analysis.ai.planner import AIPlannerError
 from data_analysis.routes import analysis_routes
-from tests.entitlement_test_support import installed_business_fixture
+from tests.entitlement_test_support import EntitlementTestState, installed_business_fixture
 
 
 _entitlement_fixture = installed_business_fixture(1, 2, extra_capabilities=("ai_analytics",))
@@ -102,6 +102,10 @@ def auth_user(user_id=1, tenant_id=1, *, payment_status="", plan="", user_type="
     }
 
 
+def tenant_context(user_id=1, tenant_id=1):
+    return SimpleNamespace(user_id=user_id, tenant_id=tenant_id, user=auth_user(user_id,tenant_id)[1])
+
+
 class AIUsageRouteTests(unittest.TestCase):
     def setUp(self):
         self.client = build_client()
@@ -125,7 +129,7 @@ class AIUsageRouteTests(unittest.TestCase):
                 clear=False,
             ),
             patch.object(analysis_routes, "enforce_data_workspace_rate_limit", return_value=None),
-            patch.object(analysis_routes, "require_regular_user_id", return_value=auth_user()),
+            patch.object(analysis_routes, "require_active_tenant_user_id", return_value=tenant_context()),
             patch.object(
                 analysis_routes.token_metering,
                 "get_model_multipliers",
@@ -222,7 +226,7 @@ class AIUsageRouteTests(unittest.TestCase):
     def test_unauthorized_user_cannot_use_ai_route(self):
         with patch.object(
             analysis_routes,
-            "require_regular_user_id",
+            "require_active_tenant_user_id",
             side_effect=HTTPException(status_code=401, detail="Not logged in"),
         ), patch.object(analysis_routes.ai_service, "ask_planner") as ask_planner:
             response = self.post_ai()
@@ -234,8 +238,8 @@ class AIUsageRouteTests(unittest.TestCase):
     def test_tenant_user_dataset_mismatch_is_rejected_before_usage_increment(self):
         with patch.object(
             analysis_routes,
-            "require_regular_user_id",
-            return_value=auth_user(user_id=1, tenant_id=2),
+            "require_active_tenant_user_id",
+            return_value=tenant_context(user_id=1, tenant_id=2),
         ), patch.object(analysis_routes.ai_service, "ask_planner") as ask_planner:
             response = self.post_ai()
 
@@ -246,7 +250,7 @@ class AIUsageRouteTests(unittest.TestCase):
     def test_path_user_mismatch_is_rejected_before_usage_increment(self):
         with patch.object(
             analysis_routes,
-            "require_regular_user_id",
+            "require_active_tenant_user_id",
             side_effect=HTTPException(status_code=403, detail="User id does not match session"),
         ), patch.object(analysis_routes.ai_service, "ask_planner") as ask_planner:
             response = self.post_ai(user_id=2)
@@ -309,6 +313,43 @@ class AIUsageRouteTests(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertEqual(self.finalizations, [])
         self.assertEqual(self.releases, ["request-1"])
+
+
+class TenantAICommercialBoundaryTests(unittest.TestCase):
+    def test_execution_profile_uses_current_tenant_capabilities(self):
+        state = (
+            EntitlementTestState()
+            .activate_plan(7, "forms")
+            .activate_plan(8, "business_plus")
+        )
+        with state.installed():
+            self.assertEqual(analysis_routes._resolve_ai_plan(7), "free")
+            self.assertEqual(analysis_routes._resolve_ai_plan(8), "pro")
+            state.activate_plan(8, "forms")
+            self.assertEqual(analysis_routes._resolve_ai_plan(8), "free")
+
+    def test_ai_addon_denied_before_dataset_or_provider_access(self):
+        state = EntitlementTestState().activate_plan(7, "business")
+        with (
+            state.installed(),
+            patch.object(
+                analysis_routes,
+                "require_active_tenant_user_id",
+                return_value=tenant_context(3, 7),
+            ),
+            patch.object(analysis_routes.data_services, "read_dataset") as dataset,
+            patch.object(
+                analysis_routes.ai_service,
+                "run_ai_analysis_on_dataframe",
+            ) as provider,
+        ):
+            response = build_client().post(
+                "/users/3/analysis/ai",
+                json={"input_path": "private.csv", "user_message": "Summarize"},
+            )
+        self.assertEqual(response.status_code,403)
+        dataset.assert_not_called()
+        provider.assert_not_called()
 
 
 if __name__ == "__main__":

@@ -1,8 +1,10 @@
 import socket
 import os
 import unittest
+from datetime import datetime, timedelta, timezone
+from email.utils import format_datetime
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from fastapi import FastAPI, HTTPException, Response
 from fastapi.testclient import TestClient
@@ -10,7 +12,7 @@ from pydantic import ValidationError
 from starlette.requests import Request
 
 from routes import auth_routes, notification_routes
-from services import notification_delivery_service, notification_service
+from services import auth_service, notification_delivery_service, notification_service
 from services.installation_service import PushSubscriptionBindingError
 from services.push_subscription_security import UnsafePushEndpoint, validate_push_endpoint
 
@@ -303,6 +305,94 @@ class ExternalDeliveryMembershipTests(unittest.TestCase):
         active = next(item for item in self.client.tables["web_push_subscriptions"] if item["id"] == "active")
         self.assertIsNotNone(active["revoked_at"])
 
+    def test_worker_classifies_provider_failures_without_persisting_provider_content(self):
+        from pywebpush import WebPushException
+
+        row = {"channel": "web_push", "tenant_id": 1, "user_id": 10, "subscription_id": "active", "payload": {"title": "Title"}}
+        environment = {"WEB_PUSH_ENABLED": "true", "WEB_PUSH_VAPID_PUBLIC_KEY": "public", "WEB_PUSH_VAPID_PRIVATE_KEY": "private", "WEB_PUSH_VAPID_SUBJECT": "mailto:test@example.com"}
+        expectations = (
+            (400, "web_push_request_invalid", False),
+            (401, "web_push_provider_unauthorized", False),
+            (403, "web_push_provider_forbidden", False),
+            (500, "web_push_provider_unavailable", True),
+            (503, "web_push_provider_unavailable", True),
+        )
+        for status, code, retryable in expectations:
+            with self.subTest(status=status):
+                failure = WebPushException(
+                    "provider response must not be persisted",
+                    response=SimpleNamespace(status_code=status, headers={}),
+                )
+                with patch.object(notification_delivery_service, "service_supabase", self.client), patch.dict("os.environ", environment, clear=False), patch.object(notification_delivery_service, "validate_push_endpoint", side_effect=lambda value: value), patch("pywebpush.webpush", side_effect=failure), self.assertRaises(notification_delivery_service.DeliveryError) as raised:
+                    notification_delivery_service._deliver_web_push(row)
+                self.assertEqual(raised.exception.code, code)
+                self.assertEqual(raised.exception.retryable, retryable)
+                self.assertNotIn("provider response", raised.exception.code)
+
+    def test_worker_honors_numeric_and_http_date_retry_after(self):
+        from pywebpush import WebPushException
+
+        row = {"channel": "web_push", "tenant_id": 1, "user_id": 10, "subscription_id": "active", "payload": {"title": "Title"}}
+        environment = {"WEB_PUSH_ENABLED": "true", "WEB_PUSH_VAPID_PUBLIC_KEY": "public", "WEB_PUSH_VAPID_PRIVATE_KEY": "private", "WEB_PUSH_VAPID_SUBJECT": "mailto:test@example.com"}
+        values = (
+            ("120", 120),
+            (format_datetime(datetime.now(timezone.utc) + timedelta(seconds=120)), 120),
+        )
+        for retry_after, expected in values:
+            with self.subTest(retry_after=retry_after):
+                failure = WebPushException(
+                    "limited",
+                    response=SimpleNamespace(
+                        status_code=429,
+                        headers={"Retry-After": retry_after},
+                    ),
+                )
+                with patch.object(notification_delivery_service, "service_supabase", self.client), patch.dict("os.environ", environment, clear=False), patch.object(notification_delivery_service, "validate_push_endpoint", side_effect=lambda value: value), patch("pywebpush.webpush", side_effect=failure), self.assertRaises(notification_delivery_service.DeliveryError) as raised:
+                    notification_delivery_service._deliver_web_push(row)
+                self.assertEqual(raised.exception.code, "web_push_rate_limited")
+                self.assertTrue(raised.exception.retryable)
+                self.assertLessEqual(abs(raised.exception.retry_after_seconds - expected), 2)
+
+    def test_invalid_global_vapid_key_does_not_revoke_subscription(self):
+        row = {"channel": "web_push", "tenant_id": 1, "user_id": 10, "subscription_id": "active", "payload": {"title": "Title"}}
+        environment = {"WEB_PUSH_ENABLED": "true", "WEB_PUSH_VAPID_PUBLIC_KEY": "public", "WEB_PUSH_VAPID_PRIVATE_KEY": "private", "WEB_PUSH_VAPID_SUBJECT": "mailto:test@example.com"}
+        with patch.object(notification_delivery_service, "service_supabase", self.client), patch.dict("os.environ", environment, clear=False), patch.object(notification_delivery_service, "validate_push_endpoint", side_effect=lambda value: value), patch("pywebpush.webpush", side_effect=ValueError("invalid local key material")), self.assertRaises(notification_delivery_service.DeliveryError) as raised:
+            notification_delivery_service._deliver_web_push(row)
+        self.assertEqual(raised.exception.code, "web_push_provider_configuration_invalid")
+        self.assertFalse(raised.exception.retryable)
+        self.assertEqual(raised.exception.terminal_outcome, "dead")
+        active = next(item for item in self.client.tables["web_push_subscriptions"] if item["id"] == "active")
+        self.assertIsNone(active["revoked_at"])
+
+    def test_global_vapid_failure_cannot_mass_revoke_recipients(self):
+        self.client.tables["web_push_subscriptions"].append({
+            **self.client.tables["web_push_subscriptions"][0],
+            "id": "second", "user_id": 11,
+        })
+        self.client.tables["tenant_memberships"].append({
+            "tenant_id": 1, "user_id": 11, "status": "active",
+        })
+        environment = {
+            "WEB_PUSH_ENABLED": "true",
+            "WEB_PUSH_VAPID_PUBLIC_KEY": "invalid-global-public",
+            "WEB_PUSH_VAPID_PRIVATE_KEY": "invalid-global-private",
+            "WEB_PUSH_VAPID_SUBJECT": "mailto:test@example.com",
+        }
+        for user_id, subscription_id in ((10, "active"), (11, "second")):
+            row = {
+                "channel": "web_push", "tenant_id": 1, "user_id": user_id,
+                "subscription_id": subscription_id, "payload": {"title": "Title"},
+            }
+            with patch.object(notification_delivery_service, "service_supabase", self.client), patch.dict("os.environ", environment, clear=False), patch.object(notification_delivery_service, "validate_push_endpoint", side_effect=lambda value: value), patch("pywebpush.webpush", side_effect=ValueError("invalid global key")), self.assertRaises(notification_delivery_service.DeliveryError) as raised:
+                notification_delivery_service._deliver_web_push(row)
+            self.assertEqual(
+                raised.exception.code, "web_push_provider_configuration_invalid"
+            )
+        self.assertTrue(all(
+            item["revoked_at"] is None
+            for item in self.client.tables["web_push_subscriptions"]
+        ))
+
     def test_inactive_member_email_is_rejected_before_smtp(self):
         self.client.tables["users"] = [{"id": "11", "email": "former@example.com"}]
         with patch.object(notification_delivery_service, "service_supabase", self.client):
@@ -327,6 +417,47 @@ class LogoutPushRevocationTests(unittest.TestCase):
         with patch.object(auth_routes, "get_authenticated_user_row", return_value=(object(), {"id": 42})), patch.object(auth_routes, "revoke_all_web_push_subscriptions", side_effect=RuntimeError("database unavailable")):
             result = auth_routes.log_out(self.request(), response)
         self.assertEqual(result["message"], "Logged out successfully")
+
+    def test_logout_revokes_only_the_request_verified_provider_session(self):
+        request = self.request()
+        request.state.verified_auth_session = {
+            "access_token": "verified-access",
+            "refresh_token": "verified-refresh",
+            "auth_id": "verified-user",
+        }
+        provider_auth = Mock()
+        provider = SimpleNamespace(auth=provider_auth)
+
+        with patch.object(
+            auth_service, "create_session_supabase_client", return_value=provider
+        ):
+            revoked = auth_service.revoke_verified_auth_session(request)
+
+        self.assertTrue(revoked)
+        provider_auth.set_session.assert_called_once_with(
+            "verified-access", "verified-refresh"
+        )
+        provider_auth.sign_out.assert_called_once_with({"scope": "local"})
+        self.assertIsNone(request.state.verified_auth_session)
+
+    def test_logout_fails_closed_when_provider_session_cannot_be_revoked(self):
+        response = Response()
+        with patch.object(
+            auth_routes,
+            "get_authenticated_user_row",
+            return_value=(object(), {"id": 42}),
+        ), patch.object(
+            auth_routes, "revoke_all_web_push_subscriptions", return_value=0
+        ), patch.object(
+            auth_routes,
+            "revoke_verified_auth_session",
+            side_effect=RuntimeError("provider unavailable"),
+        ):
+            result = auth_routes.log_out(self.request(), response)
+
+        self.assertEqual(result.status_code, 503)
+        self.assertIn("madar_access_token", result.headers.get("set-cookie", ""))
+        self.assertNotIn("provider unavailable", result.body.decode())
 
     def test_identified_logout_revokes_only_current_installation(self):
         response = Response()

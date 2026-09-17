@@ -1,3 +1,4 @@
+from tests.entitlement_test_support import installed_business_fixture
 import copy
 import unittest
 from unittest.mock import patch
@@ -317,6 +318,9 @@ class _ProjectMutationSupabase:
 
 
 class BuilderRevisionSafetyTests(unittest.TestCase):
+    def setUp(self):
+        self.enterContext(installed_business_fixture(7))
+
     def test_builder_text_size_boundary_is_enforced_for_drafts_and_publication(self):
         def schema_for(font_size):
             return {

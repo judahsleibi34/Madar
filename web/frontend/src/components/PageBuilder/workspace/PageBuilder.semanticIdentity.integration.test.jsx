@@ -1,10 +1,32 @@
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { WorkspaceContext } from "../../../commercial/capabilityContext";
+import matrix from "../../../commercial/planMatrix.generated.json";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render as testingRender,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { builderInitialProjectLoadPromises } from "../core/PageBuilder.config";
 import { getBuilderRecoveryStorageKey } from "../core/PageBuilder.recovery";
 import PageBuilder from "./PageBuilder";
+
+const fullCapabilities = {
+  ready: true,
+  revision: "test-business-plus",
+  can: (capability) => matrix.plans.business_plus[capability] === true,
+};
+
+const render = (ui, options) => testingRender(
+  <WorkspaceContext.Provider value={fullCapabilities}>
+    {ui}
+  </WorkspaceContext.Provider>,
+  options,
+);
 
 const apiMocks = vi.hoisted(() => ({
   fetchBuilderProject: vi.fn(),
@@ -145,9 +167,9 @@ describe("mounted PageBuilder semantic acknowledgement", () => {
 
   it("sends an explicit sidebar Save click to the backend even when the draft is already acknowledged", async () => {
     render(
-      <MemoryRouter initialEntries={[`/page-builder/projects/${projectId}/pages`]}>
+      <WorkspaceContext.Provider value={{ ready: true, can: (cap) => matrix.plans.business_plus[cap] === true }}><MemoryRouter initialEntries={[`/page-builder/projects/${projectId}/pages`]}>
         <PageBuilder user={user} />
-      </MemoryRouter>
+      </MemoryRouter></WorkspaceContext.Provider>
     );
 
     expect((await screen.findByLabelText("Page name")).value).toBe("Home");
@@ -169,9 +191,9 @@ describe("mounted PageBuilder semantic acknowledgement", () => {
 
   it("renders public responsive navigation inside builder Preview", async () => {
     const { container } = render(
-      <MemoryRouter initialEntries={["/page-builder/projects/" + projectId + "/pages"]}>
+      <WorkspaceContext.Provider value={{ ready: true, can: (cap) => matrix.plans.business_plus[cap] === true }}><MemoryRouter initialEntries={["/page-builder/projects/" + projectId + "/pages"]}>
         <PageBuilder user={user} />
-      </MemoryRouter>
+      </MemoryRouter></WorkspaceContext.Provider>
     );
 
     await screen.findByLabelText("Page name");
@@ -198,9 +220,9 @@ describe("mounted PageBuilder semantic acknowledgement", () => {
     });
 
     render(
-      <MemoryRouter initialEntries={[`/page-builder/projects/${projectId}/header-footer`]}>
+      <WorkspaceContext.Provider value={{ ready: true, can: (cap) => matrix.plans.business_plus[cap] === true }}><MemoryRouter initialEntries={[`/page-builder/projects/${projectId}/header-footer`]}>
         <PageBuilder user={user} />
-      </MemoryRouter>
+      </MemoryRouter></WorkspaceContext.Provider>
     );
 
     await waitFor(() => {
@@ -219,9 +241,9 @@ describe("mounted PageBuilder semantic acknowledgement", () => {
 
   it("accepts a recursively reordered jsonb acknowledgement and publishes without another draft save", async () => {
     render(
-      <MemoryRouter initialEntries={[`/page-builder/projects/${projectId}/pages`]}>
+      <WorkspaceContext.Provider value={{ ready: true, can: (cap) => matrix.plans.business_plus[cap] === true }}><MemoryRouter initialEntries={[`/page-builder/projects/${projectId}/pages`]}>
         <PageBuilder user={user} />
-      </MemoryRouter>
+      </MemoryRouter></WorkspaceContext.Provider>
     );
 
     expect((await screen.findByLabelText("Page name")).value).toBe("Home");
@@ -305,9 +327,9 @@ describe("mounted PageBuilder semantic acknowledgement", () => {
     });
 
     render(
-      <MemoryRouter initialEntries={["/page-builder/projects/" + projectId + "/pages"]}>
+      <WorkspaceContext.Provider value={{ ready: true, can: (cap) => matrix.plans.business_plus[cap] === true }}><MemoryRouter initialEntries={["/page-builder/projects/" + projectId + "/pages"]}>
         <PageBuilder user={user} />
-      </MemoryRouter>
+      </MemoryRouter></WorkspaceContext.Provider>
     );
 
     await screen.findByLabelText("Page name");
@@ -381,9 +403,9 @@ describe("mounted PageBuilder semantic acknowledgement", () => {
     }));
 
     const firstMount = render(
-      <MemoryRouter initialEntries={[`/page-builder/projects/${projectId}/pages/sections`]}>
+      <WorkspaceContext.Provider value={{ ready: true, can: (cap) => matrix.plans.business_plus[cap] === true }}><MemoryRouter initialEntries={[`/page-builder/projects/${projectId}/pages/sections`]}>
         <PageBuilder user={user} />
-      </MemoryRouter>
+      </MemoryRouter></WorkspaceContext.Provider>
     );
     await screen.findByLabelText("Page name");
 
@@ -433,9 +455,9 @@ describe("mounted PageBuilder semantic acknowledgement", () => {
     });
 
     const secondMount = render(
-      <MemoryRouter initialEntries={[`/page-builder/projects/${projectId}/pages/sections`]}>
+      <WorkspaceContext.Provider value={{ ready: true, can: (cap) => matrix.plans.business_plus[cap] === true }}><MemoryRouter initialEntries={[`/page-builder/projects/${projectId}/pages/sections`]}>
         <PageBuilder user={user} />
-      </MemoryRouter>
+      </MemoryRouter></WorkspaceContext.Provider>
     );
     await screen.findByLabelText("Page name");
     await waitFor(() => {
@@ -565,9 +587,9 @@ describe("mounted PageBuilder semantic acknowledgement", () => {
     });
 
     const mounted = render(
-      <MemoryRouter initialEntries={[`/page-builder/projects/${projectId}/pages/sections`]}>
+      <WorkspaceContext.Provider value={{ ready: true, can: (cap) => matrix.plans.business_plus[cap] === true }}><MemoryRouter initialEntries={[`/page-builder/projects/${projectId}/pages/sections`]}>
         <PageBuilder user={user} />
-      </MemoryRouter>
+      </MemoryRouter></WorkspaceContext.Provider>
     );
     await screen.findByLabelText("Page name");
     const frame = mounted.container.querySelector('[data-builder-element-id="block-lines"]');
@@ -621,9 +643,9 @@ describe("mounted PageBuilder semantic acknowledgement", () => {
     });
 
     const mounted = render(
-      <MemoryRouter initialEntries={[`/page-builder/projects/${projectId}/pages/sections`]}>
+      <WorkspaceContext.Provider value={{ ready: true, can: (cap) => matrix.plans.business_plus[cap] === true }}><MemoryRouter initialEntries={[`/page-builder/projects/${projectId}/pages/sections`]}>
         <PageBuilder user={user} />
-      </MemoryRouter>
+      </MemoryRouter></WorkspaceContext.Provider>
     );
     await screen.findByLabelText("Page name");
     const frame = mounted.container.querySelector('[data-builder-element-id="block-heading-size"]');
@@ -653,9 +675,9 @@ describe("mounted PageBuilder semantic acknowledgement", () => {
 
   it("undoes and redoes a component edit without changing its page structure", async () => {
     const mounted = render(
-      <MemoryRouter initialEntries={["/page-builder/projects/" + projectId + "/pages/sections"]}>
+      <WorkspaceContext.Provider value={{ ready: true, can: (cap) => matrix.plans.business_plus[cap] === true }}><MemoryRouter initialEntries={["/page-builder/projects/" + projectId + "/pages/sections"]}>
         <PageBuilder user={user} />
-      </MemoryRouter>
+      </MemoryRouter></WorkspaceContext.Provider>
     );
     await screen.findByLabelText("Page name");
 
@@ -727,9 +749,9 @@ describe("mounted PageBuilder semantic acknowledgement", () => {
     });
 
     const mounted = render(
-      <MemoryRouter initialEntries={[`/page-builder/projects/${projectId}/pages/sections`]}>
+      <WorkspaceContext.Provider value={{ ready: true, can: (cap) => matrix.plans.business_plus[cap] === true }}><MemoryRouter initialEntries={[`/page-builder/projects/${projectId}/pages/sections`]}>
         <PageBuilder user={user} />
-      </MemoryRouter>
+      </MemoryRouter></WorkspaceContext.Provider>
     );
     await screen.findByLabelText("Page name");
 
@@ -777,9 +799,9 @@ describe("mounted PageBuilder semantic acknowledgement", () => {
     });
 
     const mounted = render(
-      <MemoryRouter initialEntries={[`/page-builder/projects/${projectId}/pages/sections`]}>
+      <WorkspaceContext.Provider value={{ ready: true, can: (cap) => matrix.plans.business_plus[cap] === true }}><MemoryRouter initialEntries={[`/page-builder/projects/${projectId}/pages/sections`]}>
         <PageBuilder user={user} />
-      </MemoryRouter>
+      </MemoryRouter></WorkspaceContext.Provider>
     );
     await screen.findByLabelText("Page name");
 

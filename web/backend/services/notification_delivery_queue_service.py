@@ -7,6 +7,10 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from database import service_supabase
+from services.notification_outbox_service import (
+    is_recent_dead_for_readiness,
+    is_terminal_recipient_error,
+)
 from services.web_push_config import get_web_push_configuration
 
 
@@ -156,15 +160,20 @@ def get_delivery_metrics(*, client=None) -> dict[str, int]:
     }
 
 
-def get_delivery_channel_metrics(*, client=None) -> dict[str, Any]:
+def get_delivery_channel_metrics(
+    *, client=None, dead_readiness_window_seconds: int = 86400
+) -> dict[str, Any]:
     rows = _rows(
         (client or service_supabase).table("notification_deliveries")
-        .select("channel,status,created_at,sent_at,last_error_code")
+        .select("channel,status,created_at,updated_at,dead_at,sent_at,last_error_code")
         .in_("status", ["pending", "processing", "sent", "dead"])
         .limit(5000)
         .execute()
     )
     now = _now()
+    readiness_window = int(dead_readiness_window_seconds)
+    if readiness_window <= 0:
+        raise ValueError("dead readiness window must be positive")
     result: dict[str, Any] = {}
     for channel in ("internal", "email", "web_push"):
         selected = [row for row in rows if row.get("channel") == channel]
@@ -178,11 +187,26 @@ def get_delivery_channel_metrics(*, client=None) -> dict[str, Any]:
                 continue
         sent_dates = sorted(str(row.get("sent_at")) for row in selected if row.get("sent_at"))
         errors = [str(row.get("last_error_code")) for row in selected if row.get("last_error_code")]
+        actionable_dead = [
+            row
+            for row in selected
+            if row.get("status") == "dead"
+            and not is_terminal_recipient_error(row.get("last_error_code"))
+            and is_recent_dead_for_readiness(
+                row, current=now, window_seconds=readiness_window
+            )
+        ]
         result[channel] = {
             "pending": sum(row.get("status") == "pending" for row in selected),
             "processing": sum(row.get("status") == "processing" for row in selected),
             "sent": sum(row.get("status") == "sent" for row in selected),
             "dead": sum(row.get("status") == "dead" for row in selected),
+            "actionable_dead": len(actionable_dead),
+            "terminal_dead": sum(
+                row.get("status") == "dead"
+                and is_terminal_recipient_error(row.get("last_error_code"))
+                for row in selected
+            ),
             "oldest_queued_age_seconds": max(0, int((now - min(dates)).total_seconds())) if dates else 0,
             "last_success_at": sent_dates[-1] if sent_dates else None,
             "last_error_code": errors[-1] if errors else None,
