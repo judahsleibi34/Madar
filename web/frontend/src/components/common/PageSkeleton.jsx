@@ -44,7 +44,14 @@ export default function PageSkeleton({
           </section>
           <section className="page-skeleton-site-cards" aria-hidden="true"><i /><i /><i /></section>
         </div>
-      ) : <LoadingBar label={label} />}
+      ) : <>
+        <LoadingBar label={label} />
+        <div className="page-skeleton-content" aria-hidden="true">
+          <div className="page-skeleton-content-heading"><i /><i /></div>
+          <div className="page-skeleton-content-cards"><i /><i /><i /></div>
+          <div className="page-skeleton-content-panel"><i /><i /><i /><i /></div>
+        </div>
+      </>}
     </main>
   );
 }

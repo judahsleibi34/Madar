@@ -1,3 +1,6 @@
+import { getEcommerceCacheScope, readEcommerceAdminCacheSnapshot } from "./utils/ecommerceAdminCache";
+import EcommerceRouteSkeleton from "./EcommerceRouteSkeleton";
+import { StorePreviewSkeleton } from "./CommerceLoadingLayouts";
 import AuthToast from "../AuthPages/AuthToast";
 import { useEffect, useMemo, useState } from "react";
 import { ExternalLink, RefreshCw, Settings } from "lucide-react";
@@ -11,16 +14,17 @@ const STOREFRONT_ORIGIN = String(
 ).replace(/\/$/, "");
 
 export default function EcommerceStorePage({ user }) {
+  const cacheScope = getEcommerceCacheScope(user);
   const location = useLocation();
   const { t, locale, direction } = useCommerceI18n();
   const draftPreview = new URLSearchParams(location.search).get("preview") === "draft";
-  const [website, setWebsite] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const snapshot = readEcommerceAdminCacheSnapshot(cacheScope, "website-settings");
+  const [website, setWebsite] = useState(() => snapshot?.data || null);
+  const [loading, setLoading] = useState(() => !snapshot);
   const [error, setError] = useState("");
   const [toast, setToast] = useState(null);
   const [frameVersion, setFrameVersion] = useState(0);
   const [frameReady, setFrameReady] = useState(false);
-  const cacheScope = user?.tenant_id || user?.id ? `commerce-${user?.tenant_id || user?.id}` : "authenticated";
 
   useEffect(() => {
     let cancelled = false;
@@ -57,6 +61,8 @@ export default function EcommerceStorePage({ user }) {
   const previewPath = livePath ? `${livePath}${draftPreview ? "?preview=draft" : ""}` : "";
   const openUrl = draftPreview ? previewPath : liveUrl;
 
+  if (loading) return <EcommerceRouteSkeleton pathname="/ecommerce/store" label={t("admin.loadingStorePreview")} direction={direction} lang={locale} />;
+
   return (
     <main className="ecommerce-store-admin" dir={direction} lang={locale}>
       <header className="ecommerce-store-admin-header app-page-intro">
@@ -78,7 +84,6 @@ export default function EcommerceStorePage({ user }) {
         )}
       </header>
 
-      {loading && <div className="ecommerce-store-page-skeleton" role="status" aria-label={t("admin.loadingStorePreview")}><i /><i /><i /></div>}
       {!loading && error && (
         <div className="ecommerce-store-admin-state is-error">
           <h2>{t("admin.previewUnavailable")}</h2>
@@ -94,8 +99,8 @@ export default function EcommerceStorePage({ user }) {
         </div>
       )}
       {!loading && !error && subdomain && (
-        <section className="ecommerce-store-frame-shell">
-          {!frameReady && <div className="ecommerce-store-frame-loading" role="status" aria-label={t("admin.loadingStorefront")}><i /><i /><i /><i /></div>}
+        <section className="ecommerce-store-frame-shell" aria-busy={!frameReady}>
+          {!frameReady && <StorePreviewSkeleton className="ecommerce-store-frame-loading" label={t("admin.loadingStorefront")} />}
           <iframe
             key={frameVersion}
             src={previewPath}

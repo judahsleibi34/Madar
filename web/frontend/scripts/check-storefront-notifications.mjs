@@ -4,7 +4,7 @@ import { chromium, expect } from "@playwright/test";
 const origin = new URL(process.argv[2] || "http://127.0.0.1:5189");
 assert(["127.0.0.1", "localhost", "[::1]"].includes(origin.hostname), "Browser validation requires a loopback frontend");
 const browser = await chromium.launch({ headless: true });
-const product = { id: "product-1", slug: "chair", name: "Chair", price: "20", currency: "USD", in_stock: true, images: [] };
+const product = { id: "4e298339-4a33-45f1-b89d-d60e40e34581", slug: "chair", name: "Chair", price: "20", currency: "USD", in_stock: true, images: [] };
 const site = { brand: "Test Store", commerce_currency: "USD" };
 const token = "a".repeat(64);
 let passed = 0;
@@ -13,7 +13,7 @@ async function scenario(name, run, options = {}) {
   const context = await browser.newContext({ viewport: options.viewport || { width: 1440, height: 900 } });
   const page = await context.newPage();
   page.setDefaultTimeout(10000);
-  const state = { productError: false, deliveryError: false, noAreas: false, discountError: false, orderError: false, changed: false, priceChanged: false };
+  const state = { productError: false, deliveryError: false, noAreas: false, discountError: false, orderError: false, validationError: false, changed: false, priceChanged: false };
   const errors = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await page.route("**/*", async (route) => {
@@ -24,8 +24,9 @@ async function scenario(name, run, options = {}) {
     if (path.includes("/public/sites/")) {
       if (path.includes("/catalog/products/")) return state.productError ? json(unsafe, 503) : json({ site, product, category: null, tags: [], attributes: [], options: [], variants: [] });
       if (path.endsWith("/store-profile")) return json({ site });
-      if (path.endsWith("/delivery-areas")) return state.deliveryError ? json(unsafe, 503) : json({ areas: state.noAreas ? [] : [{ id: "area-1", name_en: "City", name_ar: "City" }] });
+      if (path.endsWith("/delivery-areas")) return state.deliveryError ? json(unsafe, 503) : json({ areas: state.noAreas ? [] : [{ id: "95000000-0000-0000-0000-000000000001", name_en: "City", name_ar: "City" }] });
       if (path.endsWith("/cart/reconcile")) return json({ valid: !state.changed, items: [{ product_id: product.id, name: product.name, price: state.priceChanged ? "25" : product.price, currency: product.currency }] });
+      if (path.endsWith("/orders") && state.validationError) return json({detail:[{loc:["body","street"],msg:"internal_variable_name secret"}]},422);
       if (path.endsWith("/orders")) return state.orderError ? json(unsafe, 503) : json({ confirmation_token: token });
       if (path.includes("/orders/confirmation/")) return json({ order: { id: "order-1", order_number: "TEST-1", created_at: "2026-09-17T12:00:00Z", total: "20", currency: "USD", status: "pending", payment_status: "unpaid" }, items: [] });
       if (path.endsWith("/loyalty/me")) return json({ detail: "Not signed in" }, 401);
@@ -47,6 +48,8 @@ async function scenario(name, run, options = {}) {
       return r.x >= 0 && r.y >= 0 && r.right <= innerWidth && r.bottom <= innerHeight && (el === top || el.contains(top));
     });
     assert(visible, `${name}: toast must be inside viewport and above other content`);
+    const placement=await toast.evaluate(el=>{const r=el.getBoundingClientRect();return {dir:el.dir,left:r.left,right:innerWidth-r.right,width:innerWidth};});
+    if(placement.width>600) assert(placement.dir==="rtl" ? placement.left<=25 : placement.right<=25, `${name}: toast must follow language direction`);
     assert(!((await page.locator("body").innerText()).includes("SUPABASE_SERVICE_KEY")), "Sensitive exception leaked");
   }
   const gotoProduct = () => page.goto(new URL("/site/demo/shop/product/chair", origin).href);
@@ -59,7 +62,7 @@ async function scenario(name, run, options = {}) {
     await page.locator('[name="email"]').fill("customer@example.test");
     await page.locator('[name="phone"]').fill("123456789");
     await page.locator('[name="street"]').fill("Main street");
-    await expect(page.locator('[name="service_area_id"]')).toHaveValue("area-1");
+    await expect(page.locator('[name="service_area_id"]')).toHaveValue("95000000-0000-0000-0000-000000000001");
   }
   try {
     await run({ page, state, toast, visibleToast, gotoProduct, checkout });
@@ -87,6 +90,22 @@ try {
       await expect(toast).toHaveCount(0);
     }, { viewport });
   }
+  await scenario("mobile menu panel and search spacing", async ({page,gotoProduct}) => {
+    await gotoProduct();
+    const input=page.locator('.live-store-header-search input');
+    const layout=await input.evaluate(el=>{const r=el.getBoundingClientRect(),b=el.nextElementSibling.getBoundingClientRect(),s=getComputedStyle(el);return {right:r.right-b.left,paddingRight:parseFloat(s.paddingRight),width:r.width};});
+    assert(layout.paddingRight>=layout.right && layout.width>200,'Search text must leave space for its icon');
+    await page.locator('.live-store-mobile-menu').click();
+    const panel=page.getByRole('dialog',{name:'Store navigation'});
+    await expect(panel).toBeVisible();
+    await expect(panel.getByRole('link')).toHaveCount(5);
+    await expect(panel).toContainText('Language');
+    const rect=await panel.boundingBox();assert(rect.x>=0&&rect.x+rect.width<=393&&rect.height<=852);
+    await panel.getByRole('link',{name:'Categories',exact:true}).click();
+    await expect(panel).toHaveCount(0);
+    await page.locator('.live-store-mobile-menu').click();
+    await page.keyboard.press('Escape');await expect(panel).toHaveCount(0);
+  },{viewport:{width:393,height:852}});
   await scenario("Arabic add-to-cart notification", async ({ page, gotoProduct, visibleToast, toast }) => {
     await gotoProduct();
     await page.getByRole("button", { name: "العربية", exact: true }).click();
@@ -126,6 +145,23 @@ try {
     await page.getByRole("button", { name: "Add to cart", exact: true }).click();
     await visibleToast("Could not update your cart");
     await expect(page.getByRole("button", { name: "Open cart, 0 items" })).toBeVisible();
+  });
+  await scenario("short checkout fields rejected before network", async ({page,checkout,visibleToast}) => {
+    await checkout();
+    let writes=0; page.on("request",r=>{if(r.url().endsWith("/orders") || r.url().endsWith("/cart/reconcile")) writes++;});
+    for (const [name,value] of [["customer_name","A"],["phone","1234"],["street","  "]]) {
+      await page.locator(`[name="${name}"]`).fill(value);
+      await page.getByRole("button",{name:"Place order",exact:true}).click();
+      await visibleToast("Check your checkout details");
+      await page.locator(`[name="${name}"]`).fill(name==="customer_name"?"Customer":name==="phone"?"123456789":"Main street");
+    }
+    assert.equal(writes,0);
+  });
+  await scenario("checkout validation response is safe", async ({page,state,checkout,visibleToast}) => {
+    await checkout();state.validationError=true;
+    await page.getByRole("button",{name:"Place order",exact:true}).click();
+    await visibleToast("Check your checkout details");
+    assert(!(await page.locator("body").innerText()).includes("internal_variable_name"));
   });
   await scenario("checkout rejection", async ({ page, state, checkout, visibleToast }) => { await checkout(); state.orderError = true; await page.getByRole("button", { name: "Place order", exact: true }).click(); await visibleToast("Could not place your order"); });
   await scenario("checkout success survives navigation", async ({ page, checkout, visibleToast }) => { await checkout(); await page.getByRole("button", { name: "Place order", exact: true }).click(); await visibleToast("Order placed"); await expect(page).toHaveURL(new RegExp(`/confirmation/${token}$`)); });

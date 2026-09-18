@@ -1053,3 +1053,21 @@ html[dir="rtl"] .forgot-card .form-status-message {
 html[dir="rtl"] .auth-section-title {
   text-align: right;
 }
+
+
+.auth-toast { top:24px; pointer-events:auto; align-items:flex-start; gap:12px; }
+.auth-toast[dir="ltr"] { right:24px !important; left:auto !important; direction:ltr !important; text-align:left; }
+.auth-toast[dir="rtl"] { left:24px !important; right:auto !important; direction:rtl !important; }
+.auth-toast-icon { margin-block-start:8px; }
+.auth-toast-message { flex:1; padding-block:6px; }
+.auth-toast-message strong { font-size:14px; line-height:1.4; }
+.auth-toast-message >span { font-size:13px; line-height:1.5; }
+.auth-toast-dismiss { width:44px; height:44px; flex:0 0 44px; display:grid; place-items:center; border:0; border-radius:8px; background:transparent; color:var(--theme-text); cursor:pointer; }
+.auth-toast-dismiss:hover { background:var(--theme-primary-soft); }
+.auth-toast-dismiss:focus-visible { outline:2px solid var(--theme-primary); outline-offset:2px; }
+@media(max-width:600px) {
+ .auth-toast { top:16px; }
+ .auth-toast[dir="ltr"] { right:16px !important; }
+ .auth-toast[dir="rtl"] { left:16px !important; }
+}
+@media(prefers-reduced-motion:reduce) { .auth-toast { animation:none; } }

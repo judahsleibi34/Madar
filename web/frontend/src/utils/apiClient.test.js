@@ -33,6 +33,7 @@ const fetchCall = (index = 0) => fetch.mock.calls[index];
 
 afterEach(() => {
   clearCsrfToken();
+  document.cookie = "madar_csrf_token=; Max-Age=0; path=/";
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
@@ -316,5 +317,75 @@ describe("apiFetch session refresh", () => {
     expect(fetchCall(2)[0]).toBe("/api/builder/projects/123");
     expect(fetchCall(2)[1].headers.get("X-CSRF-Token")).toBe("new-token");
     expect(fetchCall(2)[1].headers.get("Content-Type")).toBe("application/json");
+  });
+});
+
+
+describe("CSRF session races", () => {
+  it("uses the shared cookie after another tab replaces the session token", async () => {
+    setCsrfToken("old-tab-token");
+    document.cookie = "madar_csrf_token=current-session-token; path=/";
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse({ ok: true })));
+    await apiFetch("/api/screen-time/heartbeat", { method: "POST", body: "{}" });
+    expect(fetchCall()[1].headers.get("X-CSRF-Token")).toBe("current-session-token");
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("shares a token refresh across concurrent rejected heartbeat and cart requests", async () => {
+    setCsrfToken("expired-token");
+    const attempts = new Map();
+    const fetchMock = vi.fn(async (url) => {
+      if (url.includes("/auth/user_status")) return jsonResponse({ csrf_token: "fresh-token" });
+      const count = (attempts.get(url) || 0) + 1;
+      attempts.set(url, count);
+      return count === 1 ? jsonResponse({ detail: "Invalid CSRF token" }, { status: 403 }) : jsonResponse({ ok: true });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const responses = await Promise.all([
+      apiFetch("/api/screen-time/heartbeat", { method: "POST", body: "{}" }),
+      apiFetch("/api/public/sites/demo/cart/reconcile", { method: "POST", body: "{}" }),
+    ]);
+    expect(responses.every(response => response.ok)).toBe(true);
+    expect(fetchMock.mock.calls.filter(([url]) => url.includes("/auth/user_status"))).toHaveLength(1);
+    expect(fetchMock.mock.calls.filter(([url, init]) => !url.includes("/auth/") && init.headers.get("X-CSRF-Token") === "fresh-token")).toHaveLength(2);
+  });
+
+  it("replaces an explicitly supplied expired header on the single retry", async () => {
+    vi.stubGlobal("fetch", vi.fn()
+      .mockResolvedValueOnce(jsonResponse({ detail: "Invalid CSRF token" }, { status: 403 }))
+      .mockResolvedValueOnce(jsonResponse({ csrf_token: "replacement" }))
+      .mockResolvedValueOnce(jsonResponse({ ok: true })));
+    const response = await apiFetch("/api/public/sites/demo/cart/reconcile", {
+      method: "POST", headers: { "X-CSRF-Token": "expired" }, body: "{}",
+    });
+    expect(response.ok).toBe(true);
+    expect(fetchCall(2)[1].headers.get("X-CSRF-Token")).toBe("replacement");
+  });
+});
+
+
+describe("expired-session mutation recovery", () => {
+  it("refreshes the session when status cannot issue a new CSRF token", async () => {
+    setCsrfToken("expired");
+    vi.stubGlobal("fetch",vi.fn()
+      .mockResolvedValueOnce(jsonResponse({detail:"Invalid CSRF token"},{status:403}))
+      .mockResolvedValueOnce(jsonResponse({logged_in:false}))
+      .mockResolvedValueOnce(jsonResponse({logged_in:true},{headers:{"X-CSRF-Token":"renewed"}}))
+      .mockResolvedValueOnce(jsonResponse({ok:true})));
+    const response=await apiFetch("/api/screen-time/heartbeat",{method:"POST",body:"{}"});
+    expect(response.ok).toBe(true);
+    expect(fetch).toHaveBeenCalledTimes(4);
+    expect(fetchCall(2)[0]).toBe("/api/auth/refresh");
+    expect(fetchCall(3)[1].headers.get("X-CSRF-Token")).toBe("renewed");
+  });
+
+  it("renews an explicit CSRF header after an authentication refresh",async()=>{
+    vi.stubGlobal("fetch",vi.fn()
+      .mockResolvedValueOnce(jsonResponse({detail:"Session expired"},{status:401}))
+      .mockResolvedValueOnce(jsonResponse({logged_in:true},{headers:{"X-CSRF-Token":"renewed"}}))
+      .mockResolvedValueOnce(jsonResponse({ok:true})));
+    const response=await apiFetch("/api/public/sites/demo/orders",{method:"POST",headers:{"X-CSRF-Token":"expired"},body:"{}"});
+    expect(response.ok).toBe(true);
+    expect(fetchCall(2)[1].headers.get("X-CSRF-Token")).toBe("renewed");
   });
 });

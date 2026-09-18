@@ -1,43 +1,42 @@
+import { StorePreviewSkeleton, ProductEditorSkeleton, ThemeSkeleton, CatalogSkeleton } from "./CommerceLoadingLayouts";
 import EcommerceOperationsSkeleton from "./EcommerceOperationsSkeleton";
 
 function HeaderSkeleton() {
   return <header className="ecommerce-route-skeleton-header" aria-hidden="true"><div><i /><i /></div><i /></header>;
 }
 
-function CatalogSkeleton({ label }) {
-  return (
-    <main className="ecommerce-page" role="status" aria-label={label}>
-      <div className="ecommerce-page-skeleton">
-        <header><div><i /><i /><i /></div><i /></header>
-        <section>{Array.from({ length: 3 }, (_, index) => <i key={index} />)}</section>
-        <article><header><div><i /><i /></div><i /></header>{Array.from({ length: 5 }, (_, index) => <i key={index} />)}</article>
-      </div>
-    </main>
-  );
-}
+export default function EcommerceRouteSkeleton({ pathname = "", label = "Loading Online Store", lang = "en", direction = lang === "ar" ? "rtl" : "ltr" }) {
+  if (/^\/ecommerce\/products\/(?:new|[^/]+\/edit)/.test(pathname)) return <ProductEditorSkeleton label={label} direction={direction} lang={lang} />;
 
-export default function EcommerceRouteSkeleton({ pathname = "", label = "Loading Online Store" }) {
   if (pathname.startsWith("/ecommerce/store")) {
     return (
-      <main className="ecommerce-store-admin" role="status" aria-label={label}>
+      <main className="ecommerce-store-admin" dir={direction} lang={lang} aria-busy="true">
         <HeaderSkeleton />
-        <div className="ecommerce-store-page-skeleton"><i /><i /><i /></div>
+        <StorePreviewSkeleton label={label} />
       </main>
     );
   }
 
   if (pathname.startsWith("/ecommerce/theme")) {
     return (
-      <main className="ecommerce-page ecommerce-operations-page" role="status" aria-label={label}>
+      <main dir={direction} lang={lang} className="ecommerce-page ecommerce-operations-page" aria-busy="true">
         <HeaderSkeleton />
-        <div className="ecommerce-theme-skeleton"><i /><i /><i /><i /><i /><i /></div>
+        <ThemeSkeleton label={label} />
       </main>
     );
   }
 
   if (/^\/ecommerce\/orders\/[^/]+/.test(pathname)) {
-    return <main className="ecommerce-page ecommerce-operations-page"><EcommerceOperationsSkeleton variant="order-detail" label={label} /></main>;
+    return <main dir={direction} lang={lang} className="ecommerce-page ecommerce-operations-page"><EcommerceOperationsSkeleton variant="order-detail" label={label} /></main>;
   }
+
+  if (pathname.startsWith("/ecommerce/orders")) return <main className="ecommerce-page ecommerce-operations-page ecommerce-orders-page" dir={direction} lang={lang}>
+    <HeaderSkeleton />
+    <div className="ecommerce-orders-workspace">
+      <aside className="ecommerce-operations-card ecommerce-orders-sidebar" aria-hidden="true"><div className="commerce-skeleton-fields commerce-skeleton-sidebar-fields">{Array.from({ length: 6 }, (_, index) => <div key={index}><i /><i /></div>)}</div></aside>
+      <div><section className="ecommerce-operations-card ecommerce-orders-search-card"><div className="ecommerce-route-skeleton-filters" aria-hidden="true"><i /><i /><i /></div></section><section className="ecommerce-operations-card ecommerce-orders-results"><EcommerceOperationsSkeleton variant="orders" label={label} /></section></div>
+    </div>
+  </main>;
 
   if (pathname.startsWith("/ecommerce/delivery") || pathname.startsWith("/ecommerce/orders") || pathname.startsWith("/ecommerce/loyalty")) {
     const variant = pathname.startsWith("/ecommerce/delivery")
@@ -46,7 +45,7 @@ export default function EcommerceRouteSkeleton({ pathname = "", label = "Loading
         ? "loyalty"
         : "orders";
     return (
-      <main className="ecommerce-page ecommerce-operations-page">
+      <main dir={direction} lang={lang} className="ecommerce-page ecommerce-operations-page">
         <HeaderSkeleton />
         <section className="ecommerce-operations-card">
           {variant !== "loyalty" && <div className="ecommerce-route-skeleton-filters" aria-hidden="true"><i /><i /><i /></div>}
@@ -56,5 +55,5 @@ export default function EcommerceRouteSkeleton({ pathname = "", label = "Loading
     );
   }
 
-  return <CatalogSkeleton label={label} />;
+  return <main className="ecommerce-page" dir={direction} lang={lang}><CatalogSkeleton label={label} section={pathname.startsWith("/ecommerce/tags") ? "tags" : pathname.startsWith("/ecommerce/categories") ? "categories" : "products"} /></main>;
 }

@@ -2,10 +2,10 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import { afterEach, expect, it, vi } from "vitest";
 import "../../i18n";
 import EcommerceLoyaltyPage from "./EcommerceLoyaltyPage";
-import { fetchEcommerceCatalog, fetchEcommerceLoyalty, saveEcommerceLoyalty } from "../../services/ecommerceApi";
+import { fetchEcommerceCatalog, fetchEcommerceLoyalty, saveEcommerceLoyalty, fetchEcommerceSettings, saveEcommerceSettings } from "../../services/ecommerceApi";
 
-vi.mock("../../services/ecommerceApi", () => ({ fetchEcommerceCatalog:vi.fn(), fetchEcommerceLoyalty:vi.fn(), saveEcommerceLoyalty:vi.fn() }));
-afterEach(() => { cleanup(); vi.resetAllMocks(); });
+vi.mock("../../services/ecommerceApi", () => ({ fetchEcommerceCatalog:vi.fn(), fetchEcommerceLoyalty:vi.fn(), saveEcommerceLoyalty:vi.fn(), fetchEcommerceSettings:vi.fn().mockResolvedValue({currency:"USD",currency_locked:false}), saveEcommerceSettings:vi.fn() }));
+afterEach(() => { cleanup(); vi.resetAllMocks(); fetchEcommerceSettings.mockResolvedValue({currency:"USD",currency_locked:false}); });
 it("keeps settings editable and loads the catalog when loyalty storage is unavailable", async () => {
   fetchEcommerceCatalog.mockResolvedValue({ products:[], commerce_currency:"USD" });
   fetchEcommerceLoyalty.mockRejectedValueOnce(new Error("Loyalty settings require database migration 097")).mockResolvedValueOnce({ currency:"USD" });
@@ -50,4 +50,53 @@ it("saves multiple products and separate normal and loyalty validity conditions"
       {audience:"normal",product_ids:["a"],discount_basis_points:2000,validity_mode:"lifetime",validity_days:null},
     ],
   }), {scope:"authenticated"}));
+});
+
+
+it("selects search results without losing other selections and clears all selections", async () => {
+  fetchEcommerceCatalog.mockResolvedValue({ products: ["a", "b", "c"].map(id => ({ id, status:"active", translations:{en:{name:`Product ${id}`}} })) });
+  fetchEcommerceLoyalty.mockResolvedValue({ currency:"USD" });
+  saveEcommerceLoyalty.mockImplementation(async rule => ({rule}));
+  render(<EcommerceLoyaltyPage />);
+  await screen.findByLabelText("Currency");
+  fireEvent.click(screen.getByText("Reward products"));
+  fireEvent.click(screen.getByRole("checkbox", {name:"Product a"}));
+  fireEvent.change(screen.getByLabelText("Search products"), {target:{value:"Product b"}});
+  fireEvent.click(screen.getByRole("button", {name:"Select all results"}));
+  fireEvent.change(screen.getByLabelText("Search products"), {target:{value:""}});
+  expect(screen.getByRole("checkbox", {name:"Product a"}).checked).toBe(true);
+  expect(screen.getByRole("checkbox", {name:"Product b"}).checked).toBe(true);
+  fireEvent.click(screen.getByRole("button", {name:"Select all", exact:true}));
+  expect(screen.getAllByRole("checkbox").every(input => input.checked)).toBe(true);
+  fireEvent.click(screen.getByRole("button", {name:"Clear selection"}));
+  expect(screen.getAllByRole("checkbox").every(input => !input.checked)).toBe(true);
+  fireEvent.click(screen.getByRole("button", {name:"Select all", exact:true}));
+  fireEvent.click(screen.getByRole("button", {name:"Save"}));
+  await waitFor(() => expect(saveEcommerceLoyalty).toHaveBeenCalledOnce());
+  expect(saveEcommerceLoyalty.mock.calls[0][0].discount_conditions[0].product_ids).toEqual(["a", "b", "c"]);
+});
+
+
+it("offers supported currencies and persists the shared store currency", async () => {
+  fetchEcommerceCatalog.mockResolvedValue({products:[]});
+  fetchEcommerceLoyalty.mockResolvedValue({currency:"USD",rule:{reward_product_id:"a"}});
+  saveEcommerceSettings.mockResolvedValue({currency:"JOD",currency_locked:false});
+  saveEcommerceLoyalty.mockImplementation(async rule => ({rule}));
+  render(<EcommerceLoyaltyPage />);
+  const dropdown = await screen.findByLabelText("Currency");
+  expect([...dropdown.options].map(option => option.value)).toEqual(["", "ILS", "JOD", "USD", "EUR"]);
+  fireEvent.change(dropdown, {target:{value:"JOD"}});
+  fireEvent.click(screen.getByRole("button", {name:"Save"}));
+  await waitFor(() => expect(saveEcommerceSettings).toHaveBeenCalledWith("JOD"));
+  await waitFor(() => expect(saveEcommerceLoyalty).toHaveBeenCalledOnce());
+});
+
+it("preserves the store currency lock", async () => {
+  fetchEcommerceSettings.mockResolvedValue({currency:"ILS",currency_locked:true});
+  fetchEcommerceCatalog.mockResolvedValue({products:[]});
+  fetchEcommerceLoyalty.mockResolvedValue({currency:"USD"});
+  render(<EcommerceLoyaltyPage />);
+  const dropdown = await screen.findByLabelText("Currency");
+  expect(dropdown.value).toBe("ILS");
+  expect(dropdown.disabled).toBe(true);
 });

@@ -53,6 +53,29 @@ function LocationProbe() {
 }
 
 describe("EcommerceStorefront", () => {
+  it.each(["en", "ar"])("uses the %s store identity on the homepage and footer", async (locale) => {
+    await i18n.changeLanguage(locale);
+    const site = { brand: "English Store", description: "English description", brand_ar: "متجر مدار", description_ar: "وصف المتجر" };
+    fetchPublicEcommerceCatalog.mockResolvedValue({ ...catalog, site });
+    fetchPublicEcommerceProfile.mockResolvedValue({ site });
+    render(<MemoryRouter initialEntries={["/store/demo"]}><Routes><Route path="/store/:subdomain/*" element={<EcommerceStorefront />} /></Routes></MemoryRouter>);
+    const name = locale === "ar" ? site.brand_ar : site.brand;
+    const description = locale === "ar" ? site.description_ar : site.description;
+    expect(await screen.findByRole("heading", { level: 1, name })).toBeTruthy();
+    expect(screen.getAllByText(description).length).toBeGreaterThanOrEqual(2);
+    expect(document.querySelector(".live-store").getAttribute("dir")).toBe(locale === "ar" ? "rtl" : "ltr");
+  });
+
+  it("falls back to English store identity when Arabic is blank", async () => {
+    await i18n.changeLanguage("ar");
+    const site = { brand: "English Store", description: "English description", brand_ar: "  ", description_ar: "" };
+    fetchPublicEcommerceCatalog.mockResolvedValue({ ...catalog, site });
+    fetchPublicEcommerceProfile.mockResolvedValue({ site });
+    render(<MemoryRouter initialEntries={["/store/demo"]}><Routes><Route path="/store/:subdomain/*" element={<EcommerceStorefront />} /></Routes></MemoryRouter>);
+    expect(await screen.findByRole("heading", { level: 1, name: site.brand })).toBeTruthy();
+    expect(screen.getAllByText(site.description).length).toBeGreaterThanOrEqual(2);
+  });
+
   it("shows the cart subtotal and opens the checkout page", async () => {
     localStorage.setItem("madar-store-cart:demo", JSON.stringify([{
       id: "43b86c1a-fbf7-41d3-a58a-cbe07fc8459f",
@@ -540,4 +563,20 @@ it("shows a safe cart error instead of success when browser storage rejects an a
     expect(document.body.textContent).not.toContain("internal_storage");
     expect(screen.getByRole("button", { name: "Open cart, 0 items" })).toBeTruthy();
   } finally { storage.mockRestore(); }
+});
+
+it("closes the mobile navigation after a page selection and Escape", async () => {
+  fetchPublicEcommerceCatalog.mockResolvedValue(catalog);
+  fetchPublicEcommerceProfile.mockResolvedValue({ site: catalog.site });
+  render(<MemoryRouter initialEntries={["/store/demo"]}><Routes><Route path="/store/:subdomain/*" element={<EcommerceStorefront />} /></Routes></MemoryRouter>);
+  await screen.findByRole("heading", { level: 1, name: "Test Store" });
+  const toggle = document.querySelector(".live-store-mobile-menu");
+  fireEvent.click(toggle);
+  expect(toggle.getAttribute("aria-expanded")).toBe("true");
+  expect(toggle.getAttribute("aria-controls")).toBe("live-store-mobile-navigation");
+  fireEvent.click(document.querySelector('#live-store-mobile-navigation a[href="/store/demo/categories"]'));
+  expect(toggle.getAttribute("aria-expanded")).toBe("false");
+  fireEvent.click(toggle);
+  fireEvent.keyDown(document, { key: "Escape" });
+  expect(toggle.getAttribute("aria-expanded")).toBe("false");
 });

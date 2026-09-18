@@ -1,3 +1,5 @@
+import { getEcommerceCacheScope, readEcommerceAdminCacheSnapshot } from "./utils/ecommerceAdminCache";
+import { StorePreviewSkeleton, ThemeSkeleton } from "./CommerceLoadingLayouts";
 import { notifyCommerceAction } from "../../utils/commerceActionToast";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ExternalLink, LoaderCircle, Monitor, RotateCcw, Rocket, Smartphone } from "lucide-react";
@@ -24,14 +26,15 @@ const THEME_PREVIEW_KEY = "madar-online-store-theme-preview";
 
 export default function EcommerceThemePage({ user }) {
   const { t, locale, direction } = useCommerceI18n();
-  const cacheScope = user?.id ? `user-${user.id}` : "authenticated";
+  const cacheScope = getEcommerceCacheScope(user);
   const cachedTheme = useMemo(() => readEcommerceThemeCacheSnapshot(cacheScope), [cacheScope]);
   const [theme, setTheme] = useState(() => normalizeStoreTheme(cachedTheme?.theme));
   const [loading, setLoading] = useState(() => !cachedTheme);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState(null);
-  const [website, setWebsite] = useState(null);
-  const [previewLoading, setPreviewLoading] = useState(true);
+  const websiteSnapshot = readEcommerceAdminCacheSnapshot(cacheScope, "website-settings");
+  const [website, setWebsite] = useState(() => websiteSnapshot?.data || null);
+  const [previewLoading, setPreviewLoading] = useState(() => !websiteSnapshot);
   const [frameReady, setFrameReady] = useState(false);
   const [previewMode, setPreviewMode] = useState("desktop");
   const [previewWidth, setPreviewWidth] = useState(720);
@@ -56,7 +59,7 @@ export default function EcommerceThemePage({ user }) {
     let cancelled = false;
     fetchEcommerceTheme({ scope: cacheScope, force: Boolean(cachedTheme?.isStale) })
       .then((result) => {
-        if (!cancelled) setTheme(normalizeStoreTheme(result?.theme));
+        if (!cancelled) setTheme(current => JSON.stringify(current) === JSON.stringify(normalizeStoreTheme(cachedTheme?.theme)) ? normalizeStoreTheme(result?.theme) : current);
       })
       .catch(() => {
         if (!cancelled) setToast({ id: Date.now(), type: "error", title: t("admin.loadColorsError"), message: t("admin.tryAgain") });
@@ -65,16 +68,16 @@ export default function EcommerceThemePage({ user }) {
         if (!cancelled) setLoading(false);
       });
     return () => { cancelled = true; };
-  }, [cacheScope, cachedTheme?.isStale, t]);
+  }, [cacheScope, cachedTheme, t]);
 
   useEffect(() => {
     let cancelled = false;
-    fetchWebsiteSettings()
+    fetchWebsiteSettings(cacheScope)
       .then((result) => { if (!cancelled) setWebsite(result || null); })
       .catch(() => { if (!cancelled) { setWebsite(null); setToast({ type: "error", title: t("admin.loadSettingsError"), message: t("admin.tryAgain") }); } })
       .finally(() => { if (!cancelled) setPreviewLoading(false); });
     return () => { cancelled = true; };
-  }, [t]);
+  }, [cacheScope, t]);
 
   const valid = useMemo(() => COLOR_FIELDS.every(([key]) => isHexColor(theme[key])), [theme]);
   const subdomain = String(website?.subdomain || "").trim();
@@ -138,7 +141,7 @@ export default function EcommerceThemePage({ user }) {
       </header>
 
       {loading ? (
-        <div className="ecommerce-theme-skeleton" role="status" aria-label={t("admin.loadingStoreDesign")}><i /><i /><i /><i /><i /><i /></div>
+        <ThemeSkeleton label={t("admin.loadingStoreDesign")} />
       ) : (
         <div className="ecommerce-theme-layout">
           <section className="ecommerce-theme-controls" aria-label={t("admin.storeColors")}>
@@ -172,7 +175,7 @@ export default function EcommerceThemePage({ user }) {
               <button type="button" className="ecommerce-secondary-button" disabled={saving || loading || !previewPath} onClick={preview}><ExternalLink size={16} />{t("admin.openFullPreview")}</button>
             </div>
             <div className="ecommerce-theme-live-shell" ref={previewShellRef}>
-              {(previewLoading || (previewPath && !frameReady)) && <div className="ecommerce-theme-frame-skeleton" role="status" aria-label={t("admin.loadingExactPreview")}><i /><i /><i /><i /></div>}
+              {(previewLoading || (previewPath && !frameReady)) && <StorePreviewSkeleton className="ecommerce-theme-frame-skeleton" label={t("admin.loadingExactPreview")} />}
               {!previewLoading && !previewPath && <div className="ecommerce-theme-preview-empty"><strong>{t("admin.setAddress")}</strong><span>{t("admin.openSettingsAddress")}</span></div>}
               {previewPath && <div className="ecommerce-theme-frame-viewport" style={{ width:viewportWidth * previewScale, height:760 * previewScale }}>
                 <iframe ref={previewFrameRef} src={previewPath} title={t("admin.draftPreviewTitle")} style={{ width:viewportWidth, height:760, transform:`scale(${previewScale})` }} onLoad={() => { setFrameReady(true); previewFrameRef.current?.contentWindow?.postMessage({ type: "madar-online-store-theme-preview", theme }, window.location.origin); }} />

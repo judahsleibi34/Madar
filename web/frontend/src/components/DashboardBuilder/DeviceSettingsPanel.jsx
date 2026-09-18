@@ -38,11 +38,11 @@ function formatLastSeen(value, language, copy) {
   }).format(date);
 }
 
-function DeviceCard({ device, copy, lang, browserPermission, busy, onRemove, onEnable, onDisable }) {
+function DeviceCard({ device, copy, lang, browserPermission, busy, onRemove, onEnable, onDisable, showNotificationControls }) {
   const MobileIcon = PLATFORM_ICONS.has(device.platform) ? Smartphone : Laptop;
   const notificationState = getDeviceNotificationState(device, browserPermission, copy);
-  const canEnable = device.is_current && notificationState.key !== "enabled" && notificationState.key !== "blocked";
-  const canDisable = device.is_current && notificationState.key === "enabled";
+  const canEnable = showNotificationControls && device.is_current && notificationState.key !== "enabled" && notificationState.key !== "blocked";
+  const canDisable = showNotificationControls && device.is_current && notificationState.key === "enabled";
 
   return (
     <article className={`device-settings-item${device.is_current ? " is-current" : ""}`}>
@@ -62,7 +62,7 @@ function DeviceCard({ device, copy, lang, browserPermission, busy, onRemove, onE
           <small className="device-settings-guidance">{copy.permissionBlockedGuidance}</small>
         )}
       </div>
-      <div className="device-settings-actions">
+      {(canEnable || canDisable || !device.is_current) && <div className="device-settings-actions">
         {canEnable && (
           <button type="button" className="settings-save-button" disabled={busy} onClick={onEnable}>
             <BellRing size={16} /> {copy.enableNotifications}
@@ -78,12 +78,12 @@ function DeviceCard({ device, copy, lang, browserPermission, busy, onRemove, onE
             <Trash2 size={16} /> {copy.removeDevice}
           </button>
         )}
-      </div>
+      </div>}
     </article>
   );
 }
 
-export default function DeviceSettingsPanel({ lang = "en", tenantId, copy, showNotification }) {
+export default function DeviceSettingsPanel({ lang = "en", tenantId, copy, showNotification, notificationsOnly = false }) {
   const [devices, setDevices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -132,9 +132,9 @@ export default function DeviceSettingsPanel({ lang = "en", tenantId, copy, showN
   useEffect(() => {
     if (!install.supportedHost) return undefined;
     const loadTimer = window.setTimeout(loadDevices, 0);
-    getPushPublicKey().then(setPushConfig).catch(() => setPushConfig({ enabled: false }));
+    if (notificationsOnly) getPushPublicKey().then(setPushConfig).catch(() => setPushConfig({ enabled: false }));
     return () => window.clearTimeout(loadTimer);
-  }, [install.supportedHost, loadDevices]);
+  }, [install.supportedHost, loadDevices, notificationsOnly]);
 
   useEffect(() => {
     const refreshOnFocus = () => loadDevices();
@@ -208,9 +208,9 @@ export default function DeviceSettingsPanel({ lang = "en", tenantId, copy, showN
 
   return (
     <div className="device-settings-panel">
-      <section className="settings-card device-settings-card" aria-labelledby="devices-title">
+      <section className="settings-card device-settings-card" aria-labelledby={notificationsOnly ? "browser-notifications-title" : "devices-title"}>
         <header>
-          <div><h2 id="devices-title">{copy.devicesTitle}</h2><p>{copy.devicesDescription}</p></div>
+          <div><h2 id={notificationsOnly ? "browser-notifications-title" : "devices-title"}>{notificationsOnly ? copy.browserNotificationsTitle : copy.devicesTitle}</h2><p>{notificationsOnly ? copy.browserNotificationsDescription : copy.devicesDescription}</p></div>
         </header>
         {loading && (
           <div className="device-settings-skeleton" aria-label={copy.loading} role="status">
@@ -230,7 +230,7 @@ export default function DeviceSettingsPanel({ lang = "en", tenantId, copy, showN
         {error && <p className="device-settings-message is-error" role="alert">{error}</p>}
         {!loading && !error && (
           <div className="device-settings-list">
-            {renderedDevices.map((device) => (
+            {renderedDevices.filter((device) => !notificationsOnly || device.is_current).map((device) => (
               <DeviceCard
                 key={device.id}
                 device={device}
@@ -241,13 +241,14 @@ export default function DeviceSettingsPanel({ lang = "en", tenantId, copy, showN
                 onRemove={setRemoveTarget}
                 onEnable={enableNotifications}
                 onDisable={disableNotifications}
+                showNotificationControls={notificationsOnly}
               />
             ))}
           </div>
         )}
       </section>
 
-      <section className="settings-card device-settings-card device-install-card" aria-labelledby="install-madar-title">
+      {!notificationsOnly && <section className="settings-card device-settings-card device-install-card" aria-labelledby="install-madar-title">
         <div className="device-settings-icon" aria-hidden="true"><Download size={22} /></div>
         <div>
           <h2 id="install-madar-title">{copy.installMadar}</h2>
@@ -274,7 +275,7 @@ export default function DeviceSettingsPanel({ lang = "en", tenantId, copy, showN
             <Download size={16} /> {install.isPrompting ? copy.installing : copy.installMadar}
           </button>
         )}
-      </section>
+      </section>}
 
       {removeTarget && (
         <PageDeleteConfirmModal

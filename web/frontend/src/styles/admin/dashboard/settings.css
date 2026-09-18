@@ -798,3 +798,49 @@
     width: 100%;
   }
 }
+
+/* Match the product editor's paired language cards for store identity. */
+.settings-page .settings-store-translations {
+  min-width: 0;
+  margin: 0 0 4px;
+  padding: 16px;
+  border: 1px solid var(--theme-border);
+  border-radius: 15px;
+  background: var(--theme-bg-soft);
+}
+.settings-store-translation-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+.settings-store-language-card {
+  min-width: 0;
+  padding: 16px;
+  border-radius: 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+  background: var(--theme-surface);
+}
+.settings-store-language-card > strong {
+  color: var(--color-accent-text);
+  font-size: var(--font-size-sm, .875rem);
+}
+.settings-page .settings-store-language-card textarea {
+  min-height: 112px;
+  max-height: 180px;
+  resize: vertical;
+}
+@media (max-width: 760px) {
+  .settings-store-translation-grid { grid-template-columns: 1fr; }
+  .settings-page .settings-store-translations { padding: 10px; }
+}
+
+
+.settings-toast[dir="ltr"] { direction:ltr; right:24px; left:auto; text-align:left; }
+.settings-toast[dir="rtl"] { direction:rtl; left:24px; right:auto; text-align:right; }
+.settings-toast button { width:44px; height:44px; flex:0 0 44px; }
+@media(max-width:600px) {
+ .settings-toast[dir="ltr"] { right:16px; left:auto; width:calc(100vw - 32px); }
+ .settings-toast[dir="rtl"] { left:16px; right:auto; width:calc(100vw - 32px); }
+}

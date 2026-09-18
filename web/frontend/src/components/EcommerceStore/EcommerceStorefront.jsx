@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, ArrowRight, CheckCircle2, ChevronRight, Gift, Mail, Menu, Minus, Phone, Plus, Search, ShieldCheck, ShoppingBag, ShoppingCart, Trash2, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, AlertCircle, CheckCircle2, ChevronRight, Globe2, Gift, Mail, Menu, Minus, Phone, Plus, Search, ShieldCheck, ShoppingBag, ShoppingCart, Trash2, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import i18n from "../../i18n";
 
@@ -46,14 +46,15 @@ class StorefrontActionError extends Error {
 }
 
 function StoreActionToast({ notification, onDismiss, locale }) {
+  const [paused, setPaused] = useState(false);
   useEffect(() => {
-    if (!notification) return undefined;
-    const timer = window.setTimeout(onDismiss, 4200);
+    if (!notification || paused) return undefined;
+    const timer = window.setTimeout(onDismiss, notification.type === "error" ? 6500 : 4200);
     return () => window.clearTimeout(timer);
-  }, [notification, onDismiss]);
+  }, [notification, onDismiss, paused]);
   if (!notification) return null;
-  return <div className={`live-store-action-toast is-${notification.type}`} role={notification.type === "error" ? "alert" : "status"} aria-live={notification.type === "error" ? "assertive" : "polite"} dir={locale === "ar" ? "rtl" : "ltr"}>
-    <span aria-hidden="true">{notification.type === "error" ? "!" : <CheckCircle2 size={18} />}</span>
+  return <div className={`live-store-action-toast is-${notification.type}`} role={notification.type === "error" ? "alert" : "status"} aria-live={notification.type === "error" ? "assertive" : "polite"} dir={locale === "ar" ? "rtl" : "ltr"} onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)} onFocus={() => setPaused(true)} onBlur={() => setPaused(false)}>
+    <span aria-hidden="true">{notification.type === "error" ? <AlertCircle size={20} /> : <CheckCircle2 size={20} />}</span>
     <div><strong>{notification.title}</strong>{notification.message && <p>{notification.message}</p>}</div>
     <button type="button" onClick={onDismiss} aria-label={c("admin.close")}><X size={16} /></button>
   </div>;
@@ -97,6 +98,38 @@ function ProductImage({ product, className = "", eager = false }) {
 function StoreHeader({ brand, logoUrl, cartCount, shopPath, homePath, categoriesPath, contactPath, onCartOpen }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const toggleRef = useRef(null);
+  const panelRef = useRef(null);
+  const { pathname } = useLocation();
+  useEffect(() => {
+    if (!menuOpen) return undefined;
+    const panel = panelRef.current;
+    const toggle = toggleRef.current;
+    const store = panel?.closest(".live-store");
+    const previousOverflow = store?.style.overflowY;
+    if (store) store.style.overflowY = "hidden";
+    panel?.querySelector("button")?.focus();
+    const handleKey = event => {
+      if (event.key === "Escape") setMenuOpen(false);
+      if (event.key !== "Tab") return;
+      const targets = Array.from(panel?.querySelectorAll("a[href],button") || []);
+      const first = targets[0], last = targets.at(-1);
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+    };
+    document.addEventListener("keydown", handleKey);
+    const media = window.matchMedia?.("(min-width:761px)");
+    const closeOnResize = event => { if (event.matches) setMenuOpen(false); };
+    media?.addEventListener?.("change", closeOnResize);
+    return () => {
+      document.removeEventListener("keydown", handleKey);
+      media?.removeEventListener?.("change", closeOnResize);
+      if (store) store.style.overflowY = previousOverflow;
+      toggle?.focus();
+    };
+  }, [menuOpen]);
+  const links = [[homePath,c("nav.home")],[shopPath,c("common.products")],[categoriesPath,c("nav.categories")],[contactPath,c("nav.contact")]];
+  const brandLink = <Link className="live-store-brand" to={homePath} onClick={() => setMenuOpen(false)}>{logoUrl && <img {...getResponsiveMediaProps(logoUrl, { fallbackWidth:160, sizes:"48px" })} alt="" />}<span>{brand}</span></Link>;
   const navigate = useNavigate();
   const searchStore = (event) => {
     event.preventDefault();
@@ -105,22 +138,26 @@ function StoreHeader({ brand, logoUrl, cartCount, shopPath, homePath, categories
     setMenuOpen(false);
   };
   return (
+    <>
     <header className="live-store-header">
       <div className="live-store-header-inner">
-        <Link className="live-store-brand" to={homePath}>{logoUrl && <img {...getResponsiveMediaProps(logoUrl, { fallbackWidth: 160, sizes: "48px" })} alt="" />}<span>{brand}</span></Link>
+        {brandLink}
         <button
           type="button"
           className="live-store-mobile-menu"
+          ref={toggleRef}
           onClick={() => setMenuOpen((value) => !value)}
           aria-label={c("nav.shop")}
+          aria-expanded={menuOpen}
+          aria-controls="live-store-mobile-navigation"
         >
           {menuOpen ? <X size={22} /> : <Menu size={22} />}
         </button>
-        <nav className={menuOpen ? "is-open" : ""} aria-label={c("nav.navigation")}>
-          <Link to={homePath}>{c("nav.home")}</Link>
-          <Link to={shopPath}>{c("common.products")}</Link>
-          <Link to={categoriesPath}>{c("nav.categories")}</Link>
-          <Link to={contactPath}>{c("nav.contact")}</Link>
+        <nav id="live-store-navigation" aria-label={c("nav.navigation")}>
+          <Link to={homePath} onClick={() => setMenuOpen(false)}>{c("nav.home")}</Link>
+          <Link to={shopPath} onClick={() => setMenuOpen(false)}>{c("common.products")}</Link>
+          <Link to={categoriesPath} onClick={() => setMenuOpen(false)}>{c("nav.categories")}</Link>
+          <Link to={contactPath} onClick={() => setMenuOpen(false)}>{c("nav.contact")}</Link>
         </nav>
         <form className="live-store-header-search" role="search" onSubmit={searchStore}>
           <input type="search" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder={c("catalog.searchPlaceholder")} aria-label={c("nav.searchStore")} />
@@ -133,6 +170,19 @@ function StoreHeader({ brand, logoUrl, cartCount, shopPath, homePath, categories
         </button>
       </div>
     </header>
+    {menuOpen && <div className="live-store-menu-overlay" onMouseDown={event => { if (event.target === event.currentTarget) setMenuOpen(false); }}>
+      <section ref={panelRef} className="live-store-menu-panel" role="dialog" aria-modal="true" aria-label={c("nav.navigation")}>
+        <header>{brandLink}<button type="button" onClick={() => setMenuOpen(false)} aria-label={c("admin.close")}><X size={22} aria-hidden="true" /></button></header>
+        <div className="live-store-menu-content">
+          <p className="live-store-menu-label">{c("nav.menu")}</p>
+          <nav id="live-store-mobile-navigation" aria-label={c("nav.navigation")}>
+            {links.map(([path,label]) => <Link key={path} to={path} aria-current={pathname === path ? "page" : undefined} onClick={() => setMenuOpen(false)}><span>{label}</span><ChevronRight size={18} aria-hidden="true" /></Link>)}
+          </nav>
+          <div className="live-store-menu-language"><p className="live-store-menu-label">{c("nav.language")}</p><button type="button" onClick={() => { i18n.changeLanguage(activeLocale() === "ar" ? "en" : "ar"); setMenuOpen(false); }}><Globe2 size={20} aria-hidden="true" /><span>{activeLocale() === "ar" ? "English" : "\u0627\u0644\u0639\u0631\u0628\u064a\u0629"}</span><ChevronRight size={18} aria-hidden="true" /></button></div>
+        </div>
+      </section>
+    </div>}
+    </>
   );
 }
 
@@ -235,7 +285,11 @@ function StoreCheckout({ items, loyalty, normalDiscounts, shopPath, storePath, s
 
   const submit = async (event) => {
     event.preventDefault();
-    const invalidField = Array.from(event.currentTarget.elements).find((field) => field.willValidate && !field.validity.valid);
+    const minimumLengths = { customer_name: 2, phone: 5, street: 3 };
+    const invalidField = Array.from(event.currentTarget.elements).find((field) =>
+      field.willValidate && (!field.validity.valid ||
+        (minimumLengths[field.name] && String(field.value).trim().length < minimumLengths[field.name]))
+    );
     if (invalidField) {
       onNotify({ type: "error", title: c("storeFeedback.completeFields"), message: c("storeFeedback.completeFieldsBody") });
       invalidField.focus();
@@ -245,15 +299,15 @@ function StoreCheckout({ items, loyalty, normalDiscounts, shopPath, storePath, s
     const form = new FormData(event.currentTarget);
     try {
       const result = await onPlaceOrder({
-        customer_name: String(form.get("customer_name") || ""),
-        email: String(form.get("email") || ""),
-        phone: String(form.get("phone") || ""),
+        customer_name: String(form.get("customer_name") || "").trim(),
+        email: String(form.get("email") || "").trim(),
+        phone: String(form.get("phone") || "").trim(),
         service_area_id: String(form.get("service_area_id") || ""),
-        street: String(form.get("street") || ""),
-        building: String(form.get("building") || ""),
-        floor_apartment: String(form.get("floor_apartment") || ""),
-        address_description: String(form.get("address_description") || ""),
-        delivery_notes: String(form.get("delivery_notes") || ""),
+        street: String(form.get("street") || "").trim(),
+        building: String(form.get("building") || "").trim(),
+        floor_apartment: String(form.get("floor_apartment") || "").trim(),
+        address_description: String(form.get("address_description") || "").trim(),
+        delivery_notes: String(form.get("delivery_notes") || "").trim(),
         payment_method: "cash_on_delivery",
         items: items.map((item) => ({ product_id: item.id, ...(item.variant_id ? { variant_id: item.variant_id } : {}), quantity: item.quantity })),
       });
@@ -261,9 +315,10 @@ function StoreCheckout({ items, loyalty, normalDiscounts, shopPath, storePath, s
       onNotify({ type: "success", title: c("storeFeedback.orderPlaced"), message: c("storeFeedback.orderPlacedBody") });
       navigate(`${storePath}/confirmation/${result.confirmation_token}`, { replace: true });
     } catch (error) {
-      const message = error instanceof StorefrontActionError ? c(error.messageKey) : c("errors.placeOrder");
+      const validationFailed = error?.status === 422;
+      const message = validationFailed ? c("storeFeedback.completeFields") : error instanceof StorefrontActionError ? c(error.messageKey) : c("errors.placeOrder");
       setStatus({ saving: false, error: message });
-      onNotify({ type: "error", title: message, message: c("admin.tryAgain") });
+      onNotify({ type: "error", title: message, message: c(validationFailed ? "storeFeedback.completeFieldsBody" : "admin.tryAgain") });
     }
   };
 
@@ -279,9 +334,9 @@ function StoreCheckout({ items, loyalty, normalDiscounts, shopPath, storePath, s
           <section>
             <h2>{c("checkout.contact")}</h2>
             <div className="live-store-checkout-fields">
-              <label className="is-wide"><span>{c("checkout.name")}</span><input name="customer_name" autoComplete="name" required maxLength={160} /></label>
+              <label className="is-wide"><span>{c("checkout.name")}</span><input name="customer_name" minLength={2} autoComplete="name" required maxLength={160} /></label>
               <label><span>{c("checkout.email")}</span><input name="email" type="email" autoComplete="email" required maxLength={254} dir="ltr" /></label>
-              <label><span>{c("checkout.phone")}</span><input name="phone" type="tel" autoComplete="tel" required maxLength={50} dir="ltr" /></label>
+              <label><span>{c("checkout.phone")}</span><input name="phone" minLength={5} type="tel" autoComplete="tel" required maxLength={50} dir="ltr" /></label>
             </div>
           </section>
           <section>
@@ -291,7 +346,7 @@ function StoreCheckout({ items, loyalty, normalDiscounts, shopPath, storePath, s
               {!delivery.loading && delivery.error && <p className="is-wide live-store-checkout-error">{delivery.error}</p>}
               {!delivery.loading && !delivery.error && !delivery.areas.length && <p className="is-wide live-store-checkout-error">{c("checkout.noAreas")}</p>}
               <label className="is-wide"><span>{c("checkout.serviceArea")}</span><select name="service_area_id" required value={selectedAreaId} disabled={!delivery.areas.length} onChange={(event) => setSelectedAreaId(event.target.value)}><option value="">{c("checkout.chooseArea")}</option>{delivery.areas.map((area) => <option key={area.id} value={area.id}>{activeLocale() === "ar" ? area.name_ar || area.name_en : area.name_en || area.name_ar}</option>)}</select></label>
-              <label className="is-wide"><span>{c("checkout.street")}</span><input name="street" autoComplete="street-address" required maxLength={240} /></label>
+              <label className="is-wide"><span>{c("checkout.street")}</span><input name="street" minLength={3} autoComplete="street-address" required maxLength={240} /></label>
               <label><span>{c("checkout.building")}</span><input name="building" maxLength={120} /></label>
               <label><span>{c("checkout.floor")}</span><input name="floor_apartment" maxLength={120} /></label>
               <label className="is-wide"><span>{c("checkout.description")}</span><textarea name="address_description" rows={2} maxLength={500} /></label>
@@ -351,7 +406,7 @@ function StoreSkeleton({ view }) {
   const label = c(`loading.${view === "product" ? "product" : view === "catalog" ? "catalog" : view}`);
   if (view === "landing") {
     return (
-      <div className="live-store-skeleton is-landing" role="status" aria-label={c("loading.home")}>
+      <div className="live-store-skeleton is-landing" aria-busy="true" role="status" aria-label={c("loading.home")}>
         <section className="live-store-skeleton-landing-hero">
           <div className="live-store-skeleton-copy">
             <SkeletonBlock className="is-title" />
@@ -372,7 +427,7 @@ function StoreSkeleton({ view }) {
 
   if (view === "categories") {
     return (
-      <section className="live-store-skeleton is-categories" role="status" aria-label={c("loading.categories")}>
+      <section className="live-store-skeleton is-categories" aria-busy="true" role="status" aria-label={c("loading.categories")}>
         <div className="live-store-skeleton-copy"><SkeletonBlock className="is-title" /><SkeletonBlock className="is-line" /></div>
         <div className="live-store-skeleton-category-grid">{Array.from({ length: 6 }, (_, index) => <SkeletonBlock className="is-category" key={index} />)}</div>
       </section>
@@ -381,7 +436,7 @@ function StoreSkeleton({ view }) {
 
   if (view === "contact") {
     return (
-      <section className="live-store-skeleton is-contact" role="status" aria-label={c("loading.contact")}>
+      <section className="live-store-skeleton is-contact" aria-busy="true" role="status" aria-label={c("loading.contact")}>
         <div className="live-store-skeleton-copy"><SkeletonBlock className="is-title" /><SkeletonBlock className="is-line" /><SkeletonBlock className="is-line is-short" /></div>
         <SkeletonBlock className="is-contact-card" />
       </section>
@@ -390,7 +445,7 @@ function StoreSkeleton({ view }) {
 
   if (view === "product") {
     return (
-      <section className="live-store-skeleton is-product" role="status" aria-label={c("loading.product")}>
+      <section className="live-store-skeleton is-product" aria-busy="true" role="status" aria-label={c("loading.product")}>
         <SkeletonBlock className="is-product-image" />
         <div className="live-store-skeleton-copy"><SkeletonBlock className="is-subtitle" /><SkeletonBlock className="is-title" /><SkeletonBlock className="is-price" /><SkeletonBlock className="is-line" /><SkeletonBlock className="is-line is-short" /><SkeletonBlock className="is-button" /></div>
       </section>
@@ -398,7 +453,7 @@ function StoreSkeleton({ view }) {
   }
 
   return (
-    <section className="live-store-skeleton is-catalog" role="status" aria-label={label}>
+    <section className="live-store-skeleton is-catalog" role="status" aria-label={label} aria-busy="true">
       <div className="live-store-skeleton-copy is-page-heading">
         <SkeletonBlock className="is-title" />
         <SkeletonBlock className="is-subtitle" />
@@ -939,6 +994,10 @@ export default function EcommerceStorefront({ subdomain: suppliedSubdomain = "",
   };
 
   const placeOrder = async (payload) => {
+    if (!Array.isArray(payload.items) || payload.items.length < 1 || payload.items.length > 50 ||
+      payload.items.some(item => !Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > 99)) {
+      throw new StorefrontActionError("cart.changed");
+    }
     const reconciliation = await reconcilePublicEcommerceCart(subdomain, payload.items);
     if (!reconciliation?.valid) {
       throw new StorefrontActionError("cart.changed");
@@ -976,7 +1035,9 @@ export default function EcommerceStorefront({ subdomain: suppliedSubdomain = "",
     () => new Map(catalog.categories.map((item) => [item.id, item])),
     [catalog.categories]
   );
-  const brand = site?.brand || site?.footer_store_name || "";
+  const brand = (locale === "ar" && site?.brand_ar?.trim()) || site?.brand || site?.footer_store_name || "";
+  const description = (locale === "ar" && site?.description_ar?.trim()) || site?.description || "";
+  const localizedSite = site ? { ...site, brand, description } : site;
   const activeCategory = catalog.categories.find((item) => item.slug === filters.category) || null;
   const seoView = error || (filters.category && !activeCategory) ? "missing" : draftPreviewMode ? "preview" : confirmationRoute ? "confirmation" : checkoutRoute ? "checkout" : productSlug ? (productDetail?.product ? "product" : "missing") : categoriesRoute ? "categories" : isCatalogView ? "catalog" : contactRoute ? "contact" : "home";
   const savedTheme = normalizeStoreTheme(draftTheme || site?.store_theme || site?.theme);
@@ -1028,7 +1089,7 @@ export default function EcommerceStorefront({ subdomain: suppliedSubdomain = "",
         {!loading && error && <div className="live-store-state is-error"><h2>{c("errors.storeUnavailable")}</h2><p>{error}</p></div>}
 
         {!loading && !error && isLanding && (
-          <StoreLanding brand={brand} site={site} catalog={catalog} categoryById={categoryById} locale={locale} shopPath={shopPath} productBasePath={homePath} onAdd={addToCart} />
+          <StoreLanding brand={brand} site={localizedSite} catalog={catalog} categoryById={categoryById} locale={locale} shopPath={shopPath} productBasePath={homePath} onAdd={addToCart} />
         )}
 
         {!loading && !error && categoriesRoute && (
@@ -1036,7 +1097,7 @@ export default function EcommerceStorefront({ subdomain: suppliedSubdomain = "",
         )}
 
         {!loading && !error && contactRoute && (
-          <StoreContact brand={brand} site={site} />
+          <StoreContact brand={brand} site={localizedSite} />
         )}
 
         {!loading && !error && checkoutRoute && (
@@ -1073,7 +1134,7 @@ export default function EcommerceStorefront({ subdomain: suppliedSubdomain = "",
         )}
       </main>
       <footer className="live-store-footer">
-        <div>{brand && <strong>{brand}</strong>}{site?.description && <p>{site.description}</p>}</div>
+        <div>{brand && <strong>{brand}</strong>}{description && <p>{description}</p>}</div>
         <div><strong>{c("nav.shop")}</strong><Link to={shopPath}>{c("common.products")}</Link><Link to={categoriesPath}>{c("common.categories")}</Link></div>
         <div><strong>{c("nav.contact")}</strong>{site?.contact_email && <a dir="ltr" href={`mailto:${site.contact_email}`}>{site.contact_email}</a>}{site?.phone && <a dir="ltr" href={`tel:${site.phone}`}>{site.phone}</a>}</div>
       </footer>

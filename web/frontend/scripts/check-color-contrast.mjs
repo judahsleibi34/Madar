@@ -4,7 +4,9 @@ import path from "node:path";
 import { chromium } from "@playwright/test";
 
 const baseUrl = process.env.CONTRAST_AUDIT_URL || "http://127.0.0.1:5173";
-const outputDir = path.join(os.tmpdir(), "madar-contrast-audit");
+const mockApi = process.env.CONTRAST_AUDIT_MOCK === "1";
+if (mockApi && !["localhost", "127.0.0.1", "[::1]"].includes(new URL(baseUrl).hostname)) throw new Error("Mock contrast checks require a loopback frontend");
+const outputDir = process.env.CONTRAST_AUDIT_OUTPUT_DIR || path.join(os.tmpdir(), "madar-contrast-audit");
 const viewports = [
   { name: "compact", width: 390, height: 844 },
   { name: "intermediate", width: 768, height: 1024 },
@@ -20,6 +22,7 @@ const publicRoutes = [
   "/", "/demo", "/pricing", "/pricing/base-plans", "/pricing/custom-plan",
   "/team", "/about", "/contact", "/privacy-policy", "/terms-and-conditions",
   "/login", "/signup", "/forgot-password", "/reset-password", "/verify-email",
+  "/site/demo/shop", "/site/demo/shop/products", "/site/demo/shop/product/chair", "/site/demo/shop/checkout",
 ];
 const adminRoutes = [
   "/dashboard", "/admin/users", "/admin/account-access", "/notifications",
@@ -29,9 +32,9 @@ const adminRoutes = [
 const userRoutes = [
   "/dashboard", "/page-builder", "/builder-responses", "/builder-data", "/calendar",
   "/agenda", "/archive", "/ecommerce/tags", "/ecommerce/categories",
-  "/ecommerce/products", "/ecommerce/theme", "/ecommerce/cv-rerank",
+  "/ecommerce/products", "/ecommerce/products/new", "/ecommerce/delivery", "/ecommerce/orders", "/ecommerce/loyalty", "/ecommerce/theme", "/ecommerce/cv-rerank",
   "/ecommerce/store", "/my-plan", "/notifications", "/settings/change-password",
-  "/settings/security", "/settings", "/admin/users",
+  "/settings/security", "/settings", "/settings?tab=website", "/settings?tab=ecommerce", "/settings?tab=devices", "/settings?tab=notifications", "/admin/users",
 ];
 
 const fakeUser = (role) => ({
@@ -56,6 +59,38 @@ async function installEnvironment(page, role, theme, language) {
   }, theme);
   await page.addInitScript((selectedLanguage) => localStorage.setItem("madar.language", selectedLanguage), language);
 
+  if (mockApi) {
+    const user = fakeUser(role || "user");
+    await page.route("**/*", route => {
+      const url = new URL(route.request().url());
+      const path = url.pathname;
+      if (!path.startsWith("/api/") && url.origin === new URL(baseUrl).origin) return route.continue();
+      const json = data => route.fulfill({contentType:"application/json", body:JSON.stringify(data)});
+      if (path.includes("/public/sites/")) {
+        const product = {id:"product-1",slug:"chair",name:"Chair",price:"20",currency:"USD",in_stock:true,images:[]};
+        const site = {brand:"Madar Store",commerce_currency:"USD",description:"Store description"};
+        if (path.endsWith("/store-profile")) return json({site});
+        if (path.includes("/catalog/products/")) return json({site,product,category:null,tags:[],attributes:[],options:[],variants:[]});
+        if (path.endsWith("/delivery-areas")) return json({areas:[{id:"area-1",name_en:"City",name_ar:"City"}]});
+        if (path.endsWith("/discounts")) return json({conditions:[]});
+        if (path.endsWith("/loyalty/me")) return json({eligible:false});
+        if (path.endsWith("/visits")) return json({success:true});
+        return json({site,catalog:{products:[product],categories:[],tags:[],pagination:{page:1,pages:1,total:1,limit:12}}});
+      }
+      if (path.endsWith("/auth/user_status")) return json({logged_in:Boolean(role), authenticated:Boolean(role), user:role ? user : null});
+      if (path.endsWith("/auth/refresh")) return json({logged_in:false});
+      if (path.endsWith("/website/settings")) return json({website:{brand:"Madar",footer_store_name:"Madar Store",description:"Store description",standard_path_slug:"demo",ecommerce_theme:{}}});
+      if (path.endsWith("/ecommerce/settings")) return json({currency:"USD",currency_locked:false});
+      if (path.endsWith("/ecommerce/catalog")) return json({products:[],categories:[],tags:[],commerce_currency:"USD"});
+      if (path.endsWith("/ecommerce/loyalty")) return json({currency:"USD",rule:{reward_product_id:"product-a"}});
+      if (path.endsWith("/notifications/preferences")) return json({preferences:["calendar","reservations","forms","general"].flatMap(category=>["in_app","push","email"].map(channel=>({category,channel,enabled:true})))});
+      if (path.endsWith("/auth/mfa/status")) return json({factors:[],current_level:"aal1",next_level:"aal1"});
+      if (path.endsWith("/info")) return json({user});
+      if (path.startsWith("/api/") || url.origin !== new URL(baseUrl).origin) return json({success:true,user,orders:[],areas:[],projects:[],pagination:{},notifications:[],unread_count:0,installations:[],preferences:[],users:[],data:[],reservations:[],events:[],forms:[],pages:[],theme:{},rule:{},totals:{}});
+      return route.continue();
+    });
+    return;
+  }
   if (!role) return;
   const user = fakeUser(role);
   await page.route("**/api/auth/user_status**", (route) => route.fulfill({
@@ -121,6 +156,7 @@ async function inspectContrast(page) {
       return blend(parsed, backgroundOf(element));
     };
     const isVisible = (element) => {
+      if (element.checkVisibility && !element.checkVisibility({checkVisibilityCSS:true,checkOpacity:true})) return false;
       const style = getComputedStyle(element);
       const rect = element.getBoundingClientRect();
       let effectiveOpacity = 1;
@@ -130,13 +166,13 @@ async function inspectContrast(page) {
     };
     const selector = (element) => {
       const id = element.id ? `#${element.id}` : "";
-      const classes = String(element.className || "").trim().split(/\s+/).filter(Boolean).slice(0, 3).map((name) => `.${name}`).join("");
+      const classes = String(element.getAttribute("class") || "").trim().split(/\s+/).filter(Boolean).slice(0, 3).map((name) => `.${name}`).join("");
       const label = element.getAttribute("aria-label") || element.getAttribute("title") || element.getAttribute("name") || element.getAttribute("type");
       const detail = label ? `[label=${String(label).slice(0, 48)}]` : "";
       return `${element.tagName.toLowerCase()}${id}${classes}${detail}`.slice(0, 180);
     };
     const failures = [];
-    const checked = { text: 0, placeholders: 0, controls: 0 };
+    const checked = { text: 0, placeholders: 0, controls: 0, icons: 0 };
 
     for (const element of document.querySelectorAll("body *")) {
       if (!isVisible(element) || element.closest("[aria-hidden='true']")) continue;
@@ -161,6 +197,15 @@ async function inspectContrast(page) {
         effectiveColor: foreground.map((value) => Number(value.toFixed(2))),
         effectiveBackground: background.map((value) => Number(value.toFixed(2))),
       });
+    }
+
+    for (const element of document.querySelectorAll("svg.lucide")) {
+      if (!isVisible(element) || element.closest(".builder-canvas, .builder-form-preview-page, .tenant-site-runtime")) continue;
+      const foreground = effectiveColor(element, "stroke");
+      if (!foreground) continue;
+      checked.icons += 1;
+      const actual = ratio(foreground, backgroundOf(element));
+      if (actual + 0.01 < 3) failures.push({kind:"icon", selector:selector(element), ratio:Number(actual.toFixed(2)), required:3, color:getComputedStyle(element).stroke});
     }
 
     for (const element of document.querySelectorAll("input[placeholder], textarea[placeholder]")) {
@@ -218,16 +263,28 @@ async function auditRouteSet(browser, routes, role) {
         page.removeAllListeners("pageerror");
         page.on("pageerror", (error) => pageErrors.push(error.message));
         const response = await page.goto(`${baseUrl}${route}`, { waitUntil: "domcontentloaded", timeout: 30_000 });
-        await page.waitForTimeout(1500);
-        const pageHeight = await page.evaluate(() => document.documentElement.scrollHeight);
+        await page.waitForTimeout(mockApi ? 500 : 1500);
+        await page.evaluate(async () => {
+          const animations = document.getAnimations().filter(animation => animation.playState === "running" && Number.isFinite(animation.effect?.getComputedTiming().endTime));
+          await Promise.all(animations.map(animation => animation.finished.catch(() => {})));
+        });
+        const pageHeight = await page.evaluate(() => (document.querySelector(".authenticated-main, .live-store, .tenant-site-runtime") || document.documentElement).scrollHeight);
         const maxScroll = Math.max(0, pageHeight - viewport.height);
         const stepCount = Math.min(6, Math.max(1, Math.ceil(pageHeight / viewport.height)));
         const positions = Array.from({ length: stepCount }, (_, index) => stepCount === 1 ? 0 : Math.round(maxScroll * index / (stepCount - 1)));
-        const aggregate = { checked: { text: 0, placeholders: 0, controls: 0 }, failures: [], failureCount: 0 };
+        const aggregate = { checked: { text: 0, placeholders: 0, controls: 0, icons: 0 }, failures: [], failureCount: 0 };
         const failureKeys = new Set();
         for (const position of positions) {
-          await page.evaluate((top) => window.scrollTo({ top, behavior: "instant" }), position);
-          await page.waitForTimeout(180);
+          await page.evaluate((top) => {
+            const scroller = document.querySelector(".authenticated-main, .live-store, .tenant-site-runtime");
+            if (scroller) scroller.scrollTo({top,behavior:"instant"});
+            else window.scrollTo({top,behavior:"instant"});
+          }, position);
+          await page.waitForTimeout(mockApi ? 60 : 180);
+          await page.evaluate(async () => {
+            const animations = document.getAnimations().filter(animation => animation.playState === "running" && Number.isFinite(animation.effect?.getComputedTiming().endTime));
+            await Promise.all(animations.map(animation => animation.finished.catch(() => {})));
+          });
           const inspection = await inspectContrast(page);
           for (const key of Object.keys(aggregate.checked)) aggregate.checked[key] += inspection.checked[key];
           for (const failure of inspection.failures) {
@@ -238,6 +295,7 @@ async function auditRouteSet(browser, routes, role) {
         aggregate.failureCount = aggregate.failures.length;
         results.push({ role: role || "public", route, theme, direction: languageMode.name, viewport: viewport.name, status: response?.status() || 0, pageErrors, ...aggregate });
       }
+      console.log(`${role || "public"} ${viewport.name} ${theme} ${languageMode.name}: ${routes.length} pages checked`);
       await context.close();
     }
   }
@@ -254,13 +312,14 @@ const [publicResults, adminResults, userResults] = await Promise.all([
 const results = [...publicResults, ...adminResults, ...userResults];
 await browser.close();
 
-const failures = results.filter((result) => result.failureCount > 0);
+const failures = results.filter((result) => result.failureCount > 0 || result.pageErrors.length > 0);
 const report = {
   generatedAt: new Date().toISOString(), baseUrl, outputDir,
   routeChecks: results.length,
   textChecks: results.reduce((sum, result) => sum + result.checked.text, 0),
   placeholderChecks: results.reduce((sum, result) => sum + result.checked.placeholders, 0),
   controlChecks: results.reduce((sum, result) => sum + result.checked.controls, 0),
+  iconChecks: results.reduce((sum, result) => sum + result.checked.icons, 0),
   failedRouteChecks: failures.length,
   failures,
 };
@@ -268,6 +327,7 @@ await writeFile(path.join(outputDir, "report.json"), `${JSON.stringify(report, n
 console.log(JSON.stringify({
   outputDir, routeChecks: report.routeChecks, textChecks: report.textChecks,
   placeholderChecks: report.placeholderChecks, controlChecks: report.controlChecks,
+  iconChecks: report.iconChecks,
   failedRouteChecks: report.failedRouteChecks,
 }, null, 2));
 if (failures.length > 0) process.exitCode = 1;

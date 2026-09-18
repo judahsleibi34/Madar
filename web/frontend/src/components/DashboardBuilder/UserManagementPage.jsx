@@ -530,7 +530,7 @@ export default function UserManagementPage({ currentUser, lang = "en" }) {
       )}
 
       {toast && (
-        <div className="user-management-toast-wrap" role="status" aria-live="polite">
+        <div className="user-management-toast-wrap" dir={activeLang === "ar" ? "rtl" : "ltr"} role={toast.type === "error" ? "alert" : "status"} aria-live={toast.type === "error" ? "assertive" : "polite"}>
           <div className={`user-management-toast ${toast.type}`}>
             {toast.type === "error" ? <AlertCircle size={17} /> : <CheckCircle2 size={17} />}
             <span>{toast.text}</span>

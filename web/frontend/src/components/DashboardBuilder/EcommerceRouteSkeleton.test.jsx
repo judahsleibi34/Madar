@@ -10,6 +10,8 @@ describe("EcommerceRouteSkeleton", () => {
     ["/ecommerce/tags", ".ecommerce-page-skeleton"],
     ["/ecommerce/categories", ".ecommerce-page-skeleton"],
     ["/ecommerce/products", ".ecommerce-page-skeleton"],
+    ["/ecommerce/products/new", ".commerce-editor-skeleton"],
+    ["/ecommerce/products/product-1/edit", ".commerce-editor-skeleton"],
     ["/ecommerce/delivery", ".ecommerce-skeleton-delivery-grid"],
     ["/ecommerce/orders", ".ecommerce-skeleton-order-list"],
     ["/ecommerce/loyalty", ".ecommerce-skeleton-field-grid"],

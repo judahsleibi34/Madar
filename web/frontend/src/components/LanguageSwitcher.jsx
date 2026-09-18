@@ -8,6 +8,7 @@ export default function LanguageSwitcher({
   onChange,
   compact = false,
   className = "",
+  label,
 }) {
   const { language, setLanguage, supportedLanguages, t } = useLanguage();
 
@@ -57,7 +58,7 @@ export default function LanguageSwitcher({
           className="language-toggle-current"
           dir={safeLanguage === "ar" ? "rtl" : "ltr"}
         >
-          {selectedLabel}
+          {label || selectedLabel}
         </span>
       )}
 

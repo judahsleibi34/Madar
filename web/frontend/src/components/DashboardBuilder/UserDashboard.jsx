@@ -24,7 +24,7 @@ import { fetchSiteVisitMetrics } from "../../services/siteVisitApi";
 import {
   getDashboardCacheScope,
   readDashboardMetricsCache,
-  writeDashboardMetricsCache,
+  fetchDashboardMetricsCached,
 } from "./utils/dashboardSnapshotCache";
 import {
   fetchBuilderSiteMembers,
@@ -260,14 +260,20 @@ function UserDashboardContent({ user, weeklyScreenTimeSeconds = 0, cacheScope = 
         setLoading(false);
       }
 
-      let records;
-      try {
-        const result = await listBuilderProjects({ limit: 100 });
-        records = result.projects;
-      } catch {
-        if (cachedMetrics) return;
-        records = [];
-      }
+      const projectRequest = listBuilderProjects({ limit: 100 }).catch(() => null);
+      const membersRequest = projectRequest.then(result => Promise.all((result?.projects || []).map(record => {
+        const id = record?.id || record?.project_id;
+        return id ? fetchBuilderSiteMembers(id).catch(() => null) : Promise.resolve([]);
+      })));
+      const [projectResult, storage, reservations, visitMetrics, memberGroups] = await Promise.all([
+        projectRequest,
+        fetchBuilderStorageUsage().catch(() => null),
+        loadAllReservations().catch(() => null),
+        fetchSiteVisitMetrics().catch(() => null),
+        membersRequest,
+      ]);
+      if (!projectResult && cachedMetrics) throw new Error("Dashboard refresh unavailable");
+      const records = projectResult?.projects || [];
 
       const remoteProjects = records.map(parseProjectSchema).filter(Boolean);
       const localProject = getLocalProject();
@@ -283,34 +289,15 @@ function UserDashboardContent({ user, weeklyScreenTimeSeconds = 0, cacheScope = 
         primaryRecord?.id || primaryRecord?.project_id || primaryProject?.id || ""
       );
 
-      const [storage, reservations, memberGroups, visitMetrics] = await Promise.all([
-        fetchBuilderStorageUsage().catch(() => null),
-        loadAllReservations().catch(() => []),
-        Promise.all(
-          records.map((record) => {
-            const projectId = record?.id || record?.project_id;
-            return projectId
-              ? fetchBuilderSiteMembers(projectId).catch(() => [])
-              : Promise.resolve([]);
-          })
-        ),
-        fetchSiteVisitMetrics().catch(() => ({
-          website_visits: 0,
-          store_visits: 0,
-        })),
-      ]);
-
-      if (cancelled) return;
-
       const uniqueMembers = new Map();
-      memberGroups.flat().forEach((member) => {
+      memberGroups.filter(Boolean).flat().forEach((member) => {
         if (String(member?.status || "Active").toLowerCase() === "disabled") return;
         const key = member?.userId || member?.user_id || member?.email || member?.id;
         if (key) uniqueMembers.set(String(key), member);
       });
 
       const usedBytes =
-        Number(storage?.used_bytes || 0) + Number(storage?.reserved_bytes || 0);
+        storage ? Number(storage.used_bytes || 0) + Number(storage.reserved_bytes || 0) : Number(cachedMetrics?.usedBytes || 0);
 
       const nextMetrics = {
         projects: projects.length,
@@ -322,26 +309,27 @@ function UserDashboardContent({ user, weeklyScreenTimeSeconds = 0, cacheScope = 
           (total, project) => total + countReservationForms(project),
           0
         ),
-        newReservations: reservations.filter(
+        newReservations: reservations ? reservations.filter(
           (reservation) => String(reservation?.status || "new").toLowerCase() === "new"
-        ).length,
-        totalReservations: reservations.length,
-        websiteVisits: Number(visitMetrics?.website_visits || 0),
-        storeVisits: Number(visitMetrics?.store_visits || 0),
+        ).length : Number(cachedMetrics?.newReservations || 0),
+        totalReservations: reservations ? reservations.length : Number(cachedMetrics?.totalReservations || 0),
+        websiteVisits: Number(visitMetrics?.website_visits ?? cachedMetrics?.websiteVisits ?? 0),
+        storeVisits: Number(visitMetrics?.store_visits ?? cachedMetrics?.storeVisits ?? 0),
         usedBytes,
-        quotaBytes: Number(storage?.quota_bytes || 0),
-        permittedUsers: uniqueMembers.size,
+        quotaBytes: Number(storage?.quota_bytes ?? cachedMetrics?.quotaBytes ?? 0),
+        permittedUsers: memberGroups.some(group => group === null) && cachedMetrics ? cachedMetrics.permittedUsers : uniqueMembers.size,
         permissionTypes: getPermissionTypes(projects),
         projectId,
         storeUrl: primaryProject ? getProductionTenantUrl(primaryProject, "/shop") : "",
         websiteUrl: primaryProject ? getProductionTenantUrl(primaryProject) : "",
       };
-      writeDashboardMetricsCache(cacheScope, nextMetrics);
-      setMetrics(nextMetrics);
-      setLoading(false);
+      return nextMetrics;
     };
 
-    loadMetrics();
+    fetchDashboardMetricsCached(cacheScope, loadMetrics)
+      .then(nextMetrics => { if (!cancelled) setMetrics(normalizeDashboardMetrics(nextMetrics)); })
+      .catch(() => { /* Keep the cached snapshot during a failed background refresh. */ })
+      .finally(() => { if (!cancelled) setLoading(false); });
     return () => {
       cancelled = true;
     };

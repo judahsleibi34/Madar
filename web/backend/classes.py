@@ -55,6 +55,8 @@ class WebsiteSettingsUpdate(BaseModel):
     standard_path_slug: Optional[str] = None
     brand: Optional[str] = None
     footer_store_name: Optional[str] = None
+    store_name_ar: Optional[str] = Field(default=None, max_length=80)
+    store_description_ar: Optional[str] = Field(default=None, max_length=500)
     logo_url: Optional[str] = None
     # Empty contact details are valid and are normalized by website_routes.
     # EmailStr rejects "" during request parsing, preventing users from

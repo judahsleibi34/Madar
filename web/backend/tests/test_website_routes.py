@@ -106,6 +106,7 @@ class FakeQuery:
 class FakeSupabase:
     def __init__(self):
         self.tables = {
+            "tenants": [{"tenant_id": 7, "lifecycle_state": "active"}],
             "website_settings": [
                 {
                     "id": 1,
@@ -721,3 +722,35 @@ class TenantSiteOwnerAccessTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class BilingualStoreIdentityTests(unittest.TestCase):
+    def test_arabic_identity_is_saved_without_new_columns_and_preserves_theme(self):
+        client = build_website_client()
+        theme = {"accent": "#123456", "growth": {"seo_title_en": "SEO"}, "store_identity_ar": {"store_description_ar": "Previous"}}
+        with patch.object(website_routes, "require_active_tenant_member", return_value=fake_tenant_context()), \
+             patch.object(website_routes, "get_settings_for_tenant", return_value={"id": 1, "ecommerce_theme": theme}), \
+             patch.object(website_routes, "save_settings_for_tenant", side_effect=lambda **kwargs: kwargs["update_payload"]) as save, \
+             patch.object(website_routes, "record_audit_event"), \
+             patch.object(website_routes, "invalidate_ecommerce_cache"):
+            response = client.put("/website/settings", json={"store_name_ar": "  متجر مدار  "})
+        self.assertEqual(response.status_code, 200)
+        payload = save.call_args.kwargs["update_payload"]
+        self.assertNotIn("store_name_ar", payload)
+        self.assertEqual(payload["ecommerce_theme"]["accent"], theme["accent"])
+        self.assertEqual(payload["ecommerce_theme"]["growth"], theme["growth"])
+        self.assertEqual(payload["ecommerce_theme"]["store_identity_ar"], {"store_name_ar": "متجر مدار", "store_description_ar": "Previous"})
+
+    def test_public_profile_exposes_only_identity_text(self):
+        profile = public_site_routes.build_public_store_profile({"brand": "English", "ecommerce_theme": {"store_identity_ar": {"store_name_ar": "متجر مدار", "store_description_ar": "وصف", "private": "secret"}}}, "demo")
+        self.assertEqual(profile["brand_ar"], "متجر مدار")
+        self.assertEqual(profile["description_ar"], "وصف")
+        self.assertNotIn("store_identity_ar", profile["store_theme"])
+        self.assertNotIn("secret", str(profile))
+
+    def test_arabic_identity_length_limits(self):
+        from classes import WebsiteSettingsUpdate
+        from pydantic import ValidationError
+        for field, limit in (("store_name_ar", 80), ("store_description_ar", 500)):
+            with self.assertRaises(ValidationError):
+                WebsiteSettingsUpdate(**{field: "a" * (limit + 1)})

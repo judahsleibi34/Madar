@@ -1,3 +1,4 @@
+import { SettingsSkeleton } from "./CommerceLoadingLayouts";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Bell, ExternalLink, Globe2, ImagePlus, KeyRound, MonitorSmartphone, Save, ShieldCheck, ShoppingBag, UserRound, X } from "lucide-react";
@@ -21,6 +22,8 @@ import {
 import { getBuilderAssetFileName } from "../PageBuilder/core/PageBuilder.uploadHandlers";
 import { apiFetch } from "../../utils/apiClient";
 import { resolveMediaUrl } from "../../utils/media";
+import { clearEcommerceAdminCache } from "./utils/ecommerceAdminCache";
+import { clearAllEcommerceCatalogCaches } from "./utils/ecommerceCatalogCache";
 import { clearPublicEcommerceCache, fetchEcommerceSettings, saveEcommerceSettings } from "../../services/ecommerceApi";
 import { getSettingsContent } from "../../content";
 import { buildProfilePayload } from "./profilePayload";
@@ -219,8 +222,9 @@ function SettingsNotification({ notification, isArabic, label, onClose }) {
       className={`settings-toast settings-toast-${notification.type} ${
         isArabic ? "settings-toast-rtl" : ""
       }`}
-      role="alert"
-      aria-live="polite"
+      dir={isArabic ? "rtl" : "ltr"}
+      role={notification.type === "error" ? "alert" : "status"}
+      aria-live={notification.type === "error" ? "assertive" : "polite"}
     >
       <div className="settings-toast-content">
         <span>{notification.message}</span>
@@ -255,7 +259,8 @@ export default function SettingsPage({
   const [notification, setNotification] = useState(null);
 
   const [isSavingAccount, setIsSavingAccount] = useState(false);
-  const [isLoadingAccount, setIsLoadingAccount] = useState(false);
+  const [isLoadingAccount, setIsLoadingAccount] = useState(Boolean(userId || accountApiBasePath));
+  const [isLoadingWebsite, setIsLoadingWebsite] = useState(!accountOnly);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
   const [isSavingSite, setIsSavingSite] = useState(false);
@@ -375,12 +380,16 @@ export default function SettingsPage({
       contactEmail: siteChrome.contactEmail || "",
       phone: siteChrome.phone || "",
       description: siteChrome.description || "",
+      storeNameAr: siteChrome.storeNameAr || "",
+      descriptionAr: siteChrome.descriptionAr || "",
     }),
     [
       project,
       siteChrome.brand,
       siteChrome.contactEmail,
       siteChrome.description,
+      siteChrome.storeNameAr,
+      siteChrome.descriptionAr,
       siteChrome.footerStoreName,
       siteChrome.logoUrl,
       siteChrome.phone,
@@ -626,6 +635,8 @@ export default function SettingsPage({
                 contactEmail: website.contact_email || "",
                 phone: website.phone || "",
                 description: website.description || "",
+                storeNameAr: website.ecommerce_theme?.store_identity_ar?.store_name_ar || "",
+                descriptionAr: website.ecommerce_theme?.store_identity_ar?.store_description_ar || "",
               },
             };
 
@@ -635,6 +646,8 @@ export default function SettingsPage({
         }
       } catch {
         // Keep local settings visible if the backend settings request fails.
+      } finally {
+        if (!cancelled) setIsLoadingWebsite(false);
       }
     };
 
@@ -847,6 +860,8 @@ export default function SettingsPage({
         throw new Error(getApiErrorMessage(data.detail, t.accountError));
       }
 
+      clearEcommerceAdminCache(null, "website-settings");
+      clearAllEcommerceCatalogCaches();
       const savedWebsite = data.website || {};
       const savedProject = {
         ...nextProject,
@@ -891,6 +906,8 @@ export default function SettingsPage({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           footer_store_name: storeName,
+          store_name_ar: siteForm.storeNameAr,
+          store_description_ar: siteForm.descriptionAr,
           logo_url: siteForm.logoUrl,
           description: siteForm.description,
           contact_email: siteForm.contactEmail,
@@ -904,6 +921,8 @@ export default function SettingsPage({
         throw new Error(getApiErrorMessage(data.detail, t.storeSaveError));
       }
 
+      clearEcommerceAdminCache(null, "website-settings");
+      clearAllEcommerceCatalogCaches();
       const savedWebsite = data.website || {};
       const nextProject = {
         ...project,
@@ -911,6 +930,8 @@ export default function SettingsPage({
           ...defaultSiteChrome,
           ...(project.siteChrome || {}),
           footerStoreName: savedWebsite.footer_store_name ?? storeName,
+          storeNameAr: savedWebsite.ecommerce_theme?.store_identity_ar?.store_name_ar ?? siteForm.storeNameAr,
+          descriptionAr: savedWebsite.ecommerce_theme?.store_identity_ar?.store_description_ar ?? siteForm.descriptionAr,
           logoUrl: savedWebsite.logo_url ?? siteForm.logoUrl,
           description: savedWebsite.description ?? siteForm.description,
           contactEmail: savedWebsite.contact_email ?? siteForm.contactEmail,
@@ -968,7 +989,8 @@ export default function SettingsPage({
         role="tabpanel"
         aria-label={tabLabels[activeTab]}
       >
-        {activeTab === "profile" && (
+        {((activeTab === "profile" && isLoadingAccount) || (["website", "ecommerce"].includes(activeTab) && isLoadingWebsite)) && <SettingsSkeleton label={isArabic ? "جارٍ تحميل الإعدادات" : "Loading settings"} />}
+        {activeTab === "profile" && !isLoadingAccount && (
         <form
           className="settings-card settings-profile-card"
           onSubmit={saveAccount}
@@ -1098,7 +1120,7 @@ export default function SettingsPage({
         </form>
         )}
 
-        {activeTab === "website" && !accountOnly && (
+        {activeTab === "website" && !accountOnly && !isLoadingWebsite && (
           <form
             className="settings-card settings-profile-card settings-website-card"
             onSubmit={saveSiteSettings}
@@ -1263,7 +1285,7 @@ export default function SettingsPage({
           </form>
         )}
 
-        {activeTab === "ecommerce" && !accountOnly && (
+        {activeTab === "ecommerce" && !accountOnly && !isLoadingWebsite && (
           <form
             className="settings-card settings-profile-card settings-website-card"
             onSubmit={saveStoreSettings}
@@ -1309,31 +1331,71 @@ export default function SettingsPage({
 
             <div className="settings-profile-body">
               <div className="settings-form-grid">
-                <label className="settings-wide-field">
-                  {t.storeName}
-                  <input
-                    value={siteForm.footerStoreName}
-                    className={fieldErrors.footerStoreName ? "field-has-error" : ""}
-                    onChange={(event) => updateSiteField("footerStoreName", event.target.value)}
-                  />
-                  {fieldErrors.footerStoreName && (
-                    <span className="settings-field-error">{fieldErrors.footerStoreName}</span>
-                  )}
-                  <small>{t.storeNameHelp}</small>
-                </label>
+                <fieldset className="settings-store-translations settings-wide-field" aria-label={t.storeTranslations}>
+                  <div className="settings-store-translation-grid">
+                    <div className="settings-store-language-card">
+                      <strong>{t.storeEnglish}</strong>
+                      <label className="settings-wide-field">
+                        {t.storeNameEnglish}
+                        <input
+                          value={siteForm.footerStoreName}
+                          dir="ltr"
+                          lang="en"
+                          maxLength={80}
+                          className={fieldErrors.footerStoreName ? "field-has-error" : ""}
+                          onChange={(event) => updateSiteField("footerStoreName", event.target.value)}
+                        />
+                        {fieldErrors.footerStoreName && (
+                          <span className="settings-field-error">{fieldErrors.footerStoreName}</span>
+                        )}
+                        <small>{t.storeNameHelp}</small>
+                      </label>
+                      <label className="settings-wide-field">
+                        {t.storeDescriptionEnglish}
+                        <textarea
+                          ref={(textarea) => {
+                            descriptionTextareaRef.current = textarea;
+                            resizeTextareaToContent(textarea);
+                          }}
+                          rows={1}
+                          value={siteForm.description}
+                          dir="ltr"
+                          lang="en"
+                          maxLength={500}
+                          onChange={(event) => {
+                            resizeTextareaToContent(event.currentTarget);
+                            updateSiteField("description", event.target.value);
+                          }}
+                        />
+                      </label>
+                    </div>
+                    <div className="settings-store-language-card">
+                      <strong>{t.storeArabic}</strong>
+                      <label className="settings-wide-field">
+                        {t.storeNameArabic}
+                        <input dir="rtl" lang="ar" maxLength={80} value={siteForm.storeNameAr} onChange={(event) => updateSiteField("storeNameAr", event.target.value)} />
+                      </label>
+                      <label className="settings-wide-field">
+                        {t.storeDescriptionArabic}
+                        <textarea dir="rtl" lang="ar" rows={3} maxLength={500} value={siteForm.descriptionAr} onChange={(event) => updateSiteField("descriptionAr", event.target.value)} />
+                        <small>{t.arabicStoreHelp}</small>
+                      </label>
+                    </div>
+                  </div>
+                </fieldset>
 
                 <label>
-                  Store currency
+                  {t.storeCurrency}
                   <select
-                    aria-label="Store currency"
+                    aria-label={t.storeCurrency}
                     value={commerceSettings.currency}
                     disabled={commerceSettings.currency_locked}
                     onChange={(event) => setCommerceSettings((current) => ({ ...current, currency: event.target.value }))}
                   >
-                    <option value="">Select currency</option>
+                    <option value="">{t.selectCurrency}</option>
                     {["ILS", "JOD", "USD", "EUR"].map((currency) => <option key={currency} value={currency}>{currency}</option>)}
                   </select>
-                  <small>{commerceSettings.currency_locked ? "Locked after the first order." : "All active products and orders use this currency. No currency conversion is applied."}</small>
+                  <small>{commerceSettings.currency_locked ? t.currencyLocked : t.currencyHelp}</small>
                 </label>
 
                 <label>
@@ -1367,22 +1429,6 @@ export default function SettingsPage({
                     type="tel"
                     value={siteForm.phone}
                     onChange={(event) => updateSiteField("phone", event.target.value)}
-                  />
-                </label>
-
-                <label className="settings-wide-field">
-                  {t.storeDescription}
-                  <textarea
-                    ref={(textarea) => {
-                      descriptionTextareaRef.current = textarea;
-                      resizeTextareaToContent(textarea);
-                    }}
-                    rows={1}
-                    value={siteForm.description}
-                    onChange={(event) => {
-                      resizeTextareaToContent(event.currentTarget);
-                      updateSiteField("description", event.target.value);
-                    }}
                   />
                 </label>
 
@@ -1430,10 +1476,19 @@ export default function SettingsPage({
           />
         )}
         {activeTab === "notifications" && !accountOnly && (
-          <NotificationPreferencesPanel
-            copy={t.notificationPreferences}
-            showNotification={showNotification}
-          />
+          <>
+            <DeviceSettingsPanel
+              lang={lang}
+              tenantId={user?.tenant_id}
+              copy={t.devices}
+              showNotification={showNotification}
+              notificationsOnly
+            />
+            <NotificationPreferencesPanel
+              copy={t.notificationPreferences}
+              showNotification={showNotification}
+            />
+          </>
         )}
       </div>
     </section>

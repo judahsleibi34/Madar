@@ -1,3 +1,5 @@
+import { getEcommerceCacheScope } from "./utils/ecommerceAdminCache";
+import { CatalogSkeleton } from "./CommerceLoadingLayouts";
 import { notifyCommerceAction } from "../../utils/commerceActionToast";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
@@ -430,23 +432,14 @@ function requiredFieldLabel(field) {
   return languageCard && labelText === "Name" ? `${languageCard} name` : labelText;
 }
 
-function EcommercePageSkeleton({ label }) {
-  return (
-    <div className="ecommerce-page-skeleton" role="status" aria-label={label}>
-      <header><div><i /><i /><i /></div><i /></header>
-      <section>{Array.from({ length: 3 }, (_, index) => <i key={index} />)}</section>
-      <article><header><div><i /><i /></div><i /></header>{Array.from({ length: 5 }, (_, index) => <i key={index} />)}</article>
-    </div>
-  );
-}
-
 export default function EcommercePage({ section = "products", user }) {
   const { t, locale: language, direction } = useCommerceI18n();
   const config = SECTION_CONFIG[section] || SECTION_CONFIG.products;
   const Icon = config.icon;
-  const cacheScope = user?.id ? `user-${user.id}` : "authenticated";
+  const cacheScope = getEcommerceCacheScope(user);
   const summaryStorageKey = `${SUMMARY_VISIBILITY_STORAGE_KEY}:${cacheScope}:${section}`;
   const summaryCustomizerRef = useRef(null);
+  const catalogRequestVersion = useRef(0);
   const [summaryCustomizerOpen, setSummaryCustomizerOpen] = useState(false);
   const [hiddenSummaryCardIds, setHiddenSummaryCardIds] = useState(() => readHiddenSummaryCards(summaryStorageKey));
   const initialCatalogSnapshot = useMemo(() => readEcommerceCatalogCacheSnapshot(cacheScope), [cacheScope]);
@@ -506,6 +499,7 @@ export default function EcommercePage({ section = "products", user }) {
   }, []);
 
   const loadCatalog = useCallback(async () => {
+    const version = ++catalogRequestVersion.current;
     const cached = readEcommerceCatalogCacheSnapshot(cacheScope);
     if (cached) {
       setCatalog(cached.catalog);
@@ -515,9 +509,11 @@ export default function EcommercePage({ section = "products", user }) {
     }
     try {
       const data = await fetchEcommerceCatalog({ scope: cacheScope, force: Boolean(cached?.isStale) });
+      if (version !== catalogRequestVersion.current) return;
       setCatalog({ tags: data?.tags || [], categories: data?.categories || [], products: data?.products || [], stock_summary: data?.stock_summary || { low_stock: 0, out_of_stock: 0 }, commerce_currency: data?.commerce_currency || null });
       setStatus("ready");
     } catch {
+      if (version !== catalogRequestVersion.current) return;
       if (cached) {
         setStatus("ready");
         showToast({ type: "error", title: t("commerce:admin.loadCommerce"), message: t("commerce:feedback.cachedCatalog") });
@@ -531,7 +527,7 @@ export default function EcommercePage({ section = "products", user }) {
 
   useEffect(() => {
     const timer = window.setTimeout(loadCatalog, 0);
-    return () => window.clearTimeout(timer);
+    return () => { window.clearTimeout(timer); catalogRequestVersion.current += 1; };
   }, [loadCatalog]);
 
   const items = useMemo(() => catalog[section] || [], [catalog, section]);
@@ -653,7 +649,7 @@ export default function EcommercePage({ section = "products", user }) {
   };
 
   if (status === "loading") {
-    return <section className="ecommerce-page"><EcommercePageSkeleton label={t("commerce:admin.loadingCatalog")} /></section>;
+    return <section className="ecommerce-page"><CatalogSkeleton label={t("commerce:admin.loadingCatalog")} section={section} summaryCount={visibleSummaryCards.length} /></section>;
   }
 
   return (

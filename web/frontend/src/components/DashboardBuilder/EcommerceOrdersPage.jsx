@@ -1,7 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { getEcommerceCacheScope, readEcommerceAdminCacheSnapshot } from "./utils/ecommerceAdminCache";
+import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, CheckCircle2, PackageCheck, RefreshCw, Search, SlidersHorizontal } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 
+import useDebouncedValue from "../../hooks/useDebouncedValue";
 import AuthToast from "../AuthPages/AuthToast";
 import EcommerceOperationsSkeleton from "./EcommerceOperationsSkeleton";
 import { collectEcommerceOrderPayment, fetchEcommerceDeliveryAreas, fetchEcommerceOrder, fetchEcommerceOrders, transitionEcommerceOrder } from "../../services/ecommerceApi";
@@ -23,8 +25,9 @@ const snapshotText = (snapshot, locale) => (snapshot?.items || []).map((entry) =
 function OrderDetail({ cacheScope, orderId }) {
   const { t, locale, direction, money, dateTime, status: statusLabel, payment: paymentLabel } = useCommerceI18n();
   const navigate = useNavigate();
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const initial = readEcommerceAdminCacheSnapshot(cacheScope, `order:${orderId}`);
+  const [data, setData] = useState(() => initial?.data || null);
+  const [loading, setLoading] = useState(() => !initial);
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState(null);
   useEffect(() => {
@@ -86,32 +89,50 @@ function OrderDetail({ cacheScope, orderId }) {
 }
 
 export default function EcommerceOrdersPage({ user }) {
+  const cacheScope = getEcommerceCacheScope(user);
   const location = useLocation();
   const { t, locale, direction, money, dateTime, status: statusLabel, payment: paymentLabel } = useCommerceI18n();
   const orderId = location.pathname.match(/\/ecommerce\/orders\/([^/]+)/)?.[1];
-  const [orders, setOrders] = useState([]);
-  const [areas, setAreas] = useState([]);
+  const initial = readEcommerceAdminCacheSnapshot(cacheScope, "orders:/ecommerce/orders");
+  const [orders, setOrders] = useState(() => initial?.data?.orders || []);
+  const [areas, setAreas] = useState(() => readEcommerceAdminCacheSnapshot(cacheScope, "delivery-areas")?.data?.areas || []);
   const [filters, setFilters] = useState({ order_number: "", customer_name: "", phone: "", status: "", payment_status: "", date_from: "", date_to: "", service_area_id: "" });
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => !initial);
   const [error, setError] = useState("");
   const [toast, setToast] = useState(null);
-  const cacheScope = user?.tenant_id || user?.id ? `commerce-${user?.tenant_id || user?.id}` : "authenticated";
-  const query = useMemo(() => filters, [filters]);
-  const load = () => { setLoading(true); setError(""); fetchEcommerceOrders(query, { scope: cacheScope, force: true }).then((result) => { setOrders(result?.orders || []); setToast({ type: "success", title: t("feedback.ordersRefreshed"), message: t("feedback.ordersRefreshedBody") }); }).catch(() => { setError(t("errors.loadOrders")); setToast({ type: "error", title: t("errors.loadOrders"), message: t("admin.tryAgain") }); }).finally(() => setLoading(false)); };
+  const query = useDebouncedValue(filters);
+  const requestVersion = useRef(0);
+  const load = () => {
+    const version = ++requestVersion.current;
+    setLoading(true); setError("");
+    fetchEcommerceOrders(filters, { scope:cacheScope, force:true })
+      .then((result) => { if (version === requestVersion.current) { setOrders(result?.orders || []); setToast({type:"success", title:t("feedback.ordersRefreshed"), message:t("feedback.ordersRefreshedBody")}); } })
+      .catch(() => { if (version === requestVersion.current) { setError(t("errors.loadOrders")); setToast({type:"error", title:t("errors.loadOrders"), message:t("admin.tryAgain")}); } })
+      .finally(() => { if (version === requestVersion.current) setLoading(false); });
+  };
   useEffect(() => {
     let cancelled = false;
     fetchEcommerceDeliveryAreas({ scope: cacheScope }).then((result) => { if (!cancelled) setAreas(result?.areas || []); }).catch(() => { if (!cancelled) setToast({ type: "error", title: t("admin.loadDelivery"), message: t("admin.tryAgain") }); });
     return () => { cancelled = true; };
   }, [cacheScope, t]);
   useEffect(() => {
+    if (orderId) return undefined;
+    const version = ++requestVersion.current;
     let cancelled = false;
-    fetchEcommerceOrders(query, { scope: cacheScope })
-      .then((result) => { if (!cancelled) setOrders(result?.orders || []); })
-      .catch(() => { if (!cancelled) { setError(t("errors.loadOrders")); setToast({ type: "error", title: t("errors.loadOrders"), message: t("admin.tryAgain") }); } })
-      .finally(() => { if (!cancelled) setLoading(false); });
+    const params = new URLSearchParams(Object.entries(query).filter(([, value]) => String(value || "").trim()));
+    const snapshot = readEcommerceAdminCacheSnapshot(cacheScope, `orders:/ecommerce/orders${params.size ? `?${params}` : ""}`);
+    Promise.resolve().then(() => {
+      if (cancelled) return null;
+      setLoading(!snapshot); setError("");
+      if (snapshot) setOrders(snapshot.data?.orders || []);
+      return fetchEcommerceOrders(query, { scope:cacheScope });
+    })
+      .then((result) => { if (!cancelled && version === requestVersion.current) setOrders(result?.orders || []); })
+      .catch(() => { if (!cancelled && version === requestVersion.current) { if (!snapshot) setError(t("errors.loadOrders")); setToast({ type:"error", title:t("errors.loadOrders"), message:t("admin.tryAgain") }); } })
+      .finally(() => { if (!cancelled && version === requestVersion.current) setLoading(false); });
     return () => { cancelled = true; };
-  }, [cacheScope, query, t]);
-  if (orderId) return <OrderDetail cacheScope={cacheScope} orderId={orderId} />;
+  }, [cacheScope, orderId, query, t]);
+  if (orderId) return <OrderDetail key={`${cacheScope}:${orderId}`} cacheScope={cacheScope} orderId={orderId} />;
   const update = (key, value) => setFilters((current) => ({ ...current, [key]: value }));
   return (
     <main className="ecommerce-page ecommerce-operations-page ecommerce-orders-page" dir={direction} lang={locale}>

@@ -56,6 +56,7 @@ import "./styles/core/ui-consistency.css";
 import "./styles/core/page-hierarchy.css";
 import "./styles/admin/internal-theme.css";
 import "./styles/core/contrast-contract.css";
+import "./styles/admin/dashboard/settings-responsive.css";
 import App from "./App.jsx";
 import { getBrandedRuntimePath } from "./utils/hostedAddress";
 import { installMadarPwaMetadata, isMadarPwaHost } from "./pwa/pwaContext";

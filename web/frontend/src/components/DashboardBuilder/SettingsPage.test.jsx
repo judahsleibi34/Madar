@@ -240,15 +240,19 @@ describe("SettingsPage canonical email handling", () => {
       </MemoryRouter>
     );
 
-    const storeName = await screen.findByLabelText(/^store name/i);
+    const storeName = await screen.findByLabelText(/^store name \(English\)/i);
     expect(storeName.value).toBe("Previous Store");
     fireEvent.change(storeName, { target: { value: "Madar Store" } });
+    fireEvent.change(screen.getByLabelText(/^store name \(Arabic\)/i), { target: { value: "متجر مدار" } });
+    fireEvent.change(screen.getByLabelText(/^store description \(Arabic\)/i), { target: { value: "وصف المتجر" } });
     fireEvent.click(screen.getByRole("button", { name: /save store details/i }));
 
     await waitFor(() => {
       const saveCall = apiFetch.mock.calls.find(([, options]) => options?.method === "PUT");
       expect(JSON.parse(saveCall[1].body)).toEqual({
         footer_store_name: "Madar Store",
+        store_name_ar: "متجر مدار",
+        store_description_ar: "وصف المتجر",
         logo_url: "",
         description: "Store description",
         contact_email: "shop@example.com",
