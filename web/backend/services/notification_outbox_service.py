@@ -10,6 +10,27 @@ from database import service_supabase
 
 logger = logging.getLogger(__name__)
 
+# These failures describe a recipient, preference, installation, or endpoint
+# that can no longer receive this delivery. They remain durable telemetry, but
+# they are not evidence that the queue or provider is currently unhealthy.
+TERMINAL_RECIPIENT_ERROR_CODES = frozenset({
+    "email_channel_disabled",
+    "email_preference_disabled",
+    "email_recipient_not_found",
+    "recipient_inactive",
+    "smtp_recipient_rejected",
+    "web_push_disabled",
+    "web_push_endpoint_unsafe",
+    "web_push_installation_inactive",
+    "web_push_preference_disabled",
+    "web_push_subscription_malformed",
+    "web_push_subscription_revoked",
+})
+
+
+def is_terminal_recipient_error(code: Any) -> bool:
+    return str(code or "") in TERMINAL_RECIPIENT_ERROR_CODES
+
 ALLOWED_CHANNELS = {"internal", "email", "web_push"}
 SAFE_CODE_PATTERN = re.compile(r"^[a-z0-9_.-]{1,100}$")
 MAX_OUTBOX_PAYLOAD_BYTES = 64 * 1024
@@ -188,11 +209,35 @@ def claim_notifications(*, limit: int = 25) -> list[dict[str, Any]]:
     return [row for row in (data or []) if isinstance(row, dict)]
 
 
-def get_queue_metrics(*, client=None, now: datetime | None = None) -> dict[str, int]:
+def is_recent_dead_for_readiness(
+    row: dict[str, Any], *, current: datetime, window_seconds: int
+) -> bool:
+    for field in ("dead_at", "updated_at", "created_at"):
+        raw = row.get(field)
+        if not raw:
+            continue
+        try:
+            value = datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
+            if value.tzinfo is None:
+                value = value.replace(tzinfo=timezone.utc)
+            age = (current - value).total_seconds()
+            return age < 0 or age <= window_seconds
+        except (TypeError, ValueError):
+            continue
+    # An unparseable dead row cannot be silently excluded from readiness.
+    return True
+
+
+def get_queue_metrics(
+    *,
+    client=None,
+    now: datetime | None = None,
+    dead_readiness_window_seconds: int = 86400,
+) -> dict[str, int]:
     database_client = client or service_supabase
     response = (
         database_client.table("notification_outbox")
-        .select("status,created_at")
+        .select("status,created_at,updated_at,last_error_code")
         .in_("status", ["pending", "failed", "processing", "dead", "sent"])
         .limit(5000)
         .execute()
@@ -220,7 +265,7 @@ def get_queue_metrics(*, client=None, now: datetime | None = None) -> dict[str, 
     try:
         delivery_response = (
             database_client.table("notification_deliveries")
-            .select("status,created_at,channel")
+            .select("status,created_at,updated_at,dead_at,channel,last_error_code")
             .in_("status", ["pending", "processing", "dead", "sent"])
             .limit(5000)
             .execute()
@@ -250,6 +295,9 @@ def get_queue_metrics(*, client=None, now: datetime | None = None) -> dict[str, 
         if pending_dates
         else 0
     )
+    readiness_window = int(dead_readiness_window_seconds)
+    if readiness_window <= 0:
+        raise ValueError("dead readiness window must be positive")
     delivery_dead_by_channel = {
         channel: sum(
             row.get("status") == "dead" and row.get("channel") == channel
@@ -257,7 +305,31 @@ def get_queue_metrics(*, client=None, now: datetime | None = None) -> dict[str, 
         )
         for channel in ("internal", "email", "web_push")
     }
+    delivery_actionable_dead_by_channel = {
+        channel: sum(
+            row.get("status") == "dead"
+            and row.get("channel") == channel
+            and not is_terminal_recipient_error(row.get("last_error_code"))
+            and is_recent_dead_for_readiness(
+                row, current=current, window_seconds=readiness_window
+            )
+            for row in delivery_rows
+        )
+        for channel in ("internal", "email", "web_push")
+    }
+    delivery_terminal = sum(
+        row.get("status") == "dead"
+        and is_terminal_recipient_error(row.get("last_error_code"))
+        for row in delivery_rows
+    )
     delivery_dead = sum(delivery_dead_by_channel.values())
+    outbox_actionable_dead = sum(
+        row.get("status") == "dead"
+        and is_recent_dead_for_readiness(
+            row, current=current, window_seconds=readiness_window
+        )
+        for row in rows
+    )
 
     return {
         "queue_depth": counts["pending"] + counts["failed"] + sum(
@@ -267,10 +339,15 @@ def get_queue_metrics(*, client=None, now: datetime | None = None) -> dict[str, 
         **{
             **counts,
             "outbox_dead": counts["dead"],
+            "outbox_dead_actionable": outbox_actionable_dead,
             "delivery_dead": delivery_dead,
+            "delivery_dead_terminal": delivery_terminal,
             "delivery_internal_dead": delivery_dead_by_channel["internal"],
             "delivery_email_dead": delivery_dead_by_channel["email"],
             "delivery_web_push_dead": delivery_dead_by_channel["web_push"],
+            "delivery_internal_dead_actionable": delivery_actionable_dead_by_channel["internal"],
+            "delivery_email_dead_actionable": delivery_actionable_dead_by_channel["email"],
+            "delivery_web_push_dead_actionable": delivery_actionable_dead_by_channel["web_push"],
             "dead": counts["dead"] + delivery_dead,
         },
         "delivery_pending": sum(
