@@ -32,6 +32,13 @@ declare -a control_plane_paths=(
   web/scripts/madar_alert_hook.sh
   web/scripts/backup_madar.sh
   web/scripts/verify_backup.sh
+  web/scripts/backup_support.py
+  web/scripts/verify_latest_backup.sh
+  web/scripts/replicate_latest_node1.py
+  web/scripts/replicate_latest_offhost.sh
+  web/scripts/replicate_backup_offhost.sh
+  web/scripts/restore_madar.sh
+  web/scripts/rehearse_backup.py
 )
 
 if ! git -C "$repo" diff --quiet \

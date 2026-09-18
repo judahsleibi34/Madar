@@ -2,6 +2,13 @@
 # Keep this tracked LF-only: it is executed by Linux from cross-platform checkouts.
 set -Eeuo pipefail
 
+for argument in "$@"; do
+  if [[ "$argument" == "--recover-current-schema" ]]; then
+    echo "[madar-production] ERROR: schema recovery is coordinator-only." >&2
+    exit 2
+  fi
+done
+
 readonly SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 readonly TRACKED_CONTROL_ROOT="$(cd -- "$SCRIPT_DIR/.." && pwd)"
 if [[ "$TRACKED_CONTROL_ROOT" == "/opt/madar/control-plane/deployment" ]]; then

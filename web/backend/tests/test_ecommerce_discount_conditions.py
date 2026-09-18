@@ -50,11 +50,11 @@ def test_v2_preserves_all_products_and_percentages():
     assert database.rpc.call_args.args[1]["p_conditions"][1]["discount_basis_points"] == 2500
 
 def test_migration_mirror_and_checkout_invariants():
-    name = "100_add_ecommerce_discount_conditions.sql"
+    name = "102_add_ecommerce_discount_conditions.sql"
     sql = (ROOT / "database/migrations" / name).read_bytes()
     assert sql == (ROOT / "supabase/migrations" / name).read_bytes()
     text = sql.decode().lower()
-    for contract in ("v_schema_version <> 99","schema_version = 100","basis_points desc","for share","inventory_allocated_quantity","idempotency_conflict","reward_conditions","transaction_type='earn'"):
+    for contract in ("v_schema_version <> 101","schema_version = 102","basis_points desc","for share","inventory_allocated_quantity","idempotency_conflict","reward_conditions","transaction_type='earn'"):
         assert contract in text
 
 def test_public_offers_do_not_expose_loyalty_conditions():

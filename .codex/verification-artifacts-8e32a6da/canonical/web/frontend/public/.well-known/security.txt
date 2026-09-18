@@ -1,4 +1,0 @@
-Contact: mailto:info@madar.com
-Expires: 2027-06-21T00:00:00Z
-Preferred-Languages: en, ar
-Policy: /privacy-policy

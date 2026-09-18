@@ -164,6 +164,7 @@ services:
       - ./docker-compose.yml:/test-repository/docker-compose.yml:ro
       - ./docker-compose.dev.yml:/test-repository/docker-compose.dev.yml:ro
       - ./deployment:/test-repository/deployment:ro
+      - /var/lib/madar/backup-state:/var/lib/madar/backup-state:ro
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/live', timeout=2)"]
       interval: 15s

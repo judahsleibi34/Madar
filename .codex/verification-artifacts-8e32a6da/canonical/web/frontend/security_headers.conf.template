@@ -1,7 +1,0 @@
-add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data: https:; connect-src 'self' ${MADAR_CSP_CONNECT_SRC}; media-src 'self' blob: https:; frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; manifest-src 'self'" always;
-add_header Strict-Transport-Security "${MADAR_HSTS}" always;
-add_header X-Content-Type-Options "nosniff" always;
-add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=()" always;
-add_header X-Frame-Options "DENY" always;
-add_header Cross-Origin-Opener-Policy "same-origin" always;

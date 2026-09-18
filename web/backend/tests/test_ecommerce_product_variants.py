@@ -12,8 +12,8 @@ from routes.public_site_routes import PublicStoreOrderCreate
 WEB_ROOT = Path(__file__).resolve().parents[2]
 MIGRATION = WEB_ROOT / "database" / "migrations" / "096_create_ecommerce_product_variants.sql"
 MIRROR = WEB_ROOT / "supabase" / "migrations" / "096_create_ecommerce_product_variants.sql"
-PRESENTATION_MIGRATION = WEB_ROOT / "database" / "migrations" / "099_add_variant_attribute_presentation.sql"
-PRESENTATION_MIRROR = WEB_ROOT / "supabase" / "migrations" / "099_add_variant_attribute_presentation.sql"
+PRESENTATION_MIGRATION = WEB_ROOT / "database" / "migrations" / "101_add_variant_attribute_presentation.sql"
+PRESENTATION_MIRROR = WEB_ROOT / "supabase" / "migrations" / "101_add_variant_attribute_presentation.sql"
 PRODUCT_ID = "11111111-1111-1111-1111-111111111111"
 OPTION_ID = "22222222-2222-2222-2222-222222222222"
 VALUE_ID = "33333333-3333-3333-3333-333333333333"
@@ -165,8 +165,8 @@ class EcommerceProductVariantTests(unittest.TestCase):
         self.assertIn("add column color_hex text", sql)
         self.assertIn("save_ecommerce_product_aggregate_v2_safe", sql)
         self.assertIn("perform public.save_ecommerce_product_aggregate_safe", sql)
-        self.assertIn("v_schema_version<>98", sql)
-        self.assertIn("schema_version=99", sql)
+        self.assertIn("v_schema_version<>100", sql)
+        self.assertIn("schema_version=101", sql)
         self.assertNotIn("drop table", sql)
 
 

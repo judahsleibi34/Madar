@@ -10,8 +10,9 @@ class FakeResponse:
 
 
 class FakeQuery:
-    def __init__(self, client):
+    def __init__(self, client, table):
         self.client = client
+        self.table = table
         self.payload = None
         self.update_payload = None
         self.filters = []
@@ -61,7 +62,11 @@ class FakeQuery:
             self.client.rows.append(row)
             return FakeResponse([dict(row)])
 
-        rows = list(self.client.rows)
+        rows = list(
+            self.client.rows
+            if self.table == "notification_outbox"
+            else self.client.deliveries
+        )
         for key, value in self.filters:
             if isinstance(value, tuple):
                 rows = [row for row in rows if row.get(key) in value]
@@ -76,11 +81,12 @@ class FakeQuery:
 class FakeClient:
     def __init__(self):
         self.rows = []
+        self.deliveries = []
 
     def table(self, name):
-        if name != "notification_outbox":
+        if name not in {"notification_outbox", "notification_deliveries"}:
             raise AssertionError(name)
-        return FakeQuery(self)
+        return FakeQuery(self, name)
 
 
 class NotificationOutboxServiceTests(unittest.TestCase):
@@ -100,6 +106,37 @@ class NotificationOutboxServiceTests(unittest.TestCase):
         self.assertEqual(metrics["oldest_pending_age_seconds"], 300)
         self.assertEqual(metrics["dead"], 1)
         self.assertEqual(metrics["sent"], 1)
+
+    def test_dead_readiness_separates_terminal_and_historical_delivery_telemetry(self):
+        client = FakeClient()
+        client.deliveries.extend([
+            {
+                "status": "dead",
+                "channel": "web_push",
+                "last_error_code": "web_push_subscription_revoked",
+                "updated_at": "2026-07-20T00:04:30+00:00",
+            },
+            {
+                "status": "dead",
+                "channel": "web_push",
+                "last_error_code": "web_push_provider_unauthorized",
+                "updated_at": "2026-07-20T00:04:40+00:00",
+            },
+            {
+                "status": "dead",
+                "channel": "web_push",
+                "last_error_code": "web_push_provider_rejected",
+                "updated_at": "2026-07-18T00:00:00+00:00",
+            },
+        ])
+        metrics = notification_outbox_service.get_queue_metrics(
+            client=client,
+            now=datetime(2026, 7, 20, 0, 5, tzinfo=timezone.utc),
+            dead_readiness_window_seconds=3600,
+        )
+        self.assertEqual(metrics["delivery_web_push_dead"], 3)
+        self.assertEqual(metrics["delivery_dead_terminal"], 1)
+        self.assertEqual(metrics["delivery_web_push_dead_actionable"], 1)
 
     def test_enqueue_is_deduplicated_and_tenant_scoped(self):
         client = FakeClient()

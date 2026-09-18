@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import os
+import json
+import re
 import tempfile
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -226,19 +228,47 @@ def check_notification_queue() -> str:
     if not _env_bool("NOTIFICATION_WORKER_REQUIRED", False):
         return "disabled"
     try:
-        metrics = get_queue_metrics()
+        dead_window = int(
+            os.getenv("NOTIFICATION_DEAD_READINESS_WINDOW_SECONDS", "86400")
+        )
+        if dead_window <= 0:
+            return "misconfigured"
+        metrics = get_queue_metrics(
+            dead_readiness_window_seconds=dead_window,
+        )
         maximum_depth = int(os.getenv("NOTIFICATION_QUEUE_MAX_DEPTH", "1000"))
         maximum_age = int(os.getenv("NOTIFICATION_QUEUE_MAX_AGE_SECONDS", "900"))
         maximum_dead = int(os.getenv("NOTIFICATION_QUEUE_MAX_DEAD", "0"))
         if min(maximum_depth, maximum_age, maximum_dead) < 0:
             return "misconfigured"
         if "outbox_dead" in metrics:
-            relevant_dead = int(metrics.get("outbox_dead") or 0)
-            relevant_dead += int(metrics.get("delivery_internal_dead") or 0)
+            relevant_dead = int(
+                metrics.get("outbox_dead_actionable", metrics.get("outbox_dead"))
+                or 0
+            )
+            relevant_dead += int(
+                metrics.get(
+                    "delivery_internal_dead_actionable",
+                    metrics.get("delivery_internal_dead"),
+                )
+                or 0
+            )
             if _env_bool("EMAIL_CHANNEL_ENABLED", False):
-                relevant_dead += int(metrics.get("delivery_email_dead") or 0)
+                relevant_dead += int(
+                    metrics.get(
+                        "delivery_email_dead_actionable",
+                        metrics.get("delivery_email_dead"),
+                    )
+                    or 0
+                )
             if get_web_push_configuration().operational:
-                relevant_dead += int(metrics.get("delivery_web_push_dead") or 0)
+                relevant_dead += int(
+                    metrics.get(
+                        "delivery_web_push_dead_actionable",
+                        metrics.get("delivery_web_push_dead"),
+                    )
+                    or 0
+                )
         else:
             # Compatibility fallback for legacy metrics/test doubles.
             relevant_dead = int(metrics.get("dead") or 0)
@@ -261,9 +291,17 @@ def check_notification_email() -> str:
     if not all(os.getenv(name, "").strip() for name in required):
         return "unavailable"
     try:
-        metrics = get_delivery_channel_metrics().get("email", {})
+        dead_window = int(
+            os.getenv("NOTIFICATION_DEAD_READINESS_WINDOW_SECONDS", "86400")
+        )
+        if dead_window <= 0:
+            return "misconfigured"
+        metrics = get_delivery_channel_metrics(
+            dead_readiness_window_seconds=dead_window
+        ).get("email", {})
         maximum_dead = int(os.getenv("NOTIFICATION_EMAIL_MAX_DEAD", "0"))
-        return "degraded" if int(metrics.get("dead") or 0) > maximum_dead else "configured"
+        relevant_dead = int(metrics.get("actionable_dead", metrics.get("dead")) or 0)
+        return "degraded" if relevant_dead > maximum_dead else "configured"
     except Exception:
         return "unavailable"
 
@@ -278,13 +316,29 @@ def check_notification_push() -> str:
 def check_backup_freshness() -> str:
     required = _env_bool("BACKUP_FRESHNESS_REQUIRED", False)
     marker = os.getenv("BACKUP_FRESHNESS_MARKER", "").strip()
+    if not required:
+        return "disabled"
     if not marker:
         return "missing" if required else "disabled"
     try:
         maximum_age = int(os.getenv("BACKUP_MAX_AGE_SECONDS", "129600"))
         if maximum_age <= 0:
             return "misconfigured"
-        age = datetime.now(timezone.utc).timestamp() - Path(marker).stat().st_mtime
+        path = Path(marker)
+        if path.is_symlink() or not path.is_file():
+            return "missing"
+        # Check mtime first for legacy stale-state diagnostics, then validate
+        # the timestamp attested by the verifier. Touching a file cannot renew it.
+        age = datetime.now(timezone.utc).timestamp() - path.stat().st_mtime
+        if not 0 <= age <= maximum_age:
+            return "stale"
+        state = json.loads(path.read_text())
+        if (state.get('format') != 1 or state.get('verified') is not True
+                or state.get('backup_id') != 'madar-' + state.get('created_at', '')
+                or not re.fullmatch(r'[0-9a-f]{64}', state.get('manifest_sha256', ''))):
+            return "invalid"
+        created = datetime.strptime(state['created_at'], '%Y%m%dT%H%M%SZ').replace(tzinfo=timezone.utc)
+        age = (datetime.now(timezone.utc) - created).total_seconds()
         return "ok" if 0 <= age <= maximum_age else "stale"
     except (OSError, ValueError):
         return "missing" if required else "unavailable"
