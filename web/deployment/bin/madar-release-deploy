@@ -1075,14 +1075,24 @@ class DockerGitOperations:
         if not isinstance(components, dict):
             raise RuntimeError("candidate_core_readiness_invalid")
         allowed_worker_degradation = {
-            "notification_worker", "calendar_sync_worker", "data_deletion_worker",
+            "notification_worker",
+            "notification_queue",
+            "notification_email",
+            "notification_push",
+            "calendar_sync_worker",
+            "calendar_sync_queue",
+            "data_deletion_worker",
         }
         degraded = {
             name for name, value in components.items()
             if value not in ACCEPTED_READINESS_STATES
         }
-        if not degraded <= allowed_worker_degradation:
-            raise RuntimeError("candidate_core_readiness_failed")
+        unexpected = degraded - allowed_worker_degradation
+        if unexpected:
+            raise RuntimeError(
+                "candidate_core_readiness_failed:"
+                + ",".join(sorted(unexpected))
+            )
         frontend_base = f"http://127.0.0.1:{ports['frontend']}"
         with urllib.request.urlopen(f"{frontend_base}/", timeout=5) as response:
             if response.status != 200:
