@@ -1,5 +1,5 @@
 {
-  "storeFeedback": {"noDelivery": "التوصيل غير متاح حاليًا", "discountsUnavailable": "تعذر تحميل الخصومات المتاحة", "discountsUnavailableBody": "تعذر التحقق من الخصومات. حاول مجددًا قبل تقديم طلبك.", "completeFields": "تحقق من تفاصيل الطلب", "completeFieldsBody": "أكمل الحقول المطلوبة وأدخل عنوان بريد إلكتروني صالحًا قبل تقديم طلبك.", "added": "تمت الإضافة إلى السلة", "addedBody": "تمت إضافة {{name}} إلى سلتك.", "removed": "تمت إزالة المنتج", "removedBody": "تمت إزالة المنتج من سلتك.", "quantityUpdated": "تم تحديث الكمية", "quantityUpdatedBody": "تم تحديث الكمية في سلتك.", "quantityLimit": "تم بلوغ الحد الأقصى للكمية", "quantityLimitBody": "يمكنك إضافة ما يصل إلى 99 قطعة من كل منتج.", "cartUnavailable": "تعذر تحديث سلتك", "cartUnavailableBody": "تحقق من أذونات التخزين في المتصفح وحاول مجددًا.", "deliveryUnavailable": "تعذر تحميل خيارات التوصيل", "orderPlaced": "تم تقديم الطلب", "orderPlacedBody": "تم استلام طلبك. جارٍ فتح التأكيد."},
+  "storeFeedback": {"noDelivery": "التوصيل غير متاح حاليًا", "discountsUnavailable": "تعذر تحميل الخصومات المتاحة", "discountsUnavailableBody": "تعذر التحقق من الخصومات. حاول مجددًا قبل تقديم طلبك.", "completeFields": "تحقق من تفاصيل الطلب", "completeFieldsBody": "تحقق من الاسم والبريد الإلكتروني ورقم الهاتف وعنوان التوصيل، ثم حاول مرة أخرى.", "added": "تمت الإضافة إلى السلة", "addedBody": "تمت إضافة {{name}} إلى سلتك. افتح السلة عندما تكون مستعدًا لإتمام الطلب.", "removed": "تمت إزالة المنتج", "removedBody": "تم تحديث سلتك. يمكنك متابعة التسوق.", "quantityUpdated": "تم تحديث الكمية", "quantityUpdatedBody": "تم تحديث الكمية وإجمالي سلتك.", "quantityLimit": "تم بلوغ الحد الأقصى للكمية", "quantityLimitBody": "اختر كمية بين 1 و99.", "cartUnavailable": "تعذر تحديث سلتك", "cartUnavailableBody": "تحقق من أذونات التخزين في المتصفح وحاول مجددًا.", "deliveryUnavailable": "تعذر تحميل خيارات التوصيل", "orderPlaced": "تم تقديم الطلب", "orderPlacedBody": "شكرًا لك! تم استلام طلبك. نفتح الآن صفحة التأكيد."},
   "feedback": {"draftUnavailable": "تعذر الاحتفاظ بمسودة المعاينة المحلية", "draftUnavailableBody": "تحقق من أذونات التخزين في المتصفح ثم حاول مجددًا. لم يتغير التصميم المنشور.", "mediaUploaded": "تم رفع الوسائط", "mediaUploadedBody": "تمت إضافة الوسائط. احفظ المنتج للاحتفاظ بهذه التغييرات.", "locationCreated": "تمت إضافة موقع التوصيل", "locationCreatedBody": "احفظ إعدادات التوصيل لإتاحة هذا الموقع للعملاء.", "ordersRefreshed": "تم تحديث الطلبات", "ordersRefreshedBody": "تظهر الآن أحدث الطلبات.", "previewRefreshed": "تم تحديث معاينة المتجر", "previewRefreshedBody": "اكتمل تحميل معاينة المتجر.", "cachedCatalog": "تعذر تحديث الكتالوج. يتم عرض العناصر التي تم تحميلها سابقًا."},
   "common": {
     "refresh": "تحديث",
@@ -9,7 +9,7 @@
     "sku": "رمز المنتج", "barcode": "الباركود", "price": "السعر", "status": "الحالة", "active": "نشط", "inactive": "غير نشط",
     "draft": "مسودة", "archived": "مؤرشف", "yes": "نعم", "no": "لا", "viewAll": "عرض الكل", "back": "رجوع"
   },
-  "nav": { "home": "الرئيسية", "shop": "المتجر", "categories": "التصنيفات", "contact": "تواصل معنا", "cart": "السلة", "searchStore": "البحث في المتجر", "openCart_one": "فتح السلة، عنصر واحد", "openCart_two": "فتح السلة، عنصران", "openCart_few": "فتح السلة، {{count}} عناصر", "openCart_many": "فتح السلة، {{count}} عنصرًا", "openCart_other": "فتح السلة، {{count}} عنصر", "navigation": "التنقل في المتجر" },
+  "nav": { "menu": "القائمة", "language": "اللغة", "home": "الرئيسية", "shop": "المتجر", "categories": "التصنيفات", "contact": "تواصل معنا", "cart": "السلة", "searchStore": "البحث في المتجر", "openCart_one": "فتح السلة، عنصر واحد", "openCart_two": "فتح السلة، عنصران", "openCart_few": "فتح السلة، {{count}} عناصر", "openCart_many": "فتح السلة، {{count}} عنصرًا", "openCart_other": "فتح السلة، {{count}} عنصر", "navigation": "التنقل في المتجر" },
   "landing": {
     "browse": "تصفح المنتجات", "shopCategory": "تسوق من {{name}}", "products": "المنتجات", "collections": "التصنيفات",
     "featured": "مختار لك", "noFeatured": "لا يوجد منتج مميز", "noPublished": "لا توجد منتجات منشورة"
@@ -60,7 +60,7 @@
     "options": "الخيارات", "optionsVariants": "الخيارات والأنواع", "variantAttributes": "خصائص الأنواع", "variantsInventory": "الأنواع والمخزون", "variants": "الأنواع", "variantMedia": "صور النوع", "variantDetails": "سعر ومخزون النوع", "inventory": "المخزون",
     "displayOrder": "ترتيب العرض", "addAttribute": "إضافة مواصفة", "addOption": "إضافة خيار", "addOptions": "إضافة خيارات", "addAnotherOption": "إضافة خيار آخر", "addVariantAttribute": "إضافة خاصية نوع", "addValue": "إضافة قيمة", "addVariant": "إضافة نوع",
     "removeVariant": "إزالة النوع", "nameEnglish": "الاسم بالإنجليزية", "nameArabic": "الاسم بالعربية", "descriptionEnglish": "الوصف بالإنجليزية",
-    "descriptionArabic": "الوصف بالعربية", "slug": "المعرّف النصي", "productSku": "رمز المنتج", "brand": "العلامة التجارية", "brandHelp": "اسم العلامة التجارية.", "category": "التصنيف", "noCategory": "بدون تصنيف", "noTags": "اختر الوسوم", "searchCategories": "ابحث في التصنيفات", "searchTags": "ابحث في الوسوم", "noSearchResults": "لا توجد نتائج", "tagsSelected": "{{count}} وسوم محددة",
+    "descriptionArabic": "الوصف بالعربية", "slug": "المعرّف النصي", "productSku": "رمز المنتج", "brand": "العلامة التجارية (اختياري)", "brandHelp": "اسم العلامة التجارية. يمكنك ترك هذا الحقل فارغًا.", "category": "التصنيف", "noCategory": "بدون تصنيف", "noTags": "اختر الوسوم", "searchCategories": "ابحث في التصنيفات", "searchTags": "ابحث في الوسوم", "noSearchResults": "لا توجد نتائج", "tagsSelected": "{{count}} وسوم محددة",
     "basePrice": "السعر الأساسي", "comparePrice": "سعر الخصم", "storeCurrency": "عملة المتجر", "media": "الوسائط", "addImages": "إضافة صور", "addMedia": "إضافة صور أو فيديوهات", "uploading": "جارٍ الرفع…",
     "required": "مطلوب", "optionNameEnglish": "اسم الخيار بالإنجليزية", "optionNameArabic": "اسم الخيار بالعربية", "valueEnglish": "القيمة بالإنجليزية", "valueArabic": "القيمة بالعربية",
     "variantSku": "رمز النوع", "priceOverride": "سعر خاص للنوع", "compareOverride": "سعر النوع قبل الخصم", "inheritBase": "استخدام السعر الأساسي", "trackInventory": "تتبع المخزون",
@@ -127,6 +127,8 @@
     "draftStoreTitle": "معاينة مسودة المتجر الإلكتروني", "publishedStoreTitle": "المتجر الإلكتروني المنشور"
   },
   "loyalty": {
+    "selectCurrency": "اختر العملة", "currencyHelp": "تُستخدم عملة المتجر لجميع المنتجات والطلبات. لا يتم تحويل العملات.", "currencyLocked": "لا يمكن تغيير عملة المتجر بعد أول طلب.",
+    "selectAll": "تحديد الكل", "selectAllResults": "تحديد كل النتائج", "clearSelection": "مسح التحديد",
     "conditions": "شروط الخصم",
     "highestDiscount": "يطبق أعلى خصم مستحق لكل منتج محدد، دون جمع الخصومات.",
     "conditionNumber": "الشرط {{number}}",

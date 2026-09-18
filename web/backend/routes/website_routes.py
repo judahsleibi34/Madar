@@ -158,6 +158,11 @@ def build_settings_update_payload(settings: WebsiteSettingsUpdate):
     if settings.description is not None:
         update_payload["description"] = validate_description(settings.description)
 
+    if settings.store_name_ar is not None:
+        update_payload["store_name_ar"] = validate_footer_name(settings.store_name_ar)
+    if settings.store_description_ar is not None:
+        update_payload["store_description_ar"] = validate_description(settings.store_description_ar)
+
     return update_payload
 
 
@@ -183,6 +188,20 @@ def update_website_settings(
         tenant_id = context.tenant_id
         authenticated_user_id = context.user_id
         existing_website = get_settings_for_tenant(tenant_id, authenticated_user_id)
+        identity_updates = {
+            key: update_payload.pop(key)
+            for key in ("store_name_ar", "store_description_ar")
+            if key in update_payload
+        }
+        if identity_updates:
+            saved_theme = (existing_website or {}).get("ecommerce_theme")
+            saved_theme = saved_theme if isinstance(saved_theme, dict) else {}
+            identity = saved_theme.get("store_identity_ar")
+            identity = identity if isinstance(identity, dict) else {}
+            update_payload["ecommerce_theme"] = {
+                **saved_theme,
+                "store_identity_ar": {**identity, **identity_updates},
+            }
         if "standard_path_slug" in update_payload:
             require_any_entitlement(
                 tenant_id,

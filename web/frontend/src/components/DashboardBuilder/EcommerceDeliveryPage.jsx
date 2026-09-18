@@ -1,3 +1,4 @@
+import { getEcommerceCacheScope, readEcommerceAdminCacheSnapshot } from "./utils/ecommerceAdminCache";
 import { useEffect, useMemo, useState } from "react";
 import { LoaderCircle, MapPin, Plus, Save, Search, Trash2, X } from "lucide-react";
 
@@ -7,23 +8,27 @@ import { createEcommerceDeliveryLocation, fetchEcommerceDeliveryAreas, saveEcomm
 import { useCommerceI18n } from "../../utils/commerceI18n";
 
 export default function EcommerceDeliveryPage({ user }) {
+  const cacheScope = getEcommerceCacheScope(user);
   const { t, locale, direction } = useCommerceI18n();
-  const [areas, setAreas] = useState([]);
-  const [savedIds, setSavedIds] = useState([]);
-  const [selectedIds, setSelectedIds] = useState([]);
+  const snapshot = readEcommerceAdminCacheSnapshot(cacheScope, "delivery-areas");
+  const initialAreas = snapshot?.data?.areas || [];
+  const initialIds = initialAreas.filter(area => area.enabled).map(area => area.id);
+  const [areas, setAreas] = useState(() => initialAreas);
+  const [savedIds, setSavedIds] = useState(() => initialIds);
+  const [selectedIds, setSelectedIds] = useState(() => initialIds);
   const [search, setSearch] = useState("");
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => !snapshot);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState(null);
   const [locationOpen, setLocationOpen] = useState(false);
   const [location, setLocation] = useState({ country: "", country_ar: "", levels: ["", ""], levels_ar: ["", ""] });
   const [creating, setCreating] = useState(false);
   const [locationError, setLocationError] = useState("");
-  const cacheScope = user?.tenant_id || user?.id ? `commerce-${user?.tenant_id || user?.id}` : "authenticated";
 
 
   useEffect(() => {
     let cancelled = false;
+    const previousIds = (readEcommerceAdminCacheSnapshot(cacheScope, "delivery-areas")?.data?.areas || []).filter(area => area.enabled).map(area => area.id);
     fetchEcommerceDeliveryAreas({ scope: cacheScope })
       .then((result) => {
         if (cancelled) return;
@@ -31,7 +36,7 @@ export default function EcommerceDeliveryPage({ user }) {
         const enabled = nextAreas.filter((area) => area.enabled).map((area) => area.id);
         setAreas(nextAreas);
         setSavedIds(enabled);
-        setSelectedIds(enabled);
+        setSelectedIds(current => [...current].sort().join() === [...previousIds].sort().join() ? enabled : current);
       })
       .catch(() => { if (!cancelled) setToast({ type: "error", title: t("admin.loadDelivery"), message: t("admin.tryAgain") }); })
       .finally(() => { if (!cancelled) setLoading(false); });

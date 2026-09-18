@@ -164,3 +164,25 @@ describe("merchant ecommerce operations", () => {
     expect(screen.getByLabelText("البحث في مناطق التوصيل")).toBeTruthy();
     expect(document.querySelector(".ecommerce-operations-page").getAttribute("dir")).toBe("rtl");
   });
+
+
+it("debounces Orders typing and ignores late results from an older search", async () => {
+  fetchEcommerceDeliveryAreas.mockResolvedValue({areas:[]});
+  let finishOld;
+  fetchEcommerceOrders.mockImplementation(query => query.customer_name === "old"
+    ? new Promise(resolve => { finishOld = resolve; }) : Promise.resolve({orders:[]}));
+  render(<MemoryRouter initialEntries={["/ecommerce/orders"]}><EcommerceOrdersPage /></MemoryRouter>);
+  await screen.findByText("No orders found");
+  fetchEcommerceOrders.mockClear();
+  fireEvent.change(screen.getByLabelText("Customer"), {target:{value:"o"}});
+  fireEvent.change(screen.getByLabelText("Customer"), {target:{value:"ol"}});
+  fireEvent.change(screen.getByLabelText("Customer"), {target:{value:"old"}});
+  expect(fetchEcommerceOrders).not.toHaveBeenCalled();
+  await waitFor(() => expect(fetchEcommerceOrders).toHaveBeenCalledOnce());
+  expect(screen.getByRole("status", {name:/Loading orders/})).toBeTruthy();
+  fireEvent.change(screen.getByLabelText("Customer"), {target:{value:"new"}});
+  await waitFor(() => expect(fetchEcommerceOrders).toHaveBeenCalledTimes(2));
+  await screen.findByText("No orders found");
+  finishOld({orders:[{id:"old",order_number:"STALE-ORDER",customer_name:"Old",total:0,currency:"USD"}]});
+  await waitFor(() => expect(screen.queryByText("STALE-ORDER")).toBeNull());
+});

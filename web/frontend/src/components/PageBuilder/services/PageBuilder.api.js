@@ -1,4 +1,5 @@
-﻿import { apiFetch, createApiError } from "../../../utils/apiClient";
+import { clearEcommerceAdminCache, loadEcommerceAdminResource } from "../../DashboardBuilder/utils/ecommerceAdminCache";
+import { apiFetch, createApiError } from "../../../utils/apiClient";
 import { getPersistableProject } from "../core/PageBuilder.editorState";
 
 export const BUILDER_CLIENT_CONTRACT = "cloud-draft-v1";
@@ -544,28 +545,12 @@ export const uploadBuilderAsset = async (file) => {
   return data?.asset_url || data?.url || "";
 };
 
-const WEBSITE_SETTINGS_CACHE_MS = 45_000;
-const websiteSettingsCache = new Map();
-const websiteSettingsRequests = new Map();
-
-export const fetchWebsiteSettings = async (scope = "authenticated", { force = false } = {}) => {
-  const cacheKey = String(scope || "authenticated");
-  const cached = websiteSettingsCache.get(cacheKey);
-  if (!force && cached && Date.now() - cached.cachedAt <= WEBSITE_SETTINGS_CACHE_MS) return cached.data;
-  if (!force && websiteSettingsRequests.has(cacheKey)) return websiteSettingsRequests.get(cacheKey);
-
-  const pending = apiFetch(getApiUrl("/website/settings"), {
-    method: "GET",
-    cache: "no-store",
-  }).then(async (response) => {
+export const fetchWebsiteSettings = (scope = "authenticated", { force = false } = {}) =>
+  loadEcommerceAdminResource(scope, "website-settings", async () => {
+    const response = await apiFetch(getApiUrl("/website/settings"), { method: "GET", cache: "no-store" });
     const data = await parseJsonResponse(response);
-    const website = data?.website || null;
-    websiteSettingsCache.set(cacheKey, { cachedAt: Date.now(), data: website });
-    return website;
-  }).finally(() => websiteSettingsRequests.delete(cacheKey));
-  websiteSettingsRequests.set(cacheKey, pending);
-  return pending;
-};
+    return data?.website || null;
+  }, { force });
 
 export const updateWebsiteSettings = async (settings) => {
   const response = await apiFetch(getApiUrl("/website/settings"), {
@@ -575,8 +560,7 @@ export const updateWebsiteSettings = async (settings) => {
   });
 
   const data = await parseJsonResponse(response);
-  websiteSettingsCache.clear();
-  websiteSettingsRequests.clear();
+  clearEcommerceAdminCache(null, "website-settings");
   return data?.website || null;
 };
 

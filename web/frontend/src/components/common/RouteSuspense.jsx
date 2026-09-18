@@ -3,7 +3,7 @@ import { Suspense, useEffect, useState } from "react";
 import PageSkeleton from "./PageSkeleton";
 
 function DelayedFallback({
-  delay = 160,
+  delay = 0,
   fallback,
   label,
   lang,

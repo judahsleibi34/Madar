@@ -109,6 +109,7 @@ function SidebarRow({
       aria-expanded={expandable ? expanded : undefined}
       aria-controls={expandable ? controls : undefined}
       data-sidebar-path={path}
+      data-route-path={path}
     >
       <Icon className="admin-sidebar-row-icon" size={18} aria-hidden="true" />
       <span className="admin-sidebar-row-label">{label}</span>
@@ -457,6 +458,7 @@ export default function DashboardSidebar({
           <button
             type="button"
             className="admin-sidebar-brand"
+            data-route-path={DASHBOARD_ROUTES.dashboard}
             onClick={() => goTo(DASHBOARD_ROUTES.dashboard)}
             title={t("sidebar.brand")}
           >
@@ -567,7 +569,8 @@ export default function DashboardSidebar({
                         type="button"
                         key={item.path}
                         className={active ? "active" : ""}
-                        onClick={() => goTo(item.path)}
+                        data-route-path={item.path}
+                onClick={() => goTo(item.path)}
                         title={item.label}
                         aria-current={active ? "page" : undefined}
                       >
@@ -680,13 +683,9 @@ export default function DashboardSidebar({
                     current={activeSidebarLanguage}
                     onChange={onLanguageChange}
                     className="admin-sidebar-lang-switcher"
+                    label={t("sidebar.language", { defaultValue: "Language" })}
                   />
-                  <span
-                    className="admin-sidebar-language-label"
-                    aria-hidden="true"
-                  >
-                    {t("sidebar.language", { defaultValue: "Language" })}
-                  </span>
+
                 </div>
               )}
 
@@ -695,6 +694,7 @@ export default function DashboardSidebar({
                 className={`admin-sidebar-utility ${
                   settingsRouteActive ? "active" : ""
                 }`}
+                data-route-path={DASHBOARD_ROUTES.settings}
                 onClick={() => goTo(DASHBOARD_ROUTES.settings)}
                 title={t("sidebar.settings")}
                 aria-current={settingsRouteActive ? "page" : undefined}

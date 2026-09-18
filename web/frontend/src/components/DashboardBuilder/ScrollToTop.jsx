@@ -1,26 +1,30 @@
-import { useEffect } from "react";
+import { useLayoutEffect } from "react";
 import { useLocation, useNavigationType } from "react-router-dom";
 
 export default function ScrollToTop() {
-  const { hash, pathname, search } = useLocation();
+  const { hash, key, pathname, search } = useLocation();
   const navigationType = useNavigationType();
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (navigationType === "POP") return;
 
     if (hash) {
-      window.requestAnimationFrame(() => {
+      const frame = window.requestAnimationFrame(() => {
         document.getElementById(hash.slice(1))?.scrollIntoView();
       });
-      return;
+      return () => window.cancelAnimationFrame(frame);
     }
 
-    window.scrollTo({
-      top: 0,
-      left: 0,
-      behavior: "auto",
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+    document.querySelectorAll(".authenticated-main, .live-store, .tenant-site-runtime").forEach((element) => {
+      if (typeof element.scrollTo === "function") {
+        element.scrollTo({ top: 0, left: 0, behavior: "instant" });
+      } else {
+        element.scrollTop = 0;
+        element.scrollLeft = 0;
+      }
     });
-  }, [hash, navigationType, pathname, search]);
+  }, [hash, key, navigationType, pathname, search]);
 
   return null;
 }

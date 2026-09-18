@@ -1,5 +1,5 @@
 /* ============================================================
-   SIDEBAR — CLEAN RTL/LTR VERSION
+   SIDEBAR â€” CLEAN RTL/LTR VERSION
    ============================================================ */
 
 .admin-dashboard-layout {
@@ -1000,7 +1000,6 @@ img.admin-sidebar-avatar {
 .admin-dashboard-layout:has(.authenticated-main :is(
   .ecommerce-page-skeleton,
   .ecommerce-route-skeleton-header,
-  .ecommerce-operations-skeleton,
   .ecommerce-theme-skeleton,
   .ecommerce-store-page-skeleton
 )) .dashboard-sidebar > :not(.dashboard-sidebar-skeleton) {
@@ -1010,7 +1009,6 @@ img.admin-sidebar-avatar {
 .admin-dashboard-layout:has(.authenticated-main :is(
   .ecommerce-page-skeleton,
   .ecommerce-route-skeleton-header,
-  .ecommerce-operations-skeleton,
   .ecommerce-theme-skeleton,
   .ecommerce-store-page-skeleton
 )) .dashboard-sidebar-skeleton {

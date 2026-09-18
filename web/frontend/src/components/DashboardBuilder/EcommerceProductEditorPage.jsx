@@ -1,3 +1,5 @@
+import { getEcommerceCacheScope } from "./utils/ecommerceAdminCache";
+import { ProductEditorSkeleton } from "./CommerceLoadingLayouts";
 import { notifyCommerceAction } from "../../utils/commerceActionToast";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, ChevronDown, ImagePlus, Plus, Save, Search, Trash2, X } from "lucide-react";
@@ -124,7 +126,7 @@ function ProductMediaUploader({ items, busy, disabled, progress, error, dragging
 
 export function EcommerceProductEditor({ user, productId, embedded = false, initialCatalog, onClose, onSaved }) {
   const { t, locale, direction, localize } = useCommerceI18n();
-  const scope = user?.id ? `user-${user.id}` : "authenticated";
+  const scope = getEcommerceCacheScope(user);
   const [catalog, setCatalog] = useState(() => initialCatalog || { products: [], categories: [], tags: [], commerce_currency: "USD" });
   const [form, setForm] = useState(() => emptyProduct(initialCatalog?.commerce_currency));
   const [state, setState] = useState({ loading: !initialCatalog, saving: false, error: "" });
@@ -233,7 +235,7 @@ export function EcommerceProductEditor({ user, productId, embedded = false, init
   const addAttribute = () => update("attributes", [...form.attributes, { id: uuid(), name_translations: { en: "" }, value_translations: { en: "" }, sort_order: form.attributes.length }]);
   const changeAttribute = (id, field, value) => update("attributes", form.attributes.map((item) => item.id === id ? { ...item, [field]: value } : item));
   const addOption = () => update("options", [...form.options, { id: uuid(), code: "", name_translations: { en: "" }, required: true, display_type: "text", sort_order: form.options.length, values: [] }]);
-  const changeOption = (id, change) => update("options", form.options.map((item) => item.id === id ? { ...item, ...change } : item));
+  const changeOption = (id, change) => setForm((current) => ({ ...current, options: current.options.map((item) => item.id === id ? { ...item, ...(typeof change === "function" ? change(item) : change) } : item) }));
   const addValue = (option, rawValue) => {
     const label = String(rawValue || "").trim();
     if (!label) return;
@@ -242,12 +244,12 @@ export function EcommerceProductEditor({ user, productId, embedded = false, init
       return;
     }
     const nextValue = { id: uuid(), code: "", value_translations: { en: label }, color_hex: option.display_type === "color" ? "#808080" : null, sort_order: option.values.length, active: true };
-    changeOption(option.id, { values: [...option.values, nextValue] });
+    changeOption(option.id, (current) => ({ values: [...current.values, { ...nextValue, sort_order: current.values.length }] }));
     setValueDrafts((current) => ({ ...current, [option.id]: "" }));
     setEditingValue((current) => ({ ...current, [option.id]: nextValue.id }));
     setMerchantNotice("");
   };
-  const changeValue = (option, valueId, change) => changeOption(option.id, { values: option.values.map((value) => value.id === valueId ? { ...value, ...change } : value) });
+  const changeValue = (option, valueId, change) => changeOption(option.id, (current) => ({ values: current.values.map((value) => value.id === valueId ? { ...value, ...change } : value) }));
   const removeValue = (option, value) => {
     if (referencedValueIds.current.has(value.id) || form.variants.some((variant) => variant.option_value_ids.includes(value.id))) {
       changeValue(option, value.id, { active: false });
@@ -405,9 +407,7 @@ export function EcommerceProductEditor({ user, productId, embedded = false, init
     }
   };
 
-  if (state.loading) return <section className="ecommerce-product-editor" dir={direction}>
-<p>{t("merchant.loadingProduct")}</p>
-</section>;
+  if (state.loading) return <ProductEditorSkeleton label={t("merchant.loadingProduct")} direction={direction} lang={locale} />;
   return (
     <form className="ecommerce-product-editor" onSubmit={submit} dir={direction} lang={locale} noValidate>
       <header>
@@ -587,7 +587,7 @@ export function EcommerceProductEditor({ user, productId, embedded = false, init
       <div className="ecommerce-editor-value-edit-fields">
         <label>{t("admin.englishValue")}<input dir="ltr" value={selectedValue.value_translations.en || ""} onChange={(e) => changeValue(option, selectedValue.id, { value_translations: { ...selectedValue.value_translations, en: e.target.value } })} /></label>
         <label>{t("admin.arabicValue")}<input dir="rtl" value={selectedValue.value_translations.ar || ""} onChange={(e) => changeValue(option, selectedValue.id, { value_translations: { ...selectedValue.value_translations, ar: e.target.value } })} /></label>
-        {option.display_type === "color" && <label className="ecommerce-editor-color-field">{t("admin.colorSwatch")}<span><input aria-label={t("admin.colorSwatch")} type="color" value={selectedValue.color_hex || "#808080"} onChange={(e) => changeValue(option, selectedValue.id, { color_hex: e.target.value.toUpperCase() })} /><code dir="ltr">{selectedValue.color_hex || "#808080"}</code></span></label>}
+        {option.display_type === "color" && <label className="ecommerce-editor-color-field">{t("admin.colorSwatch")}<span><input aria-label={t("admin.colorSwatch")} type="color" value={selectedValue.color_hex || "#808080"} onInput={(e) => changeValue(option, selectedValue.id, { color_hex: e.currentTarget.value.toUpperCase() })} onChange={(e) => changeValue(option, selectedValue.id, { color_hex: e.target.value.toUpperCase() })} /><code dir="ltr">{selectedValue.color_hex || "#808080"}</code></span></label>}
       </div>
     </div>}
   </article>;

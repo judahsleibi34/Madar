@@ -1,16 +1,17 @@
+import { readEcommerceCatalogCacheSnapshot } from "./utils/ecommerceCatalogCache";
+import { getEcommerceCacheScope, readEcommerceAdminCacheSnapshot } from "./utils/ecommerceAdminCache";
 import { useEffect, useMemo, useState } from "react";
 import { LoaderCircle, Plus, Save, Search, Trash2 } from "lucide-react";
 
 import AuthToast from "../AuthPages/AuthToast";
 import EcommerceOperationsSkeleton from "./EcommerceOperationsSkeleton";
-import { fetchEcommerceCatalog, fetchEcommerceLoyalty, saveEcommerceLoyalty } from "../../services/ecommerceApi";
+import { fetchEcommerceCatalog, fetchEcommerceLoyalty, saveEcommerceLoyalty, fetchEcommerceSettings, saveEcommerceSettings } from "../../services/ecommerceApi";
 import { useCommerceI18n } from "../../utils/commerceI18n";
 
 const newCondition = (audience = "loyalty") => ({
   audience, product_ids: [], discount_basis_points: audience === "loyalty" ? 1000 : 500,
   validity_mode: "lifetime", validity_days: null,
 });
-const EMPTY = { enabled:true, earning_rate_basis_points:500, threshold_points:100, discount_conditions:[newCondition()] };
 const normalizeRule = (rule) => ({
   enabled:rule?.enabled ?? true,
   earning_rate_basis_points:rule?.earning_rate_basis_points ?? 500,
@@ -25,6 +26,8 @@ const normalizeRule = (rule) => ({
 function ConditionCard({ condition, index, products, update, remove, t, localize }) {
   const [search, setSearch] = useState("");
   const choices = products.filter((product) => localize(product.translations).toLocaleLowerCase().includes(search.toLocaleLowerCase()));
+  const allSelected = choices.length > 0 && choices.every((product) => condition.product_ids.includes(product.id));
+  const selectAll = () => update("product_ids", [...new Set([...condition.product_ids, ...choices.map((product) => product.id)])].slice(0, 100));
   const toggle = (id) => update("product_ids", condition.product_ids.includes(id)
     ? condition.product_ids.filter((selected) => selected !== id) : [...condition.product_ids, id]);
   return (
@@ -48,6 +51,10 @@ function ConditionCard({ condition, index, products, update, remove, t, localize
       <details className="ecommerce-loyalty-product-picker">
         <summary>{t("loyalty.rewardProducts")} <span>{t("loyalty.selectedProducts", { count:condition.product_ids.length })}</span></summary>
         <label className="ecommerce-search"><Search size={16} aria-hidden="true" /><input aria-label={t("loyalty.searchProducts")} value={search} placeholder={t("loyalty.searchProducts")} onChange={(event) => setSearch(event.target.value)} /></label>
+        <div className="ecommerce-loyalty-selection-actions">
+          <button type="button" className="ecommerce-secondary-button" disabled={!choices.length || allSelected || condition.product_ids.length >= 100} onClick={selectAll}>{t(search.trim() ? "loyalty.selectAllResults" : "loyalty.selectAll")}</button>
+          <button type="button" className="ecommerce-secondary-button" disabled={!condition.product_ids.length} onClick={() => update("product_ids", [])}>{t("loyalty.clearSelection")}</button>
+        </div>
         <div className="ecommerce-loyalty-product-choices">
           {choices.map((product) => <label key={product.id}><input type="checkbox" checked={condition.product_ids.includes(product.id)} disabled={!condition.product_ids.includes(product.id) && condition.product_ids.length >= 100} onChange={() => toggle(product.id)} /><span>{localize(product.translations)}</span></label>)}
           {!choices.length && <p>{t("loyalty.noProducts")}</p>}
@@ -59,35 +66,49 @@ function ConditionCard({ condition, index, products, update, remove, t, localize
 }
 
 export default function EcommerceLoyaltyPage({ user }) {
+  const cacheScope = getEcommerceCacheScope(user);
   const { t, locale, direction, localize } = useCommerceI18n();
-  const [form, setForm] = useState(EMPTY);
-  const [saved, setSaved] = useState(EMPTY);
-  const [products, setProducts] = useState([]);
-  const [currency, setCurrency] = useState("");
-  const [loading, setLoading] = useState(true);
+  const ruleSnapshot = readEcommerceAdminCacheSnapshot(cacheScope, "loyalty");
+  const catalogSnapshot = readEcommerceCatalogCacheSnapshot(cacheScope);
+  const settingsSnapshot = readEcommerceAdminCacheSnapshot(cacheScope, "settings");
+  const initialRule = normalizeRule(ruleSnapshot?.data?.rule);
+  const initialCurrency = settingsSnapshot?.data?.currency || ruleSnapshot?.data?.currency || catalogSnapshot?.catalog?.commerce_currency || "";
+  const [form, setForm] = useState(() => initialRule);
+  const [saved, setSaved] = useState(() => initialRule);
+  const [products, setProducts] = useState(() => (catalogSnapshot?.catalog?.products || []).filter(product => ["active", "inactive"].includes(product.status)));
+  const [currency, setCurrency] = useState(() => initialCurrency);
+  const [savedCurrency, setSavedCurrency] = useState(() => initialCurrency);
+  const [currencyLocked, setCurrencyLocked] = useState(() => !settingsSnapshot || Boolean(settingsSnapshot.data.currency_locked));
+  const [loading, setLoading] = useState(() => !(ruleSnapshot && catalogSnapshot && settingsSnapshot));
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState(null);
   const [loadError, setLoadError] = useState("");
-  const cacheScope = user?.tenant_id || user?.id ? `commerce-${user?.tenant_id || user?.id}` : "authenticated";
 
   useEffect(() => {
     let cancelled = false;
-    Promise.allSettled([fetchEcommerceLoyalty({ scope:cacheScope }), fetchEcommerceCatalog({ scope:cacheScope })])
-      .then(([loyaltyResult, catalogResult]) => {
+    const ruleSnapshot = readEcommerceAdminCacheSnapshot(cacheScope, "loyalty");
+    const catalogSnapshot = readEcommerceCatalogCacheSnapshot(cacheScope);
+    const settingsSnapshot = readEcommerceAdminCacheSnapshot(cacheScope, "settings");
+    Promise.allSettled([fetchEcommerceLoyalty({ scope:cacheScope }), fetchEcommerceCatalog({ scope:cacheScope }), fetchEcommerceSettings({ scope:cacheScope })])
+      .then(([loyaltyResult, catalogResult, settingsResult]) => {
         if (cancelled) return;
-        const loyalty = loyaltyResult.status === "fulfilled" ? loyaltyResult.value : null;
-        const catalog = catalogResult.status === "fulfilled" ? catalogResult.value : null;
-        if (loyaltyResult.status === "rejected") { setLoadError(t("loyalty.loadError")); setToast({ type: "error", title: t("loyalty.loadError"), message: t("admin.tryAgain") }); }
+        const loyalty = loyaltyResult.status === "fulfilled" ? loyaltyResult.value : ruleSnapshot?.data;
+        const catalog = catalogResult.status === "fulfilled" ? catalogResult.value : catalogSnapshot?.catalog;
+        if (loyaltyResult.status === "rejected") { if (!ruleSnapshot) setLoadError(t("loyalty.loadError")); setToast({ type: "error", title: t("loyalty.loadError"), message: t("admin.tryAgain") }); }
         if (catalogResult.status === "rejected") setToast({ type:"error", title:t("loyalty.loadError"), message:t("admin.tryAgain") });
         const next = normalizeRule(loyalty?.rule);
-        setForm({ ...next, enabled:true }); setSaved(next);
-        setCurrency(loyalty?.currency || catalog?.commerce_currency || "");
+        setForm(current => JSON.stringify(current) === JSON.stringify(normalizeRule(ruleSnapshot?.data?.rule)) ? { ...next, enabled:true } : current); setSaved(next);
+        const settings = settingsResult.status === "fulfilled" ? settingsResult.value : settingsSnapshot?.data;
+        const nextCurrency = settings?.currency || loyalty?.currency || catalog?.commerce_currency || "";
+        const previousCurrency = settingsSnapshot?.data?.currency || ruleSnapshot?.data?.currency || catalogSnapshot?.catalog?.commerce_currency || "";
+        setCurrency(current => current === previousCurrency ? nextCurrency : current); setSavedCurrency(nextCurrency);
+        setCurrencyLocked(!settings || Boolean(settings.currency_locked));
         setProducts((catalog?.products || []).filter((product) => ["active", "inactive"].includes(product.status)));
       }).finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [cacheScope, t]);
 
-  const dirty = useMemo(() => JSON.stringify(form) !== JSON.stringify(saved), [form, saved]);
+  const dirty = useMemo(() => JSON.stringify(form) !== JSON.stringify(saved) || currency !== savedCurrency, [form, saved, currency, savedCurrency]);
   const valid = form.threshold_points >= 1 && form.earning_rate_basis_points >= 1 && form.earning_rate_basis_points <= 10000
     && form.discount_conditions.some((condition) => condition.audience === "loyalty")
     && form.discount_conditions.every((condition) => condition.product_ids.length > 0 && condition.discount_basis_points >= 1
@@ -106,6 +127,12 @@ export default function EcommerceLoyaltyPage({ user }) {
   const save = async () => {
     setSaving(true);
     try {
+      if (currency !== savedCurrency) {
+        const settings = await saveEcommerceSettings(currency);
+        const nextCurrency = settings?.currency || currency;
+        setCurrency(nextCurrency); setSavedCurrency(nextCurrency);
+        setCurrencyLocked(Boolean(settings?.currency_locked));
+      }
       const result = await saveEcommerceLoyalty({ ...form, enabled:true, threshold_points:Number(form.threshold_points) }, { scope:cacheScope });
       const next = normalizeRule(result.rule);
       setForm(next); setSaved(next);
@@ -121,7 +148,7 @@ export default function EcommerceLoyaltyPage({ user }) {
       <section className="ecommerce-operations-card">
         {loading ? <EcommerceOperationsSkeleton variant="loyalty" label={t("common.loading")} /> : <>
           <div className="ecommerce-form-grid">
-            <label><span>{t("common.currency")}</span><input value={currency} readOnly /></label>
+            <label><span>{t("common.currency")}</span><select aria-label={t("common.currency")} value={currency} disabled={currencyLocked || saving} onChange={(event) => setCurrency(event.target.value)}><option value="" disabled>{t("loyalty.selectCurrency")}</option>{["ILS", "JOD", "USD", "EUR"].map((code) => <option key={code} value={code}>{code}</option>)}</select><small>{t(currencyLocked ? "loyalty.currencyLocked" : "loyalty.currencyHelp")}</small></label>
             <label><span>{t("loyalty.earningRate")}</span><input type="number" min="0.01" max="100" step="0.01" value={form.earning_rate_basis_points / 100} onChange={(event) => update("earning_rate_basis_points", Math.round(Number(event.target.value) * 100))} /></label>
             <label><span>{t("loyalty.threshold")}</span><input type="number" min="1" value={form.threshold_points} onChange={(event) => update("threshold_points", event.target.value)} /></label>
           </div>

@@ -116,6 +116,25 @@ describe("merchant product options and variants editor", () => {
     expect(labels).not.toContain("L / Green");
   });
 
+  it("preserves live color picker edits when adding another value", async () => {
+    fetchEcommerceCatalog.mockResolvedValue(catalog());
+    saveEcommerceItem.mockResolvedValue({ id: "product-1" });
+    renderEditor();
+    fireEvent.change(await screen.findByLabelText("Name (English)"), { target: { value: "Colored shirt" } });
+    addOption("Color", ["Red"]);
+    fireEvent.change(screen.getByLabelText("Type"), { target: { value: "color" } });
+    fireEvent.input(screen.getByLabelText("Color swatch"), { target: { value: "#e53935" } });
+    const input = screen.getByLabelText("New value for Color");
+    fireEvent.change(input, { target: { value: "Blue" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    fireEvent.input(screen.getByLabelText("Color swatch"), { target: { value: "#1e88e5" } });
+    fireEvent.click(screen.getByRole("button", { name: "Red", exact: true }));
+    expect(screen.getByLabelText("Color swatch").value).toBe("#e53935");
+    fireEvent.click(screen.getByRole("button", { name: "Save product" }));
+    await waitFor(() => expect(saveEcommerceItem).toHaveBeenCalledOnce());
+    expect(saveEcommerceItem.mock.calls[0][2].options[0].values.map((value) => value.color_hex)).toEqual(["#E53935", "#1E88E5"]);
+  });
+
   it("prevents duplicate values and hides the redundant required-option control", async () => {
     fetchEcommerceCatalog.mockResolvedValue(catalog());
     renderEditor();

@@ -1,22 +1,25 @@
 import {
   apiFetch,
+  createApiError,
   getApiUrl,
   readApiError,
   readApiResponse,
 } from "../utils/apiClient";
 import {
+  clearAllEcommerceCatalogCaches,
+  clearEcommerceThemeCache,
   getOrCreateEcommerceCatalogRequest,
   getOrCreateEcommerceThemeRequest,
   readEcommerceCatalogCache,
   readEcommerceThemeCache,
   removeFromEcommerceCatalogCache,
   updateEcommerceCatalogCache,
-  writeEcommerceCatalogCache,
   writeEcommerceThemeCache,
 } from "../components/DashboardBuilder/utils/ecommerceCatalogCache";
 import {
   clearEcommerceAdminCache,
   loadEcommerceAdminResource,
+  writeEcommerceAdminCache,
 } from "../components/DashboardBuilder/utils/ecommerceAdminCache";
 
 async function request(path, options = {}) {
@@ -31,7 +34,7 @@ async function request(path, options = {}) {
 
   if (response.status === 204) return null;
   const data = await readApiResponse(response);
-  if (!response.ok) throw new Error(readApiError(data, "Catalog request failed"));
+  if (!response.ok) throw createApiError(response, data, "Catalog request failed");
   return data;
 }
 
@@ -43,7 +46,6 @@ export const fetchEcommerceCatalog = ({ scope, force = false } = {}) => {
 
   return getOrCreateEcommerceCatalogRequest(scope, async () => {
     const catalog = await request("/ecommerce/catalog");
-    writeEcommerceCatalogCache(scope, catalog);
     return catalog;
   });
 };
@@ -71,7 +73,6 @@ export const fetchEcommerceTheme = ({ scope, force = false } = {}) => {
   }
   return getOrCreateEcommerceThemeRequest(scope, async () => {
     const result = await request("/ecommerce/theme");
-    writeEcommerceThemeCache(scope, result?.theme);
     return result;
   });
 };
@@ -81,6 +82,7 @@ export const saveEcommerceTheme = async (theme, { scope } = {}) => {
     method: "PUT",
     body: JSON.stringify(theme),
   });
+  clearEcommerceThemeCache(scope);
   writeEcommerceThemeCache(scope, result?.theme || theme);
   return result;
 };
@@ -92,12 +94,14 @@ export const saveEcommerceGrowth = (growth) => request("/ecommerce/growth", {
   body: JSON.stringify(growth),
 });
 
-export const fetchEcommerceSettings = () => request("/ecommerce/settings");
+export const fetchEcommerceSettings = ({ scope, force = false } = {}) => loadEcommerceAdminResource(scope, "settings", () => request("/ecommerce/settings"), { force });
 
-export const saveEcommerceSettings = (currency) => request("/ecommerce/settings", {
-  method: "PUT",
-  body: JSON.stringify({ currency }),
-});
+export const saveEcommerceSettings = async (currency) => {
+  const result = await request("/ecommerce/settings", { method: "PUT", body: JSON.stringify({ currency }) });
+  clearEcommerceAdminCache(null, "settings");
+  clearAllEcommerceCatalogCaches();
+  return result;
+};
 
 export const fetchEcommerceDeliveryAreas = ({ scope, force = false } = {}) =>
   loadEcommerceAdminResource(scope, "delivery-areas", () => request("/ecommerce/delivery-areas"), { force });
@@ -108,6 +112,7 @@ export const createEcommerceDeliveryLocation = async (location, { scope } = {}) 
     body: JSON.stringify(location),
   });
   clearEcommerceAdminCache(scope, "delivery-areas");
+  if (Array.isArray(result?.areas)) writeEcommerceAdminCache(scope, "delivery-areas", result);
   return result;
 };
 
@@ -117,6 +122,7 @@ export const saveEcommerceDeliveryAreas = async (enabledServiceAreaIds, { scope 
     body: JSON.stringify({ enabled_service_area_ids: enabledServiceAreaIds }),
   });
   clearEcommerceAdminCache(scope, "delivery-areas");
+  if (Array.isArray(result?.areas)) writeEcommerceAdminCache(scope, "delivery-areas", result);
   return result;
 };
 
@@ -155,6 +161,7 @@ export const fetchEcommerceLoyalty = ({ scope, force = false } = {}) =>
 export const saveEcommerceLoyalty = async (payload, { scope } = {}) => {
   const result = await request("/ecommerce/loyalty", { method: "PUT", body: JSON.stringify(payload) });
   clearEcommerceAdminCache(scope, "loyalty");
+  writeEcommerceAdminCache(scope, "loyalty", result);
   return result;
 };
 

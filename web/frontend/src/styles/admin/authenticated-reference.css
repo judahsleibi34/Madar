@@ -1208,3 +1208,68 @@
     display: none;
   }
 }
+
+/* Keep the language icon and label in normal flow in both directions. */
+.admin-dashboard-layout.authenticated-shell.admin-dashboard-layout-builder
+  > .admin-sidebar.dashboard-sidebar:not(.is-workspace-collapsed)
+  .admin-sidebar-language-item > .language-toggle-button {
+  display: flex !important;
+  direction: inherit !important;
+  align-items: center !important;
+  gap: 10px !important;
+}
+.admin-dashboard-layout.authenticated-shell.admin-dashboard-layout-builder
+  > .admin-sidebar.dashboard-sidebar:not(.is-workspace-collapsed)
+  .admin-sidebar-language-item .language-toggle-current {
+  display: block !important;
+  visibility: visible !important;
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  text-align: start !important;
+}
+/* Let expanded navigation grow instead of painting over the settings footer. */
+.admin-sidebar.dashboard-sidebar .admin-sidebar-top,
+.admin-sidebar.dashboard-sidebar .admin-sidebar-nav {
+  flex-shrink: 0;
+}
+
+/* Show the language row in every expanded dashboard sidebar, not just the builder. */
+.admin-sidebar.dashboard-sidebar:not(.is-workspace-collapsed):not(.is-compact)
+  .admin-sidebar-language-item > .language-toggle-button {
+  display: flex !important;
+  direction: inherit !important;
+  justify-content: flex-start !important;
+  align-items: center !important;
+  gap: 10px !important;
+}
+.admin-sidebar.dashboard-sidebar:not(.is-workspace-collapsed):not(.is-compact)
+  .admin-sidebar-language-item .language-toggle-current {
+  display: block !important;
+  visibility: visible !important;
+  color: inherit !important;
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  text-align: start !important;
+}
+
+.admin-dashboard-layout.authenticated-shell
+  > .admin-sidebar.dashboard-sidebar:not(.is-workspace-collapsed):not(.is-compact)
+  .admin-sidebar-language-item,
+.admin-dashboard-layout.authenticated-shell
+  > .admin-sidebar.dashboard-sidebar:not(.is-workspace-collapsed):not(.is-compact)
+  .admin-sidebar-language-item > .language-toggle-button {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+}
+
+
+/* Leave mobile workspace content room for forms and embedded storefronts. */
+@media (max-width: 760px) {
+  .admin-dashboard-layout.authenticated-shell > .authenticated-main {
+    padding-inline: 16px !important;
+  }
+  .authenticated-main > .ecommerce-store-admin {
+    padding-inline: 0;
+  }
+}

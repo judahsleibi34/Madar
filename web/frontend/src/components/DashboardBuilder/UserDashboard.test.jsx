@@ -3,6 +3,9 @@ import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import UserDashboard from "./UserDashboard";
+import { clearAllDashboardSnapshotCaches } from "./utils/dashboardSnapshotCache";
+import { listBuilderProjects, fetchBuilderStorageUsage, listBuilderReservations } from "../PageBuilder/services/PageBuilder.api";
+import { fetchSiteVisitMetrics } from "../../services/siteVisitApi";
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
@@ -37,6 +40,8 @@ afterEach(() => {
   cleanup();
   localStorage.clear();
   sessionStorage.clear();
+  clearAllDashboardSnapshotCaches();
+  vi.clearAllMocks();
 });
 
 describe("UserDashboard shortcuts", () => {
@@ -128,4 +133,29 @@ describe("UserDashboard shortcuts", () => {
       ).toContain("store-visits");
     });
   });
+});
+
+it("renders cached dashboard metrics on return without another backend request", async () => {
+  const user = { id: 20, tenant_id: 7, name: "Owner" };
+  const first = render(<MemoryRouter><UserDashboard user={user} /></MemoryRouter>);
+  await screen.findByText("42");
+  first.unmount();
+  const projectCalls = listBuilderProjects.mock.calls.length;
+  const visitCalls = fetchSiteVisitMetrics.mock.calls.length;
+  render(<MemoryRouter><UserDashboard user={user} /></MemoryRouter>);
+  expect(screen.getByText("42")).toBeTruthy();
+  await waitFor(() => expect(document.querySelector(".user-dashboard-skeleton")).toBeNull());
+  expect(listBuilderProjects.mock.calls.length).toBe(projectCalls);
+  expect(fetchSiteVisitMetrics.mock.calls.length).toBe(visitCalls);
+});
+
+it("starts storage, reservations, and visit reads before the project list finishes", async () => {
+  let resolve;
+  listBuilderProjects.mockImplementationOnce(() => new Promise(done => { resolve = done; }));
+  render(<MemoryRouter><UserDashboard user={{ id: 21, tenant_id: 7 }} /></MemoryRouter>);
+  await waitFor(() => expect(fetchBuilderStorageUsage).toHaveBeenCalled());
+  expect(listBuilderReservations).toHaveBeenCalled();
+  expect(fetchSiteVisitMetrics).toHaveBeenCalled();
+  resolve({ projects: [] });
+  await screen.findByText("42");
 });

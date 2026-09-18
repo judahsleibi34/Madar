@@ -1,3 +1,6 @@
+import { clearEcommerceAdminCache } from "./components/DashboardBuilder/utils/ecommerceAdminCache";
+import { clearAllEcommerceCatalogCaches } from "./components/DashboardBuilder/utils/ecommerceCatalogCache";
+import { clearAllDashboardSnapshotCaches } from "./components/DashboardBuilder/utils/dashboardSnapshotCache";
 import { lazy, useCallback, useEffect, useState } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
@@ -11,6 +14,7 @@ import RouteSuspense from "./components/common/RouteSuspense";
 import { appShellContent } from "./content";
 import { getCurrentLanguage, setAppLanguage } from "./i18n/language";
 import { DashboardLoadingElement, DashboardShell } from "./routes/shared";
+import { useRoutePreloading } from "./routes/routePreload";
 import UserWorkspaceRoutes from "./routes/UserWorkspaceRoutes";
 import { getRouteErrorSurface } from "./routes/routeErrorSurface";
 import {
@@ -46,6 +50,7 @@ const TenantSiteRoutes = lazy(() => import("./routes/TenantSiteRoutes"));
 let authBootstrapPromise = null;
 
 export default function App() {
+  useRoutePreloading();
   const { t, i18n } = useTranslation(["auth", "dashboard", "common"]);
   const [lang, setLang] = useState(getCurrentLanguage);
   const [themeMode, setThemeMode] = useState(readStoredThemeMode);
@@ -251,7 +256,12 @@ export default function App() {
   }, [themeMode]);
 
   useEffect(() => {
-    if (authChecked && !isLoggedIn) clearAllCalendarWorkspaceCaches();
+    if (authChecked && !isLoggedIn) {
+      clearAllCalendarWorkspaceCaches();
+      clearAllDashboardSnapshotCaches();
+      clearEcommerceAdminCache();
+      clearAllEcommerceCatalogCaches();
+    }
   }, [authChecked, isLoggedIn]);
 
   useEffect(() => {
@@ -638,6 +648,7 @@ export default function App() {
     <DashboardShell {...shellProps} showNotifications={false}>
       <EcommerceRouteSkeleton
         pathname={location.pathname}
+        lang={lang}
         label={t("common:actions.loading")}
       />
     </DashboardShell>

@@ -11,7 +11,8 @@ describe("commerce action feedback", () => {
     const { rerender } = render(<><CommerceActionToast /><p>Product editor</p></>);
     act(() => notifyCommerceAction({ type: "success", title: "Product saved" }));
     rerender(<><CommerceActionToast /><p>Products</p></>);
-    expect(screen.getByRole("alert").textContent).toContain("Product saved");
+    expect(screen.getByRole("status").textContent).toContain("Product saved");
+    expect(screen.getByRole("status").getAttribute("aria-live")).toBe("polite");
     act(() => notifyCommerceAction({ type: "error", title: "Could not load orders" }));
     act(() => vi.advanceTimersByTime(4200));
     expect(screen.getByRole("alert").textContent).toContain("Could not load orders");

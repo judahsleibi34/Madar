@@ -683,3 +683,11 @@
     grid-template-columns: 1fr;
   }
 }
+
+
+.user-management-toast-wrap[dir="ltr"] { right:24px !important; left:auto !important; }
+.user-management-toast-wrap[dir="rtl"] { left:24px !important; right:auto !important; }
+@media(max-width:600px) {
+ .user-management-toast-wrap[dir="ltr"] { right:16px !important; }
+ .user-management-toast-wrap[dir="rtl"] { left:16px !important; }
+}

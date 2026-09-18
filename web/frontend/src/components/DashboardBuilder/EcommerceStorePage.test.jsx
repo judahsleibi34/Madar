@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -41,4 +41,19 @@ it("shows safe toast and inline feedback when the store preview cannot load", as
   expect((await screen.findByRole("alert")).textContent).toContain("Could not load website settings");
   expect(document.body.textContent).not.toContain("DATABASE_URL");
   expect(document.body.textContent).not.toContain("internal_settings");
+});
+
+it("uses the same preview skeleton through settings and iframe loading, then removes it", async () => {
+  let resolveSettings;
+  fetchWebsiteSettings.mockReturnValue(new Promise(resolve => { resolveSettings = resolve; }));
+  const { container } = render(<MemoryRouter><EcommerceStorePage /></MemoryRouter>);
+  expect(container.querySelector(".commerce-preview-header")).toBeTruthy();
+  expect(container.querySelector(".commerce-preview-hero")).toBeTruthy();
+  expect(screen.queryByTitle("Published online store")).toBeNull();
+  resolveSettings({ subdomain: "olive-house" });
+  const iframe = await screen.findByTitle("Published online store");
+  expect(container.querySelector(".ecommerce-store-frame-loading .commerce-preview-hero")).toBeTruthy();
+  fireEvent.load(iframe);
+  expect(container.querySelector(".ecommerce-store-frame-loading")).toBeNull();
+  expect(container.querySelector(".ecommerce-store-frame-shell").getAttribute("aria-busy")).toBe("false");
 });

@@ -6,6 +6,7 @@ export const API_URL = import.meta.env.VITE_API_URL || "/api";
 
 let csrfToken = "";
 let refreshSessionPromise = null;
+let refreshCsrfPromise = null;
 
 export const getApiUrl = (path) =>
   `${String(API_URL).replace(/\/+$/, "")}/${String(path).replace(/^\/+/, "")}`;
@@ -22,7 +23,11 @@ const getCookieValue = (name) => {
   );
 };
 
-export const getCsrfToken = () => csrfToken || decodeURIComponent(getCookieValue(CSRF_COOKIE_NAME));
+export const getCsrfToken = () => {
+  // Cookies are shared across tabs; the in-memory token can belong to an older session.
+  try { return decodeURIComponent(getCookieValue(CSRF_COOKIE_NAME)) || csrfToken; }
+  catch { return csrfToken; }
+};
 
 export const setCsrfToken = (token) => {
   csrfToken = token || getCsrfToken() || "";
@@ -119,24 +124,31 @@ export const createApiError = (response, data, fallback = "Request failed") => {
   return error;
 };
 
-const refreshCsrfToken = async () => {
-  const response = await fetch(getApiUrl("/auth/user_status"), {
-    method: "GET",
-    cache: "no-store",
-    credentials: "include",
-  });
+const refreshCsrfToken = () => {
+  if (refreshCsrfPromise) return refreshCsrfPromise;
+  const refresh = async () => {
+    const response = await fetch(getApiUrl("/auth/user_status"), {
+      method: "GET",
+      cache: "no-store",
+      credentials: "include",
+    });
 
-  if (!response.ok) return "";
+    if (!response.ok) return "";
 
-  const responseToken = response.headers.get(CSRF_HEADER_NAME);
+    const responseToken = response.headers.get(CSRF_HEADER_NAME);
 
-  if (responseToken) {
-    return setCsrfToken(responseToken);
-  }
+    if (responseToken) {
+      return setCsrfToken(responseToken);
+    }
 
-  const data = await response.json().catch(() => null);
-  syncCsrfTokenFromResponseData(data);
-  return getCsrfToken();
+    const data = await response.json().catch(() => null);
+    syncCsrfTokenFromResponseData(data);
+    return data?.csrf_token ? getCsrfToken() : "";
+  };
+  refreshCsrfPromise = (typeof navigator !== "undefined" && navigator.locks?.request
+    ? navigator.locks.request("madar-auth-session", refresh)
+    : refresh()).finally(() => { refreshCsrfPromise = null; });
+  return refreshCsrfPromise;
 };
 
 const isInvalidCsrfResponse = async (response) => {
@@ -205,8 +217,11 @@ export const apiFetch = async (input, init = {}) => {
     const refreshedToken = await refreshCsrfToken();
 
     if (refreshedToken) {
+      const retryHeaders = new Headers(fetchInit.headers || {});
+      retryHeaders.set(CSRF_HEADER_NAME, refreshedToken);
       return apiFetch(input, {
         ...fetchInit,
+        headers: retryHeaders,
         skipAuthRefresh: true,
       });
     }
@@ -230,8 +245,11 @@ export const apiFetch = async (input, init = {}) => {
     const refreshResponse = await refreshSessionPromise;
 
     if (refreshResponse.ok) {
+      const retryHeaders = new Headers(fetchInit.headers || {});
+      if (UNSAFE_METHODS.has(method) && getCsrfToken()) retryHeaders.set(CSRF_HEADER_NAME, getCsrfToken());
       return apiFetch(input, {
         ...fetchInit,
+        headers: retryHeaders,
         skipAuthRefresh: true,
       });
     }

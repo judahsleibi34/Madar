@@ -1,4 +1,4 @@
-import { lazy, useEffect } from "react";
+import { lazy } from "react";
 import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 
 import RouteSuspense from "../components/common/RouteSuspense";
@@ -20,15 +20,6 @@ const loadEcommerceOrdersPage = () => import("../components/DashboardBuilder/Eco
 const loadEcommerceLoyaltyPage = () => import("../components/DashboardBuilder/EcommerceLoyaltyPage");
 const loadEcommerceThemePage = () => import("../components/DashboardBuilder/EcommerceThemePage");
 const loadEcommerceStorePage = () => import("../components/DashboardBuilder/EcommerceStorePage");
-const ecommerceRouteLoaders = [
-  loadEcommercePage,
-  loadEcommerceDeliveryPage,
-  loadEcommerceOrdersPage,
-  loadEcommerceLoyaltyPage,
-  loadEcommerceThemePage,
-  loadEcommerceStorePage,
-  loadEcommerceProductEditorPage,
-];
 const EcommerceProductEditorPage = lazy(loadEcommerceProductEditorPage);
 const ArchivePage = lazy(() => import("../components/DashboardBuilder/ArchivePage"));
 const EcommercePage = lazy(loadEcommercePage);
@@ -87,21 +78,6 @@ export default function UserWorkspaceRoutes({
     location.pathname.startsWith("/archive");
   const isEcommerceLoadingPath = location.pathname.startsWith("/ecommerce");
 
-  useEffect(() => {
-    if (!location.pathname.startsWith("/dashboard") && !isEcommerceLoadingPath) return undefined;
-    const preload = () => {
-      ecommerceRouteLoaders.forEach((loader) => {
-        loader().catch(() => {});
-      });
-    };
-    if (typeof window.requestIdleCallback === "function") {
-      const idleId = window.requestIdleCallback(preload, { timeout: 1200 });
-      return () => window.cancelIdleCallback(idleId);
-    }
-    const timeoutId = window.setTimeout(preload, 250);
-    return () => window.clearTimeout(timeoutId);
-  }, [isEcommerceLoadingPath, location.pathname]);
-
   const renderShell = (children, options = {}) => (
     <DashboardShell
       {...shellProps}
@@ -140,14 +116,14 @@ export default function UserWorkspaceRoutes({
               }
             )
           : isEcommerceLoadingPath
-            ? renderShell(<EcommerceRouteSkeleton pathname={location.pathname} />)
-            : <DashboardLoadingElement pathname={location.pathname} lang={lang} />
+            ? renderShell(<EcommerceRouteSkeleton pathname={location.pathname} lang={lang} label={lang === "ar" ? "\u062c\u0627\u0631\u064d \u0627\u0644\u062a\u062d\u0645\u064a\u0644" : "Loading Online Store"} />)
+            : renderShell(<DashboardLoadingElement pathname={location.pathname} lang={lang} />)
       }
       lang={lang}
       variant={isBuilderLoadingPath ? "builder" : "dashboard"}
       delay={isEcommerceLoadingPath ? 0 : undefined}
     >
-      <Routes>
+      <Routes key={`${user?.tenant_id || "unknown"}:${user?.id || "anonymous"}`}>
       <Route
         path="/dashboard/*"
         element={renderShell(

@@ -1109,3 +1109,14 @@
     padding-top: 0;
   }
 }
+
+
+.notification-toast-viewport[dir="ltr"] { direction:ltr !important; right:20px !important; left:auto !important; }
+.notification-toast-viewport[dir="rtl"] { direction:rtl !important; left:20px !important; right:auto !important; }
+.notification-toast-dismiss { width:44px; height:44px; }
+.notification-toast-content strong { font-size:14px; line-height:1.4; }
+.notification-toast-content span { font-size:13px; line-height:1.5; }
+@media(max-width:600px) {
+ .notification-toast-viewport[dir="ltr"] { right:16px !important; }
+ .notification-toast-viewport[dir="rtl"] { left:16px !important; }
+}

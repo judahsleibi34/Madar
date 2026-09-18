@@ -4,7 +4,7 @@ const placeholders = (count, className = "") => Array.from({ length: count }, (_
 
 export default function EcommerceOperationsSkeleton({ variant = "orders", label = "Loading" }) {
   return (
-    <div className={`ecommerce-operations-skeleton is-${variant}`} role="status" aria-label={label} aria-live="polite">
+    <div className={`ecommerce-operations-skeleton is-${variant}`} role="status" aria-label={label} aria-live="polite" aria-busy="true">
       {variant === "delivery" && (
         <div className="ecommerce-skeleton-delivery-grid">
           {placeholders(8, "ecommerce-skeleton-delivery-card")}

@@ -883,8 +883,12 @@ def build_public_store_profile(settings: dict, subdomain: str) -> dict:
     saved_theme = settings.get("ecommerce_theme") if isinstance(settings.get("ecommerce_theme"), dict) else {}
     if saved_theme == LEGACY_DEFAULT_PUBLIC_STORE_THEME:
         saved_theme = {}
+    identity_ar = saved_theme.get("store_identity_ar")
+    identity_ar = identity_ar if isinstance(identity_ar, dict) else {}
     return {
         "subdomain": subdomain,
+        "brand_ar": str(identity_ar.get("store_name_ar") or ""),
+        "description_ar": str(identity_ar.get("store_description_ar") or ""),
         "brand": settings.get("footer_store_name") or settings.get("brand"),
         "footer_store_name": settings.get("footer_store_name"),
         "logo_url": settings.get("logo_url"),
@@ -892,7 +896,7 @@ def build_public_store_profile(settings: dict, subdomain: str) -> dict:
         "contact_email": settings.get("contact_email"),
         "phone": settings.get("phone"),
         "description": settings.get("description"),
-        "store_theme": {**DEFAULT_PUBLIC_STORE_THEME, **{key: value for key, value in saved_theme.items() if key != "growth"}},
+        "store_theme": {**DEFAULT_PUBLIC_STORE_THEME, **{key: value for key, value in saved_theme.items() if key not in {"growth", "store_identity_ar"}}},
         "growth": _public_store_growth(saved_theme),
     }
 

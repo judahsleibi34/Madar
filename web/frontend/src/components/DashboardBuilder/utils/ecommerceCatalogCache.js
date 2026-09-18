@@ -1,7 +1,7 @@
 export const ECOMMERCE_CATALOG_CACHE_VERSION = 3;
 
 const STORAGE_KEY = `madar-ecommerce-catalog-cache-v${ECOMMERCE_CATALOG_CACHE_VERSION}`;
-const MAX_AGE_MS = 3 * 60 * 1000;
+const MAX_AGE_MS = 30_000;
 const STALE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 const MAX_ENTRIES = 8;
 const memoryCache = new Map();
@@ -108,6 +108,7 @@ export function writeEcommerceCatalogCache(scope, catalog) {
 
 
 export function updateEcommerceCatalogCache(scope, section, item) {
+  inFlightRequests.delete(cacheKey(scope));
   const snapshot = readEcommerceCatalogCacheSnapshot(scope);
   if (!snapshot || !Array.isArray(snapshot.catalog?.[section]) || !item?.id) return;
   const currentItems = snapshot.catalog[section];
@@ -118,6 +119,7 @@ export function updateEcommerceCatalogCache(scope, section, item) {
 }
 
 export function removeFromEcommerceCatalogCache(scope, section, itemId) {
+  inFlightRequests.delete(cacheKey(scope));
   const snapshot = readEcommerceCatalogCacheSnapshot(scope);
   if (!snapshot || !Array.isArray(snapshot.catalog?.[section])) return;
   writeEcommerceCatalogCache(scope, {
@@ -142,6 +144,7 @@ export function getOrCreateEcommerceCatalogRequest(scope, loader) {
   if (activeRequest) return activeRequest;
   const request = Promise.resolve()
     .then(loader)
+    .then(catalog => { if (inFlightRequests.get(key) === request) writeEcommerceCatalogCache(scope, catalog); return catalog; })
     .finally(() => {
       if (inFlightRequests.get(key) === request) inFlightRequests.delete(key);
     });
@@ -189,9 +192,15 @@ export function getOrCreateEcommerceThemeRequest(scope, loader) {
   const key = `theme:${encodeURIComponent(String(scope || "authenticated"))}`;
   const activeRequest = inFlightRequests.get(key);
   if (activeRequest) return activeRequest;
-  const request = Promise.resolve().then(loader).finally(() => {
+  const request = Promise.resolve().then(loader).then(result => { if (inFlightRequests.get(key) === request) writeEcommerceThemeCache(scope, result?.theme); return result; }).finally(() => {
     if (inFlightRequests.get(key) === request) inFlightRequests.delete(key);
   });
   inFlightRequests.set(key, request);
   return request;
+}
+
+export function clearAllEcommerceCatalogCaches() {
+  memoryCache.clear();
+  inFlightRequests.clear();
+  try { window.sessionStorage.removeItem(STORAGE_KEY); } catch { /* Memory cleanup still applies. */ }
 }

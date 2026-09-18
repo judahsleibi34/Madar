@@ -34,3 +34,60 @@ body :is(button, input, select, textarea, [role="button"])[aria-disabled="true"]
   opacity: 1;
   box-shadow: none;
 }
+
+/* Filled commerce actions use the on-fill token; accent text is for links. */
+body .admin-dashboard-layout .admin-dashboard-page :is(.ecommerce-page, .ecommerce-store-admin, .ecommerce-product-editor, .ecommerce-theme-page) .ecommerce-primary-button {
+  background: var(--theme-primary) !important;
+  border: 1px solid var(--theme-primary) !important;
+  opacity: 1 !important;
+  color: var(--theme-text-inverse) !important;
+  -webkit-text-fill-color: var(--theme-text-inverse) !important;
+}
+body .admin-dashboard-layout .admin-dashboard-page :is(.ecommerce-page, .ecommerce-store-admin, .ecommerce-product-editor, .ecommerce-theme-page) .ecommerce-primary-button :is(svg, span) {
+  color: inherit !important;
+  -webkit-text-fill-color: inherit !important;
+}
+body .admin-dashboard-layout .admin-dashboard-page :is(.ecommerce-page, .ecommerce-store-admin, .ecommerce-product-editor, .ecommerce-theme-page) .ecommerce-primary-button:disabled {
+  background: var(--color-disabled-bg) !important;
+  color: var(--color-disabled-text) !important;
+  -webkit-text-fill-color: var(--color-disabled-text) !important;
+  border: 1px solid var(--color-disabled-border) !important;
+  opacity: 1 !important;
+  box-shadow: none !important;
+}
+
+body .admin-dashboard-layout .admin-dashboard-page :is(.ecommerce-page, .ecommerce-store-admin, .ecommerce-product-editor, .ecommerce-theme-page) .ecommerce-primary-button:hover:not(:disabled) {
+  background: var(--theme-primary-hover) !important;
+  border-color: var(--theme-primary-hover) !important;
+}
+
+body .admin-dashboard-page .user-dashboard-customizer-toggle {
+  border: 1px solid var(--color-border-control) !important;
+}
+body .admin-dashboard-page .ecommerce-product-editor button[role="option"][aria-selected="true"] {
+  border: 1px solid var(--color-border-control) !important;
+}
+
+body .admin-dashboard-page .ecommerce-product-editor a {
+  color: var(--theme-text) !important;
+  -webkit-text-fill-color: var(--theme-text) !important;
+}
+
+body .admin-dashboard-page .cash-chart .cash-bar > span {
+  color: var(--theme-text-inverse) !important;
+  -webkit-text-fill-color: var(--theme-text-inverse) !important;
+}
+
+body .page-builder .builder-subbar-actions :is(.builder-history-controls, .artboard-camera-controls) > button {
+  border: 1px solid var(--color-border-control) !important;
+}
+body .page-builder .builder-subbar-actions :is(.builder-history-controls, .artboard-camera-controls) > button:disabled {
+  background: var(--color-disabled-bg) !important;
+  color: var(--color-disabled-text) !important;
+  -webkit-text-fill-color: var(--color-disabled-text) !important;
+  opacity: 1 !important;
+}
+body .page-builder .builder-subbar-actions :is(.builder-history-controls, .artboard-camera-controls) > button:disabled svg {
+  color: inherit !important;
+  opacity: 1 !important;
+}

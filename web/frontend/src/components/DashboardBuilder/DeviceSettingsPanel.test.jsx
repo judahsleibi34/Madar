@@ -114,6 +114,19 @@ describe("DeviceSettingsPanel", () => {
     expect(articles[1].textContent).toContain("Installed app");
     expect(screen.queryByText(current.id)).toBeNull();
     expect(screen.getAllByRole("button", { name: "Remove device" })).toHaveLength(1);
+    expect(screen.queryByRole("button", { name: "Disable notifications" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Enable notifications" })).toBeNull();
+  });
+
+  it("shows enable notifications only for the current browser in notification mode", async () => {
+    listInstallations.mockResolvedValue([{ ...current, notifications_enabled: false, has_active_push_subscription: false }, remote]);
+    enableBrowserPushNotifications.mockResolvedValue({ enabled: true });
+    render(<DeviceSettingsPanel lang="en" tenantId={7} copy={copy} showNotification={vi.fn()} notificationsOnly />);
+    fireEvent.click(await screen.findByRole("button", { name: "Enable notifications" }));
+    await waitFor(() => expect(enableBrowserPushNotifications).toHaveBeenCalled());
+    expect(screen.queryByRole("button", { name: "Remove device" })).toBeNull();
+    expect(screen.queryByText("Android")).toBeNull();
+    expect(screen.queryByText("Install Madar")).toBeNull();
   });
 
   it("confirms and removes only the selected remote device", async () => {
@@ -134,7 +147,7 @@ describe("DeviceSettingsPanel", () => {
     listInstallations
       .mockResolvedValueOnce([current, remote])
       .mockResolvedValueOnce([{ ...current, notifications_enabled: false, has_active_push_subscription: false }, remote]);
-    renderPanel();
+    render(<DeviceSettingsPanel lang="en" tenantId={7} copy={copy} showNotification={vi.fn()} notificationsOnly />);
     fireEvent.click(await screen.findByRole("button", { name: "Disable notifications" }));
     await waitFor(() => expect(disableCurrentInstallationNotifications).toHaveBeenCalled());
     expect(unsubscribe).toHaveBeenCalledTimes(1);
