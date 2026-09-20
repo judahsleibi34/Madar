@@ -1,3 +1,4 @@
+import PageHeaderSkeleton from "../../common/PageHeaderSkeleton";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -142,10 +143,10 @@ export default function BuilderProjectChooser({
 
   return (
     <section className="builder-project-chooser" aria-busy={["loading", "loading-more", "creating"].includes(status)}>
-      <header className="builder-project-chooser-header app-page-intro">
+      {status === "loading" ? <PageHeaderSkeleton className="builder-project-chooser-header app-page-intro" /> : (<header className="builder-project-chooser-header app-page-intro">
         <h1>Choose a project</h1>
         <span>Each project opens with its own cloud draft and recovery copy.</span>
-      </header>
+      </header>)}
       {error && <p className="builder-project-chooser-error" role="alert">{error}</p>}
       {status === "loading" ? (
         <BuilderProjectLoadingState

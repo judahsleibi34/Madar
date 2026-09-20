@@ -1,3 +1,4 @@
+import PageHeaderSkeleton from "../common/PageHeaderSkeleton";
 import { getEcommerceCacheScope, readEcommerceAdminCacheSnapshot } from "./utils/ecommerceAdminCache";
 import EcommerceRouteSkeleton from "./EcommerceRouteSkeleton";
 import { StorePreviewSkeleton } from "./CommerceLoadingLayouts";
@@ -65,7 +66,7 @@ export default function EcommerceStorePage({ user }) {
 
   return (
     <main className="ecommerce-store-admin" dir={direction} lang={locale}>
-      <header className="ecommerce-store-admin-header app-page-intro">
+      {(!error && subdomain && !frameReady) ? <PageHeaderSkeleton className="ecommerce-store-admin-header app-page-intro" actions /> : (<header className="ecommerce-store-admin-header app-page-intro">
         <div>
           <h1>{draftPreview ? t("admin.draftPreview") : t("admin.publishedStore")}</h1>
           <p>{draftPreview ? t("admin.draftPreviewBody") : t("admin.publishedStoreBody")}</p>
@@ -82,7 +83,7 @@ export default function EcommerceStorePage({ user }) {
             </a>
           </div>
         )}
-      </header>
+      </header>)}
 
       {!loading && error && (
         <div className="ecommerce-store-admin-state is-error">

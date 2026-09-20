@@ -36,11 +36,18 @@ function addOption(name, values) {
   fireEvent.click(optionButton);
   const nameInputs = screen.getAllByLabelText("English name");
   fireEvent.change(nameInputs.at(-1), { target: { value: name } });
-  const valueInput = screen.getByLabelText(`New value for ${name}`);
   values.forEach((value) => {
+    const addBtn = screen.getAllByRole("button", { name: /Add value|Add color/ }).at(-1);
+    fireEvent.click(addBtn);
+    const valueInput = screen.getByLabelText("Value");
     fireEvent.change(valueInput, { target: { value } });
-    fireEvent.keyDown(valueInput, { key: "Enter" });
+    const submitBtns = screen.getAllByRole("button", { name: /Add value|Add color/ });
+    fireEvent.click(submitBtns.at(-1));
   });
+}
+
+function addVariantRow() {
+  fireEvent.click(screen.getByRole("button", { name: "Add variant" }));
 }
 
 afterEach(async () => {
@@ -68,52 +75,59 @@ describe("merchant product options and variants editor", () => {
     expect(payload.variants).toEqual([]);
   });
 
-  it("uses the Size by Color matrix and persists only the seven available T-shirt combinations", async () => {
+  it("adds variant rows with manual Size/Color values and persists them", async () => {
     fetchEcommerceCatalog.mockResolvedValue(catalog());
     saveEcommerceItem.mockResolvedValue({ id: "product-1" });
     renderEditor();
 
     fireEvent.change(await screen.findByLabelText("Name (English)"), { target: { value: "Shirt" } });
-    addOption("Size", ["S", "M", "L"]);
-    addOption("Color", ["Red", "Green", "Blue"]);
+    addOption("Size", []);
+    addOption("Color", []);
     expect(screen.queryByRole("heading", { name: "Inventory", exact: true })).toBeNull();
     fireEvent.change(screen.getAllByLabelText("Type").at(-1), { target: { value: "color" } });
-    [["Red", "#E53935"], ["Green", "#43A047"], ["Blue", "#1E88E5"]].forEach(([name, hex]) => {
-      fireEvent.click(screen.getByRole("button", { name }));
-      fireEvent.change(screen.getByLabelText("Color swatch"), { target: { value: hex } });
-    });
 
-    expect(screen.getAllByRole("checkbox", { name: / availability$/ })).toHaveLength(9);
-    expect(screen.getAllByRole("checkbox", { name: / availability$/ }).every((checkbox) => checkbox.checked)).toBe(true);
-    const enabled = [["S", "Red", 10], ["S", "Green", 5], ["S", "Blue", 2], ["M", "Red", 8], ["M", "Green", 4], ["L", "Red", 3], ["L", "Blue", 6]];
-    ["M / Blue", "L / Green"].forEach((label) => {
-      fireEvent.click(screen.getByRole("checkbox", { name: `${label} availability` }));
-    });
-    enabled.forEach(([size, color, quantity]) => {
-      const label = `${size} / ${color}`;
-      fireEvent.change(screen.getByLabelText(`${label} quantity`), { target: { value: String(quantity) } });
-    });
-    expect(screen.queryByRole("button", { name: "Edit S / Red details" })).toBeNull();
-    expect(screen.getByRole("button", { name: "Remove S / Red variant" })).toBeTruthy();
-    fireEvent.change(screen.getByLabelText("S / Red price override"), { target: { value: "23" } });
+    addVariantRow();
+    const allInputs = screen.getAllByPlaceholderText("Size");
+    const sizeInput = allInputs.at(-1);
+    fireEvent.change(sizeInput, { target: { value: "S" } });
+    const colorInputs = screen.getAllByPlaceholderText("Color");
+    const colorInput = colorInputs.at(-1);
+    fireEvent.change(colorInput, { target: { value: "Red" } });
+
+    addVariantRow();
+    const sizeInputs2 = screen.getAllByPlaceholderText("Size");
+    fireEvent.change(sizeInputs2.at(-1), { target: { value: "S" } });
+    const colorInputs2 = screen.getAllByPlaceholderText("Color");
+    fireEvent.change(colorInputs2.at(-1), { target: { value: "Green" } });
+
+    addVariantRow();
+    const sizeInputs3 = screen.getAllByPlaceholderText("Size");
+    fireEvent.change(sizeInputs3.at(-1), { target: { value: "M" } });
+    const colorInputs3 = screen.getAllByPlaceholderText("Color");
+    fireEvent.change(colorInputs3.at(-1), { target: { value: "Red" } });
+
+    const quantityInputs = screen.getAllByLabelText(/quantity$/);
+    fireEvent.change(quantityInputs[0], { target: { value: "10" } });
+    fireEvent.change(quantityInputs[1], { target: { value: "5" } });
+    fireEvent.change(quantityInputs[2], { target: { value: "8" } });
+
     fireEvent.click(screen.getByRole("button", { name: "Save product" }));
 
     await waitFor(() => expect(saveEcommerceItem).toHaveBeenCalledOnce());
     const payload = saveEcommerceItem.mock.calls[0][2];
     expect(payload.options.map((option) => option.code)).toEqual(["size", "color"]);
-    expect(payload.options[0].values.map((value) => value.code)).toEqual(["s", "m", "l"]);
-    expect(payload.options[1]).toMatchObject({ display_type: "color" });
-    expect(payload.options[1].values.map((value) => value.color_hex)).toEqual(["#E53935", "#43A047", "#1E88E5"]);
-    expect(payload.variants).toHaveLength(7);
-    expect(payload.variants[0]).toMatchObject({ price_override: 23, inventory_quantity: 10 });
-    expect(payload.variants[1].price_override).toBeNull();
+    expect(payload.options[0].values.map((v) => v.value_translations.en)).toEqual(["S", "M"]);
+    expect(payload.options[1].values.map((v) => v.value_translations.en)).toEqual(["Red", "Green"]);
+    expect(payload.variants).toHaveLength(3);
+    expect(payload.variants[0]).toMatchObject({ inventory_quantity: 10 });
+    expect(payload.variants[1]).toMatchObject({ inventory_quantity: 5 });
+    expect(payload.variants[2]).toMatchObject({ inventory_quantity: 8 });
+
     const labels = payload.variants.map((variant) => variant.option_value_ids.map((id) => {
       const value = payload.options.flatMap((option) => option.values).find((entry) => entry.id === id);
       return value.value_translations.en;
     }).join(" / "));
-    expect(labels).toEqual(enabled.map(([size, color]) => `${size} / ${color}`));
-    expect(labels).not.toContain("M / Blue");
-    expect(labels).not.toContain("L / Green");
+    expect(labels).toEqual(["S / Red", "S / Green", "M / Red"]);
   });
 
   it("preserves live color picker edits when adding another value", async () => {
@@ -121,14 +135,20 @@ describe("merchant product options and variants editor", () => {
     saveEcommerceItem.mockResolvedValue({ id: "product-1" });
     renderEditor();
     fireEvent.change(await screen.findByLabelText("Name (English)"), { target: { value: "Colored shirt" } });
-    addOption("Color", ["Red"]);
+    // Create Color option with both values via the addOption helper
+    addOption("Color", ["Red", "Blue"]);
+    // Change display type to color
     fireEvent.change(screen.getByLabelText("Type"), { target: { value: "color" } });
+    // Expand to see color value rows
+    fireEvent.click(screen.getByRole("button", { name: "Manage values" }));
+    // Edit Red's hex
+    fireEvent.click(screen.getAllByRole("button", { name: "Edit value" }).at(0));
     fireEvent.input(screen.getByLabelText("Color swatch"), { target: { value: "#e53935" } });
-    const input = screen.getByLabelText("New value for Color");
-    fireEvent.change(input, { target: { value: "Blue" } });
-    fireEvent.keyDown(input, { key: "Enter" });
+    // Edit Blue's hex (clicking Edit value for Blue opens its editor, closing Red's)
+    fireEvent.click(screen.getAllByRole("button", { name: "Edit value" }).at(1));
     fireEvent.input(screen.getByLabelText("Color swatch"), { target: { value: "#1e88e5" } });
-    fireEvent.click(screen.getByRole("button", { name: "Red", exact: true }));
+    // Click Red's edit again to verify hex is preserved
+    fireEvent.click(screen.getAllByRole("button", { name: "Edit value" }).at(0));
     expect(screen.getByLabelText("Color swatch").value).toBe("#e53935");
     fireEvent.click(screen.getByRole("button", { name: "Save product" }));
     await waitFor(() => expect(saveEcommerceItem).toHaveBeenCalledOnce());
@@ -143,10 +163,15 @@ describe("merchant product options and variants editor", () => {
 
     expect(screen.queryByText("Advanced")).toBeNull();
     expect(screen.queryByRole("checkbox", { name: "Require a value for Size" })).toBeNull();
-    const valueInput = screen.getByLabelText("New value for Size");
+    // Open inline form and try to add a duplicate "s"
+    fireEvent.click(screen.getAllByRole("button", { name: "Add value" }).at(-1));
+    const valueInput = screen.getByLabelText("Value");
     fireEvent.change(valueInput, { target: { value: "s" } });
-    fireEvent.keyDown(valueInput, { key: "Enter" });
+    const submitBtns = screen.getAllByRole("button", { name: "Add value" });
+    fireEvent.click(submitBtns.at(-1));
     expect(screen.getByText("That value already exists in Size.")).toBeTruthy();
+    // Expand the card to verify only one "S" chip exists
+    fireEvent.click(screen.getByRole("button", { name: "Manage values" }));
     expect(screen.getAllByRole("button", { name: "S" })).toHaveLength(1);
   });
 
@@ -160,12 +185,17 @@ describe("merchant product options and variants editor", () => {
     await waitFor(() => expect(saveEcommerceItem).toHaveBeenCalledOnce());
   });
 
-  it("makes a generated variant available by default when publishing", async () => {
+  it("makes a manually added variant available by default when publishing", async () => {
     fetchEcommerceCatalog.mockResolvedValue(catalog());
     saveEcommerceItem.mockResolvedValue({ id: "product-1" });
     renderEditor();
     fireEvent.change(await screen.findByLabelText("Name (English)"), { target: { value: "Active shirt" } });
-    addOption("Size", ["S"]);
+    addOption("Size", []);
+
+    addVariantRow();
+    const sizeInput = screen.getByPlaceholderText("Size");
+    fireEvent.change(sizeInput, { target: { value: "S" } });
+
     fireEvent.change(screen.getByLabelText("Status"), { target: { value: "active" } });
     fireEvent.click(screen.getByRole("button", { name: "Save product" }));
     await waitFor(() => expect(saveEcommerceItem).toHaveBeenCalledOnce());
@@ -193,6 +223,7 @@ describe("merchant product options and variants editor", () => {
     saveEcommerceItem.mockResolvedValue({ id: "product-1" });
     renderEditor("/ecommerce/products/product-1/edit");
 
+    fireEvent.click(await screen.findByRole("button", { name: "Manage values" }));
     fireEvent.click(await screen.findByRole("button", { name: "Remove S" }));
     expect(screen.getByText(/used by an existing variant, so it was archived/)).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Save product" }));
@@ -207,7 +238,7 @@ describe("merchant product options and variants editor", () => {
     });
   });
 
-  it("reloads the same variant and creates exactly one newly enabled combination", async () => {
+  it("allows adding a second variant row with existing option values", async () => {
     const sizeOption = "11111111-1111-4111-8111-111111111111";
     const colorOption = "22222222-2222-4222-8222-222222222222";
     const small = "33333333-3333-4333-8333-333333333333";
@@ -229,10 +260,20 @@ describe("merchant product options and variants editor", () => {
     saveEcommerceItem.mockResolvedValue({ id: "product-1" });
     renderEditor("/ecommerce/products/product-1/edit");
 
-    expect((await screen.findByLabelText("S / Red quantity")).value).toBe("10");
-    expect(screen.getByLabelText("S / Green quantity").disabled).toBe(true);
-    fireEvent.click(screen.getByRole("checkbox", { name: "S / Green availability" }));
-    fireEvent.change(screen.getByLabelText("S / Green quantity"), { target: { value: "4" } });
+    const sizeInputs = await screen.findAllByPlaceholderText("Size");
+    const existingSizeInput = sizeInputs[0];
+    expect(existingSizeInput.value).toBe("S");
+
+    addVariantRow();
+    const newSizeInputs = screen.getAllByPlaceholderText("Size");
+    const newSizeInput = newSizeInputs.at(-1);
+    fireEvent.change(newSizeInput, { target: { value: "S" } });
+    const colorInputs = screen.getAllByPlaceholderText("Color");
+    const colorInput = colorInputs.at(-1);
+    fireEvent.change(colorInput, { target: { value: "Green" } });
+
+    const quantityInputs = screen.getAllByLabelText(/quantity$/);
+    fireEvent.change(quantityInputs.at(-1), { target: { value: "4" } });
     fireEvent.click(screen.getByRole("button", { name: "Save product" }));
 
     await waitFor(() => expect(saveEcommerceItem).toHaveBeenCalledOnce());
@@ -243,18 +284,137 @@ describe("merchant product options and variants editor", () => {
     expect(variants[1].id).not.toBe(existingId);
   });
 
-  it("shows the full combination in each row for three dimensions", async () => {
+  it("shows option columns in the variant row table for three dimensions", async () => {
     fetchEcommerceCatalog.mockResolvedValue(catalog());
     renderEditor();
     await screen.findByLabelText("Name (English)");
     addOption("Size", ["M"]);
     addOption("Color", ["Red", "Blue"]);
     addOption("Fit", ["Slim", "Regular"]);
-    expect(screen.getByText("M / Red / Slim")).toBeTruthy();
-    expect(screen.getByText("M / Blue / Regular")).toBeTruthy();
-    expect(screen.getByRole("checkbox", { name: "M / Red / Slim availability" })).toBeTruthy();
-    expect(screen.getByRole("checkbox", { name: "M / Blue / Regular availability" })).toBeTruthy();
+
+    addVariantRow();
+    const sizeInputs = screen.getAllByPlaceholderText("Size");
+    fireEvent.change(sizeInputs.at(-1), { target: { value: "M" } });
+    const colorInputs = screen.getAllByPlaceholderText("Color");
+    fireEvent.change(colorInputs.at(-1), { target: { value: "Red" } });
+    const fitInputs = screen.getAllByPlaceholderText("Fit");
+    fireEvent.change(fitInputs.at(-1), { target: { value: "Slim" } });
+
+    addVariantRow();
+    const sizeInputs2 = screen.getAllByPlaceholderText("Size");
+    fireEvent.change(sizeInputs2.at(-1), { target: { value: "M" } });
+    const colorInputs2 = screen.getAllByPlaceholderText("Color");
+    fireEvent.change(colorInputs2.at(-1), { target: { value: "Blue" } });
+    const fitInputs2 = screen.getAllByPlaceholderText("Fit");
+    fireEvent.change(fitInputs2.at(-1), { target: { value: "Regular" } });
+
+    expect(screen.getAllByText("Size").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("Color").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("Fit").length).toBeGreaterThanOrEqual(1);
     expect(screen.queryByRole("table")).toBeNull();
+  });
+
+  it("satisfies the Section 11 acceptance test for Size/Color attributes and manual variant inventory", async () => {
+    fetchEcommerceCatalog.mockResolvedValue(catalog());
+    saveEcommerceItem.mockResolvedValue({ id: "product-1" });
+    const { container } = renderEditor();
+
+    fireEvent.change(await screen.findByLabelText("Name (English)"), { target: { value: "Sneaker" } });
+
+    // 1. Create Size (Text) with 42, 43, 44
+    fireEvent.click(screen.getByRole("button", { name: "Add variant attribute" }));
+    const enNameInputs = screen.getAllByLabelText("English name");
+    fireEvent.change(enNameInputs.at(-1), { target: { value: "Size" } });
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Add value" }).at(-1));
+    fireEvent.change(screen.getByLabelText("Value"), { target: { value: "42" } });
+    fireEvent.click(screen.getAllByRole("button", { name: "Add value" }).at(-1));
+
+    fireEvent.change(screen.getByLabelText("Value"), { target: { value: "43" } });
+    fireEvent.click(screen.getAllByRole("button", { name: "Add value" }).at(-1));
+
+    fireEvent.change(screen.getByLabelText("Value"), { target: { value: "44" } });
+    fireEvent.click(screen.getAllByRole("button", { name: "Add value" }).at(-1));
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    // 2. Create Color (Color) with Red #FF0000, Green #00AA00, Black #000000
+    fireEvent.click(screen.getByRole("button", { name: "Add variant attribute" }));
+    const enNameInputs2 = screen.getAllByLabelText("English name");
+    fireEvent.change(enNameInputs2.at(-1), { target: { value: "Color" } });
+    const typeSelects = screen.getAllByLabelText("Type");
+    fireEvent.change(typeSelects.at(-1), { target: { value: "color" } });
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Add color" }).at(-1));
+    fireEvent.change(screen.getByLabelText("Value"), { target: { value: "Red" } });
+    fireEvent.change(screen.getByLabelText("Hex"), { target: { value: "#FF0000" } });
+    fireEvent.click(screen.getAllByRole("button", { name: "Add color" }).at(-1));
+
+    fireEvent.change(screen.getByLabelText("Value"), { target: { value: "Green" } });
+    fireEvent.change(screen.getByLabelText("Hex"), { target: { value: "#00AA00" } });
+    fireEvent.click(screen.getAllByRole("button", { name: "Add color" }).at(-1));
+
+    fireEvent.change(screen.getByLabelText("Value"), { target: { value: "Black" } });
+    fireEvent.change(screen.getByLabelText("Hex"), { target: { value: "#000000" } });
+    fireEvent.click(screen.getAllByRole("button", { name: "Add color" }).at(-1));
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    // 3. Manually create 4 variants:
+    // - 42 + Red (qty 5)
+    // - 42 + Green (qty 8)
+    // - 43 + Red (qty 3)
+    // - 44 + Black (qty 7)
+    addVariantRow();
+    fireEvent.change(screen.getAllByPlaceholderText("Size").at(-1), { target: { value: "42" } });
+    fireEvent.change(screen.getAllByPlaceholderText("Color").at(-1), { target: { value: "Red" } });
+    fireEvent.change(screen.getAllByLabelText(/quantity$/).at(-1), { target: { value: "5" } });
+
+    addVariantRow();
+    fireEvent.change(screen.getAllByPlaceholderText("Size").at(-1), { target: { value: "42" } });
+    fireEvent.change(screen.getAllByPlaceholderText("Color").at(-1), { target: { value: "Green" } });
+    fireEvent.change(screen.getAllByLabelText(/quantity$/).at(-1), { target: { value: "8" } });
+
+    addVariantRow();
+    fireEvent.change(screen.getAllByPlaceholderText("Size").at(-1), { target: { value: "43" } });
+    fireEvent.change(screen.getAllByPlaceholderText("Color").at(-1), { target: { value: "Red" } });
+    fireEvent.change(screen.getAllByLabelText(/quantity$/).at(-1), { target: { value: "3" } });
+
+    addVariantRow();
+    fireEvent.change(screen.getAllByPlaceholderText("Size").at(-1), { target: { value: "44" } });
+    fireEvent.change(screen.getAllByPlaceholderText("Color").at(-1), { target: { value: "Black" } });
+    fireEvent.change(screen.getAllByLabelText(/quantity$/).at(-1), { target: { value: "7" } });
+
+    // Verify exactly 4 variants exist, not 9
+    const rows = container.querySelectorAll(".ecommerce-variant-matrix-row");
+    expect(rows).toHaveLength(4);
+
+    // Verify independent quantities
+    const qtyInputs = screen.getAllByLabelText(/quantity$/);
+    expect(qtyInputs.map((input) => input.value)).toEqual(["5", "8", "3", "7"]);
+
+    // Edit Red's hex value -> swatch updates in attribute editor
+    const manageBtns = screen.getAllByRole("button", { name: "Manage values" });
+    fireEvent.click(manageBtns.at(-1));
+    const editBtns = screen.getAllByRole("button", { name: "Edit value" });
+    fireEvent.click(editBtns[0]);
+    fireEvent.change(screen.getByLabelText("Hex"), { target: { value: "#EE1111" } });
+    fireEvent.click(screen.getByRole("button", { name: "Close value editor" }));
+
+    const hexCodes = container.querySelectorAll(".ecommerce-editor-color-value-hex");
+    expect(hexCodes[0].textContent).toBe("#EE1111");
+
+    // Save product sends correct payload structure
+    fireEvent.click(screen.getByRole("button", { name: "Save product" }));
+    await waitFor(() => expect(saveEcommerceItem).toHaveBeenCalledOnce());
+
+    const savedPayload = saveEcommerceItem.mock.calls[0][2];
+    expect(savedPayload.options).toHaveLength(2);
+    expect(savedPayload.options[0].values.map((v) => v.value_translations.en)).toEqual(["42", "43", "44"]);
+    expect(savedPayload.options[1].values.map((v) => v.value_translations.en)).toEqual(["Red", "Green", "Black"]);
+    expect(savedPayload.options[1].values[0].color_hex).toBe("#EE1111");
+    expect(savedPayload.variants).toHaveLength(4);
+    expect(savedPayload.variants.map((v) => v.inventory_quantity)).toEqual([5, 8, 3, 7]);
   });
 
   it("uses Arabic labels and RTL direction", async () => {
@@ -267,3 +427,4 @@ describe("merchant product options and variants editor", () => {
     expect(screen.getByRole("heading", { name: "خصائص الأنواع" })).toBeTruthy();
   });
 });
+

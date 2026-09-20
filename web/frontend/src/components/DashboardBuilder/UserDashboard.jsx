@@ -1,10 +1,13 @@
+import PageHeaderSkeleton from "../common/PageHeaderSkeleton";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import {
   BellRing,
   CalendarClock,
+  Check,
   CircleCheckBig,
+  Copy,
   CreditCard,
   ExternalLink,
   FileText,
@@ -206,6 +209,7 @@ function UserDashboardContent({ user, weeklyScreenTimeSeconds = 0, cacheScope = 
     : null;
   const [metrics, setMetrics] = useState(() => initialMetrics || EMPTY_METRICS);
   const [loading, setLoading] = useState(() => !initialMetrics);
+  const [copiedUrl, setCopiedUrl] = useState("");
 
   useEffect(() => {
     try {
@@ -443,9 +447,17 @@ function UserDashboardContent({ user, weeklyScreenTimeSeconds = 0, cacheScope = 
     );
   };
 
+  const copyToClipboard = async (url) => {
+    try {
+      await navigator.clipboard?.writeText(url);
+      setCopiedUrl(url);
+      setTimeout(() => setCopiedUrl(""), 2000);
+    } catch { /* clipboard unavailable */ }
+  };
+
   return (
     <div className="user-dashboard-page">
-      <header className="user-dashboard-hero app-page-intro">
+      {(loading) ? <PageHeaderSkeleton className="user-dashboard-hero app-page-intro" /> : (<header className="user-dashboard-hero app-page-intro">
         <h1>
           {t("userDashboard.welcome", {
             name: displayName,
@@ -458,7 +470,7 @@ function UserDashboardContent({ user, weeklyScreenTimeSeconds = 0, cacheScope = 
               "A clear view of your forms, reservations, storage, plan, and access.",
           })}
         </p>
-      </header>
+      </header>)}
 
       <nav className="user-dashboard-quick-actions" aria-label="Form, website, and store shortcuts">
         <Link to={responsesPath + "/incomplete"}>
@@ -470,26 +482,36 @@ function UserDashboardContent({ user, weeklyScreenTimeSeconds = 0, cacheScope = 
           <span>Completed forms</span>
         </Link>
         {metrics.websiteUrl && (
-          <a
-            className="is-primary"
-            href={metrics.websiteUrl}
-            target="_blank"
-            rel="noreferrer"
-          >
-            <ExternalLink size={18} aria-hidden="true" />
-            <span>View website</span>
-          </a>
+          <span className="user-dashboard-link-group">
+            <a
+              className="is-primary"
+              href={metrics.websiteUrl}
+              target="_blank"
+              rel="noreferrer"
+            >
+              <ExternalLink size={18} aria-hidden="true" />
+              <span>View website</span>
+            </a>
+            <button type="button" className="user-dashboard-copy-btn" aria-label="Copy website link" onClick={() => copyToClipboard(metrics.websiteUrl)}>
+              {copiedUrl === metrics.websiteUrl ? <Check size={15} /> : <Copy size={15} />}
+            </button>
+          </span>
         )}
         {metrics.storeUrl && (
-          <a
-            className="is-primary"
-            href={metrics.storeUrl}
-            target="_blank"
-            rel="noreferrer"
-          >
-            <ShoppingBag size={18} aria-hidden="true" />
-            <span>View store</span>
-          </a>
+          <span className="user-dashboard-link-group">
+            <a
+              className="is-primary"
+              href={metrics.storeUrl}
+              target="_blank"
+              rel="noreferrer"
+            >
+              <ShoppingBag size={18} aria-hidden="true" />
+              <span>View store</span>
+            </a>
+            <button type="button" className="user-dashboard-copy-btn" aria-label="Copy store link" onClick={() => copyToClipboard(metrics.storeUrl)}>
+              {copiedUrl === metrics.storeUrl ? <Check size={15} /> : <Copy size={15} />}
+            </button>
+          </span>
         )}
         <div className="user-dashboard-customizer" ref={customizerRef}>
           <button

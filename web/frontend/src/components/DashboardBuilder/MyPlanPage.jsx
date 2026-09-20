@@ -1,3 +1,4 @@
+import PageHeaderSkeleton from "../common/PageHeaderSkeleton";
 import { useEffect, useMemo, useState } from "react";
 import { CreditCard, ExternalLink } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -124,7 +125,7 @@ export default function MyPlanPage() {
 
   return (
     <section className="my-plan-page" dir={direction}>
-      <header className="my-plan-header app-page-intro">
+      {(loading) ? <PageHeaderSkeleton className="my-plan-header app-page-intro" actions /> : (<header className="my-plan-header app-page-intro">
         <div>
           <h1>{copy.title}</h1>
           <p>{copy.subtitle}</p>
@@ -132,7 +133,7 @@ export default function MyPlanPage() {
         <button className="my-plan-button primary" type="button" onClick={() => navigate("/pricing")}>
           <CreditCard size={17} /> {copy.review}
         </button>
-      </header>
+      </header>)}
 
       {loading && <div className="my-plan-current-card" role="status">{copy.loading}</div>}
       {!loading && error && <div className="my-plan-current-card" role="alert">{error}</div>}

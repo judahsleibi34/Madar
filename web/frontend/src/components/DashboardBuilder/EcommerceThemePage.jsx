@@ -1,3 +1,4 @@
+import PageHeaderSkeleton from "../common/PageHeaderSkeleton";
 import { getEcommerceCacheScope, readEcommerceAdminCacheSnapshot } from "./utils/ecommerceAdminCache";
 import { StorePreviewSkeleton, ThemeSkeleton } from "./CommerceLoadingLayouts";
 import { notifyCommerceAction } from "../../utils/commerceActionToast";
@@ -133,12 +134,12 @@ export default function EcommerceThemePage({ user }) {
 
   return (
     <main className="ecommerce-theme-page" dir={direction} lang={locale}>
-      <header className="ecommerce-page-header app-page-intro">
+      {(loading || previewLoading || (previewPath && !frameReady)) ? <PageHeaderSkeleton className="ecommerce-page-header app-page-intro" /> : (<header className="ecommerce-page-header app-page-intro">
         <div>
           <h1>{t("admin.storeDesign")}</h1>
           <p>{t("admin.storeDesignSubtitle")}</p>
         </div>
-      </header>
+      </header>)}
 
       {loading ? (
         <ThemeSkeleton label={t("admin.loadingStoreDesign")} />

@@ -126,6 +126,19 @@ export const saveEcommerceDeliveryAreas = async (enabledServiceAreaIds, { scope 
   return result;
 };
 
+export const fetchEcommerceDeliveryPricing = ({ scope, force = false } = {}) =>
+  loadEcommerceAdminResource(scope, "delivery-pricing", () => request("/ecommerce/delivery-pricing"), { force });
+
+export const saveEcommerceDeliveryPricing = async (fromAreaId, prices, { scope } = {}) => {
+  const result = await request("/ecommerce/delivery-pricing", {
+    method: "PUT",
+    body: JSON.stringify({ from_area_id: fromAreaId, prices }),
+  });
+  clearEcommerceAdminCache(scope, "delivery-pricing");
+  if (result?.pricing) writeEcommerceAdminCache(scope, "delivery-pricing", result);
+  return result;
+};
+
 export const fetchEcommerceOrders = (filters = {}, { scope, force = false } = {}) => {
   const params = new URLSearchParams();
   Object.entries(filters).forEach(([key, value]) => {
