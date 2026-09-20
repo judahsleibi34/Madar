@@ -1,3 +1,4 @@
+import PageHeaderSkeleton from "../common/PageHeaderSkeleton";
 import { readEcommerceCatalogCacheSnapshot } from "./utils/ecommerceCatalogCache";
 import { getEcommerceCacheScope, readEcommerceAdminCacheSnapshot } from "./utils/ecommerceAdminCache";
 import { useEffect, useMemo, useState } from "react";
@@ -144,7 +145,7 @@ export default function EcommerceLoyaltyPage({ user }) {
 
   return (
     <main className="ecommerce-page ecommerce-operations-page ecommerce-loyalty-page" dir={direction} lang={locale}>
-      <header className="ecommerce-page-header app-page-intro"><div><h1>{t("loyalty.title")}</h1><p>{t("loyalty.subtitle")}</p></div></header>
+      {(loading) ? <PageHeaderSkeleton className="ecommerce-page-header app-page-intro" /> : (<header className="ecommerce-page-header app-page-intro"><div><h1>{t("loyalty.title")}</h1><p>{t("loyalty.subtitle")}</p></div></header>)}
       <section className="ecommerce-operations-card">
         {loading ? <EcommerceOperationsSkeleton variant="loyalty" label={t("common.loading")} /> : <>
           <div className="ecommerce-form-grid">

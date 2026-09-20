@@ -1,3 +1,4 @@
+import PageHeaderSkeleton from "../common/PageHeaderSkeleton";
 import { SettingsSkeleton } from "./CommerceLoadingLayouts";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -958,13 +959,13 @@ export default function SettingsPage({
         onClose={clearNotification}
       />
 
-      <header className="settings-header app-page-intro">
+      {((activeTab === "profile" && isLoadingAccount) || (["website", "ecommerce"].includes(activeTab) && isLoadingWebsite)) ? <PageHeaderSkeleton className="settings-header app-page-intro" /> : (<header className="settings-header app-page-intro">
         <div>
 
           <h1>{pageCopy.title}</h1>
           <span>{pageCopy.subtitle}</span>
         </div>
-      </header>
+      </header>)}
 
       <nav className="settings-tabs" role="tablist" aria-label={isArabic ? "أقسام الإعدادات" : "Settings sections"}>
         {settingsTabs.map(({ id, label, icon: TabIcon }) => (

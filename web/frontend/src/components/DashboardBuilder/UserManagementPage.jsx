@@ -1,3 +1,4 @@
+import PageHeaderSkeleton from "../common/PageHeaderSkeleton";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertCircle,
@@ -463,7 +464,7 @@ export default function UserManagementPage({ currentUser, lang = "en" }) {
 
   return (
     <section className="user-management-page">
-      <header className="admin-dashboard-header user-management-header app-page-intro">
+      {(loading) ? <PageHeaderSkeleton className="admin-dashboard-header user-management-header app-page-intro" actions /> : (<header className="admin-dashboard-header user-management-header app-page-intro">
         <div>
           <h1>{labels.title}</h1>
           <p>{labels.subtitle}</p>
@@ -477,7 +478,7 @@ export default function UserManagementPage({ currentUser, lang = "en" }) {
           <RefreshCw size={16} className={refreshing ? "is-spinning" : ""} />
           {labels.refresh}
         </button>
-      </header>
+      </header>)}
 
       <div className="user-management-stats">
         <article>

@@ -1,3 +1,4 @@
+import PageHeaderSkeleton from "../common/PageHeaderSkeleton";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Archive,
@@ -250,7 +251,7 @@ export default function ArchivePage({ user }) {
         </header>
 
         <div className="archive-page daw-page">
-          <header className="archive-header daw-header app-page-intro">
+          {(visibleStatus === "loading" && !visibleItems.length) ? <PageHeaderSkeleton className="archive-header daw-header app-page-intro" /> : (<header className="archive-header daw-header app-page-intro">
             <div>
               <h1 id="archive-title">Saved work history</h1>
               <p>
@@ -258,7 +259,7 @@ export default function ArchivePage({ user }) {
                 so useful previous work remains available.
               </p>
             </div>
-          </header>
+          </header>)}
 
       <div className="archive-summary-grid" aria-label="Archive summary">
         {FILTERS.slice(1).map((filter) => {

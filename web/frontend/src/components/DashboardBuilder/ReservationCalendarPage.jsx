@@ -1,3 +1,4 @@
+import PageHeaderSkeleton from "../common/PageHeaderSkeleton";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
@@ -1142,7 +1143,7 @@ export default function ReservationCalendarPage({ user = null, initialView = "",
 
   return (
     <div className="reservation-calendar-page calendar-workspace-page">
-      <header className="reservation-calendar-toolbar app-page-intro">
+      {(loading) ? <PageHeaderSkeleton className="reservation-calendar-toolbar app-page-intro" actions /> : (<header className="reservation-calendar-toolbar app-page-intro">
         <div className="calendar-toolbar-copy"><h1>Calendar</h1><p>Bookings, events, tasks, reminders, and sync health in one place.</p></div>
         <div className="reservation-calendar-toolbar-actions">
           <button type="button" className="calendar-toolbar-action calendar-notification-action" onClick={enableSystemNotifications} disabled={pushState === "checking" || pushState === "loading" || pushState === "enabled" || pushState === "android_enabled"} title="Allow system notifications for calendar reminders"><BellRing size={16} /><span>{pushButtonLabel}</span></button>
@@ -1151,7 +1152,7 @@ export default function ReservationCalendarPage({ user = null, initialView = "",
           <a className={`calendar-toolbar-action${calendarFeaturesAvailable ? "" : " is-disabled"}`} aria-disabled={!calendarFeaturesAvailable} onClick={(event) => { if (!calendarFeaturesAvailable) event.preventDefault(); }} href={getCalendarExportUrl({ start: rangeStart.toISOString(), end: rangeEnd.toISOString() })}><Download size={16} /><span>Export</span></a>
           <button type="button" className="calendar-toolbar-action is-primary" onClick={() => openNewEvent()} disabled={!calendarFeaturesAvailable}><Plus size={17} /><span>New event</span></button>
         </div>
-      </header>
+      </header>)}
       {pushGuidance && <p className="calendar-push-guidance" role="status">{pushGuidance}</p>}
 
       <section className="calendar-summary-grid" aria-label="Calendar summary">

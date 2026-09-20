@@ -2,7 +2,7 @@ import { getEcommerceCacheScope } from "./utils/ecommerceAdminCache";
 import { ProductEditorSkeleton } from "./CommerceLoadingLayouts";
 import { notifyCommerceAction } from "../../utils/commerceActionToast";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, ChevronDown, ImagePlus, Plus, Save, Search, Trash2, X } from "lucide-react";
+import { ArrowLeft, ChevronDown, ImagePlus, Pencil, Plus, Save, Search, Trash2, X } from "lucide-react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { DASHBOARD_ROUTES } from "../../config/routes";
@@ -27,13 +27,6 @@ const emptyProduct = (currency = "USD") => ({
 
 const activeOptionValues = (option) => (option.values || []).filter((value) => value.active !== false);
 const combinationKey = (ids) => ids.filter(Boolean).join(":");
-const buildCombinations = (options) => {
-  if (!options.length || options.some((option) => !activeOptionValues(option).length)) return [];
-  return options.reduce(
-    (combinations, option) => combinations.flatMap((ids) => activeOptionValues(option).map((value) => [...ids, value.id])),
-    [[]],
-  );
-};
 
 function Checkbox({ checked, onChange, children, ariaLabel }) {
   return <label className="ecommerce-editor-checkbox">
@@ -138,7 +131,6 @@ export function EcommerceProductEditor({ user, productId, embedded = false, init
   const [slugManuallyEdited, setSlugManuallyEdited] = useState(editing);
   const [skuManuallyEdited, setSkuManuallyEdited] = useState(editing);
   const [autoSkuSuffix] = useState(() => uuid().replace(/-/g, "").slice(0, 8).toUpperCase());
-  const [valueDrafts, setValueDrafts] = useState({});
   const [editingValue, setEditingValue] = useState({});
   const [merchantNotice, setMerchantNotice] = useState("");
   const showMerchantNotice = (message) => {
@@ -147,14 +139,54 @@ export function EcommerceProductEditor({ user, productId, embedded = false, init
   };
   const persistedVariantIds = useRef(new Set());
   const referencedValueIds = useRef(new Set());
-  const disabledCombinationKeys = useRef(new Set());
+  const [expandedOptions, setExpandedOptions] = useState({});
+  const toggleOptionExpand = (optionId) => setExpandedOptions((current) => ({ ...current, [optionId]: !current[optionId] }));
+  const [inlineValueForm, setInlineValueForm] = useState(null); // { optionId, mode: "text"|"color" }
+  const openInlineValueForm = (optionId, mode) => {
+    setInlineValueForm({ optionId, mode });
+    setInlineTextDraft("");
+    setInlineTextDraftAr("");
+    setInlineColorDraft("");
+    setInlineColorDraftAr("");
+    setInlineColorHex("#808080");
+  };
+  const closeInlineValueForm = () => setInlineValueForm(null);
+  const [inlineTextDraft, setInlineTextDraft] = useState("");
+  const [inlineTextDraftAr, setInlineTextDraftAr] = useState("");
+  const [inlineColorDraft, setInlineColorDraft] = useState("");
+  const [inlineColorDraftAr, setInlineColorDraftAr] = useState("");
+  const [inlineColorHex, setInlineColorHex] = useState("#808080");
+  const submitInlineTextValue = (optionId) => {
+    const en = inlineTextDraft.trim();
+    if (!en) return;
+    const option = form.options.find((o) => o.id === optionId);
+    if (!option) return;
+    const exists = activeOptionValues(option).some((v) => String(v.value_translations?.en || "").trim().toLocaleLowerCase() === en.toLocaleLowerCase());
+    if (exists) { showMerchantNotice(t("admin.duplicateOptionValue", { option: option.name_translations.en })); return; }
+    const nv = { id: uuid(), code: "", value_translations: localized(en, inlineTextDraftAr), color_hex: null, sort_order: option.values.length, active: true };
+    changeOption(optionId, (current) => ({ values: [...current.values, { ...nv, sort_order: current.values.length }] }));
+    setInlineTextDraft(""); setInlineTextDraftAr(""); setMerchantNotice("");
+  };
+  const submitInlineColorValue = (optionId) => {
+    const en = inlineColorDraft.trim();
+    if (!en) return;
+    const option = form.options.find((o) => o.id === optionId);
+    if (!option) return;
+    const exists = activeOptionValues(option).some((v) => String(v.value_translations?.en || "").trim().toLocaleLowerCase() === en.toLocaleLowerCase());
+    if (exists) { showMerchantNotice(t("admin.duplicateOptionValue", { option: option.name_translations.en })); return; }
+    let hex = inlineColorHex.trim();
+    if (!hex.startsWith("#") && hex.length > 0) hex = `#${hex}`;
+    if (!/^#[0-9a-fA-F]{6}$/.test(hex)) hex = "#808080";
+    const nv = { id: uuid(), code: "", value_translations: localized(en, inlineColorDraftAr), color_hex: hex.toUpperCase(), sort_order: option.values.length, active: true };
+    changeOption(optionId, (current) => ({ values: [...current.values, { ...nv, sort_order: current.values.length }] }));
+    setInlineColorDraft(""); setInlineColorDraftAr(""); setInlineColorHex("#808080"); setMerchantNotice("");
+  };
 
   useEffect(() => {
     let cancelled = false;
     if (initialCatalog && !editing) {
       Promise.resolve().then(() => {
         if (cancelled) return;
-        disabledCombinationKeys.current.clear();
         setCatalog(initialCatalog);
         setForm(emptyProduct(initialCatalog.commerce_currency));
         setState({ loading: false, saving: false, error: "" });
@@ -165,7 +197,6 @@ export function EcommerceProductEditor({ user, productId, embedded = false, init
       if (cancelled) return;
       const product = result.products?.find((item) => item.id === productId);
       if (editing && !product) throw new Error(t("commerce:errors.productNotFound"));
-      disabledCombinationKeys.current.clear();
       persistedVariantIds.current = new Set((product?.variants || []).map((variant) => variant.id));
       referencedValueIds.current = new Set((product?.variants || []).flatMap((variant) => variant.option_value_ids || []));
       setCatalog(result);
@@ -181,45 +212,6 @@ export function EcommerceProductEditor({ user, productId, embedded = false, init
 
   const valueById = useMemo(() => new Map(form.options.flatMap((option) => option.values || []).map((value) => [value.id, value])), [form.options]);
   const optionIdByValueId = useMemo(() => new Map(form.options.flatMap((option) => (option.values || []).map((value) => [value.id, option.id]))), [form.options]);
-  const possibleCombinations = useMemo(() => buildCombinations(form.options), [form.options]);
-  const variantByCombination = useMemo(() => new Map(form.variants.map((variant) => [combinationKey(form.options.map((option) => variant.option_value_ids.find((id) => optionIdByValueId.get(id) === option.id) || "")), variant])), [form.options, form.variants, optionIdByValueId]);
-
-  useEffect(() => {
-    if (editing) return;
-    const combinations = new Map(possibleCombinations.map((ids) => [combinationKey(ids), ids]));
-    setForm((current) => {
-      const existingByCombination = new Map(current.variants.map((variant) => [
-        combinationKey(form.options.map((option) => variant.option_value_ids.find((id) => optionIdByValueId.get(id) === option.id) || "")),
-        variant,
-      ]));
-      const variants = [];
-      combinations.forEach((ids, key) => {
-        const existing = existingByCombination.get(key);
-        if (existing) {
-          variants.push(existing);
-          return;
-        }
-        if (disabledCombinationKeys.current.has(key)) return;
-        const suffix = ids.map((id) => code(valueById.get(id)?.value_translations?.en, "value").toUpperCase()).join("-");
-        variants.push({
-          id: uuid(),
-          sku: `${current.sku || skuCode(current.translations.en.name, autoSkuSuffix)}-${suffix}`.slice(0, 120),
-          barcode: null,
-          price_override: null,
-          compare_at_price_override: null,
-          track_inventory: true,
-          inventory_quantity: 0,
-          low_stock_threshold: 5,
-          allow_backorder: false,
-          images: [],
-          active: true,
-          option_value_ids: ids,
-        });
-      });
-      if (variants.length === current.variants.length && variants.every((variant, index) => variant === current.variants[index])) return current;
-      return { ...current, variants };
-    });
-  }, [autoSkuSuffix, editing, form.options, optionIdByValueId, possibleCombinations, valueById]);
 
   const update = (field, value) => setForm((current) => ({ ...current, [field]: value }));
   const updateTranslation = (locale, field, value) => setForm((current) => ({ ...current, translations: { ...current.translations, [locale]: { ...current.translations[locale], [field]: value } } }));
@@ -236,19 +228,7 @@ export function EcommerceProductEditor({ user, productId, embedded = false, init
   const changeAttribute = (id, field, value) => update("attributes", form.attributes.map((item) => item.id === id ? { ...item, [field]: value } : item));
   const addOption = () => update("options", [...form.options, { id: uuid(), code: "", name_translations: { en: "" }, required: true, display_type: "text", sort_order: form.options.length, values: [] }]);
   const changeOption = (id, change) => setForm((current) => ({ ...current, options: current.options.map((item) => item.id === id ? { ...item, ...(typeof change === "function" ? change(item) : change) } : item) }));
-  const addValue = (option, rawValue) => {
-    const label = String(rawValue || "").trim();
-    if (!label) return;
-    if (activeOptionValues(option).some((value) => String(value.value_translations?.en || "").trim().toLocaleLowerCase() === label.toLocaleLowerCase())) {
-      showMerchantNotice(t("admin.duplicateOptionValue", { option: option.name_translations?.en || t("merchant.options") }));
-      return;
-    }
-    const nextValue = { id: uuid(), code: "", value_translations: { en: label }, color_hex: option.display_type === "color" ? "#808080" : null, sort_order: option.values.length, active: true };
-    changeOption(option.id, (current) => ({ values: [...current.values, { ...nextValue, sort_order: current.values.length }] }));
-    setValueDrafts((current) => ({ ...current, [option.id]: "" }));
-    setEditingValue((current) => ({ ...current, [option.id]: nextValue.id }));
-    setMerchantNotice("");
-  };
+
   const changeValue = (option, valueId, change) => changeOption(option.id, (current) => ({ values: current.values.map((value) => value.id === valueId ? { ...value, ...change } : value) }));
   const removeValue = (option, value) => {
     if (referencedValueIds.current.has(value.id) || form.variants.some((variant) => variant.option_value_ids.includes(value.id))) {
@@ -268,48 +248,49 @@ export function EcommerceProductEditor({ user, productId, embedded = false, init
     update("options", form.options.filter((entry) => entry.id !== option.id));
     setMerchantNotice("");
   };
-  const newVariant = (optionValueIds) => {
-    const suffix = optionValueIds.map((id) => code(valueById.get(id)?.value_translations?.en, "value").toUpperCase()).join("-");
-    return { id: uuid(), sku: `${form.sku || skuCode(form.translations.en.name, autoSkuSuffix)}-${suffix}`.slice(0, 120), barcode: null, price_override: null, compare_at_price_override: null, track_inventory: true, inventory_quantity: 0, low_stock_threshold: 5, allow_backorder: false, images: [], active: true, option_value_ids: optionValueIds };
-  };
   const changeVariant = (id, change) => update("variants", form.variants.map((item) => item.id === id ? { ...item, ...change } : item));
-  const setCombinationAvailable = (ids, available) => {
-    const key = combinationKey(ids);
-    const existing = variantByCombination.get(key);
-    if (available) disabledCombinationKeys.current.delete(key);
-    else disabledCombinationKeys.current.add(key);
-    if (available && !existing) {
-      update("variants", [...form.variants, newVariant(ids)]);
-    } else if (!available && existing && persistedVariantIds.current.has(existing.id)) {
-      changeVariant(existing.id, { active: false });
-    } else if (!available && existing) {
-      update("variants", form.variants.filter((variant) => variant.id !== existing.id));
-    } else if (available && existing) {
-      changeVariant(existing.id, { active: true });
+  const resolveOrCreateValue = (option, label) => {
+    const normalized = String(label || "").trim().toLocaleLowerCase();
+    if (!normalized) return null;
+    const existingActive = activeOptionValues(option).find(
+      (value) => String(value.value_translations?.en || "").trim().toLocaleLowerCase() === normalized,
+    );
+    if (existingActive) return existingActive.id;
+    const archived = (option.values || []).find(
+      (value) => value.active === false && String(value.value_translations?.en || "").trim().toLocaleLowerCase() === normalized,
+    );
+    if (archived) { changeValue(option, archived.id, { active: true }); return archived.id; }
+    const newValue = { id: uuid(), code: "", value_translations: { en: String(label).trim() }, normalized_value: normalized, color_hex: option.display_type === "color" ? "#808080" : null, sort_order: option.values.length, active: true };
+    changeOption(option.id, (current) => ({ values: [...current.values, { ...newValue, sort_order: current.values.length }] }));
+    return newValue.id;
+  };
+  const updateVariantOption = (variantId, optionId, newValueId) => {
+    setForm((current) => ({
+      ...current,
+      variants: current.variants.map((variant) => {
+        if (variant.id !== variantId) return variant;
+        const filteredIds = variant.option_value_ids.filter((id) => optionIdByValueId.get(id) !== optionId);
+        return { ...variant, option_value_ids: newValueId ? [...filteredIds, newValueId] : filteredIds };
+      }),
+    }));
+  };
+  const addVariantRow = () => {
+    const rowSuffix = uuid().replace(/-/g, "").slice(0, 6).toUpperCase();
+    update("variants", [...form.variants, {
+      id: uuid(), sku: `${form.sku || skuCode(form.translations.en.name, autoSkuSuffix)}-${rowSuffix}`.slice(0, 120),
+      barcode: null, price_override: null, compare_at_price_override: null,
+      track_inventory: true, inventory_quantity: 0, low_stock_threshold: 5, allow_backorder: false,
+      images: [], active: true, option_value_ids: [],
+    }]);
+  };
+  const removeVariantRow = (variantId) => {
+    if (persistedVariantIds.current.has(variantId)) {
+      changeVariant(variantId, { active: false });
+    } else {
+      update("variants", form.variants.filter((v) => v.id !== variantId));
     }
   };
-  const renderVariantMatrixRow = (ids) => {
-    const key = combinationKey(ids);
-    const variant = variantByCombination.get(key);
-    const values = ids.map((id) => valueById.get(id));
-    const label = values.map((value) => localize(value, "value") || value?.code).join(" / ");
-    const fullLabel = values.map((value) => localize(value, "value") || value?.code).join(" / ");
-    const colorValue = values.find((value) => form.options.find((option) => option.id === optionIdByValueId.get(value?.id))?.display_type === "color");
-    const available = Boolean(variant?.active);
-    return <div className={`ecommerce-variant-matrix-row${available ? " is-available" : ""}`} key={key}>
-      <div className="ecommerce-variant-matrix-name">
-        {colorValue?.color_hex && <span className="ecommerce-color-swatch" style={{ backgroundColor: colorValue.color_hex }} aria-hidden="true" />}
-        <span><bdi>{label}</bdi></span>
-      </div>
-      <Checkbox checked={available} ariaLabel={t("admin.variantAvailabilityLabel", { variant: fullLabel })} onChange={(event) => setCombinationAvailable(ids, event.target.checked)}>{t("admin.available")}</Checkbox>
-      <label><span>{t("admin.quantity")}</span><input aria-label={t("admin.variantQuantityLabel", { variant: fullLabel })} type="number" min="0" disabled={!available} value={variant?.inventory_quantity ?? ""} onChange={(event) => changeVariant(variant.id, { inventory_quantity: event.target.value })} /></label>
-      <label><span>{t("common.sku")}</span><input aria-label={t("admin.variantSkuLabel", { variant: fullLabel })} dir="ltr" disabled={!available} value={variant?.sku || ""} onChange={(event) => changeVariant(variant.id, { sku: event.target.value })} /></label>
-      <label><span>{t("common.price")}</span><input className="ecommerce-variant-price-input" aria-label={t("admin.variantPriceLabel", { variant: fullLabel })} type="number" min="0" step="0.01" disabled={!available} placeholder={t("admin.inheritPrice", { price: form.price, currency: catalog.commerce_currency })} value={variant?.price_override ?? ""} onChange={(event) => changeVariant(variant.id, { price_override: event.target.value })} /></label>
-      <div className="ecommerce-variant-row-actions">
-      {available && variant ? <button className="ecommerce-variant-delete-action" type="button" aria-label={t("admin.removeVariantLabel", { variant: fullLabel })} onClick={() => setCombinationAvailable(ids, false)}><Trash2 size={16} /></button> : null}
-      </div>
-    </div>;
-  };
+  const getSelectedValueForOption = (variant, optionId) => variant.option_value_ids.find((id) => optionIdByValueId.get(id) === optionId) || "";
   const validateMerchantForm = () => {
     if (!String(form.translations.en.name || "").trim()) return t("admin.validationProductName");
     const optionNames = form.options.map((option) => String(option.name_translations?.en || "").trim().toLocaleLowerCase());
@@ -323,13 +304,14 @@ export function EcommerceProductEditor({ user, productId, embedded = false, init
       if (new Set(labels).size !== labels.length) return t("admin.duplicateOptionValue", { option: option.name_translations.en });
       if (option.display_type === "color" && values.some((value) => value.active !== false && !/^#[0-9a-f]{6}$/i.test(value.color_hex || ""))) return t("admin.validationColorSwatch", { option: option.name_translations.en });
     }
-    const variantKeys = form.variants.map((variant) => combinationKey(variant.option_value_ids));
+    const activeVariants = form.variants.filter((v) => v.active !== false);
+    const variantKeys = activeVariants.map((variant) => combinationKey([...variant.option_value_ids].sort()));
     if (new Set(variantKeys).size !== variantKeys.length) return t("admin.validationDuplicateCombination");
-    const skus = form.variants.map((variant) => String(variant.sku || "").trim().toLocaleLowerCase());
+    const skus = activeVariants.map((variant) => String(variant.sku || "").trim().toLocaleLowerCase());
     if (skus.some((sku) => !sku)) return t("admin.validationVariantSku");
     if (new Set(skus).size !== skus.length) return t("admin.validationUniqueSku");
-    if (form.status === "active" && form.options.length && !form.variants.some((variant) => variant.active)) return t("admin.validationSellableVariant");
-    for (const variant of form.variants) {
+    if (form.status === "active" && form.options.length && !activeVariants.some((variant) => variant.active)) return t("admin.validationSellableVariant");
+    for (const variant of activeVariants) {
       const selected = new Set(variant.option_value_ids);
       if (variant.active && form.options.some((option) => option.required && !(option.values || []).some((value) => selected.has(value.id)))) {
         return t("admin.validationRequiredOptions");
@@ -536,81 +518,495 @@ export function EcommerceProductEditor({ user, productId, embedded = false, init
 <button className="ecommerce-primary-button" type="button" disabled={form.attributes.length >= 50} onClick={addAttribute}><Plus size={16} />{t("merchant.addAttribute")}</button>
 </section>
       <section className="ecommerce-editor-options-variants">
-<h2>{t("merchant.variantAttributes")}</h2>
-<p>{t("admin.variantAttributesHelp")}</p>
-{merchantNotice && <p className="ecommerce-editor-notice" role="status">{merchantNotice}</p>}
-{!form.options.length ? <button className="ecommerce-primary-button" type="button" onClick={addOption}><Plus size={16} />{t("merchant.addVariantAttribute")}</button> : <>
-<div className="ecommerce-editor-option-list">
-{form.options.map((option, optionIndex) => {
-  const activeValues = activeOptionValues(option);
-  const selectedValue = option.values.find((value) => value.id === editingValue[option.id] && value.active !== false);
-  return <article className="ecommerce-editor-option-card is-compact" key={option.id}>
-    <header className="ecommerce-editor-spec-card-header">
-      <div className="ecommerce-editor-spec-title"><span>{optionIndex + 1}</span><strong>{t("admin.untitledOption", { count: optionIndex + 1 })}</strong></div>
-      <div className="ecommerce-editor-row-actions">
-        <button className="ecommerce-editor-delete-icon" type="button" aria-label={t("admin.removeOption")} onClick={() => removeOption(option)}><Trash2 size={16} /></button>
-      </div>
-    </header>
-    <div className="ecommerce-editor-option-setup">
-      <div className="ecommerce-editor-spec-field">
-        <strong>{t("admin.optionName")}</strong>
-        <p>{t("admin.optionNameHelp")}</p>
-        <label><span>{t("admin.english")}</span><input required aria-label={t("admin.englishName")} placeholder={t("admin.optionNameExampleEnglish")} dir="ltr" value={option.name_translations.en || ""} onChange={(e) => changeOption(option.id, { name_translations: { ...option.name_translations, en: e.target.value } })} /></label>
-        <label><span>{t("admin.arabic")}</span><input aria-label={t("admin.arabicName")} placeholder={t("admin.optionNameExampleArabic")} dir="rtl" value={option.name_translations.ar || ""} onChange={(e) => changeOption(option.id, { name_translations: { ...option.name_translations, ar: e.target.value } })} /></label>
-      </div>
-      <div className="ecommerce-editor-spec-field">
-        <strong>{t("admin.presentationType")}</strong>
-        <p>{t("admin.presentationTypeHelp")}</p>
-        <label><span>{t("admin.presentationType")}</span><select aria-label={t("admin.presentationType")} value={option.display_type || "text"} onChange={(e) => changeOption(option.id, { display_type: e.target.value, values: option.values.map((value) => ({ ...value, color_hex: e.target.value === "color" ? value.color_hex || "#808080" : null })) })}><option value="text">{t("admin.textType")}</option><option value="color">{t("admin.colorType")}</option></select></label>
-      </div>
-    </div>
-    <div className="ecommerce-editor-option-values">
-      <strong>{t("admin.values")}</strong>
-      <p>{t("admin.optionValuesHelp")}</p>
-      <div className="ecommerce-editor-value-chips">
-      {activeValues.map((value) => <span className={editingValue[option.id] === value.id ? "is-editing" : ""} key={value.id}>
-        {option.display_type === "color" && <i className="ecommerce-color-swatch" style={{ backgroundColor: value.color_hex }} aria-hidden="true" />}
-        <button type="button" onClick={() => setEditingValue((current) => ({ ...current, [option.id]: value.id }))}><bdi>{localize(value, "value") || value.code}</bdi></button>
-        <button type="button" aria-label={t("admin.removeOptionValue", { value: localize(value, "value") || value.code })} onClick={() => removeValue(option, value)}><X size={14} /></button>
-      </span>)}
-      </div>
-      <div className="ecommerce-editor-add-value">
-        <input aria-label={t("admin.newValueForOption", { option: option.name_translations.en || optionIndex + 1 })} dir="ltr" placeholder={t("admin.optionValueExample")} value={valueDrafts[option.id] || ""} onChange={(event) => setValueDrafts((current) => ({ ...current, [option.id]: event.target.value }))} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addValue(option, event.currentTarget.value); } }} />
-        <button className="ecommerce-primary-button" type="button" disabled={activeValues.length >= 50 || !(valueDrafts[option.id] || "").trim()} onClick={() => addValue(option, valueDrafts[option.id])}><Plus size={16} />{t("merchant.addValue")}</button>
-      </div>
-    </div>
-    {selectedValue && <div className="ecommerce-editor-value-edit">
-      <header>
-        <div><strong>{t("admin.editOptionValue")}</strong><span>{t("admin.editOptionValueHelp", { value: localize(selectedValue, "value") || selectedValue.code })}</span></div>
-        <button className="ecommerce-editor-value-edit-close" type="button" aria-label={t("admin.closeValueEditor")} onClick={() => setEditingValue((current) => ({ ...current, [option.id]: null }))}><X size={16} /></button>
-      </header>
-      <div className="ecommerce-editor-value-edit-fields">
-        <label>{t("admin.englishValue")}<input dir="ltr" value={selectedValue.value_translations.en || ""} onChange={(e) => changeValue(option, selectedValue.id, { value_translations: { ...selectedValue.value_translations, en: e.target.value } })} /></label>
-        <label>{t("admin.arabicValue")}<input dir="rtl" value={selectedValue.value_translations.ar || ""} onChange={(e) => changeValue(option, selectedValue.id, { value_translations: { ...selectedValue.value_translations, ar: e.target.value } })} /></label>
-        {option.display_type === "color" && <label className="ecommerce-editor-color-field">{t("admin.colorSwatch")}<span><input aria-label={t("admin.colorSwatch")} type="color" value={selectedValue.color_hex || "#808080"} onInput={(e) => changeValue(option, selectedValue.id, { color_hex: e.currentTarget.value.toUpperCase() })} onChange={(e) => changeValue(option, selectedValue.id, { color_hex: e.target.value.toUpperCase() })} /><code dir="ltr">{selectedValue.color_hex || "#808080"}</code></span></label>}
-      </div>
-    </div>}
-  </article>;
-})}
-</div>
-<button className="ecommerce-primary-button" type="button" disabled={form.options.length >= 5} onClick={addOption}><Plus size={16} />{t("merchant.addVariantAttribute")}</button>
-<div className="ecommerce-variant-matrix">
-<header><div><h3>{t("merchant.variantsInventory")}</h3></div></header>
-{possibleCombinations.length ? <div className="ecommerce-variant-matrix-table">
-  <div className="ecommerce-variant-matrix-head" aria-hidden="true">
-    <span>{t("admin.combination")}</span>
-    <span>{t("admin.available")}</span>
-    <span>{t("admin.quantity")}</span>
-    <span>{t("common.sku")}</span>
-    <span>{t("common.price")}</span>
-    <span>{t("admin.actions")}</span>
-  </div>
-  <div className="ecommerce-variant-matrix-group">{possibleCombinations.map(renderVariantMatrixRow)}</div>
-  </div>
-  : <p className="ecommerce-editor-inline-help">{t("admin.completeVariantAttributeValues")}</p>}
-</div>
-</>}
-</section>
+        <h2>{t("merchant.variantAttributes")}</h2>
+        <p>{t("admin.variantAttributesHelp")}</p>
+        {merchantNotice && <p className="ecommerce-editor-notice" role="status">{merchantNotice}</p>}
+        {!form.options.length ? (
+          <button className="ecommerce-primary-button" type="button" onClick={addOption}>
+            <Plus size={16} />{t("merchant.addVariantAttribute")}
+          </button>
+        ) : (
+          <>
+            <div className="ecommerce-editor-option-list">
+              {form.options.map((option, optionIndex) => {
+                const activeValues = activeOptionValues(option);
+                const isExpanded = Boolean(expandedOptions[option.id]);
+                const isColorType = option.display_type === "color";
+                const isNamed = Boolean(option.name_translations?.en?.trim());
+                const inlineForm = inlineValueForm?.optionId === option.id ? inlineValueForm : null;
+                const editingValId = editingValue[option.id];
+
+                return (
+                  <article className="ecommerce-editor-option-card is-compact" key={option.id}>
+                    <div className="ecommerce-editor-attribute-row">
+                      <div className="ecommerce-editor-attribute-info">
+                        <span className="ecommerce-editor-attribute-idx">{optionIndex + 1}</span>
+                        <input
+                          required
+                          aria-label={t("admin.englishName")}
+                          placeholder={t("admin.optionNameExampleEnglish")}
+                          dir="ltr"
+                          className="ecommerce-editor-option-name-input"
+                          value={option.name_translations.en || ""}
+                          onChange={(e) => changeOption(option.id, { name_translations: { ...option.name_translations, en: e.target.value } })}
+                        />
+                        <select
+                          aria-label={t("admin.presentationType")}
+                          className="ecommerce-editor-type-select"
+                          value={option.display_type || "text"}
+                          onChange={(e) => changeOption(option.id, {
+                            display_type: e.target.value,
+                            values: option.values.map((value) => ({
+                              ...value,
+                              color_hex: e.target.value === "color" ? value.color_hex || "#808080" : null,
+                            })),
+                          })}
+                        >
+                          <option value="text">{t("admin.textType")}</option>
+                          <option value="color">{t("admin.colorType")}</option>
+                        </select>
+                        <span className="ecommerce-editor-value-count">
+                          {activeValues.length} {activeValues.length === 1 ? "value" : "values"}
+                        </span>
+                        {!isNamed && (
+                          <span className="ecommerce-editor-unnamed-warning">
+                            {t("admin.nameAttributeNotice") || "Name this attribute before using it in variants."}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="ecommerce-editor-row-actions">
+                        {isNamed && (
+                          <button
+                            className="ecommerce-editor-add-inline-btn"
+                            type="button"
+                            onClick={() => openInlineValueForm(option.id, isColorType ? "color" : "text")}
+                          >
+                            <Plus size={14} />
+                            {isColorType ? (t("merchant.addColor") || "Add color") : (t("merchant.addValue") || "Add value")}
+                          </button>
+                        )}
+                        <button
+                          className={`ecommerce-editor-toggle-btn${isExpanded ? " is-expanded" : ""}`}
+                          type="button"
+                          aria-label={isExpanded ? t("admin.hideValues") : t("admin.manageValues")}
+                          onClick={() => toggleOptionExpand(option.id)}
+                        >
+                          <ChevronDown size={15} className={`ecommerce-editor-chevron${isExpanded ? " is-rotated" : ""}`} />
+                          <span>{isExpanded ? (t("admin.hideValues") || "Hide values") : (t("admin.manageValues") || "Manage values")}</span>
+                        </button>
+                        <button
+                          className="ecommerce-editor-delete-icon"
+                          type="button"
+                          aria-label={t("admin.removeOption") || "Delete"}
+                          title={t("common.delete") || "Delete"}
+                          onClick={() => removeOption(option)}
+                        >
+                          <Trash2 size={16} />
+                          <span>{t("common.delete") || "Delete"}</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {inlineForm && (
+                      <div className="ecommerce-editor-inline-value-form">
+                        {inlineForm.mode === "text" ? (
+                          <>
+                            <label>
+                              <span>{t("admin.valueName") || "Value"}</span>
+                              <input
+                                dir="ltr"
+                                autoFocus
+                                aria-label={t("admin.valueName") || "Value"}
+                                placeholder={t("admin.optionValueExample") || "42"}
+                                value={inlineTextDraft}
+                                onChange={(e) => setInlineTextDraft(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") { e.preventDefault(); submitInlineTextValue(option.id); }
+                                  if (e.key === "Escape") closeInlineValueForm();
+                                }}
+                              />
+                            </label>
+                            <label>
+                              <span>{t("admin.arabicValue") || "Arabic"}</span>
+                              <input
+                                dir="rtl"
+                                aria-label={t("admin.arabicValue") || "Arabic"}
+                                placeholder={t("admin.optionNameExampleArabic") || "٤٢"}
+                                value={inlineTextDraftAr}
+                                onChange={(e) => setInlineTextDraftAr(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") { e.preventDefault(); submitInlineTextValue(option.id); }
+                                }}
+                              />
+                            </label>
+                            <div className="ecommerce-editor-inline-value-actions">
+                              <button
+                                className="ecommerce-primary-button"
+                                type="button"
+                                disabled={!inlineTextDraft.trim()}
+                                onClick={() => submitInlineTextValue(option.id)}
+                              >
+                                <Plus size={14} />{t("merchant.addValue") || "Add value"}
+                              </button>
+                              <button className="ecommerce-secondary-button" type="button" onClick={closeInlineValueForm}>
+                                {t("common.cancel") || "Cancel"}
+                              </button>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <label>
+                              <span>{t("admin.colorName") || "Color name"}</span>
+                              <input
+                                dir="ltr"
+                                autoFocus
+                                aria-label={t("admin.valueName") || "Value"}
+                                placeholder="Red"
+                                value={inlineColorDraft}
+                                onChange={(e) => setInlineColorDraft(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") { e.preventDefault(); submitInlineColorValue(option.id); }
+                                  if (e.key === "Escape") closeInlineValueForm();
+                                }}
+                              />
+                            </label>
+                            <label>
+                              <span>{t("admin.arabicName") || "Arabic name"}</span>
+                              <input
+                                dir="rtl"
+                                aria-label={t("admin.arabicValue") || "Arabic"}
+                                placeholder="أحمر"
+                                value={inlineColorDraftAr}
+                                onChange={(e) => setInlineColorDraftAr(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") { e.preventDefault(); submitInlineColorValue(option.id); }
+                                }}
+                              />
+                            </label>
+                            <label className="ecommerce-editor-color-field">
+                              <span>{t("admin.colorSwatch") || "Color swatch"}</span>
+                              <span className="ecommerce-editor-color-pick-row">
+                                <input
+                                  aria-label={t("admin.colorSwatch") || "Color swatch"}
+                                  type="color"
+                                  value={/^#[0-9a-fA-F]{6}$/.test(inlineColorHex) ? inlineColorHex : "#808080"}
+                                  onInput={(e) => setInlineColorHex(e.currentTarget.value.toUpperCase())}
+                                  onChange={(e) => setInlineColorHex(e.target.value.toUpperCase())}
+                                />
+                                <input
+                                  dir="ltr"
+                                  className="ecommerce-editor-hex-input"
+                                  aria-label="Hex"
+                                  placeholder="#FF0000"
+                                  value={inlineColorHex}
+                                  onChange={(e) => {
+                                    let v = e.target.value.toUpperCase();
+                                    if (!v.startsWith("#") && v.length > 0) v = `#${v}`;
+                                    setInlineColorHex(v);
+                                  }}
+                                />
+                              </span>
+                            </label>
+                            <div className="ecommerce-editor-inline-value-actions">
+                              <button
+                                className="ecommerce-primary-button"
+                                type="button"
+                                disabled={!inlineColorDraft.trim()}
+                                onClick={() => submitInlineColorValue(option.id)}
+                              >
+                                <Plus size={14} />{t("merchant.addColor") || "Add color"}
+                              </button>
+                              <button className="ecommerce-secondary-button" type="button" onClick={closeInlineValueForm}>
+                                {t("common.cancel") || "Cancel"}
+                              </button>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )}
+
+                    {isExpanded && (
+                      <div className="ecommerce-editor-managed-values">
+                        {!activeValues.length ? (
+                          <p className="ecommerce-editor-empty-values-hint">
+                            {t("admin.addAtLeastOneValue", { option: option.name_translations.en }) || "No values yet."}
+                          </p>
+                        ) : (
+                          <div className="ecommerce-editor-values-table">
+                            {activeValues.map((value) => {
+                              const isValEditing = editingValId === value.id;
+                              const labelText = localize(value, "value") || value.code;
+                              return (
+                                <div className={`ecommerce-editor-value-entry${isValEditing ? " is-editing" : ""}`} key={value.id}>
+                                  <div className="ecommerce-editor-value-entry-row">
+                                    {isColorType && (
+                                      <i
+                                        className="ecommerce-color-swatch"
+                                        style={{ backgroundColor: value.color_hex || "#808080" }}
+                                        aria-hidden="true"
+                                      />
+                                    )}
+                                    <button
+                                      type="button"
+                                      className="ecommerce-editor-value-name-btn"
+                                      onClick={() => setEditingValue((cur) => ({ ...cur, [option.id]: isValEditing ? null : value.id }))}
+                                    >
+                                      <bdi>{labelText}</bdi>
+                                    </button>
+                                    {isColorType && (
+                                      <code className="ecommerce-editor-color-value-hex">
+                                        {(value.color_hex || "#808080").toUpperCase()}
+                                      </code>
+                                    )}
+                                    <div className="ecommerce-editor-value-entry-actions">
+                                      <button
+                                        type="button"
+                                        className="ecommerce-editor-val-action-btn"
+                                        aria-label={t("admin.editOptionValue") || "Edit value"}
+                                        onClick={() => setEditingValue((cur) => ({ ...cur, [option.id]: isValEditing ? null : value.id }))}
+                                      >
+                                        <Pencil size={13} />
+                                        <span>{t("admin.edit") || "Edit"}</span>
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="ecommerce-editor-val-action-btn is-danger"
+                                        aria-label={t("admin.removeOptionValue", { value: labelText })}
+                                        onClick={() => removeValue(option, value)}
+                                      >
+                                        <Trash2 size={13} />
+                                        <span>{t("admin.remove") || "Remove"}</span>
+                                      </button>
+                                    </div>
+                                  </div>
+
+                                  {isValEditing && (
+                                    <div className="ecommerce-editor-value-edit-panel">
+                                      <label>
+                                        <span>{t("admin.englishValue") || "English"}</span>
+                                        <input
+                                          dir="ltr"
+                                          value={value.value_translations?.en || ""}
+                                          onChange={(e) => changeValue(option, value.id, {
+                                            value_translations: { ...value.value_translations, en: e.target.value },
+                                          })}
+                                        />
+                                      </label>
+                                      <label>
+                                        <span>{t("admin.arabicValue") || "Arabic"}</span>
+                                        <input
+                                          dir="rtl"
+                                          value={value.value_translations?.ar || ""}
+                                          onChange={(e) => changeValue(option, value.id, {
+                                            value_translations: { ...value.value_translations, ar: e.target.value },
+                                          })}
+                                        />
+                                      </label>
+                                      {isColorType && (
+                                        <label className="ecommerce-editor-color-field">
+                                          <span>{t("admin.colorSwatch") || "Color swatch"}</span>
+                                          <span className="ecommerce-editor-color-pick-row">
+                                            <input
+                                              aria-label={t("admin.colorSwatch") || "Color swatch"}
+                                              type="color"
+                                              value={/^#[0-9a-fA-F]{6}$/.test(value.color_hex || "") ? value.color_hex : "#808080"}
+                                              onInput={(e) => changeValue(option, value.id, { color_hex: e.currentTarget.value.toUpperCase() })}
+                                              onChange={(e) => changeValue(option, value.id, { color_hex: e.target.value.toUpperCase() })}
+                                            />
+                                            <input
+                                              dir="ltr"
+                                              className="ecommerce-editor-hex-input"
+                                              aria-label="Hex"
+                                              placeholder="#FF0000"
+                                              value={value.color_hex || "#808080"}
+                                              onChange={(e) => {
+                                                let v = e.target.value.toUpperCase();
+                                                if (!v.startsWith("#") && v.length > 0) v = `#${v}`;
+                                                changeValue(option, value.id, { color_hex: v });
+                                              }}
+                                            />
+                                          </span>
+                                        </label>
+                                      )}
+                                      <button
+                                        type="button"
+                                        className="ecommerce-secondary-button ecommerce-editor-val-close-btn"
+                                        aria-label={t("admin.closeValueEditor") || "Close"}
+                                        onClick={() => setEditingValue((cur) => ({ ...cur, [option.id]: null }))}
+                                      >
+                                        {t("admin.close") || "Close"}
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </article>
+                );
+              })}
+            </div>
+            <button className="ecommerce-primary-button" type="button" disabled={form.options.length >= 5} onClick={addOption}>
+              <Plus size={16} />{t("merchant.addVariantAttribute")}
+            </button>
+          </>
+        )}
+      </section>
+
+      {form.options.length > 0 && (
+        <section className="ecommerce-variant-matrix">
+          <header className="ecommerce-variant-matrix-header">
+            <div>
+              <h3>{t("merchant.variantsInventory")}</h3>
+            </div>
+            <div className="ecommerce-variant-matrix-header-actions">
+              <button className="ecommerce-primary-button" type="button" onClick={addVariantRow}>
+                <Plus size={16} />{t("merchant.addVariant")}
+              </button>
+            </div>
+          </header>
+
+          {form.variants.filter((v) => v.active !== false).length === 0 && (
+            <p className="ecommerce-editor-inline-help">{t("admin.addVariantHelp")}</p>
+          )}
+
+          <div style={{ display: "none" }}>
+            {form.options.filter((option) => Boolean(option.name_translations?.en?.trim())).map((option) => (
+              <datalist key={option.id} id={`option-values-${option.id}`}>
+                {activeOptionValues(option).map((value) => (
+                  <option key={value.id} value={localize(value, "value") || value.code} />
+                ))}
+              </datalist>
+            ))}
+          </div>
+
+          {form.variants.filter((v) => v.active !== false).length > 0 && (() => {
+            const namedOptions = form.options.filter((option) => Boolean(option.name_translations?.en?.trim()));
+            const gridCols = `${namedOptions.map(() => "minmax(130px, 1fr)").join(" ")} 85px minmax(140px, 1.4fr) 115px 85px 75px`;
+
+            return (
+              <div className="ecommerce-variant-matrix-table-wrap">
+                <div className="ecommerce-variant-matrix-table">
+                  <div className="ecommerce-variant-matrix-head" aria-hidden="true" style={{ gridTemplateColumns: gridCols }}>
+                    {namedOptions.map((option) => (
+                      <span key={option.id}>{option.name_translations.en}</span>
+                    ))}
+                    <span>{t("admin.quantity")}</span>
+                    <span>{t("common.sku")}</span>
+                    <span>{t("common.price")}</span>
+                    <span>{t("admin.available")}</span>
+                    <span>{t("admin.actions")}</span>
+                  </div>
+
+                  <div className="ecommerce-variant-matrix-group">
+                    {form.variants.filter((variant) => variant.active !== false).map((variant) => {
+                      const variantLabel = variant.option_value_ids.map((id) => localize(valueById.get(id), "value") || valueById.get(id)?.code).join(" / ");
+                      return (
+                        <div className="ecommerce-variant-matrix-row is-available" style={{ gridTemplateColumns: gridCols }} key={variant.id}>
+                          {namedOptions.map((option) => {
+                            const selectedId = getSelectedValueForOption(variant, option.id);
+                            const selectedValue = selectedId ? valueById.get(selectedId) : null;
+                            const isColorOpt = option.display_type === "color";
+
+                            return (
+                              <div className="ecommerce-variant-attr-cell" key={option.id}>
+                                {isColorOpt && (
+                                  <i
+                                    className={`ecommerce-color-swatch${selectedValue?.color_hex ? "" : " ecommerce-color-swatch--empty"}`}
+                                    style={{ backgroundColor: selectedValue?.color_hex || "transparent" }}
+                                    aria-hidden="true"
+                                  />
+                                )}
+                                <input
+                                  list={`option-values-${option.id}`}
+                                  dir="ltr"
+                                  placeholder={option.name_translations.en || "..."}
+                                  value={selectedId ? (localize(selectedValue, "value") || selectedValue?.code || "") : ""}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    if (!val.trim()) {
+                                      updateVariantOption(variant.id, option.id, "");
+                                      return;
+                                    }
+                                    const valueId = resolveOrCreateValue(option, val);
+                                    if (valueId) updateVariantOption(variant.id, option.id, valueId);
+                                  }}
+                                />
+                              </div>
+                            );
+                          })}
+
+                          <label className="ecommerce-variant-qty-cell">
+                            <input
+                              aria-label={t("admin.variantQuantityLabel", { variant: variantLabel })}
+                              type="number"
+                              min="0"
+                              value={variant.inventory_quantity ?? ""}
+                              onChange={(e) => changeVariant(variant.id, { inventory_quantity: e.target.value })}
+                            />
+                          </label>
+
+                          <label className="ecommerce-variant-sku-cell">
+                            <input
+                              aria-label={t("admin.variantSkuLabel", { variant: variantLabel })}
+                              dir="ltr"
+                              value={variant.sku || ""}
+                              onChange={(e) => changeVariant(variant.id, { sku: e.target.value })}
+                            />
+                          </label>
+
+                          <label className="ecommerce-variant-price-cell">
+                            <input
+                              className="ecommerce-variant-price-input"
+                              aria-label={t("admin.variantPriceLabel", { variant: variantLabel })}
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              placeholder={form.price}
+                              value={variant.price_override ?? ""}
+                              onChange={(e) => changeVariant(variant.id, { price_override: e.target.value })}
+                            />
+                            <span className="ecommerce-variant-currency">{catalog.commerce_currency}</span>
+                          </label>
+
+                          <div className="ecommerce-variant-avail-cell">
+                            <label className="ecommerce-editor-switch" title={t("admin.available") || "Available"}>
+                              <input
+                                type="checkbox"
+                                aria-label={t("admin.variantAvailabilityLabel", { variant: variantLabel }) || "Available"}
+                                checked={variant.active !== false}
+                                onChange={(e) => changeVariant(variant.id, { active: e.target.checked })}
+                              />
+                              <span className="ecommerce-editor-switch-slider" />
+                            </label>
+                          </div>
+
+                          <div className="ecommerce-variant-row-actions">
+                            <button
+                              className="ecommerce-variant-delete-action"
+                              type="button"
+                              aria-label={t("admin.removeVariantLabel", { variant: variantLabel }) || "Delete"}
+                              title={t("common.delete") || "Delete"}
+                              onClick={() => removeVariantRow(variant.id)}
+                            >
+                              <Trash2 size={16} />
+                              <span className="ecommerce-variant-delete-text">{t("common.delete") || "Delete"}</span>
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+        </section>
+      )}
       {!form.options.length && <section className="ecommerce-editor-inventory">
 <h2>{t("merchant.inventory")}</h2><div className="ecommerce-editor-grid ecommerce-editor-inventory-fields">
 <label>{t("merchant.currentStock")}<input type="number" min="0" value={form.inventory_quantity} onChange={(e) => update("inventory_quantity", e.target.value)} />

@@ -1,3 +1,4 @@
+import PageHeaderSkeleton from "../common/PageHeaderSkeleton";
 import { getEcommerceCacheScope, readEcommerceAdminCacheSnapshot } from "./utils/ecommerceAdminCache";
 import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, CheckCircle2, PackageCheck, RefreshCw, Search, SlidersHorizontal } from "lucide-react";
@@ -47,7 +48,7 @@ function OrderDetail({ cacheScope, orderId }) {
     } catch { setToast({ type: "error", title: t("errors.updateOrder"), message: t("admin.tryAgain") }); }
     finally { setBusy(false); }
   };
-  if (loading) return <main className="ecommerce-page ecommerce-operations-page" dir={direction} lang={locale}><EcommerceOperationsSkeleton variant="order-detail" label={t("merchant.loadingOrders")} /></main>;
+  if (loading) return <main className="ecommerce-page ecommerce-operations-page" dir={direction} lang={locale}><PageHeaderSkeleton className="ecommerce-page-header app-page-intro" actions /><EcommerceOperationsSkeleton variant="order-detail" label={t("merchant.loadingOrders")} /></main>;
   if (!data?.order) return <main className="ecommerce-page ecommerce-operations-page" dir={direction} lang={locale}><button onClick={() => navigate("/ecommerce/orders")}>{t("common.back")}</button><p>{t("admin.orderNotFound")}</p><AuthToast {...toast} dir={direction} onDismiss={() => setToast(null)} /></main>;
   const { order, items = [], status_history: history = [] } = data;
   return (
@@ -136,7 +137,7 @@ export default function EcommerceOrdersPage({ user }) {
   const update = (key, value) => setFilters((current) => ({ ...current, [key]: value }));
   return (
     <main className="ecommerce-page ecommerce-operations-page ecommerce-orders-page" dir={direction} lang={locale}>
-      <header className="ecommerce-page-header app-page-intro"><div><h1>{t("merchant.ordersTitle")}</h1><p>{t("merchant.ordersSubtitle")}</p></div></header>
+      {loading ? <PageHeaderSkeleton className="ecommerce-page-header app-page-intro" /> : (<header className="ecommerce-page-header app-page-intro"><div><h1>{t("merchant.ordersTitle")}</h1><p>{t("merchant.ordersSubtitle")}</p></div></header>)}
       <div className="ecommerce-orders-workspace">
         <aside className="ecommerce-operations-card ecommerce-orders-sidebar" aria-labelledby="orders-metadata-title">
           <header className="ecommerce-orders-filter-toolbar"><h2 id="orders-metadata-title"><SlidersHorizontal size={18} />{t("merchant.filters")}</h2></header>

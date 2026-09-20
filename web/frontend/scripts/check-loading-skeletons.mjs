@@ -15,12 +15,14 @@ await page.evaluate(async()=>{
  const dom=await import('/node_modules/.vite/deps/react-dom_client.js'); const createRoot=dom.createRoot || dom.default.createRoot;
  const layouts=await import('/src/components/DashboardBuilder/CommerceLoadingLayouts.jsx');
  const {default:Operations}=await import('/src/components/DashboardBuilder/EcommerceOperationsSkeleton.jsx');
+ const {default:Header}=await import('/src/components/common/PageHeaderSkeleton.jsx');
  document.querySelector('#root').style.display='none';
  const el=document.createElement('div');el.id='loading-test';el.className='admin-dashboard-page';document.body.append(el);
  window.renderSkeleton=(variant,lang)=>{
   el.dir=lang==='ar'?'rtl':'ltr';
   let component,props={label:'Loading'};
-  if(variant==='store')component=layouts.StorePreviewSkeleton;
+  if(variant==='header') {component=Header;props.actions=true;}
+  else if(variant==='store')component=layouts.StorePreviewSkeleton;
   else if(variant==='theme')component=layouts.ThemeSkeleton;
   else if(variant==='editor')component=layouts.ProductEditorSkeleton;
   else if(variant==='settings')component=layouts.SettingsSkeleton;
@@ -30,7 +32,7 @@ await page.evaluate(async()=>{
  };
  window.loadingRoot=createRoot(el);
 });
-for(const width of [320,768,1440])for(const lang of ['en','ar'])for(const theme of ['light','dark'])for(const variant of ['store','theme','editor','settings','catalog','delivery','loyalty','orders','order-detail']){
+for(const width of [320,768,1440])for(const lang of ['en','ar'])for(const theme of ['light','dark'])for(const variant of ['header','store','theme','editor','settings','catalog','delivery','loyalty','orders','order-detail']){
  await page.setViewportSize({width,height:900});
  await page.evaluate(({variant,lang,theme})=>{document.documentElement.dataset.theme=theme;window.renderSkeleton(variant,lang);},{variant,lang,theme});
  await page.waitForTimeout(40);
@@ -38,7 +40,7 @@ for(const width of [320,768,1440])for(const lang of ['en','ar'])for(const theme 
   const root=document.querySelector('#loading-test');
   return {statuses:root.querySelectorAll('[role=status]').length,overflow:[...root.querySelectorAll('i,section,article,[role=status]')].filter(e=>{const r=e.getBoundingClientRect();return r.width>0&&(r.left< -1||r.right>innerWidth+1);}).map(e=>e.className||e.tagName)};
  });
- assert.equal(result.statuses,1,`${variant}: one loading announcement`);
+ assert.equal(result.statuses,variant==='header'?0:1,`${variant}: one loading announcement`);
  assert.deepEqual(result.overflow,[],`${width} ${lang} ${theme} ${variant}: no overflow`);count++;
 }
 await page.emulateMedia({reducedMotion:'reduce'});
@@ -49,27 +51,36 @@ assert.deepEqual(errors,[],'No browser exceptions');
 let storeChecks = 0;
 for (const width of [320,1440]) for (const lang of ['en','ar']) {
  const livePage = await browser.newPage({viewport:{width,height:900}});
- let releaseSettings;
+ let releaseSettings, releaseFrame, settingsRequested;
+ const settingsStarted = new Promise(resolve=>{settingsRequested=resolve;});
+ const pendingFrame = new Promise(resolve=>{releaseFrame=resolve;});
  const pendingSettings = new Promise(resolve=>{releaseSettings=resolve;});
  await livePage.addInitScript(lang=>localStorage.setItem('madar.language',lang),lang);
  await livePage.route('**/*',async route=>{
   const u=new URL(route.request().url()), path=u.pathname;
   const json=data=>route.fulfill({contentType:'application/json',body:JSON.stringify(data)});
   if(path.endsWith('/auth/user_status'))return json({logged_in:true,user:{id:24,tenant_id:7,first_name:'Owner',email:'owner@example.com',user_type:'user',subscription_type:'full_platform',plan:'business'}});
-  if(path.endsWith('/website/settings')){await pendingSettings;return json({website:{subdomain:'demo'}});}
-  if(path.includes('/public/sites/'))return json({site:{brand:'Madar Store'},catalog:{products:[],categories:[],tags:[],pagination:{page:1,pages:1,total:0}},areas:[]});
+  if(path.endsWith('/website/settings')){settingsRequested();await pendingSettings;return json({website:{subdomain:'demo'}});}
+  if(path.includes('/public/sites/')){await pendingFrame;return json({site:{brand:'Madar Store'},catalog:{products:[],categories:[],tags:[],pagination:{page:1,pages:1,total:0}},areas:[]});}
   if(path.startsWith('/api/')||u.origin!==origin)return json({notifications:[],unread_count:0,projects:[]});
   return route.continue();
  });
  await livePage.goto(origin+'/ecommerce/store');
+ await settingsStarted;
  await livePage.locator('.ecommerce-store-page-skeleton').waitFor();
  const before=await livePage.locator('.ecommerce-store-page-skeleton').boundingBox();
  assert(before.width<=width && before.height<=780,'Store skeleton must have bounded preview dimensions');
  assert.equal(await livePage.locator('.commerce-preview-hero').count(),1,'Store loading must show the preview structure');
  assert.equal(await livePage.locator('.ecommerce-store-frame').count(),0,'Wait for the configured address before mounting the iframe');
+ assert.equal(await livePage.locator('main h1').count(),0,'Keep the title skeletal while settings load');
  releaseSettings();
  await livePage.locator('.ecommerce-store-frame').waitFor();
+ assert.equal(await livePage.locator('main h1').count(),0,'Keep the title skeletal while the iframe loads');
+ assert.equal(await livePage.locator('main .page-header-skeleton').count(),1);
+ releaseFrame();
  await livePage.waitForFunction(()=>!document.querySelector('.ecommerce-store-frame-loading'));
+ assert.equal(await livePage.locator('main .page-header-skeleton').count(),0);
+ assert.equal(await livePage.locator('main h1').count(),1,'Reveal the title with the finished preview');
  const after=await livePage.locator('.ecommerce-store-frame-shell').boundingBox();
  assert(Math.abs(after.height-before.height)<=1,'Preview skeleton and iframe reserve the same height');
  assert.equal(await livePage.locator('.ecommerce-store-frame-shell').getAttribute('aria-busy'),'false');

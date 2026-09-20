@@ -1,3 +1,4 @@
+import PageHeaderSkeleton from "../common/PageHeaderSkeleton";
 import { useEffect, useMemo, useState } from "react";
 import { Bell, CheckCircle2, Circle } from "lucide-react";
 
@@ -111,7 +112,7 @@ export default function NotificationsPage({ user }) {
       aria-labelledby="notifications-title"
       dir={direction}
     >
-      <header className="notifications-page-header app-page-intro">
+      {(loading) ? <PageHeaderSkeleton className="notifications-page-header app-page-intro" /> : (<header className="notifications-page-header app-page-intro">
         <div>
           <h1 id="notifications-title">{t("notifications.title")}</h1>
           <p>{t("notifications.subtitle")}</p>
@@ -125,7 +126,7 @@ export default function NotificationsPage({ user }) {
           <strong>{unreadCount}</strong>
           <span>{t("notifications.unread")}</span>
         </div>
-      </header>
+      </header>)}
 
       <div className="notifications-actions">
         <button

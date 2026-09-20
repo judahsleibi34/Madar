@@ -17,6 +17,7 @@ describe("EcommerceStorePage", () => {
       <MemoryRouter><EcommerceStorePage /></MemoryRouter>
     );
     expect((await screen.findByTitle("Published online store")).getAttribute("src")).toBe("/site/olive-house/shop");
+    fireEvent.load(screen.getByTitle("Published online store"));
     expect(screen.getByRole("link", { name: "Open production store" }).getAttribute("href")).toBe("https://madarportal.com/site/olive-house/shop");
     expect(screen.queryByText("Published storefront")).toBeNull();
     expect(screen.queryByText("Customer view")).toBeNull();
@@ -29,6 +30,7 @@ describe("EcommerceStorePage", () => {
     render(<MemoryRouter initialEntries={["/ecommerce/store?preview=draft"]}><EcommerceStorePage /></MemoryRouter>);
 
     expect((await screen.findByTitle("Draft online store preview")).getAttribute("src")).toBe("/site/olive-house/shop?preview=draft");
+    fireEvent.load(screen.getByTitle("Draft online store preview"));
     expect(screen.getByText("Nothing here is live yet.", { exact: false })).toBeTruthy();
   });
 });
@@ -50,10 +52,20 @@ it("uses the same preview skeleton through settings and iframe loading, then rem
   expect(container.querySelector(".commerce-preview-header")).toBeTruthy();
   expect(container.querySelector(".commerce-preview-hero")).toBeTruthy();
   expect(screen.queryByTitle("Published online store")).toBeNull();
+  expect(screen.queryByRole("heading", { name: "Published store" })).toBeNull();
+  expect(container.querySelector(".page-header-skeleton")).toBeTruthy();
   resolveSettings({ subdomain: "olive-house" });
   const iframe = await screen.findByTitle("Published online store");
   expect(container.querySelector(".ecommerce-store-frame-loading .commerce-preview-hero")).toBeTruthy();
+  expect(screen.queryByRole("heading", { name: "Published store" })).toBeNull();
+  expect(container.querySelector(".page-header-skeleton")).toBeTruthy();
   fireEvent.load(iframe);
+  expect(screen.getByRole("heading", { name: "Published store" })).toBeTruthy();
+  expect(container.querySelector(".page-header-skeleton")).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+  expect(screen.queryByRole("heading", { name: "Published store" })).toBeNull();
+  fireEvent.load(screen.getByTitle("Published online store"));
+  expect(screen.getByRole("heading", { name: "Published store" })).toBeTruthy();
   expect(container.querySelector(".ecommerce-store-frame-loading")).toBeNull();
   expect(container.querySelector(".ecommerce-store-frame-shell").getAttribute("aria-busy")).toBe("false");
 });

@@ -1358,7 +1358,7 @@ body.theme-dark .admin-dashboard-page .settings-page .settings-save-button {
 .admin-dashboard-page .user-dashboard-page .user-dashboard-quick-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 14px;
   margin-bottom: 10px;
 }
 
@@ -1391,6 +1391,51 @@ body.theme-dark .admin-dashboard-page .settings-page .settings-save-button {
   color: var(--theme-text-inverse);
   background: var(--theme-primary);
   border-color: var(--color-accent-text);
+}
+
+.user-dashboard-link-group {
+  display: inline-flex;
+  align-items: stretch;
+}
+
+.user-dashboard-link-group a {
+  border-end-start-radius: 0;
+  margin: 0;
+}
+
+.user-dashboard-copy-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 38px;
+  padding: 0 8px;
+  border: 1px solid var(--theme-border) !important;
+  border-start-start-radius: 0 !important;
+  border-end-start-radius: 0 !important;
+  border-start-end-radius: 11px !important;
+  border-end-end-radius: 11px !important;
+  background: var(--theme-surface) !important;
+  color: var(--theme-text-muted) !important;
+  cursor: pointer;
+  margin-left: -1px;
+  transition: background .15s, color .15s;
+}
+
+.user-dashboard-copy-btn:hover {
+  background: var(--theme-bg-soft) !important;
+  color: var(--theme-text) !important;
+  border-color: var(--theme-text-muted) !important;
+}
+
+.user-dashboard-link-group:has(a.is-primary) .user-dashboard-copy-btn {
+  border-color: rgba(var(--theme-primary-rgb), 0.4) !important;
+  background: rgba(var(--theme-primary-rgb), 0.15) !important;
+  color: var(--theme-primary) !important;
+}
+
+.user-dashboard-link-group:has(a.is-primary) .user-dashboard-copy-btn:hover {
+  background: rgba(var(--theme-primary-rgb), 0.25) !important;
+  color: var(--theme-primary) !important;
 }
 
 .admin-dashboard-page .user-dashboard-page .user-dashboard-metrics-grid {

@@ -213,6 +213,32 @@ class DeliveryAreasUpdate(BaseModel):
         return list(dict.fromkeys(value))
 
 
+class DeliveryPricingItem(BaseModel):
+    to_area_id: UUID
+    price: float = Field(ge=0, le=99999999999.99)
+
+    @field_validator("price")
+    @classmethod
+    def round_price(cls, value):
+        return round(value, 2)
+
+
+class DeliveryPricingBulkUpdate(BaseModel):
+    from_area_id: UUID
+    prices: list[DeliveryPricingItem] = Field(max_length=100)
+
+    @field_validator("prices")
+    @classmethod
+    def unique_area_ids(cls, value):
+        seen = set()
+        for item in value:
+            key = str(item.to_area_id)
+            if key in seen:
+                raise ValueError("Duplicate delivery area in pricing list")
+            seen.add(key)
+        return value
+
+
 class OrderStatusUpdate(BaseModel):
     status: Literal["confirmed", "preparing", "out_for_delivery", "delivered", "cancelled", "rejected"]
     note: str = Field(default="", max_length=1000)
@@ -925,6 +951,65 @@ def update_delivery_areas(payload: DeliveryAreasUpdate, request: Request, respon
         raise
     invalidate_ecommerce_cache(context.tenant_id)
     return result
+
+
+@router.get("/delivery-pricing")
+def get_delivery_pricing(request: Request, response: Response):
+    context = _require_ecommerce_access(request, response)
+    rows = _rows(
+        service_supabase.table("ecommerce_delivery_pricing")
+        .select("id,from_area_id,to_area_id,price")
+        .eq("tenant_id", context.tenant_id)
+    )
+    return {"pricing": rows}
+
+
+@router.put("/delivery-pricing")
+def update_delivery_pricing(payload: DeliveryPricingBulkUpdate, request: Request, response: Response):
+    context = _require_ecommerce_access(request, response)
+    _require_role(context)
+    from_area_id = str(payload.from_area_id)
+    existing = _rows(
+        service_supabase.table("ecommerce_delivery_pricing")
+        .select("id,to_area_id")
+        .eq("tenant_id", context.tenant_id)
+        .eq("from_area_id", from_area_id)
+    )
+    existing_by_area = {str(row["to_area_id"]): row["id"] for row in existing}
+    requested_areas = {str(item.to_area_id) for item in payload.prices}
+    all_area_ids = list({from_area_id} | requested_areas)
+    if all_area_ids:
+        valid = _rows(
+            service_supabase.table("ecommerce_service_areas")
+            .select("id")
+            .in_("id", all_area_ids)
+            .eq("active", True)
+        )
+        if len(valid) != len(all_area_ids):
+            raise HTTPException(status_code=400, detail="One or more delivery areas are unavailable")
+    for item in payload.prices:
+        to_id = str(item.to_area_id)
+        if to_id == from_area_id:
+            continue
+        if to_id in existing_by_area:
+            service_supabase.table("ecommerce_delivery_pricing").update({"price": item.price}).eq("id", existing_by_area[to_id]).execute()
+        else:
+            service_supabase.table("ecommerce_delivery_pricing").insert({
+                "tenant_id": context.tenant_id,
+                "from_area_id": from_area_id,
+                "to_area_id": to_id,
+                "price": item.price,
+            }).execute()
+    for row in existing:
+        if str(row["to_area_id"]) not in requested_areas:
+            service_supabase.table("ecommerce_delivery_pricing").delete().eq("id", row["id"]).execute()
+    invalidate_ecommerce_cache(context.tenant_id)
+    updated = _rows(
+        service_supabase.table("ecommerce_delivery_pricing")
+        .select("id,from_area_id,to_area_id,price")
+        .eq("tenant_id", context.tenant_id)
+    )
+    return {"pricing": updated}
 
 
 ORDER_STATUSES = {"pending", "confirmed", "preparing", "out_for_delivery", "delivered", "fulfilled", "cancelled", "rejected"}
