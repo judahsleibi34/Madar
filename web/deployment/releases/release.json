@@ -2,13 +2,13 @@
   "release_metadata_version": 1,
   "schema": {
     "compatible_min": 81,
-    "compatible_max": 102,
-    "target": 102,
+    "compatible_max": 104,
+    "target": 104,
     "migration_class": "expand-only",
     "rollback_compatible_min": 81,
     "rollback_compatible_max": 99
   },
   "migration_policy": "automatic-after-known-good-backup-first-forward-repair",
-  "notes": "Forward-only production bridge preserving immutable schema 099 commercial access ledger. Starting from production schema 99, apply migration 100 site-visit RPC correction, migration 101 variant attribute presentation, and migration 102 ecommerce discount conditions. Perform governed verified backup before migration. Do not replay migrations 001-099. After schema advances beyond 99, use forward repair rather than incompatible traffic rollback.",
-  "migration_manifest": "migrations-100-102.json"
+  "notes": "Forward-only production bridge preserving immutable schema 099 commercial access ledger. Starting from production schema 99, apply migrations 100 through 102, migration 103 delivery pricing, and migration 104 to normalize pricing to one fee per delivery area. Perform governed verified backup before migration. Do not replay migrations 001-099. After schema advances beyond 99, use forward repair rather than incompatible traffic rollback.",
+  "migration_manifest": "migrations-100-104.json"
 }

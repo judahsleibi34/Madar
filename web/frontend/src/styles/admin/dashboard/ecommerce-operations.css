@@ -47,26 +47,36 @@
 .ecommerce-delivery-grid label.is-enabled { border-color:var(--theme-primary); background:var(--theme-surface); }
 .ecommerce-delivery-grid label span { display: flex; min-width: 0; flex-direction: column; }
 .ecommerce-delivery-grid label small { color: var(--theme-text-muted); text-align: left; }
-.ecommerce-delivery-page { font-family:var(--font-family-base); font-size:var(--font-size-sm,.875rem); }
+.ecommerce-delivery-page { max-width:1400px; gap:18px; padding-top:28px; font-family:var(--font-family-base); font-size:var(--font-size-sm,.875rem); }
+.ecommerce-delivery-page .ecommerce-page-header { padding:0; }
+.ecommerce-delivery-page .ecommerce-page-header h1 { margin:0 0 8px; font-size:clamp(1.75rem,3vw,2.35rem); font-weight:800; line-height:1.15; letter-spacing:-.025em; }
+.ecommerce-delivery-page .ecommerce-page-header p { font-size:var(--font-size-sm,.875rem); font-weight:400; line-height:1.55; }
 .ecommerce-delivery-page .ecommerce-delivery-actions { display:flex; flex-wrap:wrap; align-items:center; justify-content:flex-end; gap:10px; }
-.ecommerce-delivery-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:12px; }
-.ecommerce-delivery-page .ecommerce-delivery-grid { margin-top:22px; }
-.ecommerce-delivery-page .ecommerce-operations-card { border:0; padding:0; background:transparent; }
-.ecommerce-delivery-card { display:flex; flex-direction:column; padding:16px; border:1px solid var(--theme-border); border-radius:12px; background:var(--theme-surface); transition:border-color .15s,box-shadow .15s; }
+.ecommerce-delivery-page .ecommerce-delivery-actions .ecommerce-primary-button:first-child { border:1px solid var(--color-border-control) !important; background:transparent; box-shadow:none; color:var(--theme-text); }
+.ecommerce-delivery-page .ecommerce-delivery-actions .ecommerce-primary-button:first-child:hover:not(:disabled) { border-color:var(--theme-primary) !important; background:var(--theme-bg-soft); }
+.ecommerce-delivery-page .ecommerce-operations-card { margin-top:2px; padding:0; border:0; background:transparent; }
+.ecommerce-delivery-page .ecommerce-operations-toolbar { gap:14px; }
+.ecommerce-delivery-page .ecommerce-search { min-height:44px; padding:0 14px; border:1px solid var(--color-border-control); border-radius:11px; background:var(--theme-surface); }
+.ecommerce-delivery-page .ecommerce-search:focus-within { border-color:var(--theme-text-muted); }
+.ecommerce-delivery-enabled-count { flex:0 0 auto; padding:7px 11px; border-radius:999px; background:var(--theme-bg-soft); color:var(--theme-text-muted); font-weight:600; }
+.ecommerce-delivery-page .ecommerce-delivery-grid { margin-top:16px; display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:14px; }
+.ecommerce-delivery-card { display:flex; min-width:0; flex-direction:column; padding:18px; border:1px solid var(--theme-border); border-radius:12px; background:var(--theme-surface); transition:border-color .15s,background-color .15s; }
 .ecommerce-delivery-card:hover { border-color:var(--theme-text-muted); }
-.ecommerce-delivery-card.is-enabled { border-color:var(--theme-primary); }
-.ecommerce-delivery-card-header { display:flex; align-items:center; justify-content:space-between; gap:10px; border:0; background:transparent; min-height:0; }
-.ecommerce-delivery-card-actions { display:flex; align-items:center; gap:6px; flex-shrink:0; }
-.ecommerce-delivery-card-actions input[type="checkbox"] { appearance:auto !important; width:18px !important; height:18px !important; min-width:18px; min-height:18px !important; margin:0; padding:0 !important; accent-color:var(--theme-primary); cursor:pointer; }
-.ecommerce-delivery-card-delete { display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; padding:0; border:0; border-radius:6px; background:transparent; color:var(--theme-text-muted); cursor:pointer; flex-shrink:0; }
-.ecommerce-delivery-card-delete:hover { background:var(--theme-danger); color:var(--theme-text-inverse); }
-.ecommerce-delivery-card-title { display:flex; align-items:center; gap:8px; min-width:0; flex:1 1 0; cursor:pointer; }
+.ecommerce-delivery-card.is-enabled { border-color:var(--theme-border); background:var(--theme-surface); }
+.ecommerce-delivery-card-header { display:flex; align-items:flex-start; justify-content:flex-start; gap:10px; min-height:30px; padding:0; border:0 !important; outline:0; border-radius:0; background:transparent !important; box-shadow:none !important; }
+.ecommerce-delivery-card-actions { display:flex; align-items:center; gap:8px; flex-shrink:0; }
+.ecommerce-delivery-card-toggle { appearance:auto !important; width:19px !important; height:19px !important; min-width:19px; min-height:19px !important; margin:4px 0 0; padding:0 !important; border:0 !important; box-shadow:none !important; accent-color:var(--theme-primary); cursor:pointer; flex:0 0 auto; }
+.ecommerce-delivery-card-delete { display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; padding:0; border:0; border-radius:7px; background:transparent; color:var(--theme-text-muted); cursor:pointer; flex-shrink:0; }
+.ecommerce-delivery-card-delete:hover:not(:disabled) { background:color-mix(in srgb,var(--theme-danger) 12%,transparent); color:var(--theme-danger); }
+.ecommerce-delivery-card-title { display:flex; align-items:flex-start; gap:9px; min-width:0; flex:1 1 0; padding:4px 0 0; border:0 !important; outline:0; border-radius:0; background:transparent !important; box-shadow:none !important; cursor:pointer; }
 .ecommerce-delivery-card-title svg { flex-shrink:0; color:var(--theme-text-muted); }
-.ecommerce-delivery-area-name { font-size:var(--font-size-sm,.875rem); font-weight:600; overflow-wrap:normal; word-break:normal; min-width:0; }
-.ecommerce-delivery-card-fee { display:flex; flex-direction:column; gap:6px; margin-top:12px; }
-.ecommerce-delivery-fee-label { font-size:var(--font-size-xs,.75rem); color:var(--theme-text-muted); font-weight:400; }
-.ecommerce-delivery-price-input { width:100%; height:36px; padding:6px 10px; border:1px solid var(--theme-border); border-radius:8px; background:var(--theme-bg); color:var(--theme-text); font:inherit; font-size:var(--font-size-sm,.875rem); text-align:start; }
-.ecommerce-delivery-price-input:focus { outline:none; border-color:var(--theme-primary); }
+.ecommerce-delivery-area-name { min-width:0; color:var(--theme-text); font-size:var(--font-size-sm,.875rem); font-weight:650; line-height:1.45; overflow-wrap:anywhere; }
+.ecommerce-delivery-card-fee { display:flex; flex-direction:column; gap:7px; margin-top:18px; padding-top:15px; border-top:1px solid var(--theme-border); }
+.ecommerce-delivery-fee-label { font-size:var(--font-size-xs,.75rem); color:var(--theme-text-muted); font-weight:500; }
+.ecommerce-delivery-price-field { min-width:0; }
+.ecommerce-delivery-price-input { width:100%; min-width:0; height:42px; padding:7px 11px; border:1px solid var(--color-border-control); border-radius:9px; background:var(--theme-bg); color:var(--theme-text); font:inherit; font-size:var(--font-size-sm,.875rem); text-align:start; }
+.ecommerce-delivery-price-input:focus { outline:none; border-color:var(--theme-text-muted); }
+.ecommerce-delivery-price-input:disabled { opacity:.5; cursor:not-allowed; }
 .ecommerce-delivery-price-input::-webkit-inner-spin-button,
 .ecommerce-delivery-price-input::-webkit-outer-spin-button { -webkit-appearance:none; margin:0; }
 .ecommerce-delivery-price-input[type="number"] { -moz-appearance:textfield; }
@@ -99,8 +109,11 @@
   .ecommerce-delivery-location-dialog { padding:20px; }
   .ecommerce-delivery-location-dialog form { grid-template-columns:1fr; }
   .ecommerce-delivery-page .ecommerce-page-header { flex-direction:column; align-items:stretch; }
-  .ecommerce-delivery-page .ecommerce-page-actions { display:flex; flex-wrap:wrap; gap:10px; }
-  .ecommerce-delivery-page .ecommerce-operations-card { padding:16px; }
+  .ecommerce-delivery-page .ecommerce-page-actions { display:grid; grid-template-columns:1fr; width:100%; gap:10px; }
+  .ecommerce-delivery-page .ecommerce-page-actions button { width:100%; }
+  .ecommerce-delivery-page .ecommerce-operations-toolbar { align-items:stretch; }
+  .ecommerce-delivery-enabled-count { align-self:flex-start; }
+  .ecommerce-delivery-page .ecommerce-delivery-grid { grid-template-columns:1fr; }
 }
 .ecommerce-operations-state { min-height: 180px; display: flex; align-items: center; justify-content: center; gap: 10px; color: var(--theme-text-muted); }
 .ecommerce-operations-state.is-error, .ecommerce-operations-warning { color: var(--theme-danger, #b42318); }

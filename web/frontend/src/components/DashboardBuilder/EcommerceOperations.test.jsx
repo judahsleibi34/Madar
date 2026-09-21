@@ -9,19 +9,24 @@ import {
   collectEcommerceOrderPayment,
   createEcommerceDeliveryLocation,
   fetchEcommerceDeliveryAreas,
+  fetchEcommerceDeliveryPricing,
   fetchEcommerceOrder,
   fetchEcommerceOrders,
   saveEcommerceDeliveryAreas,
+  saveEcommerceDeliveryPricing,
   transitionEcommerceOrder,
 } from "../../services/ecommerceApi";
 
 vi.mock("../../services/ecommerceApi", () => ({
   collectEcommerceOrderPayment: vi.fn(),
   createEcommerceDeliveryLocation: vi.fn(),
+  deleteEcommerceDeliveryLocation: vi.fn(),
   fetchEcommerceDeliveryAreas: vi.fn(),
+  fetchEcommerceDeliveryPricing: vi.fn(),
   fetchEcommerceOrder: vi.fn(),
   fetchEcommerceOrders: vi.fn(),
   saveEcommerceDeliveryAreas: vi.fn(),
+  saveEcommerceDeliveryPricing: vi.fn(),
   transitionEcommerceOrder: vi.fn(),
 }));
 
@@ -33,8 +38,13 @@ const areas = [
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
+  fetchEcommerceDeliveryPricing.mockResolvedValue({ pricing: [] });
+  saveEcommerceDeliveryPricing.mockResolvedValue({ pricing: [] });
   i18n.changeLanguage("en");
 });
+
+fetchEcommerceDeliveryPricing.mockResolvedValue({ pricing: [] });
+saveEcommerceDeliveryPricing.mockResolvedValue({ pricing: [] });
 
 describe("merchant ecommerce operations", () => {
   it("loads, searches, changes, and batch-saves delivery coverage", async () => {
@@ -42,14 +52,34 @@ describe("merchant ecommerce operations", () => {
     saveEcommerceDeliveryAreas.mockResolvedValue({ enabled_service_area_ids: areas.map((area) => area.id) });
     render(<EcommerceDeliveryPage />);
 
-    expect(await screen.findByText("Ramallah")).toBeTruthy();
+    expect(await screen.findByRole("checkbox", { name: "Ramallah" })).toBeTruthy();
     expect(screen.getByText("1 enabled")).toBeTruthy();
     fireEvent.change(screen.getByLabelText("Search delivery areas"), { target: { value: "نابلس" } });
-    expect(screen.queryByText("Ramallah")).toBeNull();
+    expect(screen.queryByRole("checkbox", { name: "Ramallah" })).toBeNull();
     fireEvent.click(screen.getByRole("checkbox", { name: /Nablus/ }));
     expect(screen.getByText("2 enabled")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: /Save delivery areas/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Save delivery settings/ }));
     await waitFor(() => expect(saveEcommerceDeliveryAreas).toHaveBeenCalledWith(areas.map((area) => area.id), { scope: "authenticated" }));
+  });
+
+  it("saves one fee for each enabled delivery area", async () => {
+    const enabledAreas = areas.map((area) => ({ ...area, enabled: true }));
+    fetchEcommerceDeliveryAreas.mockResolvedValue({ areas: enabledAreas });
+    fetchEcommerceDeliveryPricing.mockResolvedValue({
+      pricing: [{ id: "price-1", service_area_id: areas[1].id, price: 7.5 }],
+    });
+    render(<EcommerceDeliveryPage />);
+
+    expect(await screen.findByDisplayValue("7.5")).toBeTruthy();
+    fireEvent.change(screen.getByLabelText(/Delivery price — Nablus/), { target: { value: "9" } });
+    fireEvent.click(screen.getByRole("button", { name: /Save delivery settings/ }));
+    await waitFor(() => expect(saveEcommerceDeliveryPricing).toHaveBeenCalledWith(
+      [
+        { service_area_id: areas[0].id, price: 0 },
+        { service_area_id: areas[1].id, price: 9 },
+      ],
+      { scope: "authenticated" }
+    ));
   });
 
   it("creates a custom hierarchy and includes it in the next coverage save", async () => {
@@ -68,10 +98,10 @@ describe("merchant ecommerce operations", () => {
     fireEvent.change(screen.getByLabelText("District / other level (optional)"), { target: { value: "Downtown" } });
     fireEvent.click(screen.getByRole("button", { name: "Add location", exact: true }));
     await waitFor(() => expect(createEcommerceDeliveryLocation).toHaveBeenCalledWith({ country: "Jordan", levels: ["Amman", "Downtown"], name_ar: "الأردن / عمان / Downtown" }, { scope: "authenticated" }));
-    expect(await screen.findByText(custom.name_en)).toBeTruthy();
+    expect(await screen.findByRole("checkbox", { name: custom.name_en })).toBeTruthy();
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(saveEcommerceDeliveryAreas).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: /Save delivery areas/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Save delivery settings/ }));
     await waitFor(() => expect(saveEcommerceDeliveryAreas).toHaveBeenCalledWith([areas[0].id, custom.id], { scope: "authenticated" }));
   });
 
@@ -159,7 +189,7 @@ describe("merchant ecommerce operations", () => {
     render(<EcommerceDeliveryPage />);
 
     expect(await screen.findByRole("heading", { level: 1, name: "مناطق التوصيل" })).toBeTruthy();
-    expect(screen.getByText("رام الله")).toBeTruthy();
+    expect(screen.getByRole("checkbox", { name: "رام الله" })).toBeTruthy();
     expect(screen.getByText("1 مفعّلة")).toBeTruthy();
     expect(screen.getByLabelText("البحث في مناطق التوصيل")).toBeTruthy();
     expect(document.querySelector(".ecommerce-operations-page").getAttribute("dir")).toBe("rtl");

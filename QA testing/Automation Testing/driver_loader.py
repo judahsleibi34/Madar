@@ -1,4 +1,5 @@
-﻿from selenium import webdriver
+import os
+from selenium import webdriver
 from selenium.common.exceptions import WebDriverException
 
 
@@ -7,9 +8,40 @@ class DriverLoader:
 
     @classmethod
     def create_driver(cls):
+        # Prevent OWASP ZAP's bundled ChromeDriver from
+        # overriding Selenium Manager.
+        path_parts = os.environ.get(
+            "PATH",
+            ""
+        ).split(
+            os.pathsep
+        )
+
+        path_parts = [
+            part
+            for part in path_parts
+            if "zap\\webdriver"
+            not in part.lower()
+        ]
+
+        os.environ["PATH"] = (
+            os.pathsep.join(
+                path_parts
+            )
+        )
+
         options = webdriver.ChromeOptions()
 
         options.add_argument("--start-maximized")
+
+        # Capture browser/network traffic for QA diagnostics.
+        options.set_capability(
+            "goog:loggingPrefs",
+            {
+                "performance": "ALL",
+                "browser": "ALL"
+            }
+        )
 
         options.add_experimental_option(
             "detach",

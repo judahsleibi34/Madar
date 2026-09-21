@@ -261,8 +261,8 @@ def check_production_lineage(errors: list[str]) -> None:
                 relative = path.relative_to(REPO_ROOT.parent).as_posix()
                 if number <= 99 and relative not in frozen["files"]:
                     errors.append(f"unexpected historical migration: {relative}")
-                if number > 102:
-                    errors.append(f"unexpected migration beyond release target 102: {relative}")
+                if number > 104:
+                    errors.append(f"unexpected migration beyond release target 104: {relative}")
     except (OSError, KeyError, ValueError, TypeError) as error:
         errors.append(f"production lineage manifest invalid: {type(error).__name__}")
 

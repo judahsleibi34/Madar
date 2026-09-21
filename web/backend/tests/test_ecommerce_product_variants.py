@@ -1,11 +1,13 @@
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
+from fastapi import Response
 from pydantic import ValidationError
 
 from routes import ecommerce_routes
-from routes.ecommerce_routes import ProductPayload
+from routes.ecommerce_routes import ProductPayload, ProductVariantInventoryPayload
 from routes.public_site_routes import PublicStoreOrderCreate
 
 
@@ -134,6 +136,52 @@ class EcommerceProductVariantTests(unittest.TestCase):
                 options=[{"id": OPTION_ID, "code": "finish", "name_translations": {"en": "Finish"}, "values": [{"id": VALUE_ID, "code": "matte", "value_translations": {"en": "Matte"}}]}],
                 variants=[{"id": VARIANT_ID, "sku": "SHIRT-X", "option_value_ids": ["77777777-7777-7777-7777-777777777777"]}],
             ))
+
+    def test_variant_inventory_payload_exposes_only_options_and_variants(self):
+        payload = ProductVariantInventoryPayload(
+            options=[{"id": OPTION_ID, "code": "color", "display_type": "color", "name_translations": {"en": "Color"}, "values": [
+                {"id": VALUE_ID, "code": "black", "value_translations": {"en": "Black"}, "color_hex": "#111111"},
+            ]}],
+            variants=[{"id": VARIANT_ID, "sku": "SHIRT-BLACK", "inventory_quantity": 4, "option_value_ids": [VALUE_ID]}],
+        )
+        self.assertEqual(set(payload.model_dump().keys()), {"options", "variants"})
+
+    def test_variant_only_route_preserves_product_fields_and_attributes(self):
+        existing = {
+            **product_payload(),
+            "id": PRODUCT_ID,
+            "attributes": [{
+                "id": "55555555-5555-4555-8555-555555555555",
+                "name_translations": {"en": "Material"},
+                "value_translations": {"en": "Leather"},
+                "sort_order": 0,
+            }],
+            "options": [],
+            "variants": [],
+        }
+        payload = ProductVariantInventoryPayload(
+            options=[{"id": OPTION_ID, "code": "color", "display_type": "color", "name_translations": {"en": "Color"}, "values": [
+                {"id": VALUE_ID, "code": "black", "value_translations": {"en": "Black"}, "color_hex": "#111111"},
+            ]}],
+            variants=[{"id": VARIANT_ID, "sku": "SHIRT-BLACK", "inventory_quantity": 4, "option_value_ids": [VALUE_ID]}],
+        )
+        updated = {**existing, "options": payload.model_dump(mode="json")["options"], "variants": payload.model_dump(mode="json")["variants"]}
+
+        with patch.object(ecommerce_routes, "_require_ecommerce_access", return_value=SimpleNamespace(tenant_id=7)), \
+             patch.object(ecommerce_routes, "_require_role"), \
+             patch.object(ecommerce_routes, "_tenant_row", return_value=existing), \
+             patch.object(ecommerce_routes, "_catalog_for_tenant", side_effect=[{"products": [existing]}, {"products": [updated]}]), \
+             patch.object(ecommerce_routes, "_save_product_aggregate") as save_aggregate, \
+             patch.object(ecommerce_routes, "_product_data") as save_product_fields, \
+             patch.object(ecommerce_routes, "invalidate_ecommerce_cache"):
+            result = ecommerce_routes.update_product_variants(PRODUCT_ID, payload, object(), Response())
+
+        save_product_fields.assert_not_called()
+        saved_payload = save_aggregate.call_args.args[2]
+        self.assertEqual(saved_payload.translations["en"]["name"], "Shirt")
+        self.assertEqual(saved_payload.price, 20)
+        self.assertEqual(saved_payload.attributes[0].value_translations["en"], "Leather")
+        self.assertEqual(result["product"]["variants"][0]["inventory_quantity"], 4)
 
     def test_checkout_contract_accepts_variant_and_keeps_simple_legacy_item(self):
         base = {"idempotency_key": "checkout-1234567890abcdef", "customer_name": "Buyer", "email": "buyer@example.com", "phone": "+970590000000", "service_area_id": "95000000-0000-0000-0000-000000000001", "street": "Main Street"}

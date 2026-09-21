@@ -214,7 +214,7 @@ class DeliveryAreasUpdate(BaseModel):
 
 
 class DeliveryPricingItem(BaseModel):
-    to_area_id: UUID
+    service_area_id: UUID
     price: float = Field(ge=0, le=99999999999.99)
 
     @field_validator("price")
@@ -224,7 +224,6 @@ class DeliveryPricingItem(BaseModel):
 
 
 class DeliveryPricingBulkUpdate(BaseModel):
-    from_area_id: UUID
     prices: list[DeliveryPricingItem] = Field(max_length=100)
 
     @field_validator("prices")
@@ -232,7 +231,7 @@ class DeliveryPricingBulkUpdate(BaseModel):
     def unique_area_ids(cls, value):
         seen = set()
         for item in value:
-            key = str(item.to_area_id)
+            key = str(item.service_area_id)
             if key in seen:
                 raise ValueError("Duplicate delivery area in pricing list")
             seen.add(key)
@@ -391,6 +390,12 @@ class ProductVariantPayload(BaseModel):
     def unique_values(cls, value):
         if len(value) != len(set(value)): raise ValueError("A variant cannot repeat an option value")
         return value
+
+
+class ProductVariantInventoryPayload(BaseModel):
+    options: list[ProductOptionPayload] = Field(..., min_length=1, max_length=5)
+    variants: list[ProductVariantPayload] = Field(..., min_length=1, max_length=500)
+
 
 class ProductPayload(CatalogItemPayload):
     sku: str | None = Field(default=None, max_length=120)
@@ -900,7 +905,7 @@ def create_custom_delivery_area(payload: CustomDeliveryAreaCreate, request: Requ
     context = _require_ecommerce_access(request, response)
     _require_role(context)
     prefix = f"custom-{int(context.tenant_id)}-"
-    existing = _rows(service_supabase.table("ecommerce_service_areas").select("id,name_en").like("code", f"{prefix}%"))
+    existing = _rows(service_supabase.table("ecommerce_service_areas").select("id,name_en").like("code", f"{prefix}%").eq("active", True))
     if len(existing) >= 100:
         raise HTTPException(status_code=400, detail="A store can have at most 100 custom locations")
     name = " / ".join([payload.country, *payload.levels])
@@ -914,6 +919,36 @@ def create_custom_delivery_area(payload: CustomDeliveryAreaCreate, request: Requ
     _rows(service_supabase.table("ecommerce_service_areas").insert(area))
     invalidate_ecommerce_cache(context.tenant_id)
     return {"area": {**area, "enabled": False}}
+
+
+@router.delete("/delivery-areas/custom/{area_id}")
+def delete_custom_delivery_area(area_id: UUID, request: Request, response: Response):
+    context = _require_ecommerce_access(request, response)
+    _require_role(context)
+    rows = _rows(
+        service_supabase.table("ecommerce_service_areas")
+        .select("id,code")
+        .eq("id", str(area_id))
+        .eq("active", True)
+        .limit(1)
+    )
+    area = rows[0] if rows else None
+    if not area or not str(area.get("code") or "").startswith(f"custom-{int(context.tenant_id)}-"):
+        raise HTTPException(status_code=404, detail="Custom delivery location not found")
+    try:
+        service_supabase.table("ecommerce_delivery_pricing").delete().eq("tenant_id", context.tenant_id).eq(
+            "service_area_id", str(area_id)
+        ).execute()
+    except Exception as error:
+        message = str(error).lower()
+        if "ecommerce_delivery_pricing" not in message and "schema cache" not in message and "pgrst" not in message:
+            raise
+    service_supabase.table("ecommerce_tenant_service_areas").delete().eq("tenant_id", context.tenant_id).eq(
+        "service_area_id", str(area_id)
+    ).execute()
+    service_supabase.table("ecommerce_service_areas").update({"active": False}).eq("id", str(area_id)).execute()
+    invalidate_ecommerce_cache(context.tenant_id)
+    return {"deleted": True, "area_id": str(area_id)}
 
 
 @router.get("/delivery-areas")
@@ -956,11 +991,14 @@ def update_delivery_areas(payload: DeliveryAreasUpdate, request: Request, respon
 @router.get("/delivery-pricing")
 def get_delivery_pricing(request: Request, response: Response):
     context = _require_ecommerce_access(request, response)
-    rows = _rows(
-        service_supabase.table("ecommerce_delivery_pricing")
-        .select("id,from_area_id,to_area_id,price")
-        .eq("tenant_id", context.tenant_id)
-    )
+    try:
+        rows = _rows(
+            service_supabase.table("ecommerce_delivery_pricing")
+            .select("id,service_area_id,price")
+            .eq("tenant_id", context.tenant_id)
+        )
+    except Exception as error:
+        raise HTTPException(status_code=503, detail="Delivery pricing requires database migration 104") from error
     return {"pricing": rows}
 
 
@@ -968,47 +1006,61 @@ def get_delivery_pricing(request: Request, response: Response):
 def update_delivery_pricing(payload: DeliveryPricingBulkUpdate, request: Request, response: Response):
     context = _require_ecommerce_access(request, response)
     _require_role(context)
-    from_area_id = str(payload.from_area_id)
-    existing = _rows(
-        service_supabase.table("ecommerce_delivery_pricing")
-        .select("id,to_area_id")
-        .eq("tenant_id", context.tenant_id)
-        .eq("from_area_id", from_area_id)
-    )
-    existing_by_area = {str(row["to_area_id"]): row["id"] for row in existing}
-    requested_areas = {str(item.to_area_id) for item in payload.prices}
-    all_area_ids = list({from_area_id} | requested_areas)
-    if all_area_ids:
+    try:
+        existing = _rows(
+            service_supabase.table("ecommerce_delivery_pricing")
+            .select("id,service_area_id")
+            .eq("tenant_id", context.tenant_id)
+        )
+    except Exception as error:
+        raise HTTPException(status_code=503, detail="Delivery pricing requires database migration 104") from error
+    existing_by_area = {str(row["service_area_id"]): row["id"] for row in existing}
+    requested_areas = {str(item.service_area_id) for item in payload.prices}
+    if requested_areas:
         valid = _rows(
             service_supabase.table("ecommerce_service_areas")
-            .select("id")
-            .in_("id", all_area_ids)
+            .select("id,code")
+            .in_("id", list(requested_areas))
             .eq("active", True)
         )
-        if len(valid) != len(all_area_ids):
+        if len(valid) != len(requested_areas) or any(
+            not _delivery_area_belongs_to_tenant(area, context.tenant_id) for area in valid
+        ):
             raise HTTPException(status_code=400, detail="One or more delivery areas are unavailable")
-    for item in payload.prices:
-        to_id = str(item.to_area_id)
-        if to_id == from_area_id:
-            continue
-        if to_id in existing_by_area:
-            service_supabase.table("ecommerce_delivery_pricing").update({"price": item.price}).eq("id", existing_by_area[to_id]).execute()
-        else:
-            service_supabase.table("ecommerce_delivery_pricing").insert({
-                "tenant_id": context.tenant_id,
-                "from_area_id": from_area_id,
-                "to_area_id": to_id,
-                "price": item.price,
-            }).execute()
-    for row in existing:
-        if str(row["to_area_id"]) not in requested_areas:
-            service_supabase.table("ecommerce_delivery_pricing").delete().eq("id", row["id"]).execute()
-    invalidate_ecommerce_cache(context.tenant_id)
-    updated = _rows(
-        service_supabase.table("ecommerce_delivery_pricing")
-        .select("id,from_area_id,to_area_id,price")
+    enabled_rows = _rows(
+        service_supabase.table("ecommerce_tenant_service_areas")
+        .select("service_area_id")
         .eq("tenant_id", context.tenant_id)
+        .eq("enabled", True)
     )
+    enabled_areas = {str(row.get("service_area_id")) for row in enabled_rows}
+    if requested_areas != enabled_areas:
+        raise HTTPException(
+            status_code=400,
+            detail="Provide one delivery price for every enabled area",
+        )
+    try:
+        for item in payload.prices:
+            area_id = str(item.service_area_id)
+            if area_id in existing_by_area:
+                service_supabase.table("ecommerce_delivery_pricing").update({"price": item.price}).eq("id", existing_by_area[area_id]).execute()
+            else:
+                service_supabase.table("ecommerce_delivery_pricing").insert({
+                    "tenant_id": context.tenant_id,
+                    "service_area_id": area_id,
+                    "price": item.price,
+                }).execute()
+        for row in existing:
+            if str(row["service_area_id"]) not in requested_areas:
+                service_supabase.table("ecommerce_delivery_pricing").delete().eq("id", row["id"]).execute()
+        updated = _rows(
+            service_supabase.table("ecommerce_delivery_pricing")
+            .select("id,service_area_id,price")
+            .eq("tenant_id", context.tenant_id)
+        )
+    except Exception as error:
+        raise HTTPException(status_code=503, detail="Delivery pricing could not be persisted") from error
+    invalidate_ecommerce_cache(context.tenant_id)
     return {"pricing": updated}
 
 
@@ -1376,6 +1428,33 @@ def update_product(product_id: UUID, payload: ProductPayload, request: Request, 
             product["tag_ids"] = tag_ids
         invalidate_ecommerce_cache(context.tenant_id)
         return {"product": product}
+    except Exception as error:
+        _handle_catalog_error(error)
+
+
+@router.put("/products/{product_id}/variants")
+def update_product_variants(product_id: UUID, payload: ProductVariantInventoryPayload, request: Request, response: Response):
+    context = _require_ecommerce_access(request, response)
+    _require_role(context)
+    _tenant_row("ecommerce_products", product_id, context.tenant_id)
+    try:
+        catalog = _catalog_for_tenant(context.tenant_id)
+        existing = next((item for item in catalog["products"] if str(item.get("id")) == str(product_id)), None)
+        if not existing:
+            raise HTTPException(status_code=404, detail="ecommerce_products item not found")
+        validated = ProductPayload.model_validate({
+            **existing,
+            "attributes": existing.get("attributes") or [],
+            "options": payload.options,
+            "variants": payload.variants,
+        })
+        _save_product_aggregate(context.tenant_id, str(product_id), validated)
+        invalidate_ecommerce_cache(context.tenant_id)
+        updated_catalog = _catalog_for_tenant(context.tenant_id)
+        product = next(item for item in updated_catalog["products"] if str(item.get("id")) == str(product_id))
+        return {"product": product}
+    except HTTPException:
+        raise
     except Exception as error:
         _handle_catalog_error(error)
 

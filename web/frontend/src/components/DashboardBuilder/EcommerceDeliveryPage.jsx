@@ -7,6 +7,7 @@ import AuthToast from "../AuthPages/AuthToast";
 import EcommerceOperationsSkeleton from "./EcommerceOperationsSkeleton";
 import {
   createEcommerceDeliveryLocation,
+  deleteEcommerceDeliveryLocation,
   fetchEcommerceDeliveryAreas,
   fetchEcommerceDeliveryPricing,
   saveEcommerceDeliveryAreas,
@@ -30,6 +31,7 @@ export default function EcommerceDeliveryPage({ user }) {
   const [locationOpen, setLocationOpen] = useState(false);
   const [location, setLocation] = useState({ country: "", country_ar: "", levels: ["", ""], levels_ar: ["", ""] });
   const [creating, setCreating] = useState(false);
+  const [deletingId, setDeletingId] = useState("");
   const [locationError, setLocationError] = useState("");
 
   const [pricing, setPricing] = useState(() => {
@@ -69,10 +71,12 @@ export default function EcommerceDeliveryPage({ user }) {
     let cancelled = false;
     fetchEcommerceDeliveryPricing({ scope: cacheScope })
       .then((result) => {
-        if (!cancelled) setPricing(result?.pricing || []);
+        if (cancelled) return;
+        const nextPricing = result?.pricing || [];
+        setPricing(nextPricing);
       })
       .catch(() => {
-        if (!cancelled) setToast({ type: "error", title: t("admin.loadPricing"), message: t("admin.tryAgain") });
+        if (!cancelled) setToast({ type: "error", title: t("merchant.loadPricing"), message: t("admin.tryAgain") });
       });
     return () => {
       cancelled = true;
@@ -82,7 +86,7 @@ export default function EcommerceDeliveryPage({ user }) {
   const pricingMap = useMemo(() => {
     const map = {};
     for (const row of pricing) {
-      map[row.to_area_id] = row.price;
+      map[row.service_area_id] = row.price;
     }
     return map;
   }, [pricing]);
@@ -132,9 +136,9 @@ export default function EcommerceDeliveryPage({ user }) {
     const num = priceStr === "" ? null : parseFloat(priceStr);
     if (priceStr !== "" && (isNaN(num) || num < 0)) return;
     setPricing((prev) => {
-      const next = prev.filter((r) => r.to_area_id !== areaId);
+      const next = prev.filter((r) => r.service_area_id !== areaId);
       if (num !== null) {
-        next.push({ id: `pending-${areaId}`, to_area_id: areaId, price: num });
+        next.push({ id: `pending-${areaId}`, service_area_id: areaId, price: num });
       }
       return next;
     });
@@ -183,16 +187,42 @@ export default function EcommerceDeliveryPage({ user }) {
     }
   };
 
+  const deleteLocation = async (area) => {
+    if (deletingId) return;
+    setDeletingId(area.id);
+    try {
+      await deleteEcommerceDeliveryLocation(area.id, { scope: cacheScope });
+      setAreas((current) => current.filter((item) => item.id !== area.id));
+      setSelectedIds((current) => current.filter((id) => id !== area.id));
+      setSavedIds((current) => current.filter((id) => id !== area.id));
+      setPricing((current) => current.filter((row) => row.service_area_id !== area.id));
+      setToast({ type: "success", title: t("merchant.locationDeleted"), message: t("merchant.locationDeletedBody") });
+    } catch {
+      setToast({ type: "error", title: t("merchant.deleteLocationError"), message: t("admin.tryAgain") });
+    } finally {
+      setDeletingId("");
+    }
+  };
+
   const save = async () => {
     setSaving(true);
     try {
       await saveEcommerceDeliveryAreas(selectedIds, { scope: cacheScope });
       setSavedIds(selectedIds);
-      if (pricingDirty && selectedIds.length > 0) {
-        const toSave = pricing
-          .filter((r) => selectedIds.includes(r.to_area_id))
-          .map((r) => ({ to_area_id: r.to_area_id, price: r.price }));
-        await saveEcommerceDeliveryPricing(selectedIds[0], toSave, { scope: cacheScope });
+      if (pricingDirty || dirty) {
+        const pricesByArea = new Map(
+          pricing.map((row) => [row.service_area_id, row.price]),
+        );
+        const toSave = selectedIds.map((serviceAreaId) => ({
+          service_area_id: serviceAreaId,
+          price: Number(pricesByArea.get(serviceAreaId) ?? 0),
+        }));
+        try {
+          await saveEcommerceDeliveryPricing(toSave, { scope: cacheScope });
+        } catch {
+          setToast({ type: "error", title: t("merchant.savePricingError"), message: t("admin.tryAgain") });
+          return;
+        }
         setPricingDirty(false);
       }
       setToast({
@@ -259,7 +289,7 @@ export default function EcommerceDeliveryPage({ user }) {
               placeholder={t("merchant.searchAreas")}
             />
           </label>
-          <strong>{t("merchant.enabledCount", { count: selectedIds.length })}</strong>
+          <span className="ecommerce-delivery-enabled-count">{t("merchant.enabledCount", { count: selectedIds.length })}</span>
         </div>
         {loading ? (
           <EcommerceOperationsSkeleton variant="delivery" label={t("admin.loadingDelivery")} />
@@ -268,6 +298,14 @@ export default function EcommerceDeliveryPage({ user }) {
             {visible.map((area) => (
               <div key={area.id} className={"ecommerce-delivery-card" + (selectedIds.includes(area.id) ? " is-enabled" : "")}>
                 <div className="ecommerce-delivery-card-header">
+                  <input
+                    className="ecommerce-delivery-card-toggle"
+                    type="checkbox"
+                    aria-label={locale === "ar" ? area.name_ar || area.name_en : area.name_en || area.name_ar}
+                    checked={selectedIds.includes(area.id)}
+                    onChange={() => toggle(area.id)}
+                    onClick={(event) => event.stopPropagation()}
+                  />
                   <span className="ecommerce-delivery-card-title" onClick={() => toggle(area.id)} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(area.id); } }}>
                     <MapPin size={18} aria-hidden="true" />
                     <span className="ecommerce-delivery-area-name">
@@ -276,31 +314,28 @@ export default function EcommerceDeliveryPage({ user }) {
                   </span>
                   <span className="ecommerce-delivery-card-actions">
                     {area.code?.startsWith("custom-") && (
-                      <button type="button" className="ecommerce-delivery-card-delete" aria-label={t("admin.delete", { name: area.name_en })} onClick={(e) => { e.stopPropagation(); /* TODO: delete custom location */ }}>
-                        <Trash2 size={15} />
+                      <button type="button" disabled={deletingId === area.id} className="ecommerce-delivery-card-delete" aria-label={t("admin.delete", { name: area.name_en })} onClick={(e) => { e.stopPropagation(); deleteLocation(area); }}>
+                        {deletingId === area.id ? <LoaderCircle className="is-spinning" size={15} /> : <Trash2 size={15} />}
                       </button>
                     )}
-                    <input
-                      type="checkbox"
-                      checked={selectedIds.includes(area.id)}
-                      onChange={() => toggle(area.id)}
-                      onClick={(e) => e.stopPropagation()}
-                    />
                   </span>
                 </div>
                 <div className="ecommerce-delivery-card-fee">
                   <span className="ecommerce-delivery-fee-label">{t("merchant.deliveryFee")}</span>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    className="ecommerce-delivery-price-input"
-                    value={pricingMap[area.id] ?? ""}
-                    onChange={(event) => updateAreaPrice(area.id, event.target.value)}
-                    onClick={(e) => e.stopPropagation()}
-                    placeholder="0.00"
-                    aria-label={t("merchant.deliveryPrice")}
-                  />
+                  <div className="ecommerce-delivery-price-field">
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      disabled={!selectedIds.includes(area.id)}
+                      className="ecommerce-delivery-price-input"
+                      value={pricingMap[area.id] ?? ""}
+                      onChange={(event) => updateAreaPrice(area.id, event.target.value)}
+                      onClick={(e) => e.stopPropagation()}
+                      placeholder="0.00"
+                      aria-label={`${t("merchant.deliveryPrice")} — ${area.name_en || area.name_ar}`}
+                    />
+                  </div>
                 </div>
               </div>
             ))}
