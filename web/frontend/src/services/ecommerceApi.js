@@ -60,6 +60,15 @@ export const saveEcommerceItem = async (section, itemId, payload, { scope } = {}
   return result;
 };
 
+export const saveEcommerceProductVariants = async (productId, payload, { scope } = {}) => {
+  const result = await request(`/ecommerce/products/${productId}/variants`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+  updateEcommerceCatalogCache(scope, "products", result?.product);
+  return result;
+};
+
 export const deleteEcommerceItem = async (section, itemId, { scope } = {}) => {
   const result = await request(`/ecommerce/${section}/${itemId}`, { method: "DELETE" });
   removeFromEcommerceCatalogCache(scope, section, itemId);
@@ -116,6 +125,15 @@ export const createEcommerceDeliveryLocation = async (location, { scope } = {}) 
   return result;
 };
 
+export const deleteEcommerceDeliveryLocation = async (areaId, { scope } = {}) => {
+  const result = await request(`/ecommerce/delivery-areas/custom/${encodeURIComponent(areaId)}`, {
+    method: "DELETE",
+  });
+  clearEcommerceAdminCache(scope, "delivery-areas");
+  clearEcommerceAdminCache(scope, "delivery-pricing");
+  return result;
+};
+
 export const saveEcommerceDeliveryAreas = async (enabledServiceAreaIds, { scope } = {}) => {
   const result = await request("/ecommerce/delivery-areas", {
     method: "PUT",
@@ -129,10 +147,10 @@ export const saveEcommerceDeliveryAreas = async (enabledServiceAreaIds, { scope 
 export const fetchEcommerceDeliveryPricing = ({ scope, force = false } = {}) =>
   loadEcommerceAdminResource(scope, "delivery-pricing", () => request("/ecommerce/delivery-pricing"), { force });
 
-export const saveEcommerceDeliveryPricing = async (fromAreaId, prices, { scope } = {}) => {
+export const saveEcommerceDeliveryPricing = async (prices, { scope } = {}) => {
   const result = await request("/ecommerce/delivery-pricing", {
     method: "PUT",
-    body: JSON.stringify({ from_area_id: fromAreaId, prices }),
+    body: JSON.stringify({ prices }),
   });
   clearEcommerceAdminCache(scope, "delivery-pricing");
   if (result?.pricing) writeEcommerceAdminCache(scope, "delivery-pricing", result);

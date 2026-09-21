@@ -461,32 +461,25 @@ health evidence, dirty/different release, checksum drift, missing predecessor,
 or a ledger already beyond target fails before mutation. No tenant/business
 table is queried or changed.
 
-### Current schema 100 bridge
+### Current schema 104 bridge
 
-The release contract accepts schema `81..100` and targets `100` using the
-pinned contiguous `migrations-097-100.json` manifest. The existing controller,
-backup gates, locking, bridge-first acceptance and forward-repair semantics are
-unchanged. Migration 100 is a 99-to-100 expansion that preserves legacy scalar
-loyalty fields and old entitlements while adding rule-condition and entitlement
-snapshots. A V2 save RPC reuses legacy actor validation, currency validation,
-tenant rule locking and versioning before atomically saving all conditions.
+The release contract accepts schema `81..104` and targets `104` using the
+pinned contiguous `migrations-100-104.json` manifest. The existing controller,
+backup gates, locking, bridge-first acceptance, and forward-repair semantics are
+unchanged. The four expand-only transitions cover the site-visit RPC correction,
+variant presentation metadata, ecommerce discount conditions, and tenant-scoped
+delivery pricing. Migration 103 adds the delivery-pricing table; migration 104
+forward-normalizes it from an origin/destination matrix to one fee per tenant
+and enabled service area without rewriting orders or tenant delivery-area mappings.
 
-Checkout keeps its existing idempotency, product/variant locks, inventory
-allocation and order snapshots. It compares normal offers with all eligible
-verified-customer reward conditions per product, taking one maximum percentage.
-Mixed validity is evaluated independently; the outer entitlement expires at the
-latest fixed expiry, or never when a lifetime condition exists. Rule changes do
-not change existing reward conditions. Earn-once checks are order-bound across
-rule versions. `rehearse_migration_100.sh` proves legacy behavior plus bundle
-issuance, multi-product checkout, higher normal/loyalty selection, expiry,
-revocation and tenant isolation on disposable PostgreSQL.
-
-Source-schema saves fall back only for a single-product 10% loyalty condition.
-Multi-product or additional conditions require schema 100 and fail clearly
-before it exists. A retained release capped at 99 cannot be used for traffic
-rollback after 100 commits. Updating this manifest/release contract remains a
-protected control-plane change subject to provenance-aware upgrade gates;
-no installed controller or production database is changed by these source edits.
+The bridge application turns a missing delivery-pricing relation into an explicit
+upgrade-required response instead of leaking a database error. Once schema 103 is
+live, merchants maintain one non-negative fee for each enabled destination area.
+A retained release capped below the live schema cannot
+be used for traffic rollback after the later transition commits. Updating this
+manifest/release contract remains a protected control-plane change subject to
+provenance-aware upgrade gates; no installed controller or production database
+is changed by these source edits.
 
 ### Earlier schema 099 bridge
 

@@ -1,12 +1,12 @@
 import { getEcommerceCacheScope } from "./utils/ecommerceAdminCache";
 import { ProductEditorSkeleton } from "./CommerceLoadingLayouts";
 import { notifyCommerceAction } from "../../utils/commerceActionToast";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, ChevronDown, ImagePlus, Pencil, Plus, Save, Search, Trash2, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { ArrowLeft, ChevronDown, ImagePlus, Plus, Save, Search, Trash2, X } from "lucide-react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { DASHBOARD_ROUTES } from "../../config/routes";
-import { fetchEcommerceCatalog, saveEcommerceItem, uploadEcommerceProductImage } from "../../services/ecommerceApi";
+import { fetchEcommerceCatalog, saveEcommerceItem, saveEcommerceProductVariants, uploadEcommerceProductImage } from "../../services/ecommerceApi";
 import { useCommerceI18n } from "../../utils/commerceI18n";
 import { getResponsiveMediaProps, isVideoMediaUrl, resolveMediaUrl } from "../../utils/media";
 
@@ -23,10 +23,67 @@ const emptyProduct = (currency = "USD") => ({
   price: 0, compare_at_price: null, cost_price: null, currency: currency || "USD", track_inventory: true, inventory_quantity: 0,
   low_stock_threshold: 5, allow_backorder: false, images: [], weight: null, weight_unit: "kg",
   requires_shipping: true, taxable: true, seo_title: "", seo_description: "", attributes: [], options: [], variants: [],
+  variantOptionId: uuid(), colorOptionId: uuid(), variantGroups: [], hadVariantInventory: false,
 });
 
-const activeOptionValues = (option) => (option.values || []).filter((value) => value.active !== false);
-const combinationKey = (ids) => ids.filter(Boolean).join(":");
+const validHex = (value) => /^#[0-9a-f]{6}$/i.test(String(value || ""));
+const emptyVariantColor = () => ({
+  id: uuid(), valueId: uuid(), colorName: "", colorValue: "", quantity: 0,
+  sku: "", barcode: null, price_override: null, compare_at_price_override: null,
+  track_inventory: true, low_stock_threshold: 5, allow_backorder: false, images: [], active: true,
+});
+const emptyVariantGroup = () => ({ id: uuid(), name: "", colors: [emptyVariantColor()] });
+const variantInventoryIsFilled = (groups) => {
+  if (!groups.length) return false;
+  for (const group of groups) {
+    if (!String(group.name || "").trim() || !group.colors.length) return false;
+    for (const color of group.colors) {
+      if (!String(color.colorName || "").trim() || !String(color.colorValue || "").trim()) return false;
+    }
+  }
+  return true;
+};
+
+const hydrateVariantGroups = (product) => {
+  const options = product?.options || [];
+  const variants = (product?.variants || []).filter((variant) => variant.active !== false);
+  const colorOption = options.find((option) => String(option.code || "").toLocaleLowerCase() === "color")
+    || options.find((option) => String(option.name_translations?.en || "").trim().toLocaleLowerCase() === "color")
+    || options.find((option) => option.display_type === "color")
+    || options.find((option) => (option.values || []).some((value) => validHex(value.color_hex)));
+  const variantOption = options.find((option) => option.id !== colorOption?.id);
+  const valueById = new Map(options.flatMap((option) => (option.values || []).map((value) => [value.id, value])));
+  const groups = [];
+  const groupById = new Map();
+
+  for (const variant of variants) {
+    const selected = (variant.option_value_ids || []).map((id) => valueById.get(id)).filter(Boolean);
+    const variantValue = selected.find((value) => (variantOption?.values || []).some((candidate) => candidate.id === value.id));
+    const colorValue = selected.find((value) => (colorOption?.values || []).some((candidate) => candidate.id === value.id));
+    const fallbackName = selected.filter((value) => value.id !== colorValue?.id).map((value) => value.value_translations?.en || value.code).join(" / ");
+    const groupId = variantValue?.id || variant.id;
+    let group = groupById.get(groupId);
+    if (!group) {
+      group = { id: groupId, name: variantValue?.value_translations?.en || fallbackName || "", colors: [] };
+      groups.push(group);
+      groupById.set(groupId, group);
+    }
+    group.colors.push({
+      ...variant,
+      valueId: colorValue?.id || uuid(),
+      colorName: colorValue?.value_translations?.en || "",
+      colorValue: colorValue?.color_hex || "",
+      quantity: Number(variant.inventory_quantity || 0),
+    });
+  }
+
+  return {
+    variantOptionId: variantOption?.id || uuid(),
+    colorOptionId: colorOption?.id || uuid(),
+    variantGroups: groups,
+    hadVariantInventory: Boolean(options.length || variants.length),
+  };
+};
 
 function Checkbox({ checked, onChange, children, ariaLabel }) {
   return <label className="ecommerce-editor-checkbox">
@@ -131,76 +188,24 @@ export function EcommerceProductEditor({ user, productId, embedded = false, init
   const [slugManuallyEdited, setSlugManuallyEdited] = useState(editing);
   const [skuManuallyEdited, setSkuManuallyEdited] = useState(editing);
   const [autoSkuSuffix] = useState(() => uuid().replace(/-/g, "").slice(0, 8).toUpperCase());
-  const [editingValue, setEditingValue] = useState({});
-  const [merchantNotice, setMerchantNotice] = useState("");
-  const showMerchantNotice = (message) => {
-    setMerchantNotice(message);
-    notifyCommerceAction({ type: "error", title: t("admin.completeRequired"), message });
-  };
-  const persistedVariantIds = useRef(new Set());
-  const referencedValueIds = useRef(new Set());
-  const [expandedOptions, setExpandedOptions] = useState({});
-  const toggleOptionExpand = (optionId) => setExpandedOptions((current) => ({ ...current, [optionId]: !current[optionId] }));
-  const [inlineValueForm, setInlineValueForm] = useState(null); // { optionId, mode: "text"|"color" }
-  const openInlineValueForm = (optionId, mode) => {
-    setInlineValueForm({ optionId, mode });
-    setInlineTextDraft("");
-    setInlineTextDraftAr("");
-    setInlineColorDraft("");
-    setInlineColorDraftAr("");
-    setInlineColorHex("#808080");
-  };
-  const closeInlineValueForm = () => setInlineValueForm(null);
-  const [inlineTextDraft, setInlineTextDraft] = useState("");
-  const [inlineTextDraftAr, setInlineTextDraftAr] = useState("");
-  const [inlineColorDraft, setInlineColorDraft] = useState("");
-  const [inlineColorDraftAr, setInlineColorDraftAr] = useState("");
-  const [inlineColorHex, setInlineColorHex] = useState("#808080");
-  const submitInlineTextValue = (optionId) => {
-    const en = inlineTextDraft.trim();
-    if (!en) return;
-    const option = form.options.find((o) => o.id === optionId);
-    if (!option) return;
-    const exists = activeOptionValues(option).some((v) => String(v.value_translations?.en || "").trim().toLocaleLowerCase() === en.toLocaleLowerCase());
-    if (exists) { showMerchantNotice(t("admin.duplicateOptionValue", { option: option.name_translations.en })); return; }
-    const nv = { id: uuid(), code: "", value_translations: localized(en, inlineTextDraftAr), color_hex: null, sort_order: option.values.length, active: true };
-    changeOption(optionId, (current) => ({ values: [...current.values, { ...nv, sort_order: current.values.length }] }));
-    setInlineTextDraft(""); setInlineTextDraftAr(""); setMerchantNotice("");
-  };
-  const submitInlineColorValue = (optionId) => {
-    const en = inlineColorDraft.trim();
-    if (!en) return;
-    const option = form.options.find((o) => o.id === optionId);
-    if (!option) return;
-    const exists = activeOptionValues(option).some((v) => String(v.value_translations?.en || "").trim().toLocaleLowerCase() === en.toLocaleLowerCase());
-    if (exists) { showMerchantNotice(t("admin.duplicateOptionValue", { option: option.name_translations.en })); return; }
-    let hex = inlineColorHex.trim();
-    if (!hex.startsWith("#") && hex.length > 0) hex = `#${hex}`;
-    if (!/^#[0-9a-fA-F]{6}$/.test(hex)) hex = "#808080";
-    const nv = { id: uuid(), code: "", value_translations: localized(en, inlineColorDraftAr), color_hex: hex.toUpperCase(), sort_order: option.values.length, active: true };
-    changeOption(optionId, (current) => ({ values: [...current.values, { ...nv, sort_order: current.values.length }] }));
-    setInlineColorDraft(""); setInlineColorDraftAr(""); setInlineColorHex("#808080"); setMerchantNotice("");
-  };
+  const [expandedVariants, setExpandedVariants] = useState({});
 
   useEffect(() => {
     let cancelled = false;
     if (initialCatalog && !editing) {
-      Promise.resolve().then(() => {
-        if (cancelled) return;
-        setCatalog(initialCatalog);
-        setForm(emptyProduct(initialCatalog.commerce_currency));
-        setState({ loading: false, saving: false, error: "" });
-      });
       return () => { cancelled = true; };
     }
     fetchEcommerceCatalog({ scope, force: true }).then((result) => {
       if (cancelled) return;
       const product = result.products?.find((item) => item.id === productId);
       if (editing && !product) throw new Error(t("commerce:errors.productNotFound"));
-      persistedVariantIds.current = new Set((product?.variants || []).map((variant) => variant.id));
-      referencedValueIds.current = new Set((product?.variants || []).flatMap((variant) => variant.option_value_ids || []));
       setCatalog(result);
-      setForm(product ? { ...emptyProduct(result.commerce_currency), ...product, attributes: product.attributes || [], options: (product.options || []).map((option) => ({ ...option, required: true, display_type: option.display_type || "text", values: (option.values || []).map((value) => ({ ...value, color_hex: value.color_hex || null })) })), variants: product.variants || [] } : emptyProduct(result.commerce_currency));
+      setForm(product ? {
+        ...emptyProduct(result.commerce_currency),
+        ...product,
+        attributes: product.attributes || [],
+        ...hydrateVariantGroups(product),
+      } : emptyProduct(result.commerce_currency));
       setState({ loading: false, saving: false, error: "" });
     }).catch(() => {
       if (cancelled) return;
@@ -209,9 +214,6 @@ export function EcommerceProductEditor({ user, productId, embedded = false, init
     });
     return () => { cancelled = true; };
   }, [editing, initialCatalog, productId, scope, t]);
-
-  const valueById = useMemo(() => new Map(form.options.flatMap((option) => option.values || []).map((value) => [value.id, value])), [form.options]);
-  const optionIdByValueId = useMemo(() => new Map(form.options.flatMap((option) => (option.values || []).map((value) => [value.id, option.id]))), [form.options]);
 
   const update = (field, value) => setForm((current) => ({ ...current, [field]: value }));
   const updateTranslation = (locale, field, value) => setForm((current) => ({ ...current, translations: { ...current.translations, [locale]: { ...current.translations[locale], [field]: value } } }));
@@ -226,108 +228,68 @@ export function EcommerceProductEditor({ user, productId, embedded = false, init
   }));
   const addAttribute = () => update("attributes", [...form.attributes, { id: uuid(), name_translations: { en: "" }, value_translations: { en: "" }, sort_order: form.attributes.length }]);
   const changeAttribute = (id, field, value) => update("attributes", form.attributes.map((item) => item.id === id ? { ...item, [field]: value } : item));
-  const addOption = () => update("options", [...form.options, { id: uuid(), code: "", name_translations: { en: "" }, required: true, display_type: "text", sort_order: form.options.length, values: [] }]);
-  const changeOption = (id, change) => setForm((current) => ({ ...current, options: current.options.map((item) => item.id === id ? { ...item, ...(typeof change === "function" ? change(item) : change) } : item) }));
-
-  const changeValue = (option, valueId, change) => changeOption(option.id, (current) => ({ values: current.values.map((value) => value.id === valueId ? { ...value, ...change } : value) }));
-  const removeValue = (option, value) => {
-    if (referencedValueIds.current.has(value.id) || form.variants.some((variant) => variant.option_value_ids.includes(value.id))) {
-      changeValue(option, value.id, { active: false });
-      showMerchantNotice(t("admin.referencedValueArchived", { value: localize(value, "value") || value.code }));
-      return;
-    }
-    changeOption(option.id, { values: option.values.filter((entry) => entry.id !== value.id) });
-    setMerchantNotice("");
+  const addVariantGroup = () => {
+    const group = emptyVariantGroup();
+    setForm((current) => ({ ...current, variantGroups: [...current.variantGroups, group] }));
+    setExpandedVariants((current) => ({ ...current, [group.id]: true }));
   };
-  const removeOption = (option) => {
-    const valueIds = new Set((option.values || []).map((value) => value.id));
-    if (form.variants.some((variant) => variant.option_value_ids.some((id) => valueIds.has(id)))) {
-      showMerchantNotice(t("admin.optionUsedByVariant"));
-      return;
-    }
-    update("options", form.options.filter((entry) => entry.id !== option.id));
-    setMerchantNotice("");
-  };
-  const changeVariant = (id, change) => update("variants", form.variants.map((item) => item.id === id ? { ...item, ...change } : item));
-  const resolveOrCreateValue = (option, label) => {
-    const normalized = String(label || "").trim().toLocaleLowerCase();
-    if (!normalized) return null;
-    const existingActive = activeOptionValues(option).find(
-      (value) => String(value.value_translations?.en || "").trim().toLocaleLowerCase() === normalized,
-    );
-    if (existingActive) return existingActive.id;
-    const archived = (option.values || []).find(
-      (value) => value.active === false && String(value.value_translations?.en || "").trim().toLocaleLowerCase() === normalized,
-    );
-    if (archived) { changeValue(option, archived.id, { active: true }); return archived.id; }
-    const newValue = { id: uuid(), code: "", value_translations: { en: String(label).trim() }, normalized_value: normalized, color_hex: option.display_type === "color" ? "#808080" : null, sort_order: option.values.length, active: true };
-    changeOption(option.id, (current) => ({ values: [...current.values, { ...newValue, sort_order: current.values.length }] }));
-    return newValue.id;
-  };
-  const updateVariantOption = (variantId, optionId, newValueId) => {
-    setForm((current) => ({
-      ...current,
-      variants: current.variants.map((variant) => {
-        if (variant.id !== variantId) return variant;
-        const filteredIds = variant.option_value_ids.filter((id) => optionIdByValueId.get(id) !== optionId);
-        return { ...variant, option_value_ids: newValueId ? [...filteredIds, newValueId] : filteredIds };
-      }),
-    }));
-  };
-  const addVariantRow = () => {
-    const rowSuffix = uuid().replace(/-/g, "").slice(0, 6).toUpperCase();
-    update("variants", [...form.variants, {
-      id: uuid(), sku: `${form.sku || skuCode(form.translations.en.name, autoSkuSuffix)}-${rowSuffix}`.slice(0, 120),
-      barcode: null, price_override: null, compare_at_price_override: null,
-      track_inventory: true, inventory_quantity: 0, low_stock_threshold: 5, allow_backorder: false,
-      images: [], active: true, option_value_ids: [],
-    }]);
-  };
-  const removeVariantRow = (variantId) => {
-    if (persistedVariantIds.current.has(variantId)) {
-      changeVariant(variantId, { active: false });
-    } else {
-      update("variants", form.variants.filter((v) => v.id !== variantId));
-    }
-  };
-  const getSelectedValueForOption = (variant, optionId) => variant.option_value_ids.find((id) => optionIdByValueId.get(id) === optionId) || "";
-  const validateMerchantForm = () => {
-    if (!String(form.translations.en.name || "").trim()) return t("admin.validationProductName");
-    const optionNames = form.options.map((option) => String(option.name_translations?.en || "").trim().toLocaleLowerCase());
-    if (optionNames.some((name) => !name)) return t("admin.validationOptionName");
-    if (new Set(optionNames).size !== optionNames.length) return t("admin.validationDuplicateOption");
-    for (const option of form.options) {
-      const values = option.values || [];
-      if (!values.length) return t("admin.addAtLeastOneValue", { option: option.name_translations.en });
-      const labels = values.map((value) => String(value.value_translations?.en || "").trim().toLocaleLowerCase());
-      if (labels.some((label) => !label)) return t("admin.validationValueName", { option: option.name_translations.en });
-      if (new Set(labels).size !== labels.length) return t("admin.duplicateOptionValue", { option: option.name_translations.en });
-      if (option.display_type === "color" && values.some((value) => value.active !== false && !/^#[0-9a-f]{6}$/i.test(value.color_hex || ""))) return t("admin.validationColorSwatch", { option: option.name_translations.en });
-    }
-    const activeVariants = form.variants.filter((v) => v.active !== false);
-    const variantKeys = activeVariants.map((variant) => combinationKey([...variant.option_value_ids].sort()));
-    if (new Set(variantKeys).size !== variantKeys.length) return t("admin.validationDuplicateCombination");
-    const skus = activeVariants.map((variant) => String(variant.sku || "").trim().toLocaleLowerCase());
-    if (skus.some((sku) => !sku)) return t("admin.validationVariantSku");
-    if (new Set(skus).size !== skus.length) return t("admin.validationUniqueSku");
-    if (form.status === "active" && form.options.length && !activeVariants.some((variant) => variant.active)) return t("admin.validationSellableVariant");
-    for (const variant of activeVariants) {
-      const selected = new Set(variant.option_value_ids);
-      if (variant.active && form.options.some((option) => option.required && !(option.values || []).some((value) => selected.has(value.id)))) {
-        return t("admin.validationRequiredOptions");
+  const changeVariantGroup = (groupId, change) => setForm((current) => ({
+    ...current,
+    variantGroups: current.variantGroups.map((group) => group.id === groupId ? { ...group, ...change } : group),
+  }));
+  const removeVariantGroup = (groupId) => setForm((current) => ({
+    ...current,
+    variantGroups: current.variantGroups.filter((group) => group.id !== groupId),
+  }));
+  const addVariantColor = (groupId) => setForm((current) => ({
+    ...current,
+    variantGroups: current.variantGroups.map((group) => group.id === groupId
+      ? { ...group, colors: [...group.colors, emptyVariantColor()] }
+      : group),
+  }));
+  const changeVariantColor = (groupId, colorId, change) => setForm((current) => ({
+    ...current,
+    variantGroups: current.variantGroups.map((group) => group.id === groupId
+      ? { ...group, colors: group.colors.map((color) => color.id === colorId ? { ...color, ...change } : color) }
+      : group),
+  }));
+  const removeVariantColor = (groupId, colorId) => setForm((current) => ({
+    ...current,
+    variantGroups: current.variantGroups.map((group) => group.id === groupId && group.colors.length > 1
+      ? { ...group, colors: group.colors.filter((color) => color.id !== colorId) }
+      : group),
+  }));
+  const validateVariantInventory = () => {
+    if (form.status === "active" && form.hadVariantInventory && !form.variantGroups.length) return t("admin.validationSellableVariant");
+    const names = form.variantGroups.map((group) => group.name.trim().toLocaleLowerCase());
+    if (names.some((name) => !name)) return t("admin.validationVariantName");
+    if (new Set(names).size !== names.length) return t("admin.validationDuplicateVariantName");
+    const globalColors = new Map();
+    for (const group of form.variantGroups) {
+      if (!group.colors.length) return t("admin.validationVariantColor");
+      const colorNames = group.colors.map((color) => color.colorName.trim().toLocaleLowerCase());
+      if (colorNames.some((name) => !name)) return t("admin.validationColorName");
+      if (new Set(colorNames).size !== colorNames.length) return t("admin.validationDuplicateColor");
+      for (const color of group.colors) {
+        if (!validHex(color.colorValue)) return t("admin.validationColorValue");
+        const quantity = Number(color.quantity);
+        if (!Number.isInteger(quantity) || quantity < 0) return t("admin.validationColorQuantity");
+        const key = color.colorName.trim().toLocaleLowerCase();
+        const previousHex = globalColors.get(key);
+        if (previousHex && previousHex !== color.colorValue.toUpperCase()) return t("admin.validationColorConsistency");
+        globalColors.set(key, color.colorValue.toUpperCase());
       }
     }
     return "";
   };
-  const appendMedia = (url, variantId = null) => setForm((current) => variantId ? {
-    ...current,
-    variants: current.variants.map((variant) => variant.id === variantId
-      ? { ...variant, images: [...(variant.images || []), url].slice(0, 10) }
-      : variant),
-  } : { ...current, images: [...(current.images || []), url].slice(0, 10) });
-  const uploadMedia = async (files, variantId = null) => {
-    const target = variantId || "product";
-    const current = variantId ? form.variants.find((item) => item.id === variantId)?.images || [] : form.images || [];
+  const validateMerchantForm = () => {
+    if (!String(form.translations.en.name || "").trim()) return t("admin.validationProductName");
+    return validateVariantInventory();
+  };
+  const appendMedia = (url) => setForm((current) => ({ ...current, images: [...(current.images || []), url].slice(0, 10) }));
+  const uploadMedia = async (files) => {
+    const target = "product";
+    const current = form.images || [];
     const selected = Array.from(files || []);
     if (!selected.length) return;
     const showUploadError = (message) => {
@@ -346,7 +308,7 @@ export function EcommerceProductEditor({ user, productId, embedded = false, init
         setUploadProgress({ current: index + 1, total: selected.length });
         const url = await uploadEcommerceProductImage(file);
         if (!url) throw new Error(t("commerce:errors.uploadMedia"));
-        appendMedia(url, variantId);
+        appendMedia(url);
       }
       notifyCommerceAction({ type: "success", title: t("feedback.mediaUploaded"), message: t("feedback.mediaUploadedBody") });
     } catch {
@@ -355,6 +317,75 @@ export function EcommerceProductEditor({ user, productId, embedded = false, init
       setUploading("");
       setUploadProgress({ current: 0, total: 0 });
     }
+  };
+
+  const buildVariantInventoryPayload = () => {
+    if (!form.variantGroups.length) return { options: [], variants: [] };
+    const colorValues = [];
+    const colorValueByName = new Map();
+    for (const group of form.variantGroups) {
+      for (const color of group.colors) {
+        const key = color.colorName.trim().toLocaleLowerCase();
+        if (!colorValueByName.has(key)) {
+          const value = {
+            id: color.valueId,
+            code: code(`color-${colorValues.length + 1}-${color.colorName}`, `color-${colorValues.length + 1}`),
+            value_translations: localized(color.colorName),
+            color_hex: color.colorValue.toUpperCase(),
+            sort_order: colorValues.length,
+            active: true,
+          };
+          colorValues.push(value);
+          colorValueByName.set(key, value);
+        }
+      }
+    }
+    const options = [
+      {
+        id: form.variantOptionId,
+        code: "variant",
+        name_translations: { en: "Variant" },
+        required: true,
+        display_type: "text",
+        sort_order: 0,
+        values: form.variantGroups.map((group, index) => ({
+          id: group.id,
+          code: code(`variant-${index + 1}-${group.name}`, `variant-${index + 1}`),
+          value_translations: localized(group.name),
+          color_hex: null,
+          sort_order: index,
+          active: true,
+        })),
+      },
+      {
+        id: form.colorOptionId,
+        code: "color",
+        name_translations: { en: "Color" },
+        required: true,
+        display_type: "color",
+        sort_order: 1,
+        values: colorValues,
+      },
+    ];
+    const variants = form.variantGroups.flatMap((group, groupIndex) => group.colors.map((color, colorIndex) => {
+      const selectedColor = colorValueByName.get(color.colorName.trim().toLocaleLowerCase());
+      const generatedSku = `${form.sku || skuCode(form.translations.en.name, autoSkuSuffix)}-${groupIndex + 1}-${colorIndex + 1}-${color.id.replace(/-/g, "").slice(0, 6).toUpperCase()}`;
+      return {
+        id: color.id,
+        sku: String(color.sku || generatedSku).trim().slice(0, 120),
+        barcode: color.barcode || null,
+        price_override: color.price_override === "" || color.price_override == null ? null : Number(color.price_override),
+        compare_at_price_override: color.compare_at_price_override === "" || color.compare_at_price_override == null ? null : Number(color.compare_at_price_override),
+        track_inventory: true,
+        inventory_quantity: Number(color.quantity),
+        low_stock_threshold: Number(color.low_stock_threshold || 0),
+        allow_backorder: Boolean(color.allow_backorder),
+        images: color.images || [],
+        active: true,
+        option_value_ids: [group.id, selectedColor.id],
+      };
+    }));
+    return { options, variants };
   };
 
   const submit = async (event) => {
@@ -367,22 +398,51 @@ export function EcommerceProductEditor({ user, productId, embedded = false, init
     }
     setState((current) => ({ ...current, saving: true, error: "" }));
     try {
+      const inventory = buildVariantInventoryPayload();
+      const productForm = { ...form };
+      delete productForm.variantGroups;
+      delete productForm.variantOptionId;
+      delete productForm.colorOptionId;
+      delete productForm.hadVariantInventory;
+      delete productForm.options;
+      delete productForm.variants;
       const payload = {
-        ...form,
+        ...productForm,
         slug: code(form.slug || form.translations.en.name, "product"),
         sku: String(form.sku || "").trim() || null,
         barcode: form.barcode || null,
         price: Number(form.price || 0), compare_at_price: form.compare_at_price === "" || form.compare_at_price == null ? null : Number(form.compare_at_price),
         inventory_quantity: Number(form.inventory_quantity || 0), low_stock_threshold: Number(form.low_stock_threshold || 0), currency: catalog.commerce_currency,
         attributes: form.attributes.map((item, index) => ({ ...item, sort_order: index, name_translations: localized(item.name_translations.en, item.name_translations.ar), value_translations: localized(item.value_translations.en, item.value_translations.ar) })),
-        options: form.options.map((option, index) => ({ ...option, display_type: option.display_type || "text", code: code(option.code || option.name_translations.en, `option-${index + 1}`), sort_order: index, name_translations: localized(option.name_translations.en, option.name_translations.ar), values: option.values.map((value, valueIndex) => ({ ...value, color_hex: option.display_type === "color" ? value.color_hex : null, code: code(value.code || value.value_translations.en, `value-${valueIndex + 1}`), sort_order: valueIndex, value_translations: localized(value.value_translations.en, value.value_translations.ar) })) })),
-        variants: form.variants.map((variant) => ({ ...variant, sku: variant.sku.trim(), barcode: variant.barcode || null, price_override: variant.price_override === "" || variant.price_override == null ? null : Number(variant.price_override), compare_at_price_override: variant.compare_at_price_override === "" || variant.compare_at_price_override == null ? null : Number(variant.compare_at_price_override), inventory_quantity: Number(variant.inventory_quantity || 0), low_stock_threshold: Number(variant.low_stock_threshold || 0), option_value_ids: variant.option_value_ids.filter(Boolean) })),
+        options: inventory.options,
+        variants: inventory.variants,
       };
       const savedProduct = await saveEcommerceItem("products", productId, payload, { scope });
       notifyCommerceAction({ type: "success", title: t("admin.savedTitle", { item: t("admin.productSingular") }), message: t("admin.changesSaved") });
       onSaved?.(savedProduct);
     } catch {
       setState((current) => ({ ...current, saving: false, error: t("commerce:errors.saveProduct") }));
+      notifyCommerceAction({ type: "error", title: t("commerce:errors.saveProduct"), message: t("admin.tryAgain") });
+    } finally {
+      setState((current) => ({ ...current, saving: false }));
+    }
+  };
+
+  const saveVariants = async () => {
+    if (!productId) return;
+    const validationError = validateVariantInventory();
+    if (validationError) {
+      setState((current) => ({ ...current, saving: false, error: validationError }));
+      notifyCommerceAction({ type: "error", title: t("admin.completeRequired"), message: validationError });
+      return;
+    }
+    setState((current) => ({ ...current, saving: true, error: "" }));
+    try {
+      const inventory = buildVariantInventoryPayload();
+      await saveEcommerceProductVariants(productId, inventory, { scope });
+      notifyCommerceAction({ type: "success", title: t("admin.savedTitle", { item: t("merchant.variants") }), message: t("admin.changesSaved") });
+    } catch {
+      setState((current) => ({ ...current, error: t("commerce:errors.saveProduct") }));
       notifyCommerceAction({ type: "error", title: t("commerce:errors.saveProduct"), message: t("admin.tryAgain") });
     } finally {
       setState((current) => ({ ...current, saving: false }));
@@ -423,8 +483,8 @@ export function EcommerceProductEditor({ user, productId, embedded = false, init
 <div className="ecommerce-editor-grid ecommerce-editor-basic-meta">
 <label>{t("merchant.slug")}<input dir="ltr" value={form.slug} onChange={(e) => { setSlugManuallyEdited(true); update("slug", e.target.value); }} />
 </label>
-<label>{t("merchant.productSku")}<input dir="ltr" disabled={Boolean(form.options.length)} value={form.sku || ""} onChange={(e) => { setSkuManuallyEdited(true); update("sku", e.target.value); }} />
-{form.options.length > 0 && <small className="ecommerce-editor-field-help">{t("admin.skuMovedToVariants")}</small>}
+<label>{t("merchant.productSku")}<input dir="ltr" disabled={Boolean(form.variantGroups.length)} value={form.sku || ""} onChange={(e) => { setSkuManuallyEdited(true); update("sku", e.target.value); }} />
+{form.variantGroups.length > 0 && <small className="ecommerce-editor-field-help">{t("admin.skuMovedToVariants")}</small>}
 </label>
 <label>{t("merchant.brand")}<input value={form.brand} onChange={(e) => update("brand", e.target.value)} />
 <small className="ecommerce-editor-field-help">{t("merchant.brandHelp")}</small>
@@ -517,497 +577,62 @@ export function EcommerceProductEditor({ user, productId, embedded = false, init
 </div>}
 <button className="ecommerce-primary-button" type="button" disabled={form.attributes.length >= 50} onClick={addAttribute}><Plus size={16} />{t("merchant.addAttribute")}</button>
 </section>
-      <section className="ecommerce-editor-options-variants">
-        <h2>{t("merchant.variantAttributes")}</h2>
-        <p>{t("admin.variantAttributesHelp")}</p>
-        {merchantNotice && <p className="ecommerce-editor-notice" role="status">{merchantNotice}</p>}
-        {!form.options.length ? (
-          <button className="ecommerce-primary-button" type="button" onClick={addOption}>
-            <Plus size={16} />{t("merchant.addVariantAttribute")}
-          </button>
-        ) : (
-          <>
-            <div className="ecommerce-editor-option-list">
-              {form.options.map((option, optionIndex) => {
-                const activeValues = activeOptionValues(option);
-                const isExpanded = Boolean(expandedOptions[option.id]);
-                const isColorType = option.display_type === "color";
-                const isNamed = Boolean(option.name_translations?.en?.trim());
-                const inlineForm = inlineValueForm?.optionId === option.id ? inlineValueForm : null;
-                const editingValId = editingValue[option.id];
-
-                return (
-                  <article className="ecommerce-editor-option-card is-compact" key={option.id}>
-                    <div className="ecommerce-editor-attribute-row">
-                      <div className="ecommerce-editor-attribute-info">
-                        <span className="ecommerce-editor-attribute-idx">{optionIndex + 1}</span>
-                        <input
-                          required
-                          aria-label={t("admin.englishName")}
-                          placeholder={t("admin.optionNameExampleEnglish")}
-                          dir="ltr"
-                          className="ecommerce-editor-option-name-input"
-                          value={option.name_translations.en || ""}
-                          onChange={(e) => changeOption(option.id, { name_translations: { ...option.name_translations, en: e.target.value } })}
-                        />
-                        <select
-                          aria-label={t("admin.presentationType")}
-                          className="ecommerce-editor-type-select"
-                          value={option.display_type || "text"}
-                          onChange={(e) => changeOption(option.id, {
-                            display_type: e.target.value,
-                            values: option.values.map((value) => ({
-                              ...value,
-                              color_hex: e.target.value === "color" ? value.color_hex || "#808080" : null,
-                            })),
-                          })}
-                        >
-                          <option value="text">{t("admin.textType")}</option>
-                          <option value="color">{t("admin.colorType")}</option>
-                        </select>
-                        <span className="ecommerce-editor-value-count">
-                          {activeValues.length} {activeValues.length === 1 ? "value" : "values"}
-                        </span>
-                        {!isNamed && (
-                          <span className="ecommerce-editor-unnamed-warning">
-                            {t("admin.nameAttributeNotice") || "Name this attribute before using it in variants."}
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="ecommerce-editor-row-actions">
-                        {isNamed && (
-                          <button
-                            className="ecommerce-editor-add-inline-btn"
-                            type="button"
-                            onClick={() => openInlineValueForm(option.id, isColorType ? "color" : "text")}
-                          >
-                            <Plus size={14} />
-                            {isColorType ? (t("merchant.addColor") || "Add color") : (t("merchant.addValue") || "Add value")}
-                          </button>
-                        )}
-                        <button
-                          className={`ecommerce-editor-toggle-btn${isExpanded ? " is-expanded" : ""}`}
-                          type="button"
-                          aria-label={isExpanded ? t("admin.hideValues") : t("admin.manageValues")}
-                          onClick={() => toggleOptionExpand(option.id)}
-                        >
-                          <ChevronDown size={15} className={`ecommerce-editor-chevron${isExpanded ? " is-rotated" : ""}`} />
-                          <span>{isExpanded ? (t("admin.hideValues") || "Hide values") : (t("admin.manageValues") || "Manage values")}</span>
-                        </button>
-                        <button
-                          className="ecommerce-editor-delete-icon"
-                          type="button"
-                          aria-label={t("admin.removeOption") || "Delete"}
-                          title={t("common.delete") || "Delete"}
-                          onClick={() => removeOption(option)}
-                        >
-                          <Trash2 size={16} />
-                          <span>{t("common.delete") || "Delete"}</span>
-                        </button>
-                      </div>
-                    </div>
-
-                    {inlineForm && (
-                      <div className="ecommerce-editor-inline-value-form">
-                        {inlineForm.mode === "text" ? (
-                          <>
-                            <label>
-                              <span>{t("admin.valueName") || "Value"}</span>
-                              <input
-                                dir="ltr"
-                                autoFocus
-                                aria-label={t("admin.valueName") || "Value"}
-                                placeholder={t("admin.optionValueExample") || "42"}
-                                value={inlineTextDraft}
-                                onChange={(e) => setInlineTextDraft(e.target.value)}
-                                onKeyDown={(e) => {
-                                  if (e.key === "Enter") { e.preventDefault(); submitInlineTextValue(option.id); }
-                                  if (e.key === "Escape") closeInlineValueForm();
-                                }}
-                              />
-                            </label>
-                            <label>
-                              <span>{t("admin.arabicValue") || "Arabic"}</span>
-                              <input
-                                dir="rtl"
-                                aria-label={t("admin.arabicValue") || "Arabic"}
-                                placeholder={t("admin.optionNameExampleArabic") || "٤٢"}
-                                value={inlineTextDraftAr}
-                                onChange={(e) => setInlineTextDraftAr(e.target.value)}
-                                onKeyDown={(e) => {
-                                  if (e.key === "Enter") { e.preventDefault(); submitInlineTextValue(option.id); }
-                                }}
-                              />
-                            </label>
-                            <div className="ecommerce-editor-inline-value-actions">
-                              <button
-                                className="ecommerce-primary-button"
-                                type="button"
-                                disabled={!inlineTextDraft.trim()}
-                                onClick={() => submitInlineTextValue(option.id)}
-                              >
-                                <Plus size={14} />{t("merchant.addValue") || "Add value"}
-                              </button>
-                              <button className="ecommerce-secondary-button" type="button" onClick={closeInlineValueForm}>
-                                {t("common.cancel") || "Cancel"}
-                              </button>
-                            </div>
-                          </>
-                        ) : (
-                          <>
-                            <label>
-                              <span>{t("admin.colorName") || "Color name"}</span>
-                              <input
-                                dir="ltr"
-                                autoFocus
-                                aria-label={t("admin.valueName") || "Value"}
-                                placeholder="Red"
-                                value={inlineColorDraft}
-                                onChange={(e) => setInlineColorDraft(e.target.value)}
-                                onKeyDown={(e) => {
-                                  if (e.key === "Enter") { e.preventDefault(); submitInlineColorValue(option.id); }
-                                  if (e.key === "Escape") closeInlineValueForm();
-                                }}
-                              />
-                            </label>
-                            <label>
-                              <span>{t("admin.arabicName") || "Arabic name"}</span>
-                              <input
-                                dir="rtl"
-                                aria-label={t("admin.arabicValue") || "Arabic"}
-                                placeholder="أحمر"
-                                value={inlineColorDraftAr}
-                                onChange={(e) => setInlineColorDraftAr(e.target.value)}
-                                onKeyDown={(e) => {
-                                  if (e.key === "Enter") { e.preventDefault(); submitInlineColorValue(option.id); }
-                                }}
-                              />
-                            </label>
-                            <label className="ecommerce-editor-color-field">
-                              <span>{t("admin.colorSwatch") || "Color swatch"}</span>
-                              <span className="ecommerce-editor-color-pick-row">
-                                <input
-                                  aria-label={t("admin.colorSwatch") || "Color swatch"}
-                                  type="color"
-                                  value={/^#[0-9a-fA-F]{6}$/.test(inlineColorHex) ? inlineColorHex : "#808080"}
-                                  onInput={(e) => setInlineColorHex(e.currentTarget.value.toUpperCase())}
-                                  onChange={(e) => setInlineColorHex(e.target.value.toUpperCase())}
-                                />
-                                <input
-                                  dir="ltr"
-                                  className="ecommerce-editor-hex-input"
-                                  aria-label="Hex"
-                                  placeholder="#FF0000"
-                                  value={inlineColorHex}
-                                  onChange={(e) => {
-                                    let v = e.target.value.toUpperCase();
-                                    if (!v.startsWith("#") && v.length > 0) v = `#${v}`;
-                                    setInlineColorHex(v);
-                                  }}
-                                />
-                              </span>
-                            </label>
-                            <div className="ecommerce-editor-inline-value-actions">
-                              <button
-                                className="ecommerce-primary-button"
-                                type="button"
-                                disabled={!inlineColorDraft.trim()}
-                                onClick={() => submitInlineColorValue(option.id)}
-                              >
-                                <Plus size={14} />{t("merchant.addColor") || "Add color"}
-                              </button>
-                              <button className="ecommerce-secondary-button" type="button" onClick={closeInlineValueForm}>
-                                {t("common.cancel") || "Cancel"}
-                              </button>
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    )}
-
-                    {isExpanded && (
-                      <div className="ecommerce-editor-managed-values">
-                        {!activeValues.length ? (
-                          <p className="ecommerce-editor-empty-values-hint">
-                            {t("admin.addAtLeastOneValue", { option: option.name_translations.en }) || "No values yet."}
-                          </p>
-                        ) : (
-                          <div className="ecommerce-editor-values-table">
-                            {activeValues.map((value) => {
-                              const isValEditing = editingValId === value.id;
-                              const labelText = localize(value, "value") || value.code;
-                              return (
-                                <div className={`ecommerce-editor-value-entry${isValEditing ? " is-editing" : ""}`} key={value.id}>
-                                  <div className="ecommerce-editor-value-entry-row">
-                                    {isColorType && (
-                                      <i
-                                        className="ecommerce-color-swatch"
-                                        style={{ backgroundColor: value.color_hex || "#808080" }}
-                                        aria-hidden="true"
-                                      />
-                                    )}
-                                    <button
-                                      type="button"
-                                      className="ecommerce-editor-value-name-btn"
-                                      onClick={() => setEditingValue((cur) => ({ ...cur, [option.id]: isValEditing ? null : value.id }))}
-                                    >
-                                      <bdi>{labelText}</bdi>
-                                    </button>
-                                    {isColorType && (
-                                      <code className="ecommerce-editor-color-value-hex">
-                                        {(value.color_hex || "#808080").toUpperCase()}
-                                      </code>
-                                    )}
-                                    <div className="ecommerce-editor-value-entry-actions">
-                                      <button
-                                        type="button"
-                                        className="ecommerce-editor-val-action-btn"
-                                        aria-label={t("admin.editOptionValue") || "Edit value"}
-                                        onClick={() => setEditingValue((cur) => ({ ...cur, [option.id]: isValEditing ? null : value.id }))}
-                                      >
-                                        <Pencil size={13} />
-                                        <span>{t("admin.edit") || "Edit"}</span>
-                                      </button>
-                                      <button
-                                        type="button"
-                                        className="ecommerce-editor-val-action-btn is-danger"
-                                        aria-label={t("admin.removeOptionValue", { value: labelText })}
-                                        onClick={() => removeValue(option, value)}
-                                      >
-                                        <Trash2 size={13} />
-                                        <span>{t("admin.remove") || "Remove"}</span>
-                                      </button>
-                                    </div>
-                                  </div>
-
-                                  {isValEditing && (
-                                    <div className="ecommerce-editor-value-edit-panel">
-                                      <label>
-                                        <span>{t("admin.englishValue") || "English"}</span>
-                                        <input
-                                          dir="ltr"
-                                          value={value.value_translations?.en || ""}
-                                          onChange={(e) => changeValue(option, value.id, {
-                                            value_translations: { ...value.value_translations, en: e.target.value },
-                                          })}
-                                        />
-                                      </label>
-                                      <label>
-                                        <span>{t("admin.arabicValue") || "Arabic"}</span>
-                                        <input
-                                          dir="rtl"
-                                          value={value.value_translations?.ar || ""}
-                                          onChange={(e) => changeValue(option, value.id, {
-                                            value_translations: { ...value.value_translations, ar: e.target.value },
-                                          })}
-                                        />
-                                      </label>
-                                      {isColorType && (
-                                        <label className="ecommerce-editor-color-field">
-                                          <span>{t("admin.colorSwatch") || "Color swatch"}</span>
-                                          <span className="ecommerce-editor-color-pick-row">
-                                            <input
-                                              aria-label={t("admin.colorSwatch") || "Color swatch"}
-                                              type="color"
-                                              value={/^#[0-9a-fA-F]{6}$/.test(value.color_hex || "") ? value.color_hex : "#808080"}
-                                              onInput={(e) => changeValue(option, value.id, { color_hex: e.currentTarget.value.toUpperCase() })}
-                                              onChange={(e) => changeValue(option, value.id, { color_hex: e.target.value.toUpperCase() })}
-                                            />
-                                            <input
-                                              dir="ltr"
-                                              className="ecommerce-editor-hex-input"
-                                              aria-label="Hex"
-                                              placeholder="#FF0000"
-                                              value={value.color_hex || "#808080"}
-                                              onChange={(e) => {
-                                                let v = e.target.value.toUpperCase();
-                                                if (!v.startsWith("#") && v.length > 0) v = `#${v}`;
-                                                changeValue(option, value.id, { color_hex: v });
-                                              }}
-                                            />
-                                          </span>
-                                        </label>
-                                      )}
-                                      <button
-                                        type="button"
-                                        className="ecommerce-secondary-button ecommerce-editor-val-close-btn"
-                                        aria-label={t("admin.closeValueEditor") || "Close"}
-                                        onClick={() => setEditingValue((cur) => ({ ...cur, [option.id]: null }))}
-                                      >
-                                        {t("admin.close") || "Close"}
-                                      </button>
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </article>
-                );
-              })}
-            </div>
-            <button className="ecommerce-primary-button" type="button" disabled={form.options.length >= 5} onClick={addOption}>
-              <Plus size={16} />{t("merchant.addVariantAttribute")}
-            </button>
-          </>
-        )}
-      </section>
-
-      {form.options.length > 0 && (
-        <section className="ecommerce-variant-matrix">
-          <header className="ecommerce-variant-matrix-header">
-            <div>
-              <h3>{t("merchant.variantsInventory")}</h3>
-            </div>
-            <div className="ecommerce-variant-matrix-header-actions">
-              <button className="ecommerce-primary-button" type="button" onClick={addVariantRow}>
-                <Plus size={16} />{t("merchant.addVariant")}
-              </button>
-            </div>
-          </header>
-
-          {form.variants.filter((v) => v.active !== false).length === 0 && (
-            <p className="ecommerce-editor-inline-help">{t("admin.addVariantHelp")}</p>
-          )}
-
-          <div style={{ display: "none" }}>
-            {form.options.filter((option) => Boolean(option.name_translations?.en?.trim())).map((option) => (
-              <datalist key={option.id} id={`option-values-${option.id}`}>
-                {activeOptionValues(option).map((value) => (
-                  <option key={value.id} value={localize(value, "value") || value.code} />
-                ))}
-              </datalist>
-            ))}
-          </div>
-
-          {form.variants.filter((v) => v.active !== false).length > 0 && (() => {
-            const namedOptions = form.options.filter((option) => Boolean(option.name_translations?.en?.trim()));
-            const gridCols = `${namedOptions.map(() => "minmax(130px, 1fr)").join(" ")} 85px minmax(140px, 1.4fr) 115px 85px 75px`;
-
-            return (
-              <div className="ecommerce-variant-matrix-table-wrap">
-                <div className="ecommerce-variant-matrix-table">
-                  <div className="ecommerce-variant-matrix-head" aria-hidden="true" style={{ gridTemplateColumns: gridCols }}>
-                    {namedOptions.map((option) => (
-                      <span key={option.id}>{option.name_translations.en}</span>
-                    ))}
-                    <span>{t("admin.quantity")}</span>
-                    <span>{t("common.sku")}</span>
-                    <span>{t("common.price")}</span>
-                    <span>{t("admin.available")}</span>
-                    <span>{t("admin.actions")}</span>
-                  </div>
-
-                  <div className="ecommerce-variant-matrix-group">
-                    {form.variants.filter((variant) => variant.active !== false).map((variant) => {
-                      const variantLabel = variant.option_value_ids.map((id) => localize(valueById.get(id), "value") || valueById.get(id)?.code).join(" / ");
-                      return (
-                        <div className="ecommerce-variant-matrix-row is-available" style={{ gridTemplateColumns: gridCols }} key={variant.id}>
-                          {namedOptions.map((option) => {
-                            const selectedId = getSelectedValueForOption(variant, option.id);
-                            const selectedValue = selectedId ? valueById.get(selectedId) : null;
-                            const isColorOpt = option.display_type === "color";
-
-                            return (
-                              <div className="ecommerce-variant-attr-cell" key={option.id}>
-                                {isColorOpt && (
-                                  <i
-                                    className={`ecommerce-color-swatch${selectedValue?.color_hex ? "" : " ecommerce-color-swatch--empty"}`}
-                                    style={{ backgroundColor: selectedValue?.color_hex || "transparent" }}
-                                    aria-hidden="true"
-                                  />
-                                )}
-                                <input
-                                  list={`option-values-${option.id}`}
-                                  dir="ltr"
-                                  placeholder={option.name_translations.en || "..."}
-                                  value={selectedId ? (localize(selectedValue, "value") || selectedValue?.code || "") : ""}
-                                  onChange={(e) => {
-                                    const val = e.target.value;
-                                    if (!val.trim()) {
-                                      updateVariantOption(variant.id, option.id, "");
-                                      return;
-                                    }
-                                    const valueId = resolveOrCreateValue(option, val);
-                                    if (valueId) updateVariantOption(variant.id, option.id, valueId);
-                                  }}
-                                />
-                              </div>
-                            );
-                          })}
-
-                          <label className="ecommerce-variant-qty-cell">
-                            <input
-                              aria-label={t("admin.variantQuantityLabel", { variant: variantLabel })}
-                              type="number"
-                              min="0"
-                              value={variant.inventory_quantity ?? ""}
-                              onChange={(e) => changeVariant(variant.id, { inventory_quantity: e.target.value })}
-                            />
-                          </label>
-
-                          <label className="ecommerce-variant-sku-cell">
-                            <input
-                              aria-label={t("admin.variantSkuLabel", { variant: variantLabel })}
-                              dir="ltr"
-                              value={variant.sku || ""}
-                              onChange={(e) => changeVariant(variant.id, { sku: e.target.value })}
-                            />
-                          </label>
-
-                          <label className="ecommerce-variant-price-cell">
-                            <input
-                              className="ecommerce-variant-price-input"
-                              aria-label={t("admin.variantPriceLabel", { variant: variantLabel })}
-                              type="number"
-                              min="0"
-                              step="0.01"
-                              placeholder={form.price}
-                              value={variant.price_override ?? ""}
-                              onChange={(e) => changeVariant(variant.id, { price_override: e.target.value })}
-                            />
-                            <span className="ecommerce-variant-currency">{catalog.commerce_currency}</span>
-                          </label>
-
-                          <div className="ecommerce-variant-avail-cell">
-                            <label className="ecommerce-editor-switch" title={t("admin.available") || "Available"}>
-                              <input
-                                type="checkbox"
-                                aria-label={t("admin.variantAvailabilityLabel", { variant: variantLabel }) || "Available"}
-                                checked={variant.active !== false}
-                                onChange={(e) => changeVariant(variant.id, { active: e.target.checked })}
-                              />
-                              <span className="ecommerce-editor-switch-slider" />
-                            </label>
-                          </div>
-
-                          <div className="ecommerce-variant-row-actions">
-                            <button
-                              className="ecommerce-variant-delete-action"
-                              type="button"
-                              aria-label={t("admin.removeVariantLabel", { variant: variantLabel }) || "Delete"}
-                              title={t("common.delete") || "Delete"}
-                              onClick={() => removeVariantRow(variant.id)}
-                            >
-                              <Trash2 size={16} />
-                              <span className="ecommerce-variant-delete-text">{t("common.delete") || "Delete"}</span>
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
+      <section className="ecommerce-variant-inventory-editor">
+        <header className="ecommerce-variant-editor-header">
+          <div><h2>{t("merchant.variantsInventory")}</h2><p>{t("admin.variantCardsHelp")}</p></div>
+        </header>
+        <div className="ecommerce-variant-card-list">
+          {form.variantGroups.map((group, groupIndex) => {
+            const expanded = expandedVariants[group.id] !== false;
+            const total = group.colors.reduce((sum, color) => sum + (Number.isInteger(Number(color.quantity)) && Number(color.quantity) >= 0 ? Number(color.quantity) : 0), 0);
+            const label = group.name.trim() || t("admin.untitledVariant", { count: groupIndex + 1 });
+            return <article className="ecommerce-variant-card" key={group.id}>
+              <header className="ecommerce-variant-card-header">
+                <button type="button" className="ecommerce-variant-card-toggle" aria-expanded={expanded} aria-controls={`variant-card-${group.id}`} onClick={() => setExpandedVariants((current) => ({ ...current, [group.id]: !expanded }))}>
+                  <ChevronDown className={expanded ? "is-expanded" : ""} size={18} /><strong>{label}</strong><span>{t("admin.units", { count: total })}</span>
+                </button>
+                <button type="button" className="ecommerce-variant-card-delete" aria-label={t("admin.removeVariantLabel", { variant: label })} onClick={() => removeVariantGroup(group.id)}><Trash2 size={16} /></button>
+              </header>
+              {expanded && <div className="ecommerce-variant-card-body" id={`variant-card-${group.id}`}>
+                <label className="ecommerce-variant-name-field"><span>{t("admin.variantName")}</span><input required name={`variant-name-${group.id}`} autoComplete="off" maxLength={200} value={group.name} placeholder={t("admin.variantNamePlaceholder")} onChange={(event) => changeVariantGroup(group.id, { name: event.target.value })} /></label>
+                <div className="ecommerce-variant-colors-title"><strong>{t("admin.colors")}</strong></div>
+                <div className="ecommerce-variant-color-head" aria-hidden="true"><span>{t("admin.colorName")}</span><span>{t("admin.colorValue")}</span><span>{t("admin.quantity")}</span><span /></div>
+                <div className="ecommerce-variant-color-list">
+                  {group.colors.map((color) => <div className="ecommerce-variant-color-row" key={color.id}>
+                    <label><span>{t("admin.colorName")}</span><input required name={`color-name-${color.id}`} autoComplete="off" maxLength={200} value={color.colorName} placeholder={t("admin.colorNamePlaceholder")} onChange={(event) => changeVariantColor(group.id, color.id, { colorName: event.target.value })} /></label>
+                    <label>
+                      <span>{t("admin.colorValue")}</span>
+                      <span className="ecommerce-variant-color-control">
+                        <i className={`ecommerce-color-swatch${validHex(color.colorValue) ? "" : " ecommerce-color-swatch--empty"}`} style={{ backgroundColor: validHex(color.colorValue) ? color.colorValue : "transparent" }} aria-hidden="true" />
+                        <input className="ecommerce-variant-native-color" type="color" value={validHex(color.colorValue) ? color.colorValue : "#000000"} aria-label={t("admin.colorPickerFor", { color: color.colorName || t("admin.unnamedColor") })} onInput={(event) => changeVariantColor(group.id, color.id, { colorValue: event.currentTarget.value.toUpperCase() })} onChange={(event) => changeVariantColor(group.id, color.id, { colorValue: event.target.value.toUpperCase() })} />
+                        <input className="ecommerce-variant-hex-input" name={`color-hex-${color.id}`} autoComplete="off" spellCheck="false" dir="ltr" maxLength={7} placeholder="#111111" aria-label={t("admin.hexFor", { color: color.colorName || t("admin.unnamedColor") })} value={color.colorValue} onChange={(event) => {
+                          const raw = event.target.value.trim().toUpperCase();
+                          changeVariantColor(group.id, color.id, { colorValue: raw && !raw.startsWith("#") ? `#${raw}` : raw });
+                        }} />
+                      </span>
+                    </label>
+                    <label><span>{t("admin.quantity")}</span><input type="number" inputMode="numeric" min="0" step="1" aria-label={t("admin.colorQuantityFor", { color: color.colorName || t("admin.unnamedColor"), variant: label })} value={color.quantity} onChange={(event) => {
+                      const raw = event.target.value;
+                      const quantity = raw === "" ? "" : Math.max(0, Math.trunc(Number(raw) || 0));
+                      changeVariantColor(group.id, color.id, { quantity });
+                    }} /></label>
+                    <button type="button" className="ecommerce-variant-color-delete" disabled={group.colors.length === 1} title={group.colors.length === 1 ? t("admin.keepOneColor") : t("admin.removeColor")} aria-label={t("admin.removeColor")} onClick={() => removeVariantColor(group.id, color.id)}><Trash2 size={16} /></button>
+                  </div>)}
                 </div>
-              </div>
-            );
-          })()}
-        </section>
-      )}
-      {!form.options.length && <section className="ecommerce-editor-inventory">
+                <footer className="ecommerce-variant-card-footer">
+                  <button type="button" className="ecommerce-variant-add-color" onClick={() => addVariantColor(group.id)}><Plus size={16} />{t("merchant.addColor")}</button>
+                  <strong>{t("admin.variantTotal", { count: total })}</strong>
+                </footer>
+              </div>}
+            </article>;
+          })}
+        </div>
+        <div className="ecommerce-variant-editor-actions">
+          <button type="button" className="ecommerce-add-variant-button" onClick={addVariantGroup}><Plus size={16} />{t("merchant.addVariant")}</button>
+          {productId && variantInventoryIsFilled(form.variantGroups) && <button type="button" className="ecommerce-save-variants-button" disabled={state.saving} onClick={saveVariants}><Save size={16} />{state.saving ? t("merchant.saving") : t("merchant.saveVariants")}</button>}
+        </div>
+      </section>
+      {!form.variantGroups.length && !form.hadVariantInventory && <section className="ecommerce-editor-inventory">
 <h2>{t("merchant.inventory")}</h2><div className="ecommerce-editor-grid ecommerce-editor-inventory-fields">
 <label>{t("merchant.currentStock")}<input type="number" min="0" value={form.inventory_quantity} onChange={(e) => update("inventory_quantity", e.target.value)} />
 </label>

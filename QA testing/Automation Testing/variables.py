@@ -18,6 +18,7 @@ class Variables:
     DASHBOARD_URL = f"{BASE_URL}/dashboard"
     TAGS_URL = f"{BASE_URL}/ecommerce/tags"
     CATEGORIES_URL = f"{BASE_URL}/ecommerce/categories"
+    PRODUCTS_URL = f"{BASE_URL}/ecommerce/products"
 
     LOGIN_EMAIL = "demo@madarportal.com"
     LOGIN_PASSWORD = "Demo@123"

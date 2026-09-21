@@ -247,32 +247,17 @@ queried directly. Its SHA must match state and its reported compatibility range
 must contain the live schema. Candidate rollback bounds are descriptive metadata
 today; retained-target attestation is the operative rollback check.
 
-Current bridge contract after this policy update is schema range `81..100`, target
-`100`, class `expand-only`, rollback metadata `81..99`, and the
-checksum-pinned, contiguous `migrations-097-100.json`. It promotes and is
-accepted while schema 96 through 100 is live. Text-only product variants retain
-the legacy aggregate save path before schema 99, while color presentation saves
-fail clearly instead of silently discarding swatches. Only after bridge
-acceptance may the coordinator create a source-schema-bound verified backup and
-execute the needed 96-to-100 transitions. Migration 099 adds only constrained
-variant-attribute presentation metadata and a transactional V2 wrapper around
-the existing aggregate save; it does not change variant identity, SKU,
-inventory, checkout, restoration, snapshots, or order history.
-
-Migration 100 adds bounded multi-product discount conditions to rule versions
-and immutable entitlement snapshots. Normal offers require no points (including
-guests); unlocked loyalty offers retain verified identity and threshold spending.
-Checkout selects the highest eligible percentage per product, never adds
-percentages, and snapshots its source and winning entitlement. Lifetime and
-fixed-period conditions coexist; normal periods start at rule creation, loyalty
-periods at entitlement grant. A bundle costs one threshold, expires only when
-all its conditions expire, and restores points once on revocation. Processing a
-previously earned order after a rule edit cannot award points again.
-Before schema 100, only a representable single-product 10% loyalty condition
-may use the legacy save RPC. Other conditions fail explicitly, never silently
-discard products or percentages. The editor remains available for drafting when
-loyalty storage is absent; it does not pretend those drafts were persisted.
-Releases capped at schema 99 are not rollback targets after 100 commits.
+The current bridge contract is schema range `81..104`, target `104`, class
+`expand-only`, rollback metadata `81..99`, and the checksum-pinned, contiguous
+`migrations-100-104.json`. Only after bridge acceptance may the coordinator
+create a source-schema-bound verified backup and execute the needed 99-to-103
+transitions. Migration 100 corrects the site-visit counter RPC, migration 101
+adds product-variant presentation metadata, migration 102 adds bounded ecommerce
+discount conditions, migration 103 adds tenant-scoped delivery pricing, and
+migration 104 normalizes that table to exactly one non-negative fee per enabled
+delivery area. The pricing table is service-role-only with row-level security
+enabled. Releases capped below the
+live schema are not rollback targets after a later transition commits.
 
 The preceding schema-097 bridge added verified-customer loyalty through atomic
 functions. Identity is `(store tenant_id, public.users.id)`; checkout email and
