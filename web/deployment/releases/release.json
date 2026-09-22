@@ -6,9 +6,9 @@
     "target": 104,
     "migration_class": "expand-only",
     "rollback_compatible_min": 81,
-    "rollback_compatible_max": 99
+    "rollback_compatible_max": 102
   },
   "migration_policy": "automatic-after-known-good-backup-first-forward-repair",
-  "notes": "Forward-only production bridge preserving immutable schema 099 commercial access ledger. Starting from production schema 99, apply migrations 100 through 102, migration 103 delivery pricing, and migration 104 to normalize pricing to one fee per delivery area. Perform governed verified backup before migration. Do not replay migrations 001-099. After schema advances beyond 99, use forward repair rather than incompatible traffic rollback.",
-  "migration_manifest": "migrations-100-104.json"
+  "notes": "Forward-only production bridge from schema 102 to 104. Migration 103 creates ecommerce delivery pricing and migration 104 normalizes pricing to one fee per delivery area. Perform the governed verified backup while schema 102 is still serving before applying either migration. Do not replay or rewrite migrations 001-102. After schema advances beyond 102, use forward repair rather than an incompatible traffic rollback.",
+  "migration_manifest": "migrations-103-104.json"
 }

@@ -20,32 +20,107 @@ class FakeOperations:
         self.schema = schema
         self.calls = []
 
+        # Tests that construct a fresh operations object after an interrupted
+        # first promotion model the candidate as the currently loaded route.
+        self.traffic_slot = "green"
+
+        # A fresh operations object used for a subsequent ordinary release
+        # models the existing known-good consumers as the current worker owner.
+        self.worker_owner = "old"
+
     def _call(self, name, *args):
         self.calls.append((name, *args))
         if self.fail_at == name:
             raise RuntimeError(f"injected_{name}_failure")
 
-    def verify_source(self, sha): self._call("verify_source", sha)
+    def verify_source(self, sha):
+        self._call("verify_source", sha)
+
     def build(self, sha, slot):
         self._call("build", sha, slot)
-        return {"backend": "backend@sha256:1", "frontend": "frontend@sha256:2", "worker": "worker@sha256:3"}
+        return {
+            "backend": "backend@sha256:1",
+            "frontend": "frontend@sha256:2",
+            "worker": "worker@sha256:3",
+        }
+
     def schema_version(self):
         self._call("schema_version")
         return self.schema
-    def preflight(self, sha, slot, images, schema): self._call("preflight", sha, slot, schema)
-    def start_candidate(self, sha, slot, images): self._call("start_candidate", sha, slot)
-    def validate_candidate(self, sha, slot): self._call("validate_candidate", sha, slot)
+
+    def preflight(self, sha, slot, images, schema):
+        self._call("preflight", sha, slot, schema)
+
+    def start_candidate(self, sha, slot, images):
+        self._call("start_candidate", sha, slot)
+
+    def validate_candidate_core(self, sha, slot):
+        # Keep the existing fault-injection name because these tests treat
+        # candidate core/deep validation as one pre-switch validation phase.
+        self._call("validate_candidate", sha, slot)
+
+    def validate_candidate(self, sha, slot):
+        self._call("validate_candidate", sha, slot)
+
     def validate_rollback_target(self, release, schema):
-        self._call("validate_rollback_target", release["sha"], release["slot"], schema)
+        self._call(
+            "validate_rollback_target",
+            release["sha"],
+            release["slot"],
+            schema,
+        )
         if self.fail_at == "rollback_schema":
-            raise RuntimeError("known_good_rollback_schema_incompatible")
-        return {"compatible_min": 81, "compatible_max": 83}
-    def activate_workers(self, sha, slot, images): self._call("activate_workers", sha, slot)
-    def deactivate_workers(self, release): self._call("deactivate_workers", release["slot"])
-    def restore_workers(self, release): self._call("restore_workers", release["slot"])
-    def switch_traffic(self, slot): self._call("switch_traffic", slot)
-    def observe(self, sha, slot): self._call("observe", sha, slot)
-    def stop_candidate(self, slot): self._call("stop_candidate", slot)
+            raise RuntimeError(
+                "known_good_rollback_schema_incompatible"
+            )
+        return {
+            "compatible_min": 81,
+            "compatible_max": 83,
+        }
+
+    def activate_workers(self, sha, slot, images):
+        self._call("activate_workers", sha, slot)
+        self.worker_owner = "candidate"
+
+    def deactivate_workers(self, release):
+        self._call("deactivate_workers", release["slot"])
+        self.worker_owner = "none"
+
+    def restore_workers(self, release):
+        self._call("restore_workers", release["slot"])
+        self.worker_owner = "old"
+
+    def worker_ownership(self, retained, candidate):
+        self._call(
+            "worker_ownership",
+            retained["slot"],
+            candidate["slot"],
+        )
+        return self.worker_owner
+
+    def switch_traffic(self, slot):
+        self._call("switch_traffic", slot)
+        self.traffic_slot = slot
+
+    def current_traffic_slot(self):
+        self._call("current_traffic_slot")
+        return self.traffic_slot
+
+    def resolve_serving_slot(self, expected):
+        self._call("resolve_serving_slot")
+        if self.traffic_slot in expected:
+            return self.traffic_slot
+        return None
+
+    def observe(self, sha, slot):
+        self._call("observe", sha, slot)
+
+    def stop_candidate(self, slot, *, expected_serving=None):
+        self._call("stop_candidate", slot)
+
+    def validate_recovery_backup(self, schema):
+        self._call("validate_recovery_backup", schema)
+        return {"schema": schema}
 
 
 class ReleaseDeployerTests(unittest.TestCase):

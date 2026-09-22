@@ -262,23 +262,36 @@ class ActiveRuntimeRefreshTests(unittest.TestCase):
             )
 
     def test_runtime_recreation_uses_only_existing_images_and_required_services(self):
-        operations = release_cli.DockerGitOperations.__new__(
-            release_cli.DockerGitOperations
-        )
-        operations.schema_version = lambda: 93
-        operations._compose = Mock()
-        operations.refresh_active_runtime_services(SHA, "green", IMAGES)
-        args = operations._compose.call_args.args
-        self.assertEqual(args[:3], (SHA, "green", IMAGES))
-        for value in (
-            "--no-build", "parser-worker", "backend", "notification-worker",
-            "calendar-sync-worker", "data-deletion-worker",
-        ):
-            self.assertIn(value, args)
-        self.assertNotIn("build", args)
-        self.assertNotIn("down", args)
-        self.assertNotIn("madar-switch-traffic", args)
-        self.assertTrue(operations._compose.call_args.kwargs["workers_active"])
+        with tempfile.TemporaryDirectory() as root:
+            operations = release_cli.DockerGitOperations.__new__(
+                release_cli.DockerGitOperations
+            )
+            operations.state_root = Path(root)
+            operations.schema_version = lambda: 93
+            operations._compose = Mock()
+            operations._require_worker_authority = Mock(return_value={})
+            operations._require_other_worker_slot_inactive = Mock()
+
+            operations.refresh_active_runtime_services(SHA, "green", IMAGES)
+
+            args = operations._compose.call_args.args
+            self.assertEqual(args[:3], (SHA, "green", IMAGES))
+            for value in (
+                "--no-build",
+                "parser-worker",
+                "notification-worker",
+                "calendar-sync-worker",
+                "data-deletion-worker",
+            ):
+                self.assertIn(value, args)
+
+            self.assertNotIn("backend", args)
+            self.assertNotIn("build", args)
+            self.assertNotIn("down", args)
+            self.assertNotIn("madar-switch-traffic", args)
+            self.assertTrue(
+                operations._compose.call_args.kwargs["workers_active"]
+            )
 
     def test_web_push_environment_is_propagated_without_logging_secrets(self):
         with tempfile.TemporaryDirectory() as root:

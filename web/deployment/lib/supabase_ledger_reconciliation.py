@@ -94,24 +94,116 @@ def _run(
 
     web_root = repository_root / "web"
     release = load_json(web_root / "deployment/releases/release.json", "ledger_reconciliation_release_contract_invalid")
-    target = int(release.get("schema", {}).get("target", -1))
-    manifest_name = str(release.get("migration_manifest") or "")
-    version = target if migration_version is None else migration_version
-    if target not in {97, 98, 99, 100, 101} or version not in {97, 98, 99, 100, 101} or version > target or not manifest_name or Path(manifest_name).name != manifest_name:
-        raise RuntimeError("ledger_reconciliation_release_contract_invalid")
-    manifest = load_json(web_root / "deployment/releases" / manifest_name, "ledger_reconciliation_manifest_invalid")
-    manifest_release = str(manifest.get("release_sha") or "")
-    if manifest_release not in {release_sha, "CURRENT", "STAGING"}:
-        raise RuntimeError("ledger_reconciliation_manifest_release_mismatch")
+    try:
+        target = int(release.get("schema", {}).get("target", -1))
+        version = (
+            target
+            if migration_version is None
+            else int(migration_version)
+        )
+    except (TypeError, ValueError) as error:
+        raise RuntimeError(
+            "ledger_reconciliation_release_contract_invalid"
+        ) from error
+
+    manifest_name = str(
+        release.get("migration_manifest") or ""
+    )
+
+    if (
+        target < 1
+        or target > 999
+        or version < 1
+        or version > 999
+        or version > target
+        or not manifest_name
+        or Path(manifest_name).name != manifest_name
+    ):
+        raise RuntimeError(
+            "ledger_reconciliation_release_contract_invalid"
+        )
+
+    manifest = load_json(
+        web_root / "deployment/releases" / manifest_name,
+        "ledger_reconciliation_manifest_invalid",
+    )
+
+    manifest_release = str(
+        manifest.get("release_sha") or ""
+    )
+
+    if manifest_release not in {
+        release_sha,
+        "CURRENT",
+        "STAGING",
+    }:
+        raise RuntimeError(
+            "ledger_reconciliation_manifest_release_mismatch"
+        )
+
     entries = manifest.get("migrations", [])
-    numbers = [item.get("number") for item in entries]
-    if not numbers or numbers != list(range(numbers[0], target + 1)):
-        raise RuntimeError("ledger_reconciliation_manifest_transition_invalid")
+
+    if not isinstance(entries, list) or not entries:
+        raise RuntimeError(
+            "ledger_reconciliation_manifest_transition_invalid"
+        )
+
+    try:
+        numbers = [
+            int(item["number"])
+            for item in entries
+            if isinstance(item, dict)
+        ]
+    except (KeyError, TypeError, ValueError) as error:
+        raise RuntimeError(
+            "ledger_reconciliation_manifest_transition_invalid"
+        ) from error
+
+    if len(numbers) != len(entries):
+        raise RuntimeError(
+            "ledger_reconciliation_manifest_transition_invalid"
+        )
+
+    if numbers[-1] != target:
+        raise RuntimeError(
+            "ledger_reconciliation_release_contract_invalid"
+        )
+
+    if numbers != list(
+        range(numbers[0], numbers[-1] + 1)
+    ):
+        raise RuntimeError(
+            "ledger_reconciliation_manifest_transition_invalid"
+        )
+
+    if version not in numbers:
+        raise RuntimeError(
+            "ledger_reconciliation_release_contract_invalid"
+        )
+
     for item in entries:
-        number = item.get("number")
-        if number not in {97, 98, 99, 100, 101} or item.get("from_schema") != number - 1 or item.get("to_schema") != number:
-            raise RuntimeError("ledger_reconciliation_manifest_transition_invalid")
-    matching = [item for item in entries if item.get("number") == version]
+        try:
+            number = int(item["number"])
+            from_schema = int(item["from_schema"])
+            to_schema = int(item["to_schema"])
+        except (KeyError, TypeError, ValueError) as error:
+            raise RuntimeError(
+                "ledger_reconciliation_manifest_transition_invalid"
+            ) from error
+
+        if (
+            from_schema != number - 1
+            or to_schema != number
+        ):
+            raise RuntimeError(
+                "ledger_reconciliation_manifest_transition_invalid"
+            )
+
+    matching = [
+        item
+        for item in entries
+        if int(item["number"]) == version
+    ]
     if len(matching) != 1 or int(matching[0].get("from_schema", -1)) != version - 1 or int(matching[0].get("to_schema", -1)) != version:
         raise RuntimeError("ledger_reconciliation_manifest_transition_invalid")
     migration = (repository_root / str(matching[0].get("path", ""))).resolve()
@@ -277,7 +369,12 @@ def run(*, state_root: Path, **arguments) -> dict:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Reconcile a coordinator-verified migration into the Supabase CLI ledger.")
-    parser.add_argument("--migration-version", required=True, choices=("097", "098", "099", "100", "101"))
+    parser.add_argument(
+        "--migration-version",
+        required=True,
+        type=int,
+        help="Migration number; must exist in the active release manifest.",
+    )
     parser.add_argument("--release-sha", required=True)
     parser.add_argument("--repository-root", required=True, type=Path)
     parser.add_argument("--state-root", required=True, type=Path)
@@ -286,7 +383,15 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args(argv)
     try:
-        result = run(migration_version=int(args.migration_version), release_sha=args.release_sha.lower(), repository_root=args.repository_root, state_root=args.state_root, supabase_bin=args.supabase_bin, confirmation=args.confirm, dry_run=args.dry_run)
+        result = run(
+            migration_version=args.migration_version,
+            release_sha=args.release_sha.lower(),
+            repository_root=args.repository_root,
+            state_root=args.state_root,
+            supabase_bin=args.supabase_bin,
+            confirmation=args.confirm,
+            dry_run=args.dry_run,
+        )
     except Exception as error:
         print(f"ledger reconciliation failed: {error}", file=sys.stderr)
         return 1

@@ -1,6 +1,6 @@
 # Madar production release acceptance policy
 
-Last implementation review: 2026-09-14
+Last implementation review: 2026-09-22
 
 ## A. Purpose and authority
 
@@ -248,16 +248,17 @@ must contain the live schema. Candidate rollback bounds are descriptive metadata
 today; retained-target attestation is the operative rollback check.
 
 The current bridge contract is schema range `81..104`, target `104`, class
-`expand-only`, rollback metadata `81..99`, and the checksum-pinned, contiguous
-`migrations-100-104.json`. Only after bridge acceptance may the coordinator
-create a source-schema-bound verified backup and execute the needed 99-to-103
-transitions. Migration 100 corrects the site-visit counter RPC, migration 101
-adds product-variant presentation metadata, migration 102 adds bounded ecommerce
-discount conditions, migration 103 adds tenant-scoped delivery pricing, and
-migration 104 normalizes that table to exactly one non-negative fee per enabled
-delivery area. The pricing table is service-role-only with row-level security
-enabled. Releases capped below the
-live schema are not rollback targets after a later transition commits.
+`expand-only`, rollback metadata `81..102`, and the checksum-pinned, contiguous
+`migrations-103-104.json`. Production is already at schema 102; migrations
+100 through 102 are applied production history and remain immutable rather than
+being replayed by this release. Only after bridge acceptance at schema 102 may
+the coordinator create a source-schema-bound verified backup and execute
+102→103→104. Migration 103 creates the tenant-scoped delivery-pricing table in
+its intermediate origin/destination form. Migration 104 then normalizes that
+table to exactly one non-negative fee per tenant and service area. Delivery
+pricing remains an upgrade-required operation until schema 104 is available.
+Once schema advances beyond 102, the retained schema-102 release is no longer
+an automatic traffic-rollback target and recovery is forward-repair-only.
 
 The preceding schema-097 bridge added verified-customer loyalty through atomic
 functions. Identity is `(store tenant_id, public.users.id)`; checkout email and
