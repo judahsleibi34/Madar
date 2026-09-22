@@ -1,12 +1,20 @@
 import hashlib
+import importlib.util
 import os
 from pathlib import Path
 import subprocess
 import tempfile
 import unittest
+from types import SimpleNamespace
+from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[2]
+REHEARSAL_PATH = ROOT / "scripts" / "rehearse_backup.py"
+spec = importlib.util.spec_from_file_location("rehearse_backup", REHEARSAL_PATH)
+rehearsal = importlib.util.module_from_spec(spec)
+assert spec.loader is not None
+spec.loader.exec_module(rehearsal)
 
 
 class BackupToolingTests(unittest.TestCase):
@@ -44,6 +52,7 @@ class BackupToolingTests(unittest.TestCase):
             "PGPASSWORD": "synthetic-test-password",
             "PGDATABASE": "madar",
             "MADAR_BACKUP_TIMESTAMP": timestamp,
+            "MADAR_PROVIDER_BACKUP_REQUIRED": "false",
         }
         for key, name in (
             ("MADAR_BUILDER_ASSETS_DIR", "builder-assets"),
@@ -180,6 +189,49 @@ class BackupToolingTests(unittest.TestCase):
             result = self.run_script("restore_madar.sh", "--dry-run", backup, env=env)
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn("pg_restore", result.stdout)
+
+    def test_rehearsal_attaches_stdin_only_for_stdin_driven_psql(self):
+        with tempfile.TemporaryDirectory() as root:
+            backup = Path(root) / "backup"
+            for name in ("builder-assets", "private-uploads", "generated-artifacts", "avatars"):
+                (backup / "files" / name).mkdir(parents=True)
+            (backup / "database.dump").write_bytes(b"fixture database")
+            (backup / "manifest.json").write_text(
+                '{"backup_id":"fixture","created_at":"2026-09-22T00:00:00Z",'
+                '"database":{"schema_version":102,"public_tables":0}}',
+                encoding="utf-8",
+            )
+            migration = Path(root) / "migration.sql"
+            migration.write_text("SELECT 1;\n", encoding="utf-8")
+            outputs = {
+                "restored_schema": "102\n",
+                "metadata_validation": "schema=104\npublic_tables=0\ninvalid_indexes=0\nauth_users=0\n",
+            }
+
+            with (
+                mock.patch.object(
+                    rehearsal, "run",
+                    side_effect=lambda command, *, phase, **kwargs: outputs.get(phase, ""),
+                ) as run_mock,
+                mock.patch.object(
+                    rehearsal.subprocess, "run",
+                    return_value=SimpleNamespace(returncode=0),
+                ),
+            ):
+                rehearsal.rehearse(
+                    backup,
+                    "supabase/postgres@sha256:" + "a" * 64,
+                    migration,
+                    target_schema=104,
+                )
+
+            calls = {call.kwargs["phase"]: call for call in run_mock.call_args_list}
+            stdin_call = calls["role_prerequisites"]
+            self.assertIn("-i", stdin_call.args[0])
+            self.assertIn("CREATE ROLE", stdin_call.kwargs["input"])
+            migration_call = calls["isolated_migration"]
+            self.assertNotIn("-i", migration_call.args[0])
+            self.assertEqual(migration_call.args[0][-2:], ["--file", "/migration.sql"])
 
     def test_offhost_replication_refuses_an_unmounted_local_directory(self):
         with tempfile.TemporaryDirectory() as root:

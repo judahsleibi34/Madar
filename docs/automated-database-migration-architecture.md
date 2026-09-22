@@ -1,6 +1,6 @@
 # Automated database migration architecture
 
-Last implementation review: 2026-09-14
+Last implementation review: 2026-09-22
 
 ## 1. Purpose, authority, and scope
 
@@ -463,23 +463,27 @@ table is queried or changed.
 
 ### Current schema 104 bridge
 
-The release contract accepts schema `81..104` and targets `104` using the
-pinned contiguous `migrations-100-104.json` manifest. The existing controller,
-backup gates, locking, bridge-first acceptance, and forward-repair semantics are
-unchanged. The four expand-only transitions cover the site-visit RPC correction,
-variant presentation metadata, ecommerce discount conditions, and tenant-scoped
-delivery pricing. Migration 103 adds the delivery-pricing table; migration 104
-forward-normalizes it from an origin/destination matrix to one fee per tenant
-and enabled service area without rewriting orders or tenant delivery-area mappings.
+The release contract accepts schema `81..104`, targets `104`, and has rollback
+metadata bounded at schema `102`. Production is already at schema 102.
+Migrations 100 through 102 are therefore immutable applied production history;
+they are checksum-pinned by `check_forward_release.py` but are not part of the
+active execution manifest.
 
-The bridge application turns a missing delivery-pricing relation into an explicit
-upgrade-required response instead of leaking a database error. Once schema 103 is
-live, merchants maintain one non-negative fee for each enabled destination area.
-A retained release capped below the live schema cannot
-be used for traffic rollback after the later transition commits. Updating this
-manifest/release contract remains a protected control-plane change subject to
-provenance-aware upgrade gates; no installed controller or production database
-is changed by these source edits.
+The active checksum-pinned manifest is `migrations-103-104.json`, representing
+the contiguous `102→103→104` transition. The existing controller, backup gates,
+locking, bridge-first acceptance, and forward-repair semantics are unchanged.
+Migration 103 is `expand-only` and creates the tenant-scoped delivery-pricing
+table in its intermediate origin/destination form. Migration 104 is
+`forward-compatible`: it backfills `service_area_id`, deterministically removes
+duplicate tenant/service-area rows, drops the origin/destination matrix
+columns, and enforces one pricing row per tenant and service area.
+
+The bridge application may be accepted while schema 102 is live, but delivery
+pricing explicitly requires schema 104. Schema 103 is an intermediate migration
+state rather than the terminal application contract. The governed verified
+backup is created while schema 102 is still serving. Once the first committed
+transition advances the database beyond 102, the retained schema-102 release is
+no longer an automatic rollback target; retries must resume or repair forward.
 
 ### Earlier schema 099 bridge
 
@@ -533,7 +537,7 @@ The following are the mandatory design invariants. Test names are from
 | 7 | A completed schema transition is never blindly replayed after interruption. | Executor compares live schema to each `to_schema` and records `already_applied`; database schema is authoritative. The persistent timer and same-known-good branch re-enter that idempotent path after reboot. | `test_migration_executor.py :: test_resume_from_schema_82_skips_first_migration`; `test_automatic_migration_control_plane.py :: test_committed_transition_reuses_backup_without_old_release_rollback`; `test_monorepo_deployment.py :: test_auto_deploy_suppresses_bad_sha_and_refuses_uninitialized_state`, `test_timer_waits_after_completion_instead_of_retrying_immediately`. |
 | 8 | Once DB schema exceeds the previous release's compatibility maximum, automatic traffic rollback to it is prohibited. | Retained target is validated only at source before mutation; automatic migration has no switch/restore path and partial resume requires the original backup. | `test_committed_transition_reuses_backup_without_old_release_rollback`; `test_release_deployer.py :: test_retained_target_is_attested_against_observed_schema_before_start`. |
 | 9 | Reverse SQL migrations are not automatically attempted. | Manifests require one-step forward transitions; executor skips reached targets and has no reverse executor; coordinator failure semantics are forward-repair-only. | `test_committed_transition_reuses_backup_without_old_release_rollback`; `test_migration_executor.py :: test_resume_from_schema_82_skips_first_migration`. |
-| 10 | Final success after an executed transition waits for target schema, worker refresh, active application validation, and stable-route validation. | `automatic_migrate_known_good()` target check followed by actual `refresh_active_workers()`; transition completion write occurs last. A proven fresh `already_at_target` release has already passed promotion workers/observation and repeats stable validation before recording its nonexecuting result. | `test_successful_94_to_95_records_target_only_after_worker_and_route_validation`, `test_stable_route_failure_prevents_final_migration_success`, `test_prior_release_migrates_then_later_release_noops_idempotently`; `test_release_bootstrap.py :: test_post_migration_refresh_requires_exact_known_good_and_schema_83`. |
+| 10 | Final success after an executed transition waits for target schema, worker refresh, active application validation, and stable-route validation. | `automatic_migrate_known_good()` target check followed by actual `refresh_active_workers()`; transition completion write occurs last. A proven fresh `already_at_target` release has already passed promotion workers/observation and repeats stable validation before recording its nonexecuting result. | `test_successful_102_to_104_records_target_only_after_worker_and_route_validation`, `test_stable_route_failure_prevents_final_migration_success`, `test_prior_release_migrates_then_later_release_noops_idempotently`; `test_release_bootstrap.py :: test_post_migration_refresh_requires_exact_known_good_and_schema_83`. |
 | 11 | A later release accepted at an already-reached target neither borrows the prior release's backup nor bypasses a genuine current-release resume. | Fresh no-op requires no per-SHA state plus matching known-good and acceptance-time target observations. Any current-release state retains exact SHA/source backup attestation. | `test_prior_release_migrates_then_later_release_noops_idempotently`, `test_current_release_partial_state_without_backup_still_fails_closed`, `test_current_release_substituted_resume_backup_still_fails_closed`. |
 
 Static orchestration tests in `test_monorepo_deployment.py` additionally verify

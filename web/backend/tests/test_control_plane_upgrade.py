@@ -55,6 +55,7 @@ class FakeOperations:
         self.schema = 93
         self.timer = {"enabled": "enabled", "active": "active"}
         self.interlock = False
+        self.interlock_sha = None
         self.snapshot = {"state": "unchanged"}
         self.controller_compatibility = "normal_compatible"
 
@@ -86,13 +87,21 @@ class FakeOperations:
         self._event("protected_change_required")
         return self.protected
 
-    def quiesce(self):
+    def quiesce(self, approved_sha):
         self._event("quiesce")
+        self.arm_interlock(approved_sha)
         self.timer = {"enabled": "disabled", "active": "inactive"}
+
+    def durable_quiesce_snapshot_exists(self, approved_sha):
+        return (
+            self.interlock
+            and self.interlock_sha == approved_sha
+        )
 
     def arm_interlock(self, sha):
         self._event("arm_interlock")
         self.interlock = True
+        self.interlock_sha = sha
 
     def release_deployment_lock(self):
         self._event("release_deployment_lock")
@@ -135,7 +144,7 @@ class FakeOperations:
             self.production = sha
             self.slot = "blue"
 
-    def attest_serving(self, sha):
+    def attest_serving(self, sha, *, recovery=False):
         self._event("attest_serving")
         if self.production != sha:
             raise upgrade.UpgradeError("not_promoted")
@@ -166,6 +175,7 @@ class FakeOperations:
     def clear_interlock(self):
         self.events.append("clear_interlock")
         self.interlock = False
+        self.interlock_sha = None
 
     def clear_authorization(self):
         self.events.append("clear_authorization")

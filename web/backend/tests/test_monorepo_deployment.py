@@ -67,7 +67,7 @@ class MonorepoDeploymentTests(unittest.TestCase):
 
     def test_release_deployer_uses_explicit_compose_and_environment_roots(self):
         self.assertIn('"MADAR_ENV_FILE": str(self.env_file)', self.release_deploy)
-        self.assertIn('"docker", "compose", "--project-name", f"madar-{slot}"', self.release_deploy)
+        self.assertIn('"docker", "compose", "--project-name", f"{self.project_prefix}-{slot}"', self.release_deploy)
         self.assertIn('"--project-directory", str(web)', self.release_deploy)
         self.assertIn('"--env-file", str(self.env_file)', self.release_deploy)
         self.assertEqual(self.compose.count("${MADAR_ENV_FILE:-.env}"), 4)
@@ -109,7 +109,7 @@ class MonorepoDeploymentTests(unittest.TestCase):
         self.assertIn("known_bad_release_suppressed", self.release_library)
         self.assertIn("/health/ready", self.release_deploy)
         self.assertIn("retained_worker_containers_missing", self.release_deploy)
-        self.assertIn('["docker", "inspect", name]', self.release_deploy)
+        self.assertIn('"docker", "inspect", "--format"', self.release_deploy)
 
     def test_persistent_bind_mounts_keep_their_pre_move_host_paths(self):
         for path in (
