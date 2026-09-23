@@ -32,6 +32,7 @@ sys.path.insert(0, str(WEB_ROOT))
 from deployment.lib.release_deployer import Compatibility, ReleaseDeployer, atomic_json, utc_now  # noqa: E402
 from deployment.lib.environment_file import load_environment_file  # noqa: E402
 from deployment.lib.control_plane_upgrade_authorization import (  # noqa: E402
+    require_production_mutation_identity,
     require_upgrade_authorization,
 )
 from deployment.lib.migration_executor import (  # noqa: E402
@@ -2070,6 +2071,7 @@ def main() -> int:
     )
     parser.add_argument("--slot", choices=tuple(SLOT_PORTS), default="green")
     args = parser.parse_args()
+    require_production_mutation_identity(SCRIPT)
     normalized_sha = args.sha.lower()
     if not re.fullmatch(r"[0-9a-f]{40}", normalized_sha):
         raise RuntimeError("candidate_sha_invalid")

@@ -38,6 +38,7 @@ sys.path.insert(0, str(WEB_ROOT))
 from deployment.lib.control_plane_upgrade_authorization import (  # noqa: E402
     require_upgrade_authorization,
 )
+import deployment.lib.control_plane_upgrade_authorization as authorization  # noqa: E402
 import control_plane_filesystem as filesystem  # noqa: E402
 
 
@@ -1443,6 +1444,116 @@ class ControlPlaneUpgradeTests(unittest.TestCase):
             operations.timer, {"enabled": "disabled", "active": "inactive"}
         )
         self.assertTrue(operations.interlock)
+
+    def test_production_mutation_identity_guard_rejects_root_for_installed_scripts(self):
+        guard = getattr(
+            authorization,
+            "require_production_mutation_identity",
+            None,
+        )
+        self.assertIsNotNone(
+            guard,
+            "production mutation identity guard is missing",
+        )
+
+        with tempfile.TemporaryDirectory() as root:
+            root_path = Path(root)
+            installed_root = root_path / "opt/madar/control-plane/deployment"
+            installed_script = (
+                installed_root / "bin/madar-release-deploy"
+            )
+            installed_script.parent.mkdir(parents=True)
+            installed_script.write_text(
+                "#!/usr/bin/env python3\n",
+                encoding="utf-8",
+            )
+
+            development_script = (
+                root_path / "repository/web/deployment/bin/madar-release-deploy"
+            )
+            development_script.parent.mkdir(parents=True)
+            development_script.write_text(
+                "#!/usr/bin/env python3\n",
+                encoding="utf-8",
+            )
+
+            identity = SimpleNamespace(
+                pw_uid=1000,
+                pw_gid=1000,
+            )
+
+            # Installed production mutation as root must fail closed.
+            with (
+                mock.patch.object(
+                    authorization.pwd,
+                    "getpwnam",
+                    return_value=identity,
+                ),
+                mock.patch.object(
+                    authorization.os,
+                    "geteuid",
+                    return_value=0,
+                ),
+                mock.patch.object(
+                    authorization.os,
+                    "getegid",
+                    return_value=0,
+                ),
+            ):
+                with self.assertRaisesRegex(
+                    RuntimeError,
+                    "production_mutation_identity_invalid",
+                ):
+                    guard(
+                        installed_script,
+                        installed_root=installed_root,
+                    )
+
+            # Installed production mutation as canonical madar must pass.
+            with (
+                mock.patch.object(
+                    authorization.pwd,
+                    "getpwnam",
+                    return_value=identity,
+                ),
+                mock.patch.object(
+                    authorization.os,
+                    "geteuid",
+                    return_value=1000,
+                ),
+                mock.patch.object(
+                    authorization.os,
+                    "getegid",
+                    return_value=1000,
+                ),
+            ):
+                guard(
+                    installed_script,
+                    installed_root=installed_root,
+                )
+
+            # Development/staging copies must not require the production UID.
+            with (
+                mock.patch.object(
+                    authorization.pwd,
+                    "getpwnam",
+                    return_value=identity,
+                ),
+                mock.patch.object(
+                    authorization.os,
+                    "geteuid",
+                    return_value=0,
+                ),
+                mock.patch.object(
+                    authorization.os,
+                    "getegid",
+                    return_value=0,
+                ),
+            ):
+                guard(
+                    development_script,
+                    installed_root=installed_root,
+                )
 
     def test_interlock_requires_exact_sha_and_one_time_secret(self):
         with tempfile.TemporaryDirectory() as root:

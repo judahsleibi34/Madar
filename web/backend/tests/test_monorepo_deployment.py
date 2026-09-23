@@ -14,6 +14,7 @@ RELEASE_DEPLOY = WEB_ROOT / "deployment" / "bin" / "madar-release-deploy"
 RELEASE_LIBRARY = WEB_ROOT / "deployment" / "lib" / "release_deployer.py"
 ENVIRONMENT_LIBRARY = WEB_ROOT / "deployment" / "lib" / "environment_file.py"
 SWITCH = WEB_ROOT / "deployment" / "bin" / "madar-switch-traffic"
+MIGRATE = WEB_ROOT / "deployment" / "bin" / "madar-migrate"
 PROXY_COMPOSE = WEB_ROOT / "deployment" / "proxy" / "docker-compose.yml"
 PROXY_CONFIG = WEB_ROOT / "deployment" / "proxy" / "nginx.conf"
 RELEASE_COMPOSE = WEB_ROOT / "deployment" / "docker-compose.release.yml"
@@ -39,6 +40,7 @@ class MonorepoDeploymentTests(unittest.TestCase):
         self.release_library = RELEASE_LIBRARY.read_text(encoding="utf-8")
         self.environment_library = ENVIRONMENT_LIBRARY.read_text(encoding="utf-8")
         self.switch = SWITCH.read_text(encoding="utf-8")
+        self.migrate = MIGRATE.read_text(encoding="utf-8")
         self.proxy_compose = PROXY_COMPOSE.read_text(encoding="utf-8")
         self.proxy_config = PROXY_CONFIG.read_text(encoding="utf-8")
         self.release_compose = RELEASE_COMPOSE.read_text(encoding="utf-8")
@@ -99,6 +101,37 @@ class MonorepoDeploymentTests(unittest.TestCase):
             self.assertIn(variable, self.release_deploy)
             self.assertIn(variable, self.release_compose)
         self.assertIn("internal: true", self.release_compose)
+
+    def test_installed_production_mutators_enforce_madar_runtime_identity(self):
+        # Shell orchestration entrypoints execute before the Python deployer,
+        # so they must fail closed themselves when installed and run as root.
+        for name, source in {
+            "madar-auto-deploy": self.wrapper,
+            "madar-production-deploy": self.deploy,
+        }.items():
+            with self.subTest(entrypoint=name):
+                self.assertIn(
+                    "production_mutation_identity_invalid",
+                    source,
+                )
+                self.assertIn("id -u madar", source)
+                self.assertIn("id -g madar", source)
+
+        # Python mutation entrypoints share the canonical identity guard.
+        for name, source in {
+            "madar-release-deploy": self.release_deploy,
+            "madar-switch-traffic": self.switch,
+            "madar-migrate": self.migrate,
+        }.items():
+            with self.subTest(entrypoint=name):
+                self.assertIn(
+                    "require_production_mutation_identity",
+                    source,
+                )
+                self.assertIn(
+                    "require_production_mutation_identity(SCRIPT",
+                    source,
+                )
 
     def test_rollback_switches_to_retained_target_without_rebuild_or_git_reset(self):
         combined = self.deploy + self.release_deploy + self.release_library

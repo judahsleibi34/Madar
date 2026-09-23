@@ -68,6 +68,44 @@ class ReleaseBootstrapTests(unittest.TestCase):
     def compatibility(self):
         return release_cli.Compatibility(81, 83, 83, "expand-only", 81, 83)
 
+    def test_invalid_production_identity_fails_before_release_state_initialization(self):
+        with (
+            patch.object(
+                release_cli,
+                "require_production_mutation_identity",
+                side_effect=RuntimeError(
+                    "production_mutation_identity_invalid"
+                ),
+            ) as identity_guard,
+            patch.object(
+                release_cli,
+                "load_production_path_contract",
+            ) as load_contract,
+            patch.object(
+                release_cli,
+                "require_upgrade_authorization",
+            ) as authorization_guard,
+            patch.object(
+                release_cli.sys,
+                "argv",
+                [
+                    str(release_cli.SCRIPT),
+                    SHA,
+                ],
+            ),
+        ):
+            with self.assertRaisesRegex(
+                RuntimeError,
+                "production_mutation_identity_invalid",
+            ):
+                release_cli.main()
+
+        identity_guard.assert_called_once_with(
+            release_cli.SCRIPT
+        )
+        load_contract.assert_not_called()
+        authorization_guard.assert_not_called()
+
     def test_schema_probe_uses_apikey_only_for_opaque_server_secret(self):
         headers = release_cli.supabase_server_headers(
             "sb_secret_synthetic_fixture_not_a_credential"

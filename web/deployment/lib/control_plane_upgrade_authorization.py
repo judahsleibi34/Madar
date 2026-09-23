@@ -6,11 +6,47 @@ import hashlib
 import hmac
 import json
 import os
+import pwd
 import re
 from pathlib import Path
 
 
 UPGRADE_INTERLOCK = Path("/run/madar/control-plane-upgrade/in-progress.json")
+PRODUCTION_CONTROL_ROOT = Path("/opt/madar/control-plane/deployment")
+PRODUCTION_MUTATION_USER = "madar"
+
+
+def require_production_mutation_identity(
+    script: Path,
+    *,
+    installed_root: Path = PRODUCTION_CONTROL_ROOT,
+    user: str = PRODUCTION_MUTATION_USER,
+) -> None:
+    """Fail closed when installed production mutators run as another identity.
+
+    Repository, staging, and test copies are intentionally unaffected. Only
+    executables beneath the installed production control-plane root enforce
+    the canonical deployment UID/GID.
+    """
+
+    resolved_script = Path(script).resolve()
+    resolved_root = Path(installed_root).resolve()
+
+    if not resolved_script.is_relative_to(resolved_root):
+        return
+
+    try:
+        identity = pwd.getpwnam(user)
+    except KeyError as error:
+        raise RuntimeError(
+            "production_mutation_identity_invalid"
+        ) from error
+
+    if (
+        os.geteuid() != identity.pw_uid
+        or os.getegid() != identity.pw_gid
+    ):
+        raise RuntimeError("production_mutation_identity_invalid")
 
 
 def require_upgrade_authorization(
