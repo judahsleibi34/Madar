@@ -172,7 +172,7 @@ switches remain authorized inside the credential-bearing transient unit.
 | 5 | `automation_quiesce` | Capture timer state, disable/stop timer, stop service, arm interlock, release normal deploy lock. |
 | 6 | `candidate_staging` | Create the protected exact-SHA Git bundle and detached root-owned tree. |
 | 7 | `candidate_static_preflight` | Required-path, symlink, digest, syntax, contract, ownership, ACL, filesystem capability and capacity validation. |
-| 8 | `installer_dry_run` | Execute the candidate installer's complete read-only preflight without apply, including the same deterministic filesystem, source, production-path, timer/service and backup checks used by apply; verify the protected-tree digest is unchanged. |
+| 8 | `installer_dry_run` | Execute the candidate installer's read-only preflight without apply. Re-run the shared deterministic filesystem, source, and production-path checks; require the auto-deploy timer/service to remain quiesced and reject any running backup/verification/replication service, while allowing scheduled backup timers to remain active because dry-run is non-mutating. Verify the protected-tree digest is unchanged. Installer apply later requires those backup timers to be quiesced. |
 | 9 | `control_plane_install` / `control_plane_install_attestation` | Normally create a protected backup and atomically install, then attest provenance, guard, modes, units, paths, backup hashes and absence of legacy authority. For `controller_ahead_bridge`, skip publication and backup creation and instead use `preinstalled_control_plane_attestation` to verify the already-installed exact candidate controller. |
 | 10 | `controlled_candidate_deployment` | Issue a one-cycle systemd credential and synchronously run the exact ordinary auto-deploy entrypoint in a hardened transient unit while the timer remains disabled. The canonical controller alone may build, migrate, promote or advance production Git. |
 | 11 | serving attestation | Require production HEAD, installed provenance, active/known-good state, stable and slot SHA/readiness, schema range, workers, frontend and proxy target to agree. Require a terminal migration outcome. |
@@ -288,34 +288,40 @@ controller files, modifying provenance/state, running migration SQL, switching
 traffic, or re-enabling the timer after a post-promotion failure without first
 diagnosing retained evidence.
 
-## Initial bootstrap
+## Initial bootstrap (completed)
 
-The currently installed controller predates this command. The first merged
-release containing it still requires one final execution of the existing
-reviewed manual control-plane installation procedure from an exact-SHA,
-root-protected staging tree, including timer quiescence, installer dry-run,
-backup, apply and provenance/health verification. That installation places the
-launcher in `/usr/local/sbin`. After this one-time bootstrap, future protected
-control-plane releases use only the one-command workflow.
+The one-time production bootstrap is complete. The privileged launcher is now
+installed at `/usr/local/sbin/madar-control-plane-upgrade`, and the canonical
+root-owned controller is established under `/opt/madar/control-plane/deployment`.
+Future protected control-plane releases use the governed one-command exact-SHA
+workflow; they must not repeat the historical manual publication procedure
+merely because ordinary auto-deploy rejects a protected-path change.
 
-The bootstrap backup must be a unique child of the installer-owned root path,
-for example
+The bootstrap was required because the first release containing the privileged
+upgrader could not be installed by a command that did not yet exist in the
+trusted controller. Its reviewed procedure used an exact-SHA, root-protected
+staging tree, timer quiescence, installer dry-run, a protected backup, apply,
+and provenance/health verification.
+
+The bootstrap backup contract requires a unique child of the installer-owned
+root path, for example
 `/var/lib/madar-control-plane/backups/pre-<sha-prefix>-<UTC timestamp>`.
-Do not place privileged backups below application-owned `/var/lib/madar`:
-write authority over an ancestor permits replacement of an otherwise private
-child. The installer may create its own mode-0700
-`/var/lib/madar-control-plane` hierarchy after the shared dry-run preflight has
-attested `/`, `/var`, and `/var/lib`; it never changes those system parents.
+Privileged backups must not be placed below application-owned
+`/var/lib/madar`: write authority over an ancestor permits replacement of an
+otherwise private child. The installer-owned mode-0700
+`/var/lib/madar-control-plane` hierarchy is separate from application-owned
+release state.
 
-That manual controller-first publication intentionally creates a temporary
-split state: installed controller at the explicitly approved future release,
-serving application at its older known-good ancestor. The governed upgrader is
-then run for that same exact SHA. It classifies the authorized bridge, stages
-and validates the candidate, performs installer dry-run and installed-controller
-attestation, but does not reinstall or downgrade the controller and does not
-fabricate a new controller backup. Its controlled deployment promotes the
-application through the canonical immutable release machinery, runs same-SHA
-validation, and restores the timer's captured state.
+The historical controller-first publication intentionally created a temporary
+split state: the installed controller was at the explicitly approved future
+release while the older known-good application was still serving. The governed
+upgrader then ran for that same exact SHA, classified the authorized bridge,
+staged and validated the candidate, performed installer dry-run and
+installed-controller attestation, promoted the application through the
+canonical immutable release machinery, ran same-SHA validation, and restored
+the captured automation state. That bootstrap boundary is historical; normal
+future protected releases start from the already-established privileged
+upgrader.
 
 ## Implementation and test map
 

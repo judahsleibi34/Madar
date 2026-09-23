@@ -1,6 +1,6 @@
 # Madar production release acceptance policy
 
-Last implementation review: 2026-09-22
+Last implementation review: 2026-09-23
 
 ## A. Purpose and authority
 
@@ -104,19 +104,26 @@ script, and provenance marker is ready. The backed-up prior tree is then
 replaced, so removed stale files cannot survive beneath a marker for newer
 source.
 
-Installer dry-run and apply share the same read-only static preflight before
-the first directory, backup, or controller mutation. Every existing component
-of privileged source and destination paths must be a real root-owned directory
-with no group/world write bit and no effective non-root POSIX ACL write grant;
-private upgrade state directories, when present, must be mode 0700. Root-owned
-mode 0755 system parents such as `/var/lib` are valid. The preflight also checks
-launcher/controller/unit parents and existing targets, the backup and upgrade
-state hierarchy, writable destination mounts, source cleanliness and identity,
-required production paths, timer/service quiescence, and working
-`renameat2(RENAME_EXCHANGE)` support on the publication filesystem. A static
-failure is reported by dry-run before mutation and apply re-evaluates the same
-checks to remain fail-closed against races. The installer never chmods or
-chowns `/`, `/var`, or `/var/lib`.
+Installer dry-run and apply share the same read-only static filesystem
+preflight before the first directory, backup, or controller mutation. Every
+existing component of privileged source and destination paths must be a real
+root-owned directory with no group/world write bit and no effective non-root
+POSIX ACL write grant; private upgrade state directories, when present, must
+be mode 0700. Root-owned mode 0755 system parents such as `/var/lib` are valid.
+The shared preflight also checks launcher/controller/unit parents and existing
+targets, the backup and upgrade state hierarchy, writable destination mounts,
+source cleanliness and identity, required production paths, and working
+`renameat2(RENAME_EXCHANGE)` support on the publication filesystem.
+
+Operational quiescence is deliberately mode-aware. The auto-deploy timer must
+be inactive and disabled and the auto-deploy service must be inactive for both
+installer modes. A currently running backup, verification, or replication
+service also blocks both modes. Scheduled backup timers may remain active
+during installer dry-run because dry-run is read-only; installer apply requires
+those backup timers to be quiesced first by the governed upgrader. Apply
+re-evaluates the static checks after quiescence to remain fail-closed against
+races. The installer never stops those backup timers merely to make its own
+preflight pass, and it never chmods or chowns `/`, `/var`, or `/var/lib`.
 
 ## B. Candidate eligibility (automatic production gate)
 
