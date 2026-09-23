@@ -1528,6 +1528,209 @@ class ControlPlaneUpgradeTests(unittest.TestCase):
         self.assertNotIn("quiesce", operations.events)
         self.assertNotIn("installer_apply", operations.events)
 
+    def test_failure_state_matrix_preserves_control_plane_safety_boundaries(self):
+        scenarios = (
+            # Failure before durable quiescence: production automation has not
+            # been touched and no recovery interlock may be left behind.
+            {
+                "name": "quiesce_before_interlock",
+                "failure": "quiesce",
+                "production_after": "old",
+                "installed_after": "old",
+                "promoted": False,
+                "timer": "original",
+                "interlock": False,
+                "semantics": "pre_install_production_untouched",
+            },
+            # Failure after quiescence but before controller publication:
+            # restoration is permitted only because old controller and old
+            # application identities still attest exactly.
+            {
+                "name": "candidate_static_preflight",
+                "failure": "static_preflight",
+                "production_after": "old",
+                "installed_after": "old",
+                "promoted": False,
+                "timer": "original",
+                "interlock": False,
+                "semantics": "pre_install_production_untouched",
+            },
+            {
+                "name": "installer_dry_run",
+                "failure": "installer_dry_run",
+                "production_after": "old",
+                "installed_after": "old",
+                "promoted": False,
+                "timer": "original",
+                "interlock": False,
+                "semantics": "pre_install_production_untouched",
+            },
+            # Once the new controller is durably installed, failure must fail
+            # closed: automation disabled and interlock retained.
+            {
+                "name": "verify_install",
+                "failure": "verify_install",
+                "production_after": "old",
+                "installed_after": "approved",
+                "promoted": False,
+                "timer": "disabled",
+                "interlock": True,
+                "semantics": "post_install_manual_intervention_timer_disabled",
+            },
+            # A failure while the deployment subprocess is executing but
+            # before promotion must not claim application promotion.
+            {
+                "name": "controlled_candidate_deployment",
+                "failure": "controlled_candidate_deployment",
+                "production_after": "old",
+                "installed_after": "approved",
+                "promoted": False,
+                "timer": "disabled",
+                "interlock": True,
+                "semantics": "post_install_manual_intervention_timer_disabled",
+            },
+            # If the deploy subprocess changed durable known-good state and
+            # the following serving attestation fails, failure handling must
+            # discover that promotion and switch to forward-repair semantics.
+            {
+                "name": "first_serving_attestation",
+                "failure": "attest_serving",
+                "production_after": "approved",
+                "installed_after": "approved",
+                "promoted": True,
+                "timer": "disabled",
+                "interlock": True,
+                "semantics": "post_promotion_forward_repair_timer_disabled",
+            },
+            # Everything after successful promotion is forward repair only.
+            {
+                "name": "same_sha_idempotence",
+                "failure": "same_sha_idempotence",
+                "production_after": "approved",
+                "installed_after": "approved",
+                "promoted": True,
+                "timer": "disabled",
+                "interlock": True,
+                "semantics": "post_promotion_forward_repair_timer_disabled",
+            },
+            {
+                "name": "automation_restore",
+                "failure": "restore_timer",
+                "production_after": "approved",
+                "installed_after": "approved",
+                "promoted": True,
+                "timer": "disabled",
+                "interlock": True,
+                "semantics": "post_promotion_forward_repair_timer_disabled",
+            },
+        )
+
+        old_sha = "1" * 40
+        approved = self.SHA
+        original_timer = {
+            "enabled": "enabled",
+            "active": "active",
+        }
+        disabled_timer = {
+            "enabled": "disabled",
+            "active": "inactive",
+        }
+
+        for scenario in scenarios:
+            with self.subTest(scenario=scenario["name"]):
+                with tempfile.TemporaryDirectory() as root:
+                    operations, record, _audit, coordinator = self.coordinator(
+                        root,
+                        failure=scenario["failure"],
+                    )
+
+                    with self.assertRaises(upgrade.UpgradeError) as raised:
+                        coordinator.execute(dry_run=False)
+
+                    coordinator.handle_failure(raised.exception)
+                    coordinator.cleanup()
+
+                    expected_production = (
+                        approved
+                        if scenario["production_after"] == "approved"
+                        else old_sha
+                    )
+                    expected_installed = (
+                        approved
+                        if scenario["installed_after"] == "approved"
+                        else old_sha
+                    )
+                    expected_timer = (
+                        original_timer
+                        if scenario["timer"] == "original"
+                        else disabled_timer
+                    )
+
+                    self.assertEqual(
+                        operations.production,
+                        expected_production,
+                    )
+                    self.assertEqual(
+                        operations.installed,
+                        expected_installed,
+                    )
+                    self.assertEqual(
+                        record.application_promoted,
+                        scenario["promoted"],
+                    )
+                    self.assertEqual(
+                        record.failure_semantics,
+                        scenario["semantics"],
+                    )
+                    self.assertEqual(
+                        operations.timer,
+                        expected_timer,
+                    )
+                    self.assertEqual(
+                        operations.interlock,
+                        scenario["interlock"],
+                    )
+                    self.assertEqual(record.status, "failed")
+
+                    # A failed transaction must never report normal success.
+                    self.assertFalse(coordinator.success)
+                    self.assertNotEqual(
+                        record.failure_semantics,
+                        "complete",
+                    )
+
+                    # No failure after promotion may restore the old
+                    # automatic deployment schedule.
+                    if scenario["promoted"]:
+                        self.assertNotIn(
+                            "clear_interlock",
+                            operations.events,
+                        )
+                        self.assertEqual(
+                            operations.timer,
+                            disabled_timer,
+                        )
+
+                    # A pre-install recovery is allowed to restore automation
+                    # only after the exact old controller/application state
+                    # has been positively attested.
+                    if (
+                        scenario["timer"] == "original"
+                        and scenario["failure"] != "quiesce"
+                    ):
+                        self.assertIn(
+                            "preinstall_restore_safe",
+                            operations.events,
+                        )
+                        self.assertIn(
+                            "restore_timer",
+                            operations.events,
+                        )
+                        self.assertIn(
+                            "clear_interlock",
+                            operations.events,
+                        )
+
     def test_preinstall_failure_restores_original_timer_only_after_attestation(self):
         with tempfile.TemporaryDirectory() as root:
             operations, record, audit, coordinator = self.coordinator(
