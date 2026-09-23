@@ -2,13 +2,13 @@
   "release_metadata_version": 1,
   "schema": {
     "compatible_min": 81,
-    "compatible_max": 104,
-    "target": 104,
-    "migration_class": "expand-only",
+    "compatible_max": 105,
+    "target": 105,
+    "migration_class": "forward-compatible",
     "rollback_compatible_min": 81,
-    "rollback_compatible_max": 102
+    "rollback_compatible_max": 104
   },
   "migration_policy": "automatic-after-known-good-backup-first-forward-repair",
-  "notes": "Forward-only production bridge from schema 102 to 104. Migration 103 creates ecommerce delivery pricing and migration 104 normalizes pricing to one fee per delivery area. Perform the governed verified backup while schema 102 is still serving before applying either migration. Do not replay or rewrite migrations 001-102. After schema advances beyond 102, use forward repair rather than an incompatible traffic rollback.",
-  "migration_manifest": "migrations-103-104.json"
+  "notes": "Forward-compatible bridge from schema 104 to 105. Migration 105 establishes website_settings.subdomain as the normalized, nonreserved, case-insensitively unique canonical hosted identity while preserving standard_path_slug for legacy paths. Its preflight fails before writes on invalid, reserved, duplicate, or ambiguous identities. Perform the governed verified backup at schema 104 and use forward repair after commit.",
+  "migration_manifest": "migrations-105.json"
 }

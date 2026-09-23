@@ -14,8 +14,8 @@ describe("production API origin build contract", () => {
     expect(dockerfile).toContain("MADAR_REQUIRE_PRODUCTION_API_URL=$MADAR_REQUIRE_PRODUCTION_API_URL");
     expect(packageJson.scripts.build).toContain("api-origin:audit");
     expect(packageJson.scripts.build).toContain("bundle-origin:audit");
-    expect(originCheck).toContain("https://api.madarportal.com");
-    expect(bundleCheck).toContain("https://api.madarportal.com");
+    expect(originCheck).toContain('const expected = "/api"');
+    expect(bundleCheck).toContain('const expected = "/api"');
   });
 
   it("keeps third-party analytics origins out of the application bundle contract", () => {

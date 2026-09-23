@@ -624,7 +624,7 @@ export default function SettingsPage({
               publish: {
                 ...(prev.publish || {}),
                 subdomain: sanitizeSubdomain(
-                  website.standard_path_slug || website.subdomain || ""
+                  website.subdomain || website.standard_path_slug || ""
                 ),
               },
               siteChrome: {
@@ -841,7 +841,7 @@ export default function SettingsPage({
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          standard_path_slug: sanitizeSubdomain(siteForm.subdomain),
+          subdomain: sanitizeSubdomain(siteForm.subdomain),
           brand: siteForm.brand,
           footer_store_name: siteForm.footerStoreName,
           logo_url: siteForm.logoUrl,
@@ -869,7 +869,7 @@ export default function SettingsPage({
         publish: {
           ...(nextProject.publish || {}),
           subdomain: sanitizeSubdomain(
-            savedWebsite.standard_path_slug || savedWebsite.subdomain || ""
+            savedWebsite.subdomain || savedWebsite.standard_path_slug || ""
           ),
         },
       };
@@ -1190,8 +1190,7 @@ export default function SettingsPage({
                   </span>
                 )}
                 <small>
-                  Included address: madarportal.com/site/{sanitizeSubdomain(siteForm.subdomain) || "business-name"}.
-                  A branded .madarportal.com subdomain requires the separate paid add-on.
+                  Included address: {sanitizeSubdomain(siteForm.subdomain) || "business-name"}.madarportal.com.
                 </small>
               </label>
 
@@ -1436,7 +1435,7 @@ export default function SettingsPage({
                 <label className="settings-wide-field">
                   {t.storeAddress}
                   <input
-                    value={`madarportal.com/site/${sanitizeSubdomain(siteForm.subdomain)}/shop`}
+                    value={`${sanitizeSubdomain(siteForm.subdomain)}.madarportal.com/shop`}
                     readOnly
                   />
                   <small>{t.storeAddressHelp}</small>
@@ -1446,7 +1445,7 @@ export default function SettingsPage({
 
             <div className="settings-profile-actions settings-website-profile-actions">
               <SmartLink
-                to={`/site/${encodeURIComponent(sanitizeSubdomain(siteForm.subdomain))}/shop`}
+                to={`https://${encodeURIComponent(sanitizeSubdomain(siteForm.subdomain))}.madarportal.com/shop`}
                 className="settings-reset-password-button"
                 target="_blank"
                 rel="noreferrer"

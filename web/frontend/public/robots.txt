@@ -5,6 +5,8 @@ Disallow: /admin
 Disallow: /ecommerce
 Disallow: /shop/checkout
 Disallow: /shop/confirmation/
+# Compatibility URLs redirect permanently; keep them out of search indexes while
+# crawlers converge on each tenant's canonical hostname.
 Disallow: /store/*/checkout
 Disallow: /store/*/confirmation/
 Disallow: /site/*/shop/checkout

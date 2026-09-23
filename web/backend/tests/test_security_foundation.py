@@ -382,6 +382,7 @@ class SecurityFoundationTests(unittest.TestCase):
         for header in session_cookie_headers:
             self.assertNotIn("Max-Age=", header)
             self.assertNotIn("Expires=", header)
+            self.assertNotIn("Domain=", header)
 
     def test_logout_cookie_helper_clears_csrf_cookie(self):
         client = self.build_origin_client()

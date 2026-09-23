@@ -22,6 +22,18 @@ class FrontendEdgeConfigTests(unittest.TestCase):
         self.assertEqual(dockerfile.count("@sha256:"), 2)
         self.assertIn("EXPOSE 8080", dockerfile)
 
+    def test_same_origin_api_proxy_preserves_trusted_forwarding_context(self):
+        nginx = (ROOT / "frontend" / "nginx.conf.template").read_text(encoding="utf-8")
+        self.assertIn("location /api/", nginx)
+        self.assertIn("proxy_pass http://backend:8000/", nginx)
+        self.assertIn("proxy_set_header Host $host", nginx)
+        self.assertIn("proxy_set_header X-Forwarded-Host $host", nginx)
+        self.assertIn("proxy_set_header X-Forwarded-Proto $madar_forwarded_proto", nginx)
+        self.assertIn("proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for", nginx)
+        self.assertIn("proxy_set_header X-Real-IP $remote_addr", nginx)
+        self.assertIn("proxy_set_header X-Request-ID $madar_request_id", nginx)
+        self.assertNotIn("location /api/ {\n        try_files", nginx)
+
     def test_compose_drops_privileges_and_keeps_dev_ports_loopback_only(self):
         compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
         development = (ROOT / "docker-compose.dev.yml").read_text(encoding="utf-8")

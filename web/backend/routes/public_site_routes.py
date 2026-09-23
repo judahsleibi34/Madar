@@ -16,6 +16,7 @@ from urllib.parse import quote, urlparse
 from xml.sax.saxutils import escape as xml_escape
 
 from fastapi import APIRouter, HTTPException, Request, Response
+from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 from database import service_supabase, supabase
@@ -50,13 +51,16 @@ from services.site_permission_service import (
 )
 from services.entitlement_service import (
     increment_operational_usage,
-    require_branded_subdomain,
     require_public_runtime_entitlement,
 )
 from services.tenant_lifecycle_service import tenant_is_active
 from services.hosted_address_service import (
     HOSTED_ADDRESS_PATTERN,
+    canonical_tenant_url,
+    enforce_request_tenant_identity,
+    hosted_address_is_valid,
     normalize_hosted_address,
+    request_hosted_tenant,
 )
 from services.notification_action_service import build_notification_action
 from services.calendar_workspace_cache_service import invalidate_calendar_workspace_cache
@@ -886,7 +890,7 @@ def build_public_store_profile(settings: dict, subdomain: str) -> dict:
     identity_ar = saved_theme.get("store_identity_ar")
     identity_ar = identity_ar if isinstance(identity_ar, dict) else {}
     return {
-        "subdomain": subdomain,
+        "subdomain": normalize_hosted_address(settings.get("subdomain") or subdomain),
         "brand_ar": str(identity_ar.get("store_name_ar") or ""),
         "description_ar": str(identity_ar.get("store_description_ar") or ""),
         "brand": settings.get("footer_store_name") or settings.get("brand"),
@@ -922,7 +926,7 @@ def build_public_site_profile(settings: dict, subdomain: str, project: dict) -> 
     saved_store_theme = settings.get("ecommerce_theme")
     saved_store_theme = saved_store_theme if isinstance(saved_store_theme, dict) else {}
     return {
-        "subdomain": subdomain,
+        "subdomain": normalize_hosted_address(settings.get("subdomain") or subdomain),
         "brand": chrome.get("brand") or chrome.get("brandName") or fallback_name,
         "footer_store_name": chrome.get("footerStoreName") or fallback.get("footer_store_name"),
         "logo_url": chrome.get("logoUrl") or fallback.get("logo_url"),
@@ -1808,53 +1812,35 @@ def format_submission(row: dict):
 def normalize_subdomain(value: str) -> str:
     subdomain = normalize_hosted_address(value)
 
-    if not subdomain or not SUBDOMAIN_PATTERN.match(subdomain):
+    if not hosted_address_is_valid(subdomain):
         raise HTTPException(status_code=404, detail="Published site not found")
 
     return subdomain
 
 
-def _request_uses_branded_address(request: Request, site_identifier: str) -> bool:
-    public_domain = os.getenv("PUBLIC_SITE_DOMAIN", "madarportal.com").strip().lower()
-    candidate_hosts = [
-        str(request.headers.get("x-forwarded-host") or "").split(",", 1)[0],
-        str(request.headers.get("host") or ""),
-    ]
-    origin = str(request.headers.get("origin") or "")
-    if origin:
-        candidate_hosts.append(urlparse(origin).hostname or "")
-    expected = f"{site_identifier}.{public_domain}"
-    return any(
-        host.strip().lower().split(":", 1)[0] == expected
-        for host in candidate_hosts
-        if host
-    )
+def _case_insensitive_identifier_filter(query, column: str, value: str):
+    matcher = getattr(query, "ilike", None)
+    return matcher(column, value) if callable(matcher) else query.eq(column, value)
 
 
 def resolve_website_settings(site_identifier: str, *, request: Request):
-    branded = _request_uses_branded_address(request, site_identifier)
-    lookup_column = "subdomain" if branded else "standard_path_slug"
-    settings_response = (
-        service_supabase.table("website_settings")
-        .select("*")
-        .eq(lookup_column, site_identifier)
-        .limit(2)
-        .execute()
-    )
+    requested_identifier = normalize_subdomain(site_identifier)
+    resolved_identifier = enforce_request_tenant_identity(request, requested_identifier)
+    hosted = bool(request_hosted_tenant(request))
+    settings_query = service_supabase.table("website_settings").select("*")
+    settings_response = _case_insensitive_identifier_filter(
+        settings_query, "subdomain", resolved_identifier
+    ).limit(2).execute()
 
     settings_rows = getattr(settings_response, "data", None) or []
 
-    if not settings_rows and not branded:
-        # Compatibility phase for pre-071 rows. Migration 071 backfills the
-        # canonical path slug; retain old /site/:subdomain links meanwhile.
-        settings_response = (
-            service_supabase.table("website_settings")
-            .select("*")
-            .eq("subdomain", site_identifier)
-            .limit(2)
-            .execute()
-        )
-        settings_rows = getattr(settings_response, "data", None) or []
+    if not settings_rows and not hosted:
+        # Legacy path aliases are compatibility-only and never become hosted
+        # identities. Host-derived requests resolve only the canonical column.
+        legacy_query = service_supabase.table("website_settings").select("*")
+        settings_response = _case_insensitive_identifier_filter(
+            legacy_query, "standard_path_slug", requested_identifier
+        ).limit(2).execute()
 
     settings = unique_public_row(
         settings_response,
@@ -1866,8 +1852,6 @@ def resolve_website_settings(site_identifier: str, *, request: Request):
         tenant_id, client=service_supabase
     ):
         raise HTTPException(status_code=404, detail="Published site not found")
-    if branded:
-        require_branded_subdomain(settings, allow_legacy_routing=True)
     return settings
 
 
@@ -1880,14 +1864,55 @@ def resolve_tenant_id(settings: dict):
     return tenant_id
 
 
+def _legacy_redirect_target(request: Request, identifier: str, path: str) -> str:
+    if request_hosted_tenant(request):
+        raise HTTPException(status_code=404, detail="Legacy route not found")
+    clean_identifier = normalize_subdomain(identifier)
+    settings = resolve_website_settings(clean_identifier, request=request)
+    canonical = normalize_subdomain(settings.get("subdomain"))
+    target = canonical_tenant_url(canonical, path)
+    return f"{target}?{request.url.query}" if request.url.query else target
+
+
+@router.get("/legacy/site/{identifier}")
+@router.get("/legacy/site/{identifier}/{legacy_path:path}")
+def redirect_legacy_site(identifier: str, request: Request, legacy_path: str = ""):
+    suffix = f"/{legacy_path.lstrip('/')}" if legacy_path else "/"
+    return RedirectResponse(
+        _legacy_redirect_target(request, identifier, suffix),
+        status_code=308,
+    )
+
+
+@router.get("/legacy/store/{identifier}")
+@router.get("/legacy/store/{identifier}/{legacy_path:path}")
+def redirect_legacy_store(identifier: str, request: Request, legacy_path: str = ""):
+    suffix = "/shop" + (f"/{legacy_path.lstrip('/')}" if legacy_path else "")
+    return RedirectResponse(
+        _legacy_redirect_target(request, identifier, suffix),
+        status_code=308,
+    )
+
+
+@router.get("/legacy/forms/{identifier}/{form_id}")
+def redirect_legacy_form(identifier: str, form_id: str, request: Request):
+    clean_form_id = quote(str(form_id or "").strip(), safe="")
+    if not clean_form_id:
+        raise HTTPException(status_code=404, detail="Published form not found")
+    return RedirectResponse(
+        _legacy_redirect_target(request, identifier, f"/forms/{clean_form_id}"),
+        status_code=308,
+    )
+
+
 def resolve_public_store_settings(site_identifier: str, *, request: Request) -> dict:
     """Reuse public store identity/profile lookups without sharing data across tenants."""
-    branded = _request_uses_branded_address(request, site_identifier)
+    hosted = bool(request_hosted_tenant(request))
     cache_key = ecommerce_cache_key(
         0,
         "public-store-settings-v1",
         site_identifier=site_identifier,
-        branded=branded,
+        hosted=hosted,
     )
     cached = read_ecommerce_cache(cache_key)
     if isinstance(cached, dict):
@@ -2488,7 +2513,9 @@ def register_tenant_visitor(
                 "email": clean_email,
                 "password": payload.password,
                 "options": {
-                    "email_redirect_to": f"{FRONTEND_URL}/site/{clean_subdomain}",
+                    "email_redirect_to": canonical_tenant_url(
+                        settings.get("subdomain") or clean_subdomain
+                    ),
                     "data": {"first_name": first_name, "last_name": last_name},
                 },
             }
@@ -2613,6 +2640,7 @@ def login_tenant_visitor(
 
 @router.get("/sites/{subdomain}/auth/status")
 def tenant_visitor_status(subdomain: str, request: Request, response: Response):
+    enforce_request_tenant_identity(request, normalize_subdomain(subdomain))
     try:
         user_row, membership = require_tenant_visitor(subdomain, request, response)
         return {"logged_in": True, "user": build_user_payload(user_row), "role": membership.get("role")}
@@ -2642,8 +2670,8 @@ def create_public_screen_time_heartbeat(
 
 
 @router.post("/sites/{subdomain}/auth/logout")
-def logout_tenant_visitor(subdomain: str, response: Response):
-    normalize_subdomain(subdomain)
+def logout_tenant_visitor(subdomain: str, request: Request, response: Response):
+    enforce_request_tenant_identity(request, normalize_subdomain(subdomain))
     delete_auth_cookies(response)
     return {"logged_in": False, "message": "Logged out"}
 
@@ -2672,11 +2700,8 @@ def get_public_store_profile(subdomain: str, request: Request, response: Respons
     return {"success": True, "site": site_profile}
 
 def _canonical_storefront_base(settings: dict, site_identifier: str, request: Request) -> str:
-    if _request_uses_branded_address(request, site_identifier):
-        public_domain = os.getenv("PUBLIC_SITE_DOMAIN", "madarportal.com").strip().lower()
-        return f"https://{site_identifier}.{public_domain}/shop"
-    slug = str(settings.get("standard_path_slug") or site_identifier).strip().lower()
-    return f"{FRONTEND_URL.rstrip('/')}/site/{quote(slug, safe='')}/shop"
+    canonical = str(settings.get("subdomain") or site_identifier).strip().lower()
+    return canonical_tenant_url(canonical, "/shop")
 
 
 def _storefront_sitemap_xml(settings: dict, site_identifier: str, request: Request) -> str:

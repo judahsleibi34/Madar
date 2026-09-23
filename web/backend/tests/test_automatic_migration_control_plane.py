@@ -118,16 +118,45 @@ class AutomaticMigrationControlPlaneTests(unittest.TestCase):
         )
         self.resume_schema = self.source_schema + 1
 
-    def test_current_manifest_and_rollback_contract_cover_schema_102_to_104(self):
-        self.assertEqual(self.source_schema, 102)
-        self.assertEqual(self.target_schema, 104)
+    def test_same_origin_api_must_report_frontend_release_and_slot(self):
+        operations = self.module.DockerGitOperations.__new__(
+            self.module.DockerGitOperations
+        )
+        operations._json = lambda url: {
+            "release_sha": self.sha,
+            "release_slot": "green",
+        }
+
+        operations._validate_frontend_backend_identity(
+            "http://127.0.0.1:3200", self.sha, "green"
+        )
+
+    def test_same_origin_api_rejects_opposite_slot_or_release(self):
+        operations = self.module.DockerGitOperations.__new__(
+            self.module.DockerGitOperations
+        )
+        cases = (
+            ({"release_sha": "b" * 40, "release_slot": "green"}, "release"),
+            ({"release_sha": self.sha, "release_slot": "blue"}, "slot"),
+        )
+        for identity, error in cases:
+            with self.subTest(identity=identity):
+                operations._json = lambda url, value=identity: value
+                with self.assertRaisesRegex(RuntimeError, error):
+                    operations._validate_frontend_backend_identity(
+                        "http://127.0.0.1:3200", self.sha, "green"
+                    )
+
+    def test_current_manifest_and_rollback_contract_cover_schema_104_to_105(self):
+        self.assertEqual(self.source_schema, 104)
+        self.assertEqual(self.target_schema, 105)
         self.assertEqual(
             self.metadata["schema"]["rollback_compatible_max"],
             self.source_schema,
         )
         self.assertEqual(
             [entry["number"] for entry in self.manifest["migrations"]],
-            [103, 104],
+            [105],
         )
 
     def fixture(self, root: Path, *, schema: int | None = None):
@@ -351,7 +380,7 @@ class AutomaticMigrationControlPlaneTests(unittest.TestCase):
             source_schema=self.source_schema,
         )
 
-    def test_successful_102_to_104_records_target_only_after_worker_and_route_validation(self):
+    def test_successful_104_to_105_records_target_only_after_worker_and_route_validation(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             state_root, operations, compatibility, events = self.fixture(root)

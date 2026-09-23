@@ -280,16 +280,15 @@ export const getProductionTenantUrl = (project, path = "/") => {
     return `https://${customDomain}${cleanPath}`;
   }
 
-  return `${getProductionAppOrigin()}/site/${subdomain}${cleanPath}`;
+  return buildCanonicalTenantUrl(subdomain, cleanPath);
 };
 
 export const getStandaloneFormPath = (project, formId) => {
-  const subdomain = getProjectSubdomain(project);
-  return `/forms/${subdomain}/${encodeURIComponent(String(formId || ""))}`;
+  return `/forms/${encodeURIComponent(String(formId || ""))}`;
 };
 
 export const getProductionFormUrl = (project, formId) =>
-  `${getProductionAppOrigin()}${getStandaloneFormPath(project, formId)}`;
+  getProductionTenantUrl(project, getStandaloneFormPath(project, formId));
 
 export const getTenantLoginTarget = (project) => {
   const loginPath = project?.siteChrome?.authPageSlug || "/login";
@@ -300,3 +299,4 @@ export const getTenantLoginTarget = (project) => {
 
   return getProductionTenantUrl(project, loginPath);
 };
+import { buildCanonicalTenantUrl } from "../../../utils/hostedAddress";

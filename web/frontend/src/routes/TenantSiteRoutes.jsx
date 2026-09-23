@@ -1,9 +1,10 @@
-import { lazy, useEffect } from "react";
+import { lazy, useEffect, useState } from "react";
 import { Navigate, Route, Routes, useLocation, useParams } from "react-router-dom";
 
 import RouteSuspense from "../components/common/RouteSuspense";
 import { preloadPublicEcommerceCatalog } from "../services/ecommerceApi";
-import { getBrandedMadarSubdomain } from "../utils/hostedAddress";
+import { fetchPublicSiteBootstrap } from "../components/PageBuilder/services/PageBuilder.api";
+import { buildCanonicalTenantUrl, getBrandedMadarSubdomain } from "../utils/hostedAddress";
 
 const TenantSiteRuntime = lazy(() =>
   import("../components/PageBuilder/runtime/TenantSiteRuntime")
@@ -12,20 +13,46 @@ const EcommerceStorefront = lazy(() =>
   import("../components/EcommerceStore/EcommerceStorefront")
 );
 
-function ConnectedSiteStorefront() {
-  const { subdomain = "" } = useParams();
-  const basePath = `/site/${encodeURIComponent(subdomain)}/shop`;
-  return <EcommerceStorefront subdomain={subdomain} basePath={basePath} />;
-}
-
-function BrandedStorefront() {
-  const subdomain = getBrandedMadarSubdomain(window.location.hostname);
+function HostedStorefront({ subdomain }) {
   if (!subdomain) return <Navigate to="/" replace />;
   return <EcommerceStorefront subdomain={subdomain} basePath="/shop" />;
 }
 
+function LegacyTenantRedirect({ prefix }) {
+  const params = useParams();
+  const location = useLocation();
+  const [failedIdentifier, setFailedIdentifier] = useState("");
+  const legacyIdentifier = String(params.subdomain || "").trim().toLowerCase();
+  const wildcard = String(params["*"] || "").replace(/^\/+/, "");
+  const formId = String(params.formId || "");
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchPublicSiteBootstrap(legacyIdentifier)
+      .then((payload) => {
+        if (cancelled) return;
+        const canonicalTenant = String(payload?.site?.subdomain || "").trim().toLowerCase();
+        const formSuffix = formId ? `/forms/${encodeURIComponent(formId)}` : "";
+        const tail = formSuffix || `${prefix}${wildcard ? `/${wildcard}` : ""}` || "/";
+        const target = buildCanonicalTenantUrl(
+          canonicalTenant,
+          `${tail}${location.search}${location.hash}`
+        );
+        if (!target) throw new Error("Invalid canonical tenant address");
+        window.location.replace(target);
+      })
+      .catch(() => {
+        if (!cancelled) setFailedIdentifier(legacyIdentifier);
+      });
+    return () => { cancelled = true; };
+  }, [formId, legacyIdentifier, location.hash, location.search, prefix, wildcard]);
+
+  return failedIdentifier === legacyIdentifier ? <Navigate to="/" replace /> : null;
+}
+
 export default function TenantSiteRoutes() {
   const location = useLocation();
+  const hostedTenant = getBrandedMadarSubdomain(window.location.hostname);
   const siteMatch = location.pathname.match(/^\/site\/([^/]+)(?:\/|$)/i);
   const currentSubdomain = siteMatch ? decodeURIComponent(siteMatch[1]) : "";
   const isShopRoute = /^\/site\/[^/]+\/shop(?:\/|$)/i.test(location.pathname);
@@ -47,11 +74,20 @@ export default function TenantSiteRoutes() {
   return (
     <RouteSuspense label="Loading site" variant="tenant-runtime" delay={0}>
       <Routes>
-        <Route path="/forms/:subdomain/:formId" element={<TenantSiteRuntime />} />
-        <Route path="/store/:subdomain/*" element={<EcommerceStorefront />} />
-        <Route path="/shop/*" element={<BrandedStorefront />} />
-        <Route path="/site/:subdomain/shop/*" element={<ConnectedSiteStorefront />} />
-        <Route path="/site/:subdomain/*" element={<TenantSiteRuntime />} />
+        {hostedTenant ? (
+          <>
+            <Route path="/shop/*" element={<HostedStorefront subdomain={hostedTenant} />} />
+            <Route path="/forms/:formId" element={<TenantSiteRuntime siteIdentifier={hostedTenant} />} />
+            <Route path="/*" element={<TenantSiteRuntime siteIdentifier={hostedTenant} />} />
+          </>
+        ) : (
+          <>
+            <Route path="/forms/:subdomain/:formId" element={<LegacyTenantRedirect prefix="" />} />
+            <Route path="/store/:subdomain/*" element={<LegacyTenantRedirect prefix="/shop" />} />
+            <Route path="/site/:subdomain/*" element={<LegacyTenantRedirect prefix="" />} />
+            <Route path="/shop/*" element={<Navigate to="/" replace />} />
+          </>
+        )}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </RouteSuspense>

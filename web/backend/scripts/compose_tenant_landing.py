@@ -653,7 +653,7 @@ def first(rows: list[dict[str, Any]], label: str) -> dict[str, Any]:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--site-slug", required=True, help="Existing website_settings subdomain/path slug")
+    parser.add_argument("--site-slug", required=True, help="Existing canonical website_settings subdomain or legacy path slug")
     parser.add_argument("--apply", action="store_true", help="Save the validated draft")
     parser.add_argument("--publish", action="store_true", help="Atomically publish after saving")
     arguments = parser.parse_args()
@@ -690,7 +690,7 @@ def main() -> None:
     )
     form_page_count = sum(page_contains_form(item) for item in validated.get("pages") or [])
     print({
-        "site": settings.get("standard_path_slug") or settings.get("subdomain"),
+        "site": settings.get("subdomain"),
         "project": project_record.get("name"),
         "public_pages": [item.get("name") for item in (validated.get("pages") or []) if item.get("showInNavigation")],
         "preserved_form_pages": form_page_count,

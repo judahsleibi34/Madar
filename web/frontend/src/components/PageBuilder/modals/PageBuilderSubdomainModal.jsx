@@ -56,7 +56,7 @@ export default function PageBuilderSubdomainModal({
     [websiteName]
   );
 
-  const websiteLink = `${domain}/site/${cleanWebsiteName || content.defaultWebsiteName}`;
+  const websiteLink = `https://${cleanWebsiteName || content.defaultWebsiteName}.${domain.replace(/^https?:\/\//, "").replace(/\/+$/, "")}`;
 
   const handleWebsiteNameChange = (event) => {
     setWebsiteName(sanitizeSubdomain(event.target.value));

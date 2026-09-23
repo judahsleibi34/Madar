@@ -65,6 +65,10 @@ class Query:
         self.filters.append(("eq", field, value))
         return self
 
+    def ilike(self, field, value):
+        self.filters.append(("ilike", field, value))
+        return self
+
     @property
     def not_(self):
         return self
@@ -83,6 +87,8 @@ class Query:
             include = True
             for operation, field, value in self.filters:
                 if operation == "eq" and str(row.get(field)) != str(value):
+                    include = False
+                if operation == "ilike" and str(row.get(field)).lower() != str(value).lower():
                     include = False
                 if operation == "not_null" and row.get(field) is None:
                     include = False

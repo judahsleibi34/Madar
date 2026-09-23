@@ -1,5 +1,7 @@
 # Madar pricing and entitlements implementation
 
+> Historical implementation record. The standard-path/premium-Madar-subdomain model below is superseded by [Canonical tenant hosting architecture](canonical-tenant-hosting-architecture.md) and migration 105. Historical migrations 071 and 099 remain immutable.
+
 **Implementation date:** 2026-07-30 UTC
 
 **Pre-migration hardening rehearsal:** 2026-07-31 UTC

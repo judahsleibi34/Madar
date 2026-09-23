@@ -1,11 +1,20 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, useLocation } from "react-router-dom";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import TenantSiteRoutes from "./TenantSiteRoutes";
 
+afterEach(cleanup);
+
+vi.mock("../utils/hostedAddress", async (importOriginal) => ({
+  ...(await importOriginal()),
+  getBrandedMadarSubdomain: () => "madar-demo",
+}));
+
 vi.mock("../components/PageBuilder/runtime/TenantSiteRuntime", () => ({
-  default: () => <div>Builder website runtime</div>,
+  default: ({ siteIdentifier }) => (
+    <div>{`Builder website runtime:${siteIdentifier}`}</div>
+  ),
 }));
 
 vi.mock("../components/EcommerceStore/EcommerceStorefront", () => ({
@@ -20,7 +29,7 @@ function LocationProbe() {
 describe("TenantSiteRoutes storefront connection", () => {
   it("mounts the standalone ecommerce storefront at the website Shop path", async () => {
     render(
-      <MemoryRouter initialEntries={["/site/madar-demo/shop/catalog?tag=best-seller"]}>
+      <MemoryRouter initialEntries={["/shop/catalog?tag=best-seller"]}>
         <TenantSiteRoutes />
         <LocationProbe />
       </MemoryRouter>
@@ -28,10 +37,25 @@ describe("TenantSiteRoutes storefront connection", () => {
 
     await waitFor(() => {
       expect(screen.getByLabelText("current location").textContent).toBe(
-        "/site/madar-demo/shop/catalog?tag=best-seller"
+        "/shop/catalog?tag=best-seller"
       );
     });
     expect(await screen.findByText("External ecommerce storefront")).toBeTruthy();
-    expect(screen.queryByText("Builder website runtime")).toBeNull();
+    expect(screen.queryByText("Builder website runtime:madar-demo")).toBeNull();
   });
+
+  it.each(["/", "/about/team", "/forms/contact-form"])(
+    "renders the host-derived tenant runtime directly at %s without rewriting the path",
+    async (path) => {
+      render(
+        <MemoryRouter initialEntries={[path]}>
+          <TenantSiteRoutes />
+          <LocationProbe />
+        </MemoryRouter>
+      );
+
+      expect(await screen.findByText("Builder website runtime:madar-demo")).toBeTruthy();
+      expect(screen.getByLabelText("current location").textContent).toBe(path);
+    }
+  );
 });

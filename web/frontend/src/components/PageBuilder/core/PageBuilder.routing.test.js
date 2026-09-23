@@ -126,17 +126,17 @@ describe("public page routing contract", () => {
         { publish: { subdomain: "disco2", siteBaseDomain: "madar.app" } },
         "/forms/form-1"
       )
-    ).toBe("https://madarportal.com/site/disco2/forms/form-1");
+    ).toBe("https://disco2.madarportal.com/forms/form-1");
   });
 
   it("builds a standalone respondent form link outside the website route", () => {
     const project = { publish: { subdomain: "disco2" } };
 
     expect(getStandaloneFormPath(project, "form-1")).toBe(
-      "/forms/disco2/form-1"
+      "/forms/form-1"
     );
     expect(getProductionFormUrl(project, "form-1")).toBe(
-      "https://madarportal.com/forms/disco2/form-1"
+      "https://disco2.madarportal.com/forms/form-1"
     );
   });
 

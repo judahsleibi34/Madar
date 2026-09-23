@@ -18,7 +18,7 @@ describe("EcommerceStorePage", () => {
     );
     expect((await screen.findByTitle("Published online store")).getAttribute("src")).toBe("/site/olive-house/shop");
     fireEvent.load(screen.getByTitle("Published online store"));
-    expect(screen.getByRole("link", { name: "Open production store" }).getAttribute("href")).toBe("https://madarportal.com/site/olive-house/shop");
+    expect(screen.getByRole("link", { name: "Open production store" }).getAttribute("href")).toBe("https://olive-house.madarportal.com/shop");
     expect(screen.queryByText("Published storefront")).toBeNull();
     expect(screen.queryByText("Customer view")).toBeNull();
     expect(screen.queryByText("Live")).toBeNull();
