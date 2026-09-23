@@ -2494,6 +2494,12 @@ class SystemOperations:
         ).stdout
         if self.audit:
             self.audit.log(f"journal label={label} {journal[:12000]}")
+        if (
+            start_result.returncode == 75
+            and not recovery
+            and not migration_repair
+        ):
+            raise UpgradeError("candidate_retry_suppressed")
         if start_result.returncode != 0:
             raise UpgradeError(f"{label}_failed")
 

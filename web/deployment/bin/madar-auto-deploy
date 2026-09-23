@@ -3,6 +3,25 @@ set -Eeuo pipefail
 
 readonly SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 readonly TRACKED_CONTROL_ROOT="$(cd -- "$SCRIPT_DIR/.." && pwd)"
+
+require_production_mutation_identity() {
+    if [[ "$TRACKED_CONTROL_ROOT" != "/opt/madar/control-plane/deployment" ]]; then
+        return 0
+    fi
+
+    local expected_uid expected_gid
+    if ! expected_uid="$(id -u madar)" || ! expected_gid="$(id -g madar)"; then
+        echo "[madar-auto-deploy] ERROR: production_mutation_identity_invalid" >&2
+        exit 1
+    fi
+
+    if [[ "$EUID" -ne "$expected_uid" || "$(id -g)" -ne "$expected_gid" ]]; then
+        echo "[madar-auto-deploy] ERROR: production_mutation_identity_invalid" >&2
+        exit 1
+    fi
+}
+
+require_production_mutation_identity
 if [[ "$TRACKED_CONTROL_ROOT" == "/opt/madar/control-plane/deployment" ]]; then
     # Interactive production execution receives the same root-owned path
     # contract as systemd. The later file is authoritative by design.
@@ -94,6 +113,16 @@ if git -C "$REPO_ROOT" diff --quiet "$KNOWN_GOOD" "$TARGET_SHA" -- "${RUNTIME_PA
 fi
 if [[ "$RELEASE_ELIGIBILITY" == "suppressed" ]]; then
     echo "[madar-auto-deploy] Candidate is recorded failed and remains suppressed: ${TARGET_SHA:0:12}"
+
+    # The ordinary timer must remain a quiet successful no-op while a known
+    # bad SHA is cooling down. A governed control-plane cycle carries this
+    # one-time systemd credential and must instead report a temporary result
+    # so the coordinator does not mistake suppression for deployment success.
+    if [[ -n "${CREDENTIALS_DIRECTORY:-}" &&
+          -f "${CREDENTIALS_DIRECTORY}/madar-control-plane-upgrade" ]]; then
+        exit 75
+    fi
+
     exit 0
 fi
 

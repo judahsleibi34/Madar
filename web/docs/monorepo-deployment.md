@@ -92,23 +92,29 @@ blue/green traffic, hand-copy control-plane files, edit provenance/release
 state, or re-enable the timer after a failed post-promotion transaction without
 diagnosis.
 
-### One-time bootstrap
+### One-time bootstrap (completed)
 
-The first release containing the upgrader cannot be installed by a command that
-does not yet exist in the trusted controller. It therefore requires one final
-use of the existing approved exact-SHA manual installation procedure: quiesce
-the timer/service, build a root-protected exact-SHA worktree, run
+The production bootstrap is complete. The first release containing the
+privileged upgrader required the approved exact-SHA manual installation
+procedure because the trusted command did not yet exist: quiesce automation,
+build a root-protected exact-SHA worktree, run
 `web/deployment/bin/madar-install-control-plane` dry-run, create the protected
 backup, apply as root, attest provenance/path contract/health, run the
-controlled deployment and same-SHA check, then restore automation. That install
-places `/usr/local/sbin/madar-control-plane-upgrade`. Future protected releases
-must use the one-command workflow.
+controlled deployment and same-SHA check, then restore automation. That
+historical installation placed
+`/usr/local/sbin/madar-control-plane-upgrade`.
 
-Use a unique bootstrap backup below
+Future protected releases must use the governed one-command workflow rather
+than repeating manual controller publication. A protected-path rejection by
+ordinary auto-deploy is the signal to use the exact-SHA privileged upgrader,
+not to modify production state by hand.
+
+The bootstrap used a unique protected backup below
 `/var/lib/madar-control-plane/backups`, not below application-owned
-`/var/lib/madar`. Dry-run performs the complete shared static preflight and
-must pass before apply; apply repeats it before creating the mode-0700 upgrade
-state hierarchy or backup.
+`/var/lib/madar`. Installer dry-run and apply continue to share the static
+filesystem trust preflight; a running backup operation blocks either mode,
+while scheduled backup timers may remain active for dry-run and must be
+quiesced before apply.
 
 Never update the provenance marker or isolated installed files by hand.
 

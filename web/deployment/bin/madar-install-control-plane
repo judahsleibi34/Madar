@@ -142,11 +142,18 @@ if [[ -d "$backup_root" && -n "$(find "$backup_root" -mindepth 1 -maxdepth 1 -pr
   exit 1
 fi
 
-# Timers must be quiesced by the governed upgrader before operational files
-# change. Never interrupt a running backup, verification, or replication.
+# A read-only dry run may execute while backup timers remain scheduled, but
+# never while a backup, verification, or replication service is actually
+# running. Apply is stricter: the governed upgrader must first quiesce every
+# backup timer before operational files may change.
 for name in madar-backup madar-backup-verify madar-node1-backup madar-offhost-backup; do
-  if systemctl is-active --quiet "$name.timer" || systemctl is-active --quiet "$name.service"; then
-    echo "backup operations must be quiesced before installation: $name" >&2
+  if systemctl is-active --quiet "$name.service"; then
+    echo "backup operation must complete before installation: $name" >&2
+    exit 1
+  fi
+
+  if (( apply )) && systemctl is-active --quiet "$name.timer"; then
+    echo "backup timer must be quiesced before installation: $name" >&2
     exit 1
   fi
 done

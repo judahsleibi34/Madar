@@ -14,6 +14,7 @@ RELEASE_DEPLOY = WEB_ROOT / "deployment" / "bin" / "madar-release-deploy"
 RELEASE_LIBRARY = WEB_ROOT / "deployment" / "lib" / "release_deployer.py"
 ENVIRONMENT_LIBRARY = WEB_ROOT / "deployment" / "lib" / "environment_file.py"
 SWITCH = WEB_ROOT / "deployment" / "bin" / "madar-switch-traffic"
+MIGRATE = WEB_ROOT / "deployment" / "bin" / "madar-migrate"
 PROXY_COMPOSE = WEB_ROOT / "deployment" / "proxy" / "docker-compose.yml"
 PROXY_CONFIG = WEB_ROOT / "deployment" / "proxy" / "nginx.conf"
 RELEASE_COMPOSE = WEB_ROOT / "deployment" / "docker-compose.release.yml"
@@ -39,6 +40,7 @@ class MonorepoDeploymentTests(unittest.TestCase):
         self.release_library = RELEASE_LIBRARY.read_text(encoding="utf-8")
         self.environment_library = ENVIRONMENT_LIBRARY.read_text(encoding="utf-8")
         self.switch = SWITCH.read_text(encoding="utf-8")
+        self.migrate = MIGRATE.read_text(encoding="utf-8")
         self.proxy_compose = PROXY_COMPOSE.read_text(encoding="utf-8")
         self.proxy_config = PROXY_CONFIG.read_text(encoding="utf-8")
         self.release_compose = RELEASE_COMPOSE.read_text(encoding="utf-8")
@@ -100,6 +102,37 @@ class MonorepoDeploymentTests(unittest.TestCase):
             self.assertIn(variable, self.release_compose)
         self.assertIn("internal: true", self.release_compose)
 
+    def test_installed_production_mutators_enforce_madar_runtime_identity(self):
+        # Shell orchestration entrypoints execute before the Python deployer,
+        # so they must fail closed themselves when installed and run as root.
+        for name, source in {
+            "madar-auto-deploy": self.wrapper,
+            "madar-production-deploy": self.deploy,
+        }.items():
+            with self.subTest(entrypoint=name):
+                self.assertIn(
+                    "production_mutation_identity_invalid",
+                    source,
+                )
+                self.assertIn("id -u madar", source)
+                self.assertIn("id -g madar", source)
+
+        # Python mutation entrypoints share the canonical identity guard.
+        for name, source in {
+            "madar-release-deploy": self.release_deploy,
+            "madar-switch-traffic": self.switch,
+            "madar-migrate": self.migrate,
+        }.items():
+            with self.subTest(entrypoint=name):
+                self.assertIn(
+                    "require_production_mutation_identity",
+                    source,
+                )
+                self.assertIn(
+                    "require_production_mutation_identity(SCRIPT",
+                    source,
+                )
+
     def test_rollback_switches_to_retained_target_without_rebuild_or_git_reset(self):
         combined = self.deploy + self.release_deploy + self.release_library
         self.assertNotIn("reset --hard", combined)
@@ -135,6 +168,20 @@ class MonorepoDeploymentTests(unittest.TestCase):
             "/opt/madar/control-plane/deployment",
             self.wrapper,
         )
+
+    def test_auto_deploy_reports_controlled_suppression_without_breaking_timer_noop(self):
+        marker = 'if [[ "$RELEASE_ELIGIBILITY" == "suppressed" ]]; then'
+        start = self.wrapper.index(marker)
+        end = self.wrapper.index("\nfi", start) + len("\nfi")
+        block = self.wrapper[start:end]
+
+        # Ordinary timer execution remains a successful no-op.
+        self.assertIn("exit 0", block)
+
+        # Governed execution must report suppression distinctly.
+        self.assertIn("CREDENTIALS_DIRECTORY", block)
+        self.assertIn("madar-control-plane-upgrade", block)
+        self.assertIn("exit 75", block)
 
     def test_auto_deploy_suppresses_bad_sha_and_refuses_uninitialized_state(self):
         self.assertIn("failed_releases", self.wrapper)
@@ -222,6 +269,36 @@ class MonorepoDeploymentTests(unittest.TestCase):
         for dockerfile in (self.backend_dockerfile, self.frontend_dockerfile):
             self.assertIn("org.opencontainers.image.revision=$MADAR_RELEASE_SHA", dockerfile)
             self.assertIn("org.opencontainers.image.created=$MADAR_BUILD_TIMESTAMP", dockerfile)
+
+    def test_installer_dry_run_does_not_require_backup_timers_quiesced(self):
+        # A read-only installer dry run must be usable while the normal
+        # backup schedule remains active. Running backup services are still
+        # rejected because the operator should retry after the operation
+        # actually in progress has completed.
+        self.assertIn(
+            'if systemctl is-active --quiet "$name.service"; then',
+            self.installer,
+        )
+        self.assertIn(
+            'if (( apply )) && systemctl is-active --quiet "$name.timer"; then',
+            self.installer,
+        )
+
+        # The apply path must retain the hard quiescence requirement.
+        self.assertIn(
+            "backup timer must be quiesced before installation",
+            self.installer,
+        )
+        self.assertIn(
+            "backup operation must complete before installation",
+            self.installer,
+        )
+
+        # Do not solve dry-run by stopping timers from inside the installer.
+        self.assertNotIn(
+            'systemctl stop "$name.timer"',
+            self.installer,
+        )
 
     def test_control_plane_installer_preserves_layout_and_does_not_start_timer(self):
         self.assertIn("install_root=\"$control_plane_root/deployment\"", self.installer)

@@ -19,6 +19,7 @@ WEB_ROOT = SCRIPT.parents[2]
 sys.path.insert(0, str(WEB_ROOT))
 
 from deployment.lib.control_plane_upgrade_authorization import (  # noqa: E402
+    require_production_mutation_identity,
     require_upgrade_authorization,
 )
 from deployment.lib.runtime_authority import (  # noqa: E402
@@ -87,6 +88,7 @@ def _wait_for_stable_route(expected_sha: str) -> None:
 def main() -> int:
     if len(sys.argv) != 2 or sys.argv[1] not in PORTS:
         raise SystemExit("usage: madar-switch-traffic blue|green")
+    require_production_mutation_identity(SCRIPT)
     slot = sys.argv[1]
     state_root = Path(os.environ["MADAR_DEPLOY_STATE_ROOT"]).resolve()
     if not state_root.is_dir() or state_root == Path("/"):
