@@ -113,6 +113,16 @@ if git -C "$REPO_ROOT" diff --quiet "$KNOWN_GOOD" "$TARGET_SHA" -- "${RUNTIME_PA
 fi
 if [[ "$RELEASE_ELIGIBILITY" == "suppressed" ]]; then
     echo "[madar-auto-deploy] Candidate is recorded failed and remains suppressed: ${TARGET_SHA:0:12}"
+
+    # The ordinary timer must remain a quiet successful no-op while a known
+    # bad SHA is cooling down. A governed control-plane cycle carries this
+    # one-time systemd credential and must instead report a temporary result
+    # so the coordinator does not mistake suppression for deployment success.
+    if [[ -n "${CREDENTIALS_DIRECTORY:-}" &&
+          -f "${CREDENTIALS_DIRECTORY}/madar-control-plane-upgrade" ]]; then
+        exit 75
+    fi
+
     exit 0
 fi
 

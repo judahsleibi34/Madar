@@ -169,6 +169,20 @@ class MonorepoDeploymentTests(unittest.TestCase):
             self.wrapper,
         )
 
+    def test_auto_deploy_reports_controlled_suppression_without_breaking_timer_noop(self):
+        marker = 'if [[ "$RELEASE_ELIGIBILITY" == "suppressed" ]]; then'
+        start = self.wrapper.index(marker)
+        end = self.wrapper.index("\nfi", start) + len("\nfi")
+        block = self.wrapper[start:end]
+
+        # Ordinary timer execution remains a successful no-op.
+        self.assertIn("exit 0", block)
+
+        # Governed execution must report suppression distinctly.
+        self.assertIn("CREDENTIALS_DIRECTORY", block)
+        self.assertIn("madar-control-plane-upgrade", block)
+        self.assertIn("exit 75", block)
+
     def test_auto_deploy_suppresses_bad_sha_and_refuses_uninitialized_state(self):
         self.assertIn("failed_releases", self.wrapper)
         self.assertIn("remains suppressed", self.wrapper)

@@ -1160,6 +1160,153 @@ class ControlPlaneUpgradeTests(unittest.TestCase):
         self.assertTrue(wrapper.startswith("#!/usr/bin/python3 -I"))
         self.assertIn("os.environ.clear()", wrapper)
 
+    def test_controlled_auto_deploy_maps_suppression_to_explicit_result(self):
+        operations = object.__new__(upgrade.SystemOperations)
+        operations.repo = Path("/srv/madar/production")
+        operations.control_root = Path(
+            "/opt/madar/control-plane/deployment"
+        )
+        operations.contract_path = (
+            operations.control_root / "production-paths.conf"
+        )
+        operations.authorization_file = Path(
+            "/run/madar/control-plane-upgrade/authorized.credential"
+        )
+        operations.audit = None
+        operations.write_authorization = mock.Mock()
+        operations.clear_authorization = mock.Mock()
+
+        operations.command = mock.Mock(
+            side_effect=[
+                upgrade.CommandResult("", "", 75),
+                upgrade.CommandResult(
+                    "[madar-auto-deploy] Candidate is recorded failed "
+                    "and remains suppressed",
+                    "",
+                    0,
+                ),
+            ]
+        )
+
+        with self.assertRaisesRegex(
+            upgrade.UpgradeError,
+            "candidate_retry_suppressed",
+        ):
+            operations.run_deploy_service(
+                "controlled_candidate_deployment",
+                self.SHA,
+            )
+
+        operations.write_authorization.assert_called_once()
+        operations.clear_authorization.assert_called_once()
+
+    def test_controlled_auto_deploy_other_failure_remains_deploy_failure(self):
+        operations = object.__new__(upgrade.SystemOperations)
+        operations.repo = Path("/srv/madar/production")
+        operations.control_root = Path(
+            "/opt/madar/control-plane/deployment"
+        )
+        operations.contract_path = (
+            operations.control_root / "production-paths.conf"
+        )
+        operations.authorization_file = Path(
+            "/run/madar/control-plane-upgrade/authorized.credential"
+        )
+        operations.audit = None
+        operations.write_authorization = mock.Mock()
+        operations.clear_authorization = mock.Mock()
+
+        operations.command = mock.Mock(
+            side_effect=[
+                upgrade.CommandResult("", "", 1),
+                upgrade.CommandResult(
+                    "ordinary deployment failure",
+                    "",
+                    0,
+                ),
+            ]
+        )
+
+        with self.assertRaisesRegex(
+            upgrade.UpgradeError,
+            "controlled_candidate_deployment_failed",
+        ):
+            operations.run_deploy_service(
+                "controlled_candidate_deployment",
+                self.SHA,
+            )
+
+    def test_suppressed_bridge_stops_before_serving_attestation(self):
+        production = "1" * 40
+        approved = self.SHA
+
+        with tempfile.TemporaryDirectory() as root:
+            operations, record, _audit, coordinator = self.coordinator(
+                root,
+                protected=False,
+            )
+            operations.production = production
+            operations.installed = approved
+            operations.controller_compatibility = "controller_ahead_bridge"
+            operations.timer = {
+                "enabled": "disabled",
+                "active": "inactive",
+            }
+
+            def suppressed_deployment(label, sha, **kwargs):
+                operations.events.append(label)
+                if label == "controlled_candidate_deployment":
+                    raise upgrade.UpgradeError(
+                        "candidate_retry_suppressed"
+                    )
+                raise AssertionError(
+                    f"unexpected deployment cycle: {label}"
+                )
+
+            operations.run_deploy_service = suppressed_deployment
+
+            with self.assertRaisesRegex(
+                upgrade.UpgradeError,
+                "candidate_retry_suppressed",
+            ) as raised:
+                coordinator.execute(dry_run=False)
+
+            coordinator.handle_failure(raised.exception)
+            coordinator.cleanup()
+
+        # The old application remains exactly where it was.
+        self.assertEqual(operations.production, production)
+        self.assertEqual(operations.installed, approved)
+
+        # Suppression must never be misread as promotion success.
+        self.assertFalse(record.application_promoted)
+        self.assertEqual(
+            record.error_code,
+            "candidate_retry_suppressed",
+        )
+
+        # This is the preinstalled-controller split-state recovery case.
+        self.assertEqual(
+            record.failure_semantics,
+            "controller_ahead_bridge_application_untouched_timer_disabled",
+        )
+
+        # Most importantly: no candidate serving attestation and no
+        # same-SHA validation may occur after suppression.
+        self.assertNotIn("attest_serving", operations.events)
+        self.assertNotIn("same_sha_idempotence", operations.events)
+
+        # Automation remains intentionally disabled and the recovery
+        # interlock remains armed.
+        self.assertEqual(
+            operations.timer,
+            {
+                "enabled": "disabled",
+                "active": "inactive",
+            },
+        )
+        self.assertTrue(operations.interlock)
+
     def test_success_runs_bridge_then_same_sha_before_timer_restore(self):
         with tempfile.TemporaryDirectory() as root:
             operations, record, audit, coordinator = self.coordinator(root)
