@@ -270,6 +270,36 @@ class MonorepoDeploymentTests(unittest.TestCase):
             self.assertIn("org.opencontainers.image.revision=$MADAR_RELEASE_SHA", dockerfile)
             self.assertIn("org.opencontainers.image.created=$MADAR_BUILD_TIMESTAMP", dockerfile)
 
+    def test_installer_dry_run_does_not_require_backup_timers_quiesced(self):
+        # A read-only installer dry run must be usable while the normal
+        # backup schedule remains active. Running backup services are still
+        # rejected because the operator should retry after the operation
+        # actually in progress has completed.
+        self.assertIn(
+            'if systemctl is-active --quiet "$name.service"; then',
+            self.installer,
+        )
+        self.assertIn(
+            'if (( apply )) && systemctl is-active --quiet "$name.timer"; then',
+            self.installer,
+        )
+
+        # The apply path must retain the hard quiescence requirement.
+        self.assertIn(
+            "backup timer must be quiesced before installation",
+            self.installer,
+        )
+        self.assertIn(
+            "backup operation must complete before installation",
+            self.installer,
+        )
+
+        # Do not solve dry-run by stopping timers from inside the installer.
+        self.assertNotIn(
+            'systemctl stop "$name.timer"',
+            self.installer,
+        )
+
     def test_control_plane_installer_preserves_layout_and_does_not_start_timer(self):
         self.assertIn("install_root=\"$control_plane_root/deployment\"", self.installer)
         self.assertIn("control_plane_root=/opt/madar/control-plane", self.installer)
