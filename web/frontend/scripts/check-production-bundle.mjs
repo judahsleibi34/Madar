@@ -10,14 +10,14 @@ if (!required) {
   process.exit(0);
 }
 
-const expected = "https://api.madarportal.com";
+const expected = "/api";
 const assets = readdirSync("dist/assets")
   .filter((name) => name.endsWith(".js"))
   .map((name) => readFileSync(join("dist/assets", name), "utf8"))
   .join("\n");
 
 if (!assets.includes(expected)) {
-  console.error("Production bundle does not contain the canonical Madar API origin.");
+  console.error("Production bundle does not contain the same-origin /api base.");
   process.exit(1);
 }
 

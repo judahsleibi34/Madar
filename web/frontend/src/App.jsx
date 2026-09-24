@@ -32,6 +32,7 @@ import { applyThemeMode, readStoredThemeMode, transitionThemeMode } from "./util
 import { clearAllCalendarWorkspaceCaches } from "./components/DashboardBuilder/utils/calendarWorkspaceCache";
 import { getInstallationId, registerInstallation } from "./pwa/installation";
 import { isMadarPwaHost } from "./pwa/pwaContext";
+import { getBrandedMadarSubdomain } from "./utils/hostedAddress";
 import { getExistingMadarPushEndpoint } from "./pwa/serviceWorker";
 import { subscribeAppInstalled } from "./pwa/installPromptStore";
 import { reconcileBrowserPushLifecycle } from "./services/notificationsApi";
@@ -65,7 +66,8 @@ export default function App() {
 
   const normalizedUserType = normalizeUserType(user?.user_type);
   const isAdminUser = normalizedUserType === "admin";
-  const isTenantSiteRoute = isTenantSiteRoutePath(location.pathname);
+  const hostedTenant = getBrandedMadarSubdomain(window.location.hostname);
+  const isTenantSiteRoute = Boolean(hostedTenant) || isTenantSiteRoutePath(location.pathname);
   const isDashboardRoute = isDashboardRoutePath(location.pathname);
   const isEcommerceRoute = location.pathname.startsWith("/ecommerce");
   const errorSurface = getRouteErrorSurface(location.pathname, { isAdminUser });
@@ -362,6 +364,12 @@ export default function App() {
     let mounted = true;
 
     const runInitialAuthCheck = async () => {
+      if (hostedTenant) {
+        setIsLoggedIn(false);
+        setUser(null);
+        setAuthChecked(true);
+        return;
+      }
       try {
         if (!authBootstrapPromise) {
           authBootstrapPromise = bootstrapAuth();
@@ -392,7 +400,7 @@ export default function App() {
     return () => {
       mounted = false;
     };
-  }, [bootstrapAuth]);
+  }, [bootstrapAuth, hostedTenant]);
 
   useEffect(() => {
     if (!isLoggedIn || !authChecked) return;

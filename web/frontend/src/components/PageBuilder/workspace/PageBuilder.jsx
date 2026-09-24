@@ -460,7 +460,7 @@ const createCleanBlankProject = () => cleanBuilderProject(createBlankWorkspacePr
 const getWebsiteSettingsPayload = (project = {}) => {
   const siteChrome = { ...defaultSiteChrome, ...(project.siteChrome || {}) };
   return {
-    standard_path_slug: sanitizeSubdomain(project.publish?.subdomain || ""),
+    subdomain: sanitizeSubdomain(project.publish?.subdomain || ""),
     brand: String(siteChrome.brand || "").trim(),
     footer_store_name: String(siteChrome.footerStoreName || "").trim(),
     logo_url: String(siteChrome.logoUrl || "").trim(),
@@ -589,7 +589,11 @@ const stripAutosaveMetadata = (project = {}) => getPersistableProject(project);
 
 const getAutosaveSnapshot = (project = {}) => serializePersistableProject(project);
 
-const resolveLiveSitePath = (subdomain) => `/site/${encodeURIComponent(String(subdomain || "").trim())}/`;
+const resolveLiveSitePath = (subdomain) => {
+  const label = String(subdomain || "").trim();
+  const domain = String(import.meta.env.VITE_PUBLIC_SITE_DOMAIN || "madarportal.com").trim();
+  return label ? `https://${label}.${domain}/` : "";
+};
 
 const getBackendFailureDetail = (error) =>
   String(error?.data?.detail || error?.message || "");
@@ -1448,7 +1452,7 @@ export default function PageBuilder({
     if (demoMode) return;
 
     const subdomain = sanitizeSubdomain(
-      websiteSettings?.standard_path_slug || websiteSettings?.subdomain || ""
+      websiteSettings?.subdomain || websiteSettings?.standard_path_slug || ""
     );
 
     if (!subdomain) return;
@@ -1804,7 +1808,7 @@ export default function PageBuilder({
 
     const syncedValues = {
       subdomain: sanitizeSubdomain(
-        websiteSettings.standard_path_slug || websiteSettings.subdomain || ""
+        websiteSettings.subdomain || websiteSettings.standard_path_slug || ""
       ),
       brand: String(websiteSettings.brand || ""),
       footerStoreName: String(websiteSettings.footer_store_name || ""),
@@ -1822,7 +1826,7 @@ export default function PageBuilder({
     updateProject((current) => {
       const currentPayload = getWebsiteSettingsPayload(current);
       const nextPayload = {
-        standard_path_slug: syncedValues.subdomain,
+        subdomain: syncedValues.subdomain,
         brand: syncedValues.brand.trim(),
         footer_store_name: syncedValues.footerStoreName.trim(),
         logo_url: syncedValues.logoUrl.trim(),
@@ -3324,7 +3328,7 @@ export default function PageBuilder({
       let websiteSettingsSyncFailed = false;
       if (websiteSettingsPayloadChanged(submittedBaseSchema, nextProject)) {
         const websitePayload = getWebsiteSettingsPayload(nextProject);
-        if (websitePayload.standard_path_slug && websitePayload.brand) {
+        if (websitePayload.subdomain && websitePayload.brand) {
           try {
             const savedWebsite = await updateWebsiteSettings(websitePayload);
             if (savedWebsite) {
@@ -3836,8 +3840,8 @@ export default function PageBuilder({
   };
 
   const publicSiteSubdomain = sanitizeSubdomain(
-    websiteSettings?.standard_path_slug ||
-      websiteSettings?.subdomain ||
+    websiteSettings?.subdomain ||
+      websiteSettings?.standard_path_slug ||
       project?.publish?.subdomain ||
       ""
   );
@@ -4020,10 +4024,10 @@ export default function PageBuilder({
         }));
       }
       const resolvedPublicSubdomain = sanitizeSubdomain(
-        publishedSite?.standard_path_slug ||
-          websiteSettings?.standard_path_slug ||
-          publishedSite?.subdomain ||
+        publishedSite?.subdomain ||
           websiteSettings?.subdomain ||
+          publishedSite?.standard_path_slug ||
+          websiteSettings?.standard_path_slug ||
           publishCandidate?.publish?.subdomain ||
           ""
       );

@@ -10,7 +10,6 @@ from services.url_validation import validate_public_url
 from services.website_settings_service import get_settings_for_tenant, ensure_settings_for_tenant, save_settings_for_tenant
 from services.entitlement_service import (
     require_any_entitlement,
-    require_branded_subdomain,
 )
 from services.hosted_address_service import validate_hosted_address
 
@@ -202,17 +201,12 @@ def update_website_settings(
                 **saved_theme,
                 "store_identity_ar": {**identity, **identity_updates},
             }
-        if "standard_path_slug" in update_payload:
+        if {"standard_path_slug", "subdomain"}.intersection(update_payload):
             require_any_entitlement(
                 tenant_id,
                 {"standard_hosted_address", "public_form_links"},
                 message="An active website or public-form plan is required to configure a hosted identifier.",
             )
-        if (
-            "subdomain" in update_payload
-            and update_payload["subdomain"] != (existing_website or {}).get("subdomain")
-        ):
-            require_branded_subdomain(existing_website or {"tenant_id": tenant_id})
 
         updated_website = save_settings_for_tenant(
             tenant_id=tenant_id,
@@ -255,6 +249,8 @@ def update_website_settings(
         raise
 
     except Exception as e:
+        if "duplicate" in str(e).lower() or "unique" in str(e).lower():
+            raise HTTPException(status_code=409, detail="Hosted address is already in use")
         logger.warning("website.settings.update_failed", extra={"user_id": user_id, "error_type": type(e).__name__})
         raise HTTPException(
             status_code=500,

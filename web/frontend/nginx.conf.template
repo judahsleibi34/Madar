@@ -1,3 +1,14 @@
+map $http_x_forwarded_proto $madar_forwarded_proto {
+    default $scheme;
+    "http" http;
+    "https" https;
+}
+
+map $http_x_request_id $madar_request_id {
+    default $http_x_request_id;
+    "" $request_id;
+}
+
 server {
     listen 8080;
     server_name _;
@@ -6,6 +17,58 @@ server {
     index index.html;
 
     include /etc/nginx/conf.d/includes/security_headers.conf;
+
+    location /api/ {
+        proxy_pass http://backend:8000/;
+        proxy_http_version 1.1;
+        proxy_request_buffering off;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Forwarded-Proto $madar_forwarded_proto;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Request-ID $madar_request_id;
+    }
+
+    location = /api {
+        return 308 /api/;
+    }
+
+    location ~ "^/site/([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)(?:/(.*))?/?$" {
+        rewrite ^/site/([^/]+)(?:/(.*))?/?$ /public/legacy/site/$1/$2 break;
+        proxy_pass http://backend:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Forwarded-Proto $madar_forwarded_proto;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Request-ID $madar_request_id;
+    }
+
+    location ~ "^/store/([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)(?:/(.*))?/?$" {
+        rewrite ^/store/([^/]+)(?:/(.*))?/?$ /public/legacy/store/$1/$2 break;
+        proxy_pass http://backend:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Forwarded-Proto $madar_forwarded_proto;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Request-ID $madar_request_id;
+    }
+
+    location ~ "^/forms/([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)/([^/]+)/?$" {
+        rewrite ^/forms/([^/]+)/([^/]+)/?$ /public/legacy/forms/$1/$2 break;
+        proxy_pass http://backend:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Forwarded-Proto $madar_forwarded_proto;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Request-ID $madar_request_id;
+    }
 
     location / {
         try_files $uri $uri/ /index.html;

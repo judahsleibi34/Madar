@@ -11,6 +11,8 @@ from urllib.parse import urlparse
 from fastapi import Request, Response
 from starlette.responses import JSONResponse
 
+from services.hosted_address_service import hosted_tenant_from_hostname
+
 SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
 AUTH_COOKIE_NAMES = {"madar_access_token", "madar_refresh_token"}
 CSRF_COOKIE_NAME = "madar_csrf_token"
@@ -266,6 +268,19 @@ def origin_from_request(request: Request) -> str | None:
     return None
 
 
+def tenant_public_origin_matches_request(request: Request, request_origin: str | None) -> bool:
+    if not request_origin or not request.url.path.startswith("/public/sites/"):
+        return False
+    match = re.match(r"^/public/sites/([^/]+)(?:/|$)", request.url.path)
+    if not match:
+        return False
+    parsed = urlparse(request_origin)
+    if parsed.username or parsed.password or parsed.scheme.lower() != "https":
+        return False
+    tenant = hosted_tenant_from_hostname(parsed.hostname)
+    return bool(tenant and tenant == match.group(1).strip().lower())
+
+
 def validate_cookie_write_origin(request: Request, allowed_origins: set[str]) -> JSONResponse | None:
     if not CSRF_ORIGIN_CHECK_ENABLED:
         return None
@@ -282,6 +297,9 @@ def validate_cookie_write_origin(request: Request, allowed_origins: set[str]) ->
         return None
 
     if request_origin and request_origin in allowed_origins:
+        return None
+
+    if tenant_public_origin_matches_request(request, request_origin):
         return None
 
     return JSONResponse(

@@ -26,7 +26,8 @@ The current branch already supports the core product loop end to end:
 What is still partial or intentionally limited:
 
 - billing stores internal feature-state and pending checkout state, but no real payment provider is integrated yet
-- the canonical live-site URL is still path-based: `/site/<subdomain>/`
+- tenant websites use canonical `https://<subdomain>.madarportal.com/` URLs;
+  `/site/<subdomain>/` remains redirect-only compatibility state
 - the repository still contains duplicate migration trees that should eventually be consolidated
 - the frontend has build/lint validation, but no dedicated frontend unit test runner is configured yet
 
@@ -73,6 +74,8 @@ Core required values:
 - `SUPABASE_ANON_KEY`
 - `SUPABASE_SERVICE_KEY`
 - `FRONTEND_URL` or `FRONTEND_URLS`
+- `PUBLIC_SITE_DOMAIN` (the trusted tenant-host suffix, for example
+  `madarportal.com`)
 
 Common security and session settings:
 
@@ -395,7 +398,8 @@ Before merging or deploying:
 - run the backend test modules relevant to the change
 - confirm migrations are applied in the target environment
 - confirm Supabase keys and backend env vars are present
-- confirm public-site routing still uses `/site/<subdomain>/`
+- confirm public-site routing uses `https://<subdomain>.madarportal.com/` and
+  legacy `/site/<subdomain>/` requests redirect permanently
 - confirm billing expectations match the current feature-state implementation
 - confirm auth, CSRF, tenant isolation, and audit logging are working
 - confirm `security.txt` and the privacy policy page are reachable
@@ -404,8 +408,8 @@ Before merging or deploying:
 
 - real payment processing is not integrated yet
 - migration history exists in two parallel directories and still needs a future source-of-truth decision
-- frontend automated tests are limited compared with the backend coverage
-- the current canonical live URL remains path-based
+- browser E2E coverage remains smaller than the unit/component coverage
+- wildcard DNS, TLS, and Cloudflare Tunnel routing remain operator-managed
 - some compatibility fallbacks remain in the backend for older data paths
 
 ## Current Roadmap Summary

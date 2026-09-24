@@ -138,6 +138,59 @@ def test_public_store_settings_lookup_is_reused_and_tenant_scoped():
     assert invalidate_ecommerce_cache(7) == 1
 
 
+def test_public_store_settings_cache_cannot_bypass_host_identity():
+    def request_for(host):
+        return Request({
+            "type": "http",
+            "method": "GET",
+            "path": "/public/sites/demo/store-profile",
+            "headers": [(b"host", host.encode())],
+            "query_string": b"",
+            "client": ("127.0.0.1", 1),
+            "server": (host, 443),
+            "scheme": "https",
+        })
+
+    settings = {
+        "tenant_id": 7,
+        "standard_path_slug": "demo",
+        "subdomain": "demo",
+        "brand": "Demo",
+    }
+
+    invalidate_ecommerce_cache(7)
+
+    with patch.object(
+        public_site_routes,
+        "resolve_website_settings",
+        return_value=settings,
+    ) as lookup:
+        correct = public_site_routes.resolve_public_store_settings(
+            "demo",
+            request=request_for("demo.madarportal.com"),
+        )
+
+        assert correct == settings
+        assert lookup.call_count == 1
+
+        try:
+            public_site_routes.resolve_public_store_settings(
+                "demo",
+                request=request_for("wrong-tenant.madarportal.com"),
+            )
+        except Exception as exc:
+            assert getattr(exc, "status_code", None) == 404
+        else:
+            raise AssertionError(
+                "cached tenant settings bypassed hostname/path identity enforcement"
+            )
+
+        # The rejected request must fail before either cache reuse or DB resolution.
+        assert lookup.call_count == 1
+
+    invalidate_ecommerce_cache(7)
+
+
 def test_public_catalog_source_rows_are_reused_across_filter_payloads():
     source_rows = ([], [], [], [])
     with patch.object(

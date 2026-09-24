@@ -166,8 +166,22 @@ def parse_trusted_proxy_networks(value: str | None = None) -> tuple:
 
 
 def ip_is_trusted_proxy(ip_address, trusted_networks: tuple | None = None) -> bool:
-    networks = trusted_networks if trusted_networks is not None else parse_trusted_proxy_networks()
-    return any(ip_address in network for network in networks)
+    parsed_ip = (
+        ip_address
+        if isinstance(ip_address, (ipaddress.IPv4Address, ipaddress.IPv6Address))
+        else parse_ip_address(ip_address)
+    )
+
+    if parsed_ip is None:
+        return False
+
+    networks = (
+        trusted_networks
+        if trusted_networks is not None
+        else parse_trusted_proxy_networks()
+    )
+
+    return any(parsed_ip in network for network in networks)
 
 
 def parse_forwarded_for(value: str | None):

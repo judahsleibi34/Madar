@@ -88,9 +88,9 @@ def save_settings_for_tenant(tenant_id: int, user_id: int, update_payload: dict)
 
 def require_public_subdomain(tenant_id: int, user_id: int):
     settings = ensure_settings_for_tenant(tenant_id, user_id)
-    standard_path_slug = (settings.get("standard_path_slug") or "").strip().lower()
+    subdomain = (settings.get("subdomain") or "").strip().lower()
 
-    if not standard_path_slug:
+    if not subdomain:
         raise HTTPException(
             status_code=400,
             detail="Configure a standard hosted address before going live.",

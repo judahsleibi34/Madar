@@ -48,7 +48,7 @@ services:
       MADAR_RELEASE_SHA: ${MADAR_RELEASE_SHA:-development}
       MADAR_BUILD_TIMESTAMP: ${MADAR_BUILD_TIMESTAMP:-unknown}
       SCHEMA_COMPATIBLE_MIN: ${SCHEMA_COMPATIBLE_MIN:-81}
-      SCHEMA_COMPATIBLE_MAX: ${SCHEMA_COMPATIBLE_MAX:-83}
+      SCHEMA_COMPATIBLE_MAX: ${SCHEMA_COMPATIBLE_MAX:-105}
       # Direct PostgreSQL credentials are operator-only. An explicit empty
       # override makes the key unusable even when the shared env_file contains
       # it for backup or catalog-verification tooling.
@@ -124,6 +124,7 @@ services:
       MICROSOFT_CALENDAR_CLIENT_ID: ${MICROSOFT_CALENDAR_CLIENT_ID:-}
       MICROSOFT_CALENDAR_CLIENT_SECRET: ${MICROSOFT_CALENDAR_CLIENT_SECRET:-}
       PUBLIC_API_URL: ${PUBLIC_API_URL:-}
+      PUBLIC_SITE_DOMAIN: ${PUBLIC_SITE_DOMAIN:-madarportal.com}
       FRONTEND_PRIMARY_URL: ${FRONTEND_PRIMARY_URL:-}
       ALLOW_REMOTE_DATASET_URLS: ${ALLOW_REMOTE_DATASET_URLS:-false}
       REMOTE_INGESTION_WORKER_URL: ${REMOTE_INGESTION_WORKER_URL:-http://remote-ingestion-worker:8093/fetch}
@@ -161,6 +162,7 @@ services:
       - ./backend/Dockerfile:/test-repository/backend/Dockerfile:ro
       - ./frontend/Dockerfile:/test-repository/frontend/Dockerfile:ro
       - ./frontend/security_headers.conf.template:/test-repository/frontend/security_headers.conf.template:ro
+      - ./frontend/nginx.conf.template:/test-repository/frontend/nginx.conf.template:ro
       - ./docker-compose.yml:/test-repository/docker-compose.yml:ro
       - ./docker-compose.dev.yml:/test-repository/docker-compose.dev.yml:ro
       - ./deployment:/test-repository/deployment:ro
@@ -420,6 +422,7 @@ services:
       context: ./frontend
       args:
         VITE_API_URL: ${VITE_API_URL:-}
+        VITE_PUBLIC_SITE_DOMAIN: ${PUBLIC_SITE_DOMAIN:-madarportal.com}
         MADAR_REQUIRE_PRODUCTION_API_URL: ${MADAR_REQUIRE_PRODUCTION_API_URL:-true}
         MADAR_RELEASE_SHA: ${MADAR_RELEASE_SHA:-development}
         MADAR_BUILD_TIMESTAMP: ${MADAR_BUILD_TIMESTAMP:-unknown}

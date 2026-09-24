@@ -205,10 +205,11 @@ origin, and one shared non-empty build timestamp. Otherwise both artifacts are
 rebuilt. Preflight resolves each recorded tag again and rejects a changed image
 ID.
 
-The production frontend build requires `VITE_API_URL` to equal
-`https://api.madarportal.com`; the staging override expects
-`http://127.0.0.1:18001`. Deep validation also finds a Vite JavaScript asset on
-the loopback candidate frontend and verifies that the expected origin is
+The production frontend build requires `VITE_API_URL=/api`, which the frontend
+Nginx service proxies to the backend on the same public origin; the staging
+override expects `http://127.0.0.1:18001`. `PUBLIC_SITE_DOMAIN` supplies the
+trusted tenant-host suffix. Deep validation also finds a Vite JavaScript asset
+on the loopback candidate frontend and verifies that the expected API base is
 embedded.
 
 Implemented by `web/deployment/bin/madar-release-deploy ::
@@ -254,18 +255,16 @@ queried directly. Its SHA must match state and its reported compatibility range
 must contain the live schema. Candidate rollback bounds are descriptive metadata
 today; retained-target attestation is the operative rollback check.
 
-The current bridge contract is schema range `81..104`, target `104`, class
-`expand-only`, rollback metadata `81..102`, and the checksum-pinned, contiguous
-`migrations-103-104.json`. Production is already at schema 102; migrations
-100 through 102 are applied production history and remain immutable rather than
-being replayed by this release. Only after bridge acceptance at schema 102 may
+The current bridge contract is schema range `81..105`, target `105`, class
+`forward-compatible`, rollback metadata `81..104`, and the checksum-pinned
+`migrations-105.json`. Migrations 100 through 104 are applied production
+history and remain immutable. Only after bridge acceptance at schema 104 may
 the coordinator create a source-schema-bound verified backup and execute
-102→103→104. Migration 103 creates the tenant-scoped delivery-pricing table in
-its intermediate origin/destination form. Migration 104 then normalizes that
-table to exactly one non-negative fee per tenant and service area. Delivery
-pricing remains an upgrade-required operation until schema 104 is available.
-Once schema advances beyond 102, the retained schema-102 release is no longer
-an automatic traffic-rollback target and recovery is forward-repair-only.
+104→105. Migration 105 establishes `website_settings.subdomain` as the
+normalized, nonreserved, case-insensitively unique canonical tenant hostname,
+while retaining `standard_path_slug` as legacy compatibility state. Invalid,
+reserved, duplicate, or ambiguous identities abort before mutation with row
+evidence. Once schema advances beyond 104, recovery is forward-repair-only.
 
 The preceding schema-097 bridge added verified-customer loyalty through atomic
 functions. Identity is `(store tenant_id, public.users.id)`; checkout email and

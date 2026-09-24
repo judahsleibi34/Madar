@@ -61,13 +61,13 @@ describe("EcommerceThemePage", () => {
     const open = vi.spyOn(window, "open").mockImplementation(() => null);
     render(<EcommerceThemePage />);
     await screen.findByLabelText("Store colors");
-    expect((await screen.findByTitle("Exact draft storefront preview")).getAttribute("src")).toBe("/site/olive-house/shop?preview=draft");
+    expect((await screen.findByTitle("Exact draft storefront preview")).getAttribute("src")).toBe("https://olive-house.madarportal.com/shop?preview=draft");
 
     fireEvent.change(screen.getByLabelText("Main color"), { target: { value: "#a33a2b" } });
     fireEvent.click(screen.getByRole("button", { name: "Open full preview" }));
 
     expect(JSON.parse(localStorage.getItem("madar-online-store-theme-preview"))).toMatchObject({ accent: "#a33a2b" });
-    expect(open).toHaveBeenCalledWith("/site/olive-house/shop?preview=draft", "_blank", "noopener,noreferrer");
+    expect(open).toHaveBeenCalledWith("https://olive-house.madarportal.com/shop?preview=draft", "_blank", "noopener,noreferrer");
     expect(saveEcommerceTheme).not.toHaveBeenCalled();
   });
 
