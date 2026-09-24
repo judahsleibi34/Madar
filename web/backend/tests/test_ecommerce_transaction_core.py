@@ -14,8 +14,8 @@ from routes.public_site_routes import PublicStoreOrderCreate
 WEB_ROOT = Path(__file__).resolve().parents[2]
 MIGRATION = WEB_ROOT / "database" / "migrations" / "094_create_ecommerce_transaction_core.sql"
 MIRROR = WEB_ROOT / "supabase" / "migrations" / "094_create_ecommerce_transaction_core.sql"
-DELIVERY_FEE_MIGRATION = WEB_ROOT / "database" / "migrations" / "105_add_order_delivery_fees.sql"
-DELIVERY_FEE_MIRROR = WEB_ROOT / "supabase" / "migrations" / "105_add_order_delivery_fees.sql"
+DELIVERY_FEE_MIGRATION = WEB_ROOT / "database" / "migrations" / "106_add_order_delivery_fees.sql"
+DELIVERY_FEE_MIRROR = WEB_ROOT / "supabase" / "migrations" / "106_add_order_delivery_fees.sql"
 
 
 def order_payload(**overrides):

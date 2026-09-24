@@ -147,16 +147,16 @@ class AutomaticMigrationControlPlaneTests(unittest.TestCase):
                         "http://127.0.0.1:3200", self.sha, "green"
                     )
 
-    def test_current_manifest_and_rollback_contract_cover_schema_104_to_105(self):
+    def test_current_manifest_and_rollback_contract_cover_schema_104_to_108(self):
         self.assertEqual(self.source_schema, 104)
-        self.assertEqual(self.target_schema, 105)
+        self.assertEqual(self.target_schema, 108)
         self.assertEqual(
             self.metadata["schema"]["rollback_compatible_max"],
             self.source_schema,
         )
         self.assertEqual(
             [entry["number"] for entry in self.manifest["migrations"]],
-            [105],
+            [105, 106, 107, 108],
         )
 
     def fixture(self, root: Path, *, schema: int | None = None):
@@ -380,7 +380,7 @@ class AutomaticMigrationControlPlaneTests(unittest.TestCase):
             source_schema=self.source_schema,
         )
 
-    def test_successful_104_to_105_records_target_only_after_worker_and_route_validation(self):
+    def test_successful_104_to_108_records_target_only_after_worker_and_route_validation(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             state_root, operations, compatibility, events = self.fixture(root)
