@@ -39,6 +39,7 @@ declare -a control_plane_paths=(
   web/scripts/replicate_backup_offhost.sh
   web/scripts/restore_madar.sh
   web/scripts/rehearse_backup.py
+  web/scripts/monitor_hosted_domains.py
 )
 
 if ! git -C "$repo" diff --quiet \

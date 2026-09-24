@@ -32,6 +32,7 @@ not turn the upgrader into a general application deployment path.
 | Replaceable controller | `/opt/madar/control-plane/deployment` | Canonical release, migration, proxy, guard, installer, and systemd implementation. |
 | Path/remote trust contract | `/opt/madar/control-plane/deployment/production-paths.conf` | Root-owned canonical production paths and expected Git remote identity. |
 | Installer | `bin/madar-install-control-plane` | Backs up the old controller, atomically publishes the exact staged controller, installs units and the next-invocation launcher, and leaves automation stopped. |
+| Hosted-domain synthetic monitor | `/usr/local/lib/madar/monitor_hosted_domains.py` with `madar-hosted-domain-monitor.service/.timer` | Performs unauthenticated read-only public checks; installed and attested as a protected operational helper, with timer activation left to a separate operator decision. |
 | Authorized transient unit | `madar-control-plane-upgrade-<pid>-<cycle>.service` | Runs the exact `madar-auto-deploy` entrypoint as `madar` with the ordinary path/backup environment, hardening properties, and a systemd `LoadCredential` visible only inside that cycle. |
 
 No `NOPASSWD` rule or automatic invocation is added. The `madar` account

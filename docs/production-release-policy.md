@@ -1,6 +1,6 @@
 # Madar production release acceptance policy
 
-Last implementation review: 2026-09-23
+Last implementation review: 2026-09-24
 
 ## A. Purpose and authority
 
@@ -776,6 +776,7 @@ Implemented by `ReleaseDeployer._checkpoint()` and `_recover_interrupted()`.
 | `check_production_config.py` | No | No | No | Operator/staging presence and shape validation; never prints values |
 | `check_dependency_locks.py` | No | No | No | Backend and frontend CI |
 | `check_host_capacity.sh` | No | No | No | Installed periodic host-capacity service/timer; host-specific |
+| `monitor_hosted_domains.py` | No | No | No | Read-only public HTTPS synthetic monitor; its timer is separately governed and does not enable deployment |
 | `rehearse_migration_*.sh` | No | No | No | Manual, migration-specific rehearsals |
 | backend test suite/image build | Image build only | No | No | Backend CI |
 | frontend lint/tests/build/audit | Production image build runs the build | No | No | Frontend CI |
@@ -833,6 +834,8 @@ gates, non-automatic CI/manual checks, failure semantics, defaults, and bounded
 ranges against the implementation. If no text change is needed, the PR should
 say why. Control-plane changes also require the provenance-aware installation
 procedure before automatic deployment can accept the changed controller source.
+
+The hosted-domain monitor script and its service/timer are protected operational files. The installer backs up, installs, and attests them but does not enable either the monitor timer or `madar-auto-deploy.timer`. The monitor's live success history, current backup/Node 1 state, and exact-main CI are operator prerequisites to a separate decision to resume automatic deployment; see the [hosted-domain runbook](../web/docs/hosted-tenant-domains-operations-runbook.md). This adds no release-promotion or migration gate to the current controller.
 
 ## T. Privileged protected-control-plane upgrade gate
 
