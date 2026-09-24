@@ -44,6 +44,12 @@ describe("TenantSiteRoutes storefront connection", () => {
     expect(screen.queryByText("Builder website runtime:madar-demo")).toBeNull();
   });
 
+  it("mounts the hosted storefront home at /shop without changing the path", async () => {
+    render(<MemoryRouter initialEntries={["/shop"]}><TenantSiteRoutes /><LocationProbe /></MemoryRouter>);
+    expect(await screen.findByText("External ecommerce storefront")).toBeTruthy();
+    expect(screen.getByLabelText("current location").textContent).toBe("/shop");
+  });
+
   it.each(["/", "/about/team", "/forms/contact-form"])(
     "renders the host-derived tenant runtime directly at %s without rewriting the path",
     async (path) => {

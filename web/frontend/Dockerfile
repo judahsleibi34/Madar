@@ -36,6 +36,8 @@ RUN rm -f /etc/nginx/conf.d/default.conf \
 COPY --chown=nginx:nginx --from=build /app/dist /usr/share/nginx/html
 COPY --chown=nginx:nginx nginx.conf.template /etc/nginx/templates/default.conf.template
 COPY --chown=nginx:nginx security_headers.conf.template /etc/nginx/templates/includes/security_headers.conf.template
+COPY --chown=nginx:nginx storefront_frame_headers.conf.template /etc/nginx/templates/includes/storefront_frame_headers.conf.template
+COPY --chown=nginx:nginx admin_preview_frame_headers.conf.template /etc/nginx/templates/includes/admin_preview_frame_headers.conf.template
 
 LABEL org.opencontainers.image.revision=$MADAR_RELEASE_SHA \
       org.opencontainers.image.created=$MADAR_BUILD_TIMESTAMP

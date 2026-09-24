@@ -29,7 +29,7 @@ describe("merchant-defined ecommerce variants", () => {
         { id: "white", code: "white", value: "White", color_hex: "#FFFFFF" },
       ],
     }], variants: [{ id: "black-only", sku: "BLACK", option_value_ids: ["black"], price: "20.00", in_stock: true, images: [] }] });
-    render(<MemoryRouter initialEntries={["/store/demo/product/shirt"]}><Routes><Route path="/store/:subdomain/*" element={<EcommerceStorefront />} /></Routes></MemoryRouter>);
+    render(<MemoryRouter initialEntries={["/shop/product/shirt"]}><Routes><Route path="/shop/*" element={<EcommerceStorefront subdomain="demo" />} /></Routes></MemoryRouter>);
     const black = await screen.findByRole("button", { name: "Black" });
     const white = screen.getByRole("button", { name: "White" });
     expect(black.querySelector(".live-store-color-swatch").style.backgroundColor).toBe("rgb(17, 17, 17)");
@@ -45,7 +45,7 @@ describe("merchant-defined ecommerce variants", () => {
     ] });
     fetchPublicEcommerceCatalog.mockResolvedValue({ site: { brand: "Store" }, catalog: { categories: [], tags: [], products: [], pagination: { page: 1, pages: 1, total: 0, limit: 12 } } });
 
-    render(<MemoryRouter initialEntries={["/store/demo/product/shirt"]}><Routes><Route path="/store/:subdomain/*" element={<EcommerceStorefront />} /></Routes></MemoryRouter>);
+    render(<MemoryRouter initialEntries={["/shop/product/shirt"]}><Routes><Route path="/shop/*" element={<EcommerceStorefront subdomain="demo" />} /></Routes></MemoryRouter>);
 
     const add = await screen.findByRole("button", { name: "Choose options" });
     expect(add.disabled).toBe(true);
@@ -76,7 +76,7 @@ describe("merchant-defined ecommerce variants", () => {
       ],
     });
 
-    render(<MemoryRouter initialEntries={["/store/demo/product/shirt"]}><Routes><Route path="/store/:subdomain/*" element={<EcommerceStorefront />} /></Routes></MemoryRouter>);
+    render(<MemoryRouter initialEntries={["/shop/product/shirt"]}><Routes><Route path="/shop/*" element={<EcommerceStorefront subdomain="demo" />} /></Routes></MemoryRouter>);
 
     expect(await screen.findByText("12 items available")).toBeTruthy();
     expect(screen.getByText("2 of 3 variants available")).toBeTruthy();
@@ -96,7 +96,7 @@ describe("merchant-defined ecommerce variants", () => {
   it("loads a legacy simple-product cart line without a variant", async () => {
     localStorage.setItem("madar-store-cart:demo", JSON.stringify([{ ...product, quantity: 1 }]));
     fetchPublicEcommerceCatalog.mockResolvedValue({ site: { brand: "Store" }, catalog: { categories: [], tags: [], products: [], pagination: { page: 1, pages: 1, total: 0, limit: 12 } } });
-    render(<MemoryRouter initialEntries={["/store/demo"]}><Routes><Route path="/store/:subdomain/*" element={<EcommerceStorefront />} /></Routes></MemoryRouter>);
+    render(<MemoryRouter initialEntries={["/shop"]}><Routes><Route path="/shop/*" element={<EcommerceStorefront subdomain="demo" />} /></Routes></MemoryRouter>);
     fireEvent.click(await screen.findByRole("button", { name: "Open cart, 1 item" }));
     expect(screen.getByText("Shirt")).toBeTruthy();
   });
@@ -115,7 +115,7 @@ describe("merchant-defined ecommerce variants", () => {
       variants: [{ id: "variant-1", sku: "SHIRT-B-L", option_value_ids: ["black", "large"], price: "20", in_stock: true, images: [] }],
     });
 
-    render(<MemoryRouter initialEntries={["/store/demo/product/shirt"]}><Routes><Route path="/store/:subdomain/*" element={<EcommerceStorefront />} /></Routes></MemoryRouter>);
+    render(<MemoryRouter initialEntries={["/shop/product/shirt"]}><Routes><Route path="/shop/*" element={<EcommerceStorefront subdomain="demo" />} /></Routes></MemoryRouter>);
 
     expect(await screen.findByRole("heading", { level: 1, name: "قميص" })).toBeTruthy();
     expect(screen.getByText("الخامة")).toBeTruthy();

@@ -1078,15 +1078,15 @@ function StoreLanding({ brand, site, catalog, categoryById, locale, shopPath, pr
     </div>
   );
 }
-export default function EcommerceStorefront({ subdomain: suppliedSubdomain = "", basePath: suppliedBasePath = "" }) {
+export default function EcommerceStorefront({ subdomain: suppliedSubdomain = "", previewBasePath = "" }) {
   const params = useParams();
   const location = useLocation();
   const navigate = useNavigate();
-  const subdomain = suppliedSubdomain || params.subdomain || "";
-  const storePath = suppliedBasePath || `/store/${encodeURIComponent(subdomain)}`;
+  const subdomain = suppliedSubdomain || (previewBasePath ? params.subdomain : "");
+  const storePath = previewBasePath || "/shop";
   const { i18n: commerceI18n } = useTranslation("commerce");
   const locale = normalizeCommerceLocale(commerceI18n.resolvedLanguage || commerceI18n.language);
-  const canonicalStorePath = suppliedBasePath === "/shop" ? "/shop" : `/site/${encodeURIComponent(subdomain)}/shop`;
+  const canonicalStorePath = "/shop";
   const shopPath = `${storePath}/catalog`;
   const categoriesPath = `${storePath}/categories`;
   const contactPath = `${storePath}/contact`;
@@ -1101,7 +1101,7 @@ export default function EcommerceStorefront({ subdomain: suppliedSubdomain = "",
   const confirmationToken = routeTail.match(/^confirmation\/([0-9a-f]{64})\/?$/)?.[1] || "";
   const confirmationRoute = Boolean(confirmationToken);
   const urlFilters = useMemo(() => new URLSearchParams(location.search), [location.search]);
-  const [draftPreviewMode] = useState(() => new URLSearchParams(window.location.search).get("preview") === "draft");
+  const [draftPreviewMode] = useState(() => Boolean(previewBasePath) || new URLSearchParams(location.search).get("preview") === "draft");
   const [draftTheme, setDraftTheme] = useState(() => draftPreviewMode ? readThemePreview() : null);
   const [catalog, setCatalog] = useState(EMPTY_CATALOG);
   const [site, setSite] = useState(null);
@@ -1303,7 +1303,7 @@ export default function EcommerceStorefront({ subdomain: suppliedSubdomain = "",
   useEffect(() => {
     if (!draftPreviewMode) return undefined;
     const receiveTheme = (event) => {
-      if (event.origin !== window.location.origin || event.data?.type !== "madar-online-store-theme-preview") return;
+      if (event.origin !== window.location.origin || event.source !== window.parent || event.data?.type !== "madar-online-store-theme-preview") return;
       const nextTheme = event.data?.theme;
       if (nextTheme && typeof nextTheme === "object") setDraftTheme(nextTheme);
     };

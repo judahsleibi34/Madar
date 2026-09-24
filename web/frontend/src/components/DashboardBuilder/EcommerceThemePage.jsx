@@ -11,7 +11,6 @@ import { fetchWebsiteSettings } from "../PageBuilder/services/PageBuilder.api";
 import { readEcommerceThemeCacheSnapshot } from "./utils/ecommerceCatalogCache";
 import { MADAR_STORE_THEME, normalizeStoreTheme } from "../../utils/ecommerceTheme";
 import { useCommerceI18n } from "../../utils/commerceI18n";
-import { buildCanonicalTenantUrl } from "../../utils/hostedAddress";
 
 const DEFAULT_THEME = MADAR_STORE_THEME;
 
@@ -83,7 +82,7 @@ export default function EcommerceThemePage({ user }) {
 
   const valid = useMemo(() => COLOR_FIELDS.every(([key]) => isHexColor(theme[key])), [theme]);
   const subdomain = String(website?.subdomain || "").trim();
-  const previewPath = subdomain ? buildCanonicalTenantUrl(subdomain, "/shop?preview=draft") : "";
+  const previewPath = subdomain ? `/ecommerce-preview/${encodeURIComponent(subdomain)}?preview=draft` : "";
   const viewportWidth = previewMode === "mobile" ? 390 : 1120;
   const previewScale = Math.min(1, previewWidth / viewportWidth);
 

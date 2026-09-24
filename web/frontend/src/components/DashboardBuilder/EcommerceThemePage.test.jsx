@@ -61,14 +61,23 @@ describe("EcommerceThemePage", () => {
     const open = vi.spyOn(window, "open").mockImplementation(() => null);
     render(<EcommerceThemePage />);
     await screen.findByLabelText("Store colors");
-    expect((await screen.findByTitle("Exact draft storefront preview")).getAttribute("src")).toBe("https://olive-house.madarportal.com/shop?preview=draft");
+    expect((await screen.findByTitle("Exact draft storefront preview")).getAttribute("src")).toBe("/ecommerce-preview/olive-house?preview=draft");
 
     fireEvent.change(screen.getByLabelText("Main color"), { target: { value: "#a33a2b" } });
     fireEvent.click(screen.getByRole("button", { name: "Open full preview" }));
 
     expect(JSON.parse(localStorage.getItem("madar-online-store-theme-preview"))).toMatchObject({ accent: "#a33a2b" });
-    expect(open).toHaveBeenCalledWith("https://olive-house.madarportal.com/shop?preview=draft", "_blank", "noopener,noreferrer");
+    expect(open).toHaveBeenCalledWith("/ecommerce-preview/olive-house?preview=draft", "_blank", "noopener,noreferrer");
     expect(saveEcommerceTheme).not.toHaveBeenCalled();
+  });
+
+  it("sends draft theme only to the exact preview origin", async () => {
+    render(<EcommerceThemePage />);
+    const frame = await screen.findByTitle("Exact draft storefront preview");
+    const postMessage = vi.spyOn(frame.contentWindow, "postMessage");
+    fireEvent.load(frame);
+    expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({ type: "madar-online-store-theme-preview" }), window.location.origin);
+    expect(postMessage).not.toHaveBeenCalledWith(expect.anything(), "*");
   });
 
   it("rejects incomplete color values with a toast", async () => {

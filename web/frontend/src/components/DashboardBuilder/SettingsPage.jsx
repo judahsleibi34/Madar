@@ -23,6 +23,7 @@ import {
 import { getBuilderAssetFileName } from "../PageBuilder/core/PageBuilder.uploadHandlers";
 import { apiFetch } from "../../utils/apiClient";
 import { resolveMediaUrl } from "../../utils/media";
+import { buildCanonicalTenantUrl } from "../../utils/hostedAddress";
 import { clearEcommerceAdminCache } from "./utils/ecommerceAdminCache";
 import { clearAllEcommerceCatalogCaches } from "./utils/ecommerceCatalogCache";
 import { clearPublicEcommerceCache, fetchEcommerceSettings, saveEcommerceSettings } from "../../services/ecommerceApi";
@@ -1435,7 +1436,7 @@ export default function SettingsPage({
                 <label className="settings-wide-field">
                   {t.storeAddress}
                   <input
-                    value={`${sanitizeSubdomain(siteForm.subdomain)}.madarportal.com/shop`}
+                    value={buildCanonicalTenantUrl(sanitizeSubdomain(siteForm.subdomain), "/shop").replace(/^https:\/\//, "")}
                     readOnly
                   />
                   <small>{t.storeAddressHelp}</small>
@@ -1445,7 +1446,7 @@ export default function SettingsPage({
 
             <div className="settings-profile-actions settings-website-profile-actions">
               <SmartLink
-                to={`https://${encodeURIComponent(sanitizeSubdomain(siteForm.subdomain))}.madarportal.com/shop`}
+                to={buildCanonicalTenantUrl(sanitizeSubdomain(siteForm.subdomain), "/shop")}
                 className="settings-reset-password-button"
                 target="_blank"
                 rel="noreferrer"

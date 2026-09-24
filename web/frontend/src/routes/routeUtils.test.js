@@ -3,13 +3,22 @@ import { describe, expect, it } from "vitest";
 import { getSafePostLoginPath, isDashboardRoutePath, isTenantSiteRoutePath } from "./routeUtils";
 
 describe("Ecommerce route classification", () => {
-  it.each(["/store/palcode", "/store/palcode/catalog", "/shop", "/shop/categories"])(
-    "treats %s as a public storefront route",
+  it.each(["/shop", "/shop/categories"])(
+    "treats %s as a canonical storefront route",
     (pathname) => {
       expect(isTenantSiteRoutePath(pathname)).toBe(true);
       expect(isDashboardRoutePath(pathname)).toBe(false);
     },
   );
+
+  it.each(["/store/palcode", "/store/palcode/catalog", "/site/palcode/shop/product/chair"])(
+    "routes legacy input %s through tenant compatibility handling",
+    (pathname) => expect(isTenantSiteRoutePath(pathname)).toBe(true),
+  );
+
+  it("routes internal draft previews separately from public storefronts", () => {
+    expect(isTenantSiteRoutePath("/ecommerce-preview/palcode/catalog")).toBe(true);
+  });
 
   it.each([
     "/ecommerce/tags",

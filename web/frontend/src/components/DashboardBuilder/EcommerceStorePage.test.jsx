@@ -16,7 +16,7 @@ describe("EcommerceStorePage", () => {
     const { container } = render(
       <MemoryRouter><EcommerceStorePage /></MemoryRouter>
     );
-    expect((await screen.findByTitle("Published online store")).getAttribute("src")).toBe("/site/olive-house/shop");
+    expect((await screen.findByTitle("Published online store")).getAttribute("src")).toBe("https://olive-house.madarportal.com/shop");
     fireEvent.load(screen.getByTitle("Published online store"));
     expect(screen.getByRole("link", { name: "Open production store" }).getAttribute("href")).toBe("https://olive-house.madarportal.com/shop");
     expect(screen.queryByText("Published storefront")).toBeNull();
@@ -29,7 +29,7 @@ describe("EcommerceStorePage", () => {
     fetchWebsiteSettings.mockResolvedValue({ subdomain: "olive-house" });
     render(<MemoryRouter initialEntries={["/ecommerce/store?preview=draft"]}><EcommerceStorePage /></MemoryRouter>);
 
-    expect((await screen.findByTitle("Draft online store preview")).getAttribute("src")).toBe("/site/olive-house/shop?preview=draft");
+    expect((await screen.findByTitle("Draft online store preview")).getAttribute("src")).toBe("/ecommerce-preview/olive-house?preview=draft");
     fireEvent.load(screen.getByTitle("Draft online store preview"));
     expect(screen.getByText("Nothing here is live yet.", { exact: false })).toBeTruthy();
   });
