@@ -55,7 +55,7 @@ export const saveEcommerceItem = async (section, itemId, payload, { scope } = {}
     method: itemId ? "PUT" : "POST",
     body: JSON.stringify(payload),
   });
-  const singular = section === "categories" ? "category" : section === "products" ? "product" : "tag";
+  const singular = section === "categories" ? "category" : section === "products" ? "product" : section === "brands" ? "brand" : "tag";
   updateEcommerceCatalogCache(scope, section, result?.[singular]);
   return result;
 };
@@ -101,6 +101,13 @@ export const fetchEcommerceGrowth = () => request("/ecommerce/growth");
 export const saveEcommerceGrowth = (growth) => request("/ecommerce/growth", {
   method: "PUT",
   body: JSON.stringify(growth),
+});
+
+export const fetchEcommerceSocialLinks = () => request("/ecommerce/social-links");
+
+export const saveEcommerceSocialLinks = (socialLinks) => request("/ecommerce/social-links", {
+  method: "PUT",
+  body: JSON.stringify(socialLinks),
 });
 
 export const fetchEcommerceSettings = ({ scope, force = false } = {}) => loadEcommerceAdminResource(scope, "settings", () => request("/ecommerce/settings"), { force });

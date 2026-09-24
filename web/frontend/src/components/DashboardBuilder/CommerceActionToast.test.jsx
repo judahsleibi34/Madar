@@ -14,9 +14,9 @@ describe("commerce action feedback", () => {
     expect(screen.getByRole("status").textContent).toContain("Product saved");
     expect(screen.getByRole("status").getAttribute("aria-live")).toBe("polite");
     act(() => notifyCommerceAction({ type: "error", title: "Could not load orders" }));
-    act(() => vi.advanceTimersByTime(4200));
+    act(() => vi.advanceTimersByTime(4400));
     expect(screen.getByRole("alert").textContent).toContain("Could not load orders");
-    act(() => vi.advanceTimersByTime(4200));
+    act(() => vi.advanceTimersByTime(6500));
     expect(screen.queryByRole("alert")).toBeNull();
   });
 });

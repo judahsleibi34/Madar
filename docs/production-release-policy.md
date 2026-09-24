@@ -247,17 +247,19 @@ queried directly. Its SHA must match state and its reported compatibility range
 must contain the live schema. Candidate rollback bounds are descriptive metadata
 today; retained-target attestation is the operative rollback check.
 
-The current bridge contract is schema range `81..104`, target `104`, class
-`expand-only`, rollback metadata `81..99`, and the checksum-pinned, contiguous
-`migrations-100-104.json`. Only after bridge acceptance may the coordinator
-create a source-schema-bound verified backup and execute the needed 99-to-103
-transitions. Migration 100 corrects the site-visit counter RPC, migration 101
-adds product-variant presentation metadata, migration 102 adds bounded ecommerce
-discount conditions, migration 103 adds tenant-scoped delivery pricing, and
-migration 104 normalizes that table to exactly one non-negative fee per enabled
-delivery area. The pricing table is service-role-only with row-level security
-enabled. Releases capped below the
-live schema are not rollback targets after a later transition commits.
+The current bridge contract is schema range `104..107`, target `107`, class
+`expand-only`, rollback metadata `104..104`, and the checksum-pinned
+`migrations-105-107.json`. Only after bridge acceptance may the coordinator
+create a source-schema-bound verified backup and execute the contiguous
+transitions. Migration 105 snapshots the configured non-negative delivery-area
+fee into each new order and adds it to the server-calculated total. Existing
+orders retain a zero delivery fee, and later merchant price changes do not
+rewrite captured order fees. Migration 106 adds one nullable, validated image
+URL per ecommerce category for merchant-managed storefront presentation.
+Category reads remain source-schema compatible and image writes fail clearly
+until schema 106 is live. Migration 107 adds tenant-scoped ecommerce brands, one optional validated image per brand, and an optional tenant-safe product brand relationship. Brand selection and storefront brand filtering remain unavailable until schema 107 is live. The pricing table, order write path, and catalog tables
+remain service-role-only. Releases capped below the live schema are not rollback
+targets after either transition commits.
 
 The preceding schema-097 bridge added verified-customer loyalty through atomic
 functions. Identity is `(store tenant_id, public.users.id)`; checkout email and
@@ -279,7 +281,7 @@ An earlier bridge contract was schema range `81..95`, target
 accepted while schema 94 is live. Structured delivery checkout and merchant
 order operations deliberately fail closed until the schema-095 RPCs and tables
 are present. Only afterward may the separate coordinator create a
-schema-94-bound verified backup and execute 94→95. Existing catalog and settings
+schema-94-bound verified backup and execute 94â†’95. Existing catalog and settings
 reads remain safe throughout that bridge interval.
 
 Implemented by `web/deployment/lib/release_deployer.py :: Compatibility.load()`
@@ -300,6 +302,9 @@ and `ReleaseDeployer.deploy()`, plus `DockerGitOperations.schema_version()`,
 - duplicate numeric prefixes fail unless exactly listed in
   `GRANDFATHERED_DUPLICATES` (currently empty);
 - the two trees must have matching modern filenames and byte-identical contents;
+- immutable lineage checks normalize checkout CRLF to Git-canonical LF before
+  hashing, so Windows checkout conversion cannot manufacture a historical
+  migration change; all other bytes remain checksum-significant;
 - the historical database/Supabase 004/005 filename swap must remain complete
   and content-equivalent across the swapped names;
 - the historical 013/014 files must remain present and byte-identical in each
@@ -508,7 +513,7 @@ recorded and skipped. Every unapplied transition must start exactly at its
 declared `from_schema`; its SQL must advance core state to `to_schema`; and the
 final target must be reached. Each modern SQL file owns its `BEGIN`/`COMMIT`
 transaction. Failure is recorded, the connection is rolled back/closed, and the
-system is resumed or forward-repaired—never automatically reverse-migrated.
+system is resumed or forward-repairedâ€”never automatically reverse-migrated.
 
 Implemented by `web/deployment/bin/madar-migrate`,
 `web/deployment/lib/migration_executor.py :: MigrationManifest.load()` and

@@ -862,6 +862,9 @@ LEGACY_DEFAULT_PUBLIC_STORE_THEME = {
     "text": "#151821",
     "muted": "#697181",
 }
+PUBLIC_STORE_SOCIAL_FIELDS = (
+    "facebook", "instagram", "tiktok", "snapchat",
+)
 
 def _public_store_growth(saved_theme: dict[str, Any]) -> dict[str, Any]:
     value = saved_theme.get("growth") if isinstance(saved_theme, dict) else None
@@ -875,6 +878,18 @@ def _public_store_growth(saved_theme: dict[str, Any]) -> dict[str, Any]:
     for key, limit in (("featured_product_ids", 12), ("featured_category_ids", 6)):
         selected = value.get(key) if isinstance(value.get(key), list) else []
         result[key] = list(dict.fromkeys(str(item) for item in selected if item))[:limit]
+    return result
+
+
+def _public_store_social_links(saved_theme: dict[str, Any]) -> dict[str, str]:
+    value = saved_theme.get("social_links") if isinstance(saved_theme, dict) else None
+    value = value if isinstance(value, dict) else {}
+    result: dict[str, str] = {}
+    for key in PUBLIC_STORE_SOCIAL_FIELDS:
+        link = str(value.get(key) or "").strip()
+        parsed = urlparse(link)
+        if link and parsed.scheme == "https" and parsed.hostname and not parsed.username and not parsed.password:
+            result[key] = link
     return result
 
 
@@ -896,8 +911,9 @@ def build_public_store_profile(settings: dict, subdomain: str) -> dict:
         "contact_email": settings.get("contact_email"),
         "phone": settings.get("phone"),
         "description": settings.get("description"),
-        "store_theme": {**DEFAULT_PUBLIC_STORE_THEME, **{key: value for key, value in saved_theme.items() if key not in {"growth", "store_identity_ar"}}},
+        "store_theme": {**DEFAULT_PUBLIC_STORE_THEME, **{key: value for key, value in saved_theme.items() if key not in {"growth", "social_links", "store_identity_ar"}}},
         "growth": _public_store_growth(saved_theme),
+        "social_links": _public_store_social_links(saved_theme),
     }
 
 def build_public_site_profile(settings: dict, subdomain: str, project: dict) -> dict:
@@ -1926,8 +1942,18 @@ def _public_catalog_item(row: dict[str, Any], locale: str) -> dict[str, Any]:
         "slug": str(row.get("slug") or ""),
         "name": localized["name"],
         "description": localized["description"],
+        "image_url": str(row.get("image_url") or "").strip() or None,
         "parent_id": str(row.get("parent_id") or "") or None,
         "sort_order": int(row.get("sort_order") or 0),
+    }
+
+
+def _public_catalog_brand(row: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "id": str(row.get("id") or ""),
+        "slug": str(row.get("slug") or ""),
+        "name": str(row.get("name") or "").strip(),
+        "image_url": str(row.get("image_url") or "").strip() or None,
     }
 
 
@@ -1936,17 +1962,19 @@ def _public_catalog_product(
     *,
     locale: str,
     tag_ids: list[str],
+    include_inventory: bool = False,
 ) -> dict[str, Any]:
     localized = _localized_catalog_text(row.get("translations"), locale)
     track_inventory = bool(row.get("track_inventory"))
     inventory_quantity = int(row.get("inventory_quantity") or 0)
     allow_backorder = bool(row.get("allow_backorder"))
     seo_availability = "InStock" if (not track_inventory or inventory_quantity > 0) else "BackOrder" if allow_backorder else "OutOfStock"
-    return {
+    product = {
         "id": str(row.get("id") or ""),
         "slug": str(row.get("slug") or ""),
         "sku": str(row.get("sku") or ""),
         "category_id": str(row.get("category_id") or "") or None,
+        "brand_id": str(row.get("brand_id") or "") or None,
         "tag_ids": tag_ids,
         "name": localized["name"],
         "description": localized["description"],
@@ -1976,6 +2004,10 @@ def _public_catalog_product(
         "created_at": row.get("created_at"),
         "updated_at": row.get("updated_at"),
     }
+    if include_inventory:
+        product["track_inventory"] = track_inventory
+        product["inventory_quantity"] = inventory_quantity
+    return product
 
 
 def _catalog_descendant_ids(
@@ -1995,10 +2027,10 @@ def _catalog_descendant_ids(
     return descendants
 
 
-def _read_public_catalog_rows(tenant_id: int) -> tuple[list[dict], list[dict], list[dict], list[dict]]:
+def _read_public_catalog_rows(tenant_id: int) -> tuple[list[dict], list[dict], list[dict], list[dict], list[dict]]:
     category_rows = rows(
         service_supabase.table("ecommerce_categories")
-        .select("id,slug,parent_id,translations,sort_order,updated_at")
+        .select("*")
         .eq("tenant_id", tenant_id)
         .eq("status", "active")
         .order("sort_order")
@@ -2013,36 +2045,59 @@ def _read_public_catalog_rows(tenant_id: int) -> tuple[list[dict], list[dict], l
         .order("created_at", desc=True)
         .execute()
     )
-    product_rows = rows(
-        service_supabase.table("ecommerce_products")
-        .select(
-            "id,slug,sku,category_id,translations,product_type,brand,price,"
+    brand_rows = _optional_p1a_rows(
+        service_supabase.table("ecommerce_brands")
+        .select("id,slug,name,image_url,updated_at")
+        .eq("tenant_id", tenant_id)
+        .eq("status", "active")
+        .order("name")
+    ) or []
+    product_select = (
+            "id,slug,sku,category_id,brand_id,translations,product_type,brand,price,"
             "compare_at_price,currency,track_inventory,inventory_quantity,"
             "allow_backorder,images,weight,weight_unit,requires_shipping,"
             "taxable,seo_title,seo_description,created_at,updated_at"
-        )
-        .eq("tenant_id", tenant_id)
-        .eq("status", "active")
-        .order("created_at", desc=True)
-        .execute()
     )
+    try:
+        product_rows = rows(
+            service_supabase.table("ecommerce_products").select(product_select)
+            .eq("tenant_id", tenant_id).eq("status", "active")
+            .order("created_at", desc=True).execute()
+        )
+    except Exception as error:
+        raw = str(error).lower()
+        if "brand_id" not in raw and "schema cache" not in raw and "pgrst204" not in raw:
+            raise
+        product_rows = rows(
+            service_supabase.table("ecommerce_products")
+            .select(product_select.replace("brand_id,", ""))
+            .eq("tenant_id", tenant_id).eq("status", "active")
+            .order("created_at", desc=True).execute()
+        )
     link_rows = rows(
         service_supabase.table("ecommerce_product_tags")
         .select("product_id,tag_id")
         .eq("tenant_id", tenant_id)
         .execute()
     )
-    return category_rows, tag_rows, product_rows, link_rows
+    return category_rows, tag_rows, brand_rows, product_rows, link_rows
 
 
-def _cached_public_catalog_rows(tenant_id: int) -> tuple[list[dict], list[dict], list[dict], list[dict]]:
-    cache_key = ecommerce_cache_key(tenant_id, "public-catalog-source-v1")
+def _cached_public_catalog_rows(tenant_id: int) -> tuple[list[dict], list[dict], list[dict], list[dict], list[dict]]:
+    cache_key = ecommerce_cache_key(tenant_id, "public-catalog-source-v2")
     cached, _cache_hit = get_or_create_ecommerce_cache(
         cache_key,
         tenant_id,
         lambda: _read_public_catalog_rows(tenant_id),
     )
     return cached
+
+
+def _split_public_catalog_rows(catalog_rows):
+    if len(catalog_rows) == 4:
+        category_rows, tag_rows, product_rows, link_rows = catalog_rows
+        return category_rows, tag_rows, [], product_rows, link_rows
+    return catalog_rows
 
 
 def _filter_catalog_taxonomy(
@@ -2052,6 +2107,8 @@ def _filter_catalog_taxonomy(
     tag_rows: list[dict[str, Any]],
     category: str,
     tag: str,
+    brand_rows: list[dict[str, Any]] | None = None,
+    brand: str = "",
 ) -> list[dict[str, Any]]:
     clean_category = str(category or "").strip().lower()
     if clean_category:
@@ -2085,6 +2142,15 @@ def _filter_catalog_taxonomy(
             item for item in products
             if tag_id and tag_id in item.get("tag_ids", [])
         ]
+
+    clean_brand = str(brand or "").strip().lower()
+    if clean_brand:
+        selected_brand = next(
+            (item for item in (brand_rows or []) if str(item.get("slug") or "").lower() == clean_brand),
+            None,
+        )
+        brand_id = str(selected_brand.get("id") or "") if selected_brand else ""
+        products = [item for item in products if brand_id and str(item.get("brand_id") or "") == brand_id]
     return products
 
 
@@ -2112,6 +2178,20 @@ def _sort_catalog(products: list[dict[str, Any]], sort: str) -> list[dict[str, A
         products.sort(key=lambda item: str(item.get("name") or "").casefold())
     return products
 
+
+def _filter_catalog_price(
+    products: list[dict[str, Any]],
+    minimum: Decimal | None,
+    maximum: Decimal | None,
+) -> list[dict[str, Any]]:
+    if minimum is None and maximum is None:
+        return products
+    return [
+        item for item in products
+        if (minimum is None or Decimal(str(item.get("price") or 0)) >= minimum)
+        and (maximum is None or Decimal(str(item.get("price") or 0)) <= maximum)
+    ]
+
 def _optional_p1a_rows(query) -> list[dict[str, Any]] | None:
     try:
         return rows(query.execute())
@@ -2122,6 +2202,96 @@ def _optional_p1a_rows(query) -> list[dict[str, Any]] | None:
         raise
 
 
+def _attach_public_variant_options(
+    products: list[dict[str, Any]],
+    *,
+    tenant_id: int,
+    locale: str,
+) -> None:
+    product_ids = list(dict.fromkeys(str(product.get("id") or "") for product in products if product.get("id")))
+    if not product_ids:
+        return
+    option_rows = _optional_p1a_rows(
+        service_supabase.table("ecommerce_product_options")
+        .select("id,product_id,name_translations,sort_order")
+        .eq("tenant_id", tenant_id)
+        .in_("product_id", product_ids)
+        .order("sort_order")
+    )
+    if option_rows is None:
+        return
+    options_by_product: dict[str, list[dict[str, Any]]] = {}
+    for option in option_rows:
+        options_by_product.setdefault(str(option.get("product_id") or ""), []).append(option)
+    for product in products:
+        product["has_variants"] = bool(options_by_product.get(str(product.get("id") or "")))
+        product["variant_options"] = []
+    if not option_rows:
+        return
+
+    option_ids = [str(option.get("id") or "") for option in option_rows if option.get("id")]
+    value_rows = rows(
+        service_supabase.table("ecommerce_product_option_values")
+        .select("id,product_id,option_id,value_translations,sort_order")
+        .eq("tenant_id", tenant_id)
+        .eq("active", True)
+        .in_("option_id", option_ids)
+        .order("sort_order")
+        .execute()
+    )
+    variant_rows = rows(
+        service_supabase.table("ecommerce_product_variants")
+        .select("id,product_id,track_inventory,inventory_quantity,allow_backorder")
+        .eq("tenant_id", tenant_id)
+        .eq("active", True)
+        .in_("product_id", product_ids)
+        .execute()
+    )
+    available_variant_ids = {
+        str(variant.get("id") or "")
+        for variant in variant_rows
+        if not variant.get("track_inventory")
+        or bool(variant.get("allow_backorder"))
+        or int(variant.get("inventory_quantity") or 0) > 0
+    }
+    links = [] if not available_variant_ids else rows(
+        service_supabase.table("ecommerce_variant_option_values")
+        .select("variant_id,option_id,option_value_id")
+        .eq("tenant_id", tenant_id)
+        .in_("variant_id", sorted(available_variant_ids))
+        .execute()
+    )
+    available_value_ids = {str(link.get("option_value_id") or "") for link in links}
+    available_product_ids = {
+        str(variant.get("product_id") or "")
+        for variant in variant_rows
+        if str(variant.get("id") or "") in available_variant_ids
+    }
+
+    for product in products:
+        product_id = str(product.get("id") or "")
+        options = options_by_product.get(product_id, [])
+        if not options:
+            continue
+        product["in_stock"] = product_id in available_product_ids
+        summaries = []
+        for option in options:
+            option_id = str(option.get("id") or "")
+            names = option.get("name_translations") or {}
+            option_name = names.get(locale) or names.get("en") or next(iter(names.values()), "")
+            values = []
+            for value in value_rows:
+                if str(value.get("option_id") or "") != option_id or str(value.get("id") or "") not in available_value_ids:
+                    continue
+                labels = value.get("value_translations") or {}
+                label = labels.get(locale) or labels.get("en") or next(iter(labels.values()), "")
+                if label and label not in values:
+                    values.append(label)
+            if values:
+                summaries.append({"id": option_id, "name": option_name, "values": values})
+        product["variant_options"] = summaries
+
+
 
 def _catalog_payload(
     *,
@@ -2130,13 +2300,16 @@ def _catalog_payload(
     search: str = "",
     category: str = "",
     tag: str = "",
+    brand: str = "",
+    min_price: Decimal | None = None,
+    max_price: Decimal | None = None,
     sort: Literal["latest", "price_low", "price_high", "name"] = "latest",
     page: int = 1,
     limit: int = 12,
     featured_product_ids: list[str] | None = None,
     featured_category_ids: list[str] | None = None,
 ) -> dict[str, Any]:
-    category_rows, tag_rows, product_rows, link_rows = _cached_public_catalog_rows(tenant_id)
+    category_rows, tag_rows, brand_rows, product_rows, link_rows = _split_public_catalog_rows(_cached_public_catalog_rows(tenant_id))
     tags_by_product: dict[str, list[str]] = {}
     for link in link_rows:
         tags_by_product.setdefault(
@@ -2146,6 +2319,7 @@ def _catalog_payload(
 
     categories = [_public_catalog_item(row, locale) for row in category_rows]
     tags = [_public_catalog_item(row, locale) for row in tag_rows]
+    brands = [_public_catalog_brand(row) for row in brand_rows]
     products = [
         _public_catalog_product(
             row,
@@ -2158,15 +2332,20 @@ def _catalog_payload(
         products,
         category_rows=category_rows,
         tag_rows=tag_rows,
+        brand_rows=brand_rows,
         category=category,
         tag=tag,
+        brand=brand,
     )
-    variant_products = _optional_p1a_rows(service_supabase.table("ecommerce_product_options").select("product_id").eq("tenant_id", tenant_id))
-    if variant_products is not None:
-        variant_product_ids = {str(item.get("product_id")) for item in variant_products}
-        for product in products:
-            product["has_variants"] = str(product.get("id")) in variant_product_ids
-    products = _sort_catalog(_search_catalog(products, search), sort)
+    products = _search_catalog(products, search)
+    available_prices = [Decimal(str(item.get("price") or 0)) for item in products]
+    price_bounds = {
+        "min": str(min(available_prices)) if available_prices else None,
+        "max": str(max(available_prices)) if available_prices else None,
+        "currency": str(products[0].get("currency") or "") if products else "",
+    }
+    products = _filter_catalog_price(products, min_price, max_price)
+    products = _sort_catalog(products, sort)
     products_by_id = {str(item.get("id")): item for item in products}
     categories_by_id = {str(item.get("id")): item for item in categories}
     selected_products = [products_by_id[item] for item in (featured_product_ids or []) if item in products_by_id]
@@ -2176,12 +2355,25 @@ def _catalog_payload(
     safe_page = max(1, page)
     safe_limit = max(1, min(limit, 48))
     start = (safe_page - 1) * safe_limit
+    visible_products = products[start:start + safe_limit]
+    variant_summary_products = list({
+        str(product.get("id")): product
+        for product in [*visible_products, *selected_products]
+        if product.get("id")
+    }.values())
+    _attach_public_variant_options(
+        variant_summary_products,
+        tenant_id=tenant_id,
+        locale=locale,
+    )
     return {
         "categories": categories,
         "tags": tags,
-        "products": products[start:start + safe_limit],
+        "brands": brands,
+        "products": visible_products,
         "featured_products": selected_products,
         "featured_categories": selected_categories,
+        "price_bounds": price_bounds,
         "pagination": {
             "page": safe_page,
             "limit": safe_limit,
@@ -2197,7 +2389,7 @@ def _catalog_product_payload(
     product_slug: str,
     locale: str,
 ) -> dict[str, Any]:
-    category_rows, tag_rows, product_rows, link_rows = _cached_public_catalog_rows(tenant_id)
+    category_rows, tag_rows, _brand_rows, product_rows, link_rows = _split_public_catalog_rows(_cached_public_catalog_rows(tenant_id))
     row = next(
         (
             item for item in product_rows
@@ -2217,6 +2409,7 @@ def _catalog_product_payload(
         row,
         locale=locale,
         tag_ids=product_tag_ids,
+        include_inventory=True,
     )
     category = next(
         (
@@ -2681,7 +2874,7 @@ def _canonical_storefront_base(settings: dict, site_identifier: str, request: Re
 
 def _storefront_sitemap_xml(settings: dict, site_identifier: str, request: Request) -> str:
     tenant_id = resolve_tenant_id(settings)
-    categories, _tags, products, _links = _cached_public_catalog_rows(tenant_id)
+    categories, _tags, _brands, products, _links = _split_public_catalog_rows(_cached_public_catalog_rows(tenant_id))
     base = _canonical_storefront_base(settings, site_identifier, request)
     entries = [(base, settings.get("updated_at"))]
     entries.extend((f"{base}/catalog?category={quote(str(row.get('slug') or ''), safe='-')}", row.get("updated_at")) for row in categories if row.get("slug"))
@@ -2718,6 +2911,9 @@ def get_public_catalog(
     search: str = "",
     category: str = "",
     tag: str = "",
+    brand: str = "",
+    min_price: Decimal | None = None,
+    max_price: Decimal | None = None,
     sort: Literal["latest", "price_low", "price_high", "name"] = "latest",
     locale: str = "en",
     page: int = 1,
@@ -2731,16 +2927,22 @@ def get_public_catalog(
     search_value = str(search or "")[:200]
     category_value = str(category or "")[:160]
     tag_value = str(tag or "")[:160]
+    brand_value = str(brand or "")[:160]
+    min_price_value = max(Decimal("0"), min_price) if min_price is not None else None
+    max_price_value = max(Decimal("0"), max_price) if max_price is not None else None
     page_value = max(1, page)
     limit_value = max(1, min(limit, 48))
     growth = _public_store_growth(settings.get("ecommerce_theme") if isinstance(settings.get("ecommerce_theme"), dict) else {})
     cache_key = ecommerce_cache_key(
         tenant_id,
-        "catalog-v1",
+        "catalog-v2",
         locale=locale_value,
         search=search_value,
         category=category_value,
         tag=tag_value,
+        brand=brand_value,
+        min_price=str(min_price_value) if min_price_value is not None else "",
+        max_price=str(max_price_value) if max_price_value is not None else "",
         sort=sort,
         page=page_value,
         limit=limit_value,
@@ -2755,6 +2957,9 @@ def get_public_catalog(
                 search=search_value,
                 category=category_value,
                 tag=tag_value,
+                brand=brand_value,
+                min_price=min_price_value,
+                max_price=max_price_value,
                 sort=sort,
                 page=page_value,
                 limit=limit_value,
@@ -2874,6 +3079,7 @@ def _ecommerce_order_storage_error(error: Exception) -> HTTPException:
         ("ecommerce_variant_not_allowed", 409, "variant_invalid", "This simple product does not accept a variant."),
         ("ecommerce_product_unavailable", 409, "product_unavailable", "One or more products are no longer available."),
         ("ecommerce_delivery_area_unavailable", 409, "delivery_area_unavailable", "This store no longer delivers to the selected area."),
+        ("ecommerce_delivery_price_unavailable", 409, "delivery_area_unavailable", "Delivery pricing is not available for the selected area."),
         ("ecommerce_delivery_street_required", 400, "delivery_street_required", "A street address is required."),
         ("ecommerce_currency_configuration_required", 409, "currency_configuration_required", "This store must configure one currency before accepting orders."),
         ("ecommerce_currency_product_mismatch", 409, "currency_mismatch", "The catalog contains a product in a different currency."),
@@ -2907,7 +3113,21 @@ def get_public_store_delivery_areas(subdomain: str, request: Request):
         service_supabase.table("ecommerce_service_areas").select("id,code,name_en,name_ar,sort_order")
         .in_("id", enabled_ids).eq("active", True).order("sort_order").execute()
     )
-    return {"success": True, "areas": areas}
+    pricing_rows = [] if not enabled_ids else rows(
+        service_supabase.table("ecommerce_delivery_pricing")
+        .select("service_area_id,price")
+        .eq("tenant_id", tenant_id)
+        .in_("service_area_id", enabled_ids)
+        .execute()
+    )
+    prices = {str(row.get("service_area_id")): row.get("price", 0) for row in pricing_rows}
+    return {
+        "success": True,
+        "areas": [
+            {**area, "delivery_fee": prices.get(str(area.get("id")), 0)}
+            for area in areas
+        ],
+    }
 
 
 @router.post("/sites/{subdomain}/cart/reconcile")
@@ -3076,7 +3296,7 @@ def create_public_store_order(
         "idempotent_replay": bool(result.get("duplicate")),
         "order": {key: order.get(key) for key in (
             "id", "order_number", "status", "payment_status", "payment_method",
-            "currency", "subtotal", "discount_total", "total",
+            "currency", "subtotal", "discount_total", "delivery_fee", "total",
         )},
     }
 
@@ -3090,11 +3310,31 @@ def get_public_order_confirmation(subdomain: str, confirmation_token: str, reque
     settings = resolve_public_store_settings(clean_subdomain, request=request)
     tenant_id = resolve_tenant_id(settings)
     token_hash = hash_public_identifier(f"ecommerce-confirmation-token:{confirmation_token}")
-    order_rows = rows(
-        service_supabase.table("ecommerce_orders").select(
-            "id,order_number,status,payment_status,payment_method,currency,subtotal,discount_total,total,created_at,customer_name,customer_email,customer_phone,service_area_code,service_area_name_en,service_area_name_ar,street,building,floor_apartment,address_description,delivery_notes"
-        ).eq("tenant_id", tenant_id).eq("confirmation_token_hash", token_hash).limit(1).execute()
+    confirmation_fields = (
+        "id,order_number,status,payment_status,payment_method,currency,subtotal,"
+        "discount_total,delivery_fee,total,created_at,customer_name,customer_email,"
+        "customer_phone,service_area_code,service_area_name_en,service_area_name_ar,"
+        "street,building,floor_apartment,address_description,delivery_notes"
     )
+    try:
+        order_rows = rows(
+            service_supabase.table("ecommerce_orders").select(confirmation_fields)
+            .eq("tenant_id", tenant_id).eq("confirmation_token_hash", token_hash).limit(1).execute()
+        )
+    except Exception as error:
+        raw_error = str(error).lower()
+        missing_delivery_fee = "delivery_fee" in raw_error and (
+            "pgrst204" in raw_error or "schema cache" in raw_error or "does not exist" in raw_error
+        )
+        if not missing_delivery_fee:
+            raise
+        legacy_fields = confirmation_fields.replace("delivery_fee,", "")
+        order_rows = rows(
+            service_supabase.table("ecommerce_orders").select(legacy_fields)
+            .eq("tenant_id", tenant_id).eq("confirmation_token_hash", token_hash).limit(1).execute()
+        )
+        for legacy_order in order_rows:
+            legacy_order["delivery_fee"] = 0
     if not order_rows:
         raise HTTPException(status_code=404, detail="Order confirmation not found")
     order = order_rows[0]

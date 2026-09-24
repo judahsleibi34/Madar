@@ -1407,34 +1407,33 @@ body.theme-dark .admin-dashboard-page .settings-page .settings-save-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 38px;
-  padding: 0 8px;
-  border: 1px solid var(--theme-border) !important;
+  min-width: 48px;
+  padding: 0 14px;
+  border: 0 !important;
   border-start-start-radius: 0 !important;
   border-end-start-radius: 0 !important;
   border-start-end-radius: 11px !important;
   border-end-end-radius: 11px !important;
-  background: var(--theme-surface) !important;
-  color: var(--theme-text-muted) !important;
+  background: transparent !important;
+  color: var(--theme-primary) !important;
   cursor: pointer;
-  margin-left: -1px;
+  margin-inline-start: 0;
   transition: background .15s, color .15s;
 }
 
 .user-dashboard-copy-btn:hover {
-  background: var(--theme-bg-soft) !important;
-  color: var(--theme-text) !important;
-  border-color: var(--theme-text-muted) !important;
+  background: rgba(var(--theme-primary-rgb), 0.08) !important;
+  color: var(--theme-primary) !important;
 }
 
 .user-dashboard-link-group:has(a.is-primary) .user-dashboard-copy-btn {
-  border-color: rgba(var(--theme-primary-rgb), 0.4) !important;
-  background: rgba(var(--theme-primary-rgb), 0.15) !important;
+  border: 0 !important;
+  background: transparent !important;
   color: var(--theme-primary) !important;
 }
 
 .user-dashboard-link-group:has(a.is-primary) .user-dashboard-copy-btn:hover {
-  background: rgba(var(--theme-primary-rgb), 0.25) !important;
+  background: rgba(var(--theme-primary-rgb), 0.08) !important;
   color: var(--theme-primary) !important;
 }
 

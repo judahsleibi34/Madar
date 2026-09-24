@@ -18,7 +18,7 @@ const skuCode = (value, suffix) => {
 };
 const localized = (en = "", ar = "") => ({ en: String(en).trim(), ...(String(ar).trim() ? { ar: String(ar).trim() } : {}) });
 const emptyProduct = (currency = "USD") => ({
-  slug: "", sku: "", barcode: null, category_id: null, tag_ids: [], product_type: "physical", brand: "",
+  slug: "", sku: "", barcode: null, category_id: null, brand_id: null, tag_ids: [], product_type: "physical",
   translations: { en: { name: "", description: "" }, ar: { name: "", description: "" } }, status: "draft",
   price: 0, compare_at_price: null, cost_price: null, currency: currency || "USD", track_inventory: true, inventory_quantity: 0,
   low_stock_threshold: 5, allow_backorder: false, images: [], weight: null, weight_unit: "kg",
@@ -177,7 +177,7 @@ function ProductMediaUploader({ items, busy, disabled, progress, error, dragging
 export function EcommerceProductEditor({ user, productId, embedded = false, initialCatalog, onClose, onSaved }) {
   const { t, locale, direction, localize } = useCommerceI18n();
   const scope = getEcommerceCacheScope(user);
-  const [catalog, setCatalog] = useState(() => initialCatalog || { products: [], categories: [], tags: [], commerce_currency: "USD" });
+  const [catalog, setCatalog] = useState(() => initialCatalog || { products: [], categories: [], brands: [], tags: [], commerce_currency: "USD" });
   const [form, setForm] = useState(() => emptyProduct(initialCatalog?.commerce_currency));
   const [state, setState] = useState({ loading: !initialCatalog, saving: false, error: "" });
   const [uploading, setUploading] = useState("");
@@ -486,9 +486,6 @@ export function EcommerceProductEditor({ user, productId, embedded = false, init
 <label>{t("merchant.productSku")}<input dir="ltr" disabled={Boolean(form.variantGroups.length)} value={form.sku || ""} onChange={(e) => { setSkuManuallyEdited(true); update("sku", e.target.value); }} />
 {form.variantGroups.length > 0 && <small className="ecommerce-editor-field-help">{t("admin.skuMovedToVariants")}</small>}
 </label>
-<label>{t("merchant.brand")}<input value={form.brand} onChange={(e) => update("brand", e.target.value)} />
-<small className="ecommerce-editor-field-help">{t("merchant.brandHelp")}</small>
-</label>
 <label>{t("common.status")}<select value={form.status} onChange={(e) => update("status", e.target.value)}>
 <option value="draft">{t("common.draft")}</option>
 <option value="active">{t("common.active")}</option>
@@ -519,6 +516,16 @@ export function EcommerceProductEditor({ user, productId, embedded = false, init
   onChange={(value) => update("category_id", value || null)}
   searchLabel={t("merchant.searchCategories")}
   emptyLabel={t("merchant.noCategory")}
+  noResultsLabel={t("merchant.noSearchResults")}
+  selectionLabel={() => ""}
+/>
+<SearchableDropdown
+  label={t("merchant.brand")}
+  items={[{ id: "", label: t("merchant.noBrand") }, ...(catalog.brands || []).map((item) => ({ id: item.id, label: item.name || item.slug }))]}
+  value={form.brand_id || ""}
+  onChange={(value) => update("brand_id", value || null)}
+  searchLabel={t("merchant.searchBrands")}
+  emptyLabel={t("merchant.noBrand")}
   noResultsLabel={t("merchant.noSearchResults")}
   selectionLabel={() => ""}
 />

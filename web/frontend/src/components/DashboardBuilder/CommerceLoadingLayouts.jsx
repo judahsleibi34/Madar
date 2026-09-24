@@ -24,6 +24,17 @@ export function ThemeSkeleton({ label = "Loading store design" }) {
   </div>;
 }
 
+export function SocialLinksSkeleton({ label = "Loading social links" }) {
+  return <section className="ecommerce-social-skeleton" role="status" aria-label={label} aria-busy="true">
+    <div className="ecommerce-social-skeleton-heading" aria-hidden="true"><i /><div><i /><i /></div></div>
+    <div className="ecommerce-social-skeleton-grid" aria-hidden="true">
+      {Array.from({ length: 4 }, (_, index) => <div key={index}><i /><i /></div>)}
+    </div>
+    <i className="ecommerce-social-skeleton-note" aria-hidden="true" />
+    <footer aria-hidden="true"><i /></footer>
+  </section>;
+}
+
 export function CatalogSkeleton({ label = "Loading catalog", section = "products", summaryCount }) {
   return <div className="ecommerce-page-skeleton commerce-catalog-skeleton" role="status" aria-label={label} aria-busy="true">
     <header aria-hidden="true"><div><i /><i /><i /></div><i /></header>

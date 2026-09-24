@@ -206,7 +206,7 @@ first command returns nonzero.
 
 Some names in the following table are architectural predicates requested for
 reasoning about the flow, not additional strings written to disk. The
-“implemented representation” column gives the exact durable or derived form, so
+â€œimplemented representationâ€‌ column gives the exact durable or derived form, so
 this table does not invent persistence states.
 
 | Architectural state | Implemented representation and transition |
@@ -461,25 +461,24 @@ health evidence, dirty/different release, checksum drift, missing predecessor,
 or a ledger already beyond target fails before mutation. No tenant/business
 table is queried or changed.
 
-### Current schema 104 bridge
+### Current schema 107 bridge
 
-The release contract accepts schema `81..104` and targets `104` using the
-pinned contiguous `migrations-100-104.json` manifest. The existing controller,
-backup gates, locking, bridge-first acceptance, and forward-repair semantics are
-unchanged. The four expand-only transitions cover the site-visit RPC correction,
-variant presentation metadata, ecommerce discount conditions, and tenant-scoped
-delivery pricing. Migration 103 adds the delivery-pricing table; migration 104
-forward-normalizes it from an origin/destination matrix to one fee per tenant
-and enabled service area without rewriting orders or tenant delivery-area mappings.
+The release contract accepts schema `104..107` and targets `107` using the
+pinned `migrations-105-107.json` manifest. The existing controller, backup
+gates, locking, bridge-first acceptance, and forward-repair semantics are
+unchanged. Migration 105 adds a non-negative delivery-fee snapshot to orders. A
+trigger loads the price for the selected enabled service area during insertion,
+includes that fee in the authoritative order total, and preserves the captured
+value when pricing changes later. Existing orders are backfilled with zero.
+Migration 106 adds one nullable, constrained category image URL. Migration 107 adds tenant-scoped brands, one nullable constrained brand image URL, and an optional tenant-safe brand reference on products. Source-schema
+catalog reads omit the absent field safely; ordinary category writes fall back
+without it, while image writes report that the catalog migration is pending.
 
-The bridge application turns a missing delivery-pricing relation into an explicit
-upgrade-required response instead of leaking a database error. Once schema 103 is
-live, merchants maintain one non-negative fee for each enabled destination area.
-A retained release capped below the live schema cannot
-be used for traffic rollback after the later transition commits. Updating this
-manifest/release contract remains a protected control-plane change subject to
-provenance-aware upgrade gates; no installed controller or production database
-is changed by these source edits.
+A retained release capped below the live schema cannot be used for traffic
+rollback after the transition commits. Updating this manifest/release contract
+remains a protected control-plane change subject to provenance-aware upgrade
+gates; no installed controller or production database is changed by these
+source edits.
 
 ### Earlier schema 099 bridge
 
@@ -510,7 +509,7 @@ available after migration 097.
 ### Earlier schema 095 bridge
 
 The current release contract accepts schema `81..95` and targets `95` with the
-pinned `migrations-095.json` manifest. Migration 095 is an expand-only `94→95`
+pinned `migrations-095.json` manifest. Migration 095 is an expand-only `94â†’95`
 transition. The application may be promoted on schema 94, but structured public
 checkout and merchant delivery/order operations fail closed until their RPCs and
 tables exist; catalog and settings reads keep their schema-94 bridge behavior.

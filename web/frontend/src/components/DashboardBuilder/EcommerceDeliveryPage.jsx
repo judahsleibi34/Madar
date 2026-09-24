@@ -3,7 +3,7 @@ import { getEcommerceCacheScope, readEcommerceAdminCacheSnapshot } from "./utils
 import { useEffect, useMemo, useState } from "react";
 import { LoaderCircle, MapPin, Plus, Save, Search, Trash2, X } from "lucide-react";
 
-import AuthToast from "../AuthPages/AuthToast";
+import EcommerceToast from "./EcommerceToast";
 import EcommerceOperationsSkeleton from "./EcommerceOperationsSkeleton";
 import {
   createEcommerceDeliveryLocation,
@@ -227,9 +227,9 @@ export default function EcommerceDeliveryPage({ user }) {
       }
       setToast({
         type: "success",
-        title: pricingDirty ? t("admin.pricingSaved") : t("admin.deliverySaved"),
+        title: pricingDirty ? t("merchant.pricingSaved") : t("admin.deliverySaved"),
         message: pricingDirty
-          ? t("admin.pricingSavedBody")
+          ? t("merchant.pricingSavedBody")
           : t("admin.deliverySavedBody", { count: selectedIds.length }),
       });
     } catch {
@@ -472,7 +472,7 @@ export default function EcommerceDeliveryPage({ user }) {
         </div>
       )}
 
-      <AuthToast dir={direction} key={toast?.id} type={toast?.type} title={toast?.title} message={toast?.message} onDismiss={() => setToast(null)} />
+      <EcommerceToast dir={direction} key={toast?.id} type={toast?.type} title={toast?.title} message={toast?.message} onDismiss={() => setToast(null)} />
     </main>
   );
 }

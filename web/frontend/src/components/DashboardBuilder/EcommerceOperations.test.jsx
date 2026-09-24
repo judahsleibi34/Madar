@@ -80,6 +80,9 @@ describe("merchant ecommerce operations", () => {
       ],
       { scope: "authenticated" }
     ));
+    expect(await screen.findByText("Delivery settings saved")).toBeTruthy();
+    expect(screen.getByText("Delivery areas and fees were updated successfully.")).toBeTruthy();
+    expect(screen.queryByText("admin.pricingSaved")).toBeNull();
   });
 
   it("creates a custom hierarchy and includes it in the next coverage save", async () => {

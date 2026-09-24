@@ -3,10 +3,12 @@ from fastapi import HTTPException
 from pydantic import ValidationError
 from unittest.mock import patch
 
-from routes.ecommerce_routes import CatalogItemPayload, ProductPayload, StoreThemePayload, _clean_slug, _product_data
+from routes.ecommerce_routes import BrandPayload, CategoryPayload, CatalogItemPayload, ProductPayload, StoreSocialLinksPayload, StoreThemePayload, _clean_slug, _managed_catalog_asset_keys, _product_data
 from routes.public_site_routes import (
     _filter_catalog_taxonomy,
     _localized_catalog_text,
+    _public_catalog_item,
+    _public_catalog_brand,
     _public_catalog_product,
     build_public_site_profile,
     build_public_store_profile,
@@ -79,6 +81,55 @@ class EcommerceRoutesTests(unittest.TestCase):
     def test_store_theme_rejects_incomplete_colors(self):
         with self.assertRaises(ValidationError):
             StoreThemePayload(accent="#123")
+
+    def test_social_links_require_https_and_are_exposed_publicly(self):
+        links = StoreSocialLinksPayload(
+            instagram="https://instagram.com/madar",
+        )
+        profile = build_public_store_profile(
+            {"ecommerce_theme": {"social_links": links.model_dump()}},
+            "madar",
+        )
+        self.assertEqual(profile["social_links"], {"instagram": "https://instagram.com/madar"})
+        self.assertNotIn("social_links", profile["store_theme"])
+        with self.assertRaises(ValidationError):
+            StoreSocialLinksPayload(facebook="http://facebook.com/madar")
+
+    def test_category_image_is_validated_and_exposed_publicly(self):
+        image_url = "/uploads/tenant_7/builder_assets/0123456789abcdef0123456789abcdef.webp"
+        payload = CategoryPayload(
+            translations=translations("Home"),
+            image_url=image_url,
+        )
+        self.assertEqual(payload.image_url, image_url)
+        self.assertEqual(_managed_catalog_asset_keys([image_url], 7), {
+            "tenant_7/builder_assets/0123456789abcdef0123456789abcdef.webp"
+        })
+        public_item = _public_catalog_item({
+            "id": "category-1",
+            "slug": "home",
+            "translations": translations("Home"),
+            "image_url": image_url,
+        }, "en")
+        self.assertEqual(public_item["image_url"], image_url)
+
+        with self.assertRaises(ValidationError):
+            CategoryPayload(
+                translations=translations("Unsafe"),
+                image_url="http://example.com/category.svg",
+            )
+
+    def test_brand_accepts_one_image_and_is_exposed_publicly(self):
+        image_url = "/uploads/tenant_7/builder_assets/0123456789abcdef0123456789abcdef.webp"
+        payload = BrandPayload(name="Nike", image_url=image_url)
+        self.assertEqual(payload.name, "Nike")
+        self.assertEqual(_public_catalog_brand({
+            "id": "brand-1", "slug": "nike", "name": "Nike", "image_url": image_url,
+        }), {
+            "id": "brand-1", "slug": "nike", "name": "Nike", "image_url": image_url,
+        })
+        with self.assertRaises(HTTPException):
+            _managed_catalog_asset_keys([image_url], 8)
     def test_product_sku_is_generated_when_left_empty(self):
         payload = ProductPayload(
             sku="",
@@ -204,6 +255,22 @@ class EcommerceRoutesTests(unittest.TestCase):
         self.assertNotIn("cost_price", product)
         self.assertNotIn("inventory_quantity", product)
         self.assertNotIn("created_by", product)
+        detail_product = _public_catalog_product(
+            {
+                "id": "product-1",
+                "slug": "chair",
+                "translations": translations("Chair"),
+                "price": "20.00",
+                "track_inventory": True,
+                "inventory_quantity": 6,
+                "allow_backorder": False,
+            },
+            locale="en",
+            tag_ids=[],
+            include_inventory=True,
+        )
+        self.assertTrue(detail_product["track_inventory"])
+        self.assertEqual(detail_product["inventory_quantity"], 6)
 
     def test_public_category_filter_includes_descendants_and_is_tenant_row_scoped(self):
         categories = [
@@ -221,6 +288,22 @@ class EcommerceRoutesTests(unittest.TestCase):
             tag_rows=[],
             category="furniture",
             tag="",
+        )
+        self.assertEqual([item["id"] for item in filtered], ["one"])
+
+    def test_public_brand_filter_matches_products_by_brand_id(self):
+        products = [
+            {"id": "one", "brand_id": "brand-1", "tag_ids": []},
+            {"id": "two", "brand_id": None, "tag_ids": []},
+        ]
+        filtered = _filter_catalog_taxonomy(
+            products,
+            category_rows=[],
+            tag_rows=[],
+            brand_rows=[{"id": "brand-1", "slug": "nike"}],
+            category="",
+            tag="",
+            brand="nike",
         )
         self.assertEqual([item["id"] for item in filtered], ["one"])
 

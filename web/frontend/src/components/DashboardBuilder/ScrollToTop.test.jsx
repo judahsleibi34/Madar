@@ -8,6 +8,7 @@ function Navigation() {
   return <>
     <button onClick={() => navigate("/settings")}>Settings</button>
     <button onClick={() => navigate("/ecommerce/products")}>Products</button>
+    <button onClick={() => navigate("/ecommerce/products?category=chairs", { state: { preserveScroll: true } })}>Filter products</button>
     <button onClick={() => navigate(-1)}>Back</button>
     <main className="authenticated-main" data-testid="content" />
     <aside className="admin-sidebar" data-testid="sidebar" />
@@ -46,5 +47,15 @@ describe("ScrollToTop", () => {
     screen.getByTestId("content").scrollTop = 300;
     fireEvent.click(screen.getByText("Back"));
     expect(screen.getByTestId("content").scrollTop).toBe(300);
+  });
+
+  it("preserves the current position for filter navigation", () => {
+    vi.spyOn(window, "scrollTo").mockImplementation(() => {});
+    render(<MemoryRouter initialEntries={["/ecommerce/products"]}><ScrollToTop /><Navigation /></MemoryRouter>);
+    screen.getByTestId("content").scrollTop = 300;
+    screen.getByTestId("store").scrollTop = 200;
+    fireEvent.click(screen.getByText("Filter products"));
+    expect(screen.getByTestId("content").scrollTop).toBe(300);
+    expect(screen.getByTestId("store").scrollTop).toBe(200);
   });
 });

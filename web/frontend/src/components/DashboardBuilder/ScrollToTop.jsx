@@ -2,11 +2,12 @@ import { useLayoutEffect } from "react";
 import { useLocation, useNavigationType } from "react-router-dom";
 
 export default function ScrollToTop() {
-  const { hash, key, pathname, search } = useLocation();
+  const { hash, key, pathname, search, state } = useLocation();
   const navigationType = useNavigationType();
 
   useLayoutEffect(() => {
     if (navigationType === "POP") return;
+    if (state?.preserveScroll) return;
 
     if (hash) {
       const frame = window.requestAnimationFrame(() => {
@@ -24,7 +25,7 @@ export default function ScrollToTop() {
         element.scrollLeft = 0;
       }
     });
-  }, [hash, key, navigationType, pathname, search]);
+  }, [hash, key, navigationType, pathname, search, state]);
 
   return null;
 }
