@@ -19,20 +19,21 @@ const site = {
 
 describe("storefront SEO", () => {
   it("builds localized store and category metadata with canonical URLs", () => {
-    const home = buildStorefrontSeo({ origin: "https://madarportal.com", storePath: "/site/olive/shop", locale: "ar", site, view: "home" });
+    const home = buildStorefrontSeo({ origin: "https://olive.madarportal.com", storePath: "/shop", locale: "ar", site, view: "home" });
     expect(home.title).toBe("متجر الزيتون");
     expect(home.description).toBe("وصف التاجر");
-    expect(home.canonical).toBe("https://madarportal.com/site/olive/shop");
+    expect(home.canonical).toBe("https://olive.madarportal.com/shop");
 
-    const category = buildStorefrontSeo({ origin: "https://madarportal.com", storePath: "/site/olive/shop", locale: "en", site, category: { name: "Gifts", slug: "gifts", description: "Thoughtful gifts" }, view: "catalog" });
+    const category = buildStorefrontSeo({ origin: "https://olive.madarportal.com", storePath: "/shop", locale: "en", site, category: { name: "Gifts", slug: "gifts", description: "Thoughtful gifts" }, view: "catalog" });
     expect(category.title).toBe("Gifts | Olive House");
-    expect(category.canonical).toBe("https://madarportal.com/site/olive/shop/catalog?category=gifts");
+    expect(category.canonical).toBe("https://olive.madarportal.com/shop/catalog?category=gifts");
   });
 
   it("emits truthful simple and aggregate product offers", () => {
-    const base = { origin: "https://madarportal.com", storePath: "/site/olive/shop", locale: "en", site, view: "product" };
+    const base = { origin: "https://olive.madarportal.com", storePath: "/shop", locale: "en", site, view: "product" };
     const simple = buildStorefrontSeo({ ...base, productDetail: { product: { name: "Soap", slug: "soap", sku: "SOAP", price: "10.00", currency: "ILS", in_stock: false, seo_availability: "OutOfStock", images: ["https://cdn.example.com/soap.webp"] }, variants: [] } });
     expect(simple.type).toBe("product");
+    expect(simple.canonical).toBe("https://olive.madarportal.com/shop/product/soap");
     expect(simple.structuredData.offers).toMatchObject({ "@type": "Offer", price: "10.00", priceCurrency: "ILS", availability: "https://schema.org/OutOfStock" });
     expect(simple.image).toBe("https://cdn.example.com/soap.webp");
 
@@ -53,9 +54,9 @@ describe("storefront SEO", () => {
 
   it("installs and cleans native document head tags", () => {
     const previous = document.title;
-    const rendered = render(<StorefrontSeo origin="https://madarportal.com" storePath="/site/olive/shop" locale="en" site={site} view="home" />);
+    const rendered = render(<StorefrontSeo origin="https://olive.madarportal.com" storePath="/shop" locale="en" site={site} view="home" />);
     expect(document.title).toBe("Olive store");
-    expect(document.head.querySelector('link[rel="canonical"]')?.href).toBe("https://madarportal.com/site/olive/shop");
+    expect(document.head.querySelector('link[rel="canonical"]')?.href).toBe("https://olive.madarportal.com/shop");
     expect(document.head.querySelector('meta[property="og:title"]')?.content).toBe("Olive store");
     expect(JSON.parse(document.head.querySelector('script[type="application/ld+json"]')?.textContent)["@type"]).toBe("Organization");
     rendered.unmount();

@@ -70,6 +70,18 @@ server {
         proxy_set_header X-Request-ID $madar_request_id;
     }
 
+    location ~ ^/ecommerce-preview(?:/|$) {
+        try_files /index.html =404;
+        add_header Cache-Control "no-cache, no-store, must-revalidate" always;
+        include /etc/nginx/conf.d/includes/admin_preview_frame_headers.conf;
+    }
+
+    location ~ ^/shop(?:/|$) {
+        try_files /index.html =404;
+        add_header Cache-Control "no-cache, no-store, must-revalidate" always;
+        include /etc/nginx/conf.d/includes/storefront_frame_headers.conf;
+    }
+
     location / {
         try_files $uri $uri/ /index.html;
     }

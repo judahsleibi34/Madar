@@ -15,7 +15,13 @@ const EcommerceStorefront = lazy(() =>
 
 function HostedStorefront({ subdomain }) {
   if (!subdomain) return <Navigate to="/" replace />;
-  return <EcommerceStorefront subdomain={subdomain} basePath="/shop" />;
+  return <EcommerceStorefront subdomain={subdomain} />;
+}
+
+function AdminStorePreview() {
+  const { subdomain } = useParams();
+  if (!buildCanonicalTenantUrl(subdomain, "/shop")) return <Navigate to="/" replace />;
+  return <EcommerceStorefront subdomain={subdomain} previewBasePath={`/ecommerce-preview/${encodeURIComponent(subdomain)}`} />;
 }
 
 function LegacyTenantRedirect({ prefix }) {
@@ -84,6 +90,7 @@ export default function TenantSiteRoutes() {
           <>
             <Route path="/forms/:subdomain/:formId" element={<LegacyTenantRedirect prefix="" />} />
             <Route path="/store/:subdomain/*" element={<LegacyTenantRedirect prefix="/shop" />} />
+            <Route path="/ecommerce-preview/:subdomain/*" element={<AdminStorePreview />} />
             <Route path="/site/:subdomain/*" element={<LegacyTenantRedirect prefix="" />} />
             <Route path="/shop/*" element={<Navigate to="/" replace />} />
           </>

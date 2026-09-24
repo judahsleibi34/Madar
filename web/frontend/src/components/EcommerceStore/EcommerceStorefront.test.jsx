@@ -53,12 +53,27 @@ function LocationProbe() {
 }
 
 describe("EcommerceStorefront", () => {
+  it("keeps internal draft preview in same-origin storage and rejects untrusted theme messages", async () => {
+    fetchPublicEcommerceCatalog.mockResolvedValue(catalog);
+    fetchPublicEcommerceProfile.mockResolvedValue({ site: { brand: "Test Store" } });
+    localStorage.setItem("madar-online-store-theme-preview", JSON.stringify({ accent: "#224466" }));
+    render(<MemoryRouter initialEntries={["/ecommerce-preview/demo?preview=draft"]}><Routes><Route path="/ecommerce-preview/:subdomain/*" element={<EcommerceStorefront subdomain="demo" previewBasePath="/ecommerce-preview/demo" />} /></Routes></MemoryRouter>);
+    const storefront = await screen.findByRole("heading", { level: 1, name: "Test Store" });
+    expect(storefront.closest(".live-store").style.getPropertyValue("--store-accent")).toBe("#224466");
+    window.dispatchEvent(new MessageEvent("message", { origin: "https://untrusted.example", source: window, data: { type: "madar-online-store-theme-preview", theme: { accent: "#ff0000" } } }));
+    expect(storefront.closest(".live-store").style.getPropertyValue("--store-accent")).toBe("#224466");
+    window.dispatchEvent(new MessageEvent("message", { origin: window.location.origin, data: { type: "madar-online-store-theme-preview", theme: { accent: "#ff0000" } } }));
+    expect(storefront.closest(".live-store").style.getPropertyValue("--store-accent")).toBe("#224466");
+    window.dispatchEvent(new MessageEvent("message", { origin: window.location.origin, source: window, data: { type: "madar-online-store-theme-preview", theme: { accent: "#336699" } } }));
+    await waitFor(() => expect(storefront.closest(".live-store").style.getPropertyValue("--store-accent")).toBe("#336699"));
+    expect(document.head.querySelector('meta[name="robots"]')?.content).toContain("noindex");
+  });
   it.each(["en", "ar"])("uses the %s store identity on the homepage and footer", async (locale) => {
     await i18n.changeLanguage(locale);
     const site = { brand: "English Store", description: "English description", brand_ar: "متجر مدار", description_ar: "وصف المتجر" };
     fetchPublicEcommerceCatalog.mockResolvedValue({ ...catalog, site });
     fetchPublicEcommerceProfile.mockResolvedValue({ site });
-    render(<MemoryRouter initialEntries={["/store/demo"]}><Routes><Route path="/store/:subdomain/*" element={<EcommerceStorefront />} /></Routes></MemoryRouter>);
+    render(<MemoryRouter initialEntries={["/shop"]}><Routes><Route path="/shop/*" element={<EcommerceStorefront subdomain="demo" />} /></Routes></MemoryRouter>);
     const name = locale === "ar" ? site.brand_ar : site.brand;
     const description = locale === "ar" ? site.description_ar : site.description;
     expect(await screen.findByRole("heading", { level: 1, name })).toBeTruthy();
@@ -71,7 +86,7 @@ describe("EcommerceStorefront", () => {
     const site = { brand: "English Store", description: "English description", brand_ar: "  ", description_ar: "" };
     fetchPublicEcommerceCatalog.mockResolvedValue({ ...catalog, site });
     fetchPublicEcommerceProfile.mockResolvedValue({ site });
-    render(<MemoryRouter initialEntries={["/store/demo"]}><Routes><Route path="/store/:subdomain/*" element={<EcommerceStorefront />} /></Routes></MemoryRouter>);
+    render(<MemoryRouter initialEntries={["/shop"]}><Routes><Route path="/shop/*" element={<EcommerceStorefront subdomain="demo" />} /></Routes></MemoryRouter>);
     expect(await screen.findByRole("heading", { level: 1, name: site.brand })).toBeTruthy();
     expect(screen.getAllByText(site.description).length).toBeGreaterThanOrEqual(2);
   });
@@ -93,8 +108,8 @@ describe("EcommerceStorefront", () => {
     });
 
     render(
-      <MemoryRouter initialEntries={["/store/demo"]}>
-        <Routes><Route path="/store/:subdomain/*" element={<EcommerceStorefront />} /></Routes>
+      <MemoryRouter initialEntries={["/shop"]}>
+        <Routes><Route path="/shop/*" element={<EcommerceStorefront subdomain="demo" />} /></Routes>
       </MemoryRouter>
     );
 
@@ -112,13 +127,13 @@ describe("EcommerceStorefront", () => {
   it("supports catalog and store-wide search from URL state", async () => {
     fetchPublicEcommerceCatalog.mockResolvedValue(catalog);
     render(
-      <MemoryRouter initialEntries={["/store/demo?search=original"]}>
+      <MemoryRouter initialEntries={["/shop?search=original"]}>
         <Routes>
           <Route
-            path="/store/:subdomain/*"
+            path="/shop/*"
             element={
               <>
-                <EcommerceStorefront />
+                <EcommerceStorefront subdomain="demo" />
                 <LocationProbe />
               </>
             }
@@ -158,8 +173,8 @@ describe("EcommerceStorefront", () => {
     fetchPublicEcommerceCatalog.mockResolvedValue(catalog);
 
     render(
-      <MemoryRouter initialEntries={["/store/demo"]}>
-        <Routes><Route path="/store/:subdomain/*" element={<EcommerceStorefront />} /></Routes>
+      <MemoryRouter initialEntries={["/shop"]}>
+        <Routes><Route path="/shop/*" element={<EcommerceStorefront subdomain="demo" />} /></Routes>
       </MemoryRouter>
     );
 
@@ -193,9 +208,9 @@ describe("EcommerceStorefront", () => {
     });
 
     render(
-      <MemoryRouter initialEntries={["/store/demo/product/chair"]}>
+      <MemoryRouter initialEntries={["/shop/product/chair"]}>
         <Routes>
-          <Route path="/store/:subdomain/*" element={<EcommerceStorefront />} />
+          <Route path="/shop/*" element={<EcommerceStorefront subdomain="demo" />} />
         </Routes>
       </MemoryRouter>
     );
@@ -238,8 +253,8 @@ describe("EcommerceStorefront", () => {
     });
 
     render(
-      <MemoryRouter initialEntries={["/store/demo"]}>
-        <Routes><Route path="/store/:subdomain/*" element={<EcommerceStorefront />} /></Routes>
+      <MemoryRouter initialEntries={["/shop"]}>
+        <Routes><Route path="/shop/*" element={<EcommerceStorefront subdomain="demo" />} /></Routes>
       </MemoryRouter>
     );
 
@@ -269,8 +284,8 @@ describe("EcommerceStorefront", () => {
     });
 
     render(
-      <MemoryRouter initialEntries={["/store/demo"]}>
-        <Routes><Route path="/store/:subdomain/*" element={<EcommerceStorefront />} /></Routes>
+      <MemoryRouter initialEntries={["/shop"]}>
+        <Routes><Route path="/shop/*" element={<EcommerceStorefront subdomain="demo" />} /></Routes>
       </MemoryRouter>
     );
 
@@ -305,15 +320,15 @@ describe("EcommerceStorefront", () => {
       },
     });
     render(
-      <MemoryRouter initialEntries={["/store/demo/categories"]}>
-        <Routes><Route path="/store/:subdomain/*" element={<EcommerceStorefront />} /></Routes>
+      <MemoryRouter initialEntries={["/shop/categories"]}>
+        <Routes><Route path="/shop/*" element={<EcommerceStorefront subdomain="demo" />} /></Routes>
       </MemoryRouter>
     );
 
     expect(await screen.findByRole("heading", { level: 1, name: "Categories" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Gifts" })).toBeTruthy();
-    expect(screen.getByRole("link", { name: "Home" }).getAttribute("href")).toBe("/store/demo");
-    expect(screen.getAllByRole("link", { name: "Products" })[0].getAttribute("href")).toBe("/store/demo/catalog");
+    expect(screen.getByRole("link", { name: "Home" }).getAttribute("href")).toBe("/shop");
+    expect(screen.getAllByRole("link", { name: "Products" })[0].getAttribute("href")).toBe("/shop/catalog");
 
     fireEvent.click(screen.getByRole("link", { name: "Contact us" }));
     expect(await screen.findByRole("heading", { level: 1, name: "How can we help?" })).toBeTruthy();
@@ -326,11 +341,11 @@ describe("EcommerceStorefront", () => {
     expect(await screen.findByRole("heading", { level: 1, name: "Standalone Store" })).toBeTruthy();
   });
   it.each([
-    ["home", "/store/demo", "Loading home page", "is-landing"],
-    ["products", "/store/demo/catalog", "Loading products page", "is-catalog"],
-    ["categories", "/store/demo/categories", "Loading categories page", "is-categories"],
-    ["contact", "/store/demo/contact", "Loading contact page", "is-contact"],
-    ["product details", "/store/demo/product/chair", "Loading product details page", "is-product"],
+    ["home", "/shop", "Loading home page", "is-landing"],
+    ["products", "/shop/catalog", "Loading products page", "is-catalog"],
+    ["categories", "/shop/categories", "Loading categories page", "is-categories"],
+    ["contact", "/shop/contact", "Loading contact page", "is-contact"],
+    ["product details", "/shop/product/chair", "Loading product details page", "is-product"],
   ])("shows a page-shaped skeleton while loading %s", (_name, route, label, className) => {
     const pending = new Promise(() => {});
     fetchPublicEcommerceCatalog.mockReturnValue(pending);
@@ -338,7 +353,7 @@ describe("EcommerceStorefront", () => {
 
     render(
       <MemoryRouter initialEntries={[route]}>
-        <Routes><Route path="/store/:subdomain/*" element={<EcommerceStorefront />} /></Routes>
+        <Routes><Route path="/shop/*" element={<EcommerceStorefront subdomain="demo" />} /></Routes>
       </MemoryRouter>
     );
 
@@ -367,8 +382,8 @@ describe("EcommerceStorefront", () => {
     });
 
     render(
-      <MemoryRouter initialEntries={["/store/demo/catalog"]}>
-        <Routes><Route path="/store/:subdomain/*" element={<EcommerceStorefront />} /></Routes>
+      <MemoryRouter initialEntries={["/shop/catalog"]}>
+        <Routes><Route path="/shop/*" element={<EcommerceStorefront subdomain="demo" />} /></Routes>
       </MemoryRouter>
     );
 
@@ -399,8 +414,8 @@ describe("EcommerceStorefront", () => {
     });
 
     render(
-      <MemoryRouter initialEntries={[`/store/demo/confirmation/${token}`]}>
-        <Routes><Route path="/store/:subdomain/*" element={<EcommerceStorefront />} /></Routes>
+      <MemoryRouter initialEntries={[`/shop/confirmation/${token}`]}>
+        <Routes><Route path="/shop/*" element={<EcommerceStorefront subdomain="demo" />} /></Routes>
       </MemoryRouter>
     );
 
@@ -421,8 +436,8 @@ describe("EcommerceStorefront", () => {
     }));
 
     render(
-      <MemoryRouter initialEntries={["/store/demo/catalog"]}>
-        <Routes><Route path="/store/:subdomain/*" element={<EcommerceStorefront />} /></Routes>
+      <MemoryRouter initialEntries={["/shop/catalog"]}>
+        <Routes><Route path="/shop/*" element={<EcommerceStorefront subdomain="demo" />} /></Routes>
       </MemoryRouter>
     );
 
@@ -455,8 +470,8 @@ describe("EcommerceStorefront", () => {
     ] });
 
     render(
-      <MemoryRouter initialEntries={["/store/demo/checkout"]}>
-        <Routes><Route path="/store/:subdomain/*" element={<EcommerceStorefront />} /></Routes>
+      <MemoryRouter initialEntries={["/shop/checkout"]}>
+        <Routes><Route path="/shop/*" element={<EcommerceStorefront subdomain="demo" />} /></Routes>
       </MemoryRouter>
     );
 
@@ -480,8 +495,8 @@ describe("EcommerceStorefront", () => {
     });
 
     render(
-      <MemoryRouter initialEntries={["/store/demo/product/chair"]}>
-        <Routes><Route path="/store/:subdomain/*" element={<EcommerceStorefront />} /></Routes>
+      <MemoryRouter initialEntries={["/shop/product/chair"]}>
+        <Routes><Route path="/shop/*" element={<EcommerceStorefront subdomain="demo" />} /></Routes>
       </MemoryRouter>
     );
 
@@ -514,7 +529,7 @@ describe("EcommerceStorefront", () => {
           announcement_enabled: true,
           announcement_text_en: "Free local delivery this week",
           announcement_text_ar: "توصيل محلي مجاني هذا الأسبوع",
-          announcement_link: "/store/demo/catalog",
+          announcement_link: "/shop/catalog",
           featured_product_ids: ["featured"],
           featured_category_ids: [],
         },
@@ -528,7 +543,7 @@ describe("EcommerceStorefront", () => {
       },
     });
 
-    render(<MemoryRouter initialEntries={["/store/demo"]}><Routes><Route path="/store/:subdomain/*" element={<EcommerceStorefront />} /></Routes></MemoryRouter>);
+    render(<MemoryRouter initialEntries={["/shop"]}><Routes><Route path="/shop/*" element={<EcommerceStorefront subdomain="demo" />} /></Routes></MemoryRouter>);
 
     const announcement = await screen.findByText("Free local delivery this week");
     expect(announcement.closest(".live-store-announcement")).toBeTruthy();
@@ -545,7 +560,7 @@ describe("EcommerceStorefront", () => {
 
 it("uses safe visible feedback when a public product request fails", async () => {
   fetchPublicEcommerceProduct.mockRejectedValue(new Error("SUPABASE_SERVICE_KEY=private-key; SQL internal_product failed"));
-  render(<MemoryRouter initialEntries={["/store/demo/product/chair"]}><Routes><Route path="/store/:subdomain/*" element={<EcommerceStorefront />} /></Routes></MemoryRouter>);
+  render(<MemoryRouter initialEntries={["/shop/product/chair"]}><Routes><Route path="/shop/*" element={<EcommerceStorefront subdomain="demo" />} /></Routes></MemoryRouter>);
   expect((await screen.findByRole("alert")).textContent).toContain("Could not load the live store");
   expect(document.body.textContent).not.toContain("SUPABASE_SERVICE_KEY");
   expect(document.body.textContent).not.toContain("internal_product");
@@ -553,7 +568,7 @@ it("uses safe visible feedback when a public product request fails", async () =>
 
 it("shows a safe cart error instead of success when browser storage rejects an add", async () => {
   fetchPublicEcommerceProduct.mockResolvedValue({ site: { brand: "Store" }, product: { id: "product-1", slug: "chair", name: "Chair", price: "20", currency: "ILS", in_stock: true, images: [] }, category: null, tags: [], attributes: [], options: [], variants: [] });
-  render(<MemoryRouter initialEntries={["/store/demo/product/chair"]}><Routes><Route path="/store/:subdomain/*" element={<EcommerceStorefront />} /></Routes></MemoryRouter>);
+  render(<MemoryRouter initialEntries={["/shop/product/chair"]}><Routes><Route path="/shop/*" element={<EcommerceStorefront subdomain="demo" />} /></Routes></MemoryRouter>);
   await screen.findByRole("heading", { level: 1, name: "Chair" });
   const storage = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw new Error("internal_storage secret"); });
   try {
@@ -568,13 +583,13 @@ it("shows a safe cart error instead of success when browser storage rejects an a
 it("closes the mobile navigation after a page selection and Escape", async () => {
   fetchPublicEcommerceCatalog.mockResolvedValue(catalog);
   fetchPublicEcommerceProfile.mockResolvedValue({ site: catalog.site });
-  render(<MemoryRouter initialEntries={["/store/demo"]}><Routes><Route path="/store/:subdomain/*" element={<EcommerceStorefront />} /></Routes></MemoryRouter>);
+  render(<MemoryRouter initialEntries={["/shop"]}><Routes><Route path="/shop/*" element={<EcommerceStorefront subdomain="demo" />} /></Routes></MemoryRouter>);
   await screen.findByRole("heading", { level: 1, name: "Test Store" });
   const toggle = document.querySelector(".live-store-mobile-menu");
   fireEvent.click(toggle);
   expect(toggle.getAttribute("aria-expanded")).toBe("true");
   expect(toggle.getAttribute("aria-controls")).toBe("live-store-mobile-navigation");
-  fireEvent.click(document.querySelector('#live-store-mobile-navigation a[href="/store/demo/categories"]'));
+  fireEvent.click(document.querySelector('#live-store-mobile-navigation a[href="/shop/categories"]'));
   expect(toggle.getAttribute("aria-expanded")).toBe("false");
   fireEvent.click(toggle);
   fireEvent.keyDown(document, { key: "Escape" });

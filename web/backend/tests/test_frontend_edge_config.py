@@ -14,6 +14,16 @@ class FrontendEdgeConfigTests(unittest.TestCase):
         self.assertIn("frame-ancestors 'none'", headers)
         self.assertIn("object-src 'none'", headers)
         self.assertIn("${MADAR_HSTS}", headers)
+        storefront_headers = (ROOT / "frontend" / "storefront_frame_headers.conf.template").read_text(encoding="utf-8")
+        self.assertIn("frame-ancestors https://${MADAR_PUBLIC_SITE_DOMAIN}", storefront_headers)
+        self.assertNotIn("X-Frame-Options", storefront_headers)
+        preview_headers = (ROOT / "frontend" / "admin_preview_frame_headers.conf.template").read_text(encoding="utf-8")
+        self.assertIn("frame-ancestors 'self'", preview_headers)
+        self.assertIn('X-Frame-Options "SAMEORIGIN"', preview_headers)
+        self.assertIn('X-Robots-Tag "noindex, nofollow, noarchive"', preview_headers)
+        self.assertNotIn("frame-ancestors 'none'", preview_headers)
+        self.assertNotIn('X-Frame-Options "DENY"', preview_headers)
+        self.assertNotIn("frame-ancestors *", preview_headers)
 
     def test_frontend_runtime_is_non_root_and_digest_pinned(self):
         dockerfile = (ROOT / "frontend" / "Dockerfile").read_text(encoding="utf-8")

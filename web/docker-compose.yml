@@ -441,6 +441,7 @@ services:
       APP_ENV: production
       MADAR_RELEASE_SHA: ${MADAR_RELEASE_SHA:-development}
       MADAR_CSP_CONNECT_SRC: ${MADAR_CSP_CONNECT_SRC:-https://api.madarportal.com}
+      MADAR_PUBLIC_SITE_DOMAIN: ${PUBLIC_SITE_DOMAIN:-madarportal.com}
       MADAR_HSTS: ${MADAR_HSTS:-}
     ports:
       - "127.0.0.1:${MADAR_FRONTEND_BIND_PORT:-3000}:8080"

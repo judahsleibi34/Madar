@@ -667,6 +667,28 @@ class WebsiteRoutesTests(unittest.TestCase):
             "https://fresh-site.madarportal.com/about?x=1",
         )
 
+    def test_legacy_store_and_site_shop_routes_redirect_to_hosted_shop(self):
+        fake_supabase = FakeSupabase()
+        client = build_public_client(fake_supabase)
+        with patch.object(public_site_routes, "service_supabase", fake_supabase):
+            for legacy_path, canonical_path in (
+                ("/public/legacy/store/standard-site", "/shop"),
+                ("/public/legacy/store/standard-site/catalog", "/shop/catalog"),
+                ("/public/legacy/site/standard-site/shop", "/shop"),
+                ("/public/legacy/site/standard-site/shop/product/chair", "/shop/product/chair"),
+            ):
+                with self.subTest(legacy_path=legacy_path):
+                    response = client.get(
+                        f"{legacy_path}?tag=best-seller",
+                        headers={"Host": "madarportal.com"},
+                        follow_redirects=False,
+                    )
+                    self.assertEqual(response.status_code, 308)
+                    self.assertEqual(
+                        response.headers["location"],
+                        f"https://fresh-site.madarportal.com{canonical_path}?tag=best-seller",
+                    )
+
     def test_legacy_redirect_does_not_run_on_tenant_host(self):
         fake_supabase = FakeSupabase()
         client = build_public_client(fake_supabase)

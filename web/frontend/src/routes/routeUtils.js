@@ -9,6 +9,7 @@ export function isTenantSiteRoutePath(pathname) {
     pathname.startsWith("/site/") ||
     pathname.startsWith("/forms/") ||
     pathname.startsWith("/store/") ||
+    pathname.startsWith("/ecommerce-preview/") ||
     pathname === "/shop" ||
     pathname.startsWith("/shop/")
   );
