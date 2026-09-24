@@ -16,6 +16,7 @@ MIGRATION = WEB_ROOT / "database" / "migrations" / "096_create_ecommerce_product
 MIRROR = WEB_ROOT / "supabase" / "migrations" / "096_create_ecommerce_product_variants.sql"
 PRESENTATION_MIGRATION = WEB_ROOT / "database" / "migrations" / "101_add_variant_attribute_presentation.sql"
 PRESENTATION_MIRROR = WEB_ROOT / "supabase" / "migrations" / "101_add_variant_attribute_presentation.sql"
+CURRENT_CHECKOUT_MIGRATION = WEB_ROOT / "database" / "migrations" / "102_add_ecommerce_discount_conditions.sql"
 PRODUCT_ID = "11111111-1111-1111-1111-111111111111"
 OPTION_ID = "22222222-2222-2222-2222-222222222222"
 VALUE_ID = "33333333-3333-3333-3333-333333333333"
@@ -205,6 +206,13 @@ class EcommerceProductVariantTests(unittest.TestCase):
         self.assertIn("set inventory_quantity=inventory_quantity+v_item.inventory_allocated_quantity", sql)
         self.assertIn("v_schema_version<>95", sql)
         self.assertIn("set schema_version = 96", sql)
+
+    def test_current_checkout_locks_and_decrements_the_exact_requested_variant(self):
+        sql = CURRENT_CHECKOUT_MIGRATION.read_text(encoding="utf-8").lower()
+        self.assertIn("id=v_requested.variant_id and active for update", sql)
+        self.assertIn("v_requested.quantity>v_variant.inventory_quantity", sql)
+        self.assertIn("update public.ecommerce_product_variants set inventory_quantity=inventory_quantity-v_allocated", sql)
+        self.assertIn("values(v_tenant_id,v_product.id,v_requested.variant_id", sql)
 
     def test_presentation_extension_is_mirrored_forward_only_and_wraps_atomic_save(self):
         self.assertEqual(PRESENTATION_MIGRATION.read_bytes(), PRESENTATION_MIRROR.read_bytes())

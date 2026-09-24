@@ -492,8 +492,8 @@ function UserDashboardContent({ user, weeklyScreenTimeSeconds = 0, cacheScope = 
               <ExternalLink size={18} aria-hidden="true" />
               <span>View website</span>
             </a>
-            <button type="button" className="user-dashboard-copy-btn" aria-label="Copy website link" onClick={() => copyToClipboard(metrics.websiteUrl)}>
-              {copiedUrl === metrics.websiteUrl ? <Check size={15} /> : <Copy size={15} />}
+            <button type="button" className="user-dashboard-copy-btn" aria-label="Copy website link" title={copiedUrl === metrics.websiteUrl ? "Copied" : "Copy website link"} onClick={() => copyToClipboard(metrics.websiteUrl)}>
+              {copiedUrl === metrics.websiteUrl ? <Check size={15} aria-hidden="true" /> : <Copy size={15} aria-hidden="true" />}
             </button>
           </span>
         )}
@@ -508,8 +508,8 @@ function UserDashboardContent({ user, weeklyScreenTimeSeconds = 0, cacheScope = 
               <ShoppingBag size={18} aria-hidden="true" />
               <span>View store</span>
             </a>
-            <button type="button" className="user-dashboard-copy-btn" aria-label="Copy store link" onClick={() => copyToClipboard(metrics.storeUrl)}>
-              {copiedUrl === metrics.storeUrl ? <Check size={15} /> : <Copy size={15} />}
+            <button type="button" className="user-dashboard-copy-btn" aria-label="Copy store link" title={copiedUrl === metrics.storeUrl ? "Copied" : "Copy store link"} onClick={() => copyToClipboard(metrics.storeUrl)}>
+              {copiedUrl === metrics.storeUrl ? <Check size={15} aria-hidden="true" /> : <Copy size={15} aria-hidden="true" />}
             </button>
           </span>
         )}

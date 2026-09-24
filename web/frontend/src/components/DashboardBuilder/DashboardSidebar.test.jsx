@@ -25,6 +25,7 @@ const labels = {
   "sidebar.categories": "Categories",
   "sidebar.products": "Products",
   "sidebar.storeTheme": "Store theme",
+  "sidebar.socialLinks": "Social links",
   "sidebar.cvRerank": "CV Rerank",
   "sidebar.store": "Store",
   "sidebar.pageBuilder": "Page Builder",
@@ -140,8 +141,10 @@ describe("DashboardSidebar navigation hierarchy", () => {
     expect(document.getElementById("dashboard-sidebar-ecommerce")).toBeTruthy();
     expect(screen.getByRole("link", { name: "Tags" })).toBeTruthy();
     expect(screen.getByRole("link", { name: "Categories" }).getAttribute("href")).toBe("/ecommerce/categories");
+    expect(screen.getByRole("link", { name: "Brands" }).getAttribute("href")).toBe("/ecommerce/brands");
     expect(screen.getByRole("link", { name: "Store" }).hasAttribute("aria-current")).toBe(false);
     expect(screen.getByRole("link", { name: "Store theme" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Social links" }).getAttribute("href")).toBe("/ecommerce/social-links");
     expect(within(document.getElementById("dashboard-sidebar-ecommerce")).queryByRole("button", { name: "CV Rerank" })).toBeNull();
     expect(screen.getByRole("link", { name: "Store" })).toBeTruthy();
   });

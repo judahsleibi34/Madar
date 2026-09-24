@@ -15,6 +15,7 @@ import {
 const catalog = (name) => ({
   tags: [{ id: `${name}-tag` }],
   categories: [{ id: `${name}-category` }],
+  brands: [{ id: `${name}-brand` }],
   products: [{ id: `${name}-product` }],
 });
 
@@ -72,6 +73,15 @@ describe("Ecommerce catalog cache", () => {
 
     removeFromEcommerceCatalogCache("user-1", "products", "original-product");
     expect(readEcommerceCatalogCache("user-1").products).toEqual([]);
+  });
+
+  it("updates and removes brands in the cached catalog", () => {
+    writeEcommerceCatalogCache("user-1", catalog("original"));
+    updateEcommerceCatalogCache("user-1", "brands", { id: "original-brand", name: "Updated brand" });
+    expect(readEcommerceCatalogCache("user-1").brands).toEqual([{ id: "original-brand", name: "Updated brand" }]);
+
+    removeFromEcommerceCatalogCache("user-1", "brands", "original-brand");
+    expect(readEcommerceCatalogCache("user-1").brands).toEqual([]);
   });
 
   it("caches store theme settings by user scope", () => {

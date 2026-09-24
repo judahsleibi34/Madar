@@ -5,7 +5,7 @@ import { ArrowLeft, CheckCircle2, PackageCheck, RefreshCw, Search, SlidersHorizo
 import { Link, useLocation, useNavigate } from "react-router-dom";
 
 import useDebouncedValue from "../../hooks/useDebouncedValue";
-import AuthToast from "../AuthPages/AuthToast";
+import EcommerceToast from "./EcommerceToast";
 import EcommerceOperationsSkeleton from "./EcommerceOperationsSkeleton";
 import { collectEcommerceOrderPayment, fetchEcommerceDeliveryAreas, fetchEcommerceOrder, fetchEcommerceOrders, transitionEcommerceOrder } from "../../services/ecommerceApi";
 
@@ -49,7 +49,7 @@ function OrderDetail({ cacheScope, orderId }) {
     finally { setBusy(false); }
   };
   if (loading) return <main className="ecommerce-page ecommerce-operations-page" dir={direction} lang={locale}><PageHeaderSkeleton className="ecommerce-page-header app-page-intro" actions /><EcommerceOperationsSkeleton variant="order-detail" label={t("merchant.loadingOrders")} /></main>;
-  if (!data?.order) return <main className="ecommerce-page ecommerce-operations-page" dir={direction} lang={locale}><button onClick={() => navigate("/ecommerce/orders")}>{t("common.back")}</button><p>{t("admin.orderNotFound")}</p><AuthToast {...toast} dir={direction} onDismiss={() => setToast(null)} /></main>;
+  if (!data?.order) return <main className="ecommerce-page ecommerce-operations-page" dir={direction} lang={locale}><button onClick={() => navigate("/ecommerce/orders")}>{t("common.back")}</button><p>{t("admin.orderNotFound")}</p><EcommerceToast {...toast} dir={direction} onDismiss={() => setToast(null)} /></main>;
   const { order, items = [], status_history: history = [] } = data;
   return (
     <main className="ecommerce-page ecommerce-operations-page" dir={direction} lang={locale}>
@@ -58,7 +58,7 @@ function OrderDetail({ cacheScope, orderId }) {
         <section><h2>{t("merchant.customer")}</h2><p><strong>{order.customer_name}</strong><br /><bdi>{order.customer_phone}</bdi><br /><bdi>{order.customer_email}</bdi></p></section>
         <section><h2>{t("common.delivery")}</h2><p><strong>{locale === "ar" ? order.service_area_name_ar || order.service_area_name_en : order.service_area_name_en || order.service_area_name_ar || order.city}</strong><br />{order.street || order.address_line_1}</p></section>
         <section><h2>{t("merchant.payment")}</h2><p>{paymentLabel("cash_on_delivery")}<br /><strong>{paymentLabel(order.payment_status)}</strong></p></section>
-        <section><h2>{t("merchant.orderDetail")}</h2><p>{t("common.status")}: <strong>{statusLabel(order.status)}</strong><br />{t("common.subtotal")}: {money(order.subtotal, order.currency)}<br />{t("common.discount")}: {money(order.discount_total, order.currency)}<br />{t("common.total")}: <strong>{money(order.total, order.currency)}</strong></p></section>
+        <section><h2>{t("merchant.orderDetail")}</h2><p>{t("common.status")}: <strong>{statusLabel(order.status)}</strong><br />{t("common.subtotal")}: {money(order.subtotal, order.currency)}<br />{t("common.discount")}: {money(order.discount_total, order.currency)}<br />{t("merchant.deliveryFee")}: {money(order.delivery_fee, order.currency)}<br />{t("common.total")}: <strong>{money(order.total, order.currency)}</strong></p></section>
       </div>
       <section className="ecommerce-operations-card">
         <h2>{t("merchant.items")}</h2>
@@ -84,7 +84,7 @@ function OrderDetail({ cacheScope, orderId }) {
         })}</div>
       </section>
       <section className="ecommerce-operations-card"><h2>{t("merchant.statusHistory")}</h2><ol className="ecommerce-status-history">{history.map((entry) => <li key={entry.id || `${entry.new_status}-${entry.created_at}`}><PackageCheck size={17} /><span><strong>{statusLabel(entry.new_status)}</strong><small>{dateTime(entry.created_at)}{entry.note ? ` · ${entry.note}` : ""}</small></span></li>)}</ol></section>
-      <AuthToast dir={direction} key={toast?.id} type={toast?.type} title={toast?.title} message={toast?.message} onDismiss={() => setToast(null)} />
+      <EcommerceToast dir={direction} key={toast?.id} type={toast?.type} title={toast?.title} message={toast?.message} onDismiss={() => setToast(null)} />
     </main>
   );
 }
@@ -164,7 +164,7 @@ export default function EcommerceOrdersPage({ user }) {
       </section>
         </div>
       </div>
-      <AuthToast {...toast} dir={direction} onDismiss={() => setToast(null)} />
+      <EcommerceToast {...toast} dir={direction} onDismiss={() => setToast(null)} />
     </main>
   );
 }

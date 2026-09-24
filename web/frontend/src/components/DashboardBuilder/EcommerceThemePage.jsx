@@ -5,7 +5,7 @@ import { notifyCommerceAction } from "../../utils/commerceActionToast";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ExternalLink, LoaderCircle, Monitor, RotateCcw, Rocket, Smartphone } from "lucide-react";
 
-import AuthToast from "../AuthPages/AuthToast";
+import EcommerceToast from "./EcommerceToast";
 import { fetchEcommerceTheme, saveEcommerceTheme } from "../../services/ecommerceApi";
 import { fetchWebsiteSettings } from "../PageBuilder/services/PageBuilder.api";
 import { readEcommerceThemeCacheSnapshot } from "./utils/ecommerceCatalogCache";
@@ -186,7 +186,7 @@ export default function EcommerceThemePage({ user }) {
         </div>
       )}
 
-      <AuthToast dir={direction} key={toast?.id} type={toast?.type} title={toast?.title} message={toast?.message} onDismiss={() => setToast(null)} />
+      <EcommerceToast dir={direction} key={toast?.id} type={toast?.type} title={toast?.title} message={toast?.message} onDismiss={() => setToast(null)} />
     </main>
   );
 }

@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import EcommerceStorefront from "./EcommerceStorefront";
 import i18n from "../../i18n";
+import { normalizeWhatsAppNumber } from "../../utils/whatsapp";
 import { fetchPublicEcommerceCatalog, fetchPublicEcommerceDeliveryAreas, fetchPublicEcommerceProduct, fetchPublicEcommerceProfile } from "../../services/ecommerceApi";
 import { fetchPublicEcommerceOrderConfirmation } from "../../services/ecommerceApi";
 import { recordPublicSiteVisit } from "../../services/siteVisitApi";
@@ -91,6 +92,59 @@ describe("EcommerceStorefront", () => {
     expect(screen.getAllByText(site.description).length).toBeGreaterThanOrEqual(2);
   });
 
+  it("keeps social icons visible before their links are configured", async () => {
+    const site = { brand: "Test Store" };
+    fetchPublicEcommerceCatalog.mockResolvedValue({ ...catalog, site });
+    fetchPublicEcommerceProfile.mockResolvedValue({ site });
+
+    render(<MemoryRouter initialEntries={["/shop"]}><Routes><Route path="/shop/*" element={<EcommerceStorefront subdomain="demo" />} /></Routes></MemoryRouter>);
+
+    await screen.findByRole("heading", { level: 1, name: "Test Store" });
+    expect(document.querySelectorAll(".live-store-footer-social .is-disabled")).toHaveLength(4);
+    expect(document.querySelector('[data-social-icon="facebook"]')).toBeTruthy();
+  });
+
+  it("shows configured social profiles in the footer", async () => {
+    const site = {
+      brand: "Test Store",
+      social_links: { instagram: "https://instagram.com/test-store", snapchat: "https://snapchat.com/add/test-store" },
+    };
+    fetchPublicEcommerceCatalog.mockResolvedValue({ ...catalog, site });
+    fetchPublicEcommerceProfile.mockResolvedValue({ site });
+
+    render(<MemoryRouter initialEntries={["/shop"]}><Routes><Route path="/shop/*" element={<EcommerceStorefront subdomain="demo" />} /></Routes></MemoryRouter>);
+
+    const instagram = await screen.findByRole("link", { name: "Instagram" });
+    expect(instagram.getAttribute("href")).toBe(site.social_links.instagram);
+    expect(instagram.getAttribute("target")).toBe("_blank");
+    expect(instagram.querySelector('[data-social-icon="instagram"]')).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Snapchat" })).toBeTruthy();
+    expect(document.querySelector(".live-store-footer").classList.contains("has-social-links")).toBe(true);
+  });
+
+  it("opens a WhatsApp chat using the phone number published in settings", async () => {
+    const site = { brand: "Test Store", phone: "059 000 0000" };
+    fetchPublicEcommerceCatalog.mockResolvedValue({ ...catalog, site });
+    fetchPublicEcommerceProfile.mockResolvedValue({ site });
+
+    render(<MemoryRouter initialEntries={["/shop"]}><Routes><Route path="/shop/*" element={<EcommerceStorefront subdomain="demo" />} /></Routes></MemoryRouter>);
+
+    const link = await screen.findByRole("link", { name: "Chat with Test Store on WhatsApp" });
+    const destination = new URL(link.href);
+    expect(destination.origin).toBe("https://wa.me");
+    expect(destination.pathname).toBe("/970590000000");
+    expect(destination.searchParams.get("text")).toBe("Hello Test Store, I have a question about your store.");
+    expect(link.getAttribute("target")).toBe("_blank");
+    expect(link.getAttribute("rel")).toContain("noopener");
+  });
+
+  it("normalizes supported international WhatsApp numbers and rejects invalid values", () => {
+    expect(normalizeWhatsAppNumber("+970 59 000 0000")).toBe("970590000000");
+    expect(normalizeWhatsAppNumber("00972-50-123-4567")).toBe("972501234567");
+    expect(normalizeWhatsAppNumber("0590000000")).toBe("970590000000");
+    expect(normalizeWhatsAppNumber("not a phone")).toBe("");
+  });
+
   it("shows the cart subtotal and opens the checkout page", async () => {
     localStorage.setItem("madar-store-cart:demo", JSON.stringify([{
       id: "43b86c1a-fbf7-41d3-a58a-cbe07fc8459f",
@@ -104,7 +158,13 @@ describe("EcommerceStorefront", () => {
     fetchPublicEcommerceCatalog.mockResolvedValue(catalog);
     fetchPublicEcommerceProfile.mockResolvedValue({ site: { brand: "Test Store" } });
     fetchPublicEcommerceDeliveryAreas.mockResolvedValue({
-      areas: [{ id: "95000000-0000-0000-0000-000000000001", code: "ramallah", name_en: "Ramallah", name_ar: "رام الله" }],
+      areas: [{
+        id: "95000000-0000-0000-0000-000000000001",
+        code: "ramallah",
+        name_en: "Ramallah",
+        name_ar: "Ramallah",
+        delivery_fee: "6.50",
+      }],
     });
 
     render(
@@ -115,10 +175,13 @@ describe("EcommerceStorefront", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "Open cart, 2 items" }));
     expect(screen.getByText("Subtotal").parentElement.textContent).toContain("$56.00");
+    expect((await screen.findByText("Delivery fee")).parentElement.textContent).toContain("$6.50");
+    expect(screen.getByText("Total").parentElement.textContent).toContain("$62.50");
     fireEvent.click(screen.getByRole("link", { name: /Proceed to checkout/ }));
 
     expect(await screen.findByRole("heading", { level: 1, name: "Checkout" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Place order" })).toBeTruthy();
+    expect(screen.getByText("Ramallah — $6.50")).toBeTruthy();
     expect(fetchPublicEcommerceProfile).toHaveBeenCalledWith("demo");
     expect(recordPublicSiteVisit).toHaveBeenCalledTimes(1);
     expect(recordPublicSiteVisit).toHaveBeenCalledWith("demo", "store");
@@ -166,6 +229,39 @@ describe("EcommerceStorefront", () => {
       expect.objectContaining({ search: "chair" })
     );
   });
+
+  it("updates URL-backed price filters from the dual range slider", async () => {
+    fetchPublicEcommerceCatalog.mockResolvedValue({
+      ...catalog,
+      catalog: {
+        ...catalog.catalog,
+        price_bounds: { min: "5", max: "100", currency: "USD" },
+      },
+    });
+    render(
+      <MemoryRouter initialEntries={["/shop/catalog?min_price=10&max_price=80"]}>
+        <Routes>
+          <Route path="/shop/*" element={<><EcommerceStorefront subdomain="demo" /><LocationProbe /></>} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    const minimum = await screen.findByRole("slider", { name: "Minimum" });
+    const maximum = screen.getByRole("slider", { name: "Maximum" });
+    expect(minimum.value).toBe("10");
+    expect(maximum.value).toBe("80");
+
+    fireEvent.change(minimum, { target: { value: "25" } });
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("current query").textContent).toContain("min_price=25");
+    });
+    expect(fetchPublicEcommerceCatalog).toHaveBeenLastCalledWith(
+      "demo",
+      expect.objectContaining({ min_price: "25", max_price: "80" })
+    );
+  });
+
   it("defaults public English catalogs to LTR independently of the dashboard language", async () => {
     document.documentElement.lang = "ar";
     document.documentElement.dir = "rtl";
@@ -218,8 +314,16 @@ describe("EcommerceStorefront", () => {
     expect(await screen.findByAltText("Chair 1")).toBeTruthy();
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
     expect(screen.getByRole("heading", { level: 1, name: "Chair" })).toBeTruthy();
+    const zoomButton = screen.getByRole("button", { name: "Open enlarged product image" });
+    fireEvent.mouseEnter(zoomButton);
+    expect(zoomButton.classList.contains("is-hovered")).toBe(true);
+    fireEvent.click(zoomButton);
+    expect(screen.getByRole("dialog", { name: "Enlarged product image" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Close enlarged product image" }));
+    expect(screen.queryByRole("dialog", { name: "Enlarged product image" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Show product image 2" }));
     expect(await screen.findByAltText("Chair 2")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Open enlarged product image" }).classList.contains("is-hovered")).toBe(false);
   });
   it("renders a fixed landing layout with dynamic published store content", async () => {
     fetchPublicEcommerceCatalog.mockResolvedValue({
@@ -236,7 +340,14 @@ describe("EcommerceStorefront", () => {
         },
       },
       catalog: {
-        categories: [{ id: "category-1", slug: "home", name: "Home", description: "Objects for everyday living", parent_id: null }],
+        categories: [
+          { id: "category-1", slug: "home", name: "Home", description: "Objects for everyday living", image_url: "https://example.com/home.webp", parent_id: null },
+          { id: "category-2", slug: "studio", name: "Studio", description: "Tools for creative rooms", image_url: null, parent_id: null },
+        ],
+        brands: [
+          { id: "brand-1", slug: "olive", name: "Olive Studio", image_url: "https://example.com/olive.webp" },
+          { id: "brand-2", slug: "cedar", name: "Cedar Works", image_url: null },
+        ],
         tags: [],
         products: [{
           id: "product-1",
@@ -246,6 +357,8 @@ describe("EcommerceStorefront", () => {
           price: "35.00",
           currency: "ILS",
           in_stock: true,
+          has_variants: true,
+          variant_options: [{ id: "size", name: "Size", values: ["36", "37", "38"] }],
           images: ["https://example.com/tray.webp"],
         }],
         pagination: { page: 1, pages: 1, total: 1, limit: 8 },
@@ -261,7 +374,26 @@ describe("EcommerceStorefront", () => {
     expect(await screen.findByRole("heading", { level: 1, name: "Olive House" })).toBeTruthy();
     expect(screen.getAllByText("Made locally for thoughtful homes.")).toHaveLength(2);
     expect(screen.getByRole("heading", { name: "Home" })).toBeTruthy();
+    expect(document.querySelectorAll(".live-store-category-carousel")).toHaveLength(2);
+    expect(screen.getByRole("heading", { name: "Brands" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Previous brands" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Next brands" })).toBeTruthy();
+    expect(screen.getAllByRole("link", { name: /Olive Studio/ })[0].getAttribute("href")).toContain("brand=olive");
+    expect(document.querySelector(".live-store-brand-section + .live-store-category-section")).toBeTruthy();
+    expect(screen.queryByText("Objects for everyday living")).toBeNull();
+    expect(document.querySelector(".live-store-category-carousel").style.getPropertyValue("--store-carousel-columns")).toBe("2");
+    expect(screen.getByRole("button", { name: "Previous categories" }).classList.contains("is-previous")).toBe(true);
+    expect(screen.getByRole("button", { name: "Next categories" }).classList.contains("is-next")).toBe(true);
+    expect(screen.getByRole("button", { name: "Previous categories" }).disabled).toBe(false);
+    expect(screen.getByRole("button", { name: "Next categories" }).disabled).toBe(false);
+    const categoryTrack = document.querySelectorAll(".live-store-category-carousel")[1];
+    categoryTrack.scrollBy = vi.fn();
+    fireEvent.click(screen.getByRole("button", { name: "Next categories" }));
+    expect(categoryTrack.scrollBy).toHaveBeenCalledWith(expect.objectContaining({ behavior: "smooth" }));
+    expect(document.querySelectorAll(".live-store-category-section")[1].querySelector(".live-store-category-media img")?.getAttribute("src")).toContain("home.webp");
     expect(screen.getAllByText("Olive tray").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("36").length).toBeGreaterThan(0);
+    expect(screen.queryByText("NIKE / HOME")).toBeNull();
     expect(screen.getAllByAltText("Olive tray")).toHaveLength(2);
     expect(document.querySelector(".live-store").style.getPropertyValue("--store-accent")).toBe("#287a55");
     expect(screen.queryByRole("textbox")).toBeNull();
@@ -406,7 +538,7 @@ describe("EcommerceStorefront", () => {
         id: "order-1", order_number: "MD-1001", created_at: "2026-09-12T10:00:00Z",
         customer_name: "Buyer", customer_phone: "0590000000", customer_email: "buyer@example.com",
         service_area_name_en: "Ramallah", street: "Main Street", building: "7", floor_apartment: "2A",
-        subtotal: "25", discount_total: "0", total: "25", currency: "ILS",
+        subtotal: "25", discount_total: "0", delivery_fee: "5", total: "30", currency: "ILS",
         payment_status: "unpaid", status: "pending",
       },
       items: [{ id: "item-1", product_name: "Snapshot Product", sku: "SKU-1", quantity: 2, line_total: "25" }],
@@ -422,6 +554,8 @@ describe("EcommerceStorefront", () => {
     expect(await screen.findByRole("heading", { level: 1, name: "MD-1001" })).toBeTruthy();
     expect(screen.getByText("Snapshot Product")).toBeTruthy();
     expect(screen.getByText(/Main Street/)).toBeTruthy();
+    expect(screen.getByText("Delivery fee").parentElement.textContent).toContain("₪5.00");
+    expect(screen.getByText("Total").parentElement.textContent).toContain("₪30.00");
     expect(fetchPublicEcommerceOrderConfirmation).toHaveBeenCalledWith("demo", token);
   });
 
@@ -477,7 +611,7 @@ describe("EcommerceStorefront", () => {
 
     expect(await screen.findByRole("heading", { level: 1, name: "إتمام الطلب" })).toBeTruthy();
     const area = screen.getByLabelText("منطقة التوصيل");
-    await screen.findByRole("option", { name: "رام الله" });
+    await screen.findByRole("option", { name: /^رام الله/ });
     expect(area.textContent).toContain("رام الله");
     expect(area.textContent).toContain("English fallback");
     expect(screen.getByRole("button", { name: "إرسال الطلب" })).toBeTruthy();

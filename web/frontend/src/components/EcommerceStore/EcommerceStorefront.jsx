@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, ArrowRight, AlertCircle, CheckCircle2, ChevronRight, Globe2, Gift, Mail, Menu, Minus, Phone, Plus, Search, ShieldCheck, ShoppingBag, ShoppingCart, Trash2, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, AlertCircle, CheckCircle2, ChevronLeft, ChevronRight, Globe2, Gift, Mail, Menu, MessageCircle, Minus, Phone, Plus, Search, ShieldCheck, ShoppingBag, ShoppingCart, Trash2, X, ZoomIn } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import i18n from "../../i18n";
 
@@ -20,21 +20,38 @@ import { getResponsiveMediaProps, isVideoMediaUrl, resolveMediaUrl } from "../..
 import { normalizeStoreTheme } from "../../utils/ecommerceTheme";
 import { formatCommerceMoney, normalizeCommerceLocale } from "../../utils/commerceI18n";
 import { estimateCartDiscount } from "../../utils/ecommerceDiscounts";
+import { normalizeWhatsAppNumber } from "../../utils/whatsapp";
 import { trackCommerceEvent, trackPurchaseOnce } from "../../services/commerceAnalytics";
 import { recordPublicSiteVisit } from "../../services/siteVisitApi";
 import "../../styles/public/ecommerce-storefront.css";
 
 const EMPTY_CATALOG = {
   categories: [],
+  brands: [],
   tags: [],
   products: [],
   featured_products: [],
   featured_categories: [],
+  price_bounds: { min: null, max: null, currency: "" },
   pagination: { page: 1, pages: 1, total: 0, limit: 12 },
 };
 
 const formatPrice = formatCommerceMoney;
 const c = (key, values) => i18n.t(`commerce:${key}`, values);
+
+const STORE_SOCIAL_NETWORKS = [
+  ["facebook", "Facebook"],
+  ["instagram", "Instagram"],
+  ["tiktok", "TikTok"],
+  ["snapchat", "Snapchat"],
+];
+
+function SocialIcon({ network }) {
+  if (network === "instagram") return <svg data-social-icon={network} viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="5" /><circle cx="12" cy="12" r="4" /><circle className="is-filled" cx="17.5" cy="6.5" r="1" /></svg>;
+  if (network === "tiktok") return <svg data-social-icon={network} viewBox="0 0 24 24" aria-hidden="true"><path d="M14.2 3h3.4c.3 2.1 1.5 3.4 3.4 3.8v3.5a8.2 8.2 0 0 1-3.4-1v6.1A6.4 6.4 0 1 1 12 9v3.6a2.9 2.9 0 1 0 2.2 2.8V3Z" /></svg>;
+  if (network === "snapchat") return <svg data-social-icon={network} viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.2c3 0 4.8 2.3 4.8 5.2 0 1 .1 1.8.4 2.5.4.9 1.1 1.2 2.1 1.6.7.3.8 1.2.1 1.6-.8.4-1.5.7-2.1 1.1-.4.3-.3 1 .1 1.3.4.3.9.5 1.4.7-.8.8-1.8 1.1-2.9 1.1-.7 0-1.4.8-1.9 1.4-.5.6-1.2 1.1-2 1.1s-1.5-.5-2-1.1c-.5-.6-1.2-1.4-1.9-1.4-1.1 0-2.1-.3-2.9-1.1.5-.2 1-.4 1.4-.7.4-.3.5-1 .1-1.3-.6-.4-1.3-.7-2.1-1.1-.7-.4-.6-1.3.1-1.6 1-.4 1.7-.7 2.1-1.6.3-.7.4-1.5.4-2.5C7.2 5.5 9 3.2 12 3.2Z" /></svg>;
+  return <svg data-social-icon="facebook" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 8h3V4h-3c-3.3 0-5 2-5 5v3H6v4h3v8h4v-8h3l1-4h-4V9c0-.7.3-1 1-1Z" /></svg>;
+}
 
 const activeLocale = () => normalizeCommerceLocale(i18n.resolvedLanguage || i18n.language);
 
@@ -43,6 +60,25 @@ class StorefrontActionError extends Error {
     super("Storefront action could not complete");
     this.messageKey = messageKey;
   }
+}
+
+function StoreWhatsAppLink({ phone, brand }) {
+  const number = normalizeWhatsAppNumber(phone);
+  if (!number) return null;
+  const message = c("contact.whatsappMessage", { brand: brand || c("nav.shop") });
+  const href = `https://wa.me/${number}?text=${encodeURIComponent(message)}`;
+  return (
+    <a
+      className="live-store-whatsapp"
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label={c("contact.whatsappAria", { brand: brand || c("nav.shop") })}
+      onClick={() => trackCommerceEvent("contact_click", { channel: "whatsapp", locale: activeLocale() })}
+    >
+      <span className="live-store-whatsapp-mark" aria-hidden="true"><MessageCircle size={28} /><Phone size={14} /></span>
+    </a>
+  );
 }
 
 function StoreActionToast({ notification, onDismiss, locale }) {
@@ -186,9 +222,13 @@ function StoreHeader({ brand, logoUrl, cartCount, shopPath, homePath, categories
   );
 }
 
-function StoreCart({ open, items, homePath, checkoutPath, onClose, onQuantityChange, onRemove }) {
+function StoreCart({ open, items, homePath, checkoutPath, delivery, selectedAreaId, onSelectedAreaChange, loyalty, normalDiscounts, onClose, onQuantityChange, onRemove }) {
   const currency = items[0]?.currency || "USD";
   const subtotal = items.reduce((total, item) => total + Number(item.price || 0) * Number(item.quantity || 0), 0);
+  const estimatedDiscount = estimateCartDiscount(items, normalDiscounts, loyalty?.entitlements || []);
+  const selectedArea = delivery.areas.find((area) => area.id === selectedAreaId);
+  const deliveryFee = Number(selectedArea?.delivery_fee || 0);
+  const total = subtotal - estimatedDiscount + deliveryFee;
   if (!open) return null;
   return (
     <div className="live-store-cart-overlay" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
@@ -225,6 +265,16 @@ function StoreCart({ open, items, homePath, checkoutPath, onClose, onQuantityCha
           {items.length > 0 && (
             <>
               <div className="live-store-cart-subtotal"><span>{c("common.subtotal")}</span><strong>{formatPrice(subtotal, currency, activeLocale())}</strong></div>
+              {estimatedDiscount > 0 && <div className="live-store-cart-subtotal"><span>{c("common.discount")}</span><strong>-{formatPrice(estimatedDiscount, currency, activeLocale())}</strong></div>}
+              <label className="live-store-cart-delivery">
+                <span>{c("checkout.serviceArea")}</span>
+                <select value={selectedAreaId} disabled={delivery.loading || !delivery.areas.length} onChange={(event) => onSelectedAreaChange(event.target.value)}>
+                  <option value="">{delivery.loading ? c("checkout.loadingAreas") : c("checkout.chooseArea")}</option>
+                  {delivery.areas.map((area) => <option key={area.id} value={area.id}>{activeLocale() === "ar" ? area.name_ar || area.name_en : area.name_en || area.name_ar}</option>)}
+                </select>
+              </label>
+              <div className="live-store-cart-subtotal"><span>{c("merchant.deliveryFee")}</span><strong>{selectedArea ? formatPrice(deliveryFee, currency, activeLocale()) : c("checkout.chooseArea")}</strong></div>
+              <div className="live-store-cart-subtotal is-total"><span>{c("common.total")}</span><strong>{formatPrice(total, currency, activeLocale())}</strong></div>
               <Link className="live-store-cart-checkout" to={checkoutPath} onClick={onClose}>{c("cart.checkout")} <ArrowRight size={17} aria-hidden="true" /></Link>
               <Link className="live-store-cart-continue" to={`${homePath}/catalog`} onClick={onClose}>{c("cart.continue")}</Link>
             </>
@@ -236,41 +286,22 @@ function StoreCart({ open, items, homePath, checkoutPath, onClose, onQuantityCha
   );
 }
 
-function StoreCheckout({ items, loyalty, normalDiscounts, shopPath, storePath, subdomain, onPlaceOrder, onNotify }) {
+function StoreCheckout({ items, loyalty, normalDiscounts, shopPath, storePath, delivery, selectedAreaId, onSelectedAreaChange, onPlaceOrder, onNotify }) {
   const navigate = useNavigate();
   const [status, setStatus] = useState({ saving: false, error: "" });
-  const [delivery, setDelivery] = useState({ loading: true, error: "", areas: [] });
-  const [selectedAreaId, setSelectedAreaId] = useState("");
   const currency = items[0]?.currency || "USD";
   const subtotal = items.reduce((total, item) => total + Number(item.price || 0) * Number(item.quantity || 0), 0);
   const estimatedDiscount = estimateCartDiscount(items, normalDiscounts, loyalty?.entitlements || []);
-  const estimatedTotal = subtotal - estimatedDiscount;
+  const selectedArea = delivery.areas.find((area) => area.id === selectedAreaId);
+  const deliveryFee = Number(selectedArea?.delivery_fee || 0);
+  const estimatedTotal = subtotal - estimatedDiscount + deliveryFee;
 
   const checkoutTracked = useRef(false);
   useEffect(() => {
-    if (checkoutTracked.current || !items.length) return;
+    if (checkoutTracked.current || !items.length || delivery.loading || !selectedArea) return;
     checkoutTracked.current = true;
-    trackCommerceEvent("begin_checkout", { item_count: items.reduce((sum, item) => sum + item.quantity, 0), subtotal, discount_total: 0, total: subtotal, currency, locale: activeLocale() });
-  }, [currency, items, subtotal]);
-
-
-  useEffect(() => {
-    let cancelled = false;
-    fetchPublicEcommerceDeliveryAreas(subdomain).then((result) => {
-      if (cancelled) return;
-      const areas = result?.areas || [];
-      setDelivery({ loading: false, error: "", areas });
-      setSelectedAreaId((current) => current || areas[0]?.id || "");
-      if (!areas.length) onNotify({ type: "error", title: c("storeFeedback.noDelivery"), message: c("checkout.noAreas") });
-    }).catch(() => {
-      if (!cancelled) {
-        setDelivery({ loading: false, error: c("storeFeedback.deliveryUnavailable"), areas: [] });
-        onNotify({ type: "error", title: c("storeFeedback.deliveryUnavailable"), message: c("admin.tryAgain") });
-      }
-    });
-    return () => { cancelled = true; };
-  }, [subdomain, onNotify]);
-  const selectedArea = delivery.areas.find((area) => area.id === selectedAreaId);
+    trackCommerceEvent("begin_checkout", { item_count: items.reduce((sum, item) => sum + item.quantity, 0), subtotal, discount_total: estimatedDiscount, delivery_fee: deliveryFee, total: estimatedTotal, currency, locale: activeLocale() });
+  }, [currency, delivery.loading, deliveryFee, estimatedDiscount, estimatedTotal, items, selectedArea, subtotal]);
 
   if (!items.length) {
     return (
@@ -345,7 +376,7 @@ function StoreCheckout({ items, loyalty, normalDiscounts, shopPath, storePath, s
               {delivery.loading && <p className="is-wide">{c("checkout.loadingAreas")}</p>}
               {!delivery.loading && delivery.error && <p className="is-wide live-store-checkout-error">{delivery.error}</p>}
               {!delivery.loading && !delivery.error && !delivery.areas.length && <p className="is-wide live-store-checkout-error">{c("checkout.noAreas")}</p>}
-              <label className="is-wide"><span>{c("checkout.serviceArea")}</span><select name="service_area_id" required value={selectedAreaId} disabled={!delivery.areas.length} onChange={(event) => setSelectedAreaId(event.target.value)}><option value="">{c("checkout.chooseArea")}</option>{delivery.areas.map((area) => <option key={area.id} value={area.id}>{activeLocale() === "ar" ? area.name_ar || area.name_en : area.name_en || area.name_ar}</option>)}</select></label>
+              <label className="is-wide"><span>{c("checkout.serviceArea")}</span><select name="service_area_id" required value={selectedAreaId} disabled={!delivery.areas.length} onChange={(event) => onSelectedAreaChange(event.target.value)}><option value="">{c("checkout.chooseArea")}</option>{delivery.areas.map((area) => <option key={area.id} value={area.id}>{activeLocale() === "ar" ? area.name_ar || area.name_en : area.name_en || area.name_ar} — {formatPrice(area.delivery_fee || 0, currency, activeLocale())}</option>)}</select></label>
               <label className="is-wide"><span>{c("checkout.street")}</span><input name="street" minLength={3} autoComplete="street-address" required maxLength={240} /></label>
               <label><span>{c("checkout.building")}</span><input name="building" maxLength={120} /></label>
               <label><span>{c("checkout.floor")}</span><input name="floor_apartment" maxLength={120} /></label>
@@ -365,9 +396,9 @@ function StoreCheckout({ items, loyalty, normalDiscounts, shopPath, storePath, s
           </div>
           <div className="live-store-checkout-total"><span>{c("common.subtotal")}</span><strong>{formatPrice(subtotal, currency, activeLocale())}</strong></div>
           {estimatedDiscount > 0 && <div className="live-store-checkout-total"><span>{c("common.discount")}</span><strong>-{formatPrice(estimatedDiscount, currency, activeLocale())}</strong></div>}
-          {estimatedDiscount > 0 && <div className="live-store-checkout-total"><span>{c("common.total")}</span><strong>{formatPrice(estimatedTotal, currency, activeLocale())}</strong></div>}
+          <div className="live-store-checkout-total"><span>{c("merchant.deliveryFee")}</span><strong>{formatPrice(deliveryFee, currency, activeLocale())}</strong></div>
+          <div className="live-store-checkout-total is-grand-total"><span>{c("common.total")}</span><strong>{formatPrice(estimatedTotal, currency, activeLocale())}</strong></div>
           {selectedArea && <p>{c("checkout.serviceArea")}: <strong>{activeLocale() === "ar" ? selectedArea.name_ar || selectedArea.name_en : selectedArea.name_en || selectedArea.name_ar}</strong></p>}
-          <p>{c("checkout.deliveryFeeNote")}</p>
           {status.error && <div className="live-store-checkout-error" role="alert">{status.error}</div>}
           <button type="submit" disabled={status.saving || delivery.loading || !delivery.areas.length}>{status.saving ? c("checkout.placing") : c("checkout.placeOrder")}</button>
         </aside>
@@ -392,6 +423,7 @@ function StoreConfirmation({ data, shopPath }) {
       {(data.items || []).map((item) => Array.isArray(item.selected_options_snapshot?.items) && item.selected_options_snapshot.items.length > 0 ? <p className="live-store-confirmation-options" key={`${item.id}-options`}>{item.selected_options_snapshot.items.map((entry) => `${entry.option_name_translations?.[activeLocale()] || entry.option_name_translations?.en || entry.option_name_translations?.ar || entry.option_code}: ${entry.value_translations?.[activeLocale()] || entry.value_translations?.en || entry.value_translations?.ar || entry.value_code}`).join(" · ")}</p> : null)}
       <div className="live-store-checkout-total"><span>{c("common.subtotal")}</span><strong>{formatPrice(order.subtotal, order.currency, activeLocale())}</strong></div>
       <div className="live-store-checkout-total"><span>{c("common.discount")}</span><strong>{formatPrice(order.discount_total, order.currency, activeLocale())}</strong></div>
+      <div className="live-store-checkout-total"><span>{c("merchant.deliveryFee")}</span><strong>{formatPrice(order.delivery_fee, order.currency, activeLocale())}</strong></div>
       <div className="live-store-checkout-total"><span>{c("common.total")}</span><strong>{formatPrice(order.total, order.currency, activeLocale())}</strong></div>
       <Link to={shopPath}>{c("cart.continue")}</Link>
     </section>
@@ -476,6 +508,7 @@ function StoreCategories({ categories, shopPath }) {
         <div className="live-store-directory-grid">
           {categories.map((category) => (
             <Link key={category.id} to={`${shopPath}?category=${encodeURIComponent(category.slug)}`}>
+              {category.image_url && <img className="live-store-directory-image" {...getResponsiveMediaProps(category.image_url, { widths: [480, 768, 1024, 1440], fallbackWidth: 1024, sizes: "(max-width: 760px) calc(100vw - 34px), (max-width: 980px) 50vw, 600px" })} alt="" loading="lazy" decoding="async" />}
               <div>
                 <h2>{category.name}</h2>
                 {category.description && <p>{category.description}</p>}
@@ -535,8 +568,9 @@ function CategoryList({ categories, activeSlug, onSelect }) {
         <button
           type="button"
           className={activeSlug === item.slug ? "is-active" : ""}
-          style={{ paddingInlineStart: `${depth * 14 + 2}px` }}
+          style={{ "--category-depth": depth }}
           onClick={() => onSelect(item.slug)}
+          title={item.name}
         >
           <span>{item.name}</span>
           <ChevronRight size={15} aria-hidden="true" />
@@ -563,25 +597,169 @@ function CategoryList({ categories, activeSlug, onSelect }) {
   );
 }
 
+function PriceRangeFilter({ bounds, minimum, maximum, locale, onChange }) {
+  const boundMinimum = Number(bounds?.min);
+  const boundMaximum = Number(bounds?.max);
+  const hasRange = Number.isFinite(boundMinimum) && Number.isFinite(boundMaximum);
+  const safeMinimum = hasRange ? Math.max(0, boundMinimum) : 0;
+  const safeMaximum = hasRange ? Math.max(safeMinimum, boundMaximum) : 0;
+  const requestedMinimum = Number(minimum);
+  const requestedMaximum = Number(maximum);
+  const initialMinimum = minimum === "" || !Number.isFinite(requestedMinimum) ? safeMinimum : Math.min(safeMaximum, Math.max(safeMinimum, requestedMinimum));
+  const initialMaximum = maximum === "" || !Number.isFinite(requestedMaximum) ? safeMaximum : Math.max(safeMinimum, Math.min(safeMaximum, requestedMaximum));
+  const [values, setValues] = useState({ min: Math.min(initialMinimum, initialMaximum), max: Math.max(initialMinimum, initialMaximum) });
+  const commitTimerRef = useRef(null);
+  const currency = bounds?.currency || "USD";
+  const spread = safeMaximum - safeMinimum;
+  const start = spread > 0 ? ((values.min - safeMinimum) / spread) * 100 : 0;
+  const end = spread > 0 ? ((values.max - safeMinimum) / spread) * 100 : 100;
+
+  useEffect(() => () => window.clearTimeout(commitTimerRef.current), []);
+
+  const scheduleChange = (next) => {
+    setValues(next);
+    window.clearTimeout(commitTimerRef.current);
+    commitTimerRef.current = window.setTimeout(() => {
+      const nextMinimum = next.min <= safeMinimum ? "" : String(Number(next.min.toFixed(2)));
+      const nextMaximum = next.max >= safeMaximum ? "" : String(Number(next.max.toFixed(2)));
+      onChange(nextMinimum, nextMaximum);
+    }, 280);
+  };
+
+  return (
+    <section className="live-store-filter-card live-store-price-filter" aria-labelledby="store-price-filter-title">
+      <div className="live-store-price-filter-heading">
+        <h2 id="store-price-filter-title">{c("catalog.priceFilter")}</h2>
+        {(minimum || maximum) && <button type="button" onClick={() => onChange("", "")}>{c("catalog.clearPrice")}</button>}
+      </div>
+      <div className="live-store-price-values" aria-live="polite">
+        <span><small>{c("catalog.minPrice")}</small><strong>{formatPrice(values.min, currency, locale)}</strong></span>
+        <span><small>{c("catalog.maxPrice")}</small><strong>{formatPrice(values.max, currency, locale)}</strong></span>
+      </div>
+      <div className="live-store-price-range" style={{ "--price-start": `${start}%`, "--price-end": `${end}%` }}>
+        <span className="live-store-price-range-track" aria-hidden="true" />
+        <input
+          type="range"
+          min={safeMinimum}
+          max={safeMaximum}
+          step="0.01"
+          value={values.min}
+          disabled={!hasRange || spread === 0}
+          aria-label={c("catalog.minPrice")}
+          onChange={(event) => scheduleChange({ min: Math.min(Number(event.target.value), values.max), max: values.max })}
+        />
+        <input
+          type="range"
+          min={safeMinimum}
+          max={safeMaximum}
+          step="0.01"
+          value={values.max}
+          disabled={!hasRange || spread === 0}
+          aria-label={c("catalog.maxPrice")}
+          onChange={(event) => scheduleChange({ min: values.min, max: Math.max(Number(event.target.value), values.min) })}
+        />
+      </div>
+    </section>
+  );
+}
+
 function ProductGallery({ product }) {
   const media = Array.isArray(product?.images) ? product.images.slice(0, 10) : [];
   const [selectedMedia, setSelectedMedia] = useState("");
+  const [hoveredMedia, setHoveredMedia] = useState("");
+  const [lightboxMedia, setLightboxMedia] = useState("");
+  const [zoomOrigin, setZoomOrigin] = useState({ x: 50, y: 50 });
+  const activeMedia = media.includes(selectedMedia) ? selectedMedia : (media[0] || "");
+  const hoverZoomed = hoveredMedia === activeMedia;
+  const lightboxOpen = lightboxMedia === activeMedia;
+
+  useEffect(() => {
+    if (!lightboxOpen) return undefined;
+    const previousOverflow = document.body.style.overflow;
+    const closeOnEscape = (event) => {
+      if (event.key === "Escape") setLightboxMedia("");
+    };
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [lightboxOpen]);
 
   if (!media.length) {
     return <div className="live-store-detail-gallery"><div className="live-store-detail-main-image"><ProductImage product={product} /></div></div>;
   }
 
-  const activeMedia = media.includes(selectedMedia) ? selectedMedia : media[0];
   const selectedIndex = media.indexOf(activeMedia);
   const activeUrl = resolveMediaUrl(activeMedia);
+  const updateZoomOrigin = (event) => {
+    if (!hoverZoomed) return;
+    const bounds = event.currentTarget.getBoundingClientRect();
+    if (!bounds.width || !bounds.height) return;
+    setZoomOrigin({
+      x: Math.max(0, Math.min(100, ((event.clientX - bounds.left) / bounds.width) * 100)),
+      y: Math.max(0, Math.min(100, ((event.clientY - bounds.top) / bounds.height) * 100)),
+    });
+  };
+  const chooseMedia = (item) => {
+    setHoveredMedia("");
+    setLightboxMedia("");
+    setZoomOrigin({ x: 50, y: 50 });
+    setSelectedMedia(item);
+  };
   return (
     <div className="live-store-detail-gallery">
-      <div className="live-store-detail-main-image">
+      <div className={`live-store-detail-main-image${!isVideoMediaUrl(activeMedia) ? " is-zoomable" : ""}`}>
         {isVideoMediaUrl(activeMedia)
           ? <video src={activeUrl} controls playsInline preload="metadata" aria-label={`${product.name} ${selectedIndex + 1}`} />
-          : <img {...getResponsiveMediaProps(activeMedia, { sizes: "(max-width: 760px) 100vw, 58vw" })} alt={`${product.name} ${selectedIndex + 1}`} decoding="async" />}
+          : (
+            <button
+              type="button"
+              className={`live-store-product-zoom-surface${hoverZoomed ? " is-hovered" : ""}`}
+              onClick={() => setLightboxMedia(activeMedia)}
+              onMouseEnter={() => setHoveredMedia(activeMedia)}
+              onMouseLeave={() => {
+                setHoveredMedia("");
+                setZoomOrigin({ x: 50, y: 50 });
+              }}
+              onMouseMove={updateZoomOrigin}
+              aria-label={c("product.openZoom")}
+            >
+              <img
+                {...getResponsiveMediaProps(activeMedia, { sizes: "(max-width: 760px) 100vw, 58vw" })}
+                alt={`${product.name} ${selectedIndex + 1}`}
+                decoding="async"
+                style={{ transformOrigin: `${zoomOrigin.x}% ${zoomOrigin.y}%` }}
+              />
+              <span className="live-store-product-zoom-indicator" aria-hidden="true">
+                <ZoomIn size={20} />
+              </span>
+            </button>
+          )}
       </div>
-      {media.length > 1 && <div className="live-store-detail-thumbnails">{media.map((item, index) => { const video = isVideoMediaUrl(item); return <button type="button" className={index === selectedIndex ? "is-active" : ""} key={item} onClick={() => setSelectedMedia(item)} aria-label={c(video ? "product.showMedia" : "product.showImage", { count: index + 1 })}>{video ? <video src={resolveMediaUrl(item)} muted playsInline preload="metadata" /> : <img {...getResponsiveMediaProps(item, { fallbackWidth: 320, sizes: "120px" })} alt="" loading="lazy" decoding="async" />}</button>; })}</div>}
+      {media.length > 1 && <div className="live-store-detail-thumbnails">{media.map((item, index) => { const video = isVideoMediaUrl(item); return <button type="button" className={index === selectedIndex ? "is-active" : ""} key={item} onClick={() => chooseMedia(item)} aria-label={c(video ? "product.showMedia" : "product.showImage", { count: index + 1 })}>{video ? <video src={resolveMediaUrl(item)} muted playsInline preload="metadata" /> : <img {...getResponsiveMediaProps(item, { fallbackWidth: 320, sizes: "120px" })} alt="" loading="lazy" decoding="async" />}</button>; })}</div>}
+      {lightboxOpen && (
+        <div
+          className="live-store-product-lightbox"
+          role="dialog"
+          aria-modal="true"
+          aria-label={c("product.imageZoom")}
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setLightboxMedia("");
+          }}
+        >
+          <button type="button" className="live-store-product-lightbox-close" onClick={() => setLightboxMedia("")} aria-label={c("product.closeZoom")}>
+            <X size={24} aria-hidden="true" />
+          </button>
+          <img
+            {...getResponsiveMediaProps(activeMedia, { sizes: "100vw" })}
+            src={activeUrl}
+            alt={`${product.name} ${selectedIndex + 1}`}
+            decoding="async"
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -595,16 +773,40 @@ function StoreProductDetail({ detail, locale, shopPath, onAdd }) {
   const matchingVariants = activeVariants.filter((variant) => selectedIds.every((id) => variant.option_value_ids.includes(id)));
   const resolved = requiredComplete && matchingVariants.length === 1 ? matchingVariants[0] : undefined;
   const optionForValue = (valueId) => options.find((option) => option.values.some((value) => value.id === valueId));
+  const detailsForVariant = (variant) => variant.option_value_ids.map((valueId) => {
+    const option = optionForValue(valueId);
+    const value = option?.values.find((item) => item.id === valueId);
+    return option && value ? { option, value } : null;
+  }).filter(Boolean);
+  const inventoryCount = (item) => Math.max(0, Math.floor(Number(item?.inventory_quantity) || 0));
+  const valueHasStock = (valueId) => activeVariants.some((variant) => variant.in_stock && variant.option_value_ids.includes(valueId));
   const possible = (optionId, valueId) => activeVariants.some((variant) => {
     if (!variant.in_stock || !variant.option_value_ids.includes(valueId)) return false;
     return Object.entries(selection).every(([selectedOptionId, selectedValueId]) => selectedOptionId === optionId || !selectedValueId || variant.option_value_ids.includes(selectedValueId));
   });
-  const displayProduct = resolved ? { ...product, price: resolved.price, compare_at_price: resolved.compare_at_price, images: resolved.images?.length ? resolved.images : product.images, sku: resolved.sku, in_stock: resolved.in_stock } : product;
-  const selectedOptions = resolved ? resolved.option_value_ids.map((valueId) => {
-    const option = optionForValue(valueId); const value = option?.values.find((item) => item.id === valueId);
-    return { option_code: option?.code, option_name: option?.name, value_code: value?.code, value: value?.value };
-  }) : [];
+  const selectOption = (optionId, valueId) => setSelection((current) => {
+    const next = { ...current, [optionId]: valueId };
+    const compatible = activeVariants.some((variant) => variant.in_stock && Object.values(next).filter(Boolean).every((id) => variant.option_value_ids.includes(id)));
+    return compatible ? next : { [optionId]: valueId };
+  });
+  const selectVariant = (variant) => {
+    const next = {};
+    detailsForVariant(variant).forEach(({ option, value }) => { next[option.id] = value.id; });
+    setSelection(next);
+  };
+  const displayProduct = resolved ? { ...product, price: resolved.price, compare_at_price: resolved.compare_at_price, images: resolved.images?.length ? resolved.images : product.images, sku: resolved.sku, in_stock: resolved.in_stock, track_inventory: resolved.track_inventory, inventory_quantity: resolved.inventory_quantity, allow_backorder: resolved.allow_backorder } : product;
+  const selectedOptions = resolved ? detailsForVariant(resolved).map(({ option, value }) => ({
+    option_code: option.code, option_name: option.name, value_code: value.code, value: value.value,
+  })) : [];
   const canAdd = options.length ? Boolean(resolved?.in_stock) : product.in_stock;
+  const allVariantStockIsCounted = activeVariants.length > 0 && activeVariants.every((variant) => variant.track_inventory && !variant.allow_backorder);
+  const exactStock = options.length
+    ? (allVariantStockIsCounted ? activeVariants.reduce((total, variant) => total + inventoryCount(variant), 0) : null)
+    : (product.track_inventory && !product.allow_backorder ? inventoryCount(product) : null);
+  const availableVariantCount = activeVariants.filter((variant) => variant.in_stock).length;
+  const stockText = exactStock === null
+    ? c(product.in_stock ? "product.available" : "product.outOfStock")
+    : c("product.itemsAvailable", { count: exactStock });
   return (
     <section className="live-store-detail">
       <ProductGallery product={displayProduct} />
@@ -612,14 +814,33 @@ function StoreProductDetail({ detail, locale, shopPath, onAdd }) {
         <Link className="live-store-back" to={shopPath}><ArrowLeft size={15} aria-hidden="true" />{c("product.back")}</Link>
         <p className="live-store-product-category">{[product.brand, category?.name].filter(Boolean).join(" / ")}</p>
         <h1>{product.name}</h1>
+        <div className={`live-store-stock-summary ${product.in_stock ? "" : "is-sold-out"}`}>
+          <strong>{stockText}</strong>
+          {options.length > 0 && <span>{c("product.variantsAvailable", { available: availableVariantCount, total: activeVariants.length })}</span>}
+        </div>
+        {attributes.length > 0 && <section className="live-store-product-facts" aria-labelledby="product-specifications"><h2 id="product-specifications">{c("product.specifications")}</h2><dl className="live-store-attributes">{attributes.map((attribute) => <div key={attribute.id}><dt>{attribute.name}</dt><dd>{attribute.value}</dd></div>)}</dl></section>}
         <div className="live-store-detail-price">{formatPrice(displayProduct.price, product.currency, locale)}</div>
         {displayProduct.compare_at_price && <del className="live-store-detail-compare-price">{formatPrice(displayProduct.compare_at_price, product.currency, locale)}</del>}
         {product.description && <p>{product.description}</p>}
-        {options.length > 0 && <div className="live-store-variant-options">{options.map((option) => <fieldset key={option.id}><legend>{option.name}{option.required ? " *" : ""}</legend><div>{option.values.map((value) => { const enabled = possible(option.id, value.id); return <button type="button" key={value.id} disabled={!enabled} className={`${selection[option.id] === value.id ? "is-active" : ""}${option.display_type === "color" ? " is-color" : ""}`} aria-label={value.value} aria-pressed={selection[option.id] === value.id} onClick={() => setSelection((current) => ({ ...current, [option.id]: value.id }))}>{option.display_type === "color" && value.color_hex && <span className="live-store-color-swatch" style={{ backgroundColor: value.color_hex }} aria-hidden="true" />}<span>{value.value}</span></button>; })}</div></fieldset>)}</div>}
+        {options.length > 0 && <div className="live-store-variant-options">{options.map((option) => <fieldset key={option.id}><legend>{option.name}{option.required ? " *" : ""}</legend><div>{option.values.map((value) => { const inStock = valueHasStock(value.id); const enabled = inStock && possible(option.id, value.id); return <button type="button" key={value.id} disabled={!inStock} className={`${selection[option.id] === value.id ? "is-active" : ""}${option.display_type === "color" ? " is-color" : ""}${!inStock ? " is-sold-out" : ""}${inStock && !enabled ? " is-incompatible" : ""}`} aria-label={value.value} aria-pressed={selection[option.id] === value.id} onClick={() => selectOption(option.id, value.id)}>{option.display_type === "color" && value.color_hex && <span className="live-store-color-swatch" style={{ backgroundColor: value.color_hex }} aria-hidden="true" />}<span>{value.value}</span>{!inStock && <small>{c("product.outOfStock")}</small>}</button>; })}</div></fieldset>)}</div>}
+        {activeVariants.length > 0 && <section className="live-store-variant-inventory" aria-labelledby="variant-inventory-heading">
+          <header><h2 id="variant-inventory-heading">{c("product.variantsStock")}</h2><span>{availableVariantCount}/{activeVariants.length}</span></header>
+          <div className="live-store-variant-list">
+            {activeVariants.map((variant) => {
+              const variantDetails = detailsForVariant(variant);
+              const quantity = variant.track_inventory ? inventoryCount(variant) : null;
+              const label = variantDetails.map(({ value }) => value.value).join(" / ") || variant.sku;
+              const quantityText = quantity === null ? c("product.available") : c("product.itemsAvailable", { count: quantity });
+              return <button type="button" key={variant.id} disabled={!variant.in_stock} className={`live-store-variant-card ${resolved?.id === variant.id ? "is-active" : ""} ${variant.in_stock ? "" : "is-sold-out"}`} aria-label={c("product.selectVariant", { variant: label, stock: variant.in_stock ? quantityText : c("product.outOfStock") })} aria-pressed={resolved?.id === variant.id} onClick={() => selectVariant(variant)}>
+                <span className="live-store-variant-card-values">{variantDetails.map(({ option, value }) => <span key={value.id}>{option.display_type === "color" && value.color_hex && <i className="live-store-color-swatch" style={{ backgroundColor: value.color_hex }} aria-hidden="true" />}<span><small>{option.name}</small><strong>{value.value}</strong></span></span>)}</span>
+                <span className="live-store-variant-card-stock"><strong>{quantityText}</strong>{!variant.in_stock && <small>{c("product.outOfStock")}</small>}{variant.allow_backorder && quantity === 0 && <small>{c("product.availableToOrder")}</small>}</span>
+              </button>;
+            })}
+          </div>
+        </section>}
         {options.length > 0 && !resolved && <p className="live-store-variant-help">{c("product.requiredHelp")}</p>}
         {resolved && <p className="live-store-variant-meta"><bdi>{c("common.sku")} {resolved.sku}</bdi> · {resolved.in_stock ? c("product.available") : c("product.outOfStock")}</p>}
         <button type="button" disabled={!canAdd} onClick={() => onAdd({ ...displayProduct, variant_id: resolved?.id, selected_options: selectedOptions })}><ShoppingBag size={18} />{canAdd ? c("product.addToCart") : resolved ? c("product.outOfStock") : options.length ? c("product.chooseOptions") : c("product.outOfStock")}</button>
-        {attributes.length > 0 && <dl className="live-store-attributes">{attributes.map((attribute) => <div key={attribute.id}><dt>{attribute.name}</dt><dd>{attribute.value}</dd></div>)}</dl>}
         {tags.length > 0 && <div className="live-store-detail-tags">{tags.map((item) => <span key={item.id}>{item.name}</span>)}</div>}
       </div>
     </section>
@@ -627,7 +848,7 @@ function StoreProductDetail({ detail, locale, shopPath, onAdd }) {
 }
 
 
-function ProductCard({ product, category, locale, productPath, onAdd, eager = false }) {
+function ProductCard({ product, locale, productPath, onAdd, eager = false }) {
   return (
     <article className="live-store-product-card">
       <Link className="live-store-product-image" to={productPath}>
@@ -635,10 +856,14 @@ function ProductCard({ product, category, locale, productPath, onAdd, eager = fa
         <span className="live-store-product-view">{c("common.products")}</span>
       </Link>
       <div className="live-store-product-body">
-        <p className="live-store-product-category">
-          {[product.brand, category?.name].filter(Boolean).join(" / ") || "Product"}
-        </p>
         <h2><Link to={productPath}>{product.name}</Link></h2>
+        {product.variant_options?.length > 0 && (
+          <div className="live-store-product-variant-preview" aria-label={c("product.variantsAvailable", { available: product.variant_options.reduce((total, option) => total + option.values.length, 0), total: product.variant_options.reduce((total, option) => total + option.values.length, 0) })}>
+            {product.variant_options.flatMap((option) => option.values.map((value) => (
+              <span key={`${option.id}:${value}`} title={option.name}>{value}</span>
+            )))}
+          </div>
+        )}
         <div className="live-store-product-bottom">
           <div className="live-store-price-row">
             <strong>{formatPrice(product.price, product.currency, locale)}</strong>
@@ -656,11 +881,137 @@ function ProductCard({ product, category, locale, productPath, onAdd, eager = fa
   );
 }
 
+function CategoryCarousel({ categories, shopPath, categoriesPath, kind = "category" }) {
+  const trackRef = useRef(null);
+  const loopResetRef = useRef(null);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const rtl = activeLocale() === "ar";
+  const isBrandCarousel = kind === "brand";
+  const carouselTitle = isBrandCarousel ? c("catalog.brands") : c("common.categories");
+  const filterKey = isBrandCarousel ? "brand" : "category";
+  const viewAllPath = isBrandCarousel ? shopPath : categoriesPath;
+  const categoryCount = categories.length;
+  const loopedCategories = categoryCount > 1
+    ? [-1, 0, 1].flatMap((group) => categories.map((category, index) => ({ category, index, group })))
+    : categories.map((category, index) => ({ category, index, group: 0 }));
+  const scrollToItem = useCallback((renderIndex, behavior = "smooth") => {
+    const track = trackRef.current;
+    const item = track?.children[renderIndex];
+    if (!track || !item) return;
+    const trackRect = track.getBoundingClientRect();
+    const itemRect = item.getBoundingClientRect();
+    const left = rtl ? itemRect.right - trackRect.right : itemRect.left - trackRect.left;
+    if (typeof track.scrollBy === "function") track.scrollBy({ left, behavior });
+    else track.scrollLeft += left;
+  }, [rtl]);
+  const scheduleLoopReset = useCallback((renderIndex, categoryIndex, delay = 220) => {
+    if (renderIndex >= categoryCount && renderIndex < categoryCount * 2) return;
+    window.clearTimeout(loopResetRef.current);
+    loopResetRef.current = window.setTimeout(
+      () => scrollToItem(categoryCount + categoryIndex, "auto"),
+      delay,
+    );
+  }, [categoryCount, scrollToItem]);
+  useLayoutEffect(() => {
+    if (categoryCount > 1) scrollToItem(categoryCount, "auto");
+    return () => window.clearTimeout(loopResetRef.current);
+  }, [categoryCount, scrollToItem]);
+  const move = useCallback((step) => {
+    if (categoryCount < 2) return;
+    window.clearTimeout(loopResetRef.current);
+    const nextIndex = (activeIndex + step + categoryCount) % categoryCount;
+    const crossesEnd = step > 0 && activeIndex === categoryCount - 1;
+    const crossesStart = step < 0 && activeIndex === 0;
+    const renderIndex = crossesEnd
+      ? categoryCount * 2
+      : crossesStart
+        ? categoryCount - 1
+        : categoryCount + nextIndex;
+    setActiveIndex(nextIndex);
+    scrollToItem(renderIndex);
+    if (crossesEnd || crossesStart) scheduleLoopReset(renderIndex, nextIndex, 520);
+  }, [activeIndex, categoryCount, scheduleLoopReset, scrollToItem]);
+  useEffect(() => {
+    const prefersReducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    if (categoryCount < 2 || prefersReducedMotion) return undefined;
+    const timer = window.setInterval(() => move(1), 5000);
+    return () => window.clearInterval(timer);
+  }, [categoryCount, move]);
+  const syncActiveIndex = () => {
+    const track = trackRef.current;
+    if (!track) return;
+    const trackRect = track.getBoundingClientRect();
+    const trackEdge = rtl ? trackRect.right : trackRect.left;
+    let nearestIndex = 0;
+    let nearestRenderIndex = categoryCount;
+    let nearestDistance = Number.POSITIVE_INFINITY;
+    Array.from(track.children).forEach((item, index) => {
+      const itemRect = item.getBoundingClientRect();
+      const itemEdge = rtl ? itemRect.right : itemRect.left;
+      const distance = Math.abs(itemEdge - trackEdge);
+      if (distance < nearestDistance) {
+        nearestIndex = Number(item.dataset.categoryIndex || 0);
+        nearestRenderIndex = index;
+        nearestDistance = distance;
+      }
+    });
+    setActiveIndex(nearestIndex);
+    scheduleLoopReset(nearestRenderIndex, nearestIndex);
+  };
+  const previousLabel = c(isBrandCarousel ? "catalog.previousBrands" : "catalog.previousCategories");
+  const nextLabel = c(isBrandCarousel ? "catalog.nextBrands" : "catalog.nextCategories");
+
+  return (
+    <section className={`live-store-landing-section live-store-category-section${isBrandCarousel ? " live-store-brand-section" : ""}`} aria-label={carouselTitle}>
+      <header>
+        <div><h2>{carouselTitle}</h2></div>
+        <div className="live-store-category-header-actions">
+          <Link to={viewAllPath}>{c("common.viewAll")} <ArrowRight size={17} aria-hidden="true" /></Link>
+        </div>
+      </header>
+      <div className="live-store-category-stage">
+        {categories.length > 1 && (
+          <button className="live-store-category-side-control is-previous" type="button" onClick={() => move(-1)} aria-label={previousLabel}>
+            {rtl ? <ChevronRight size={24} aria-hidden="true" /> : <ChevronLeft size={24} aria-hidden="true" />}
+          </button>
+        )}
+        <ul className="live-store-category-carousel" ref={trackRef} onScroll={syncActiveIndex} style={{ "--store-carousel-columns": Math.min(5, Math.max(1, categories.length)), "--store-carousel-tablet-columns": Math.min(3, Math.max(1, categories.length)) }}>
+          {loopedCategories.map(({ category, index, group }) => (
+            <li
+              key={`${group}-${category.id}`}
+              data-category-index={index}
+              aria-hidden={group === 0 ? undefined : "true"}
+            >
+              <Link to={`${shopPath}?${filterKey}=${encodeURIComponent(category.slug)}`} tabIndex={group === 0 ? undefined : -1}>
+                <div className={`live-store-category-media${category.image_url ? "" : " is-placeholder"}`}>
+                  {category.image_url
+                    ? <img {...getResponsiveMediaProps(category.image_url, { widths: [240, 320, 480, 640], fallbackWidth: 480, sizes: "(max-width: 760px) 50vw, (max-width: 980px) 33vw, 20vw" })} alt="" loading={index < 5 ? "eager" : "lazy"} decoding="async" />
+                    : <span>{String(index + 1).padStart(2, "0")}</span>}
+                </div>
+                <div className="live-store-category-copy">
+                  <div><h3>{category.name}</h3></div>
+                  <ArrowRight size={20} aria-hidden="true" />
+                </div>
+              </Link>
+            </li>
+          ))}
+        </ul>
+        {categories.length > 1 && (
+          <button className="live-store-category-side-control is-next" type="button" onClick={() => move(1)} aria-label={nextLabel}>
+            {rtl ? <ChevronLeft size={24} aria-hidden="true" /> : <ChevronRight size={24} aria-hidden="true" />}
+          </button>
+        )}
+      </div>
+    </section>
+  );
+}
+
 
 function StoreLanding({ brand, site, catalog, categoryById, locale, shopPath, productBasePath, onAdd }) {
   const selectedProductIds = site?.growth?.featured_product_ids || [];
   const selectedCategoryIds = site?.growth?.featured_category_ids || [];
   const featuredProducts = (selectedProductIds.length ? catalog.featured_products : catalog.products).slice(0, 12);
+  const featuredBrands = (catalog.brands || []).slice(0, 6);
   const featuredCategories = (selectedCategoryIds.length ? catalog.featured_categories : catalog.categories.filter((item) => !item.parent_id)).slice(0, 6);
   const leadProduct = featuredProducts[0];
   const productTotal = Number(catalog.pagination?.total || catalog.products.length || 0);
@@ -694,19 +1045,21 @@ function StoreLanding({ brand, site, catalog, categoryById, locale, shopPath, pr
         </div>
       </section>
 
+      {featuredBrands.length > 0 && (
+        <CategoryCarousel
+          categories={featuredBrands}
+          shopPath={shopPath}
+          categoriesPath={shopPath}
+          kind="brand"
+        />
+      )}
+
       {featuredCategories.length > 0 && (
-        <section className="live-store-landing-section">
-          <header><div><h2>{c("common.categories")}</h2></div><Link to={shopPath}>{c("common.viewAll")} <ArrowRight size={17} /></Link></header>
-          <div className="live-store-category-grid">
-            {featuredCategories.map((category, index) => (
-              <Link key={category.id} to={`${shopPath}?category=${encodeURIComponent(category.slug)}`}>
-                <span>{String(index + 1).padStart(2, "0")}</span>
-                <div><h3>{category.name}</h3>{category.description && <p>{category.description}</p>}</div>
-                <ArrowRight size={20} />
-              </Link>
-            ))}
-          </div>
-        </section>
+        <CategoryCarousel
+          categories={featuredCategories}
+          shopPath={shopPath}
+          categoriesPath={`${productBasePath}/categories`}
+        />
       )}
 
       <section className="live-store-landing-section live-store-featured-section">
@@ -757,6 +1110,8 @@ export default function EcommerceStorefront({ subdomain: suppliedSubdomain = "",
   const [confirmation, setConfirmation] = useState(null);
   const [loyalty, setLoyalty] = useState(null);
   const [normalDiscounts, setNormalDiscounts] = useState([]);
+  const [delivery, setDelivery] = useState({ loading: false, error: "", areas: [] });
+  const [selectedAreaId, setSelectedAreaId] = useState("");
   const [requestStatus, setRequestStatus] = useState({
     key: "",
     loading: true,
@@ -783,13 +1138,16 @@ export default function EcommerceStorefront({ subdomain: suppliedSubdomain = "",
   const filters = {
     search: urlFilters.get("search") || "",
     category: urlFilters.get("category") || "",
+    brand: urlFilters.get("brand") || "",
     tag: urlFilters.get("tag") || "",
+    minPrice: urlFilters.get("min_price") || "",
+    maxPrice: urlFilters.get("max_price") || "",
     sort: urlFilters.get("sort") || "latest",
     page: urlFilters.get("page") || "1",
     locale,
   };
 
-  const hasCatalogFilters = Boolean(filters.search || filters.category || filters.tag || filters.page !== "1" || filters.sort !== "latest");
+  const hasCatalogFilters = Boolean(filters.search || filters.category || filters.brand || filters.tag || filters.minPrice || filters.maxPrice || filters.page !== "1" || filters.sort !== "latest");
   const landingRoute = routeTail === "";
   const isLanding = landingRoute && !hasCatalogFilters;
   const isCatalogView = catalogRoute || (landingRoute && hasCatalogFilters);
@@ -799,7 +1157,10 @@ export default function EcommerceStorefront({ subdomain: suppliedSubdomain = "",
     productSlug,
     filters.search,
     filters.category,
+    filters.brand,
     filters.tag,
+    filters.minPrice,
+    filters.maxPrice,
     filters.sort,
     filters.page,
     locale,
@@ -822,7 +1183,10 @@ export default function EcommerceStorefront({ subdomain: suppliedSubdomain = "",
         : fetchPublicEcommerceCatalog(subdomain, {
           search: filters.search,
           category: filters.category,
+          brand: filters.brand,
           tag: filters.tag,
+          min_price: filters.minPrice,
+          max_price: filters.maxPrice,
           sort: filters.sort,
           page: filters.page,
           locale,
@@ -869,7 +1233,10 @@ export default function EcommerceStorefront({ subdomain: suppliedSubdomain = "",
     contactRoute,
     checkoutRoute,
     filters.category,
+    filters.brand,
     filters.tag,
+    filters.minPrice,
+    filters.maxPrice,
     confirmationToken,
     notify,
   ]);
@@ -886,6 +1253,28 @@ export default function EcommerceStorefront({ subdomain: suppliedSubdomain = "",
   }, [subdomain, confirmationToken, notify]);
 
   useEffect(() => {
+    if (!subdomain || (!cartOpen && !checkoutRoute)) return undefined;
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) setDelivery((current) => ({ ...current, loading: true, error: "" }));
+    });
+    fetchPublicEcommerceDeliveryAreas(subdomain)
+      .then((result) => {
+        if (cancelled) return;
+        const areas = result?.areas || [];
+        setDelivery({ loading: false, error: "", areas });
+        setSelectedAreaId((current) => areas.some((area) => area.id === current) ? current : areas[0]?.id || "");
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setDelivery({ loading: false, error: c("storeFeedback.deliveryUnavailable"), areas: [] });
+          notify({ type: "error", title: c("storeFeedback.deliveryUnavailable"), message: c("admin.tryAgain") });
+        }
+      });
+    return () => { cancelled = true; };
+  }, [cartOpen, checkoutRoute, notify, subdomain]);
+
+  useEffect(() => {
     if (loading || error || !productDetail?.product) return;
     const product = productDetail.product; const key = `item:${locale}:${product.id}`;
     if (analyticsViewsRef.current.has(key)) return;
@@ -895,11 +1284,11 @@ export default function EcommerceStorefront({ subdomain: suppliedSubdomain = "",
 
   useEffect(() => {
     if (loading || error || (!isLanding && !isCatalogView) || !catalog.products.length) return;
-    const key = `list:${locale}:${filters.category}:${filters.tag}:${filters.search}:${filters.page}`;
+    const key = `list:${locale}:${filters.category}:${filters.brand}:${filters.tag}:${filters.search}:${filters.page}`;
     if (analyticsViewsRef.current.has(key)) return;
     analyticsViewsRef.current.add(key);
     trackCommerceEvent("view_item_list", { store: subdomain, list: filters.category || "catalog", product_ids: catalog.products.map((item) => item.id), currency: catalog.products[0]?.currency, locale });
-  }, [catalog.products, error, filters.category, filters.page, filters.search, filters.tag, isCatalogView, isLanding, loading, locale, subdomain]);
+  }, [catalog.products, error, filters.brand, filters.category, filters.page, filters.search, filters.tag, isCatalogView, isLanding, loading, locale, subdomain]);
 
   const announcementText = String(site?.growth?.[locale === "ar" ? "announcement_text_ar" : "announcement_text_en"] || site?.growth?.announcement_text_en || site?.growth?.announcement_text_ar || "").trim();
   const announcementLink = safePublicUrl(site?.growth?.announcement_link, window.location.origin);
@@ -927,7 +1316,33 @@ export default function EcommerceStorefront({ subdomain: suppliedSubdomain = "",
     if (value) next.set(key, value);
     else next.delete(key);
     if (resetPage && key !== "page") next.delete("page");
-    navigate(`${shopPath}${next.toString() ? `?${next}` : ""}`);
+    navigate(`${shopPath}${next.toString() ? `?${next}` : ""}`, {
+      preventScrollReset: true,
+      state: { preserveScroll: true },
+    });
+  };
+
+  const setPriceFilters = (rawMinimum, rawMaximum) => {
+    const normalizePrice = (value) => {
+      if (String(value ?? "").trim() === "") return "";
+      const parsed = Number(value);
+      return Number.isFinite(parsed) && parsed >= 0 ? String(parsed) : "";
+    };
+    let minimum = normalizePrice(rawMinimum);
+    let maximum = normalizePrice(rawMaximum);
+    if (minimum && maximum && Number(minimum) > Number(maximum)) {
+      [minimum, maximum] = [maximum, minimum];
+    }
+    const next = new URLSearchParams(location.search);
+    if (minimum) next.set("min_price", minimum);
+    else next.delete("min_price");
+    if (maximum) next.set("max_price", maximum);
+    else next.delete("max_price");
+    next.delete("page");
+    navigate(`${shopPath}${next.toString() ? `?${next}` : ""}`, {
+      preventScrollReset: true,
+      state: { preserveScroll: true },
+    });
   };
 
   const cartItems = useMemo(() => Array.from(cart.reduce((items, item) => {
@@ -1035,9 +1450,18 @@ export default function EcommerceStorefront({ subdomain: suppliedSubdomain = "",
     () => new Map(catalog.categories.map((item) => [item.id, item])),
     [catalog.categories]
   );
+  const priceBounds = useMemo(() => {
+    if (catalog.price_bounds?.min != null && catalog.price_bounds?.max != null) return catalog.price_bounds;
+    const prices = catalog.products.map((item) => Number(item.price)).filter(Number.isFinite);
+    return prices.length
+      ? { min: Math.min(...prices), max: Math.max(...prices), currency: catalog.products[0]?.currency || "USD" }
+      : { min: 0, max: 0, currency: "USD" };
+  }, [catalog.price_bounds, catalog.products]);
   const brand = (locale === "ar" && site?.brand_ar?.trim()) || site?.brand || site?.footer_store_name || "";
   const description = (locale === "ar" && site?.description_ar?.trim()) || site?.description || "";
   const localizedSite = site ? { ...site, brand, description } : site;
+  const socialLinks = STORE_SOCIAL_NETWORKS
+    .map(([key, label]) => ({ key, label, href: String(site?.social_links?.[key] || "").trim() }));
   const activeCategory = catalog.categories.find((item) => item.slug === filters.category) || null;
   const seoView = error || (filters.category && !activeCategory) ? "missing" : draftPreviewMode ? "preview" : confirmationRoute ? "confirmation" : checkoutRoute ? "checkout" : productSlug ? (productDetail?.product ? "product" : "missing") : categoriesRoute ? "categories" : isCatalogView ? "catalog" : contactRoute ? "contact" : "home";
   const savedTheme = normalizeStoreTheme(draftTheme || site?.store_theme || site?.theme);
@@ -1049,6 +1473,7 @@ export default function EcommerceStorefront({ subdomain: suppliedSubdomain = "",
     "--store-muted": savedTheme.muted,
     "--store-night": savedTheme.accentDark || savedTheme.text,
   };
+  const catalogRefreshing = loading && isCatalogView && Boolean(requestStatus.key);
 
   useLayoutEffect(() => {
     const root = document.documentElement;
@@ -1070,7 +1495,8 @@ export default function EcommerceStorefront({ subdomain: suppliedSubdomain = "",
       <StoreHeader brand={brand} logoUrl={site?.logo_url} cartCount={cartCount} shopPath={shopPath} homePath={homePath} categoriesPath={categoriesPath} contactPath={contactPath} onCartOpen={openCart} />
       {site?.growth?.announcement_enabled && announcementText && <div className="live-store-announcement" role="status">{announcementLink ? <a href={announcementLink} onClick={() => trackCommerceEvent("promotion_click", { store: subdomain, locale, placement: "announcement" })}>{announcementText}</a> : <span>{announcementText}</span>}</div>}
       <StoreActionToast notification={notification} onDismiss={dismissNotification} locale={locale} />
-      <StoreCart open={cartOpen} items={cartItems} homePath={homePath} checkoutPath={checkoutPath} onClose={() => setCartOpen(false)} onQuantityChange={changeCartQuantity} onRemove={removeCartItem} />
+      <StoreWhatsAppLink phone={site?.phone} brand={brand} />
+      <StoreCart open={cartOpen} items={cartItems} homePath={homePath} checkoutPath={checkoutPath} delivery={delivery} selectedAreaId={selectedAreaId} onSelectedAreaChange={setSelectedAreaId} loyalty={loyalty} normalDiscounts={normalDiscounts} onClose={() => setCartOpen(false)} onQuantityChange={changeCartQuantity} onRemove={removeCartItem} />
       {loyalty && <section className="live-store-loyalty" aria-label={c("loyalty.title")}>
         <Gift size={20} aria-hidden="true" />
         <div><strong>{c("loyalty.balance")}: {loyalty.account?.current_balance || 0}</strong>
@@ -1085,7 +1511,7 @@ export default function EcommerceStorefront({ subdomain: suppliedSubdomain = "",
       </section>}
       <main>
 
-        {loading && <StoreSkeleton view={productSlug ? "product" : categoriesRoute ? "categories" : contactRoute ? "contact" : checkoutRoute ? "catalog" : isLanding ? "landing" : "catalog"} />}
+        {loading && !catalogRefreshing && <StoreSkeleton view={productSlug ? "product" : categoriesRoute ? "categories" : contactRoute ? "contact" : checkoutRoute ? "catalog" : isLanding ? "landing" : "catalog"} />}
         {!loading && error && <div className="live-store-state is-error"><h2>{c("errors.storeUnavailable")}</h2><p>{error}</p></div>}
 
         {!loading && !error && isLanding && (
@@ -1101,7 +1527,7 @@ export default function EcommerceStorefront({ subdomain: suppliedSubdomain = "",
         )}
 
         {!loading && !error && checkoutRoute && (
-          <StoreCheckout items={cartItems} loyalty={loyalty} normalDiscounts={normalDiscounts} shopPath={shopPath} storePath={storePath} subdomain={subdomain} onPlaceOrder={placeOrder} onNotify={notify} />
+          <StoreCheckout items={cartItems} loyalty={loyalty} normalDiscounts={normalDiscounts} shopPath={shopPath} storePath={storePath} delivery={delivery} selectedAreaId={selectedAreaId} onSelectedAreaChange={setSelectedAreaId} onPlaceOrder={placeOrder} onNotify={notify} />
         )}
 
         {!loading && !error && confirmationRoute && (
@@ -1110,8 +1536,8 @@ export default function EcommerceStorefront({ subdomain: suppliedSubdomain = "",
 
         {!loading && !error && productSlug && productDetail?.product && <StoreProductDetail key={productDetail.product.id} detail={productDetail} locale={locale} shopPath={shopPath} onAdd={addToCart} />}
 
-        {!loading && !error && !productSlug && !checkoutRoute && isCatalogView && (
-          <section className="live-store-catalog-page">
+        {(!loading || catalogRefreshing) && !error && !productSlug && !checkoutRoute && isCatalogView && (
+          <section className={`live-store-catalog-page${catalogRefreshing ? " is-refreshing" : ""}`} aria-busy={catalogRefreshing}>
             <header className="live-store-page-heading">
               <h1>{c("catalog.title")}</h1>
             </header>
@@ -1122,6 +1548,8 @@ export default function EcommerceStorefront({ subdomain: suppliedSubdomain = "",
                 <button type="submit" aria-label={c("common.search")}><Search size={18} /></button>
               </form>
               <div className="live-store-filter-card"><h2>{c("common.categories")}</h2><CategoryList categories={catalog.categories} activeSlug={filters.category} onSelect={(value) => setFilter("category", value)} /></div>
+              {catalog.brands?.length > 0 && <div className="live-store-filter-card"><h2>{c("catalog.brands")}</h2><div className="live-store-tags"><button type="button" className={!filters.brand ? "is-active" : ""} onClick={() => setFilter("brand", "")}>{c("catalog.allBrands")}</button>{catalog.brands.map((item) => <button type="button" key={item.id} className={filters.brand === item.slug ? "is-active" : ""} onClick={() => setFilter("brand", filters.brand === item.slug ? "" : item.slug)}>{item.name}</button>)}</div></div>}
+              <PriceRangeFilter key={`${priceBounds.min}:${priceBounds.max}:${filters.minPrice}:${filters.maxPrice}`} bounds={priceBounds} minimum={filters.minPrice} maximum={filters.maxPrice} locale={locale} onChange={setPriceFilters} />
               {catalog.tags.length > 0 && <div className="live-store-filter-card"><h2>{c("common.tags")}</h2><div className="live-store-tags">{catalog.tags.map((item) => <button type="button" key={item.id} className={filters.tag === item.slug ? "is-active" : ""} onClick={() => setFilter("tag", filters.tag === item.slug ? "" : item.slug)}>{item.name}</button>)}</div></div>}
             </aside>
             <div className="live-store-results">
@@ -1133,10 +1561,11 @@ export default function EcommerceStorefront({ subdomain: suppliedSubdomain = "",
           </section>
         )}
       </main>
-      <footer className="live-store-footer">
+      <footer className="live-store-footer has-social-links">
         <div>{brand && <strong>{brand}</strong>}{description && <p>{description}</p>}</div>
         <div><strong>{c("nav.shop")}</strong><Link to={shopPath}>{c("common.products")}</Link><Link to={categoriesPath}>{c("common.categories")}</Link></div>
         <div><strong>{c("nav.contact")}</strong>{site?.contact_email && <a dir="ltr" href={`mailto:${site.contact_email}`}>{site.contact_email}</a>}{site?.phone && <a dir="ltr" href={`tel:${site.phone}`}>{site.phone}</a>}</div>
+        <div className="live-store-footer-social"><strong>{c("footer.followUs")}</strong><nav aria-label={c("footer.followUs")}>{socialLinks.map((item) => item.href ? <a key={item.key} href={item.href} target="_blank" rel="noopener noreferrer" aria-label={item.label} title={item.label}><SocialIcon network={item.key} /></a> : <span key={item.key} className="is-disabled" title={item.label} aria-hidden="true"><SocialIcon network={item.key} /></span>)}</nav></div>
       </footer>
     </div>
   );

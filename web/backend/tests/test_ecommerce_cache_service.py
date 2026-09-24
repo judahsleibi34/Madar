@@ -1,3 +1,4 @@
+from decimal import Decimal
 from unittest.mock import patch
 
 from fastapi import Request, Response
@@ -202,3 +203,30 @@ def test_public_catalog_source_rows_are_reused_across_filter_payloads():
         public_site_routes._catalog_payload(tenant_id=9, locale="en", search="second")
 
     assert read_rows.call_count == 1
+
+
+def test_public_catalog_price_filter_applies_both_bounds():
+    products = [
+        {"id": "low", "price": "9.99"},
+        {"id": "middle", "price": "25.00"},
+        {"id": "high", "price": "80.00"},
+    ]
+
+    filtered = public_site_routes._filter_catalog_price(
+        products,
+        Decimal("10"),
+        Decimal("50"),
+    )
+
+    assert [item["id"] for item in filtered] == ["middle"]
+
+
+def test_public_catalog_price_filter_keeps_open_bounds():
+    products = [
+        {"id": "low", "price": "9.99"},
+        {"id": "middle", "price": "25.00"},
+        {"id": "high", "price": "80.00"},
+    ]
+
+    assert [item["id"] for item in public_site_routes._filter_catalog_price(products, Decimal("25"), None)] == ["middle", "high"]
+    assert [item["id"] for item in public_site_routes._filter_catalog_price(products, None, Decimal("25"))] == ["low", "middle"]

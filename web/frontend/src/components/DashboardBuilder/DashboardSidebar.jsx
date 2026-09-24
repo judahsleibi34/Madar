@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+﻿import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
@@ -11,12 +11,14 @@ import {
   Database,
   CreditCard,
   Gift,
+  Badge,
   FolderTree,
   FileSearch,
   Package,
   MapPin,
   Palette,
   ShoppingBag,
+  Share2,
   Tag,
   ShieldCheck,
   Settings,
@@ -172,6 +174,7 @@ export default function DashboardSidebar({
   const ecommerceRouteActive = [
     DASHBOARD_ROUTES.ecommerceTags,
     DASHBOARD_ROUTES.ecommerceCategories,
+    DASHBOARD_ROUTES.ecommerceBrands,
     DASHBOARD_ROUTES.ecommerceProducts,
     DASHBOARD_ROUTES.ecommerceDelivery,
     DASHBOARD_ROUTES.ecommerceOrders,
@@ -288,6 +291,11 @@ export default function DashboardSidebar({
       icon: FolderTree,
     },
     {
+      label: t("sidebar.brands", { defaultValue: "Brands" }),
+      path: DASHBOARD_ROUTES.ecommerceBrands,
+      icon: Badge,
+    },
+    {
       label: t("sidebar.products", { defaultValue: "Products" }),
       path: DASHBOARD_ROUTES.ecommerceProducts,
       icon: Package,
@@ -311,6 +319,11 @@ export default function DashboardSidebar({
       label: t("sidebar.storeTheme", { defaultValue: "Store theme" }),
       path: DASHBOARD_ROUTES.ecommerceTheme,
       icon: Palette,
+    },
+    {
+      label: t("sidebar.socialLinks", { defaultValue: "Social links" }),
+      path: DASHBOARD_ROUTES.ecommerceSocialLinks,
+      icon: Share2,
     },
     {
       label: t("sidebar.store", { defaultValue: "Store" }),

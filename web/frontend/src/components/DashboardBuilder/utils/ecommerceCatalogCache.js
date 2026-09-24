@@ -1,4 +1,4 @@
-export const ECOMMERCE_CATALOG_CACHE_VERSION = 3;
+export const ECOMMERCE_CATALOG_CACHE_VERSION = 4;
 
 const STORAGE_KEY = `madar-ecommerce-catalog-cache-v${ECOMMERCE_CATALOG_CACHE_VERSION}`;
 const MAX_AGE_MS = 30_000;
@@ -33,6 +33,7 @@ function isCatalog(value) {
     value &&
       Array.isArray(value.tags) &&
       Array.isArray(value.categories) &&
+      Array.isArray(value.brands) &&
       Array.isArray(value.products),
   );
 }
@@ -89,9 +90,12 @@ export function readEcommerceCatalogCache(scope) {
 }
 
 export function writeEcommerceCatalogCache(scope, catalog) {
-  if (!isCatalog(catalog)) return;
+  const normalizedCatalog = catalog && !Array.isArray(catalog.brands)
+    ? { ...catalog, brands: [] }
+    : catalog;
+  if (!isCatalog(normalizedCatalog)) return;
   const key = cacheKey(scope);
-  const entry = { catalog, cachedAt: Date.now() };
+  const entry = { catalog: normalizedCatalog, cachedAt: Date.now() };
   memoryCache.set(key, entry);
 
   const entries = readStoredEntries();

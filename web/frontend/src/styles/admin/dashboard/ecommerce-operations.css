@@ -1,4 +1,80 @@
 .ecommerce-operations-page { padding: 34px clamp(18px, 4vw, 52px) 60px; color: var(--theme-text); }
+.auth-toast.ecommerce-toast {
+  top: 24px;
+  width: min(420px, calc(100vw - 48px));
+  min-height: 72px;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--theme-border);
+  border-inline-start: 1px solid var(--theme-border);
+  border-radius: 12px;
+  background: var(--theme-surface);
+  color: var(--theme-text);
+  box-shadow: 0 16px 40px rgba(var(--theme-shadow-rgb), 0.2);
+  font-family: var(--font-family-base);
+}
+.auth-toast.ecommerce-toast[dir="rtl"] {
+  border-inline-start: 1px solid var(--theme-border);
+  border-inline-end: 1px solid var(--theme-border);
+}
+.ecommerce-toast .auth-toast-icon {
+  width: 32px;
+  height: 32px;
+  flex-basis: 32px;
+  margin-top: 1px;
+  border-radius: 9px;
+}
+.ecommerce-toast.auth-toast-error .auth-toast-icon {
+  background: color-mix(in srgb, var(--theme-danger) 14%, transparent);
+  color: var(--theme-danger);
+}
+.ecommerce-toast .auth-toast-message {
+  flex: 1;
+  gap: 4px;
+  padding-block: 2px;
+}
+.ecommerce-toast .auth-toast-message strong {
+  font-family: inherit;
+  font-size: var(--font-size-sm, .875rem);
+  font-weight: var(--font-weight-semibold, 600);
+  line-height: 1.4;
+}
+.ecommerce-toast .auth-toast-message > span {
+  font-family: inherit;
+  font-size: var(--font-size-xs, .75rem);
+  font-weight: var(--font-weight-regular, 400);
+  line-height: 1.55;
+}
+.ecommerce-toast .auth-toast-dismiss {
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  margin: -2px -2px -2px 0;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--theme-text-muted);
+}
+.ecommerce-toast .auth-toast-dismiss:hover {
+  background: var(--theme-bg-soft);
+  color: var(--theme-text);
+}
+.ecommerce-toast .auth-toast-dismiss:focus-visible {
+  outline: 2px solid var(--theme-primary);
+  outline-offset: 2px;
+}
+@media (max-width: 600px) {
+  .auth-toast.ecommerce-toast {
+    top: 16px;
+    right: 16px;
+    width: calc(100vw - 32px);
+  }
+  .auth-toast.ecommerce-toast[dir="rtl"] {
+    right: auto;
+    left: 16px;
+  }
+}
 .ecommerce-loyalty-actions { display:flex; justify-content:flex-end; margin-top:24px; padding-top:20px; border-top:1px solid var(--theme-border); }
 .ecommerce-loyalty-actions > .ecommerce-primary-button { min-width:128px; min-height:44px; font-family:var(--font-family-base); font-size:var(--font-size-sm,.875rem) !important; font-weight:var(--font-weight-semibold,600) !important; background:var(--accent) !important; color:var(--theme-text-inverse) !important; }
 .ecommerce-loyalty-actions > .ecommerce-primary-button:hover:not(:disabled) { background:var(--theme-primary-hover) !important; }

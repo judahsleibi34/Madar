@@ -6,6 +6,7 @@ const routes = [
   [/^\/ecommerce\/orders(?:\/|$)/, () => import("../components/DashboardBuilder/EcommerceOrdersPage")],
   [/^\/ecommerce\/loyalty(?:\/|$)/, () => import("../components/DashboardBuilder/EcommerceLoyaltyPage")],
   [/^\/ecommerce\/theme(?:\/|$)/, () => import("../components/DashboardBuilder/EcommerceThemePage")],
+  [/^\/ecommerce\/social-links(?:\/|$)/, () => import("../components/DashboardBuilder/EcommerceSocialLinksPage")],
   [/^\/ecommerce\/store(?:\/|$)/, () => import("../components/DashboardBuilder/EcommerceStorePage")],
   [/^\/(?:ecommerce\/)?cv-rerank(?:\/|$)/, () => import("../components/DashboardBuilder/CvRerankPage")],
   [/^\/ecommerce(?:\/|$)/, () => import("../components/DashboardBuilder/EcommercePage")],

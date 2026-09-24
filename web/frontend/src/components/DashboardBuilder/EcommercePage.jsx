@@ -8,6 +8,7 @@ import {
   CheckCircle2,
   Clock3,
   FolderTree,
+  Badge,
   ImagePlus,
   LoaderCircle,
   Package,
@@ -20,7 +21,7 @@ import {
   X,
 } from "lucide-react";
 
-import AuthToast from "../AuthPages/AuthToast";
+import EcommerceToast from "./EcommerceToast";
 import { EcommerceProductEditor } from "./EcommerceProductEditorPage";
 
 import {
@@ -29,7 +30,7 @@ import {
   saveEcommerceItem,
   uploadEcommerceProductImage,
 } from "../../services/ecommerceApi";
-import { resolveMediaUrl } from "../../utils/media";
+import { getResponsiveMediaProps, resolveMediaUrl } from "../../utils/media";
 import { formatCommerceMoney, useCommerceI18n } from "../../utils/commerceI18n";
 import { commerceProductStock } from "../../utils/commerceStock";
 import { readEcommerceCatalogCacheSnapshot } from "./utils/ecommerceCatalogCache";
@@ -46,6 +47,12 @@ const SECTION_CONFIG = {
     title: "Categories",
     singular: "category",
     description: "Build a clear catalog structure with parent categories and subcategories.",
+  },
+  brands: {
+    icon: Badge,
+    title: "Brands",
+    singular: "brand",
+    description: "Manage the brands customers can use to browse your catalog.",
   },
   products: {
     icon: Package,
@@ -83,7 +90,8 @@ function ecommerceSlug(value = "") {
 function blankForm(section) {
   const shared = { slug: "", status: "", translations: blankTranslations() };
   if (section === "tags") return shared;
-  if (section === "categories") return { ...shared, parent_id: "", sort_order: "" };
+  if (section === "categories") return { ...shared, parent_id: "", sort_order: "", image_url: "" };
+  if (section === "brands") return { name: "", image_url: "", status: "active" };
   return {
     ...shared,
     sku: "",
@@ -91,7 +99,7 @@ function blankForm(section) {
     category_id: "",
     tag_ids: [],
     product_type: "",
-    brand: "",
+    brand_id: "",
     price: "",
     discount_price: "",
     currency: "",
@@ -130,10 +138,11 @@ function itemToForm(section, item) {
 }
 
 function translatedName(item, language = "en") {
-  return item?.translations?.[language]?.name || item?.translations?.en?.name || item?.translations?.ar?.name || item?.slug || "Untitled";
+  return item?.translations?.[language]?.name || item?.translations?.en?.name || item?.translations?.ar?.name || item?.name || item?.slug || "Untitled";
 }
 
 function payloadFromForm(section, form) {
+  if (section === "brands") return { name: form.name.trim(), image_url: form.image_url || null, status: form.status };
   const shared = {
     slug: ecommerceSlug(form.slug || form.translations.en.name) || null,
     status: form.status,
@@ -150,7 +159,12 @@ function payloadFromForm(section, form) {
   };
   if (section === "tags") return shared;
   if (section === "categories") {
-    return { ...shared, parent_id: form.parent_id || null, sort_order: Number(form.sort_order || 0) };
+    return {
+      ...shared,
+      parent_id: form.parent_id || null,
+      sort_order: Number(form.sort_order || 0),
+      image_url: form.image_url || null,
+    };
   }
   const discountedPrice = form.discount_price === "" ? null : Number(form.discount_price);
   return {
@@ -160,7 +174,7 @@ function payloadFromForm(section, form) {
     category_id: form.category_id || null,
     tag_ids: form.tag_ids,
     product_type: form.product_type,
-    brand: form.brand.trim(),
+    brand_id: form.brand_id || null,
     price: discountedPrice ?? Number(form.price || 0),
     compare_at_price: discountedPrice === null ? null : Number(form.price || 0),
     cost_price: form.cost_price == null || form.cost_price === "" ? null : Number(form.cost_price),
@@ -262,6 +276,90 @@ function CommonFields({ form, setForm, onSlugChange, t }) {
   );
 }
 
+function CatalogImageField({ form, setForm, t, kind = "category" }) {
+  const [uploading, setUploading] = useState(false);
+  const [dragActive, setDragActive] = useState(false);
+  const [error, setError] = useState("");
+
+  const addImage = async (files) => {
+    const file = Array.from(files || [])[0];
+    setError("");
+    if (!file) return;
+    if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) {
+      setError(t("commerce:errors.invalidImageType"));
+      return;
+    }
+    setUploading(true);
+    try {
+      const imageUrl = await uploadEcommerceProductImage(file);
+      if (!imageUrl) throw new Error("missing catalog image URL");
+      setForm((current) => ({ ...current, image_url: imageUrl }));
+      notifyCommerceAction({
+        type: "success",
+        title: t(`commerce:admin.${kind}ImageUploaded`),
+        message: t(`commerce:admin.${kind}ImageUploadedBody`),
+      });
+    } catch {
+      setError(t("commerce:errors.uploadImage"));
+      notifyCommerceAction({
+        type: "error",
+        title: t("commerce:errors.uploadImage"),
+        message: t("commerce:admin.tryAgain"),
+      });
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <fieldset className="ecommerce-form-section ecommerce-category-image-section">
+      <legend>{t(`commerce:admin.${kind}Image`)}</legend>
+      <p className="ecommerce-field-help">{t(`commerce:admin.${kind}ImageHelp`)}</p>
+      {form.image_url ? (
+        <figure className="ecommerce-category-image-preview">
+          <img
+            {...getResponsiveMediaProps(form.image_url, {
+              widths: [320, 480, 768, 1024],
+              fallbackWidth: 768,
+              sizes: "(max-width: 820px) calc(100vw - 48px), 880px",
+            })}
+            alt=""
+            decoding="async"
+          />
+          <button type="button" onClick={() => { setForm((current) => ({ ...current, image_url: "" })); setError(""); }}>
+            <Trash2 size={17} aria-hidden="true" />
+            {t(`commerce:admin.remove${kind[0].toUpperCase() + kind.slice(1)}Image`)}
+          </button>
+        </figure>
+      ) : (
+        <label
+          className={`ecommerce-category-image-upload${dragActive ? " is-dragging" : ""}`}
+          onDragEnter={(event) => { event.preventDefault(); setDragActive(true); }}
+          onDragOver={(event) => event.preventDefault()}
+          onDragLeave={() => setDragActive(false)}
+          onDrop={(event) => { event.preventDefault(); setDragActive(false); if (!uploading) void addImage(event.dataTransfer.files); }}
+        >
+          <input
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            disabled={uploading}
+            onChange={(event) => {
+              const files = Array.from(event.currentTarget.files || []);
+              event.currentTarget.value = "";
+              void addImage(files);
+            }}
+          />
+          {uploading ? <LoaderCircle className="is-spinning" size={24} aria-hidden="true" /> : <ImagePlus size={24} aria-hidden="true" />}
+          <strong>{uploading ? t("commerce:admin.uploading") : t(`commerce:admin.upload${kind[0].toUpperCase() + kind.slice(1)}Image`)}</strong>
+          <span>{t("commerce:admin.dragBrowse")}</span>
+          <small>{t("commerce:admin.imageRequirements")}</small>
+        </label>
+      )}
+      {error && <p className="ecommerce-category-image-error" role="alert">{error}</p>}
+    </fieldset>
+  );
+}
+
 function ProductFields({ form, setForm, catalog, t, language }) {
   const update = (field, value) => setForm((current) => ({ ...current, [field]: value }));
   const selectedTagIds = Array.isArray(form.tag_ids) ? form.tag_ids : [];
@@ -310,7 +408,7 @@ function ProductFields({ form, setForm, catalog, t, language }) {
 
   const uploadProductImages = (event) => {
     const input = event.currentTarget;
-    const files = input.files;
+    const files = Array.from(input.files || []);
     input.value = "";
     void addProductImages(files);
   };
@@ -343,7 +441,7 @@ function ProductFields({ form, setForm, catalog, t, language }) {
             <input aria-label="Barcode" aria-describedby="product-barcode-help" value={form.barcode} onChange={(event) => update("barcode", event.target.value)} />
             <small id="product-barcode-help" className="ecommerce-field-help">{t("commerce:admin.barcodeHelp")}</small>
           </label>
-          <label>{t("commerce:merchant.brand")}<input value={form.brand} onChange={(event) => update("brand", event.target.value)} /></label>
+          <label>{t("commerce:merchant.brand")}<select value={form.brand_id || ""} onChange={(event) => update("brand_id", event.target.value)}><option value="">{t("commerce:merchant.noBrand")}</option>{(catalog.brands || []).map((brand) => <option key={brand.id} value={brand.id}>{brand.name}</option>)}</select></label>
           <label>{t("commerce:admin.productType")}<select value={form.product_type} onChange={(event) => update("product_type", event.target.value)} required><option value="" disabled>{t("commerce:admin.chooseProductType")}</option><option value="physical">{t("commerce:admin.physical")}</option><option value="digital">{t("commerce:admin.digital")}</option><option value="service">{t("commerce:admin.service")}</option></select></label>
           <label>{t("commerce:merchant.category")}<select value={form.category_id} onChange={(event) => update("category_id", event.target.value)}><option value="">{t("commerce:admin.uncategorized")}</option>{catalog.categories.map((category) => <option key={category.id} value={category.id}>{translatedName(category, language)}</option>)}</select></label>
           <label>{t("commerce:common.status")}<select value={form.status} onChange={(event) => update("status", event.target.value)} required><option value="" disabled>{t("commerce:admin.chooseStatus")}</option><option value="draft">{t("commerce:common.draft")}</option><option value="active">{t("commerce:common.active")}</option><option value="inactive">{t("commerce:common.inactive")}</option><option value="archived">{t("commerce:common.archived")}</option></select></label>
@@ -443,7 +541,7 @@ export default function EcommercePage({ section = "products", user }) {
   const [summaryCustomizerOpen, setSummaryCustomizerOpen] = useState(false);
   const [hiddenSummaryCardIds, setHiddenSummaryCardIds] = useState(() => readHiddenSummaryCards(summaryStorageKey));
   const initialCatalogSnapshot = useMemo(() => readEcommerceCatalogCacheSnapshot(cacheScope), [cacheScope]);
-  const [catalog, setCatalog] = useState(() => initialCatalogSnapshot?.catalog || { tags: [], categories: [], products: [], stock_summary: { low_stock: 0, out_of_stock: 0 } });
+  const [catalog, setCatalog] = useState(() => initialCatalogSnapshot?.catalog || { tags: [], categories: [], brands: [], products: [], stock_summary: { low_stock: 0, out_of_stock: 0 } });
   const [status, setStatus] = useState(() => initialCatalogSnapshot ? "ready" : "loading");
   const [query, setQuery] = useState("");
   const [editing, setEditing] = useState(null);
@@ -510,7 +608,7 @@ export default function EcommercePage({ section = "products", user }) {
     try {
       const data = await fetchEcommerceCatalog({ scope: cacheScope, force: Boolean(cached?.isStale) });
       if (version !== catalogRequestVersion.current) return;
-      setCatalog({ tags: data?.tags || [], categories: data?.categories || [], products: data?.products || [], stock_summary: data?.stock_summary || { low_stock: 0, out_of_stock: 0 }, commerce_currency: data?.commerce_currency || null });
+      setCatalog({ tags: data?.tags || [], categories: data?.categories || [], brands: data?.brands || [], products: data?.products || [], stock_summary: data?.stock_summary || { low_stock: 0, out_of_stock: 0 }, commerce_currency: data?.commerce_currency || null });
       setStatus("ready");
     } catch {
       if (version !== catalogRequestVersion.current) return;
@@ -629,19 +727,29 @@ export default function EcommercePage({ section = "products", user }) {
   const stockSummary = catalog.stock_summary || {};
   const lowStockCount = Number(stockSummary.low_stock ?? items.reduce((count, item) => count + Number(item.low_stock_count || 0), 0));
   const outOfStockCount = Number(stockSummary.out_of_stock ?? items.reduce((count, item) => count + Number(item.out_of_stock_count || 0), 0));
-  const sectionKey = section === "categories" ? "categories" : section === "tags" ? "tags" : "products";
+  const sectionKey = ["categories", "tags", "brands", "products"].includes(section) ? section : "products";
+  const statusSummaryCards = section === "brands"
+    ? [
+      { id: "active", label: t("commerce:common.active"), value: activeCount, icon: CheckCircle2 },
+      { id: "inactive", label: t("commerce:common.inactive"), value: inactiveCount, icon: Boxes },
+    ]
+    : [
+      { id: "draft", label: t("commerce:common.draft"), value: draftCount, icon: Clock3 },
+      { id: "active", label: t("commerce:common.active"), value: activeCount, icon: CheckCircle2 },
+      { id: "inactive", label: t("commerce:common.inactive"), value: inactiveCount, icon: Boxes },
+      { id: "archived", label: t("commerce:common.archived"), value: archivedCount, icon: Archive },
+    ];
   const summaryCards = [
     { id: "total", label: t(`dashboard:ecommercePages.${sectionKey}.totalLabel`), value: items.length, icon: Icon },
-    { id: "draft", label: t("commerce:common.draft"), value: draftCount, icon: Clock3 },
-    { id: "active", label: t("commerce:common.active"), value: activeCount, icon: CheckCircle2 },
-    { id: "inactive", label: t("commerce:common.inactive"), value: inactiveCount, icon: Boxes },
-    { id: "archived", label: t("commerce:common.archived"), value: archivedCount, icon: Archive },
+    ...statusSummaryCards,
     ...(section === "products" ? [
       { id: "low-stock", label: t("commerce:merchant.lowStock"), value: lowStockCount, icon: Package },
       { id: "out-of-stock", label: t("commerce:merchant.outOfStock"), value: outOfStockCount, icon: Boxes },
     ] : []),
   ];
-  const visibleSummaryCards = summaryCards.filter((card) => !hiddenSummaryCardIds.includes(card.id));
+  const visibleSummaryCards = section === "brands"
+    ? summaryCards
+    : summaryCards.filter((card) => !hiddenSummaryCardIds.includes(card.id));
   const toggleSummaryCard = (cardId) => {
     setHiddenSummaryCardIds((current) => (
       current.includes(cardId) ? current.filter((id) => id !== cardId) : [...current, cardId]
@@ -662,7 +770,7 @@ export default function EcommercePage({ section = "products", user }) {
       </header>
 
       <div className="ecommerce-summary-toolbar">
-        <div className="ecommerce-summary-customizer" ref={summaryCustomizerRef}>
+        {section !== "brands" && <div className="ecommerce-summary-customizer" ref={summaryCustomizerRef}>
           <button type="button" className="ecommerce-summary-customizer-toggle" aria-expanded={summaryCustomizerOpen} aria-controls="ecommerce-summary-card-checklist" onClick={() => setSummaryCustomizerOpen((current) => !current)}>
             <SlidersHorizontal size={18} aria-hidden="true" />
             <span>{t(`commerce:admin.customize${sectionKey[0].toUpperCase() + sectionKey.slice(1)}Cards`)}</span>
@@ -675,7 +783,7 @@ export default function EcommercePage({ section = "products", user }) {
               </div>
             </div>
           )}
-        </div>
+        </div>}
         {section !== "products" && <button type="button" className="ecommerce-primary-button" onClick={openCreate}><Plus size={18} />{t("commerce:admin.add", { item: t(`commerce:admin.${sectionKey}Singular`) })}</button>}
         {section === "products" && <button type="button" className="ecommerce-primary-button" onClick={() => { setProductEditorId(null); setProductEditorOpen(true); }}><Plus size={18} />{t("commerce:admin.add", { item: t("commerce:admin.productsSingular") })}</button>}
       </div>
@@ -714,8 +822,10 @@ export default function EcommercePage({ section = "products", user }) {
               const category = section === "products" ? catalog.categories.find((candidate) => candidate.id === item.category_id) : null;
               return (
                 <article className="ecommerce-record" key={item.id}>
-                  <span className="ecommerce-record-icon"><Icon size={18} /></span>
-                  <div className="ecommerce-record-main"><strong>{translatedName(item, language)}</strong><span>{section === "products" ? <><bdi>{item.sku}</bdi> · <bdi>{formatCommerceMoney(item.price, item.currency, language)}</bdi></> : item.slug}</span>{section === "products" && <span className={`ecommerce-stock-indicator is-${commerceProductStock(item).state}`}>{t(`commerce:stock.${commerceProductStock(item).state}`)}{item.options?.length ? ` · ${t("commerce:admin.variantStockCounts", { low: item.low_stock_count || 0, out: item.out_of_stock_count || 0 })}` : ""}</span>}</div>
+                  {(section === "categories" || section === "brands") && item.image_url
+                    ? <span className="ecommerce-record-icon ecommerce-record-category-image"><img {...getResponsiveMediaProps(item.image_url, { widths: [320], fallbackWidth: 320, sizes: "42px" })} alt="" loading="lazy" decoding="async" /></span>
+                    : <span className="ecommerce-record-icon"><Icon size={18} /></span>}
+                  <div className="ecommerce-record-main"><strong>{translatedName(item, language)}</strong><span>{section === "products" ? <><bdi>{item.sku}</bdi> آ· <bdi>{formatCommerceMoney(item.price, item.currency, language)}</bdi></> : item.slug}</span>{section === "products" && <span className={`ecommerce-stock-indicator is-${commerceProductStock(item).state}`}>{t(`commerce:stock.${commerceProductStock(item).state}`)}{item.options?.length ? ` آ· ${t("commerce:admin.variantStockCounts", { low: item.low_stock_count || 0, out: item.out_of_stock_count || 0 })}` : ""}</span>}</div>
                   <div className="ecommerce-record-meta">{parent ? t("commerce:admin.under", { name: translatedName(parent, language) }) : category ? translatedName(category, language) : section === "categories" ? t("commerce:admin.topLevel") : ""}</div>
                   <span className={`ecommerce-status is-${item.status}`}>{t(`commerce:status.${item.status}`, { defaultValue: item.status })}</span>
                   <div className="ecommerce-record-actions">{section === "products" ? <button type="button" onClick={() => { setProductEditorId(item.id); setProductEditorOpen(true); }} aria-label={t("commerce:admin.openEditor", { name: translatedName(item, language) })}><Pencil size={16} /></button> : <button type="button" onClick={() => openEdit(item)} aria-label={t("commerce:admin.quickEdit", { name: translatedName(item, language) })}><Pencil size={16} /></button>}<button type="button" onClick={() => remove(item)} aria-label={t("commerce:admin.delete", { name: translatedName(item, language) })}><Trash2 size={16} /></button></div>
@@ -731,9 +841,10 @@ export default function EcommercePage({ section = "products", user }) {
           <section className="ecommerce-modal" role="dialog" aria-modal="true" aria-labelledby="ecommerce-form-title">
             <header><div><span>{editing ? t("commerce:admin.edit") : t("commerce:admin.create")}</span><h2 id="ecommerce-form-title">{editing ? t("commerce:admin.editItem", { item: t(`commerce:admin.${sectionKey}Singular`) }) : t("commerce:admin.newItem", { item: t(`commerce:admin.${sectionKey}Singular`) })}</h2></div><button type="button" onClick={closeForm} aria-label={t("commerce:admin.close")}><X size={20} /></button></header>
             <form onSubmit={submit} noValidate>
-              <TranslationFields form={form} setForm={setForm} descriptions={section !== "tags"} autoGenerateSlug={!editing && !slugManuallyEdited} t={t} />
+              {section !== "brands" && <TranslationFields form={form} setForm={setForm} descriptions={section !== "tags"} autoGenerateSlug={!editing && !slugManuallyEdited} t={t} />}
               {section === "tags" && <CommonFields form={form} setForm={setForm} onSlugChange={() => setSlugManuallyEdited(true)} t={t} />}
-              {section === "categories" && <><CommonFields form={form} setForm={setForm} onSlugChange={() => setSlugManuallyEdited(true)} t={t} /><fieldset className="ecommerce-form-section ecommerce-hierarchy-section" aria-label={t("commerce:admin.hierarchy")}><small id="category-display-position-help" className="ecommerce-field-help">{t("commerce:admin.displayOrderHelp")}</small><div className="ecommerce-field-grid"><label>{t("commerce:admin.parentCategory")}<select value={form.parent_id || ""} onChange={(event) => setForm({ ...form, parent_id: event.target.value })}><option value="">{t("commerce:admin.topLevel")}</option>{catalog.categories.filter((category) => category.id !== editing?.id).map((category) => <option key={category.id} value={category.id}>{translatedName(category, language)}</option>)}</select></label><label><span>{t("commerce:admin.displayPosition")}</span><input type="number" min="0" step="1" inputMode="numeric" value={form.sort_order} required aria-label={t("commerce:admin.displayPosition")} aria-describedby="category-display-position-help" onChange={(event) => setForm({ ...form, sort_order: event.target.value })} /></label></div></fieldset></>}
+              {section === "categories" && <><CommonFields form={form} setForm={setForm} onSlugChange={() => setSlugManuallyEdited(true)} t={t} /><CatalogImageField form={form} setForm={setForm} t={t} /><fieldset className="ecommerce-form-section ecommerce-hierarchy-section" aria-label={t("commerce:admin.hierarchy")}><small id="category-display-position-help" className="ecommerce-field-help">{t("commerce:admin.displayOrderHelp")}</small><div className="ecommerce-field-grid"><label>{t("commerce:admin.parentCategory")}<select value={form.parent_id || ""} onChange={(event) => setForm({ ...form, parent_id: event.target.value })}><option value="">{t("commerce:admin.topLevel")}</option>{catalog.categories.filter((category) => category.id !== editing?.id).map((category) => <option key={category.id} value={category.id}>{translatedName(category, language)}</option>)}</select></label><label><span>{t("commerce:admin.displayPosition")}</span><input type="number" min="0" step="1" inputMode="numeric" value={form.sort_order} required aria-label={t("commerce:admin.displayPosition")} aria-describedby="category-display-position-help" onChange={(event) => setForm({ ...form, sort_order: event.target.value })} /></label></div></fieldset></>}
+              {section === "brands" && <><div className="ecommerce-field-grid"><label>{t("commerce:admin.brandNameEnglish")}<input value={form.name} maxLength={160} required onChange={(event) => setForm({ ...form, name: event.target.value })} /></label><label>{t("commerce:common.status")}<select value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value })}><option value="active">{t("commerce:common.active")}</option><option value="inactive">{t("commerce:common.inactive")}</option></select></label></div><CatalogImageField form={form} setForm={setForm} t={t} kind="brand" /></>}
               {section === "products" && <><div className="ecommerce-field-grid"><label>{t("commerce:merchant.slug")}<input value={form.slug} onChange={(event) => setForm({ ...form, slug: event.target.value })} required /></label></div><ProductFields form={form} setForm={setForm} catalog={catalog} t={t} language={language} /></>}
               <footer><button type="button" className="ecommerce-secondary-button" onClick={closeForm}>{t("commerce:common.cancel")}</button><button type="submit" className="ecommerce-primary-button" disabled={saving}>{saving && <LoaderCircle size={17} className="is-spinning" />}{saving ? t("commerce:merchant.saving") : t("commerce:common.save")}</button></footer>
             </form>
@@ -758,7 +869,7 @@ export default function EcommercePage({ section = "products", user }) {
           </section>
         </div>
       )}
-      <AuthToast
+      <EcommerceToast
         key={toast?.id}
         type={toast?.type}
         title={toast?.title}

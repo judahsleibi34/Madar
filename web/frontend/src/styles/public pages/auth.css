@@ -1055,7 +1055,14 @@ html[dir="rtl"] .auth-section-title {
 }
 
 
-.auth-toast { top:24px; pointer-events:auto; align-items:flex-start; gap:12px; }
+.auth-toast {
+  top: calc(116px + env(safe-area-inset-top));
+  max-height: calc(100dvh - 132px - env(safe-area-inset-top));
+  overflow-y: auto;
+  pointer-events: auto;
+  align-items: flex-start;
+  gap: 12px;
+}
 .auth-toast[dir="ltr"] { right:24px !important; left:auto !important; direction:ltr !important; text-align:left; }
 .auth-toast[dir="rtl"] { left:24px !important; right:auto !important; direction:rtl !important; }
 .auth-toast-icon { margin-block-start:8px; }
@@ -1066,7 +1073,11 @@ html[dir="rtl"] .auth-section-title {
 .auth-toast-dismiss:hover { background:var(--theme-primary-soft); }
 .auth-toast-dismiss:focus-visible { outline:2px solid var(--theme-primary); outline-offset:2px; }
 @media(max-width:600px) {
- .auth-toast { top:16px; }
+ .auth-toast {
+   top: calc(76px + env(safe-area-inset-top));
+   width: min(360px, calc(100vw - 32px));
+   max-height: calc(100dvh - 92px - env(safe-area-inset-top));
+ }
  .auth-toast[dir="ltr"] { right:16px !important; }
  .auth-toast[dir="rtl"] { left:16px !important; }
 }

@@ -41,9 +41,13 @@ LEGACY_DEFAULT_STORE_THEME = {
     "muted": "#697181",
 }
 HEX_COLOR_PATTERN = re.compile(r"^#[0-9a-fA-F]{6}$")
+SOCIAL_LINK_FIELDS = (
+    "facebook", "instagram", "tiktok", "snapchat",
+)
 CATALOG_TABLES = (
     "ecommerce_tags",
     "ecommerce_categories",
+    "ecommerce_brands",
     "ecommerce_products",
     "ecommerce_product_tags",
 )
@@ -101,6 +105,46 @@ class CatalogItemPayload(BaseModel):
 class CategoryPayload(CatalogItemPayload):
     parent_id: UUID | None = None
     sort_order: int = Field(default=0, ge=0, le=1_000_000)
+    image_url: str | None = Field(default=None, max_length=2048)
+
+    @field_validator("image_url", mode="before")
+    @classmethod
+    def validate_image_url(cls, value):
+        url = str(value or "").strip()
+        if not url:
+            return None
+        managed = bool(PRODUCT_MEDIA_ASSET_PATTERN.fullmatch(url)) and not url.lower().endswith((".mp4", ".webm"))
+        external = bool(re.match(r"^https://", url, re.IGNORECASE)) and not re.search(
+            r"[.]svgz?(?:[?#]|$)",
+            url,
+            re.IGNORECASE,
+        )
+        if not (managed or external):
+            raise ValueError("Category image must be secure uploaded media")
+        return url
+
+
+class BrandPayload(BaseModel):
+    name: str = Field(..., min_length=1, max_length=160)
+    image_url: str | None = Field(default=None, max_length=2048)
+    status: Literal["active", "inactive"] = "active"
+
+    @field_validator("name")
+    @classmethod
+    def clean_brand_name(cls, value: str) -> str:
+        return value.strip()
+
+    @field_validator("image_url", mode="before")
+    @classmethod
+    def validate_image_url(cls, value):
+        url = str(value or "").strip()
+        if not url:
+            return None
+        managed = bool(PRODUCT_MEDIA_ASSET_PATTERN.fullmatch(url)) and not url.lower().endswith((".mp4", ".webm"))
+        external = bool(re.match(r"^https://", url, re.IGNORECASE)) and not re.search(r"[.]svgz?(?:[?#]|$)", url, re.IGNORECASE)
+        if not (managed or external):
+            raise ValueError("Brand image must be secure uploaded media")
+        return url
 
 
 class StoreThemePayload(BaseModel):
@@ -197,11 +241,32 @@ class CustomDeliveryAreaCreate(BaseModel):
             raise ValueError("Each location level must contain 1 to 100 characters")
         return cleaned
 
+
     @model_validator(mode="after")
     def require_country(self):
         if not self.country:
             raise ValueError("Country is required")
         return self
+
+class StoreSocialLinksPayload(BaseModel):
+    facebook: str = Field(default="", max_length=500)
+    instagram: str = Field(default="", max_length=500)
+    tiktok: str = Field(default="", max_length=500)
+    snapchat: str = Field(default="", max_length=500)
+
+    @field_validator(*SOCIAL_LINK_FIELDS)
+    @classmethod
+    def validate_social_url(cls, value: str) -> str:
+        cleaned = str(value or "").strip()
+        if not cleaned:
+            return ""
+        if any(character in cleaned for character in ("\\", "\r", "\n", "\x00")):
+            raise ValueError("Social links must be valid HTTPS URLs")
+        parsed = urlparse(cleaned)
+        if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password:
+            raise ValueError("Social links must be valid HTTPS URLs")
+        return cleaned
+
 
 
 class DeliveryAreasUpdate(BaseModel):
@@ -401,6 +466,7 @@ class ProductPayload(CatalogItemPayload):
     sku: str | None = Field(default=None, max_length=120)
     barcode: str | None = Field(default=None, max_length=120)
     category_id: UUID | None = None
+    brand_id: UUID | None = None
     tag_ids: list[UUID] = Field(default_factory=list, max_length=100)
     product_type: Literal["physical", "digital", "service"] = "physical"
     brand: str = Field(default="", max_length=160)
@@ -548,7 +614,7 @@ def _validate_category_parent(context, parent_id: UUID | None, category_id: UUID
     return parent_value
 
 
-def _validate_product_links(context, category_id: UUID | None, tag_ids: list[UUID]) -> tuple[str | None, list[str]]:
+def _validate_product_links(context, category_id: UUID | None, brand_id: UUID | None, tag_ids: list[UUID]) -> tuple[str | None, str | None, str, list[str]]:
     category_value = None
     if category_id is not None:
         category_value = str(category_id)
@@ -556,24 +622,39 @@ def _validate_product_links(context, category_id: UUID | None, tag_ids: list[UUI
     unique_tags = list(dict.fromkeys(str(item) for item in tag_ids))
     for tag_id in unique_tags:
         _tenant_row("ecommerce_tags", tag_id, context.tenant_id)
-    return category_value, unique_tags
+    brand_value = None
+    brand_name = ""
+    if brand_id is not None:
+        brand_value = str(brand_id)
+        try:
+            brand = _tenant_row("ecommerce_brands", brand_value, context.tenant_id)
+        except Exception as error:
+            _handle_catalog_error(error)
+        brand_name = str(brand.get("name") or "").strip()
+    return category_value, brand_value, brand_name, unique_tags
 
 
-def _managed_product_asset_keys(images: list[str], tenant_id: int) -> set[str]:
+def _managed_catalog_asset_keys(images: list[str], tenant_id: int) -> set[str]:
     keys: set[str] = set()
     for image in images:
         match = PRODUCT_MEDIA_ASSET_PATTERN.fullmatch(str(image or "").strip())
         if not match:
             continue
         if int(match.group("tenant")) != int(tenant_id):
-            raise HTTPException(status_code=400, detail="Product images must belong to this workspace")
+            raise HTTPException(status_code=400, detail="Catalog images must belong to this workspace")
         keys.add(match.group("key"))
     return keys
 
 
-def _sync_product_image_assets(*, tenant_id: int, previous_images: list[str], current_images: list[str]) -> None:
-    previous_keys = _managed_product_asset_keys(previous_images, tenant_id)
-    current_keys = _managed_product_asset_keys(current_images, tenant_id)
+def _sync_catalog_image_assets(
+    *,
+    tenant_id: int,
+    previous_images: list[str],
+    current_images: list[str],
+    usage: str,
+) -> None:
+    previous_keys = _managed_catalog_asset_keys(previous_images, tenant_id)
+    current_keys = _managed_catalog_asset_keys(current_images, tenant_id)
     now = datetime.now(timezone.utc)
     for storage_key in current_keys:
         service_supabase.table("builder_assets").update({
@@ -582,7 +663,7 @@ def _sync_product_image_assets(*, tenant_id: int, previous_images: list[str], cu
             "last_referenced_at": now.isoformat(),
             "retention_until": None,
             "deleted_at": None,
-            "metadata": {"usage": "ecommerce_product"},
+            "metadata": {"usage": usage},
         }).eq("tenant_id", int(tenant_id)).eq("storage_key", storage_key).execute()
 
     removed_keys = previous_keys - current_keys
@@ -594,9 +675,33 @@ def _sync_product_image_assets(*, tenant_id: int, previous_images: list[str], cu
         .eq("tenant_id", int(tenant_id))
     )
     still_referenced = set().union(*(
-        _managed_product_asset_keys(row.get("images") or [], tenant_id)
+        _managed_catalog_asset_keys(row.get("images") or [], tenant_id)
         for row in product_rows
     )) if product_rows else set()
+    category_rows = _rows(
+        service_supabase.table("ecommerce_categories")
+        .select("*")
+        .eq("tenant_id", int(tenant_id))
+    )
+    for row in category_rows:
+        if row.get("image_url"):
+            still_referenced.update(
+                _managed_catalog_asset_keys([row.get("image_url")], tenant_id)
+            )
+    try:
+        brand_rows = _rows(
+            service_supabase.table("ecommerce_brands")
+            .select("image_url")
+            .eq("tenant_id", int(tenant_id))
+        )
+    except Exception as error:
+        raw = str(error).lower()
+        if not ("pgrst205" in raw or "could not find the table" in raw or "schema cache" in raw):
+            raise
+        brand_rows = []
+    for row in brand_rows:
+        if row.get("image_url"):
+            still_referenced.update(_managed_catalog_asset_keys([row.get("image_url")], tenant_id))
     retention_until = (now + timedelta(days=7)).isoformat()
     for storage_key in removed_keys - still_referenced:
         asset_rows = _rows(
@@ -629,13 +734,15 @@ def _generate_sku(slug: str) -> str:
 
 
 def _product_data(payload: ProductPayload, context) -> tuple[dict[str, Any], list[str]]:
-    category_id, tag_ids = _validate_product_links(context, payload.category_id, payload.tag_ids)
+    category_id, brand_id, brand_name, tag_ids = _validate_product_links(context, payload.category_id, payload.brand_id, payload.tag_ids)
     slug = _clean_slug(payload.slug, payload.translations)
-    _managed_product_asset_keys(payload.images, context.tenant_id)
+    _managed_catalog_asset_keys(payload.images, context.tenant_id)
     data = payload.model_dump(mode="json", exclude={"tag_ids", "attributes", "options", "variants"})
     data.update(
         tenant_id=context.tenant_id,
         category_id=category_id,
+        brand_id=brand_id,
+        brand=brand_name,
         slug=slug,
         sku=payload.sku or _generate_sku(slug),
         barcode=str(payload.barcode or "").strip() or None,
@@ -737,11 +844,19 @@ def _attach_product_aggregates(products: list[dict[str, Any]], tenant_id: int) -
 def _catalog_for_tenant(tenant_id: int) -> dict[str, list[dict[str, Any]]]:
     tags = _rows(service_supabase.table("ecommerce_tags").select("*").eq("tenant_id", tenant_id).order("created_at", desc=True))
     categories = _rows(service_supabase.table("ecommerce_categories").select("*").eq("tenant_id", tenant_id).order("sort_order").order("created_at"))
+    try:
+        brands = _rows(service_supabase.table("ecommerce_brands").select("*").eq("tenant_id", tenant_id).order("name"))
+    except Exception as error:
+        raw = str(error).lower()
+        if not ("pgrst205" in raw or "could not find the table" in raw or "schema cache" in raw):
+            raise
+        brands = []
     products = _rows(service_supabase.table("ecommerce_products").select("*").eq("tenant_id", tenant_id).order("created_at", desc=True))
     products = _attach_product_aggregates(_attach_product_tags(products, tenant_id), tenant_id)
     return {
         "tags": tags,
         "categories": categories,
+        "brands": brands,
         "products": products,
         "stock_summary": {
             "low_stock": sum(int(product.get("low_stock_count") or 0) for product in products),
@@ -770,6 +885,14 @@ def _store_growth_for_tenant(tenant_id: int) -> dict[str, Any]:
         return StoreGrowthPayload.model_validate(growth or {}).model_dump(mode="json")
     except Exception:
         return StoreGrowthPayload().model_dump(mode="json")
+
+
+def _store_social_links_for_tenant(tenant_id: int) -> dict[str, str]:
+    social_links = _store_theme_for_tenant(tenant_id).get("social_links")
+    try:
+        return StoreSocialLinksPayload.model_validate(social_links or {}).model_dump(mode="json")
+    except Exception:
+        return StoreSocialLinksPayload().model_dump(mode="json")
 
 
 def _validate_featured_rows(tenant_id: int, table: str, selected_ids: list[UUID]) -> None:
@@ -827,6 +950,29 @@ def update_store_theme(payload: StoreThemePayload, request: Request, response: R
         raise HTTPException(status_code=404, detail="Website settings not found")
     invalidate_ecommerce_cache(context.tenant_id)
     return {"theme": theme}
+
+
+@router.get("/social-links")
+def get_store_social_links(request: Request, response: Response):
+    context = _require_ecommerce_access(request, response)
+    return {"social_links": _store_social_links_for_tenant(context.tenant_id)}
+
+
+@router.put("/social-links")
+def update_store_social_links(payload: StoreSocialLinksPayload, request: Request, response: Response):
+    context = _require_ecommerce_access(request, response)
+    _require_role(context)
+    social_links = payload.model_dump(mode="json")
+    theme = {**_store_theme_for_tenant(context.tenant_id), "social_links": social_links}
+    rows = _rows(
+        service_supabase.table("website_settings")
+        .update({"ecommerce_theme": theme})
+        .eq("tenant_id", int(context.tenant_id))
+    )
+    if not rows:
+        raise HTTPException(status_code=404, detail="Website settings not found")
+    invalidate_ecommerce_cache(context.tenant_id)
+    return {"social_links": social_links}
 
 
 @router.get("/growth")
@@ -1264,7 +1410,7 @@ def collect_order_payment(order_id: UUID, request: Request, response: Response):
 def get_catalog(request: Request, response: Response):
     context = _require_ecommerce_access(request, response)
     try:
-        cache_key = ecommerce_cache_key(context.tenant_id, "authenticated-catalog-v2")
+        cache_key = ecommerce_cache_key(context.tenant_id, "authenticated-catalog-v3")
         catalog, _cache_hit = get_or_create_ecommerce_cache(
             cache_key,
             context.tenant_id,
@@ -1314,6 +1460,73 @@ def delete_tag(tag_id: UUID, request: Request, response: Response):
     return Response(status_code=204)
 
 
+@router.post("/brands", status_code=201)
+def create_brand(payload: BrandPayload, request: Request, response: Response):
+    context = _require_ecommerce_access(request, response)
+    _require_role(context)
+    _managed_catalog_asset_keys([payload.image_url], context.tenant_id)
+    data = payload.model_dump(mode="json")
+    data.update(
+        tenant_id=context.tenant_id,
+        created_by=context.user_id,
+        slug=_clean_slug(None, {"en": {"name": payload.name}}),
+    )
+    try:
+        rows = _rows(service_supabase.table("ecommerce_brands").insert(data))
+        _sync_catalog_image_assets(
+            tenant_id=context.tenant_id,
+            previous_images=[],
+            current_images=[rows[0].get("image_url")],
+            usage="ecommerce_brand",
+        )
+        invalidate_ecommerce_cache(context.tenant_id)
+        return {"brand": rows[0]}
+    except Exception as error:
+        _handle_catalog_error(error)
+
+
+@router.put("/brands/{brand_id}")
+def update_brand(brand_id: UUID, payload: BrandPayload, request: Request, response: Response):
+    context = _require_ecommerce_access(request, response)
+    _require_role(context)
+    existing = _tenant_row("ecommerce_brands", brand_id, context.tenant_id)
+    _managed_catalog_asset_keys([payload.image_url], context.tenant_id)
+    data = payload.model_dump(mode="json")
+    data["slug"] = _clean_slug(None, {"en": {"name": payload.name}})
+    try:
+        rows = _rows(service_supabase.table("ecommerce_brands").update(data).eq("id", str(brand_id)).eq("tenant_id", context.tenant_id))
+        service_supabase.table("ecommerce_products").update({"brand": payload.name}).eq("tenant_id", context.tenant_id).eq("brand_id", str(brand_id)).execute()
+        _sync_catalog_image_assets(
+            tenant_id=context.tenant_id,
+            previous_images=[existing.get("image_url")],
+            current_images=[rows[0].get("image_url")],
+            usage="ecommerce_brand",
+        )
+        invalidate_ecommerce_cache(context.tenant_id)
+        return {"brand": rows[0]}
+    except Exception as error:
+        _handle_catalog_error(error)
+
+
+@router.delete("/brands/{brand_id}", status_code=204)
+def delete_brand(brand_id: UUID, request: Request, response: Response):
+    context = _require_ecommerce_access(request, response)
+    _require_role(context)
+    existing = _tenant_row("ecommerce_brands", brand_id, context.tenant_id)
+    try:
+        service_supabase.table("ecommerce_brands").delete().eq("id", str(brand_id)).eq("tenant_id", context.tenant_id).execute()
+        _sync_catalog_image_assets(
+            tenant_id=context.tenant_id,
+            previous_images=[existing.get("image_url")],
+            current_images=[],
+            usage="ecommerce_brand",
+        )
+    except Exception as error:
+        _handle_catalog_error(error)
+    invalidate_ecommerce_cache(context.tenant_id)
+    return Response(status_code=204)
+
+
 @router.post("/categories", status_code=201)
 def create_category(payload: CategoryPayload, request: Request, response: Response):
     context = _require_ecommerce_access(request, response)
@@ -1325,8 +1538,30 @@ def create_category(payload: CategoryPayload, request: Request, response: Respon
         parent_id=_validate_category_parent(context, payload.parent_id),
         slug=_clean_slug(payload.slug, payload.translations),
     )
+    _managed_catalog_asset_keys([payload.image_url], context.tenant_id)
     try:
-        rows = _rows(service_supabase.table("ecommerce_categories").insert(data))
+        try:
+            rows = _rows(service_supabase.table("ecommerce_categories").insert(data))
+        except Exception as error:
+            raw = str(error).lower()
+            missing_image_column = "image_url" in raw and (
+                "pgrst204" in raw or "does not exist" in raw or "schema cache" in raw
+            )
+            if not missing_image_column or payload.image_url:
+                if missing_image_column:
+                    raise HTTPException(
+                        status_code=503,
+                        detail="Category images are unavailable until the catalog migration completes",
+                    ) from error
+                raise
+            data.pop("image_url", None)
+            rows = _rows(service_supabase.table("ecommerce_categories").insert(data))
+        _sync_catalog_image_assets(
+            tenant_id=context.tenant_id,
+            previous_images=[],
+            current_images=[rows[0].get("image_url")],
+            usage="ecommerce_category",
+        )
         invalidate_ecommerce_cache(context.tenant_id)
         return {"category": rows[0]}
     except Exception as error:
@@ -1337,14 +1572,36 @@ def create_category(payload: CategoryPayload, request: Request, response: Respon
 def update_category(category_id: UUID, payload: CategoryPayload, request: Request, response: Response):
     context = _require_ecommerce_access(request, response)
     _require_role(context)
-    _tenant_row("ecommerce_categories", category_id, context.tenant_id)
+    existing_category = _tenant_row("ecommerce_categories", category_id, context.tenant_id)
     data = payload.model_dump(mode="json")
     data.update(
         parent_id=_validate_category_parent(context, payload.parent_id, category_id),
         slug=_clean_slug(payload.slug, payload.translations),
     )
+    _managed_catalog_asset_keys([payload.image_url], context.tenant_id)
     try:
-        rows = _rows(service_supabase.table("ecommerce_categories").update(data).eq("id", str(category_id)).eq("tenant_id", context.tenant_id))
+        try:
+            rows = _rows(service_supabase.table("ecommerce_categories").update(data).eq("id", str(category_id)).eq("tenant_id", context.tenant_id))
+        except Exception as error:
+            raw = str(error).lower()
+            missing_image_column = "image_url" in raw and (
+                "pgrst204" in raw or "does not exist" in raw or "schema cache" in raw
+            )
+            if not missing_image_column or payload.image_url:
+                if missing_image_column:
+                    raise HTTPException(
+                        status_code=503,
+                        detail="Category images are unavailable until the catalog migration completes",
+                    ) from error
+                raise
+            data.pop("image_url", None)
+            rows = _rows(service_supabase.table("ecommerce_categories").update(data).eq("id", str(category_id)).eq("tenant_id", context.tenant_id))
+        _sync_catalog_image_assets(
+            tenant_id=context.tenant_id,
+            previous_images=[existing_category.get("image_url")],
+            current_images=[rows[0].get("image_url")],
+            usage="ecommerce_category",
+        )
         invalidate_ecommerce_cache(context.tenant_id)
         return {"category": rows[0]}
     except Exception as error:
@@ -1355,9 +1612,15 @@ def update_category(category_id: UUID, payload: CategoryPayload, request: Reques
 def delete_category(category_id: UUID, request: Request, response: Response):
     context = _require_ecommerce_access(request, response)
     _require_role(context)
-    _tenant_row("ecommerce_categories", category_id, context.tenant_id)
+    existing_category = _tenant_row("ecommerce_categories", category_id, context.tenant_id)
     try:
         service_supabase.table("ecommerce_categories").delete().eq("id", str(category_id)).eq("tenant_id", context.tenant_id).execute()
+        _sync_catalog_image_assets(
+            tenant_id=context.tenant_id,
+            previous_images=[existing_category.get("image_url")],
+            current_images=[],
+            usage="ecommerce_category",
+        )
     except Exception as error:
         _handle_catalog_error(error)
     invalidate_ecommerce_cache(context.tenant_id)
@@ -1383,14 +1646,25 @@ def create_product(payload: ProductPayload, request: Request, response: Response
     if payload.options:
         data["status"] = "draft"
     try:
-        rows = _rows(service_supabase.table("ecommerce_products").insert(data))
+        try:
+            rows = _rows(service_supabase.table("ecommerce_products").insert(data))
+        except Exception as error:
+            raw = str(error).lower()
+            missing_brand_column = "brand_id" in raw and ("pgrst204" in raw or "does not exist" in raw or "schema cache" in raw)
+            if not missing_brand_column or payload.brand_id is not None:
+                if missing_brand_column:
+                    raise HTTPException(status_code=503, detail="Product brands are unavailable until the catalog migration completes") from error
+                raise
+            legacy_data = {key: value for key, value in data.items() if key != "brand_id"}
+            rows = _rows(service_supabase.table("ecommerce_products").insert(legacy_data))
         product = rows[0]
         _replace_product_tags(context, str(product["id"]), tag_ids)
         product["tag_ids"] = tag_ids
-        _sync_product_image_assets(
+        _sync_catalog_image_assets(
             tenant_id=context.tenant_id,
             previous_images=[],
             current_images=product.get("images") or [],
+            usage="ecommerce_product",
         )
         _save_product_aggregate(context.tenant_id, str(product["id"]), payload)
         if payload.options and desired_status != "draft":
@@ -1413,14 +1687,25 @@ def update_product(product_id: UUID, payload: ProductPayload, request: Request, 
     if payload.options:
         data["status"] = "draft"
     try:
-        rows = _rows(service_supabase.table("ecommerce_products").update(data).eq("id", str(product_id)).eq("tenant_id", context.tenant_id))
+        try:
+            rows = _rows(service_supabase.table("ecommerce_products").update(data).eq("id", str(product_id)).eq("tenant_id", context.tenant_id))
+        except Exception as error:
+            raw = str(error).lower()
+            missing_brand_column = "brand_id" in raw and ("pgrst204" in raw or "does not exist" in raw or "schema cache" in raw)
+            if not missing_brand_column or payload.brand_id is not None:
+                if missing_brand_column:
+                    raise HTTPException(status_code=503, detail="Product brands are unavailable until the catalog migration completes") from error
+                raise
+            legacy_data = {key: value for key, value in data.items() if key != "brand_id"}
+            rows = _rows(service_supabase.table("ecommerce_products").update(legacy_data).eq("id", str(product_id)).eq("tenant_id", context.tenant_id))
         product = rows[0]
         _replace_product_tags(context, str(product_id), tag_ids)
         product["tag_ids"] = tag_ids
-        _sync_product_image_assets(
+        _sync_catalog_image_assets(
             tenant_id=context.tenant_id,
             previous_images=existing_product.get("images") or [],
             current_images=product.get("images") or [],
+            usage="ecommerce_product",
         )
         _save_product_aggregate(context.tenant_id, str(product_id), payload)
         if payload.options and desired_status != "draft":
@@ -1465,10 +1750,11 @@ def delete_product(product_id: UUID, request: Request, response: Response):
     _require_role(context)
     existing_product = _tenant_row("ecommerce_products", product_id, context.tenant_id)
     service_supabase.table("ecommerce_products").delete().eq("id", str(product_id)).eq("tenant_id", context.tenant_id).execute()
-    _sync_product_image_assets(
+    _sync_catalog_image_assets(
         tenant_id=context.tenant_id,
         previous_images=existing_product.get("images") or [],
         current_images=[],
+        usage="ecommerce_product",
     )
     invalidate_ecommerce_cache(context.tenant_id)
     return Response(status_code=204)

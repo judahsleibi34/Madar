@@ -1,14 +1,14 @@
 {
   "release_metadata_version": 1,
   "schema": {
-    "compatible_min": 81,
-    "compatible_max": 105,
-    "target": 105,
+    "compatible_min": 104,
+    "compatible_max": 108,
+    "target": 108,
     "migration_class": "forward-compatible",
-    "rollback_compatible_min": 81,
+    "rollback_compatible_min": 104,
     "rollback_compatible_max": 104
   },
   "migration_policy": "automatic-after-known-good-backup-first-forward-repair",
-  "notes": "Forward-compatible bridge from schema 104 to 105. Migration 105 establishes website_settings.subdomain as the normalized, nonreserved, case-insensitively unique canonical hosted identity while preserving standard_path_slug for legacy paths. Its preflight fails before writes on invalid, reserved, duplicate, or ambiguous identities. Perform the governed verified backup at schema 104 and use forward repair after commit.",
-  "migration_manifest": "migrations-105.json"
+  "notes": "Forward-compatible schema 104 to 108 bridge. Migration 105 establishes canonical tenant subdomains; migration 106 snapshots order delivery fees; migration 107 adds ecommerce category images; migration 108 adds tenant-scoped ecommerce brands. Use a verified backup at schema 104 before migration and forward repair after schema advances beyond 104.",
+  "migration_manifest": "migrations-105-108.json"
 }

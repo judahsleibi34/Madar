@@ -1,0 +1,21 @@
+{
+  "release_sha": "CURRENT",
+  "migrations": [
+    {
+      "number": 105,
+      "path": "web/database/migrations/105_add_order_delivery_fees.sql",
+      "sha256": "c40e0e95974167df53322926015cd3478cdbcbab0533e2e5ae6f360ec1a58081",
+      "from_schema": 104,
+      "to_schema": 105,
+      "compatibility": "forward-compatible"
+    },
+    {
+      "number": 106,
+      "path": "web/database/migrations/106_add_ecommerce_category_images.sql",
+      "sha256": "c878fe059b0ba14e9ab052f77ca31ac4f68508e55fe8d9b9dc12e293eef4240d",
+      "from_schema": 105,
+      "to_schema": 106,
+      "compatibility": "expand-only"
+    }
+  ]
+}

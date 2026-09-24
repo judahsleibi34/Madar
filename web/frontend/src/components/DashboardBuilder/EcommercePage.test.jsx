@@ -32,6 +32,30 @@ beforeEach(() => {
 });
 
 describe("EcommercePage", () => {
+  it("shows only the supported Brand status cards", async () => {
+    fetchEcommerceCatalog.mockResolvedValue({
+      tags: [],
+      categories: [],
+      brands: [
+        { id: "brand-active", name: "Active brand", status: "active" },
+        { id: "brand-inactive", name: "Inactive brand", status: "inactive" },
+      ],
+      products: [],
+    });
+
+    const { container } = render(<EcommercePage section="brands" />);
+    await screen.findByText("Active brand");
+
+    expect([...container.querySelectorAll(".ecommerce-summary-card")].map((card) => card.textContent)).toEqual([
+      "Total brands2",
+      "Active1",
+      "Inactive1",
+    ]);
+    expect(screen.queryByText("Draft")).toBeNull();
+    expect(screen.queryByText("Archived")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Customize brand cards" })).toBeNull();
+  });
+
   it("shows cards for every catalog status", async () => {
     fetchEcommerceCatalog.mockResolvedValue({
       tags: [
@@ -156,6 +180,8 @@ describe("EcommercePage", () => {
     expect(await screen.findByRole("button", { name: "Customize category cards" })).toBeTruthy();
     fireEvent.click(await screen.findByRole("button", { name: "Add category" }));
     expect(screen.getByLabelText("Parent category")).toBeTruthy();
+    expect(screen.getByText("Category image")).toBeTruthy();
+    expect(screen.getByText("Add one landscape image for this category carousel card.")).toBeTruthy();
     expect(screen.getByLabelText("Display position").value).toBe("");
     expect(screen.getByLabelText("Status").value).toBe("");
     expect(screen.getByLabelText("Status").querySelector('option[value="inactive"]')?.textContent).toBe("Inactive");
@@ -175,6 +201,57 @@ describe("EcommercePage", () => {
     expect(screen.getByRole("button", { name: "Add variant" })).toBeTruthy();
     expect(screen.getAllByRole("button", { name: "Save product" })).toHaveLength(1);
     expect(screen.queryByText("Full product editor")).toBeNull();
+  });
+  it("uploads and previews one category image", async () => {
+    render(<EcommercePage section="categories" />);
+    await screen.findByText("No categories yet");
+    fireEvent.click(screen.getByRole("button", { name: "Add category" }));
+
+    const input = document.querySelector('.ecommerce-category-image-upload input[type="file"]');
+    const file = new File(["category"], "category.webp", { type: "image/webp" });
+    fireEvent.change(input, { target: { files: [file] } });
+
+    await waitFor(() => expect(uploadEcommerceProductImage).toHaveBeenCalledWith(file));
+    const preview = document.querySelector(".ecommerce-category-image-preview img");
+    expect(preview?.getAttribute("src")).toContain("0123456789abcdef0123456789abcdef.webp");
+    expect(screen.getByRole("button", { name: "Remove category image" })).toBeTruthy();
+  });
+  it("uploads, previews, and saves one brand image", async () => {
+    fetchEcommerceCatalog.mockResolvedValue({ tags: [], categories: [], brands: [], products: [] });
+    saveEcommerceItem.mockResolvedValue({
+      brand: {
+        id: "brand-1",
+        name: "Nike",
+        status: "active",
+        image_url: "/uploads/tenant_7/builder_assets/0123456789abcdef0123456789abcdef.webp",
+      },
+    });
+
+    render(<EcommercePage section="brands" />);
+    await screen.findByText("No brands yet");
+    fireEvent.click(screen.getByRole("button", { name: "Add Brand" }));
+
+    const input = document.querySelector('.ecommerce-category-image-upload input[type="file"]');
+    const file = new File(["brand"], "brand.webp", { type: "image/webp" });
+    fireEvent.change(input, { target: { files: [file] } });
+
+    await waitFor(() => expect(uploadEcommerceProductImage).toHaveBeenCalledWith(file));
+    expect(document.querySelector(".ecommerce-category-image-preview img")?.getAttribute("src")).toContain("0123456789abcdef0123456789abcdef.webp");
+    expect(screen.getByRole("button", { name: "Remove brand image" })).toBeTruthy();
+
+    fireEvent.change(screen.getByLabelText("Brand name (English)"), { target: { value: "Nike" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(saveEcommerceItem).toHaveBeenCalledWith(
+      "brands",
+      undefined,
+      expect.objectContaining({
+        name: "Nike",
+        status: "active",
+        image_url: "/uploads/tenant_7/builder_assets/0123456789abcdef0123456789abcdef.webp",
+      }),
+      expect.any(Object),
+    ));
   });
   it("opens product editing in a popup and resets the editor for creation", async () => {
     fetchEcommerceCatalog.mockResolvedValue({ tags: [], categories: [], products: [{

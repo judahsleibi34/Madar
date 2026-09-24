@@ -2,7 +2,7 @@ import PageHeaderSkeleton from "../common/PageHeaderSkeleton";
 import { getEcommerceCacheScope, readEcommerceAdminCacheSnapshot } from "./utils/ecommerceAdminCache";
 import EcommerceRouteSkeleton from "./EcommerceRouteSkeleton";
 import { StorePreviewSkeleton } from "./CommerceLoadingLayouts";
-import AuthToast from "../AuthPages/AuthToast";
+import EcommerceToast from "./EcommerceToast";
 import { useEffect, useMemo, useState } from "react";
 import { ExternalLink, RefreshCw, Settings } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
@@ -107,7 +107,7 @@ export default function EcommerceStorePage({ user }) {
           />
         </section>
       )}
-      <AuthToast {...toast} dir={direction} onDismiss={() => setToast(null)} />
+      <EcommerceToast {...toast} dir={direction} onDismiss={() => setToast(null)} />
     </main>
   );
 }

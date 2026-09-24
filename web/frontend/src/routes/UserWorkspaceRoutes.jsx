@@ -19,6 +19,7 @@ const loadEcommerceDeliveryPage = () => import("../components/DashboardBuilder/E
 const loadEcommerceOrdersPage = () => import("../components/DashboardBuilder/EcommerceOrdersPage");
 const loadEcommerceLoyaltyPage = () => import("../components/DashboardBuilder/EcommerceLoyaltyPage");
 const loadEcommerceThemePage = () => import("../components/DashboardBuilder/EcommerceThemePage");
+const loadEcommerceSocialLinksPage = () => import("../components/DashboardBuilder/EcommerceSocialLinksPage");
 const loadEcommerceStorePage = () => import("../components/DashboardBuilder/EcommerceStorePage");
 const EcommerceProductEditorPage = lazy(loadEcommerceProductEditorPage);
 const ArchivePage = lazy(() => import("../components/DashboardBuilder/ArchivePage"));
@@ -27,6 +28,7 @@ const EcommerceDeliveryPage = lazy(loadEcommerceDeliveryPage);
 const EcommerceOrdersPage = lazy(loadEcommerceOrdersPage);
 const EcommerceLoyaltyPage = lazy(loadEcommerceLoyaltyPage);
 const EcommerceThemePage = lazy(loadEcommerceThemePage);
+const EcommerceSocialLinksPage = lazy(loadEcommerceSocialLinksPage);
 const EcommerceStorePage = lazy(loadEcommerceStorePage);
 const CvRerankPage = lazy(() => import("../components/DashboardBuilder/CvRerankPage"));
 const ReservationCalendarPage = lazy(() =>
@@ -238,6 +240,10 @@ export default function UserWorkspaceRoutes({
         element={renderShell(<EcommercePage key="categories" section="categories" user={user} />)}
       />
       <Route
+        path="/ecommerce/brands/*"
+        element={renderShell(<EcommercePage key="brands" section="brands" user={user} />)}
+      />
+      <Route
         path="/ecommerce/products/*"
         element={renderShell(<EcommercePage key="products" section="products" user={user} />)}
       />
@@ -264,6 +270,10 @@ export default function UserWorkspaceRoutes({
       <Route
         path="/ecommerce/theme/*"
         element={renderShell(<EcommerceThemePage user={user} />)}
+      />
+      <Route
+        path="/ecommerce/social-links/*"
+        element={renderShell(<EcommerceSocialLinksPage user={user} />)}
       />
       <Route
         path="/ecommerce/cv-rerank/*"
