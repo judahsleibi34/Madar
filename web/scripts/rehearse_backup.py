@@ -50,6 +50,16 @@ def run(command: list[str], *, phase: str, timeout: int = 180, input: str | None
     return result.stdout
 
 
+def psql_command(container: str, *, attach_stdin: bool) -> list[str]:
+    command = ["docker", "exec"]
+    if attach_stdin:
+        command.append("-i")
+    return command + [
+        container, "psql", "-X", "-h", "/tmp", "-U", "postgres",
+        "-d", "postgres", "-v", "ON_ERROR_STOP=1", "-At",
+    ]
+
+
 def file_inventory(root: Path) -> dict[str, str]:
     files = {}
     for path in sorted(root.rglob("*")):
@@ -121,7 +131,7 @@ def rehearse(backup: Path, image: str, migration: Path | None = None, *, target_
             time.sleep(0.5)
         else:
             raise RehearsalError("database_start_timeout")
-        psql = ["docker", "exec", "-i", name, "psql", "-X", "-h", "/tmp", "-U", "postgres", "-d", "postgres", "-v", "ON_ERROR_STOP=1", "-At"]
+        psql = psql_command(name, attach_stdin=True)
         # Logical dumps exclude cluster roles. NOLOGIN prerequisites only; this
         # rehearsal must never be mistaken for a live authorization bootstrap.
         run(psql, phase="role_prerequisites", input="CREATE ROLE anon NOLOGIN; CREATE ROLE authenticated NOLOGIN; CREATE ROLE service_role NOLOGIN;\n")
@@ -141,7 +151,7 @@ def rehearse(backup: Path, image: str, migration: Path | None = None, *, target_
         if set(new_tables) & restored_tables:
             raise RehearsalError('expected_new_table_already_exists')
         if migration:
-            run(psql + ["--file", "/migration.sql"], phase="isolated_migration")
+            run(psql_command(name, attach_stdin=False) + ["--file", "/migration.sql"], phase="isolated_migration")
         rows = run(psql, phase="metadata_validation", input="""
 SELECT 'schema='||schema_version FROM public.application_schema_state WHERE contract_key='core';
 SELECT 'public_tables='||count(*) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relkind='r';

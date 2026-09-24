@@ -1,4 +1,4 @@
-const RESERVED_MADAR_HOSTS = new Set([
+export const RESERVED_MADAR_HOSTS = new Set([
   "admin",
   "api",
   "app",
@@ -25,8 +25,8 @@ export const getBrandedMadarSubdomain = (
   hostname,
   publicDomain = import.meta.env.VITE_PUBLIC_SITE_DOMAIN || "madarportal.com"
 ) => {
-  const cleanHost = String(hostname || "").trim().toLowerCase().split(":", 1)[0];
-  const cleanDomain = String(publicDomain || "").trim().toLowerCase();
+  const cleanHost = String(hostname || "").trim().toLowerCase().replace(/\.$/, "").split(":", 1)[0];
+  const cleanDomain = String(publicDomain || "").trim().toLowerCase().replace(/^\.+|\.+$/g, "");
   if (!cleanHost || !cleanDomain || cleanHost === cleanDomain) return "";
   const suffix = `.${cleanDomain}`;
   if (!cleanHost.endsWith(suffix)) return "";
@@ -40,15 +40,25 @@ export const getBrandedMadarSubdomain = (
   return candidate;
 };
 
-export const getBrandedRuntimePath = (locationLike) => {
-  const subdomain = getBrandedMadarSubdomain(locationLike?.hostname);
-  if (!subdomain) return "";
-  const pathname = String(locationLike?.pathname || "/");
+export const buildCanonicalTenantUrl = (
+  tenant,
+  path = "/",
+  publicDomain = import.meta.env.VITE_PUBLIC_SITE_DOMAIN || "madarportal.com"
+) => {
+  const cleanTenant = String(tenant || "").trim().toLowerCase();
+  const cleanDomain = String(publicDomain || "").trim().toLowerCase().replace(/^\.+|\.+$/g, "");
   if (
-    pathname === "/shop" ||
-    pathname.startsWith("/shop/") ||
-    pathname.startsWith("/site/") ||
-    pathname.startsWith("/api/")
+    !/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(cleanTenant) ||
+    RESERVED_MADAR_HOSTS.has(cleanTenant) ||
+    !cleanDomain
   ) return "";
-  return `/site/${encodeURIComponent(subdomain)}${pathname.startsWith("/") ? pathname : `/${pathname}`}`;
+  const cleanPath = String(path || "/");
+  return `https://${cleanTenant}.${cleanDomain}${cleanPath.startsWith("/") ? cleanPath : `/${cleanPath}`}`;
+};
+
+// Kept as a compatibility export for callers outside the application bundle.
+// Canonical tenant routing must never rewrite the browser path.
+export const getBrandedRuntimePath = (locationLike) => {
+  void locationLike;
+  return "";
 };

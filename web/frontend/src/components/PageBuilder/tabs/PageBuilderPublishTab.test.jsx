@@ -33,7 +33,7 @@ describe("PageBuilderPublishTab", () => {
       />
     );
 
-    expect(screen.getByDisplayValue("https://madarportal.com/site/disco2/")).toBeTruthy();
+    expect(screen.getByDisplayValue("https://disco2.madarportal.com/")).toBeTruthy();
     expect(screen.queryByDisplayValue(/project_/)).toBeNull();
   });
 
@@ -49,7 +49,7 @@ describe("PageBuilderPublishTab", () => {
       />
     );
 
-    expect(screen.getByDisplayValue("https://madarportal.com/site/disco2/")).toBeTruthy();
+    expect(screen.getByDisplayValue("https://disco2.madarportal.com/")).toBeTruthy();
     expect(screen.queryByDisplayValue(/project_/)).toBeNull();
   });
 
@@ -98,7 +98,7 @@ describe("PageBuilderPublishTab", () => {
     render(<PageBuilderPublishTab project={projectWithForm} publishedFormIds={["form-1"]} />);
 
     expect(
-      screen.getByDisplayValue("https://madarportal.com/forms/disco2/form-1")
+      screen.getByDisplayValue("https://disco2.madarportal.com/forms/form-1")
     ).toBeTruthy();
     expect(screen.queryByDisplayValue(/page-builder\/form-preview/)).toBeNull();
   });
@@ -157,7 +157,7 @@ describe("PageBuilderPublishTab", () => {
       />
     );
 
-    expect(screen.getByDisplayValue("https://madarportal.com/site/disco2/")).toBeTruthy();
+    expect(screen.getByDisplayValue("https://disco2.madarportal.com/")).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: /preview site/i }));
 
@@ -184,10 +184,10 @@ describe("PageBuilderPublishTab", () => {
     );
 
     expect(
-      screen.getByDisplayValue("https://madarportal.com/forms/disco2/form-1")
+      screen.getByDisplayValue("https://disco2.madarportal.com/forms/form-1")
     ).toBeTruthy();
     expect(
-      screen.getByDisplayValue("https://madarportal.com/forms/disco2/form-2")
+      screen.getByDisplayValue("https://disco2.madarportal.com/forms/form-2")
     ).toBeTruthy();
 
     const previewButtons = screen.getAllByRole("button", { name: /preview form/i });

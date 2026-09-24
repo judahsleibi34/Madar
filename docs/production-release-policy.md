@@ -1,6 +1,6 @@
 # Madar production release acceptance policy
 
-Last implementation review: 2026-09-14
+Last implementation review: 2026-09-24
 
 ## A. Purpose and authority
 
@@ -104,19 +104,26 @@ script, and provenance marker is ready. The backed-up prior tree is then
 replaced, so removed stale files cannot survive beneath a marker for newer
 source.
 
-Installer dry-run and apply share the same read-only static preflight before
-the first directory, backup, or controller mutation. Every existing component
-of privileged source and destination paths must be a real root-owned directory
-with no group/world write bit and no effective non-root POSIX ACL write grant;
-private upgrade state directories, when present, must be mode 0700. Root-owned
-mode 0755 system parents such as `/var/lib` are valid. The preflight also checks
-launcher/controller/unit parents and existing targets, the backup and upgrade
-state hierarchy, writable destination mounts, source cleanliness and identity,
-required production paths, timer/service quiescence, and working
-`renameat2(RENAME_EXCHANGE)` support on the publication filesystem. A static
-failure is reported by dry-run before mutation and apply re-evaluates the same
-checks to remain fail-closed against races. The installer never chmods or
-chowns `/`, `/var`, or `/var/lib`.
+Installer dry-run and apply share the same read-only static filesystem
+preflight before the first directory, backup, or controller mutation. Every
+existing component of privileged source and destination paths must be a real
+root-owned directory with no group/world write bit and no effective non-root
+POSIX ACL write grant; private upgrade state directories, when present, must
+be mode 0700. Root-owned mode 0755 system parents such as `/var/lib` are valid.
+The shared preflight also checks launcher/controller/unit parents and existing
+targets, the backup and upgrade state hierarchy, writable destination mounts,
+source cleanliness and identity, required production paths, and working
+`renameat2(RENAME_EXCHANGE)` support on the publication filesystem.
+
+Operational quiescence is deliberately mode-aware. The auto-deploy timer must
+be inactive and disabled and the auto-deploy service must be inactive for both
+installer modes. A currently running backup, verification, or replication
+service also blocks both modes. Scheduled backup timers may remain active
+during installer dry-run because dry-run is read-only; installer apply requires
+those backup timers to be quiesced first by the governed upgrader. Apply
+re-evaluates the static checks after quiescence to remain fail-closed against
+races. The installer never stops those backup timers merely to make its own
+preflight pass, and it never chmods or chowns `/`, `/var`, or `/var/lib`.
 
 ## B. Candidate eligibility (automatic production gate)
 
@@ -198,10 +205,11 @@ origin, and one shared non-empty build timestamp. Otherwise both artifacts are
 rebuilt. Preflight resolves each recorded tag again and rejects a changed image
 ID.
 
-The production frontend build requires `VITE_API_URL` to equal
-`https://api.madarportal.com`; the staging override expects
-`http://127.0.0.1:18001`. Deep validation also finds a Vite JavaScript asset on
-the loopback candidate frontend and verifies that the expected origin is
+The production frontend build requires `VITE_API_URL=/api`, which the frontend
+Nginx service proxies to the backend on the same public origin; the staging
+override expects `http://127.0.0.1:18001`. `PUBLIC_SITE_DOMAIN` supplies the
+trusted tenant-host suffix. Deep validation also finds a Vite JavaScript asset
+on the loopback candidate frontend and verifies that the expected API base is
 embedded.
 
 Implemented by `web/deployment/bin/madar-release-deploy ::
@@ -247,19 +255,16 @@ queried directly. Its SHA must match state and its reported compatibility range
 must contain the live schema. Candidate rollback bounds are descriptive metadata
 today; retained-target attestation is the operative rollback check.
 
-The current bridge contract is schema range `104..107`, target `107`, class
-`expand-only`, rollback metadata `104..104`, and the checksum-pinned
-`migrations-105-107.json`. Only after bridge acceptance may the coordinator
-create a source-schema-bound verified backup and execute the contiguous
-transitions. Migration 105 snapshots the configured non-negative delivery-area
-fee into each new order and adds it to the server-calculated total. Existing
-orders retain a zero delivery fee, and later merchant price changes do not
-rewrite captured order fees. Migration 106 adds one nullable, validated image
-URL per ecommerce category for merchant-managed storefront presentation.
-Category reads remain source-schema compatible and image writes fail clearly
-until schema 106 is live. Migration 107 adds tenant-scoped ecommerce brands, one optional validated image per brand, and an optional tenant-safe product brand relationship. Brand selection and storefront brand filtering remain unavailable until schema 107 is live. The pricing table, order write path, and catalog tables
-remain service-role-only. Releases capped below the live schema are not rollback
-targets after either transition commits.
+The current bridge contract is schema range `81..105`, target `105`, class
+`forward-compatible`, rollback metadata `81..104`, and the checksum-pinned
+`migrations-105.json`. Migrations 100 through 104 are applied production
+history and remain immutable. Only after bridge acceptance at schema 104 may
+the coordinator create a source-schema-bound verified backup and execute
+104→105. Migration 105 establishes `website_settings.subdomain` as the
+normalized, nonreserved, case-insensitively unique canonical tenant hostname,
+while retaining `standard_path_slug` as legacy compatibility state. Invalid,
+reserved, duplicate, or ambiguous identities abort before mutation with row
+evidence. Once schema advances beyond 104, recovery is forward-repair-only.
 
 The preceding schema-097 bridge added verified-customer loyalty through atomic
 functions. Identity is `(store tenant_id, public.users.id)`; checkout email and
@@ -281,7 +286,7 @@ An earlier bridge contract was schema range `81..95`, target
 accepted while schema 94 is live. Structured delivery checkout and merchant
 order operations deliberately fail closed until the schema-095 RPCs and tables
 are present. Only afterward may the separate coordinator create a
-schema-94-bound verified backup and execute 94â†’95. Existing catalog and settings
+schema-94-bound verified backup and execute 94→95. Existing catalog and settings
 reads remain safe throughout that bridge interval.
 
 Implemented by `web/deployment/lib/release_deployer.py :: Compatibility.load()`
@@ -302,9 +307,6 @@ and `ReleaseDeployer.deploy()`, plus `DockerGitOperations.schema_version()`,
 - duplicate numeric prefixes fail unless exactly listed in
   `GRANDFATHERED_DUPLICATES` (currently empty);
 - the two trees must have matching modern filenames and byte-identical contents;
-- immutable lineage checks normalize checkout CRLF to Git-canonical LF before
-  hashing, so Windows checkout conversion cannot manufacture a historical
-  migration change; all other bytes remain checksum-significant;
 - the historical database/Supabase 004/005 filename swap must remain complete
   and content-equivalent across the swapped names;
 - the historical 013/014 files must remain present and byte-identical in each
@@ -513,7 +515,7 @@ recorded and skipped. Every unapplied transition must start exactly at its
 declared `from_schema`; its SQL must advance core state to `to_schema`; and the
 final target must be reached. Each modern SQL file owns its `BEGIN`/`COMMIT`
 transaction. Failure is recorded, the connection is rolled back/closed, and the
-system is resumed or forward-repairedâ€”never automatically reverse-migrated.
+system is resumed or forward-repaired—never automatically reverse-migrated.
 
 Implemented by `web/deployment/bin/madar-migrate`,
 `web/deployment/lib/migration_executor.py :: MigrationManifest.load()` and
@@ -774,6 +776,7 @@ Implemented by `ReleaseDeployer._checkpoint()` and `_recover_interrupted()`.
 | `check_production_config.py` | No | No | No | Operator/staging presence and shape validation; never prints values |
 | `check_dependency_locks.py` | No | No | No | Backend and frontend CI |
 | `check_host_capacity.sh` | No | No | No | Installed periodic host-capacity service/timer; host-specific |
+| `monitor_hosted_domains.py` | No | No | No | Read-only public HTTPS synthetic monitor; its timer is separately governed and does not enable deployment |
 | `rehearse_migration_*.sh` | No | No | No | Manual, migration-specific rehearsals |
 | backend test suite/image build | Image build only | No | No | Backend CI |
 | frontend lint/tests/build/audit | Production image build runs the build | No | No | Frontend CI |
@@ -831,6 +834,8 @@ gates, non-automatic CI/manual checks, failure semantics, defaults, and bounded
 ranges against the implementation. If no text change is needed, the PR should
 say why. Control-plane changes also require the provenance-aware installation
 procedure before automatic deployment can accept the changed controller source.
+
+The hosted-domain monitor script and its service/timer are protected operational files. The installer backs up, installs, and attests them but does not enable either the monitor timer or `madar-auto-deploy.timer`. The monitor's live success history, current backup/Node 1 state, and exact-main CI are operator prerequisites to a separate decision to resume automatic deployment; see the [hosted-domain runbook](../web/docs/hosted-tenant-domains-operations-runbook.md). This adds no release-promotion or migration gate to the current controller.
 
 ## T. Privileged protected-control-plane upgrade gate
 

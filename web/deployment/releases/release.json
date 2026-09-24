@@ -2,13 +2,13 @@
   "release_metadata_version": 1,
   "schema": {
     "compatible_min": 104,
-    "compatible_max": 107,
-    "target": 107,
-    "migration_class": "expand-only",
+    "compatible_max": 108,
+    "target": 108,
+    "migration_class": "forward-compatible",
     "rollback_compatible_min": 104,
     "rollback_compatible_max": 104
   },
   "migration_policy": "automatic-after-known-good-backup-first-forward-repair",
-  "notes": "Forward-only schema 104 to 107 bridge. Migration 105 snapshots delivery fees, migration 106 adds category images, and migration 107 adds tenant-scoped ecommerce brands with optional product assignment. Perform a governed verified backup before migration. Do not replay migrations 001-104. After schema advances beyond 104, use forward repair rather than incompatible traffic rollback.",
-  "migration_manifest": "migrations-105-107.json"
+  "notes": "Forward-compatible schema 104 to 108 bridge. Migration 105 establishes canonical tenant subdomains; migration 106 snapshots order delivery fees; migration 107 adds ecommerce category images; migration 108 adds tenant-scoped ecommerce brands. Use a verified backup at schema 104 before migration and forward repair after schema advances beyond 104.",
+  "migration_manifest": "migrations-105-108.json"
 }

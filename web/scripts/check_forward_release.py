@@ -1,69 +1,261 @@
 #!/usr/bin/env python3
-"""Validate the production-based forward-only schema-107 source contract."""
+"""Validate the production schema-104 to schema-108 forward release."""
+
 from __future__ import annotations
+
 import hashlib
 import json
 from pathlib import Path
 import re
 
+
 ROOT = Path(__file__).resolve().parents[2]
-BASELINE = '1e6b739a43759309a45ede2dff28a859209e4a64'
+BASELINE = "1e6b739a43759309a45ede2dff28a859209e4a64"
+
+SOURCE_SCHEMA = 104
+TARGET_SCHEMA = 108
+MANIFEST_NAME = "migrations-105-108.json"
+
+# Migrations 100-104 have already been applied to production and are no
+# longer part of the active 104 -> 105 execution manifest. Keep them
+# explicitly checksum-pinned so narrowing the active manifest cannot make
+# already-applied production history mutable.
+APPLIED_PRODUCTION_MIGRATIONS = {
+    100: (
+        "100_correct_site_visit_counter_rpc.sql",
+        "cd1ba91ca5619c58d7fef247e9523cbf11e9c5812774d44c544cb238645745f9",
+    ),
+    101: (
+        "101_add_variant_attribute_presentation.sql",
+        "deb740c8ced84a3e712d93b077aa273220e026c96b13dd064593bdd5a67feaad",
+    ),
+    102: (
+        "102_add_ecommerce_discount_conditions.sql",
+        "95a87d3ee5ed4606592a1ef5385c6a22bf02e2bcbfde05edb88af5081457b3f1",
+    ),
+    103: (
+        "103_create_ecommerce_delivery_pricing.sql",
+        "37b4f97a6bf70b99aaaf3c097c3f6547e79fdcd2c87779ad4ebbb193ede5ddbc",
+    ),
+    104: (
+        "104_flatten_ecommerce_delivery_pricing.sql",
+        "a2121defc5bbf5e590912c145766fcce0b4fb7652faa07bfc7f484c8811df960",
+    ),
+}
+
+EXPECTED = {
+    105: (
+        "105_canonical_tenant_subdomains.sql",
+        "forward-compatible",
+    ),
+    106: (
+        "106_add_order_delivery_fees.sql",
+        "forward-compatible",
+    ),
+    107: (
+        "107_add_ecommerce_category_images.sql",
+        "expand-only",
+    ),
+    108: (
+        "108_add_ecommerce_brands.sql",
+        "expand-only",
+    ),
+}
+
 
 def digest(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes().replace(b'\r\n', b'\n')).hexdigest()
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
 
 def validate(root: Path = ROOT) -> list[str]:
-    errors = []
-    release_dir = root / 'web/deployment/releases'
+    errors: list[str] = []
+    release_dir = root / "web/deployment/releases"
+
     try:
-        pin = json.loads((release_dir / 'production-001-099.json').read_text())
-        if pin['production_baseline'] != BASELINE or len(pin['files']) != 198:
-            errors.append('immutable production lineage manifest invalid')
-        for relative, checksum in pin['files'].items():
+        # Immutable historical production lineage remains frozen through 099.
+        pin = json.loads(
+            (release_dir / "production-001-099.json").read_text(
+                encoding="utf-8"
+            )
+        )
+
+        if (
+            pin["production_baseline"] != BASELINE
+            or len(pin["files"]) != 198
+        ):
+            errors.append("immutable production lineage manifest invalid")
+
+        for relative, checksum in pin["files"].items():
+            if not re.fullmatch(
+                r"web/(database|supabase)/migrations/"
+                r"\d{3}_[a-z0-9_]+\.sql",
+                relative,
+            ):
+                errors.append(
+                    "invalid production migration path: " + relative
+                )
+                continue
+
             path = root / relative
-            if not re.fullmatch(r'web/(database|supabase)/migrations/\d{3}_[a-z0-9_]+\.sql', relative):
-                errors.append('invalid production migration path')
-                continue
+
             if not path.is_file() or digest(path) != checksum:
-                errors.append('immutable production migration changed: ' + relative)
-        release = json.loads((release_dir / 'release.json').read_text())
-        schema = release['schema']
-        if not (schema['compatible_min'] == 104 <= schema['compatible_max'] == schema['target'] == 107
-                and schema['rollback_compatible_min'] == 104 == schema['rollback_compatible_max']
-                and schema['migration_class'] == 'expand-only'
-                and release['migration_policy'] == 'automatic-after-known-good-backup-first-forward-repair'
-                and release['migration_manifest'] == 'migrations-105-107.json'):
-            errors.append('release must bridge schema 104 to target 107 with rollback bounded at 104')
-        manifest = json.loads((release_dir / 'migrations-105-107.json').read_text(encoding='utf-8-sig'))
-        if manifest.get('release_sha') not in {'CURRENT','STAGING'} and not re.fullmatch(r'[0-9a-f]{40}', str(manifest.get('release_sha',''))):
-            errors.append('manifest release identity invalid')
-        entries = manifest['migrations']
-        if [entry['number'] for entry in entries] != [105, 106, 107]:
-            errors.append('forward manifest must contain ordered migrations 105, 106, and 107')
+                errors.append(
+                    "immutable production migration changed: " + relative
+                )
+
+        # Schema 100-104 is already live in production. These migrations
+        # must remain immutable even though the active execution manifest
+        # begins at schema 104 and therefore contains 105 through 108.
+        for number, (filename, checksum) in (
+            APPLIED_PRODUCTION_MIGRATIONS.items()
+        ):
+            database = (
+                root
+                / "web/database/migrations"
+                / filename
+            )
+            supabase = (
+                root
+                / "web/supabase/migrations"
+                / filename
+            )
+
+            if (
+                not database.is_file()
+                or not supabase.is_file()
+                or digest(database) != checksum
+                or digest(supabase) != checksum
+                or database.read_bytes() != supabase.read_bytes()
+            ):
+                errors.append(
+                    "applied production migration changed: "
+                    f"{number:03d}_{filename.split('_', 1)[1]}"
+                )
+
+        release = json.loads(
+            (release_dir / "release.json").read_text(
+                encoding="utf-8"
+            )
+        )
+
+        schema = release["schema"]
+
+        if not (
+            int(schema["compatible_min"]) <= SOURCE_SCHEMA
+            <= TARGET_SCHEMA
+            == int(schema["compatible_max"])
+            == int(schema["target"])
+            and int(schema["rollback_compatible_min"]) <= SOURCE_SCHEMA
+            == int(schema["rollback_compatible_max"])
+            and schema["migration_class"] == "forward-compatible"
+            and release["migration_policy"]
+            == "automatic-after-known-good-backup-first-forward-repair"
+            and release["migration_manifest"] == MANIFEST_NAME
+        ):
+            errors.append(
+                "release must bridge production schema 104 to 108 "
+                "with rollback bounded at schema 104"
+            )
+
+        manifest = json.loads(
+            (release_dir / MANIFEST_NAME).read_text(
+                encoding="utf-8"
+            )
+        )
+
+        identity = str(manifest.get("release_sha") or "")
+
+        if (
+            identity not in {"CURRENT", "STAGING"}
+            and not re.fullmatch(r"[0-9a-f]{40}", identity)
+        ):
+            errors.append("manifest release identity invalid")
+
+        entries = manifest["migrations"]
+
+        if [int(entry["number"]) for entry in entries] != [105, 106, 107, 108]:
+            errors.append(
+                "forward manifest must contain ordered migrations 105 through 108"
+            )
+
+        previous = SOURCE_SCHEMA
+
         for entry in entries:
-            n = entry['number']
-            canonical = {
-                105: '105_add_order_delivery_fees.sql',
-                106: '106_add_ecommerce_category_images.sql',
-                107: '107_add_ecommerce_brands.sql',
-            }.get(n)
-            if n not in (105, 106, 107) or entry['from_schema'] != n - 1 or entry['to_schema'] != n or entry['compatibility'] not in ('expand-only','forward-compatible') or entry['path'] != 'web/database/migrations/' + canonical:
-                errors.append('forward manifest transition/path invalid')
+            number = int(entry["number"])
+
+            if number not in EXPECTED:
+                errors.append(
+                    f"unexpected forward migration: {number}"
+                )
                 continue
-            a = root / entry['path']
-            b = root / 'web/supabase/migrations' / canonical
-            if a.read_bytes().replace(b'\r\n', b'\n') != b.read_bytes().replace(b'\r\n', b'\n') or digest(a) != entry['sha256']:
-                errors.append('forward migration mirror/checksum invalid: ' + canonical)
-        for tree in ('database','supabase'):
-            versions = sorted(int(p.name.split('_',1)[0]) for p in (root / f'web/{tree}/migrations').glob('*.sql'))
-            if versions != list(range(1,108)):
-                errors.append('migration namespace must contain exactly 001 through 107: ' + tree)
-    except (OSError, KeyError, ValueError, TypeError):
-        errors.append('forward release artifacts missing or malformed')
+
+            filename, compatibility = EXPECTED[number]
+
+            expected_path = (
+                "web/database/migrations/" + filename
+            )
+
+            if not (
+                int(entry["from_schema"]) == previous
+                and int(entry["to_schema"]) == number
+                and number == previous + 1
+                and entry["compatibility"] == compatibility
+                and entry["path"] == expected_path
+            ):
+                errors.append(
+                    f"forward migration contract invalid: {number}"
+                )
+                previous = number
+                continue
+
+            database = root / expected_path
+            supabase = root / "web/supabase/migrations" / filename
+
+            if (
+                not database.is_file()
+                or not supabase.is_file()
+                or database.read_bytes() != supabase.read_bytes()
+                or digest(database) != str(entry["sha256"])
+            ):
+                errors.append(
+                    "forward migration mirror/checksum invalid: "
+                    + filename
+                )
+
+            previous = number
+
+        for tree in ("database", "supabase"):
+            versions = sorted(
+                int(path.name.split("_", 1)[0])
+                for path in (
+                    root / f"web/{tree}/migrations"
+                ).glob("*.sql")
+            )
+
+            if versions != list(range(1, TARGET_SCHEMA + 1)):
+                errors.append(
+                    "migration namespace must contain exactly "
+                    f"001 through {TARGET_SCHEMA:03d}: {tree}"
+                )
+
+    except (OSError, KeyError, ValueError, TypeError) as error:
+        errors.append(
+            "forward release artifacts missing or malformed: "
+            + type(error).__name__
+        )
+
     return errors
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     errors = validate()
-    for error in errors: print('INVALID ' + error)
-    print('Forward release source contract ' + ('INVALID' if errors else 'PASS'))
+
+    for error in errors:
+        print("INVALID " + error)
+
+    print(
+        "Forward release source contract "
+        + ("INVALID" if errors else "PASS")
+    )
+
     raise SystemExit(bool(errors))

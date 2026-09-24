@@ -7,11 +7,11 @@ if (!required) {
   process.exit(0);
 }
 
-const expected = "https://api.madarportal.com";
+const expected = "/api";
 const configured = String(process.env.VITE_API_URL || "").trim().replace(/\/+$/, "");
 
 if (configured !== expected) {
-  console.error("Production API origin is missing or does not match the canonical Madar API origin.");
+  console.error("Production API base must use the same-origin /api reverse proxy.");
   process.exit(1);
 }
 

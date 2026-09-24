@@ -1,5 +1,7 @@
 # Madar public-site publication isolation fix
 
+> Historical isolation record. Its routing discussion is superseded by [Canonical tenant hosting architecture](canonical-tenant-hosting-architecture.md); hostname is now an additional mandatory isolation boundary.
+
 Date: 2026-07-31 (UTC)
 
 Development checkout: `/home/madar/saas/Madar-dev`

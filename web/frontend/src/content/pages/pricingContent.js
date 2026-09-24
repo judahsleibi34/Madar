@@ -28,7 +28,7 @@ export const pricingContent = {
     comingSoon: "Coming soon",
     back: "Back",
     fairUse: "Forms, submissions, and reservation requests are not billed by count. Fair-use, anti-abuse, security, payload, rate, and platform-stability controls still apply.",
-    addressNote: "Website plans include one standard madarportal.com/site/business-name address. A branded business-name.madarportal.com subdomain is $5/month.",
+    addressNote: "Website plans include one canonical business-name.madarportal.com address.",
     exclusions: "Customer-owned custom domains and hosted business email are not currently available. AI analytics is an optional token-based add-on.",
     plans: {
       forms: {
@@ -100,7 +100,7 @@ export const pricingContent = {
     comingSoon: "قريباً",
     back: "رجوع",
     fairUse: "لا تتم محاسبة النماذج أو الردود أو طلبات الحجز حسب العدد. تبقى ضوابط الاستخدام العادل ومكافحة الإساءة والأمان ومعدلات الطلبات سارية.",
-    addressNote: "تشمل خطط المواقع عنواناً قياسياً على madarportal.com/site/business-name. النطاق الفرعي business-name.madarportal.com متاح مقابل 5 دولارات شهرياً.",
+    addressNote: "تشمل خطط المواقع عنواناً أساسياً بصيغة business-name.madarportal.com.",
     exclusions: "النطاقات المملوكة للعملاء والبريد التجاري المستضاف غير متاحة حالياً. تحليلات الذكاء الاصطناعي إضافة اختيارية تعتمد على الرموز.",
     plans: {
       forms: {

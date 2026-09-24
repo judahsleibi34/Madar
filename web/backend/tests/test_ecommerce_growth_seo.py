@@ -87,11 +87,11 @@ class EcommerceGrowthSeoTests(unittest.TestCase):
                 _validate_featured_rows(7, "ecommerce_products", [UUID(int=2)])
 
     def test_sitemap_contains_only_supplied_active_public_rows(self):
-        settings = {"tenant_id": 7, "standard_path_slug": "olive", "updated_at": "2026-09-01T10:00:00Z"}
+        settings = {"tenant_id": 7, "subdomain": "olive", "standard_path_slug": "olive-old", "updated_at": "2026-09-01T10:00:00Z"}
         rows = ([{"slug": "gifts", "updated_at": "2026-09-02"}], [], [{"slug": "soap", "updated_at": "2026-09-03"}], [])
         with patch("routes.public_site_routes._cached_public_catalog_rows", return_value=rows):
             xml = _storefront_sitemap_xml(settings, "olive", make_request())
-        self.assertIn("/site/olive/shop</loc>", xml)
+        self.assertIn("https://olive.madarportal.com/shop</loc>", xml)
         self.assertIn("category=gifts", xml)
         self.assertIn("/product/soap", xml)
         for forbidden in ("checkout", "confirmation", "dashboard", "token"):

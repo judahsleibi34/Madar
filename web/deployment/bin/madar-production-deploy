@@ -11,6 +11,25 @@ done
 
 readonly SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 readonly TRACKED_CONTROL_ROOT="$(cd -- "$SCRIPT_DIR/.." && pwd)"
+
+require_production_mutation_identity() {
+    if [[ "$TRACKED_CONTROL_ROOT" != "/opt/madar/control-plane/deployment" ]]; then
+        return 0
+    fi
+
+    local expected_uid expected_gid
+    if ! expected_uid="$(id -u madar)" || ! expected_gid="$(id -g madar)"; then
+        echo "[madar-production] ERROR: production_mutation_identity_invalid" >&2
+        exit 1
+    fi
+
+    if [[ "$EUID" -ne "$expected_uid" || "$(id -g)" -ne "$expected_gid" ]]; then
+        echo "[madar-production] ERROR: production_mutation_identity_invalid" >&2
+        exit 1
+    fi
+}
+
+require_production_mutation_identity
 if [[ "$TRACKED_CONTROL_ROOT" == "/opt/madar/control-plane/deployment" ]]; then
     # Interactive production execution receives the same root-owned path
     # contract as systemd. The later file is authoritative by design.

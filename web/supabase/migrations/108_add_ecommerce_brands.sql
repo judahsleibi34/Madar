@@ -79,17 +79,17 @@ begin
   if v_schema_version is null then
     raise exception using
       errcode = 'P0001',
-      message = 'migration_107_schema_state_missing';
+      message = 'migration_108_schema_state_missing';
   end if;
 
-  if v_schema_version <> 106 then
+  if v_schema_version <> 107 then
     raise exception using
       errcode = 'P0001',
-      message = format('migration_107_expected_schema_106_got_%s', v_schema_version);
+      message = format('migration_108_expected_schema_107_got_%s', v_schema_version);
   end if;
 
   update public.application_schema_state
-  set schema_version = 107,
+  set schema_version = 108,
       applied_at = now()
   where contract_key = 'core';
 end;

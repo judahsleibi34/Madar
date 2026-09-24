@@ -1,5 +1,7 @@
 # Madar release-safety instructions
 
+Before preparing or merging any PR targeting `main`, read [`docs/MADAR_AUTO_DEPLOY_MERGE_CONTRACT.md`](docs/MADAR_AUTO_DEPLOY_MERGE_CONTRACT.md) and treat its auto-deploy, migration, protected-path, and production-mutation rules as mandatory release constraints.
+
 Before changing deployment, migrations, schema compatibility, Docker/Compose,
 production runtime code, release-sensitive backend/frontend code, or opening a
 PR targeting `main`, read [`docs/production-release-policy.md`](docs/production-release-policy.md).

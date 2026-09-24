@@ -1,0 +1,21 @@
+{
+  "release_sha": "CURRENT",
+  "migrations": [
+    {
+      "number": 103,
+      "path": "web/database/migrations/103_create_ecommerce_delivery_pricing.sql",
+      "sha256": "37b4f97a6bf70b99aaaf3c097c3f6547e79fdcd2c87779ad4ebbb193ede5ddbc",
+      "from_schema": 102,
+      "to_schema": 103,
+      "compatibility": "expand-only"
+    },
+    {
+      "number": 104,
+      "path": "web/database/migrations/104_flatten_ecommerce_delivery_pricing.sql",
+      "sha256": "a2121defc5bbf5e590912c145766fcce0b4fb7652faa07bfc7f484c8811df960",
+      "from_schema": 103,
+      "to_schema": 104,
+      "compatibility": "forward-compatible"
+    }
+  ]
+}

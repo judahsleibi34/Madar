@@ -382,6 +382,7 @@ class SecurityFoundationTests(unittest.TestCase):
         for header in session_cookie_headers:
             self.assertNotIn("Max-Age=", header)
             self.assertNotIn("Expires=", header)
+            self.assertNotIn("Domain=", header)
 
     def test_logout_cookie_helper_clears_csrf_cookie(self):
         client = self.build_origin_client()
@@ -647,6 +648,30 @@ class SecurityFoundationTests(unittest.TestCase):
 
         with patch.object(rate_limit_service, "TRUSTED_PROXY_IPS", "10.0.0.0/24"):
             self.assertEqual(rate_limit_service.get_client_ip(request), "198.51.100.30")
+
+    def test_trusted_proxy_helper_accepts_string_addresses_and_fails_closed(self):
+        networks = rate_limit_service.parse_trusted_proxy_networks(
+            "127.0.0.1,::1,10.0.0.0/24"
+        )
+
+        self.assertTrue(
+            rate_limit_service.ip_is_trusted_proxy("127.0.0.1", networks)
+        )
+        self.assertTrue(
+            rate_limit_service.ip_is_trusted_proxy("::1", networks)
+        )
+        self.assertTrue(
+            rate_limit_service.ip_is_trusted_proxy("10.0.0.42", networks)
+        )
+        self.assertFalse(
+            rate_limit_service.ip_is_trusted_proxy("198.51.100.20", networks)
+        )
+        self.assertFalse(
+            rate_limit_service.ip_is_trusted_proxy("not-an-ip", networks)
+        )
+        self.assertFalse(
+            rate_limit_service.ip_is_trusted_proxy("", networks)
+        )
 
     def test_untrusted_spoofed_forwarded_headers_do_not_bypass_rate_limit(self):
         app = FastAPI()

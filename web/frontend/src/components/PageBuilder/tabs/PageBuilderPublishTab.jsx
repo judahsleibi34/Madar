@@ -10,6 +10,7 @@ import { getPublishContent } from "../../../content/pageBuilder";
 import {
   getProductionAppOrigin,
   getProductionFormUrl,
+  getProductionTenantUrl,
   sanitizeSubdomain,
 } from "../core/PageBuilder.routing";
 
@@ -55,16 +56,23 @@ export default function PageBuilderPublishTab({
   const content = getPublishContent(lang);
   const forms = Array.isArray(project.forms) ? project.forms : [];
   const publishSubdomain = sanitizeSubdomain(project?.publish?.subdomain || "");
-  const hasPublicSubdomain = Boolean(publishSubdomain || hasConfiguredSubdomain);
-  const configuredLiveSitePath = publishSubdomain ? `/site/${publishSubdomain}/` : "";
+  const legacyLiveSubdomain = sanitizeSubdomain(
+    String(liveSitePath || "").match(/^\/site\/([^/]+)/)?.[1] || ""
+  );
+  const effectiveSubdomain = publishSubdomain || legacyLiveSubdomain;
+  const effectiveProject = effectiveSubdomain
+    ? { ...project, publish: { ...(project.publish || {}), subdomain: effectiveSubdomain } }
+    : project;
+  const hasPublicSubdomain = Boolean(effectiveSubdomain || hasConfiguredSubdomain);
+  const configuredLiveSitePath = effectiveSubdomain ? getProductionTenantUrl(effectiveProject) : "";
   const isPublished = project.status === "published";
   const isFormPublished = (form) => (
     Array.isArray(publishedFormIds) ? publishedFormIds.includes(form.id) : isPublished
   );
-  const resolvedLiveSitePath = isPublished ? liveSitePath || configuredLiveSitePath : "";
+  const resolvedLiveSitePath = isPublished ? configuredLiveSitePath || liveSitePath : "";
   const productionAppOrigin = getProductionAppOrigin();
   const publicLink = resolvedLiveSitePath
-    ? `${productionAppOrigin}${resolvedLiveSitePath}`
+    ? (/^https:\/\//.test(resolvedLiveSitePath) ? resolvedLiveSitePath : `${productionAppOrigin}${resolvedLiveSitePath}`)
     : "";
   const publicLinkPlaceholder = hasPublicSubdomain
     ? content.siteNotPublished
@@ -87,7 +95,7 @@ export default function PageBuilderPublishTab({
   const qrUrl = buildQrUrl(publicLink, publicQrVersion);
   const formDestinations = forms.map((form) => {
     const isLive = isFormPublished(form);
-    const link = isLive && publishSubdomain ? getProductionFormUrl(project, form.id) : "";
+    const link = isLive && effectiveSubdomain ? getProductionFormUrl(effectiveProject, form.id) : "";
     return {
       form,
       isLive,
@@ -126,7 +134,7 @@ export default function PageBuilderPublishTab({
           <AlertTriangle size={22} aria-hidden="true" />
           <div>
             <strong>Choose your standard hosted address first</strong>
-            <p>Page-builder plans include a path such as madarportal.com/site/business-name. A branded business-name.madarportal.com address is a separate paid add-on.</p>
+            <p>Website plans include a canonical address such as business-name.madarportal.com.</p>
           </div>
           <button type="button" className="primary-action" onClick={openWebsiteSettings}>
             Add hosted address

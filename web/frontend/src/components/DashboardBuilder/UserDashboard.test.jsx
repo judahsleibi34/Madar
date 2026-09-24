@@ -54,13 +54,13 @@ describe("UserDashboard shortcuts", () => {
 
     const websiteLink = await screen.findByRole("link", { name: "View website" });
     expect(websiteLink.getAttribute("href")).toBe(
-      "https://madarportal.com/site/olive-house/",
+      "https://olive-house.madarportal.com/",
     );
     expect(websiteLink.getAttribute("target")).toBe("_blank");
 
     const storeLink = screen.getByRole("link", { name: "View store" });
     expect(storeLink.getAttribute("href")).toBe(
-      "https://madarportal.com/site/olive-house/shop",
+      "https://olive-house.madarportal.com/shop",
     );
     expect(storeLink.getAttribute("target")).toBe("_blank");
     expect(await screen.findByText("42")).toBeTruthy();

@@ -102,8 +102,10 @@ def classify(values: dict[str, str], e2e: dict[str, str]) -> list[tuple[str, str
         database_status = "MISSING"
     checks.append(("DATABASE_CONNECTION", database_status))
 
-    for name in ("VITE_API_URL", "PUBLIC_API_URL", "FRONTEND_PRIMARY_URL"):
+    required("VITE_API_URL", lambda value: value.strip().rstrip("/") == "/api")
+    for name in ("PUBLIC_API_URL", "FRONTEND_PRIMARY_URL"):
         required(name, absolute_https_origin)
+    required("PUBLIC_SITE_DOMAIN", lambda value: bool(re.fullmatch(r"[a-z0-9]+(?:[.-][a-z0-9]+)+", value.strip().lower().strip("."))))
     required("FRONTEND_URLS", safe_https_origins)
     required("MADAR_STORAGE_ROOT", absolute_non_root)
     required("COOKIE_SECURE", lambda value: value.strip().lower() == "true")
@@ -114,7 +116,7 @@ def classify(values: dict[str, str], e2e: dict[str, str]) -> list[tuple[str, str
         "MADAR_CSP_CONNECT_SRC",
         lambda value: (
             absolute_https_origin(value)
-            and value.rstrip("/") == values.get("VITE_API_URL", "").strip().rstrip("/")
+            and value.rstrip("/") == values.get("PUBLIC_API_URL", "").strip().rstrip("/")
         ),
     )
     required("REDIS_URL", lambda value: value.startswith(("redis://", "rediss://")))

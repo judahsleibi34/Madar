@@ -9,10 +9,7 @@ import { Link, useLocation } from "react-router-dom";
 
 import { fetchWebsiteSettings } from "../PageBuilder/services/PageBuilder.api";
 import { useCommerceI18n } from "../../utils/commerceI18n";
-
-const STOREFRONT_ORIGIN = String(
-  import.meta.env.VITE_STOREFRONT_URL || import.meta.env.VITE_PUBLIC_APP_URL || "https://madarportal.com"
-).replace(/\/$/, "");
+import { buildCanonicalTenantUrl } from "../../utils/hostedAddress";
 
 export default function EcommerceStorePage({ user }) {
   const cacheScope = getEcommerceCacheScope(user);
@@ -48,13 +45,11 @@ export default function EcommerceStorePage({ user }) {
   }, [cacheScope, t]);
 
   const subdomain = String(website?.subdomain || "").trim();
-  const livePath = subdomain
-    ? `/site/${encodeURIComponent(subdomain)}/shop`
-    : "";
+  const livePath = subdomain ? `/site/${encodeURIComponent(subdomain)}/shop` : "";
   const liveUrl = useMemo(
     () => (
       subdomain
-        ? new URL(`/site/${encodeURIComponent(subdomain)}/shop`, STOREFRONT_ORIGIN).toString()
+        ? buildCanonicalTenantUrl(subdomain, "/shop")
         : ""
     ),
     [subdomain]

@@ -32,6 +32,7 @@ sys.path.insert(0, str(WEB_ROOT))
 from deployment.lib.release_deployer import Compatibility, ReleaseDeployer, atomic_json, utc_now  # noqa: E402
 from deployment.lib.environment_file import load_environment_file  # noqa: E402
 from deployment.lib.control_plane_upgrade_authorization import (  # noqa: E402
+    require_production_mutation_identity,
     require_upgrade_authorization,
 )
 from deployment.lib.migration_executor import (  # noqa: E402
@@ -260,7 +261,10 @@ class DockerGitOperations:
         staging = bool(os.getenv("MADAR_COMPOSE_OVERRIDE", "").strip())
         frontend_target = "staging" if staging else "production"
         frontend_api_url = os.getenv("VITE_API_URL", "").strip().rstrip("/")
-        expected_api_url = "http://127.0.0.1:18001" if staging else "https://api.madarportal.com"
+        public_site_domain = os.getenv("PUBLIC_SITE_DOMAIN", "madarportal.com").strip().lower().strip(".")
+        if not re.fullmatch(r"[a-z0-9]+(?:[.-][a-z0-9]+)+", public_site_domain):
+            raise RuntimeError("public_site_domain_missing_or_invalid")
+        expected_api_url = "http://127.0.0.1:18001" if staging else "/api"
         if frontend_api_url != expected_api_url:
             raise RuntimeError("frontend_api_origin_missing_or_invalid")
         frontend_tag = f"madar-frontend:{sha}-{frontend_target}"
@@ -291,6 +295,7 @@ class DockerGitOperations:
         self.run([
             "docker", "build", *frontend_labels,
             "--build-arg", f"VITE_API_URL={frontend_api_url}",
+            "--build-arg", f"VITE_PUBLIC_SITE_DOMAIN={public_site_domain}",
             "--build-arg", f"MADAR_REQUIRE_PRODUCTION_API_URL={'false' if staging else 'true'}",
             "--build-arg", f"MADAR_RELEASE_SHA={sha}",
             "--build-arg", f"MADAR_BUILD_TIMESTAMP={build_timestamp}", "-t", frontend_tag,
@@ -309,7 +314,7 @@ class DockerGitOperations:
         return (
             "http://127.0.0.1:18001"
             if os.getenv("MADAR_COMPOSE_OVERRIDE", "").strip()
-            else "https://api.madarportal.com"
+            else "/api"
         )
 
     def schema_version(self) -> int:
@@ -982,9 +987,13 @@ class DockerGitOperations:
             if response.status != 200:
                 raise RuntimeError("active_refresh_frontend_unavailable")
             self._validate_frontend_api_origin(frontend_base, response.read())
+        self._validate_frontend_backend_identity(frontend_base, sha, slot)
         with urllib.request.urlopen("http://127.0.0.1:3000/", timeout=5) as response:
             if response.status != 200:
                 raise RuntimeError("active_refresh_stable_frontend_unavailable")
+        self._validate_frontend_backend_identity(
+            "http://127.0.0.1:3000", sha, slot
+        )
 
     def validate_stable_candidate(self, sha: str) -> None:
         stable_identity = self._json("http://127.0.0.1:8001/health/version")
@@ -994,6 +1003,21 @@ class DockerGitOperations:
         with urllib.request.urlopen("http://127.0.0.1:3000/", timeout=5) as response:
             if response.status != 200:
                 raise RuntimeError("stable_proxy_frontend_validation_failed")
+        slot = str(stable_identity.get("release_slot") or "")
+        self._validate_frontend_backend_identity(
+            "http://127.0.0.1:3000", sha, slot or None
+        )
+
+    def _validate_frontend_backend_identity(
+        self, frontend_base: str, sha: str, slot: str | None
+    ) -> None:
+        """Prove a frontend's same-origin API reaches its paired backend."""
+
+        identity = self._json(f"{frontend_base}/api/health/version")
+        if identity.get("release_sha") != sha:
+            raise RuntimeError("frontend_api_release_identity_mismatch")
+        if slot and identity.get("release_slot") != slot:
+            raise RuntimeError("frontend_api_release_slot_mismatch")
 
     def _validate_frontend_api_origin(self, frontend_base: str, html: bytes) -> None:
         parser = ScriptSourceParser()
@@ -1037,6 +1061,9 @@ class DockerGitOperations:
                     with urllib.request.urlopen(f"{frontend_base}/", timeout=5) as response:
                         if response.status == 200:
                             self._validate_frontend_api_origin(frontend_base, response.read())
+                            self._validate_frontend_backend_identity(
+                                frontend_base, sha, slot
+                            )
                             return
                     last_failure = "frontend_unavailable"
             except urllib.error.HTTPError as error:
@@ -2070,6 +2097,7 @@ def main() -> int:
     )
     parser.add_argument("--slot", choices=tuple(SLOT_PORTS), default="green")
     args = parser.parse_args()
+    require_production_mutation_identity(SCRIPT)
     normalized_sha = args.sha.lower()
     if not re.fullmatch(r"[0-9a-f]{40}", normalized_sha):
         raise RuntimeError("candidate_sha_invalid")

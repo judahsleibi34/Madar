@@ -6,7 +6,8 @@ describe("canonical pricing copy", () => {
   it("describes manual activation and the unlimited-volume fair-use policy", () => {
     expect(pricingContent.en.manualActivation.toLowerCase()).toContain("does not charge");
     expect(pricingContent.en.fairUse.toLowerCase()).toContain("not billed by count");
-    expect(pricingContent.en.addressNote).toContain("$5/month");
+    expect(pricingContent.en.addressNote).toContain("business-name.madarportal.com");
+    expect(pricingContent.en.addressNote).not.toContain("/site/");
   });
 
   it("does not contain WhatsApp pricing", () => {

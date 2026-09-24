@@ -22,6 +22,7 @@ from deployment.lib.migration_executor import (  # noqa: E402
     MigrationManifest,
 )
 from deployment.lib.control_plane_upgrade_authorization import (  # noqa: E402
+    require_production_mutation_identity,
     require_upgrade_authorization,
 )
 
@@ -73,6 +74,7 @@ def main() -> int:
     parser.add_argument("--verify-script", type=Path)
 
     args = parser.parse_args()
+    require_production_mutation_identity(SCRIPT)
 
     if not args.database_url:
         raise SystemExit(

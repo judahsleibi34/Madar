@@ -3,8 +3,8 @@
   "migrations": [
     {
       "number": 105,
-      "path": "web/database/migrations/105_add_order_delivery_fees.sql",
-      "sha256": "c40e0e95974167df53322926015cd3478cdbcbab0533e2e5ae6f360ec1a58081",
+      "path": "web/database/migrations/105_canonical_tenant_subdomains.sql",
+      "sha256": "f445f36bbba71f6c78f1c4e16f8a59ae63277c7c4f59510bf4e91eab4c967097",
       "from_schema": 104,
       "to_schema": 105,
       "compatibility": "forward-compatible"

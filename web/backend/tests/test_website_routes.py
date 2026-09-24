@@ -63,6 +63,10 @@ class FakeQuery:
         self.filters.append((column, value))
         return self
 
+    def ilike(self, column, value):
+        self.filters.append((column, str(value).lower()))
+        return self
+
     @property
     def not_(self):
         return self
@@ -85,7 +89,7 @@ class FakeQuery:
         rows = list(self.supabase.tables.get(self.table_name, []))
 
         for column, value in self.filters:
-            rows = [row for row in rows if row.get(column) == value]
+            rows = [row for row in rows if str(row.get(column)).lower() == str(value).lower()]
 
         for column in self.not_null_columns:
             rows = [row for row in rows if row.get(column) is not None]
@@ -146,7 +150,6 @@ class WebsiteRoutesTests(unittest.TestCase):
     def setUp(self):
         self.entitlement_patches = [
             patch.object(website_routes, "require_any_entitlement", return_value={}),
-            patch.object(website_routes, "require_branded_subdomain", return_value=None),
         ]
         for entitlement_patch in self.entitlement_patches:
             entitlement_patch.start()
@@ -619,30 +622,61 @@ class WebsiteRoutesTests(unittest.TestCase):
         client = build_public_client(fake_supabase)
 
         with patch.object(public_site_routes, "service_supabase", fake_supabase), \
-             patch.object(public_site_routes, "enforce_public_rate_limit"), \
-             patch.object(public_site_routes, "require_branded_subdomain") as branded_gate:
+             patch.object(public_site_routes, "enforce_public_rate_limit"):
             response = client.get("/public/sites/standard-site")
 
         self.assertEqual(response.status_code, 200)
-        branded_gate.assert_not_called()
         self.assertEqual(response.json()["project"]["published_schema"]["defaultPageId"], "home")
 
-    def test_branded_hostname_invokes_backend_entitlement_gate(self):
+    def test_canonical_hostname_does_not_require_retired_premium_gate(self):
         fake_supabase = FakeSupabase()
         client = build_public_client(fake_supabase)
 
         with patch.object(public_site_routes, "service_supabase", fake_supabase), \
-             patch.object(public_site_routes, "enforce_public_rate_limit"), \
-             patch.object(public_site_routes, "require_branded_subdomain") as branded_gate:
+             patch.object(public_site_routes, "enforce_public_rate_limit"):
             response = client.get(
                 "/public/sites/fresh-site",
                 headers={"Host": "fresh-site.madarportal.com"},
             )
 
         self.assertEqual(response.status_code, 200)
-        self.assertGreaterEqual(branded_gate.call_count, 1)
-        for call in branded_gate.call_args_list:
-            self.assertEqual(call.args[0]["tenant_id"], 7)
+
+    def test_canonical_hostname_rejects_path_tenant_mismatch(self):
+        fake_supabase = FakeSupabase()
+        client = build_public_client(fake_supabase)
+        with patch.object(public_site_routes, "service_supabase", fake_supabase), \
+             patch.object(public_site_routes, "enforce_public_rate_limit"):
+            response = client.get(
+                "/public/sites/standard-site",
+                headers={"Host": "fresh-site.madarportal.com"},
+            )
+        self.assertEqual(response.status_code, 404)
+
+    def test_legacy_site_path_redirects_permanently_and_preserves_query(self):
+        fake_supabase = FakeSupabase()
+        client = build_public_client(fake_supabase)
+        with patch.object(public_site_routes, "service_supabase", fake_supabase):
+            response = client.get(
+                "/public/legacy/site/standard-site/about?x=1",
+                headers={"Host": "madarportal.com"},
+                follow_redirects=False,
+            )
+        self.assertEqual(response.status_code, 308)
+        self.assertEqual(
+            response.headers["location"],
+            "https://fresh-site.madarportal.com/about?x=1",
+        )
+
+    def test_legacy_redirect_does_not_run_on_tenant_host(self):
+        fake_supabase = FakeSupabase()
+        client = build_public_client(fake_supabase)
+        with patch.object(public_site_routes, "service_supabase", fake_supabase):
+            response = client.get(
+                "/public/legacy/site/fresh-site/about",
+                headers={"Host": "fresh-site.madarportal.com"},
+                follow_redirects=False,
+            )
+        self.assertEqual(response.status_code, 404)
 
 
 

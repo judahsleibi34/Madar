@@ -95,6 +95,7 @@ PROTECTED_PATHS = (
     "web/scripts/replicate_backup_offhost.sh",
     "web/scripts/restore_madar.sh",
     "web/scripts/rehearse_backup.py",
+    "web/scripts/monitor_hosted_domains.py",
 )
 EXPECTED_CONTRACT = {
     "MADAR_PRODUCTION_REPO": "/srv/madar/production",
@@ -2328,6 +2329,7 @@ class SystemOperations:
             "madar-backup-verify.service", "madar-backup-verify.timer",
             "madar-node1-backup.service", "madar-node1-backup.timer",
             "madar-offhost-backup.service", "madar-offhost-backup.timer",
+            "madar-hosted-domain-monitor.service", "madar-hosted-domain-monitor.timer",
         ):
             path = Path("/etc/systemd/system") / unit
             if (
@@ -2494,6 +2496,12 @@ class SystemOperations:
         ).stdout
         if self.audit:
             self.audit.log(f"journal label={label} {journal[:12000]}")
+        if (
+            start_result.returncode == 75
+            and not recovery
+            and not migration_repair
+        ):
+            raise UpgradeError("candidate_retry_suppressed")
         if start_result.returncode != 0:
             raise UpgradeError(f"{label}_failed")
 

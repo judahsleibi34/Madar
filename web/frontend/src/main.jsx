@@ -58,12 +58,10 @@ import "./styles/admin/internal-theme.css";
 import "./styles/core/contrast-contract.css";
 import "./styles/admin/dashboard/settings-responsive.css";
 import App from "./App.jsx";
-import { getBrandedRuntimePath } from "./utils/hostedAddress";
 import { installMadarPwaMetadata, isMadarPwaHost } from "./pwa/pwaContext";
 import { getMadarServiceWorkerRegistration } from "./pwa/serviceWorker";
 import { initializeInstallPromptCapture } from "./pwa/installPromptStore";
 
-const brandedRuntimePath = getBrandedRuntimePath(window.location);
 const madarPwaHost = isMadarPwaHost(window.location);
 
 if (madarPwaHost) {
@@ -77,14 +75,6 @@ if (madarPwaHost) {
       console.warn("Madar service worker registration failed:", error);
     });
   }
-}
-
-if (brandedRuntimePath) {
-  window.history.replaceState(
-    null,
-    "",
-    `${brandedRuntimePath}${window.location.search}${window.location.hash}`
-  );
 }
 
 createRoot(document.getElementById("root")).render(

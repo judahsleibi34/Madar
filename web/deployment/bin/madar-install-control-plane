@@ -77,11 +77,13 @@ declare -a units=(
   madar-node1-backup.timer
   madar-offhost-backup.service
   madar-offhost-backup.timer
+  madar-hosted-domain-monitor.service
+  madar-hosted-domain-monitor.timer
 )
-declare -a backup_scripts=(
+declare -a operational_scripts=(
   backup_madar.sh verify_backup.sh verify_latest_backup.sh backup_support.py
   replicate_latest_node1.py replicate_latest_offhost.sh replicate_backup_offhost.sh
-  restore_madar.sh rehearse_backup.py
+  restore_madar.sh rehearse_backup.py monitor_hosted_domains.py
 )
 
 [[ $EUID -eq 0 ]] || { echo "control-plane installer requires root" >&2; exit 1; }
@@ -142,17 +144,24 @@ if [[ -d "$backup_root" && -n "$(find "$backup_root" -mindepth 1 -maxdepth 1 -pr
   exit 1
 fi
 
-# Timers must be quiesced by the governed upgrader before operational files
-# change. Never interrupt a running backup, verification, or replication.
+# A read-only dry run may execute while backup timers remain scheduled, but
+# never while a backup, verification, or replication service is actually
+# running. Apply is stricter: the governed upgrader must first quiesce every
+# backup timer before operational files may change.
 for name in madar-backup madar-backup-verify madar-node1-backup madar-offhost-backup; do
-  if systemctl is-active --quiet "$name.timer" || systemctl is-active --quiet "$name.service"; then
-    echo "backup operations must be quiesced before installation: $name" >&2
+  if systemctl is-active --quiet "$name.service"; then
+    echo "backup operation must complete before installation: $name" >&2
+    exit 1
+  fi
+
+  if (( apply )) && systemctl is-active --quiet "$name.timer"; then
+    echo "backup timer must be quiesced before installation: $name" >&2
     exit 1
   fi
 done
-for script in "${backup_scripts[@]}"; do
+for script in "${operational_scripts[@]}"; do
   [[ -f "$web_root/scripts/$script" && ! -L "$web_root/scripts/$script" ]] || {
-    echo "canonical backup helper missing or symlinked: $script" >&2; exit 1;
+    echo "canonical operations helper missing or symlinked: $script" >&2; exit 1;
   }
 done
 
@@ -195,7 +204,7 @@ for specification in \
     cp -a -- "$current" "$backup_root/$backup_name"
   fi
 done
-for script in "${backup_scripts[@]}"; do
+for script in "${operational_scripts[@]}"; do
   current="/usr/local/lib/madar/$script"
   if [[ -e "$current" ]]; then cp -a -- "$current" "$backup_root/$script"; fi
 done
@@ -235,7 +244,7 @@ for relative in "${tracked_files[@]}"; do
   install -D -o root -g root -m "$mode" "$source_path" "$stage_root/$relative"
 done
 install -d -o root -g madar -m 0750 "$stage_root/scripts"
-for script in "${backup_scripts[@]}"; do
+for script in "${operational_scripts[@]}"; do
   install -o root -g root -m 0755 \
     "$web_root/scripts/$script" "$stage_root/scripts/$script"
 done
@@ -282,7 +291,7 @@ else
   mv -T -- "$stage_root" "$install_root"
 fi
 trap - EXIT
-for script in "${backup_scripts[@]}"; do
+for script in "${operational_scripts[@]}"; do
   install -o root -g root -m 0755 "$web_root/scripts/$script" "/usr/local/lib/madar/$script"
   cmp --silent "$web_root/scripts/$script" "/usr/local/lib/madar/$script"
 done

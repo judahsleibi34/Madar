@@ -38,6 +38,7 @@ sys.path.insert(0, str(WEB_ROOT))
 from deployment.lib.control_plane_upgrade_authorization import (  # noqa: E402
     require_upgrade_authorization,
 )
+import deployment.lib.control_plane_upgrade_authorization as authorization  # noqa: E402
 import control_plane_filesystem as filesystem  # noqa: E402
 
 
@@ -55,6 +56,7 @@ class FakeOperations:
         self.schema = 93
         self.timer = {"enabled": "enabled", "active": "active"}
         self.interlock = False
+        self.interlock_sha = None
         self.snapshot = {"state": "unchanged"}
         self.controller_compatibility = "normal_compatible"
 
@@ -86,13 +88,21 @@ class FakeOperations:
         self._event("protected_change_required")
         return self.protected
 
-    def quiesce(self):
+    def quiesce(self, approved_sha):
         self._event("quiesce")
+        self.arm_interlock(approved_sha)
         self.timer = {"enabled": "disabled", "active": "inactive"}
+
+    def durable_quiesce_snapshot_exists(self, approved_sha):
+        return (
+            self.interlock
+            and self.interlock_sha == approved_sha
+        )
 
     def arm_interlock(self, sha):
         self._event("arm_interlock")
         self.interlock = True
+        self.interlock_sha = sha
 
     def release_deployment_lock(self):
         self._event("release_deployment_lock")
@@ -135,7 +145,7 @@ class FakeOperations:
             self.production = sha
             self.slot = "blue"
 
-    def attest_serving(self, sha):
+    def attest_serving(self, sha, *, recovery=False):
         self._event("attest_serving")
         if self.production != sha:
             raise upgrade.UpgradeError("not_promoted")
@@ -166,6 +176,7 @@ class FakeOperations:
     def clear_interlock(self):
         self.events.append("clear_interlock")
         self.interlock = False
+        self.interlock_sha = None
 
     def clear_authorization(self):
         self.events.append("clear_authorization")
@@ -1149,6 +1160,153 @@ class ControlPlaneUpgradeTests(unittest.TestCase):
         self.assertTrue(wrapper.startswith("#!/usr/bin/python3 -I"))
         self.assertIn("os.environ.clear()", wrapper)
 
+    def test_controlled_auto_deploy_maps_suppression_to_explicit_result(self):
+        operations = object.__new__(upgrade.SystemOperations)
+        operations.repo = Path("/srv/madar/production")
+        operations.control_root = Path(
+            "/opt/madar/control-plane/deployment"
+        )
+        operations.contract_path = (
+            operations.control_root / "production-paths.conf"
+        )
+        operations.authorization_file = Path(
+            "/run/madar/control-plane-upgrade/authorized.credential"
+        )
+        operations.audit = None
+        operations.write_authorization = mock.Mock()
+        operations.clear_authorization = mock.Mock()
+
+        operations.command = mock.Mock(
+            side_effect=[
+                upgrade.CommandResult("", "", 75),
+                upgrade.CommandResult(
+                    "[madar-auto-deploy] Candidate is recorded failed "
+                    "and remains suppressed",
+                    "",
+                    0,
+                ),
+            ]
+        )
+
+        with self.assertRaisesRegex(
+            upgrade.UpgradeError,
+            "candidate_retry_suppressed",
+        ):
+            operations.run_deploy_service(
+                "controlled_candidate_deployment",
+                self.SHA,
+            )
+
+        operations.write_authorization.assert_called_once()
+        operations.clear_authorization.assert_called_once()
+
+    def test_controlled_auto_deploy_other_failure_remains_deploy_failure(self):
+        operations = object.__new__(upgrade.SystemOperations)
+        operations.repo = Path("/srv/madar/production")
+        operations.control_root = Path(
+            "/opt/madar/control-plane/deployment"
+        )
+        operations.contract_path = (
+            operations.control_root / "production-paths.conf"
+        )
+        operations.authorization_file = Path(
+            "/run/madar/control-plane-upgrade/authorized.credential"
+        )
+        operations.audit = None
+        operations.write_authorization = mock.Mock()
+        operations.clear_authorization = mock.Mock()
+
+        operations.command = mock.Mock(
+            side_effect=[
+                upgrade.CommandResult("", "", 1),
+                upgrade.CommandResult(
+                    "ordinary deployment failure",
+                    "",
+                    0,
+                ),
+            ]
+        )
+
+        with self.assertRaisesRegex(
+            upgrade.UpgradeError,
+            "controlled_candidate_deployment_failed",
+        ):
+            operations.run_deploy_service(
+                "controlled_candidate_deployment",
+                self.SHA,
+            )
+
+    def test_suppressed_bridge_stops_before_serving_attestation(self):
+        production = "1" * 40
+        approved = self.SHA
+
+        with tempfile.TemporaryDirectory() as root:
+            operations, record, _audit, coordinator = self.coordinator(
+                root,
+                protected=False,
+            )
+            operations.production = production
+            operations.installed = approved
+            operations.controller_compatibility = "controller_ahead_bridge"
+            operations.timer = {
+                "enabled": "disabled",
+                "active": "inactive",
+            }
+
+            def suppressed_deployment(label, sha, **kwargs):
+                operations.events.append(label)
+                if label == "controlled_candidate_deployment":
+                    raise upgrade.UpgradeError(
+                        "candidate_retry_suppressed"
+                    )
+                raise AssertionError(
+                    f"unexpected deployment cycle: {label}"
+                )
+
+            operations.run_deploy_service = suppressed_deployment
+
+            with self.assertRaisesRegex(
+                upgrade.UpgradeError,
+                "candidate_retry_suppressed",
+            ) as raised:
+                coordinator.execute(dry_run=False)
+
+            coordinator.handle_failure(raised.exception)
+            coordinator.cleanup()
+
+        # The old application remains exactly where it was.
+        self.assertEqual(operations.production, production)
+        self.assertEqual(operations.installed, approved)
+
+        # Suppression must never be misread as promotion success.
+        self.assertFalse(record.application_promoted)
+        self.assertEqual(
+            record.error_code,
+            "candidate_retry_suppressed",
+        )
+
+        # This is the preinstalled-controller split-state recovery case.
+        self.assertEqual(
+            record.failure_semantics,
+            "controller_ahead_bridge_application_untouched_timer_disabled",
+        )
+
+        # Most importantly: no candidate serving attestation and no
+        # same-SHA validation may occur after suppression.
+        self.assertNotIn("attest_serving", operations.events)
+        self.assertNotIn("same_sha_idempotence", operations.events)
+
+        # Automation remains intentionally disabled and the recovery
+        # interlock remains armed.
+        self.assertEqual(
+            operations.timer,
+            {
+                "enabled": "disabled",
+                "active": "inactive",
+            },
+        )
+        self.assertTrue(operations.interlock)
+
     def test_success_runs_bridge_then_same_sha_before_timer_restore(self):
         with tempfile.TemporaryDirectory() as root:
             operations, record, audit, coordinator = self.coordinator(root)
@@ -1370,6 +1528,209 @@ class ControlPlaneUpgradeTests(unittest.TestCase):
         self.assertNotIn("quiesce", operations.events)
         self.assertNotIn("installer_apply", operations.events)
 
+    def test_failure_state_matrix_preserves_control_plane_safety_boundaries(self):
+        scenarios = (
+            # Failure before durable quiescence: production automation has not
+            # been touched and no recovery interlock may be left behind.
+            {
+                "name": "quiesce_before_interlock",
+                "failure": "quiesce",
+                "production_after": "old",
+                "installed_after": "old",
+                "promoted": False,
+                "timer": "original",
+                "interlock": False,
+                "semantics": "pre_install_production_untouched",
+            },
+            # Failure after quiescence but before controller publication:
+            # restoration is permitted only because old controller and old
+            # application identities still attest exactly.
+            {
+                "name": "candidate_static_preflight",
+                "failure": "static_preflight",
+                "production_after": "old",
+                "installed_after": "old",
+                "promoted": False,
+                "timer": "original",
+                "interlock": False,
+                "semantics": "pre_install_production_untouched",
+            },
+            {
+                "name": "installer_dry_run",
+                "failure": "installer_dry_run",
+                "production_after": "old",
+                "installed_after": "old",
+                "promoted": False,
+                "timer": "original",
+                "interlock": False,
+                "semantics": "pre_install_production_untouched",
+            },
+            # Once the new controller is durably installed, failure must fail
+            # closed: automation disabled and interlock retained.
+            {
+                "name": "verify_install",
+                "failure": "verify_install",
+                "production_after": "old",
+                "installed_after": "approved",
+                "promoted": False,
+                "timer": "disabled",
+                "interlock": True,
+                "semantics": "post_install_manual_intervention_timer_disabled",
+            },
+            # A failure while the deployment subprocess is executing but
+            # before promotion must not claim application promotion.
+            {
+                "name": "controlled_candidate_deployment",
+                "failure": "controlled_candidate_deployment",
+                "production_after": "old",
+                "installed_after": "approved",
+                "promoted": False,
+                "timer": "disabled",
+                "interlock": True,
+                "semantics": "post_install_manual_intervention_timer_disabled",
+            },
+            # If the deploy subprocess changed durable known-good state and
+            # the following serving attestation fails, failure handling must
+            # discover that promotion and switch to forward-repair semantics.
+            {
+                "name": "first_serving_attestation",
+                "failure": "attest_serving",
+                "production_after": "approved",
+                "installed_after": "approved",
+                "promoted": True,
+                "timer": "disabled",
+                "interlock": True,
+                "semantics": "post_promotion_forward_repair_timer_disabled",
+            },
+            # Everything after successful promotion is forward repair only.
+            {
+                "name": "same_sha_idempotence",
+                "failure": "same_sha_idempotence",
+                "production_after": "approved",
+                "installed_after": "approved",
+                "promoted": True,
+                "timer": "disabled",
+                "interlock": True,
+                "semantics": "post_promotion_forward_repair_timer_disabled",
+            },
+            {
+                "name": "automation_restore",
+                "failure": "restore_timer",
+                "production_after": "approved",
+                "installed_after": "approved",
+                "promoted": True,
+                "timer": "disabled",
+                "interlock": True,
+                "semantics": "post_promotion_forward_repair_timer_disabled",
+            },
+        )
+
+        old_sha = "1" * 40
+        approved = self.SHA
+        original_timer = {
+            "enabled": "enabled",
+            "active": "active",
+        }
+        disabled_timer = {
+            "enabled": "disabled",
+            "active": "inactive",
+        }
+
+        for scenario in scenarios:
+            with self.subTest(scenario=scenario["name"]):
+                with tempfile.TemporaryDirectory() as root:
+                    operations, record, _audit, coordinator = self.coordinator(
+                        root,
+                        failure=scenario["failure"],
+                    )
+
+                    with self.assertRaises(upgrade.UpgradeError) as raised:
+                        coordinator.execute(dry_run=False)
+
+                    coordinator.handle_failure(raised.exception)
+                    coordinator.cleanup()
+
+                    expected_production = (
+                        approved
+                        if scenario["production_after"] == "approved"
+                        else old_sha
+                    )
+                    expected_installed = (
+                        approved
+                        if scenario["installed_after"] == "approved"
+                        else old_sha
+                    )
+                    expected_timer = (
+                        original_timer
+                        if scenario["timer"] == "original"
+                        else disabled_timer
+                    )
+
+                    self.assertEqual(
+                        operations.production,
+                        expected_production,
+                    )
+                    self.assertEqual(
+                        operations.installed,
+                        expected_installed,
+                    )
+                    self.assertEqual(
+                        record.application_promoted,
+                        scenario["promoted"],
+                    )
+                    self.assertEqual(
+                        record.failure_semantics,
+                        scenario["semantics"],
+                    )
+                    self.assertEqual(
+                        operations.timer,
+                        expected_timer,
+                    )
+                    self.assertEqual(
+                        operations.interlock,
+                        scenario["interlock"],
+                    )
+                    self.assertEqual(record.status, "failed")
+
+                    # A failed transaction must never report normal success.
+                    self.assertFalse(coordinator.success)
+                    self.assertNotEqual(
+                        record.failure_semantics,
+                        "complete",
+                    )
+
+                    # No failure after promotion may restore the old
+                    # automatic deployment schedule.
+                    if scenario["promoted"]:
+                        self.assertNotIn(
+                            "clear_interlock",
+                            operations.events,
+                        )
+                        self.assertEqual(
+                            operations.timer,
+                            disabled_timer,
+                        )
+
+                    # A pre-install recovery is allowed to restore automation
+                    # only after the exact old controller/application state
+                    # has been positively attested.
+                    if (
+                        scenario["timer"] == "original"
+                        and scenario["failure"] != "quiesce"
+                    ):
+                        self.assertIn(
+                            "preinstall_restore_safe",
+                            operations.events,
+                        )
+                        self.assertIn(
+                            "restore_timer",
+                            operations.events,
+                        )
+                        self.assertIn(
+                            "clear_interlock",
+                            operations.events,
+                        )
+
     def test_preinstall_failure_restores_original_timer_only_after_attestation(self):
         with tempfile.TemporaryDirectory() as root:
             operations, record, audit, coordinator = self.coordinator(
@@ -1433,6 +1794,116 @@ class ControlPlaneUpgradeTests(unittest.TestCase):
             operations.timer, {"enabled": "disabled", "active": "inactive"}
         )
         self.assertTrue(operations.interlock)
+
+    def test_production_mutation_identity_guard_rejects_root_for_installed_scripts(self):
+        guard = getattr(
+            authorization,
+            "require_production_mutation_identity",
+            None,
+        )
+        self.assertIsNotNone(
+            guard,
+            "production mutation identity guard is missing",
+        )
+
+        with tempfile.TemporaryDirectory() as root:
+            root_path = Path(root)
+            installed_root = root_path / "opt/madar/control-plane/deployment"
+            installed_script = (
+                installed_root / "bin/madar-release-deploy"
+            )
+            installed_script.parent.mkdir(parents=True)
+            installed_script.write_text(
+                "#!/usr/bin/env python3\n",
+                encoding="utf-8",
+            )
+
+            development_script = (
+                root_path / "repository/web/deployment/bin/madar-release-deploy"
+            )
+            development_script.parent.mkdir(parents=True)
+            development_script.write_text(
+                "#!/usr/bin/env python3\n",
+                encoding="utf-8",
+            )
+
+            identity = SimpleNamespace(
+                pw_uid=1000,
+                pw_gid=1000,
+            )
+
+            # Installed production mutation as root must fail closed.
+            with (
+                mock.patch.object(
+                    authorization.pwd,
+                    "getpwnam",
+                    return_value=identity,
+                ),
+                mock.patch.object(
+                    authorization.os,
+                    "geteuid",
+                    return_value=0,
+                ),
+                mock.patch.object(
+                    authorization.os,
+                    "getegid",
+                    return_value=0,
+                ),
+            ):
+                with self.assertRaisesRegex(
+                    RuntimeError,
+                    "production_mutation_identity_invalid",
+                ):
+                    guard(
+                        installed_script,
+                        installed_root=installed_root,
+                    )
+
+            # Installed production mutation as canonical madar must pass.
+            with (
+                mock.patch.object(
+                    authorization.pwd,
+                    "getpwnam",
+                    return_value=identity,
+                ),
+                mock.patch.object(
+                    authorization.os,
+                    "geteuid",
+                    return_value=1000,
+                ),
+                mock.patch.object(
+                    authorization.os,
+                    "getegid",
+                    return_value=1000,
+                ),
+            ):
+                guard(
+                    installed_script,
+                    installed_root=installed_root,
+                )
+
+            # Development/staging copies must not require the production UID.
+            with (
+                mock.patch.object(
+                    authorization.pwd,
+                    "getpwnam",
+                    return_value=identity,
+                ),
+                mock.patch.object(
+                    authorization.os,
+                    "geteuid",
+                    return_value=0,
+                ),
+                mock.patch.object(
+                    authorization.os,
+                    "getegid",
+                    return_value=0,
+                ),
+            ):
+                guard(
+                    development_script,
+                    installed_root=installed_root,
+                )
 
     def test_interlock_requires_exact_sha_and_one_time_secret(self):
         with tempfile.TemporaryDirectory() as root:

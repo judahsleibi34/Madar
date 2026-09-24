@@ -461,13 +461,13 @@ const decodePathSegment = (value) => {
 export const getBuilderPreviewBasePath = (projectId) =>
   `/page-builder/projects/${encodeURIComponent(String(projectId || ""))}/preview`;
 
-export default function TenantSiteRuntime({ draftPreview = false } = {}) {
+export default function TenantSiteRuntime({ draftPreview = false, siteIdentifier = "" } = {}) {
   const params = useParams();
   const { projectId = "", subdomain = "my-site" } = params;
   const location = useLocation();
   const navigate = useNavigate();
 
-  const cleanSubdomain = getCleanSubdomain(subdomain);
+  const cleanSubdomain = getCleanSubdomain(siteIdentifier || subdomain);
   const isPublicRuntime = !draftPreview;
   const [runtimeLayout, setRuntimeLayout] = useState(() => {
     const availableWidth = getRuntimeAvailableWidth();
@@ -481,7 +481,7 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
   } = runtimeLayout;
   const activePath = location.pathname;
   const previewBasePath = getBuilderPreviewBasePath(projectId);
-  const runtimeBasePath = draftPreview ? previewBasePath : `/site/${cleanSubdomain}`;
+  const runtimeBasePath = draftPreview ? previewBasePath : (siteIdentifier ? "/" : `/site/${cleanSubdomain}`);
   const directStandaloneFormId = params.formId
     ? decodePathSegment(params.formId)
     : "";
@@ -489,7 +489,9 @@ export default function TenantSiteRuntime({ draftPreview = false } = {}) {
     ? `/forms/${params.formId}`
     : draftPreview
     ? location.pathname.slice(previewBasePath.length)
-    : `/${params["*"] || ""}`;
+    : siteIdentifier
+      ? location.pathname
+      : `/${params["*"] || ""}`;
   const standaloneFormMatch = !draftPreview
     ? routePagePath.match(/^\/forms\/([^/]+)\/?$/)
     : null;
