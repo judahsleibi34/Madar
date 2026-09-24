@@ -4,7 +4,7 @@ import { getEcommerceCacheScope, readEcommerceAdminCacheSnapshot } from "./utils
 import { useEffect, useMemo, useState } from "react";
 import { LoaderCircle, Plus, Save, Search, Trash2 } from "lucide-react";
 
-import AuthToast from "../AuthPages/AuthToast";
+import EcommerceToast from "./EcommerceToast";
 import EcommerceOperationsSkeleton from "./EcommerceOperationsSkeleton";
 import { fetchEcommerceCatalog, fetchEcommerceLoyalty, saveEcommerceLoyalty, fetchEcommerceSettings, saveEcommerceSettings } from "../../services/ecommerceApi";
 import { useCommerceI18n } from "../../utils/commerceI18n";
@@ -167,7 +167,7 @@ export default function EcommerceLoyaltyPage({ user }) {
           </footer>
         </>}
       </section>
-      <AuthToast dir={direction} type={toast?.type} title={toast?.title} message={toast?.message} onDismiss={() => setToast(null)} />
+      <EcommerceToast dir={direction} type={toast?.type} title={toast?.title} message={toast?.message} onDismiss={() => setToast(null)} />
     </main>
   );
 }

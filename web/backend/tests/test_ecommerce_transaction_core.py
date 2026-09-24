@@ -14,6 +14,8 @@ from routes.public_site_routes import PublicStoreOrderCreate
 WEB_ROOT = Path(__file__).resolve().parents[2]
 MIGRATION = WEB_ROOT / "database" / "migrations" / "094_create_ecommerce_transaction_core.sql"
 MIRROR = WEB_ROOT / "supabase" / "migrations" / "094_create_ecommerce_transaction_core.sql"
+DELIVERY_FEE_MIGRATION = WEB_ROOT / "database" / "migrations" / "105_add_order_delivery_fees.sql"
+DELIVERY_FEE_MIRROR = WEB_ROOT / "supabase" / "migrations" / "105_add_order_delivery_fees.sql"
 
 
 def order_payload(**overrides):
@@ -45,7 +47,8 @@ class RpcResult:
             "currency": "ILS",
             "subtotal": "20.00",
             "discount_total": "0.00",
-            "total": "20.00",
+            "delivery_fee": "5.00",
+            "total": "25.00",
         },
     }
 
@@ -91,6 +94,8 @@ class EcommerceTransactionCoreTests(unittest.TestCase):
         self.assertEqual(len(client.params["p_confirmation_token_hash"]), 64)
         self.assertEqual(len(result["confirmation_token"]), 64)
         self.assertEqual(result["order"]["currency"], "ILS")
+        self.assertEqual(result["order"]["delivery_fee"], "5.00")
+        self.assertEqual(result["order"]["total"], "25.00")
         self.assertIsNone(client.params["p_customer_id"])
 
     def test_migration_is_mirrored_and_contains_concurrency_guards(self):
@@ -111,6 +116,18 @@ class EcommerceTransactionCoreTests(unittest.TestCase):
         self.assertIn("inventory_restored_at = now()", text)
         self.assertIn("set status = p_reason", text)
         self.assertIn("p_reason not in ('cancelled', 'rejected')", text)
+
+    def test_delivery_fee_migration_snapshots_server_price_into_order_total(self):
+        sql = DELIVERY_FEE_MIGRATION.read_bytes()
+        self.assertEqual(sql, DELIVERY_FEE_MIRROR.read_bytes())
+        text = sql.decode("utf-8").lower()
+        self.assertIn("add column delivery_fee", text)
+        self.assertIn("ecommerce_delivery_price_unavailable", text)
+        self.assertIn("new.delivery_fee := v_delivery_fee", text)
+        self.assertIn("new.delivery_fee := old.delivery_fee", text)
+        self.assertIn("+ coalesce(new.delivery_fee, 0)", text)
+        self.assertIn("migration_105_expected_schema_104", text)
+        self.assertIn("set schema_version = 105", text)
 
 
 if __name__ == "__main__":

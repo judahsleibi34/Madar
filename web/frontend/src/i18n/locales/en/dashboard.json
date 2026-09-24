@@ -9,6 +9,7 @@
     "delivery": "Delivery",
     "orders": "Orders",
     "storeTheme": "Store theme",
+    "socialLinks": "Social links",
     "cvRerank": "CV Rerank",
     "language": "Language",
     "brand": "Madar",
@@ -30,7 +31,8 @@
     "userManagement": "User Management",
     "admin": "Admin",
     "userRole": "User",
-    "security": "Security"
+    "security": "Security",
+    "brands": "Brands"
   },
   "ecommercePages": {
     "kicker": "Online Store",
@@ -64,6 +66,13 @@
       "totalLabel": "Total products",
       "emptyTitle": "No products yet",
       "emptyDescription": "Products you create will appear here with their price and availability."
+    },
+    "brands": {
+      "title": "Brands",
+      "description": "Manage brand names and images used by your products.",
+      "totalLabel": "Total brands",
+      "emptyTitle": "No brands yet",
+      "emptyDescription": "Brands you create will be available in the product form."
     }
   },
   "loading": {

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import AuthToast from "../AuthPages/AuthToast";
+import EcommerceToast from "./EcommerceToast";
 import { useCommerceI18n } from "../../utils/commerceI18n";
 
 // Kept outside route suspense so completion feedback survives navigation.
@@ -17,5 +17,5 @@ export default function CommerceActionToast() {
   }, []);
   const dismiss = useCallback(() => setNotifications((current) => current.slice(1)), []);
   const notification = notifications[0];
-  return <AuthToast key={notification?.id} {...notification} dir={direction} onDismiss={dismiss} />;
+  return <EcommerceToast key={notification?.id} {...notification} dir={direction} onDismiss={dismiss} />;
 }

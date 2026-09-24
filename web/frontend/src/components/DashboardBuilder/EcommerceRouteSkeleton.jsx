@@ -1,5 +1,5 @@
 import HeaderSkeleton from "../common/PageHeaderSkeleton";
-import { StorePreviewSkeleton, ProductEditorSkeleton, ThemeSkeleton, CatalogSkeleton } from "./CommerceLoadingLayouts";
+import { StorePreviewSkeleton, ProductEditorSkeleton, ThemeSkeleton, SocialLinksSkeleton, CatalogSkeleton } from "./CommerceLoadingLayouts";
 import EcommerceOperationsSkeleton from "./EcommerceOperationsSkeleton";
 
 
@@ -9,8 +9,17 @@ export default function EcommerceRouteSkeleton({ pathname = "", label = "Loading
   if (pathname.startsWith("/ecommerce/store")) {
     return (
       <main className="ecommerce-store-admin" dir={direction} lang={lang} aria-busy="true">
-        <HeaderSkeleton className="app-page-intro" actions />
+        <HeaderSkeleton className="ecommerce-store-admin-header app-page-intro" actions />
         <StorePreviewSkeleton label={label} />
+      </main>
+    );
+  }
+
+  if (pathname.startsWith("/ecommerce/social-links")) {
+    return (
+      <main dir={direction} lang={lang} className="ecommerce-page ecommerce-operations-page ecommerce-social-page" aria-busy="true">
+        <HeaderSkeleton className="app-page-intro" />
+        <SocialLinksSkeleton label={label} />
       </main>
     );
   }
@@ -53,5 +62,5 @@ export default function EcommerceRouteSkeleton({ pathname = "", label = "Loading
     );
   }
 
-  return <main className="ecommerce-page" dir={direction} lang={lang}><CatalogSkeleton label={label} section={pathname.startsWith("/ecommerce/tags") ? "tags" : pathname.startsWith("/ecommerce/categories") ? "categories" : "products"} /></main>;
+  return <main className="ecommerce-page" dir={direction} lang={lang}><CatalogSkeleton label={label} section={pathname.startsWith("/ecommerce/tags") ? "tags" : pathname.startsWith("/ecommerce/categories") ? "categories" : pathname.startsWith("/ecommerce/brands") ? "brands" : "products"} /></main>;
 }

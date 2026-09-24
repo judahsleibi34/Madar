@@ -23,7 +23,11 @@ vi.mock("../components/DashboardBuilder/EcommerceStorePage", () => ({
 }));
 vi.mock("../components/DashboardBuilder/EcommerceThemePage", () => ({
   default: () => <h1>Store theme</h1>,
-}));vi.mock("../components/DashboardBuilder/ReservationCalendarPage", async () => {
+}));
+vi.mock("../components/DashboardBuilder/EcommerceSocialLinksPage", () => ({
+  default: () => <h1>Social links</h1>,
+}));
+vi.mock("../components/DashboardBuilder/ReservationCalendarPage", async () => {
   const React = await import("react");
   function CalendarMock({ user, initialView, onViewChange }) {
     const [mountedTenant] = React.useState(user?.tenant_id || "missing");
@@ -62,8 +66,10 @@ describe("workspace settings routes", () => {
   it.each([
     ["/ecommerce/tags", "Tags"],
     ["/ecommerce/categories", "Categories"],
+    ["/ecommerce/brands", "Brands"],
     ["/ecommerce/products", "Products"],
     ["/ecommerce/theme", "Store theme"],
+    ["/ecommerce/social-links", "Social links"],
     ["/ecommerce/cv-rerank", "CV Rerank"],
   ])("renders the Ecommerce page for %s", async (pathname, heading) => {
     render(

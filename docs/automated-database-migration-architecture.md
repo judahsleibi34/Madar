@@ -461,25 +461,21 @@ health evidence, dirty/different release, checksum drift, missing predecessor,
 or a ledger already beyond target fails before mutation. No tenant/business
 table is queried or changed.
 
-### Current schema 105 bridge
+### Current schema 108 bridge
 
-The release contract accepts schema `81..105`, targets `105`, and has rollback
-metadata bounded at schema `104`. Migrations 100 through 104 are immutable
-applied production history and remain checksum-pinned by
-`check_forward_release.py` outside the active manifest.
+The release contract accepts schema `104..108` and targets `108` using the
+checksum-pinned `migrations-105-108.json` manifest.
 
-The active checksum-pinned manifest is `migrations-105.json`, representing the
-single `104→105` transition. The controller, backup gates, locking, bridge-first
-acceptance, and forward-repair semantics are unchanged. Migration 105 is
-`forward-compatible`: before any write it rejects invalid, reserved, duplicate,
-or backfill-colliding tenant identities with row evidence. It then backfills
-missing canonical identities, normalizes valid existing identities, and
-enforces the canonical `website_settings.subdomain` contract while retaining
-`standard_path_slug` for legacy paths.
+The active migration sequence is contiguous:
 
-The governed verified backup is created while schema 104 is serving. After the
-transition commits, recovery resumes or repairs forward rather than applying
-automatic downgrade SQL.
+- migration 105: canonical tenant subdomains (`104 -> 105`);
+- migration 106: order delivery-fee snapshots (`105 -> 106`);
+- migration 107: ecommerce category images (`106 -> 107`);
+- migration 108: tenant-scoped ecommerce brands (`107 -> 108`).
+
+Rollback compatibility is bounded at schema 104. After schema advances beyond
+104, recovery proceeds forward rather than attempting automatic downgrade SQL
+or traffic rollback to an incompatible retained release.
 
 ### Earlier schema 099 bridge
 

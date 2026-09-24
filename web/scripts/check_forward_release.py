@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate the production schema-104 to schema-105 forward release."""
+"""Validate the production schema-104 to schema-108 forward release."""
 
 from __future__ import annotations
 
@@ -13,8 +13,8 @@ ROOT = Path(__file__).resolve().parents[2]
 BASELINE = "1e6b739a43759309a45ede2dff28a859209e4a64"
 
 SOURCE_SCHEMA = 104
-TARGET_SCHEMA = 105
-MANIFEST_NAME = "migrations-105.json"
+TARGET_SCHEMA = 108
+MANIFEST_NAME = "migrations-105-108.json"
 
 # Migrations 100-104 have already been applied to production and are no
 # longer part of the active 104 -> 105 execution manifest. Keep them
@@ -47,6 +47,18 @@ EXPECTED = {
     105: (
         "105_canonical_tenant_subdomains.sql",
         "forward-compatible",
+    ),
+    106: (
+        "106_add_order_delivery_fees.sql",
+        "forward-compatible",
+    ),
+    107: (
+        "107_add_ecommerce_category_images.sql",
+        "expand-only",
+    ),
+    108: (
+        "108_add_ecommerce_brands.sql",
+        "expand-only",
     ),
 }
 
@@ -93,7 +105,7 @@ def validate(root: Path = ROOT) -> list[str]:
 
         # Schema 100-104 is already live in production. These migrations
         # must remain immutable even though the active execution manifest
-        # begins at schema 104 and therefore contains only 105.
+        # begins at schema 104 and therefore contains 105 through 108.
         for number, (filename, checksum) in (
             APPLIED_PRODUCTION_MIGRATIONS.items()
         ):
@@ -141,7 +153,7 @@ def validate(root: Path = ROOT) -> list[str]:
             and release["migration_manifest"] == MANIFEST_NAME
         ):
             errors.append(
-                "release must bridge production schema 104 to 105 "
+                "release must bridge production schema 104 to 108 "
                 "with rollback bounded at schema 104"
             )
 
@@ -161,9 +173,9 @@ def validate(root: Path = ROOT) -> list[str]:
 
         entries = manifest["migrations"]
 
-        if [int(entry["number"]) for entry in entries] != [105]:
+        if [int(entry["number"]) for entry in entries] != [105, 106, 107, 108]:
             errors.append(
-                "forward manifest must contain migration 105"
+                "forward manifest must contain ordered migrations 105 through 108"
             )
 
         previous = SOURCE_SCHEMA
