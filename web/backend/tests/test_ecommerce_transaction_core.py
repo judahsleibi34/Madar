@@ -126,8 +126,8 @@ class EcommerceTransactionCoreTests(unittest.TestCase):
         self.assertIn("new.delivery_fee := v_delivery_fee", text)
         self.assertIn("new.delivery_fee := old.delivery_fee", text)
         self.assertIn("+ coalesce(new.delivery_fee, 0)", text)
-        self.assertIn("migration_105_expected_schema_104", text)
-        self.assertIn("set schema_version = 105", text)
+        self.assertIn("migration_106_expected_schema_105", text)
+        self.assertIn("set schema_version = 106", text)
 
 
 if __name__ == "__main__":
