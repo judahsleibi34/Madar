@@ -8,14 +8,14 @@ Base images are digest-pinned. Update each tag and digest together after an appr
 
 Nginx emits CSP, content-type, referrer, permissions, frame, and opener policies on the app shell and immutable assets. `unsafe-eval` is forbidden. `unsafe-inline` remains limited to styles because the current React/Page Builder runtime uses inline style properties. HTTPS image, font, and media scheme sources are required for validated tenant-supplied content; executable scripts remain same-origin only. The API connection source is injected through `MADAR_CSP_CONNECT_SRC`, which must be the exact public API origin in production.
 
-HSTS is deliberately empty by default. Set `MADAR_HSTS=max-age=31536000; includeSubDomains` only after confirming that every covered hostname is permanently TLS-only at the terminating proxy. COEP is intentionally omitted because public tenant pages use third-party media that does not consistently return cross-origin resource policy headers. COOP remains enabled.
+HSTS `max-age` is active in the hosted-domain production deployment. `includeSubDomains` must remain disabled until a separate security decision covers every tenant and exact infrastructure hostname. The template default remains empty for unconfigured environments. COEP is intentionally omitted because public tenant pages use third-party media that does not consistently return cross-origin resource policy headers. COOP remains enabled.
 
 Run an isolated header check after building the frontend:
 
 ```bash
 docker run --rm -d --name madar-edge-audit -p 127.0.0.1:38080:8080 \
   -e MADAR_CSP_CONNECT_SRC=https://api.staging.example \
-  -e 'MADAR_HSTS=max-age=31536000; includeSubDomains' \
+  -e 'MADAR_HSTS=max-age=31536000' \
   madar-dev-frontend
 
 cd frontend

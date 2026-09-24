@@ -1,5 +1,7 @@
 # Madar canonical tenant hosting architecture
 
+For current operator procedures and monitoring, see [Hosted Tenant Domains Operations Runbook](hosted-tenant-domains-operations-runbook.md).
+
 ## Status and scope
 
 Schema 105 makes `website_settings.subdomain` the canonical Madar-hosted tenant identity. The public URL is `https://{tenant}.madarportal.com`; `standard_path_slug` remains only a legacy path alias. Customer-owned domains are not implemented.

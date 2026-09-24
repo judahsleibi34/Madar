@@ -63,6 +63,7 @@ class InstallFilesystemLayout:
         return (
             self.launcher_parent / "madar-control-plane-upgrade",
             self.alert_parent / "madar_alert_hook.sh",
+            self.alert_parent / "monitor_hosted_domains.py",
             self.systemd_parent / "madar-auto-deploy.service",
             self.systemd_parent / "madar-auto-deploy.timer",
             self.systemd_parent / "madar-release-proxy.service",
@@ -72,7 +73,8 @@ class InstallFilesystemLayout:
                 "replicate_latest_node1.py", "replicate_latest_offhost.sh", "replicate_backup_offhost.sh",
                 "restore_madar.sh", "rehearse_backup.py")),
             *(self.systemd_parent / (name + suffix) for name in (
-                "madar-backup", "madar-backup-verify", "madar-node1-backup", "madar-offhost-backup")
+                "madar-backup", "madar-backup-verify", "madar-node1-backup", "madar-offhost-backup",
+                "madar-hosted-domain-monitor")
                 for suffix in (".service", ".timer")),
         )
 
