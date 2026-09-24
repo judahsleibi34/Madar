@@ -1907,19 +1907,38 @@ def redirect_legacy_form(identifier: str, form_id: str, request: Request):
 
 def resolve_public_store_settings(site_identifier: str, *, request: Request) -> dict:
     """Reuse public store identity/profile lookups without sharing data across tenants."""
-    hosted = bool(request_hosted_tenant(request))
+    requested_identifier = normalize_subdomain(site_identifier)
+
+    # Host/path tenant identity is a security boundary and must be validated
+    # before any cache lookup can return tenant-scoped data.
+    resolved_identifier = enforce_request_tenant_identity(
+        request,
+        requested_identifier,
+    )
+    hosted_tenant = request_hosted_tenant(request)
+
     cache_key = ecommerce_cache_key(
         0,
-        "public-store-settings-v1",
-        site_identifier=site_identifier,
-        hosted=hosted,
+        "public-store-settings-v2",
+        site_identifier=resolved_identifier,
+        hosted_tenant=hosted_tenant,
     )
+
     cached = read_ecommerce_cache(cache_key)
     if isinstance(cached, dict):
         return cached
-    settings = resolve_website_settings(site_identifier, request=request)
+
+    settings = resolve_website_settings(
+        resolved_identifier,
+        request=request,
+    )
     tenant_id = resolve_tenant_id(settings)
-    write_ecommerce_cache(cache_key, tenant_id, settings, ttl_seconds=30)
+    write_ecommerce_cache(
+        cache_key,
+        tenant_id,
+        settings,
+        ttl_seconds=30,
+    )
     return settings
 
 
