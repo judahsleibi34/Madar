@@ -14,8 +14,8 @@ from routes.public_site_routes import PublicStoreOrderCreate
 WEB_ROOT = Path(__file__).resolve().parents[2]
 MIGRATION = WEB_ROOT / "database" / "migrations" / "094_create_ecommerce_transaction_core.sql"
 MIRROR = WEB_ROOT / "supabase" / "migrations" / "094_create_ecommerce_transaction_core.sql"
-DELIVERY_FEE_MIGRATION = WEB_ROOT / "database" / "migrations" / "105_add_order_delivery_fees.sql"
-DELIVERY_FEE_MIRROR = WEB_ROOT / "supabase" / "migrations" / "105_add_order_delivery_fees.sql"
+DELIVERY_FEE_MIGRATION = WEB_ROOT / "database" / "migrations" / "106_add_order_delivery_fees.sql"
+DELIVERY_FEE_MIRROR = WEB_ROOT / "supabase" / "migrations" / "106_add_order_delivery_fees.sql"
 
 
 def order_payload(**overrides):
@@ -126,8 +126,8 @@ class EcommerceTransactionCoreTests(unittest.TestCase):
         self.assertIn("new.delivery_fee := v_delivery_fee", text)
         self.assertIn("new.delivery_fee := old.delivery_fee", text)
         self.assertIn("+ coalesce(new.delivery_fee, 0)", text)
-        self.assertIn("migration_105_expected_schema_104", text)
-        self.assertIn("set schema_version = 105", text)
+        self.assertIn("migration_106_expected_schema_105", text)
+        self.assertIn("set schema_version = 106", text)
 
 
 if __name__ == "__main__":
