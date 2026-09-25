@@ -29,6 +29,7 @@ class FakeCursor:
             self.result = (self.connection.schema,)
         elif "MIGRATION_TO=" in text:
             self.connection.schema = int(text.rsplit("MIGRATION_TO=", 1)[1].split()[0])
+            self.connection.applied.append(self.connection.schema)
             self.result = None
         else:
             self.result = None
@@ -38,6 +39,7 @@ class FakeCursor:
 class FakeConnection:
     def __init__(self, schema=81, lock_available=True):
         self.schema = schema
+        self.applied = []
         self.lock_available = lock_available
         self.autocommit = False
         self.closed = False
@@ -46,12 +48,12 @@ class FakeConnection:
 
 
 class MigrationExecutorTests(unittest.TestCase):
-    def fixture(self, root: Path):
+    def fixture(self, root: Path, numbers=(82, 83)):
         repository = root / "repo"
         migration_dir = repository / "web/database/migrations"
         migration_dir.mkdir(parents=True)
         entries = []
-        for number in (82, 83):
+        for number in numbers:
             path = migration_dir / f"{number:03d}.sql"
             path.write_text(f"-- MIGRATION_TO={number}\n", encoding="utf-8")
             entries.append({
@@ -87,6 +89,52 @@ class MigrationExecutorTests(unittest.TestCase):
         self.assertEqual(persisted["status"], "completed")
         self.assertEqual([row["status"] for row in persisted["migrations"]], ["applied", "applied"])
         self.assertTrue(connection.closed)
+
+    def test_schema_105_bridge_requires_backup_then_applies_only_106_through_108(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            repository, manifest_path, backup = self.fixture(root, (106, 107, 108))
+            connection = FakeConnection(schema=105)
+            events = []
+
+            def verified_backup(path):
+                self.assertEqual(path, backup)
+                events.append("backup_verified")
+
+            def connect():
+                events.append("database_opened")
+                return connection
+
+            manifest = MigrationManifest.load(manifest_path, repository)
+            with self.assertRaisesRegex(RuntimeError, "backup_not_verified"):
+                LockedMigrationExecutor(
+                    connection_factory=connect,
+                    manifest=manifest,
+                    state_file=root / "unverified.json",
+                    backup_dir=backup,
+                    backup_verifier=lambda _path: (_ for _ in ()).throw(
+                        RuntimeError("backup_not_verified")
+                    ),
+                ).run()
+            self.assertEqual(events, [])
+            self.assertEqual(connection.applied, [])
+
+            executor = LockedMigrationExecutor(
+                connection_factory=connect,
+                manifest=manifest,
+                state_file=root / "state.json",
+                backup_dir=backup,
+                backup_verifier=verified_backup,
+            )
+            result = executor.run()
+
+        self.assertEqual(events, ["backup_verified", "database_opened"])
+        self.assertEqual(connection.applied, [106, 107, 108])
+        self.assertEqual(result["observed_schema"], 108)
+        self.assertEqual(
+            [row["number"] for row in result["migrations"]],
+            [106, 107, 108],
+        )
 
     def test_resume_from_schema_82_skips_first_migration(self):
         with tempfile.TemporaryDirectory() as temporary:

@@ -147,17 +147,89 @@ class AutomaticMigrationControlPlaneTests(unittest.TestCase):
                         "http://127.0.0.1:3200", self.sha, "green"
                     )
 
-    def test_current_manifest_and_rollback_contract_cover_schema_104_to_108(self):
-        self.assertEqual(self.source_schema, 104)
+    def test_current_manifest_and_rollback_contract_cover_schema_105_to_108(self):
+        self.assertEqual(self.source_schema, 105)
         self.assertEqual(self.target_schema, 108)
+        self.assertEqual(self.metadata["schema"]["compatible_min"], 105)
+        self.assertEqual(
+            self.metadata["schema"]["rollback_compatible_min"],
+            self.source_schema,
+        )
         self.assertEqual(
             self.metadata["schema"]["rollback_compatible_max"],
             self.source_schema,
         )
         self.assertEqual(
             [entry["number"] for entry in self.manifest["migrations"]],
-            [105, 106, 107, 108],
+            [106, 107, 108],
         )
+
+    def test_fresh_104_source_manifest_at_schema_105_requires_same_release_backup(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            state_root, operations, _compatibility, events = self.fixture(
+                root, schema=105
+            )
+            historical_metadata = json.loads(json.dumps(self.metadata))
+            historical_metadata["schema"].update(
+                compatible_min=104,
+                rollback_compatible_min=104,
+                rollback_compatible_max=104,
+            )
+            historical_metadata["migration_manifest"] = "migrations-105-108.json"
+            historical_manifest = (
+                WEB_ROOT / "deployment/releases/migrations-105-108.json"
+            ).read_bytes()
+            candidate_release_dir = (
+                operations.release_root / "web/deployment/releases"
+            )
+            (candidate_release_dir / "release.json").write_text(
+                json.dumps(historical_metadata), encoding="utf-8"
+            )
+            (candidate_release_dir / "migrations-105-108.json").write_bytes(
+                historical_manifest
+            )
+            migration_name = "105_canonical_tenant_subdomains.sql"
+            migration_105 = next(
+                source for source in (
+                    WEB_ROOT / "database/migrations" / migration_name,
+                    Path("/app/database/migrations") / migration_name,
+                ) if source.is_file()
+            )
+            candidate_105 = operations.release_root / "web/database/migrations" / migration_105.name
+            candidate_105.write_bytes(migration_105.read_bytes())
+            installed_dir = root / "installed/deployment/releases"
+            installed_dir.mkdir(parents=True)
+            (installed_dir / "release.json").write_text(
+                json.dumps(historical_metadata), encoding="utf-8"
+            )
+            (installed_dir / "migrations-105-108.json").write_bytes(
+                historical_manifest
+            )
+            compatibility = self.module.Compatibility.load(
+                installed_dir / "release.json"
+            )
+            operations.compatibility = compatibility
+            with (
+                patch.object(self.module, "WEB_ROOT", root / "installed"),
+                patch.object(self.module, "_validate_stable_known_good"),
+                patch.object(
+                    self.module,
+                    "_create_verified_migration_backup",
+                    side_effect=AssertionError("fresh release must not create a resume backup"),
+                ),
+            ):
+                with self.assertRaisesRegex(
+                    RuntimeError,
+                    "automatic_migration_resume_backup_attestation_missing",
+                ):
+                    self.module.automatic_migrate_known_good(
+                        sha=self.sha,
+                        state_root=state_root,
+                        compatibility=compatibility,
+                        operations=operations,
+                    )
+            self.assertIn("schema:105", events)
 
     def fixture(self, root: Path, *, schema: int | None = None):
         if schema is None:
@@ -380,7 +452,7 @@ class AutomaticMigrationControlPlaneTests(unittest.TestCase):
             source_schema=self.source_schema,
         )
 
-    def test_successful_104_to_108_records_target_only_after_worker_and_route_validation(self):
+    def test_successful_105_to_108_records_target_only_after_worker_and_route_validation(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             state_root, operations, compatibility, events = self.fixture(root)
