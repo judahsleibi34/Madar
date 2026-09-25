@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, ArrowRight, AlertCircle, CheckCircle2, ChevronLeft, ChevronRight, Globe2, Gift, Mail, Menu, MessageCircle, Minus, Phone, Plus, Search, ShieldCheck, ShoppingBag, ShoppingCart, Trash2, X, ZoomIn } from "lucide-react";
+import { ArrowLeft, ArrowRight, AlertCircle, CheckCircle2, ChevronLeft, ChevronRight, Globe2, Gift, LogOut, Mail, Menu, MessageCircle, Minus, Phone, Plus, Search, ShieldCheck, ShoppingBag, ShoppingCart, Trash2, UserRound, X, ZoomIn } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import i18n from "../../i18n";
 
@@ -14,6 +14,10 @@ import {
   fetchPublicEcommerceOrderConfirmation,
   fetchPublicEcommerceLoyalty,
   fetchPublicEcommerceDiscounts,
+  fetchPublicStoreAccount,
+  loginPublicStoreAccount,
+  logoutPublicStoreAccount,
+  registerPublicStoreAccount,
 } from "../../services/ecommerceApi";
 import StorefrontSeo, { safePublicUrl } from "./StorefrontSeo";
 import { getResponsiveMediaProps, isVideoMediaUrl, resolveMediaUrl } from "../../utils/media";
@@ -38,6 +42,7 @@ const EMPTY_CATALOG = {
 
 const formatPrice = formatCommerceMoney;
 const c = (key, values) => i18n.t(`commerce:${key}`, values);
+const CHECKOUT_EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/u;
 
 const STORE_SOCIAL_NETWORKS = [
   ["facebook", "Facebook"],
@@ -106,6 +111,29 @@ const readCart = (key) => {
 };
 const cartLineKey = (item) => `${item.id}:${item.variant_id || "simple"}`;
 const optionSnapshotText = (options = []) => options.map((item) => `${item.option_name || item.option_code}: ${item.value || item.value_code}`).join(" · ");
+const CART_REMOVAL_REASONS = new Set(["unavailable", "variant_required", "variant_unavailable", "variant_invalid"]);
+
+const applyCartReconciliation = (cartItems, reconciliationItems) => {
+  if (!Array.isArray(reconciliationItems)) return cartItems;
+  const byId = new Map(reconciliationItems.map((item) => [`${item.product_id}:${item.variant_id || "simple"}`, item]));
+  return cartItems.flatMap((item) => {
+    const current = byId.get(cartLineKey(item));
+    if (!current) return [item];
+    if (CART_REMOVAL_REASONS.has(current.reason)) return [];
+    if (!current.available && current.reason !== "insufficient_inventory") return [item];
+    const maximum = Number(current.max_quantity);
+    if (current.reason === "insufficient_inventory" && (!Number.isFinite(maximum) || maximum < 1)) return [];
+    return [{
+      ...item,
+      name: current.name || item.name,
+      slug: current.slug || item.slug,
+      images: current.images || item.images,
+      price: current.price ?? item.price,
+      currency: current.currency || item.currency,
+      quantity: current.reason === "insufficient_inventory" ? Math.min(item.quantity, maximum) : item.quantity,
+    }];
+  });
+};
 
 
 const readThemePreview = () => {
@@ -131,7 +159,118 @@ function ProductImage({ product, className = "", eager = false }) {
   );
 }
 
-function StoreHeader({ brand, logoUrl, cartCount, shopPath, homePath, categoriesPath, contactPath, onCartOpen }) {
+function StoreAccountMenu({ subdomain, account, loyalty, logoUrl, onAccountChange }) {
+  const menuRef = useRef(null);
+  const [open, setOpen] = useState(false);
+  const [mode, setMode] = useState("login");
+  const [status, setStatus] = useState({ saving: false, error: "", message: "" });
+  const avatarUrl = resolveMediaUrl(account?.avatar);
+  const storeLogoUrl = resolveMediaUrl(logoUrl);
+  const initials = String(account?.name || account?.email || "").split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase()).join("");
+  const activeRewards = (loyalty?.entitlements || []).filter((item) => item.status === "active").length;
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const closeOnEscape = (event) => { if (event.key === "Escape") setOpen(false); };
+    const closeOutside = (event) => {
+      if (!menuRef.current?.contains(event.target)) setOpen(false);
+    };
+    document.addEventListener("keydown", closeOnEscape);
+    document.addEventListener("pointerdown", closeOutside);
+    return () => {
+      document.removeEventListener("keydown", closeOnEscape);
+      document.removeEventListener("pointerdown", closeOutside);
+    };
+  }, [open]);
+
+  const submit = async (event) => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const password = String(form.get("password") || "");
+    if (mode === "register" && password !== String(form.get("confirm_password") || "")) {
+      setStatus({ saving: false, error: c("account.passwordMismatch"), message: "" });
+      event.currentTarget.elements.confirm_password?.focus();
+      return;
+    }
+    setStatus({ saving: true, error: "", message: "" });
+    try {
+      if (mode === "register") {
+        const result = await registerPublicStoreAccount(subdomain, {
+          full_name: String(form.get("full_name") || "").trim(),
+          email: String(form.get("email") || "").trim(),
+          password,
+        });
+        setStatus({ saving: false, error: "", message: result?.message || c("account.registrationReady") });
+        setMode("login");
+        return;
+      }
+      const result = await loginPublicStoreAccount(subdomain, {
+        email: String(form.get("email") || "").trim(),
+        password: String(form.get("password") || ""),
+      });
+      await onAccountChange(result?.user || null);
+      setStatus({ saving: false, error: "", message: "" });
+      setOpen(false);
+    } catch (error) {
+      setStatus({ saving: false, error: error?.message || c("account.requestFailed"), message: "" });
+    }
+  };
+
+  const logout = async () => {
+    setStatus({ saving: true, error: "", message: "" });
+    try {
+      await logoutPublicStoreAccount(subdomain);
+      await onAccountChange(null);
+      setStatus({ saving: false, error: "", message: "" });
+      setOpen(false);
+    } catch (error) {
+      setStatus({ saving: false, error: error?.message || c("account.requestFailed"), message: "" });
+    }
+  };
+
+  return (
+    <div className="live-store-account" ref={menuRef}>
+      <button type="button" className="live-store-account-trigger" onClick={() => setOpen((value) => !value)} aria-label={account ? c("account.openAccount") : c("account.signInRegister")} aria-expanded={open}>
+        {storeLogoUrl ? <img className="live-store-account-store-logo" src={storeLogoUrl} alt="" /> : avatarUrl ? <img src={avatarUrl} alt="" /> : initials ? <span>{initials}</span> : <UserRound size={21} aria-hidden="true" />}
+      </button>
+      {open && <div className="live-store-account-popover" role="dialog" aria-label={c("account.title")}>
+        <header>
+          <div className="live-store-account-avatar">{avatarUrl ? <img src={avatarUrl} alt="" /> : initials ? <span>{initials}</span> : <UserRound size={24} aria-hidden="true" />}</div>
+          <div><strong>{account?.name || c("account.welcome")}</strong>{account?.email && <small>{account.email}</small>}</div>
+          <button type="button" onClick={() => setOpen(false)} aria-label={c("admin.close")}><X size={17} /></button>
+        </header>
+        {account ? <div className="live-store-account-body">
+          {loyalty?.enabled ? <div className="live-store-account-rewards">
+            <span><Gift size={18} aria-hidden="true" />{c("loyalty.balance")}</span>
+            <strong>{loyalty.account?.current_balance || 0}</strong>
+            <small>{c("account.activeRewards", { count: activeRewards })}</small>
+          </div> : <p>{c("account.noLoyalty")}</p>}
+          <button type="button" className="live-store-account-logout" disabled={status.saving} onClick={logout}><LogOut size={17} />{c("account.logout")}</button>
+        </div> : <div className="live-store-account-body">
+          <div className="live-store-account-tabs">
+            <button type="button" className={mode === "login" ? "is-active" : ""} onClick={() => { setMode("login"); setStatus({ saving: false, error: "", message: "" }); }}>{c("account.signIn")}</button>
+            <button type="button" className={mode === "register" ? "is-active" : ""} onClick={() => { setMode("register"); setStatus({ saving: false, error: "", message: "" }); }}>{c("account.register")}</button>
+          </div>
+          <form onSubmit={submit}>
+            {mode === "register" && <label><span>{c("account.fullName")}</span><input name="full_name" autoComplete="name" minLength={2} maxLength={160} required /></label>}
+            <label><span>{c("checkout.email")}</span><input name="email" type="email" autoComplete="email" maxLength={254} required /></label>
+            <label><span>{c("account.password")}</span><input name="password" type="password" autoComplete={mode === "register" ? "new-password" : "current-password"} minLength={mode === "register" ? 8 : 1} maxLength={200} required /></label>
+            {mode === "register" && <label><span>{c("account.confirmPassword")}</span><input name="confirm_password" type="password" autoComplete="new-password" minLength={8} maxLength={200} required /></label>}
+            {status.error && <p className="live-store-account-error" role="alert">{status.error}</p>}
+            {status.message && <p className="live-store-account-message" role="status">{status.message}</p>}
+            <button type="submit" disabled={status.saving}>{status.saving ? c("account.pleaseWait") : mode === "register" ? c("account.createAccount") : c("account.signIn")}</button>
+          </form>
+          <div className="live-store-account-divider"><span>{c("account.or")}</span></div>
+          <button type="button" className="live-store-account-google" onClick={() => setStatus({ saving: false, error: "", message: c("account.googleUnavailable") })}>
+            <span aria-hidden="true">G</span>{c("account.continueWithGoogle")}
+          </button>
+        </div>}
+      </div>}
+    </div>
+  );
+}
+
+function StoreHeader({ brand, logoUrl, cartCount, shopPath, homePath, categoriesPath, contactPath, onCartOpen, subdomain, account, loyalty, onAccountChange }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const toggleRef = useRef(null);
@@ -165,7 +304,7 @@ function StoreHeader({ brand, logoUrl, cartCount, shopPath, homePath, categories
     };
   }, [menuOpen]);
   const links = [[homePath,c("nav.home")],[shopPath,c("common.products")],[categoriesPath,c("nav.categories")],[contactPath,c("nav.contact")]];
-  const brandLink = <Link className="live-store-brand" to={homePath} onClick={() => setMenuOpen(false)}>{logoUrl && <img {...getResponsiveMediaProps(logoUrl, { fallbackWidth:160, sizes:"48px" })} alt="" />}<span>{brand}</span></Link>;
+  const brandLink = <Link className="live-store-brand" to={homePath} onClick={() => setMenuOpen(false)}>{logoUrl && <img {...getResponsiveMediaProps(logoUrl, { fallbackWidth:256, sizes:"88px" })} alt="" />}<span>{brand}</span></Link>;
   const navigate = useNavigate();
   const searchStore = (event) => {
     event.preventDefault();
@@ -199,7 +338,16 @@ function StoreHeader({ brand, logoUrl, cartCount, shopPath, homePath, categories
           <input type="search" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder={c("catalog.searchPlaceholder")} aria-label={c("nav.searchStore")} />
           <button type="submit" aria-label={c("common.search")}><Search size={18} aria-hidden="true" /></button>
         </form>
-        <button type="button" className="live-store-language" onClick={() => i18n.changeLanguage(activeLocale() === "ar" ? "en" : "ar")}>{activeLocale() === "ar" ? "English" : "العربية"}</button>
+        <button
+          type="button"
+          className="live-store-language"
+          aria-label={activeLocale() === "ar" ? "English" : "العربية"}
+          title={activeLocale() === "ar" ? "English" : "العربية"}
+          onClick={() => i18n.changeLanguage(activeLocale() === "ar" ? "en" : "ar")}
+        >
+          <Globe2 size={21} strokeWidth={2} aria-hidden="true" />
+        </button>
+        <StoreAccountMenu subdomain={subdomain} account={account} loyalty={loyalty} logoUrl={logoUrl} onAccountChange={onAccountChange} />
         <button type="button" className="live-store-cart" onClick={onCartOpen} aria-label={c("nav.openCart", { count: cartCount })}>
           <ShoppingCart size={21} strokeWidth={1.8} aria-hidden="true" />
           {cartCount > 0 && <b>{cartCount > 99 ? "99+" : cartCount}</b>}
@@ -316,6 +464,14 @@ function StoreCheckout({ items, loyalty, normalDiscounts, shopPath, storePath, d
 
   const submit = async (event) => {
     event.preventDefault();
+    const emailField = event.currentTarget.elements.namedItem("email");
+    if (emailField && !CHECKOUT_EMAIL_PATTERN.test(String(emailField.value || "").trim())) {
+      const message = i18n.t("common:status.invalidEmail");
+      setStatus({ saving: false, error: message });
+      onNotify({ type: "error", title: c("storeFeedback.completeFields"), message });
+      emailField.focus();
+      return;
+    }
     const minimumLengths = { customer_name: 2, phone: 5, street: 3 };
     const invalidField = Array.from(event.currentTarget.elements).find((field) =>
       field.willValidate && (!field.validity.valid ||
@@ -784,62 +940,63 @@ function StoreProductDetail({ detail, locale, shopPath, onAdd }) {
     if (!variant.in_stock || !variant.option_value_ids.includes(valueId)) return false;
     return Object.entries(selection).every(([selectedOptionId, selectedValueId]) => selectedOptionId === optionId || !selectedValueId || variant.option_value_ids.includes(selectedValueId));
   });
-  const selectOption = (optionId, valueId) => setSelection((current) => {
-    const next = { ...current, [optionId]: valueId };
-    const compatible = activeVariants.some((variant) => variant.in_stock && Object.values(next).filter(Boolean).every((id) => variant.option_value_ids.includes(id)));
-    return compatible ? next : { [optionId]: valueId };
-  });
-  const selectVariant = (variant) => {
-    const next = {};
-    detailsForVariant(variant).forEach(({ option, value }) => { next[option.id] = value.id; });
-    setSelection(next);
+  const selectOption = (optionId, valueId) => {
+    setSelection((current) => {
+      const next = { ...current, [optionId]: valueId };
+      const compatible = activeVariants.some((variant) => variant.in_stock && Object.values(next).filter(Boolean).every((id) => variant.option_value_ids.includes(id)));
+      return compatible ? next : { [optionId]: valueId };
+    });
   };
   const displayProduct = resolved ? { ...product, price: resolved.price, compare_at_price: resolved.compare_at_price, images: resolved.images?.length ? resolved.images : product.images, sku: resolved.sku, in_stock: resolved.in_stock, track_inventory: resolved.track_inventory, inventory_quantity: resolved.inventory_quantity, allow_backorder: resolved.allow_backorder } : product;
   const selectedOptions = resolved ? detailsForVariant(resolved).map(({ option, value }) => ({
     option_code: option.code, option_name: option.name, value_code: value.code, value: value.value,
   })) : [];
   const canAdd = options.length ? Boolean(resolved?.in_stock) : product.in_stock;
-  const allVariantStockIsCounted = activeVariants.length > 0 && activeVariants.every((variant) => variant.track_inventory && !variant.allow_backorder);
-  const exactStock = options.length
-    ? (allVariantStockIsCounted ? activeVariants.reduce((total, variant) => total + inventoryCount(variant), 0) : null)
-    : (product.track_inventory && !product.allow_backorder ? inventoryCount(product) : null);
-  const availableVariantCount = activeVariants.filter((variant) => variant.in_stock).length;
-  const stockText = exactStock === null
+  const simpleStock = product.track_inventory && !product.allow_backorder ? inventoryCount(product) : null;
+  const stockText = simpleStock === null
     ? c(product.in_stock ? "product.available" : "product.outOfStock")
-    : c("product.itemsAvailable", { count: exactStock });
+    : c("product.itemsAvailable", { count: simpleStock });
+  const resolvedQuantity = resolved?.track_inventory && !resolved?.allow_backorder ? inventoryCount(resolved) : null;
+  const resolvedStockText = resolvedQuantity === null
+    ? c(resolved?.in_stock ? "product.available" : "product.outOfStock")
+    : c("product.itemsAvailable", { count: resolvedQuantity });
+  const visibleStockText = options.length ? (resolved ? resolvedStockText : null) : stockText;
+  const visibleInStock = options.length ? Boolean(resolved?.in_stock) : product.in_stock;
   return (
     <section className="live-store-detail">
       <ProductGallery product={displayProduct} />
       <div className="live-store-detail-copy">
         <Link className="live-store-back" to={shopPath}><ArrowLeft size={15} aria-hidden="true" />{c("product.back")}</Link>
-        <p className="live-store-product-category">{[product.brand, category?.name].filter(Boolean).join(" / ")}</p>
         <h1>{product.name}</h1>
-        <div className={`live-store-stock-summary ${product.in_stock ? "" : "is-sold-out"}`}>
-          <strong>{stockText}</strong>
-          {options.length > 0 && <span>{c("product.variantsAvailable", { available: availableVariantCount, total: activeVariants.length })}</span>}
-        </div>
+        {(product.brand || category?.name) && <h2 className="live-store-product-category">{[product.brand, category?.name].filter(Boolean).join(" / ")}</h2>}
+        {!options.length && visibleStockText && <div className={`live-store-stock-summary ${visibleInStock ? "" : "is-sold-out"}`}>
+          <strong>{visibleStockText}</strong>
+        </div>}
         {attributes.length > 0 && <section className="live-store-product-facts" aria-labelledby="product-specifications"><h2 id="product-specifications">{c("product.specifications")}</h2><dl className="live-store-attributes">{attributes.map((attribute) => <div key={attribute.id}><dt>{attribute.name}</dt><dd>{attribute.value}</dd></div>)}</dl></section>}
         <div className="live-store-detail-price">{formatPrice(displayProduct.price, product.currency, locale)}</div>
         {displayProduct.compare_at_price && <del className="live-store-detail-compare-price">{formatPrice(displayProduct.compare_at_price, product.currency, locale)}</del>}
         {product.description && <p>{product.description}</p>}
-        {options.length > 0 && <div className="live-store-variant-options">{options.map((option) => <fieldset key={option.id}><legend>{option.name}{option.required ? " *" : ""}</legend><div>{option.values.map((value) => { const inStock = valueHasStock(value.id); const enabled = inStock && possible(option.id, value.id); return <button type="button" key={value.id} disabled={!inStock} className={`${selection[option.id] === value.id ? "is-active" : ""}${option.display_type === "color" ? " is-color" : ""}${!inStock ? " is-sold-out" : ""}${inStock && !enabled ? " is-incompatible" : ""}`} aria-label={value.value} aria-pressed={selection[option.id] === value.id} onClick={() => selectOption(option.id, value.id)}>{option.display_type === "color" && value.color_hex && <span className="live-store-color-swatch" style={{ backgroundColor: value.color_hex }} aria-hidden="true" />}<span>{value.value}</span>{!inStock && <small>{c("product.outOfStock")}</small>}</button>; })}</div></fieldset>)}</div>}
-        {activeVariants.length > 0 && <section className="live-store-variant-inventory" aria-labelledby="variant-inventory-heading">
-          <header><h2 id="variant-inventory-heading">{c("product.variantsStock")}</h2><span>{availableVariantCount}/{activeVariants.length}</span></header>
-          <div className="live-store-variant-list">
-            {activeVariants.map((variant) => {
-              const variantDetails = detailsForVariant(variant);
-              const quantity = variant.track_inventory ? inventoryCount(variant) : null;
-              const label = variantDetails.map(({ value }) => value.value).join(" / ") || variant.sku;
-              const quantityText = quantity === null ? c("product.available") : c("product.itemsAvailable", { count: quantity });
-              return <button type="button" key={variant.id} disabled={!variant.in_stock} className={`live-store-variant-card ${resolved?.id === variant.id ? "is-active" : ""} ${variant.in_stock ? "" : "is-sold-out"}`} aria-label={c("product.selectVariant", { variant: label, stock: variant.in_stock ? quantityText : c("product.outOfStock") })} aria-pressed={resolved?.id === variant.id} onClick={() => selectVariant(variant)}>
-                <span className="live-store-variant-card-values">{variantDetails.map(({ option, value }) => <span key={value.id}>{option.display_type === "color" && value.color_hex && <i className="live-store-color-swatch" style={{ backgroundColor: value.color_hex }} aria-hidden="true" />}<span><small>{option.name}</small><strong>{value.value}</strong></span></span>)}</span>
-                <span className="live-store-variant-card-stock"><strong>{quantityText}</strong>{!variant.in_stock && <small>{c("product.outOfStock")}</small>}{variant.allow_backorder && quantity === 0 && <small>{c("product.availableToOrder")}</small>}</span>
-              </button>;
-            })}
-          </div>
-        </section>}
+        {options.length > 0 && <div className="live-store-variant-options">{options.map((option) => (
+          <fieldset className="live-store-variant-option" key={option.id}>
+            <legend>{option.name}{option.required ? " *" : ""}</legend>
+            <div className="live-store-variant-option-values">{option.values.map((value) => {
+              const inStock = valueHasStock(value.id);
+              const enabled = inStock && possible(option.id, value.id);
+              const active = selection[option.id] === value.id;
+              return <label key={value.id} className={`${active ? "is-active" : ""}${option.display_type === "color" ? " is-color" : ""}${!inStock ? " is-sold-out" : ""}${inStock && !enabled ? " is-incompatible" : ""}`}>
+                <input type="radio" name={`product-option-${option.id}`} value={value.id} checked={active} disabled={!inStock} onChange={() => selectOption(option.id, value.id)} />
+                {option.display_type === "color" && value.color_hex && <span className="live-store-color-swatch" style={{ backgroundColor: value.color_hex }} aria-hidden="true" />}
+                <span>{value.value}</span>
+                {!inStock && <small>{c("product.outOfStock")}</small>}
+              </label>;
+            })}</div>
+          </fieldset>
+        ))}</div>}
         {options.length > 0 && !resolved && <p className="live-store-variant-help">{c("product.requiredHelp")}</p>}
-        {resolved && <p className="live-store-variant-meta"><bdi>{c("common.sku")} {resolved.sku}</bdi> · {resolved.in_stock ? c("product.available") : c("product.outOfStock")}</p>}
+        {options.length > 0 && visibleStockText && <div className={`live-store-stock-summary ${visibleInStock ? "" : "is-sold-out"}`}>
+          <strong>{visibleStockText}</strong>
+        </div>}
+        {resolved && <p className="live-store-variant-meta"><bdi>{c("common.sku")} {resolved.sku}</bdi></p>}
         <button type="button" disabled={!canAdd} onClick={() => onAdd({ ...displayProduct, variant_id: resolved?.id, selected_options: selectedOptions })}><ShoppingBag size={18} />{canAdd ? c("product.addToCart") : resolved ? c("product.outOfStock") : options.length ? c("product.chooseOptions") : c("product.outOfStock")}</button>
         {tags.length > 0 && <div className="live-store-detail-tags">{tags.map((item) => <span key={item.id}>{item.name}</span>)}</div>}
       </div>
@@ -849,19 +1006,19 @@ function StoreProductDetail({ detail, locale, shopPath, onAdd }) {
 
 
 function ProductCard({ product, locale, productPath, onAdd, eager = false }) {
+  const primaryVariantOption = product.variant_options?.find((option) => option.display_type !== "color");
   return (
     <article className="live-store-product-card">
       <Link className="live-store-product-image" to={productPath}>
         <ProductImage product={product} eager={eager} />
-        <span className="live-store-product-view">{c("common.products")}</span>
       </Link>
       <div className="live-store-product-body">
         <h2><Link to={productPath}>{product.name}</Link></h2>
-        {product.variant_options?.length > 0 && (
-          <div className="live-store-product-variant-preview" aria-label={c("product.variantsAvailable", { available: product.variant_options.reduce((total, option) => total + option.values.length, 0), total: product.variant_options.reduce((total, option) => total + option.values.length, 0) })}>
-            {product.variant_options.flatMap((option) => option.values.map((value) => (
-              <span key={`${option.id}:${value}`} title={option.name}>{value}</span>
-            )))}
+        {primaryVariantOption?.values?.length > 0 && (
+          <div className="live-store-product-variant-preview" aria-label={primaryVariantOption.name}>
+            {primaryVariantOption.values.map((value) => (
+              <span key={`${primaryVariantOption.id}:${value}`}>{value}</span>
+            ))}
           </div>
         )}
         <div className="live-store-product-bottom">
@@ -871,7 +1028,7 @@ function ProductCard({ product, locale, productPath, onAdd, eager = false }) {
               <del>{formatPrice(product.compare_at_price, product.currency, locale)}</del>
             )}
           </div>
-          {product.has_variants ? <Link className="live-store-product-options" to={productPath}>{c("product.chooseOptions")}</Link> : <button type="button" disabled={!product.in_stock} onClick={() => onAdd(product)}>
+          {product.has_variants ? <Link className="live-store-product-options" to={productPath}>{c("product.addToCart")}</Link> : <button type="button" disabled={!product.in_stock} onClick={() => onAdd(product)}>
             <ShoppingBag size={16} aria-hidden="true" />
             {product.in_stock ? c("product.addToCart") : c("product.outOfStock")}
           </button>}
@@ -1101,13 +1258,15 @@ export default function EcommerceStorefront({ subdomain: suppliedSubdomain = "",
   const confirmationToken = routeTail.match(/^confirmation\/([0-9a-f]{64})\/?$/)?.[1] || "";
   const confirmationRoute = Boolean(confirmationToken);
   const urlFilters = useMemo(() => new URLSearchParams(location.search), [location.search]);
-  const [draftPreviewMode] = useState(() => Boolean(previewBasePath) || new URLSearchParams(location.search).get("preview") === "draft");
+  const embeddedPreviewMode = Boolean(previewBasePath);
+  const [draftPreviewMode] = useState(() => new URLSearchParams(location.search).get("preview") === "draft");
   const [draftTheme, setDraftTheme] = useState(() => draftPreviewMode ? readThemePreview() : null);
   const [catalog, setCatalog] = useState(EMPTY_CATALOG);
   const [site, setSite] = useState(null);
   const siteRef = useRef(null);
   const [productDetail, setProductDetail] = useState(null);
   const [confirmation, setConfirmation] = useState(null);
+  const [account, setAccount] = useState(null);
   const [loyalty, setLoyalty] = useState(null);
   const [normalDiscounts, setNormalDiscounts] = useState([]);
   const [delivery, setDelivery] = useState({ loading: false, error: "", areas: [] });
@@ -1124,16 +1283,30 @@ export default function EcommerceStorefront({ subdomain: suppliedSubdomain = "",
   const notify = useCallback((value) => setNotification({ ...value }), []);
   const dismissNotification = useCallback(() => setNotification(null), []);
   const orderAttemptRef = useRef({ fingerprint: "", key: "" });
+  const cartReconcileRef = useRef("");
   const analyticsViewsRef = useRef(new Set());
   const recordedVisitRef = useRef("");
 
+  const handleAccountChange = async (user) => {
+    setAccount(user);
+    if (!user) {
+      setLoyalty(null);
+      return;
+    }
+    try {
+      setLoyalty(await fetchPublicEcommerceLoyalty(subdomain));
+    } catch {
+      setLoyalty(null);
+    }
+  };
+
   useEffect(() => {
-    if (!subdomain || draftPreviewMode) return;
+    if (!subdomain || embeddedPreviewMode) return;
     const visitKey = `store:${subdomain}`;
     if (recordedVisitRef.current === visitKey) return;
     recordedVisitRef.current = visitKey;
     recordPublicSiteVisit(subdomain, "store").catch(() => {});
-  }, [draftPreviewMode, subdomain]);
+  }, [embeddedPreviewMode, subdomain]);
 
   const filters = {
     search: urlFilters.get("search") || "",
@@ -1243,9 +1416,23 @@ export default function EcommerceStorefront({ subdomain: suppliedSubdomain = "",
 
   useEffect(() => {
     let cancelled = false;
-    fetchPublicEcommerceLoyalty(subdomain)
-      .then((result) => { if (!cancelled) setLoyalty(result); })
-      .catch(() => { if (!cancelled) setLoyalty(null); });
+    fetchPublicStoreAccount(subdomain)
+      .then(async (result) => {
+        if (cancelled) return;
+        const user = result?.logged_in ? result.user : null;
+        setAccount(user);
+        if (!user) {
+          setLoyalty(null);
+          return;
+        }
+        try {
+          const loyaltyResult = await fetchPublicEcommerceLoyalty(subdomain);
+          if (!cancelled) setLoyalty(loyaltyResult);
+        } catch {
+          if (!cancelled) setLoyalty(null);
+        }
+      })
+      .catch(() => { if (!cancelled) { setAccount(null); setLoyalty(null); } });
     fetchPublicEcommerceDiscounts(subdomain)
       .then((result) => { if (!cancelled) setNormalDiscounts(result?.conditions || []); })
       .catch(() => { if (!cancelled) { setNormalDiscounts([]); notify({ type: "error", title: c("storeFeedback.discountsUnavailable"), message: c("storeFeedback.discountsUnavailableBody") }); } });
@@ -1311,7 +1498,7 @@ export default function EcommerceStorefront({ subdomain: suppliedSubdomain = "",
     return () => window.removeEventListener("message", receiveTheme);
   }, [draftPreviewMode]);
 
-  const setFilter = (key, value, resetPage = true) => {
+  const setFilter = useCallback((key, value, resetPage = true) => {
     const next = new URLSearchParams(location.search);
     if (value) next.set(key, value);
     else next.delete(key);
@@ -1320,6 +1507,21 @@ export default function EcommerceStorefront({ subdomain: suppliedSubdomain = "",
       preventScrollReset: true,
       state: { preserveScroll: true },
     });
+  }, [location.search, navigate, shopPath]);
+
+  const catalogSearchTimerRef = useRef(null);
+  useEffect(() => {
+    return () => window.clearTimeout(catalogSearchTimerRef.current);
+  }, []);
+  const scheduleCatalogSearch = (value) => {
+    window.clearTimeout(catalogSearchTimerRef.current);
+    const normalized = String(value || "").trim();
+    if (normalized === filters.search) return;
+    if (!normalized) {
+      setFilter("search", "");
+      return;
+    }
+    catalogSearchTimerRef.current = window.setTimeout(() => setFilter("search", normalized), 250);
   };
 
   const setPriceFilters = (rawMinimum, rawMaximum) => {
@@ -1352,7 +1554,7 @@ export default function EcommerceStorefront({ subdomain: suppliedSubdomain = "",
   }, new Map()).values()), [cart]);
   const cartCount = cartItems.reduce((total, item) => total + item.quantity, 0);
 
-  const saveCart = (next) => {
+  const saveCart = useCallback((next) => {
     try {
       localStorage.setItem(cartKey, JSON.stringify(next));
       setCart(next);
@@ -1361,7 +1563,40 @@ export default function EcommerceStorefront({ subdomain: suppliedSubdomain = "",
       notify({ type: "error", title: c("storeFeedback.cartUnavailable"), message: c("storeFeedback.cartUnavailableBody") });
       return false;
     }
-  };
+  }, [cartKey, notify, setCart]);
+
+  useEffect(() => {
+    if (!checkoutRoute || embeddedPreviewMode || !cartItems.length) return undefined;
+    const requestedItems = cartItems.map((item) => ({
+      product_id: item.id,
+      ...(item.variant_id ? { variant_id: item.variant_id } : {}),
+      quantity: item.quantity,
+    }));
+    const fingerprint = JSON.stringify(requestedItems);
+    if (cartReconcileRef.current === fingerprint) return undefined;
+    cartReconcileRef.current = fingerprint;
+    let cancelled = false;
+    reconcilePublicEcommerceCart(subdomain, requestedItems)
+      .then((reconciliation) => {
+        if (cancelled) return;
+        const refreshedCart = applyCartReconciliation(cartItems, reconciliation?.items);
+        if (JSON.stringify(refreshedCart) === JSON.stringify(cartItems)) return;
+        cartReconcileRef.current = JSON.stringify(refreshedCart.map((item) => ({
+          product_id: item.id,
+          ...(item.variant_id ? { variant_id: item.variant_id } : {}),
+          quantity: item.quantity,
+        })));
+        if (saveCart(refreshedCart)) {
+          notify({ type: "success", title: c("cart.updatedTitle"), message: c("cart.updated") });
+        }
+      })
+      .catch(() => {
+        if (!cancelled) cartReconcileRef.current = "";
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [cartItems, checkoutRoute, embeddedPreviewMode, notify, saveCart, subdomain]);
 
   const addToCart = (product) => {
     const identity = cartLineKey(product); const existing = cartItems.find((item) => cartLineKey(item) === identity);
@@ -1415,6 +1650,11 @@ export default function EcommerceStorefront({ subdomain: suppliedSubdomain = "",
     }
     const reconciliation = await reconcilePublicEcommerceCart(subdomain, payload.items);
     if (!reconciliation?.valid) {
+      const refreshedCart = applyCartReconciliation(cartItems, reconciliation?.items);
+      if (JSON.stringify(refreshedCart) !== JSON.stringify(cartItems)) {
+        saveCart(refreshedCart);
+        throw new StorefrontActionError("cart.updated");
+      }
       throw new StorefrontActionError("cart.changed");
     }
     const reconciledById = new Map((reconciliation.items || []).map((item) => [`${item.product_id}:${item.variant_id || "simple"}`, item]));
@@ -1492,23 +1732,11 @@ export default function EcommerceStorefront({ subdomain: suppliedSubdomain = "",
   return (
     <div className="live-store" style={storeStyle} dir={locale === "ar" ? "rtl" : "ltr"} lang={locale}>
       <StorefrontSeo origin={window.location.origin} storePath={canonicalStorePath} locale={locale} site={site} productDetail={productDetail} category={activeCategory} view={seoView} />
-      <StoreHeader brand={brand} logoUrl={site?.logo_url} cartCount={cartCount} shopPath={shopPath} homePath={homePath} categoriesPath={categoriesPath} contactPath={contactPath} onCartOpen={openCart} />
+      <StoreHeader brand={brand} logoUrl={site?.logo_url} cartCount={cartCount} shopPath={shopPath} homePath={homePath} categoriesPath={categoriesPath} contactPath={contactPath} onCartOpen={openCart} subdomain={subdomain} account={account} loyalty={loyalty} onAccountChange={handleAccountChange} />
       {site?.growth?.announcement_enabled && announcementText && <div className="live-store-announcement" role="status">{announcementLink ? <a href={announcementLink} onClick={() => trackCommerceEvent("promotion_click", { store: subdomain, locale, placement: "announcement" })}>{announcementText}</a> : <span>{announcementText}</span>}</div>}
       <StoreActionToast notification={notification} onDismiss={dismissNotification} locale={locale} />
       <StoreWhatsAppLink phone={site?.phone} brand={brand} />
       <StoreCart open={cartOpen} items={cartItems} homePath={homePath} checkoutPath={checkoutPath} delivery={delivery} selectedAreaId={selectedAreaId} onSelectedAreaChange={setSelectedAreaId} loyalty={loyalty} normalDiscounts={normalDiscounts} onClose={() => setCartOpen(false)} onQuantityChange={changeCartQuantity} onRemove={removeCartItem} />
-      {loyalty && <section className="live-store-loyalty" aria-label={c("loyalty.title")}>
-        <Gift size={20} aria-hidden="true" />
-        <div><strong>{c("loyalty.balance")}: {loyalty.account?.current_balance || 0}</strong>
-          {(loyalty.entitlements || []).find((item) => item.status === "active") && <small>
-            {c("loyalty.activeReward")}: {c("loyalty.appliedDiscount")} · {
-              (loyalty.entitlements || []).find((item) => item.status === "active")?.expires_at
-                ? c("loyalty.expires", { date: new Intl.DateTimeFormat(activeLocale()).format(new Date((loyalty.entitlements || []).find((item) => item.status === "active").expires_at)) })
-                : c("loyalty.rewardLifetime")
-            }
-          </small>}
-        </div>
-      </section>}
       <main>
 
         {loading && !catalogRefreshing && <StoreSkeleton view={productSlug ? "product" : categoriesRoute ? "categories" : contactRoute ? "contact" : checkoutRoute ? "catalog" : isLanding ? "landing" : "catalog"} />}
@@ -1543,17 +1771,17 @@ export default function EcommerceStorefront({ subdomain: suppliedSubdomain = "",
             </header>
             <div className="live-store-shell">
               <aside>
-              <form className="live-store-search" onSubmit={(event) => { event.preventDefault(); const value = new FormData(event.currentTarget).get("search"); setFilter("search", typeof value === "string" ? value : ""); }}>
-                <input key={filters.search} name="search" defaultValue={filters.search} placeholder={c("catalog.searchPlaceholder")} aria-label={c("catalog.searchProducts")} />
+              <form className="live-store-search" onSubmit={(event) => { event.preventDefault(); window.clearTimeout(catalogSearchTimerRef.current); const value = new FormData(event.currentTarget).get("search"); setFilter("search", typeof value === "string" ? value.trim() : ""); }}>
+                <input key={filters.search} name="search" defaultValue={filters.search} onChange={(event) => scheduleCatalogSearch(event.target.value)} placeholder={c("catalog.searchPlaceholder")} aria-label={c("catalog.searchProducts")} />
                 <button type="submit" aria-label={c("common.search")}><Search size={18} /></button>
               </form>
-              <div className="live-store-filter-card"><h2>{c("common.categories")}</h2><CategoryList categories={catalog.categories} activeSlug={filters.category} onSelect={(value) => setFilter("category", value)} /></div>
+              <div className="live-store-filter-card"><h2>{c("common.categories")}</h2><CategoryList categories={catalog.categories} activeSlug={filters.category} onSelect={(value) => setFilter("category", filters.category === value ? "" : value)} /></div>
               {catalog.brands?.length > 0 && <div className="live-store-filter-card"><h2>{c("catalog.brands")}</h2><div className="live-store-tags"><button type="button" className={!filters.brand ? "is-active" : ""} onClick={() => setFilter("brand", "")}>{c("catalog.allBrands")}</button>{catalog.brands.map((item) => <button type="button" key={item.id} className={filters.brand === item.slug ? "is-active" : ""} onClick={() => setFilter("brand", filters.brand === item.slug ? "" : item.slug)}>{item.name}</button>)}</div></div>}
               <PriceRangeFilter key={`${priceBounds.min}:${priceBounds.max}:${filters.minPrice}:${filters.maxPrice}`} bounds={priceBounds} minimum={filters.minPrice} maximum={filters.maxPrice} locale={locale} onChange={setPriceFilters} />
               {catalog.tags.length > 0 && <div className="live-store-filter-card"><h2>{c("common.tags")}</h2><div className="live-store-tags">{catalog.tags.map((item) => <button type="button" key={item.id} className={filters.tag === item.slug ? "is-active" : ""} onClick={() => setFilter("tag", filters.tag === item.slug ? "" : item.slug)}>{item.name}</button>)}</div></div>}
             </aside>
             <div className="live-store-results">
-              <div className="live-store-toolbar"><p>{c("catalog.showing", { count: catalog.pagination.total })}</p><select value={filters.sort} onChange={(event) => setFilter("sort", event.target.value)} aria-label={c("catalog.title")}><option value="latest">{c("catalog.latest")}</option><option value="price_low">{c("catalog.priceLow")}</option><option value="price_high">{c("catalog.priceHigh")}</option><option value="name">{c("catalog.name")}</option></select></div>
+              <div className="live-store-toolbar"><select value={filters.sort} onChange={(event) => setFilter("sort", event.target.value)} aria-label={c("catalog.title")}><option value="latest">{c("catalog.latest")}</option><option value="price_low">{c("catalog.priceLow")}</option><option value="price_high">{c("catalog.priceHigh")}</option><option value="name">{c("catalog.name")}</option></select></div>
               {catalog.products.length > 0 ? <div className="live-store-grid">{catalog.products.map((product, index) => <ProductCard key={product.id} product={product} category={categoryById.get(product.category_id)} locale={locale} productPath={`${homePath}/product/${encodeURIComponent(product.slug)}`} onAdd={addToCart} eager={index < 3} />)}</div> : <div className="live-store-empty"><ShoppingBag size={38} /><h2>{c("catalog.emptyTitle")}</h2><p>{c("catalog.emptyBody")}</p></div>}
               {catalog.pagination.pages > 1 && <nav className="live-store-pagination" aria-label={c("catalog.pages")}>{Array.from({ length: catalog.pagination.pages }, (_, index) => index + 1).map((page) => <button type="button" key={page} className={Number(filters.page) === page ? "is-active" : ""} onClick={() => setFilter("page", String(page), false)}>{page}</button>)}</nav>}
               </div>
@@ -1562,10 +1790,17 @@ export default function EcommerceStorefront({ subdomain: suppliedSubdomain = "",
         )}
       </main>
       <footer className="live-store-footer has-social-links">
-        <div>{brand && <strong>{brand}</strong>}{description && <p>{description}</p>}</div>
+        <div className="live-store-footer-brand">
+          <Link to={homePath} aria-label={brand || c("nav.home")}>
+            {site?.logo_url && <img {...getResponsiveMediaProps(site.logo_url, { fallbackWidth:320, sizes:"104px" })} alt="" loading="lazy" decoding="async" />}
+            {brand && <strong>{brand}</strong>}
+          </Link>
+          {description && <p>{description}</p>}
+        </div>
         <div><strong>{c("nav.shop")}</strong><Link to={shopPath}>{c("common.products")}</Link><Link to={categoriesPath}>{c("common.categories")}</Link></div>
         <div><strong>{c("nav.contact")}</strong>{site?.contact_email && <a dir="ltr" href={`mailto:${site.contact_email}`}>{site.contact_email}</a>}{site?.phone && <a dir="ltr" href={`tel:${site.phone}`}>{site.phone}</a>}</div>
         <div className="live-store-footer-social"><strong>{c("footer.followUs")}</strong><nav aria-label={c("footer.followUs")}>{socialLinks.map((item) => item.href ? <a key={item.key} href={item.href} target="_blank" rel="noopener noreferrer" aria-label={item.label} title={item.label}><SocialIcon network={item.key} /></a> : <span key={item.key} className="is-disabled" title={item.label} aria-hidden="true"><SocialIcon network={item.key} /></span>)}</nav></div>
+        <div className="live-store-footer-powered"><a href="https://madarportal.com/">{c("platform.poweredBy")}</a></div>
       </footer>
     </div>
   );

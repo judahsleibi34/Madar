@@ -27,6 +27,11 @@ const emptyProduct = (currency = "USD") => ({
 });
 
 const validHex = (value) => /^#[0-9a-f]{6}$/i.test(String(value || ""));
+const isCombinedSize = (value) => /[/,+&]|\s+(?:or|او)\s+/i.test(String(value || "").trim());
+const splitCombinedSize = (value) => String(value || "").trim()
+  .split(/\s*(?:[/,+&]|\s+(?:or|او)\s+)\s*/i)
+  .map((item) => item.trim())
+  .filter(Boolean);
 const emptyVariantColor = () => ({
   id: uuid(), valueId: uuid(), colorName: "", colorValue: "", quantity: 0,
   sku: "", barcode: null, price_override: null, compare_at_price_override: null,
@@ -61,19 +66,29 @@ const hydrateVariantGroups = (product) => {
     const variantValue = selected.find((value) => (variantOption?.values || []).some((candidate) => candidate.id === value.id));
     const colorValue = selected.find((value) => (colorOption?.values || []).some((candidate) => candidate.id === value.id));
     const fallbackName = selected.filter((value) => value.id !== colorValue?.id).map((value) => value.value_translations?.en || value.code).join(" / ");
-    const groupId = variantValue?.id || variant.id;
-    let group = groupById.get(groupId);
-    if (!group) {
-      group = { id: groupId, name: variantValue?.value_translations?.en || fallbackName || "", colors: [] };
-      groups.push(group);
-      groupById.set(groupId, group);
-    }
-    group.colors.push({
-      ...variant,
-      valueId: colorValue?.id || uuid(),
-      colorName: colorValue?.value_translations?.en || "",
-      colorValue: colorValue?.color_hex || "",
-      quantity: Number(variant.inventory_quantity || 0),
+    const sourceName = variantValue?.value_translations?.en || fallbackName || "";
+    const splitNames = variantOption?.code === "size" && isCombinedSize(sourceName) ? splitCombinedSize(sourceName) : [sourceName];
+    const sourceQuantity = Number(variant.inventory_quantity || 0);
+    const baseQuantity = Math.floor(sourceQuantity / splitNames.length);
+    const remainder = sourceQuantity % splitNames.length;
+    splitNames.forEach((name, index) => {
+      const groupKey = splitNames.length > 1 ? `${variantValue?.id || variant.id}:${name.toLocaleLowerCase()}` : (variantValue?.id || variant.id);
+      let group = groupById.get(groupKey);
+      if (!group) {
+        group = { id: splitNames.length > 1 ? uuid() : (variantValue?.id || variant.id), name, colors: [] };
+        groups.push(group);
+        groupById.set(groupKey, group);
+      }
+      group.colors.push({
+        ...variant,
+        id: splitNames.length > 1 ? uuid() : variant.id,
+        sku: splitNames.length > 1 ? "" : variant.sku,
+        barcode: splitNames.length > 1 ? null : variant.barcode,
+        valueId: colorValue?.id || uuid(),
+        colorName: colorValue?.value_translations?.en || "",
+        colorValue: colorValue?.color_hex || "",
+        quantity: baseQuantity + (index < remainder ? 1 : 0),
+      });
     });
   }
 
@@ -263,6 +278,7 @@ export function EcommerceProductEditor({ user, productId, embedded = false, init
     if (form.status === "active" && form.hadVariantInventory && !form.variantGroups.length) return t("admin.validationSellableVariant");
     const names = form.variantGroups.map((group) => group.name.trim().toLocaleLowerCase());
     if (names.some((name) => !name)) return t("admin.validationVariantName");
+    if (form.variantGroups.some((group) => isCombinedSize(group.name))) return t("admin.validationCombinedSize");
     if (new Set(names).size !== names.length) return t("admin.validationDuplicateVariantName");
     const globalColors = new Map();
     for (const group of form.variantGroups) {
@@ -343,8 +359,8 @@ export function EcommerceProductEditor({ user, productId, embedded = false, init
     const options = [
       {
         id: form.variantOptionId,
-        code: "variant",
-        name_translations: { en: "Variant" },
+        code: "size",
+        name_translations: { en: "Size", ar: "المقاس" },
         required: true,
         display_type: "text",
         sort_order: 0,
@@ -635,7 +651,7 @@ export function EcommerceProductEditor({ user, productId, embedded = false, init
           })}
         </div>
         <div className="ecommerce-variant-editor-actions">
-          <button type="button" className="ecommerce-add-variant-button" onClick={addVariantGroup}><Plus size={16} />{t("merchant.addVariant")}</button>
+          <button type="button" className="ecommerce-add-variant-button" onClick={addVariantGroup}><Plus size={16} />{t("admin.addSize")}</button>
           {productId && variantInventoryIsFilled(form.variantGroups) && <button type="button" className="ecommerce-save-variants-button" disabled={state.saving} onClick={saveVariants}><Save size={16} />{state.saving ? t("merchant.saving") : t("merchant.saveVariants")}</button>}
         </div>
       </section>

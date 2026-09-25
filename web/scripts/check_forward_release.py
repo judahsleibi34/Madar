@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate the production schema-105 to schema-108 forward release."""
+"""Validate the production schema-108 to schema-109 forward release."""
 
 from __future__ import annotations
 
@@ -12,12 +12,12 @@ import re
 ROOT = Path(__file__).resolve().parents[2]
 BASELINE = "1e6b739a43759309a45ede2dff28a859209e4a64"
 
-SOURCE_SCHEMA = 105
-TARGET_SCHEMA = 108
-MANIFEST_NAME = "migrations-106-108.json"
+SOURCE_SCHEMA = 108
+TARGET_SCHEMA = 109
+MANIFEST_NAME = "migrations-109.json"
 
-# Migrations 100-105 have already been applied to production and are no
-# longer part of the active 105 -> 108 execution manifest. Keep them
+# Migrations 100-108 have already been applied to production and are no
+# longer part of the active 108 -> 109 execution manifest. Keep them
 # explicitly checksum-pinned so narrowing the active manifest cannot make
 # already-applied production history mutable.
 APPLIED_PRODUCTION_MIGRATIONS = {
@@ -45,20 +45,24 @@ APPLIED_PRODUCTION_MIGRATIONS = {
         "105_canonical_tenant_subdomains.sql",
         "f445f36bbba71f6c78f1c4e16f8a59ae63277c7c4f59510bf4e91eab4c967097",
     ),
-}
-
-EXPECTED = {
     106: (
         "106_add_order_delivery_fees.sql",
-        "forward-compatible",
+        "d761e17c78f32ade46561214e2f4e9cf7f6fbb6190994323e1046ad691cfc972",
     ),
     107: (
         "107_add_ecommerce_category_images.sql",
-        "expand-only",
+        "96643c4de3919e835e56e1fcaac93019f86391b7bbf48a4779570c9117671ec3",
     ),
     108: (
         "108_add_ecommerce_brands.sql",
-        "expand-only",
+        "bafe65b98e0b3b3952aa2d46986e7eae282e08a4fbdaffdd0f583cff6657d4fa",
+    ),
+}
+
+EXPECTED = {
+    109: (
+        "109_fix_ecommerce_order_delivery_totals_constraint.sql",
+        "forward-compatible",
     ),
 }
 
@@ -103,9 +107,9 @@ def validate(root: Path = ROOT) -> list[str]:
                     "immutable production migration changed: " + relative
                 )
 
-        # Schema 100-105 is already live in production. These migrations
+        # Schema 100-108 is already live in production. These migrations
         # must remain immutable even though the active execution manifest
-        # begins at schema 105 and therefore contains 106 through 108.
+        # begins at schema 108 and therefore contains only migration 109.
         for number, (filename, checksum) in (
             APPLIED_PRODUCTION_MIGRATIONS.items()
         ):
@@ -153,8 +157,8 @@ def validate(root: Path = ROOT) -> list[str]:
             and release["migration_manifest"] == MANIFEST_NAME
         ):
             errors.append(
-                "release must bridge production schema 105 to 108 "
-                "with rollback bounded at schema 105"
+                "release must bridge production schema 108 to 109 "
+                "with rollback bounded at schema 108"
             )
 
         manifest = json.loads(
@@ -173,9 +177,9 @@ def validate(root: Path = ROOT) -> list[str]:
 
         entries = manifest["migrations"]
 
-        if [int(entry["number"]) for entry in entries] != [106, 107, 108]:
+        if [int(entry["number"]) for entry in entries] != [109]:
             errors.append(
-                "forward manifest must contain ordered migrations 106 through 108"
+                "forward manifest must contain only migration 109"
             )
 
         previous = SOURCE_SCHEMA

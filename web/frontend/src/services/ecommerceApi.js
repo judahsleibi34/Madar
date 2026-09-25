@@ -359,6 +359,26 @@ export const fetchPublicEcommerceDeliveryAreas = (subdomain) =>
 export const fetchPublicEcommerceLoyalty = (subdomain) =>
   request(`/public/sites/${encodeURIComponent(subdomain)}/loyalty/me`);
 
+export const fetchPublicStoreAccount = (subdomain) =>
+  request(`/public/sites/${encodeURIComponent(subdomain)}/auth/status`);
+
+export const loginPublicStoreAccount = (subdomain, payload) =>
+  request(`/public/sites/${encodeURIComponent(subdomain)}/auth/login`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+export const registerPublicStoreAccount = (subdomain, payload) =>
+  request(`/public/sites/${encodeURIComponent(subdomain)}/auth/register`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+export const logoutPublicStoreAccount = (subdomain) =>
+  request(`/public/sites/${encodeURIComponent(subdomain)}/auth/logout`, {
+    method: "POST",
+  });
+
 export const fetchPublicEcommerceDiscounts = (subdomain) =>
   request(`/public/sites/${encodeURIComponent(subdomain)}/discounts`);
 

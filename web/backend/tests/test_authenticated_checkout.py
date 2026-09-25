@@ -95,6 +95,33 @@ class AuthenticatedCheckoutTests(unittest.TestCase):
         query = database.table.return_value
         for method in ("select", "eq", "limit", "order"):
             getattr(query, method).return_value = query
+        query.execute.side_effect = [
+            SimpleNamespace(data=[{"id": "rule-1"}]),
+            SimpleNamespace(data=[]),
+            SimpleNamespace(data=[]),
+            SimpleNamespace(data=[]),
+        ]
+
+        with patch.object(routes, "service_supabase", database):
+            response = self.client.get(
+                "/public/sites/test-store/loyalty/me",
+                headers={"cookie": "madar_access_token=access"},
+            )
+
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertTrue(response.json()["enabled"])
+        database.rpc.assert_called_once_with(
+            "expire_ecommerce_loyalty_entitlements_safe",
+            {"p_tenant_id": 7, "p_customer_id": 42},
+        )
+        self.assertEqual(query.eq.call_args_list.count(call("customer_id", 42)), 3)
+        self.assertEqual(query.eq.call_args_list.count(call("tenant_id", 7)), 4)
+
+    def test_loyalty_read_is_disabled_without_an_enabled_database_rule(self):
+        database = MagicMock()
+        query = database.table.return_value
+        for method in ("select", "eq", "limit", "order"):
+            getattr(query, method).return_value = query
         query.execute.return_value = SimpleNamespace(data=[])
 
         with patch.object(routes, "service_supabase", database):
@@ -104,12 +131,13 @@ class AuthenticatedCheckoutTests(unittest.TestCase):
             )
 
         self.assertEqual(response.status_code, 200, response.text)
-        database.rpc.assert_called_once_with(
-            "expire_ecommerce_loyalty_entitlements_safe",
-            {"p_tenant_id": 7, "p_customer_id": 42},
-        )
-        self.assertEqual(query.eq.call_args_list.count(call("customer_id", 42)), 3)
-        self.assertEqual(query.eq.call_args_list.count(call("tenant_id", 7)), 3)
+        self.assertEqual(response.json(), {
+            "enabled": False,
+            "account": None,
+            "entitlements": [],
+            "transactions": [],
+        })
+        database.rpc.assert_not_called()
 
     def test_guest_loyalty_read_requires_authentication(self):
         self.auth.side_effect = HTTPException(

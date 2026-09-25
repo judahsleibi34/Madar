@@ -12,10 +12,11 @@ vi.mock("../../services/ecommerceApi", () => ({
   fetchPublicEcommerceOrderConfirmation: vi.fn(), createPublicEcommerceOrder: vi.fn(),
   fetchPublicEcommerceLoyalty: vi.fn(() => Promise.reject(new Error("guest"))),
   fetchPublicEcommerceDiscounts: vi.fn(() => Promise.resolve({ conditions:[] })),
+  fetchPublicStoreAccount: vi.fn(() => Promise.resolve({ logged_in: false, user: null })),
   reconcilePublicEcommerceCart: vi.fn(),
 }));
 
-const product = { id: "product-1", slug: "shirt", name: "Shirt", price: "20.00", compare_at_price: "25.00", currency: "ILS", in_stock: true, images: ["https://example.com/base.webp"] };
+const product = { id: "product-1", slug: "shirt", name: "Shirt", brand: "Noura Studio", price: "20.00", compare_at_price: "25.00", currency: "ILS", in_stock: true, images: ["https://example.com/base.webp"] };
 const color = { id: "option-color", code: "color", name: "Color", required: true, values: [{ id: "black", code: "black", value: "Black" }, { id: "white", code: "white", value: "White" }] };
 const size = { id: "option-size", code: "size", name: "Size", required: true, values: [{ id: "small", code: "s", value: "S" }, { id: "large", code: "l", value: "L" }] };
 
@@ -23,19 +24,22 @@ afterEach(() => { cleanup(); vi.clearAllMocks(); localStorage.clear(); i18n.chan
 
 describe("merchant-defined ecommerce variants", () => {
   it("renders generic color presentation as accessible labeled swatches", async () => {
-    fetchPublicEcommerceProduct.mockResolvedValue({ site: { brand: "Store" }, product, category: null, tags: [], attributes: [], options: [{
+    fetchPublicEcommerceProduct.mockResolvedValue({ site: { brand: "Store" }, product, category: { name: "Women" }, tags: [], attributes: [], options: [{
       ...color, display_type: "color", values: [
         { id: "black", code: "black", value: "Black", color_hex: "#111111" },
         { id: "white", code: "white", value: "White", color_hex: "#FFFFFF" },
       ],
     }], variants: [{ id: "black-only", sku: "BLACK", option_value_ids: ["black"], price: "20.00", in_stock: true, images: [] }] });
     render(<MemoryRouter initialEntries={["/shop/product/shirt"]}><Routes><Route path="/shop/*" element={<EcommerceStorefront subdomain="demo" />} /></Routes></MemoryRouter>);
-    const black = await screen.findByRole("button", { name: "Black" });
-    const white = screen.getByRole("button", { name: "White" });
-    expect(black.querySelector(".live-store-color-swatch").style.backgroundColor).toBe("rgb(17, 17, 17)");
+    const black = await screen.findByRole("radio", { name: "Black" });
+    const white = screen.getByRole("radio", { name: /White/ });
+    const productName = screen.getByRole("heading", { level: 1, name: "Shirt" });
+    const productTag = screen.getByRole("heading", { level: 2, name: "Noura Studio / Women" });
+    expect(productName.compareDocumentPosition(productTag) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(black.closest("label").querySelector(".live-store-color-swatch").style.backgroundColor).toBe("rgb(17, 17, 17)");
     expect(white.disabled).toBe(true);
     fireEvent.click(black);
-    expect(black.getAttribute("aria-pressed")).toBe("true");
+    expect(black.checked).toBe(true);
   });
 
   it("requires an explicit valid combination and updates price, image, and cart identity", async () => {
@@ -49,9 +53,9 @@ describe("merchant-defined ecommerce variants", () => {
 
     const add = await screen.findByRole("button", { name: "Choose options" });
     expect(add.disabled).toBe(true);
-    fireEvent.click(screen.getByRole("button", { name: "White" }));
-    expect(screen.getByRole("button", { name: "S" }).classList.contains("is-incompatible")).toBe(true);
-    fireEvent.click(screen.getByRole("button", { name: "L" }));
+    fireEvent.click(screen.getByRole("radio", { name: "White" }));
+    expect(screen.getByRole("radio", { name: "S" }).closest("label").classList.contains("is-incompatible")).toBe(true);
+    fireEvent.click(screen.getByRole("radio", { name: "L" }));
     expect(screen.getByText("₪24.00")).toBeTruthy();
     expect(screen.getByAltText("Shirt 1").getAttribute("src")).toContain("white.webp");
     fireEvent.click(screen.getByRole("button", { name: "Add to cart" }));
@@ -61,7 +65,7 @@ describe("merchant-defined ecommerce variants", () => {
     expect(stored[0]).toMatchObject({ id: "product-1", variant_id: "variant-white-large" });
   });
 
-  it("shows every variant quantity and prevents selecting a sold-out combination", async () => {
+  it("keeps the variant matrix hidden and selects a combination through expandable options", async () => {
     fetchPublicEcommerceProduct.mockResolvedValue({
       site: { brand: "Store" },
       product: { ...product, track_inventory: true, inventory_quantity: 0 },
@@ -78,17 +82,22 @@ describe("merchant-defined ecommerce variants", () => {
 
     render(<MemoryRouter initialEntries={["/shop/product/shirt"]}><Routes><Route path="/shop/*" element={<EcommerceStorefront subdomain="demo" />} /></Routes></MemoryRouter>);
 
-    expect(await screen.findByText("12 items available")).toBeTruthy();
-    expect(screen.getByText("2 of 3 variants available")).toBeTruthy();
+    expect(await screen.findByRole("radio", { name: "White" })).toBeTruthy();
+    expect(screen.queryByText("12 items available")).toBeNull();
+    expect(screen.queryByText("7 items available")).toBeNull();
+    expect(screen.queryByText("2 of 3 variants available")).toBeNull();
     expect(screen.getByRole("heading", { name: "Specifications" })).toBeTruthy();
     expect(screen.getByText("Material")).toBeTruthy();
     expect(screen.getByText("Cotton")).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "Variants & stock" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Select White/ })).toBeNull();
 
-    const soldOut = screen.getByRole("button", { name: "Select White / S, Out of stock" });
-    expect(soldOut.disabled).toBe(true);
-    expect(soldOut.classList.contains("is-sold-out")).toBe(true);
-
-    fireEvent.click(screen.getByRole("button", { name: "Select White / L, 7 items available" }));
+    fireEvent.click(screen.getByRole("radio", { name: "White" }));
+    expect(screen.queryByText("7 items available")).toBeNull();
+    fireEvent.click(screen.getByRole("radio", { name: "L" }));
+    expect(screen.getByText("7 items available")).toBeTruthy();
+    expect(screen.getAllByText("7 items available")).toHaveLength(1);
+    expect(document.querySelector(".live-store-variant-meta")?.textContent).not.toContain("items available");
     fireEvent.click(screen.getByRole("button", { name: "Add to cart" }));
     expect(JSON.parse(localStorage.getItem("madar-store-cart:demo"))[0]).toMatchObject({ variant_id: "white-large" });
   });
@@ -120,7 +129,9 @@ describe("merchant-defined ecommerce variants", () => {
     expect(await screen.findByRole("heading", { level: 1, name: "قميص" })).toBeTruthy();
     expect(screen.getByText("الخامة")).toBeTruthy();
     expect(screen.getByText("قطن")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "أسود" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "L" })).toBeTruthy();
+    const localizedOptions = screen.getAllByRole("radio");
+    expect(localizedOptions).toHaveLength(2);
+    fireEvent.click(localizedOptions[0]);
+    expect(screen.getByRole("radio", { name: "L" })).toBeTruthy();
     expect(document.querySelector(".live-store").getAttribute("dir")).toBe("rtl");
   });

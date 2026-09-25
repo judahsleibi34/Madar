@@ -2257,7 +2257,7 @@ def _attach_public_variant_options(
         return
     option_rows = _optional_p1a_rows(
         service_supabase.table("ecommerce_product_options")
-        .select("id,product_id,name_translations,sort_order")
+        .select("id,product_id,name_translations,display_type,sort_order")
         .eq("tenant_id", tenant_id)
         .in_("product_id", product_ids)
         .order("sort_order")
@@ -2332,7 +2332,12 @@ def _attach_public_variant_options(
                 if label and label not in values:
                     values.append(label)
             if values:
-                summaries.append({"id": option_id, "name": option_name, "values": values})
+                summaries.append({
+                    "id": option_id,
+                    "name": option_name,
+                    "display_type": str(option.get("display_type") or "text"),
+                    "values": values,
+                })
         product["variant_options"] = summaries
 
 
@@ -2726,7 +2731,8 @@ def register_tenant_visitor(
                 "password": payload.password,
                 "options": {
                     "email_redirect_to": canonical_tenant_url(
-                        settings.get("subdomain") or clean_subdomain
+                        settings.get("subdomain") or clean_subdomain,
+                        "/shop",
                     ),
                     "data": {"first_name": first_name, "last_name": last_name},
                 },
@@ -2778,7 +2784,7 @@ def register_tenant_visitor(
         )
 
         return {
-            "message": "Account created. Check your email, then log in.",
+            "message": "Account created. We sent you a confirmation email. Confirm it before logging in.",
             "requires_email_verification": True,
         }
     except HTTPException:
@@ -3429,6 +3435,22 @@ def get_public_store_loyalty(subdomain: str, request: Request, response: Respons
     )
     customer_id = int(customer["id"])
     try:
+        rule_rows = rows(
+            service_supabase.table("ecommerce_loyalty_rules")
+            .select("id")
+            .eq("tenant_id", tenant_id)
+            .eq("is_current", True)
+            .eq("enabled", True)
+            .limit(1)
+            .execute()
+        )
+        if not rule_rows:
+            return {
+                "enabled": False,
+                "account": None,
+                "entitlements": [],
+                "transactions": [],
+            }
         service_supabase.rpc("expire_ecommerce_loyalty_entitlements_safe", {
             "p_tenant_id": tenant_id, "p_customer_id": customer_id,
         }).execute()
@@ -3441,6 +3463,7 @@ def get_public_store_loyalty(subdomain: str, request: Request, response: Respons
         raise HTTPException(status_code=503, detail="Loyalty is temporarily unavailable") from error
     products_by_id = {str(product.get("id")): product for product in products}
     return {
+        "enabled": True,
         "account": account_rows[0] if account_rows else {
             "current_balance": 0, "lifetime_earned": 0, "lifetime_spent": 0,
         },

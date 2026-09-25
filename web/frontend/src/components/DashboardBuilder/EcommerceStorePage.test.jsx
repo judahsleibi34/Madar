@@ -10,13 +10,13 @@ vi.mock("../PageBuilder/services/PageBuilder.api", () => ({
 }));
 
 describe("EcommerceStorePage", () => {
-  it("opens the storefront directly without an internal preview banner", async () => {
+  it("embeds the published store on the same origin and opens production externally", async () => {
     fetchWebsiteSettings.mockResolvedValue({ subdomain: "olive-house" });
 
     const { container } = render(
       <MemoryRouter><EcommerceStorePage /></MemoryRouter>
     );
-    expect((await screen.findByTitle("Published online store")).getAttribute("src")).toBe("https://olive-house.madarportal.com/shop");
+    expect((await screen.findByTitle("Published online store")).getAttribute("src")).toBe("/ecommerce-preview/olive-house");
     fireEvent.load(screen.getByTitle("Published online store"));
     expect(screen.getByRole("link", { name: "Open production store" }).getAttribute("href")).toBe("https://olive-house.madarportal.com/shop");
     expect(screen.queryByText("Published storefront")).toBeNull();
