@@ -463,19 +463,23 @@ table is queried or changed.
 
 ### Current schema 108 bridge
 
-The release contract accepts schema `104..108` and targets `108` using the
-checksum-pinned `migrations-105-108.json` manifest.
+Production is currently at schema 105. The release contract accepts schema
+`105..108` and targets `108` using the checksum-pinned
+`migrations-106-108.json` manifest.
 
 The active migration sequence is contiguous:
 
-- migration 105: canonical tenant subdomains (`104 -> 105`);
 - migration 106: order delivery-fee snapshots (`105 -> 106`);
 - migration 107: ecommerce category images (`106 -> 107`);
 - migration 108: tenant-scoped ecommerce brands (`107 -> 108`).
 
-Rollback compatibility is bounded at schema 104. After schema advances beyond
-104, recovery proceeds forward rather than attempting automatic downgrade SQL
-or traffic rollback to an incompatible retained release.
+Migration 105 established canonical tenant subdomains in the prior `104 -> 105`
+production release. It remains immutable production history and its historical
+manifests are retained. A verified schema-105 backup is required before the
+current bridge mutates the database. Rollback compatibility is bounded at
+schema 105. After schema advances beyond 105, recovery proceeds forward rather
+than attempting automatic downgrade SQL or traffic rollback to an incompatible
+retained release.
 
 ### Earlier schema 099 bridge
 

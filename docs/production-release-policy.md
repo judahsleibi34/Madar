@@ -255,18 +255,17 @@ queried directly. Its SHA must match state and its reported compatibility range
 must contain the live schema. Candidate rollback bounds are descriptive metadata
 today; retained-target attestation is the operative rollback check.
 
-The current bridge contract is schema range `104..108`, target `108`, class
-`forward-compatible`, rollback metadata `104..104`, and the checksum-pinned
-`migrations-105-108.json`. Migrations 100 through 104 are applied production
-history and remain immutable. Only after bridge acceptance at schema 104 may
-the coordinator create a source-schema-bound verified backup and execute the
-ordered 104→108 sequence. Migration 105 establishes `website_settings.subdomain`
-as the normalized, nonreserved, case-insensitively unique canonical tenant
-hostname while retaining `standard_path_slug` as legacy compatibility state.
-Invalid, reserved, duplicate, or ambiguous identities abort before mutation
-with row evidence. Migration 106 snapshots order delivery fees, 107 adds
-e-commerce category images, and 108 adds tenant-scoped e-commerce brands.
-Once schema advances beyond 104, recovery is forward-repair-only.
+Production is currently at schema 105. The current bridge contract is schema
+range `105..108`, target `108`, class `forward-compatible`, rollback metadata
+`105..105`, and the checksum-pinned `migrations-106-108.json`. Migrations 100
+through 105 are applied production history and remain immutable. Migration 105
+established canonical tenant subdomains in the prior `104→105` release; its
+historical manifests remain retained. Only after bridge acceptance at schema
+105 may the coordinator create a verified source-schema-105 backup and execute
+the ordered `105→106→107→108` sequence. Migration 106 snapshots order delivery
+fees, 107 adds e-commerce category images, and 108 adds tenant-scoped
+e-commerce brands. Once schema advances beyond 105, recovery is
+forward-repair-only.
 
 The preceding schema-097 bridge added verified-customer loyalty through atomic
 functions. Identity is `(store tenant_id, public.users.id)`; checkout email and

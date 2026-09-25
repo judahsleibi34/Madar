@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate the production schema-104 to schema-108 forward release."""
+"""Validate the production schema-105 to schema-108 forward release."""
 
 from __future__ import annotations
 
@@ -12,12 +12,12 @@ import re
 ROOT = Path(__file__).resolve().parents[2]
 BASELINE = "1e6b739a43759309a45ede2dff28a859209e4a64"
 
-SOURCE_SCHEMA = 104
+SOURCE_SCHEMA = 105
 TARGET_SCHEMA = 108
-MANIFEST_NAME = "migrations-105-108.json"
+MANIFEST_NAME = "migrations-106-108.json"
 
-# Migrations 100-104 have already been applied to production and are no
-# longer part of the active 104 -> 105 execution manifest. Keep them
+# Migrations 100-105 have already been applied to production and are no
+# longer part of the active 105 -> 108 execution manifest. Keep them
 # explicitly checksum-pinned so narrowing the active manifest cannot make
 # already-applied production history mutable.
 APPLIED_PRODUCTION_MIGRATIONS = {
@@ -41,13 +41,13 @@ APPLIED_PRODUCTION_MIGRATIONS = {
         "104_flatten_ecommerce_delivery_pricing.sql",
         "a2121defc5bbf5e590912c145766fcce0b4fb7652faa07bfc7f484c8811df960",
     ),
+    105: (
+        "105_canonical_tenant_subdomains.sql",
+        "f445f36bbba71f6c78f1c4e16f8a59ae63277c7c4f59510bf4e91eab4c967097",
+    ),
 }
 
 EXPECTED = {
-    105: (
-        "105_canonical_tenant_subdomains.sql",
-        "forward-compatible",
-    ),
     106: (
         "106_add_order_delivery_fees.sql",
         "forward-compatible",
@@ -103,9 +103,9 @@ def validate(root: Path = ROOT) -> list[str]:
                     "immutable production migration changed: " + relative
                 )
 
-        # Schema 100-104 is already live in production. These migrations
+        # Schema 100-105 is already live in production. These migrations
         # must remain immutable even though the active execution manifest
-        # begins at schema 104 and therefore contains 105 through 108.
+        # begins at schema 105 and therefore contains 106 through 108.
         for number, (filename, checksum) in (
             APPLIED_PRODUCTION_MIGRATIONS.items()
         ):
@@ -141,11 +141,11 @@ def validate(root: Path = ROOT) -> list[str]:
         schema = release["schema"]
 
         if not (
-            int(schema["compatible_min"]) <= SOURCE_SCHEMA
+            int(schema["compatible_min"]) == SOURCE_SCHEMA
             <= TARGET_SCHEMA
             == int(schema["compatible_max"])
             == int(schema["target"])
-            and int(schema["rollback_compatible_min"]) <= SOURCE_SCHEMA
+            and int(schema["rollback_compatible_min"]) == SOURCE_SCHEMA
             == int(schema["rollback_compatible_max"])
             and schema["migration_class"] == "forward-compatible"
             and release["migration_policy"]
@@ -153,8 +153,8 @@ def validate(root: Path = ROOT) -> list[str]:
             and release["migration_manifest"] == MANIFEST_NAME
         ):
             errors.append(
-                "release must bridge production schema 104 to 108 "
-                "with rollback bounded at schema 104"
+                "release must bridge production schema 105 to 108 "
+                "with rollback bounded at schema 105"
             )
 
         manifest = json.loads(
@@ -173,9 +173,9 @@ def validate(root: Path = ROOT) -> list[str]:
 
         entries = manifest["migrations"]
 
-        if [int(entry["number"]) for entry in entries] != [105, 106, 107, 108]:
+        if [int(entry["number"]) for entry in entries] != [106, 107, 108]:
             errors.append(
-                "forward manifest must contain ordered migrations 105 through 108"
+                "forward manifest must contain ordered migrations 106 through 108"
             )
 
         previous = SOURCE_SCHEMA
