@@ -1,0 +1,147 @@
+{
+  "schema_version": 1,
+  "namespace": "bdbdbb1b-0189-4eca-a711-5df19a0e36bf",
+  "store": {
+    "name": "Thread & Form",
+    "name_ar": "خيط وقالب",
+    "description": "Considered clothing for work, weekends, and everywhere between.",
+    "description_ar": "ملابس مدروسة للعمل وعطلة نهاية الأسبوع وكل ما بينهما.",
+    "currency": "USD",
+    "theme": {"accent": "#7A3E2B", "background": "#F7F3ED", "surface": "#FFFFFF", "text": "#211D1A", "muted": "#756D66"},
+    "growth": {
+      "seo_title_en": "Thread & Form | Modern everyday clothing",
+      "seo_title_ar": "خيط وقالب | ملابس عصرية لكل يوم",
+      "seo_description_en": "Shop modern clothing, activewear, outerwear, and accessories in inclusive sizes.",
+      "seo_description_ar": "تسوق الملابس العصرية والرياضية والخارجية والإكسسوارات بمقاسات متنوعة.",
+      "announcement_enabled": true,
+      "announcement_text_en": "Free delivery on orders over $120",
+      "announcement_text_ar": "توصيل مجاني للطلبات فوق 120$",
+      "announcement_link": "/shop/catalog"
+    }
+  },
+  "brands": [
+    {"slug": "northline", "name": "Northline", "status": "active"},
+    {"slug": "cedar-loom", "name": "Cedar & Loom", "status": "active"},
+    {"slug": "atlas-active", "name": "Atlas Active", "status": "active"},
+    {"slug": "noura-studio", "name": "Noura Studio", "status": "active"}
+  ],
+  "categories": [
+    {"slug": "women", "name": "Women", "name_ar": "نساء", "description": "Modern layers, dresses, and tailored separates.", "description_ar": "طبقات وفساتين وقطع مفصلة عصرية.", "sort_order": 10},
+    {"slug": "men", "name": "Men", "name_ar": "رجال", "description": "Relaxed shirts, denim, and everyday tailoring.", "description_ar": "قمصان مريحة ودنيم وقطع يومية أنيقة.", "sort_order": 20},
+    {"slug": "essentials", "name": "Essentials", "name_ar": "أساسيات", "description": "Dependable wardrobe staples made for repeat wear.", "description_ar": "قطع أساسية موثوقة للاستخدام اليومي.", "sort_order": 30},
+    {"slug": "outerwear", "name": "Outerwear", "name_ar": "ملابس خارجية", "description": "Versatile jackets and overshirts for changing weather.", "description_ar": "سترات وقمصان خارجية متعددة الاستخدامات.", "sort_order": 40},
+    {"slug": "activewear", "name": "Activewear", "name_ar": "ملابس رياضية", "description": "Soft technical pieces for movement and recovery.", "description_ar": "قطع تقنية ناعمة للحركة والراحة.", "sort_order": 50},
+    {"slug": "accessories", "name": "Accessories", "name_ar": "إكسسوارات", "description": "The finishing pieces: caps, belts, and more.", "description_ar": "لمسات الإطلالة الأخيرة من قبعات وأحزمة والمزيد.", "sort_order": 60}
+  ],
+  "tags": [
+    {"slug": "new-arrival", "name": "New arrival", "name_ar": "وصل حديثاً"},
+    {"slug": "bestseller", "name": "Bestseller", "name_ar": "الأكثر مبيعاً"},
+    {"slug": "responsible", "name": "Responsible materials", "name_ar": "مواد مسؤولة"},
+    {"slug": "sale", "name": "Sale", "name_ar": "تخفيض"}
+  ],
+  "colors": {
+    "black": {"name": "Black", "name_ar": "أسود", "hex": "#191919"},
+    "white": {"name": "White", "name_ar": "أبيض", "hex": "#F4F2ED"},
+    "sage": {"name": "Sage", "name_ar": "أخضر مريمي", "hex": "#8C9A7A"},
+    "sand": {"name": "Sand", "name_ar": "رملي", "hex": "#C8AD8D"},
+    "sky": {"name": "Sky blue", "name_ar": "أزرق سماوي", "hex": "#91B7D5"},
+    "stone": {"name": "Stone", "name_ar": "حجري", "hex": "#9B958A"},
+    "olive": {"name": "Olive", "name_ar": "زيتوني", "hex": "#62684A"},
+    "navy": {"name": "Navy", "name_ar": "كحلي", "hex": "#27364A"},
+    "grey": {"name": "Heather grey", "name_ar": "رمادي", "hex": "#A4A4A2"},
+    "plum": {"name": "Plum", "name_ar": "برقوقي", "hex": "#69445C"},
+    "cocoa": {"name": "Cocoa", "name_ar": "كاكاو", "hex": "#755748"},
+    "burgundy": {"name": "Burgundy", "name_ar": "عنابي", "hex": "#722F37"},
+    "cream": {"name": "Cream", "name_ar": "كريمي", "hex": "#E8DDC5"},
+    "indigo": {"name": "Indigo", "name_ar": "نيلي", "hex": "#3C4D67"},
+    "brown": {"name": "Cognac", "name_ar": "بني", "hex": "#8A563B"}
+  },
+  "products": [
+    {
+      "slug": "relaxed-organic-cotton-tee", "sku_prefix": "CL-TEE", "name": "Relaxed organic cotton tee", "name_ar": "تيشيرت قطن عضوي بقصة مريحة",
+      "description": "A substantial organic-cotton tee with a clean neckline and relaxed unisex fit.", "description_ar": "تيشيرت من القطن العضوي بقماش متين وياقة نظيفة وقصة مريحة للجميع.",
+      "category": "essentials", "brand": "cedar-loom", "tags": ["bestseller", "responsible"], "price": "34.00", "cost_price": "13.50", "weight": "0.240",
+      "image": "/demo/clothing/relaxed-organic-cotton-tee.png", "sizes": ["XS", "S", "M", "L", "XL"], "colors": ["white", "black", "sage"],
+      "attributes": [{"name": "Material", "name_ar": "الخامة", "value": "100% organic cotton", "value_ar": "قطن عضوي 100%"}, {"name": "Fit", "name_ar": "القصة", "value": "Relaxed", "value_ar": "مريح"}, {"name": "Care", "name_ar": "العناية", "value": "Machine wash cold", "value_ar": "غسيل آلي بماء بارد"}]
+    },
+    {
+      "slug": "everyday-linen-shirt", "sku_prefix": "NL-LINEN", "name": "Everyday linen shirt", "name_ar": "قميص كتان يومي",
+      "description": "Breathable linen-blend shirt with a soft collar and easy straight fit.", "description_ar": "قميص مزيج كتان مسامي بياقة ناعمة وقصة مستقيمة سهلة.",
+      "category": "men", "brand": "northline", "tags": ["new-arrival", "responsible"], "price": "68.00", "cost_price": "27.00", "weight": "0.330",
+      "image": "/demo/clothing/everyday-linen-shirt.png", "sizes": ["S", "M", "L", "XL"], "colors": ["sand", "sky"],
+      "attributes": [{"name": "Material", "name_ar": "الخامة", "value": "Linen and cotton", "value_ar": "كتان وقطن"}, {"name": "Fit", "name_ar": "القصة", "value": "Regular", "value_ar": "عادي"}, {"name": "Care", "name_ar": "العناية", "value": "Machine wash cold", "value_ar": "غسيل آلي بماء بارد"}]
+    },
+    {
+      "slug": "tailored-wide-leg-trousers", "sku_prefix": "NS-TROUSER", "name": "Tailored wide-leg trousers", "name_ar": "بنطال مفصل بقصة واسعة",
+      "description": "High-rise trousers with a fluid wide leg, pressed crease, and hidden closure.", "description_ar": "بنطال بخصر مرتفع وساق واسعة وانسيابية وثنية مكوية وإغلاق مخفي.",
+      "category": "women", "brand": "noura-studio", "tags": ["bestseller", "sale"], "price": "82.00", "compare_at_price": "104.00", "cost_price": "33.00", "weight": "0.520",
+      "image": "/demo/clothing/tailored-wide-leg-trousers.png", "sizes": ["36", "38", "40", "42", "44"], "colors": ["black", "stone"],
+      "attributes": [{"name": "Material", "name_ar": "الخامة", "value": "Recycled twill", "value_ar": "نسيج تويل معاد التدوير"}, {"name": "Fit", "name_ar": "القصة", "value": "Wide leg", "value_ar": "ساق واسعة"}, {"name": "Care", "name_ar": "العناية", "value": "Machine wash cold", "value_ar": "غسيل آلي بماء بارد"}]
+    },
+    {
+      "slug": "city-bomber-jacket", "sku_prefix": "NL-BOMBER", "name": "City bomber jacket", "name_ar": "جاكيت بومبر للمدينة",
+      "description": "A lightly padded bomber with matte hardware, ribbed trims, and practical pockets.", "description_ar": "جاكيت بومبر مبطن بخفة مع إكسسوارات مطفية وحواف مضلعة وجيوب عملية.",
+      "category": "outerwear", "brand": "northline", "tags": ["new-arrival"], "price": "118.00", "cost_price": "49.00", "weight": "0.820",
+      "image": "/demo/clothing/city-bomber-jacket.png", "sizes": ["S", "M", "L", "XL"], "colors": ["olive", "black"],
+      "attributes": [{"name": "Material", "name_ar": "الخامة", "value": "Recycled nylon shell", "value_ar": "نايلون معاد التدوير"}, {"name": "Fit", "name_ar": "القصة", "value": "Regular", "value_ar": "عادي"}, {"name": "Care", "name_ar": "العناية", "value": "Machine wash cold", "value_ar": "غسيل آلي بماء بارد"}]
+    },
+    {
+      "slug": "motion-high-rise-leggings", "sku_prefix": "AA-LEGGING", "name": "Motion high-rise leggings", "name_ar": "ليقنز موشن بخصر مرتفع",
+      "description": "Supportive squat-proof leggings with a smooth high-rise waistband and hidden pocket.", "description_ar": "ليقنز داعم وغير شفاف بخصر مرتفع ناعم وجيب مخفي.",
+      "category": "activewear", "brand": "atlas-active", "tags": ["bestseller", "responsible"], "price": "58.00", "cost_price": "21.00", "weight": "0.290",
+      "image": "/demo/clothing/motion-high-rise-leggings.png", "sizes": ["XS", "S", "M", "L", "XL"], "colors": ["black", "plum"],
+      "attributes": [{"name": "Material", "name_ar": "الخامة", "value": "Recycled performance jersey", "value_ar": "جيرسي رياضي معاد التدوير"}, {"name": "Fit", "name_ar": "القصة", "value": "Compression", "value_ar": "ضاغط"}, {"name": "Care", "name_ar": "العناية", "value": "Machine wash cold", "value_ar": "غسيل آلي بماء بارد"}]
+    },
+    {
+      "slug": "recovery-performance-hoodie", "sku_prefix": "AA-HOODIE", "name": "Recovery performance hoodie", "name_ar": "هودي رياضي للراحة",
+      "description": "A breathable technical hoodie with four-way stretch and a clean bonded pocket.", "description_ar": "هودي تقني مسامي بمرونة رباعية الاتجاهات وجيب ملتحم أنيق.",
+      "category": "activewear", "brand": "atlas-active", "tags": ["sale"], "price": "76.00", "compare_at_price": "92.00", "cost_price": "30.00", "weight": "0.570",
+      "image": "/demo/clothing/recovery-performance-hoodie.png", "sizes": ["S", "M", "L", "XL"], "colors": ["navy", "grey"],
+      "attributes": [{"name": "Material", "name_ar": "الخامة", "value": "Technical stretch knit", "value_ar": "نسيج تقني مرن"}, {"name": "Fit", "name_ar": "القصة", "value": "Athletic", "value_ar": "رياضي"}, {"name": "Care", "name_ar": "العناية", "value": "Machine wash cold", "value_ar": "غسيل آلي بماء بارد"}]
+    },
+    {
+      "slug": "ribbed-knit-midi-dress", "sku_prefix": "NS-DRESS", "name": "Ribbed knit midi dress", "name_ar": "فستان ميدي محبوك مضلع",
+      "description": "A softly structured rib-knit dress with a square neckline and side slit.", "description_ar": "فستان محبوك مضلع بقوام ناعم وياقة مربعة وشق جانبي.",
+      "category": "women", "brand": "noura-studio", "tags": ["new-arrival"], "price": "88.00", "cost_price": "35.00", "weight": "0.610",
+      "image": "/demo/clothing/ribbed-knit-midi-dress.png", "sizes": ["XS", "S", "M", "L"], "colors": ["cocoa", "burgundy"],
+      "attributes": [{"name": "Material", "name_ar": "الخامة", "value": "Viscose blend knit", "value_ar": "محبوك من مزيج الفيسكوز"}, {"name": "Fit", "name_ar": "القصة", "value": "Fitted", "value_ar": "محدد"}, {"name": "Care", "name_ar": "العناية", "value": "Machine wash cold", "value_ar": "غسيل آلي بماء بارد"}]
+    },
+    {
+      "slug": "heavyweight-crew-sweatshirt", "sku_prefix": "CL-CREW", "name": "Heavyweight crew sweatshirt", "name_ar": "سويت شيرت ثقيل بياقة دائرية",
+      "description": "Brushed heavyweight fleece with dropped shoulders and durable ribbed edges.", "description_ar": "فليس ثقيل وممشط بأكتاف منخفضة وحواف مضلعة متينة.",
+      "category": "essentials", "brand": "cedar-loom", "tags": ["bestseller"], "price": "64.00", "cost_price": "25.00", "weight": "0.680",
+      "image": "/demo/clothing/heavyweight-crew-sweatshirt.png", "sizes": ["S", "M", "L", "XL"], "colors": ["cream", "grey"],
+      "attributes": [{"name": "Material", "name_ar": "الخامة", "value": "Cotton-rich fleece", "value_ar": "فليس غني بالقطن"}, {"name": "Fit", "name_ar": "القصة", "value": "Oversized", "value_ar": "فضفاض"}, {"name": "Care", "name_ar": "العناية", "value": "Machine wash cold", "value_ar": "غسيل آلي بماء بارد"}]
+    },
+    {
+      "slug": "utility-denim-overshirt", "sku_prefix": "NL-DENIM", "name": "Utility denim overshirt", "name_ar": "قميص دنيم خارجي عملي",
+      "description": "Midweight denim overshirt with utility pockets and softly washed character.", "description_ar": "قميص دنيم خارجي متوسط الوزن بجيوب عملية ولمسة مغسولة ناعمة.",
+      "category": "outerwear", "brand": "northline", "tags": ["new-arrival", "responsible"], "price": "94.00", "cost_price": "38.00", "weight": "0.790",
+      "image": "/demo/clothing/utility-denim-overshirt.png", "sizes": ["S", "M", "L", "XL"], "colors": ["indigo", "black"],
+      "attributes": [{"name": "Material", "name_ar": "الخامة", "value": "Responsible cotton denim", "value_ar": "دنيم من قطن مسؤول"}, {"name": "Fit", "name_ar": "القصة", "value": "Relaxed", "value_ar": "مريح"}, {"name": "Care", "name_ar": "العناية", "value": "Machine wash cold", "value_ar": "غسيل آلي بماء بارد"}]
+    },
+    {
+      "slug": "pleated-midi-skirt", "sku_prefix": "NS-SKIRT", "name": "Pleated midi skirt", "name_ar": "تنورة ميدي بكسرات",
+      "description": "Fluid permanent pleats, a comfortable waist, and an elegant midi length.", "description_ar": "كسرات انسيابية ثابتة وخصر مريح وطول ميدي أنيق.",
+      "category": "women", "brand": "noura-studio", "tags": ["sale", "responsible"], "price": "72.00", "compare_at_price": "86.00", "cost_price": "28.00", "weight": "0.410",
+      "image": "/demo/clothing/pleated-midi-skirt.png", "sizes": ["XS", "S", "M", "L"], "colors": ["black", "sand"],
+      "attributes": [{"name": "Material", "name_ar": "الخامة", "value": "Recycled satin", "value_ar": "ساتان معاد التدوير"}, {"name": "Fit", "name_ar": "القصة", "value": "A-line", "value_ar": "قصة A"}, {"name": "Care", "name_ar": "العناية", "value": "Machine wash cold", "value_ar": "غسيل آلي بماء بارد"}]
+    },
+    {
+      "slug": "washed-canvas-cap", "sku_prefix": "CL-CAP", "name": "Washed canvas cap", "name_ar": "قبعة كانفاس مغسولة",
+      "description": "Six-panel cotton-canvas cap with an adjustable metal clasp.", "description_ar": "قبعة كانفاس قطنية بستة ألواح ومشبك معدني قابل للتعديل.",
+      "category": "accessories", "brand": "cedar-loom", "tags": ["new-arrival"], "price": "26.00", "cost_price": "8.50", "weight": "0.110",
+      "image": "/demo/clothing/washed-canvas-cap.png", "sizes": ["One size"], "colors": ["black", "sand", "olive"],
+      "attributes": [{"name": "Material", "name_ar": "الخامة", "value": "Cotton canvas", "value_ar": "كانفاس قطني"}, {"name": "Fit", "name_ar": "القصة", "value": "Adjustable", "value_ar": "قابل للتعديل"}, {"name": "Care", "name_ar": "العناية", "value": "Spot clean", "value_ar": "تنظيف موضعي"}]
+    },
+    {
+      "slug": "everyday-leather-belt", "sku_prefix": "NL-BELT", "name": "Everyday leather belt", "name_ar": "حزام جلد يومي",
+      "description": "A clean full-grain leather belt finished with a brushed metal buckle.", "description_ar": "حزام جلد كامل الحبيبات بتصميم نظيف وإبزيم معدني مصقول.",
+      "category": "accessories", "brand": "northline", "tags": ["bestseller"], "price": "44.00", "cost_price": "17.00", "weight": "0.190",
+      "image": "/demo/clothing/everyday-leather-belt.png", "sizes": ["80", "90", "100", "110"], "colors": ["black", "brown"],
+      "attributes": [{"name": "Material", "name_ar": "الخامة", "value": "Full-grain leather", "value_ar": "جلد كامل الحبيبات"}, {"name": "Fit", "name_ar": "القصة", "value": "30 mm width", "value_ar": "عرض 30 مم"}, {"name": "Care", "name_ar": "العناية", "value": "Wipe clean", "value_ar": "يمسح بقطعة قماش"}]
+    }
+  ],
+  "featured_products": ["relaxed-organic-cotton-tee", "tailored-wide-leg-trousers", "city-bomber-jacket", "motion-high-rise-leggings", "ribbed-knit-midi-dress", "utility-denim-overshirt"],
+  "featured_categories": ["women", "men", "essentials", "activewear", "outerwear", "accessories"]
+}
