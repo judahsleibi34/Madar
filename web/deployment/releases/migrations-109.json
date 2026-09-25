@@ -1,0 +1,13 @@
+{
+  "release_sha": "CURRENT",
+  "migrations": [
+    {
+      "number": 109,
+      "path": "web/database/migrations/109_fix_ecommerce_order_delivery_totals_constraint.sql",
+      "sha256": "c2d1f1aee929a39a4fc8b86d0b63c86499638fa65eb8dfa3bcc3f0a8579a8803",
+      "from_schema": 108,
+      "to_schema": 109,
+      "compatibility": "forward-compatible"
+    }
+  ]
+}

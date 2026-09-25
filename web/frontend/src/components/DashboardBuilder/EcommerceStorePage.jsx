@@ -45,7 +45,8 @@ export default function EcommerceStorePage({ user }) {
   }, [cacheScope, t]);
 
   const subdomain = String(website?.subdomain || "").trim();
-  const draftPath = subdomain ? `/ecommerce-preview/${encodeURIComponent(subdomain)}?preview=draft` : "";
+  const publishedPreviewPath = subdomain ? `/ecommerce-preview/${encodeURIComponent(subdomain)}` : "";
+  const draftPath = publishedPreviewPath ? `${publishedPreviewPath}?preview=draft` : "";
   const liveUrl = useMemo(
     () => (
       subdomain
@@ -54,8 +55,8 @@ export default function EcommerceStorePage({ user }) {
     ),
     [subdomain]
   );
-  const previewPath = draftPreview ? draftPath : liveUrl;
-  const openUrl = previewPath;
+  const previewPath = draftPreview ? draftPath : publishedPreviewPath;
+  const openUrl = draftPreview ? draftPath : liveUrl;
 
   if (loading) return <EcommerceRouteSkeleton pathname="/ecommerce/store" label={t("admin.loadingStorePreview")} direction={direction} lang={locale} />;
 

@@ -41,6 +41,7 @@ LEGACY_DEFAULT_STORE_THEME = {
     "muted": "#697181",
 }
 HEX_COLOR_PATTERN = re.compile(r"^#[0-9a-fA-F]{6}$")
+COMBINED_SIZE_VALUE_PATTERN = re.compile(r"[/,+&]|\s+(?:or|او)\s+", re.IGNORECASE)
 SOCIAL_LINK_FIELDS = (
     "facebook", "instagram", "tiktok", "snapchat",
 )
@@ -530,6 +531,11 @@ class ProductPayload(CatalogItemPayload):
             normalized_values = [next(iter(value.value_translations.values())).casefold() for value in option.values]
             if len(normalized_values) != len(set(normalized_values)):
                 raise ValueError("Option values must be unique within an option")
+            if option.code.casefold() == "size":
+                for value in option.values:
+                    labels = [str(label).strip() for label in value.value_translations.values()]
+                    if any(COMBINED_SIZE_VALUE_PATTERN.search(label) for label in labels):
+                        raise ValueError("Each size must be a separate option value")
         if any(set(variant.option_value_ids) - value_ids for variant in (self.variants or [])):
             raise ValueError("Every variant value must belong to this product")
         if self.variants and not self.options:

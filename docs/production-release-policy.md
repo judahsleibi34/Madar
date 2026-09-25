@@ -255,17 +255,26 @@ queried directly. Its SHA must match state and its reported compatibility range
 must contain the live schema. Candidate rollback bounds are descriptive metadata
 today; retained-target attestation is the operative rollback check.
 
-Production is currently at schema 105. The current bridge contract is schema
+Production is currently at schema 108. The current bridge contract is schema
+range `108..109`, target `109`, class `forward-compatible`, rollback
+metadata `108..108`, and the checksum-pinned `migrations-109.json`.
+Migrations through 108 are applied production history and remain immutable.
+Only after bridge acceptance at schema 108 may the coordinator create a
+verified source-schema-108 backup and execute migration 109. Migration 109
+corrects the e-commerce order totals constraint so the immutable delivery-fee
+snapshot is included in the stored total. Once schema advances beyond 108,
+recovery is forward-repair-only.
+
+The preceding schema-108 bridge contract used schema
 range `105..108`, target `108`, class `forward-compatible`, rollback metadata
 `105..105`, and the checksum-pinned `migrations-106-108.json`. Migrations 100
 through 105 are applied production history and remain immutable. Migration 105
 established canonical tenant subdomains in the prior `104→105` release; its
 historical manifests remain retained. Only after bridge acceptance at schema
-105 may the coordinator create a verified source-schema-105 backup and execute
+105 the coordinator could create a verified source-schema-105 backup and execute
 the ordered `105→106→107→108` sequence. Migration 106 snapshots order delivery
 fees, 107 adds e-commerce category images, and 108 adds tenant-scoped
-e-commerce brands. Once schema advances beyond 105, recovery is
-forward-repair-only.
+e-commerce brands.
 
 The preceding schema-097 bridge added verified-customer loyalty through atomic
 functions. Identity is `(store tenant_id, public.users.id)`; checkout email and
