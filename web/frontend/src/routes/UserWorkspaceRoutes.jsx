@@ -18,6 +18,7 @@ const loadEcommercePage = () => import("../components/DashboardBuilder/Ecommerce
 const loadEcommerceDeliveryPage = () => import("../components/DashboardBuilder/EcommerceDeliveryPage");
 const loadEcommerceOrdersPage = () => import("../components/DashboardBuilder/EcommerceOrdersPage");
 const loadEcommerceLoyaltyPage = () => import("../components/DashboardBuilder/EcommerceLoyaltyPage");
+const loadEcommerceLandingPage = () => import("../components/DashboardBuilder/EcommerceLandingPage");
 const loadEcommerceThemePage = () => import("../components/DashboardBuilder/EcommerceThemePage");
 const loadEcommerceSocialLinksPage = () => import("../components/DashboardBuilder/EcommerceSocialLinksPage");
 const loadEcommerceStorePage = () => import("../components/DashboardBuilder/EcommerceStorePage");
@@ -27,6 +28,7 @@ const EcommercePage = lazy(loadEcommercePage);
 const EcommerceDeliveryPage = lazy(loadEcommerceDeliveryPage);
 const EcommerceOrdersPage = lazy(loadEcommerceOrdersPage);
 const EcommerceLoyaltyPage = lazy(loadEcommerceLoyaltyPage);
+const EcommerceLandingPage = lazy(loadEcommerceLandingPage);
 const EcommerceThemePage = lazy(loadEcommerceThemePage);
 const EcommerceSocialLinksPage = lazy(loadEcommerceSocialLinksPage);
 const EcommerceStorePage = lazy(loadEcommerceStorePage);
@@ -266,6 +268,10 @@ export default function UserWorkspaceRoutes({
       <Route
         path="/ecommerce/loyalty/*"
         element={renderShell(<EcommerceLoyaltyPage user={user} />)}
+      />
+      <Route
+        path="/ecommerce/landing-page/*"
+        element={renderShell(<EcommerceLandingPage user={user} />)}
       />
       <Route
         path="/ecommerce/theme/*"

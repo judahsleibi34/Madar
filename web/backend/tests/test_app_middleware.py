@@ -57,6 +57,11 @@ class AppMiddlewareTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertRegex(response.headers["X-Request-ID"], r"^[a-f0-9]{32}$")
 
+    def test_server_timing_reports_application_time(self):
+        response = TestClient(app).get("/")
+        self.assertEqual(response.status_code, 200)
+        self.assertRegex(response.headers.get("Server-Timing", ""), r"(?:^|, )app;dur=\d+(?:\.\d)?")
+
     def test_unhandled_exception_returns_sanitized_json_with_cors_and_request_id(self):
         with self.cors_origins(["http://localhost:3000"]):
             response = self.unhandled_response(origin="http://localhost:3000")

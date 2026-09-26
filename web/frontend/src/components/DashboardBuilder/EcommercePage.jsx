@@ -23,10 +23,12 @@ import {
 
 import EcommerceToast from "./EcommerceToast";
 import { EcommerceProductEditor } from "./EcommerceProductEditorPage";
+import PageDeleteConfirmModal from "../PageBuilder/modals/PageDeleteConfirmModal";
 
 import {
   deleteEcommerceItem,
-  fetchEcommerceCatalog,
+  fetchEcommerceCatalogOptions,
+  fetchEcommerceCatalogSection,
   saveEcommerceItem,
   uploadEcommerceProductImage,
 } from "../../services/ecommerceApi";
@@ -552,6 +554,8 @@ export default function EcommercePage({ section = "products", user }) {
   const [productEditorId, setProductEditorId] = useState(null);
   const [slugManuallyEdited, setSlugManuallyEdited] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleting, setDeleting] = useState(false);
   const [toast, setToast] = useState(null);
 
   useEffect(() => {
@@ -606,9 +610,22 @@ export default function EcommercePage({ section = "products", user }) {
       setStatus("loading");
     }
     try {
-      const data = await fetchEcommerceCatalog({ scope: cacheScope, force: Boolean(cached?.isStale) });
+      const [data, options] = section === "products"
+        ? await Promise.all([
+            fetchEcommerceCatalogSection(section, { scope: cacheScope, force: Boolean(cached?.isStale) }),
+            fetchEcommerceCatalogOptions({ scope: cacheScope, force: Boolean(cached?.isStale) }),
+          ])
+        : [await fetchEcommerceCatalogSection(section, { scope: cacheScope, force: Boolean(cached?.isStale) }), null];
       if (version !== catalogRequestVersion.current) return;
-      setCatalog({ tags: data?.tags || [], categories: data?.categories || [], brands: data?.brands || [], products: data?.products || [], stock_summary: data?.stock_summary || { low_stock: 0, out_of_stock: 0 }, commerce_currency: data?.commerce_currency || null });
+      setCatalog((current) => ({
+        ...current,
+        ...(options || {}),
+        [section]: data?.[section] || [],
+        ...(section === "products" ? {
+          stock_summary: data?.stock_summary || { low_stock: 0, out_of_stock: 0 },
+          commerce_currency: data?.commerce_currency || options?.commerce_currency || null,
+        } : {}),
+      }));
       setStatus("ready");
     } catch {
       if (version !== catalogRequestVersion.current) return;
@@ -621,7 +638,7 @@ export default function EcommercePage({ section = "products", user }) {
       setStatus("error");
       showToast({ type: "error", title: t("commerce:admin.loadCommerce"), message });
     }
-  }, [cacheScope, showToast, t]);
+  }, [cacheScope, section, showToast, t]);
 
   useEffect(() => {
     const timer = window.setTimeout(loadCatalog, 0);
@@ -702,8 +719,14 @@ export default function EcommercePage({ section = "products", user }) {
     }
   };
 
-  const remove = async (item) => {
-    if (!window.confirm(t("commerce:admin.deleteConfirm", { name: translatedName(item, language) }))) return;
+  const remove = (item) => {
+    setDeleteTarget(item);
+  };
+
+  const confirmRemove = async () => {
+    const item = deleteTarget;
+    if (!item || deleting) return;
+    setDeleting(true);
     try {
       await deleteEcommerceItem(section, item.id, { scope: cacheScope });
       setCatalog((current) => ({
@@ -718,6 +741,9 @@ export default function EcommercePage({ section = "products", user }) {
     } catch {
       const message = t("commerce:admin.deleteFailed", { item: t(`commerce:admin.${sectionKey}Singular`).toLocaleLowerCase(language) });
       showToast({ type: "error", title: t("commerce:admin.deleteFailedTitle", { item: t(`commerce:admin.${sectionKey}Singular`).toLocaleLowerCase(language) }), message });
+    } finally {
+      setDeleting(false);
+      setDeleteTarget(null);
     }
   };
   const activeCount = items.filter((item) => item.status === "active").length;
@@ -756,10 +782,6 @@ export default function EcommercePage({ section = "products", user }) {
     ));
   };
 
-  if (status === "loading") {
-    return <section className="ecommerce-page"><CatalogSkeleton label={t("commerce:admin.loadingCatalog")} section={section} summaryCount={visibleSummaryCards.length} /></section>;
-  }
-
   return (
     <section className="ecommerce-page" aria-labelledby={`ecommerce-${section}-title`} dir={direction} lang={language}>
       <header className="ecommerce-page-header app-page-intro">
@@ -769,7 +791,11 @@ export default function EcommercePage({ section = "products", user }) {
         </div>
       </header>
 
-      <div className="ecommerce-summary-toolbar">
+      {status === "loading" && (
+        <CatalogSkeleton label={t("commerce:admin.loadingCatalog")} section={section} summaryCount={visibleSummaryCards.length} />
+      )}
+
+      {status !== "loading" && <><div className="ecommerce-summary-toolbar">
         {section !== "brands" && <div className="ecommerce-summary-customizer" ref={summaryCustomizerRef}>
           <button type="button" className="ecommerce-summary-customizer-toggle" aria-expanded={summaryCustomizerOpen} aria-controls="ecommerce-summary-card-checklist" onClick={() => setSummaryCustomizerOpen((current) => !current)}>
             <SlidersHorizontal size={18} aria-hidden="true" />
@@ -867,6 +893,20 @@ export default function EcommercePage({ section = "products", user }) {
               }}
             />
           </section>
+        </div>
+      )}
+      </>}
+      {deleteTarget && (
+        <div className="page-builder ecommerce-delete-confirmation">
+          <PageDeleteConfirmModal
+            title={t("commerce:admin.deleteConfirm", { name: translatedName(deleteTarget, language) })}
+            icon={<Trash2 size={26} aria-hidden="true" />}
+            cancelLabel={t("commerce:common.cancel")}
+            confirmLabel={t("commerce:common.remove")}
+            confirmDisabled={deleting}
+            onCancel={() => { if (!deleting) setDeleteTarget(null); }}
+            onConfirm={confirmRemove}
+          />
         </div>
       )}
       <EcommerceToast

@@ -22,6 +22,7 @@ import {
 import StorefrontSeo, { safePublicUrl } from "./StorefrontSeo";
 import { getResponsiveMediaProps, isVideoMediaUrl, resolveMediaUrl } from "../../utils/media";
 import { normalizeStoreTheme } from "../../utils/ecommerceTheme";
+import { createDemoLandingSlides } from "../../config/ecommerceLandingDefaults";
 import { formatCommerceMoney, normalizeCommerceLocale } from "../../utils/commerceI18n";
 import { estimateCartDiscount } from "../../utils/ecommerceDiscounts";
 import { normalizeWhatsAppNumber } from "../../utils/whatsapp";
@@ -37,12 +38,26 @@ const EMPTY_CATALOG = {
   featured_products: [],
   featured_categories: [],
   price_bounds: { min: null, max: null, currency: "" },
+  sale_summary: { active: false, max_percentage: 0 },
   pagination: { page: 1, pages: 1, total: 0, limit: 12 },
 };
 
 const formatPrice = formatCommerceMoney;
 const c = (key, values) => i18n.t(`commerce:${key}`, values);
 const CHECKOUT_EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/u;
+
+const productSalePercentage = (product) => {
+  const price = Number(product?.price);
+  const compareAtPrice = Number(product?.compare_at_price);
+  if (!Number.isFinite(price) || !Number.isFinite(compareAtPrice) || price < 0 || compareAtPrice <= price || compareAtPrice <= 0) return 0;
+  return Math.min(100, Math.max(1, Math.round(((compareAtPrice - price) / compareAtPrice) * 100)));
+};
+
+function ProductSaleBadge({ product }) {
+  const percentage = productSalePercentage(product);
+  if (!percentage) return null;
+  return <span className="live-store-product-sale-badge">{c("product.salePercentage", { percentage })}</span>;
+}
 
 const STORE_SOCIAL_NETWORKS = [
   ["facebook", "Facebook"],
@@ -182,6 +197,16 @@ function StoreAccountMenu({ subdomain, account, loyalty, logoUrl, onAccountChang
       document.removeEventListener("pointerdown", closeOutside);
     };
   }, [open]);
+
+  useEffect(() => {
+    const openLogin = () => {
+      setMode("login");
+      setStatus({ saving: false, error: "", message: "" });
+      setOpen(true);
+    };
+    window.addEventListener("madar:store-account-open", openLogin);
+    return () => window.removeEventListener("madar:store-account-open", openLogin);
+  }, []);
 
   const submit = async (event) => {
     event.preventDefault();
@@ -434,8 +459,9 @@ function StoreCart({ open, items, homePath, checkoutPath, delivery, selectedArea
   );
 }
 
-function StoreCheckout({ items, loyalty, normalDiscounts, shopPath, storePath, delivery, selectedAreaId, onSelectedAreaChange, onPlaceOrder, onNotify }) {
+function StoreCheckout({ items, account, loyalty, normalDiscounts, shopPath, storePath, delivery, selectedAreaId, onSelectedAreaChange, onPlaceOrder, onNotify }) {
   const navigate = useNavigate();
+  const formRef = useRef(null);
   const [status, setStatus] = useState({ saving: false, error: "" });
   const currency = items[0]?.currency || "USD";
   const subtotal = items.reduce((total, item) => total + Number(item.price || 0) * Number(item.quantity || 0), 0);
@@ -450,6 +476,21 @@ function StoreCheckout({ items, loyalty, normalDiscounts, shopPath, storePath, d
     checkoutTracked.current = true;
     trackCommerceEvent("begin_checkout", { item_count: items.reduce((sum, item) => sum + item.quantity, 0), subtotal, discount_total: estimatedDiscount, delivery_fee: deliveryFee, total: estimatedTotal, currency, locale: activeLocale() });
   }, [currency, delivery.loading, deliveryFee, estimatedDiscount, estimatedTotal, items, selectedArea, subtotal]);
+
+  useEffect(() => {
+    if (!account || !formRef.current) return;
+    const savedFields = {
+      customer_name: account.name,
+      email: account.email,
+      phone: account.phone,
+    };
+    Object.entries(savedFields).forEach(([name, value]) => {
+      const field = formRef.current?.elements.namedItem(name);
+      if (field && !String(field.value || "").trim() && String(value || "").trim()) {
+        field.value = String(value).trim();
+      }
+    });
+  }, [account]);
 
   if (!items.length) {
     return (
@@ -516,7 +557,25 @@ function StoreCheckout({ items, loyalty, normalDiscounts, shopPath, storePath, d
         <h1>{c("checkout.title")}</h1>
         <p>{c("checkout.subtitle")}</p>
       </header>
-      <form onSubmit={submit} noValidate>
+      {account === null && (
+        <aside className="live-store-checkout-loyalty-prompt" aria-labelledby="checkout-loyalty-title">
+          <span aria-hidden="true"><Gift size={22} /></span>
+          <div>
+            <strong id="checkout-loyalty-title">{c("checkoutLoyalty.title")}</strong>
+            <p>{c("checkoutLoyalty.body")}</p>
+          </div>
+          <button type="button" onClick={() => window.dispatchEvent(new CustomEvent("madar:store-account-open"))}>
+            <UserRound size={17} aria-hidden="true" />{c("checkoutLoyalty.signIn")}
+          </button>
+        </aside>
+      )}
+      {account && (
+        <div className="live-store-checkout-profile-note" role="status">
+          <CheckCircle2 size={18} aria-hidden="true" />
+          <span>{c("checkoutLoyalty.prefilled", { name: account.name || account.email })}</span>
+        </div>
+      )}
+      <form ref={formRef} onSubmit={submit} noValidate>
         <div className="live-store-checkout-form">
           <section>
             <h2>{c("checkout.contact")}</h2>
@@ -844,7 +903,7 @@ function ProductGallery({ product }) {
   }, [lightboxOpen]);
 
   if (!media.length) {
-    return <div className="live-store-detail-gallery"><div className="live-store-detail-main-image"><ProductImage product={product} /></div></div>;
+    return <div className="live-store-detail-gallery"><div className="live-store-detail-main-image"><ProductImage product={product} /><ProductSaleBadge product={product} /></div></div>;
   }
 
   const selectedIndex = media.indexOf(activeMedia);
@@ -867,6 +926,7 @@ function ProductGallery({ product }) {
   return (
     <div className="live-store-detail-gallery">
       <div className={`live-store-detail-main-image${!isVideoMediaUrl(activeMedia) ? " is-zoomable" : ""}`}>
+        <ProductSaleBadge product={product} />
         {isVideoMediaUrl(activeMedia)
           ? <video src={activeUrl} controls playsInline preload="metadata" aria-label={`${product.name} ${selectedIndex + 1}`} />
           : (
@@ -1011,6 +1071,7 @@ function ProductCard({ product, locale, productPath, onAdd, eager = false }) {
     <article className="live-store-product-card">
       <Link className="live-store-product-image" to={productPath}>
         <ProductImage product={product} eager={eager} />
+        <ProductSaleBadge product={product} />
       </Link>
       <div className="live-store-product-body">
         <h2><Link to={productPath}>{product.name}</Link></h2>
@@ -1142,7 +1203,7 @@ function CategoryCarousel({ categories, shopPath, categoriesPath, kind = "catego
               <Link to={`${shopPath}?${filterKey}=${encodeURIComponent(category.slug)}`} tabIndex={group === 0 ? undefined : -1}>
                 <div className={`live-store-category-media${category.image_url ? "" : " is-placeholder"}`}>
                   {category.image_url
-                    ? <img {...getResponsiveMediaProps(category.image_url, { widths: [240, 320, 480, 640], fallbackWidth: 480, sizes: "(max-width: 760px) 50vw, (max-width: 980px) 33vw, 20vw" })} alt="" loading={index < 5 ? "eager" : "lazy"} decoding="async" />
+                    ? <img {...getResponsiveMediaProps(category.image_url, { widths: [240, 320, 480, 640], fallbackWidth: 480, sizes: "(max-width: 760px) 50vw, (max-width: 980px) 33vw, 20vw" })} alt={isBrandCarousel ? category.name : ""} loading={index < 5 ? "eager" : "lazy"} decoding="async" />
                     : <span>{String(index + 1).padStart(2, "0")}</span>}
                 </div>
                 <div className="live-store-category-copy">
@@ -1163,6 +1224,133 @@ function CategoryCarousel({ categories, shopPath, categoriesPath, kind = "catego
   );
 }
 
+function StoreSaleBar({ percentage, shopPath, onDismiss }) {
+  return (
+    <div className="live-store-sale-bar" role="status">
+      <Gift size={18} aria-hidden="true" />
+      <Link to={shopPath}>{c("salePromotion.bar", { percentage })}</Link>
+      <button type="button" onClick={onDismiss} aria-label={c("salePromotion.dismissBar")}>
+        <X size={18} />
+      </button>
+    </div>
+  );
+}
+
+function StoreSalePopup({ percentage, shopPath, onDismiss }) {
+  const closeRef = useRef(null);
+
+  useEffect(() => {
+    const previouslyFocused = document.activeElement;
+    closeRef.current?.focus();
+    const closeOnEscape = (event) => {
+      if (event.key === "Escape") onDismiss();
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      window.removeEventListener("keydown", closeOnEscape);
+      previouslyFocused?.focus?.();
+    };
+  }, [onDismiss]);
+
+  return (
+    <div className="live-store-sale-popup-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onDismiss()}>
+      <section className="live-store-sale-popup" role="dialog" aria-modal="true" aria-label={c("salePromotion.dialogLabel", { percentage })}>
+        <button ref={closeRef} className="live-store-sale-popup-close" type="button" onClick={onDismiss} aria-label={c("salePromotion.dismissPopup")}>
+          <X size={20} />
+        </button>
+        <div className="live-store-sale-popup-offer" aria-hidden="true">
+          <span className="live-store-sale-popup-icon"><Gift size={24} /></span>
+          <small>{c("salePromotion.kicker")}</small>
+          <strong><bdi>{c("salePromotion.discountValue", { percentage })}</bdi></strong>
+          <span>{c("salePromotion.off")}</span>
+        </div>
+        <div className="live-store-sale-popup-copy">
+          <span>{c("salePromotion.kicker")}</span>
+          <h2>{c("salePromotion.title", { percentage })}</h2>
+          <p>{c("salePromotion.popupBody", { percentage })}</p>
+          <Link to={shopPath} onClick={onDismiss}><ShoppingBag size={18} aria-hidden="true" />{c("salePromotion.shopSale")}<ArrowRight size={18} aria-hidden="true" /></Link>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+
+function LandingHeroCarousel({ site, brand, locale }) {
+  const configuredSlides = Array.isArray(site?.landing_page?.slides) ? site.landing_page.slides : [];
+  const demoSlides = createDemoLandingSlides();
+  demoSlides[0] = {
+    ...demoSlides[0],
+    title_en: brand,
+    title_ar: String(site?.brand_ar || "").trim() || brand,
+    subtitle_en: site?.description || demoSlides[0].subtitle_en,
+    subtitle_ar: String(site?.description_ar || "").trim() || site?.description || demoSlides[0].subtitle_ar,
+  };
+  const slides = configuredSlides.length ? configuredSlides : demoSlides;
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [paused, setPaused] = useState(false);
+  const [pageVisible, setPageVisible] = useState(() => !document.hidden);
+  const swipeStartRef = useRef(null);
+  const rtl = locale === "ar";
+  const autoplay = site?.landing_page?.autoplay_enabled !== false;
+  const interval = Math.min(15000, Math.max(3000, Number(site?.landing_page?.interval_ms) || 5000));
+  const goTo = useCallback((index) => setActiveIndex((index + slides.length) % slides.length), [slides.length]);
+
+  useEffect(() => {
+    const handleVisibilityChange = () => setPageVisible(!document.hidden);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, []);
+
+  useEffect(() => {
+    const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    if (!autoplay || paused || reducedMotion || slides.length < 2 || !pageVisible) return undefined;
+    const timer = window.setInterval(() => setActiveIndex((current) => (current + 1) % slides.length), interval);
+    return () => window.clearInterval(timer);
+  }, [autoplay, interval, pageVisible, paused, slides.length]);
+
+  const activeSlide = slides[activeIndex] || slides[0];
+  const title = rtl ? activeSlide.title_ar || activeSlide.title_en : activeSlide.title_en || activeSlide.title_ar;
+  const subtitle = rtl ? activeSlide.subtitle_ar || activeSlide.subtitle_en : activeSlide.subtitle_en || activeSlide.subtitle_ar;
+
+  return (
+    <section
+      className="live-store-hero-carousel"
+      aria-roledescription="carousel"
+      aria-label={brand}
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+      onFocusCapture={() => setPaused(true)}
+      onBlurCapture={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setPaused(false); }}
+      onPointerDown={(event) => { swipeStartRef.current = event.clientX; }}
+      onPointerUp={(event) => {
+        if (swipeStartRef.current === null) return;
+        const distance = event.clientX - swipeStartRef.current;
+        swipeStartRef.current = null;
+        if (Math.abs(distance) > 45) goTo(activeIndex + (distance < 0 ? 1 : -1));
+      }}
+    >
+      <div className="live-store-hero-carousel-slides">
+        {slides.map((slide, index) => (
+          <article className={`live-store-hero-carousel-slide${index === activeIndex ? " is-active" : ""}`} key={slide.id || index} aria-hidden={index === activeIndex ? undefined : "true"}>
+            {slide.image_url && <img {...getResponsiveMediaProps(slide.image_url, { widths: [640, 960, 1280, 1600, 1920], fallbackWidth: 1600, sizes: "100vw" })} alt="" loading={index === 0 ? "eager" : "lazy"} decoding="async" />}
+          </article>
+        ))}
+      </div>
+      <div className="live-store-hero-carousel-shade" />
+      <div className="live-store-hero-carousel-content" aria-live="polite">
+        {title && <h1>{title}</h1>}
+        {subtitle && <p>{subtitle}</p>}
+      </div>
+      {slides.length > 1 && <>
+        <button type="button" className="live-store-hero-carousel-arrow is-previous" onClick={() => goTo(activeIndex - 1)} aria-label={rtl ? "الشريحة التالية" : "Previous slide"}>{rtl ? <ChevronRight /> : <ChevronLeft />}</button>
+        <button type="button" className="live-store-hero-carousel-arrow is-next" onClick={() => goTo(activeIndex + 1)} aria-label={rtl ? "الشريحة السابقة" : "Next slide"}>{rtl ? <ChevronLeft /> : <ChevronRight />}</button>
+        <div className="live-store-hero-carousel-dots" role="group" aria-label={rtl ? "شرائح العرض" : "Carousel slides"}>{slides.map((slide, index) => <button type="button" key={slide.id || index} className={index === activeIndex ? "is-active" : ""} aria-label={rtl ? `الشريحة ${index + 1}` : `Slide ${index + 1}`} aria-current={index === activeIndex ? "true" : undefined} onClick={() => goTo(index)} />)}</div>
+      </>}
+    </section>
+  );
+}
+
 
 function StoreLanding({ brand, site, catalog, categoryById, locale, shopPath, productBasePath, onAdd }) {
   const selectedProductIds = site?.growth?.featured_product_ids || [];
@@ -1170,37 +1358,9 @@ function StoreLanding({ brand, site, catalog, categoryById, locale, shopPath, pr
   const featuredProducts = (selectedProductIds.length ? catalog.featured_products : catalog.products).slice(0, 12);
   const featuredBrands = (catalog.brands || []).slice(0, 6);
   const featuredCategories = (selectedCategoryIds.length ? catalog.featured_categories : catalog.categories.filter((item) => !item.parent_id)).slice(0, 6);
-  const leadProduct = featuredProducts[0];
-  const productTotal = Number(catalog.pagination?.total || catalog.products.length || 0);
-
   return (
     <div className="live-store-landing">
-      <section className="live-store-landing-hero">
-        <div className="live-store-landing-copy">
-          <h1 className="live-store-welcome-title">{brand}</h1>
-          {site?.description && <p>{site.description}</p>}
-          <div className="live-store-landing-actions">
-            <Link className="live-store-primary-link" to={shopPath}>{c("landing.browse")} <ArrowRight size={18} /></Link>
-            {featuredCategories[0] && <Link className="live-store-text-link" to={`${shopPath}?category=${encodeURIComponent(featuredCategories[0].slug)}`}>{c("landing.shopCategory", { name: featuredCategories[0].name })}</Link>}
-          </div>
-          {(productTotal > 0 || catalog.categories.length > 0) && (
-            <dl className="live-store-landing-facts">
-              {productTotal > 0 && <div><dt>{productTotal}</dt><dd>{c("landing.products")}</dd></div>}
-              {catalog.categories.length > 0 && <div><dt>{catalog.categories.length}</dt><dd>{c("landing.collections")}</dd></div>}
-            </dl>
-          )}
-        </div>
-        <div className="live-store-landing-visual">
-          {leadProduct ? (
-            <Link to={`${productBasePath}/product/${encodeURIComponent(leadProduct.slug)}`}>
-              <ProductImage product={leadProduct} eager />
-              <span><small>{c("landing.featured")}</small><strong>{leadProduct.name}</strong><b>{formatPrice(leadProduct.price, leadProduct.currency, locale)}</b></span>
-            </Link>
-          ) : (
-            <div className="live-store-landing-placeholder"><ShoppingBag size={42} aria-label="No featured product" /></div>
-          )}
-        </div>
-      </section>
+      <LandingHeroCarousel site={site} brand={brand} locale={locale} />
 
       {featuredBrands.length > 0 && (
         <CategoryCarousel
@@ -1266,7 +1426,7 @@ export default function EcommerceStorefront({ subdomain: suppliedSubdomain = "",
   const siteRef = useRef(null);
   const [productDetail, setProductDetail] = useState(null);
   const [confirmation, setConfirmation] = useState(null);
-  const [account, setAccount] = useState(null);
+  const [account, setAccount] = useState(undefined);
   const [loyalty, setLoyalty] = useState(null);
   const [normalDiscounts, setNormalDiscounts] = useState([]);
   const [delivery, setDelivery] = useState({ loading: false, error: "", areas: [] });
@@ -1280,12 +1440,38 @@ export default function EcommerceStorefront({ subdomain: suppliedSubdomain = "",
   const [cart, setCart] = useState(() => readCart(cartKey));
   const [cartOpen, setCartOpen] = useState(false);
   const [notification, setNotification] = useState(null);
+  const [dismissedSaleBarKey, setDismissedSaleBarKey] = useState("");
+  const [dismissedSalePopupKey, setDismissedSalePopupKey] = useState("");
   const notify = useCallback((value) => setNotification({ ...value }), []);
   const dismissNotification = useCallback(() => setNotification(null), []);
   const orderAttemptRef = useRef({ fingerprint: "", key: "" });
   const cartReconcileRef = useRef("");
   const analyticsViewsRef = useRef(new Set());
   const recordedVisitRef = useRef("");
+
+  const salePercentage = useMemo(() => {
+    const reportedMaximum = Number(catalog.sale_summary?.max_percentage) || 0;
+    const visibleProducts = [...(catalog.products || []), ...(catalog.featured_products || []), productDetail?.product].filter(Boolean);
+    return Math.max(reportedMaximum, ...visibleProducts.map(productSalePercentage));
+  }, [catalog.featured_products, catalog.products, catalog.sale_summary?.max_percentage, productDetail?.product]);
+
+  const saleStorageKey = `${subdomain || "store"}:${salePercentage}`;
+  const wasSaleDismissed = (kind) => {
+    try { return sessionStorage.getItem(`madar-sale-${kind}:${saleStorageKey}`) === "dismissed"; }
+    catch { return false; }
+  };
+  const saleBarVisible = Boolean(salePercentage) && dismissedSaleBarKey !== saleStorageKey && !wasSaleDismissed("bar");
+  const salePopupVisible = Boolean(salePercentage) && dismissedSalePopupKey !== saleStorageKey && !wasSaleDismissed("popup");
+
+  const dismissSaleBar = useCallback(() => {
+    setDismissedSaleBarKey(saleStorageKey);
+    try { sessionStorage.setItem(`madar-sale-bar:${saleStorageKey}`, "dismissed"); } catch { /* Storage may be unavailable. */ }
+  }, [saleStorageKey]);
+
+  const dismissSalePopup = useCallback(() => {
+    setDismissedSalePopupKey(saleStorageKey);
+    try { sessionStorage.setItem(`madar-sale-popup:${saleStorageKey}`, "dismissed"); } catch { /* Storage may be unavailable. */ }
+  }, [saleStorageKey]);
 
   const handleAccountChange = async (user) => {
     setAccount(user);
@@ -1733,6 +1919,8 @@ export default function EcommerceStorefront({ subdomain: suppliedSubdomain = "",
     <div className="live-store" style={storeStyle} dir={locale === "ar" ? "rtl" : "ltr"} lang={locale}>
       <StorefrontSeo origin={window.location.origin} storePath={canonicalStorePath} locale={locale} site={site} productDetail={productDetail} category={activeCategory} view={seoView} />
       <StoreHeader brand={brand} logoUrl={site?.logo_url} cartCount={cartCount} shopPath={shopPath} homePath={homePath} categoriesPath={categoriesPath} contactPath={contactPath} onCartOpen={openCart} subdomain={subdomain} account={account} loyalty={loyalty} onAccountChange={handleAccountChange} />
+      {saleBarVisible && <StoreSaleBar percentage={salePercentage} shopPath={shopPath} onDismiss={dismissSaleBar} />}
+      {salePopupVisible && <StoreSalePopup percentage={salePercentage} shopPath={shopPath} onDismiss={dismissSalePopup} />}
       {site?.growth?.announcement_enabled && announcementText && <div className="live-store-announcement" role="status">{announcementLink ? <a href={announcementLink} onClick={() => trackCommerceEvent("promotion_click", { store: subdomain, locale, placement: "announcement" })}>{announcementText}</a> : <span>{announcementText}</span>}</div>}
       <StoreActionToast notification={notification} onDismiss={dismissNotification} locale={locale} />
       <StoreWhatsAppLink phone={site?.phone} brand={brand} />
@@ -1755,7 +1943,7 @@ export default function EcommerceStorefront({ subdomain: suppliedSubdomain = "",
         )}
 
         {!loading && !error && checkoutRoute && (
-          <StoreCheckout items={cartItems} loyalty={loyalty} normalDiscounts={normalDiscounts} shopPath={shopPath} storePath={storePath} delivery={delivery} selectedAreaId={selectedAreaId} onSelectedAreaChange={setSelectedAreaId} onPlaceOrder={placeOrder} onNotify={notify} />
+          <StoreCheckout items={cartItems} account={account} loyalty={loyalty} normalDiscounts={normalDiscounts} shopPath={shopPath} storePath={storePath} delivery={delivery} selectedAreaId={selectedAreaId} onSelectedAreaChange={setSelectedAreaId} onPlaceOrder={placeOrder} onNotify={notify} />
         )}
 
         {!loading && !error && confirmationRoute && (

@@ -96,6 +96,9 @@
   font-size: 0.7rem;
   text-transform: uppercase;
 }
+.ecommerce-social-field > span b svg { width: 14px; height: 14px; fill: currentColor; }
+.ecommerce-social-field > span b svg.is-stroke { fill: none; stroke: currentColor; stroke-width: 1.8; }
+.ecommerce-social-field > span b svg.is-stroke .is-filled { fill: currentColor; stroke: none; }
 .ecommerce-social-field > div { position: relative; }
 .ecommerce-social-field input {
   width: 100%;
@@ -123,6 +126,7 @@
   color: var(--theme-text-muted);
 }
 .ecommerce-social-field a:hover { background: var(--theme-bg-soft); color: var(--accent); }
+.ecommerce-social-field > small { margin-top: -2px; color: var(--theme-text-muted); font-size: 0.74rem; line-height: 1.45; }
 .ecommerce-social-security-note { margin-top: 20px; }
 .ecommerce-social-card > footer {
   margin-top: 24px;

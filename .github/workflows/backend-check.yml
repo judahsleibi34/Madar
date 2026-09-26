@@ -40,6 +40,8 @@ jobs:
             --env MADAR_TEST_REPOSITORY_ROOT=/test-repository \
             --tmpfs /tmp:rw,exec,nosuid,nodev,size=1g,mode=1777 \
             --volume "$PWD/web/scripts:/scripts:ro" \
+            --volume "$PWD/web/demo-data:/demo-data:ro" \
+            --volume "$PWD/web/frontend/public:/frontend/public:ro" \
             --volume "$PWD/web/database:/app/database:ro" \
             --volume "$PWD/web/supabase:/app/supabase:ro" \
             --volume "$PWD/web/scripts:/test-repository/scripts:ro" \

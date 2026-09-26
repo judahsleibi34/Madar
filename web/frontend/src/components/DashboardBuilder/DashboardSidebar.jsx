@@ -5,6 +5,7 @@ import {
   Home,
   Archive,
   LayoutDashboard,
+  GalleryHorizontalEnd,
   PanelsTopLeft,
   ClipboardList,
   CalendarDays,
@@ -178,6 +179,7 @@ export default function DashboardSidebar({
     DASHBOARD_ROUTES.ecommerceProducts,
     DASHBOARD_ROUTES.ecommerceDelivery,
     DASHBOARD_ROUTES.ecommerceOrders,
+    DASHBOARD_ROUTES.ecommerceLanding,
     DASHBOARD_ROUTES.ecommerceTheme,
     DASHBOARD_ROUTES.ecommerceStore,
   ].some(
@@ -314,6 +316,11 @@ export default function DashboardSidebar({
       label: t("sidebar.loyalty", { defaultValue: "Loyalty" }),
       path: DASHBOARD_ROUTES.ecommerceLoyalty,
       icon: Gift,
+    },
+    {
+      label: t("sidebar.landingPage", { defaultValue: "Landing page" }),
+      path: DASHBOARD_ROUTES.ecommerceLanding,
+      icon: GalleryHorizontalEnd,
     },
     {
       label: t("sidebar.storeTheme", { defaultValue: "Store theme" }),

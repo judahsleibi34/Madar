@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import EcommerceSocialLinksPage from "./EcommerceSocialLinksPage";
 import { fetchEcommerceSocialLinks, saveEcommerceSocialLinks } from "../../services/ecommerceApi";
+import { clearEcommerceAdminCache } from "./utils/ecommerceAdminCache";
 
 vi.mock("../../services/ecommerceApi", () => ({
   fetchEcommerceSocialLinks: vi.fn(),
@@ -15,7 +16,10 @@ beforeEach(() => {
   saveEcommerceSocialLinks.mockImplementation(async (socialLinks) => ({ social_links: socialLinks }));
 });
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  clearEcommerceAdminCache("authenticated", "social-links");
+});
 
 describe("EcommerceSocialLinksPage", () => {
   it("uses a page-shaped social links skeleton while loading", () => {
@@ -27,10 +31,11 @@ describe("EcommerceSocialLinksPage", () => {
   });
 
   it("loads and saves the complete social profile set", async () => {
-    render(<EcommerceSocialLinksPage />);
+    const { container } = render(<EcommerceSocialLinksPage />);
 
     const instagram = await screen.findByDisplayValue("https://instagram.com/madar");
     expect(instagram).toBeTruthy();
+    expect(container.querySelectorAll("[data-network-icon]")).toHaveLength(4);
     const facebook = screen.getByPlaceholderText("https://facebook.com/your-page");
     fireEvent.change(facebook, { target: { value: "https://facebook.com/madar" } });
     fireEvent.click(screen.getByRole("button", { name: "Save social links" }));
@@ -39,7 +44,7 @@ describe("EcommerceSocialLinksPage", () => {
       facebook: "https://facebook.com/madar",
       instagram: "https://instagram.com/madar",
       snapchat: "",
-    })));
+    }), { scope: "authenticated" }));
     expect(await screen.findByText("Social links saved")).toBeTruthy();
   });
 
@@ -51,5 +56,19 @@ describe("EcommerceSocialLinksPage", () => {
 
     expect(await screen.findByText("Check the social links")).toBeTruthy();
     expect(saveEcommerceSocialLinks).not.toHaveBeenCalled();
+  });
+
+  it("accepts a Snapchat username and creates the profile URL automatically", async () => {
+    fetchEcommerceSocialLinks.mockResolvedValueOnce({ social_links: { snapchat: "https://www.snapchat.com/add/existing.user" } });
+    render(<EcommerceSocialLinksPage />);
+
+    const snapchat = await screen.findByDisplayValue("existing.user");
+    fireEvent.change(snapchat, { target: { value: "@madar.shop" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save social links" }));
+
+    await waitFor(() => expect(saveEcommerceSocialLinks).toHaveBeenCalledWith(expect.objectContaining({
+      snapchat: "https://www.snapchat.com/add/madar.shop",
+    }), { scope: "authenticated" }));
+    expect(screen.getByDisplayValue("madar.shop")).toBeTruthy();
   });
 });

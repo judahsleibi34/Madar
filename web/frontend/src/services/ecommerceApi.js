@@ -50,6 +50,26 @@ export const fetchEcommerceCatalog = ({ scope, force = false } = {}) => {
   });
 };
 
+export const fetchEcommerceCatalogSection = (section, { scope, force = false } = {}) => {
+  if (!["tags", "categories", "brands", "products"].includes(section)) {
+    return Promise.reject(new Error("Unsupported ecommerce catalog section"));
+  }
+  return loadEcommerceAdminResource(
+    scope,
+    `catalog:${section}`,
+    () => request(`/ecommerce/${section}`),
+    { force },
+  );
+};
+
+export const fetchEcommerceCatalogOptions = ({ scope, force = false } = {}) =>
+  loadEcommerceAdminResource(
+    scope,
+    "catalog:options",
+    () => request("/ecommerce/catalog/options"),
+    { force },
+  );
+
 export const saveEcommerceItem = async (section, itemId, payload, { scope } = {}) => {
   const result = await request(`/ecommerce/${section}${itemId ? `/${itemId}` : ""}`, {
     method: itemId ? "PUT" : "POST",
@@ -57,6 +77,8 @@ export const saveEcommerceItem = async (section, itemId, payload, { scope } = {}
   });
   const singular = section === "categories" ? "category" : section === "products" ? "product" : section === "brands" ? "brand" : "tag";
   updateEcommerceCatalogCache(scope, section, result?.[singular]);
+  clearEcommerceAdminCache(scope, `catalog:${section}`);
+  if (section !== "products") clearEcommerceAdminCache(scope, "catalog:options");
   return result;
 };
 
@@ -66,12 +88,15 @@ export const saveEcommerceProductVariants = async (productId, payload, { scope }
     body: JSON.stringify(payload),
   });
   updateEcommerceCatalogCache(scope, "products", result?.product);
+  clearEcommerceAdminCache(scope, "catalog:products");
   return result;
 };
 
 export const deleteEcommerceItem = async (section, itemId, { scope } = {}) => {
   const result = await request(`/ecommerce/${section}/${itemId}`, { method: "DELETE" });
   removeFromEcommerceCatalogCache(scope, section, itemId);
+  clearEcommerceAdminCache(scope, `catalog:${section}`);
+  if (section !== "products") clearEcommerceAdminCache(scope, "catalog:options");
   return result;
 };
 
@@ -103,18 +128,32 @@ export const saveEcommerceGrowth = (growth) => request("/ecommerce/growth", {
   body: JSON.stringify(growth),
 });
 
-export const fetchEcommerceSocialLinks = () => request("/ecommerce/social-links");
+export const fetchEcommerceLandingPage = () => request("/ecommerce/landing-page");
 
-export const saveEcommerceSocialLinks = (socialLinks) => request("/ecommerce/social-links", {
+export const saveEcommerceLandingPage = (landingPage) => request("/ecommerce/landing-page", {
   method: "PUT",
-  body: JSON.stringify(socialLinks),
+  body: JSON.stringify(landingPage),
 });
+
+export const fetchEcommerceSocialLinks = ({ scope, force = false } = {}) =>
+  loadEcommerceAdminResource(scope, "social-links", () => request("/ecommerce/social-links"), { force });
+
+export const saveEcommerceSocialLinks = async (socialLinks, { scope } = {}) => {
+  const result = await request("/ecommerce/social-links", {
+    method: "PUT",
+    body: JSON.stringify(socialLinks),
+  });
+  clearEcommerceAdminCache(scope, "social-links");
+  writeEcommerceAdminCache(scope, "social-links", result);
+  return result;
+};
 
 export const fetchEcommerceSettings = ({ scope, force = false } = {}) => loadEcommerceAdminResource(scope, "settings", () => request("/ecommerce/settings"), { force });
 
-export const saveEcommerceSettings = async (currency) => {
+export const saveEcommerceSettings = async (currency, { scope } = {}) => {
   const result = await request("/ecommerce/settings", { method: "PUT", body: JSON.stringify({ currency }) });
-  clearEcommerceAdminCache(null, "settings");
+  clearEcommerceAdminCache(scope, "settings");
+  writeEcommerceAdminCache(scope, "settings", result);
   clearAllEcommerceCatalogCaches();
   return result;
 };
