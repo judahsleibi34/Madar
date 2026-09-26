@@ -5,13 +5,18 @@ import EcommercePage from "./EcommercePage";
 import {
   deleteEcommerceItem,
   fetchEcommerceCatalog,
+  fetchEcommerceCatalogOptions,
+  fetchEcommerceCatalogSection,
   saveEcommerceItem,
   uploadEcommerceProductImage,
 } from "../../services/ecommerceApi";
 import { clearEcommerceCatalogCache, writeEcommerceCatalogCache } from "./utils/ecommerceCatalogCache";
+import { clearEcommerceAdminCache } from "./utils/ecommerceAdminCache";
 
 vi.mock("../../services/ecommerceApi", () => ({
   fetchEcommerceCatalog: vi.fn(),
+  fetchEcommerceCatalogOptions: vi.fn(),
+  fetchEcommerceCatalogSection: vi.fn(),
   saveEcommerceItem: vi.fn(),
   deleteEcommerceItem: vi.fn(),
   uploadEcommerceProductImage: vi.fn(),
@@ -20,12 +25,28 @@ vi.mock("../../services/ecommerceApi", () => ({
 afterEach(() => {
   cleanup();
   clearEcommerceCatalogCache("authenticated");
+  clearEcommerceAdminCache("authenticated", "catalog:");
 });
 
 beforeEach(() => {
   window.localStorage.clear();
   vi.clearAllMocks();
   fetchEcommerceCatalog.mockResolvedValue({ tags: [], categories: [], products: [] });
+  fetchEcommerceCatalogSection.mockImplementation((section) =>
+    fetchEcommerceCatalog().then((catalog) => ({
+      [section]: catalog?.[section] || [],
+      stock_summary: catalog?.stock_summary,
+      commerce_currency: catalog?.commerce_currency,
+    })),
+  );
+  fetchEcommerceCatalogOptions.mockImplementation(() =>
+    fetchEcommerceCatalog().then((catalog) => ({
+      tags: catalog?.tags || [],
+      categories: catalog?.categories || [],
+      brands: catalog?.brands || [],
+      commerce_currency: catalog?.commerce_currency,
+    })),
+  );
   saveEcommerceItem.mockResolvedValue({});
   deleteEcommerceItem.mockResolvedValue(null);
   uploadEcommerceProductImage.mockResolvedValue("/uploads/tenant_7/builder_assets/0123456789abcdef0123456789abcdef.webp");
@@ -198,7 +219,7 @@ describe("EcommercePage", () => {
     expect(screen.getByRole("heading", { name: "New product" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Specifications" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Variants & inventory" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Add variant" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Add size" })).toBeTruthy();
     expect(screen.getAllByRole("button", { name: "Save product" })).toHaveLength(1);
     expect(screen.queryByText("Full product editor")).toBeNull();
   });
@@ -310,6 +331,26 @@ describe("EcommercePage", () => {
     expect(document.body.textContent).not.toContain("internal_catalog");
   });
 
+  it("uses the Builder confirmation modal before deleting a catalog item", async () => {
+    const tag = { id: "tag-1", slug: "summer", status: "active", translations: { en: { name: "Summer" } } };
+    fetchEcommerceCatalog.mockResolvedValue({ tags: [tag], categories: [], products: [] });
+    render(<EcommercePage section="tags" />);
+    await screen.findByText("Summer");
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete Summer" }));
+    const dialog = screen.getByRole("dialog", { name: "Delete Summer?" });
+    expect(dialog.classList.contains("page-delete-modal")).toBe(true);
+    expect(deleteEcommerceItem).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByRole("dialog", { name: "Delete Summer?" })).toBeNull();
+    expect(deleteEcommerceItem).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete Summer" }));
+    fireEvent.click(screen.getByRole("button", { name: "Remove" }));
+    await waitFor(() => expect(deleteEcommerceItem).toHaveBeenCalledWith("tags", "tag-1", expect.any(Object)));
+  });
+
   it("uses safe toast text after a failed create and keeps the form open", async () => {
     saveEcommerceItem.mockRejectedValue(new Error("DATABASE_URL=postgres://secret; internal_insert failed"));
     render(<EcommercePage section="tags" />);
@@ -330,17 +371,15 @@ describe("EcommercePage", () => {
     deleteEcommerceItem.mockRejectedValue(new Error("SUPABASE_SERVICE_KEY=secret internal_delete"));
     render(<EcommercePage section="tags" />);
     await screen.findByText("Summer");
-    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
-    try {
-      if (operation === "delete") {
-        fireEvent.click(screen.getByRole("button", { name: "Delete Summer" }));
-      } else {
-        fireEvent.click(screen.getByRole("button", { name: "Quick edit Summer" }));
-        fireEvent.click(screen.getByRole("button", { name: "Save" }));
-      }
-      expect((await screen.findByRole("alert")).textContent).toContain("Could not");
-      expect(document.body.textContent).not.toContain("SUPABASE_SERVICE_KEY");
-      expect(document.body.textContent).not.toContain("internal_");
-      expect(screen.getAllByText("Summer").length).toBeGreaterThan(0);
-    } finally { confirm.mockRestore(); }
+    if (operation === "delete") {
+      fireEvent.click(screen.getByRole("button", { name: "Delete Summer" }));
+      fireEvent.click(screen.getByRole("button", { name: "Remove" }));
+    } else {
+      fireEvent.click(screen.getByRole("button", { name: "Quick edit Summer" }));
+      fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    }
+    expect((await screen.findByRole("alert")).textContent).toContain("Could not");
+    expect(document.body.textContent).not.toContain("SUPABASE_SERVICE_KEY");
+    expect(document.body.textContent).not.toContain("internal_");
+    expect(screen.getAllByText("Summer").length).toBeGreaterThan(0);
   });

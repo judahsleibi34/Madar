@@ -84,7 +84,14 @@ class FakeSupabase:
         return FakeQuery(self, table_name)
 
     def rpc(self, name, payload):
-        assert name == "create_notification_event_intent"
+        assert name in {"create_notification_event_intent", "get_or_create_notification_event"}
+        existing = next((
+            event for event in self.tables["notification_events"]
+            if event.get("tenant_id") == payload["p_tenant_id"]
+            and event.get("deduplication_key") == payload["p_deduplication_key"]
+        ), None)
+        if existing:
+            return FakeQueryResult([existing])
         event = {
             "id": "event-1",
             "tenant_id": payload["p_tenant_id"],
@@ -155,3 +162,35 @@ def test_internal_reminder_is_delivered_only_to_its_target_user(monkeypatch):
 
     assert len(fake_supabase.tables["user_notifications"]) == 1
     assert fake_supabase.tables["user_notifications"][0]["user_id"] == 11
+
+
+def test_ecommerce_order_notification_reaches_active_store_owner(monkeypatch):
+    fake_supabase = FakeSupabase()
+    monkeypatch.setattr(
+        notification_delivery_service, "service_supabase", fake_supabase
+    )
+
+    notification_delivery_service.deliver_notification({
+        "channel": "internal",
+        "tenant_id": 7,
+        "payload": {
+            "event_type": "ecommerce_order_created",
+            "source_type": "ecommerce_order",
+            "source_id": "order-1",
+            "title": "New order: MD-1001",
+            "body": "MD-1001 was placed for ILS 25.00.",
+            "data": {"order_id": "order-1", "order_number": "MD-1001"},
+            "event_deduplication_key": "ecommerce-order:order-1",
+        },
+    })
+
+    recipients = {
+        row["user_id"] for row in fake_supabase.tables["user_notifications"]
+    }
+    assert recipients == {11, 12}
+    owner_notification = next(
+        row for row in fake_supabase.tables["user_notifications"]
+        if row["user_id"] == 11
+    )
+    assert owner_notification["event_type"] == "ecommerce_order_created"
+    assert owner_notification["data"]["order_id"] == "order-1"

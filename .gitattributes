@@ -10,3 +10,8 @@ Dockerfile text eol=lf
 web/deployment/bin/* text eol=lf
 web/deployment/*.conf text eol=lf
 web/deployment/systemd/* text eol=lf
+
+# Migration manifests pin the exact SQL bytes. Keep both canonical migration
+# trees on LF on every platform so raw SHA-256 validation is reproducible.
+web/database/migrations/*.sql text eol=lf
+web/supabase/migrations/*.sql text eol=lf

@@ -34,6 +34,7 @@ import { getInstallationId, registerInstallation } from "./pwa/installation";
 import { isMadarPwaHost } from "./pwa/pwaContext";
 import { getBrandedMadarSubdomain } from "./utils/hostedAddress";
 import { getExistingMadarPushEndpoint } from "./pwa/serviceWorker";
+import { scheduleIdleWork } from "./utils/scheduleIdleWork";
 import { subscribeAppInstalled } from "./pwa/installPromptStore";
 import { reconcileBrowserPushLifecycle } from "./services/notificationsApi";
 import { NotificationProvider } from "./notifications/NotificationProvider";
@@ -298,7 +299,7 @@ export default function App() {
         inFlight = false;
       }
     };
-    reconcile();
+    const cancelInitialReconcile = scheduleIdleWork(reconcile);
     const handleInstalled = () => {
       reconcile({ installedConfirmed: true, force: true });
     };
@@ -317,6 +318,7 @@ export default function App() {
     navigator.serviceWorker?.addEventListener?.("message", handleServiceWorkerMessage);
     return () => {
       cancelled = true;
+      cancelInitialReconcile();
       unsubscribeInstalled();
       window.removeEventListener("focus", handleFocus);
       document.removeEventListener("visibilitychange", handleVisibility);
@@ -537,12 +539,16 @@ export default function App() {
     setLang(setAppLanguage(code));
   };
 
-  const handleLoginSuccess = async () => {
+  const handleLoginSuccess = async (authenticatedUser) => {
     const params = new URLSearchParams(location.search);
     const returnTo = params.get("returnTo");
 
     try {
-      const userInfo = await fetchUserInfo();
+      // Login and MFA verification return the canonical session payload. Reuse
+      // it instead of serially validating the brand-new session a second time.
+      const userInfo = authenticatedUser?.id
+        ? normalizeUser(authenticatedUser)
+        : await fetchUserInfo();
 
       if (!userInfo) {
         throw new Error(appShellContent.errors.postLoginUnauthorized);

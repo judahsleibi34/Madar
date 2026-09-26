@@ -6,7 +6,7 @@ import { ArrowLeft, ChevronDown, ImagePlus, Plus, Save, Search, Trash2, X } from
 import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { DASHBOARD_ROUTES } from "../../config/routes";
-import { fetchEcommerceCatalog, saveEcommerceItem, saveEcommerceProductVariants, uploadEcommerceProductImage } from "../../services/ecommerceApi";
+import { fetchEcommerceCatalogOptions, fetchEcommerceCatalogSection, saveEcommerceItem, saveEcommerceProductVariants, uploadEcommerceProductImage } from "../../services/ecommerceApi";
 import { useCommerceI18n } from "../../utils/commerceI18n";
 import { getResponsiveMediaProps, isVideoMediaUrl, resolveMediaUrl } from "../../utils/media";
 
@@ -207,11 +207,7 @@ export function EcommerceProductEditor({ user, productId, embedded = false, init
 
   useEffect(() => {
     let cancelled = false;
-    if (initialCatalog && !editing) {
-      return () => { cancelled = true; };
-    }
-    fetchEcommerceCatalog({ scope, force: true }).then((result) => {
-      if (cancelled) return;
+    const applyCatalog = (result) => {
       const product = result.products?.find((item) => item.id === productId);
       if (editing && !product) throw new Error(t("commerce:errors.productNotFound"));
       setCatalog(result);
@@ -222,6 +218,19 @@ export function EcommerceProductEditor({ user, productId, embedded = false, init
         ...hydrateVariantGroups(product),
       } : emptyProduct(result.commerce_currency));
       setState({ loading: false, saving: false, error: "" });
+    };
+    if (initialCatalog && (!editing || initialCatalog.products?.some((item) => item.id === productId))) {
+      applyCatalog(initialCatalog);
+      return () => { cancelled = true; };
+    }
+    Promise.all([
+      fetchEcommerceCatalogOptions({ scope, force: true }),
+      editing
+        ? fetchEcommerceCatalogSection("products", { scope, force: true })
+        : Promise.resolve({ products: [] }),
+    ]).then(([options, products]) => {
+      if (cancelled) return;
+      applyCatalog({ ...options, ...products });
     }).catch(() => {
       if (cancelled) return;
       setState({ loading: false, saving: false, error: t("commerce:errors.loadProduct") });

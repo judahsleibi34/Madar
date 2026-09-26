@@ -24,6 +24,9 @@ vi.mock("../components/DashboardBuilder/EcommerceStorePage", () => ({
 vi.mock("../components/DashboardBuilder/EcommerceThemePage", () => ({
   default: () => <h1>Store theme</h1>,
 }));
+vi.mock("../components/DashboardBuilder/EcommerceLandingPage", () => ({
+  default: () => <h1>Landing page</h1>,
+}));
 vi.mock("../components/DashboardBuilder/EcommerceSocialLinksPage", () => ({
   default: () => <h1>Social links</h1>,
 }));
@@ -68,6 +71,7 @@ describe("workspace settings routes", () => {
     ["/ecommerce/categories", "Categories"],
     ["/ecommerce/brands", "Brands"],
     ["/ecommerce/products", "Products"],
+    ["/ecommerce/landing-page", "Landing page"],
     ["/ecommerce/theme", "Store theme"],
     ["/ecommerce/social-links", "Social links"],
     ["/ecommerce/cv-rerank", "CV Rerank"],

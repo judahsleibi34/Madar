@@ -54,9 +54,14 @@ from services.request_body_limits import RequestBodyLimitMiddleware
 from services.runtime_config import validate_runtime_configuration
 from services.observability_service import (
     CORRELATION_ID,
+    begin_request_timings,
     configure_structured_logging,
     correlation_id,
+    end_request_timings,
     record_request,
+    record_request_timing,
+    request_timings_snapshot,
+    server_timing_value,
 )
 from services.request_security import (
     CSRF_HEADER_NAME,
@@ -108,6 +113,22 @@ PUBLIC_UPLOAD_MEDIA_TYPES = {
     ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 }
 RESPONSIVE_IMAGE_WIDTHS = {320, 480, 768, 1024, 1440, 1920, 2560}
+PERFORMANCE_TIMING_ROUTES = {
+    "/auth/login",
+    "/auth/user_status",
+    "/ecommerce/catalog",
+    "/ecommerce/tags",
+    "/ecommerce/categories",
+    "/ecommerce/brands",
+    "/ecommerce/products",
+    "/ecommerce/catalog/options",
+    "/calendar/bootstrap",
+    "/builder/projects",
+    "/builder/projects/{project_id}/site-members",
+    "/screen-time/weekly",
+    "/billing/usage",
+    "/notifications",
+}
 
 
 def render_responsive_builder_image(source: bytes, media_type: str, width: int) -> tuple[bytes, str]:
@@ -182,6 +203,7 @@ async def csrf_origin_middleware(request: Request, call_next):
 async def observability_middleware(request: Request, call_next):
     request_id = correlation_id(request.headers.get("X-Request-ID"))
     context_token = CORRELATION_ID.set(request_id)
+    timings_token = begin_request_timings()
     started = time.monotonic()
     try:
         response = await call_next(request)
@@ -194,11 +216,32 @@ async def observability_middleware(request: Request, call_next):
             elapsed_seconds=elapsed,
         )
         response.headers["X-Request-ID"] = request_id
+        measured = request_timings_snapshot()
+        record_request_timing("app", max(0.0, elapsed - sum(measured.values())))
+        timing_header = server_timing_value()
+        if timing_header:
+            response.headers["Server-Timing"] = timing_header
+        if route in PERFORMANCE_TIMING_ROUTES or elapsed >= 0.5:
+            logger.info(
+                "http.request_timing",
+                extra={
+                    "method": request.method,
+                    "route": route,
+                    "status_code": response.status_code,
+                    "duration_ms": round(elapsed * 1000, 1),
+                    "timings": {
+                        name: round(duration * 1000, 1)
+                        for name, duration in request_timings_snapshot().items()
+                    },
+                },
+            )
         return response
     except Exception as error:
         route = getattr(request.scope.get("route"), "path", "unmatched")
         elapsed = time.monotonic() - started
         record_request(method=request.method, route=route, status_code=500, elapsed_seconds=elapsed)
+        measured = request_timings_snapshot()
+        record_request_timing("app", max(0.0, elapsed - sum(measured.values())))
         logger.error(
             "http.request_unhandled",
             extra={"method": request.method, "route": route, "status_code": 500, "error_type": type(error).__name__},
@@ -210,10 +253,14 @@ async def observability_middleware(request: Request, call_next):
                 "message": "An unexpected server error occurred.",
                 "request_id": request_id,
             },
-            headers={"X-Request-ID": request_id},
+            headers={
+                "X-Request-ID": request_id,
+                **({"Server-Timing": server_timing_value()} if server_timing_value() else {}),
+            },
         )
         return error_response
     finally:
+        end_request_timings(timings_token)
         CORRELATION_ID.reset(context_token)
 
 
@@ -377,5 +424,5 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=[CSRF_HEADER_NAME, "X-Request-ID"],
+    expose_headers=[CSRF_HEADER_NAME, "X-Request-ID", "Server-Timing"],
 )

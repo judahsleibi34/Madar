@@ -1,4 +1,3 @@
-import PageHeaderSkeleton from "../common/PageHeaderSkeleton";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
@@ -28,6 +27,7 @@ import {
   getDashboardCacheScope,
   readDashboardMetricsCache,
   fetchDashboardMetricsCached,
+  writeDashboardMetricsCache,
 } from "./utils/dashboardSnapshotCache";
 import {
   fetchBuilderSiteMembers,
@@ -269,12 +269,11 @@ function UserDashboardContent({ user, weeklyScreenTimeSeconds = 0, cacheScope = 
         const id = record?.id || record?.project_id;
         return id ? fetchBuilderSiteMembers(id).catch(() => null) : Promise.resolve([]);
       })));
-      const [projectResult, storage, reservations, visitMetrics, memberGroups] = await Promise.all([
+      const [projectResult, storage, reservations, visitMetrics] = await Promise.all([
         projectRequest,
         fetchBuilderStorageUsage().catch(() => null),
         loadAllReservations().catch(() => null),
         fetchSiteVisitMetrics().catch(() => null),
-        membersRequest,
       ]);
       if (!projectResult && cachedMetrics) throw new Error("Dashboard refresh unavailable");
       const records = projectResult?.projects || [];
@@ -292,13 +291,6 @@ function UserDashboardContent({ user, weeklyScreenTimeSeconds = 0, cacheScope = 
       const projectId = String(
         primaryRecord?.id || primaryRecord?.project_id || primaryProject?.id || ""
       );
-
-      const uniqueMembers = new Map();
-      memberGroups.filter(Boolean).flat().forEach((member) => {
-        if (String(member?.status || "Active").toLowerCase() === "disabled") return;
-        const key = member?.userId || member?.user_id || member?.email || member?.id;
-        if (key) uniqueMembers.set(String(key), member);
-      });
 
       const usedBytes =
         storage ? Number(storage.used_bytes || 0) + Number(storage.reserved_bytes || 0) : Number(cachedMetrics?.usedBytes || 0);
@@ -321,12 +313,31 @@ function UserDashboardContent({ user, weeklyScreenTimeSeconds = 0, cacheScope = 
         storeVisits: Number(visitMetrics?.store_visits ?? cachedMetrics?.storeVisits ?? 0),
         usedBytes,
         quotaBytes: Number(storage?.quota_bytes ?? cachedMetrics?.quotaBytes ?? 0),
-        permittedUsers: memberGroups.some(group => group === null) && cachedMetrics ? cachedMetrics.permittedUsers : uniqueMembers.size,
+        permittedUsers: Number(cachedMetrics?.permittedUsers || 0),
         permissionTypes: getPermissionTypes(projects),
         projectId,
         storeUrl: primaryProject ? getProductionTenantUrl(primaryProject, "/shop") : "",
         websiteUrl: primaryProject ? getProductionTenantUrl(primaryProject) : "",
       };
+
+      // Member enumeration is secondary dashboard data. Let the core snapshot
+      // (and project-dependent screen-time request) render without waiting for it.
+      void membersRequest.then((memberGroups) => {
+        if (cancelled) return;
+        const uniqueMembers = new Map();
+        memberGroups.filter(Boolean).flat().forEach((member) => {
+          if (String(member?.status || "Active").toLowerCase() === "disabled") return;
+          const key = member?.userId || member?.user_id || member?.email || member?.id;
+          if (key) uniqueMembers.set(String(key), member);
+        });
+        if (memberGroups.every((group) => group === null)) return;
+        const completedMetrics = {
+          ...nextMetrics,
+          permittedUsers: uniqueMembers.size,
+        };
+        setMetrics(normalizeDashboardMetrics(completedMetrics));
+        writeDashboardMetricsCache(cacheScope, completedMetrics);
+      });
       return nextMetrics;
     };
 
@@ -457,7 +468,7 @@ function UserDashboardContent({ user, weeklyScreenTimeSeconds = 0, cacheScope = 
 
   return (
     <div className="user-dashboard-page">
-      {(loading) ? <PageHeaderSkeleton className="user-dashboard-hero app-page-intro" /> : (<header className="user-dashboard-hero app-page-intro">
+      <header className="user-dashboard-hero app-page-intro">
         <h1>
           {t("userDashboard.welcome", {
             name: displayName,
@@ -470,7 +481,7 @@ function UserDashboardContent({ user, weeklyScreenTimeSeconds = 0, cacheScope = 
               "A clear view of your forms, reservations, storage, plan, and access.",
           })}
         </p>
-      </header>)}
+      </header>
 
       <nav className="user-dashboard-quick-actions" aria-label="Form, website, and store shortcuts">
         <Link to={responsesPath + "/incomplete"}>

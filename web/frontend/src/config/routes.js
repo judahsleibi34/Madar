@@ -32,6 +32,7 @@ export const DASHBOARD_ROUTES = {
   ecommerceDelivery: "/ecommerce/delivery",
   ecommerceOrders: "/ecommerce/orders",
   ecommerceLoyalty: "/ecommerce/loyalty",
+  ecommerceLanding: "/ecommerce/landing-page",
   ecommerceTheme: "/ecommerce/theme",
   ecommerceSocialLinks: "/ecommerce/social-links",
   ecommerceCvRerank: "/ecommerce/cv-rerank",

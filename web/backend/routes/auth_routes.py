@@ -28,6 +28,7 @@ from services.account_lifecycle_service import (
 )
 from services.api_errors import api_error, error_detail
 from services.billing_service import get_billing_summary_for_tenant
+from services.observability_service import timed_operation
 from services.onboarding_service import (
     ensure_subdomain_available,
     validate_onboarding_subdomain,
@@ -804,18 +805,20 @@ def login(user: LogIn, response: Response, request: Request):
         enforce_auth_rate_limit(request, "login_ip")
         enforce_auth_rate_limit(request, "login", clean_email)
 
-        auth_response = supabase.auth.sign_in_with_password(
-            {
-                "email": clean_email,
-                "password": user.password,
-            }
-        )
+        with timed_operation("auth_provider"):
+            auth_response = supabase.auth.sign_in_with_password(
+                {
+                    "email": clean_email,
+                    "password": user.password,
+                }
+            )
 
         if not auth_response.user or not auth_response.session:
             raise HTTPException(status_code=401, detail="Invalid email or password")
 
         auth_user_id = str(auth_response.user.id)
-        local_user = get_local_user_by_auth_id(auth_user_id)
+        with timed_operation("user_profile"):
+            local_user = get_local_user_by_auth_id(auth_user_id)
 
         if not local_user:
             raise HTTPException(
@@ -968,9 +971,13 @@ def login(user: LogIn, response: Response, request: Request):
             metadata={"login_method": "credentials"},
         )
 
+        with timed_operation("billing"):
+            session_user = build_user_payload(local_user)
+            session_user.update(get_billing_summary_for_tenant(local_user.get("tenant_id")))
+
         login_payload = {
             "message": "User is logged in",
-            "user": build_user_payload(local_user),
+            "user": session_user,
             "csrf_token": csrf_token,
         }
 
@@ -1078,8 +1085,9 @@ def user_status(request: Request, response: Response):
                 "platform_account_required",
                 "This account is limited to the website where it was created.",
             )
-        user_payload = build_user_payload(user_data)
-        user_payload.update(get_billing_summary_for_tenant(user_data.get("tenant_id")))
+        with timed_operation("billing"):
+            user_payload = build_user_payload(user_data)
+            user_payload.update(get_billing_summary_for_tenant(user_data.get("tenant_id")))
         csrf_token = ensure_csrf_token(request, response)
 
         return {
