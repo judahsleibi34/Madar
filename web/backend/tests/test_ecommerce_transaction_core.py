@@ -16,6 +16,8 @@ MIGRATION = WEB_ROOT / "database" / "migrations" / "094_create_ecommerce_transac
 MIRROR = WEB_ROOT / "supabase" / "migrations" / "094_create_ecommerce_transaction_core.sql"
 DELIVERY_FEE_MIGRATION = WEB_ROOT / "database" / "migrations" / "106_add_order_delivery_fees.sql"
 DELIVERY_FEE_MIRROR = WEB_ROOT / "supabase" / "migrations" / "106_add_order_delivery_fees.sql"
+ORDER_NOTIFICATION_MIGRATION = WEB_ROOT / "database" / "migrations" / "110_enqueue_ecommerce_order_notifications.sql"
+ORDER_NOTIFICATION_MIRROR = WEB_ROOT / "supabase" / "migrations" / "110_enqueue_ecommerce_order_notifications.sql"
 
 
 def order_payload(**overrides):
@@ -134,6 +136,18 @@ class EcommerceTransactionCoreTests(unittest.TestCase):
         self.assertIn("inventory_restored_at = now()", text)
         self.assertIn("set status = p_reason", text)
         self.assertIn("p_reason not in ('cancelled', 'rejected')", text)
+
+    def test_order_notification_migration_is_atomic_and_repairable(self):
+        sql = ORDER_NOTIFICATION_MIGRATION.read_bytes()
+        self.assertEqual(sql, ORDER_NOTIFICATION_MIRROR.read_bytes())
+        text = sql.decode("utf-8").lower()
+        self.assertIn("create constraint trigger ecommerce_order_created_notification_intent", text)
+        self.assertIn("deferrable initially deferred", text)
+        self.assertIn("create_notification_event_intent", text)
+        self.assertIn("ecommerce_order_created", text)
+        self.assertIn("now() - interval '30 days'", text)
+        self.assertIn("migration_110_expected_schema_109", text)
+        self.assertIn("set schema_version = 110", text)
 
     def test_delivery_fee_migration_snapshots_server_price_into_order_total(self):
         sql = DELIVERY_FEE_MIGRATION.read_bytes()

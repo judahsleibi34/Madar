@@ -331,7 +331,7 @@ describe("document rendering", () => {
     fireEvent.click(screen.getByRole("button", { name: /open/i }));
 
     expect(screen.getByTitle("Managed guide").getAttribute("src")).toMatch(
-      /\/uploads\/tenant_7\/builder_assets\/56fee3e0f73c4110abdf423d501fb835\.pdf\?v=3$/
+      /\/uploads\/tenant_7\/builder_assets\/56fee3e0f73c4110abdf423d501fb835\.pdf\?v=4$/
     );
   });
 

@@ -174,13 +174,23 @@ function ProductImage({ product, className = "", eager = false }) {
   );
 }
 
-function StoreAccountMenu({ subdomain, account, loyalty, logoUrl, onAccountChange }) {
+function GmailIcon() {
+  return <svg className="live-store-gmail-icon" viewBox="0 0 24 24" aria-hidden="true">
+    <path fill="#4285F4" d="M3.5 19.5h3.25V9.24L2 5.68v12.07c0 .97.67 1.75 1.5 1.75Z" />
+    <path fill="#34A853" d="M17.25 19.5h3.25c.83 0 1.5-.78 1.5-1.75V5.68l-4.75 3.56V19.5Z" />
+    <path fill="#FBBC04" d="M17.25 9.24 22 5.68V4.8c0-2.17-2.13-3.4-3.6-2.28L12 7.32l5.25 3.94V9.24Z" />
+    <path fill="#EA4335" d="M6.75 9.24 2 5.68V4.8c0-2.17 2.13-3.4 3.6-2.28L12 7.32v3.94L6.75 7.32v1.92Z" />
+    <path fill="#C5221F" d="M17.25 9.24 12 13.18 6.75 9.24V7.32L12 11.26l5.25-3.94v1.92Z" />
+  </svg>;
+}
+function StoreAccountMenu({ subdomain, account, loyalty, onAccountChange }) {
   const menuRef = useRef(null);
+  const triggerRef = useRef(null);
   const [open, setOpen] = useState(false);
+  const [popoverTop, setPopoverTop] = useState(null);
   const [mode, setMode] = useState("login");
   const [status, setStatus] = useState({ saving: false, error: "", message: "" });
   const avatarUrl = resolveMediaUrl(account?.avatar);
-  const storeLogoUrl = resolveMediaUrl(logoUrl);
   const initials = String(account?.name || account?.email || "").split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase()).join("");
   const activeRewards = (loyalty?.entitlements || []).filter((item) => item.status === "active").length;
 
@@ -195,6 +205,25 @@ function StoreAccountMenu({ subdomain, account, loyalty, logoUrl, onAccountChang
     return () => {
       document.removeEventListener("keydown", closeOnEscape);
       document.removeEventListener("pointerdown", closeOutside);
+    };
+  }, [open]);
+
+  useLayoutEffect(() => {
+    if (!open) return undefined;
+    const updatePopoverPosition = () => {
+      const trigger = triggerRef.current;
+      const header = trigger?.closest(".live-store-header");
+      if (!trigger) return;
+      const triggerBottom = trigger.getBoundingClientRect().bottom;
+      const headerBottom = header?.getBoundingClientRect().bottom || triggerBottom;
+      setPopoverTop(Math.ceil(Math.max(triggerBottom, headerBottom) + 8));
+    };
+    updatePopoverPosition();
+    window.addEventListener("resize", updatePopoverPosition);
+    window.addEventListener("scroll", updatePopoverPosition, true);
+    return () => {
+      window.removeEventListener("resize", updatePopoverPosition);
+      window.removeEventListener("scroll", updatePopoverPosition, true);
     };
   }, [open]);
 
@@ -255,10 +284,10 @@ function StoreAccountMenu({ subdomain, account, loyalty, logoUrl, onAccountChang
 
   return (
     <div className="live-store-account" ref={menuRef}>
-      <button type="button" className="live-store-account-trigger" onClick={() => setOpen((value) => !value)} aria-label={account ? c("account.openAccount") : c("account.signInRegister")} aria-expanded={open}>
-        {storeLogoUrl ? <img className="live-store-account-store-logo" src={storeLogoUrl} alt="" /> : avatarUrl ? <img src={avatarUrl} alt="" /> : initials ? <span>{initials}</span> : <UserRound size={21} aria-hidden="true" />}
+      <button type="button" className="live-store-account-trigger" ref={triggerRef} onClick={() => setOpen((value) => !value)} aria-label={account ? c("account.openAccount") : c("account.signInRegister")} aria-expanded={open}>
+        {avatarUrl ? <img src={avatarUrl} alt="" /> : initials ? <span>{initials}</span> : <UserRound size={21} aria-hidden="true" />}
       </button>
-      {open && <div className="live-store-account-popover" role="dialog" aria-label={c("account.title")}>
+      {open && <div className="live-store-account-popover" role="dialog" aria-label={c("account.title")} style={popoverTop === null ? undefined : { "--store-account-popover-top": `${popoverTop}px` }}>
         <header>
           <div className="live-store-account-avatar">{avatarUrl ? <img src={avatarUrl} alt="" /> : initials ? <span>{initials}</span> : <UserRound size={24} aria-hidden="true" />}</div>
           <div><strong>{account?.name || c("account.welcome")}</strong>{account?.email && <small>{account.email}</small>}</div>
@@ -287,7 +316,7 @@ function StoreAccountMenu({ subdomain, account, loyalty, logoUrl, onAccountChang
           </form>
           <div className="live-store-account-divider"><span>{c("account.or")}</span></div>
           <button type="button" className="live-store-account-google" onClick={() => setStatus({ saving: false, error: "", message: c("account.googleUnavailable") })}>
-            <span aria-hidden="true">G</span>{c("account.continueWithGoogle")}
+            <GmailIcon />{c("account.continueWithGoogle")}
           </button>
         </div>}
       </div>}
@@ -372,7 +401,7 @@ function StoreHeader({ brand, logoUrl, cartCount, shopPath, homePath, categories
         >
           <Globe2 size={21} strokeWidth={2} aria-hidden="true" />
         </button>
-        <StoreAccountMenu subdomain={subdomain} account={account} loyalty={loyalty} logoUrl={logoUrl} onAccountChange={onAccountChange} />
+        <StoreAccountMenu subdomain={subdomain} account={account} loyalty={loyalty} onAccountChange={onAccountChange} />
         <button type="button" className="live-store-cart" onClick={onCartOpen} aria-label={c("nav.openCart", { count: cartCount })}>
           <ShoppingCart size={21} strokeWidth={1.8} aria-hidden="true" />
           {cartCount > 0 && <b>{cartCount > 99 ? "99+" : cartCount}</b>}
@@ -463,12 +492,26 @@ function StoreCheckout({ items, account, loyalty, normalDiscounts, shopPath, sto
   const navigate = useNavigate();
   const formRef = useRef(null);
   const [status, setStatus] = useState({ saving: false, error: "" });
+  const [loyaltyPromptDismissed, setLoyaltyPromptDismissed] = useState(false);
+  const loyaltyPromptCloseRef = useRef(null);
   const currency = items[0]?.currency || "USD";
   const subtotal = items.reduce((total, item) => total + Number(item.price || 0) * Number(item.quantity || 0), 0);
   const estimatedDiscount = estimateCartDiscount(items, normalDiscounts, loyalty?.entitlements || []);
   const selectedArea = delivery.areas.find((area) => area.id === selectedAreaId);
   const deliveryFee = Number(selectedArea?.delivery_fee || 0);
   const estimatedTotal = subtotal - estimatedDiscount + deliveryFee;
+
+  const showLoyaltyPrompt = account === null && !loyaltyPromptDismissed;
+
+  useEffect(() => {
+    if (!showLoyaltyPrompt) return undefined;
+    loyaltyPromptCloseRef.current?.focus();
+    const closeOnEscape = (event) => {
+      if (event.key === "Escape") setLoyaltyPromptDismissed(true);
+    };
+    document.addEventListener("keydown", closeOnEscape);
+    return () => document.removeEventListener("keydown", closeOnEscape);
+  }, [showLoyaltyPrompt]);
 
   const checkoutTracked = useRef(false);
   useEffect(() => {
@@ -513,7 +556,7 @@ function StoreCheckout({ items, account, loyalty, normalDiscounts, shopPath, sto
       emailField.focus();
       return;
     }
-    const minimumLengths = { customer_name: 2, phone: 5, street: 3 };
+    const minimumLengths = { customer_name: 2, phone: 5 };
     const invalidField = Array.from(event.currentTarget.elements).find((field) =>
       field.willValidate && (!field.validity.valid ||
         (minimumLengths[field.name] && String(field.value).trim().length < minimumLengths[field.name]))
@@ -531,11 +574,7 @@ function StoreCheckout({ items, account, loyalty, normalDiscounts, shopPath, sto
         email: String(form.get("email") || "").trim(),
         phone: String(form.get("phone") || "").trim(),
         service_area_id: String(form.get("service_area_id") || ""),
-        street: String(form.get("street") || "").trim(),
-        building: String(form.get("building") || "").trim(),
-        floor_apartment: String(form.get("floor_apartment") || "").trim(),
-        address_description: String(form.get("address_description") || "").trim(),
-        delivery_notes: String(form.get("delivery_notes") || "").trim(),
+        street: String(selectedArea?.name_en || selectedArea?.name_ar || selectedArea?.code || "Service area"),
         payment_method: "cash_on_delivery",
         items: items.map((item) => ({ product_id: item.id, ...(item.variant_id ? { variant_id: item.variant_id } : {}), quantity: item.quantity })),
       });
@@ -557,17 +596,20 @@ function StoreCheckout({ items, account, loyalty, normalDiscounts, shopPath, sto
         <h1>{c("checkout.title")}</h1>
         <p>{c("checkout.subtitle")}</p>
       </header>
-      {account === null && (
-        <aside className="live-store-checkout-loyalty-prompt" aria-labelledby="checkout-loyalty-title">
-          <span aria-hidden="true"><Gift size={22} /></span>
-          <div>
-            <strong id="checkout-loyalty-title">{c("checkoutLoyalty.title")}</strong>
-            <p>{c("checkoutLoyalty.body")}</p>
-          </div>
-          <button type="button" onClick={() => window.dispatchEvent(new CustomEvent("madar:store-account-open"))}>
-            <UserRound size={17} aria-hidden="true" />{c("checkoutLoyalty.signIn")}
-          </button>
-        </aside>
+      {showLoyaltyPrompt && (
+        <div className="live-store-checkout-loyalty-overlay" onMouseDown={(event) => { if (event.target === event.currentTarget) setLoyaltyPromptDismissed(true); }}>
+          <aside className="live-store-checkout-loyalty-prompt" role="dialog" aria-modal="true" aria-labelledby="checkout-loyalty-title">
+            <button ref={loyaltyPromptCloseRef} type="button" className="live-store-checkout-loyalty-close" onClick={() => setLoyaltyPromptDismissed(true)} aria-label={c("admin.close")}><X size={18} aria-hidden="true" /></button>
+            <span aria-hidden="true"><Gift size={22} /></span>
+            <div>
+              <strong id="checkout-loyalty-title">{c("checkoutLoyalty.title")}</strong>
+              <p>{c("checkoutLoyalty.body")}</p>
+            </div>
+            <button type="button" className="live-store-checkout-loyalty-action" onClick={() => { setLoyaltyPromptDismissed(true); window.dispatchEvent(new CustomEvent("madar:store-account-open")); }}>
+              <UserRound size={17} aria-hidden="true" />{c("checkoutLoyalty.signIn")}
+            </button>
+          </aside>
+        </div>
       )}
       {account && (
         <div className="live-store-checkout-profile-note" role="status">
@@ -592,11 +634,6 @@ function StoreCheckout({ items, account, loyalty, normalDiscounts, shopPath, sto
               {!delivery.loading && delivery.error && <p className="is-wide live-store-checkout-error">{delivery.error}</p>}
               {!delivery.loading && !delivery.error && !delivery.areas.length && <p className="is-wide live-store-checkout-error">{c("checkout.noAreas")}</p>}
               <label className="is-wide"><span>{c("checkout.serviceArea")}</span><select name="service_area_id" required value={selectedAreaId} disabled={!delivery.areas.length} onChange={(event) => onSelectedAreaChange(event.target.value)}><option value="">{c("checkout.chooseArea")}</option>{delivery.areas.map((area) => <option key={area.id} value={area.id}>{activeLocale() === "ar" ? area.name_ar || area.name_en : area.name_en || area.name_ar} — {formatPrice(area.delivery_fee || 0, currency, activeLocale())}</option>)}</select></label>
-              <label className="is-wide"><span>{c("checkout.street")}</span><input name="street" minLength={3} autoComplete="street-address" required maxLength={240} /></label>
-              <label><span>{c("checkout.building")}</span><input name="building" maxLength={120} /></label>
-              <label><span>{c("checkout.floor")}</span><input name="floor_apartment" maxLength={120} /></label>
-              <label className="is-wide"><span>{c("checkout.description")}</span><textarea name="address_description" rows={2} maxLength={500} /></label>
-              <label className="is-wide"><span>{c("checkout.notes")}</span><textarea name="delivery_notes" rows={3} maxLength={1000} /></label>
             </div>
           </section>
           <section className="live-store-payment-method">

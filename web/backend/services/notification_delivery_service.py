@@ -190,7 +190,7 @@ def _deliver_internal(row: dict[str, Any]) -> None:
 
     recipient_query = (
         service_supabase.table("tenant_memberships")
-        .select("user_id")
+        .select("user_id,role")
         .eq("tenant_id", int(tenant_id))
         .eq("status", "active")
     )
@@ -223,7 +223,12 @@ def _deliver_internal(row: dict[str, Any]) -> None:
             event_type=event.get("event_type") or payload.get("event_type"),
             source_type=event.get("source_type") or payload.get("source_type"),
         )
-        if not preference_enabled(
+        mandatory_store_order = (
+            str(event.get("event_type") or payload.get("event_type") or "")
+            == "ecommerce_order_created"
+            and str(recipient.get("role") or "") in {"owner", "admin"}
+        )
+        if not mandatory_store_order and not preference_enabled(
             tenant_id=tenant_id,
             user_id=recipient["user_id"],
             category=category,

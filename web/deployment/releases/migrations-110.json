@@ -1,0 +1,13 @@
+{
+  "release_sha": "CURRENT",
+  "migrations": [
+    {
+      "number": 110,
+      "path": "web/database/migrations/110_enqueue_ecommerce_order_notifications.sql",
+      "sha256": "62abac35e0ba0a3ddef331391a2de76302e36898816c39ba99c3c67c5c55ca55",
+      "from_schema": 109,
+      "to_schema": 110,
+      "compatibility": "forward-compatible"
+    }
+  ]
+}

@@ -21,7 +21,10 @@ def _utc_now() -> str:
 
 
 def _rows(response) -> list[dict[str, Any]]:
-    return getattr(response, "data", None) or []
+    data = getattr(response, "data", None)
+    if isinstance(data, dict):
+        return [data]
+    return [row for row in (data or []) if isinstance(row, dict)]
 
 
 def get_web_push_public_config() -> dict[str, Any]:

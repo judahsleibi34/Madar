@@ -156,7 +156,7 @@ describe("EcommerceStorefront", () => {
     expect(screen.queryByRole("dialog", { name: "Customer account" })).toBeNull();
   });
 
-  it("uses the original store logo for the account trigger avatar", async () => {
+  it("uses the customer avatar control instead of repeating the store logo", async () => {
     fetchPublicEcommerceCatalog.mockResolvedValue({
       ...catalog,
       site: { ...catalog.site, logo_url: "https://example.com/store-logo.webp" },
@@ -166,7 +166,8 @@ describe("EcommerceStorefront", () => {
     render(<MemoryRouter initialEntries={["/shop"]}><Routes><Route path="/shop/*" element={<EcommerceStorefront subdomain="demo" />} /></Routes></MemoryRouter>);
 
     const trigger = await screen.findByRole("button", { name: "Sign in or register" });
-    expect(trigger.querySelector(".live-store-account-store-logo")?.getAttribute("src")).toContain("store-logo.webp");
+    expect(trigger.querySelector(".live-store-account-store-logo")).toBeNull();
+    expect(trigger.querySelector("svg")).toBeTruthy();
   });
 
   it("offers customer sign-in and registration from the header account control", async () => {
@@ -192,6 +193,30 @@ describe("EcommerceStorefront", () => {
     expect(screen.getByRole("button", { name: "Create account" })).toBeTruthy();
   });
 
+  it("positions the mobile account panel below the full header", async () => {
+    fetchPublicEcommerceCatalog.mockResolvedValue(catalog);
+    fetchPublicEcommerceProfile.mockResolvedValue({ site: { brand: "Test Store" } });
+    const rect = (bottom) => ({
+      bottom, height: bottom, left: 0, right: 393, top: 0, width: 393,
+      x: 0, y: 0, toJSON: () => ({}),
+    });
+    const bounds = vi.spyOn(HTMLElement.prototype, "getBoundingClientRect")
+      .mockImplementation(function getBounds() {
+        if (this.classList?.contains("live-store-header")) return rect(140);
+        if (this.classList?.contains("live-store-account-trigger")) return rect(60);
+        return rect(0);
+      });
+
+    try {
+      render(<MemoryRouter initialEntries={["/shop"]}><Routes><Route path="/shop/*" element={<EcommerceStorefront subdomain="demo" />} /></Routes></MemoryRouter>);
+      fireEvent.click(await screen.findByRole("button", { name: "Sign in or register" }));
+      const dialog = await screen.findByRole("dialog", { name: "Customer account" });
+      await waitFor(() => expect(dialog.style.getPropertyValue("--store-account-popover-top")).toBe("148px"));
+    } finally {
+      bounds.mockRestore();
+    }
+  });
+
   it.each(["en", "ar"])("uses the %s store identity on the homepage and footer", async (locale) => {
     await i18n.changeLanguage(locale);
     const site = { brand: "English Store", description: "English description", brand_ar: "متجر مدار", description_ar: "وصف المتجر" };
@@ -204,7 +229,6 @@ describe("EcommerceStorefront", () => {
     expect(screen.getAllByText(description).length).toBeGreaterThanOrEqual(2);
     expect(document.querySelector(".live-store").getAttribute("dir")).toBe(locale === "ar" ? "rtl" : "ltr");
   });
-
   it("falls back to English store identity when Arabic is blank", async () => {
     await i18n.changeLanguage("ar");
     const site = { brand: "English Store", description: "English description", brand_ar: "  ", description_ar: "" };
@@ -304,7 +328,13 @@ describe("EcommerceStorefront", () => {
 
     expect(await screen.findByRole("heading", { level: 1, name: "Checkout" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Place order" })).toBeTruthy();
-    expect(await screen.findByText("Sign in before ordering and earn points")).toBeTruthy();
+    expect(screen.queryByLabelText("Street")).toBeNull();
+    expect(screen.queryByLabelText("Building")).toBeNull();
+    expect(screen.queryByLabelText("Floor / apartment")).toBeNull();
+    expect(screen.queryByLabelText("Landmark / address description")).toBeNull();
+    expect(screen.queryByLabelText("Delivery notes")).toBeNull();
+    expect(await screen.findByRole("dialog", { name: "Sign in before ordering and earn points" })).toBeTruthy();
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Close" }));
     fireEvent.click(screen.getByRole("button", { name: "Sign in to earn points" }));
     expect(await screen.findByRole("dialog", { name: "Customer account" })).toBeTruthy();
     expect(screen.getByText("Ramallah — $6.50")).toBeTruthy();
@@ -375,10 +405,11 @@ describe("EcommerceStorefront", () => {
       </MemoryRouter>
     );
 
+    await screen.findByRole("dialog", { name: "Sign in before ordering and earn points" });
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
     fireEvent.change(await screen.findByLabelText("Customer name"), { target: { value: "Judah Sleibi" } });
     fireEvent.change(screen.getByLabelText("Email"), { target: { value: "judahsleibi34@gmailcom" } });
     fireEvent.change(screen.getByLabelText("Phone"), { target: { value: "+970599203855" } });
-    fireEvent.change(screen.getByLabelText("Street"), { target: { value: "YMCA street 12" } });
     fireEvent.click(screen.getByRole("button", { name: "Place order" }));
 
     expect((await screen.findAllByRole("alert")).some((alert) => alert.textContent.includes("Please enter a valid email address."))).toBe(true);
@@ -986,6 +1017,18 @@ it("shows a safe cart error instead of success when browser storage rejects an a
   } finally { storage.mockRestore(); }
 });
 
+it("keeps language selection in the hamburger and account access in the header", async () => {
+  fetchPublicEcommerceCatalog.mockResolvedValue(catalog);
+  fetchPublicEcommerceProfile.mockResolvedValue({ site: catalog.site });
+  render(<MemoryRouter initialEntries={["/shop"]}><Routes><Route path="/shop/*" element={<EcommerceStorefront subdomain="demo" />} /></Routes></MemoryRouter>);
+  const accountTrigger = await screen.findByRole("button", { name: "Sign in or register" });
+  expect(accountTrigger.querySelector("svg")).toBeTruthy();
+  const toggle = document.querySelector(".live-store-mobile-menu");
+  fireEvent.click(toggle);
+  expect(document.querySelector(".live-store-menu-account")).toBeNull();
+  fireEvent.click(document.querySelector(".live-store-menu-language button"));
+  expect(toggle.getAttribute("aria-expanded")).toBe("false");
+});
 it("closes the mobile navigation after a page selection and Escape", async () => {
   fetchPublicEcommerceCatalog.mockResolvedValue(catalog);
   fetchPublicEcommerceProfile.mockResolvedValue({ site: catalog.site });
