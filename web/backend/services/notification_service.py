@@ -11,6 +11,7 @@ from services.notification_action_service import (
     normalize_notification_data,
 )
 from services.web_push_config import get_web_push_configuration
+from services.observability_service import traced_operation
 
 logger = logging.getLogger(__name__)
 
@@ -47,21 +48,24 @@ def list_user_notifications(
     if unread_only:
         query = query.is_("read_at", "null")
 
-    response = query.execute()
-    notifications = [_format_notification(row) for row in _rows(response)]
+    with traced_operation("notifications_list_query"):
+        response = query.execute()
+    with traced_operation("notifications_transform"):
+        notifications = [_format_notification(row) for row in _rows(response)]
 
     try:
         unread_query = service_supabase.table("user_notifications").select("id", count="exact")
     except TypeError:
         # Lightweight test adapters may not implement PostgREST's count kwarg.
         unread_query = service_supabase.table("user_notifications").select("id")
-    unread_response = (
-        unread_query
-        .eq("tenant_id", int(tenant_id))
-        .eq("user_id", int(user_id))
-        .is_("read_at", "null")
-        .execute()
-    )
+    with traced_operation("notifications_unread_query"):
+        unread_response = (
+            unread_query
+            .eq("tenant_id", int(tenant_id))
+            .eq("user_id", int(user_id))
+            .is_("read_at", "null")
+            .execute()
+        )
 
     exact_count = getattr(unread_response, "count", None)
 

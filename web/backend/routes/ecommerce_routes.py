@@ -18,7 +18,8 @@ from services.ecommerce_cache_service import (
     get_or_create_ecommerce_cache,
     invalidate_ecommerce_cache,
 )
-from services.observability_service import timed_operation
+from services.bounded_query_service import submit_db_read
+from services.observability_service import timed_operation, traced_operation
 from services.tenant_service import require_active_tenant_member
 
 
@@ -955,42 +956,45 @@ def _catalog_for_tenant(tenant_id: int) -> dict[str, list[dict[str, Any]]]:
 
 
 def _catalog_tags_for_tenant(tenant_id: int) -> dict[str, Any]:
-    return {
-        "tags": _rows(
-            service_supabase.table("ecommerce_tags")
-            .select("*")
-            .eq("tenant_id", tenant_id)
-            .order("created_at", desc=True)
-        )
-    }
+    with traced_operation("catalog_tags"):
+        return {
+            "tags": _rows(
+                service_supabase.table("ecommerce_tags")
+                .select("*")
+                .eq("tenant_id", tenant_id)
+                .order("created_at", desc=True)
+            )
+        }
 
 
 def _catalog_categories_for_tenant(tenant_id: int) -> dict[str, Any]:
-    return {
-        "categories": _rows(
-            service_supabase.table("ecommerce_categories")
-            .select("*")
-            .eq("tenant_id", tenant_id)
-            .order("sort_order")
-            .order("created_at")
-        )
-    }
+    with traced_operation("catalog_categories"):
+        return {
+            "categories": _rows(
+                service_supabase.table("ecommerce_categories")
+                .select("*")
+                .eq("tenant_id", tenant_id)
+                .order("sort_order")
+                .order("created_at")
+            )
+        }
 
 
 def _catalog_brands_for_tenant(tenant_id: int) -> dict[str, Any]:
-    try:
-        brands = _rows(
-            service_supabase.table("ecommerce_brands")
-            .select("*")
-            .eq("tenant_id", tenant_id)
-            .order("name")
-        )
-    except Exception as error:
-        raw = str(error).lower()
-        if not ("pgrst205" in raw or "could not find the table" in raw or "schema cache" in raw):
-            raise
-        brands = []
-    return {"brands": brands}
+    with traced_operation("catalog_brands"):
+        try:
+            brands = _rows(
+                service_supabase.table("ecommerce_brands")
+                .select("*")
+                .eq("tenant_id", tenant_id)
+                .order("name")
+            )
+        except Exception as error:
+            raw = str(error).lower()
+            if not ("pgrst205" in raw or "could not find the table" in raw or "schema cache" in raw):
+                raise
+            brands = []
+        return {"brands": brands}
 
 
 def _catalog_products_for_tenant(tenant_id: int) -> dict[str, Any]:
@@ -1067,20 +1071,39 @@ def _validate_featured_rows(tenant_id: int, table: str, selected_ids: list[UUID]
 
 
 def _store_currency_for_tenant(tenant_id: int) -> str | None:
-    try:
-        settings = _rows(
-            service_supabase.table("website_settings")
-            .select("ecommerce_currency")
-            .eq("tenant_id", int(tenant_id))
-            .limit(1)
-        )
-    except Exception as error:
-        message = str(error).lower()
-        if "ecommerce_currency" in message or "pgrst204" in message or "schema cache" in message:
-            return None
-        raise
-    currency = str(settings[0].get("ecommerce_currency") or "").strip().upper() if settings else ""
-    return currency or None
+    with traced_operation("catalog_currency"):
+        try:
+            settings = _rows(
+                service_supabase.table("website_settings")
+                .select("ecommerce_currency")
+                .eq("tenant_id", int(tenant_id))
+                .limit(1)
+            )
+        except Exception as error:
+            message = str(error).lower()
+            if "ecommerce_currency" in message or "pgrst204" in message or "schema cache" in message:
+                return None
+            raise
+        currency = str(settings[0].get("ecommerce_currency") or "").strip().upper() if settings else ""
+        return currency or None
+
+
+def _catalog_options_for_tenant(tenant_id: int) -> dict[str, Any]:
+    loaders = {
+        "tags": lambda: _catalog_tags_for_tenant(tenant_id),
+        "categories": lambda: _catalog_categories_for_tenant(tenant_id),
+        "brands": lambda: _catalog_brands_for_tenant(tenant_id),
+        "currency": lambda: _store_currency_for_tenant(tenant_id),
+    }
+    with traced_operation("catalog_options_parallel"):
+        pending = {name: submit_db_read(loader) for name, loader in loaders.items()}
+        results = {name: future.result() for name, future in pending.items()}
+    return {
+        **results["tags"],
+        **results["categories"],
+        **results["brands"],
+        "commerce_currency": results["currency"],
+    }
 
 
 def _store_currency_locked(tenant_id: int) -> bool:
@@ -1670,17 +1693,13 @@ def get_products(request: Request, response: Response):
 
 @router.get("/catalog/options")
 def get_catalog_options(request: Request, response: Response):
-    context = _require_ecommerce_access(request, response)
+    with traced_operation("catalog_authorization"):
+        context = _require_ecommerce_access(request, response)
     try:
         return _cached_catalog_resource(
             context.tenant_id,
             "catalog-options",
-            lambda: {
-                **_catalog_tags_for_tenant(context.tenant_id),
-                **_catalog_categories_for_tenant(context.tenant_id),
-                **_catalog_brands_for_tenant(context.tenant_id),
-                "commerce_currency": _store_currency_for_tenant(context.tenant_id),
-            },
+            lambda: _catalog_options_for_tenant(context.tenant_id),
         )
     except Exception as error:
         _handle_catalog_error(error)

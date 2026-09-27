@@ -38,6 +38,41 @@ async function request(path, options = {}) {
   return data;
 }
 
+let catalogOptionsPreload = null;
+
+export const preloadEcommerceCatalogOptions = () => {
+  if (!catalogOptionsPreload) {
+    // This GET authorizes independently on the backend. Do not let a
+    // speculative 401 start its own refresh while auth bootstrap is running.
+    catalogOptionsPreload = request("/ecommerce/catalog/options", {
+      skipAuthRefresh: true,
+    });
+    // The route may redirect before consuming the speculative request.
+    catalogOptionsPreload.catch(() => {});
+  }
+  return catalogOptionsPreload;
+};
+
+export const clearEcommerceCatalogOptionsPreload = () => {
+  catalogOptionsPreload = null;
+};
+
+const loadEcommerceCatalogOptions = async () => {
+  const preloaded = catalogOptionsPreload;
+  catalogOptionsPreload = null;
+  if (!preloaded) return request("/ecommerce/catalog/options");
+  try {
+    return await preloaded;
+  } catch (error) {
+    // Auth bootstrap may have refreshed an expired session in parallel.
+    // Retry through the normal request path only after the protected route mounts.
+    if (error?.status === 401 || error?.status === 403) {
+      return request("/ecommerce/catalog/options");
+    }
+    throw error;
+  }
+};
+
 export const fetchEcommerceCatalog = ({ scope, force = false } = {}) => {
   if (!force) {
     const cached = readEcommerceCatalogCache(scope);
@@ -66,7 +101,7 @@ export const fetchEcommerceCatalogOptions = ({ scope, force = false } = {}) =>
   loadEcommerceAdminResource(
     scope,
     "catalog:options",
-    () => request("/ecommerce/catalog/options"),
+    loadEcommerceCatalogOptions,
     { force },
   );
 

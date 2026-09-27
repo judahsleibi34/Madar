@@ -22,6 +22,7 @@ from services.upload_config import get_data_upload_dir, get_private_charts_dir, 
 
 CORRELATION_ID = contextvars.ContextVar("madar_correlation_id", default="")
 REQUEST_TIMINGS = contextvars.ContextVar("madar_request_timings", default=None)
+REQUEST_TIMING_MARKERS = contextvars.ContextVar("madar_request_timing_markers", default=None)
 CORRELATION_PATTERN = re.compile(r"^[A-Za-z0-9._:-]{8,80}$")
 _lock = threading.Lock()
 _requests: dict[tuple[str, str, str], int] = defaultdict(int)
@@ -49,11 +50,16 @@ def record_request(*, method: str, route: str, status_code: int, elapsed_seconds
 
 
 def begin_request_timings():
-    return REQUEST_TIMINGS.set({})
+    return (
+        REQUEST_TIMINGS.set({}),
+        REQUEST_TIMING_MARKERS.set({"origin": time.perf_counter(), "markers": {}}),
+    )
 
 
 def end_request_timings(token) -> None:
-    REQUEST_TIMINGS.reset(token)
+    timings_token, markers_token = token
+    REQUEST_TIMINGS.reset(timings_token)
+    REQUEST_TIMING_MARKERS.reset(markers_token)
 
 
 def record_request_timing(name: str, duration_seconds: float) -> None:
@@ -61,7 +67,18 @@ def record_request_timing(name: str, duration_seconds: float) -> None:
     if timings is None:
         return
     safe_name = "".join(character if character.isalnum() or character in "_-" else "_" for character in name)
-    timings[safe_name] = timings.get(safe_name, 0.0) + max(float(duration_seconds), 0.0)
+    with _lock:
+        timings[safe_name] = timings.get(safe_name, 0.0) + max(float(duration_seconds), 0.0)
+
+
+def record_request_timing_marker(name: str) -> None:
+    state = REQUEST_TIMING_MARKERS.get()
+    if state is None:
+        return
+    safe_name = "".join(character if character.isalnum() or character in "_-" else "_" for character in name)
+    offset = max(0.0, time.perf_counter() - float(state["origin"]))
+    with _lock:
+        state["markers"][safe_name] = offset
 
 
 @contextmanager
@@ -73,15 +90,37 @@ def timed_operation(name: str):
         record_request_timing(name, time.perf_counter() - started_at)
 
 
+@contextmanager
+def traced_operation(name: str):
+    record_request_timing_marker(f"{name}_start")
+    try:
+        with timed_operation(name):
+            yield
+    finally:
+        record_request_timing_marker(f"{name}_end")
+
+
 def request_timings_snapshot() -> dict[str, float]:
-    return dict(REQUEST_TIMINGS.get() or {})
+    with _lock:
+        return dict(REQUEST_TIMINGS.get() or {})
+
+
+def request_timing_markers_snapshot() -> dict[str, float]:
+    state = REQUEST_TIMING_MARKERS.get() or {}
+    with _lock:
+        return dict(state.get("markers") or {})
 
 
 def server_timing_value() -> str:
-    return ", ".join(
+    durations = [
         f'{name};dur={duration_seconds * 1000:.1f}'
         for name, duration_seconds in request_timings_snapshot().items()
-    )
+    ]
+    markers = [
+        f'{name};dur={offset_seconds * 1000:.1f};desc="offset"'
+        for name, offset_seconds in request_timing_markers_snapshot().items()
+    ]
+    return ", ".join([*durations, *markers])
 
 
 def _escape(value: str) -> str:

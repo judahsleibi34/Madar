@@ -1,5 +1,6 @@
 import os
 import unittest
+import time
 from datetime import datetime, timezone
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -200,6 +201,54 @@ class CalendarRouteTests(unittest.TestCase):
             "calendar_task_query", "calendar_connections", "calendar_workload",
             "calendar_transform",
         }.issubset(timings))
+
+    def test_workspace_independent_reads_overlap_in_request_trace(self):
+        context = SimpleNamespace(
+            tenant_id=7, user_id=12, role="member", membership_status="active",
+            user={"timezone": "UTC"},
+        )
+        start = datetime(2026, 7, 1, tzinfo=timezone.utc)
+        end = datetime(2026, 7, 8, tzinfo=timezone.utc)
+
+        class SlowQuery(Query):
+            @property
+            def not_(self):
+                return self
+            def is_(self, *_args): return self
+            def execute(self):
+                time.sleep(0.03)
+                return SimpleNamespace(data=[])
+
+        client = SimpleNamespace(table=lambda _name: SlowQuery([]))
+        access = SimpleNamespace(
+            calendar={"id": "calendar-1"},
+            role="owner",
+            allows=lambda _permission: True,
+        )
+
+        def slow_tasks(*_args):
+            time.sleep(0.06)
+            return []
+
+        token = observability_service.begin_request_timings()
+        try:
+            with patch.object(calendar_routes, "service_supabase", client), patch.object(
+                calendar_routes, "ensure_default_calendar"
+            ), patch.object(
+                calendar_routes, "list_accessible_calendars", return_value=[access]
+            ), patch.object(
+                calendar_routes, "workspace_task_rows", side_effect=slow_tasks
+            ), patch.object(
+                calendar_routes, "workspace_linked_task_event_ids", return_value=set()
+            ):
+                calendar_routes._calendar_workspace_payload(context, start, end)
+            markers = observability_service.request_timing_markers_snapshot()
+        finally:
+            observability_service.end_request_timings(token)
+
+        self.assertLess(markers["calendar_event_query_start"], markers["calendar_task_query_end"])
+        self.assertLess(markers["calendar_task_query_start"], markers["calendar_event_query_end"])
+        self.assertLess(markers["calendar_connections_start"], markers["calendar_event_query_end"])
 
     def test_cached_bootstrap_refreshes_reservations_on_every_request(self):
         context = SimpleNamespace(

@@ -27,6 +27,7 @@ from services.notification_preference_service import (
     set_notification_preference,
 )
 from services.web_push_config import get_web_push_configuration
+from services.observability_service import traced_operation
 
 
 router = APIRouter(prefix="/notifications", tags=["Notifications"])
@@ -69,16 +70,18 @@ def list_notifications(
     limit: int = Query(default=30, ge=1, le=100),
     unread_only: bool = Query(default=False),
 ):
-    context = _current_context(request, response)
-    return {
-        "success": True,
-        **list_user_notifications(
-            tenant_id=context.tenant_id,
-            user_id=context.user_id,
-            limit=limit,
-            unread_only=unread_only,
-        ),
-    }
+    with traced_operation("notifications_authorization"):
+        context = _current_context(request, response)
+    with traced_operation("notifications_payload"):
+        return {
+            "success": True,
+            **list_user_notifications(
+                tenant_id=context.tenant_id,
+                user_id=context.user_id,
+                limit=limit,
+                unread_only=unread_only,
+            ),
+        }
 
 
 @router.post("/{notification_id}/read")
