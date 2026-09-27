@@ -213,3 +213,42 @@ def test_ecommerce_order_notification_reaches_active_store_owner(monkeypatch):
     )
     assert owner_notification["event_type"] == "ecommerce_order_created"
     assert owner_notification["data"]["order_id"] == "order-1"
+
+
+def test_notification_rpc_accepts_single_object_response():
+    assert notification_service._rows(FakeResponse({"id": "event-1"})) == [
+        {"id": "event-1"}
+    ]
+
+
+def test_ecommerce_order_in_app_notification_is_mandatory_for_owner(monkeypatch):
+    fake_supabase = FakeSupabase()
+    monkeypatch.setattr(
+        notification_delivery_service, "service_supabase", fake_supabase
+    )
+    monkeypatch.setattr(
+        notification_delivery_service,
+        "preference_enabled",
+        lambda **_kwargs: False,
+    )
+
+    notification_delivery_service.deliver_notification({
+        "channel": "internal",
+        "tenant_id": 7,
+        "payload": {
+            "event_type": "ecommerce_order_created",
+            "source_type": "ecommerce_order",
+            "source_id": "order-mandatory-1",
+            "title": "New order: MD-1002",
+            "body": "MD-1002 was placed for ILS 25.00.",
+            "data": {
+                "order_id": "order-mandatory-1",
+                "order_number": "MD-1002",
+            },
+            "event_deduplication_key": "ecommerce-order:order-mandatory-1",
+        },
+    })
+
+    assert {
+        row["user_id"] for row in fake_supabase.tables["user_notifications"]
+    } == {11}

@@ -1,14 +1,14 @@
 {
   "release_metadata_version": 1,
   "schema": {
-    "compatible_min": 108,
-    "compatible_max": 109,
-    "target": 109,
+    "compatible_min": 109,
+    "compatible_max": 110,
+    "target": 110,
     "migration_class": "forward-compatible",
-    "rollback_compatible_min": 108,
-    "rollback_compatible_max": 108
+    "rollback_compatible_min": 109,
+    "rollback_compatible_max": 109
   },
   "migration_policy": "automatic-after-known-good-backup-first-forward-repair",
-  "notes": "Forward-compatible schema 108 to 109 bridge. Schema 108 is the accepted production source and migrations through 108 are immutable applied production history. Migration 109 corrects the ecommerce order totals constraint so the immutable delivery-fee snapshot is included in the stored total. A verified schema-108 backup is required before migration; recovery is forward-repair-only after schema advances beyond 108.",
-  "migration_manifest": "migrations-109.json"
+  "notes": "Forward-compatible schema 109 to 110 bridge. Migrations through 109 are immutable applied production history. Migration 110 makes ecommerce order creation and its durable notification intent atomic, keeps owner/admin in-app order notifications mandatory, and repairs missing notification intents for recent orders. A verified schema-109 backup is required before migration; recovery is forward-repair-only after schema advances beyond 109.",
+  "migration_manifest": "migrations-110.json"
 }

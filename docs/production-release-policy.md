@@ -255,15 +255,16 @@ queried directly. Its SHA must match state and its reported compatibility range
 must contain the live schema. Candidate rollback bounds are descriptive metadata
 today; retained-target attestation is the operative rollback check.
 
-Production is currently at schema 108. The current bridge contract is schema
-range `108..109`, target `109`, class `forward-compatible`, rollback
-metadata `108..108`, and the checksum-pinned `migrations-109.json`.
-Migrations through 108 are applied production history and remain immutable.
-Only after bridge acceptance at schema 108 may the coordinator create a
-verified source-schema-108 backup and execute migration 109. Migration 109
-corrects the e-commerce order totals constraint so the immutable delivery-fee
-snapshot is included in the stored total. Once schema advances beyond 108,
-recovery is forward-repair-only.
+Production is currently at schema 109. The current bridge contract is schema
+range `109..110`, target `110`, class `forward-compatible`, rollback
+metadata `109..109`, and the checksum-pinned `migrations-110.json`.
+Migrations through 109 are applied production history and remain immutable.
+Only after bridge acceptance at schema 109 may the coordinator create a
+verified source-schema-109 backup and execute migration 110. Migration 110
+atomically creates the durable e-commerce order notification intent with the
+order transaction, installs a deferred order trigger so finalized totals are
+included, and safely repairs missing intents for orders from the preceding 30
+days. Once schema advances beyond 109, recovery is forward-repair-only.
 
 The preceding schema-108 bridge contract used schema
 range `105..108`, target `108`, class `forward-compatible`, rollback metadata
