@@ -65,6 +65,12 @@ export default function App() {
   const navigate = useNavigate();
   const location = useLocation();
 
+  useEffect(() => {
+    if (location.pathname.startsWith("/notifications")) {
+      window.performance?.mark?.("madar:notifications:route-enter");
+    }
+  }, [location.pathname]);
+
   const normalizedUserType = normalizeUserType(user?.user_type);
   const isAdminUser = normalizedUserType === "admin";
   const hostedTenant = getBrandedMadarSubdomain(window.location.hostname);

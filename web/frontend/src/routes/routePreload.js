@@ -37,6 +37,10 @@ const routes = [
 ];
 const pending = new Map();
 
+export function shouldPreloadCurrentRoute(pathname) {
+  return /^\/ecommerce\/products\/(?:new|[^/]+\/edit)(?:\/|$)/.test(pathname);
+}
+
 export function getRoutePreloader(pathname) {
   return routes.find(([pattern]) => pattern.test(pathname))?.[1];
 }
@@ -55,6 +59,11 @@ export function preloadRoute(href, { origin = window.location.origin, connection
 
 export function useRoutePreloading() {
   useEffect(() => {
+    // Direct editor loads wait for auth before React reaches the lazy route.
+    // Start only this measured route chunk immediately so it overlaps auth.
+    if (shouldPreloadCurrentRoute(window.location.pathname)) {
+      preloadRoute(window.location.href);
+    }
     const onIntent = (event) => {
       const target = event.target?.closest?.("a[href], [data-route-path]");
       if (!target || target.hasAttribute("download") || target.getAttribute("target") === "_blank") return;

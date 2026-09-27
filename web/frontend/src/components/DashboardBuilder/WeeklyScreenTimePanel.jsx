@@ -26,6 +26,7 @@ function getDisplayName(user) {
 export default function WeeklyScreenTimePanel({
   currentUser = null,
   currentSeconds = 0,
+  enabled = true,
   projectId = "",
 }) {
   const [period, setPeriod] = useState("week");
@@ -38,9 +39,12 @@ export default function WeeklyScreenTimePanel({
   const selectedPeriod = PERIODS.find((item) => item.id === period) || PERIODS[1];
 
   useEffect(() => {
+    if (!enabled) return undefined;
     let cancelled = false;
+    let inFlight = null;
 
     const loadSummary = async () => {
+      if (inFlight) return inFlight;
       const cachedSummary = readScreenTimeCache(cacheScope, projectId, period);
       if (cachedSummary) {
         setSummary(cachedSummary);
@@ -48,27 +52,36 @@ export default function WeeklyScreenTimePanel({
       } else {
         setLoading(true);
       }
-      try {
-        const nextSummary = await fetchWeeklyScreenTime(projectId, period);
-        if (!cancelled) {
-          const safeSummary = nextSummary || { users: [], total_seconds: 0 };
-          writeScreenTimeCache(cacheScope, projectId, period, safeSummary);
-          setSummary(safeSummary);
+      inFlight = (async () => {
+        try {
+          const nextSummary = await fetchWeeklyScreenTime(projectId, period);
+          if (!cancelled) {
+            const safeSummary = nextSummary || { users: [], total_seconds: 0 };
+            writeScreenTimeCache(cacheScope, projectId, period, safeSummary);
+            setSummary(safeSummary);
+          }
+        } catch {
+          if (!cancelled && !cachedSummary) setSummary({ users: [], total_seconds: 0 });
+        } finally {
+          inFlight = null;
+          if (!cancelled) setLoading(false);
         }
-      } catch {
-        if (!cancelled && !cachedSummary) setSummary({ users: [], total_seconds: 0 });
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
+      })();
+      return inFlight;
     };
 
     loadSummary();
-    const intervalId = window.setInterval(loadSummary, 30000);
+    const refreshWhenVisible = () => {
+      if (document.visibilityState !== "hidden") loadSummary();
+    };
+    window.addEventListener("focus", refreshWhenVisible);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
     return () => {
       cancelled = true;
-      window.clearInterval(intervalId);
+      window.removeEventListener("focus", refreshWhenVisible);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
     };
-  }, [cacheScope, period, projectId]);
+  }, [cacheScope, enabled, period, projectId]);
 
   const users = useMemo(() => {
     const currentUserId = String(currentUser?.id || currentUser?.auth_id || "");
