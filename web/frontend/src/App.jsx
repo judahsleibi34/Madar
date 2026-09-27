@@ -14,7 +14,7 @@ import RouteSuspense from "./components/common/RouteSuspense";
 import { appShellContent } from "./content";
 import { getCurrentLanguage, setAppLanguage } from "./i18n/language";
 import { DashboardLoadingElement, DashboardShell } from "./routes/shared";
-import { useRoutePreloading } from "./routes/routePreload";
+import { clearRoutePreloadedData, useRoutePreloading } from "./routes/routePreload";
 import UserWorkspaceRoutes from "./routes/UserWorkspaceRoutes";
 import { getRouteErrorSurface } from "./routes/routeErrorSurface";
 import {
@@ -269,6 +269,7 @@ export default function App() {
       clearAllCalendarWorkspaceCaches();
       clearAllDashboardSnapshotCaches();
       clearEcommerceAdminCache();
+      clearRoutePreloadedData();
       clearAllEcommerceCatalogCaches();
     }
   }, [authChecked, isLoggedIn]);

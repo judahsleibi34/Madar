@@ -25,7 +25,7 @@ from services.account_lifecycle_service import (
 )
 from services.identity_service import canonical_auth_email, normalize_email
 from services.api_errors import api_error, error_detail
-from services.observability_service import timed_operation
+from services.observability_service import traced_operation
 from services.request_security import (
     create_csrf_token,
     delete_csrf_cookie,
@@ -388,7 +388,7 @@ def get_authenticated_user_row(
     try:
         if access_token:
             try:
-                with timed_operation("auth_provider"):
+                with traced_operation("auth_provider"):
                     auth_response = supabase.auth.get_user(access_token)
                 auth_user = _get_auth_value(auth_response, "user")
             except Exception as access_error:
@@ -441,7 +441,7 @@ def get_authenticated_user_row(
             next_refresh_token,
         )
 
-    with timed_operation("user_profile"):
+    with traced_operation("user_profile"):
         user_response = (
             service_supabase.table("users")
             .select("*")

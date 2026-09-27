@@ -2,6 +2,7 @@ from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 from database import service_supabase
+from services.observability_service import traced_operation
 
 
 MAX_HEARTBEAT_SECONDS = 60
@@ -77,19 +78,20 @@ def get_weekly_screen_time(
         range_start = today - timedelta(days=6)
     range_end = today
 
-    try:
-        activity_rows = _rows(
-            service_supabase.table("workspace_screen_time_daily")
-            .select("user_id,active_seconds")
-            .eq("tenant_id", tenant_id)
-            .gte("activity_date", range_start.isoformat())
-            .lte("activity_date", range_end.isoformat())
-            .execute()
-        )
-    except Exception as error:
-        if not _schema_before_screen_time(error):
-            raise
-        activity_rows = []
+    with traced_operation("screen_time_activity_query"):
+        try:
+            activity_rows = _rows(
+                service_supabase.table("workspace_screen_time_daily")
+                .select("user_id,active_seconds")
+                .eq("tenant_id", tenant_id)
+                .gte("activity_date", range_start.isoformat())
+                .lte("activity_date", range_end.isoformat())
+                .execute()
+            )
+        except Exception as error:
+            if not _schema_before_screen_time(error):
+                raise
+            activity_rows = []
     seconds_by_user: dict[int, int] = {}
     for row in activity_rows:
         user_id = int(row.get("user_id") or 0)
@@ -99,13 +101,14 @@ def get_weekly_screen_time(
             )
 
     role_by_user: dict[int, str] = {}
-    workspace_rows = _rows(
-        service_supabase.table("tenant_memberships")
-        .select("user_id,role,status")
-        .eq("tenant_id", tenant_id)
-        .eq("status", "active")
-        .execute()
-    )
+    with traced_operation("screen_time_workspace_memberships"):
+        workspace_rows = _rows(
+            service_supabase.table("tenant_memberships")
+            .select("user_id,role,status")
+            .eq("tenant_id", tenant_id)
+            .eq("status", "active")
+            .execute()
+        )
     for row in workspace_rows:
         user_id = int(row.get("user_id") or 0)
         if user_id:
@@ -117,16 +120,18 @@ def get_weekly_screen_time(
         .eq("tenant_id", tenant_id)
         .eq("status", "active")
     )
-    site_rows = _rows(site_query.execute())
+    with traced_operation("screen_time_site_memberships"):
+        site_rows = _rows(site_query.execute())
 
     allowed_site_memberships: set[str] | None = None
     if project_id:
-        assignment_rows = _rows(
-            service_supabase.table("tenant_site_project_role_assignments")
-            .select("membership_id")
-            .eq("project_id", project_id)
-            .execute()
-        )
+        with traced_operation("screen_time_project_assignments"):
+            assignment_rows = _rows(
+                service_supabase.table("tenant_site_project_role_assignments")
+                .select("membership_id")
+                .eq("project_id", project_id)
+                .execute()
+            )
         allowed_site_memberships = {
             str(row.get("membership_id"))
             for row in assignment_rows
@@ -154,29 +159,31 @@ def get_weekly_screen_time(
             "users": [],
         }
 
-    user_rows = _rows(
-        service_supabase.table("users")
-        .select("id,first_name,last_name,email")
-        .in_("id", user_ids)
-        .execute()
-    )
-    users = []
-    for row in user_rows:
-        user_id = int(row.get("id") or 0)
-        first_name = str(row.get("first_name") or "").strip()
-        last_name = str(row.get("last_name") or "").strip()
-        name = " ".join(part for part in (first_name, last_name) if part).strip()
-        if not name:
-            name = str(row.get("email") or "User").split("@", 1)[0]
-        users.append(
-            {
-                "user_id": user_id,
-                "name": name,
-                "role": role_by_user.get(user_id, "member").replace("_", " "),
-                "active_seconds": seconds_by_user.get(user_id, 0),
-                "is_current_user": user_id == int(current_user_id),
-            }
+    with traced_operation("screen_time_users_query"):
+        user_rows = _rows(
+            service_supabase.table("users")
+            .select("id,first_name,last_name,email")
+            .in_("id", user_ids)
+            .execute()
         )
+    with traced_operation("screen_time_transform"):
+        users = []
+        for row in user_rows:
+            user_id = int(row.get("id") or 0)
+            first_name = str(row.get("first_name") or "").strip()
+            last_name = str(row.get("last_name") or "").strip()
+            name = " ".join(part for part in (first_name, last_name) if part).strip()
+            if not name:
+                name = str(row.get("email") or "User").split("@", 1)[0]
+            users.append(
+                {
+                    "user_id": user_id,
+                    "name": name,
+                    "role": role_by_user.get(user_id, "member").replace("_", " "),
+                    "active_seconds": seconds_by_user.get(user_id, 0),
+                    "is_current_user": user_id == int(current_user_id),
+                }
+            )
 
     users.sort(key=lambda item: (-item["active_seconds"], item["name"].lower()))
     return {

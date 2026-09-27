@@ -1,4 +1,6 @@
-from services import notification_delivery_service, notification_service
+from unittest.mock import patch
+
+from services import notification_delivery_service, notification_service, observability_service
 
 
 class FakeResponse:
@@ -114,6 +116,23 @@ class FakeQueryResult:
 
     def execute(self):
         return self
+
+
+def test_notification_read_exposes_serial_query_timing_breakdown():
+    fake_supabase = FakeSupabase()
+    token = observability_service.begin_request_timings()
+    try:
+        with patch.object(notification_service, "service_supabase", fake_supabase):
+            notification_service.list_user_notifications(tenant_id=7, user_id=11)
+        timings = observability_service.request_timings_snapshot()
+    finally:
+        observability_service.end_request_timings(token)
+
+    assert {
+        "notifications_list_query",
+        "notifications_transform",
+        "notifications_unread_query",
+    }.issubset(timings)
 
 
 def test_create_tenant_notification_event_creates_atomic_durable_intent(monkeypatch):
