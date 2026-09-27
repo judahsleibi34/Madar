@@ -49,6 +49,10 @@ export default function NotificationsPage({ user }) {
   const visibleNotifications = notifications.map((item) => normalizeNotification(item, t));
 
   useEffect(() => {
+    window.performance?.mark?.("madar:notifications:component-mount");
+  }, []);
+
+  useEffect(() => {
     let cancelled = false;
     Promise.all([getBrowserPushStatus(), getPushPublicKey()])
       .then(([result, config]) => {

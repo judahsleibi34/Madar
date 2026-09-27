@@ -45,6 +45,7 @@ from services.calendar_workspace_cache_service import (
     get_or_create_calendar_workspace,
     invalidate_calendar_workspace_cache,
 )
+from services.observability_service import timed_operation
 
 
 router = APIRouter(prefix="/calendar", tags=["Calendar"])
@@ -1061,8 +1062,9 @@ def queue_task_to_provider(
 
 
 def _calendar_workspace_payload(context, start: datetime, end: datetime) -> dict[str, Any]:
-    ensure_default_calendar(context)
-    accesses = list_accessible_calendars(context)
+    with timed_operation("calendar_lookup"):
+        ensure_default_calendar(context)
+        accesses = list_accessible_calendars(context)
     access_by_id = {str(access.calendar.get("id")): access for access in accesses}
     full_detail_ids = [calendar_id for calendar_id, access in access_by_id.items() if access.role in {"editor", "owner"}]
     viewer_ids = [calendar_id for calendar_id, access in access_by_id.items() if access.role == "viewer"]
@@ -1092,26 +1094,36 @@ def _calendar_workspace_payload(context, start: datetime, end: datetime) -> dict
         ) or []
         return list({str(row.get("id")): row for row in [*normal, *recurring]}.values())
 
-    detail_event_rows = [
-        *event_rows(full_detail_ids, "*"),
-        *event_rows(viewer_ids, "*", "exclude_private"),
-    ]
-    availability_rows = event_rows(
-        availability_ids,
-        "id,calendar_id,starts_at,ends_at,transparency,recurrence_rule,recurrence_exclusions",
-    )
-    availability_rows.extend(event_rows(
-        viewer_ids,
-        "id,calendar_id,starts_at,ends_at,transparency,recurrence_rule,recurrence_exclusions",
-        "private_only",
-    ))
-    events = expand_events(detail_event_rows, start, end)
-    events.extend(availability_event(row) for row in expand_events(availability_rows, start, end))
+    with timed_operation("calendar_event_query"):
+        detail_event_rows = [
+            *event_rows(full_detail_ids, "*"),
+            *event_rows(viewer_ids, "*", "exclude_private"),
+        ]
+        availability_rows = event_rows(
+            availability_ids,
+            "id,calendar_id,starts_at,ends_at,transparency,recurrence_rule,recurrence_exclusions",
+        )
+        availability_rows.extend(event_rows(
+            viewer_ids,
+            "id,calendar_id,starts_at,ends_at,transparency,recurrence_rule,recurrence_exclusions",
+            "private_only",
+        ))
+    with timed_operation("calendar_recurrence"):
+        events = expand_events(detail_event_rows, start, end)
+        events.extend(availability_event(row) for row in expand_events(availability_rows, start, end))
 
-    events.extend(reservation_events_for_range(context, start, end))
-
-    tasks = workspace_task_rows(context, detail_ids)
-    linked_task_event_ids = workspace_linked_task_event_ids(context, detail_ids)
+    with timed_operation("calendar_task_query"):
+        tasks = workspace_task_rows(context, detail_ids)
+        linked_task_event_ids = workspace_linked_task_event_ids(context, detail_ids)
+        task_ids = [str(row.get("id")) for row in tasks if row.get("id")]
+        task_reminder_rows = []
+        if task_ids:
+            task_reminder_rows = getattr(
+                service_supabase.table("calendar_task_reminders")
+                .select("task_id,minutes_before,delivery_status,scheduled_for")
+                .eq("tenant_id", context.tenant_id).in_("task_id", task_ids)
+                .eq("channel", "in_app").limit(1000).execute(), "data", None,
+            ) or []
     if linked_task_event_ids:
         events = [
             event
@@ -1120,73 +1132,69 @@ def _calendar_workspace_payload(context, start: datetime, end: datetime) -> dict
             not in linked_task_event_ids
             and str(event.get("series_id") or "") not in linked_task_event_ids
         ]
-    task_ids = [str(row.get("id")) for row in tasks if row.get("id")]
-    task_reminder_rows = []
-    if task_ids:
-        task_reminder_rows = getattr(
-            service_supabase.table("calendar_task_reminders")
-            .select("task_id,minutes_before,delivery_status,scheduled_for")
-            .eq("tenant_id", context.tenant_id).in_("task_id", task_ids)
-            .eq("channel", "in_app").limit(1000).execute(), "data", None,
-        ) or []
-    task_reminders = {str(row.get("task_id")): row for row in task_reminder_rows}
-    for task in tasks:
-        reminder = task_reminders.get(str(task.get("id")))
-        task["reminder_minutes_before"] = reminder.get("minutes_before") if reminder else 10
-    safe_tasks = [safe_task_payload(task) for task in tasks]
+    with timed_operation("calendar_connections"):
+        connections = []
+        if sync_state_ids:
+            connections = getattr(
+                service_supabase.table("calendar_sync_connections")
+                .select("id,local_calendar_id,provider,account_label,direction,status,last_success_at,last_attempt_at,last_error_code,pending_changes,failed_changes,inbound_sync_enabled,inbound_sync_status,last_inbound_success_at,inbound_sync_error_code,created_at")
+                .eq("tenant_id", context.tenant_id)
+                .in_("local_calendar_id", sync_state_ids).limit(100).execute(), "data", None,
+            ) or []
 
-    connections = []
-    if sync_state_ids:
-        connections = getattr(
-            service_supabase.table("calendar_sync_connections")
-            .select("id,local_calendar_id,provider,account_label,direction,status,last_success_at,last_attempt_at,last_error_code,pending_changes,failed_changes,inbound_sync_enabled,inbound_sync_status,last_inbound_success_at,inbound_sync_error_code,created_at")
-            .eq("tenant_id", context.tenant_id)
-            .in_("local_calendar_id", sync_state_ids).limit(100).execute(), "data", None,
-        ) or []
+        review_event_ids = {
+            str(row.get("id")) for row in detail_event_rows
+            if str(row.get("calendar_id")) in review_ids and row.get("id")
+        }
+        invitation_reviews = []
+        if review_event_ids:
+            review_rows = getattr(
+                service_supabase.table("calendar_invitation_reviews")
+                .select("id,event_id,sender_email,trust_level,reasons,disposition,created_at")
+                .eq("tenant_id", context.tenant_id).in_("event_id", sorted(review_event_ids))
+                .eq("disposition", "quarantined").order("created_at", desc=True).limit(50).execute(),
+                "data", None,
+            ) or []
+            invitation_reviews = [sanitized_invitation(row) for row in review_rows]
 
-    review_event_ids = {
-        str(row.get("id")) for row in detail_event_rows
-        if str(row.get("calendar_id")) in review_ids and row.get("id")
-    }
-    invitation_reviews = []
-    if review_event_ids:
-        review_rows = getattr(
-            service_supabase.table("calendar_invitation_reviews")
-            .select("id,event_id,sender_email,trust_level,reasons,disposition,created_at")
-            .eq("tenant_id", context.tenant_id).in_("event_id", sorted(review_event_ids))
-            .eq("disposition", "quarantined").order("created_at", desc=True).limit(50).execute(),
-            "data", None,
-        ) or []
-        invitation_reviews = [sanitized_invitation(row) for row in review_rows]
-    quarantined_event_ids = {str(review.get("event_id")) for review in invitation_reviews if review.get("event_id")}
-    events = [event for event in events if str(event.get("id") or "").split("::", 1)[0] not in quarantined_event_ids and str(event.get("series_id") or "") not in quarantined_event_ids]
-    workload_by_user: dict[str, dict[str, Any]] = {}
-    for task in tasks:
-        owner = str(task.get("owner_user_id") or "unassigned")
-        item = workload_by_user.setdefault(owner, {"user_id": task.get("owner_user_id"), "open_tasks": 0, "estimate_minutes": 0, "scheduled_minutes": 0})
-        if task.get("status") not in {"done", "cancelled"}:
-            item["open_tasks"] += 1
-            item["estimate_minutes"] += int(task.get("estimate_minutes") or 0)
-            if task.get("scheduled_start") and task.get("scheduled_end"):
-                scheduled_start = datetime.fromisoformat(str(task["scheduled_start"]).replace("Z", "+00:00"))
-                scheduled_end = datetime.fromisoformat(str(task["scheduled_end"]).replace("Z", "+00:00"))
-                item["scheduled_minutes"] += max(0, int((scheduled_end - scheduled_start).total_seconds() / 60))
-    return {
-        "success": True,
-        "calendars": [public_calendar_metadata(access) for access in accesses],
-        "events": sorted(events, key=lambda item: item.get("starts_at") or ""),
-        "tasks": safe_tasks,
-        "workload": list(workload_by_user.values()),
-        "connections": connections,
-        "invitation_reviews": invitation_reviews,
-        "viewer_timezone": str(context.user.get("timezone") or "UTC"),
-    }
+    with timed_operation("calendar_workload"):
+        workload_by_user: dict[str, dict[str, Any]] = {}
+        for task in tasks:
+            owner = str(task.get("owner_user_id") or "unassigned")
+            item = workload_by_user.setdefault(owner, {"user_id": task.get("owner_user_id"), "open_tasks": 0, "estimate_minutes": 0, "scheduled_minutes": 0})
+            if task.get("status") not in {"done", "cancelled"}:
+                item["open_tasks"] += 1
+                item["estimate_minutes"] += int(task.get("estimate_minutes") or 0)
+                if task.get("scheduled_start") and task.get("scheduled_end"):
+                    scheduled_start = datetime.fromisoformat(str(task["scheduled_start"]).replace("Z", "+00:00"))
+                    scheduled_end = datetime.fromisoformat(str(task["scheduled_end"]).replace("Z", "+00:00"))
+                    item["scheduled_minutes"] += max(0, int((scheduled_end - scheduled_start).total_seconds() / 60))
+
+    with timed_operation("calendar_transform"):
+        task_reminders = {str(row.get("task_id")): row for row in task_reminder_rows}
+        for task in tasks:
+            reminder = task_reminders.get(str(task.get("id")))
+            task["reminder_minutes_before"] = reminder.get("minutes_before") if reminder else 10
+        safe_tasks = [safe_task_payload(task) for task in tasks]
+        quarantined_event_ids = {str(review.get("event_id")) for review in invitation_reviews if review.get("event_id")}
+        events = [event for event in events if str(event.get("id") or "").split("::", 1)[0] not in quarantined_event_ids and str(event.get("series_id") or "") not in quarantined_event_ids]
+        return {
+            "success": True,
+            "calendars": [public_calendar_metadata(access) for access in accesses],
+            "events": sorted(events, key=lambda item: item.get("starts_at") or ""),
+            "tasks": safe_tasks,
+            "workload": list(workload_by_user.values()),
+            "connections": connections,
+            "invitation_reviews": invitation_reviews,
+            "viewer_timezone": str(context.user.get("timezone") or "UTC"),
+        }
 
 
 @router.get("/bootstrap")
 def calendar_bootstrap(request: Request, response: Response, start: datetime, end: datetime):
-    context = require_active_tenant_member(request, response)
-    start, end = parse_range(start, end)
+    with timed_operation("calendar_authorization"):
+        context = require_active_tenant_member(request, response)
+        start, end = parse_range(start, end)
     if not calendar_feature_enabled():
         return _calendar_disabled_payload(context, start, end)
     try:
@@ -1204,12 +1212,14 @@ def calendar_bootstrap(request: Request, response: Response, start: datetime, en
             context.tenant_id,
             lambda: _calendar_workspace_payload(context, start, end),
         )
-        fresh_reservations = reservation_events_for_range(context, start, end)
-        cached_events = [event for event in (payload.get("events") or []) if event.get("source_type") != "reservation"]
-        payload = {
-            **payload,
-            "events": sorted([*cached_events, *fresh_reservations], key=lambda item: item.get("starts_at") or ""),
-        }
+        with timed_operation("calendar_reservations"):
+            fresh_reservations = reservation_events_for_range(context, start, end)
+        with timed_operation("calendar_response"):
+            cached_events = [event for event in (payload.get("events") or []) if event.get("source_type") != "reservation"]
+            payload = {
+                **payload,
+                "events": sorted([*cached_events, *fresh_reservations], key=lambda item: item.get("starts_at") or ""),
+            }
         payload["calendar_features_available"] = True
         response.headers["X-Calendar-Cache"] = "hit" if cache_hit else "miss"
         response.headers["Cache-Control"] = "private, no-store"

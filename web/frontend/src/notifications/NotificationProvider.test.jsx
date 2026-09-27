@@ -78,7 +78,10 @@ const renderProvider = (user = userA, options = {}) => render(
 );
 
 describe("NotificationProvider", () => {
-  afterEach(cleanup);
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
 
   beforeEach(() => {
     sessionStorage.clear();
@@ -100,6 +103,28 @@ describe("NotificationProvider", () => {
     expect(screen.getByTestId("unread").textContent).toBe("27");
     expect(screen.getByTestId("toasts").textContent).toBe("");
     expect(fetchNotifications).toHaveBeenCalledWith(expect.objectContaining({ limit: 50 }));
+  });
+
+  it("initializes in ten cold documents while a fresh lease still names the document that reloaded", async () => {
+    class BroadcastChannelStub {
+      close() {}
+      postMessage() {}
+    }
+    vi.stubGlobal("BroadcastChannel", BroadcastChannelStub);
+    for (let attempt = 1; attempt <= 10; attempt += 1) {
+      localStorage.setItem(
+        "madar-notification-poll-leader:v1:tenant-a:user-1",
+        JSON.stringify({ tabId: `document-before-reload-${attempt}`, at: Date.now() }),
+      );
+      fetchNotifications.mockResolvedValueOnce(response([
+        item(`cold-${attempt}`, "2026-08-11T10:00:00Z"),
+      ]));
+
+      const view = renderProvider();
+      await waitFor(() => expect(screen.getByTestId("ids").textContent).toBe(`cold-${attempt}`));
+      view.unmount();
+    }
+    expect(fetchNotifications).toHaveBeenCalledTimes(10);
   });
 
   it("toasts only newly observed records in chronological order", async () => {

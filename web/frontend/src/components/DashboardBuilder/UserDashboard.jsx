@@ -626,6 +626,7 @@ function UserDashboardContent({ user, weeklyScreenTimeSeconds = 0, cacheScope = 
       <WeeklyScreenTimePanel
         currentUser={user}
         currentSeconds={weeklyScreenTimeSeconds}
+        enabled={!loading}
         projectId={metrics.projectId}
       />
     </div>
