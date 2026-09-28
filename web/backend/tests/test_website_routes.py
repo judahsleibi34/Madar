@@ -218,6 +218,29 @@ class WebsiteRoutesTests(unittest.TestCase):
         )
         self.assertEqual(response.json()["website"], website)
 
+    def test_store_logo_replacement_reconciles_old_and_new_references(self):
+        old_key = "tenant_7/builder_assets/0123456789abcdef0123456789abcdef.png"
+        new_key = "tenant_7/builder_assets/abcdefabcdefabcdefabcdefabcdefab.webp"
+        old_settings = {"id": 1, "tenant_id": 7, "subdomain": "olive", "logo_url": f"/uploads/{old_key}"}
+        new_settings = {**old_settings, "logo_url": f"/uploads/{new_key}"}
+        with patch.object(website_routes, "require_active_tenant_member", return_value=fake_tenant_context()), patch.object(
+            website_routes, "get_settings_for_tenant", return_value=old_settings,
+        ), patch.object(website_routes, "save_settings_for_tenant", return_value=new_settings), patch.object(
+            website_routes, "refresh_builder_asset_reference_state",
+        ) as refresh, patch.object(website_routes, "record_audit_event"):
+            response = build_website_client().put("/website/settings", json={"logo_url": f"/uploads/{new_key}"})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual({call.kwargs["storage_key"] for call in refresh.call_args_list}, {old_key, new_key})
+
+    def test_store_logo_rejects_another_tenant(self):
+        foreign = "/uploads/tenant_8/builder_assets/0123456789abcdef0123456789abcdef.png"
+        with patch.object(website_routes, "require_active_tenant_member", return_value=fake_tenant_context()), patch.object(
+            website_routes, "save_settings_for_tenant",
+        ) as save:
+            response = build_website_client().put("/website/settings", json={"logo_url": foreign})
+        self.assertEqual(response.status_code, 400)
+        save.assert_not_called()
+
     def test_canonical_put_allows_clearing_optional_contact_email(self):
         client = build_website_client()
         website = {

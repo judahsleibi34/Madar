@@ -49,7 +49,10 @@ from services.builder_asset_storage import (
     create_builder_asset_signed_url,
     download_builder_asset,
 )
-from services.asset_registry_service import extract_builder_asset_references
+from services.asset_registry_service import (
+    extract_builder_asset_references,
+    nonproject_asset_reference_count,
+)
 from services.request_body_limits import RequestBodyLimitMiddleware
 from services.runtime_config import validate_runtime_configuration
 from services.observability_service import (
@@ -241,6 +244,10 @@ def _asset_visibility(*, tenant_id: int, storage_key: str, request: Request, res
         ) or []
         if projects and storage_key in extract_builder_asset_references(projects[0].get("published_schema") or {}, tenant_id=tenant_id):
             return True, False
+    if nonproject_asset_reference_count(
+        tenant_id=tenant_id, storage_key=storage_key, public_only=True, client=service_supabase,
+    ):
+        return True, False
     try:
         _, user = get_authenticated_user_row(request, response, allow_admin_account_access=False)
         if int(user.get("tenant_id")) == tenant_id:
@@ -275,9 +282,13 @@ def get_public_builder_asset(
         raise HTTPException(status_code=404, detail="Asset was not found.")
 
     public_root = PUBLIC_UPLOADS_DIR.resolve()
+    tenant_root = public_root / f"tenant_{tenant_id}"
+    builder_root = tenant_root / "builder_assets"
+    if tenant_root.is_symlink() or builder_root.is_symlink():
+        raise HTTPException(status_code=404, detail="Asset was not found.")
     asset_path = assert_path_within_root(
-        public_root / f"tenant_{tenant_id}" / "builder_assets" / safe_filename,
-        public_root,
+        builder_root / safe_filename,
+        builder_root,
         error=HTTPException(status_code=404, detail="Asset was not found."),
     )
 

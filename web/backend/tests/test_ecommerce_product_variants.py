@@ -78,6 +78,11 @@ class EcommerceProductVariantTests(unittest.TestCase):
             def execute(self):
                 return type("Result", (), {"data": {"saved": True}})()
 
+        class EmptyVariantQuery:
+            def select(self, *_args): return self
+            def eq(self, *_args): return self
+            def execute(self): return SimpleNamespace(data=[])
+
         class Service:
             def __init__(self):
                 self.calls = []
@@ -85,6 +90,13 @@ class EcommerceProductVariantTests(unittest.TestCase):
             def rpc(self, name, params):
                 self.calls.append((name, params))
                 return Query()
+
+            def table(self, name):
+                self.assert_variant_table(name)
+                return EmptyVariantQuery()
+
+            def assert_variant_table(self, name):
+                assert name == "ecommerce_product_variants"
 
         service = Service()
         with patch.object(ecommerce_routes, "service_supabase", service):

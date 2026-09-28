@@ -44,6 +44,14 @@ class FrontendEdgeConfigTests(unittest.TestCase):
         self.assertIn("proxy_set_header X-Request-ID $madar_request_id", nginx)
         self.assertNotIn("location /api/ {\n        try_files", nginx)
 
+    def test_managed_uploads_use_the_canonical_path_and_controlled_backend_route(self):
+        nginx = (ROOT / "frontend" / "nginx.conf.template").read_text(encoding="utf-8")
+        vite = (ROOT / "frontend" / "vite.config.js").read_text(encoding="utf-8")
+        self.assertIn("location ^~ /uploads/ {", nginx)
+        self.assertIn("proxy_pass http://backend:8000;", nginx)
+        self.assertIn('"/uploads": {', vite)
+        self.assertNotIn("location /uploads/ {\n        try_files", nginx)
+
     def test_compose_drops_privileges_and_keeps_dev_ports_loopback_only(self):
         compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
         development = (ROOT / "docker-compose.dev.yml").read_text(encoding="utf-8")

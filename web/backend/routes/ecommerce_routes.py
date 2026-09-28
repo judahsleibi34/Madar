@@ -18,6 +18,10 @@ from services.ecommerce_cache_service import (
     invalidate_ecommerce_cache,
 )
 from services.tenant_service import require_active_tenant_member
+from services.asset_registry_service import (
+    extract_builder_asset_references,
+    refresh_builder_asset_reference_state,
+)
 
 
 router = APIRouter(prefix="/ecommerce", tags=["Ecommerce"])
@@ -655,77 +659,12 @@ def _sync_catalog_image_assets(
 ) -> None:
     previous_keys = _managed_catalog_asset_keys(previous_images, tenant_id)
     current_keys = _managed_catalog_asset_keys(current_images, tenant_id)
-    now = datetime.now(timezone.utc)
     for storage_key in current_keys:
         service_supabase.table("builder_assets").update({
-            "status": "active",
-            "reference_count": 1,
-            "last_referenced_at": now.isoformat(),
-            "retention_until": None,
-            "deleted_at": None,
             "metadata": {"usage": usage},
         }).eq("tenant_id", int(tenant_id)).eq("storage_key", storage_key).execute()
-
-    removed_keys = previous_keys - current_keys
-    if not removed_keys:
-        return
-    product_rows = _rows(
-        service_supabase.table("ecommerce_products")
-        .select("images")
-        .eq("tenant_id", int(tenant_id))
-    )
-    still_referenced = set().union(*(
-        _managed_catalog_asset_keys(row.get("images") or [], tenant_id)
-        for row in product_rows
-    )) if product_rows else set()
-    category_rows = _rows(
-        service_supabase.table("ecommerce_categories")
-        .select("*")
-        .eq("tenant_id", int(tenant_id))
-    )
-    for row in category_rows:
-        if row.get("image_url"):
-            still_referenced.update(
-                _managed_catalog_asset_keys([row.get("image_url")], tenant_id)
-            )
-    try:
-        brand_rows = _rows(
-            service_supabase.table("ecommerce_brands")
-            .select("image_url")
-            .eq("tenant_id", int(tenant_id))
-        )
-    except Exception as error:
-        raw = str(error).lower()
-        if not ("pgrst205" in raw or "could not find the table" in raw or "schema cache" in raw):
-            raise
-        brand_rows = []
-    for row in brand_rows:
-        if row.get("image_url"):
-            still_referenced.update(_managed_catalog_asset_keys([row.get("image_url")], tenant_id))
-    retention_until = (now + timedelta(days=7)).isoformat()
-    for storage_key in removed_keys - still_referenced:
-        asset_rows = _rows(
-            service_supabase.table("builder_assets")
-            .select("id")
-            .eq("tenant_id", int(tenant_id))
-            .eq("storage_key", storage_key)
-            .limit(1)
-        )
-        if asset_rows:
-            builder_references = _rows(
-                service_supabase.table("builder_asset_references")
-                .select("asset_id")
-                .eq("asset_id", asset_rows[0]["id"])
-                .limit(1)
-            )
-            if builder_references:
-                continue
-        service_supabase.table("builder_assets").update({
-            "status": "unreferenced",
-            "reference_count": 0,
-            "last_referenced_at": None,
-            "retention_until": retention_until,
-        }).eq("tenant_id", int(tenant_id)).eq("storage_key", storage_key).execute()
+    for storage_key in current_keys | previous_keys:
+        refresh_builder_asset_reference_state(tenant_id=tenant_id, storage_key=storage_key)
 
 
 def _generate_sku(slug: str) -> str:
@@ -786,6 +725,14 @@ def _product_aggregate_payload(payload: ProductPayload) -> dict[str, Any]:
 def _save_product_aggregate(tenant_id: int, product_id: str, payload: ProductPayload) -> None:
     if payload.attributes is None and payload.options is None and payload.variants is None:
         return
+    def variant_keys() -> set[str]:
+        rows = _rows(service_supabase.table("ecommerce_product_variants").select("images")
+            .eq("tenant_id", tenant_id).eq("product_id", product_id))
+        return set(extract_builder_asset_references(
+            [row.get("images") or [] for row in rows], tenant_id=tenant_id,
+        ))
+
+    previous_variant_keys = variant_keys()
     aggregate = _product_aggregate_payload(payload)
     params = {"p_tenant_id": tenant_id, "p_product_id": product_id, "p_attributes": aggregate["attributes"], "p_options": aggregate["options"], "p_variants": aggregate["variants"]}
     try:
@@ -799,6 +746,8 @@ def _save_product_aggregate(tenant_id: int, product_id: str, payload: ProductPay
         if uses_color:
             raise HTTPException(status_code=503, detail="Color variant attributes require database migration 099") from error
         service_supabase.rpc("save_ecommerce_product_aggregate_safe", params).execute()
+    for storage_key in previous_variant_keys | variant_keys():
+        refresh_builder_asset_reference_state(tenant_id=tenant_id, storage_key=storage_key)
 
 
 def _attach_product_aggregates(products: list[dict[str, Any]], tenant_id: int) -> list[dict[str, Any]]:
