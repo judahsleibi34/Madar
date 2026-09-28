@@ -21,6 +21,7 @@ class Query:
 
     def select(self, *_args): return self
     def eq(self, key, value): self.filters.append(("eq", key, value)); return self
+    def in_(self, key, values): self.filters.append(("in", key, set(values))); return self
     def filter(self, key, operator, value):
         assert operator == "cs"
         self.filters.append(("contains", key, json.loads(value)))
@@ -34,11 +35,13 @@ class Query:
     def execute(self):
         self.db.queries.append(self.table)
         table = self.db.setdefault(self.table, [])
+        def matches(row, kind, key, value):
+            if kind == "eq": return row.get(key) == value
+            if kind == "in": return row.get(key) in value
+            if kind == "contains": return set(value) <= set(row.get(key) or [])
+            return str(row.get(key) or "") <= str(value)
         rows = [row for row in table if all(
-            row.get(key) == value if kind == "eq" else (
-                set(value) <= set(row.get(key) or []) if kind == "contains"
-                else str(row.get(key) or "") <= str(value)
-            )
+            matches(row, kind, key, value)
             for kind, key, value in self.filters
         )]
         if self.limit_value is not None: rows = rows[:self.limit_value]
@@ -239,6 +242,26 @@ class AssetRegistryTests(unittest.TestCase):
             usage_hint="ecommerce_product", client=client,
         ), 1)
         self.assertEqual(client.queries, ["ecommerce_products", "website_settings"])
+
+    def test_shared_variant_image_checks_parent_products_in_one_query(self):
+        client = Client()
+        key = "tenant_7/builder_assets/0123456789abcdef0123456789abcdef.png"
+        url = f"/uploads/{key}"
+        client.data["ecommerce_product_variants"] = [
+            {"tenant_id": 7, "active": True, "product_id": "draft", "images": [url]},
+            {"tenant_id": 7, "active": True, "product_id": "published", "images": [url]},
+        ]
+        client.data["ecommerce_products"] = [
+            {"id": "draft", "tenant_id": 7, "status": "draft"},
+            {"id": "published", "tenant_id": 7, "status": "active"},
+        ]
+        self.assertEqual(asset_registry_service.nonproject_asset_reference_count(
+            tenant_id=7, storage_key=key, public_only=True, client=client,
+        ), 1)
+        self.assertEqual(client.queries, [
+            "website_settings", "ecommerce_categories", "ecommerce_brands",
+            "ecommerce_products", "ecommerce_product_variants", "ecommerce_products",
+        ])
 
     def test_cleanup_is_dry_run_by_default_and_rechecks_checksum(self):
         client = Client()

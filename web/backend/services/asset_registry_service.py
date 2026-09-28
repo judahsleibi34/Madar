@@ -116,13 +116,13 @@ def nonproject_asset_reference_count(*, tenant_id: int, storage_key: str, public
         if public_only:
             query = query.eq("active", True)
         variants = getattr(query.filter("images", "cs", json.dumps([url])).execute(), "data", None) or []
-        for product_id in {row.get("product_id") for row in variants if row.get("product_id")}:
-            parent_query = database_client.table("ecommerce_products").select("id").eq("tenant_id", int(tenant_id)).eq("id", product_id)
-            if public_only:
-                parent_query = parent_query.eq("status", "active")
-            if getattr(parent_query.limit(1).execute(), "data", None):
-                return 1
-        return 0
+        product_ids = {row.get("product_id") for row in variants if row.get("product_id")}
+        if not product_ids:
+            return 0
+        parent_query = database_client.table("ecommerce_products").select("id").eq("tenant_id", int(tenant_id)).in_("id", list(product_ids))
+        if public_only:
+            parent_query = parent_query.eq("status", "active")
+        return int(bool(getattr(parent_query.limit(1).execute(), "data", None)))
 
     lookups = {
         "site": site_count,
