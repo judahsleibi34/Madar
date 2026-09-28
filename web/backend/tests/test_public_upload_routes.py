@@ -80,6 +80,8 @@ class PublicUploadRouteTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.headers["content-type"], "image/png")
         self.assertEqual(response.content, PNG_BYTES)
+        self.assertEqual(response.headers["cache-control"], "public, max-age=31536000, immutable")
+        self.assertEqual(response.headers["cdn-cache-control"], "public, max-age=31536000, immutable")
 
     def test_managed_image_serves_cached_high_quality_responsive_webp(self):
         image = Image.new("RGB", (1600, 900), color=(35, 90, 140))
@@ -196,6 +198,12 @@ class PublicUploadRouteTests(unittest.TestCase):
         response = self.client.get("/uploads/tenant_1/builder_assets/logo.png")
 
         self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.headers["cache-control"], "no-store")
+
+    def test_invalid_tenant_id_is_not_cacheable(self):
+        response = self.client.get(f"/uploads/tenant_0/builder_assets/{self.asset_path.name}")
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.headers["cache-control"], "no-store")
 
     def test_public_asset_traversal_attempt_is_rejected(self):
         response = self.client.get("/uploads/tenant_1/builder_assets/%2e%2e%2fdataset.png")
@@ -222,6 +230,17 @@ class PublicUploadRouteTests(unittest.TestCase):
         self.asset_path.symlink_to(foreign_file)
         response = self.client.get(f"/uploads/tenant_1/builder_assets/{self.asset_path.name}")
         self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.headers["cache-control"], "no-store")
+
+    def test_builder_directory_symlink_rejection_is_not_cacheable(self):
+        foreign_dir = self.public_dir / "tenant_2" / "builder_assets"
+        foreign_dir.mkdir(parents=True)
+        self.asset_path.unlink()
+        self.asset_dir.rmdir()
+        self.asset_dir.symlink_to(foreign_dir, target_is_directory=True)
+        response = self.client.get(f"/uploads/tenant_1/builder_assets/{self.asset_path.name}")
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.headers["cache-control"], "no-store")
 
     def test_unregistered_physical_file_is_not_public(self):
         self.visibility_patch.stop()
@@ -234,6 +253,23 @@ class PublicUploadRouteTests(unittest.TestCase):
             self.visibility_patch.start()
         self.assertEqual(response.status_code, 404)
         self.assertEqual(response.content, b'{"detail":"Asset was not found."}')
+        self.assertEqual(response.headers["cache-control"], "no-store")
+        self.assertEqual(response.headers["cdn-cache-control"], "no-store")
+
+    def test_wrong_tenant_registry_asset_is_not_public_or_cacheable(self):
+        key = f"tenant_1/builder_assets/{self.asset_path.name}"
+        store = AssetVisibilityStore({
+            "builder_assets": [{"id": "asset-1", "tenant_id": 1, "storage_key": key, "status": "active"}],
+            "website_settings": [{"tenant_id": 1, "subdomain": "one", "logo_url": f"/uploads/{key}"}],
+        })
+        self.visibility_patch.stop()
+        try:
+            with patch.object(app_module, "service_supabase", store):
+                response = self.client.get(f"/uploads/tenant_2/builder_assets/{self.asset_path.name}")
+        finally:
+            self.visibility_patch.start()
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.headers["cache-control"], "no-store")
 
     def test_same_filename_is_isolated_between_registered_tenants(self):
         foreign = self.public_dir / "tenant_2" / "builder_assets" / self.asset_path.name
@@ -277,6 +313,27 @@ class PublicUploadRouteTests(unittest.TestCase):
         finally:
             self.visibility_patch.start()
         self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.headers["cache-control"], "no-store")
+
+    def test_responsive_asset_missing_from_both_storage_backends_is_not_cacheable(self):
+        self.asset_path.unlink()
+        with patch.object(
+            app_module, "download_builder_asset",
+            side_effect=app_module.BuilderAssetStorageError("not_found"),
+        ):
+            response = self.client.get(f"/uploads/tenant_1/builder_assets/{self.asset_path.name}?w=320")
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.headers["cache-control"], "no-store")
+
+    def test_visibility_lookup_failure_is_not_cacheable(self):
+        self.visibility_patch.stop()
+        try:
+            with patch.object(app_module, "_asset_visibility", side_effect=RuntimeError("unavailable")):
+                response = self.client.get(f"/uploads/tenant_1/builder_assets/{self.asset_path.name}")
+        finally:
+            self.visibility_patch.start()
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(response.headers["cache-control"], "no-store")
 
     def test_published_reference_is_public_but_unreferenced_draft_is_not(self):
         storage_key = "tenant_1/builder_assets/0123456789abcdef0123456789abcdef.png"
@@ -304,6 +361,7 @@ class PublicUploadRouteTests(unittest.TestCase):
             self.visibility_patch.start()
         self.assertEqual(public_response.status_code, 200)
         self.assertEqual(draft_response.status_code, 404)
+        self.assertEqual(draft_response.headers["cache-control"], "no-store")
 
     def test_multiple_builder_references_use_one_tenant_scoped_project_lookup(self):
         key = f"tenant_1/builder_assets/{self.asset_path.name}"
@@ -351,6 +409,7 @@ class PublicUploadRouteTests(unittest.TestCase):
         self.assertEqual(own.status_code, 200)
         self.assertEqual(own.headers["cache-control"], "private, no-store")
         self.assertEqual(foreign.status_code, 404)
+        self.assertEqual(foreign.headers["cache-control"], "no-store")
 
     def test_persisted_store_logo_is_public_without_project_reference(self):
         storage_key = "tenant_1/builder_assets/0123456789abcdef0123456789abcdef.png"
@@ -404,7 +463,9 @@ class PublicUploadRouteTests(unittest.TestCase):
                 with patch.object(app_module, "service_supabase", store), patch.object(
                     app_module, "get_authenticated_user_row", side_effect=Exception("anonymous")
                 ):
-                    self.assertEqual(self.client.get(f"/uploads/{storage_key}").status_code, 404)
+                    result = self.client.get(f"/uploads/{storage_key}")
+                    self.assertEqual(result.status_code, 404)
+                    self.assertEqual(result.headers["cache-control"], "no-store")
         finally:
             self.visibility_patch.start()
 
@@ -423,6 +484,7 @@ class PublicUploadRouteTests(unittest.TestCase):
         finally:
             self.visibility_patch.start()
         self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.headers["cache-control"], "no-store")
 
 
 if __name__ == "__main__":
