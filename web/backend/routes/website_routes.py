@@ -8,6 +8,11 @@ from services.ecommerce_cache_service import invalidate_ecommerce_cache
 from services.tenant_service import require_active_tenant_member
 from services.url_validation import validate_public_url
 from services.website_settings_service import get_settings_for_tenant, ensure_settings_for_tenant, save_settings_for_tenant
+from services.asset_registry_service import (
+    extract_builder_asset_references,
+    refresh_builder_asset_reference_state,
+    require_builder_asset_tenant_ownership,
+)
 from services.entitlement_service import (
     require_any_entitlement,
 )
@@ -186,6 +191,10 @@ def update_website_settings(
 
         tenant_id = context.tenant_id
         authenticated_user_id = context.user_id
+        try:
+            require_builder_asset_tenant_ownership(update_payload, tenant_id=tenant_id)
+        except ValueError as error:
+            raise HTTPException(status_code=400, detail="Logo asset must belong to this workspace") from error
         existing_website = get_settings_for_tenant(tenant_id, authenticated_user_id)
         identity_updates = {
             key: update_payload.pop(key)
@@ -213,6 +222,19 @@ def update_website_settings(
             user_id=authenticated_user_id,
             update_payload=update_payload,
         )
+        affected_assets = {
+            *extract_builder_asset_references(existing_website or {}, tenant_id=tenant_id),
+            *extract_builder_asset_references(updated_website or {}, tenant_id=tenant_id),
+        }
+        for storage_key in affected_assets:
+            try:
+                refresh_builder_asset_reference_state(tenant_id=tenant_id, storage_key=storage_key)
+            except Exception as error:
+                # The settings save has committed; the public route independently
+                # checks the persisted reference and cleanup rechecks it too.
+                logger.error("website.asset_reconciliation_failed", extra={
+                    "tenant_id": tenant_id, "error_type": type(error).__name__,
+                })
         invalidate_ecommerce_cache(tenant_id)
 
         audit_metadata = {

@@ -49,7 +49,10 @@ from services.builder_asset_storage import (
     create_builder_asset_signed_url,
     download_builder_asset,
 )
-from services.asset_registry_service import extract_builder_asset_references
+from services.asset_registry_service import (
+    extract_builder_asset_references,
+    nonproject_asset_reference_count,
+)
 from services.request_body_limits import RequestBodyLimitMiddleware
 from services.runtime_config import validate_runtime_configuration
 from services.observability_service import (
@@ -271,7 +274,7 @@ def madar_status():
 
 def _asset_visibility(*, tenant_id: int, storage_key: str, request: Request, response: Response) -> tuple[bool, bool]:
     rows = getattr(
-        service_supabase.table("builder_assets").select("id,status").eq("tenant_id", tenant_id).eq("storage_key", storage_key).limit(2).execute(),
+        service_supabase.table("builder_assets").select("id,status,metadata").eq("tenant_id", tenant_id).eq("storage_key", storage_key).limit(2).execute(),
         "data", None,
     ) or []
     if len(rows) != 1 or rows[0].get("status") not in {"active", "unreferenced"}:
@@ -281,13 +284,24 @@ def _asset_visibility(*, tenant_id: int, storage_key: str, request: Request, res
         service_supabase.table("builder_asset_references").select("project_id").eq("asset_id", asset_id).limit(100).execute(),
         "data", None,
     ) or []
-    for reference in references:
+    project_ids = list({reference.get("project_id") for reference in references if reference.get("project_id")})
+    projects = []
+    if project_ids:
         projects = getattr(
-            service_supabase.table("builder_projects").select("id,published_schema,status").eq("id", reference.get("project_id")).eq("tenant_id", tenant_id).eq("status", "published").limit(1).execute(),
+            service_supabase.table("builder_projects").select("id,published_schema,status")
+            .eq("tenant_id", tenant_id).eq("status", "published").in_("id", project_ids).execute(),
             "data", None,
         ) or []
-        if projects and storage_key in extract_builder_asset_references(projects[0].get("published_schema") or {}, tenant_id=tenant_id):
+    for project in projects:
+        if storage_key in extract_builder_asset_references(project.get("published_schema") or {}, tenant_id=tenant_id):
             return True, False
+    metadata = rows[0].get("metadata")
+    usage_hint = metadata.get("usage") if isinstance(metadata, dict) else None
+    if nonproject_asset_reference_count(
+        tenant_id=tenant_id, storage_key=storage_key, public_only=True,
+        usage_hint=usage_hint, client=service_supabase,
+    ):
+        return True, False
     try:
         _, user = get_authenticated_user_row(request, response, allow_admin_account_access=False)
         if int(user.get("tenant_id")) == tenant_id:
@@ -322,9 +336,13 @@ def get_public_builder_asset(
         raise HTTPException(status_code=404, detail="Asset was not found.")
 
     public_root = PUBLIC_UPLOADS_DIR.resolve()
+    tenant_root = public_root / f"tenant_{tenant_id}"
+    builder_root = tenant_root / "builder_assets"
+    if tenant_root.is_symlink() or builder_root.is_symlink():
+        raise HTTPException(status_code=404, detail="Asset was not found.")
     asset_path = assert_path_within_root(
-        public_root / f"tenant_{tenant_id}" / "builder_assets" / safe_filename,
-        public_root,
+        builder_root / safe_filename,
+        builder_root,
         error=HTTPException(status_code=404, detail="Asset was not found."),
     )
 

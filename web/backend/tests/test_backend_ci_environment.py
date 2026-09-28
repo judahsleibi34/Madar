@@ -163,6 +163,15 @@ class BackendCiEnvironmentTests(unittest.TestCase):
             "/tmp:rw,exec,nosuid,nodev,size=1g,mode=1777",
         )
 
+    def test_backend_ci_mounts_frontend_vite_config_read_only(self):
+        command = _named_run_command(WORKFLOW, "Run backend tests")
+        tokens = shlex.split(command)
+        mounts = [tokens[index + 1] for index, token in enumerate(tokens) if token == "--volume"]
+        self.assertIn(
+            "$PWD/web/frontend/vite.config.js:/test-repository/frontend/vite.config.js:ro",
+            mounts,
+        )
+
     def test_application_import_uses_writable_ci_storage_as_non_root(self):
         command = _named_run_command(WORKFLOW, "Run backend tests")
         ci_environment = _docker_environment(command)

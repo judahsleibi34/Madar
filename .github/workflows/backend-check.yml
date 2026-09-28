@@ -57,6 +57,7 @@ jobs:
             --volume "$PWD/web/frontend/storefront_frame_headers.conf.template:/test-repository/frontend/storefront_frame_headers.conf.template:ro" \
             --volume "$PWD/web/frontend/admin_preview_frame_headers.conf.template:/test-repository/frontend/admin_preview_frame_headers.conf.template:ro" \
             --volume "$PWD/web/frontend/nginx.conf.template:/test-repository/frontend/nginx.conf.template:ro" \
+            --volume "$PWD/web/frontend/vite.config.js:/test-repository/frontend/vite.config.js:ro" \
             --volume "$PWD/web/docker-compose.yml:/test-repository/docker-compose.yml:ro" \
             --volume "$PWD/web/docker-compose.dev.yml:/test-repository/docker-compose.dev.yml:ro" \
             madar-backend-test python scripts/run_tests_no_external_network.py
