@@ -30,6 +30,10 @@ describe("production Content Security Policy", () => {
     expect(adminPreviewHeaders).not.toContain("frame-ancestors *");
     expect(nginxTemplate).toMatch(/location ~ \^\/ecommerce-preview\(\?:\/\|\$\) \{\s*try_files \/index\.html =404;\s*add_header Cache-Control "no-cache, no-store, must-revalidate" always;\s*include \/etc\/nginx\/conf\.d\/includes\/admin_preview_frame_headers\.conf;/);
   });
+  it("keeps API media requests ahead of the generic static-file matcher", () => {
+    expect(nginxTemplate).toContain("location ^~ /api/");
+    expect(nginxTemplate).toContain("location ~* \\.(?:js|css|png|jpg|jpeg|gif|ico|svg|webp|woff2?|pdf)$");
+  });
   it("allows only the public production API connection origin", () => {
     const configuredOrigin = compose.match(
       /MADAR_CSP_CONNECT_SRC:\s*\$\{MADAR_CSP_CONNECT_SRC:-([^}]+)\}/,

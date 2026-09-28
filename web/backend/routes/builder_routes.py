@@ -59,6 +59,7 @@ from services.entitlement_service import (
     require_any_entitlement,
     require_entitlement,
 )
+from services.observability_service import traced_operation
 
 router = APIRouter(tags=["Builder"])
 logger = logging.getLogger(__name__)
@@ -2229,18 +2230,21 @@ def read_weekly_screen_time(
     project_id: Optional[str] = Query(default=None),
     period: str = Query(default="week", pattern="^(today|week|month)$"),
 ):
-    context = require_builder_context(request, response, require_active_tenant_member)
+    with traced_operation("screen_time_authorization"):
+        context = require_builder_context(request, response, require_active_tenant_member)
     if project_id:
-        get_project_for_tenant(project_id, context.tenant_id)
-    return {
-        "success": True,
-        **get_weekly_screen_time(
-            tenant_id=context.tenant_id,
-            current_user_id=context.user_id,
-            project_id=project_id,
-            period=period,
-        ),
-    }
+        with traced_operation("screen_time_project_lookup"):
+            get_project_for_tenant(project_id, context.tenant_id)
+    with traced_operation("screen_time_summary"):
+        return {
+            "success": True,
+            **get_weekly_screen_time(
+                tenant_id=context.tenant_id,
+                current_user_id=context.user_id,
+                project_id=project_id,
+                period=period,
+            ),
+        }
 
 
 @router.get("/builder/visit-metrics")

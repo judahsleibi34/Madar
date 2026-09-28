@@ -1,14 +1,14 @@
 {
   "release_metadata_version": 1,
   "schema": {
-    "compatible_min": 105,
-    "compatible_max": 108,
-    "target": 108,
+    "compatible_min": 109,
+    "compatible_max": 110,
+    "target": 110,
     "migration_class": "forward-compatible",
-    "rollback_compatible_min": 105,
-    "rollback_compatible_max": 105
+    "rollback_compatible_min": 109,
+    "rollback_compatible_max": 109
   },
   "migration_policy": "automatic-after-known-good-backup-first-forward-repair",
-  "notes": "Forward-compatible schema 105 to 108 bridge. Schema 105 is the accepted production source; migration 105 established canonical tenant subdomains and is immutable applied production history. Migration 106 snapshots order delivery fees; migration 107 adds ecommerce category images; migration 108 adds tenant-scoped ecommerce brands. A verified schema-105 backup is required before migration; recovery is forward-repair-only after schema advances beyond 105.",
-  "migration_manifest": "migrations-106-108.json"
+  "notes": "Forward-compatible schema 109 to 110 bridge. Migrations through 109 are immutable applied production history. Migration 110 makes ecommerce order creation and its durable notification intent atomic, keeps owner/admin in-app order notifications mandatory, and repairs missing notification intents for recent orders. A verified schema-109 backup is required before migration; recovery is forward-repair-only after schema advances beyond 109.",
+  "migration_manifest": "migrations-110.json"
 }

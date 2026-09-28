@@ -63,7 +63,7 @@ def extract_builder_asset_references(schema: Any, *, tenant_id: int) -> dict[str
     return found
 
 
-def nonproject_asset_reference_count(*, tenant_id: int, storage_key: str, public_only: bool = False, client=None) -> int:
+def nonproject_asset_reference_count(*, tenant_id: int, storage_key: str, public_only: bool = False, usage_hint: str | None = None, client=None) -> int:
     """Count tenant-owned site/store references, optionally only public ones.
 
     Catalog rows are queried by their exact managed URL. A registered file is
@@ -73,18 +73,23 @@ def nonproject_asset_reference_count(*, tenant_id: int, storage_key: str, public
         return 0
     database_client = client or service_supabase
     url = f"/uploads/{storage_key}"
-    settings = getattr(
-        database_client.table("website_settings")
-        .select("*")
-        .eq("tenant_id", int(tenant_id)).limit(1).execute(), "data", None,
-    ) or []
-    count = 0
-    if settings and (not public_only or settings[0].get("subdomain") or settings[0].get("standard_path_slug")):
-        count += sum(settings[0].get(field) == url for field in ("logo_url", "loading_image_url"))
-    if public_only and count:
-        return count
+    def site_count() -> int:
+        settings = getattr(
+            database_client.table("website_settings")
+            .select("*")
+            .eq("tenant_id", int(tenant_id)).limit(1).execute(), "data", None,
+        ) or []
+        if not settings or (public_only and not (settings[0].get("subdomain") or settings[0].get("standard_path_slug"))):
+            return 0
+        result = sum(settings[0].get(field) == url for field in ("logo_url", "loading_image_url"))
+        theme = settings[0].get("ecommerce_theme")
+        landing_page = theme.get("landing_page") if isinstance(theme, dict) else None
+        slides = landing_page.get("slides") if isinstance(landing_page, dict) else None
+        if isinstance(slides, list):
+            result += sum(isinstance(slide, dict) and slide.get("image_url") == url for slide in slides)
+        return result
 
-    for table in ("ecommerce_categories", "ecommerce_brands"):
+    def taxonomy_count(table: str) -> int:
         try:
             query = database_client.table(table).select("id").eq("tenant_id", int(tenant_id))
             if public_only:
@@ -97,27 +102,48 @@ def nonproject_asset_reference_count(*, tenant_id: int, storage_key: str, public
             if table != "ecommerce_brands" or not any(token in message for token in ("pgrst205", "could not find the table", "schema cache")):
                 raise
             rows = []
-        count += bool(rows)
+        return int(bool(rows))
+
+    def product_count() -> int:
+        query = database_client.table("ecommerce_products").select("id").eq("tenant_id", int(tenant_id))
+        if public_only:
+            query = query.eq("status", "active")
+        rows = getattr(query.filter("images", "cs", json.dumps([url])).limit(1).execute(), "data", None) or []
+        return int(bool(rows))
+
+    def variant_count() -> int:
+        query = database_client.table("ecommerce_product_variants").select("product_id").eq("tenant_id", int(tenant_id))
+        if public_only:
+            query = query.eq("active", True)
+        variants = getattr(query.filter("images", "cs", json.dumps([url])).execute(), "data", None) or []
+        for product_id in {row.get("product_id") for row in variants if row.get("product_id")}:
+            parent_query = database_client.table("ecommerce_products").select("id").eq("tenant_id", int(tenant_id)).eq("id", product_id)
+            if public_only:
+                parent_query = parent_query.eq("status", "active")
+            if getattr(parent_query.limit(1).execute(), "data", None):
+                return 1
+        return 0
+
+    lookups = {
+        "site": site_count,
+        "category": lambda: taxonomy_count("ecommerce_categories"),
+        "brand": lambda: taxonomy_count("ecommerce_brands"),
+        "product": product_count,
+        "variant": variant_count,
+    }
+    preferred = {
+        "ecommerce_landing_slide": "site",
+        "ecommerce_category": "category",
+        "ecommerce_brand": "brand",
+        "ecommerce_product": "product",
+    }.get(usage_hint) if public_only else None
+    order = ([preferred] if preferred else []) + [name for name in lookups if name != preferred]
+    count = 0
+    for name in order:
+        count += lookups[name]()
         if public_only and count:
             return count
-    product_query = database_client.table("ecommerce_products").select("id").eq("tenant_id", int(tenant_id))
-    if public_only:
-        product_query = product_query.eq("status", "active")
-    products = getattr(product_query.filter("images", "cs", json.dumps([url])).limit(1).execute(), "data", None) or []
-    if public_only and products:
-        return count + 1
-    variant_query = database_client.table("ecommerce_product_variants").select("product_id").eq("tenant_id", int(tenant_id))
-    if public_only:
-        variant_query = variant_query.eq("active", True)
-    variants = getattr(variant_query.filter("images", "cs", json.dumps([url])).execute(), "data", None) or []
-    for product_id in {row.get("product_id") for row in variants if row.get("product_id")}:
-        parent_query = database_client.table("ecommerce_products").select("id").eq("tenant_id", int(tenant_id)).eq("id", product_id)
-        if public_only:
-            parent_query = parent_query.eq("status", "active")
-        parent = getattr(parent_query.limit(1).execute(), "data", None) or []
-        if parent:
-            return count + bool(products) + 1
-    return count + bool(products)
+    return count
 
 
 def require_builder_asset_tenant_ownership(schema: Any, *, tenant_id: int) -> None:

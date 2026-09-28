@@ -8,6 +8,7 @@ import os
 import re
 import threading
 import time
+from contextlib import contextmanager
 from urllib.parse import urlsplit
 from collections import defaultdict
 from pathlib import Path
@@ -20,6 +21,8 @@ from services.data_deletion_service import get_deletion_metrics
 from services.upload_config import get_data_upload_dir, get_private_charts_dir, get_public_uploads_dir
 
 CORRELATION_ID = contextvars.ContextVar("madar_correlation_id", default="")
+REQUEST_TIMINGS = contextvars.ContextVar("madar_request_timings", default=None)
+REQUEST_TIMING_MARKERS = contextvars.ContextVar("madar_request_timing_markers", default=None)
 CORRELATION_PATTERN = re.compile(r"^[A-Za-z0-9._:-]{8,80}$")
 _lock = threading.Lock()
 _requests: dict[tuple[str, str, str], int] = defaultdict(int)
@@ -44,6 +47,80 @@ def record_request(*, method: str, route: str, status_code: int, elapsed_seconds
         _latency_sum[latency_key] += max(0.0, elapsed_seconds)
         if status_code >= 500:
             _errors[(method_key, route_key)] += 1
+
+
+def begin_request_timings():
+    return (
+        REQUEST_TIMINGS.set({}),
+        REQUEST_TIMING_MARKERS.set({"origin": time.perf_counter(), "markers": {}}),
+    )
+
+
+def end_request_timings(token) -> None:
+    timings_token, markers_token = token
+    REQUEST_TIMINGS.reset(timings_token)
+    REQUEST_TIMING_MARKERS.reset(markers_token)
+
+
+def record_request_timing(name: str, duration_seconds: float) -> None:
+    timings = REQUEST_TIMINGS.get()
+    if timings is None:
+        return
+    safe_name = "".join(character if character.isalnum() or character in "_-" else "_" for character in name)
+    with _lock:
+        timings[safe_name] = timings.get(safe_name, 0.0) + max(float(duration_seconds), 0.0)
+
+
+def record_request_timing_marker(name: str) -> None:
+    state = REQUEST_TIMING_MARKERS.get()
+    if state is None:
+        return
+    safe_name = "".join(character if character.isalnum() or character in "_-" else "_" for character in name)
+    offset = max(0.0, time.perf_counter() - float(state["origin"]))
+    with _lock:
+        state["markers"][safe_name] = offset
+
+
+@contextmanager
+def timed_operation(name: str):
+    started_at = time.perf_counter()
+    try:
+        yield
+    finally:
+        record_request_timing(name, time.perf_counter() - started_at)
+
+
+@contextmanager
+def traced_operation(name: str):
+    record_request_timing_marker(f"{name}_start")
+    try:
+        with timed_operation(name):
+            yield
+    finally:
+        record_request_timing_marker(f"{name}_end")
+
+
+def request_timings_snapshot() -> dict[str, float]:
+    with _lock:
+        return dict(REQUEST_TIMINGS.get() or {})
+
+
+def request_timing_markers_snapshot() -> dict[str, float]:
+    state = REQUEST_TIMING_MARKERS.get() or {}
+    with _lock:
+        return dict(state.get("markers") or {})
+
+
+def server_timing_value() -> str:
+    durations = [
+        f'{name};dur={duration_seconds * 1000:.1f}'
+        for name, duration_seconds in request_timings_snapshot().items()
+    ]
+    markers = [
+        f'{name};dur={offset_seconds * 1000:.1f};desc="offset"'
+        for name, offset_seconds in request_timing_markers_snapshot().items()
+    ]
+    return ", ".join([*durations, *markers])
 
 
 def _escape(value: str) -> str:
@@ -140,7 +217,7 @@ def metrics_access_allowed(*, client_host: str | None, authorization: str | None
 
 
 class JsonFormatter(logging.Formatter):
-    SAFE_EXTRA = ("correlation_id", "security_event_id", "error_code", "error_type", "status_code", "duration_ms", "method", "route")
+    SAFE_EXTRA = ("correlation_id", "security_event_id", "error_code", "error_type", "status_code", "duration_ms", "timings", "method", "route")
     converter = time.gmtime
 
     def format(self, record: logging.LogRecord) -> str:

@@ -1,7 +1,7 @@
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from pydantic import ValidationError
 from starlette.responses import Response
@@ -16,6 +16,8 @@ MIGRATION = WEB_ROOT / "database" / "migrations" / "094_create_ecommerce_transac
 MIRROR = WEB_ROOT / "supabase" / "migrations" / "094_create_ecommerce_transaction_core.sql"
 DELIVERY_FEE_MIGRATION = WEB_ROOT / "database" / "migrations" / "106_add_order_delivery_fees.sql"
 DELIVERY_FEE_MIRROR = WEB_ROOT / "supabase" / "migrations" / "106_add_order_delivery_fees.sql"
+ORDER_NOTIFICATION_MIGRATION = WEB_ROOT / "database" / "migrations" / "110_enqueue_ecommerce_order_notifications.sql"
+ORDER_NOTIFICATION_MIRROR = WEB_ROOT / "supabase" / "migrations" / "110_enqueue_ecommerce_order_notifications.sql"
 
 
 def order_payload(**overrides):
@@ -76,12 +78,14 @@ class EcommerceTransactionCoreTests(unittest.TestCase):
         client = RpcOnlyClient()
         request = Request({"type": "http", "method": "POST", "path": "/", "headers": []})
         payload = PublicStoreOrderCreate(**order_payload())
+        notification = Mock(return_value={"id": "notification-event"})
 
         with (
             patch.object(public_site_routes, "service_supabase", client),
             patch.object(public_site_routes, "enforce_public_rate_limit"),
             patch.object(public_site_routes, "resolve_public_store_settings", return_value={"tenant_id": 7}),
             patch.object(public_site_routes, "resolve_tenant_id", return_value=7),
+            patch.object(public_site_routes, "create_tenant_notification_event", notification),
         ):
             result = public_site_routes.create_public_store_order("test-store", payload, request, Response())
 
@@ -97,6 +101,22 @@ class EcommerceTransactionCoreTests(unittest.TestCase):
         self.assertEqual(result["order"]["delivery_fee"], "5.00")
         self.assertEqual(result["order"]["total"], "25.00")
         self.assertIsNone(client.params["p_customer_id"])
+        notification.assert_called_once_with(
+            tenant_id=7,
+            event_type="ecommerce_order_created",
+            source_type="ecommerce_order",
+            source_id="22222222-2222-2222-2222-222222222222",
+            title="New order: MD-20260912-ABC12345",
+            body="MD-20260912-ABC12345 was placed by Test Customer for ILS 25.00.",
+            data={
+                "order_id": "22222222-2222-2222-2222-222222222222",
+                "order_number": "MD-20260912-ABC12345",
+                "status": "pending",
+                "payment_status": "unpaid",
+                "currency": "ILS",
+                "total": "25.00",
+            },
+        )
 
     def test_migration_is_mirrored_and_contains_concurrency_guards(self):
         sql = MIGRATION.read_bytes()
@@ -116,6 +136,18 @@ class EcommerceTransactionCoreTests(unittest.TestCase):
         self.assertIn("inventory_restored_at = now()", text)
         self.assertIn("set status = p_reason", text)
         self.assertIn("p_reason not in ('cancelled', 'rejected')", text)
+
+    def test_order_notification_migration_is_atomic_and_repairable(self):
+        sql = ORDER_NOTIFICATION_MIGRATION.read_bytes()
+        self.assertEqual(sql, ORDER_NOTIFICATION_MIRROR.read_bytes())
+        text = sql.decode("utf-8").lower()
+        self.assertIn("create constraint trigger ecommerce_order_created_notification_intent", text)
+        self.assertIn("deferrable initially deferred", text)
+        self.assertIn("create_notification_event_intent", text)
+        self.assertIn("ecommerce_order_created", text)
+        self.assertIn("now() - interval '30 days'", text)
+        self.assertIn("migration_110_expected_schema_109", text)
+        self.assertIn("set schema_version = 110", text)
 
     def test_delivery_fee_migration_snapshots_server_price_into_order_total(self):
         sql = DELIVERY_FEE_MIGRATION.read_bytes()

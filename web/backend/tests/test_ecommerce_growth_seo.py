@@ -5,10 +5,12 @@ from uuid import UUID
 from pydantic import ValidationError
 from starlette.requests import Request
 
-from routes.ecommerce_routes import StoreGrowthPayload, _validate_featured_rows
+from routes.ecommerce_routes import StoreGrowthPayload, StoreLandingPagePayload, _validate_featured_rows
 from routes.public_site_routes import (
     _public_catalog_product,
     _public_store_growth,
+    _public_store_landing_page,
+    _public_sale_summary,
     _storefront_sitemap_xml,
     build_public_store_profile,
 )
@@ -47,6 +49,19 @@ class Client:
 
 
 class EcommerceGrowthSeoTests(unittest.TestCase):
+    def test_public_sale_summary_uses_highest_valid_discount(self):
+        summary = _public_sale_summary([
+            {"price": "80", "compare_at_price": "100"},
+            {"price": "45", "compare_at_price": "90"},
+            {"price": "30", "compare_at_price": "30"},
+            {"price": "invalid", "compare_at_price": "90"},
+        ])
+        self.assertEqual(summary, {"active": True, "max_percentage": 50})
+        self.assertEqual(
+            _public_sale_summary([{"price": "10", "compare_at_price": None}]),
+            {"active": False, "max_percentage": 0},
+        )
+
     def test_growth_payload_accepts_relative_or_https_links(self):
         self.assertEqual(StoreGrowthPayload(announcement_link="/shop/catalog").announcement_link, "/shop/catalog")
         self.assertEqual(StoreGrowthPayload(announcement_link="https://example.com/sale").announcement_link, "https://example.com/sale")
@@ -61,6 +76,33 @@ class EcommerceGrowthSeoTests(unittest.TestCase):
     def test_enabled_announcement_requires_localized_copy(self):
         with self.assertRaises(ValidationError):
             StoreGrowthPayload(announcement_enabled=True)
+
+    def test_landing_page_validates_interval_media_and_links(self):
+        payload = StoreLandingPagePayload(interval_ms=7000, slides=[{
+            "image_url": "https://example.com/campaign.webp",
+            "title_en": "New season",
+            "link": "/shop/catalog",
+        }])
+        self.assertEqual(payload.interval_ms, 7000)
+        self.assertEqual(payload.slides[0].link, "/shop/catalog")
+        demo = StoreLandingPagePayload(slides=[{"image_url": "/demo/landing/editorial-essentials.webp"}])
+        self.assertEqual(demo.slides[0].image_url, "/demo/landing/editorial-essentials.webp")
+        for invalid in (
+            {"interval_ms": 1000, "slides": []},
+            {"slides": [{"image_url": "javascript:alert(1)"}]},
+            {"slides": [{"image_url": "https://example.com/a.webp", "link": "//evil.example"}]},
+        ):
+            with self.subTest(invalid=invalid), self.assertRaises(ValidationError):
+                StoreLandingPagePayload(**invalid)
+
+    def test_public_landing_page_is_separate_from_theme(self):
+        saved = {"landing_page": {"autoplay_enabled": True, "interval_ms": 6500, "slides": [{"id": "one", "image_url": "https://example.com/hero.webp", "title_en": "Sale", "link": "/shop/catalog"}]}}
+        public = _public_store_landing_page(saved)
+        self.assertEqual(public["interval_ms"], 6500)
+        self.assertEqual(public["slides"][0]["title_en"], "Sale")
+        profile = build_public_store_profile({"ecommerce_theme": {"accent": "#123456", **saved}}, "olive")
+        self.assertNotIn("landing_page", profile["store_theme"])
+        self.assertEqual(profile["landing_page"]["slides"][0]["image_url"], "https://example.com/hero.webp")
 
     def test_public_profile_separates_theme_from_growth(self):
         profile = build_public_store_profile({

@@ -46,6 +46,54 @@ class ObservabilityServiceTests(unittest.TestCase):
         self.assertFalse(logging.getLogger("httpx").isEnabledFor(logging.INFO))
         self.assertTrue(logging.getLogger("httpx").isEnabledFor(logging.WARNING))
 
+    def test_request_operation_timings_are_isolated_and_rendered(self):
+        token = observability_service.begin_request_timings()
+        try:
+            observability_service.record_request_timing("db", 0.01234)
+            observability_service.record_request_timing("db", 0.001)
+            observability_service.record_request_timing("provider call", 0.004)
+
+            snapshot = observability_service.request_timings_snapshot()
+            self.assertAlmostEqual(snapshot["db"], 0.01334)
+            self.assertAlmostEqual(snapshot["provider_call"], 0.004)
+            self.assertEqual(
+                observability_service.server_timing_value(),
+                "db;dur=13.3, provider_call;dur=4.0",
+            )
+        finally:
+            observability_service.end_request_timings(token)
+
+        self.assertEqual(observability_service.request_timings_snapshot(), {})
+
+    def test_traced_operation_records_request_relative_start_and_end(self):
+        token = observability_service.begin_request_timings()
+        try:
+            with observability_service.traced_operation("parallel read"):
+                pass
+            timings = observability_service.request_timings_snapshot()
+            markers = observability_service.request_timing_markers_snapshot()
+            rendered = observability_service.server_timing_value()
+        finally:
+            observability_service.end_request_timings(token)
+
+        self.assertIn("parallel_read", timings)
+        self.assertLessEqual(markers["parallel_read_start"], markers["parallel_read_end"])
+        self.assertIn('parallel_read_start;dur=', rendered)
+        self.assertIn('desc="offset"', rendered)
+        self.assertEqual(observability_service.request_timing_markers_snapshot(), {})
+
+    def test_traced_operation_records_end_when_operation_fails(self):
+        token = observability_service.begin_request_timings()
+        try:
+            with self.assertRaisesRegex(RuntimeError, "failed"):
+                with observability_service.traced_operation("failing read"):
+                    raise RuntimeError("failed")
+            markers = observability_service.request_timing_markers_snapshot()
+        finally:
+            observability_service.end_request_timings(token)
+
+        self.assertLessEqual(markers["failing_read_start"], markers["failing_read_end"])
+
     def test_access_filter_removes_queries_and_successful_liveness_noise(self):
         access_filter = observability_service.SafeAccessLogFilter()
         successful_health = logging.LogRecord(

@@ -8,9 +8,13 @@ vi.mock("../PageBuilder/services/PageBuilder.api", () => ({
 }));
 
 describe("WeeklyScreenTimePanel", () => {
-  afterEach(() => cleanup());
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+  });
 
   beforeEach(() => {
+    fetchWeeklyScreenTime.mockReset();
     fetchWeeklyScreenTime.mockResolvedValue({
       total_seconds: 5400,
       users: [
@@ -66,5 +70,34 @@ describe("WeeklyScreenTimePanel", () => {
     expect(screen.getByRole("tab", { name: "This month" }).getAttribute("aria-selected")).toBe(
       "true"
     );
+  });
+
+  it("waits for project discovery and does not poll the weekly summary every 30 seconds", async () => {
+    vi.useFakeTimers();
+    const view = render(
+      <WeeklyScreenTimePanel
+        currentUser={{ id: 1, name: "Sulaima" }}
+        enabled={false}
+        projectId=""
+      />
+    );
+    expect(fetchWeeklyScreenTime).not.toHaveBeenCalled();
+
+    view.rerender(
+      <WeeklyScreenTimePanel
+        currentUser={{ id: 1, name: "Sulaima" }}
+        enabled
+        projectId="project-1"
+      />
+    );
+    await vi.waitFor(() => expect(fetchWeeklyScreenTime).toHaveBeenCalledTimes(1));
+    expect(fetchWeeklyScreenTime).toHaveBeenLastCalledWith("project-1", "week");
+
+    await vi.advanceTimersByTimeAsync(90_000);
+    expect(fetchWeeklyScreenTime).toHaveBeenCalledTimes(1);
+
+    fireEvent.focus(window);
+    fireEvent(document, new Event("visibilitychange"));
+    await vi.waitFor(() => expect(fetchWeeklyScreenTime).toHaveBeenCalledTimes(2));
   });
 });

@@ -32,6 +32,7 @@ class Query:
     def delete(self): self.operation = "delete"; return self
 
     def execute(self):
+        self.db.queries.append(self.table)
         table = self.db.setdefault(self.table, [])
         rows = [row for row in table if all(
             row.get(key) == value if kind == "eq" else (
@@ -58,7 +59,7 @@ class Query:
 
 
 class Client:
-    def __init__(self): self.data = {}
+    def __init__(self): self.data, self.queries = {}, []
     def setdefault(self, *args): return self.data.setdefault(*args)
     def table(self, name): return Query(self, name)
 
@@ -177,6 +178,67 @@ class AssetRegistryTests(unittest.TestCase):
         self.assertEqual(asset_registry_service.nonproject_asset_reference_count(
             tenant_id=7, storage_key=key, public_only=True, client=client,
         ), 0)
+
+    def test_landing_slide_replacement_recounts_and_preserves_other_references(self):
+        client = Client()
+        old = "tenant_7/builder_assets/0123456789abcdef0123456789abcdef.png"
+        new = "tenant_7/builder_assets/abcdefabcdefabcdefabcdefabcdefab.webp"
+        client.data["builder_assets"] = [
+            {"id": "old", "tenant_id": 7, "storage_key": old, "status": "unreferenced"},
+            {"id": "new", "tenant_id": 7, "storage_key": new, "status": "unreferenced"},
+        ]
+        settings = {"tenant_id": 7, "subdomain": "olive", "ecommerce_theme": {
+            "landing_page": {"slides": [{"image_url": f"/uploads/{old}"}]},
+        }}
+        client.data["website_settings"] = [settings]
+        client.data["ecommerce_products"] = [{
+            "id": "product-1", "tenant_id": 7, "status": "active", "images": [f"/uploads/{old}"],
+        }]
+        asset_registry_service.refresh_builder_asset_reference_state(tenant_id=7, storage_key=old, client=client)
+        self.assertEqual(client.data["builder_assets"][0]["reference_count"], 2)
+        self.assertEqual(asset_registry_service.nonproject_asset_reference_count(
+            tenant_id=7, storage_key=old, public_only=True, client=client,
+        ), 1)
+        settings["ecommerce_theme"]["landing_page"]["slides"] = [{"image_url": f"/uploads/{new}"}]
+        for key in (old, new):
+            asset_registry_service.refresh_builder_asset_reference_state(tenant_id=7, storage_key=key, client=client)
+        self.assertEqual([row["reference_count"] for row in client.data["builder_assets"]], [1, 1])
+        self.assertEqual([row["status"] for row in client.data["builder_assets"]], ["active", "active"])
+        client.data["ecommerce_products"].clear()
+        asset_registry_service.refresh_builder_asset_reference_state(tenant_id=7, storage_key=old, client=client)
+        self.assertEqual(client.data["builder_assets"][0]["status"], "unreferenced")
+
+    def test_public_catalog_usage_hint_prioritizes_exact_database_lookup(self):
+        client = Client()
+        key = "tenant_7/builder_assets/0123456789abcdef0123456789abcdef.png"
+        client.data["ecommerce_products"] = [{
+            "tenant_id": 7, "status": "active", "images": [f"/uploads/{key}"],
+        }]
+        count = asset_registry_service.nonproject_asset_reference_count(
+            tenant_id=7, storage_key=key, public_only=True,
+            usage_hint="ecommerce_product", client=client,
+        )
+        self.assertEqual(count, 1)
+        self.assertEqual(client.queries, ["ecommerce_products"])
+        client.queries.clear()
+        client.data["ecommerce_products"][0]["status"] = "draft"
+        self.assertEqual(asset_registry_service.nonproject_asset_reference_count(
+            tenant_id=7, storage_key=key, public_only=True,
+            usage_hint="ecommerce_product", client=client,
+        ), 0)
+        self.assertEqual(len(client.queries), 5)
+
+    def test_stale_usage_hint_falls_back_to_live_reference(self):
+        client = Client()
+        key = "tenant_7/builder_assets/0123456789abcdef0123456789abcdef.png"
+        client.data["website_settings"] = [{
+            "tenant_id": 7, "subdomain": "olive", "logo_url": f"/uploads/{key}",
+        }]
+        self.assertEqual(asset_registry_service.nonproject_asset_reference_count(
+            tenant_id=7, storage_key=key, public_only=True,
+            usage_hint="ecommerce_product", client=client,
+        ), 1)
+        self.assertEqual(client.queries, ["ecommerce_products", "website_settings"])
 
     def test_cleanup_is_dry_run_by_default_and_rechecks_checksum(self):
         client = Client()

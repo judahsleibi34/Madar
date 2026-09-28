@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import EcommerceStorefront from "./EcommerceStorefront";
 import i18n from "../../i18n";
 import { normalizeWhatsAppNumber } from "../../utils/whatsapp";
-import { fetchPublicEcommerceCatalog, fetchPublicEcommerceDeliveryAreas, fetchPublicEcommerceProduct, fetchPublicEcommerceProfile } from "../../services/ecommerceApi";
+import { createPublicEcommerceOrder, fetchPublicEcommerceCatalog, fetchPublicEcommerceDeliveryAreas, fetchPublicEcommerceLoyalty, fetchPublicEcommerceProduct, fetchPublicEcommerceProfile, fetchPublicStoreAccount, reconcilePublicEcommerceCart, registerPublicStoreAccount } from "../../services/ecommerceApi";
 import { fetchPublicEcommerceOrderConfirmation } from "../../services/ecommerceApi";
 import { recordPublicSiteVisit } from "../../services/siteVisitApi";
 
@@ -17,8 +17,12 @@ vi.mock("../../services/ecommerceApi", () => ({
   fetchPublicEcommerceDiscounts: vi.fn(() => Promise.resolve({ conditions:[] })),
   fetchPublicEcommerceProduct: vi.fn(),
   fetchPublicEcommerceProfile: vi.fn(),
+  fetchPublicStoreAccount: vi.fn(() => Promise.resolve({ logged_in: false, user: null })),
+  loginPublicStoreAccount: vi.fn(),
+  logoutPublicStoreAccount: vi.fn(),
+  registerPublicStoreAccount: vi.fn(),
   createPublicEcommerceOrder: vi.fn(),
-  reconcilePublicEcommerceCart: vi.fn(),
+  reconcilePublicEcommerceCart: vi.fn(() => Promise.resolve({ valid: true, items: [] })),
 }));
 
 vi.mock("../../services/siteVisitApi", () => ({
@@ -54,6 +58,33 @@ function LocationProbe() {
 }
 
 describe("EcommerceStorefront", () => {
+  it("renders the configured responsive landing carousel and supports manual navigation", async () => {
+    const carouselCatalog = {
+      site: {
+        brand: "Test Store",
+        landing_page: {
+          autoplay_enabled: true,
+          interval_ms: 7000,
+          slides: [
+            { id: "slide-1", image_url: "https://example.com/one.webp", title_en: "First campaign", subtitle_en: "First offer" },
+            { id: "slide-2", image_url: "https://example.com/two.webp", title_en: "Second campaign", subtitle_en: "Second offer" },
+          ],
+        },
+      },
+      catalog: { categories: [], brands: [], tags: [], products: [], pagination: { page: 1, pages: 1, total: 0, limit: 12 } },
+    };
+    fetchPublicEcommerceCatalog.mockResolvedValue(carouselCatalog);
+    fetchPublicEcommerceProfile.mockResolvedValue({ site: carouselCatalog.site });
+    render(<MemoryRouter initialEntries={["/shop"]}><Routes><Route path="/shop/*" element={<EcommerceStorefront subdomain="demo" />} /></Routes></MemoryRouter>);
+
+    expect(await screen.findByRole("heading", { name: "First campaign" })).toBeTruthy();
+    expect(screen.queryByRole("link", { name: "Shop now" })).toBeNull();
+    expect(document.querySelector('.live-store-hero-carousel-slide.is-active img')?.getAttribute("src")).toContain("one.webp");
+    fireEvent.click(screen.getByRole("button", { name: "Next slide" }));
+    expect(screen.getByRole("heading", { name: "Second campaign" })).toBeTruthy();
+    expect(document.querySelector('.live-store-hero-carousel-slide.is-active img')?.getAttribute("src")).toContain("two.webp");
+  });
+
   it("keeps internal draft preview in same-origin storage and rejects untrusted theme messages", async () => {
     fetchPublicEcommerceCatalog.mockResolvedValue(catalog);
     fetchPublicEcommerceProfile.mockResolvedValue({ site: { brand: "Test Store" } });
@@ -69,6 +100,123 @@ describe("EcommerceStorefront", () => {
     await waitFor(() => expect(storefront.closest(".live-store").style.getPropertyValue("--store-accent")).toBe("#336699"));
     expect(document.head.querySelector('meta[name="robots"]')?.content).toContain("noindex");
   });
+
+  it("renders a same-origin published preview from published data without draft overrides or visit tracking", async () => {
+    fetchPublicEcommerceCatalog.mockResolvedValue(catalog);
+    fetchPublicEcommerceProfile.mockResolvedValue({ site: { brand: "Test Store" } });
+    localStorage.setItem("madar-online-store-theme-preview", JSON.stringify({ accent: "#224466" }));
+
+    render(<MemoryRouter initialEntries={["/ecommerce-preview/demo"]}><Routes><Route path="/ecommerce-preview/:subdomain/*" element={<EcommerceStorefront subdomain="demo" previewBasePath="/ecommerce-preview/demo" />} /></Routes></MemoryRouter>);
+
+    const storefront = await screen.findByRole("heading", { level: 1, name: "Test Store" });
+    expect(storefront.closest(".live-store").style.getPropertyValue("--store-accent")).not.toBe("#224466");
+    expect(recordPublicSiteVisit).not.toHaveBeenCalled();
+  });
+
+  it("hides points when the signed-in customer's tenant has no enabled loyalty rule", async () => {
+    fetchPublicEcommerceCatalog.mockResolvedValue(catalog);
+    fetchPublicEcommerceProfile.mockResolvedValue({ site: { brand: "Test Store" } });
+    fetchPublicStoreAccount.mockResolvedValueOnce({ logged_in: true, user: { name: "Test Buyer", email: "buyer@example.com" } });
+    fetchPublicEcommerceLoyalty.mockResolvedValueOnce({
+      enabled: false,
+      account: null,
+      entitlements: [],
+      transactions: [],
+    });
+
+    render(<MemoryRouter initialEntries={["/shop"]}><Routes><Route path="/shop/*" element={<EcommerceStorefront subdomain="demo" />} /></Routes></MemoryRouter>);
+
+    await screen.findByRole("heading", { level: 1, name: "Test Store" });
+    await waitFor(() => expect(fetchPublicEcommerceLoyalty).toHaveBeenCalledWith("demo"));
+    expect(document.querySelector(".live-store-loyalty")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Open my account" }));
+    expect(screen.queryByText("Your points")).toBeNull();
+  });
+
+  it("shows the customer avatar, points, and rewards inside the account panel", async () => {
+    fetchPublicEcommerceCatalog.mockResolvedValue(catalog);
+    fetchPublicEcommerceProfile.mockResolvedValue({ site: { brand: "Test Store" } });
+    fetchPublicStoreAccount.mockResolvedValueOnce({ logged_in: true, user: { name: "Judah Sleibi", email: "judah@example.com", avatar: "" } });
+    fetchPublicEcommerceLoyalty.mockResolvedValueOnce({
+      enabled: true,
+      account: { current_balance: 125 },
+      entitlements: [{ id: "reward-1", status: "active" }],
+      transactions: [],
+    });
+
+    render(<MemoryRouter initialEntries={["/shop"]}><Routes><Route path="/shop/*" element={<EcommerceStorefront subdomain="demo" />} /></Routes></MemoryRouter>);
+
+    const accountButton = await screen.findByRole("button", { name: "Open my account" });
+    expect(accountButton.textContent).toBe("JS");
+    fireEvent.click(accountButton);
+    expect(await screen.findByText("Your points")).toBeTruthy();
+    expect(screen.getByText("125")).toBeTruthy();
+    expect(screen.getByText("1 active reward")).toBeTruthy();
+    fireEvent.pointerDown(document.body);
+    expect(screen.queryByRole("dialog", { name: "Customer account" })).toBeNull();
+  });
+
+  it("uses the customer avatar control instead of repeating the store logo", async () => {
+    fetchPublicEcommerceCatalog.mockResolvedValue({
+      ...catalog,
+      site: { ...catalog.site, logo_url: "https://example.com/store-logo.webp" },
+    });
+    fetchPublicEcommerceProfile.mockResolvedValue({ site: { brand: "Test Store" } });
+
+    render(<MemoryRouter initialEntries={["/shop"]}><Routes><Route path="/shop/*" element={<EcommerceStorefront subdomain="demo" />} /></Routes></MemoryRouter>);
+
+    const trigger = await screen.findByRole("button", { name: "Sign in or register" });
+    expect(trigger.querySelector(".live-store-account-store-logo")).toBeNull();
+    expect(trigger.querySelector("svg")).toBeTruthy();
+  });
+
+  it("offers customer sign-in and registration from the header account control", async () => {
+    fetchPublicEcommerceCatalog.mockResolvedValue(catalog);
+    fetchPublicEcommerceProfile.mockResolvedValue({ site: { brand: "Test Store" } });
+
+    render(<MemoryRouter initialEntries={["/shop"]}><Routes><Route path="/shop/*" element={<EcommerceStorefront subdomain="demo" />} /></Routes></MemoryRouter>);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Sign in or register" }));
+    expect(screen.getByLabelText("Email")).toBeTruthy();
+    expect(screen.getByLabelText("Password")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Continue with Google" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Register" }));
+    expect(screen.getByLabelText("Full name")).toBeTruthy();
+    expect(screen.getByLabelText("Confirm password")).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("Full name"), { target: { value: "Test Customer" } });
+    fireEvent.change(screen.getByLabelText("Email"), { target: { value: "customer@example.com" } });
+    fireEvent.change(screen.getByLabelText("Password"), { target: { value: "password-one" } });
+    fireEvent.change(screen.getByLabelText("Confirm password"), { target: { value: "password-two" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create account" }));
+    expect((await screen.findByRole("alert")).textContent).toBe("Passwords do not match.");
+    expect(registerPublicStoreAccount).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Create account" })).toBeTruthy();
+  });
+
+  it("positions the mobile account panel below the full header", async () => {
+    fetchPublicEcommerceCatalog.mockResolvedValue(catalog);
+    fetchPublicEcommerceProfile.mockResolvedValue({ site: { brand: "Test Store" } });
+    const rect = (bottom) => ({
+      bottom, height: bottom, left: 0, right: 393, top: 0, width: 393,
+      x: 0, y: 0, toJSON: () => ({}),
+    });
+    const bounds = vi.spyOn(HTMLElement.prototype, "getBoundingClientRect")
+      .mockImplementation(function getBounds() {
+        if (this.classList?.contains("live-store-header")) return rect(140);
+        if (this.classList?.contains("live-store-account-trigger")) return rect(60);
+        return rect(0);
+      });
+
+    try {
+      render(<MemoryRouter initialEntries={["/shop"]}><Routes><Route path="/shop/*" element={<EcommerceStorefront subdomain="demo" />} /></Routes></MemoryRouter>);
+      fireEvent.click(await screen.findByRole("button", { name: "Sign in or register" }));
+      const dialog = await screen.findByRole("dialog", { name: "Customer account" });
+      await waitFor(() => expect(dialog.style.getPropertyValue("--store-account-popover-top")).toBe("148px"));
+    } finally {
+      bounds.mockRestore();
+    }
+  });
+
   it.each(["en", "ar"])("uses the %s store identity on the homepage and footer", async (locale) => {
     await i18n.changeLanguage(locale);
     const site = { brand: "English Store", description: "English description", brand_ar: "متجر مدار", description_ar: "وصف المتجر" };
@@ -81,7 +229,6 @@ describe("EcommerceStorefront", () => {
     expect(screen.getAllByText(description).length).toBeGreaterThanOrEqual(2);
     expect(document.querySelector(".live-store").getAttribute("dir")).toBe(locale === "ar" ? "rtl" : "ltr");
   });
-
   it("falls back to English store identity when Arabic is blank", async () => {
     await i18n.changeLanguage("ar");
     const site = { brand: "English Store", description: "English description", brand_ar: "  ", description_ar: "" };
@@ -181,14 +328,134 @@ describe("EcommerceStorefront", () => {
 
     expect(await screen.findByRole("heading", { level: 1, name: "Checkout" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Place order" })).toBeTruthy();
+    expect(screen.queryByLabelText("Street")).toBeNull();
+    expect(screen.queryByLabelText("Building")).toBeNull();
+    expect(screen.queryByLabelText("Floor / apartment")).toBeNull();
+    expect(screen.queryByLabelText("Landmark / address description")).toBeNull();
+    expect(screen.queryByLabelText("Delivery notes")).toBeNull();
+    expect(await screen.findByRole("dialog", { name: "Sign in before ordering and earn points" })).toBeTruthy();
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Close" }));
+    fireEvent.click(screen.getByRole("button", { name: "Sign in to earn points" }));
+    expect(await screen.findByRole("dialog", { name: "Customer account" })).toBeTruthy();
     expect(screen.getByText("Ramallah — $6.50")).toBeTruthy();
     expect(fetchPublicEcommerceProfile).toHaveBeenCalledWith("demo");
     expect(recordPublicSiteVisit).toHaveBeenCalledTimes(1);
     expect(recordPublicSiteVisit).toHaveBeenCalledWith("demo", "store");
   });
 
-  it("supports catalog and store-wide search from URL state", async () => {
+  it("prefills checkout contact details for an authenticated customer", async () => {
+    localStorage.setItem("madar-store-cart:demo", JSON.stringify([{
+      id: "43b86c1a-fbf7-41d3-a58a-cbe07fc8459f",
+      slug: "linen-shirt",
+      name: "Linen Shirt",
+      quantity: 1,
+      price: "42.00",
+      currency: "USD",
+      images: [],
+    }]));
     fetchPublicEcommerceCatalog.mockResolvedValue(catalog);
+    fetchPublicEcommerceProfile.mockResolvedValue({ site: { brand: "Test Store" } });
+    fetchPublicStoreAccount.mockResolvedValueOnce({
+      logged_in: true,
+      user: { name: "Test Buyer", email: "buyer@example.com", phone: "+970590000000" },
+    });
+    fetchPublicEcommerceLoyalty.mockResolvedValueOnce({ enabled: true, account: { current_balance: 10 }, entitlements: [], transactions: [] });
+    fetchPublicEcommerceDeliveryAreas.mockResolvedValue({
+      areas: [{ id: "95000000-0000-0000-0000-000000000001", code: "ramallah", name_en: "Ramallah", name_ar: "رام الله", delivery_fee: "6.50" }],
+    });
+
+    render(
+      <MemoryRouter initialEntries={["/shop/checkout"]}>
+        <Routes><Route path="/shop/*" element={<EcommerceStorefront subdomain="demo" />} /></Routes>
+      </MemoryRouter>
+    );
+
+    await waitFor(() => expect(screen.getByLabelText("Customer name").value).toBe("Test Buyer"));
+    expect(screen.getByLabelText("Email").value).toBe("buyer@example.com");
+    expect(screen.getByLabelText("Phone").value).toBe("+970590000000");
+    expect(screen.getByText("Welcome back, Test Buyer. We filled in your saved contact details.")).toBeTruthy();
+    expect(screen.queryByText("Sign in before ordering and earn points")).toBeNull();
+  });
+
+  it("blocks email domains without a dot before sending a checkout request", async () => {
+    localStorage.setItem("madar-store-cart:demo", JSON.stringify([{
+      id: "43b86c1a-fbf7-41d3-a58a-cbe07fc8459f",
+      slug: "pleated-midi-skirt",
+      name: "Pleated Midi Skirt",
+      quantity: 1,
+      price: "62.00",
+      currency: "USD",
+      images: [],
+    }]));
+    fetchPublicEcommerceCatalog.mockResolvedValue(catalog);
+    fetchPublicEcommerceProfile.mockResolvedValue({ site: { brand: "Test Store" } });
+    fetchPublicEcommerceDeliveryAreas.mockResolvedValue({
+      areas: [{
+        id: "95000000-0000-0000-0000-000000000001",
+        code: "ramallah",
+        name_en: "Ramallah",
+        name_ar: "Ramallah",
+        delivery_fee: "25.00",
+      }],
+    });
+
+    render(
+      <MemoryRouter initialEntries={["/shop/checkout"]}>
+        <Routes><Route path="/shop/*" element={<EcommerceStorefront subdomain="demo" />} /></Routes>
+      </MemoryRouter>
+    );
+
+    await screen.findByRole("dialog", { name: "Sign in before ordering and earn points" });
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    fireEvent.change(await screen.findByLabelText("Customer name"), { target: { value: "Judah Sleibi" } });
+    fireEvent.change(screen.getByLabelText("Email"), { target: { value: "judahsleibi34@gmailcom" } });
+    fireEvent.change(screen.getByLabelText("Phone"), { target: { value: "+970599203855" } });
+    fireEvent.click(screen.getByRole("button", { name: "Place order" }));
+
+    expect((await screen.findAllByRole("alert")).some((alert) => alert.textContent.includes("Please enter a valid email address."))).toBe(true);
+    expect(document.activeElement).toBe(screen.getByLabelText("Email"));
+    expect(reconcilePublicEcommerceCart).toHaveBeenCalledTimes(1);
+    expect(createPublicEcommerceOrder).not.toHaveBeenCalled();
+  });
+
+  it("removes deleted products from a stale cart when checkout opens", async () => {
+    localStorage.setItem("madar-store-cart:demo", JSON.stringify([
+      { id: "deleted-product", slug: "old-product", name: "Old product", quantity: 2, price: "18.00", currency: "USD", images: [] },
+      { id: "current-product", slug: "current-product", name: "Current product", quantity: 1, price: "80.00", currency: "USD", images: [] },
+    ]));
+    fetchPublicEcommerceCatalog.mockResolvedValue(catalog);
+    fetchPublicEcommerceProfile.mockResolvedValue({ site: { brand: "Test Store" } });
+    fetchPublicEcommerceDeliveryAreas.mockResolvedValue({ areas: [] });
+    reconcilePublicEcommerceCart.mockResolvedValue({
+      valid: false,
+      items: [
+        { product_id: "deleted-product", variant_id: null, requested_quantity: 2, available: false, reason: "unavailable" },
+        { product_id: "current-product", variant_id: null, requested_quantity: 1, available: true, reason: null, max_quantity: 99, name: "Current product", slug: "current-product", images: [], price: "80.00", currency: "USD" },
+      ],
+    });
+
+    render(
+      <MemoryRouter initialEntries={["/shop/checkout"]}>
+        <Routes><Route path="/shop/*" element={<EcommerceStorefront subdomain="demo" />} /></Routes>
+      </MemoryRouter>
+    );
+
+    expect(await screen.findByText("Current product")).toBeTruthy();
+    await waitFor(() => expect(screen.queryByText("Old product")).toBeNull());
+    expect(JSON.parse(localStorage.getItem("madar-store-cart:demo"))).toEqual([
+      expect.objectContaining({ id: "current-product", quantity: 1 }),
+    ]);
+    expect(await screen.findByText("Unavailable products were removed and reduced stock quantities were adjusted.")).toBeTruthy();
+  });
+
+  it("supports catalog and store-wide search from URL state", async () => {
+    fetchPublicEcommerceCatalog.mockResolvedValue({
+      ...catalog,
+      catalog: {
+        ...catalog.catalog,
+        categories: [{ id: "women", slug: "women", name: "Women", parent_id: null }],
+      },
+    });
     render(
       <MemoryRouter initialEntries={["/shop?search=original"]}>
         <Routes>
@@ -206,10 +473,12 @@ describe("EcommerceStorefront", () => {
     );
 
     const search = await screen.findByRole("textbox");
+    const poweredByLink = screen.getByRole("link", { name: "Powered by Madar Portal" });
+    expect(poweredByLink.getAttribute("href")).toBe("https://madarportal.com/");
     expect(screen.getByRole("heading", { level: 1, name: "Products" })).toBeTruthy();
+    expect(screen.queryByText("Showing 0 results")).toBeNull();
     expect(search.value).toBe("original");
     fireEvent.change(search, { target: { value: "updated" } });
-    fireEvent.submit(search.closest("form"));
 
     await waitFor(() => {
       expect(screen.getByLabelText("current query").textContent).toContain(
@@ -217,6 +486,20 @@ describe("EcommerceStorefront", () => {
       );
     });
     expect(screen.getByRole("textbox").value).toBe("updated");
+    fireEvent.click(screen.getByRole("button", { name: "Women" }));
+    await waitFor(() => expect(screen.getByLabelText("current query").textContent).toContain("category=women"));
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "" } });
+    await waitFor(() => {
+      const currentQuery = screen.getByLabelText("current query").textContent;
+      expect(currentQuery).not.toContain("search=");
+      expect(currentQuery).toContain("category=women");
+    });
+    expect(fetchPublicEcommerceCatalog).toHaveBeenLastCalledWith(
+      "demo",
+      expect.objectContaining({ search: "", category: "women" })
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Women" }));
+    await waitFor(() => expect(screen.getByLabelText("current query").textContent).not.toContain("category=women"));
     const storeSearch = screen.getByRole("searchbox", { name: "Search store" });
     fireEvent.change(storeSearch, { target: { value: "chair" } });
     fireEvent.submit(storeSearch.closest("form"));
@@ -358,7 +641,10 @@ describe("EcommerceStorefront", () => {
           currency: "ILS",
           in_stock: true,
           has_variants: true,
-          variant_options: [{ id: "size", name: "Size", values: ["36", "37", "38"] }],
+          variant_options: [
+            { id: "color", name: "Color", display_type: "color", values: ["Black", "Sand"] },
+            { id: "size", name: "Size", display_type: "text", values: ["36", "37", "38"] },
+          ],
           images: ["https://example.com/tray.webp"],
         }],
         pagination: { page: 1, pages: 1, total: 1, limit: 8 },
@@ -373,12 +659,15 @@ describe("EcommerceStorefront", () => {
 
     expect(await screen.findByRole("heading", { level: 1, name: "Olive House" })).toBeTruthy();
     expect(screen.getAllByText("Made locally for thoughtful homes.")).toHaveLength(2);
+    expect(document.querySelector(".live-store-footer-brand img")?.getAttribute("src")).toContain("logo.webp");
     expect(screen.getByRole("heading", { name: "Home" })).toBeTruthy();
     expect(document.querySelectorAll(".live-store-category-carousel")).toHaveLength(2);
     expect(screen.getByRole("heading", { name: "Brands" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Previous brands" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Next brands" })).toBeTruthy();
     expect(screen.getAllByRole("link", { name: /Olive Studio/ })[0].getAttribute("href")).toContain("brand=olive");
+    expect(screen.getByRole("img", { name: "Olive Studio" }).getAttribute("src")).toContain("olive.webp");
+    expect(screen.getAllByText("02").some((node) => node.closest(".live-store-brand-section"))).toBe(true);
     expect(document.querySelector(".live-store-brand-section + .live-store-category-section")).toBeTruthy();
     expect(screen.queryByText("Objects for everyday living")).toBeNull();
     expect(document.querySelector(".live-store-category-carousel").style.getPropertyValue("--store-carousel-columns")).toBe("2");
@@ -393,8 +682,12 @@ describe("EcommerceStorefront", () => {
     expect(document.querySelectorAll(".live-store-category-section")[1].querySelector(".live-store-category-media img")?.getAttribute("src")).toContain("home.webp");
     expect(screen.getAllByText("Olive tray").length).toBeGreaterThan(0);
     expect(screen.getAllByText("36").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Black")).toBeNull();
+    expect(screen.queryByText("Sand")).toBeNull();
+    expect(document.querySelector(".live-store-product-view")).toBeNull();
+    expect(screen.getAllByRole("link", { name: "Add to cart" }).length).toBeGreaterThan(0);
     expect(screen.queryByText("NIKE / HOME")).toBeNull();
-    expect(screen.getAllByAltText("Olive tray")).toHaveLength(2);
+    expect(screen.getAllByAltText("Olive tray")).toHaveLength(1);
     expect(document.querySelector(".live-store").style.getPropertyValue("--store-accent")).toBe("#287a55");
     expect(screen.queryByRole("textbox")).toBeNull();
   });
@@ -577,6 +870,9 @@ describe("EcommerceStorefront", () => {
 
     expect((await screen.findAllByText("Chair")).length).toBeGreaterThan(0);
     expect(document.querySelector(".live-store").getAttribute("dir")).toBe("ltr");
+    const languageButton = document.querySelector(".live-store-language");
+    expect(languageButton.querySelector("svg")).toBeTruthy();
+    expect(languageButton.textContent).toBe("");
     fireEvent.click(screen.getByRole("button", { name: "العربية" }));
 
     expect((await screen.findAllByText("كرسي")).length).toBeGreaterThan(0);
@@ -684,6 +980,13 @@ describe("EcommerceStorefront", () => {
     expect(screen.getAllByText("Featured Soap").length).toBeGreaterThan(0);
     expect(screen.queryByText("Latest")).toBeNull();
     expect(screen.getAllByText("$12.00").length).toBeGreaterThan(0);
+    expect(document.querySelector(".live-store-product-sale-badge")?.textContent).toBe("Sale -20%");
+    expect(await screen.findByRole("dialog", { name: "Sale: up to 20% off" })).toBeTruthy();
+    expect(screen.getByText("Sale now — up to 20% off selected items")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Dismiss sale popup" }));
+    fireEvent.click(screen.getByRole("button", { name: "Dismiss sale announcement" }));
+    expect(screen.queryByRole("dialog", { name: "Sale: up to 20% off" })).toBeNull();
+    expect(screen.queryByText("Sale now — up to 20% off selected items")).toBeNull();
     const announcementLink = screen.getByRole("link", { name: "Free local delivery this week" });
     announcementLink.addEventListener("click", (event) => event.preventDefault(), { once: true });
     fireEvent.click(announcementLink);
@@ -714,6 +1017,18 @@ it("shows a safe cart error instead of success when browser storage rejects an a
   } finally { storage.mockRestore(); }
 });
 
+it("keeps language selection in the hamburger and account access in the header", async () => {
+  fetchPublicEcommerceCatalog.mockResolvedValue(catalog);
+  fetchPublicEcommerceProfile.mockResolvedValue({ site: catalog.site });
+  render(<MemoryRouter initialEntries={["/shop"]}><Routes><Route path="/shop/*" element={<EcommerceStorefront subdomain="demo" />} /></Routes></MemoryRouter>);
+  const accountTrigger = await screen.findByRole("button", { name: "Sign in or register" });
+  expect(accountTrigger.querySelector("svg")).toBeTruthy();
+  const toggle = document.querySelector(".live-store-mobile-menu");
+  fireEvent.click(toggle);
+  expect(document.querySelector(".live-store-menu-account")).toBeNull();
+  fireEvent.click(document.querySelector(".live-store-menu-language button"));
+  expect(toggle.getAttribute("aria-expanded")).toBe("false");
+});
 it("closes the mobile navigation after a page selection and Escape", async () => {
   fetchPublicEcommerceCatalog.mockResolvedValue(catalog);
   fetchPublicEcommerceProfile.mockResolvedValue({ site: catalog.site });

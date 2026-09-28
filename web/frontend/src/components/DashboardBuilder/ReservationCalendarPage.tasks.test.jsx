@@ -192,8 +192,15 @@ describe("calendar task UI", () => {
 
     await waitFor(() => expect(fetchCalendarWorkspace).toHaveBeenCalledTimes(2));
     const agendaRequest = fetchCalendarWorkspace.mock.calls[1][0];
+    const agendaStart = new Date(agendaRequest.start);
+    const agendaEnd = new Date(agendaRequest.end);
+    const localDateAsUtc = (value) => Date.UTC(
+      value.getFullYear(),
+      value.getMonth(),
+      value.getDate(),
+    );
     expect(
-      (new Date(agendaRequest.end) - new Date(agendaRequest.start)) / 86_400_000
+      (localDateAsUtc(agendaEnd) - localDateAsUtc(agendaStart)) / 86_400_000
     ).toBe(31);
     await waitFor(() => expect(writeCalendarWorkspaceCache).toHaveBeenCalledTimes(2));
   });

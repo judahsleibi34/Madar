@@ -6,6 +6,7 @@ const routes = [
   [/^\/ecommerce\/orders(?:\/|$)/, () => import("../components/DashboardBuilder/EcommerceOrdersPage")],
   [/^\/ecommerce\/loyalty(?:\/|$)/, () => import("../components/DashboardBuilder/EcommerceLoyaltyPage")],
   [/^\/ecommerce\/theme(?:\/|$)/, () => import("../components/DashboardBuilder/EcommerceThemePage")],
+  [/^\/ecommerce\/landing-page(?:\/|$)/, () => import("../components/DashboardBuilder/EcommerceLandingPage")],
   [/^\/ecommerce\/social-links(?:\/|$)/, () => import("../components/DashboardBuilder/EcommerceSocialLinksPage")],
   [/^\/ecommerce\/store(?:\/|$)/, () => import("../components/DashboardBuilder/EcommerceStorePage")],
   [/^\/(?:ecommerce\/)?cv-rerank(?:\/|$)/, () => import("../components/DashboardBuilder/CvRerankPage")],
@@ -35,6 +36,11 @@ const routes = [
   [/^\/$/, () => import("../components/MainPages/HeroSection")],
 ];
 const pending = new Map();
+let directRouteDataModule = null;
+
+export function shouldPreloadCurrentRoute(pathname) {
+  return /^\/ecommerce\/products\/(?:new|[^/]+\/edit)(?:\/|$)/.test(pathname);
+}
 
 export function getRoutePreloader(pathname) {
   return routes.find(([pattern]) => pattern.test(pathname))?.[1];
@@ -54,6 +60,15 @@ export function preloadRoute(href, { origin = window.location.origin, connection
 
 export function useRoutePreloading() {
   useEffect(() => {
+    // Direct editor loads wait for auth before React reaches the lazy route.
+    // Start only this measured route chunk immediately so it overlaps auth.
+    if (shouldPreloadCurrentRoute(window.location.pathname)) {
+      preloadRoute(window.location.href);
+      directRouteDataModule = import("../services/ecommerceApi");
+      directRouteDataModule
+        .then(({ preloadEcommerceCatalogOptions }) => preloadEcommerceCatalogOptions())
+        .catch(() => {});
+    }
     const onIntent = (event) => {
       const target = event.target?.closest?.("a[href], [data-route-path]");
       if (!target || target.hasAttribute("download") || target.getAttribute("target") === "_blank") return;
@@ -68,4 +83,12 @@ export function useRoutePreloading() {
       document.removeEventListener("touchstart", onIntent);
     };
   }, []);
+}
+
+export function clearRoutePreloadedData() {
+  if (!directRouteDataModule) return;
+  directRouteDataModule
+    .then(({ clearEcommerceCatalogOptionsPreload }) => clearEcommerceCatalogOptionsPreload())
+    .catch(() => {});
+  directRouteDataModule = null;
 }

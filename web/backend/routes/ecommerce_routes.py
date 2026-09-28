@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import re
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal
 from typing import Any, Literal
@@ -17,6 +18,8 @@ from services.ecommerce_cache_service import (
     get_or_create_ecommerce_cache,
     invalidate_ecommerce_cache,
 )
+from services.bounded_query_service import submit_db_read
+from services.observability_service import timed_operation, traced_operation
 from services.tenant_service import require_active_tenant_member
 from services.asset_registry_service import (
     extract_builder_asset_references,
@@ -30,6 +33,11 @@ LOCALE_PATTERN = re.compile(r"^[a-z]{2}(?:-[A-Z]{2})?$")
 PRODUCT_MEDIA_ASSET_PATTERN = re.compile(
     r"^/uploads/(?P<key>tenant_(?P<tenant>[1-9][0-9]*)/builder_assets/[a-f0-9]{32}\.(?:png|jpg|webp|mp4|webm))$"
 )
+LANDING_DEMO_IMAGE_URLS = {
+    "/demo/landing/editorial-essentials.webp",
+    "/demo/landing/city-layers.webp",
+    "/demo/landing/finishing-touches.webp",
+}
 DEFAULT_STORE_THEME = {
     "accent": "#852c21",
     "background": "#ffffff",
@@ -45,6 +53,7 @@ LEGACY_DEFAULT_STORE_THEME = {
     "muted": "#697181",
 }
 HEX_COLOR_PATTERN = re.compile(r"^#[0-9a-fA-F]{6}$")
+COMBINED_SIZE_VALUE_PATTERN = re.compile(r"[/,+&]|\s+(?:or|او)\s+", re.IGNORECASE)
 SOCIAL_LINK_FIELDS = (
     "facebook", "instagram", "tiktok", "snapchat",
 )
@@ -212,6 +221,64 @@ class StoreGrowthPayload(BaseModel):
     def validate_announcement_copy(self):
         if self.announcement_enabled and not (self.announcement_text_en or self.announcement_text_ar):
             raise ValueError("An enabled announcement needs English or Arabic text")
+        return self
+
+
+class StoreLandingSlidePayload(BaseModel):
+    id: UUID = Field(default_factory=uuid4)
+    image_url: str = Field(..., min_length=1, max_length=2048)
+    title_en: str = Field(default="", max_length=120)
+    title_ar: str = Field(default="", max_length=120)
+    subtitle_en: str = Field(default="", max_length=320)
+    subtitle_ar: str = Field(default="", max_length=320)
+    button_text_en: str = Field(default="", max_length=60)
+    button_text_ar: str = Field(default="", max_length=60)
+    link: str = Field(default="", max_length=500)
+
+    @field_validator(
+        "image_url", "title_en", "title_ar", "subtitle_en", "subtitle_ar",
+        "button_text_en", "button_text_ar", "link",
+        mode="before",
+    )
+    @classmethod
+    def strip_slide_text(cls, value):
+        return str(value or "").strip()
+
+    @field_validator("image_url")
+    @classmethod
+    def validate_slide_image(cls, value: str) -> str:
+        managed = (bool(PRODUCT_MEDIA_ASSET_PATTERN.fullmatch(value)) and not value.lower().endswith((".mp4", ".webm"))) or value in LANDING_DEMO_IMAGE_URLS
+        parsed = urlparse(value)
+        external = parsed.scheme == "https" and bool(parsed.hostname) and not parsed.username and not parsed.password and not re.search(r"[.]svgz?(?:[?#]|$)", value, re.IGNORECASE)
+        if not (managed or external):
+            raise ValueError("Landing slide image must be secure uploaded media")
+        return value
+
+    @field_validator("link")
+    @classmethod
+    def validate_slide_link(cls, value: str) -> str:
+        if not value:
+            return ""
+        if any(character in value for character in (chr(92), chr(13), chr(10), chr(0))):
+            raise ValueError("Slide link is invalid")
+        if value.startswith("/") and not value.startswith("//"):
+            return value
+        parsed = urlparse(value)
+        if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password:
+            raise ValueError("Slide link must be a relative path or HTTPS URL")
+        return value
+
+
+class StoreLandingPagePayload(BaseModel):
+    autoplay_enabled: bool = True
+    interval_ms: int = Field(default=5000, ge=3000, le=15000)
+    slides: list[StoreLandingSlidePayload] = Field(default_factory=list, max_length=8)
+
+    @model_validator(mode="after")
+    def validate_unique_slides(self):
+        slide_ids = [slide.id for slide in self.slides]
+        if len(slide_ids) != len(set(slide_ids)):
+            raise ValueError("Landing slide identifiers must be unique")
         return self
 
 
@@ -534,6 +601,11 @@ class ProductPayload(CatalogItemPayload):
             normalized_values = [next(iter(value.value_translations.values())).casefold() for value in option.values]
             if len(normalized_values) != len(set(normalized_values)):
                 raise ValueError("Option values must be unique within an option")
+            if option.code.casefold() == "size":
+                for value in option.values:
+                    labels = [str(label).strip() for label in value.value_translations.values()]
+                    if any(COMBINED_SIZE_VALUE_PATTERN.search(label) for label in labels):
+                        raise ValueError("Each size must be a separate option value")
         if any(set(variant.option_value_ids) - value_ids for variant in (self.variants or [])):
             raise ValueError("Every variant value must belong to this product")
         if self.variants and not self.options:
@@ -554,7 +626,8 @@ class ProductPayload(CatalogItemPayload):
 
 
 def _rows(query) -> list[dict[str, Any]]:
-    return getattr(query.execute(), "data", None) or []
+    with timed_operation("db"):
+        return getattr(query.execute(), "data", None) or []
 
 
 def _tenant_row(table: str, item_id: UUID | str, tenant_id: int) -> dict[str, Any]:
@@ -664,6 +737,8 @@ def _sync_catalog_image_assets(
             "metadata": {"usage": usage},
         }).eq("tenant_id", int(tenant_id)).eq("storage_key", storage_key).execute()
     for storage_key in current_keys | previous_keys:
+        # Includes product, taxonomy, and landing-slide images persisted by
+        # the caller; the registry service checks their exact tenant references.
         refresh_builder_asset_reference_state(tenant_id=tenant_id, storage_key=storage_key)
 
 
@@ -752,11 +827,22 @@ def _save_product_aggregate(tenant_id: int, product_id: str, payload: ProductPay
 
 def _attach_product_aggregates(products: list[dict[str, Any]], tenant_id: int) -> list[dict[str, Any]]:
     try:
-        attributes = _rows(service_supabase.table("ecommerce_product_attributes").select("*").eq("tenant_id", tenant_id).order("sort_order"))
-        options = _rows(service_supabase.table("ecommerce_product_options").select("*").eq("tenant_id", tenant_id).order("sort_order"))
-        values = _rows(service_supabase.table("ecommerce_product_option_values").select("*").eq("tenant_id", tenant_id).order("sort_order"))
-        links = _rows(service_supabase.table("ecommerce_variant_option_values").select("variant_id,option_value_id").eq("tenant_id", tenant_id))
-        variants = _rows(service_supabase.table("ecommerce_product_variants").select("*").eq("tenant_id", tenant_id).order("created_at"))
+        queries = {
+            "attributes": service_supabase.table("ecommerce_product_attributes").select("*").eq("tenant_id", tenant_id).order("sort_order"),
+            "options": service_supabase.table("ecommerce_product_options").select("*").eq("tenant_id", tenant_id).order("sort_order"),
+            "values": service_supabase.table("ecommerce_product_option_values").select("*").eq("tenant_id", tenant_id).order("sort_order"),
+            "links": service_supabase.table("ecommerce_variant_option_values").select("variant_id,option_value_id").eq("tenant_id", tenant_id),
+            "variants": service_supabase.table("ecommerce_product_variants").select("*").eq("tenant_id", tenant_id).order("created_at"),
+        }
+        with timed_operation("db_parallel"):
+            with ThreadPoolExecutor(max_workers=len(queries), thread_name_prefix="ecommerce-catalog") as executor:
+                pending = {name: executor.submit(_rows, query) for name, query in queries.items()}
+                results = {name: future.result() for name, future in pending.items()}
+        attributes = results["attributes"]
+        options = results["options"]
+        values = results["values"]
+        links = results["links"]
+        variants = results["variants"]
     except Exception as error:
         if "pgrst205" in str(error).lower() or "schema cache" in str(error).lower():
             for product in products: product.update(attributes=[], options=[], variants=[])
@@ -815,6 +901,75 @@ def _catalog_for_tenant(tenant_id: int) -> dict[str, list[dict[str, Any]]]:
     }
 
 
+def _catalog_tags_for_tenant(tenant_id: int) -> dict[str, Any]:
+    with traced_operation("catalog_tags"):
+        return {
+            "tags": _rows(
+                service_supabase.table("ecommerce_tags")
+                .select("*")
+                .eq("tenant_id", tenant_id)
+                .order("created_at", desc=True)
+            )
+        }
+
+
+def _catalog_categories_for_tenant(tenant_id: int) -> dict[str, Any]:
+    with traced_operation("catalog_categories"):
+        return {
+            "categories": _rows(
+                service_supabase.table("ecommerce_categories")
+                .select("*")
+                .eq("tenant_id", tenant_id)
+                .order("sort_order")
+                .order("created_at")
+            )
+        }
+
+
+def _catalog_brands_for_tenant(tenant_id: int) -> dict[str, Any]:
+    with traced_operation("catalog_brands"):
+        try:
+            brands = _rows(
+                service_supabase.table("ecommerce_brands")
+                .select("*")
+                .eq("tenant_id", tenant_id)
+                .order("name")
+            )
+        except Exception as error:
+            raw = str(error).lower()
+            if not ("pgrst205" in raw or "could not find the table" in raw or "schema cache" in raw):
+                raise
+            brands = []
+        return {"brands": brands}
+
+
+def _catalog_products_for_tenant(tenant_id: int) -> dict[str, Any]:
+    products = _rows(
+        service_supabase.table("ecommerce_products")
+        .select("*")
+        .eq("tenant_id", tenant_id)
+        .order("created_at", desc=True)
+    )
+    products = _attach_product_aggregates(_attach_product_tags(products, tenant_id), tenant_id)
+    return {
+        "products": products,
+        "stock_summary": {
+            "low_stock": sum(int(product.get("low_stock_count") or 0) for product in products),
+            "out_of_stock": sum(int(product.get("out_of_stock_count") or 0) for product in products),
+        },
+        "commerce_currency": _store_currency_for_tenant(tenant_id),
+    }
+
+
+def _cached_catalog_resource(tenant_id: int, namespace: str, factory):
+    cache_key = ecommerce_cache_key(tenant_id, f"authenticated-{namespace}-v1")
+    value, cache_hit = get_or_create_ecommerce_cache(cache_key, tenant_id, factory)
+    if cache_hit:
+        with timed_operation("cache"):
+            pass
+    return value
+
+
 def _store_theme_for_tenant(tenant_id: int) -> dict[str, Any]:
     rows = _rows(
         service_supabase.table("website_settings")
@@ -836,6 +991,14 @@ def _store_growth_for_tenant(tenant_id: int) -> dict[str, Any]:
         return StoreGrowthPayload().model_dump(mode="json")
 
 
+def _store_landing_page_for_tenant(tenant_id: int) -> dict[str, Any]:
+    landing_page = _store_theme_for_tenant(tenant_id).get("landing_page")
+    try:
+        return StoreLandingPagePayload.model_validate(landing_page or {}).model_dump(mode="json")
+    except Exception:
+        return StoreLandingPagePayload().model_dump(mode="json")
+
+
 def _store_social_links_for_tenant(tenant_id: int) -> dict[str, str]:
     social_links = _store_theme_for_tenant(tenant_id).get("social_links")
     try:
@@ -854,20 +1017,39 @@ def _validate_featured_rows(tenant_id: int, table: str, selected_ids: list[UUID]
 
 
 def _store_currency_for_tenant(tenant_id: int) -> str | None:
-    try:
-        settings = _rows(
-            service_supabase.table("website_settings")
-            .select("ecommerce_currency")
-            .eq("tenant_id", int(tenant_id))
-            .limit(1)
-        )
-    except Exception as error:
-        message = str(error).lower()
-        if "ecommerce_currency" in message or "pgrst204" in message or "schema cache" in message:
-            return None
-        raise
-    currency = str(settings[0].get("ecommerce_currency") or "").strip().upper() if settings else ""
-    return currency or None
+    with traced_operation("catalog_currency"):
+        try:
+            settings = _rows(
+                service_supabase.table("website_settings")
+                .select("ecommerce_currency")
+                .eq("tenant_id", int(tenant_id))
+                .limit(1)
+            )
+        except Exception as error:
+            message = str(error).lower()
+            if "ecommerce_currency" in message or "pgrst204" in message or "schema cache" in message:
+                return None
+            raise
+        currency = str(settings[0].get("ecommerce_currency") or "").strip().upper() if settings else ""
+        return currency or None
+
+
+def _catalog_options_for_tenant(tenant_id: int) -> dict[str, Any]:
+    loaders = {
+        "tags": lambda: _catalog_tags_for_tenant(tenant_id),
+        "categories": lambda: _catalog_categories_for_tenant(tenant_id),
+        "brands": lambda: _catalog_brands_for_tenant(tenant_id),
+        "currency": lambda: _store_currency_for_tenant(tenant_id),
+    }
+    with traced_operation("catalog_options_parallel"):
+        pending = {name: submit_db_read(loader) for name, loader in loaders.items()}
+        results = {name: future.result() for name, future in pending.items()}
+    return {
+        **results["tags"],
+        **results["categories"],
+        **results["brands"],
+        "commerce_currency": results["currency"],
+    }
 
 
 def _store_currency_locked(tenant_id: int) -> bool:
@@ -947,6 +1129,39 @@ def update_store_growth(payload: StoreGrowthPayload, request: Request, response:
         raise HTTPException(status_code=404, detail="Website settings not found")
     invalidate_ecommerce_cache(context.tenant_id)
     return {"growth": growth}
+
+
+@router.get("/landing-page")
+def get_store_landing_page(request: Request, response: Response):
+    context = _require_ecommerce_access(request, response)
+    return {"landing_page": _store_landing_page_for_tenant(context.tenant_id)}
+
+
+@router.put("/landing-page")
+def update_store_landing_page(payload: StoreLandingPagePayload, request: Request, response: Response):
+    context = _require_ecommerce_access(request, response)
+    _require_role(context)
+    previous = _store_landing_page_for_tenant(context.tenant_id)
+    landing_page = payload.model_dump(mode="json")
+    previous_images = [str(slide.get("image_url") or "") for slide in previous.get("slides", [])]
+    current_images = [str(slide.get("image_url") or "") for slide in landing_page.get("slides", [])]
+    _managed_catalog_asset_keys(current_images, context.tenant_id)
+    theme = {**_store_theme_for_tenant(context.tenant_id), "landing_page": landing_page}
+    rows = _rows(
+        service_supabase.table("website_settings")
+        .update({"ecommerce_theme": theme})
+        .eq("tenant_id", int(context.tenant_id))
+    )
+    if not rows:
+        raise HTTPException(status_code=404, detail="Website settings not found")
+    _sync_catalog_image_assets(
+        tenant_id=context.tenant_id,
+        previous_images=previous_images,
+        current_images=current_images,
+        usage="ecommerce_landing_slide",
+    )
+    invalidate_ecommerce_cache(context.tenant_id)
+    return {"landing_page": landing_page}
 
 
 @router.get("/settings")
@@ -1366,6 +1581,72 @@ def get_catalog(request: Request, response: Response):
             lambda: _catalog_for_tenant(context.tenant_id),
         )
         return catalog
+    except Exception as error:
+        _handle_catalog_error(error)
+
+
+@router.get("/tags")
+def get_tags(request: Request, response: Response):
+    context = _require_ecommerce_access(request, response)
+    try:
+        return _cached_catalog_resource(
+            context.tenant_id,
+            "tags",
+            lambda: _catalog_tags_for_tenant(context.tenant_id),
+        )
+    except Exception as error:
+        _handle_catalog_error(error)
+
+
+@router.get("/categories")
+def get_categories(request: Request, response: Response):
+    context = _require_ecommerce_access(request, response)
+    try:
+        return _cached_catalog_resource(
+            context.tenant_id,
+            "categories",
+            lambda: _catalog_categories_for_tenant(context.tenant_id),
+        )
+    except Exception as error:
+        _handle_catalog_error(error)
+
+
+@router.get("/brands")
+def get_brands(request: Request, response: Response):
+    context = _require_ecommerce_access(request, response)
+    try:
+        return _cached_catalog_resource(
+            context.tenant_id,
+            "brands",
+            lambda: _catalog_brands_for_tenant(context.tenant_id),
+        )
+    except Exception as error:
+        _handle_catalog_error(error)
+
+
+@router.get("/products")
+def get_products(request: Request, response: Response):
+    context = _require_ecommerce_access(request, response)
+    try:
+        return _cached_catalog_resource(
+            context.tenant_id,
+            "products",
+            lambda: _catalog_products_for_tenant(context.tenant_id),
+        )
+    except Exception as error:
+        _handle_catalog_error(error)
+
+
+@router.get("/catalog/options")
+def get_catalog_options(request: Request, response: Response):
+    with traced_operation("catalog_authorization"):
+        context = _require_ecommerce_access(request, response)
+    try:
+        return _cached_catalog_resource(
+            context.tenant_id,
+            "catalog-options",
+            lambda: _catalog_options_for_tenant(context.tenant_id),
+        )
     except Exception as error:
         _handle_catalog_error(error)
 

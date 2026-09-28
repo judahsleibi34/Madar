@@ -9,7 +9,8 @@ const RELATIVE_MEDIA_FILE_PATTERN = /\.(?:avif|gif|jpe?g|png|webp|mp4|webm)(?:[?
 const MANAGED_DOCUMENT_ASSET_PATTERN =
   /^\/uploads\/tenant_[1-9][0-9]*\/builder_assets\/[a-f0-9]{32}\.(?:pdf|doc|docx)$/;
 const RELATIVE_DOCUMENT_FILE_PATTERN = /\.(?:pdf|doc|docx)(?:[?#].*)?$/i;
-const MANAGED_ASSET_CACHE_VERSION = "3";
+// Version stable managed-asset URLs to bypass stale edge 404 responses.
+const MANAGED_ASSET_CACHE_VERSION = "4";
 
 const isSvgPath = (value) => {
   const path = String(value || "").split(/[?#]/, 1)[0].toLowerCase();

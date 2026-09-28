@@ -1,4 +1,3 @@
-import PageHeaderSkeleton from "../common/PageHeaderSkeleton";
 import { useEffect, useMemo, useState } from "react";
 import { CreditCard, ExternalLink } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -6,6 +5,11 @@ import { useNavigate } from "react-router-dom";
 import { useLanguage } from "../../i18n";
 import { BILLING_API_ROUTES } from "../../services/apiRoutes";
 import { apiFetch, getApiUrl, readApiError } from "../../utils/apiClient";
+import {
+  getEcommerceCacheScope,
+  loadEcommerceAdminResource,
+  readEcommerceAdminCacheSnapshot,
+} from "./utils/ecommerceAdminCache";
 
 const fetchJson = async (path) => {
   const response = await apiFetch(getApiUrl(path), { method: "GET", cache: "no-store" });
@@ -44,31 +48,40 @@ export const buildMyPlanView = ({ catalog, currentPlan, usage, entitlements, add
   };
 };
 
-export default function MyPlanPage() {
+export default function MyPlanPage({ user }) {
   const { direction, language } = useLanguage();
   const navigate = useNavigate();
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const cacheScope = getEcommerceCacheScope(user);
+  const initialSnapshot = useMemo(
+    () => readEcommerceAdminCacheSnapshot(cacheScope, "my-plan"),
+    [cacheScope],
+  );
+  const [data, setData] = useState(() => initialSnapshot?.data || null);
+  const [loading, setLoading] = useState(() => !initialSnapshot);
   const [error, setError] = useState("");
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([
-      fetchJson(BILLING_API_ROUTES.catalog),
-      fetchJson(BILLING_API_ROUTES.currentPlan),
-      fetchJson(BILLING_API_ROUTES.usage),
-      fetchJson(BILLING_API_ROUTES.entitlements),
-      fetchJson(BILLING_API_ROUTES.addons),
-    ])
-      .then(([catalog, currentPlan, usage, entitlements, addons]) => {
+    loadEcommerceAdminResource(cacheScope, "my-plan", async () => {
+      const [catalog, currentPlan, usage, entitlements, addons] = await Promise.all([
+        fetchJson(BILLING_API_ROUTES.catalog),
+        fetchJson(BILLING_API_ROUTES.currentPlan),
+        fetchJson(BILLING_API_ROUTES.usage),
+        fetchJson(BILLING_API_ROUTES.entitlements),
+        fetchJson(BILLING_API_ROUTES.addons),
+      ]);
+      return {
+        catalog: catalog.catalog,
+        currentPlan,
+        usage,
+        entitlements: entitlements.entitlements,
+        addons,
+      };
+    }, { force: Boolean(initialSnapshot?.isStale) })
+      .then((nextData) => {
         if (!cancelled) {
-          setData({
-            catalog: catalog.catalog,
-            currentPlan,
-            usage,
-            entitlements: entitlements.entitlements,
-            addons,
-          });
+          setData(nextData);
+          setError("");
         }
       })
       .catch((loadError) => {
@@ -78,7 +91,7 @@ export default function MyPlanPage() {
         if (!cancelled) setLoading(false);
       });
     return () => { cancelled = true; };
-  }, []);
+  }, [cacheScope, initialSnapshot?.isStale]);
 
   const view = useMemo(() => buildMyPlanView(data || {}), [data]);
   const copy = language === "ar"
@@ -125,7 +138,7 @@ export default function MyPlanPage() {
 
   return (
     <section className="my-plan-page" dir={direction}>
-      {(loading) ? <PageHeaderSkeleton className="my-plan-header app-page-intro" actions /> : (<header className="my-plan-header app-page-intro">
+      <header className="my-plan-header app-page-intro">
         <div>
           <h1>{copy.title}</h1>
           <p>{copy.subtitle}</p>
@@ -133,7 +146,7 @@ export default function MyPlanPage() {
         <button className="my-plan-button primary" type="button" onClick={() => navigate("/pricing")}>
           <CreditCard size={17} /> {copy.review}
         </button>
-      </header>)}
+      </header>
 
       {loading && <div className="my-plan-current-card" role="status">{copy.loading}</div>}
       {!loading && error && <div className="my-plan-current-card" role="alert">{error}</div>}

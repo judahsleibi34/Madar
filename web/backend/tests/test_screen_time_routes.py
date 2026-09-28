@@ -5,7 +5,7 @@ from unittest.mock import patch
 from fastapi import Response
 
 from routes import builder_routes, public_site_routes
-from services import screen_time_service
+from services import observability_service, screen_time_service
 
 
 def tenant_context():
@@ -13,6 +13,48 @@ def tenant_context():
 
 
 class ScreenTimeRoutesTests(unittest.TestCase):
+    def test_weekly_summary_exposes_serial_internal_timing_breakdown(self):
+        tables = {
+            "workspace_screen_time_daily": [{"tenant_id": 12, "user_id": 34, "active_seconds": 90}],
+            "tenant_memberships": [{"tenant_id": 12, "user_id": 34, "role": "member", "status": "active"}],
+            "tenant_site_memberships": [],
+            "users": [{"id": 34, "first_name": "Madar", "last_name": "User", "email": "user@example.test"}],
+        }
+
+        class Query:
+            def __init__(self, rows): self.rows = [dict(row) for row in rows]
+            def select(self, *_args): return self
+            def eq(self, field, value):
+                self.rows = [row for row in self.rows if row.get(field) == value]
+                return self
+            def gte(self, *_args): return self
+            def lte(self, *_args): return self
+            def in_(self, field, values):
+                self.rows = [row for row in self.rows if row.get(field) in values]
+                return self
+            def execute(self): return SimpleNamespace(data=self.rows)
+
+        client = SimpleNamespace(table=lambda name: Query(tables[name]))
+        token = observability_service.begin_request_timings()
+        try:
+            with patch.object(screen_time_service, "service_supabase", client):
+                result = screen_time_service.get_weekly_screen_time(
+                    tenant_id=12,
+                    current_user_id=34,
+                )
+            timings = observability_service.request_timings_snapshot()
+        finally:
+            observability_service.end_request_timings(token)
+
+        self.assertEqual(result["total_seconds"], 90)
+        self.assertTrue({
+            "screen_time_activity_query",
+            "screen_time_workspace_memberships",
+            "screen_time_site_memberships",
+            "screen_time_users_query",
+            "screen_time_transform",
+        }.issubset(timings))
+
     def test_workspace_heartbeat_is_scoped_to_authenticated_tenant_user(self):
         payload = builder_routes.ScreenTimeHeartbeat(active_seconds=15)
 

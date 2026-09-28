@@ -98,6 +98,7 @@ export function NotificationProvider({
     }
 
     const controller = new AbortController();
+    window.performance?.mark?.("madar:notifications:request-start");
     const promise = (async () => {
       setState((current) => current.identity === requestIdentity
         ? { ...current, loading: current.notifications.length === 0, error: null }
@@ -184,21 +185,30 @@ export function NotificationProvider({
   useEffect(() => {
     inFlightRef.current?.controller?.abort();
     baselineRef.current = { identity, established: false, ids: new Set() };
-    const resetTimer = window.setTimeout(() => {
-      setToastQueue((current) => current.filter((item) => item.identity === identity));
-      if (!identity) {
-        setState({
-          identity: "",
-          notifications: [],
-          unreadCount: 0,
-          loading: false,
-          error: null,
-        });
-      }
-    }, 0);
-    if (!identity) return () => window.clearTimeout(resetTimer);
+    setToastQueue((current) => current.filter((item) => item.identity === identity));
+    if (!identity) {
+      setState({
+        identity: "",
+        notifications: [],
+        unreadCount: 0,
+        loading: false,
+        error: null,
+      });
+      return undefined;
+    }
 
-    if (isPollingLeader) refreshNotifications();
+    // Every authenticated document must establish its own initial state. Leader
+    // election coordinates background polling only; a stale lease left by a
+    // hard reload must never prevent the route from initializing.
+    window.performance?.mark?.("madar:notifications:initial-effect");
+    refreshNotifications();
+    return () => {
+      inFlightRef.current?.controller?.abort();
+    };
+  }, [identity, refreshNotifications]);
+
+  useEffect(() => {
+    if (!identity) return undefined;
     const poll = () => {
       if (document.visibilityState === "hidden") return;
       const leader = pollingLeaderRef.current;
@@ -211,8 +221,6 @@ export function NotificationProvider({
     window.addEventListener("focus", poll);
     document.addEventListener("visibilitychange", poll);
     return () => {
-      window.clearTimeout(resetTimer);
-      inFlightRef.current?.controller?.abort();
       if (interval) window.clearInterval(interval);
       window.removeEventListener("focus", poll);
       document.removeEventListener("visibilitychange", poll);

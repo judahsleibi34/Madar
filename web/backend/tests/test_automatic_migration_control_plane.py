@@ -147,10 +147,10 @@ class AutomaticMigrationControlPlaneTests(unittest.TestCase):
                         "http://127.0.0.1:3200", self.sha, "green"
                     )
 
-    def test_current_manifest_and_rollback_contract_cover_schema_105_to_108(self):
-        self.assertEqual(self.source_schema, 105)
-        self.assertEqual(self.target_schema, 108)
-        self.assertEqual(self.metadata["schema"]["compatible_min"], 105)
+    def test_current_manifest_and_rollback_contract_cover_schema_109_to_110(self):
+        self.assertEqual(self.source_schema, 109)
+        self.assertEqual(self.target_schema, 110)
+        self.assertEqual(self.metadata["schema"]["compatible_min"], 109)
         self.assertEqual(
             self.metadata["schema"]["rollback_compatible_min"],
             self.source_schema,
@@ -161,7 +161,7 @@ class AutomaticMigrationControlPlaneTests(unittest.TestCase):
         )
         self.assertEqual(
             [entry["number"] for entry in self.manifest["migrations"]],
-            [106, 107, 108],
+            [110],
         )
 
     def test_fresh_104_source_manifest_at_schema_105_requires_same_release_backup(self):
@@ -173,6 +173,8 @@ class AutomaticMigrationControlPlaneTests(unittest.TestCase):
             historical_metadata = json.loads(json.dumps(self.metadata))
             historical_metadata["schema"].update(
                 compatible_min=104,
+                compatible_max=108,
+                target=108,
                 rollback_compatible_min=104,
                 rollback_compatible_max=104,
             )
@@ -189,15 +191,24 @@ class AutomaticMigrationControlPlaneTests(unittest.TestCase):
             (candidate_release_dir / "migrations-105-108.json").write_bytes(
                 historical_manifest
             )
-            migration_name = "105_canonical_tenant_subdomains.sql"
-            migration_105 = next(
-                source for source in (
-                    WEB_ROOT / "database/migrations" / migration_name,
-                    Path("/app/database/migrations") / migration_name,
-                ) if source.is_file()
-            )
-            candidate_105 = operations.release_root / "web/database/migrations" / migration_105.name
-            candidate_105.write_bytes(migration_105.read_bytes())
+            for migration_name in (
+                "105_canonical_tenant_subdomains.sql",
+                "106_add_order_delivery_fees.sql",
+                "107_add_ecommerce_category_images.sql",
+                "108_add_ecommerce_brands.sql",
+            ):
+                migration = next(
+                    source for source in (
+                        WEB_ROOT / "database/migrations" / migration_name,
+                        Path("/app/database/migrations") / migration_name,
+                    ) if source.is_file()
+                )
+                candidate = (
+                    operations.release_root
+                    / "web/database/migrations"
+                    / migration.name
+                )
+                candidate.write_bytes(migration.read_bytes())
             installed_dir = root / "installed/deployment/releases"
             installed_dir.mkdir(parents=True)
             (installed_dir / "release.json").write_text(
@@ -452,7 +463,7 @@ class AutomaticMigrationControlPlaneTests(unittest.TestCase):
             source_schema=self.source_schema,
         )
 
-    def test_successful_105_to_108_records_target_only_after_worker_and_route_validation(self):
+    def test_successful_109_to_110_records_target_only_after_worker_and_route_validation(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             state_root, operations, compatibility, events = self.fixture(root)

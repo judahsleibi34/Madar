@@ -8,7 +8,7 @@ import os
 import re
 import secrets
 from datetime import datetime, timedelta, timezone
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 from typing import Any, Literal, Optional
 from uuid import UUID
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -63,6 +63,7 @@ from services.hosted_address_service import (
     request_hosted_tenant,
 )
 from services.notification_action_service import build_notification_action
+from services.notification_service import create_tenant_notification_event
 from services.calendar_workspace_cache_service import invalidate_calendar_workspace_cache
 from services.public_quiz_service import (
     build_attempt_payload,
@@ -885,6 +886,46 @@ def _public_store_growth(saved_theme: dict[str, Any]) -> dict[str, Any]:
     return result
 
 
+def _public_store_landing_page(saved_theme: dict[str, Any]) -> dict[str, Any]:
+    value = saved_theme.get("landing_page") if isinstance(saved_theme, dict) else None
+    value = value if isinstance(value, dict) else {}
+    interval_ms = value.get("interval_ms")
+    interval_ms = interval_ms if isinstance(interval_ms, int) and 3000 <= interval_ms <= 15000 else 5000
+    slides = []
+    for item in value.get("slides") if isinstance(value.get("slides"), list) else []:
+        if not isinstance(item, dict) or len(slides) >= 8:
+            continue
+        image_url = str(item.get("image_url") or "").strip()
+        parsed_image = urlparse(image_url)
+        bundled_demo = image_url in {
+            "/demo/landing/editorial-essentials.webp",
+            "/demo/landing/city-layers.webp",
+            "/demo/landing/finishing-touches.webp",
+        }
+        if not image_url or not (image_url.startswith("/uploads/") or bundled_demo or (parsed_image.scheme == "https" and parsed_image.hostname and not parsed_image.username and not parsed_image.password)):
+            continue
+        link = str(item.get("link") or "").strip()
+        parsed_link = urlparse(link)
+        if link and not (link.startswith("/") and not link.startswith("//")) and not (parsed_link.scheme == "https" and parsed_link.hostname and not parsed_link.username and not parsed_link.password):
+            link = ""
+        slides.append({
+            "id": str(item.get("id") or ""),
+            "image_url": image_url,
+            "title_en": str(item.get("title_en") or "").strip(),
+            "title_ar": str(item.get("title_ar") or "").strip(),
+            "subtitle_en": str(item.get("subtitle_en") or "").strip(),
+            "subtitle_ar": str(item.get("subtitle_ar") or "").strip(),
+            "button_text_en": str(item.get("button_text_en") or "").strip(),
+            "button_text_ar": str(item.get("button_text_ar") or "").strip(),
+            "link": link,
+        })
+    return {
+        "autoplay_enabled": bool(value.get("autoplay_enabled", True)),
+        "interval_ms": interval_ms,
+        "slides": slides,
+    }
+
+
 def _public_store_social_links(saved_theme: dict[str, Any]) -> dict[str, str]:
     value = saved_theme.get("social_links") if isinstance(saved_theme, dict) else None
     value = value if isinstance(value, dict) else {}
@@ -915,8 +956,9 @@ def build_public_store_profile(settings: dict, subdomain: str) -> dict:
         "contact_email": settings.get("contact_email"),
         "phone": settings.get("phone"),
         "description": settings.get("description"),
-        "store_theme": {**DEFAULT_PUBLIC_STORE_THEME, **{key: value for key, value in saved_theme.items() if key not in {"growth", "social_links", "store_identity_ar"}}},
+        "store_theme": {**DEFAULT_PUBLIC_STORE_THEME, **{key: value for key, value in saved_theme.items() if key not in {"growth", "landing_page", "social_links", "store_identity_ar"}}},
         "growth": _public_store_growth(saved_theme),
+        "landing_page": _public_store_landing_page(saved_theme),
         "social_links": _public_store_social_links(saved_theme),
     }
 
@@ -2054,6 +2096,25 @@ def _public_catalog_product(
     return product
 
 
+def _public_sale_summary(products: list[dict[str, Any]]) -> dict[str, Any]:
+    maximum = 0
+    for product in products:
+        try:
+            price = Decimal(str(product.get("price")))
+            compare_at = Decimal(str(product.get("compare_at_price")))
+        except Exception:
+            continue
+        if price < 0 or compare_at <= price or compare_at <= 0:
+            continue
+        percentage = int(
+            (((compare_at - price) / compare_at) * Decimal("100")).quantize(
+                Decimal("1"), rounding=ROUND_HALF_UP
+            )
+        )
+        maximum = max(maximum, min(100, percentage))
+    return {"active": maximum > 0, "max_percentage": maximum}
+
+
 def _catalog_descendant_ids(
     categories: list[dict[str, Any]],
     root_id: str,
@@ -2257,7 +2318,7 @@ def _attach_public_variant_options(
         return
     option_rows = _optional_p1a_rows(
         service_supabase.table("ecommerce_product_options")
-        .select("id,product_id,name_translations,sort_order")
+        .select("id,product_id,name_translations,display_type,sort_order")
         .eq("tenant_id", tenant_id)
         .in_("product_id", product_ids)
         .order("sort_order")
@@ -2332,7 +2393,12 @@ def _attach_public_variant_options(
                 if label and label not in values:
                     values.append(label)
             if values:
-                summaries.append({"id": option_id, "name": option_name, "values": values})
+                summaries.append({
+                    "id": option_id,
+                    "name": option_name,
+                    "display_type": str(option.get("display_type") or "text"),
+                    "values": values,
+                })
         product["variant_options"] = summaries
 
 
@@ -2372,6 +2438,7 @@ def _catalog_payload(
         )
         for row in product_rows
     ]
+    sale_summary = _public_sale_summary(products)
     products = _filter_catalog_taxonomy(
         products,
         category_rows=category_rows,
@@ -2417,6 +2484,7 @@ def _catalog_payload(
         "products": visible_products,
         "featured_products": selected_products,
         "featured_categories": selected_categories,
+        "sale_summary": sale_summary,
         "price_bounds": price_bounds,
         "pagination": {
             "page": safe_page,
@@ -2726,7 +2794,8 @@ def register_tenant_visitor(
                 "password": payload.password,
                 "options": {
                     "email_redirect_to": canonical_tenant_url(
-                        settings.get("subdomain") or clean_subdomain
+                        settings.get("subdomain") or clean_subdomain,
+                        "/shop",
                     ),
                     "data": {"first_name": first_name, "last_name": last_name},
                 },
@@ -2778,7 +2847,7 @@ def register_tenant_visitor(
         )
 
         return {
-            "message": "Account created. Check your email, then log in.",
+            "message": "Account created. We sent you a confirmation email. Confirm it before logging in.",
             "requires_email_verification": True,
         }
     except HTTPException:
@@ -3333,6 +3402,33 @@ def create_public_store_order(
     if not isinstance(order, dict):
         raise api_error(503, "dependency_unavailable", "The order could not be saved. Try again shortly.")
 
+    order_id = str(order.get("id") or "").strip()
+    order_number = str(order.get("order_number") or "").strip()
+    currency = str(order.get("currency") or "").strip().upper()
+    total = str(order.get("total") or "").strip()
+    customer_name = payload.customer_name.strip()
+    display_number = order_number or order_id[:8] or "New order"
+    amount = " ".join(part for part in (currency, total) if part)
+    body = f"{display_number} was placed by {customer_name}"
+    if amount:
+        body = f"{body} for {amount}"
+    create_tenant_notification_event(
+        tenant_id=tenant_id,
+        event_type="ecommerce_order_created",
+        source_type="ecommerce_order",
+        source_id=order_id or None,
+        title=f"New order: {display_number}",
+        body=f"{body}.",
+        data={
+            "order_id": order_id,
+            "order_number": order_number,
+            "status": str(order.get("status") or ""),
+            "payment_status": str(order.get("payment_status") or ""),
+            "currency": currency,
+            "total": total,
+        },
+    )
+
     return {
         "success": True,
         "confirmation_token": confirmation_token,
@@ -3429,6 +3525,22 @@ def get_public_store_loyalty(subdomain: str, request: Request, response: Respons
     )
     customer_id = int(customer["id"])
     try:
+        rule_rows = rows(
+            service_supabase.table("ecommerce_loyalty_rules")
+            .select("id")
+            .eq("tenant_id", tenant_id)
+            .eq("is_current", True)
+            .eq("enabled", True)
+            .limit(1)
+            .execute()
+        )
+        if not rule_rows:
+            return {
+                "enabled": False,
+                "account": None,
+                "entitlements": [],
+                "transactions": [],
+            }
         service_supabase.rpc("expire_ecommerce_loyalty_entitlements_safe", {
             "p_tenant_id": tenant_id, "p_customer_id": customer_id,
         }).execute()
@@ -3441,6 +3553,7 @@ def get_public_store_loyalty(subdomain: str, request: Request, response: Respons
         raise HTTPException(status_code=503, detail="Loyalty is temporarily unavailable") from error
     products_by_id = {str(product.get("id")): product for product in products}
     return {
+        "enabled": True,
         "account": account_rows[0] if account_rows else {
             "current_balance": 0, "lifetime_earned": 0, "lifetime_spent": 0,
         },

@@ -130,6 +130,21 @@ class EcommerceProductVariantTests(unittest.TestCase):
             ProductPayload(**product_payload(options=duplicate_values, variants=[]))
 
     def test_variant_requires_options_and_valid_effective_compare_at_price(self):
+        with self.assertRaisesRegex(ValidationError, "Each size must be a separate option value"):
+            ProductPayload(**product_payload(options=[{
+                "id": OPTION_ID, "code": "size", "name_translations": {"en": "Size"},
+                "values": [{"id": VALUE_ID, "code": "sm", "value_translations": {"en": "S/M"}}],
+            }], variants=[]))
+
+        product = ProductPayload(**product_payload(options=[{
+            "id": OPTION_ID, "code": "size", "name_translations": {"en": "Size"},
+            "values": [
+                {"id": VALUE_ID, "code": "s", "value_translations": {"en": "S"}},
+                {"id": "66666666-6666-4666-8666-666666666666", "code": "m", "value_translations": {"en": "M"}},
+            ],
+        }], variants=[]))
+        self.assertEqual([value.code for value in product.options[0].values], ["s", "m"])
+
         with self.assertRaises(ValidationError):
             ProductPayload(**product_payload(variants=[{"id": VARIANT_ID, "sku": "FAKE", "option_value_ids": [VALUE_ID]}]))
 

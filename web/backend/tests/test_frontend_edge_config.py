@@ -34,7 +34,7 @@ class FrontendEdgeConfigTests(unittest.TestCase):
 
     def test_same_origin_api_proxy_preserves_trusted_forwarding_context(self):
         nginx = (ROOT / "frontend" / "nginx.conf.template").read_text(encoding="utf-8")
-        self.assertIn("location /api/", nginx)
+        self.assertIn("location ^~ /api/", nginx)
         self.assertIn("proxy_pass http://backend:8000/", nginx)
         self.assertIn("proxy_set_header Host $host", nginx)
         self.assertIn("proxy_set_header X-Forwarded-Host $host", nginx)
@@ -42,7 +42,12 @@ class FrontendEdgeConfigTests(unittest.TestCase):
         self.assertIn("proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for", nginx)
         self.assertIn("proxy_set_header X-Real-IP $remote_addr", nginx)
         self.assertIn("proxy_set_header X-Request-ID $madar_request_id", nginx)
-        self.assertNotIn("location /api/ {\n        try_files", nginx)
+        self.assertNotIn("location ^~ /api/ {\n        try_files", nginx)
+
+    def test_api_assets_cannot_be_intercepted_by_static_file_regex(self):
+        nginx = (ROOT / "frontend" / "nginx.conf.template").read_text(encoding="utf-8")
+        self.assertIn("location ^~ /api/", nginx)
+        self.assertIn("location ~* \\.(?:js|css|png|jpg|jpeg|gif|ico|svg|webp|woff2?|pdf)$", nginx)
 
     def test_managed_uploads_use_the_canonical_path_and_controlled_backend_route(self):
         nginx = (ROOT / "frontend" / "nginx.conf.template").read_text(encoding="utf-8")

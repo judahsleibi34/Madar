@@ -1,4 +1,3 @@
-import PageHeaderSkeleton from "../common/PageHeaderSkeleton";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Archive,
@@ -168,15 +167,10 @@ export default function ArchivePage({ user }) {
     const generation = ++loadGenerationRef.current;
     setStatus("loading");
     try {
-      const archiveItems = await listArchiveItems({
-        scope: archiveScope,
-      });
-      let archivedTasks = [];
-      try {
-        archivedTasks = await fetchArchivedCalendarTasks();
-      } catch {
-        archivedTasks = [];
-      }
+      const [archiveItems, archivedTasks] = await Promise.all([
+        listArchiveItems({ scope: archiveScope }),
+        fetchArchivedCalendarTasks().catch(() => []),
+      ]);
       const combined = new Map(
         archivedTasks.map((task) => {
           const item = archivedTaskItem(task);
@@ -251,7 +245,7 @@ export default function ArchivePage({ user }) {
         </header>
 
         <div className="archive-page daw-page">
-          {(visibleStatus === "loading" && !visibleItems.length) ? <PageHeaderSkeleton className="archive-header daw-header app-page-intro" /> : (<header className="archive-header daw-header app-page-intro">
+          <header className="archive-header daw-header app-page-intro">
             <div>
               <h1 id="archive-title">Saved work history</h1>
               <p>
@@ -259,7 +253,7 @@ export default function ArchivePage({ user }) {
                 so useful previous work remains available.
               </p>
             </div>
-          </header>)}
+          </header>
 
       <div className="archive-summary-grid" aria-label="Archive summary">
         {FILTERS.slice(1).map((filter) => {

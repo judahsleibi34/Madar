@@ -257,6 +257,11 @@ class BuilderSiteMemberTests(unittest.TestCase):
             )
 
         self.assertEqual(register_response.status_code, 200)
+        self.assertTrue(register_response.json()["requires_email_verification"])
+        self.assertEqual(
+            self.supabase.auth.signed_up[-1]["options"]["email_redirect_to"],
+            "https://tenant-site.madarportal.com/shop",
+        )
         membership = self.supabase.tables["tenant_site_memberships"][-1]
         self.assertEqual(membership["source"], "registered")
         self.assertIn(

@@ -57,9 +57,14 @@ from services.request_body_limits import RequestBodyLimitMiddleware
 from services.runtime_config import validate_runtime_configuration
 from services.observability_service import (
     CORRELATION_ID,
+    begin_request_timings,
     configure_structured_logging,
     correlation_id,
+    end_request_timings,
     record_request,
+    record_request_timing,
+    request_timings_snapshot,
+    server_timing_value,
 )
 from services.request_security import (
     CSRF_HEADER_NAME,
@@ -111,6 +116,22 @@ PUBLIC_UPLOAD_MEDIA_TYPES = {
     ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 }
 RESPONSIVE_IMAGE_WIDTHS = {320, 480, 768, 1024, 1440, 1920, 2560}
+PERFORMANCE_TIMING_ROUTES = {
+    "/auth/login",
+    "/auth/user_status",
+    "/ecommerce/catalog",
+    "/ecommerce/tags",
+    "/ecommerce/categories",
+    "/ecommerce/brands",
+    "/ecommerce/products",
+    "/ecommerce/catalog/options",
+    "/calendar/bootstrap",
+    "/builder/projects",
+    "/builder/projects/{project_id}/site-members",
+    "/screen-time/weekly",
+    "/billing/usage",
+    "/notifications",
+}
 
 
 def render_responsive_builder_image(source: bytes, media_type: str, width: int) -> tuple[bytes, str]:
@@ -185,6 +206,7 @@ async def csrf_origin_middleware(request: Request, call_next):
 async def observability_middleware(request: Request, call_next):
     request_id = correlation_id(request.headers.get("X-Request-ID"))
     context_token = CORRELATION_ID.set(request_id)
+    timings_token = begin_request_timings()
     started = time.monotonic()
     try:
         response = await call_next(request)
@@ -197,11 +219,32 @@ async def observability_middleware(request: Request, call_next):
             elapsed_seconds=elapsed,
         )
         response.headers["X-Request-ID"] = request_id
+        measured = request_timings_snapshot()
+        record_request_timing("app", max(0.0, elapsed - sum(measured.values())))
+        timing_header = server_timing_value()
+        if timing_header:
+            response.headers["Server-Timing"] = timing_header
+        if route in PERFORMANCE_TIMING_ROUTES or elapsed >= 0.5:
+            logger.info(
+                "http.request_timing",
+                extra={
+                    "method": request.method,
+                    "route": route,
+                    "status_code": response.status_code,
+                    "duration_ms": round(elapsed * 1000, 1),
+                    "timings": {
+                        name: round(duration * 1000, 1)
+                        for name, duration in request_timings_snapshot().items()
+                    },
+                },
+            )
         return response
     except Exception as error:
         route = getattr(request.scope.get("route"), "path", "unmatched")
         elapsed = time.monotonic() - started
         record_request(method=request.method, route=route, status_code=500, elapsed_seconds=elapsed)
+        measured = request_timings_snapshot()
+        record_request_timing("app", max(0.0, elapsed - sum(measured.values())))
         logger.error(
             "http.request_unhandled",
             extra={"method": request.method, "route": route, "status_code": 500, "error_type": type(error).__name__},
@@ -213,10 +256,14 @@ async def observability_middleware(request: Request, call_next):
                 "message": "An unexpected server error occurred.",
                 "request_id": request_id,
             },
-            headers={"X-Request-ID": request_id},
+            headers={
+                "X-Request-ID": request_id,
+                **({"Server-Timing": server_timing_value()} if server_timing_value() else {}),
+            },
         )
         return error_response
     finally:
+        end_request_timings(timings_token)
         CORRELATION_ID.reset(context_token)
 
 
@@ -227,7 +274,7 @@ def madar_status():
 
 def _asset_visibility(*, tenant_id: int, storage_key: str, request: Request, response: Response) -> tuple[bool, bool]:
     rows = getattr(
-        service_supabase.table("builder_assets").select("id,status").eq("tenant_id", tenant_id).eq("storage_key", storage_key).limit(2).execute(),
+        service_supabase.table("builder_assets").select("id,status,metadata").eq("tenant_id", tenant_id).eq("storage_key", storage_key).limit(2).execute(),
         "data", None,
     ) or []
     if len(rows) != 1 or rows[0].get("status") not in {"active", "unreferenced"}:
@@ -237,15 +284,22 @@ def _asset_visibility(*, tenant_id: int, storage_key: str, request: Request, res
         service_supabase.table("builder_asset_references").select("project_id").eq("asset_id", asset_id).limit(100).execute(),
         "data", None,
     ) or []
-    for reference in references:
+    project_ids = list({reference.get("project_id") for reference in references if reference.get("project_id")})
+    projects = []
+    if project_ids:
         projects = getattr(
-            service_supabase.table("builder_projects").select("id,published_schema,status").eq("id", reference.get("project_id")).eq("tenant_id", tenant_id).eq("status", "published").limit(1).execute(),
+            service_supabase.table("builder_projects").select("id,published_schema,status")
+            .eq("tenant_id", tenant_id).eq("status", "published").in_("id", project_ids).execute(),
             "data", None,
         ) or []
-        if projects and storage_key in extract_builder_asset_references(projects[0].get("published_schema") or {}, tenant_id=tenant_id):
+    for project in projects:
+        if storage_key in extract_builder_asset_references(project.get("published_schema") or {}, tenant_id=tenant_id):
             return True, False
+    metadata = rows[0].get("metadata")
+    usage_hint = metadata.get("usage") if isinstance(metadata, dict) else None
     if nonproject_asset_reference_count(
-        tenant_id=tenant_id, storage_key=storage_key, public_only=True, client=service_supabase,
+        tenant_id=tenant_id, storage_key=storage_key, public_only=True,
+        usage_hint=usage_hint, client=service_supabase,
     ):
         return True, False
     try:
@@ -388,5 +442,5 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=[CSRF_HEADER_NAME, "X-Request-ID"],
+    expose_headers=[CSRF_HEADER_NAME, "X-Request-ID", "Server-Timing"],
 )

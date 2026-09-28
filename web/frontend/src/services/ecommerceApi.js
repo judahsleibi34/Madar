@@ -38,6 +38,41 @@ async function request(path, options = {}) {
   return data;
 }
 
+let catalogOptionsPreload = null;
+
+export const preloadEcommerceCatalogOptions = () => {
+  if (!catalogOptionsPreload) {
+    // This GET authorizes independently on the backend. Do not let a
+    // speculative 401 start its own refresh while auth bootstrap is running.
+    catalogOptionsPreload = request("/ecommerce/catalog/options", {
+      skipAuthRefresh: true,
+    });
+    // The route may redirect before consuming the speculative request.
+    catalogOptionsPreload.catch(() => {});
+  }
+  return catalogOptionsPreload;
+};
+
+export const clearEcommerceCatalogOptionsPreload = () => {
+  catalogOptionsPreload = null;
+};
+
+const loadEcommerceCatalogOptions = async () => {
+  const preloaded = catalogOptionsPreload;
+  catalogOptionsPreload = null;
+  if (!preloaded) return request("/ecommerce/catalog/options");
+  try {
+    return await preloaded;
+  } catch (error) {
+    // Auth bootstrap may have refreshed an expired session in parallel.
+    // Retry through the normal request path only after the protected route mounts.
+    if (error?.status === 401 || error?.status === 403) {
+      return request("/ecommerce/catalog/options");
+    }
+    throw error;
+  }
+};
+
 export const fetchEcommerceCatalog = ({ scope, force = false } = {}) => {
   if (!force) {
     const cached = readEcommerceCatalogCache(scope);
@@ -50,6 +85,26 @@ export const fetchEcommerceCatalog = ({ scope, force = false } = {}) => {
   });
 };
 
+export const fetchEcommerceCatalogSection = (section, { scope, force = false } = {}) => {
+  if (!["tags", "categories", "brands", "products"].includes(section)) {
+    return Promise.reject(new Error("Unsupported ecommerce catalog section"));
+  }
+  return loadEcommerceAdminResource(
+    scope,
+    `catalog:${section}`,
+    () => request(`/ecommerce/${section}`),
+    { force },
+  );
+};
+
+export const fetchEcommerceCatalogOptions = ({ scope, force = false } = {}) =>
+  loadEcommerceAdminResource(
+    scope,
+    "catalog:options",
+    loadEcommerceCatalogOptions,
+    { force },
+  );
+
 export const saveEcommerceItem = async (section, itemId, payload, { scope } = {}) => {
   const result = await request(`/ecommerce/${section}${itemId ? `/${itemId}` : ""}`, {
     method: itemId ? "PUT" : "POST",
@@ -57,6 +112,8 @@ export const saveEcommerceItem = async (section, itemId, payload, { scope } = {}
   });
   const singular = section === "categories" ? "category" : section === "products" ? "product" : section === "brands" ? "brand" : "tag";
   updateEcommerceCatalogCache(scope, section, result?.[singular]);
+  clearEcommerceAdminCache(scope, `catalog:${section}`);
+  if (section !== "products") clearEcommerceAdminCache(scope, "catalog:options");
   return result;
 };
 
@@ -66,12 +123,15 @@ export const saveEcommerceProductVariants = async (productId, payload, { scope }
     body: JSON.stringify(payload),
   });
   updateEcommerceCatalogCache(scope, "products", result?.product);
+  clearEcommerceAdminCache(scope, "catalog:products");
   return result;
 };
 
 export const deleteEcommerceItem = async (section, itemId, { scope } = {}) => {
   const result = await request(`/ecommerce/${section}/${itemId}`, { method: "DELETE" });
   removeFromEcommerceCatalogCache(scope, section, itemId);
+  clearEcommerceAdminCache(scope, `catalog:${section}`);
+  if (section !== "products") clearEcommerceAdminCache(scope, "catalog:options");
   return result;
 };
 
@@ -103,18 +163,32 @@ export const saveEcommerceGrowth = (growth) => request("/ecommerce/growth", {
   body: JSON.stringify(growth),
 });
 
-export const fetchEcommerceSocialLinks = () => request("/ecommerce/social-links");
+export const fetchEcommerceLandingPage = () => request("/ecommerce/landing-page");
 
-export const saveEcommerceSocialLinks = (socialLinks) => request("/ecommerce/social-links", {
+export const saveEcommerceLandingPage = (landingPage) => request("/ecommerce/landing-page", {
   method: "PUT",
-  body: JSON.stringify(socialLinks),
+  body: JSON.stringify(landingPage),
 });
+
+export const fetchEcommerceSocialLinks = ({ scope, force = false } = {}) =>
+  loadEcommerceAdminResource(scope, "social-links", () => request("/ecommerce/social-links"), { force });
+
+export const saveEcommerceSocialLinks = async (socialLinks, { scope } = {}) => {
+  const result = await request("/ecommerce/social-links", {
+    method: "PUT",
+    body: JSON.stringify(socialLinks),
+  });
+  clearEcommerceAdminCache(scope, "social-links");
+  writeEcommerceAdminCache(scope, "social-links", result);
+  return result;
+};
 
 export const fetchEcommerceSettings = ({ scope, force = false } = {}) => loadEcommerceAdminResource(scope, "settings", () => request("/ecommerce/settings"), { force });
 
-export const saveEcommerceSettings = async (currency) => {
+export const saveEcommerceSettings = async (currency, { scope } = {}) => {
   const result = await request("/ecommerce/settings", { method: "PUT", body: JSON.stringify({ currency }) });
-  clearEcommerceAdminCache(null, "settings");
+  clearEcommerceAdminCache(scope, "settings");
+  writeEcommerceAdminCache(scope, "settings", result);
   clearAllEcommerceCatalogCaches();
   return result;
 };
@@ -358,6 +432,26 @@ export const fetchPublicEcommerceDeliveryAreas = (subdomain) =>
 
 export const fetchPublicEcommerceLoyalty = (subdomain) =>
   request(`/public/sites/${encodeURIComponent(subdomain)}/loyalty/me`);
+
+export const fetchPublicStoreAccount = (subdomain) =>
+  request(`/public/sites/${encodeURIComponent(subdomain)}/auth/status`);
+
+export const loginPublicStoreAccount = (subdomain, payload) =>
+  request(`/public/sites/${encodeURIComponent(subdomain)}/auth/login`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+export const registerPublicStoreAccount = (subdomain, payload) =>
+  request(`/public/sites/${encodeURIComponent(subdomain)}/auth/register`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+export const logoutPublicStoreAccount = (subdomain) =>
+  request(`/public/sites/${encodeURIComponent(subdomain)}/auth/logout`, {
+    method: "POST",
+  });
 
 export const fetchPublicEcommerceDiscounts = (subdomain) =>
   request(`/public/sites/${encodeURIComponent(subdomain)}/discounts`);

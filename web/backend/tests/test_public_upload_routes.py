@@ -16,20 +16,24 @@ PNG_BYTES = b"\x89PNG\r\n\x1a\n" + b"\x00" * 16
 
 
 class AssetVisibilityQuery:
-    def __init__(self, rows):
-        self.rows = rows
+    def __init__(self, store, table):
+        self.store, self.table = store, table
+        self.rows = store.tables.get(table, [])
         self.filters = []
 
     def select(self, *_args): return self
     def eq(self, key, value): self.filters.append((key, value)); return self
+    def in_(self, key, values): self.filters.append((key, set(values))); return self
     def filter(self, key, operator, value):
         assert operator == "cs"
         self.filters.append((key, json.loads(value)))
         return self
     def limit(self, value): self.limit_value = value; return self
     def execute(self):
+        self.store.queries.append(self.table)
         rows = [row for row in self.rows if all(
             (set(value) <= set(row.get(key) or [])) if isinstance(value, list)
+            else row.get(key) in value if isinstance(value, set)
             else row.get(key) == value for key, value in self.filters
         )]
         return SimpleNamespace(data=rows[:getattr(self, "limit_value", len(rows))])
@@ -38,9 +42,10 @@ class AssetVisibilityQuery:
 class AssetVisibilityStore:
     def __init__(self, tables):
         self.tables = tables
+        self.queries = []
 
     def table(self, name):
-        return AssetVisibilityQuery(self.tables.get(name, []))
+        return AssetVisibilityQuery(self, name)
 
 
 class PublicUploadRouteTests(unittest.TestCase):
@@ -300,6 +305,29 @@ class PublicUploadRouteTests(unittest.TestCase):
         self.assertEqual(public_response.status_code, 200)
         self.assertEqual(draft_response.status_code, 404)
 
+    def test_multiple_builder_references_use_one_tenant_scoped_project_lookup(self):
+        key = f"tenant_1/builder_assets/{self.asset_path.name}"
+        store = AssetVisibilityStore({
+            "builder_assets": [{"id": "asset-1", "tenant_id": 1, "storage_key": key, "status": "active"}],
+            "builder_asset_references": [
+                {"asset_id": "asset-1", "project_id": "draft"},
+                {"asset_id": "asset-1", "project_id": "published"},
+            ],
+            "builder_projects": [
+                {"id": "draft", "tenant_id": 1, "status": "draft", "published_schema": {"image": f"/uploads/{key}"}},
+                {"id": "published", "tenant_id": 1, "status": "published", "published_schema": {"image": f"/uploads/{key}"}},
+                {"id": "foreign", "tenant_id": 2, "status": "published", "published_schema": {"image": f"/uploads/{key}"}},
+            ],
+        })
+        self.visibility_patch.stop()
+        try:
+            with patch.object(app_module, "service_supabase", store):
+                response = self.client.get(f"/uploads/{key}")
+        finally:
+            self.visibility_patch.start()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(store.queries, ["builder_assets", "builder_asset_references", "builder_projects"])
+
     def test_unreferenced_asset_preview_requires_same_tenant_and_is_private(self):
         storage_key = "tenant_1/builder_assets/0123456789abcdef0123456789abcdef.png"
         draft = AssetVisibilityStore({
@@ -338,6 +366,28 @@ class PublicUploadRouteTests(unittest.TestCase):
             self.visibility_patch.start()
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.headers["content-type"], "image/png")
+
+    def test_persisted_landing_slide_is_public_without_project_reference(self):
+        storage_key = f"tenant_1/builder_assets/{self.asset_path.name}"
+        store = AssetVisibilityStore({
+            "builder_assets": [{
+                "id": "asset-1", "tenant_id": 1, "storage_key": storage_key,
+                "status": "active", "metadata": {"usage": "ecommerce_landing_slide"},
+            }],
+            "website_settings": [{
+                "tenant_id": 1, "subdomain": "olive", "ecommerce_theme": {
+                    "landing_page": {"slides": [{"image_url": f"/uploads/{storage_key}"}]},
+                },
+            }],
+        })
+        self.visibility_patch.stop()
+        try:
+            with patch.object(app_module, "service_supabase", store):
+                response = self.client.get(f"/uploads/{storage_key}")
+        finally:
+            self.visibility_patch.start()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.content, PNG_BYTES)
 
     def test_foreign_settings_and_soft_deleted_registry_fail_closed(self):
         storage_key = "tenant_1/builder_assets/0123456789abcdef0123456789abcdef.png"

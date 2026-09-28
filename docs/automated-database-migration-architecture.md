@@ -461,9 +461,21 @@ health evidence, dirty/different release, checksum drift, missing predecessor,
 or a ledger already beyond target fails before mutation. No tenant/business
 table is queried or changed.
 
-### Current schema 108 bridge
+### Current schema 110 bridge
 
-Production is currently at schema 105. The release contract accepts schema
+Production is currently at schema 109. The release contract accepts schema
+`109..110` and targets `110` using the checksum-pinned `migrations-110.json`
+manifest. Migration 110 makes e-commerce order persistence and its durable
+notification intent one atomic transaction by using a deferred constraint
+trigger that reads finalized totals. It also replays the same deduplicated
+intent for missing events on orders from the preceding 30 days (`109 -> 110`).
+Migrations through 109 remain immutable production history. A verified
+schema-109 backup is required before migration. Rollback compatibility is
+bounded at schema 109; after advancement, recovery is forward-repair-only.
+
+### Earlier schema 108 bridge
+
+The preceding release started at schema 105. Its contract accepted schema
 `105..108` and targets `108` using the checksum-pinned
 `migrations-106-108.json` manifest.
 
@@ -476,7 +488,7 @@ The active migration sequence is contiguous:
 Migration 105 established canonical tenant subdomains in the prior `104 -> 105`
 production release. It remains immutable production history and its historical
 manifests are retained. A verified schema-105 backup is required before the
-current bridge mutates the database. Rollback compatibility is bounded at
+schema-108 bridge mutated the database. Rollback compatibility was bounded at
 schema 105. After schema advances beyond 105, recovery proceeds forward rather
 than attempting automatic downgrade SQL or traffic rollback to an incompatible
 retained release.
