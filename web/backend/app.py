@@ -311,6 +311,14 @@ def _asset_visibility(*, tenant_id: int, storage_key: str, request: Request, res
     return False, False
 
 
+def _managed_asset_failure(status_code: int, detail: str = "Asset was not found.") -> HTTPException:
+    return HTTPException(
+        status_code=status_code,
+        detail=detail,
+        headers={"Cache-Control": "no-store", "CDN-Cache-Control": "no-store"},
+    )
+
+
 @app.get("/uploads/tenant_{tenant_id}/builder_assets/{filename}")
 def get_public_builder_asset(
     tenant_id: int,
@@ -320,7 +328,7 @@ def get_public_builder_asset(
     w: int | None = None,
 ):
     if tenant_id <= 0:
-        raise HTTPException(status_code=404, detail="Asset was not found.")
+        raise _managed_asset_failure(404)
 
     try:
         safe_filename = validate_safe_filename(
@@ -330,20 +338,20 @@ def get_public_builder_asset(
             error_message="Invalid public asset path",
         )
     except ValueError as error:
-        raise HTTPException(status_code=404, detail="Asset was not found.") from error
+        raise _managed_asset_failure(404) from error
 
     if not re.fullmatch(r"[a-f0-9]{32}\.(?:png|jpg|jpeg|webp|mp4|webm|pdf|doc|docx)", safe_filename):
-        raise HTTPException(status_code=404, detail="Asset was not found.")
+        raise _managed_asset_failure(404)
 
     public_root = PUBLIC_UPLOADS_DIR.resolve()
     tenant_root = public_root / f"tenant_{tenant_id}"
     builder_root = tenant_root / "builder_assets"
     if tenant_root.is_symlink() or builder_root.is_symlink():
-        raise HTTPException(status_code=404, detail="Asset was not found.")
+        raise _managed_asset_failure(404)
     asset_path = assert_path_within_root(
         builder_root / safe_filename,
         builder_root,
-        error=HTTPException(status_code=404, detail="Asset was not found."),
+        error=_managed_asset_failure(404),
     )
 
     response_headers = {
@@ -363,9 +371,9 @@ def get_public_builder_asset(
         )
     except Exception as error:
         logger.warning("builder.asset_visibility_lookup_failed", extra={"tenant_id": tenant_id, "error_type": type(error).__name__})
-        raise HTTPException(status_code=503, detail="Asset visibility is temporarily unavailable") from error
+        raise _managed_asset_failure(503, "Asset visibility is temporarily unavailable") from error
     if not visible:
-        raise HTTPException(status_code=404, detail="Asset was not found.")
+        raise _managed_asset_failure(404)
     if private_preview:
         response_headers = {
             **response_headers,
@@ -375,13 +383,13 @@ def get_public_builder_asset(
 
     if w is not None:
         if w not in RESPONSIVE_IMAGE_WIDTHS or not media_type.startswith("image/"):
-            raise HTTPException(status_code=400, detail="Unsupported image width.")
+            raise _managed_asset_failure(400, "Unsupported image width.")
         try:
             source = asset_path.read_bytes() if asset_path.is_file() else download_builder_asset(
                 storage_key=f"tenant_{tenant_id}/builder_assets/{safe_filename}"
             )
         except (OSError, BuilderAssetStorageError) as error:
-            raise HTTPException(status_code=404, detail="Asset was not found.") from error
+            raise _managed_asset_failure(404) from error
         content, response_media_type = render_responsive_builder_image(source, media_type, w)
         return Response(content=content, media_type=response_media_type, headers=response_headers)
 
@@ -395,7 +403,7 @@ def get_public_builder_asset(
     try:
         signed_url = create_builder_asset_signed_url(storage_key=storage_key, expires_in=60)
     except BuilderAssetStorageError as error:
-        raise HTTPException(status_code=404, detail="Asset was not found.") from error
+        raise _managed_asset_failure(404) from error
     return RedirectResponse(
         url=signed_url,
         status_code=307,
