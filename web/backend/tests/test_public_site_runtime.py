@@ -93,6 +93,7 @@ class PublicSiteRuntimeTests(unittest.TestCase):
         self.assertEqual([page["id"] for page in body["project"]["published_schema"]["pages"]], ["home"])
         self.assertEqual(len(remote.calls), 1)
         self.assertEqual(remote.calls[0][0], "get_public_site_runtime_context")
+        self.assertEqual(result.headers["Cache-Control"], "no-store")
         self.assertEqual(result.headers["CDN-Cache-Control"], "no-store")
 
     def test_hosted_hostname_disables_legacy_alias(self):
@@ -156,6 +157,7 @@ class PublicSiteRuntimeTests(unittest.TestCase):
             ["home", "secret"],
         )
         self.assertEqual(result.headers["Cache-Control"], "private, no-store")
+        self.assertEqual(result.headers["CDN-Cache-Control"], "no-store")
 
     def test_cross_tenant_or_unauthorized_session_gets_no_protected_page(self):
         for tenant_id in (1, 2):

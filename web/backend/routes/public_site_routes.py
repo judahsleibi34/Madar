@@ -3778,6 +3778,8 @@ def build_public_site_response(
         site_identifier=clean_subdomain,
     )
     apply_public_cache_headers(response, metadata, private=bool(identity))
+    if include_visitor:
+        response.headers["Cache-Control"] = "private, no-store" if identity else "no-store"
     if not identity and not include_visitor and request_etag_matches(request, metadata):
         return Response(
             status_code=304,
