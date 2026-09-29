@@ -27,12 +27,20 @@ function staticGraph(key, visited = new Set()) {
 
 const tenantGraph = staticGraph("src/tenantMain.jsx");
 const runtimeGraph = staticGraph("src/components/PageBuilder/runtime/TenantSiteRuntime.jsx");
-for (const key of new Set([...tenantGraph, ...runtimeGraph])) {
+const publicGraph = new Set([...tenantGraph, ...runtimeGraph]);
+for (const key of publicGraph) {
   const chunk = manifest[key];
   const label = `${key} ${chunk.name || ""} ${chunk.file || ""}`;
   assert.doesNotMatch(label, /appMain|AdminRoutes|PageBuilder\.api|src\/components\/PageBuilder\/index|assets\/PageBuilder-[\w-]+\.js|vendor-three|OrbitVisual|EcommerceStorefront|CountUpText|assets\/proxy-/,
     `Route-irrelevant code entered hosted public graph: ${label}`);
 }
+
+const publicIcons = Object.values(manifest).find((chunk) => chunk.name === "public-icons");
+assert.ok(publicIcons, "Bounded public icon chunk is missing");
+assert.ok([...publicGraph].some((key) => manifest[key].file === publicIcons.file),
+  "Public icon chunk is not present in the hosted tenant graph");
+assert.ok(statSync(path.join(dist, publicIcons.file)).size <= 30_000,
+  "Public icon chunk exceeded its 30 KB uncompressed budget");
 
 const tenantCss = [...tenantGraph, ...runtimeGraph].flatMap((key) => manifest[key].css || []);
 const uniqueCss = [...new Set(tenantCss)];

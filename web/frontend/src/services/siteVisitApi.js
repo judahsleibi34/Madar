@@ -1,11 +1,14 @@
 import { apiFetch, getApiUrl, readApiResponse } from "../utils/apiClient";
 
 export const recordPublicSiteVisit = async (subdomain, surface) => {
-  const response = await apiFetch(
+  // Public visit counters use only tenant, surface, and rate-limit context. Do not
+  // send session cookies or discover a CSRF token for this anonymous analytics POST.
+  const response = await fetch(
     getApiUrl(`/public/sites/${encodeURIComponent(subdomain)}/visits`),
     {
       method: "POST",
       cache: "no-store",
+      credentials: "omit",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ surface }),
     },
