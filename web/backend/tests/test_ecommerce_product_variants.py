@@ -38,6 +38,31 @@ class EcommerceProductVariantTests(unittest.TestCase):
         self.assertIsNone(product.options)
         self.assertIsNone(product.variants)
 
+    def test_specification_names_require_letters_but_color_names_may_be_numeric(self):
+        with self.assertRaisesRegex(ValidationError, "at least one letter"):
+            ProductPayload(**product_payload(attributes=[{
+                "id": VALUE_ID,
+                "name_translations": {"en": "123"},
+                "value_translations": {"en": "100"},
+            }]))
+
+        product = ProductPayload(**product_payload(
+            options=[{
+                "id": OPTION_ID,
+                "code": "color",
+                "display_type": "color",
+                "name_translations": {"en": "Color"},
+                "values": [{
+                    "id": VALUE_ID,
+                    "code": "123",
+                    "value_translations": {"en": "123"},
+                    "color_hex": "#111111",
+                }],
+            }],
+            variants=[],
+        ))
+        self.assertEqual(product.options[0].values[0].value_translations["en"], "123")
+
     def test_arbitrary_localized_option_value_and_explicit_variant_validate(self):
         product = ProductPayload(**product_payload(
             attributes=[{"id": VALUE_ID, "name_translations": {"en": "Material", "ar": "الخامة"}, "value_translations": {"en": "Cotton", "ar": "قطن"}}],

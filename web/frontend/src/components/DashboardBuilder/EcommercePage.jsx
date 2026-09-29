@@ -36,6 +36,7 @@ import { getResponsiveMediaProps, resolveMediaUrl } from "../../utils/media";
 import { formatCommerceMoney, useCommerceI18n } from "../../utils/commerceI18n";
 import { commerceProductStock } from "../../utils/commerceStock";
 import { readEcommerceCatalogCacheSnapshot } from "./utils/ecommerceCatalogCache";
+import { isPlainText, isValidName, normalizePlainText } from "./utils/catalogTextValidation";
 
 const SECTION_CONFIG = {
   tags: {
@@ -87,6 +88,21 @@ function ecommerceSlug(value = "") {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 80);
+}
+
+function catalogDeleteErrorMessage(error, section, t, language) {
+  const item = t(`commerce:admin.${section}Singular`).toLocaleLowerCase(language);
+  const status = Number(error?.status || 0);
+  if (status === 401) return t("commerce:admin.deleteSignedOut");
+  if (status === 403) return t("commerce:admin.deleteForbidden", { item });
+  if (status === 404) return t("commerce:admin.deleteNotFound", { item });
+  if (error?.code === "product_delete_migration_required") return t("commerce:admin.productDeleteUpgradeRequired");
+  if (status === 409 && section === "products") return t("commerce:admin.productDeleteReferenced");
+  if (status === 409) return t("commerce:admin.deleteReferenced", { item });
+  if (status === 429) return t("commerce:admin.deleteRateLimit");
+  if (status >= 500) return t("commerce:admin.deleteServerError", { item });
+  if (!status) return t("commerce:admin.deleteNetworkError", { item });
+  return t("commerce:admin.deleteFailed", { item });
 }
 
 function blankForm(section) {
@@ -144,18 +160,18 @@ function translatedName(item, language = "en") {
 }
 
 function payloadFromForm(section, form) {
-  if (section === "brands") return { name: form.name.trim(), image_url: form.image_url || null, status: form.status };
+  if (section === "brands") return { name: normalizePlainText(form.name), image_url: form.image_url || null, status: form.status };
   const shared = {
     slug: ecommerceSlug(form.slug || form.translations.en.name) || null,
     status: form.status,
     translations: {
       en: {
-        name: form.translations.en.name.trim(),
-        description: form.translations.en.description.trim(),
+        name: normalizePlainText(form.translations.en.name),
+        description: normalizePlainText(form.translations.en.description),
       },
       ar: {
-        name: form.translations.ar.name.trim(),
-        description: form.translations.ar.description.trim(),
+        name: normalizePlainText(form.translations.ar.name),
+        description: normalizePlainText(form.translations.ar.description),
       },
     },
   };
@@ -328,9 +344,14 @@ function CatalogImageField({ form, setForm, t, kind = "category" }) {
             alt=""
             decoding="async"
           />
-          <button type="button" onClick={() => { setForm((current) => ({ ...current, image_url: "" })); setError(""); }}>
+          <button
+            type="button"
+            className="ecommerce-category-image-remove"
+            aria-label={t(`commerce:admin.remove${kind[0].toUpperCase() + kind.slice(1)}Image`)}
+            title={t(`commerce:admin.remove${kind[0].toUpperCase() + kind.slice(1)}Image`)}
+            onClick={() => { setForm((current) => ({ ...current, image_url: "" })); setError(""); }}
+          >
             <Trash2 size={17} aria-hidden="true" />
-            {t(`commerce:admin.remove${kind[0].toUpperCase() + kind.slice(1)}Image`)}
           </button>
         </figure>
       ) : (
@@ -687,6 +708,31 @@ export default function EcommercePage({ section = "products", user }) {
       return;
     }
 
+    const nameValues = section === "brands"
+      ? [form.name]
+      : Object.values(form.translations || {}).map((translation) => translation?.name || "").filter((value) => normalizePlainText(value));
+    if (nameValues.some((value) => !isValidName(value))) {
+      showToast({
+        type: "error",
+        title: t("commerce:admin.checkNames"),
+        message: nameValues.some((value) => !isPlainText(value))
+          ? t("commerce:admin.validationPlainText")
+          : t("commerce:admin.validationNameLetters"),
+      });
+      return;
+    }
+    const descriptionValues = section === "brands"
+      ? []
+      : Object.values(form.translations || {}).map((translation) => translation?.description || "").filter(Boolean);
+    if (descriptionValues.some((value) => !isPlainText(value))) {
+      showToast({
+        type: "error",
+        title: t("commerce:admin.checkText"),
+        message: t("commerce:admin.validationPlainText"),
+      });
+      return;
+    }
+
     const wasEditing = Boolean(editing?.id);
     setSaving(true);
     try {
@@ -738,8 +784,8 @@ export default function EcommercePage({ section = "products", user }) {
         title: t("commerce:admin.deletedTitle", { item: t(`commerce:admin.${sectionKey}Singular`) }),
         message: t("commerce:admin.deletedBody", { name: translatedName(item, language) }),
       });
-    } catch {
-      const message = t("commerce:admin.deleteFailed", { item: t(`commerce:admin.${sectionKey}Singular`).toLocaleLowerCase(language) });
+    } catch (error) {
+      const message = catalogDeleteErrorMessage(error, sectionKey, t, language);
       showToast({ type: "error", title: t("commerce:admin.deleteFailedTitle", { item: t(`commerce:admin.${sectionKey}Singular`).toLocaleLowerCase(language) }), message });
     } finally {
       setDeleting(false);
@@ -870,7 +916,7 @@ export default function EcommercePage({ section = "products", user }) {
               {section !== "brands" && <TranslationFields form={form} setForm={setForm} descriptions={section !== "tags"} autoGenerateSlug={!editing && !slugManuallyEdited} t={t} />}
               {section === "tags" && <CommonFields form={form} setForm={setForm} onSlugChange={() => setSlugManuallyEdited(true)} t={t} />}
               {section === "categories" && <><CommonFields form={form} setForm={setForm} onSlugChange={() => setSlugManuallyEdited(true)} t={t} /><CatalogImageField form={form} setForm={setForm} t={t} /><fieldset className="ecommerce-form-section ecommerce-hierarchy-section" aria-label={t("commerce:admin.hierarchy")}><small id="category-display-position-help" className="ecommerce-field-help">{t("commerce:admin.displayOrderHelp")}</small><div className="ecommerce-field-grid"><label>{t("commerce:admin.parentCategory")}<select value={form.parent_id || ""} onChange={(event) => setForm({ ...form, parent_id: event.target.value })}><option value="">{t("commerce:admin.topLevel")}</option>{catalog.categories.filter((category) => category.id !== editing?.id).map((category) => <option key={category.id} value={category.id}>{translatedName(category, language)}</option>)}</select></label><label><span>{t("commerce:admin.displayPosition")}</span><input type="number" min="0" step="1" inputMode="numeric" value={form.sort_order} required aria-label={t("commerce:admin.displayPosition")} aria-describedby="category-display-position-help" onChange={(event) => setForm({ ...form, sort_order: event.target.value })} /></label></div></fieldset></>}
-              {section === "brands" && <><div className="ecommerce-field-grid"><label>{t("commerce:admin.brandNameEnglish")}<input value={form.name} maxLength={160} required onChange={(event) => setForm({ ...form, name: event.target.value })} /></label><label>{t("commerce:common.status")}<select value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value })}><option value="active">{t("commerce:common.active")}</option><option value="inactive">{t("commerce:common.inactive")}</option></select></label></div><CatalogImageField form={form} setForm={setForm} t={t} kind="brand" /></>}
+              {section === "brands" && <><div className="ecommerce-field-grid"><label>{t("commerce:admin.brandName")}<input value={form.name} maxLength={160} required onChange={(event) => setForm({ ...form, name: event.target.value })} /></label><label>{t("commerce:common.status")}<select value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value })}><option value="active">{t("commerce:common.active")}</option><option value="inactive">{t("commerce:common.inactive")}</option></select></label></div><CatalogImageField form={form} setForm={setForm} t={t} kind="brand" /></>}
               {section === "products" && <><div className="ecommerce-field-grid"><label>{t("commerce:merchant.slug")}<input value={form.slug} onChange={(event) => setForm({ ...form, slug: event.target.value })} required /></label></div><ProductFields form={form} setForm={setForm} catalog={catalog} t={t} language={language} /></>}
               <footer><button type="button" className="ecommerce-secondary-button" onClick={closeForm}>{t("commerce:common.cancel")}</button><button type="submit" className="ecommerce-primary-button" disabled={saving}>{saving && <LoaderCircle size={17} className="is-spinning" />}{saving ? t("commerce:merchant.saving") : t("commerce:common.save")}</button></footer>
             </form>
@@ -880,7 +926,6 @@ export default function EcommercePage({ section = "products", user }) {
       {productEditorOpen && (
         <div className="ecommerce-product-editor-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setProductEditorOpen(false); }}>
           <section className="ecommerce-product-editor-modal" role="dialog" aria-modal="true" aria-label={t(productEditorId ? "commerce:merchant.editProduct" : "commerce:merchant.newProduct")}>
-            <button type="button" className="ecommerce-product-editor-modal-close" onClick={() => setProductEditorOpen(false)} aria-label={t("commerce:admin.close")}><X size={20} /></button>
             <EcommerceProductEditor
               user={user}
               productId={productEditorId}

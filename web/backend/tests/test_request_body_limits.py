@@ -63,6 +63,11 @@ def build_body_limit_client(
         content = await file.read()
         return {"size": len(content)}
 
+    @app.post("/ecommerce/product-media/upload")
+    async def upload_product_media(file: UploadFile = File(...)):
+        content = await file.read()
+        return {"size": len(content)}
+
     @app.get("/builder/projects")
     def list_builder_projects():
         return {"ok": True}
@@ -154,6 +159,20 @@ class RequestBodyLimitTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["size"], 2000)
 
+    def test_ecommerce_product_media_uses_dedicated_larger_limit(self):
+        client = build_body_limit_client(
+            max_request_body_bytes=512,
+            max_builder_asset_request_body_bytes=4096,
+        )
+
+        response = client.post(
+            "/ecommerce/product-media/upload",
+            files={"file": ("product.jpg", b"x" * 2000, "image/jpeg")},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["size"], 2000)
+
     def test_default_builder_request_limit_has_multipart_headroom_above_250_mib(self):
         multipart_headroom = (
             DEFAULT_MAX_BUILDER_ASSET_REQUEST_BODY_BYTES
@@ -193,6 +212,37 @@ class RequestBodyLimitTests(unittest.TestCase):
         }, receive, send))
 
         self.assertEqual(reached_app, ["/builder/assets/upload"])
+        self.assertEqual(sent_messages[0]["status"], 204)
+
+    def test_product_media_content_length_with_multipart_headroom_is_allowed(self):
+        reached_app = []
+
+        async def app(scope, receive, send):
+            reached_app.append(scope["path"])
+            await send({"type": "http.response.start", "status": 204, "headers": []})
+            await send({"type": "http.response.body", "body": b""})
+
+        middleware = RequestBodyLimitMiddleware(app)
+        content_length = builder_routes.BUILDER_ASSET_MAX_BYTES + 64 * 1024
+        sent_messages = []
+
+        async def receive():
+            return {"type": "http.request", "body": b"", "more_body": False}
+
+        async def send(message):
+            sent_messages.append(message)
+
+        asyncio.run(middleware({
+            "type": "http",
+            "method": "POST",
+            "path": "/ecommerce/product-media/upload",
+            "headers": [
+                (b"content-type", b"multipart/form-data; boundary=madar-boundary"),
+                (b"content-length", str(content_length).encode("ascii")),
+            ],
+        }, receive, send))
+
+        self.assertEqual(reached_app, ["/ecommerce/product-media/upload"])
         self.assertEqual(sent_messages[0]["status"], 204)
 
     def test_misleading_content_length_is_enforced_by_stream_count(self):

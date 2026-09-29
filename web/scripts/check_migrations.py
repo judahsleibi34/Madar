@@ -249,6 +249,10 @@ def check_production_lineage(errors: list[str]) -> None:
     pin = REPO_ROOT / "deployment/releases/production-001-099.json"
     try:
         frozen = json.loads(pin.read_text(encoding="utf-8"))
+        release = json.loads(
+            (REPO_ROOT / "deployment/releases/release.json").read_text(encoding="utf-8")
+        )
+        release_target = int(release["schema"]["target"])
         if frozen["production_baseline"] != "1e6b739a43759309a45ede2dff28a859209e4a64" or len(frozen["files"]) != 198:
             raise ValueError("invalid immutable lineage manifest")
         for relative, checksum in frozen["files"].items():
@@ -261,8 +265,10 @@ def check_production_lineage(errors: list[str]) -> None:
                 relative = path.relative_to(REPO_ROOT.parent).as_posix()
                 if number <= 99 and relative not in frozen["files"]:
                     errors.append(f"unexpected historical migration: {relative}")
-                if number > 110:
-                    errors.append(f"unexpected migration beyond release target 110: {relative}")
+                if number > release_target:
+                    errors.append(
+                        f"unexpected migration beyond release target {release_target}: {relative}"
+                    )
     except (OSError, KeyError, ValueError, TypeError) as error:
         errors.append(f"production lineage manifest invalid: {type(error).__name__}")
 

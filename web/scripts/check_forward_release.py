@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate the production schema-109 to schema-110 forward release."""
+"""Validate the production schema-109 to schema-112 forward release."""
 
 from __future__ import annotations
 
@@ -13,11 +13,11 @@ ROOT = Path(__file__).resolve().parents[2]
 BASELINE = "1e6b739a43759309a45ede2dff28a859209e4a64"
 
 SOURCE_SCHEMA = 109
-TARGET_SCHEMA = 110
-MANIFEST_NAME = "migrations-110.json"
+TARGET_SCHEMA = 112
+MANIFEST_NAME = "migrations-110-112.json"
 
 # Migrations 100-109 have already been applied to production and are no
-# longer part of the active 109 -> 110 execution manifest. Keep them
+# longer part of the active 109 -> 112 execution manifest. Keep them
 # explicitly checksum-pinned so narrowing the active manifest cannot make
 # already-applied production history mutable.
 APPLIED_PRODUCTION_MIGRATIONS = {
@@ -66,6 +66,14 @@ APPLIED_PRODUCTION_MIGRATIONS = {
 EXPECTED = {
     110: (
         "110_enqueue_ecommerce_order_notifications.sql",
+        "forward-compatible",
+    ),
+    111: (
+        "111_add_ecommerce_product_categories.sql",
+        "forward-compatible",
+    ),
+    112: (
+        "112_allow_unreferenced_product_deletion.sql",
         "forward-compatible",
     ),
 }
@@ -161,7 +169,7 @@ def validate(root: Path = ROOT) -> list[str]:
             and release["migration_manifest"] == MANIFEST_NAME
         ):
             errors.append(
-                "release must bridge production schema 109 to 110 "
+                "release must bridge production schema 109 to 112 "
                 "with rollback bounded at schema 109"
             )
 
@@ -181,9 +189,9 @@ def validate(root: Path = ROOT) -> list[str]:
 
         entries = manifest["migrations"]
 
-        if [int(entry["number"]) for entry in entries] != [110]:
+        if [int(entry["number"]) for entry in entries] != [110, 111, 112]:
             errors.append(
-                "forward manifest must contain only migration 110"
+                "forward manifest must contain migrations 110, 111, and 112"
             )
 
         previous = SOURCE_SCHEMA

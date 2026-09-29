@@ -256,15 +256,21 @@ must contain the live schema. Candidate rollback bounds are descriptive metadata
 today; retained-target attestation is the operative rollback check.
 
 Production is currently at schema 109. The current bridge contract is schema
-range `109..110`, target `110`, class `forward-compatible`, rollback
-metadata `109..109`, and the checksum-pinned `migrations-110.json`.
+range `109..112`, target `112`, class `forward-compatible`, rollback
+metadata `109..109`, and the checksum-pinned `migrations-110-112.json`.
 Migrations through 109 are applied production history and remain immutable.
 Only after bridge acceptance at schema 109 may the coordinator create a
-verified source-schema-109 backup and execute migration 110. Migration 110
+verified source-schema-109 backup and execute migrations 110 through 112. Migration 110
 atomically creates the durable e-commerce order notification intent with the
 order transaction, installs a deferred order trigger so finalized totals are
 included, and safely repairs missing intents for orders from the preceding 30
-days. Once schema advances beyond 109, recovery is forward-repair-only.
+days. Migration 111 adds tenant-scoped product-category associations, backfills
+the existing primary category, and preserves `ecommerce_products.category_id`
+for compatibility. Migration 112 changes the product-owned variant relationship
+to cascade when an unreferenced product is deleted; order, inventory, and loyalty
+foreign keys remain restrictive so transaction history cannot be erased.
+Once schema advances beyond 109, recovery is
+forward-repair-only.
 
 The preceding schema-108 bridge contract used schema
 range `105..108`, target `108`, class `forward-compatible`, rollback metadata

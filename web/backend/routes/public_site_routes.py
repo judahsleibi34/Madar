@@ -2048,6 +2048,7 @@ def _public_catalog_product(
     *,
     locale: str,
     tag_ids: list[str],
+    category_ids: list[str] | None = None,
     include_inventory: bool = False,
 ) -> dict[str, Any]:
     localized = _localized_catalog_text(row.get("translations"), locale)
@@ -2060,6 +2061,7 @@ def _public_catalog_product(
         "slug": str(row.get("slug") or ""),
         "sku": str(row.get("sku") or ""),
         "category_id": str(row.get("category_id") or "") or None,
+        "category_ids": category_ids or ([str(row.get("category_id"))] if row.get("category_id") else []),
         "brand_id": str(row.get("brand_id") or "") or None,
         "tag_ids": tag_ids,
         "name": localized["name"],
@@ -2132,7 +2134,7 @@ def _catalog_descendant_ids(
     return descendants
 
 
-def _read_public_catalog_rows(tenant_id: int) -> tuple[list[dict], list[dict], list[dict], list[dict], list[dict]]:
+def _read_public_catalog_rows(tenant_id: int) -> tuple[list[dict], list[dict], list[dict], list[dict], list[dict], list[dict]]:
     category_rows = rows(
         service_supabase.table("ecommerce_categories")
         .select("*")
@@ -2185,11 +2187,23 @@ def _read_public_catalog_rows(tenant_id: int) -> tuple[list[dict], list[dict], l
         .eq("tenant_id", tenant_id)
         .execute()
     )
-    return category_rows, tag_rows, brand_rows, product_rows, link_rows
+    category_link_rows = _optional_p1a_rows(
+        service_supabase.table("ecommerce_product_categories")
+        .select("product_id,category_id,sort_order")
+        .eq("tenant_id", tenant_id)
+        .order("sort_order")
+    )
+    if category_link_rows is None:
+        category_link_rows = [
+            {"product_id": row.get("id"), "category_id": row.get("category_id"), "sort_order": 0}
+            for row in product_rows
+            if row.get("category_id")
+        ]
+    return category_rows, tag_rows, brand_rows, product_rows, link_rows, category_link_rows
 
 
-def _cached_public_catalog_rows(tenant_id: int) -> tuple[list[dict], list[dict], list[dict], list[dict], list[dict]]:
-    cache_key = ecommerce_cache_key(tenant_id, "public-catalog-source-v2")
+def _cached_public_catalog_rows(tenant_id: int) -> tuple[list[dict], list[dict], list[dict], list[dict], list[dict], list[dict]]:
+    cache_key = ecommerce_cache_key(tenant_id, "public-catalog-source-v3")
     cached, _cache_hit = get_or_create_ecommerce_cache(
         cache_key,
         tenant_id,
@@ -2201,7 +2215,18 @@ def _cached_public_catalog_rows(tenant_id: int) -> tuple[list[dict], list[dict],
 def _split_public_catalog_rows(catalog_rows):
     if len(catalog_rows) == 4:
         category_rows, tag_rows, product_rows, link_rows = catalog_rows
-        return category_rows, tag_rows, [], product_rows, link_rows
+        category_links = [
+            {"product_id": row.get("id"), "category_id": row.get("category_id"), "sort_order": 0}
+            for row in product_rows if row.get("category_id")
+        ]
+        return category_rows, tag_rows, [], product_rows, link_rows, category_links
+    if len(catalog_rows) == 5:
+        category_rows, tag_rows, brand_rows, product_rows, link_rows = catalog_rows
+        category_links = [
+            {"product_id": row.get("id"), "category_id": row.get("category_id"), "sort_order": 0}
+            for row in product_rows if row.get("category_id")
+        ]
+        return category_rows, tag_rows, brand_rows, product_rows, link_rows, category_links
     return catalog_rows
 
 
@@ -2230,7 +2255,7 @@ def _filter_catalog_taxonomy(
         )
         products = [
             item for item in products
-            if str(item.get("category_id") or "") in allowed
+            if any(str(category_id) in allowed for category_id in (item.get("category_ids") or [item.get("category_id")]))
         ]
 
     clean_tag = str(tag or "").strip().lower()
@@ -2419,13 +2444,19 @@ def _catalog_payload(
     featured_product_ids: list[str] | None = None,
     featured_category_ids: list[str] | None = None,
 ) -> dict[str, Any]:
-    category_rows, tag_rows, brand_rows, product_rows, link_rows = _split_public_catalog_rows(_cached_public_catalog_rows(tenant_id))
+    category_rows, tag_rows, brand_rows, product_rows, link_rows, category_link_rows = _split_public_catalog_rows(_cached_public_catalog_rows(tenant_id))
     tags_by_product: dict[str, list[str]] = {}
     for link in link_rows:
         tags_by_product.setdefault(
             str(link.get("product_id") or ""),
             [],
         ).append(str(link.get("tag_id") or ""))
+    categories_by_product: dict[str, list[str]] = {}
+    for link in category_link_rows:
+        categories_by_product.setdefault(
+            str(link.get("product_id") or ""),
+            [],
+        ).append(str(link.get("category_id") or ""))
 
     categories = [_public_catalog_item(row, locale) for row in category_rows]
     tags = [_public_catalog_item(row, locale) for row in tag_rows]
@@ -2435,6 +2466,7 @@ def _catalog_payload(
             row,
             locale=locale,
             tag_ids=tags_by_product.get(str(row.get("id") or ""), []),
+            category_ids=categories_by_product.get(str(row.get("id") or ""), []),
         )
         for row in product_rows
     ]
@@ -2501,7 +2533,7 @@ def _catalog_product_payload(
     product_slug: str,
     locale: str,
 ) -> dict[str, Any]:
-    category_rows, tag_rows, _brand_rows, product_rows, link_rows = _split_public_catalog_rows(_cached_public_catalog_rows(tenant_id))
+    category_rows, tag_rows, _brand_rows, product_rows, link_rows, category_link_rows = _split_public_catalog_rows(_cached_public_catalog_rows(tenant_id))
     row = next(
         (
             item for item in product_rows
@@ -2517,10 +2549,16 @@ def _catalog_product_payload(
         for link in link_rows
         if str(link.get("product_id") or "") == product_id
     ]
+    product_category_ids = [
+        str(link.get("category_id") or "")
+        for link in category_link_rows
+        if str(link.get("product_id") or "") == product_id
+    ]
     product = _public_catalog_product(
         row,
         locale=locale,
         tag_ids=product_tag_ids,
+        category_ids=product_category_ids,
         include_inventory=True,
     )
     category = next(
@@ -2536,9 +2574,14 @@ def _catalog_product_payload(
         for item in tag_rows
         if str(item.get("id") or "") in product_tag_ids
     ]
+    categories = [
+        _public_catalog_item(item, locale)
+        for item in category_rows
+        if str(item.get("id") or "") in product_category_ids
+    ]
     attribute_rows = _optional_p1a_rows(service_supabase.table("ecommerce_product_attributes").select("id,name_translations,value_translations,sort_order").eq("tenant_id", tenant_id).eq("product_id", product_id).order("sort_order"))
     if attribute_rows is None:
-        return {"product": product, "category": category, "tags": tags, "attributes": [], "options": [], "variants": []}
+        return {"product": product, "category": category, "categories": categories, "tags": tags, "attributes": [], "options": [], "variants": []}
     try:
         option_rows = rows(service_supabase.table("ecommerce_product_options").select("id,code,name_translations,required,sort_order,display_type").eq("tenant_id", tenant_id).eq("product_id", product_id).order("sort_order").execute())
     except Exception as error:
@@ -2584,7 +2627,7 @@ def _catalog_product_payload(
         attributes.append(attribute)
     product["has_variants"] = bool(option_rows)
     product["in_stock"] = any(item["in_stock"] for item in variant_rows) if option_rows else product["in_stock"]
-    return {"product": product, "category": category, "tags": tags, "attributes": attributes, "options": option_rows, "variants": variant_rows}
+    return {"product": product, "category": category, "categories": categories, "tags": tags, "attributes": attributes, "options": option_rows, "variants": variant_rows}
 
 
 def normalize_email(value: str) -> str:
@@ -2987,7 +3030,7 @@ def _canonical_storefront_base(settings: dict, site_identifier: str, request: Re
 
 def _storefront_sitemap_xml(settings: dict, site_identifier: str, request: Request) -> str:
     tenant_id = resolve_tenant_id(settings)
-    categories, _tags, _brands, products, _links = _split_public_catalog_rows(_cached_public_catalog_rows(tenant_id))
+    categories, _tags, _brands, products, _links, _category_links = _split_public_catalog_rows(_cached_public_catalog_rows(tenant_id))
     base = _canonical_storefront_base(settings, site_identifier, request)
     entries = [(base, settings.get("updated_at"))]
     entries.extend((f"{base}/catalog?category={quote(str(row.get('slug') or ''), safe='-')}", row.get("updated_at")) for row in categories if row.get("slug"))
