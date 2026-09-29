@@ -18,6 +18,17 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def _retained_project_references(*, tenant_id: int, draft_schema: Any, published_schema: Any, status: str) -> dict[str, str]:
+    """Retain draft assets and the current published snapshot, without granting visibility."""
+    if status == "archived":
+        return {}
+    references = extract_builder_asset_references(draft_schema or {}, tenant_id=tenant_id)
+    if status == "published":
+        for key, path in extract_builder_asset_references(published_schema or {}, tenant_id=tenant_id).items():
+            references.setdefault(key, f"published:{path}"[:500])
+    return references
+
+
 def register_builder_asset(*, tenant_id: int, uploader_user_id: int | None, storage_key: str, original_filename: str, managed_filename: str, mime_type: str, content: bytes | None = None, size_bytes: int | None = None, sha256_hex: str | None = None, client=None) -> dict[str, Any]:
     match = ASSET_URL_PATTERN.fullmatch(f"/uploads/{storage_key}")
     if not match or int(match.group("tenant")) != int(tenant_id):
@@ -63,7 +74,10 @@ def extract_builder_asset_references(schema: Any, *, tenant_id: int) -> dict[str
     return found
 
 
-def nonproject_asset_reference_count(*, tenant_id: int, storage_key: str, public_only: bool = False, usage_hint: str | None = None, client=None) -> int:
+def nonproject_asset_reference_count(
+    *, tenant_id: int, storage_key: str, public_only: bool = False,
+    usage_hint: str | None = None, settings_row: dict | None = None, client=None,
+) -> int:
     """Count tenant-owned site/store references, optionally only public ones.
 
     Catalog rows are queried by their exact managed URL. A registered file is
@@ -74,11 +88,13 @@ def nonproject_asset_reference_count(*, tenant_id: int, storage_key: str, public
     database_client = client or service_supabase
     url = f"/uploads/{storage_key}"
     def site_count() -> int:
-        settings = getattr(
-            database_client.table("website_settings")
-            .select("*")
-            .eq("tenant_id", int(tenant_id)).limit(1).execute(), "data", None,
-        ) or []
+        settings = [settings_row] if settings_row else []
+        if settings_row is None:
+            settings = getattr(
+                database_client.table("website_settings")
+                .select("*")
+                .eq("tenant_id", int(tenant_id)).limit(1).execute(), "data", None,
+            ) or []
         if not settings or (public_only and not (settings[0].get("subdomain") or settings[0].get("standard_path_slug"))):
             return 0
         result = sum(settings[0].get(field) == url for field in ("logo_url", "loading_image_url"))
@@ -167,7 +183,7 @@ def refresh_builder_asset_reference_state(*, tenant_id: int, storage_key: str, c
     """Recount project and public site/store usage after a persisted change."""
     database_client = client or service_supabase
     assets = getattr(
-        database_client.table("builder_assets").select("id,status")
+        database_client.table("builder_assets").select("id,status,reference_count,retention_until")
         .eq("tenant_id", int(tenant_id)).eq("storage_key", storage_key).limit(2).execute(), "data", None,
     ) or []
     if len(assets) != 1 or assets[0].get("status") == "soft_deleted":
@@ -180,6 +196,16 @@ def refresh_builder_asset_reference_state(*, tenant_id: int, storage_key: str, c
     count = len(project_refs) + nonproject_asset_reference_count(
         tenant_id=tenant_id, storage_key=storage_key, client=database_client,
     )
+    current = assets[0]
+    if (
+        current.get("status") == ("active" if count else "unreferenced")
+        and int(current.get("reference_count") or 0) == count
+        and (
+            (count > 0 and current.get("retention_until") is None)
+            or (count == 0 and current.get("retention_until") is not None)
+        )
+    ):
+        return
     now = _now()
     database_client.table("builder_assets").update({
         "status": "active" if count else "unreferenced",
@@ -190,19 +216,38 @@ def refresh_builder_asset_reference_state(*, tenant_id: int, storage_key: str, c
     }).eq("id", asset_id).eq("tenant_id", int(tenant_id)).execute()
 
 
-def reconcile_project_asset_references(*, project_id: str, tenant_id: int, schema: dict[str, Any], client=None) -> dict[str, int]:
+def reconcile_project_asset_references(
+    *, project_id: str, tenant_id: int, schema: dict[str, Any],
+    published_schema: dict[str, Any] | None = None, status: str = "draft", client=None,
+) -> dict[str, int]:
     database_client = client or service_supabase
-    desired = extract_builder_asset_references(schema, tenant_id=tenant_id)
-    response = database_client.table("builder_assets").select("id,storage_key,status").eq("tenant_id", int(tenant_id)).execute()
-    assets = {
-        row["storage_key"]: row for row in (getattr(response, "data", None) or [])
-        if row.get("storage_key") in desired and row.get("status") != "soft_deleted"
-    }
-    previous_response = database_client.table("builder_asset_references").select("asset_id").eq("project_id", project_id).execute()
-    previous_ids = {row["asset_id"] for row in (getattr(previous_response, "data", None) or [])}
-    database_client.table("builder_asset_references").delete().eq("project_id", project_id).execute()
+    desired = _retained_project_references(
+        tenant_id=tenant_id, draft_schema=schema, published_schema=published_schema, status=status,
+    )
+    assets = {}
+    for offset in range(0, len(desired), 100):
+        keys = list(desired)[offset:offset + 100]
+        response = (
+            database_client.table("builder_assets").select("id,storage_key,status")
+            .eq("tenant_id", int(tenant_id)).in_("storage_key", keys).execute()
+        )
+        assets.update({
+            row["storage_key"]: row for row in (getattr(response, "data", None) or [])
+            if row.get("storage_key") in desired and row.get("status") != "soft_deleted"
+        })
+    previous_response = (
+        database_client.table("builder_asset_references")
+        .select("asset_id,reference_path").eq("project_id", project_id).execute()
+    )
+    previous_rows = getattr(previous_response, "data", None) or []
+    previous_ids = {row["asset_id"] for row in previous_rows}
     references = [{"asset_id": asset["id"], "project_id": project_id, "reference_path": desired[key]} for key, asset in assets.items()]
-    if references: database_client.table("builder_asset_references").insert(references).execute()
+    previous_pairs = {(row["asset_id"], row.get("reference_path")) for row in previous_rows}
+    current_pairs = {(row["asset_id"], row["reference_path"]) for row in references}
+    if previous_pairs != current_pairs:
+        database_client.table("builder_asset_references").delete().eq("project_id", project_id).execute()
+        if references:
+            database_client.table("builder_asset_references").insert(references).execute()
     current_ids = {asset["id"] for asset in assets.values()}
     for asset_id in previous_ids | current_ids:
         asset = next((row for row in assets.values() if row["id"] == asset_id), None)
@@ -214,10 +259,32 @@ def reconcile_project_asset_references(*, project_id: str, tenant_id: int, schem
             refresh_builder_asset_reference_state(
                 tenant_id=tenant_id, storage_key=asset["storage_key"], client=database_client,
             )
-            database_client.table("builder_assets").update({
-                "project_id": project_id if asset_id in current_ids else None,
-            }).eq("id", asset_id).eq("tenant_id", int(tenant_id)).execute()
+            if previous_pairs != current_pairs:
+                database_client.table("builder_assets").update({
+                    "project_id": project_id if asset_id in current_ids else None,
+                }).eq("id", asset_id).eq("tenant_id", int(tenant_id)).execute()
     return {"referenced": len(references), "unknown": len(desired) - len(assets)}
+
+
+def project_asset_is_persisted(*, tenant_id: int, storage_key: str, client=None) -> bool:
+    """Cleanup-only guard for legacy rows whose project reference was lost."""
+    database_client = client or service_supabase
+    projects = getattr(
+        database_client.table("builder_projects")
+        .select("status,draft_schema,published_schema")
+        .eq("tenant_id", int(tenant_id)).limit(1000).execute(), "data", None,
+    ) or []
+    # A truncated project scan must fail closed rather than delete an asset.
+    if len(projects) == 1000:
+        return True
+    return any(
+        storage_key in _retained_project_references(
+            tenant_id=tenant_id, draft_schema=project.get("draft_schema"),
+            published_schema=project.get("published_schema"),
+            status=project.get("status") or "draft",
+        )
+        for project in projects
+    )
 
 
 def cleanup_expired_builder_assets(*, storage_root: Path, limit: int = 100, dry_run: bool = True, client=None) -> dict[str, int]:
@@ -227,7 +294,9 @@ def cleanup_expired_builder_assets(*, storage_root: Path, limit: int = 100, dry_
     for row in getattr(response, "data", None) or []:
         eligible += 1
         refs = database_client.table("builder_asset_references").select("asset_id").eq("asset_id", row["id"]).limit(1).execute()
-        if getattr(refs, "data", None) or nonproject_asset_reference_count(
+        if getattr(refs, "data", None) or project_asset_is_persisted(
+            tenant_id=int(row["tenant_id"]), storage_key=row["storage_key"], client=database_client,
+        ) or nonproject_asset_reference_count(
             tenant_id=int(row["tenant_id"]), storage_key=row["storage_key"], client=database_client,
         ):
             skipped += 1; referenced += 1; continue
@@ -246,7 +315,9 @@ def cleanup_expired_builder_assets(*, storage_root: Path, limit: int = 100, dry_
             current_rows = getattr(current, "data", None) or []
             if len(current_rows) != 1 or current_rows[0].get("status") != "unreferenced" or int(current_rows[0].get("reference_count") or 0) != 0:
                 skipped += 1; referenced += 1; continue
-            if nonproject_asset_reference_count(
+            if project_asset_is_persisted(
+                tenant_id=int(row["tenant_id"]), storage_key=row["storage_key"], client=database_client,
+            ) or nonproject_asset_reference_count(
                 tenant_id=int(row["tenant_id"]), storage_key=row["storage_key"], client=database_client,
             ):
                 skipped += 1; referenced += 1; continue

@@ -1259,7 +1259,7 @@ function CategoryCarousel({ categories, shopPath, categoriesPath, kind = "catego
               <Link to={`${shopPath}?${filterKey}=${encodeURIComponent(category.slug)}`} tabIndex={group === 0 ? undefined : -1}>
                 <div className={`live-store-category-media${category.image_url ? "" : " is-placeholder"}`}>
                   {category.image_url
-                    ? <img {...getResponsiveMediaProps(category.image_url, { widths: [240, 320, 480, 640], fallbackWidth: 480, sizes: "(max-width: 760px) 50vw, (max-width: 980px) 33vw, 20vw" })} alt={isBrandCarousel ? category.name : ""} loading={index < 5 ? "eager" : "lazy"} decoding="async" />
+                    ? <img {...getResponsiveMediaProps(category.image_url, { widths: [240, 320, 480, 640], fallbackWidth: 480, sizes: "(max-width: 760px) 50vw, (max-width: 980px) 33vw, 20vw" })} alt={isBrandCarousel ? category.name : ""} loading="lazy" decoding="async" />
                     : <span>{String(index + 1).padStart(2, "0")}</span>}
                 </div>
                 <div className="live-store-category-copy">
@@ -1389,12 +1389,20 @@ function LandingHeroCarousel({ site, brand, locale }) {
       <div className="live-store-hero-carousel-slides">
         {slides.map((slide, index) => (
           <article className={`live-store-hero-carousel-slide${index === activeIndex ? " is-active" : ""}`} key={slide.id || index} aria-hidden={index === activeIndex ? undefined : "true"}>
-            {slide.image_url && <img {...getResponsiveMediaProps(slide.image_url, { widths: [640, 960, 1280, 1600, 1920], fallbackWidth: 1600, sizes: "100vw" })} alt="" loading={index === 0 ? "eager" : "lazy"} decoding="async" />}
+            {slide.image_url && (index === activeIndex || (slides.length > 1 && index === (activeIndex + 1) % slides.length)) && (
+              <img
+                {...getResponsiveMediaProps(slide.image_url, { fallbackWidth: 1440, sizes: "100vw" })}
+                alt=""
+                loading={index === activeIndex ? "eager" : "lazy"}
+                decoding={index === 0 && activeIndex === 0 ? "sync" : "async"}
+                fetchPriority={index === 0 && activeIndex === 0 ? "high" : index === activeIndex ? "auto" : "low"}
+              />
+            )}
           </article>
         ))}
       </div>
       <div className="live-store-hero-carousel-shade" />
-      <div className="live-store-hero-carousel-content" aria-live="polite">
+      <div className={`live-store-hero-carousel-content${title || subtitle ? "" : " is-no-copy"}`} aria-live="polite">
         {title && <h1>{title}</h1>}
         {subtitle && <p>{subtitle}</p>}
       </div>
@@ -1439,8 +1447,8 @@ function StoreLanding({ brand, site, catalog, categoryById, locale, shopPath, pr
         <header><div><h2>{c("common.products")}</h2></div><Link to={shopPath}>{c("common.viewAll")} <ArrowRight size={17} /></Link></header>
         {featuredProducts.length > 0 ? (
           <div className="live-store-grid">
-            {featuredProducts.map((product, index) => (
-              <ProductCard key={product.id} product={product} category={categoryById.get(product.category_id)} locale={locale} productPath={`${productBasePath}/product/${encodeURIComponent(product.slug)}`} onAdd={onAdd} eager={index < 3} />
+            {featuredProducts.map((product) => (
+              <ProductCard key={product.id} product={product} category={categoryById.get(product.category_id)} locale={locale} productPath={`${productBasePath}/product/${encodeURIComponent(product.slug)}`} onAdd={onAdd} />
             ))}
           </div>
         ) : (

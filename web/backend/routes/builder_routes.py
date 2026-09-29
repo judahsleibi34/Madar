@@ -2757,6 +2757,8 @@ def update_builder_project(
                 project_id=project_id,
                 tenant_id=context.tenant_id,
                 schema=update_payload["draft_schema"],
+                published_schema=existing_project.get("published_schema"),
+                status=existing_project.get("status") or "draft",
                 client=service_supabase,
             )
         except Exception as error:
@@ -2804,6 +2806,7 @@ def archive_builder_project(project_id: str, request: Request, response: Respons
             project_id=project_id,
             tenant_id=context.tenant_id,
             schema={},
+            status="archived",
             client=service_supabase,
         )
     except Exception as error:
@@ -3303,6 +3306,22 @@ def publish_builder_project(
             entitlement.get("enforced") and entitlement.get("source") == "feature"
         ),
     )
+    try:
+        reconcile_project_asset_references(
+            project_id=project_id,
+            tenant_id=context.tenant_id,
+            schema=validated_schema,
+            published_schema=published_project.get("published_schema") or validated_schema,
+            status="published",
+            client=service_supabase,
+        )
+    except Exception as error:
+        # Publication has committed. Cleanup checks persisted schemas even if
+        # reference bookkeeping is temporarily unavailable.
+        logger.error(
+            "builder.asset_publish_reconciliation_failed",
+            extra={"tenant_id": context.tenant_id, "project_id": project_id, "error_type": type(error).__name__},
+        )
     # Migration 072 performs an unambiguous first publication binding inside
     # this same RPC transaction. Never follow a successful RPC with a second
     # activation write: that would recreate the old hybrid-publication window.
@@ -3394,6 +3413,19 @@ def unpublish_builder_project(
         _raise_revision_conflict(project_id, context.tenant_id)
 
     unpublished_project = rows[0]
+    try:
+        reconcile_project_asset_references(
+            project_id=project_id,
+            tenant_id=context.tenant_id,
+            schema=unpublished_project.get("draft_schema") or project.get("draft_schema") or {},
+            status="draft",
+            client=service_supabase,
+        )
+    except Exception as error:
+        logger.error(
+            "builder.asset_unpublish_reconciliation_failed",
+            extra={"tenant_id": context.tenant_id, "project_id": project_id, "error_type": type(error).__name__},
+        )
     record_audit_event(
         request=request,
         tenant_id=context.tenant_id,

@@ -38,7 +38,7 @@ from routes.mfa_routes import router as mfa_router
 from routes.notification_routes import router as notification_router
 from routes.password_routes import router as password_router
 from routes.public_contact_routes import router as public_contact_router
-from routes.public_site_routes import router as public_site_router
+from routes.public_site_routes import build_authorized_public_schema, router as public_site_router
 from routes.server_status_routes import router as server_status_router
 from routes.user_routes import router as user_router
 from routes.website_routes import router as website_router
@@ -280,26 +280,37 @@ def _asset_visibility(*, tenant_id: int, storage_key: str, request: Request, res
     if len(rows) != 1 or rows[0].get("status") not in {"active", "unreferenced"}:
         return False, False
     asset_id = rows[0]["id"]
-    references = getattr(
-        service_supabase.table("builder_asset_references").select("project_id").eq("asset_id", asset_id).limit(100).execute(),
-        "data", None,
+    settings = getattr(
+        service_supabase.table("website_settings")
+        .select("*")
+        .eq("tenant_id", tenant_id).limit(1).execute(), "data", None,
     ) or []
-    project_ids = list({reference.get("project_id") for reference in references if reference.get("project_id")})
-    projects = []
-    if project_ids:
-        projects = getattr(
-            service_supabase.table("builder_projects").select("id,published_schema,status")
-            .eq("tenant_id", tenant_id).eq("status", "published").in_("id", project_ids).execute(),
+    bound_id = settings[0].get("published_project_id") if settings and (
+        settings[0].get("subdomain") or settings[0].get("standard_path_slug")
+    ) else None
+    if bound_id:
+        reference = getattr(
+            service_supabase.table("builder_asset_references").select("asset_id")
+            .eq("asset_id", asset_id).eq("project_id", bound_id).limit(1).execute(),
             "data", None,
         ) or []
-    for project in projects:
-        if storage_key in extract_builder_asset_references(project.get("published_schema") or {}, tenant_id=tenant_id):
-            return True, False
+        if reference:
+            projects = getattr(
+                service_supabase.table("builder_projects").select("id,published_schema,status")
+                .eq("tenant_id", tenant_id).eq("status", "published").eq("id", bound_id).limit(1).execute(),
+                "data", None,
+            ) or []
+            public_schema = build_authorized_public_schema(
+                projects[0].get("published_schema") or {},
+            ) if projects else {}
+            if storage_key in extract_builder_asset_references(public_schema, tenant_id=tenant_id):
+                return True, False
     metadata = rows[0].get("metadata")
     usage_hint = metadata.get("usage") if isinstance(metadata, dict) else None
     if nonproject_asset_reference_count(
         tenant_id=tenant_id, storage_key=storage_key, public_only=True,
-        usage_hint=usage_hint, client=service_supabase,
+        usage_hint=usage_hint, settings_row=settings[0] if settings else {},
+        client=service_supabase,
     ):
         return True, False
     try:
