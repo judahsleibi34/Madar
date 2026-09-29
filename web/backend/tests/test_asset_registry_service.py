@@ -1,5 +1,7 @@
 import hashlib
+import io
 import json
+import sys
 import tempfile
 import unittest
 from datetime import datetime, timedelta, timezone
@@ -7,6 +9,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from services import asset_registry_service
+from scripts import reconcile_builder_project_assets
 
 
 class Response:
@@ -28,6 +31,8 @@ class Query:
         return self
     def lte(self, key, value): self.filters.append(("lte", key, value)); return self
     def limit(self, value): self.limit_value = value; return self
+    def order(self, key): self.order_key = key; return self
+    def range(self, start, end): self.range_value = (start, end); return self
     def insert(self, payload): self.operation, self.payload = "insert", payload; return self
     def update(self, payload): self.operation, self.payload = "update", payload; return self
     def delete(self): self.operation = "delete"; return self
@@ -44,6 +49,10 @@ class Query:
             matches(row, kind, key, value)
             for kind, key, value in self.filters
         )]
+        if hasattr(self, "order_key"): rows = sorted(rows, key=lambda row: row.get(self.order_key) or "")
+        if hasattr(self, "range_value"):
+            start, end = self.range_value
+            rows = rows[start:end + 1]
         if self.limit_value is not None: rows = rows[:self.limit_value]
         if self.operation == "insert":
             payloads = self.payload if isinstance(self.payload, list) else [self.payload]
@@ -131,6 +140,128 @@ class AssetRegistryTests(unittest.TestCase):
         )
         self.assertEqual(client.data["builder_assets"][0]["status"], "unreferenced")
         self.assertIsNotNone(client.data["builder_assets"][0]["retention_until"])
+
+    def test_published_snapshot_survives_draft_replacement_and_republish(self):
+        client = Client()
+        old = "tenant_7/builder_assets/0123456789abcdef0123456789abcdef.png"
+        new = "tenant_7/builder_assets/abcdefabcdefabcdefabcdefabcdefab.webp"
+        client.data["builder_assets"] = [
+            {"id": "old", "tenant_id": 7, "storage_key": old, "status": "unreferenced"},
+            {"id": "new", "tenant_id": 7, "storage_key": new, "status": "unreferenced"},
+        ]
+        old_schema = {"siteChrome": {"logoUrl": f"/uploads/{old}"}}
+        new_schema = {"siteChrome": {"logoUrl": f"/uploads/{new}"}}
+        result = asset_registry_service.reconcile_project_asset_references(
+            project_id="project-1", tenant_id=7, schema=new_schema,
+            published_schema=old_schema, status="published", client=client,
+        )
+        self.assertEqual(result, {"referenced": 2, "unknown": 0})
+        self.assertEqual({row["asset_id"] for row in client.data["builder_asset_references"]}, {"old", "new"})
+        self.assertEqual([row["status"] for row in client.data["builder_assets"]], ["active", "active"])
+        before = [dict(row) for row in client.data["builder_asset_references"]]
+        asset_registry_service.reconcile_project_asset_references(
+            project_id="project-1", tenant_id=7, schema=new_schema,
+            published_schema=old_schema, status="published", client=client,
+        )
+        self.assertEqual(client.data["builder_asset_references"], before)
+        asset_registry_service.reconcile_project_asset_references(
+            project_id="project-1", tenant_id=7, schema=new_schema,
+            published_schema=new_schema, status="published", client=client,
+        )
+        self.assertEqual({row["asset_id"] for row in client.data["builder_asset_references"]}, {"new"})
+        self.assertEqual(client.data["builder_assets"][0]["status"], "unreferenced")
+        self.assertIsNotNone(client.data["builder_assets"][0]["retention_until"])
+        asset_registry_service.reconcile_project_asset_references(
+            project_id="project-1", tenant_id=7, schema=new_schema,
+            published_schema=old_schema, status="draft", client=client,
+        )
+        self.assertEqual({row["asset_id"] for row in client.data["builder_asset_references"]}, {"new"})
+        asset_registry_service.reconcile_project_asset_references(
+            project_id="project-1", tenant_id=7, schema={}, status="archived", client=client,
+        )
+        self.assertEqual(client.data["builder_asset_references"], [])
+
+    def test_cleanup_guards_published_and_draft_schemas_when_registry_rows_are_missing(self):
+        client = Client()
+        key = "tenant_7/builder_assets/0123456789abcdef0123456789abcdef.png"
+        client.data["builder_assets"] = [{
+            "id": "asset-1", "tenant_id": 7, "storage_key": key,
+            "status": "unreferenced", "reference_count": 0,
+            "retention_until": "2020-01-01T00:00:00+00:00",
+            "sha256": hashlib.sha256(b"image").hexdigest(),
+        }]
+        project = {
+            "id": "project-1", "tenant_id": 7, "status": "published",
+            "draft_schema": {}, "published_schema": {"siteChrome": {"logoUrl": f"/uploads/{key}"}},
+        }
+        client.data["builder_projects"] = [project]
+        with tempfile.TemporaryDirectory() as root:
+            path = Path(root) / key
+            path.parent.mkdir(parents=True)
+            path.write_bytes(b"image")
+            with patch.object(asset_registry_service, "release_storage") as release:
+                published = asset_registry_service.cleanup_expired_builder_assets(
+                    storage_root=Path(root), client=client, dry_run=False,
+                )
+                self.assertEqual(published["referenced"], 1)
+                project["status"] = "draft"
+                project["draft_schema"] = {"pages": [{"image": f"/uploads/{key}"}]}
+                draft = asset_registry_service.cleanup_expired_builder_assets(
+                    storage_root=Path(root), client=client, dry_run=False,
+                )
+                self.assertEqual(draft["referenced"], 1)
+                release.assert_not_called()
+            self.assertTrue(path.exists())
+
+    def test_published_page_body_and_footer_survive_a_newer_empty_draft(self):
+        client = Client()
+        body = "tenant_7/builder_assets/0123456789abcdef0123456789abcdef.png"
+        footer = "tenant_7/builder_assets/abcdefabcdefabcdefabcdefabcdefab.webp"
+        client.data["builder_assets"] = [
+            {"id": "body", "tenant_id": 7, "storage_key": body, "status": "unreferenced"},
+            {"id": "footer", "tenant_id": 7, "storage_key": footer, "status": "unreferenced"},
+        ]
+        result = asset_registry_service.reconcile_project_asset_references(
+            project_id="project-1", tenant_id=7, schema={"pages": []},
+            published_schema={
+                "pages": [{"elements": [{"content": f"/uploads/{body}"}]}],
+                "siteChrome": {"footerImageUrl": f"/uploads/{footer}"},
+            },
+            status="published", client=client,
+        )
+        self.assertEqual(result["referenced"], 2)
+        self.assertEqual({row["asset_id"] for row in client.data["builder_asset_references"]}, {"body", "footer"})
+        self.assertTrue(all(row["status"] == "active" for row in client.data["builder_assets"]))
+
+    def test_tenant_scoped_repair_command_dry_run_apply_and_rerun(self):
+        client = Client()
+        key = "tenant_7/builder_assets/0123456789abcdef0123456789abcdef.png"
+        client.data["builder_assets"] = [{
+            "id": "asset-1", "tenant_id": 7, "storage_key": key,
+            "status": "unreferenced", "reference_count": 0,
+        }]
+        client.data["builder_projects"] = [{
+            "id": "project-1", "tenant_id": 7, "status": "published",
+            "draft_schema": {}, "published_schema": {"siteChrome": {"logoUrl": f"/uploads/{key}"}},
+        }, {
+            "id": "foreign", "tenant_id": 8, "status": "published",
+            "draft_schema": {}, "published_schema": {"siteChrome": {"logoUrl": f"/uploads/{key}"}},
+        }]
+        with patch.object(reconcile_builder_project_assets, "service_supabase", client):
+            with patch.object(sys, "argv", ["reconcile_builder_project_assets", "--tenant-id", "7"]), patch(
+                "sys.stdout", new_callable=io.StringIO,
+            ) as output:
+                self.assertEqual(reconcile_builder_project_assets.main(), 0)
+                self.assertEqual(json.loads(output.getvalue())["projects_scanned"], 1)
+            self.assertEqual(client.data.get("builder_asset_references", []), [])
+            with patch.object(sys, "argv", ["reconcile_builder_project_assets", "--tenant-id", "7", "--apply"]):
+                with patch("sys.stdout", new_callable=io.StringIO):
+                    self.assertEqual(reconcile_builder_project_assets.main(), 0)
+                    first = [dict(row) for row in client.data["builder_asset_references"]]
+                    self.assertEqual(reconcile_builder_project_assets.main(), 0)
+                    self.assertEqual(client.data["builder_asset_references"], first)
+        self.assertEqual(first[0]["asset_id"], "asset-1")
+        self.assertEqual(client.data["builder_assets"][0]["status"], "active")
 
     def test_store_logo_replacement_recounts_both_assets(self):
         client = Client()

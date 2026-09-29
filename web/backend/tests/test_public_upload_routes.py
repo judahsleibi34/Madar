@@ -340,6 +340,7 @@ class PublicUploadRouteTests(unittest.TestCase):
         published = AssetVisibilityStore({
             "builder_assets": [{"id": "asset-1", "tenant_id": 1, "storage_key": storage_key, "status": "active"}],
             "builder_asset_references": [{"asset_id": "asset-1", "project_id": "project-1"}],
+            "website_settings": [{"tenant_id": 1, "subdomain": "olive", "published_project_id": "project-1"}],
             "builder_projects": [{
                 "id": "project-1", "tenant_id": 1, "status": "published",
                 "published_schema": {"pages": [{"image": f"/uploads/{storage_key}"}]},
@@ -376,6 +377,7 @@ class PublicUploadRouteTests(unittest.TestCase):
                 {"id": "published", "tenant_id": 1, "status": "published", "published_schema": {"image": f"/uploads/{key}"}},
                 {"id": "foreign", "tenant_id": 2, "status": "published", "published_schema": {"image": f"/uploads/{key}"}},
             ],
+            "website_settings": [{"tenant_id": 1, "subdomain": "olive", "published_project_id": "published"}],
         })
         self.visibility_patch.stop()
         try:
@@ -384,7 +386,86 @@ class PublicUploadRouteTests(unittest.TestCase):
         finally:
             self.visibility_patch.start()
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(store.queries, ["builder_assets", "builder_asset_references", "builder_projects"])
+        self.assertEqual(store.queries, ["builder_assets", "website_settings", "builder_asset_references", "builder_projects"])
+
+    def test_published_site_chrome_requires_current_binding_and_status(self):
+        key = f"tenant_1/builder_assets/{self.asset_path.name}"
+        store = AssetVisibilityStore({
+            "builder_assets": [{"id": "asset-1", "tenant_id": 1, "storage_key": key, "status": "active"}],
+            "builder_asset_references": [{"asset_id": "asset-1", "project_id": "project-1"}],
+            "builder_projects": [{
+                "id": "project-1", "tenant_id": 1, "status": "published",
+                "published_schema": {"siteChrome": {"logoUrl": f"/uploads/{key}"}},
+            }],
+            "website_settings": [{"tenant_id": 1, "subdomain": "olive", "published_project_id": "project-1"}],
+        })
+        self.visibility_patch.stop()
+        try:
+            with patch.object(app_module, "service_supabase", store), patch.object(
+                app_module, "get_authenticated_user_row", side_effect=Exception("anonymous"),
+            ):
+                public = self.client.get(f"/uploads/{key}")
+                store.tables["website_settings"][0]["published_project_id"] = "another-project"
+                unbound = self.client.get(f"/uploads/{key}")
+                store.tables["website_settings"][0]["published_project_id"] = "project-1"
+                store.tables["builder_projects"][0]["status"] = "draft"
+                unpublished = self.client.get(f"/uploads/{key}")
+        finally:
+            self.visibility_patch.start()
+        self.assertEqual(public.status_code, 200)
+        self.assertEqual(unbound.status_code, 404)
+        self.assertEqual(unpublished.status_code, 404)
+        for response in (unbound, unpublished):
+            self.assertEqual(response.headers["cache-control"], "no-store")
+            self.assertEqual(response.headers["cdn-cache-control"], "no-store")
+
+    def test_draft_reference_in_bound_project_does_not_grant_public_access(self):
+        key = f"tenant_1/builder_assets/{self.asset_path.name}"
+        store = AssetVisibilityStore({
+            "builder_assets": [{"id": "asset-1", "tenant_id": 1, "storage_key": key, "status": "active"}],
+            "builder_asset_references": [{"asset_id": "asset-1", "project_id": "project-1"}],
+            "builder_projects": [{
+                "id": "project-1", "tenant_id": 1, "status": "published",
+                "draft_schema": {"pages": [{"image": f"/uploads/{key}"}]},
+                "published_schema": {"pages": []},
+            }],
+            "website_settings": [{"tenant_id": 1, "subdomain": "olive", "published_project_id": "project-1"}],
+        })
+        self.visibility_patch.stop()
+        try:
+            with patch.object(app_module, "service_supabase", store), patch.object(
+                app_module, "get_authenticated_user_row", side_effect=Exception("anonymous"),
+            ):
+                response = self.client.get(f"/uploads/{key}")
+        finally:
+            self.visibility_patch.start()
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.headers["cache-control"], "no-store")
+        self.assertEqual(response.headers["cdn-cache-control"], "no-store")
+
+    def test_private_published_page_image_is_not_anonymous_public_media(self):
+        key = f"tenant_1/builder_assets/{self.asset_path.name}"
+        store = AssetVisibilityStore({
+            "builder_assets": [{"id": "asset-1", "tenant_id": 1, "storage_key": key, "status": "active"}],
+            "builder_asset_references": [{"asset_id": "asset-1", "project_id": "project-1"}],
+            "builder_projects": [{
+                "id": "project-1", "tenant_id": 1, "status": "published",
+                "published_schema": {
+                    "pages": [{"id": "members", "visibility": "members", "image": f"/uploads/{key}"}],
+                },
+            }],
+            "website_settings": [{"tenant_id": 1, "subdomain": "olive", "published_project_id": "project-1"}],
+        })
+        self.visibility_patch.stop()
+        try:
+            with patch.object(app_module, "service_supabase", store), patch.object(
+                app_module, "get_authenticated_user_row", side_effect=Exception("anonymous"),
+            ):
+                response = self.client.get(f"/uploads/{key}")
+        finally:
+            self.visibility_patch.start()
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.headers["cache-control"], "no-store")
 
     def test_unreferenced_asset_preview_requires_same_tenant_and_is_private(self):
         storage_key = "tenant_1/builder_assets/0123456789abcdef0123456789abcdef.png"
