@@ -2231,12 +2231,17 @@
   }
 }
 @media (max-width: 760px) {
-  .live-store-hero-carousel { min-height: 520px; }
-  .live-store-hero-carousel-content { min-height: 520px; padding: 72px 52px 74px 24px; justify-content: flex-end; }
+  .live-store-hero-carousel { min-height: 0; }
+  .live-store-hero-carousel-slides { position: relative; inset: auto; width: 100%; aspect-ratio: 16 / 9; }
+  .live-store-hero-carousel-slide img { object-fit: contain; }
+  .live-store-hero-carousel-shade { display: none; }
+  .live-store-hero-carousel-content { min-height: 0; padding: 24px 52px 54px 24px; justify-content: flex-start; }
+  .live-store-hero-carousel-content.is-no-copy { padding: 0; }
   [dir="rtl"] .live-store-hero-carousel-content { padding-inline: 52px 24px; }
+  [dir="rtl"] .live-store-hero-carousel-content.is-no-copy { padding: 0; }
   .live-store-hero-carousel-content h1 { font-size: clamp(2.1rem, 11vw, 3.45rem); }
   .live-store-hero-carousel-content p { margin-top: 15px; font-size: .98rem; line-height: 1.55; }
-  .live-store-hero-carousel-arrow { width: 40px; height: 40px; }
+  .live-store-hero-carousel-arrow { top: 28.125vw; width: 40px; height: 40px; }
   .live-store-hero-carousel-arrow.is-previous { inset-inline-start: 8px; }
   .live-store-hero-carousel-arrow.is-next { inset-inline-end: 8px; }
   .live-store-hero-carousel-dots { bottom: 18px; }

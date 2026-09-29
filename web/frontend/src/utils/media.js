@@ -86,6 +86,13 @@ export const isVideoMediaUrl = (value) => /\.(?:mp4|webm)(?:[?#].*)?$/i.test(Str
 
 export const RESPONSIVE_MEDIA_WIDTHS = [320, 480, 768, 1024, 1440, 1920, 2560];
 
+export const boundedMediaWidth = (requested) => {
+  const width = Number(requested);
+  if (!Number.isFinite(width) || width <= 0) return 1440;
+  return RESPONSIVE_MEDIA_WIDTHS.find((candidate) => candidate >= width)
+    || RESPONSIVE_MEDIA_WIDTHS.at(-1);
+};
+
 export const getResponsiveMediaProps = (
   value,
   { widths = RESPONSIVE_MEDIA_WIDTHS, fallbackWidth = 1440, sizes = "100vw" } = {}
@@ -94,18 +101,15 @@ export const getResponsiveMediaProps = (
   const source = String(value || "").trim();
   if (!src || !MANAGED_IMAGE_ASSET_PATTERN.test(source)) return { src };
 
-  const candidates = [...new Set(widths)]
-    .map(Number)
-    .filter((width) => RESPONSIVE_MEDIA_WIDTHS.includes(width))
+  const candidates = [...new Set(widths.map(boundedMediaWidth))]
     .sort((left, right) => left - right);
   const appendWidth = (width) => `${src}${src.includes("?") ? "&" : "?"}w=${width}`;
-  const safeFallback = RESPONSIVE_MEDIA_WIDTHS.includes(Number(fallbackWidth))
-    ? Number(fallbackWidth)
-    : 1440;
+  const safeFallback = boundedMediaWidth(fallbackWidth);
 
   return {
     src: appendWidth(safeFallback),
-    srcSet: candidates.map((width) => `${appendWidth(width)} ${width}w`).join(", "),
+    srcSet: (candidates.length ? candidates : RESPONSIVE_MEDIA_WIDTHS)
+      .map((width) => `${appendWidth(width)} ${width}w`).join(", "),
     sizes,
   };
 };

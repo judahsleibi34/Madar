@@ -66,8 +66,9 @@ describe("EcommerceStorefront", () => {
           autoplay_enabled: true,
           interval_ms: 7000,
           slides: [
-            { id: "slide-1", image_url: "https://example.com/one.webp", title_en: "First campaign", subtitle_en: "First offer" },
-            { id: "slide-2", image_url: "https://example.com/two.webp", title_en: "Second campaign", subtitle_en: "Second offer" },
+            { id: "slide-1", image_url: "/uploads/tenant_1/builder_assets/0123456789abcdef0123456789abcdef.png", title_en: "First campaign", subtitle_en: "First offer" },
+            { id: "slide-2", image_url: "/uploads/tenant_1/builder_assets/abcdefabcdefabcdefabcdefabcdefab.webp", title_en: "Second campaign", subtitle_en: "Second offer" },
+            { id: "slide-3", image_url: "/uploads/tenant_1/builder_assets/11111111111111111111111111111111.jpg", title_en: "Third campaign" },
           ],
         },
       },
@@ -79,10 +80,24 @@ describe("EcommerceStorefront", () => {
 
     expect(await screen.findByRole("heading", { name: "First campaign" })).toBeTruthy();
     expect(screen.queryByRole("link", { name: "Shop now" })).toBeNull();
-    expect(document.querySelector('.live-store-hero-carousel-slide.is-active img')?.getAttribute("src")).toContain("one.webp");
+    const firstImage = document.querySelector(".live-store-hero-carousel-slide.is-active img");
+    expect(firstImage?.getAttribute("src")).toContain("0123456789abcdef");
+    expect(firstImage?.getAttribute("src")).toContain("?v=4&w=1440");
+    expect(firstImage?.getAttribute("srcset")).toContain("&w=480 480w");
+    expect(firstImage?.getAttribute("srcset")).toContain("&w=768 768w");
+    expect(firstImage?.getAttribute("sizes")).toBe("100vw");
+    expect(firstImage?.getAttribute("loading")).toBe("eager");
+    expect(firstImage?.getAttribute("fetchpriority")).toBe("high");
+    expect(document.querySelectorAll(".live-store-hero-carousel-slide img")).toHaveLength(2);
+    expect(document.querySelectorAll(".live-store-hero-carousel-slide")[2].querySelector("img")).toBeNull();
+    expect(document.querySelector(".live-store-hero-carousel-slide:not(.is-active) img")?.getAttribute("loading")).toBe("lazy");
+    expect(document.querySelector(".live-store-hero-carousel-slide:not(.is-active) img")?.getAttribute("fetchpriority")).toBe("low");
     fireEvent.click(screen.getByRole("button", { name: "Next slide" }));
     expect(screen.getByRole("heading", { name: "Second campaign" })).toBeTruthy();
-    expect(document.querySelector('.live-store-hero-carousel-slide.is-active img')?.getAttribute("src")).toContain("two.webp");
+    expect(document.querySelector('.live-store-hero-carousel-slide.is-active img')?.getAttribute("src")).toContain("abcdefabcdef");
+    expect(document.querySelector(".live-store-hero-carousel-slide.is-active img")?.getAttribute("loading")).toBe("eager");
+    expect(document.querySelector(".live-store-hero-carousel-slide:not(.is-active) img")?.getAttribute("loading")).toBe("lazy");
+    expect(document.querySelectorAll(".live-store-hero-carousel-slide")[0].querySelector("img")).toBeNull();
   });
 
   it("keeps internal draft preview in same-origin storage and rejects untrusted theme messages", async () => {
@@ -725,6 +740,8 @@ describe("EcommerceStorefront", () => {
     expect(screen.getByRole("button", { name: "Previous categories" }).disabled).toBe(false);
     expect(screen.getByRole("button", { name: "Next categories" }).disabled).toBe(false);
     const categoryTrack = document.querySelectorAll(".live-store-category-carousel")[1];
+    expect([...document.querySelectorAll(".live-store-category-carousel img")].every((image) => image.getAttribute("loading") === "lazy")).toBe(true);
+    expect(screen.getByAltText("Olive tray").getAttribute("loading")).toBe("lazy");
     categoryTrack.scrollBy = vi.fn();
     fireEvent.click(screen.getByRole("button", { name: "Next categories" }));
     expect(categoryTrack.scrollBy).toHaveBeenCalledWith(expect.objectContaining({ behavior: "smooth" }));

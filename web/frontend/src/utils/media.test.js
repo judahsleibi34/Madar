@@ -46,6 +46,19 @@ describe("resolveMediaUrl", () => {
     expect(getResponsiveMediaProps("https://images.example.com/photo.png"))
       .toEqual({ src: "https://images.example.com/photo.png" });
   });
+
+  it("maps unsupported requests to bounded widths instead of dropping mobile candidates", () => {
+    const props = getResponsiveMediaProps(
+      "/uploads/tenant_7/builder_assets/56fee3e0f73c4110abdf423d501fb835.png",
+      { widths: [375, 640, 960, 1600], fallbackWidth: 1600, sizes: "100vw" }
+    );
+    expect(props.src).toMatch(/&w=1920$/);
+    expect(props.srcSet).toContain("&w=480 480w");
+    expect(props.srcSet).toContain("&w=768 768w");
+    expect(props.srcSet).toContain("&w=1024 1024w");
+    expect(props.srcSet).toContain("&w=1920 1920w");
+    expect(props.srcSet).not.toContain("&w=640");
+  });
 });
 
 describe("resolveDocumentUrl", () => {
