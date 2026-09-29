@@ -4,7 +4,6 @@ import { defaultSiteChrome, fieldTypes, viewports } from "../core/PageBuilder.co
 import {
   fetchPublicFormDraft,
   fetchPublicForm,
-  fetchBuilderProject,
   fetchProtectedSitePage,
   fetchPublicSiteRuntime,
   fetchPublicSiteBootstrap,
@@ -17,7 +16,7 @@ import {
   submitPublicFormSubmission,
   startPublicQuizAttempt,
   finalizePublicQuizAttempt,
-} from "../services/PageBuilder.api";
+} from "../services/PageBuilder.publicApi";
 import { createFormIdempotencyKey } from "./formSubmission";
 import RuntimeFormToast from "./RuntimeFormToast";
 import { getRuntimeFieldError } from "./formValidation";
@@ -50,7 +49,7 @@ import {
   getLocalizedValue,
   normalizeLanguageMode,
 } from "../core/PageBuilder.localization";
-import "../../../styles/admin/PageBuilder/index.css";
+import "../../../styles/admin/PageBuilder/public-runtime.css";
 import ReservationBlock from "../blocks/ReservationBlock";
 import PhotoProofingBlock from "../blocks/PhotoProofingBlock";
 import { resolveReservationBlockValue } from "../core/PageBuilder.reservations";
@@ -790,7 +789,8 @@ export default function TenantSiteRuntime({ draftPreview = false, siteIdentifier
         return undefined;
       }
 
-      fetchBuilderProject(projectId)
+      import("../services/PageBuilder.api")
+        .then(({ fetchBuilderProject }) => fetchBuilderProject(projectId))
         .then((record) => {
           if (cancelled) return;
           const serverDraft = record?.draft_schema;

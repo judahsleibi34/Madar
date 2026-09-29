@@ -2,7 +2,7 @@ import PageBuilderCarousel from "../ui/PageBuilderCarousel";
 import AutoFitDirectText from "./PageBuilder.autoFitText";
 import LazyBuilderVideo from "./LazyBuilderVideo";
 import DocumentViewerElement from "./DocumentViewerElement";
-import CountUpText from "../ui/CountUpText";
+import LazyCountUpText from "../ui/LazyCountUpText";
 import { BuilderIcon } from "../ui/PageBuilderIconPicker";
 import ReservationBlock from "../blocks/ReservationBlock";
 import PhotoProofingBlock from "../blocks/PhotoProofingBlock";
@@ -26,6 +26,7 @@ import {
 } from "./PageBuilder.elementLayout";
 import { getElementHeadingTag } from "./PageBuilder.heading";
 import { getButtonColorPresentation } from "./PageBuilder.buttonColors";
+
 
 export const createElementRenderer = ({
   carouselElementTypes,
@@ -478,7 +479,7 @@ export const createElementRenderer = ({
         <div key={element.id} {...commonProps} className={`${commonProps.className} metric-group`} style={{ ...commonProps.style, "--metric-columns": columns, "--metric-text-color": element.styles?.metricTextColor || "var(--theme-text)", "--metric-symbol-color": element.styles?.metricSymbolColor || "var(--theme-warning)" }}>
           {metrics.map((metric, index) => (
             <div className="metric-group-item" key={`${element.id}_${index}`}>
-              <strong className="metric-value"><CountUpText value={metric.value} animateValue={renderMode !== "editing"} /></strong>
+              <strong className="metric-value"><LazyCountUpText value={metric.value} animateValue={renderMode !== "editing"} /></strong>
               <span className="metric-label">{metric.label}</span>
               {metric.description && <span className="metric-description">{metric.description}</span>}
             </div>

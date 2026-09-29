@@ -20,6 +20,7 @@ import {
 
 vi.mock("../../../utils/apiClient", () => ({
   apiFetch: vi.fn(),
+  getApiUrl: (path) => `/api/${String(path).replace(/^\/+/, "")}`,
   createApiError: vi.fn((response, data) => Object.assign(new Error("API error"), {
     status: response.status,
     data,

@@ -5,9 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "npm run api-origin:audit && npm run theme:audit && vite build && npm run bundle-origin:audit",
+    "build": "npm run api-origin:audit && npm run theme:audit && vite build && npm run bundle-origin:audit && npm run tenant-bundle:audit",
     "api-origin:audit": "node scripts/check-api-origin.mjs",
     "bundle-origin:audit": "node scripts/check-production-bundle.mjs",
+    "tenant-bundle:audit": "node scripts/check-public-tenant-bundle.mjs",
     "theme:audit": "node scripts/check-theme-contract.mjs",
     "contrast:audit": "node scripts/check-color-contrast.mjs",
     "edge:audit": "node scripts/check-security-headers.mjs",
