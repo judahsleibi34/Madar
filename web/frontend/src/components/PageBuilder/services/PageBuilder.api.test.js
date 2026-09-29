@@ -9,6 +9,7 @@ import {
   fetchProtectedSitePage,
   fetchPublicSite,
   fetchPublicSiteBootstrap,
+  fetchPublicSiteRuntime,
   listBuilderProjects,
   fetchBuilderSiteMembers,
   publishBuilderProject,
@@ -140,6 +141,15 @@ describe("builder project cloud API", () => {
     expect(result.site.brand).toBe("Tenant");
     expect(apiFetch).toHaveBeenCalledWith(
       "/api/public/sites/tenant-site/bootstrap",
+      { method: "GET", cache: "no-store" }
+    );
+  });
+  it("fetches the consolidated tenant runtime without browser caching", async () => {
+    apiFetch.mockResolvedValueOnce(jsonResponse({ visitor: { logged_in: false, user: null } }));
+    const result = await fetchPublicSiteRuntime("tenant-site");
+    expect(result.visitor.logged_in).toBe(false);
+    expect(apiFetch).toHaveBeenCalledWith(
+      "/api/public/sites/tenant-site/runtime",
       { method: "GET", cache: "no-store" }
     );
   });

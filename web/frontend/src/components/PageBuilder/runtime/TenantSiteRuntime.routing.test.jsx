@@ -7,7 +7,7 @@ import {
   fetchBuilderProject,
   fetchProtectedSitePage,
   fetchPublicForm,
-  fetchPublicSite,
+  fetchPublicSiteRuntime,
   fetchPublicSiteBootstrap,
   getTenantVisitorStatus,
   loginTenantVisitor,
@@ -19,7 +19,7 @@ vi.mock("../services/PageBuilder.api", async () => ({
   fetchBuilderProject: vi.fn(),
   fetchProtectedSitePage: vi.fn(),
   fetchPublicForm: vi.fn(),
-  fetchPublicSite: vi.fn(),
+  fetchPublicSiteRuntime: vi.fn(),
   fetchPublicSiteBootstrap: vi.fn(),
   getTenantVisitorStatus: vi.fn(),
   loginTenantVisitor: vi.fn(),
@@ -81,12 +81,16 @@ const renderPublic = ({
   contactEmail = "",
   phone = "",
   teamSections = [],
+  publishedPages = null,
+  runtimePromise = null,
+  runtimeError = null,
 } = {}) => {
   getTenantVisitorStatus.mockResolvedValue({ logged_in: false, user: null });
   fetchPublicSiteBootstrap.mockResolvedValue({
     site: { subdomain: "tenant-site", brand: "Route Test", logo_url: "" },
   });
-  fetchPublicSite.mockResolvedValue({
+  const runtimePayload = {
+    visitor: { logged_in: false, user: null },
     site: { subdomain: "tenant-site", site_id: "site-1", project_id: "project-1" },
     project: {
       site_id: "site-1",
@@ -109,13 +113,16 @@ const renderPublic = ({
         },
         theme: {},
         forms: [],
-        pages: [
+        pages: publishedPages || [
           { id: "home", name: "Home", slug: "/", sections: [] },
           { id: "team", name: "Team", slug: "/about/team", sections: teamSections },
         ],
       },
     },
-  });
+  };
+  if (runtimePromise) fetchPublicSiteRuntime.mockImplementation(() => runtimePromise);
+  else if (runtimeError) fetchPublicSiteRuntime.mockRejectedValue(runtimeError);
+  else fetchPublicSiteRuntime.mockResolvedValue(runtimePayload);
 
   return render(
     <MemoryRouter initialEntries={["/site/tenant-site/about/team"]}>
@@ -282,8 +289,48 @@ describe("TenantSiteRuntime explicit project preview", () => {
     });
 
     expect(document.querySelector(".built-site-header")?.style.backgroundColor).toBe("rgb(18, 52, 86)");
-    expect(recordPublicSiteVisit).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(recordPublicSiteVisit).toHaveBeenCalledTimes(1));
     expect(recordPublicSiteVisit).toHaveBeenCalledWith("tenant-site", "website");
+  });
+
+  it("uses one runtime request before public content without initial status or site fetch", async () => {
+    renderPublic();
+    await waitFor(() => expect(document.querySelector('[data-page-id="team"]')).toBeTruthy());
+    expect(fetchPublicSiteRuntime).toHaveBeenCalledTimes(1);
+    expect(fetchPublicSiteBootstrap).not.toHaveBeenCalled();
+    expect(getTenantVisitorStatus).not.toHaveBeenCalled();
+  });
+
+  it("keeps the published page hidden until the runtime response resolves", async () => {
+    let resolveRuntime;
+    const pending = new Promise((resolve) => { resolveRuntime = resolve; });
+    renderPublic({ runtimePromise: pending });
+    expect(document.querySelector('[data-page-id="team"]')).toBeNull();
+    expect(recordPublicSiteVisit).not.toHaveBeenCalled();
+    resolveRuntime({ visitor: { logged_in: false, user: null } });
+    await waitFor(() => expect(screen.getByText("Website temporarily unavailable")).toBeTruthy());
+    expect(document.querySelector('[data-page-id="team"]')).toBeNull();
+  });
+
+  it("keeps analytics off the failure path and distinguishes a missing site", async () => {
+    renderPublic({ runtimeError: Object.assign(new Error("missing"), { status: 404 }) });
+    await waitFor(() => expect(document.querySelector(".tenant-runtime-status-not-found")).toBeTruthy());
+    expect(recordPublicSiteVisit).not.toHaveBeenCalled();
+  });
+
+  it("shows an access prompt without flashing an entirely protected publication", async () => {
+    renderPublic({ publishedPages: [] });
+    await waitFor(() => expect(screen.getByText("Sign in required")).toBeTruthy());
+    expect(document.querySelector(".tenant-runtime-page")).toBeNull();
+    expect(getTenantVisitorStatus).not.toHaveBeenCalled();
+  });
+
+  it("keeps public content visible when visit analytics fails", async () => {
+    recordPublicSiteVisit.mockRejectedValueOnce(new Error("analytics unavailable"));
+    renderPublic();
+    await waitFor(() => expect(document.querySelector('[data-page-id="team"]')).toBeTruthy());
+    await waitFor(() => expect(recordPublicSiteVisit).toHaveBeenCalledTimes(1));
+    expect(document.querySelector('[data-page-id="team"]')).toBeTruthy();
   });
 
   it.each([
@@ -400,14 +447,15 @@ const RuntimeLocation = () => {
 
 const renderProtectedPublic = () => {
   getTenantVisitorStatus.mockResolvedValue({ logged_in: false, user: null });
-  fetchPublicSite.mockResolvedValue({
-      site: { subdomain: "tenant-site", site_id: "site-1", project_id: "project-1" },
-      project: {
-        site_id: "site-1",
-        site_identifier: "tenant-site",
-        project_id: "project-1",
-        published_version: 1,
-        publication_key: "site-1:tenant-site:project-1:1:hash",
+  fetchPublicSiteRuntime.mockResolvedValue({
+    visitor: { logged_in: false, user: null },
+    site: { subdomain: "tenant-site", site_id: "site-1", project_id: "project-1" },
+    project: {
+      site_id: "site-1",
+      site_identifier: "tenant-site",
+      project_id: "project-1",
+      published_version: 1,
+      publication_key: "site-1:tenant-site:project-1:1:hash",
       published_schema: {
         defaultPageId: "home",
         siteChrome: { brand: "Protected Route Test" },

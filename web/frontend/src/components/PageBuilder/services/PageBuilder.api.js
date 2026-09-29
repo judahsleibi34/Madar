@@ -830,6 +830,16 @@ export const fetchPublicSiteBootstrap = async (subdomain) => {
   return data || null;
 };
 
+// Initial hosted-site response: publication, filtered schema, and visitor state
+// are resolved together. The lightweight bootstrap remains available for polling.
+export const fetchPublicSiteRuntime = async (subdomain) => {
+  const response = await apiFetch(getApiUrl(`/public/sites/${subdomain}/runtime`), {
+    method: "GET",
+    cache: "no-store",
+  });
+  return (await parseJsonResponse(response)) || null;
+};
+
 export const fetchProtectedSitePage = async (subdomain, pageReference) => {
   const normalizedReference = String(pageReference || "").replace(/^\/+/, "");
   const response = await apiFetch(
