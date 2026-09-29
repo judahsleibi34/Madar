@@ -1,6 +1,6 @@
 # Automated database migration architecture
 
-Last implementation review: 2026-09-22
+Last implementation review: 2026-09-29
 
 ## 1. Purpose, authority, and scope
 
@@ -36,6 +36,14 @@ This design applies only to an explicitly opted-in, compatible, forward-only
 migration manifest. It does not make every migration automatic, does not merge
 release promotion and schema mutation into one rollback domain, and does not
 provide automatic downgrade SQL.
+
+The schema-112 to schema-113 bridge follows this ordering. Its candidate
+backend retains the full existing managed-asset authorization path only when
+PostgREST definitively reports that the new service-role RPC is absent. After
+migration 113 installs the RPC, common successful project-asset authorization
+uses one remote call; other RPC errors remain fail-closed. This compatibility
+path allows the candidate to be accepted at schema 112 before the guarded
+post-acceptance migration runs.
 
 Protected control-plane releases may be authorized through the root-owned
 one-command workflow described in

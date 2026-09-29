@@ -65,6 +65,7 @@ from services.observability_service import (
     record_request_timing,
     request_timings_snapshot,
     server_timing_value,
+    timed_operation,
 )
 from services.request_security import (
     CSRF_HEADER_NAME,
@@ -272,7 +273,8 @@ def madar_status():
     return {"message": "All working"}
 
 
-def _asset_visibility(*, tenant_id: int, storage_key: str, request: Request, response: Response) -> tuple[bool, bool]:
+def _legacy_asset_visibility(*, tenant_id: int, storage_key: str, request: Request, response: Response) -> tuple[bool, bool]:
+    """Secure bridge while schema 112 is live before migration 113 runs."""
     rows = getattr(
         service_supabase.table("builder_assets").select("id,status,metadata").eq("tenant_id", tenant_id).eq("storage_key", storage_key).limit(2).execute(),
         "data", None,
@@ -311,6 +313,58 @@ def _asset_visibility(*, tenant_id: int, storage_key: str, request: Request, res
         tenant_id=tenant_id, storage_key=storage_key, public_only=True,
         usage_hint=usage_hint, settings_row=settings[0] if settings else {},
         client=service_supabase,
+    ):
+        return True, False
+    try:
+        _, user = get_authenticated_user_row(request, response, allow_admin_account_access=False)
+        if int(user.get("tenant_id")) == tenant_id:
+            return True, True
+    except Exception:
+        pass
+    return False, False
+
+
+def _asset_visibility(*, tenant_id: int, storage_key: str, request: Request, response: Response) -> tuple[bool, bool]:
+    try:
+        result = service_supabase.rpc(
+            "get_managed_asset_visibility_context",
+            {"p_tenant_id": tenant_id, "p_storage_key": storage_key},
+        ).execute()
+    except Exception as error:
+        # The release controller deploys compatible code before its guarded
+        # schema migration. Only a definitively missing RPC uses the existing
+        # complete authorization path; network and database errors fail closed.
+        if getattr(error, "code", None) == "PGRST202":
+            return _legacy_asset_visibility(
+                tenant_id=tenant_id, storage_key=storage_key, request=request, response=response,
+            )
+        raise
+
+    rows = getattr(result, "data", None)
+    if not isinstance(rows, list) or len(rows) > 1:
+        raise ValueError("managed_asset_visibility_response_invalid")
+    if not rows:
+        return False, False
+    row = rows[0]
+    if not isinstance(row, dict) or row.get("asset_status") not in {"active", "unreferenced"}:
+        raise ValueError("managed_asset_visibility_response_invalid")
+    settings = row.get("settings")
+    metadata = row.get("metadata")
+    schema = row.get("published_schema")
+    if (settings is not None and not isinstance(settings, dict)
+            or metadata is not None and not isinstance(metadata, dict)
+            or schema is not None and not isinstance(schema, dict)):
+        raise ValueError("managed_asset_visibility_response_invalid")
+
+    if schema is not None:
+        public_schema = build_authorized_public_schema(schema)
+        if storage_key in extract_builder_asset_references(public_schema, tenant_id=tenant_id):
+            return True, False
+
+    usage_hint = metadata.get("usage") if metadata else None
+    if nonproject_asset_reference_count(
+        tenant_id=tenant_id, storage_key=storage_key, public_only=True,
+        usage_hint=usage_hint, settings_row=settings or {}, client=service_supabase,
     ):
         return True, False
     try:
@@ -377,9 +431,10 @@ def get_public_builder_asset(
     media_type = PUBLIC_UPLOAD_MEDIA_TYPES[Path(asset_path).suffix.lower()]
     storage_key = f"tenant_{tenant_id}/builder_assets/{safe_filename}"
     try:
-        visible, private_preview = _asset_visibility(
-            tenant_id=tenant_id, storage_key=storage_key, request=request, response=response,
-        )
+        with timed_operation("managed_asset_auth"):
+            visible, private_preview = _asset_visibility(
+                tenant_id=tenant_id, storage_key=storage_key, request=request, response=response,
+            )
     except Exception as error:
         logger.warning("builder.asset_visibility_lookup_failed", extra={"tenant_id": tenant_id, "error_type": type(error).__name__})
         raise _managed_asset_failure(503, "Asset visibility is temporarily unavailable") from error

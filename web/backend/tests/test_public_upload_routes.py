@@ -47,6 +47,34 @@ class AssetVisibilityStore:
     def table(self, name):
         return AssetVisibilityQuery(self, name)
 
+    def rpc(self, name, params):
+        self.queries.append(f"rpc:{name}")
+        if name != "get_managed_asset_visibility_context":
+            raise AssertionError(name)
+        tenant_id = params["p_tenant_id"]
+        key = params["p_storage_key"]
+        assets = [row for row in self.tables.get("builder_assets", [])
+                  if row.get("tenant_id") == tenant_id and row.get("storage_key") == key
+                  and row.get("status") in {"active", "unreferenced"}]
+        if not assets:
+            return SimpleNamespace(execute=lambda: SimpleNamespace(data=[]))
+        assert len(assets) == 1
+        asset = assets[0]
+        settings = next((row for row in self.tables.get("website_settings", [])
+                         if row.get("tenant_id") == tenant_id), None)
+        schema = None
+        bound_id = settings.get("published_project_id") if settings and (
+            settings.get("subdomain") or settings.get("standard_path_slug")) else None
+        if bound_id and any(row.get("asset_id") == asset.get("id") and row.get("project_id") == bound_id
+                            for row in self.tables.get("builder_asset_references", [])):
+            project = next((row for row in self.tables.get("builder_projects", [])
+                            if row.get("id") == bound_id and row.get("tenant_id") == tenant_id
+                            and row.get("status") == "published"), None)
+            schema = project.get("published_schema") if project else None
+        result = {"asset_status": asset["status"], "metadata": asset.get("metadata") or {},
+                  "settings": settings, "published_schema": schema}
+        return SimpleNamespace(execute=lambda: SimpleNamespace(data=[result]))
+
 
 class PublicUploadRouteTests(unittest.TestCase):
     def setUp(self):
@@ -364,7 +392,7 @@ class PublicUploadRouteTests(unittest.TestCase):
         self.assertEqual(draft_response.status_code, 404)
         self.assertEqual(draft_response.headers["cache-control"], "no-store")
 
-    def test_multiple_builder_references_use_one_tenant_scoped_project_lookup(self):
+    def test_common_project_path_uses_one_remote_authorization_call(self):
         key = f"tenant_1/builder_assets/{self.asset_path.name}"
         store = AssetVisibilityStore({
             "builder_assets": [{"id": "asset-1", "tenant_id": 1, "storage_key": key, "status": "active"}],
@@ -386,7 +414,7 @@ class PublicUploadRouteTests(unittest.TestCase):
         finally:
             self.visibility_patch.start()
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(store.queries, ["builder_assets", "website_settings", "builder_asset_references", "builder_projects"])
+        self.assertEqual(store.queries, ["rpc:get_managed_asset_visibility_context"])
 
     def test_published_site_chrome_requires_current_binding_and_status(self):
         key = f"tenant_1/builder_assets/{self.asset_path.name}"
@@ -529,6 +557,35 @@ class PublicUploadRouteTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.content, PNG_BYTES)
 
+    def test_public_catalog_asset_fallbacks_remain_available(self):
+        storage_key = f"tenant_1/builder_assets/{self.asset_path.name}"
+        url = f"/uploads/{storage_key}"
+        cases = {
+            "category": ("ecommerce_category", "ecommerce_categories", {"id": "category-1", "tenant_id": 1, "status": "active", "image_url": url}),
+            "brand": ("ecommerce_brand", "ecommerce_brands", {"id": "brand-1", "tenant_id": 1, "status": "active", "image_url": url}),
+            "product": ("ecommerce_product", "ecommerce_products", {"id": "product-1", "tenant_id": 1, "status": "active", "images": [url]}),
+            "variant": ("ecommerce_product_variant", "ecommerce_product_variants", {"tenant_id": 1, "product_id": "product-1", "active": True, "images": [url]}),
+        }
+        self.visibility_patch.stop()
+        try:
+            for label, (usage, table, record) in cases.items():
+                with self.subTest(label=label):
+                    tables = {
+                        "builder_assets": [{"id": "asset-1", "tenant_id": 1, "storage_key": storage_key,
+                                            "status": "active", "metadata": {"usage": usage}}],
+                        "website_settings": [{"tenant_id": 1, "subdomain": "olive"}],
+                        table: [record],
+                    }
+                    if label == "variant":
+                        tables["ecommerce_products"] = [{"id": "product-1", "tenant_id": 1, "status": "active"}]
+                    store = AssetVisibilityStore(tables)
+                    with patch.object(app_module, "service_supabase", store):
+                        response = self.client.get(url)
+                    self.assertEqual(response.status_code, 200)
+                    self.assertEqual(store.queries[0], "rpc:get_managed_asset_visibility_context")
+        finally:
+            self.visibility_patch.start()
+
     def test_foreign_settings_and_soft_deleted_registry_fail_closed(self):
         storage_key = "tenant_1/builder_assets/0123456789abcdef0123456789abcdef.png"
         settings = {"tenant_id": 2, "subdomain": "foreign", "logo_url": f"/uploads/{storage_key}"}
@@ -566,6 +623,72 @@ class PublicUploadRouteTests(unittest.TestCase):
             self.visibility_patch.start()
         self.assertEqual(response.status_code, 404)
         self.assertEqual(response.headers["cache-control"], "no-store")
+
+    def test_missing_registry_uses_one_remote_authorization_call(self):
+        key = f"tenant_1/builder_assets/{self.asset_path.name}"
+        store = AssetVisibilityStore({})
+        self.visibility_patch.stop()
+        try:
+            with patch.object(app_module, "service_supabase", store):
+                response = self.client.get(f"/uploads/{key}")
+        finally:
+            self.visibility_patch.start()
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(store.queries, ["rpc:get_managed_asset_visibility_context"])
+        self.assertEqual(response.headers["cache-control"], "no-store")
+        self.assertEqual(response.headers["cdn-cache-control"], "no-store")
+
+    def test_malformed_rpc_response_and_network_failure_fail_closed(self):
+        key = f"tenant_1/builder_assets/{self.asset_path.name}"
+
+        class InvalidClient:
+            def __init__(self, result=None, error=None):
+                self.result, self.error = result, error
+            def rpc(self, *_args, **_kwargs):
+                if self.error:
+                    raise self.error
+                return SimpleNamespace(execute=lambda: SimpleNamespace(data=self.result))
+
+        self.visibility_patch.stop()
+        try:
+            for invalid in (None, [{}], [{"asset_status": "soft_deleted"}], [{"asset_status": "active", "published_schema": []}]):
+                with self.subTest(invalid=invalid), patch.object(app_module, "service_supabase", InvalidClient(result=invalid)):
+                    response = self.client.get(f"/uploads/{key}")
+                    self.assertEqual(response.status_code, 503)
+                    self.assertEqual(response.headers["cache-control"], "no-store")
+                    self.assertEqual(response.headers["cdn-cache-control"], "no-store")
+            with patch.object(app_module, "service_supabase", InvalidClient(error=RuntimeError("network unavailable"))):
+                response = self.client.get(f"/uploads/{key}")
+                self.assertEqual(response.status_code, 503)
+        finally:
+            self.visibility_patch.start()
+
+    def test_schema_112_missing_rpc_uses_complete_legacy_authorization(self):
+        key = f"tenant_1/builder_assets/{self.asset_path.name}"
+        class MissingRpc(Exception):
+            code = "PGRST202"
+
+        class BridgeStore(AssetVisibilityStore):
+            def rpc(self, *_args, **_kwargs):
+                self.queries.append("rpc:missing")
+                raise MissingRpc()
+
+        store = BridgeStore({
+            "builder_assets": [{"id": "asset-1", "tenant_id": 1, "storage_key": key, "status": "active"}],
+            "website_settings": [{"tenant_id": 1, "subdomain": "olive", "published_project_id": "project-1"}],
+            "builder_asset_references": [{"asset_id": "asset-1", "project_id": "project-1"}],
+            "builder_projects": [{"id": "project-1", "tenant_id": 1, "status": "published",
+                                  "published_schema": {"siteChrome": {"logoUrl": f"/uploads/{key}"}}}],
+        })
+        self.visibility_patch.stop()
+        try:
+            with patch.object(app_module, "service_supabase", store):
+                response = self.client.get(f"/uploads/{key}")
+        finally:
+            self.visibility_patch.start()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(store.queries, ["rpc:missing", "builder_assets", "website_settings",
+                                         "builder_asset_references", "builder_projects"])
 
 
 if __name__ == "__main__":

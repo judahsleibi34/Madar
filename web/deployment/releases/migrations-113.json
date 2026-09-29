@@ -1,0 +1,13 @@
+{
+  "release_sha": "CURRENT",
+  "migrations": [
+    {
+      "number": 113,
+      "path": "web/database/migrations/113_consolidate_managed_asset_visibility.sql",
+      "sha256": "eca869ced3ebd98b43de58636913e873691a904c6675720424621271fd2e36dd",
+      "from_schema": 112,
+      "to_schema": 113,
+      "compatibility": "forward-compatible"
+    }
+  ]
+}
