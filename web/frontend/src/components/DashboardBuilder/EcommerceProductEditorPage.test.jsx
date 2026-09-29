@@ -3,7 +3,8 @@ import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import appI18n from "../../i18n";
-import { fetchEcommerceCatalog, saveEcommerceItem, saveEcommerceProductVariants } from "../../services/ecommerceApi";
+import { fetchEcommerceCatalog, saveEcommerceItem, saveEcommerceProductVariants, uploadEcommerceProductImage } from "../../services/ecommerceApi";
+import CommerceActionToast from "./CommerceActionToast";
 import { EcommerceProductEditor } from "./EcommerceProductEditorPage";
 
 vi.mock("../../services/ecommerceApi", () => ({
@@ -13,15 +14,16 @@ vi.mock("../../services/ecommerceApi", () => ({
   uploadEcommerceProductImage: vi.fn(),
 }));
 
-const catalog = (products = []) => ({
+const catalog = (products = [], categories = []) => ({
   commerce_currency: "ILS",
   products,
-  categories: [],
+  categories,
   tags: [],
 });
 
 const renderEditor = (props = {}) => render(
   <MemoryRouter>
+    <CommerceActionToast />
     <EcommerceProductEditor
       initialCatalog={catalog()}
       user={{ id: "user-1" }}
@@ -49,6 +51,8 @@ describe("EcommerceProductEditor variant inventory", () => {
     saveEcommerceItem.mockResolvedValue({ id: "product-1" });
     saveEcommerceProductVariants.mockReset();
     saveEcommerceProductVariants.mockResolvedValue({ product: { id: "product-1" } });
+    uploadEcommerceProductImage.mockReset();
+    uploadEcommerceProductImage.mockResolvedValue("/uploads/tenant_7/builder_assets/product.webp");
     fetchEcommerceCatalog.mockReset();
   });
 
@@ -64,6 +68,103 @@ describe("EcommerceProductEditor variant inventory", () => {
 
     await waitFor(() => expect(saveEcommerceItem).toHaveBeenCalledOnce());
     expect(saveEcommerceItem.mock.calls[0][2]).toMatchObject({ options: [], variants: [] });
+  });
+
+  it("saves every checked product category and keeps the first as the compatible primary category", async () => {
+    const categories = [
+      { id: "11111111-1111-4111-8111-111111111111", translations: { en: { name: "Women" } } },
+      { id: "22222222-2222-4222-8222-222222222222", translations: { en: { name: "Outerwear" } } },
+    ];
+    renderEditor({ initialCatalog: catalog([], categories) });
+    nameProduct("Coat");
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "Women" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Outerwear" }));
+    expect(screen.getByText("2 categories selected")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Save product" }));
+
+    await waitFor(() => expect(saveEcommerceItem).toHaveBeenCalledOnce());
+    expect(saveEcommerceItem.mock.calls[0][2]).toMatchObject({
+      category_id: categories[0].id,
+      category_ids: categories.map((category) => category.id),
+    });
+  });
+
+  it("keeps the embedded close control inside the unified header", () => {
+    const onClose = vi.fn();
+    renderEditor({ embedded: true, onClose });
+
+    const closeButton = screen.getByRole("button", { name: "Close" });
+    expect(closeButton.closest("header")?.classList.contains("ecommerce-product-editor-modal-header")).toBe(true);
+    fireEvent.click(closeButton);
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it("rejects numeric-only or formatted product names", async () => {
+    renderEditor();
+    nameProduct("12345");
+    fireEvent.click(screen.getByRole("button", { name: "Save product" }));
+    expect(await screen.findByText(/Names must contain at least one letter/)).toBeTruthy();
+    expect(saveEcommerceItem).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Dismiss notification" }));
+
+    nameProduct("<b>Chair</b>");
+    fireEvent.click(screen.getByRole("button", { name: "Save product" }));
+    expect(await screen.findByText(/Use plain text only/)).toBeTruthy();
+    expect(saveEcommerceItem).not.toHaveBeenCalled();
+  });
+
+  it("explains incomplete specification rows before saving", async () => {
+    renderEditor();
+    nameProduct("Chair");
+    fireEvent.click(screen.getByRole("button", { name: "Add specification" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save product" }));
+
+    expect(await screen.findByText("Enter an English name for every specification you added.")).toBeTruthy();
+    expect(saveEcommerceItem).not.toHaveBeenCalled();
+  });
+
+  it("shows a specific fallback when the API rejects product fields", async () => {
+    const error = new Error("internal validation detail");
+    error.status = 422;
+    saveEcommerceItem.mockRejectedValue(error);
+    renderEditor();
+    nameProduct("Chair");
+    fireEvent.click(screen.getByRole("button", { name: "Save product" }));
+
+    expect(await screen.findByText(/The server rejected one or more product fields/)).toBeTruthy();
+    expect(document.body.textContent).not.toContain("internal validation detail");
+    expect(document.querySelector(".ecommerce-editor-error")).toBeNull();
+  });
+
+  it("identifies the invalid product area from structured 422 errors", async () => {
+    const error = new Error("internal validation detail");
+    error.status = 422;
+    error.data = {
+      detail: [{ loc: ["body", "category_ids", 0], msg: "Input should be a valid UUID" }],
+    };
+    saveEcommerceItem.mockRejectedValue(error);
+    renderEditor();
+    nameProduct("Chair");
+    fireEvent.click(screen.getByRole("button", { name: "Save product" }));
+
+    expect(await screen.findByText(/selected categories are invalid or no longer available/i)).toBeTruthy();
+    expect(document.body.textContent).not.toContain("Input should be a valid UUID");
+  });
+
+  it("attempts a one MiB image and explains an unexpected server 413", async () => {
+    const error = new Error("Request body too large");
+    error.status = 413;
+    uploadEcommerceProductImage.mockRejectedValue(error);
+    renderEditor();
+    const image = new File([new Uint8Array(1024 * 1024)], "product.jpg", { type: "image/jpeg" });
+
+    fireEvent.change(screen.getByLabelText("Upload product media"), {
+      target: { files: [image] },
+    });
+
+    await waitFor(() => expect(uploadEcommerceProductImage).toHaveBeenCalledWith(image));
+    expect((await screen.findAllByText(/allowed limit is 25 MB per file/i)).length).toBeGreaterThan(0);
   });
 
   it("creates free-text variant cards and calculates stock from color quantities", async () => {
@@ -102,6 +203,28 @@ describe("EcommerceProductEditor variant inventory", () => {
     ]);
     expect(payload.variants.map((variant) => variant.inventory_quantity)).toEqual([4, 3, 3]);
     expect(payload.variants.every((variant) => variant.option_value_ids.length === 2)).toBe(true);
+  });
+
+  it("keeps inventory controls visible and applies them to generated variants", async () => {
+    renderEditor();
+    nameProduct();
+    addVariant({ name: "Large", color: "Black", hex: "#111111", quantity: "4" });
+
+    const trackInventory = screen.getByRole("checkbox", { name: "Track inventory" });
+    const allowBackorder = screen.getByRole("checkbox", { name: "Let customers order when sold out" });
+    const lowStockThreshold = screen.getByRole("spinbutton", { name: "Warn me when stock reaches" });
+    expect(screen.getAllByText("Starting stock").length).toBeGreaterThan(0);
+    expect(trackInventory.checked).toBe(true);
+    fireEvent.change(lowStockThreshold, { target: { value: "2" } });
+    fireEvent.click(trackInventory);
+    fireEvent.click(allowBackorder);
+    fireEvent.click(screen.getByRole("button", { name: "Save product" }));
+
+    await waitFor(() => expect(saveEcommerceItem).toHaveBeenCalledOnce());
+    const variants = saveEcommerceItem.mock.calls[0][2].variants;
+    expect(variants.every((variant) => variant.track_inventory === false)).toBe(true);
+    expect(variants.every((variant) => variant.allow_backorder === true)).toBe(true);
+    expect(variants.every((variant) => variant.low_stock_threshold === 2)).toBe(true);
   });
 
   it("never accepts a negative or fractional color quantity", () => {
@@ -158,16 +281,35 @@ describe("EcommerceProductEditor variant inventory", () => {
     fireEvent.click(screen.getByRole("button", { name: "Save product" }));
     expect(await screen.findByText("Enter a size for every row.")).toBeTruthy();
     expect(saveEcommerceItem).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Dismiss notification" }));
 
     fireEvent.change(variantName, { target: { value: "Kids" } });
     fireEvent.click(screen.getByRole("button", { name: "Save product" }));
     expect(await screen.findByText("Enter a name for every color.")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Dismiss notification" }));
 
     fireEvent.change(colorName, { target: { value: "Custom Blue" } });
     fireEvent.change(screen.getByLabelText("Hex value for Custom Blue"), { target: { value: "#12" } });
     fireEvent.click(screen.getByRole("button", { name: "Save product" }));
     expect(await screen.findByText("Choose or enter a valid six-digit hex value for every color.")).toBeTruthy();
     expect(saveEcommerceItem).not.toHaveBeenCalled();
+  });
+
+  it("allows a numeric color name and loads a black swatch by default", async () => {
+    renderEditor();
+    nameProduct();
+    fireEvent.click(screen.getByRole("button", { name: "Add size" }));
+    fireEvent.change(screen.getByLabelText("Size"), { target: { value: "Large" } });
+    fireEvent.change(screen.getByLabelText("Color name"), { target: { value: "42" } });
+
+    expect(screen.getByLabelText("Hex value for 42").value).toBe("#111111");
+    fireEvent.click(screen.getByRole("button", { name: "Save product" }));
+
+    await waitFor(() => expect(saveEcommerceItem).toHaveBeenCalledOnce());
+    expect(saveEcommerceItem.mock.calls[0][2].options[1].values[0]).toMatchObject({
+      value_translations: { en: "42" },
+      color_hex: "#111111",
+    });
   });
 
   it("rejects combined size ranges and keeps size-color pairings explicit", async () => {

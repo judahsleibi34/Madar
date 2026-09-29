@@ -56,7 +56,7 @@ const productSalePercentage = (product) => {
 function ProductSaleBadge({ product }) {
   const percentage = productSalePercentage(product);
   if (!percentage) return null;
-  return <span className="live-store-product-sale-badge">{c("product.salePercentage", { percentage })}</span>;
+  return <span className="live-store-product-sale-badge">{c("product.sale")}</span>;
 }
 
 const STORE_SOCIAL_NETWORKS = [
@@ -1020,6 +1020,7 @@ function ProductGallery({ product }) {
 function StoreProductDetail({ detail, locale, shopPath, onAdd }) {
   const { product, category, tags = [], attributes = [], options = [], variants = [] } = detail;
   const [selection, setSelection] = useState({});
+  const [quantity, setQuantity] = useState(1);
   const activeVariants = variants.filter((variant) => variant.active !== false);
   const selectedIds = Object.values(selection).filter(Boolean);
   const requiredComplete = options.filter((option) => option.required).every((option) => Boolean(selection[option.id]));
@@ -1059,9 +1060,19 @@ function StoreProductDetail({ detail, locale, shopPath, onAdd }) {
     : c("product.itemsAvailable", { count: resolvedQuantity });
   const visibleStockText = options.length ? (resolved ? resolvedStockText : null) : stockText;
   const visibleInStock = options.length ? Boolean(resolved?.in_stock) : product.in_stock;
+  const selectedInventory = options.length ? resolvedQuantity : simpleStock;
+  const quantityLimit = selectedInventory === null ? 99 : Math.max(1, Math.min(99, selectedInventory));
+  const selectedQuantity = Math.min(quantity, quantityLimit);
+  const updateQuantity = (value) => setQuantity(Math.max(1, Math.min(quantityLimit, Math.floor(Number(value) || 1))));
   return (
     <section className="live-store-detail">
-      <ProductGallery product={displayProduct} />
+      <div className="live-store-detail-visual">
+        <ProductGallery product={displayProduct} />
+        {(product.description || tags.length > 0) && <div className="live-store-detail-about">
+          {product.description && <p className="live-store-detail-description">{product.description}</p>}
+          {tags.length > 0 && <div className="live-store-detail-tags">{tags.map((item) => <span key={item.id}>{item.name}</span>)}</div>}
+        </div>}
+      </div>
       <div className="live-store-detail-copy">
         <Link className="live-store-back" to={shopPath}><ArrowLeft size={15} aria-hidden="true" />{c("product.back")}</Link>
         <h1>{product.name}</h1>
@@ -1072,7 +1083,7 @@ function StoreProductDetail({ detail, locale, shopPath, onAdd }) {
         {attributes.length > 0 && <section className="live-store-product-facts" aria-labelledby="product-specifications"><h2 id="product-specifications">{c("product.specifications")}</h2><dl className="live-store-attributes">{attributes.map((attribute) => <div key={attribute.id}><dt>{attribute.name}</dt><dd>{attribute.value}</dd></div>)}</dl></section>}
         <div className="live-store-detail-price">{formatPrice(displayProduct.price, product.currency, locale)}</div>
         {displayProduct.compare_at_price && <del className="live-store-detail-compare-price">{formatPrice(displayProduct.compare_at_price, product.currency, locale)}</del>}
-        {product.description && <p>{product.description}</p>}
+
         {options.length > 0 && <div className="live-store-variant-options">{options.map((option) => (
           <fieldset className="live-store-variant-option" key={option.id}>
             <legend>{option.name}{option.required ? " *" : ""}</legend>
@@ -1094,8 +1105,16 @@ function StoreProductDetail({ detail, locale, shopPath, onAdd }) {
           <strong>{visibleStockText}</strong>
         </div>}
         {resolved && <p className="live-store-variant-meta"><bdi>{c("common.sku")} {resolved.sku}</bdi></p>}
-        <button type="button" disabled={!canAdd} onClick={() => onAdd({ ...displayProduct, variant_id: resolved?.id, selected_options: selectedOptions })}><ShoppingBag size={18} />{canAdd ? c("product.addToCart") : resolved ? c("product.outOfStock") : options.length ? c("product.chooseOptions") : c("product.outOfStock")}</button>
-        {tags.length > 0 && <div className="live-store-detail-tags">{tags.map((item) => <span key={item.id}>{item.name}</span>)}</div>}
+        {canAdd && <div className="live-store-product-quantity">
+          <span>{c("common.quantity")}</span>
+          <div>
+            <button type="button" onClick={() => updateQuantity(selectedQuantity - 1)} disabled={selectedQuantity <= 1} aria-label={c("cart.decrease", { name: product.name })}><Minus size={15} aria-hidden="true" /></button>
+            <input type="number" min="1" max={quantityLimit} value={selectedQuantity} onChange={(event) => updateQuantity(event.target.value)} aria-label={c("common.quantity")} />
+            <button type="button" onClick={() => updateQuantity(selectedQuantity + 1)} disabled={selectedQuantity >= quantityLimit} aria-label={c("cart.increase", { name: product.name })}><Plus size={15} aria-hidden="true" /></button>
+          </div>
+        </div>}
+        <button type="button" disabled={!canAdd} onClick={() => onAdd({ ...displayProduct, variant_id: resolved?.id, selected_options: selectedOptions, quantity: selectedQuantity })}><ShoppingBag size={18} />{canAdd ? c("product.addToCart") : resolved ? c("product.outOfStock") : options.length ? c("product.chooseOptions") : c("product.outOfStock")}</button>
+
       </div>
     </section>
   );
@@ -1497,12 +1516,11 @@ export default function EcommerceStorefront({ subdomain: suppliedSubdomain = "",
     try { return sessionStorage.getItem(`madar-sale-${kind}:${saleStorageKey}`) === "dismissed"; }
     catch { return false; }
   };
-  const saleBarVisible = Boolean(salePercentage) && dismissedSaleBarKey !== saleStorageKey && !wasSaleDismissed("bar");
+  const saleBarVisible = Boolean(salePercentage) && dismissedSaleBarKey !== saleStorageKey;
   const salePopupVisible = Boolean(salePercentage) && dismissedSalePopupKey !== saleStorageKey && !wasSaleDismissed("popup");
 
   const dismissSaleBar = useCallback(() => {
     setDismissedSaleBarKey(saleStorageKey);
-    try { sessionStorage.setItem(`madar-sale-bar:${saleStorageKey}`, "dismissed"); } catch { /* Storage may be unavailable. */ }
   }, [saleStorageKey]);
 
   const dismissSalePopup = useCallback(() => {
@@ -1822,8 +1840,10 @@ export default function EcommerceStorefront({ subdomain: suppliedSubdomain = "",
   }, [cartItems, checkoutRoute, embeddedPreviewMode, notify, saveCart, subdomain]);
 
   const addToCart = (product) => {
-    const identity = cartLineKey(product); const existing = cartItems.find((item) => cartLineKey(item) === identity);
-    if (existing?.quantity >= 99) {
+    const identity = cartLineKey(product);
+    const existing = cartItems.find((item) => cartLineKey(item) === identity);
+    const requestedQuantity = Math.max(1, Math.min(99, Math.floor(Number(product.quantity) || 1)));
+    if ((existing?.quantity || 0) + requestedQuantity > 99) {
       notify({ type: "error", title: c("storeFeedback.quantityLimit"), message: c("storeFeedback.quantityLimitBody") });
       return;
     }
@@ -1831,14 +1851,14 @@ export default function EcommerceStorefront({ subdomain: suppliedSubdomain = "",
       id: product.id,
       slug: product.slug,
       name: product.name,
-      quantity: Math.min(99, (existing?.quantity || 0) + 1),
+      quantity: (existing?.quantity || 0) + requestedQuantity,
       price: product.price,
       currency: product.currency,
       variant_id: product.variant_id || null,
       selected_options: product.selected_options || [],
       images: product.images || [],
     };
-    trackCommerceEvent("add_to_cart", { product_id: product.id, variant_id: product.variant_id || null, quantity: 1, amount: Number(product.price || 0), currency: product.currency, locale, selected_options: (product.selected_options || []).map((item) => ({ option_code: item.option_code, value_code: item.value_code })) });
+    trackCommerceEvent("add_to_cart", { product_id: product.id, variant_id: product.variant_id || null, quantity: requestedQuantity, amount: Number(product.price || 0) * requestedQuantity, currency: product.currency, locale, selected_options: (product.selected_options || []).map((item) => ({ option_code: item.option_code, value_code: item.value_code })) });
     if (saveCart([...cartItems.filter((item) => cartLineKey(item) !== identity), nextItem])) notify({ type: "success", title: c("storeFeedback.added"), message: c("storeFeedback.addedBody", { name: product.name }) });
   };
 

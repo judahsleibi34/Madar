@@ -119,6 +119,13 @@ def _is_builder_path(path: str) -> bool:
     return path.startswith("/builder/") or USER_BUILDER_RE.match(path) is not None
 
 
+def _is_builder_asset_upload_path(path: str) -> bool:
+    return path in {
+        "/builder/assets/upload",
+        "/ecommerce/product-media/upload",
+    }
+
+
 def _is_upload_path(path: str) -> bool:
     return UPLOAD_ROUTE_RE.match(path) is not None
 
@@ -133,7 +140,7 @@ def select_request_body_limit(
     if method.upper() in SAFE_METHODS:
         return None
 
-    if path == "/builder/assets/upload" and _is_multipart_content_type(content_type):
+    if _is_builder_asset_upload_path(path) and _is_multipart_content_type(content_type):
         return config.max_builder_asset_request_body_bytes
 
     if _is_multipart_content_type(content_type) or _is_upload_path(path):

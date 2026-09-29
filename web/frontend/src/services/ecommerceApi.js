@@ -289,7 +289,7 @@ export const uploadEcommerceProductImage = async (file) => {
   });
   const data = await readApiResponse(response);
   if (!response.ok) {
-    throw new Error(readApiError(data, "Could not upload this product media"));
+    throw createApiError(response, data, "Could not upload this product media");
   }
   return data?.asset_url || data?.url || "";
 };

@@ -53,6 +53,8 @@ LEGACY_DEFAULT_STORE_THEME = {
     "muted": "#697181",
 }
 HEX_COLOR_PATTERN = re.compile(r"^#[0-9a-fA-F]{6}$")
+HTML_TAG_PATTERN = re.compile(r"<\s*/?\s*[a-z][^>]*>", re.IGNORECASE)
+CONTROL_CHARACTER_PATTERN = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
 COMBINED_SIZE_VALUE_PATTERN = re.compile(r"[/,+&]|\s+(?:or|او)\s+", re.IGNORECASE)
 SOCIAL_LINK_FIELDS = (
     "facebook", "instagram", "tiktok", "snapchat",
@@ -64,6 +66,23 @@ CATALOG_TABLES = (
     "ecommerce_products",
     "ecommerce_product_tags",
 )
+
+
+def _clean_plain_text(
+    value: Any,
+    field_name: str,
+    *,
+    require_letter: bool = False,
+    allow_empty: bool = True,
+) -> str:
+    text = CONTROL_CHARACTER_PATTERN.sub("", str(value or "")).strip()
+    if not text and not allow_empty:
+        raise ValueError(f"{field_name} is required")
+    if HTML_TAG_PATTERN.search(text):
+        raise ValueError(f"{field_name} must be plain text")
+    if text and require_letter and not any(character.isalpha() for character in text):
+        raise ValueError(f"{field_name} must include at least one letter")
+    return text
 
 
 def _clean_slug(value: str | None, translations: dict[str, dict[str, str]]) -> str:
@@ -92,8 +111,8 @@ def _validate_translations(value: Any) -> dict[str, dict[str, str]]:
             raise ValueError("Translation locale must look like en or en-US")
         if not isinstance(translation, dict):
             raise ValueError("Each translation must be an object")
-        name = str(translation.get("name") or "").strip()
-        description = str(translation.get("description") or "").strip()
+        name = _clean_plain_text(translation.get("name"), "Translation name", require_letter=True)
+        description = _clean_plain_text(translation.get("description"), "Translation description")
         if len(name) > 200 or len(description) > 10000:
             raise ValueError("Translation text is too long")
         if name:
@@ -145,7 +164,7 @@ class BrandPayload(BaseModel):
     @field_validator("name")
     @classmethod
     def clean_brand_name(cls, value: str) -> str:
-        return value.strip()
+        return _clean_plain_text(value, "Brand name", require_letter=True, allow_empty=False)
 
     @field_validator("image_url", mode="before")
     @classmethod
@@ -436,7 +455,13 @@ def _validate_localized_label(value: Any, field_name: str) -> dict[str, str]:
         raise ValueError(f"{field_name} must contain between 1 and 10 locales")
     cleaned = {}
     for locale, label in value.items():
-        locale_key, text = str(locale or "").strip(), str(label or "").strip()
+        locale_key = str(locale or "").strip()
+        text = _clean_plain_text(
+            label,
+            field_name,
+            require_letter=field_name == "name_translations",
+            allow_empty=False,
+        )
         if not LOCALE_PATTERN.fullmatch(locale_key) or not text or len(text) > 200:
             raise ValueError(f"{field_name} contains an invalid locale or value")
         cleaned[locale_key] = text
@@ -518,6 +543,13 @@ class ProductVariantPayload(BaseModel):
                 raise ValueError("Variant media must be secure uploaded media")
             cleaned.append(url)
         return list(dict.fromkeys(cleaned))
+
+    @field_validator("sku", "barcode", mode="before")
+    @classmethod
+    def clean_identifiers(cls, value: Any, info):
+        cleaned = _clean_plain_text(value, info.field_name)
+        return cleaned or None
+
     active: bool = True
     option_value_ids: list[UUID] = Field(..., min_length=1, max_length=5)
 
@@ -537,6 +569,7 @@ class ProductPayload(CatalogItemPayload):
     sku: str | None = Field(default=None, max_length=120)
     barcode: str | None = Field(default=None, max_length=120)
     category_id: UUID | None = None
+    category_ids: list[UUID] = Field(default_factory=list, max_length=20)
     brand_id: UUID | None = None
     tag_ids: list[UUID] = Field(default_factory=list, max_length=100)
     product_type: Literal["physical", "digital", "service"] = "physical"
@@ -563,7 +596,21 @@ class ProductPayload(CatalogItemPayload):
     @field_validator("sku", mode="before")
     @classmethod
     def clean_sku(cls, value: Any) -> str | None:
-        return str(value or "").strip() or None
+        return _clean_plain_text(value, "sku") or None
+
+    @field_validator("barcode", mode="before")
+    @classmethod
+    def clean_barcode(cls, value: Any) -> str | None:
+        return _clean_plain_text(value, "barcode") or None
+
+    @field_validator("brand", "seo_title", "seo_description", mode="before")
+    @classmethod
+    def clean_product_text(cls, value: Any, info) -> str:
+        return _clean_plain_text(
+            value,
+            info.field_name,
+            require_letter=info.field_name == "brand",
+        )
 
     @field_validator("currency")
     @classmethod
@@ -654,6 +701,55 @@ def _handle_catalog_error(error: Exception) -> None:
     raise error
 
 
+def _catalog_schema_version() -> int | None:
+    rows = _rows(
+        service_supabase.table("application_schema_state")
+        .select("schema_version")
+        .eq("contract_key", "core")
+        .limit(1)
+    )
+    if not rows:
+        return None
+    try:
+        return int(rows[0].get("schema_version"))
+    except (TypeError, ValueError):
+        return None
+
+
+def _handle_product_delete_error(error: Exception) -> None:
+    if isinstance(error, HTTPException):
+        raise error
+    raw = str(error).lower()
+    if "23503" in raw or "foreign key" in raw:
+        try:
+            schema_version = _catalog_schema_version()
+        except Exception:
+            schema_version = None
+        if schema_version is not None and schema_version < 112:
+            raise HTTPException(
+                status_code=503,
+                detail={
+                    "code": "product_delete_migration_required",
+                    "message": (
+                        "Product deletion is unavailable until catalog "
+                        "migration 112 is installed."
+                    ),
+                    "context": {
+                        "current_schema": schema_version,
+                        "required_schema": 112,
+                    },
+                },
+            ) from error
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "This product has order, inventory, or loyalty history and "
+                "cannot be deleted. Archive it instead."
+            ),
+        ) from error
+    _handle_catalog_error(error)
+
+
 
 def _require_ecommerce_access(request: Request, response: Response):
     """Resolve ecommerce access only from the authenticated tenant membership."""
@@ -691,11 +787,14 @@ def _validate_category_parent(context, parent_id: UUID | None, category_id: UUID
     return parent_value
 
 
-def _validate_product_links(context, category_id: UUID | None, brand_id: UUID | None, tag_ids: list[UUID]) -> tuple[str | None, str | None, str, list[str]]:
-    category_value = None
-    if category_id is not None:
-        category_value = str(category_id)
+def _validate_product_links(context, category_id: UUID | None, category_ids: list[UUID], brand_id: UUID | None, tag_ids: list[UUID]) -> tuple[str | None, list[str], str | None, str, list[str]]:
+    unique_categories = list(dict.fromkeys(str(item) for item in category_ids))
+    legacy_category = str(category_id) if category_id is not None else None
+    if legacy_category and legacy_category not in unique_categories:
+        unique_categories.insert(0, legacy_category)
+    for category_value in unique_categories:
         _tenant_row("ecommerce_categories", category_value, context.tenant_id)
+    category_value = unique_categories[0] if unique_categories else None
     unique_tags = list(dict.fromkeys(str(item) for item in tag_ids))
     for tag_id in unique_tags:
         _tenant_row("ecommerce_tags", tag_id, context.tenant_id)
@@ -708,7 +807,7 @@ def _validate_product_links(context, category_id: UUID | None, brand_id: UUID | 
         except Exception as error:
             _handle_catalog_error(error)
         brand_name = str(brand.get("name") or "").strip()
-    return category_value, brand_value, brand_name, unique_tags
+    return category_value, unique_categories, brand_value, brand_name, unique_tags
 
 
 def _managed_catalog_asset_keys(images: list[str], tenant_id: int) -> set[str]:
@@ -747,11 +846,17 @@ def _generate_sku(slug: str) -> str:
     return f"{readable_prefix}-{uuid4().hex[:8].upper()}"
 
 
-def _product_data(payload: ProductPayload, context) -> tuple[dict[str, Any], list[str]]:
-    category_id, brand_id, brand_name, tag_ids = _validate_product_links(context, payload.category_id, payload.brand_id, payload.tag_ids)
+def _product_data(payload: ProductPayload, context) -> tuple[dict[str, Any], list[str], list[str]]:
+    category_id, category_ids, brand_id, brand_name, tag_ids = _validate_product_links(
+        context,
+        payload.category_id,
+        payload.category_ids,
+        payload.brand_id,
+        payload.tag_ids,
+    )
     slug = _clean_slug(payload.slug, payload.translations)
     _managed_catalog_asset_keys(payload.images, context.tenant_id)
-    data = payload.model_dump(mode="json", exclude={"tag_ids", "attributes", "options", "variants"})
+    data = payload.model_dump(mode="json", exclude={"category_ids", "tag_ids", "attributes", "options", "variants"})
     data.update(
         tenant_id=context.tenant_id,
         category_id=category_id,
@@ -764,7 +869,7 @@ def _product_data(payload: ProductPayload, context) -> tuple[dict[str, Any], lis
     store_currency = _store_currency_for_tenant(context.tenant_id)
     if store_currency:
         data["currency"] = store_currency
-    return data, tag_ids
+    return data, category_ids, tag_ids
 
 
 def _attach_product_tags(products: list[dict[str, Any]], tenant_id: int) -> list[dict[str, Any]]:
@@ -778,6 +883,28 @@ def _attach_product_tags(products: list[dict[str, Any]], tenant_id: int) -> list
         by_product.setdefault(str(link.get("product_id")), []).append(str(link.get("tag_id")))
     for product in products:
         product["tag_ids"] = by_product.get(str(product.get("id")), [])
+    return products
+
+
+def _attach_product_categories(products: list[dict[str, Any]], tenant_id: int) -> list[dict[str, Any]]:
+    try:
+        links = _rows(
+            service_supabase.table("ecommerce_product_categories")
+            .select("product_id,category_id,sort_order")
+            .eq("tenant_id", tenant_id)
+            .order("sort_order")
+        )
+    except Exception as error:
+        raw = str(error).lower()
+        if not ("pgrst205" in raw or "could not find the table" in raw or "schema cache" in raw):
+            raise
+        links = []
+    by_product: dict[str, list[str]] = {}
+    for link in links:
+        by_product.setdefault(str(link.get("product_id")), []).append(str(link.get("category_id")))
+    for product in products:
+        primary = str(product.get("category_id") or "")
+        product["category_ids"] = by_product.get(str(product.get("id")), []) or ([primary] if primary else [])
     return products
 
 def _product_aggregate_payload(payload: ProductPayload) -> dict[str, Any]:
@@ -887,7 +1014,7 @@ def _catalog_for_tenant(tenant_id: int) -> dict[str, list[dict[str, Any]]]:
             raise
         brands = []
     products = _rows(service_supabase.table("ecommerce_products").select("*").eq("tenant_id", tenant_id).order("created_at", desc=True))
-    products = _attach_product_aggregates(_attach_product_tags(products, tenant_id), tenant_id)
+    products = _attach_product_aggregates(_attach_product_categories(_attach_product_tags(products, tenant_id), tenant_id), tenant_id)
     return {
         "tags": tags,
         "categories": categories,
@@ -950,7 +1077,7 @@ def _catalog_products_for_tenant(tenant_id: int) -> dict[str, Any]:
         .eq("tenant_id", tenant_id)
         .order("created_at", desc=True)
     )
-    products = _attach_product_aggregates(_attach_product_tags(products, tenant_id), tenant_id)
+    products = _attach_product_aggregates(_attach_product_categories(_attach_product_tags(products, tenant_id), tenant_id), tenant_id)
     return {
         "products": products,
         "stock_summary": {
@@ -1866,11 +1993,53 @@ def _replace_product_tags(context, product_id: str, tag_ids: list[str]) -> None:
         ]).execute()
 
 
+def _replace_product_categories(context, product_id: str, category_ids: list[str]) -> None:
+    try:
+        service_supabase.table("ecommerce_product_categories").delete().eq("product_id", product_id).eq("tenant_id", context.tenant_id).execute()
+        if category_ids:
+            service_supabase.table("ecommerce_product_categories").insert([
+                {
+                    "tenant_id": context.tenant_id,
+                    "product_id": product_id,
+                    "category_id": category_id,
+                    "sort_order": index,
+                }
+                for index, category_id in enumerate(category_ids)
+            ]).execute()
+    except Exception as error:
+        raw = str(error).lower()
+        missing_table = "pgrst205" in raw or "could not find the table" in raw or "schema cache" in raw
+        if missing_table and len(category_ids) <= 1:
+            return
+        if missing_table:
+            raise HTTPException(status_code=503, detail="Multiple product categories are unavailable until catalog migration 111 completes") from error
+        raise
+
+
+def _require_multi_category_storage(context, category_ids: list[str]) -> None:
+    if len(category_ids) <= 1:
+        return
+    try:
+        _rows(
+            service_supabase.table("ecommerce_product_categories")
+            .select("product_id")
+            .eq("tenant_id", context.tenant_id)
+            .limit(1)
+        )
+    except Exception as error:
+        raw = str(error).lower()
+        missing_table = "pgrst205" in raw or "could not find the table" in raw or "schema cache" in raw
+        if missing_table:
+            raise HTTPException(status_code=503, detail="Multiple product categories are unavailable until catalog migration 111 completes") from error
+        raise
+
+
 @router.post("/products", status_code=201)
 def create_product(payload: ProductPayload, request: Request, response: Response):
     context = _require_ecommerce_access(request, response)
     _require_role(context)
-    data, tag_ids = _product_data(payload, context)
+    data, category_ids, tag_ids = _product_data(payload, context)
+    _require_multi_category_storage(context, category_ids)
     data["created_by"] = context.user_id
     desired_status = data["status"]
     if payload.options:
@@ -1888,7 +2057,9 @@ def create_product(payload: ProductPayload, request: Request, response: Response
             legacy_data = {key: value for key, value in data.items() if key != "brand_id"}
             rows = _rows(service_supabase.table("ecommerce_products").insert(legacy_data))
         product = rows[0]
+        _replace_product_categories(context, str(product["id"]), category_ids)
         _replace_product_tags(context, str(product["id"]), tag_ids)
+        product["category_ids"] = category_ids
         product["tag_ids"] = tag_ids
         _sync_catalog_image_assets(
             tenant_id=context.tenant_id,
@@ -1899,6 +2070,7 @@ def create_product(payload: ProductPayload, request: Request, response: Response
         _save_product_aggregate(context.tenant_id, str(product["id"]), payload)
         if payload.options and desired_status != "draft":
             product = _rows(service_supabase.table("ecommerce_products").update({"status": desired_status}).eq("id", str(product["id"])).eq("tenant_id", context.tenant_id))[0]
+            product["category_ids"] = category_ids
             product["tag_ids"] = tag_ids
         invalidate_ecommerce_cache(context.tenant_id)
         return {"product": product}
@@ -1911,7 +2083,8 @@ def update_product(product_id: UUID, payload: ProductPayload, request: Request, 
     context = _require_ecommerce_access(request, response)
     _require_role(context)
     existing_product = _tenant_row("ecommerce_products", product_id, context.tenant_id)
-    data, tag_ids = _product_data(payload, context)
+    data, category_ids, tag_ids = _product_data(payload, context)
+    _require_multi_category_storage(context, category_ids)
     data.pop("tenant_id", None)
     desired_status = data["status"]
     if payload.options:
@@ -1929,7 +2102,9 @@ def update_product(product_id: UUID, payload: ProductPayload, request: Request, 
             legacy_data = {key: value for key, value in data.items() if key != "brand_id"}
             rows = _rows(service_supabase.table("ecommerce_products").update(legacy_data).eq("id", str(product_id)).eq("tenant_id", context.tenant_id))
         product = rows[0]
+        _replace_product_categories(context, str(product_id), category_ids)
         _replace_product_tags(context, str(product_id), tag_ids)
+        product["category_ids"] = category_ids
         product["tag_ids"] = tag_ids
         _sync_catalog_image_assets(
             tenant_id=context.tenant_id,
@@ -1940,6 +2115,7 @@ def update_product(product_id: UUID, payload: ProductPayload, request: Request, 
         _save_product_aggregate(context.tenant_id, str(product_id), payload)
         if payload.options and desired_status != "draft":
             product = _rows(service_supabase.table("ecommerce_products").update({"status": desired_status}).eq("id", str(product_id)).eq("tenant_id", context.tenant_id))[0]
+            product["category_ids"] = category_ids
             product["tag_ids"] = tag_ids
         invalidate_ecommerce_cache(context.tenant_id)
         return {"product": product}
@@ -1979,15 +2155,18 @@ def delete_product(product_id: UUID, request: Request, response: Response):
     context = _require_ecommerce_access(request, response)
     _require_role(context)
     existing_product = _tenant_row("ecommerce_products", product_id, context.tenant_id)
-    service_supabase.table("ecommerce_products").delete().eq("id", str(product_id)).eq("tenant_id", context.tenant_id).execute()
-    _sync_catalog_image_assets(
-        tenant_id=context.tenant_id,
-        previous_images=existing_product.get("images") or [],
-        current_images=[],
-        usage="ecommerce_product",
-    )
-    invalidate_ecommerce_cache(context.tenant_id)
-    return Response(status_code=204)
+    try:
+        service_supabase.table("ecommerce_products").delete().eq("id", str(product_id)).eq("tenant_id", context.tenant_id).execute()
+        _sync_catalog_image_assets(
+            tenant_id=context.tenant_id,
+            previous_images=existing_product.get("images") or [],
+            current_images=[],
+            usage="ecommerce_product",
+        )
+        invalidate_ecommerce_cache(context.tenant_id)
+        return Response(status_code=204)
+    except Exception as error:
+        _handle_product_delete_error(error)
 
 
 def _inventory_state(item: dict[str, Any]) -> str:

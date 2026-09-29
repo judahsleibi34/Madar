@@ -1,9 +1,10 @@
 import unittest
+from pathlib import Path
 from fastapi import HTTPException
 from pydantic import ValidationError
 from unittest.mock import patch
 
-from routes.ecommerce_routes import BrandPayload, CategoryPayload, CatalogItemPayload, ProductPayload, StoreSocialLinksPayload, StoreThemePayload, _clean_slug, _managed_catalog_asset_keys, _product_data
+from routes.ecommerce_routes import BrandPayload, CategoryPayload, CatalogItemPayload, ProductPayload, StoreSocialLinksPayload, StoreThemePayload, _clean_slug, _handle_product_delete_error, _managed_catalog_asset_keys, _product_data, _require_multi_category_storage
 from routes.public_site_routes import (
     _filter_catalog_taxonomy,
     _localized_catalog_text,
@@ -23,6 +24,61 @@ def translations(name="Product"):
 
 
 class EcommerceRoutesTests(unittest.TestCase):
+
+    def test_product_delete_migration_is_mirrored_and_keeps_history_protection(self):
+        web_root = Path(__file__).resolve().parents[2]
+        database = web_root / "database/migrations/112_allow_unreferenced_product_deletion.sql"
+        mirror = web_root / "supabase/migrations/112_allow_unreferenced_product_deletion.sql"
+        sql = database.read_text(encoding="utf-8")
+
+        self.assertEqual(database.read_bytes(), mirror.read_bytes())
+        self.assertIn("ecommerce_product_variants_product_fk", sql)
+        self.assertIn("on delete cascade", sql.lower())
+        self.assertIn("if v_schema_version <> 111 then", sql)
+        self.assertIn("set schema_version = 112", sql)
+        self.assertNotIn("ecommerce_order_items", sql)
+        self.assertNotIn("ecommerce_inventory_movements", sql)
+        self.assertNotIn("ecommerce_loyalty", sql)
+
+    def test_product_delete_foreign_key_conflict_explains_archive_fallback(self):
+        with (
+            patch("routes.ecommerce_routes._catalog_schema_version", return_value=112),
+            self.assertRaises(HTTPException) as caught,
+        ):
+            _handle_product_delete_error(Exception("23503 foreign key violation"))
+
+        self.assertEqual(caught.exception.status_code, 409)
+        self.assertIn("Archive it instead", caught.exception.detail)
+
+    def test_product_delete_reports_an_unapplied_schema_migration_separately(self):
+        with (
+            patch("routes.ecommerce_routes._catalog_schema_version", return_value=110),
+            self.assertRaises(HTTPException) as caught,
+        ):
+            _handle_product_delete_error(Exception("23503 foreign key violation"))
+
+        self.assertEqual(caught.exception.status_code, 503)
+        self.assertEqual(
+            caught.exception.detail["code"],
+            "product_delete_migration_required",
+        )
+        self.assertEqual(
+            caught.exception.detail["context"],
+            {"current_schema": 110, "required_schema": 112},
+        )
+
+    def test_product_categories_migration_is_mirrored_and_forward_only(self):
+        web_root = Path(__file__).resolve().parents[2]
+        database = web_root / "database/migrations/111_add_ecommerce_product_categories.sql"
+        mirror = web_root / "supabase/migrations/111_add_ecommerce_product_categories.sql"
+        sql = database.read_text(encoding="utf-8")
+
+        self.assertEqual(database.read_bytes(), mirror.read_bytes())
+        self.assertIn("create table public.ecommerce_product_categories", sql)
+        self.assertIn("from public.ecommerce_products product", sql)
+        self.assertIn("if v_schema_version <> 110 then", sql)
+        self.assertIn("set schema_version = 111", sql)
+        self.assertNotIn("drop table", sql.lower())
 
     def test_public_store_profile_uses_ecommerce_settings_only(self):
         profile = build_public_store_profile(
@@ -130,6 +186,17 @@ class EcommerceRoutesTests(unittest.TestCase):
         })
         with self.assertRaises(HTTPException):
             _managed_catalog_asset_keys([image_url], 8)
+
+    def test_catalog_names_require_letters_and_plain_text(self):
+        with self.assertRaisesRegex(ValidationError, "at least one letter"):
+            BrandPayload(name="12345")
+        with self.assertRaisesRegex(ValidationError, "plain text"):
+            BrandPayload(name="<b>Nike</b>")
+        with self.assertRaisesRegex(ValidationError, "at least one letter"):
+            CatalogItemPayload(translations={"en": {"name": "12345", "description": ""}})
+        with self.assertRaisesRegex(ValidationError, "plain text"):
+            CatalogItemPayload(translations={"en": {"name": "Chair", "description": "<p>Unsafe</p>"}})
+
     def test_product_sku_is_generated_when_left_empty(self):
         payload = ProductPayload(
             sku="",
@@ -138,7 +205,7 @@ class EcommerceRoutesTests(unittest.TestCase):
         )
 
         with patch("routes.ecommerce_routes._store_currency_for_tenant", return_value=None):
-            data, _tag_ids = _product_data(payload, type("Context", (), {"tenant_id": 7})())
+            data, _category_ids, _tag_ids = _product_data(payload, type("Context", (), {"tenant_id": 7})())
 
         self.assertRegex(data["sku"], r"^SUMMER-SHIRT-[A-F0-9]{8}$")
 
@@ -202,7 +269,7 @@ class EcommerceRoutesTests(unittest.TestCase):
         payload = ProductPayload(translations=translations(), images=media)
 
         with patch("routes.ecommerce_routes._store_currency_for_tenant", return_value=None):
-            data, _tag_ids = _product_data(payload, type("Context", (), {"tenant_id": 7})())
+            data, _category_ids, _tag_ids = _product_data(payload, type("Context", (), {"tenant_id": 7})())
 
         self.assertEqual(data["images"], media)
 
@@ -221,6 +288,38 @@ class EcommerceRoutesTests(unittest.TestCase):
 
         with self.assertRaises(HTTPException):
             _product_data(payload, type("Context", (), {"tenant_id": 7})())
+
+    def test_product_accepts_multiple_categories_and_preserves_the_first_as_primary(self):
+        first = "11111111-1111-4111-8111-111111111111"
+        second = "22222222-2222-4222-8222-222222222222"
+        payload = ProductPayload(
+            translations=translations(),
+            category_ids=[first, second],
+        )
+
+        with (
+            patch("routes.ecommerce_routes._tenant_row", side_effect=lambda table, item_id, tenant_id: {"id": str(item_id)}),
+            patch("routes.ecommerce_routes._store_currency_for_tenant", return_value=None),
+        ):
+            data, category_ids, _tag_ids = _product_data(
+                payload,
+                type("Context", (), {"tenant_id": 7})(),
+            )
+
+        self.assertEqual(category_ids, [first, second])
+        self.assertEqual(data["category_id"], first)
+        self.assertNotIn("category_ids", data)
+
+    def test_multi_category_storage_is_checked_before_product_writes_on_legacy_schema(self):
+        context = type("Context", (), {"tenant_id": 7})()
+        with patch("routes.ecommerce_routes.service_supabase") as service:
+            service.table.return_value.select.return_value.eq.return_value.limit.return_value.execute.side_effect = Exception(
+                "PGRST205 could not find the table"
+            )
+            with self.assertRaises(HTTPException) as caught:
+                _require_multi_category_storage(context, ["category-1", "category-2"])
+
+        self.assertEqual(caught.exception.status_code, 503)
 
 
     def test_product_rejects_non_http_image_urls(self):
@@ -279,7 +378,7 @@ class EcommerceRoutesTests(unittest.TestCase):
             {"id": "other", "slug": "lighting", "parent_id": None},
         ]
         products = [
-            {"id": "one", "category_id": "child", "tag_ids": []},
+            {"id": "one", "category_id": "other", "category_ids": ["other", "child"], "tag_ids": []},
             {"id": "two", "category_id": "other", "tag_ids": []},
         ]
         filtered = _filter_catalog_taxonomy(

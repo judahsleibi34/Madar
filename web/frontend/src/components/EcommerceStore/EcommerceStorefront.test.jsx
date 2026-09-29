@@ -577,13 +577,14 @@ describe("EcommerceStorefront", () => {
         price: "20.00",
         currency: "ILS",
         in_stock: true,
+        description: "Built for everyday use.",
         images: [
           "/uploads/tenant_7/builder_assets/0123456789abcdef0123456789abcdef.webp",
           "/uploads/tenant_7/builder_assets/fedcba9876543210fedcba9876543210.webp",
         ],
       },
       category: null,
-      tags: [],
+      tags: [{ id: "tag-1", name: "Responsibly made" }],
     });
 
     render(
@@ -597,6 +598,11 @@ describe("EcommerceStorefront", () => {
     expect(await screen.findByAltText("Chair 1")).toBeTruthy();
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
     expect(screen.getByRole("heading", { level: 1, name: "Chair" })).toBeTruthy();
+    const detailVisual = document.querySelector(".live-store-detail-visual");
+    expect(detailVisual?.querySelector(":scope > .live-store-detail-gallery")).toBeTruthy();
+    expect(detailVisual?.querySelector(":scope > .live-store-detail-about .live-store-detail-description")?.textContent).toBe("Built for everyday use.");
+    expect(detailVisual?.querySelector(":scope > .live-store-detail-about .live-store-detail-tags")?.textContent).toContain("Responsibly made");
+    expect(document.querySelector(".live-store-detail-copy .live-store-detail-description")).toBeNull();
     const zoomButton = screen.getByRole("button", { name: "Open enlarged product image" });
     fireEvent.mouseEnter(zoomButton);
     expect(zoomButton.classList.contains("is-hovered")).toBe(true);
@@ -608,6 +614,49 @@ describe("EcommerceStorefront", () => {
     expect(await screen.findByAltText("Chair 2")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Open enlarged product image" }).classList.contains("is-hovered")).toBe(false);
   });
+  it("adds several units of one selected variant as one cart line", async () => {
+    fetchPublicEcommerceProduct.mockResolvedValue({
+      site: { brand: "Test Store" },
+      product: { id: "product-1", name: "Chair", slug: "chair", price: "20.00", currency: "ILS", in_stock: true, images: [] },
+      category: null,
+      tags: [],
+      attributes: [],
+      options: [{
+        id: "color",
+        code: "color",
+        name: "Color",
+        required: true,
+        display_type: "color",
+        values: [
+          { id: "black", code: "black", value: "Black", color_hex: "#000000" },
+          { id: "sand", code: "sand", value: "Sand", color_hex: "#d8c7a5" },
+        ],
+      }],
+      variants: [
+        { id: "variant-black", sku: "CHAIR-BLACK", price: "20.00", in_stock: true, active: true, track_inventory: true, inventory_quantity: 4, allow_backorder: false, option_value_ids: ["black"], images: [] },
+        { id: "variant-sand", sku: "CHAIR-SAND", price: "20.00", in_stock: true, active: true, track_inventory: true, inventory_quantity: 18, allow_backorder: false, option_value_ids: ["sand"], images: [] },
+      ],
+    });
+
+    render(
+      <MemoryRouter initialEntries={["/shop/product/chair"]}>
+        <Routes><Route path="/shop/*" element={<EcommerceStorefront subdomain="demo" />} /></Routes>
+      </MemoryRouter>
+    );
+
+    fireEvent.click(await screen.findByRole("radio", { name: "Sand" }));
+    expect(screen.getByText("18 items available")).toBeTruthy();
+    const quantity = screen.getByRole("spinbutton", { name: "Quantity" });
+    fireEvent.change(quantity, { target: { value: "10" } });
+    expect(quantity.value).toBe("10");
+    fireEvent.click(screen.getByRole("button", { name: "Add to cart" }));
+
+    const saved = JSON.parse(localStorage.getItem("madar-store-cart:demo"));
+    expect(saved).toHaveLength(1);
+    expect(saved[0]).toMatchObject({ variant_id: "variant-sand", quantity: 10 });
+    expect(saved[0].selected_options[0].value).toBe("Sand");
+  });
+
   it("renders a fixed landing layout with dynamic published store content", async () => {
     fetchPublicEcommerceCatalog.mockResolvedValue({
       site: {
@@ -973,6 +1022,8 @@ describe("EcommerceStorefront", () => {
       },
     });
 
+    sessionStorage.setItem("madar-sale-bar:demo:20", "dismissed");
+
     render(<MemoryRouter initialEntries={["/shop"]}><Routes><Route path="/shop/*" element={<EcommerceStorefront subdomain="demo" />} /></Routes></MemoryRouter>);
 
     const announcement = await screen.findByText("Free local delivery this week");
@@ -980,7 +1031,7 @@ describe("EcommerceStorefront", () => {
     expect(screen.getAllByText("Featured Soap").length).toBeGreaterThan(0);
     expect(screen.queryByText("Latest")).toBeNull();
     expect(screen.getAllByText("$12.00").length).toBeGreaterThan(0);
-    expect(document.querySelector(".live-store-product-sale-badge")?.textContent).toBe("Sale -20%");
+    expect(document.querySelector(".live-store-product-sale-badge")?.textContent).toBe("Sale");
     expect(await screen.findByRole("dialog", { name: "Sale: up to 20% off" })).toBeTruthy();
     expect(screen.getByText("Sale now — up to 20% off selected items")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Dismiss sale popup" }));

@@ -12,8 +12,15 @@ it("keeps settings editable and loads the catalog when loyalty storage is unavai
   render(<EcommerceLoyaltyPage />);
   await screen.findByLabelText("Currency");
   expect(screen.queryByRole("checkbox", {name:"Enable loyalty rewards"})).toBeNull();
+  const earningRate = screen.getByLabelText("Earning rate (%)");
+  fireEvent.change(earningRate, {target:{value:"25"}});
   fireEvent.change(screen.getByLabelText("Points needed for a reward"), {target:{value:"200"}});
+  expect(earningRate.value).toBe("25");
   expect(screen.getByLabelText("Points needed for a reward").value).toBe("200");
+  const mapping = within(screen.getByRole("region", {name:"How points are mapped"}));
+  expect(mapping.getByText("100 USD paid")).toBeTruthy();
+  expect(mapping.getByText("25 points earned")).toBeTruthy();
+  expect(mapping.getByText("200 points unlock one reward")).toBeTruthy();
   expect(screen.getByRole("button", {name:"Save"}).disabled).toBe(true);
   expect(screen.queryByRole("button", {name:"Try again"})).toBeNull();
   expect(screen.getByLabelText("Currency").value).toBe("USD");
@@ -29,6 +36,8 @@ it("saves multiple products and separate normal and loyalty validity conditions"
   saveEcommerceLoyalty.mockImplementation(async (rule) => ({ rule }));
   render(<EcommerceLoyaltyPage />);
   await screen.findByLabelText("Currency");
+  fireEvent.change(screen.getByLabelText("Earning rate (%)"), {target:{value:"12.5"}});
+  fireEvent.change(screen.getByLabelText("Points needed for a reward"), {target:{value:"250"}});
   const first = within(screen.getByRole("region", {name:"Condition 1"}));
   fireEvent.click(first.getByText("Reward products"));
   fireEvent.click(first.getByRole("checkbox", {name:"Product a"}));
@@ -45,6 +54,8 @@ it("saves multiple products and separate normal and loyalty validity conditions"
   fireEvent.click(screen.getByRole("button", {name:"Save"}));
   await waitFor(() => expect(saveEcommerceLoyalty).toHaveBeenCalledWith(expect.objectContaining({
     enabled:true,
+    earning_rate_basis_points:1250,
+    threshold_points:250,
     discount_conditions:[
       {audience:"loyalty",product_ids:["a","b"],discount_basis_points:1500,validity_mode:"fixed_period",validity_days:30},
       {audience:"normal",product_ids:["a"],discount_basis_points:2000,validity_mode:"lifetime",validity_days:null},
@@ -66,6 +77,8 @@ it("selects search results without losing other selections and clears all select
   fireEvent.change(screen.getByLabelText("Search products"), {target:{value:""}});
   expect(screen.getByRole("checkbox", {name:"Product a"}).checked).toBe(true);
   expect(screen.getByRole("checkbox", {name:"Product b"}).checked).toBe(true);
+  fireEvent.click(screen.getByRole("button", {name:"Remove Product a"}));
+  expect(screen.getByRole("checkbox", {name:"Product a"}).checked).toBe(false);
   fireEvent.click(screen.getByRole("button", {name:"Select all", exact:true}));
   expect(screen.getAllByRole("checkbox").every(input => input.checked)).toBe(true);
   fireEvent.click(screen.getByRole("button", {name:"Clear selection"}));

@@ -461,14 +461,21 @@ health evidence, dirty/different release, checksum drift, missing predecessor,
 or a ledger already beyond target fails before mutation. No tenant/business
 table is queried or changed.
 
-### Current schema 110 bridge
+### Current schema 112 bridge
 
 Production is currently at schema 109. The release contract accepts schema
-`109..110` and targets `110` using the checksum-pinned `migrations-110.json`
+`109..112` and targets `112` using the checksum-pinned
+`migrations-110-112.json`
 manifest. Migration 110 makes e-commerce order persistence and its durable
 notification intent one atomic transaction by using a deferred constraint
 trigger that reads finalized totals. It also replays the same deduplicated
 intent for missing events on orders from the preceding 30 days (`109 -> 110`).
+Migration 111 adds tenant-scoped product-category associations, backfills each
+product's existing primary category, and retains the primary `category_id`
+column as a compatibility field (`110 -> 111`).
+Migration 112 makes the product-owned variant foreign key cascade on product
+deletion while leaving order, inventory, and loyalty history foreign keys
+restrictive (`111 -> 112`).
 Migrations through 109 remain immutable production history. A verified
 schema-109 backup is required before migration. Rollback compatibility is
 bounded at schema 109; after advancement, recovery is forward-repair-only.

@@ -687,8 +687,8 @@
 
 .live-store-product-sale-badge {
   position: absolute;
-  inset-block-start: 14px;
-  inset-inline-start: 14px;
+  top: 14px;
+  left: 14px;
   z-index: 4;
   min-height: 30px;
   display: inline-flex;
@@ -882,6 +882,13 @@
   display: grid;
   grid-template-columns: minmax(0, 1.15fr) minmax(300px, 0.85fr);
   gap: 58px;
+}
+
+.live-store-detail-visual {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
 }
 
 .live-store-detail-gallery {
@@ -1432,8 +1439,24 @@
   white-space: pre-line;
 }
 
+.live-store-detail-about {
+  padding: 22px 2px 0;
+  border-top: 1px solid var(--store-line);
+}
+
+.live-store-detail-description {
+  margin: 0;
+  color: var(--store-muted);
+  line-height: 1.8;
+  white-space: pre-line;
+}
+
 .live-store-detail-tags {
-  margin-top: 24px;
+  margin-top: 18px;
+}
+
+.live-store-detail-about > .live-store-detail-tags:first-child {
+  margin-top: 0;
 }
 
 .live-store-footer {
@@ -1675,6 +1698,9 @@
     grid-template-columns: 1fr;
     gap: 34px;
   }
+
+  .live-store-detail-visual { gap: 22px; }
+  .live-store-detail-about { padding-top: 18px; }
 
   .live-store-detail-main-image {
     min-height: 330px;
@@ -2624,6 +2650,16 @@
 .live-store-color-swatch { width:18px; height:18px; flex:0 0 18px; border:1px solid color-mix(in srgb,var(--store-ink) 25%,transparent); border-radius:50%; box-shadow:inset 0 0 0 2px var(--store-paper); }
 .live-store-variant-option-values label.is-color.is-active .live-store-color-swatch { box-shadow:inset 0 0 0 2px var(--store-accent); }
 .live-store-variant-help,.live-store-variant-meta { color:var(--store-muted); }
+.live-store-product-quantity { width:100%; margin:18px auto 12px; display:grid; grid-template-columns:minmax(0,1fr); justify-items:center; gap:9px; color:var(--store-ink); text-align:center; font-size:.9rem; font-weight:800; }
+.live-store-product-quantity > span { display:block; width:100%; text-align:center; }
+.live-store-product-quantity > div { justify-self:center; display:grid; grid-template-columns:38px 58px 38px; align-items:center; overflow:hidden; border:1px solid var(--store-line); border-radius:9px; background:var(--store-paper); }
+.live-store-product-quantity button { width:38px; height:38px; display:grid; place-items:center; padding:0; border:0; background:transparent; color:var(--store-ink); cursor:pointer; }
+.live-store-product-quantity button:hover:not(:disabled) { background:var(--store-soft); color:var(--store-accent); }
+.live-store-product-quantity button:disabled { background:transparent; color:var(--store-muted); opacity:.45; }
+.live-store-product-quantity input { width:58px; height:38px; padding:0; border:0; border-inline:1px solid var(--store-line); border-radius:0; appearance:textfield; background:transparent; color:var(--store-ink); text-align:center; font:inherit; line-height:38px; }
+.live-store-product-quantity input::-webkit-inner-spin-button,
+.live-store-product-quantity input::-webkit-outer-spin-button { margin:0; appearance:none; }
+
 .live-store .live-store-detail-copy > button:disabled { background:var(--store-accent); color:#fff; opacity:1; }
 .live-store-product-options { display:inline-flex; align-items:center; padding:9px 13px; border:1px solid var(--store-accent); border-radius:8px; background:var(--store-accent); color:#fff; text-decoration:none; }
 .live-store-product-options:hover { border-color:var(--store-hover); background:var(--store-hover); color:#fff; }
@@ -2685,7 +2721,8 @@
 .live-store-sale-bar a { text-decoration: underline; text-underline-offset: 0.2em; }
 .live-store-sale-bar button {
   position: absolute;
-  inset-inline-end: 12px;
+  right: 12px;
+  left: auto;
   top: 50%;
   width: 36px;
   height: 36px;
@@ -2808,7 +2845,6 @@
 
 @media (max-width: 600px) {
   .live-store-sale-bar { padding: 10px 52px 10px 16px; font-size: 0.82rem; }
-  .live-store[dir="rtl"] .live-store-sale-bar { padding: 10px 16px 10px 52px; }
   .live-store-sale-popup-backdrop { padding: 14px; }
   .live-store-sale-popup { min-height: 0; grid-template-columns: 1fr; border-radius: 22px; }
   .live-store-sale-popup-offer { min-height: 184px; padding: 28px 24px; grid-template: auto auto / auto 1fr; align-content: center; align-items: center; column-gap: 18px; }

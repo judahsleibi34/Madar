@@ -260,7 +260,8 @@ describe("EcommercePage", () => {
     expect(document.querySelector(".ecommerce-category-image-preview img")?.getAttribute("src")).toContain("0123456789abcdef0123456789abcdef.webp");
     expect(screen.getByRole("button", { name: "Remove brand image" })).toBeTruthy();
 
-    fireEvent.change(screen.getByLabelText("Brand name (English)"), { target: { value: "Nike" } });
+    expect(screen.queryByText("Brand name (English)")).toBeNull();
+    fireEvent.change(screen.getByLabelText("Brand name"), { target: { value: "Nike" } });
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
     await waitFor(() => expect(saveEcommerceItem).toHaveBeenCalledWith(
@@ -273,6 +274,17 @@ describe("EcommercePage", () => {
       }),
       expect.any(Object),
     ));
+  });
+  it("rejects numeric-only brand names before calling the API", async () => {
+    fetchEcommerceCatalog.mockResolvedValue({ tags: [], categories: [], brands: [], products: [] });
+    render(<EcommercePage section="brands" />);
+    await screen.findByText("No brands yet");
+    fireEvent.click(screen.getByRole("button", { name: "Add Brand" }));
+    fireEvent.change(screen.getByLabelText("Brand name"), { target: { value: "123" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect((await screen.findByRole("alert")).textContent).toContain("Names must contain at least one letter");
+    expect(saveEcommerceItem).not.toHaveBeenCalled();
   });
   it("opens product editing in a popup and resets the editor for creation", async () => {
     fetchEcommerceCatalog.mockResolvedValue({ tags: [], categories: [], products: [{
@@ -309,7 +321,7 @@ describe("EcommercePage", () => {
     const outSummary = screen.getAllByText("Out of stock").find((node) => node.closest(".ecommerce-summary-card"));
     expect(lowSummary.closest(".ecommerce-summary-card").textContent).toContain("2");
     expect(outSummary.closest(".ecommerce-summary-card").textContent).toContain("2");
-    expect(screen.getByText(/1 low · 1 out/)).toBeTruthy();
+    expect(screen.getByText("Low stock: 1 · Out of stock: 1")).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Low stock" }));
     expect(screen.getByText("Low simple")).toBeTruthy();
@@ -382,4 +394,54 @@ describe("EcommercePage", () => {
     expect(document.body.textContent).not.toContain("SUPABASE_SERVICE_KEY");
     expect(document.body.textContent).not.toContain("internal_");
     expect(screen.getAllByText("Summer").length).toBeGreaterThan(0);
+  });
+
+  it("explains that a product with transaction history must be archived", async () => {
+    const product = {
+      id: "product-1",
+      slug: "ordered-product",
+      sku: "ORDERED-1",
+      status: "active",
+      price: 10,
+      currency: "USD",
+      translations: { en: { name: "Ordered product" } },
+    };
+    const error = new Error("23503 internal foreign key detail");
+    error.status = 409;
+    deleteEcommerceItem.mockRejectedValue(error);
+    fetchEcommerceCatalog.mockResolvedValue({ tags: [], categories: [], products: [product] });
+    render(<EcommercePage section="products" />);
+    await screen.findByText("Ordered product");
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete Ordered product" }));
+    fireEvent.click(screen.getByRole("button", { name: "Remove" }));
+
+    expect((await screen.findByRole("alert")).textContent).toContain("Archive it instead");
+    expect(document.body.textContent).not.toContain("23503");
+    expect(screen.getAllByText("Ordered product").length).toBeGreaterThan(0);
+  });
+
+  it("distinguishes a pending catalog migration from product history", async () => {
+    const product = {
+      id: "product-1",
+      slug: "new-product",
+      sku: "NEW-1",
+      status: "draft",
+      price: 0,
+      currency: "USD",
+      translations: { en: { name: "New product" } },
+    };
+    const error = new Error("Product deletion is unavailable");
+    error.status = 503;
+    error.code = "product_delete_migration_required";
+    deleteEcommerceItem.mockRejectedValue(error);
+    fetchEcommerceCatalog.mockResolvedValue({ tags: [], categories: [], products: [product] });
+    render(<EcommercePage section="products" />);
+    await screen.findByText("New product");
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete New product" }));
+    fireEvent.click(screen.getByRole("button", { name: "Remove" }));
+
+    expect((await screen.findByRole("alert")).textContent).toContain("database update is still pending");
+    expect(document.body.textContent).not.toContain("Archive it instead");
   });
