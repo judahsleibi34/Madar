@@ -321,7 +321,7 @@ describe("EcommercePage", () => {
     const outSummary = screen.getAllByText("Out of stock").find((node) => node.closest(".ecommerce-summary-card"));
     expect(lowSummary.closest(".ecommerce-summary-card").textContent).toContain("2");
     expect(outSummary.closest(".ecommerce-summary-card").textContent).toContain("2");
-    expect(screen.getByText(/1 low · 1 out/)).toBeTruthy();
+    expect(screen.getByText("Low stock: 1 · Out of stock: 1")).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Low stock" }));
     expect(screen.getByText("Low simple")).toBeTruthy();
