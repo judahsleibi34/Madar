@@ -1110,8 +1110,13 @@ class SystemOperations:
             return "forward_repair_pending"
 
         # --------------------------------------------------------------
-        # No durable automation exists.  Only the exact never-started
-        # condition may continue.
+        # No durable automation exists. Accept either:
+        #
+        # 1. the exact never-started source state; or
+        # 2. an intermediate schema that this exact serving release was
+        #    durably accepted at. The latter does not authorize mutation:
+        #    it requires an exact-SHA candidate migration handoff check
+        #    before quiesce or installation.
         # --------------------------------------------------------------
         if terminal_error != "migration_automation_terminal_missing":
             raise UpgradeError(
@@ -1127,8 +1132,20 @@ class SystemOperations:
         source = contract["source"]
         target = contract["target"]
 
-        if live_schema != source or recorded_schema != source:
+        never_started = (
+            live_schema == source
+            and recorded_schema == source
+        )
+        candidate_handoff = (
+            source < live_schema < target
+            and recorded_schema == live_schema
+        )
+        if not (never_started or candidate_handoff):
             raise UpgradeError("migration_pending_schema_not_source")
+
+        expected_schema = (
+            live_schema if candidate_handoff else source
+        )
 
         state = json_file(
             self.state_root / "state.json",
@@ -1141,7 +1158,10 @@ class SystemOperations:
         except (TypeError, ValueError) as error:
             raise UpgradeError("migration_pending_known_good_invalid") from error
 
-        if known_good.get("sha") != sha or known_schema != source:
+        if (
+            known_good.get("sha") != sha
+            or known_schema != expected_schema
+        ):
             raise UpgradeError("migration_pending_known_good_invalid")
 
         history = state.get("history")
@@ -1173,10 +1193,14 @@ class SystemOperations:
         except (KeyError, TypeError, ValueError) as error:
             raise UpgradeError("migration_pending_acceptance_invalid") from error
 
-        if observed != source or accepted_target != target:
+        if observed != expected_schema or accepted_target != target:
             raise UpgradeError("migration_pending_acceptance_invalid")
 
-        return "pre_mutation_pending"
+        return (
+            "candidate_handoff_pending"
+            if candidate_handoff
+            else "pre_mutation_pending"
+        )
 
     def attest_active_images(
         self,
@@ -1759,6 +1783,167 @@ class SystemOperations:
         self.require_clean_repository()
         if self.repository_origin() != EXPECTED_CONTRACT["MADAR_CANONICAL_GIT_REMOTE"]:
             raise UpgradeError("canonical_git_remote_changed")
+
+    def validate_candidate_migration_handoff(
+        self,
+        approved_sha: str,
+        current: dict[str, Any],
+    ) -> dict[str, int]:
+        """Bind an accepted intermediate origin to one exact candidate path."""
+
+        if not LOWER_SHA_RE.fullmatch(approved_sha):
+            raise UpgradeError("candidate_handoff_sha_invalid")
+
+        if current.get("migration") != "candidate_handoff_pending":
+            raise UpgradeError("candidate_handoff_origin_invalid")
+
+        production_sha = str(current.get("production_sha") or "")
+        if not LOWER_SHA_RE.fullmatch(production_sha):
+            raise UpgradeError("candidate_handoff_origin_invalid")
+
+        try:
+            live_schema = int(current["schema"])
+        except (KeyError, TypeError, ValueError) as error:
+            raise UpgradeError("candidate_handoff_origin_invalid") from error
+
+        origin = self.automatic_migration_contract(production_sha)
+        origin_source = int(origin["source"])
+        origin_target = int(origin["target"])
+
+        if not origin_source < live_schema < origin_target:
+            raise UpgradeError("candidate_handoff_origin_invalid")
+
+        try:
+            release = json.loads(
+                self.madar_git(
+                    "git_candidate_handoff_release",
+                    "show",
+                    f"{approved_sha}:web/deployment/releases/release.json",
+                ).stdout
+            )
+        except (TypeError, ValueError) as error:
+            raise UpgradeError(
+                "candidate_handoff_contract_invalid"
+            ) from error
+
+        if not isinstance(release, dict):
+            raise UpgradeError("candidate_handoff_contract_invalid")
+
+        schema = release.get("schema")
+        if not isinstance(schema, dict):
+            raise UpgradeError("candidate_handoff_contract_invalid")
+
+        manifest_name = str(
+            release.get("migration_manifest") or ""
+        )
+        if (
+            Path(manifest_name).name != manifest_name
+            or not manifest_name.startswith("migrations-")
+            or not manifest_name.endswith(".json")
+        ):
+            raise UpgradeError("candidate_handoff_contract_invalid")
+
+        if (
+            release.get("migration_policy")
+            != "automatic-after-known-good-backup-first-forward-repair"
+            or schema.get("migration_class") != "forward-compatible"
+        ):
+            raise UpgradeError("candidate_handoff_contract_invalid")
+
+        try:
+            manifest = json.loads(
+                self.madar_git(
+                    "git_candidate_handoff_manifest",
+                    "show",
+                    (
+                        f"{approved_sha}:web/deployment/releases/"
+                        f"{manifest_name}"
+                    ),
+                ).stdout
+            )
+        except (TypeError, ValueError) as error:
+            raise UpgradeError(
+                "candidate_handoff_contract_invalid"
+            ) from error
+
+        if not isinstance(manifest, dict):
+            raise UpgradeError("candidate_handoff_contract_invalid")
+
+        manifest_release = str(manifest.get("release_sha") or "")
+        if manifest_release not in {
+            "CURRENT",
+            "STAGING",
+            approved_sha,
+        }:
+            raise UpgradeError("candidate_handoff_contract_invalid")
+
+        migrations = manifest.get("migrations")
+        if not isinstance(migrations, list) or not migrations:
+            raise UpgradeError("candidate_handoff_contract_invalid")
+
+        try:
+            compatible_min = int(schema["compatible_min"])
+            compatible_max = int(schema["compatible_max"])
+            target = int(schema["target"])
+            rollback_min = int(schema["rollback_compatible_min"])
+            rollback_max = int(schema["rollback_compatible_max"])
+
+            source = int(migrations[0]["from_schema"])
+            manifest_target = int(migrations[-1]["to_schema"])
+        except (KeyError, TypeError, ValueError) as error:
+            raise UpgradeError(
+                "candidate_handoff_contract_invalid"
+            ) from error
+
+        cursor = source
+        for migration in migrations:
+            if not isinstance(migration, dict):
+                raise UpgradeError(
+                    "candidate_handoff_contract_invalid"
+                )
+            try:
+                migration_source = int(migration["from_schema"])
+                migration_target = int(migration["to_schema"])
+            except (KeyError, TypeError, ValueError) as error:
+                raise UpgradeError(
+                    "candidate_handoff_contract_invalid"
+                ) from error
+
+            if (
+                migration_source != cursor
+                or migration_target <= migration_source
+                or migration.get("compatibility")
+                != "forward-compatible"
+            ):
+                raise UpgradeError(
+                    "candidate_handoff_contract_invalid"
+                )
+            cursor = migration_target
+
+        if cursor != manifest_target:
+            raise UpgradeError("candidate_handoff_contract_invalid")
+
+        if not (
+            compatible_min
+            <= source
+            <= manifest_target
+            <= compatible_max
+        ):
+            raise UpgradeError("candidate_handoff_contract_invalid")
+
+        if (
+            source != live_schema
+            or manifest_target != target
+            or target != origin_target
+            or rollback_min != live_schema
+            or rollback_max != live_schema
+        ):
+            raise UpgradeError("candidate_handoff_schema_mismatch")
+
+        return {
+            "source": source,
+            "target": target,
+        }
 
     def validate_controller_compatibility(
         self, approved_sha: str, current: dict[str, Any]
@@ -2648,6 +2833,17 @@ class UpgradeCoordinator:
                 dry_run=dry_run,
             )
             self.record.candidate_sha = self.record.approved_sha
+
+            if (
+                not recovery
+                and before.get("migration")
+                == "candidate_handoff_pending"
+            ):
+                self.audit.phase("candidate_migration_handoff")
+                self.operations.validate_candidate_migration_handoff(
+                    self.record.approved_sha,
+                    before,
+                )
 
             if recovery:
                 if rehearsal_attestation is None:

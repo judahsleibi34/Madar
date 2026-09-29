@@ -54,6 +54,7 @@ class FakeOperations:
         self.production = "1" * 40
         self.slot = "green"
         self.schema = 93
+        self.migration = "already_at_target"
         self.timer = {"enabled": "enabled", "active": "active"}
         self.interlock = False
         self.interlock_sha = None
@@ -73,12 +74,15 @@ class FakeOperations:
             "production_sha": self.production,
             "slot": self.slot,
             "schema": self.schema,
-            "migration": "already_at_target",
+            "migration": self.migration,
             "timer": dict(self.timer),
         }
 
     def resolve_candidate(self, sha, *, dry_run):
         self._event("resolve_candidate")
+
+    def validate_candidate_migration_handoff(self, sha, current):
+        self._event("validate_candidate_migration_handoff")
 
     def validate_controller_compatibility(self, sha, current):
         self._event("validate_controller_compatibility")
@@ -342,6 +346,296 @@ class ControlPlaneUpgradeTests(unittest.TestCase):
         return struct.pack("<I", filesystem.ACL_XATTR_VERSION) + b"".join(
             struct.pack("<HHI", *entry) for entry in entries
         )
+
+    def test_intermediate_known_good_without_migration_state_requires_candidate_handoff(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            sha = self.SHA
+
+            operations = object.__new__(upgrade.SystemOperations)
+            operations.state_root = root
+            operations.migration_terminal = mock.Mock(
+                side_effect=upgrade.UpgradeError(
+                    "migration_automation_terminal_missing"
+                )
+            )
+            operations.automatic_migration_contract = mock.Mock(
+                return_value={"source": 109, "target": 112}
+            )
+
+            state = {
+                "known_good_release": {
+                    "sha": sha,
+                    "schema": 110,
+                },
+                "history": [
+                    {
+                        "release_sha": sha,
+                        "status": "known_good",
+                        "phase": "complete",
+                        "schema": {
+                            "observed": 110,
+                            "target": 112,
+                        },
+                    }
+                ],
+            }
+            (root / "state.json").write_text(
+                json.dumps(state),
+                encoding="utf-8",
+            )
+
+            result = operations.migration_origin_state(
+                sha,
+                recorded_schema=110,
+                live_schema=110,
+            )
+
+            self.assertEqual(
+                result,
+                "candidate_handoff_pending",
+            )
+
+    def test_intermediate_origin_rejects_acceptance_schema_mismatch(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            sha = self.SHA
+
+            operations = object.__new__(upgrade.SystemOperations)
+            operations.state_root = root
+            operations.migration_terminal = mock.Mock(
+                side_effect=upgrade.UpgradeError(
+                    "migration_automation_terminal_missing"
+                )
+            )
+            operations.automatic_migration_contract = mock.Mock(
+                return_value={"source": 109, "target": 112}
+            )
+
+            state = {
+                "known_good_release": {
+                    "sha": sha,
+                    "schema": 110,
+                },
+                "history": [
+                    {
+                        "release_sha": sha,
+                        "status": "known_good",
+                        "phase": "complete",
+                        "schema": {
+                            "observed": 109,
+                            "target": 112,
+                        },
+                    }
+                ],
+            }
+            (root / "state.json").write_text(
+                json.dumps(state),
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(
+                upgrade.UpgradeError,
+                "migration_pending_acceptance_invalid",
+            ):
+                operations.migration_origin_state(
+                    sha,
+                    recorded_schema=110,
+                    live_schema=110,
+                )
+
+    def test_candidate_handoff_requires_exact_live_schema_migration_source(self):
+        approved = self.SHA
+        production = "b" * 40
+
+        release = {
+            "schema": {
+                "compatible_min": 109,
+                "compatible_max": 112,
+                "target": 112,
+                "migration_class": "forward-compatible",
+                "rollback_compatible_min": 110,
+                "rollback_compatible_max": 110,
+            },
+            "migration_policy": (
+                "automatic-after-known-good-backup-first-forward-repair"
+            ),
+            "migration_manifest": "migrations-111-112.json",
+        }
+        manifest = {
+            "release_sha": "CURRENT",
+            "migrations": [
+                {
+                    "number": 111,
+                    "from_schema": 110,
+                    "to_schema": 111,
+                    "compatibility": "forward-compatible",
+                },
+                {
+                    "number": 112,
+                    "from_schema": 111,
+                    "to_schema": 112,
+                    "compatibility": "forward-compatible",
+                },
+            ],
+        }
+
+        operations = object.__new__(upgrade.SystemOperations)
+        operations.automatic_migration_contract = mock.Mock(
+            return_value={"source": 109, "target": 112}
+        )
+
+        def git_result(label, *args, **_kwargs):
+            if label == "git_candidate_handoff_release":
+                return upgrade.CommandResult(
+                    json.dumps(release),
+                    "",
+                    0,
+                )
+            if label == "git_candidate_handoff_manifest":
+                return upgrade.CommandResult(
+                    json.dumps(manifest),
+                    "",
+                    0,
+                )
+            raise AssertionError(
+                f"unexpected Git operation: {label} {args}"
+            )
+
+        operations.madar_git = mock.Mock(side_effect=git_result)
+
+        current = {
+            "migration": "candidate_handoff_pending",
+            "production_sha": production,
+            "schema": 110,
+        }
+
+        result = operations.validate_candidate_migration_handoff(
+            approved,
+            current,
+        )
+        self.assertEqual(
+            result,
+            {"source": 110, "target": 112},
+        )
+
+        bad_source = json.loads(json.dumps(manifest))
+        bad_source["migrations"] = [
+            {
+                "number": 111,
+                "from_schema": 109,
+                "to_schema": 111,
+                "compatibility": "forward-compatible",
+            },
+            {
+                "number": 112,
+                "from_schema": 111,
+                "to_schema": 112,
+                "compatibility": "forward-compatible",
+            },
+        ]
+
+        def bad_source_git(label, *args, **_kwargs):
+            if label == "git_candidate_handoff_release":
+                return upgrade.CommandResult(
+                    json.dumps(release),
+                    "",
+                    0,
+                )
+            if label == "git_candidate_handoff_manifest":
+                return upgrade.CommandResult(
+                    json.dumps(bad_source),
+                    "",
+                    0,
+                )
+            raise AssertionError(
+                f"unexpected Git operation: {label} {args}"
+            )
+
+        operations.madar_git = mock.Mock(
+            side_effect=bad_source_git
+        )
+
+        with self.assertRaisesRegex(
+            upgrade.UpgradeError,
+            "candidate_handoff_schema_mismatch",
+        ):
+            operations.validate_candidate_migration_handoff(
+                approved,
+                current,
+            )
+
+        bad_release = json.loads(json.dumps(release))
+        bad_release["schema"]["rollback_compatible_min"] = 109
+        bad_release["schema"]["rollback_compatible_max"] = 109
+
+        def bad_rollback_git(label, *args, **_kwargs):
+            if label == "git_candidate_handoff_release":
+                return upgrade.CommandResult(
+                    json.dumps(bad_release),
+                    "",
+                    0,
+                )
+            if label == "git_candidate_handoff_manifest":
+                return upgrade.CommandResult(
+                    json.dumps(manifest),
+                    "",
+                    0,
+                )
+            raise AssertionError(
+                f"unexpected Git operation: {label} {args}"
+            )
+
+        operations.madar_git = mock.Mock(
+            side_effect=bad_rollback_git
+        )
+
+        with self.assertRaisesRegex(
+            upgrade.UpgradeError,
+            "candidate_handoff_schema_mismatch",
+        ):
+            operations.validate_candidate_migration_handoff(
+                approved,
+                current,
+            )
+
+    def test_candidate_handoff_validation_precedes_quiesce(self):
+        with tempfile.TemporaryDirectory() as directory:
+            operations, _record, _audit, coordinator = (
+                self.coordinator(
+                    directory,
+                    protected=True,
+                    failure="validate_candidate_migration_handoff",
+                )
+            )
+            operations.migration = "candidate_handoff_pending"
+
+            with self.assertRaisesRegex(
+                upgrade.UpgradeError,
+                "failed:validate_candidate_migration_handoff",
+            ):
+                coordinator.execute(dry_run=False)
+
+            self.assertIn(
+                "resolve_candidate",
+                operations.events,
+            )
+            self.assertIn(
+                "validate_candidate_migration_handoff",
+                operations.events,
+            )
+            self.assertNotIn(
+                "quiesce",
+                operations.events,
+            )
+            self.assertNotIn(
+                "arm_interlock",
+                operations.events,
+            )
+            self.assertNotIn(
+                "installer_apply",
+                operations.events,
+            )
 
     def test_standard_root_owned_0755_parent_is_root_protected(self):
         with tempfile.TemporaryDirectory() as root:
