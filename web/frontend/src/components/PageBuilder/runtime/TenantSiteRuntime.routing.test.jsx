@@ -3,20 +3,24 @@ import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import TenantSiteRuntime, { getBuilderPreviewBasePath } from "./TenantSiteRuntime";
+import { fetchBuilderProject } from "../services/PageBuilder.api";
 import {
-  fetchBuilderProject,
   fetchProtectedSitePage,
   fetchPublicForm,
   fetchPublicSiteRuntime,
   fetchPublicSiteBootstrap,
   getTenantVisitorStatus,
   loginTenantVisitor,
-} from "../services/PageBuilder.api";
+} from "../services/PageBuilder.publicApi";
 import { recordPublicSiteVisit } from "../../../services/siteVisitApi";
 
 vi.mock("../services/PageBuilder.api", async () => ({
   ...(await vi.importActual("../services/PageBuilder.api")),
   fetchBuilderProject: vi.fn(),
+}));
+
+vi.mock("../services/PageBuilder.publicApi", async () => ({
+  ...(await vi.importActual("../services/PageBuilder.publicApi")),
   fetchProtectedSitePage: vi.fn(),
   fetchPublicForm: vi.fn(),
   fetchPublicSiteRuntime: vi.fn(),

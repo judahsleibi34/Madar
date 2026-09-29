@@ -2,8 +2,6 @@ import { lazy, useEffect, useState } from "react";
 import { Navigate, Route, Routes, useLocation, useParams } from "react-router-dom";
 
 import RouteSuspense from "../components/common/RouteSuspense";
-import { preloadPublicEcommerceCatalog } from "../services/ecommerceApi";
-import { fetchPublicSiteBootstrap } from "../components/PageBuilder/services/PageBuilder.api";
 import { buildCanonicalTenantUrl, getBrandedMadarSubdomain } from "../utils/hostedAddress";
 
 const TenantSiteRuntime = lazy(() =>
@@ -34,7 +32,8 @@ function LegacyTenantRedirect({ prefix }) {
 
   useEffect(() => {
     let cancelled = false;
-    fetchPublicSiteBootstrap(legacyIdentifier)
+    import("../components/PageBuilder/services/PageBuilder.publicApi")
+      .then(({ fetchPublicSiteBootstrap }) => fetchPublicSiteBootstrap(legacyIdentifier))
       .then((payload) => {
         if (cancelled) return;
         const canonicalTenant = String(payload?.site?.subdomain || "").trim().toLowerCase();
@@ -67,7 +66,9 @@ export default function TenantSiteRoutes() {
     if (!currentSubdomain || isShopRoute) return undefined;
     const preload = () => {
       import("../components/EcommerceStore/EcommerceStorefront");
-      preloadPublicEcommerceCatalog(currentSubdomain);
+      import("../services/ecommerceApi")
+        .then(({ preloadPublicEcommerceCatalog }) => preloadPublicEcommerceCatalog(currentSubdomain))
+        .catch(() => {});
     };
     if (typeof window.requestIdleCallback === "function") {
       const idleId = window.requestIdleCallback(preload, { timeout: 1500 });

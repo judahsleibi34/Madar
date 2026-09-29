@@ -8,6 +8,25 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+it("keeps a metric value visible while its optional counter module loads", async () => {
+  const renderElement = createElementRenderer({
+    carouselElementTypes: new Set(),
+    selected: { type: "", id: "" },
+    preview: false,
+    getFreeElementStyle: () => ({}),
+    getElementStyle: () => ({}),
+  });
+  render(renderElement({
+    id: "metric-1",
+    type: "metric",
+    metrics: [{ value: "42", label: "Projects" }],
+    styles: {},
+  }));
+  expect(screen.getByText("42")).toBeTruthy();
+  await waitFor(() => expect(screen.getByText("42").className).toBe("count-up-number"));
+  expect(screen.getByText("Projects")).toBeTruthy();
+});
+
 describe("mixed text blocks", () => {
   it("continues an H1 as normal text inside the same element", () => {
     const updateElementInlineText = vi.fn();

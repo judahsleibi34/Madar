@@ -9,6 +9,7 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [react()],
     build: {
+      manifest: true,
       // Safari 14 cannot parse some modern syntax shipped by dependencies such as Three.js.
       // Transpile the complete production bundle, including vendor chunks, to that browser level.
       target: "safari14",
