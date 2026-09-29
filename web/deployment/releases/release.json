@@ -5,10 +5,10 @@
     "compatible_max": 112,
     "target": 112,
     "migration_class": "forward-compatible",
-    "rollback_compatible_min": 109,
-    "rollback_compatible_max": 109
+    "rollback_compatible_min": 110,
+    "rollback_compatible_max": 110
   },
   "migration_policy": "automatic-after-known-good-backup-first-forward-repair",
-  "notes": "Forward-compatible schema 109 to 112 bridge. Migrations through 109 are immutable applied production history. Migration 110 makes ecommerce order creation and its durable notification intent atomic. Migration 111 adds multi-category product associations while preserving the primary category_id compatibility field. Migration 112 allows products and their owned variants to be deleted atomically while order, inventory, and loyalty history continues to restrict deletion. A verified schema-109 backup is required before migration; recovery is forward-repair-only after schema advances beyond 109.",
-  "migration_manifest": "migrations-110-112.json"
+  "notes": "Forward-compatible application schema 109 to 112. Migrations through 110 are immutable applied production history. This release migrates from schema 110 to 112. Migration 111 adds multi-category product associations while preserving the primary category_id compatibility field. Migration 112 allows products and their owned variants to be deleted atomically while order, inventory, and loyalty history continues to restrict deletion. A verified schema-110 backup is required before migration; recovery is forward-repair-only after schema advances beyond 110.",
+  "migration_manifest": "migrations-111-112.json"
 }

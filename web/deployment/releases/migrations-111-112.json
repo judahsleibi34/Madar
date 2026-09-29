@@ -1,0 +1,21 @@
+{
+  "release_sha": "CURRENT",
+  "migrations": [
+    {
+      "number": 111,
+      "path": "web/database/migrations/111_add_ecommerce_product_categories.sql",
+      "sha256": "c5fdf0f96788bf8850d397395e5e4a833efdb6490438821e9856a2574dbe7e27",
+      "from_schema": 110,
+      "to_schema": 111,
+      "compatibility": "forward-compatible"
+    },
+    {
+      "number": 112,
+      "path": "web/database/migrations/112_allow_unreferenced_product_deletion.sql",
+      "sha256": "936361a17a1c21c19f927a66eb6ab52bd019bc986237c74431c11877b63f417a",
+      "from_schema": 111,
+      "to_schema": 112,
+      "compatibility": "forward-compatible"
+    }
+  ]
+}
