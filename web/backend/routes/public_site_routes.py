@@ -2694,8 +2694,8 @@ def get_tenant_site_access(settings: dict, user_row: dict):
     return None
 
 
-def require_tenant_visitor(subdomain: str, request: Request, response: Response):
-    settings = resolve_website_settings(normalize_subdomain(subdomain), request=request)
+def require_tenant_visitor(subdomain: str, request: Request, response: Response, *, settings: dict | None = None):
+    settings = settings or resolve_website_settings(normalize_subdomain(subdomain), request=request)
     _, user_row = get_authenticated_user_row(request, response)
     membership = get_tenant_site_access(settings, user_row)
 
@@ -2705,9 +2705,9 @@ def require_tenant_visitor(subdomain: str, request: Request, response: Response)
     return user_row, membership
 
 
-def get_optional_tenant_visitor(subdomain: str, request: Request, response: Response):
+def get_optional_tenant_visitor(subdomain: str, request: Request, response: Response, *, settings: dict | None = None):
     try:
-        return require_tenant_visitor(subdomain, request, response)
+        return require_tenant_visitor(subdomain, request, response, settings=settings)
     except HTTPException as error:
         if error.status_code in {401, 403}:
             return None
@@ -3628,6 +3628,68 @@ def get_public_site_bootstrap(subdomain: str, request: Request):
     }
 
 
+def resolve_public_site_runtime_context(subdomain: str, request: Request) -> tuple[dict, dict]:
+    """Resolve the current binding in one remote read, with a schema-113 bridge."""
+    requested = normalize_subdomain(subdomain)
+    identifier = enforce_request_tenant_identity(request, requested)
+    try:
+        result = service_supabase.rpc(
+            "get_public_site_runtime_context",
+            {
+                "p_identifier": identifier,
+                "p_allow_legacy_alias": not bool(request_hosted_tenant(request)),
+            },
+        ).execute()
+    except Exception as error:
+        if getattr(error, "code", None) != "PGRST202":
+            logger.warning("public.site_runtime_context_failed", extra={"error_type": type(error).__name__})
+            raise HTTPException(status_code=503, detail="Published site is temporarily unavailable") from error
+        settings = resolve_website_settings(requested, request=request)
+        return settings, get_bound_published_project(settings)
+
+    context_rows = getattr(result, "data", None)
+    if not isinstance(context_rows, list) or len(context_rows) > 2:
+        raise HTTPException(status_code=503, detail="Published site is temporarily unavailable")
+    context = unique_public_row(
+        result,
+        missing_detail="Published site not found",
+        ambiguous_code="publication_hostname_ambiguous",
+    )
+    if not isinstance(context, dict) or not isinstance(context.get("settings"), dict):
+        raise HTTPException(status_code=503, detail="Published site is temporarily unavailable")
+    settings = context["settings"]
+    if not isinstance(context.get("tenant_active"), bool):
+        raise HTTPException(status_code=503, detail="Published site is temporarily unavailable")
+    if not context["tenant_active"] or settings.get("tenant_id") is None:
+        raise HTTPException(status_code=404, detail="Published site not found")
+    if str(settings.get("subdomain") or "").lower() != identifier and request_hosted_tenant(request):
+        raise HTTPException(status_code=404, detail="Published site not found")
+    project = context.get("project")
+    if project is None:
+        raise HTTPException(status_code=404, detail="Published site not found")
+    if not isinstance(project, dict):
+        raise HTTPException(status_code=503, detail="Published site is temporarily unavailable")
+    validate_published_snapshot(
+        project,
+        expected_tenant_id=resolve_tenant_id(settings),
+        expected_project_id=str(settings.get("published_project_id") or ""),
+    )
+    return settings, project
+
+
+@router.get("/sites/{subdomain}/runtime")
+def get_public_site_runtime(subdomain: str, request: Request, response: Response):
+    clean_subdomain = normalize_subdomain(subdomain)
+    enforce_public_rate_limit(request, "site_lookup", clean_subdomain)
+    settings, project = resolve_public_site_runtime_context(clean_subdomain, request)
+    require_public_runtime_entitlement(settings, "website_publish")
+    identity = get_optional_tenant_visitor(clean_subdomain, request, response, settings=settings)
+    return build_public_site_response(
+        clean_subdomain, request, response, settings, project, identity,
+        include_visitor=True,
+    )
+
+
 @router.post("/sites/{subdomain}/visits", status_code=201)
 def record_public_site_visit(
     subdomain: str,
@@ -3675,7 +3737,20 @@ def get_public_site(subdomain: str, request: Request, response: Response):
     require_public_runtime_entitlement(settings, "website_publish")
     project = get_bound_published_project(settings)
 
-    identity = get_optional_tenant_visitor(clean_subdomain, request, response)
+    identity = get_optional_tenant_visitor(clean_subdomain, request, response, settings=settings)
+    return build_public_site_response(clean_subdomain, request, response, settings, project, identity)
+
+
+def build_public_site_response(
+    clean_subdomain: str,
+    request: Request,
+    response: Response,
+    settings: dict,
+    project: dict,
+    identity: tuple[dict, dict] | None,
+    *,
+    include_visitor: bool = False,
+):
     authorized_page_ids: set[str] = set()
     if identity:
         _, membership = identity
@@ -3703,7 +3778,9 @@ def get_public_site(subdomain: str, request: Request, response: Response):
         site_identifier=clean_subdomain,
     )
     apply_public_cache_headers(response, metadata, private=bool(identity))
-    if not identity and request_etag_matches(request, metadata):
+    if include_visitor:
+        response.headers["Cache-Control"] = "private, no-store" if identity else "no-store"
+    if not identity and not include_visitor and request_etag_matches(request, metadata):
         return Response(
             status_code=304,
             headers={
@@ -3714,7 +3791,7 @@ def get_public_site(subdomain: str, request: Request, response: Response):
             },
         )
 
-    return {
+    result = {
         "success": True,
         "site": build_public_site_profile(settings, clean_subdomain, project),
         "project": {
@@ -3722,6 +3799,12 @@ def get_public_site(subdomain: str, request: Request, response: Response):
             **metadata,
         },
     }
+    if include_visitor:
+        result["visitor"] = (
+            {"logged_in": True, "user": build_user_payload(identity[0]), "role": identity[1].get("role")}
+            if identity else {"logged_in": False, "user": None}
+        )
+    return result
 
 
 @router.get("/sites/{subdomain}/pages/{page_reference:path}")

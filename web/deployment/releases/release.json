@@ -1,14 +1,14 @@
 {
   "release_metadata_version": 1,
   "schema": {
-    "compatible_min": 112,
-    "compatible_max": 113,
-    "target": 113,
+    "compatible_min": 113,
+    "compatible_max": 114,
+    "target": 114,
     "migration_class": "forward-compatible",
-    "rollback_compatible_min": 112,
-    "rollback_compatible_max": 112
+    "rollback_compatible_min": 113,
+    "rollback_compatible_max": 113
   },
   "migration_policy": "automatic-after-known-good-backup-first-forward-repair",
-  "notes": "Forward-compatible application schema 112 to 113. Migrations through 112 are immutable applied production history. Migration 113 adds a service-role-only, invoker-rights managed-asset visibility context RPC. The application retains its complete legacy authorization path only while this RPC is absent during the guarded post-acceptance migration window. A verified schema-112 backup is required before migration; recovery is forward-repair-only after schema advances beyond 112.",
-  "migration_manifest": "migrations-113.json"
+  "notes": "Forward-compatible application schema 113 to 114. Migrations through 113 are immutable applied production history. Migration 114 adds a service-role-only, invoker-rights public-site runtime context RPC. The application retains its complete existing site resolution path only while this RPC is absent during the guarded post-acceptance migration window. A verified schema-113 backup is required before migration; recovery is forward-repair-only after schema advances beyond 113.",
+  "migration_manifest": "migrations-114.json"
 }

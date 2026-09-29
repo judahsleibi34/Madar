@@ -6,7 +6,7 @@ import {
   fetchPublicForm,
   fetchBuilderProject,
   fetchProtectedSitePage,
-  fetchPublicSite,
+  fetchPublicSiteRuntime,
   fetchPublicSiteBootstrap,
   getTenantVisitorStatus,
   loginTenantVisitor,
@@ -532,12 +532,16 @@ export default function TenantSiteRuntime({ draftPreview = false, siteIdentifier
   const recordedVisitRef = useRef("");
 
   useEffect(() => {
-    if (!isPublicRuntime || !cleanSubdomain) return;
+    if (!isPublicRuntime || !cleanSubdomain || publicSiteState !== "ready" || tenantAuth.loading) return;
     const visitKey = `website:${cleanSubdomain}`;
     if (recordedVisitRef.current === visitKey) return;
-    recordedVisitRef.current = visitKey;
-    recordPublicSiteVisit(cleanSubdomain, "website").catch(() => {});
-  }, [cleanSubdomain, isPublicRuntime]);
+    const frame = window.requestAnimationFrame(() => {
+      if (recordedVisitRef.current === visitKey) return;
+      recordedVisitRef.current = visitKey;
+      recordPublicSiteVisit(cleanSubdomain, "website").catch(() => {});
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [cleanSubdomain, isPublicRuntime, publicSiteState, tenantAuth.loading]);
 
   const showFormToast = useCallback((title, message) => {
     setFormToast({ id: Date.now(), title, message });
@@ -658,7 +662,7 @@ export default function TenantSiteRuntime({ draftPreview = false, siteIdentifier
   }, [cleanSubdomain, draftPreview, publicationBoundary]);
 
   useEffect(() => {
-    if (draftPreview) return;
+    if (draftPreview || !standaloneFormId) return;
     let cancelled = false;
 
     getTenantVisitorStatus(cleanSubdomain)
@@ -672,7 +676,7 @@ export default function TenantSiteRuntime({ draftPreview = false, siteIdentifier
     return () => {
       cancelled = true;
     };
-  }, [cleanSubdomain, draftPreview]);
+  }, [cleanSubdomain, draftPreview, standaloneFormId]);
 
   const submitTenantAuth = async (event, isRegistration, authElement) => {
     event.preventDefault();
@@ -813,22 +817,13 @@ export default function TenantSiteRuntime({ draftPreview = false, siteIdentifier
     setPublicationUpdate(null);
     detectedPublicationRef.current = "";
     setPublicSiteState("loading");
-
-    if (!standaloneFormId) {
-      fetchPublicSiteBootstrap(cleanSubdomain)
-        .then((bootstrap) => {
-          if (!cancelled && bootstrap?.site) {
-            setPublicSiteProfile(bootstrap.site);
-          }
-        })
-        .catch(() => {});
-    }
+    if (!standaloneFormId) setTenantAuth({ loading: true, user: null, message: "", error: "" });
 
     const loadBackendPublicContent = async () => {
       try {
         const publicContent = standaloneFormId
           ? await fetchPublicForm(cleanSubdomain, standaloneFormId)
-          : await fetchPublicSite(cleanSubdomain);
+          : await fetchPublicSiteRuntime(cleanSubdomain);
 
         if (cancelled) return;
 
@@ -863,20 +858,28 @@ export default function TenantSiteRuntime({ draftPreview = false, siteIdentifier
           window.location.hostname
         );
 
-        if (verifiedBoundary && publishedProject && typeof publishedProject === "object") {
+        const visitor = publicContent?.visitor;
+        if (
+          verifiedBoundary && publishedProject && typeof publishedProject === "object" &&
+          typeof visitor?.logged_in === "boolean" &&
+          (!visitor.logged_in || (visitor.user && typeof visitor.user === "object"))
+        ) {
           setPublicationBoundary(verifiedBoundary);
           setPublicSiteProfile(publicContent?.site || null);
           setProject(publishedProject);
+          setTenantAuth({ loading: false, user: visitor.logged_in ? visitor.user : null, message: "", error: "" });
           setPublicSiteState("ready");
           return;
         }
 
         setProject(null);
+        setTenantAuth((current) => ({ ...current, loading: false }));
         setPublicSiteState("unavailable");
-      } catch {
+      } catch (error) {
         if (cancelled) return;
         setProject(null);
-        setPublicSiteState("unavailable");
+        setTenantAuth((current) => ({ ...current, loading: false }));
+        setPublicSiteState(error?.status === 404 ? "not-found" : "unavailable");
         if (import.meta.env.DEV) {
           console.warn("Could not load published site from backend.");
         }
@@ -2321,10 +2324,9 @@ export default function TenantSiteRuntime({ draftPreview = false, siteIdentifier
         );
       }
 
-      return renderUnavailableState(
-        runtimeCopy.runtime.noPublishedTitle,
-        runtimeCopy.runtime.noPublishedBody
-      );
+      return draftPreview || publicSiteState === "not-found"
+        ? renderUnavailableState(runtimeCopy.runtime.noPublishedTitle, runtimeCopy.runtime.noPublishedBody, "not-found")
+        : renderUnavailableState("Website temporarily unavailable", "Please try again shortly.");
     }
 
     if (standaloneFormId) {
@@ -2345,6 +2347,12 @@ export default function TenantSiteRuntime({ draftPreview = false, siteIdentifier
           {renderConnectedForm(publishedForm.id, "published-form-link")}
         </main>
       );
+    }
+
+    if (isPublicRuntime && pages.length === 0) {
+      return tenantAuth.user
+        ? renderUnavailableState("Access denied", "Your account cannot access this website.", "forbidden")
+        : renderUnavailableState("Sign in required", "This website requires an account.", "authentication-required");
     }
 
     if (!activePage) {

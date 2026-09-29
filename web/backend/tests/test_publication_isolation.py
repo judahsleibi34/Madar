@@ -346,6 +346,7 @@ class PublicPublicationIsolationTests(unittest.TestCase):
         payload = response.json()
         self.assertEqual(payload["project"]["site_id"], "9")
         self.assertEqual(payload["project"]["published_schema"]["defaultPageId"], "home")
+        self.assertEqual(response.headers["Cache-Control"], "public, max-age=0, must-revalidate")
         self.assertEqual(response.headers["CDN-Cache-Control"], "no-store")
         self.assertIn("Host", response.headers["Vary"])
 

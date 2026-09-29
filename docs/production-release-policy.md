@@ -255,17 +255,17 @@ queried directly. Its SHA must match state and its reported compatibility range
 must contain the live schema. Candidate rollback bounds are descriptive metadata
 today; retained-target attestation is the operative rollback check.
 
-Production was observed at schema 112 for this change. The current candidate
-bridge contract is schema range `112..113`, target `113`, class
-`forward-compatible`, rollback metadata `112..112`, and the checksum-pinned
-`migrations-113.json`. Migrations through 112 are applied production history
-and remain immutable. Only after bridge acceptance at schema 112 may the
-coordinator create a verified source-schema-112 backup and execute migration
-113. It installs a service-role-only, invoker-rights asset-visibility context
-RPC. The candidate backend uses the complete preexisting authorization path
+Production was observed at schema 113 for this change. The current candidate
+bridge contract is schema range `113..114`, target `114`, class
+`forward-compatible`, rollback metadata `113..113`, and the checksum-pinned
+`migrations-114.json`. Migrations through 113 are applied production history
+and remain immutable. Only after bridge acceptance at schema 113 may the
+coordinator create a verified source-schema-113 backup and execute migration
+114. It installs a service-role-only, invoker-rights public-site runtime context
+RPC. The candidate backend uses the complete preexisting site resolution path
 only while that RPC is definitively absent before migration. Network/database
-errors remain fail-closed. Once schema advances beyond 112, recovery is
-forward-repair-only.
+errors remain fail-closed. Once schema advances beyond 113, recovery is
+forward-repair-only. The schema-113 asset-visibility bridge remains historical.
 
 The preceding schema-109 bridge used `migrations-110-112.json`. Migration 110
 atomically creates the durable e-commerce order notification intent with the

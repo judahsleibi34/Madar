@@ -37,13 +37,13 @@ migration manifest. It does not make every migration automatic, does not merge
 release promotion and schema mutation into one rollback domain, and does not
 provide automatic downgrade SQL.
 
-The schema-112 to schema-113 bridge follows this ordering. Its candidate
-backend retains the full existing managed-asset authorization path only when
-PostgREST definitively reports that the new service-role RPC is absent. After
-migration 113 installs the RPC, common successful project-asset authorization
-uses one remote call; other RPC errors remain fail-closed. This compatibility
-path allows the candidate to be accepted at schema 112 before the guarded
-post-acceptance migration runs.
+The schema-113 to schema-114 bridge follows this ordering. Its candidate
+backend retains the complete existing site/settings/project resolution path
+only when PostgREST definitively reports that the new service-role runtime
+context RPC is absent. Migration 114 installs that RPC so a hosted public-site
+startup resolves the active tenant, bound publication, and site settings in one
+remote read. Other RPC errors remain fail-closed. The candidate can be accepted
+at schema 113 before the guarded post-acceptance migration runs.
 
 Protected control-plane releases may be authorized through the root-owned
 one-command workflow described in
@@ -469,9 +469,29 @@ health evidence, dirty/different release, checksum drift, missing predecessor,
 or a ledger already beyond target fails before mutation. No tenant/business
 table is queried or changed.
 
-### Current schema 112 bridge
+### Current schema 114 bridge
 
-Production is currently at schema 109. The release contract accepts schema
+Production enters this release at schema 113. The release contract accepts
+`113..114`, targets 114, and lists only the checksum-pinned migration 114 in
+`migrations-114.json`. The verified backup is bound to schema 113. The bridge
+application accepts the exact missing-function response and then executes the
+same tenant lifecycle, settings, bound-project, and published-schema checks as
+the old site endpoint. Other failures stop the request. The RPC uses invoker
+rights, an empty search path, and service-role-only execution. Python still
+validates the publication and filters protected/private schema according to
+visitor membership and permissions. After schema 114 commits, recovery remains
+forward-repair-only.
+
+### Earlier schema 113 bridge
+
+Migration 113 added the managed-asset visibility context RPC. Its historical
+`migrations-113.json` remains pinned, and the application retains its secure
+schema-112 fallback only for an exact missing-function response. Schema 113 is
+now applied production history and must not be edited.
+
+### Earlier schema 112 bridge
+
+The historical release began at schema 109. Its contract accepted schema
 `109..112` and targets `112` using the checksum-pinned
 `migrations-110-112.json`
 manifest. Migration 110 makes e-commerce order persistence and its durable
