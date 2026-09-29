@@ -88,7 +88,7 @@ def nonproject_asset_reference_count(
     database_client = client or service_supabase
     url = f"/uploads/{storage_key}"
     def site_count() -> int:
-        settings = [settings_row] if settings_row else []
+        settings = [settings_row] if settings_row is not None else []
         if settings_row is None:
             settings = getattr(
                 database_client.table("website_settings")

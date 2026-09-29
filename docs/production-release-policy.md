@@ -1,6 +1,6 @@
 # Madar production release acceptance policy
 
-Last implementation review: 2026-09-24
+Last implementation review: 2026-09-29
 
 ## A. Purpose and authority
 
@@ -255,12 +255,19 @@ queried directly. Its SHA must match state and its reported compatibility range
 must contain the live schema. Candidate rollback bounds are descriptive metadata
 today; retained-target attestation is the operative rollback check.
 
-Production is currently at schema 109. The current bridge contract is schema
-range `109..112`, target `112`, class `forward-compatible`, rollback
-metadata `109..109`, and the checksum-pinned `migrations-110-112.json`.
-Migrations through 109 are applied production history and remain immutable.
-Only after bridge acceptance at schema 109 may the coordinator create a
-verified source-schema-109 backup and execute migrations 110 through 112. Migration 110
+Production was observed at schema 112 for this change. The current candidate
+bridge contract is schema range `112..113`, target `113`, class
+`forward-compatible`, rollback metadata `112..112`, and the checksum-pinned
+`migrations-113.json`. Migrations through 112 are applied production history
+and remain immutable. Only after bridge acceptance at schema 112 may the
+coordinator create a verified source-schema-112 backup and execute migration
+113. It installs a service-role-only, invoker-rights asset-visibility context
+RPC. The candidate backend uses the complete preexisting authorization path
+only while that RPC is definitively absent before migration. Network/database
+errors remain fail-closed. Once schema advances beyond 112, recovery is
+forward-repair-only.
+
+The preceding schema-109 bridge used `migrations-110-112.json`. Migration 110
 atomically creates the durable e-commerce order notification intent with the
 order transaction, installs a deferred order trigger so finalized totals are
 included, and safely repairs missing intents for orders from the preceding 30
@@ -269,8 +276,7 @@ the existing primary category, and preserves `ecommerce_products.category_id`
 for compatibility. Migration 112 changes the product-owned variant relationship
 to cascade when an unreferenced product is deleted; order, inventory, and loyalty
 foreign keys remain restrictive so transaction history cannot be erased.
-Once schema advances beyond 109, recovery is
-forward-repair-only.
+That historical manifest and its migration checksums remain retained.
 
 The preceding schema-108 bridge contract used schema
 range `105..108`, target `108`, class `forward-compatible`, rollback metadata
