@@ -1,4 +1,5 @@
 import copy
+import asyncio
 import unittest
 from datetime import datetime, timezone, timedelta
 from os import environ
@@ -7,7 +8,7 @@ from unittest.mock import patch, Mock
 
 from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.testclient import TestClient
-from routes import admin_billing_routes, public_site_routes, ecommerce_routes, billing_routes, website_routes
+from routes import admin_billing_routes, public_site_routes, ecommerce_routes, billing_routes, website_routes, builder_routes
 from services import entitlement_service as ent, commercial_access_service as access, auth_service, tenant_service
 from services.commercial_billing_service import assign_plan
 from services.commercial_catalog import GIB
@@ -87,6 +88,29 @@ class CommercialAuthorityTests(unittest.TestCase):
             self.state["commercial_suspended_at"] = self.state["effective_at"]
             with patch.dict(environ, {"COMMERCIAL_ENTITLEMENTS_ENFORCED": "false"}), self.assertRaises(HTTPException):
                 ent.require_entitlement(7, "ecommerce")
+
+    def test_product_media_upload_requires_commerce_and_denies_hold_under_bypass(self):
+        context = SimpleNamespace(tenant_id=7, user_id=5, role="owner")
+        for module, held, enforced, allowed in (
+            ("forms", False, "true", False), ("website", False, "true", False),
+            ("ecommerce", False, "true", True), ("ecommerce", True, "false", False),
+        ):
+            self.state = snapshot()
+            self.state["period"]["module_ids"] = [module]
+            self.state["subscriptions"][0]["module_basis"] = {module:self.state["subscriptions"][0]["module_basis"][module]}
+            if held:
+                self.state["commercial_suspended_at"] = self.state["effective_at"]
+            request = Request({"type":"http", "method":"POST", "path":"/ecommerce/product-media/upload", "headers":[]})
+            with self.subTest(module=module, held=held), patch.dict(environ, {"COMMERCIAL_ENTITLEMENTS_ENFORCED":enforced}), patch.object(builder_routes, "require_active_tenant_member", return_value=context), patch.object(builder_routes, "enforce_builder_asset_upload_rate_limit", side_effect=RuntimeError("authorized upload pipeline")) as pipeline:
+                if allowed:
+                    with self.assertRaisesRegex(RuntimeError, "authorized upload pipeline"):
+                        asyncio.run(builder_routes.upload_ecommerce_product_media(request, Response(), None))
+                    pipeline.assert_called_once()
+                else:
+                    with self.assertRaises(HTTPException) as error:
+                        asyncio.run(builder_routes.upload_ecommerce_product_media(request, Response(), None))
+                    self.assertEqual(error.exception.status_code, 403 if held else 402)
+                    pipeline.assert_not_called()
 
     def test_store_and_merchant_boundaries_use_ecommerce_not_website(self):
         context = SimpleNamespace(tenant_id=7, role="owner")

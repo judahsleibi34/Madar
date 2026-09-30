@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
-async function provision(page, { aal1 = false, legacy = false, conflict = false } = {}) {
-  let held = false, revision = 17, operation = "";
+async function provision(page, { aal1 = false, legacy = false, conflict = false, mutationStepUp = false } = {}) {
+  let held = false, revision = 17, operation = "", mutationAttempts = 0;
   await page.route("**/*", async route => {
     const url = new URL(route.request().url());
     if (url.origin !== "http://127.0.0.1:5179") return route.abort();
@@ -10,6 +10,10 @@ async function provision(page, { aal1 = false, legacy = false, conflict = false 
     if (url.pathname === "/api/auth/mfa/status") return json({ factors: [{ id: "synthetic-factor", status: "verified" }] });
     if (url.pathname === "/api/auth/mfa/enroll/verify") { aal1 = false; return json({ success: true }); }
     if (url.pathname.startsWith("/api/admin/billing/")) {
+      if (route.request().method() === "POST" && !url.pathname.endsWith("/quote")) {
+        mutationAttempts++;
+        if (mutationStepUp) { mutationStepUp = false; aal1 = true; }
+      }
       if (aal1) return route.fulfill({ status: 403, json: { detail: { code: "aal2_required", message: "Verify MFA" } } });
       if (url.pathname.endsWith("price-books")) return json({ price_books: [] });
       if (url.pathname.endsWith("modules/quote")) { const body = route.request().postDataJSON(); return json({ quote: { revision, module_basis: Object.fromEntries(body.module_ids.map(id => [id, { price_book_id: "launch_2026" }])), pricing: { module_ids: body.module_ids, recurring_minor: 3000, currency: "USD", billing_interval: "month", price_groups: [] } } }); }
@@ -24,6 +28,7 @@ async function provision(page, { aal1 = false, legacy = false, conflict = false 
     return json({ success: true, notifications: [], unread_count: 0 });
   });
   await page.goto("/admin/tenants/42/commercial");
+  return () => mutationAttempts;
 }
 async function confirm(page, name) {
   await page.getByRole("button", { name, exact: true }).click(); await page.getByLabel("Required reason").fill("Synthetic reason"); await page.getByLabel(/I have reviewed/).check(); await page.getByRole("button", { name: "Confirm action" }).click();
@@ -42,4 +47,20 @@ test("stale revision blocks reconfirmation", async ({ page }) => {
 });
 test("legacy review and responsive page", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 }); await provision(page, { legacy: true }); await expect(page.getByRole("heading", { name: "Legacy commercial state — Review required" })).toBeVisible(); expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});
+
+test("mutation step-up cannot submit or replay the commercial confirmation form", async ({ page }) => {
+  const attempts = await provision(page, { mutationStepUp: true });
+  await confirm(page, "Suspend commercial access");
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByRole("heading", { name: "MFA verification required" })).toBeVisible();
+  await dialog.getByLabel("Verification code").fill("123456");
+  await dialog.getByRole("button", { name: "Verify account" }).click();
+  await expect(dialog.getByRole("alert")).toContainText("Account verified");
+  expect(attempts()).toBe(1);
+  await expect(dialog.getByRole("button", { name: "Confirm action" })).toBeDisabled();
+  await dialog.getByLabel(/I have reviewed/).check();
+  await dialog.getByRole("button", { name: "Confirm action" }).click();
+  await expect(page.getByText(/Held since/)).toBeVisible();
+  expect(attempts()).toBe(2);
 });

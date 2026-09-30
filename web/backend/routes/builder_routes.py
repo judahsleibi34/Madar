@@ -1682,6 +1682,7 @@ async def upload_builder_asset(
         )
         if str(context.role or "").lower() not in {"owner", "admin", "member"}:
             raise HTTPException(status_code=403, detail="Ecommerce access required")
+        require_entitlement(context.tenant_id, "ecommerce")
     else:
         context = require_builder_context(request, response, require_builder_write_access)
         require_entitlement(context.tenant_id, "image_uploads")

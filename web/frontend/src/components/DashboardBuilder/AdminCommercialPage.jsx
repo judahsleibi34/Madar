@@ -29,6 +29,7 @@ function CommercialDialog({ action, snapshot, history, tenantId, onClose, onSucc
   const dialog = useRef(null);
   const inFlight = useRef(false);
   const intent = useRef(null);
+  const draftRevision = useRef(0);
   const ent = snapshot.entitlements || {};
   const assigned = ent.assigned_modules || [];
   const [fields, setFields] = useState({ module_ids: assigned, reason: "", reference: "", billing_months: 1, method: "bank_transfer", actual_minor: "", paid_at: "", valid_from: "", valid_until: "", receipt_reference: "", override_reason: "", period_id: "", payment_id: "", supersedes_period_id: "" });
@@ -48,21 +49,25 @@ function CommercialDialog({ action, snapshot, history, tenantId, onClose, onSucc
   }, []);
   const change = (key, value) => {
     if (intent.current) { setError("This request may already have reached the server. Retry the identical request or close and inspect history before starting a different intent."); return; }
+    draftRevision.current++;
     setFields(previous => ({ ...previous, [key]: value }));
     setConfirmed(false); setQuote(null);
   };
   const preview = async () => {
+    const requestedDraft = draftRevision.current;
+    setQuote(null); setConfirmed(false);
     setBusy(true); setError("");
     try {
       const result = await commercialRequest(`tenants/${tenantId}/modules/quote`, { module_ids: fields.module_ids, billing_months: Number(fields.billing_months) });
+      if (requestedDraft !== draftRevision.current) return;
       if (result.quote.revision !== snapshot.commercial_access.revision) { setStale(true); await onConflict(); throw new Error("Commercial state changed. Close and review the refreshed state."); }
       setQuote(result.quote);
-    } catch (err) { setError(err.message); if (err.code === "aal2_required") { setNeedsMfa(true); onStepUp(); } }
+    } catch (err) { setError(err.message); if (err.code === "aal2_required") { setNeedsMfa(true); setConfirmed(false); onStepUp(); } }
     finally { setBusy(false); }
   };
   const submit = async (event) => {
     event.preventDefault();
-    if (inFlight.current || stale || !confirmed || (requiresQuote && !quote) || (action === "manual-payments" && !quote?.payment_eligible)) return;
+    if (inFlight.current || needsMfa || stale || !confirmed || (requiresQuote && !quote) || (action === "manual-payments" && !quote?.payment_eligible)) return;
     const body = { expected_revision: snapshot.commercial_access.revision, reason: fields.reason.trim(), ...(fields.reference ? { reference: fields.reference } : {}) };
     if (body.reason.length < 3) { setError("Enter a reason of at least three characters."); return; }
     if (action === "modules" || grant) body.module_ids = fields.module_ids;
@@ -86,7 +91,7 @@ function CommercialDialog({ action, snapshot, history, tenantId, onClose, onSucc
       await onSuccess();
     } catch (err) {
       setError(err.message);
-      if (err.code === "aal2_required") { setNeedsMfa(true); onStepUp(); }
+      if (err.code === "aal2_required") { setNeedsMfa(true); setConfirmed(false); onStepUp(); }
       if (err.status === 409) { setStale(true); await onConflict(); setError(`${err.message} State refreshed. Close and review again before a new action.`); }
     } finally { inFlight.current = false; setBusy(false); }
   };
@@ -110,10 +115,10 @@ function CommercialDialog({ action, snapshot, history, tenantId, onClose, onSucc
       {input("reference", "Safe action reference (optional)", "text", false)}
       {requiresQuote && <><button type="button" disabled={busy || stale || !!intent.current} onClick={preview}>Preview server quote</button>{quote && <section aria-label="Server quote"><Pricing pricing={quote.pricing} />{action === "manual-payments" && <p>Expected payment: {money(quote.expected_payment_minor, quote.pricing.currency)}</p>}{action === "manual-payments" && !quote.payment_eligible && <p role="alert">This basis is not eligible for payment. Launch pricing is prepared, not activated; use an approved complimentary workflow if appropriate.</p>}<p>Proposed modules: {quote.pricing.module_ids.map(id => moduleNames[id]).join(", ") || "Full cancellation"}</p></section>}</>}
       <label><input type="checkbox" checked={confirmed} onChange={e => setConfirmed(e.target.checked)} required />I have reviewed this tenant, commercial basis and the effect of this action.</label>
-      {needsMfa && <AdminCommercialStepUp onVerified={async () => { setNeedsMfa(false); setError("Account verified. Review and confirm the unchanged action again."); setConfirmed(false); }} />}
       {error && <p role="alert">{error}</p>}
-      <div className="commercial-actions"><button type="button" disabled={busy} onClick={onClose}>Cancel</button><button type="submit" disabled={busy || stale || !confirmed || fields.reason.trim().length < 3 || (requiresQuote && !quote) || (action === "manual-payments" && !quote?.payment_eligible)}>{busy ? "Submitting…" : "Confirm action"}</button></div>
+      <div className="commercial-actions"><button type="button" disabled={busy} onClick={onClose}>Cancel</button><button type="submit" disabled={busy || needsMfa || stale || !confirmed || fields.reason.trim().length < 3 || (requiresQuote && !quote) || (action === "manual-payments" && !quote?.payment_eligible)}>{busy ? "Submitting…" : "Confirm action"}</button></div>
     </form>
+    {needsMfa && <AdminCommercialStepUp onVerified={async () => { setNeedsMfa(false); setError("Account verified. Review and confirm the unchanged action again."); setConfirmed(false); }} />}
   </dialog>;
 }
 

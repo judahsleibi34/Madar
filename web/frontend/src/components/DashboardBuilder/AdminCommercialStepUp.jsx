@@ -20,7 +20,7 @@ export default function AdminCommercialStepUp({ userId, onVerified }) {
     return () => { active = false; };
   }, []);
   const verify = async event => {
-    event.preventDefault(); setBusy(true); setError("");
+    event.preventDefault(); event.stopPropagation(); setBusy(true); setError("");
     try {
       const response = await apiFetch(getApiUrl("/auth/mfa/enroll/verify"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ factor_id: factor, code }) });
       const data = await response.json();

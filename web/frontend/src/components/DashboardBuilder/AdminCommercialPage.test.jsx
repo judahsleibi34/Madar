@@ -57,3 +57,16 @@ it("pins assignment to the previewed price books instead of silently choosing an
   fireEvent.click(screen.getByRole("button", { name: "Preview server quote" })); await screen.findByLabelText("Server quote"); fireEvent.click(screen.getByLabelText(/I have reviewed/)); fireEvent.click(screen.getByRole("button", { name: "Confirm action" }));
   await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull()); expect(commercialRequest.mock.calls.find(([path, body]) => path.endsWith("/modules") && body)[1].price_books).toEqual({ website: "launch_2026" });
 });
+
+it("discards an in-flight quote when the proposed module set changes", async () => {
+  const base = commercialRequest.getMockImplementation();
+  let resolveQuote;
+  commercialRequest.mockImplementation((path, body) => path.endsWith("/modules/quote") ? new Promise(resolve => { resolveQuote = () => resolve({ quote: { revision: 17, module_basis: { website: { price_book_id: "launch_2026" } }, pricing: { ...state.entitlements.pricing, module_ids: body.module_ids } } }); }) : base(path, body));
+  await open("Manage modules");
+  fireEvent.click(screen.getByRole("button", { name: "Preview server quote" }));
+  fireEvent.click(screen.getByRole("checkbox", { name: "Madar Forms" }));
+  resolveQuote();
+  await waitFor(() => expect(screen.getByRole("button", { name: "Preview server quote" }).disabled).toBe(false));
+  expect(screen.queryByLabelText("Server quote")).toBeNull();
+  expect(screen.getByRole("button", { name: "Confirm action" }).disabled).toBe(true);
+});
