@@ -126,6 +126,11 @@ def get_website_tenant_context(request: Request, response: Response):
         except (TypeError, ValueError):
             raise HTTPException(status_code=403, detail="User id does not match session")
 
+    if request.method in {"POST", "PUT", "PATCH"}:
+        require_any_entitlement(
+            context.tenant_id, {"standard_hosted_address", "public_form_links"},
+            message="Commercial website access is required.",
+        )
     return context
 
 

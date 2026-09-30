@@ -112,6 +112,21 @@ class HostedAddressRuleTests(unittest.TestCase):
 
 
 class EntitlementMatrixTests(unittest.TestCase):
+    def setUp(self):
+        self.ledger = patch.object(entitlement_service, "resolve_commercial_access", side_effect=self.ledger_for)
+        self.ledger.start()
+        self.addCleanup(self.ledger.stop)
+
+    @staticmethod
+    def ledger_for(tenant_id):
+        subscriptions, addons = entitlement_service._canonical_records(tenant_id) or ([], [])
+        plan = next((row.get("plan_id") for row in subscriptions if row.get("state") in {"active", "trial", "grace"}), "business")
+        return {"tenant_id": tenant_id, "revision": 1, "review_state": "reviewed",
+                "commercial_suspended_at": None, "effective_at": "2026-09-30T12:00:00+00:00",
+                "period": {"tenant_id": tenant_id, "plan_id": plan,
+                           "valid_from": "2026-09-01T00:00:00+00:00", "valid_until": "2026-10-01T00:00:00+00:00"},
+                "subscriptions": subscriptions, "addons": addons}
+
     def canonical_state(self, plan_id, addons=None):
         subscription = {
             "id": 1,
@@ -275,7 +290,7 @@ class EntitlementMatrixTests(unittest.TestCase):
                 "COMMERCIAL_ENTITLEMENTS_ENFORCED": "false",
                 "COMMERCIAL_ENTITLEMENT_TEST_LOOKUPS": "true",
             }), patch.object(
-                entitlement_service, "_canonical_records", side_effect=AssertionError("lookup must be bypassed")
+                entitlement_service, "resolve_commercial_access", return_value={"revision": 1, "review_state": "review_required", "commercial_suspended_at": None}
             ):
                 state = entitlement_service.require_entitlement(7, "website_publish")
                 self.assertEqual(state["source"], "operator_configuration_override")

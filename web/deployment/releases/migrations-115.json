@@ -1,0 +1,13 @@
+{
+  "release_sha": "CURRENT",
+  "migrations": [
+    {
+      "number": 115,
+      "path": "web/database/migrations/115_reconcile_commercial_access.sql",
+      "sha256": "6cc42ed38ac41857b4948f765d3435f3727fde6d19195340bd0b6a3e9bb43234",
+      "from_schema": 114,
+      "to_schema": 115,
+      "compatibility": "forward-compatible"
+    }
+  ]
+}

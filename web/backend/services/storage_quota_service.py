@@ -8,6 +8,7 @@ from typing import Any
 
 from database import service_supabase
 from services.entitlement_service import get_storage_quota_bytes
+from fastapi import HTTPException
 
 DEFAULT_TENANT_QUOTA_BYTES = 5 * 1024 * 1024 * 1024
 DEFAULT_USER_QUOTA_BYTES = 1024 * 1024 * 1024
@@ -116,12 +117,21 @@ def release_storage(*, tenant_id: int, category: str, storage_key: str, client=N
     return bool(data[0] if isinstance(data, list) and data else data)
 
 
+def _effective_quota_for_inspection(tenant_id: int) -> int:
+    try:
+        return get_storage_quota_bytes(tenant_id)
+    except HTTPException as error:
+        if error.status_code == 402:
+            return 0
+        raise
+
+
 def get_tenant_storage_usage(tenant_id: int, *, client=None) -> dict[str, Any]:
     response = (client or service_supabase).table("storage_accounts").select(
         "used_bytes,reserved_bytes,quota_bytes"
     ).eq("tenant_id", int(tenant_id)).eq("scope_key", "tenant").is_("user_id", "null").limit(1).execute()
     rows = getattr(response, "data", None) or []
-    entitlement_quota = get_storage_quota_bytes(tenant_id)
+    entitlement_quota = _effective_quota_for_inspection(tenant_id)
     if not rows:
         return {
             "used_bytes": 0,
@@ -150,7 +160,11 @@ def sync_tenant_storage_quota(tenant_id: int, *, client=None) -> dict[str, Any] 
     safety scopes or create a second physical-usage accounting row.
     """
 
-    quota_bytes = get_storage_quota_bytes(tenant_id)
+    quota_bytes = _effective_quota_for_inspection(tenant_id)
+    if quota_bytes <= 0:
+        # Reservations reauthorize every write; retained objects/accounting are
+        # not removed or rewritten while commercial access is unavailable.
+        return None
     response = (
         (client or service_supabase)
         .table("storage_accounts")

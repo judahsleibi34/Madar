@@ -58,10 +58,13 @@ def current_commercial_plan(request: Request, response: Response):
     entitlements = get_tenant_entitlements(context.tenant_id)
     return {
         "success": True,
-        "plan": entitlements.get("subscription"),
-        "plan_id": entitlements.get("plan_id"),
+        "plan": entitlements.get("assigned_subscription") or entitlements.get("subscription"),
+        "plan_id": entitlements.get("assigned_plan_id") or entitlements.get("plan_id"),
+        "commercial_access_state": entitlements.get("commercial_access_state"),
+        "commercial_denial_code": entitlements.get("commercial_denial_code"),
+        "commercial_revision": entitlements.get("commercial_revision"),
         "state": (
-            (entitlements.get("subscription") or {}).get("state")
+            (entitlements.get("assigned_subscription") or entitlements.get("subscription") or {}).get("state")
             or ("review_required" if entitlements.get("review_required") else "legacy")
         ),
         "source": entitlements.get("source"),

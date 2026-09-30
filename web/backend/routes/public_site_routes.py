@@ -1984,6 +1984,7 @@ def resolve_public_store_settings(site_identifier: str, *, request: Request) -> 
 
     cached = read_ecommerce_cache(cache_key)
     if isinstance(cached, dict):
+        require_public_runtime_entitlement(cached, "website_publish")
         return cached
 
     settings = resolve_website_settings(
@@ -1991,6 +1992,7 @@ def resolve_public_store_settings(site_identifier: str, *, request: Request) -> 
         request=request,
     )
     tenant_id = resolve_tenant_id(settings)
+    require_public_runtime_entitlement(settings, "website_publish")
     write_ecommerce_cache(
         cache_key,
         tenant_id,
@@ -3010,15 +3012,15 @@ def get_public_store_profile(subdomain: str, request: Request, response: Respons
         "etag": f'"store-profile-{hashlib.sha256(canonical.encode("utf-8")).hexdigest()}"'
     }
     apply_public_cache_headers(response, metadata)
-    response.headers["Cache-Control"] = "public, max-age=30, stale-while-revalidate=300"
-    response.headers["CDN-Cache-Control"] = "public, s-maxage=60, stale-while-revalidate=600"
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["CDN-Cache-Control"] = "no-store"
     if request_etag_matches(request, metadata):
         return Response(
             status_code=304,
             headers={
                 "ETag": metadata["etag"],
-                "Cache-Control": "public, max-age=30, stale-while-revalidate=300",
-                "CDN-Cache-Control": "public, s-maxage=60, stale-while-revalidate=600",
+                "Cache-Control": "no-store",
+                "CDN-Cache-Control": "no-store",
             },
         )
     return {"success": True, "site": site_profile}
@@ -3048,7 +3050,7 @@ def get_public_storefront_sitemap(subdomain: str, request: Request):
     clean_subdomain = normalize_subdomain(subdomain)
     enforce_public_rate_limit(request, "storefront_sitemap", clean_subdomain)
     settings = resolve_public_store_settings(clean_subdomain, request=request)
-    return Response(content=_storefront_sitemap_xml(settings, clean_subdomain, request), media_type="application/xml", headers={"Cache-Control": "public, max-age=300, stale-while-revalidate=3600"})
+    return Response(content=_storefront_sitemap_xml(settings, clean_subdomain, request), media_type="application/xml", headers={"Cache-Control": "no-store"})
 
 
 @router.get("/sites/{subdomain}/robots.txt")
@@ -3143,16 +3145,16 @@ def get_public_catalog(
         "etag": f'"catalog-{hashlib.sha256(canonical.encode("utf-8")).hexdigest()}"'
     }
     apply_public_cache_headers(response, metadata)
-    response.headers["Cache-Control"] = "public, max-age=30, stale-while-revalidate=300"
-    response.headers["CDN-Cache-Control"] = "public, s-maxage=60, stale-while-revalidate=600"
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["CDN-Cache-Control"] = "no-store"
     response.headers["X-Ecommerce-Cache"] = "HIT" if cache_hit else "MISS"
     if request_etag_matches(request, metadata):
         return Response(
             status_code=304,
             headers={
                 "ETag": metadata["etag"],
-                "Cache-Control": "public, max-age=30, stale-while-revalidate=300",
-                "CDN-Cache-Control": "public, s-maxage=60, stale-while-revalidate=600",
+                "Cache-Control": "no-store",
+                "CDN-Cache-Control": "no-store",
                 "X-Ecommerce-Cache": "HIT" if cache_hit else "MISS",
             },
         )
@@ -3204,16 +3206,16 @@ def get_public_catalog_product(
         "etag": f'"product-{hashlib.sha256(canonical.encode("utf-8")).hexdigest()}"'
     }
     apply_public_cache_headers(response, metadata)
-    response.headers["Cache-Control"] = "public, max-age=30, stale-while-revalidate=300"
-    response.headers["CDN-Cache-Control"] = "public, s-maxage=60, stale-while-revalidate=600"
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["CDN-Cache-Control"] = "no-store"
     response.headers["X-Ecommerce-Cache"] = "HIT" if cache_hit else "MISS"
     if request_etag_matches(request, metadata):
         return Response(
             status_code=304,
             headers={
                 "ETag": metadata["etag"],
-                "Cache-Control": "public, max-age=30, stale-while-revalidate=300",
-                "CDN-Cache-Control": "public, s-maxage=60, stale-while-revalidate=600",
+                "Cache-Control": "no-store",
+                "CDN-Cache-Control": "no-store",
                 "X-Ecommerce-Cache": "HIT" if cache_hit else "MISS",
             },
         )

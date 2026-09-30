@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate the production schema-113 to schema-114 forward release."""
+"""Validate the production schema-114 to schema-115 forward release."""
 
 from __future__ import annotations
 
@@ -12,12 +12,12 @@ import re
 ROOT = Path(__file__).resolve().parents[2]
 BASELINE = "1e6b739a43759309a45ede2dff28a859209e4a64"
 
-SOURCE_SCHEMA = 113
-TARGET_SCHEMA = 114
-MANIFEST_NAME = "migrations-114.json"
+SOURCE_SCHEMA = 114
+TARGET_SCHEMA = 115
+MANIFEST_NAME = "migrations-115.json"
 
-# Migrations 100-113 have already been applied to production and are no
-# longer part of the active 113 -> 114 execution manifest. Keep them
+# Migrations 100-114 have already been applied to production and are no
+# longer part of the active 114 -> 115 execution manifest. Keep them
 # explicitly checksum-pinned so narrowing the active manifest cannot make
 # already-applied production history mutable.
 APPLIED_PRODUCTION_MIGRATIONS = {
@@ -77,11 +77,15 @@ APPLIED_PRODUCTION_MIGRATIONS = {
         "113_consolidate_managed_asset_visibility.sql",
         "eca869ced3ebd98b43de58636913e873691a904c6675720424621271fd2e36dd",
     ),
+    114: (
+        "114_consolidate_public_site_runtime.sql",
+        "73db3729be8b15f5fc2e18f0584315a16cb47555db7fc691900067b3a1582f6f",
+    ),
 }
 
 EXPECTED = {
-    114: (
-        "114_consolidate_public_site_runtime.sql",
+    115: (
+        "115_reconcile_commercial_access.sql",
         "forward-compatible",
     ),
 }
@@ -127,9 +131,9 @@ def validate(root: Path = ROOT) -> list[str]:
                     "immutable production migration changed: " + relative
                 )
 
-        # Schema 100-113 is already live in production. These migrations
+        # Schema 100-114 is already live in production. These migrations
         # must remain immutable even though the active execution manifest
-        # begins at schema 113 and therefore contains only migration 114.
+        # begins at schema 114 and therefore contains only migration 115.
         for number, (filename, checksum) in (
             APPLIED_PRODUCTION_MIGRATIONS.items()
         ):
@@ -177,8 +181,8 @@ def validate(root: Path = ROOT) -> list[str]:
             and release["migration_manifest"] == MANIFEST_NAME
         ):
             errors.append(
-                "release must bridge production schema 113 to 114 "
-                "with rollback bounded at schema 113"
+                "release must bridge production schema 114 to 115 "
+                "with rollback bounded at schema 114"
             )
 
         manifest = json.loads(
@@ -197,9 +201,9 @@ def validate(root: Path = ROOT) -> list[str]:
 
         entries = manifest["migrations"]
 
-        if [int(entry["number"]) for entry in entries] != [114]:
+        if [int(entry["number"]) for entry in entries] != [115]:
             errors.append(
-                "forward manifest must contain migration 114"
+                "forward manifest must contain migration 115"
             )
 
         previous = SOURCE_SCHEMA

@@ -1,4 +1,4 @@
-"""Manual commercial plan/add-on lifecycle operations."""
+"""Product assignment operations; dated ledger access is granted separately."""
 
 from __future__ import annotations
 
@@ -141,10 +141,7 @@ def assign_plan(
         },
     ).execute()
     rows = _rows(response)
-    if state == "active":
-        from services.storage_quota_service import sync_tenant_storage_quota
-
-        sync_tenant_storage_quota(tenant_id)
+    # An active assignment alone never creates or extends paid ledger access.
     return rows[0] if rows else {}
 
 
