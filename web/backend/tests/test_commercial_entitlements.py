@@ -160,9 +160,9 @@ class EntitlementMatrixTests(unittest.TestCase):
         self.assertIn("forms", forms)
         self.assertNotIn("page_builder", forms)
         self.assertIn("standard_hosted_address", website)
-        self.assertNotIn("reservations", website)
+        self.assertIn("reservations", website)
         self.assertIn("data_exports", business)
-        self.assertNotIn("internal_calendar", business)
+        self.assertIn("internal_calendar", business)
         self.assertIn("reservations", plus)
         self.assertIn("internal_calendar", plus)
 

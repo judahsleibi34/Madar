@@ -121,7 +121,7 @@ def _effective_quota_for_inspection(tenant_id: int) -> int:
     try:
         return get_storage_quota_bytes(tenant_id)
     except HTTPException as error:
-        if error.status_code == 402:
+        if error.status_code == 402 or (error.status_code == 403 and isinstance(error.detail, dict) and error.detail.get("code") in {"commercial_access_suspended", "commercial_review_required"}):
             return 0
         raise
 

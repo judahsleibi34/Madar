@@ -12,9 +12,9 @@ from datetime import date
 from typing import Any
 
 
-CATALOG_VERSION = "2026-07-30"
+CATALOG_VERSION = "2026-09-30"
 CATALOG_CURRENCY = "USD"
-CATALOG_EFFECTIVE_DATE = date(2026, 7, 30).isoformat()
+CATALOG_EFFECTIVE_DATE = date(2026, 9, 30).isoformat()
 GIB = 1024 * 1024 * 1024
 
 BASE_PLAN_IDS = ("forms", "website", "business", "business_plus")
@@ -41,6 +41,7 @@ CAPABILITIES = (
     "standard_data_analysis",
     "page_builder",
     "website_publish",
+    "ecommerce",
     "image_uploads",
     "expanded_data_analysis",
     "data_cleaning",
@@ -77,8 +78,12 @@ _WEBSITE_CAPABILITIES = {
     "website_publish",
     "image_uploads",
     "standard_hosted_address",
+    "reservations",
+    "reservation_management",
+    "internal_calendar",
 }
 _BUSINESS_CAPABILITIES = _WEBSITE_CAPABILITIES | {
+    "ecommerce",
     "data_import",
     "standard_data_analysis",
     "expanded_data_analysis",

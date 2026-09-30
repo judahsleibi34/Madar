@@ -17,6 +17,24 @@ from services.api_errors import error_detail
 logger = logging.getLogger(__name__)
 
 
+def validate_commercial_snapshot(data: Any, tenant_id: int | str) -> dict[str, Any]:
+    """Validate a server-provided snapshot, including consolidated runtime reads."""
+    if (not isinstance(data, dict) or data.get("tenant_id") != int(tenant_id)
+        or not isinstance(data.get("revision"), int) or isinstance(data.get("revision"), bool)
+        or data["revision"] <= 0 or data.get("review_state") not in {"reviewed", "review_required"}):
+        raise ValueError("invalid_commercial_state")
+    # Schema 099–114 cannot contain a hold. Schema 115 requires an explicit
+    # hold field; a malformed upgraded snapshot must never enter the bypass.
+    version = data.get("contract_version", 114)
+    if isinstance(version, bool) or version not in {114, 115}:
+        raise ValueError("unknown_commercial_contract")
+    if version == 115 and (
+        "commercial_suspended_at" not in data or "subscriptions" not in data
+    ):
+        raise ValueError("incomplete_commercial_snapshot")
+    return data
+
+
 def resolve_commercial_access(tenant_id: int | str) -> dict[str, Any]:
     if (os.getenv("APP_ENV", "").lower() == "test"
         and os.getenv("COMMERCIAL_ENTITLEMENT_TEST_LOOKUPS", "").lower() not in {"1", "true", "yes", "on"}):
@@ -29,20 +47,7 @@ def resolve_commercial_access(tenant_id: int | str) -> dict[str, Any]:
             # Missing state cannot hide an explicit hold: the canonical RPC is
             # required even under temporary compatibility policy.
             raise ValueError("missing_commercial_state")
-        if (not isinstance(data, dict) or data.get("tenant_id") != int(tenant_id)
-            or not isinstance(data.get("revision"), int) or isinstance(data.get("revision"), bool)
-            or data["revision"] <= 0 or data.get("review_state") not in {"reviewed", "review_required"}):
-            raise ValueError("invalid_commercial_state")
-        # Schema 099–114 cannot contain a hold. Schema 115 requires an explicit
-        # hold field; a malformed upgraded snapshot must never enter the bypass.
-        version = data.get("contract_version", 114)
-        if isinstance(version, bool) or version not in {114, 115}:
-            raise ValueError("unknown_commercial_contract")
-        if version == 115 and (
-            "commercial_suspended_at" not in data or "subscriptions" not in data
-        ):
-            raise ValueError("incomplete_commercial_snapshot")
-        return data
+        return validate_commercial_snapshot(data, tenant_id)
     except Exception as error:
         logger.warning("commercial.access_lookup_failed", extra={"tenant_id": tenant_id, "error_type": type(error).__name__})
         raise HTTPException(status_code=503, detail=error_detail(

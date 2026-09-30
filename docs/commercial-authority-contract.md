@@ -24,8 +24,10 @@ The access period is finite `[valid_from, valid_until)` and its existing
 the same statement time and their required base capability. Subscription bounds
 can restrict a period further; they cannot extend it. Grandfathered hosted
 addresses remain a reviewed add-on equivalent for an otherwise entitled tenant.
-The existing catalog's website_publish capability governs storefront/catalog
-and checkout: no separate ecommerce plan taxonomy is introduced.
+The canonical ecommerce capability governs storefront/catalog and checkout;
+website_publish authorizes hosted website publishing only. Ecommerce is assigned only to Business
+and Business Plus. Website includes reservations but does not include ecommerce.
+No separate ecommerce plan taxonomy is introduced.
 
 ## Temporary operator compatibility policy
 
@@ -131,9 +133,11 @@ generic temporary-unavailability message and no tenant/plan/revision diagnostics
 Published-runtime dependency fallback was deliberately removed: a dependency
 outage cannot establish that a commercial hold is absent.
 
-Authenticated APIs use HTTP 402 commercial_access_suspended,
-commercial_access_expired, commercial_access_required,
-commercial_review_required or commercial_state_invalid as applicable. AAL1
+Authenticated APIs use HTTP 402 only for commercial_access_expired and
+commercial_access_required (renewal/access grant needed). Administrative
+commercial_access_suspended and commercial_review_required use HTTP 403.
+Malformed commercial_state_invalid and dependency failures use HTTP 503.
+Stable machine-readable codes remain unchanged. AAL1
 uses the existing HTTP 403 aal2_required contract; stale updates use HTTP 409
 commercial_revision_conflict. Authentication, MFA, logout and membership
 resolution have no commercial gate. Billing/assigned-plan/entitlement inspection
@@ -177,3 +181,14 @@ and revision semantics through an authorized provider boundary, while respecting
 explicit administrator holds. Source type cybersource remains available in the
 existing schema, but provider signature/settlement integration is future work.
 No third access authority is required.
+
+## Pre-push performance reconciliation
+
+Schema 115 enriches get_public_site_runtime_context settings with an internal
+_commercial_snapshot from resolve_commercial_access in the same SQL statement.
+The backend validates its tenant, contract and revision, removes it before
+response construction, and uses it for the existing entitlement check. Normal
+anonymous hosted startup performs exactly one PostgREST RPC, under both
+enforcement modes. No commercial snapshot is cached. An explicit hold therefore
+remains authoritative on the next request. The schema-114 bridge performs two
+reads because its runtime RPC predates this snapshot.

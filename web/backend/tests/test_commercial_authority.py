@@ -32,7 +32,7 @@ class CommercialAuthorityTests(unittest.TestCase):
         env.start(); self.addCleanup(env.stop)
         self.state = snapshot()
         lookup = patch.object(ent, "resolve_commercial_access", side_effect=lambda tenant: copy.deepcopy(self.state))
-        lookup.start(); self.addCleanup(lookup.stop)
+        self.lookup=lookup.start(); self.addCleanup(lookup.stop)
 
     def test_assigned_plan_and_valid_ledger_grant_capabilities(self):
         result = ent.get_tenant_entitlements(7)
@@ -63,6 +63,81 @@ class CommercialAuthorityTests(unittest.TestCase):
                 self.assertEqual(ent.get_tenant_entitlements(7)["commercial_denial_code"],"commercial_access_suspended")
             self.state["commercial_suspended_at"]=None
 
+    def test_authenticated_commercial_http_status_matrix(self):
+        for code, expected in (("commercial_access_required", 402), ("commercial_access_expired", 402),
+                               ("commercial_access_suspended", 403), ("commercial_review_required", 403),
+                               ("commercial_state_invalid", 503)):
+            with self.subTest(code=code), self.assertRaises(HTTPException) as error:
+                ent._require_commercial_state({"commercial_denial_code": code})
+            self.assertEqual(error.exception.status_code, expected)
+            self.assertEqual(error.exception.detail["code"], code)
+
+    def test_ecommerce_product_matrix_requires_distinct_capability(self):
+        for plan in ("forms", "website", "business", "business_plus"):
+            self.state = snapshot()
+            self.state["period"]["plan_id"] = plan
+            self.state["subscriptions"][0]["plan_id"] = plan
+            result = ent.get_tenant_entitlements(7)
+            self.assertEqual("ecommerce" in result["capabilities"], plan in {"business", "business_plus"})
+            self.assertEqual("reservations" in result["capabilities"], plan != "forms")
+            if plan in {"business", "business_plus"}:
+                ent.require_entitlement(7, "ecommerce")
+            else:
+                with self.assertRaises(HTTPException): ent.require_entitlement(7, "ecommerce")
+            self.state["commercial_suspended_at"] = self.state["effective_at"]
+            with patch.dict(environ, {"COMMERCIAL_ENTITLEMENTS_ENFORCED": "false"}), self.assertRaises(HTTPException):
+                ent.require_entitlement(7, "ecommerce")
+
+    def test_store_and_merchant_boundaries_use_ecommerce_not_website(self):
+        context = SimpleNamespace(tenant_id=7, role="owner")
+        request = Request({"type":"http", "method":"POST", "path":"/ecommerce/products", "headers":[]})
+        for plan, allowed in (("website", False), ("business", True), ("business_plus", True)):
+            self.state = snapshot()
+            self.state["period"]["plan_id"] = plan
+            self.state["subscriptions"][0]["plan_id"] = plan
+            with patch.object(ecommerce_routes, "require_active_tenant_member", return_value=context):
+                if allowed:
+                    self.assertIs(ecommerce_routes._require_ecommerce_access(request, Response()), context)
+                else:
+                    with self.assertRaises(HTTPException): ecommerce_routes._require_ecommerce_access(request, Response())
+            with patch.object(public_site_routes, "enforce_request_tenant_identity", return_value="shop"), patch.object(public_site_routes, "request_hosted_tenant", return_value="shop"), patch.object(public_site_routes, "read_ecommerce_cache", return_value={"tenant_id":7}):
+                if allowed:
+                    public_site_routes.resolve_public_store_settings("shop", request=request)
+                else:
+                    with self.assertRaises(HTTPException) as error: public_site_routes.resolve_public_store_settings("shop", request=request)
+                    self.assertEqual(error.exception.status_code, 503)
+                    self.assertEqual(error.exception.detail["code"], "tenant_service_unavailable")
+
+    def test_public_ecommerce_route_graph_denies_website_or_hold_before_domain_io(self):
+        app = FastAPI(); app.include_router(public_site_routes.router)
+        client = TestClient(app)
+        product = "00000000-0000-0000-0000-000000000001"
+        item = {"product_id":product, "quantity":1}
+        order = {"idempotency_key":"synthetic-order-key", "customer_name":"Synthetic", "email":"synthetic@example.com", "phone":"1234567", "service_area_id":product, "street":"Synthetic street", "items":[item]}
+        calls = (("GET","store-profile",None), ("GET","catalog",None), ("GET","catalog/products/test",None), ("POST","cart/reconcile",{"items":[item]}), ("POST","orders",order))
+        for held in (False, True):
+            self.state = snapshot()
+            self.state["subscriptions"][0]["plan_id"] = "website"
+            self.state["period"]["plan_id"] = "website"
+            if held: self.state["commercial_suspended_at"] = self.state["effective_at"]
+            with patch.dict(environ,{"COMMERCIAL_ENTITLEMENTS_ENFORCED":"false" if held else "true"}), patch.object(public_site_routes,"enforce_public_rate_limit"), patch.object(public_site_routes,"enforce_request_tenant_identity",return_value="shop"), patch.object(public_site_routes,"request_hosted_tenant",return_value="shop"), patch.object(public_site_routes,"read_ecommerce_cache",return_value={"tenant_id":7}), patch.object(public_site_routes,"service_supabase") as domain, patch.object(ent,"resolve_commercial_access",side_effect=lambda tenant: copy.deepcopy(self.state)) as lookup:
+                for method,path,body in calls:
+                    lookup.reset_mock()
+                    response=client.request(method,"/public/sites/shop/"+path,json=body)
+                    self.assertEqual(response.status_code,503,(held,path,response.text))
+                    self.assertEqual(response.json()["detail"]["code"],"tenant_service_unavailable")
+                    lookup.assert_called_once_with(7)
+                    domain.table.assert_not_called(); domain.rpc.assert_not_called()
+
+    def test_business_store_profile_success_checks_commercial_once(self):
+        app=FastAPI(); app.include_router(public_site_routes.router)
+        for plan in ("business", "business_plus"):
+            self.state=snapshot(); self.state["subscriptions"][0]["plan_id"]=plan; self.state["period"]["plan_id"]=plan
+            with patch.object(public_site_routes,"enforce_public_rate_limit"), patch.object(public_site_routes,"enforce_request_tenant_identity",return_value="shop"), patch.object(public_site_routes,"request_hosted_tenant",return_value="shop"), patch.object(public_site_routes,"read_ecommerce_cache",return_value={"tenant_id":7}), patch.object(ent,"resolve_commercial_access",side_effect=lambda tenant: copy.deepcopy(self.state)) as lookup:
+                response=TestClient(app).get("/public/sites/shop/store-profile")
+                self.assertEqual(response.status_code,200,response.text)
+                lookup.assert_called_once_with(7)
+
     def test_review_required_is_preserved(self):
         self.state["review_state"] = "review_required"
         self.assertEqual(ent.get_tenant_entitlements(7)["commercial_denial_code"], "commercial_review_required")
@@ -80,7 +155,7 @@ class CommercialAuthorityTests(unittest.TestCase):
         self.state["commercial_suspended_at"] = self.state["effective_at"]
         with patch.dict(environ, {"COMMERCIAL_ENTITLEMENTS_ENFORCED": "false"}), patch.object(ent, "_legacy_features", return_value=[{"payment_status":"active","plan":"complete"}]):
             with self.assertRaises(HTTPException) as error: ent.require_entitlement(7, "forms")
-        self.assertEqual(error.exception.status_code, 402)
+        self.assertEqual(error.exception.status_code, 403)
         self.assertEqual(error.exception.detail["code"], "commercial_access_suspended")
 
     def test_unsuspended_unresolved_bypass_is_preserved(self):
@@ -113,9 +188,11 @@ class CommercialAuthorityTests(unittest.TestCase):
         with patch.object(public_site_routes,"enforce_public_rate_limit"), patch.object(public_site_routes,"resolve_public_site_runtime_context",return_value=(settings,{})), patch.object(public_site_routes,"get_optional_tenant_visitor") as visitor:
             with self.assertRaises(HTTPException): public_site_routes.get_public_site_runtime("shop",request,Response())
             visitor.assert_not_called()
+        self.lookup.reset_mock()
         with patch.object(public_site_routes,"enforce_public_rate_limit"), patch.object(public_site_routes,"resolve_website_settings",return_value=settings), patch.object(public_site_routes,"get_published_form_for_site") as content:
             with self.assertRaises(HTTPException): public_site_routes.get_public_form("shop","form",request,Response())
             content.assert_not_called()
+        self.lookup.assert_called_once_with(7)
 
     def test_reservation_route_stops_before_business_mutation_on_hold(self):
         self.state["commercial_suspended_at"] = self.state["effective_at"]
@@ -125,6 +202,7 @@ class CommercialAuthorityTests(unittest.TestCase):
         with patch.object(public_site_routes,"enforce_public_form_submission_rate_limit"), patch.object(public_site_routes,"reject_suspicious_public_submission"), patch.object(public_site_routes,"resolve_website_settings",return_value=settings), patch.object(public_site_routes,"get_bound_published_project",return_value={"status":"published","published_schema":{}}), patch.object(public_site_routes,"find_published_block",return_value={"id":"reservation"}), patch.object(public_site_routes,"authorize_site_resource") as mutate:
             with self.assertRaises(HTTPException): public_site_routes.submit_public_builder_block_event("shop",event,request,Response())
             mutate.assert_not_called()
+        self.lookup.assert_called_once_with(7)
 
     def test_storefront_checkout_stops_before_order_rpc_on_hold(self):
         self.state["commercial_suspended_at"] = self.state["effective_at"]

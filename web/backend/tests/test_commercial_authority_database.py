@@ -48,6 +48,25 @@ class CommercialLedgerDatabaseTests(unittest.TestCase):
         self.assertEqual(self.state()["contract_version"],115)
         self.assertEqual(self.state()["subscriptions"],[])
 
+    def test_runtime_context_contains_same_statement_ledger_and_preserves_privileges(self):
+        subdomain = "gate-" + str(self.tenant)
+        self.db.execute("insert into public.website_settings(user_id,tenant_id,subdomain) values(%s,%s,%s)", (self.actor,self.tenant,subdomain))
+        def context():
+            return self.db.execute("select settings from public.get_public_site_runtime_context(%s,false)", (subdomain,)).fetchone()[0]["_commercial_snapshot"]
+        for operation in (None, "suspend", "reactivate"):
+            if operation:
+                self.command(operation)
+            result = context()
+            expected = self.state()
+            self.assertEqual(result["tenant_id"], self.tenant)
+            self.assertEqual(result["revision"], expected["revision"])
+            self.assertEqual(result["commercial_suspended_at"], expected["commercial_suspended_at"])
+            self.assertEqual(result["contract_version"], 115)
+        signature = "public.get_public_site_runtime_context(text,boolean)"
+        for role, allowed in (("service_role",True),("anon",False),("authenticated",False)):
+            self.assertEqual(self.db.execute("select has_function_privilege(%s,%s,'EXECUTE')", (role,signature)).fetchone()[0], allowed)
+        self.assertEqual(self.db.execute("select count(*) from public.get_public_site_runtime_context('other-tenant',false)").fetchone()[0], 0)
+
     def test_rls_and_privileges(self):
         for table in ("tenant_commercial_state","commercial_access_periods","commercial_access_events","commercial_manual_payments"):
             self.assertTrue(self.db.execute("select relrowsecurity from pg_class where oid=%s::regclass", ("public."+table,)).fetchone()[0])

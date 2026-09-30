@@ -1984,7 +1984,7 @@ def resolve_public_store_settings(site_identifier: str, *, request: Request) -> 
 
     cached = read_ecommerce_cache(cache_key)
     if isinstance(cached, dict):
-        require_public_runtime_entitlement(cached, "website_publish")
+        require_public_runtime_entitlement(cached, "ecommerce")
         return cached
 
     settings = resolve_website_settings(
@@ -1992,7 +1992,7 @@ def resolve_public_store_settings(site_identifier: str, *, request: Request) -> 
         request=request,
     )
     tenant_id = resolve_tenant_id(settings)
-    require_public_runtime_entitlement(settings, "website_publish")
+    require_public_runtime_entitlement(settings, "ecommerce")
     write_ecommerce_cache(
         cache_key,
         tenant_id,
@@ -3659,7 +3659,7 @@ def resolve_public_site_runtime_context(subdomain: str, request: Request) -> tup
     )
     if not isinstance(context, dict) or not isinstance(context.get("settings"), dict):
         raise HTTPException(status_code=503, detail="Published site is temporarily unavailable")
-    settings = context["settings"]
+    settings = dict(context["settings"])
     if not isinstance(context.get("tenant_active"), bool):
         raise HTTPException(status_code=503, detail="Published site is temporarily unavailable")
     if not context["tenant_active"] or settings.get("tenant_id") is None:
@@ -3684,7 +3684,18 @@ def get_public_site_runtime(subdomain: str, request: Request, response: Response
     clean_subdomain = normalize_subdomain(subdomain)
     enforce_public_rate_limit(request, "site_lookup", clean_subdomain)
     settings, project = resolve_public_site_runtime_context(clean_subdomain, request)
-    require_public_runtime_entitlement(settings, "website_publish")
+    # Schema 115 joins the canonical ledger in the same authoritative DB read.
+    # Never cache this snapshot or expose it in the public response.
+    snapshot = None
+    if "_commercial_snapshot" in settings:
+        from services.commercial_access_service import validate_commercial_snapshot
+        try:
+            snapshot = validate_commercial_snapshot(settings.pop("_commercial_snapshot"), settings["tenant_id"])
+            if snapshot.get("contract_version") != 115:
+                raise ValueError("invalid_runtime_commercial_contract")
+        except (ValueError, TypeError, KeyError):
+            raise HTTPException(status_code=503, detail={"code": "tenant_service_unavailable", "message": "This service is temporarily unavailable."}, headers={"Cache-Control": "no-store"})
+    require_public_runtime_entitlement(settings, "website_publish", commercial_snapshot=snapshot)
     identity = get_optional_tenant_visitor(clean_subdomain, request, response, settings=settings)
     return build_public_site_response(
         clean_subdomain, request, response, settings, project, identity,

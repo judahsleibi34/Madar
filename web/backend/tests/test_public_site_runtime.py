@@ -1,6 +1,8 @@
 """The hosted first-render contract uses one publication context operation."""
 
 import unittest
+import copy
+import os
 from contextlib import ExitStack
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -9,6 +11,8 @@ from fastapi.testclient import TestClient
 
 from app import app
 from routes import public_site_routes as routes
+from services import commercial_access_service
+from tests.test_commercial_authority import snapshot
 
 
 SETTINGS = {
@@ -65,11 +69,15 @@ class RemoteContext:
 
 
 class PublicSiteRuntimeTests(unittest.TestCase):
-    def request(self, remote, *, host="madarportal.com", visitor=None, access=None):
+    def request(self, remote, *, host="madarportal.com", visitor=None, access=None, commercial=False):
         with ExitStack() as stack:
             stack.enter_context(patch.object(routes, "service_supabase", remote))
             stack.enter_context(patch.object(routes, "enforce_public_rate_limit"))
-            stack.enter_context(patch.object(routes, "require_public_runtime_entitlement"))
+            if not commercial:
+                stack.enter_context(patch.object(routes, "require_public_runtime_entitlement"))
+            else:
+                stack.enter_context(patch.dict(os.environ, {"COMMERCIAL_ENTITLEMENT_TEST_LOOKUPS": "true"}))
+                stack.enter_context(patch.object(commercial_access_service, "service_supabase", remote))
             if visitor is None:
                 stack.enter_context(patch.object(
                     routes, "get_authenticated_user_row",
@@ -95,6 +103,51 @@ class PublicSiteRuntimeTests(unittest.TestCase):
         self.assertEqual(remote.calls[0][0], "get_public_site_runtime_context")
         self.assertEqual(result.headers["Cache-Control"], "no-store")
         self.assertEqual(result.headers["CDN-Cache-Control"], "no-store")
+
+    def commercial_remote(self, *, consolidated=True, state=None):
+        state = snapshot(tenant=1) if state is None else state
+        settings = copy.deepcopy(SETTINGS)
+        if consolidated:
+            settings["_commercial_snapshot"] = state
+        class Remote(RemoteContext):
+            def execute(self):
+                if self.calls[-1][0] == "resolve_commercial_access":
+                    return SimpleNamespace(data=state)
+                return super().execute()
+        return Remote(data=[{"settings": settings, "tenant_active": True, "project": PROJECT}])
+
+    def test_schema_114_bridge_proves_two_sequential_remote_calls(self):
+        remote = self.commercial_remote(consolidated=False)
+        result = self.request(remote, commercial=True)
+        self.assertEqual(result.status_code, 200)
+        self.assertEqual([call[0] for call in remote.calls], ["get_public_site_runtime_context", "resolve_commercial_access"])
+
+    def test_schema_115_real_entitlement_path_uses_exactly_one_remote_call(self):
+        for enforced in ("false", "true"):
+            with self.subTest(enforced=enforced), patch.dict(os.environ, {"COMMERCIAL_ENTITLEMENTS_ENFORCED": enforced}):
+                remote = self.commercial_remote()
+                result = self.request(remote, commercial=True)
+                self.assertEqual(result.status_code, 200)
+                self.assertEqual([call[0] for call in remote.calls], ["get_public_site_runtime_context"])
+                self.assertNotIn("commercial", str(result.json()).lower())
+
+    def test_consolidated_hold_denied_under_bypass_without_second_read(self):
+        state = snapshot(tenant=1, commercial_suspended_at="2026-09-30T00:00:00Z")
+        with patch.dict(os.environ, {"COMMERCIAL_ENTITLEMENTS_ENFORCED": "false"}):
+            remote = self.commercial_remote(state=state)
+            result = self.request(remote, commercial=True)
+        self.assertEqual(result.status_code, 503)
+        self.assertEqual(len(remote.calls), 1)
+        self.assertEqual(result.json()["detail"]["code"], "tenant_service_unavailable")
+        self.assertNotIn("suspended", str(result.json()))
+
+    def test_malformed_cross_tenant_or_missing_consolidated_snapshot_fails_closed(self):
+        for state in (None, {}, snapshot(tenant=2), snapshot(tenant=1, contract_version=116)):
+            remote = self.commercial_remote()
+            remote.data[0]["settings"]["_commercial_snapshot"] = state
+            result = self.request(remote, commercial=True)
+            self.assertEqual(result.status_code, 503)
+            self.assertEqual(len(remote.calls), 1)
 
     def test_hosted_hostname_disables_legacy_alias(self):
         remote = RemoteContext()

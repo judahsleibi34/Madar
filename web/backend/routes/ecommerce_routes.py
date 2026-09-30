@@ -762,7 +762,7 @@ def _require_ecommerce_access(request: Request, response: Response, *, historica
     if str(context.role or "").lower() not in {"owner", "admin", "member"}:
         raise HTTPException(status_code=403, detail="Ecommerce access required")
     if request.method not in {"GET", "HEAD"} and not historical_operation:
-        require_entitlement(context.tenant_id, "website_publish")
+        require_entitlement(context.tenant_id, "ecommerce")
     return context
 
 def _require_role(context) -> None:

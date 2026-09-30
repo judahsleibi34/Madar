@@ -258,13 +258,15 @@ def _unentitled_state(
     }
 
 
-def get_tenant_entitlements(tenant_id: int | str) -> dict[str, Any]:
+def get_tenant_entitlements(tenant_id: int | str, *, commercial_snapshot: dict | None = None) -> dict[str, Any]:
     """Assignment describes the product; the ledger authorizes effective use.
 
     No entitlement cache is used. Every request reads a new database snapshot,
     including revision and time transitions, before considering the bypass.
+    Public runtime can supply its validated same-statement ledger snapshot to
+    avoid a second WAN round trip. This is never a browser-supplied argument.
     """
-    ledger = resolve_commercial_access(tenant_id)
+    ledger = resolve_commercial_access(tenant_id) if commercial_snapshot is None else commercial_snapshot
     assigned_rows = ledger.get("subscriptions") or []
     candidates = [row for row in assigned_rows if isinstance(row, dict) and isinstance(row.get("state"), str) and row["state"] in ENTITLED_STATES] if isinstance(assigned_rows, list) else []
     assignment = candidates[0] if len(candidates) == 1 and get_product(str(candidates[0].get("plan_id") or "")) else None
@@ -397,7 +399,11 @@ def _require_commercial_state(state: dict[str, Any]) -> None:
             "commercial_access_expired": "Workspace commercial access has expired.",
             "commercial_review_required": "Workspace commercial access requires review.",
         }
-        raise HTTPException(status_code=402, detail=error_detail(
+        raise HTTPException(status_code={
+            "commercial_access_required": 402, "commercial_access_expired": 402,
+            "commercial_access_suspended": 403, "commercial_review_required": 403,
+            "commercial_state_invalid": 503,
+        }.get(code, 503), detail=error_detail(
             code, messages.get(code, "Workspace commercial access is unavailable.")))
 
 
@@ -413,8 +419,10 @@ def require_entitlement(
     capability: str,
     *,
     message: str | None = None,
+    commercial_snapshot: dict | None = None,
 ) -> dict[str, Any]:
-    state = get_tenant_entitlements(tenant_id)
+    state = (get_tenant_entitlements(tenant_id) if commercial_snapshot is None
+             else get_tenant_entitlements(tenant_id, commercial_snapshot=commercial_snapshot))
     _require_commercial_state(state)
     active = set(state.get("operational_capabilities", state["capabilities"]))
     if capability in active:
@@ -554,12 +562,15 @@ def require_branded_subdomain(
 def require_public_runtime_entitlement(
     settings: dict[str, Any],
     capability: str,
+    *, commercial_snapshot: dict | None = None,
 ) -> dict[str, Any]:
     """Authorize published use without disclosing internal commercial state."""
     try:
-        return require_entitlement(settings.get("tenant_id"), capability)
+        if commercial_snapshot is None:
+            return require_entitlement(settings.get("tenant_id"), capability)
+        return require_entitlement(settings.get("tenant_id"), capability, commercial_snapshot=commercial_snapshot)
     except HTTPException as error:
-        if error.status_code in {402, 503}:
+        if error.status_code in {402, 403, 503}:
             raise HTTPException(status_code=503, detail=error_detail(
                 "tenant_service_unavailable", "This service is temporarily unavailable."
             ), headers={"Cache-Control": "no-store"}) from error
