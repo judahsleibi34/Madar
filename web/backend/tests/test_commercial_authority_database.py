@@ -205,12 +205,12 @@ class CommercialLedgerDatabaseTests(unittest.TestCase):
             "COMMERCIAL_ENTITLEMENT_TEST_LOOKUPS":"true","COMMERCIAL_ENTITLEMENTS_ENFORCED":"true"}):
             self.assertEqual(entitlement_service.get_tenant_entitlements(self.tenant)["capabilities"],[])
             self.grant(payment=True)
-            self.assertIn("website_publish",entitlement_service.get_tenant_entitlements(self.tenant)["capabilities"])
+            self.assertEqual(entitlement_service.get_tenant_entitlements(self.tenant)["commercial_denial_code"],"commercial_review_required")
             before=self.state()["revision"]; self.command("suspend")
             self.assertEqual(entitlement_service.get_tenant_entitlements(self.tenant)["commercial_denial_code"],"commercial_access_suspended")
             self.command("reactivate")
             restored=entitlement_service.get_tenant_entitlements(self.tenant)
-            self.assertIn("website_publish",restored["capabilities"])
+            self.assertEqual(restored["commercial_denial_code"],"commercial_review_required")
             self.assertEqual(restored["commercial_revision"],before+2)
 
     def test_expiry_changes_snapshot_without_revision_or_job(self):
@@ -239,6 +239,166 @@ class CommercialLedgerDatabaseTests(unittest.TestCase):
         self.grant(payment=True)
         with self.assertRaises(psycopg.errors.RaiseException): self.db.execute("update public.tenants set lifecycle_state='deletion_pending' where tenant_id=%s",(self.tenant,))
         with self.assertRaises(psycopg.errors.ForeignKeyViolation): self.db.execute("delete from public.tenants where tenant_id=%s",(self.tenant,))
+
+
+
+@unittest.skipUnless(DSN, "Requires disposable PostgreSQL commercial rehearsal")
+class ModuleCommercialDatabaseTests(unittest.TestCase):
+    command=CommercialLedgerDatabaseTests.command
+    state=CommercialLedgerDatabaseTests.state
+
+    def setUp(self):
+        CommercialLedgerDatabaseTests.setUp(self)
+        self.db.execute("begin")
+        raw = self.db
+        class SavepointDB:
+            # Expected constraint failures must not abort the surrounding
+            # fixture rollback transaction. Production code is unchanged.
+            def execute(inner, query, params=None):
+                if query.lower().strip() == "rollback":
+                    return raw.execute(query)
+                raw.execute("savepoint fixture_statement")
+                try:
+                    result=raw.execute(query,params)
+                except Exception:
+                    raw.execute("rollback to savepoint fixture_statement")
+                    raw.execute("release savepoint fixture_statement")
+                    raise
+                raw.execute("release savepoint fixture_statement")
+                return result
+        self.db=SavepointDB()
+        self.addCleanup(lambda:self.db.execute("rollback"))
+        self.db.execute("update public.commercial_price_books set sales_start_at=statement_timestamp()-interval '1 second' where id='launch_2026'")
+
+    def assign(self, modules, books=None):
+        return self.command("assign_modules",{"module_ids":modules,"price_books":books or {}})
+
+    def basis(self):
+        return next(row['module_basis'] for row in self.state()['subscriptions'] if row['state']=='active')
+
+    def quote(self):
+        return self.db.execute("select public.resolve_module_price(%s)",(Jsonb(self.basis()),)).fetchone()[0]
+
+    def pay(self, modules):
+        now=datetime.now(timezone.utc)
+        return self.command("manual_payment",{"module_ids":modules,"valid_from":now.isoformat(),"valid_until":(now+timedelta(days=30)).isoformat(),
+            "method":"cash","actual_minor":self.quote()['recurring_minor'],"currency":"USD","billing_months":1,"paid_at":now.isoformat(),"receipt_reference":"SYNTHETIC-V2"})
+
+    def close_launch(self):
+        self.db.execute("update public.commercial_price_books set sales_end_at=statement_timestamp() where id='launch_2026'")
+
+    def test_all_seven_bundle_prices_order_and_empty(self):
+        from itertools import combinations
+        for n in (1,2,3):
+            for modules in combinations(('forms','website','ecommerce'),n):
+                self.assign(list(reversed(modules)))
+                expected=({'forms':1500,'website':2000,'ecommerce':2000}[modules[0]] if n==1 else {2:3000,3:4000}[n])
+                self.assertEqual(self.quote()['recurring_minor'],expected)
+        with self.assertRaises(psycopg.errors.InvalidParameterValue):
+            self.db.execute("select public.resolve_module_price('{}')")
+
+    def test_grandfather_single_pair_three_after_close_and_hold(self):
+        acquired=[]
+        for modules,amount in ((['website'],2000),(['forms','website'],3000),(['forms','website','ecommerce'],4000)):
+            # Independent tenant for each acquisition, within this transaction.
+            if self.state()['subscriptions']:
+                self.tenant=self.db.execute("insert into public.tenants(brand_name,owner_name) values('Synthetic','Synthetic') returning tenant_id").fetchone()[0]
+            self.assign(modules); self.pay(modules)
+            self.command('suspend'); self.command('reactivate')
+            self.assertEqual(self.quote()['recurring_minor'],amount)
+            self.assertTrue(all(value['paid_since'] for value in self.basis().values()))
+            acquired.append((self.tenant,amount))
+        self.close_launch()
+        for tenant,amount in acquired:
+            self.tenant=tenant
+            self.assertEqual(self.quote()['recurring_minor'],amount)
+        self.assertEqual(self.quote()['recurring_minor'],4000)
+        self.assign(['forms','website'])
+        self.assertEqual(self.quote()['recurring_minor'],3000)
+        self.assertNotIn('ecommerce',self.basis())
+        with self.assertRaises(psycopg.errors.InvalidParameterValue):self.assign(['forms','website','ecommerce'])
+
+    def test_mixed_book_readd_uses_current_basis_no_cross_discount(self):
+        self.assign(['forms','website','ecommerce']);self.pay(['forms','website','ecommerce']);self.close_launch()
+        self.assign(['forms','website'])
+        self.db.execute("insert into public.commercial_price_books(id,version,effective_from,currency,billing_interval,standalone_minor,sales_start_at) values('synthetic_future','test',statement_timestamp()-interval '1 day','USD','month','{\"ecommerce\":2700}',statement_timestamp()-interval '1 second')")
+        self.assign(['forms','website','ecommerce'])
+        price=self.quote()
+        self.assertEqual(price['recurring_minor'],5700)
+        self.assertEqual(self.basis()['ecommerce']['price_book_id'],'synthetic_future')
+        self.assertIsNone(self.basis()['ecommerce']['paid_since'])
+        self.assertEqual(len(price['price_groups']),2)
+        self.assertEqual(self.state()['period']['price_snapshot']['recurring_minor'],4000)
+
+    def test_add_while_open_and_full_cancel_forfeits_rights(self):
+        self.assign(['website']);self.pay(['website']);self.assign(['forms','website'])
+        self.assertEqual(self.quote()['recurring_minor'],3000)
+        self.assertIsNone(self.basis()['forms']['paid_since'])
+        self.assign([]);self.command('suspend');self.command('reactivate');self.close_launch()
+        self.assertFalse(any(row['state']=='active' for row in self.state()['subscriptions']))
+        with self.assertRaises(psycopg.errors.InvalidParameterValue):self.assign(['website'])
+
+    def test_snapshot_immutable_and_module_order_idempotent_stale_conflict(self):
+        key=str(uuid4()); revision=self.state()['revision']
+        first=self.command('assign_modules',{'module_ids':['website','forms'],'expected_revision':revision},key)
+        replay=self.command('assign_modules',{'module_ids':['forms','website'],'expected_revision':revision},key)
+        self.assertEqual(first,replay)
+        with self.assertRaises(psycopg.errors.UniqueViolation):self.command('assign_modules',{'module_ids':['ecommerce'],'expected_revision':revision},key)
+        with self.assertRaises(psycopg.errors.SerializationFailure):self.command('assign_modules',{'module_ids':['ecommerce'],'expected_revision':revision})
+        paid=self.pay(['forms','website'])
+        snap=self.db.execute('select price_snapshot from public.commercial_manual_payments where id=%s',(paid['payment_id'],)).fetchone()[0]
+        for field in ('tenant_id','module_ids','price_groups','catalog_version','currency','billing_interval','recurring_minor','effective_from','effective_until','reference','previous_revision','revision','addons'):
+            self.assertIn(field,snap)
+        with self.assertRaises(psycopg.errors.InsufficientPrivilege):self.db.execute("update public.commercial_price_books set standalone_minor='{\"forms\":9000}' where id='launch_2026'")
+        self.assertEqual(snap,self.db.execute('select price_snapshot from public.commercial_manual_payments where id=%s',(paid['payment_id'],)).fetchone()[0])
+        self.assertIn('price_snapshot',paid)
+
+    def test_complimentary_does_not_create_paid_lock_and_does_not_restore_cancelled(self):
+        self.assign(['website','ecommerce'])
+        now=datetime.now(timezone.utc)
+        self.command('complimentary',{'module_ids':['website','ecommerce'],'valid_from':now.isoformat(),'valid_until':(now+timedelta(days=1)).isoformat()})
+        self.assertTrue(all(value['paid_since'] is None for value in self.basis().values()))
+        self.assign(['website']);self.command('suspend');self.command('reactivate')
+        self.assertEqual(set(self.basis()),{'website'})
+        self.assertEqual(self.state()['period']['module_ids'],['ecommerce','website'])
+
+    def test_paid_module_runtime_removal_hold_and_second_tenant(self):
+        from services import entitlement_service as ent
+        with patch.dict(os.environ,{"COMMERCIAL_ENTITLEMENTS_ENFORCED":"true"}):
+            self.assign(['website','ecommerce']);self.pay(['website','ecommerce'])
+            active=ent.get_tenant_entitlements(self.tenant,commercial_snapshot=self.state())
+            self.assertIn('ecommerce',active['capabilities']);self.assertIn('website_publish',active['capabilities'])
+            self.assign(['website']);self.command('suspend');self.command('reactivate')
+            restored=ent.get_tenant_entitlements(self.tenant,commercial_snapshot=self.state())
+            self.assertIn('website_publish',restored['capabilities']);self.assertNotIn('ecommerce',restored['capabilities'])
+            first=self.tenant;self.command('suspend')
+            self.tenant=self.db.execute("insert into public.tenants(brand_name,owner_name) values('Second synthetic','Synthetic') returning tenant_id").fetchone()[0]
+            self.assign(['ecommerce']);self.pay(['ecommerce'])
+            self.assertIn('ecommerce',ent.get_tenant_entitlements(self.tenant,commercial_snapshot=self.state())['capabilities'])
+            self.tenant=first
+            self.assertEqual(ent.get_tenant_entitlements(first,commercial_snapshot=self.state())['commercial_denial_code'],'commercial_access_suspended')
+
+    def test_prepared_price_book_assignment_no_paid_right_before_activation(self):
+        self.db.execute("insert into public.commercial_price_books(id,version,effective_from,currency,billing_interval,standalone_minor) values('synthetic_prepared','test',statement_timestamp()-interval '1 day','USD','month',%s)",(Jsonb({'website':2000}),))
+        self.assign(['website'],{'website':'synthetic_prepared'})
+        with self.assertRaises(psycopg.errors.InvalidParameterValue):self.pay(['website'])
+        self.assertIsNone(self.basis()['website']['paid_since'])
+        self.assertFalse(self.quote()['price_groups'][0]['new_sales_active'])
+
+    def test_access_period_evidence_and_price_books_privileges(self):
+        self.assign(['website']);paid=self.pay(['website'])
+        with self.assertRaises(psycopg.errors.InsufficientPrivilege):self.db.execute("update public.commercial_access_periods set price_snapshot='{}' where id=%s",(paid['period_id'],))
+        for role in ('anon','authenticated','service_role'):
+            self.assertFalse(self.db.execute("select has_table_privilege(%s,'public.commercial_price_books','UPDATE')",(role,)).fetchone()[0])
+        self.assertTrue(self.db.execute("select relrowsecurity from pg_class where oid='public.commercial_price_books'::regclass").fetchone()[0])
+
+    def test_user_safety_scope_accepts_advertised_5gib_and_downgrade_preserves_usage(self):
+        gib=1024**3
+        self.db.execute("insert into public.storage_accounts(tenant_id,scope_key,user_id,quota_bytes,used_bytes) values(%s,%s,%s,%s,%s)",(self.tenant,'user:'+str(self.actor),self.actor,gib,gib))
+        reservation=self.db.execute("select public.reserve_storage_bytes(%s,%s,'dataset',%s,%s,%s)",(self.tenant,self.actor,2*gib,5*gib,5*gib)).fetchone()[0]
+        self.assertIsNotNone(reservation)
+        with self.assertRaises(psycopg.errors.RaiseException):self.db.execute("select public.reserve_storage_bytes(%s,%s,'dataset',1,%s,%s)",(self.tenant,self.actor,gib,gib))
+        self.assertEqual(self.db.execute("select used_bytes from public.storage_accounts where tenant_id=%s and scope_key=%s",(self.tenant,'user:'+str(self.actor))).fetchone()[0],gib)
 
 
 if __name__ == "__main__":

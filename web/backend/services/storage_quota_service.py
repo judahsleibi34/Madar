@@ -68,9 +68,9 @@ def reserve_storage(
             "p_category": category,
             "p_bytes": int(size_bytes),
             "p_tenant_quota": tenant_quota,
-            # Commercial allowance belongs only to the workspace scope. The
-            # user row remains an independent 1 GiB abuse/safety ceiling.
-            "p_user_quota": DEFAULT_USER_QUOTA_BYTES if user_id is not None else None,
+            # Retain the independent safety scope without making one operator
+            # unable to consume the advertised tenant allowance.
+            "p_user_quota": max(DEFAULT_USER_QUOTA_BYTES, tenant_quota) if user_id is not None else None,
         }).execute()
     except Exception as error:
         text = str(error).lower()

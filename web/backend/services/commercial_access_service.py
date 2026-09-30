@@ -77,6 +77,8 @@ def apply_commercial_command(*, tenant_id: int, actor_user_id: int, operation: s
         # error object. Provider details are never returned to the client.
         message = getattr(error, "message", "")
         errors = {
+            "commercial_price_book_unavailable": (409, "commercial_price_book_unavailable", "No approved price book is available for this purchase."),
+            "commercial_assignment_mismatch": (409, "commercial_assignment_mismatch", "Access coverage must match the assigned module set."),
             "commercial_revision_conflict": (409, "commercial_revision_conflict", "Commercial state changed. Reload and retry."),
             "commercial_idempotency_conflict": (409, "commercial_idempotency_conflict", "This command key was used for a different request."),
             "platform_admin_aal2_required": (403, "aal2_required", "MFA verification is required for this admin action."),

@@ -19,9 +19,9 @@ def snapshot(tenant=7, **changes):
     state = {"contract_version": 115, "tenant_id": tenant, "revision": 17, "review_state": "reviewed",
              "commercial_suspended_at": None, "effective_at": now.isoformat(), "has_history": True, "access_state": "active",
              "next_transition_at": (now + timedelta(days=1)).isoformat(),
-             "period": {"tenant_id": tenant, "plan_id": "business_plus", "valid_from": (now-timedelta(days=1)).isoformat(),
+             "period": {"tenant_id": tenant, "plan_id": None, "module_ids": ["forms","website","ecommerce"], "valid_from": (now-timedelta(days=1)).isoformat(),
                         "valid_until": (now+timedelta(days=1)).isoformat()},
-             "subscriptions": [{"tenant_id": tenant, "plan_id": "business_plus", "state": "active"}], "addons": []}
+             "subscriptions": [{"tenant_id": tenant, "plan_id": None, "module_basis": {m:{"price_book_id":"launch_2026", "acquired_at":now.isoformat(), "paid_since":now.isoformat()} for m in ("forms","website","ecommerce")}, "state": "active"}], "addons": []}
     state.update(changes)
     return state
 
@@ -73,14 +73,14 @@ class CommercialAuthorityTests(unittest.TestCase):
             self.assertEqual(error.exception.detail["code"], code)
 
     def test_ecommerce_product_matrix_requires_distinct_capability(self):
-        for plan in ("forms", "website", "business", "business_plus"):
+        for plan in ("forms", "website", "ecommerce"):
             self.state = snapshot()
-            self.state["period"]["plan_id"] = plan
-            self.state["subscriptions"][0]["plan_id"] = plan
+            self.state["period"]["module_ids"] = [plan]
+            self.state["subscriptions"][0]["module_basis"] = {plan:self.state["subscriptions"][0]["module_basis"][plan]}
             result = ent.get_tenant_entitlements(7)
-            self.assertEqual("ecommerce" in result["capabilities"], plan in {"business", "business_plus"})
-            self.assertEqual("reservations" in result["capabilities"], plan != "forms")
-            if plan in {"business", "business_plus"}:
+            self.assertEqual("ecommerce" in result["capabilities"], plan == "ecommerce")
+            self.assertEqual("reservations" in result["capabilities"], plan == "website")
+            if plan == "ecommerce":
                 ent.require_entitlement(7, "ecommerce")
             else:
                 with self.assertRaises(HTTPException): ent.require_entitlement(7, "ecommerce")
@@ -91,10 +91,10 @@ class CommercialAuthorityTests(unittest.TestCase):
     def test_store_and_merchant_boundaries_use_ecommerce_not_website(self):
         context = SimpleNamespace(tenant_id=7, role="owner")
         request = Request({"type":"http", "method":"POST", "path":"/ecommerce/products", "headers":[]})
-        for plan, allowed in (("website", False), ("business", True), ("business_plus", True)):
+        for plan, allowed in (("website", False), ("ecommerce", True)):
             self.state = snapshot()
-            self.state["period"]["plan_id"] = plan
-            self.state["subscriptions"][0]["plan_id"] = plan
+            self.state["period"]["module_ids"] = [plan]
+            self.state["subscriptions"][0]["module_basis"] = {plan:self.state["subscriptions"][0]["module_basis"][plan]}
             with patch.object(ecommerce_routes, "require_active_tenant_member", return_value=context):
                 if allowed:
                     self.assertIs(ecommerce_routes._require_ecommerce_access(request, Response()), context)
@@ -117,8 +117,8 @@ class CommercialAuthorityTests(unittest.TestCase):
         calls = (("GET","store-profile",None), ("GET","catalog",None), ("GET","catalog/products/test",None), ("POST","cart/reconcile",{"items":[item]}), ("POST","orders",order))
         for held in (False, True):
             self.state = snapshot()
-            self.state["subscriptions"][0]["plan_id"] = "website"
-            self.state["period"]["plan_id"] = "website"
+            self.state["subscriptions"][0]["module_basis"] = {"website":self.state["subscriptions"][0]["module_basis"]["website"]}
+            self.state["period"]["module_ids"] = ["website"]
             if held: self.state["commercial_suspended_at"] = self.state["effective_at"]
             with patch.dict(environ,{"COMMERCIAL_ENTITLEMENTS_ENFORCED":"false" if held else "true"}), patch.object(public_site_routes,"enforce_public_rate_limit"), patch.object(public_site_routes,"enforce_request_tenant_identity",return_value="shop"), patch.object(public_site_routes,"request_hosted_tenant",return_value="shop"), patch.object(public_site_routes,"read_ecommerce_cache",return_value={"tenant_id":7}), patch.object(public_site_routes,"service_supabase") as domain, patch.object(ent,"resolve_commercial_access",side_effect=lambda tenant: copy.deepcopy(self.state)) as lookup:
                 for method,path,body in calls:
@@ -131,8 +131,8 @@ class CommercialAuthorityTests(unittest.TestCase):
 
     def test_business_store_profile_success_checks_commercial_once(self):
         app=FastAPI(); app.include_router(public_site_routes.router)
-        for plan in ("business", "business_plus"):
-            self.state=snapshot(); self.state["subscriptions"][0]["plan_id"]=plan; self.state["period"]["plan_id"]=plan
+        for plan in ("ecommerce",):
+            self.state=snapshot(); self.state["subscriptions"][0]["module_basis"]={plan:self.state["subscriptions"][0]["module_basis"][plan]}; self.state["period"]["module_ids"]=[plan]
             with patch.object(public_site_routes,"enforce_public_rate_limit"), patch.object(public_site_routes,"enforce_request_tenant_identity",return_value="shop"), patch.object(public_site_routes,"request_hosted_tenant",return_value="shop"), patch.object(public_site_routes,"read_ecommerce_cache",return_value={"tenant_id":7}), patch.object(ent,"resolve_commercial_access",side_effect=lambda tenant: copy.deepcopy(self.state)) as lookup:
                 response=TestClient(app).get("/public/sites/shop/store-profile")
                 self.assertEqual(response.status_code,200,response.text)
@@ -246,9 +246,9 @@ class CommercialAuthorityTests(unittest.TestCase):
 
     def test_plan_assignment_only_calls_assignment_rpc(self):
         client = Mock(); client.rpc.return_value.execute.return_value.data = [{"id":1}]
-        with patch("services.commercial_billing_service.service_supabase", client):
+        with patch("services.commercial_billing_service.service_supabase", client), self.assertRaises(HTTPException):
             assign_plan(tenant_id=7, plan_id="business", state="active", admin_user_id=99, reason="Product assignment", idempotency_key="assignment-test-key")
-        self.assertEqual(client.rpc.call_args.args[0], "assign_commercial_subscription")
+        client.rpc.assert_not_called()
         client.table.assert_not_called()
 
     def test_website_settings_write_denied_on_hold_but_read_available(self):
@@ -306,6 +306,16 @@ class CommercialCommandSecurityTests(unittest.TestCase):
             self.assertEqual(command.call_args.kwargs["actor_user_id"],99)
             self.assertEqual(command.call_args.kwargs["command"]["expected_revision"],17)
             self.assertTrue(response.headers["X-Request-ID"])
+
+    def test_module_assignment_server_authorization_matrix(self):
+        payload={**self.payload,"module_ids":["website","ecommerce"]}
+        self.assertEqual(self.client.post("/admin/billing/tenants/7/modules",json=payload).status_code,401)
+        for user,aal,status in ((REGULAR_USER,"aal2",403),({**REGULAR_USER,"tenant_role":"admin"},"aal2",403),(ADMIN_USER,"aal1",403),(ADMIN_USER,"aal2",200)):
+            response,command=self.call_as(user,aal,"modules",payload)
+            self.assertEqual(response.status_code,status)
+            if status==200:
+                self.assertEqual(command.call_args.kwargs["operation"],"assign_modules")
+            else:command.assert_not_called()
 
     def test_reason_and_expected_revision_required(self):
         for change in ({"reason":"   "}, {"expected_revision":0}, {"expected_revision":"17"}):

@@ -321,7 +321,7 @@ class CommercialCommandRequest(BaseModel):
 
 
 class CommercialGrantRequest(CommercialCommandRequest):
-    plan_id: Literal["forms", "website", "business", "business_plus"]
+    module_ids: list[Literal["forms", "website", "ecommerce"]] = Field(..., min_length=1, max_length=3)
     valid_from: datetime
     valid_until: datetime
     supersedes_period_id: UUID | None = None
@@ -404,8 +404,8 @@ def reactivate_commercial_access(tenant_id: int, payload: CommercialCommandReque
 
 @router.post("/tenants/{tenant_id}/manual-payments")
 def record_commercial_manual_payment(tenant_id: int, payload: CommercialPaymentRequest, request: Request, response: Response):
-    quote = {"expected_minor": get_product(payload.plan_id)["price_minor"] * payload.billing_months,
-             "catalog_version": CATALOG_VERSION}
+    # The canonical SQL price-book resolver quotes after durable replay.
+    quote = None
     return _commercial_command(tenant_id, payload, "manual_payment", request, response, quote=quote)
 
 
@@ -443,3 +443,41 @@ def correct_commercial_manual_payment(tenant_id: int, payload: CommercialPayment
 @router.post("/tenants/{tenant_id}/review-inactive")
 def review_inactive_commercial_access(tenant_id: int, payload: CommercialCommandRequest, request: Request, response: Response):
     return _commercial_command(tenant_id, payload, "review_inactive", request, response)
+
+
+class CommercialModuleAssignmentRequest(CommercialCommandRequest):
+    module_ids: list[Literal["forms", "website", "ecommerce"]] = Field(..., max_length=3)
+    price_books: dict[Literal["forms", "website", "ecommerce"], str] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def module_set(self):
+        if len(self.module_ids) != len(set(self.module_ids)) or set(self.price_books)-set(self.module_ids):
+            raise ValueError("Unique modules and matching price-book bases are required")
+        return self
+
+
+@router.post("/tenants/{tenant_id}/modules")
+def assign_commercial_modules(tenant_id: int, payload: CommercialModuleAssignmentRequest, request: Request, response: Response):
+    return _commercial_command(tenant_id, payload, "assign_modules", request, response)
+
+
+@router.get("/tenants/{tenant_id}/modules")
+def inspect_commercial_modules(tenant_id: int, request: Request, response: Response):
+    _admin(request, response)
+    state=resolve_commercial_access(tenant_id)
+    if state.get("contract_version",114)<115:
+        raise HTTPException(status_code=503,detail={"code":"commercial_upgrade_required","message":"Module administration requires schema 115."})
+    tenant=service_supabase.table("tenants").select("tenant_id,brand_name").eq("tenant_id",tenant_id).limit(1).execute().data or []
+    hold=service_supabase.table("tenant_commercial_state").select("commercial_suspended_at,commercial_suspended_by,commercial_suspension_reason").eq("tenant_id",tenant_id).limit(1).execute().data or []
+    return {"success":True,"tenant":tenant[0] if tenant else None,"commercial_access":state,
+            "entitlements":get_tenant_entitlements(tenant_id,commercial_snapshot=state),"hold":hold[0] if hold else None}
+
+
+@router.get("/price-books")
+def inspect_price_books(request: Request, response: Response):
+    _admin(request,response)
+    try:
+        books=service_supabase.table("commercial_price_books").select("id,version,effective_from,currency,billing_interval,standalone_minor,bundle_minor,sales_start_at,sales_end_at").order("effective_from").execute().data or []
+    except Exception as error:
+        raise HTTPException(status_code=503,detail={"code":"commercial_dependency_unavailable","message":"Price-book configuration is unavailable."}) from error
+    return {"success":True,"price_books":books}

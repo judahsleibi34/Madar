@@ -17,7 +17,7 @@ from fastapi import HTTPException
 
 from database import service_supabase
 from services.api_errors import error_detail
-from services.commercial_catalog import CAPABILITIES, GIB, get_product
+from services.commercial_catalog import CAPABILITIES, GIB, get_product, module_entitlements, CORE_MODULE_IDS
 from services.commercial_access_service import resolve_commercial_access
 
 
@@ -269,10 +269,14 @@ def get_tenant_entitlements(tenant_id: int | str, *, commercial_snapshot: dict |
     ledger = resolve_commercial_access(tenant_id) if commercial_snapshot is None else commercial_snapshot
     assigned_rows = ledger.get("subscriptions") or []
     candidates = [row for row in assigned_rows if isinstance(row, dict) and isinstance(row.get("state"), str) and row["state"] in ENTITLED_STATES] if isinstance(assigned_rows, list) else []
-    assignment = candidates[0] if len(candidates) == 1 and get_product(str(candidates[0].get("plan_id") or "")) else None
+    assignment = candidates[0] if len(candidates) == 1 else None
     metadata = {
         "assigned_plan_id": (assignment or {}).get("plan_id"),
         "assigned_subscription": assignment,
+        "assigned_modules": sorted((assignment or {}).get("module_basis") or {}) if isinstance((assignment or {}).get("module_basis"), dict) else [],
+        "module_commercial_basis": (assignment or {}).get("module_basis"),
+        "pricing": (assignment or {}).get("pricing"),
+        "legacy_assignment_requires_review": bool(assignment and assignment.get("module_basis") is None),
         "commercial_revision": ledger.get("revision"),
         "commercial_access_state": ledger.get("access_state"),
         "next_transition_at": ledger.get("next_transition_at"),
@@ -322,10 +326,26 @@ def get_tenant_entitlements(tenant_id: int | str, *, commercial_snapshot: dict |
     subscription = assigned[0] if assigned else None
     if not subscription:
         return {**denied("commercial_access_required", "canonical_inactive"), "subscriptions": subscriptions, "review_required": not bool(subscriptions)}
-    plan_id = subscription.get("plan_id")
-    capabilities, allowances = _plan_entitlements(plan_id)
-    if not capabilities or period.get("plan_id") != plan_id:
-        return denied("commercial_review_required", "commercial_assignment_mismatch")
+    if subscription.get("tenant_id") != int(tenant_id):
+        return denied("commercial_state_invalid", "commercial_assignment_invalid")
+    basis = subscription.get("module_basis")
+    if basis is None or subscription.get("plan_id") is not None:
+        return denied("commercial_review_required", "legacy_module_mapping_required")
+    if (not isinstance(basis, dict) or not basis or any(module not in CORE_MODULE_IDS for module in basis)
+        or any(not isinstance(value, dict) or not isinstance(value.get("price_book_id"), str) for value in basis.values())):
+        return denied("commercial_state_invalid", "commercial_assignment_invalid")
+    covered = period.get("module_ids")
+    if (period.get("plan_id") is not None or not isinstance(covered, list)
+        or any(not isinstance(module,str) or module not in CORE_MODULE_IDS for module in covered)
+        or len(covered)!=len(set(covered))):
+        return denied("commercial_review_required", "legacy_access_mapping_required")
+    effective_modules = sorted(set(basis) & set(covered))
+    if not effective_modules:
+        return denied("commercial_access_required", "commercial_modules_uncovered")
+    if isinstance(subscription.get("pricing"), dict) and subscription["pricing"].get("pricing_status") == "review_required":
+        return denied("commercial_review_required", "commercial_price_basis_requires_review")
+    capabilities, allowances = module_entitlements(effective_modules)
+    plan_id = None
     # Optional assignment bounds further restrict a grant; an active row never
     # extends the dated ledger period. Legacy null bounds remain permissible.
     if not _valid_at(subscription, ledger.get("effective_at"), "period_start", "period_end"):
@@ -359,7 +379,8 @@ def get_tenant_entitlements(tenant_id: int | str, *, commercial_snapshot: dict |
     operational, availability = _operational_capabilities(capabilities)
     return {
         "tenant_id": int(tenant_id), "source": "canonical_commercial_ledger",
-        "plan_id": plan_id, "subscription": subscription,
+        "plan_id": None,
+        "effective_modules": effective_modules, "subscription": subscription,
         "subscriptions": subscriptions, "active_addons": active_addons,
         "capabilities": sorted(capabilities), "operational_capabilities": sorted(operational),
         "capability_availability": availability, "allowances": allowances,

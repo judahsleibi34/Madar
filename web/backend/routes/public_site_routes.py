@@ -776,6 +776,28 @@ def find_form_in_schema(schema: dict, form_id: str) -> dict:
     return matches[0]
 
 
+def require_public_form_product(settings: dict, form_id: str):
+    """Forms owns standalone links; Website owns forms in its bound live site.
+
+    Read commercial state once. A Website-native component exception never
+    grants standalone Forms or authorizes another project/tenant's form.
+    """
+    from services.entitlement_service import get_tenant_entitlements
+    try:
+        state=get_tenant_entitlements(resolve_tenant_id(settings))
+        capabilities=set(state.get("operational_capabilities",state.get("capabilities",[])))
+        if "public_form_links" in capabilities:
+            return state
+        if "website_publish" in capabilities and settings.get("published_project_id"):
+            project=get_bound_published_project(settings,require_pages=False)
+            find_form_in_schema(project.get("published_schema") or {},form_id)
+            return state
+    except HTTPException as error:
+        if error.status_code not in {402,403,404,503}:
+            raise
+    raise api_error(503,"tenant_service_unavailable","This service is temporarily unavailable.",headers={"Cache-Control":"no-store"})
+
+
 def get_published_form_for_site(settings: dict, form_id: str):
     """Resolve a published form without requiring its project to be the live website.
 
@@ -3888,7 +3910,7 @@ def get_public_form(subdomain: str, form_id: str, request: Request, response: Re
         f"{clean_subdomain}:{clean_form_id}",
     )
     settings = resolve_website_settings(clean_subdomain, request=request)
-    require_public_runtime_entitlement(settings, "public_form_links")
+    require_public_form_product(settings, clean_form_id)
     project, form, published_schema = get_published_form_for_site(settings, clean_form_id)
     authorize_site_resource(
         subdomain=clean_subdomain,
@@ -3952,7 +3974,7 @@ def start_public_quiz_attempt(
         route_name="quiz_start",
     )
     settings = resolve_website_settings(clean_subdomain, request=request)
-    require_public_runtime_entitlement(settings, "public_form_links")
+    require_public_form_product(settings, clean_form_id)
     tenant_id = resolve_tenant_id(settings)
     project, form, _ = get_published_form_for_site(settings, clean_form_id)
     if not is_public_quiz(form):
@@ -4019,7 +4041,7 @@ def finalize_public_quiz_attempt(
     enforce_public_form_submission_rate_limit(request, "quiz_finalize", f"{clean_subdomain}:{clean_form_id}")
     validate_public_answer_payload_limits(payload.answers)
     settings = resolve_website_settings(clean_subdomain, request=request)
-    require_public_runtime_entitlement(settings, "public_form_links")
+    require_public_form_product(settings, clean_form_id)
     tenant_id = resolve_tenant_id(settings)
     project, form, _ = get_published_form_for_site(settings, clean_form_id)
     if not is_public_quiz(form):
@@ -4127,7 +4149,7 @@ def list_public_builder_form_drafts(
         f"{clean_subdomain}:{clean_form_id}",
     )
     settings = resolve_website_settings(clean_subdomain, request=request)
-    require_public_runtime_entitlement(settings, "public_form_links")
+    require_public_form_product(settings, clean_form_id)
     tenant_id = resolve_tenant_id(settings)
     project, _form, _ = get_published_form_for_site(settings, clean_form_id)
     identity = authorize_site_resource(
@@ -4172,7 +4194,7 @@ def get_public_builder_form_draft(subdomain: str, form_id: str, resume_token: st
     draft_id = require_form_draft_token(resume_token)
     enforce_public_form_submission_rate_limit(request, "draft_read", f"{clean_subdomain}:{clean_form_id}")
     settings = resolve_website_settings(clean_subdomain, request=request)
-    require_public_runtime_entitlement(settings, "public_form_links")
+    require_public_form_product(settings, clean_form_id)
     tenant_id = resolve_tenant_id(settings)
     project, _form, _ = get_published_form_for_site(settings, clean_form_id)
     identity = authorize_site_resource(
@@ -4220,7 +4242,7 @@ def save_public_builder_form_draft(
         route_name="form_draft",
     )
     settings = resolve_website_settings(clean_subdomain, request=request)
-    require_public_runtime_entitlement(settings, "public_form_links")
+    require_public_form_product(settings, clean_form_id)
     tenant_id = resolve_tenant_id(settings)
     project, form, _ = get_published_form_for_site(settings, clean_form_id)
     identity = authorize_site_resource(
@@ -4322,7 +4344,7 @@ def submit_public_builder_form(
     )
 
     settings = resolve_website_settings(clean_subdomain, request=request)
-    require_public_runtime_entitlement(settings, "public_form_links")
+    require_public_form_product(settings, clean_form_id)
     tenant_id = resolve_tenant_id(settings)
     project, form, _ = get_published_form_for_site(settings, clean_form_id)
     if is_public_quiz(form):

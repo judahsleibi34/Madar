@@ -26,13 +26,13 @@ class CommercialCatalogTests(unittest.TestCase):
         plans = {
             item["id"]: item
             for item in catalog["products"]
-            if item["type"] == "base_plan"
+            if item["type"] == "core_module"
         }
 
         self.assertEqual(tuple(plans), BASE_PLAN_IDS)
         self.assertEqual(
             {key: plans[key]["price_minor"] for key in BASE_PLAN_IDS},
-            {"forms": 1500, "website": 2000, "business": 2500, "business_plus": 3000},
+            {"forms": 1500, "website": 2000, "ecommerce": 2000},
         )
         self.assertEqual(catalog["currency"], "USD")
         self.assertNotIn("whatsapp", str(catalog).lower())
@@ -40,7 +40,7 @@ class CommercialCatalogTests(unittest.TestCase):
 
     def test_unlimited_volume_allowances_are_not_commercial_quotas(self):
         for plan in get_catalog()["products"]:
-            if plan["type"] != "base_plan":
+            if plan["type"] != "core_module":
                 continue
             allowances = plan["allowances"]
             self.assertIsNone(allowances["forms"])
@@ -123,7 +123,7 @@ class EntitlementMatrixTests(unittest.TestCase):
         plan = next((row.get("plan_id") for row in subscriptions if row.get("state") in {"active", "trial", "grace"}), "business")
         return {"tenant_id": tenant_id, "revision": 1, "review_state": "reviewed",
                 "commercial_suspended_at": None, "effective_at": "2026-09-30T12:00:00+00:00",
-                "period": {"tenant_id": tenant_id, "plan_id": plan,
+                "period": {"tenant_id": tenant_id, "plan_id": None, "module_ids": sorted(next((row.get("module_basis") or {} for row in subscriptions if row.get("state") in {"active","trial","grace"}),{})),
                            "valid_from": "2026-09-01T00:00:00+00:00", "valid_until": "2026-10-01T00:00:00+00:00"},
                 "subscriptions": subscriptions, "addons": addons}
 
@@ -131,7 +131,8 @@ class EntitlementMatrixTests(unittest.TestCase):
         subscription = {
             "id": 1,
             "tenant_id": 7,
-            "plan_id": plan_id,
+            "plan_id": None,
+            "module_basis": {m:{"price_book_id":"launch_2026"} for m in ({"forms","website","ecommerce"} if plan_id in {"business","business_plus"} else {plan_id})},
             "state": "active",
         }
         return [subscription], list(addons or [])
@@ -319,7 +320,7 @@ class EntitlementMatrixTests(unittest.TestCase):
 
     def test_trial_and_grace_are_explicit_entitled_states(self):
         for subscription_state in ("trial", "grace"):
-            rows = [{"id": 1, "tenant_id": 7, "plan_id": "website", "state": subscription_state}]
+            rows = [{"id": 1, "tenant_id": 7, "plan_id": None, "module_basis": {"website":{"price_book_id":"launch_2026"}}, "state": subscription_state}]
             with self.subTest(state=subscription_state), patch.dict(
                 environ, {"COMMERCIAL_ENTITLEMENT_TEST_LOOKUPS": "true"}
             ), patch.object(entitlement_service, "_canonical_records", return_value=(rows, [])), patch.object(
