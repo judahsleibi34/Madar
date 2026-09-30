@@ -385,10 +385,17 @@ def _commercial_command(tenant_id: int, payload: CommercialCommandRequest, opera
 def inspect_commercial_access_history(tenant_id: int, request: Request, response: Response):
     _admin(request, response)
     state = resolve_commercial_access(tenant_id)
-    history = {}
-    for key, table in (("events", "commercial_access_events"), ("periods", "commercial_access_periods"),
-                       ("payments", "commercial_manual_payments")):
-        history[key] = service_supabase.table(table).select("*").eq("tenant_id", tenant_id).order("created_at", desc=True).limit(100).execute().data or []
+    response.headers["Cache-Control"] = "no-store"
+    try:
+        history = {}
+        for key, table, fields in (
+            ("events", "commercial_access_events", "id,operation,actor_user_id,aal,request_id,revision,result,created_at"),
+            ("periods", "commercial_access_periods", "id,source_type,plan_id,module_ids,price_snapshot,valid_from,valid_until,revoked_at,revoked_by,created_at"),
+            ("payments", "commercial_manual_payments", "id,module_ids,plan_id,price_snapshot,expected_minor,actual_minor,currency,method,paid_at,valid_from,valid_until,billing_months,receipt_reference,corrects_payment_id,reason,override_reason,created_at"),
+        ):
+            history[key] = service_supabase.table(table).select(fields).eq("tenant_id", tenant_id).order("created_at", desc=True).limit(100).execute().data or []
+    except Exception as error:
+        raise HTTPException(status_code=503, detail={"code": "commercial_dependency_unavailable", "message": "Commercial history is unavailable."}) from error
     return {"success": True, "commercial_access": state, **history}
 
 
@@ -464,10 +471,11 @@ def assign_commercial_modules(tenant_id: int, payload: CommercialModuleAssignmen
 @router.get("/tenants/{tenant_id}/modules")
 def inspect_commercial_modules(tenant_id: int, request: Request, response: Response):
     _admin(request, response)
+    response.headers["Cache-Control"] = "no-store"
     state=resolve_commercial_access(tenant_id)
     if state.get("contract_version",114)<115:
         raise HTTPException(status_code=503,detail={"code":"commercial_upgrade_required","message":"Module administration requires schema 115."})
-    tenant=service_supabase.table("tenants").select("tenant_id,brand_name").eq("tenant_id",tenant_id).limit(1).execute().data or []
+    tenant=service_supabase.table("tenants").select("tenant_id,brand_name,owner_name").eq("tenant_id",tenant_id).limit(1).execute().data or []
     hold=service_supabase.table("tenant_commercial_state").select("commercial_suspended_at,commercial_suspended_by,commercial_suspension_reason").eq("tenant_id",tenant_id).limit(1).execute().data or []
     return {"success":True,"tenant":tenant[0] if tenant else None,"commercial_access":state,
             "entitlements":get_tenant_entitlements(tenant_id,commercial_snapshot=state),"hold":hold[0] if hold else None}
@@ -476,8 +484,62 @@ def inspect_commercial_modules(tenant_id: int, request: Request, response: Respo
 @router.get("/price-books")
 def inspect_price_books(request: Request, response: Response):
     _admin(request,response)
+    response.headers["Cache-Control"] = "no-store"
     try:
         books=service_supabase.table("commercial_price_books").select("id,version,effective_from,currency,billing_interval,standalone_minor,bundle_minor,sales_start_at,sales_end_at").order("effective_from").execute().data or []
     except Exception as error:
         raise HTTPException(status_code=503,detail={"code":"commercial_dependency_unavailable","message":"Price-book configuration is unavailable."}) from error
+    now = datetime.now(timezone.utc)
+    for book in books:
+        start = book.get("sales_start_at")
+        end = book.get("sales_end_at")
+        book["new_sales_active"] = bool(start and datetime.fromisoformat(start.replace("Z", "+00:00")) <= now and (not end or datetime.fromisoformat(end.replace("Z", "+00:00")) > now))
     return {"success":True,"price_books":books}
+
+
+class CommercialModuleQuoteRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    module_ids: list[Literal["forms", "website", "ecommerce"]] = Field(..., max_length=3)
+    price_books: dict[Literal["forms", "website", "ecommerce"], str] = Field(default_factory=dict)
+    billing_months: int = Field(default=1, ge=1, le=120, strict=True)
+
+    @model_validator(mode="after")
+    def module_set(self):
+        if len(self.module_ids) != len(set(self.module_ids)) or set(self.price_books)-set(self.module_ids):
+            raise ValueError("Unique modules and matching price-book bases are required")
+        return self
+
+
+@router.post("/tenants/{tenant_id}/modules/quote")
+def quote_commercial_modules(tenant_id: int, payload: CommercialModuleQuoteRequest, request: Request, response: Response):
+    _admin(request, response)
+    response.headers["Cache-Control"] = "no-store"
+    state = resolve_commercial_access(tenant_id)
+    if state.get("contract_version", 114) < 115:
+        raise HTTPException(status_code=503, detail={"code": "commercial_upgrade_required", "message": "Quoting requires schema 115."})
+    try:
+        quote = service_supabase.rpc("quote_commercial_modules", {
+            "p_tenant_id": tenant_id,
+            "r": payload.model_dump(exclude={"billing_months"}),
+        }).execute().data
+        if (not isinstance(quote, dict) or not isinstance(quote.get("revision"), int)
+            or isinstance(quote.get("revision"), bool) or quote["revision"] < 1
+            or not isinstance(quote.get("module_basis"), dict)
+            or set(quote["module_basis"]) != set(payload.module_ids)
+            or not isinstance(quote.get("pricing"), dict)
+            or quote["pricing"].get("module_ids") != sorted(payload.module_ids)
+            or not isinstance(quote["pricing"].get("recurring_minor"), int)
+            or isinstance(quote["pricing"].get("recurring_minor"), bool)
+            or not isinstance(quote["pricing"].get("price_groups"), list)
+            or (payload.module_ids and not quote["pricing"]["price_groups"])
+            or any(not isinstance(basis, dict) or not isinstance(basis.get("price_book_id"), str)
+                   for basis in quote["module_basis"].values())):
+            raise ValueError("invalid_quote")
+        quote["expected_payment_minor"] = quote["pricing"]["recurring_minor"] * payload.billing_months
+        quote["billing_months"] = payload.billing_months
+        quote["payment_eligible"] = bool(quote["pricing"].get("module_ids")) and all(group.get("grandfathered") or group.get("new_sales_active") for group in quote["pricing"].get("price_groups", []))
+        return {"success": True, "quote": quote}
+    except Exception as error:
+        if getattr(error, "code", None) in {"22023", "P0002"}:
+            raise HTTPException(status_code=409, detail={"code": "commercial_price_book_unavailable", "message": "No eligible commercial basis can quote this module set."}) from error
+        raise HTTPException(status_code=503, detail={"code": "commercial_dependency_unavailable", "message": "Commercial quote is unavailable."}) from error

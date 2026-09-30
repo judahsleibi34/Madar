@@ -134,6 +134,58 @@ $$;
 revoke all on function public.resolve_module_price(jsonb,timestamptz),public.inspect_module_price(jsonb),public.valid_module_basis(jsonb),public.guard_price_book_definition() from public,anon,authenticated;
 grant execute on function public.resolve_module_price(jsonb,timestamptz),public.inspect_module_price(jsonb),public.valid_module_basis(jsonb) to service_role;
 
+
+-- Read-only proposal shared with the transactional assignment command.
+create function public.quote_commercial_modules(p_tenant_id integer, r jsonb) returns jsonb
+language plpgsql stable security definer set search_path='' as $$
+declare wanted text[]; subscription public.tenant_subscriptions; basis jsonb; module_key text;
+book_id text; book public.commercial_price_books; price jsonb; v_now timestamptz:=statement_timestamp();
+begin
+  if not exists(select 1 from public.tenants where tenant_id=p_tenant_id) then
+    raise exception using errcode='P0002',message='commercial_tenant_not_found';
+  end if;
+    if jsonb_typeof(r->'module_ids') is distinct from 'array' then raise exception using errcode='22023',message='commercial_module_set_invalid'; end if;
+    select array_agg(distinct m order by m) into wanted from jsonb_array_elements_text(r->'module_ids') m;
+    wanted:=coalesce(wanted,array[]::text[]);
+    if not (wanted <@ array['forms','website','ecommerce']::text[]) or cardinality(wanted)<>jsonb_array_length(r->'module_ids') then
+      raise exception using errcode='22023',message='commercial_module_set_invalid';
+    end if;
+    select * into subscription from public.tenant_subscriptions where tenant_id=p_tenant_id and state='active';
+    basis:=coalesce(subscription.module_basis,'{}'::jsonb);
+    select coalesce(jsonb_object_agg(key,value),'{}'::jsonb) into basis from jsonb_each(basis) where key=any(wanted);
+    foreach module_key in array wanted loop
+      if not (basis ? module_key) then
+        book_id:=r->'price_books'->>module_key;
+        if book_id is null then
+          -- Prefer the still-open launch offer; after closure acquire under
+          -- the latest approved active book, never restore a canceled lock.
+          select id into book_id from public.commercial_price_books where effective_from<=v_now
+            and sales_start_at<=v_now and (sales_end_at is null or sales_end_at>v_now)
+            order by case when id='launch_2026' then 0 else 1 end,effective_from desc,id limit 1;
+          if book_id is null then
+            select id into book_id from public.commercial_price_books where id='launch_2026' and sales_start_at is null;
+          end if;
+        end if;
+        select * into book from public.commercial_price_books where id=book_id;
+        if not found or book.effective_from>v_now or book.sales_start_at>v_now or (book.sales_end_at is not null and book.sales_end_at<=v_now) then
+          raise exception using errcode='22023',message='commercial_price_book_unavailable';
+        end if;
+        basis:=basis||jsonb_build_object(module_key,jsonb_build_object('price_book_id',book_id,'acquired_at',v_now,'paid_since',null));
+      elsif r->'price_books' ? module_key and r->'price_books'->>module_key is distinct from basis->module_key->>'price_book_id' then
+        raise exception using errcode='22023',message='commercial_continuous_basis_immutable';
+      end if;
+    end loop;
+    if cardinality(wanted)>0 then price:=public.resolve_module_price(basis); else price:=jsonb_build_object('module_ids','[]'::jsonb,'price_groups','[]'::jsonb,'recurring_minor',0,'currency','USD','billing_interval','month'); end if;
+
+  return jsonb_build_object('module_basis',basis,'pricing',price,'revision',
+    (select revision from public.tenant_commercial_state where tenant_id=p_tenant_id),
+    'removed_module_ids',(select coalesce(jsonb_agg(key order by key),'[]'::jsonb)
+      from jsonb_each(coalesce(subscription.module_basis,'{}'::jsonb)) where not(key=any(wanted))));
+end;
+$$;
+revoke all on function public.quote_commercial_modules(integer,jsonb) from public,anon,authenticated;
+grant execute on function public.quote_commercial_modules(integer,jsonb) to service_role;
+
 create or replace function public.resolve_commercial_access(p_tenant_id integer) returns jsonb
 language sql stable security definer set search_path='' as $$
 select jsonb_build_object(
@@ -295,38 +347,11 @@ begin
   end if;
   before_state := public.resolve_commercial_access(p_tenant_id);
   if p_operation='assign_modules' then
-    if jsonb_typeof(r->'module_ids') is distinct from 'array' then raise exception using errcode='22023',message='commercial_module_set_invalid'; end if;
-    select array_agg(distinct m order by m) into wanted from jsonb_array_elements_text(r->'module_ids') m;
-    wanted:=coalesce(wanted,array[]::text[]);
-    if not (wanted <@ array['forms','website','ecommerce']::text[]) or cardinality(wanted)<>jsonb_array_length(r->'module_ids') then
-      raise exception using errcode='22023',message='commercial_module_set_invalid';
-    end if;
     select * into subscription from public.tenant_subscriptions where tenant_id=p_tenant_id and state='active' for update;
-    basis:=coalesce(subscription.module_basis,'{}'::jsonb);
-    select coalesce(jsonb_object_agg(key,value),'{}'::jsonb) into basis from jsonb_each(basis) where key=any(wanted);
-    foreach module_key in array wanted loop
-      if not (basis ? module_key) then
-        book_id:=r->'price_books'->>module_key;
-        if book_id is null then
-          -- Prefer the still-open launch offer; after closure acquire under
-          -- the latest approved active book, never restore a canceled lock.
-          select id into book_id from public.commercial_price_books where effective_from<=v_now
-            and sales_start_at<=v_now and (sales_end_at is null or sales_end_at>v_now)
-            order by case when id='launch_2026' then 0 else 1 end,effective_from desc,id limit 1;
-          if book_id is null then
-            select id into book_id from public.commercial_price_books where id='launch_2026' and sales_start_at is null;
-          end if;
-        end if;
-        select * into book from public.commercial_price_books where id=book_id;
-        if not found or book.effective_from>v_now or book.sales_start_at>v_now or (book.sales_end_at is not null and book.sales_end_at<=v_now) then
-          raise exception using errcode='22023',message='commercial_price_book_unavailable';
-        end if;
-        basis:=basis||jsonb_build_object(module_key,jsonb_build_object('price_book_id',book_id,'acquired_at',v_now,'paid_since',null));
-      elsif r->'price_books' ? module_key and r->'price_books'->>module_key is distinct from basis->module_key->>'price_book_id' then
-        raise exception using errcode='22023',message='commercial_continuous_basis_immutable';
-      end if;
-    end loop;
-    if cardinality(wanted)>0 then price:=public.resolve_module_price(basis); else price:=jsonb_build_object('module_ids','[]'::jsonb,'price_groups','[]'::jsonb,'recurring_minor',0,'currency','USD','billing_interval','month'); end if;
+    price:=public.quote_commercial_modules(p_tenant_id,r);
+    basis:=price->'module_basis';
+    select coalesce(array_agg(m order by m),array[]::text[]) into wanted from jsonb_array_elements_text(price->'pricing'->'module_ids') m;
+    price:=price->'pricing';
     if subscription.id is not null then
       update public.tenant_subscriptions set state='canceled',updated_at=v_now where id=subscription.id;
     end if;

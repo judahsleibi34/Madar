@@ -287,6 +287,23 @@ class ModuleCommercialDatabaseTests(unittest.TestCase):
     def close_launch(self):
         self.db.execute("update public.commercial_price_books set sales_end_at=statement_timestamp() where id='launch_2026'")
 
+    def test_proposal_read_only_matches_assignment_and_preserves_locks(self):
+        self.assign(["forms","website"])
+        self.pay(["forms","website"])
+        before=self.state()
+        proposed=self.db.execute("select public.quote_commercial_modules(%s,%s)",
+            (self.tenant,Jsonb({"module_ids":["website"]}))).fetchone()[0]
+        self.assertEqual(proposed["pricing"]["recurring_minor"],2000)
+        self.assertEqual(proposed["removed_module_ids"],["forms"])
+        after=self.state()
+        before.pop("effective_at",None); after.pop("effective_at",None)
+        self.assertEqual(after,before)
+        self.assign(["website"])
+        self.assertEqual(self.basis(),proposed["module_basis"])
+        self.assertEqual(self.quote(),proposed["pricing"])
+        for role in ("anon","authenticated"):
+            self.assertFalse(self.db.execute("select has_function_privilege(%s,'public.quote_commercial_modules(integer,jsonb)','execute')",(role,)).fetchone()[0])
+
     def test_all_seven_bundle_prices_order_and_empty(self):
         from itertools import combinations
         for n in (1,2,3):

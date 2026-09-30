@@ -1,9 +1,9 @@
+import { Link } from "react-router-dom";
 import PageHeaderSkeleton from "../common/PageHeaderSkeleton";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertCircle,
   CheckCircle2,
-  CreditCard,
   RefreshCw,
   Search,
   ShieldCheck,
@@ -15,7 +15,6 @@ import PageDeleteConfirmModal from "../PageBuilder/modals/PageDeleteConfirmModal
 import LoadingBar from "../common/LoadingBar";
 import { apiFetch } from "../../utils/apiClient";
 import {
-  getUserManagementFriendlyLabels,
   getUserManagementLabels,
 } from "../../content";
 
@@ -34,81 +33,23 @@ const deferEffectStateUpdate = (callback) => {
   };
 };
 
-function friendlyValue(group, value, lang = "en") {
-  const activeLabels = getUserManagementFriendlyLabels(lang);
-  const fallbackLabels = getUserManagementFriendlyLabels("en");
-
-  return (
-    activeLabels[group]?.[value] ||
-    fallbackLabels[group]?.[value] ||
-    value ||
-    getUserManagementLabels(lang).none ||
-    getUserManagementLabels("en").none
-  );
-}
-
 function getDisplayName(user, labels = getUserManagementLabels("en")) {
   const name = `${user.first_name || ""} ${user.last_name || ""}`.trim();
   return name || user.email || labels.fallbackUser;
 }
 
-function getPrimaryFeature(user) {
-  if (user.commercial_subscription) {
-    return {
-      plan_id: user.commercial_subscription.plan_id,
-      state: user.commercial_subscription.state,
-    };
-  }
-  const legacy = user.features?.[0] || {};
-  const legacyPlanMap = {
-    forms_data: "forms",
-    cms: "website",
-    cms_plus: "business",
-    complete: "business_plus",
-  };
-  return {
-    plan_id: legacyPlanMap[legacy.plan] || "forms",
-    state: legacy.payment_status === "active" ? "active" : "pending_review",
-  };
-}
-
 function UserRow({
   user,
   onRoleSave,
-  onPlanSave,
   onRequestDelete,
   busyKey,
   labels,
-  planProducts,
 }) {
-  const feature = getPrimaryFeature(user);
   const [role, setRole] = useState(user.user_type || "user");
-  const [planForm, setPlanForm] = useState({
-    plan_id: feature.plan_id || "forms",
-    state: feature.state || "pending_review",
-  });
-
-  useEffect(() => {
-    return deferEffectStateUpdate(() => {
-      setRole(user.user_type || "user");
-      setPlanForm({
-        plan_id: feature.plan_id || "forms",
-        state: feature.state || "pending_review",
-      });
-    });
-  }, [
-    user.id,
-    user.user_type,
-    feature.plan_id,
-    feature.state,
-  ]);
-
+  useEffect(() => deferEffectStateUpdate(() => setRole(user.user_type || "user")), [user.id, user.user_type]);
   const roleBusy = busyKey === `role-${user.id}`;
   const planBusy = busyKey === `plan-${user.id}`;
   const deleteBusy = busyKey === `delete-${user.id}`;
-
-  const updatePlanField = (field, value) =>
-    setPlanForm((previous) => ({ ...previous, [field]: value }));
 
   return (
     <article className="user-management-row">
@@ -148,47 +89,9 @@ function UserRow({
       </div>
 
       <div className="user-management-half user-management-management-half">
-        <div className="user-management-plan-grid">
-          <label>
-            <span>{labels.plan}</span>
-            <select
-              value={planForm.plan_id}
-              onChange={(event) => updatePlanField("plan_id", event.target.value)}
-            >
-              {planProducts.map((plan) => (
-                <option key={plan.id} value={plan.id}>
-                  {plan.name}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label>
-            <span>{labels.status}</span>
-            <select
-              value={planForm.state}
-              onChange={(event) => updatePlanField("state", event.target.value)}
-            >
-              {["pending_review", "active", "scheduled_change", "past_due", "suspended", "canceled", "expired", "review_required"].map((status) => (
-                <option key={status} value={status}>
-                  {friendlyValue("payment_status", status, "en")}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-
+        <p>Commercial assignments are tenant-scoped modules. Historical plan fields are not authorization.</p>
+        {user.tenant_id && <Link className="user-management-primary" to={`/admin/tenants/${user.tenant_id}/commercial`}>Commercial access</Link>}
         <div className="user-management-actions">
-            <button
-              type="button"
-              className="user-management-primary"
-              onClick={() => onPlanSave(user, planForm)}
-              disabled={planBusy || deleteBusy || !user.tenant_id || !planProducts.length}
-            >
-              {planBusy ? <RefreshCw size={16} /> : <CreditCard size={16} />}
-              {labels.applyPlan}
-            </button>
-
             <button
               type="button"
               className="user-management-danger"
@@ -232,28 +135,9 @@ export default function UserManagementPage({ currentUser, lang = "en" }) {
   const [toast, setToast] = useState(null);
   const [busyKey, setBusyKey] = useState("");
   const [deleteTargetUser, setDeleteTargetUser] = useState(null);
-  const [catalogPlans, setCatalogPlans] = useState([]);
   const userPageCacheRef = useRef(new Map());
 
   const isAdmin = currentUser?.user_type === "admin";
-
-  useEffect(() => {
-    if (!isAdmin) return undefined;
-    let cancelled = false;
-    apiFetch(`${API_URL}/billing/catalog`, { cache: "no-store" })
-      .then((response) => response.json())
-      .then((data) => {
-        if (!cancelled) {
-          setCatalogPlans(
-            (data.catalog?.products || []).filter((product) => product.type === "base_plan")
-          );
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setCatalogPlans([]);
-      });
-    return () => { cancelled = true; };
-  }, [isAdmin]);
 
   const showToast = useCallback((type, text) => {
     setToast({
@@ -403,36 +287,6 @@ export default function UserManagementPage({ currentUser, lang = "en" }) {
     }
   };
 
-  const savePlan = async (user, planForm) => {
-    setBusyKey(`plan-${user.id}`);
-
-    try {
-      const response = await apiFetch(`${API_URL}/admin/billing/subscriptions`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          tenant_id: user.tenant_id,
-          plan_id: planForm.plan_id,
-          state: planForm.state,
-          reason: "Manual assignment from the admin user-management page",
-          idempotency_key: `admin-ui-${user.tenant_id}-${planForm.plan_id}-${planForm.state}-${crypto.randomUUID()}`,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(labels.loadError);
-      }
-
-      userPageCacheRef.current.clear();
-      await loadUsers({ silent: true, force: true });
-      showToast("success", labels.saved);
-    } catch (saveError) {
-      showToast("error", saveError.message || labels.loadError);
-    } finally {
-      setBusyKey("");
-    }
-  };
-
   const deleteUser = async (user) => {
     if (!user?.id) {
       showToast("error", labels.loadError);
@@ -548,11 +402,9 @@ export default function UserManagementPage({ currentUser, lang = "en" }) {
               key={user.id}
               user={user}
               onRoleSave={saveRole}
-              onPlanSave={savePlan}
               onRequestDelete={setDeleteTargetUser}
               busyKey={busyKey}
               labels={labels}
-              planProducts={catalogPlans}
             />
           ))
         ) : (

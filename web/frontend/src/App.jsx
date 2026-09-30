@@ -764,7 +764,7 @@ export default function App() {
           {isDashboardRoute
             && authChecked
             && isLoggedIn
-            && user?.tenant_id
+            && (user?.tenant_id || isAdminUser)
             && (user?.id || user?.auth_id)
             && isMadarPwaHost(window.location) ? (
               <NotificationProvider user={user}>
