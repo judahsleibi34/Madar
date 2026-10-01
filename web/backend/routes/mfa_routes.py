@@ -38,6 +38,9 @@ from services.mfa_login_service import (
     create_pending_mfa_client,
     get_session_from_verify_response,
     read_pending_mfa_cookie,
+    reserve_pending_mfa_operation,
+    consume_pending_mfa_payload,
+    revoke_pending_mfa_cookie,
 )
 from services.user_security_settings_service import (
     get_user_security_settings,
@@ -200,19 +203,40 @@ def get_local_user_for_pending_mfa(pending_payload: dict[str, Any]):
         result = query.eq("auth_id", auth_id).limit(1).execute()
 
     if result.data:
-        return result.data[0]
+        user = result.data[0]
+        if str(user.get("auth_id") or "") == auth_id:
+            return user
 
     return None
+
+
+def reject_pending_mfa(response: Response, status_code: int, detail: str):
+    clear_pending_mfa_cookie(response)
+    # This header belongs to the actual exception response sent by FastAPI.
+    raise HTTPException(status_code=status_code, detail=detail,
+                        headers={"Set-Cookie": response.headers.getlist("set-cookie")[-1]})
 
 
 def require_pending_mfa_payload(request: Request, response: Response) -> dict[str, Any]:
     pending_payload = read_pending_mfa_cookie(request)
 
     if not pending_payload:
-        clear_pending_mfa_cookie(response)
-        raise HTTPException(status_code=401, detail="MFA login session expired")
-
+        reject_pending_mfa(response, 401, "MFA login session expired")
+    if not reserve_pending_mfa_operation(pending_payload):
+        revoke_pending_mfa_cookie(request)
+        reject_pending_mfa(response, 401, "MFA login session expired")
     return pending_payload
+
+
+def restore_pending_mfa_client(pending_payload, request: Request, response: Response):
+    try:
+        return create_pending_mfa_client(pending_payload)
+    except Exception as error:
+        logger.warning("auth.mfa.pending_session_invalid", extra={
+            "user_id": pending_payload.get("user_id"), "error_type": type(error).__name__,
+        })
+        revoke_pending_mfa_cookie(request)
+        reject_pending_mfa(response, 401, "MFA login session expired")
 
 
 @router.get("/status")
@@ -426,19 +450,21 @@ def mfa_login_challenge(
     factor_id = payload.factor_id.strip()
 
     try:
-        mfa_client = create_pending_mfa_client(pending_payload)
+        mfa_client = restore_pending_mfa_client(pending_payload, request, response)
         challenge_response = mfa_client.auth.mfa.challenge({"factor_id": factor_id})
         challenge_id = challenge_id_from_response(challenge_response)
 
         if not challenge_id:
             raise ValueError("Missing MFA challenge id")
 
+    except HTTPException:
+        raise
     except Exception as error:
         logger.warning(
             "auth.mfa.login_challenge_failed",
             extra={"user_id": pending_payload.get("user_id"), "error_type": type(error).__name__},
         )
-        clear_pending_mfa_cookie(response)
+        revoke_pending_mfa_cookie(request)
         record_mfa_event(
             request=request,
             tenant_id=pending_payload.get("tenant_id"),
@@ -448,7 +474,7 @@ def mfa_login_challenge(
             factor_id=factor_id,
             metadata={"factor_type": "totp", "stage": "login_challenge"},
         )
-        raise HTTPException(status_code=400, detail="Could not start MFA challenge")
+        reject_pending_mfa(response, 400, "Could not start MFA challenge")
 
     record_mfa_event(
         request=request,
@@ -472,7 +498,7 @@ def mfa_login_enroll(
     """Begin enrollment using only a restricted pending-admin session."""
     pending_payload = require_pending_mfa_payload(request, response)
     try:
-        mfa_client = create_pending_mfa_client(pending_payload)
+        mfa_client = restore_pending_mfa_client(pending_payload, request, response)
         enroll_payload = {"factor_type": "totp"}
         friendly_name = str(payload.friendly_name or "").strip()
         if friendly_name:
@@ -481,6 +507,8 @@ def mfa_login_enroll(
         factor, totp = totp_payload_from_enroll_response(enrolled)
         if not factor.get("id"):
             raise ValueError("Missing MFA factor id")
+    except HTTPException:
+        raise
     except Exception as error:
         logger.warning("auth.mfa.restricted_enroll_failed", extra={
             "user_id": pending_payload.get("user_id"), "error_type": type(error).__name__,
@@ -508,7 +536,7 @@ def mfa_login_enroll_verify(
     pending_payload = require_pending_mfa_payload(request, response)
     factor_id = payload.factor_id.strip()
     try:
-        mfa_client = create_pending_mfa_client(pending_payload)
+        mfa_client = restore_pending_mfa_client(pending_payload, request, response)
         challenge = mfa_client.auth.mfa.challenge({"factor_id": factor_id})
         challenge_id = challenge_id_from_response(challenge)
         if not challenge_id:
@@ -528,8 +556,13 @@ def mfa_login_enroll_verify(
         access_token = read_value(session, "access_token")
         refresh_token = read_value(session, "refresh_token")
         local_user = get_local_user_for_pending_mfa(pending_payload)
-        if not local_user or not access_token or not refresh_token:
+        if not local_user:
+            revoke_pending_mfa_cookie(request)
+            reject_pending_mfa(response, 401, "MFA login session expired")
+        if not access_token or not refresh_token:
             raise ValueError("MFA enrollment session is incomplete")
+        if not consume_pending_mfa_payload(pending_payload):
+            reject_pending_mfa(response, 401, "MFA login session expired")
         csrf_token = set_auth_cookies(response, access_token, refresh_token)
         clear_pending_mfa_cookie(response)
         mark_aal2_verified(
@@ -537,6 +570,8 @@ def mfa_login_enroll_verify(
             auth_id=str(local_user.get("auth_id") or pending_payload.get("auth_id") or ""),
             verified_at=current_utc_iso(),
         )
+    except HTTPException:
+        raise
     except Exception as error:
         logger.warning("auth.mfa.restricted_enroll_verify_failed", extra={
             "user_id": pending_payload.get("user_id"), "error_type": type(error).__name__,
@@ -564,7 +599,7 @@ def mfa_login_verify(
     factor_id = payload.factor_id.strip()
 
     try:
-        mfa_client = create_pending_mfa_client(pending_payload)
+        mfa_client = restore_pending_mfa_client(pending_payload, request, response)
 
         if payload.challenge_id:
             verify_response = mfa_client.auth.mfa.verify(
@@ -608,8 +643,11 @@ def mfa_login_verify(
         local_user = get_local_user_for_pending_mfa(pending_payload)
 
         if not local_user:
-            raise HTTPException(status_code=404, detail="User not found")
+            revoke_pending_mfa_cookie(request)
+            reject_pending_mfa(response, 401, "MFA login session expired")
 
+        if not consume_pending_mfa_payload(pending_payload):
+            reject_pending_mfa(response, 401, "MFA login session expired")
         csrf_token = set_auth_cookies(response, access_token, refresh_token)
         clear_pending_mfa_cookie(response)
 
@@ -660,7 +698,6 @@ def mfa_login_verify(
         }
 
     except HTTPException:
-        clear_pending_mfa_cookie(response)
         raise
 
     except Exception as error:
@@ -668,7 +705,6 @@ def mfa_login_verify(
             "auth.mfa.login_verify_failed",
             extra={"user_id": pending_payload.get("user_id"), "error_type": type(error).__name__},
         )
-        clear_pending_mfa_cookie(response)
         record_mfa_event(
             request=request,
             tenant_id=pending_payload.get("tenant_id"),
@@ -688,3 +724,10 @@ def mfa_login_verify(
             metadata={"factor_type": "totp", "stage": "login_verify"},
         )
         raise HTTPException(status_code=400, detail="Could not verify MFA code")
+
+
+@router.post("/login/cancel")
+def mfa_login_cancel(request: Request, response: Response):
+    revoke_pending_mfa_cookie(request)
+    clear_pending_mfa_cookie(response)
+    return {"success": True}

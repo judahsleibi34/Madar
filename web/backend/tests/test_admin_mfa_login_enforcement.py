@@ -172,7 +172,9 @@ class AdminMfaLoginEnforcementTests(unittest.TestCase):
             )
         )
 
-        with patch.object(mfa_routes, "read_pending_mfa_cookie", return_value={"user_id": 5, "auth_id": "auth-1", "tenant_id": 7}), \
+        with patch.object(mfa_routes, "reserve_pending_mfa_operation", return_value=True), \
+             patch.object(mfa_routes, "consume_pending_mfa_payload", return_value=True), \
+             patch.object(mfa_routes, "read_pending_mfa_cookie", return_value={"user_id": 5, "auth_id": "auth-1", "tenant_id": 7}), \
              patch.object(mfa_routes, "create_pending_mfa_client", return_value=mfa_client), \
              patch.object(mfa_routes, "get_local_user_for_pending_mfa", return_value=ADMIN_USER), \
              patch.object(mfa_routes, "set_auth_cookies", return_value="csrf") as set_auth_cookies, \
@@ -199,7 +201,9 @@ class AdminMfaLoginEnforcementTests(unittest.TestCase):
             )
         )
 
-        with patch.object(mfa_routes, "read_pending_mfa_cookie", return_value={"user_id": 5, "auth_id": "auth-1", "tenant_id": 7}), \
+        with patch.object(mfa_routes, "reserve_pending_mfa_operation", return_value=True), \
+             patch.object(mfa_routes, "consume_pending_mfa_payload", return_value=True), \
+             patch.object(mfa_routes, "read_pending_mfa_cookie", return_value={"user_id": 5, "auth_id": "auth-1", "tenant_id": 7}), \
              patch.object(mfa_routes, "create_pending_mfa_client", return_value=mfa_client), \
              patch.object(mfa_routes, "set_auth_cookies") as set_auth_cookies, \
              patch.object(mfa_routes, "clear_pending_mfa_cookie") as clear_pending_mfa_cookie, \
@@ -211,7 +215,7 @@ class AdminMfaLoginEnforcementTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 400)
         set_auth_cookies.assert_not_called()
-        clear_pending_mfa_cookie.assert_called_once()
+        clear_pending_mfa_cookie.assert_not_called()
 
 
 if __name__ == "__main__":

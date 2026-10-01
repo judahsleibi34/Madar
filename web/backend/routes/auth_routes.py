@@ -41,6 +41,8 @@ from services.mfa_login_service import (
     create_pending_mfa_client,
     is_admin_mfa_login_enforcement_enabled,
     set_pending_mfa_cookie,
+    revoke_pending_mfa_cookie,
+    clear_pending_mfa_cookie,
     verified_totp_factors_for_client,
 )
 from services.audit_service import record_security_event
@@ -879,6 +881,9 @@ def login(user: LogIn, response: Response, request: Request):
             local_user = mark_local_email_verified(local_user)
 
         delete_pending_verification_cookie(response)
+        revoke_pending_mfa_cookie(request)
+        if request.cookies.get("madar_mfa_pending"):
+            clear_pending_mfa_cookie(response)
 
         mfa_enrollment_recommended = False
 
@@ -913,6 +918,9 @@ def login(user: LogIn, response: Response, request: Request):
                         "Multi-factor authentication could not be verified. Try again shortly.",
                     ) from mfa_lookup_error
 
+                # A new primary login cannot retain an older ordinary session.
+                if request.cookies.get("madar_access_token") or request.cookies.get("madar_refresh_token"):
+                    delete_auth_cookies(response)
                 if verified_factors:
                     set_pending_mfa_cookie(
                         response,
@@ -1345,7 +1353,9 @@ def log_out(
             "auth.logout.push_revocation_failed",
             extra={"error_type": type(error).__name__},
         )
+    revoke_pending_mfa_cookie(request)
     delete_auth_cookies(response)
+    clear_pending_mfa_cookie(response)
 
     return {
         "message": "Logged out successfully",
