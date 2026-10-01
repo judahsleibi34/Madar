@@ -13,7 +13,7 @@ import redis
 
 from cryptography.fernet import Fernet, InvalidToken
 from fastapi import HTTPException, Request, Response
-from database import SUPABASE_ANON_KEY, create_supabase_client
+from database import create_supabase_auth_client
 from services.auth_service import COOKIE_SAMESITE, COOKIE_SECURE
 from services.request_security import get_csrf_secret
 
@@ -191,7 +191,7 @@ def revoke_pending_mfa_cookie(request):
 
 
 def create_pending_mfa_client(pending_payload: dict[str, Any]):
-    client = create_supabase_client(SUPABASE_ANON_KEY)
+    client = create_supabase_auth_client()
     client.auth.set_session(pending_payload["access_token"], pending_payload["refresh_token"])
     return client
 
@@ -229,7 +229,13 @@ def verified_totp_factors_for_client(supabase_client) -> list[dict[str, Any]]:
 
 def get_session_from_verify_response(response: Any):
     data = response_data(response)
-    return read_value(response, "session") or read_value(data, "session")
+    session = read_value(response, "session") or read_value(data, "session")
+    if session:
+        return session
+    # Pinned supabase-auth AuthMFAVerifyResponse is itself the session payload.
+    if read_value(data, "access_token") and read_value(data, "refresh_token"):
+        return data
+    return None
 
 
 def aal_payload_from_response(response: Any) -> dict[str, Any]:

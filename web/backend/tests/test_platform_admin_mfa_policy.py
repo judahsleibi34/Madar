@@ -8,6 +8,10 @@ from services import auth_service
 
 
 class PlatformAdminPolicyTests(unittest.TestCase):
+    def setUp(self):
+        self.enterContext(patch.object(mfa_routes, "get_request_auth_client", side_effect=lambda *_args: mfa_routes.supabase))
+        self.enterContext(patch.object(mfa_routes, "persist_auth_client_session"))
+
     def test_role_and_account_kind_are_both_required(self):
         for row, expected in [
             ({"user_type": "admin", "account_kind": "platform"}, True),
@@ -33,12 +37,13 @@ class PlatformAdminPolicyTests(unittest.TestCase):
         for level, allowed in [("aal1", False), (None, False), ("aal2", True)]:
             provider = SimpleNamespace(auth=SimpleNamespace(mfa=SimpleNamespace(
                 get_authenticator_assurance_level=lambda: {"current_level": level, "next_level": "aal2"})))
-            with patch.object(auth_service, "supabase", provider):
+            with patch.object(auth_service, "get_request_auth_client", return_value=provider), patch.object(auth_service, "persist_auth_client_session"):
+                request = Request({"type": "http", "headers": []})
                 if allowed:
-                    self.assertEqual(auth_service.require_current_session_aal2()["current_level"], "aal2")
+                    self.assertEqual(auth_service.require_current_session_aal2(request)["current_level"], "aal2")
                 else:
                     with self.assertRaises(HTTPException) as denied:
-                        auth_service.require_current_session_aal2()
+                        auth_service.require_current_session_aal2(request)
                     self.assertEqual(denied.exception.detail["code"], "aal2_required")
 
     def test_tenant_admin_cannot_gain_platform_privilege_at_aal2(self):

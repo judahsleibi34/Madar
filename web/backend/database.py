@@ -127,3 +127,20 @@ def create_supabase_client(supabase_key: str) -> Client:
 
 supabase: Client = create_supabase_client(SUPABASE_ANON_KEY)
 service_supabase: Client = create_supabase_client(SUPABASE_SERVICE_KEY)
+
+
+def create_supabase_auth_client() -> Client:
+    """Isolated session state with the existing shared HTTP connection pool.
+
+    A request owns its token rotation; SDK timers must never refresh credentials
+    independently of the access/refresh cookies returned to the browser.
+    """
+    return create_api_key_compatible_client(
+        SUPABASE_URL,
+        SUPABASE_ANON_KEY,
+        options=ClientOptions(
+            auto_refresh_token=False,
+            persist_session=False,
+            httpx_client=supabase.options.httpx_client,
+        ),
+    )

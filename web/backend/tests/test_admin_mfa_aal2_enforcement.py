@@ -95,6 +95,11 @@ def resolve_target_with_context(request, response, admin_user):
 
 
 class AdminAal2EnforcementTests(unittest.TestCase):
+    def setUp(self):
+        self.enterContext(patch.object(auth_routes, "create_supabase_auth_client", side_effect=lambda: auth_routes.supabase))
+        self.enterContext(patch.object(mfa_routes, "get_request_auth_client", side_effect=lambda *_args: mfa_routes.supabase))
+        self.enterContext(patch.object(mfa_routes, "persist_auth_client_session"))
+
     def test_admin_aal1_is_denied_from_aal2_route(self):
         client = build_auth_client()
 

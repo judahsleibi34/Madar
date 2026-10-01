@@ -41,6 +41,9 @@ def local_user(email="owner@example.com"):
 
 
 class PasswordLifecycleTests(unittest.TestCase):
+    def setUp(self):
+        self.enterContext(patch.object(auth_routes, "create_supabase_auth_client", side_effect=lambda: auth_routes.supabase))
+
     def test_expired_rpc_claim_is_persisted_and_reported_as_expired(self):
         rpc_result = SimpleNamespace(
             data={"id": "request-1", "status": "expired"}

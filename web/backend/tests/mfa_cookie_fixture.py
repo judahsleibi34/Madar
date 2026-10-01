@@ -85,7 +85,8 @@ def cookie_fixture(secure=False, normal=False):
     user = {**ADMIN, "user_type": "user"} if normal else dict(ADMIN)
     for target, name, value in [
         (mfa_login_service, "pending_mfa_store", lambda: store),
-        (mfa_login_service, "create_supabase_client", lambda _key: provider),
+        (mfa_login_service, "create_supabase_auth_client", lambda: provider),
+        (auth_routes, "create_supabase_auth_client", lambda: provider),
         (mfa_login_service, "COOKIE_SECURE", secure),
         (auth_service, "COOKIE_SECURE", secure),
         (auth_routes, "supabase", provider),

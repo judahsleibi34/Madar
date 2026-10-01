@@ -45,6 +45,11 @@ def auth_response(auth_id="auth-1"):
 
 
 class AdminMfaLoginEnforcementTests(unittest.TestCase):
+    def setUp(self):
+        self.enterContext(patch.object(auth_routes, "create_supabase_auth_client", side_effect=lambda: auth_routes.supabase))
+        self.enterContext(patch.object(mfa_routes, "get_request_auth_client", side_effect=lambda *_args: mfa_routes.supabase))
+        self.enterContext(patch.object(mfa_routes, "persist_auth_client_session"))
+
     def test_platform_admin_requires_mfa_even_with_flag_off(self):
         client = build_auth_client()
 
