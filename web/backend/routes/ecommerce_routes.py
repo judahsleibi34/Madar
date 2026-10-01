@@ -21,6 +21,7 @@ from services.ecommerce_cache_service import (
 from services.bounded_query_service import submit_db_read
 from services.observability_service import timed_operation, traced_operation
 from services.tenant_service import require_active_tenant_member
+from services.entitlement_service import require_entitlement
 from services.asset_registry_service import (
     extract_builder_asset_references,
     refresh_builder_asset_reference_state,
@@ -751,7 +752,7 @@ def _handle_product_delete_error(error: Exception) -> None:
 
 
 
-def _require_ecommerce_access(request: Request, response: Response):
+def _require_ecommerce_access(request: Request, response: Response, *, historical_operation: bool = False):
     """Resolve ecommerce access only from the authenticated tenant membership."""
     context = require_active_tenant_member(
         request,
@@ -760,6 +761,8 @@ def _require_ecommerce_access(request: Request, response: Response):
     )
     if str(context.role or "").lower() not in {"owner", "admin", "member"}:
         raise HTTPException(status_code=403, detail="Ecommerce access required")
+    if request.method not in {"GET", "HEAD"} and not historical_operation:
+        require_entitlement(context.tenant_id, "ecommerce")
     return context
 
 def _require_role(context) -> None:
@@ -1579,7 +1582,7 @@ def update_loyalty_rule(payload: LoyaltyRulePayload, request: Request, response:
 
 @router.post("/loyalty/entitlements/{entitlement_id}/revoke")
 def revoke_loyalty_entitlement(entitlement_id: UUID, request: Request, response: Response):
-    context = _require_ecommerce_access(request, response)
+    context = _require_ecommerce_access(request, response, historical_operation=True)
     _require_role(context)
     try:
         return _rpc_data(service_supabase.rpc("revoke_ecommerce_loyalty_entitlement_safe", {
@@ -1662,7 +1665,7 @@ def _order_operation_error(error: Exception) -> HTTPException:
 
 @router.post("/orders/{order_id}/status")
 def transition_order_status(order_id: UUID, payload: OrderStatusUpdate, request: Request, response: Response):
-    context = _require_ecommerce_access(request, response)
+    context = _require_ecommerce_access(request, response, historical_operation=True)
     _require_role(context)
     key_hash = hashlib.sha256(f"{context.tenant_id}:{order_id}:status:{payload.idempotency_key}".encode()).hexdigest()
     try:
@@ -1683,7 +1686,7 @@ def transition_order_status(order_id: UUID, payload: OrderStatusUpdate, request:
 
 @router.post("/orders/{order_id}/collect-payment")
 def collect_order_payment(order_id: UUID, request: Request, response: Response):
-    context = _require_ecommerce_access(request, response)
+    context = _require_ecommerce_access(request, response, historical_operation=True)
     _require_role(context)
     try:
         result = _rpc_data(service_supabase.rpc("collect_ecommerce_cod_payment_safe", {

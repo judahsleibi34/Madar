@@ -103,7 +103,7 @@ class StorageQuotaTests(unittest.TestCase):
         self.assertEqual(result, "reservation-1")
         self.assertEqual(client.calls[0][1]["p_tenant_id"], 7)
         self.assertEqual(client.calls[0][1]["p_tenant_quota"], 5 * 1024 * 1024 * 1024)
-        self.assertEqual(client.calls[0][1]["p_user_quota"], 1024 * 1024 * 1024)
+        self.assertEqual(client.calls[0][1]["p_user_quota"], 5 * 1024 * 1024 * 1024)
 
     def test_explicit_tenant_quota_does_not_require_a_commercial_plan(self):
         client = Client(result="reservation-1")

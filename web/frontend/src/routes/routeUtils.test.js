@@ -53,3 +53,12 @@ describe("Agenda route classification", () => {
     ).toBe("/agenda");
   });
 });
+
+
+describe("Platform commercial route", () => {
+  it("uses the dashboard shell and rejects tenant post-login context", () => {
+    expect(isDashboardRoutePath("/admin/tenants/42/commercial")).toBe(true);
+    expect(getSafePostLoginPath({ user_type: "admin" }, "/admin/tenants/42/commercial")).toBe("/admin/tenants/42/commercial");
+    expect(getSafePostLoginPath({ user_type: "user" }, "/admin/tenants/42/commercial")).not.toBe("/admin/tenants/42/commercial");
+  });
+});

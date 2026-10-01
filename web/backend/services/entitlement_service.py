@@ -17,7 +17,8 @@ from fastapi import HTTPException
 
 from database import service_supabase
 from services.api_errors import error_detail
-from services.commercial_catalog import CAPABILITIES, GIB, get_product
+from services.commercial_catalog import CAPABILITIES, GIB, get_product, module_entitlements, CORE_MODULE_IDS
+from services.commercial_access_service import resolve_commercial_access
 
 
 logger = logging.getLogger(__name__)
@@ -39,7 +40,8 @@ LEGACY_BUILDER_MAP = {
 # TODO(payment-gateway): TEMPORARY operational override only. Production sets
 # COMMERCIAL_ENTITLEMENTS_ENFORCED=false until payment gateway integration and
 # commercial tenant assignments are ready. Set it back to true to restore the
-# canonical subscription/add-on policy; no data migration is required.
+# canonical assignment/dated-ledger/add-on policy after tenant review. This
+# flag never overrides an explicit administrative hold from the ledger.
 TEMPORARY_OVERRIDE_ALLOWANCES = {
     "storage_bytes": 10 * GIB,
     "included_workspace_operators": 10_000,
@@ -256,100 +258,174 @@ def _unentitled_state(
     }
 
 
-def get_tenant_entitlements(tenant_id: int | str) -> dict[str, Any]:
+def get_tenant_entitlements(tenant_id: int | str, *, commercial_snapshot: dict | None = None) -> dict[str, Any]:
+    """Assignment describes the product; the ledger authorizes effective use.
+
+    No entitlement cache is used. Every request reads a new database snapshot,
+    including revision and time transitions, before considering the bypass.
+    Public runtime can supply its validated same-statement ledger snapshot to
+    avoid a second WAN round trip. This is never a browser-supplied argument.
+    """
+    ledger = resolve_commercial_access(tenant_id) if commercial_snapshot is None else commercial_snapshot
+    assigned_rows = ledger.get("subscriptions") or []
+    candidates = [row for row in assigned_rows if isinstance(row, dict) and isinstance(row.get("state"), str) and row["state"] in ENTITLED_STATES] if isinstance(assigned_rows, list) else []
+    assignment = candidates[0] if len(candidates) == 1 else None
+    metadata = {
+        "assigned_plan_id": (assignment or {}).get("plan_id"),
+        "assigned_subscription": assignment,
+        "assigned_modules": sorted((assignment or {}).get("module_basis") or {}) if isinstance((assignment or {}).get("module_basis"), dict) else [],
+        "module_commercial_basis": (assignment or {}).get("module_basis"),
+        "pricing": (assignment or {}).get("pricing"),
+        "legacy_assignment_requires_review": bool(assignment and assignment.get("module_basis") is None),
+        "commercial_revision": ledger.get("revision"),
+        "commercial_access_state": ledger.get("access_state"),
+        "next_transition_at": ledger.get("next_transition_at"),
+        "effective_at": ledger.get("effective_at"),
+        "access_period": ledger.get("period"),
+        "commercial_entitlements_enforced": commercial_entitlements_enforced(),
+        "commercial_suspended_at": ledger.get("commercial_suspended_at"),
+    }
+
+    def denied(code: str, source: str) -> dict[str, Any]:
+        return {
+            **_unentitled_state(tenant_id, source=source), **metadata,
+            "commercial_denial_code": code,
+            "review_required": code in {"commercial_review_required", "commercial_state_invalid"},
+        }
+
+    if ledger.get("commercial_suspended_at") is not None:
+        return denied("commercial_access_suspended", "commercial_ledger_suspended")
     if not commercial_entitlements_enforced():
-        return _temporary_operator_override_state(tenant_id)
+        return {**_temporary_operator_override_state(tenant_id), **metadata}
+    if not ledger or ledger.get("review_state") != "reviewed":
+        return denied("commercial_review_required", "commercial_ledger_review_required")
+    period = ledger.get("period")
+    if period is None:
+        code = "commercial_access_expired" if ledger.get("access_state") == "expired" else "commercial_access_required"
+        return denied(code, "commercial_ledger_inactive")
+    if not isinstance(period, dict) or period.get("tenant_id") != int(tenant_id):
+        return denied("commercial_state_invalid", "commercial_ledger_invalid")
+    # The SQL snapshot evaluates effective_during. Validate its finite bounds
+    # against the same statement time as defense against malformed responses.
+    if not _valid_at(period, ledger.get("effective_at"), "valid_from", "valid_until", required=True):
+        return denied("commercial_state_invalid", "commercial_ledger_invalid")
+    subscriptions = ledger.get("subscriptions")
+    if subscriptions is None:
+        if ledger.get("contract_version", 114) >= 115:
+            return denied("commercial_state_invalid", "commercial_assignment_invalid")
+        # Schema-114 bridge: the old ledger resolver predates assignment in its
+        # snapshot. New privileged commands stay unavailable until schema 115.
+        records = _canonical_records(tenant_id)
+        subscriptions = records[0] if records is not None else []
+    if not isinstance(subscriptions, list) or any(not isinstance(row, dict) for row in subscriptions):
+        return denied("commercial_state_invalid", "commercial_assignment_invalid")
+    assigned = [row for row in subscriptions if isinstance(row.get("state"), str) and row["state"] in ENTITLED_STATES]
+    if len(assigned) > 1:
+        raise HTTPException(status_code=503, detail=error_detail(
+            "entitlement_state_ambiguous", "Subscription access could not be verified."))
+    subscription = assigned[0] if assigned else None
+    if not subscription:
+        return {**denied("commercial_access_required", "canonical_inactive"), "subscriptions": subscriptions, "review_required": not bool(subscriptions)}
+    if subscription.get("tenant_id") != int(tenant_id):
+        return denied("commercial_state_invalid", "commercial_assignment_invalid")
+    basis = subscription.get("module_basis")
+    if basis is None or subscription.get("plan_id") is not None:
+        return denied("commercial_review_required", "legacy_module_mapping_required")
+    if (not isinstance(basis, dict) or not basis or any(module not in CORE_MODULE_IDS for module in basis)
+        or any(not isinstance(value, dict) or not isinstance(value.get("price_book_id"), str) for value in basis.values())):
+        return denied("commercial_state_invalid", "commercial_assignment_invalid")
+    covered = period.get("module_ids")
+    if (period.get("plan_id") is not None or not isinstance(covered, list)
+        or any(not isinstance(module,str) or module not in CORE_MODULE_IDS for module in covered)
+        or len(covered)!=len(set(covered))):
+        return denied("commercial_review_required", "legacy_access_mapping_required")
+    effective_modules = sorted(set(basis) & set(covered))
+    if not effective_modules:
+        return denied("commercial_access_required", "commercial_modules_uncovered")
+    if isinstance(subscription.get("pricing"), dict) and subscription["pricing"].get("pricing_status") == "review_required":
+        return denied("commercial_review_required", "commercial_price_basis_requires_review")
+    capabilities, allowances = module_entitlements(effective_modules)
+    plan_id = None
+    # Optional assignment bounds further restrict a grant; an active row never
+    # extends the dated ledger period. Legacy null bounds remain permissible.
+    if not _valid_at(subscription, ledger.get("effective_at"), "period_start", "period_end"):
+        return denied("commercial_access_expired", "commercial_assignment_inactive")
+    addons = ledger.get("addons")
+    if not isinstance(addons, list):
+        return denied("commercial_state_invalid", "commercial_addons_invalid")
+    active_addons = []
+    for addon in addons:
+        if not isinstance(addon, dict):
+            return denied("commercial_state_invalid", "commercial_addons_invalid")
+        if addon.get("state") != ACTIVE_STATE or not _valid_at(
+            addon, ledger.get("effective_at"), "period_start", "period_end"
+        ):
+            continue
+        product = get_product(str(addon.get("addon_id") or ""))
+        quantity = addon.get("quantity")
+        if (not product or product.get("type") not in {"add_on", "token_pack"}
+            or not isinstance(quantity, int) or isinstance(quantity, bool) or quantity <= 0):
+            return denied("commercial_state_invalid", "commercial_addons_invalid")
+        required = product.get("requires_capability")
+        if required and required not in capabilities:
+            continue
+        active_addons.append(addon)
+        capabilities.update(product.get("capabilities") or [])
+        for key, value in (product.get("allowances") or {}).items():
+            if isinstance(value, int):
+                allowances[key] = int(allowances.get(key) or 0) + value * quantity
+    if ledger.get("grandfathered_subdomain"):
+        capabilities.add("branded_madar_subdomain")
+    operational, availability = _operational_capabilities(capabilities)
+    return {
+        "tenant_id": int(tenant_id), "source": "canonical_commercial_ledger",
+        "plan_id": None,
+        "effective_modules": effective_modules, "subscription": subscription,
+        "subscriptions": subscriptions, "active_addons": active_addons,
+        "capabilities": sorted(capabilities), "operational_capabilities": sorted(operational),
+        "capability_availability": availability, "allowances": allowances,
+        "review_required": False, **metadata,
+    }
 
-    # The repository's offline suite intentionally uses dummy Supabase URLs.
-    # Tests that exercise canonical lookup behavior opt in explicitly.
-    if _offline_test_compatibility():
-        return _unentitled_state(tenant_id, source="offline_test_unentitled")
 
-    records = _canonical_records(tenant_id)
-    if records is not None:
-        subscriptions, addons = records
-        entitled_subscriptions = [
-            row for row in subscriptions
-            if str(row.get("state") or "").strip().lower() in ENTITLED_STATES
-        ]
-        if len(entitled_subscriptions) > 1:
-            logger.error(
-                "entitlements.ambiguous_subscription_state",
-                extra={"tenant_id": tenant_id, "count": len(entitled_subscriptions)},
-            )
-            raise HTTPException(
-                status_code=503,
-                detail=error_detail(
-                    "entitlement_state_ambiguous",
-                    "Subscription access could not be verified.",
-                ),
-            )
-        active_subscription = entitled_subscriptions[0] if entitled_subscriptions else None
-        if subscriptions or addons:
-            plan_id = str((active_subscription or {}).get("plan_id") or "") or None
-            if active_subscription:
-                capabilities, allowances = _plan_entitlements(plan_id)
-                source = "canonical"
-            else:
-                return _unentitled_state(
-                    tenant_id,
-                    source="canonical_inactive",
-                    subscriptions=subscriptions,
-                    addons=addons,
-                    legacy=_legacy_features(tenant_id),
-                )
-            active_addons: list[dict[str, Any]] = []
-            for addon in addons:
-                if addon.get("state") != ACTIVE_STATE:
-                    continue
-                product = get_product(str(addon.get("addon_id") or ""))
-                if not product:
-                    continue
-                quantity = max(int(addon.get("quantity") or 0), 0)
-                if quantity <= 0:
-                    continue
-                active_addons.append(addon)
-                capabilities.update(product.get("capabilities") or [])
-                for key, value in (product.get("allowances") or {}).items():
-                    if isinstance(value, int):
-                        allowances[key] = int(allowances.get(key) or 0) + value * quantity
-            try:
-                website_rows = _rows(
-                    service_supabase.table("website_settings")
-                    .select("branded_subdomain_commercial_status")
-                    .eq("tenant_id", int(tenant_id))
-                    .eq("branded_subdomain_commercial_status", "grandfathered")
-                    .limit(1)
-                    .execute()
-                )
-                if website_rows:
-                    capabilities.add("branded_madar_subdomain")
-            except Exception:
-                logger.info(
-                    "entitlements.subdomain_grandfather_lookup_unavailable",
-                    extra={"tenant_id": tenant_id},
-                )
-            operational, availability = _operational_capabilities(capabilities)
-            return {
-                "tenant_id": int(tenant_id),
-                "source": source,
-                "plan_id": plan_id,
-                "subscription": active_subscription,
-                "subscriptions": subscriptions,
-                "active_addons": active_addons,
-                "capabilities": sorted(capabilities),
-                "operational_capabilities": sorted(operational),
-                "capability_availability": availability,
-                "allowances": allowances,
-                "review_required": not bool(active_subscription),
-            }
+def _valid_at(record: dict, effective_at: Any, start_key: str, end_key: str, *, required=False) -> bool:
+    try:
+        now = datetime.fromisoformat(str(effective_at).replace("Z", "+00:00"))
+        if now.tzinfo is None:
+            return False
+        bounds = []
+        for key in (start_key, end_key):
+            raw = record.get(key)
+            if raw is None:
+                if required:
+                    return False
+                bounds.append(None)
+                continue
+            value = datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
+            if value.tzinfo is None:
+                return False
+            bounds.append(value)
+        start, end = bounds
+        return ((start is None or start <= now) and (end is None or now < end)
+                and (start is None or end is None or start < end))
+    except (ValueError, TypeError, OverflowError):
+        return False
 
-    legacy = _legacy_features(tenant_id)
-    return _unentitled_state(
-        tenant_id,
-        source="missing_canonical_subscription",
-        legacy=legacy,
-    )
+
+def _require_commercial_state(state: dict[str, Any]) -> None:
+    code = state.get("commercial_denial_code")
+    if code:
+        messages = {
+            "commercial_access_suspended": "Workspace commercial access is suspended. Contact support for review. Your data is retained.",
+            "commercial_access_expired": "Workspace commercial access has expired.",
+            "commercial_review_required": "Workspace commercial access requires review.",
+        }
+        raise HTTPException(status_code={
+            "commercial_access_required": 402, "commercial_access_expired": 402,
+            "commercial_access_suspended": 403, "commercial_review_required": 403,
+            "commercial_state_invalid": 503,
+        }.get(code, 503), detail=error_detail(
+            code, messages.get(code, "Workspace commercial access is unavailable.")))
 
 
 def has_entitlement(tenant_id: int | str, capability: str) -> bool:
@@ -364,8 +440,11 @@ def require_entitlement(
     capability: str,
     *,
     message: str | None = None,
+    commercial_snapshot: dict | None = None,
 ) -> dict[str, Any]:
-    state = get_tenant_entitlements(tenant_id)
+    state = (get_tenant_entitlements(tenant_id) if commercial_snapshot is None
+             else get_tenant_entitlements(tenant_id, commercial_snapshot=commercial_snapshot))
+    _require_commercial_state(state)
     active = set(state.get("operational_capabilities", state["capabilities"]))
     if capability in active:
         return state
@@ -395,6 +474,7 @@ def require_any_entitlement(
     message: str,
 ) -> dict[str, Any]:
     state = get_tenant_entitlements(tenant_id)
+    _require_commercial_state(state)
     active = set(state.get("operational_capabilities", state["capabilities"]))
     if any(capability in active for capability in capabilities):
         return state
@@ -410,6 +490,7 @@ def require_any_entitlement(
 
 def get_storage_quota_bytes(tenant_id: int | str) -> int:
     state = get_tenant_entitlements(tenant_id)
+    _require_commercial_state(state)
     quota = int(state.get("allowances", {}).get("storage_bytes") or 0)
     if quota <= 0:
         raise HTTPException(
@@ -502,27 +583,18 @@ def require_branded_subdomain(
 def require_public_runtime_entitlement(
     settings: dict[str, Any],
     capability: str,
+    *, commercial_snapshot: dict | None = None,
 ) -> dict[str, Any]:
-    """Keep an already-published runtime available during billing outages.
-
-    Canonical inactive/suspended tenants are denied normally. Only dependency
-    failures fall back, and only for a record already bound to published content.
-    """
+    """Authorize published use without disclosing internal commercial state."""
     try:
-        return require_entitlement(settings.get("tenant_id"), capability)
+        if commercial_snapshot is None:
+            return require_entitlement(settings.get("tenant_id"), capability)
+        return require_entitlement(settings.get("tenant_id"), capability, commercial_snapshot=commercial_snapshot)
     except HTTPException as error:
-        if (
-            error.status_code == 503
-            and settings.get("published_project_id")
-        ):
-            logger.warning(
-                "entitlements.public_runtime_compatibility",
-                extra={
-                    "tenant_id": settings.get("tenant_id"),
-                    "capability": capability,
-                },
-            )
-            return {"source": "published_runtime_dependency_fallback"}
+        if error.status_code in {402, 403, 503}:
+            raise HTTPException(status_code=503, detail=error_detail(
+                "tenant_service_unavailable", "This service is temporarily unavailable."
+            ), headers={"Cache-Control": "no-store"}) from error
         raise
 
 

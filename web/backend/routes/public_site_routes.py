@@ -776,6 +776,28 @@ def find_form_in_schema(schema: dict, form_id: str) -> dict:
     return matches[0]
 
 
+def require_public_form_product(settings: dict, form_id: str):
+    """Forms owns standalone links; Website owns forms in its bound live site.
+
+    Read commercial state once. A Website-native component exception never
+    grants standalone Forms or authorizes another project/tenant's form.
+    """
+    from services.entitlement_service import get_tenant_entitlements
+    try:
+        state=get_tenant_entitlements(resolve_tenant_id(settings))
+        capabilities=set(state.get("operational_capabilities",state.get("capabilities",[])))
+        if "public_form_links" in capabilities:
+            return state
+        if "website_publish" in capabilities and settings.get("published_project_id"):
+            project=get_bound_published_project(settings,require_pages=False)
+            find_form_in_schema(project.get("published_schema") or {},form_id)
+            return state
+    except HTTPException as error:
+        if error.status_code not in {402,403,404,503}:
+            raise
+    raise api_error(503,"tenant_service_unavailable","This service is temporarily unavailable.",headers={"Cache-Control":"no-store"})
+
+
 def get_published_form_for_site(settings: dict, form_id: str):
     """Resolve a published form without requiring its project to be the live website.
 
@@ -1984,6 +2006,7 @@ def resolve_public_store_settings(site_identifier: str, *, request: Request) -> 
 
     cached = read_ecommerce_cache(cache_key)
     if isinstance(cached, dict):
+        require_public_runtime_entitlement(cached, "ecommerce")
         return cached
 
     settings = resolve_website_settings(
@@ -1991,6 +2014,7 @@ def resolve_public_store_settings(site_identifier: str, *, request: Request) -> 
         request=request,
     )
     tenant_id = resolve_tenant_id(settings)
+    require_public_runtime_entitlement(settings, "ecommerce")
     write_ecommerce_cache(
         cache_key,
         tenant_id,
@@ -3010,15 +3034,15 @@ def get_public_store_profile(subdomain: str, request: Request, response: Respons
         "etag": f'"store-profile-{hashlib.sha256(canonical.encode("utf-8")).hexdigest()}"'
     }
     apply_public_cache_headers(response, metadata)
-    response.headers["Cache-Control"] = "public, max-age=30, stale-while-revalidate=300"
-    response.headers["CDN-Cache-Control"] = "public, s-maxage=60, stale-while-revalidate=600"
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["CDN-Cache-Control"] = "no-store"
     if request_etag_matches(request, metadata):
         return Response(
             status_code=304,
             headers={
                 "ETag": metadata["etag"],
-                "Cache-Control": "public, max-age=30, stale-while-revalidate=300",
-                "CDN-Cache-Control": "public, s-maxage=60, stale-while-revalidate=600",
+                "Cache-Control": "no-store",
+                "CDN-Cache-Control": "no-store",
             },
         )
     return {"success": True, "site": site_profile}
@@ -3048,7 +3072,7 @@ def get_public_storefront_sitemap(subdomain: str, request: Request):
     clean_subdomain = normalize_subdomain(subdomain)
     enforce_public_rate_limit(request, "storefront_sitemap", clean_subdomain)
     settings = resolve_public_store_settings(clean_subdomain, request=request)
-    return Response(content=_storefront_sitemap_xml(settings, clean_subdomain, request), media_type="application/xml", headers={"Cache-Control": "public, max-age=300, stale-while-revalidate=3600"})
+    return Response(content=_storefront_sitemap_xml(settings, clean_subdomain, request), media_type="application/xml", headers={"Cache-Control": "no-store"})
 
 
 @router.get("/sites/{subdomain}/robots.txt")
@@ -3143,16 +3167,16 @@ def get_public_catalog(
         "etag": f'"catalog-{hashlib.sha256(canonical.encode("utf-8")).hexdigest()}"'
     }
     apply_public_cache_headers(response, metadata)
-    response.headers["Cache-Control"] = "public, max-age=30, stale-while-revalidate=300"
-    response.headers["CDN-Cache-Control"] = "public, s-maxage=60, stale-while-revalidate=600"
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["CDN-Cache-Control"] = "no-store"
     response.headers["X-Ecommerce-Cache"] = "HIT" if cache_hit else "MISS"
     if request_etag_matches(request, metadata):
         return Response(
             status_code=304,
             headers={
                 "ETag": metadata["etag"],
-                "Cache-Control": "public, max-age=30, stale-while-revalidate=300",
-                "CDN-Cache-Control": "public, s-maxage=60, stale-while-revalidate=600",
+                "Cache-Control": "no-store",
+                "CDN-Cache-Control": "no-store",
                 "X-Ecommerce-Cache": "HIT" if cache_hit else "MISS",
             },
         )
@@ -3204,16 +3228,16 @@ def get_public_catalog_product(
         "etag": f'"product-{hashlib.sha256(canonical.encode("utf-8")).hexdigest()}"'
     }
     apply_public_cache_headers(response, metadata)
-    response.headers["Cache-Control"] = "public, max-age=30, stale-while-revalidate=300"
-    response.headers["CDN-Cache-Control"] = "public, s-maxage=60, stale-while-revalidate=600"
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["CDN-Cache-Control"] = "no-store"
     response.headers["X-Ecommerce-Cache"] = "HIT" if cache_hit else "MISS"
     if request_etag_matches(request, metadata):
         return Response(
             status_code=304,
             headers={
                 "ETag": metadata["etag"],
-                "Cache-Control": "public, max-age=30, stale-while-revalidate=300",
-                "CDN-Cache-Control": "public, s-maxage=60, stale-while-revalidate=600",
+                "Cache-Control": "no-store",
+                "CDN-Cache-Control": "no-store",
                 "X-Ecommerce-Cache": "HIT" if cache_hit else "MISS",
             },
         )
@@ -3657,7 +3681,7 @@ def resolve_public_site_runtime_context(subdomain: str, request: Request) -> tup
     )
     if not isinstance(context, dict) or not isinstance(context.get("settings"), dict):
         raise HTTPException(status_code=503, detail="Published site is temporarily unavailable")
-    settings = context["settings"]
+    settings = dict(context["settings"])
     if not isinstance(context.get("tenant_active"), bool):
         raise HTTPException(status_code=503, detail="Published site is temporarily unavailable")
     if not context["tenant_active"] or settings.get("tenant_id") is None:
@@ -3682,7 +3706,18 @@ def get_public_site_runtime(subdomain: str, request: Request, response: Response
     clean_subdomain = normalize_subdomain(subdomain)
     enforce_public_rate_limit(request, "site_lookup", clean_subdomain)
     settings, project = resolve_public_site_runtime_context(clean_subdomain, request)
-    require_public_runtime_entitlement(settings, "website_publish")
+    # Schema 115 joins the canonical ledger in the same authoritative DB read.
+    # Never cache this snapshot or expose it in the public response.
+    snapshot = None
+    if "_commercial_snapshot" in settings:
+        from services.commercial_access_service import validate_commercial_snapshot
+        try:
+            snapshot = validate_commercial_snapshot(settings.pop("_commercial_snapshot"), settings["tenant_id"])
+            if snapshot.get("contract_version") != 115:
+                raise ValueError("invalid_runtime_commercial_contract")
+        except (ValueError, TypeError, KeyError):
+            raise HTTPException(status_code=503, detail={"code": "tenant_service_unavailable", "message": "This service is temporarily unavailable."}, headers={"Cache-Control": "no-store"})
+    require_public_runtime_entitlement(settings, "website_publish", commercial_snapshot=snapshot)
     identity = get_optional_tenant_visitor(clean_subdomain, request, response, settings=settings)
     return build_public_site_response(
         clean_subdomain, request, response, settings, project, identity,
@@ -3875,7 +3910,7 @@ def get_public_form(subdomain: str, form_id: str, request: Request, response: Re
         f"{clean_subdomain}:{clean_form_id}",
     )
     settings = resolve_website_settings(clean_subdomain, request=request)
-    require_public_runtime_entitlement(settings, "public_form_links")
+    require_public_form_product(settings, clean_form_id)
     project, form, published_schema = get_published_form_for_site(settings, clean_form_id)
     authorize_site_resource(
         subdomain=clean_subdomain,
@@ -3939,7 +3974,7 @@ def start_public_quiz_attempt(
         route_name="quiz_start",
     )
     settings = resolve_website_settings(clean_subdomain, request=request)
-    require_public_runtime_entitlement(settings, "public_form_links")
+    require_public_form_product(settings, clean_form_id)
     tenant_id = resolve_tenant_id(settings)
     project, form, _ = get_published_form_for_site(settings, clean_form_id)
     if not is_public_quiz(form):
@@ -4006,7 +4041,7 @@ def finalize_public_quiz_attempt(
     enforce_public_form_submission_rate_limit(request, "quiz_finalize", f"{clean_subdomain}:{clean_form_id}")
     validate_public_answer_payload_limits(payload.answers)
     settings = resolve_website_settings(clean_subdomain, request=request)
-    require_public_runtime_entitlement(settings, "public_form_links")
+    require_public_form_product(settings, clean_form_id)
     tenant_id = resolve_tenant_id(settings)
     project, form, _ = get_published_form_for_site(settings, clean_form_id)
     if not is_public_quiz(form):
@@ -4114,7 +4149,7 @@ def list_public_builder_form_drafts(
         f"{clean_subdomain}:{clean_form_id}",
     )
     settings = resolve_website_settings(clean_subdomain, request=request)
-    require_public_runtime_entitlement(settings, "public_form_links")
+    require_public_form_product(settings, clean_form_id)
     tenant_id = resolve_tenant_id(settings)
     project, _form, _ = get_published_form_for_site(settings, clean_form_id)
     identity = authorize_site_resource(
@@ -4159,7 +4194,7 @@ def get_public_builder_form_draft(subdomain: str, form_id: str, resume_token: st
     draft_id = require_form_draft_token(resume_token)
     enforce_public_form_submission_rate_limit(request, "draft_read", f"{clean_subdomain}:{clean_form_id}")
     settings = resolve_website_settings(clean_subdomain, request=request)
-    require_public_runtime_entitlement(settings, "public_form_links")
+    require_public_form_product(settings, clean_form_id)
     tenant_id = resolve_tenant_id(settings)
     project, _form, _ = get_published_form_for_site(settings, clean_form_id)
     identity = authorize_site_resource(
@@ -4207,7 +4242,7 @@ def save_public_builder_form_draft(
         route_name="form_draft",
     )
     settings = resolve_website_settings(clean_subdomain, request=request)
-    require_public_runtime_entitlement(settings, "public_form_links")
+    require_public_form_product(settings, clean_form_id)
     tenant_id = resolve_tenant_id(settings)
     project, form, _ = get_published_form_for_site(settings, clean_form_id)
     identity = authorize_site_resource(
@@ -4309,7 +4344,7 @@ def submit_public_builder_form(
     )
 
     settings = resolve_website_settings(clean_subdomain, request=request)
-    require_public_runtime_entitlement(settings, "public_form_links")
+    require_public_form_product(settings, clean_form_id)
     tenant_id = resolve_tenant_id(settings)
     project, form, _ = get_published_form_for_site(settings, clean_form_id)
     if is_public_quiz(form):

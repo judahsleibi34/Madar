@@ -14,7 +14,7 @@ from fastapi import HTTPException
 
 from services import entitlement_service
 from services.api_errors import error_detail
-from services.commercial_catalog import get_product
+from services.commercial_catalog import get_product, module_entitlements
 
 
 class EntitlementTestState:
@@ -26,20 +26,16 @@ class EntitlementTestState:
         return str(tenant_id)
 
     def activate_plan(self, tenant_id, plan_id: str):
-        product = get_product(plan_id)
-        if not product or product.get("type") != "base_plan":
-            raise ValueError(f"Unknown test plan: {plan_id}")
+        # Explicit route-isolation fixture aliases, not a production migration
+        # or runtime plan-name authorization path.
+        modules = ['forms','website','ecommerce'] if plan_id in {'business','business_plus'} else [plan_id]
+        capabilities, allowances = module_entitlements(modules)
         self._states[self._key(tenant_id)] = {
-            "tenant_id": tenant_id,
-            "source": "canonical_test_fixture",
-            "plan_id": plan_id,
-            "subscription": {"plan_id": plan_id, "state": "active"},
-            "subscriptions": [{"plan_id": plan_id, "state": "active"}],
-            "active_addons": [],
-            "capabilities": list(product.get("capabilities") or []),
-            "allowances": dict(product.get("allowances") or {}),
-            "legacy_features": [],
-            "review_required": False,
+            "tenant_id": tenant_id, "source": "canonical_test_fixture", "plan_id": None,
+            "assigned_modules": modules, "effective_modules": modules,
+            "subscription": {"state":"active", "module_basis":{module:{"price_book_id":"synthetic"} for module in modules}},
+            "subscriptions": [], "active_addons": [], "capabilities": sorted(capabilities),
+            "allowances": allowances, "legacy_features": [], "review_required": False,
         }
         return self
 

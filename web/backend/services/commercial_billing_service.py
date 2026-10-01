@@ -1,4 +1,4 @@
-"""Manual commercial plan/add-on lifecycle operations."""
+"""Product assignment operations; dated ledger access is granted separately."""
 
 from __future__ import annotations
 
@@ -28,37 +28,7 @@ def _require_product(product_id: str, expected_type: str | None = None) -> dict[
 
 
 def request_plan(*, tenant_id: int, user_id: int, plan_id: str) -> dict[str, Any]:
-    product = _require_product(plan_id, "base_plan")
-    now = datetime.now(timezone.utc).isoformat()
-    existing = _rows(
-        service_supabase.table("tenant_subscriptions")
-        .select("*")
-        .eq("tenant_id", tenant_id)
-        .eq("plan_id", plan_id)
-        .in_("state", ["requested", "pending_review"])
-        .order("updated_at", desc=True)
-        .limit(1)
-        .execute()
-    )
-    if existing:
-        return existing[0]
-    result = service_supabase.table("tenant_subscriptions").insert(
-        {
-            "tenant_id": tenant_id,
-            "plan_id": plan_id,
-            "state": "pending_review",
-            "catalog_version": CATALOG_VERSION,
-            "currency": product["currency"],
-            "price_minor": product["price_minor"],
-            "billing_interval": product["billing_interval"],
-            "source": "customer_request",
-            "requested_by_user_id": user_id,
-            "migration_provenance": {"request": "public_manual_activation"},
-            "updated_at": now,
-        }
-    ).execute()
-    rows = _rows(result)
-    return rows[0] if rows else {}
+    raise HTTPException(status_code=409, detail=error_detail("modular_assignment_required", "Module sales require commercial launch activation and reviewed module assignment."))
 
 
 def request_addon(
@@ -126,26 +96,8 @@ def assign_plan(
     reason: str,
     idempotency_key: str,
 ) -> dict[str, Any]:
-    product = _require_product(plan_id, "base_plan")
-    response = service_supabase.rpc(
-        "assign_commercial_subscription",
-        {
-            "p_tenant_id": tenant_id,
-            "p_plan_id": plan_id,
-            "p_state": state,
-            "p_catalog_version": CATALOG_VERSION,
-            "p_price_minor": product["price_minor"],
-            "p_admin_user_id": admin_user_id,
-            "p_reason": reason,
-            "p_idempotency_key": idempotency_key,
-        },
-    ).execute()
-    rows = _rows(response)
-    if state == "active":
-        from services.storage_quota_service import sync_tenant_storage_quota
-
-        sync_tenant_storage_quota(tenant_id)
-    return rows[0] if rows else {}
+    raise HTTPException(status_code=409, detail=error_detail(
+        "modular_assignment_required", "Use the reviewed module assignment command. Legacy plans are historical only."))
 
 
 def assign_addon(

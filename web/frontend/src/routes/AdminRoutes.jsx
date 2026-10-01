@@ -5,6 +5,7 @@ import RouteSuspense from "../components/common/RouteSuspense";
 import { appShellContent } from "../content";
 import { DashboardLoadingElement, DashboardShell, RestrictedAccessWindow } from "./shared";
 
+const AdminCommercialPage = lazy(() => import("../components/DashboardBuilder/AdminCommercialPage"));
 const Dashboard = lazy(() => import("../components/DashboardBuilder/Dashboard"));
 const AdminAccountAccessPage = lazy(() =>
   import("../components/DashboardBuilder/AdminAccountAccessPage")
@@ -68,6 +69,8 @@ export default function AdminRoutes({
             />
           )}
         />
+
+        <Route path="/admin/tenants/:tenantId/commercial" element={renderShell(<AdminCommercialPage currentUser={user} />)} />
 
         <Route
           path="/admin/users/*"

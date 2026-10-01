@@ -157,10 +157,11 @@ class BuilderAssetUploadTests(unittest.TestCase):
         with patch.object(
             builder_routes,
             "require_entitlement",
-            side_effect=HTTPException(status_code=402, detail="Builder upload entitlement required"),
-        ):
+            side_effect=lambda tenant, capability: None if capability == "ecommerce" else (_ for _ in ()).throw(HTTPException(status_code=402, detail="Builder upload entitlement required")),
+        ) as entitlement:
             response = self.post_product_media(PNG_BYTES)
 
+        entitlement.assert_called_once_with(1, "ecommerce")
         self.assertEqual(response.status_code, 200)
         self.assertRegex(
             response.json()["asset_url"],

@@ -1,0 +1,23 @@
+.commercial-page { max-width: 1200px; margin: auto; padding: clamp(12px, 3vw, 32px); color: var(--theme-text); }
+.commercial-page p, .commercial-page dd, .commercial-page td { overflow-wrap: anywhere; }
+.commercial-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 20px; }
+.commercial-card { border: 1px solid var(--theme-border); border-radius: 16px; padding: 20px; margin: 20px 0; background: var(--theme-surface); }
+.commercial-page h2 { font-size: 1.25rem; margin-top: 0; }
+.commercial-page h3 { font-size: 1rem; }
+.commercial-page dt { font-weight: 600; margin-top: 10px; }
+.commercial-page dd { margin-inline-start: 0; }
+.commercial-actions { display: flex; gap: 12px; flex-wrap: wrap; margin-block: 16px; }
+.commercial-page button, .commercial-dialog button { min-height: 44px; border: 1px solid currentColor; border-radius: 8px; padding: 10px 16px; cursor: pointer; color: inherit; background: var(--theme-surface); }
+.commercial-page button:disabled, .commercial-dialog button:disabled { opacity: .55; cursor: default; }
+.commercial-page :focus-visible, .commercial-dialog :focus-visible { outline: 3px solid #527cdb; outline-offset: 3px; }
+.commercial-warning { padding: 16px; border-inline-start: 4px solid #b66e16; background: var(--theme-surface); }
+.commercial-table-wrap { overflow-x: auto; }
+.commercial-page table { border-collapse: collapse; width: 100%; font-size: .9rem; }
+.commercial-page th, .commercial-page td { text-align: start; padding: 12px; border-bottom: 1px solid var(--theme-border); }
+.commercial-dialog { color: var(--theme-text); background: var(--theme-surface); border: 1px solid #888; border-radius: 16px; width: min(640px, calc(100vw - 32px)); max-height: 90dvh; overflow-y: auto; padding: 24px; }
+.commercial-dialog::backdrop { background: var(--app-backdrop); }
+.commercial-dialog label { display: block; margin: 16px 0; }
+.commercial-dialog input:not([type=checkbox]), .commercial-dialog textarea, .commercial-dialog select { display: block; box-sizing: border-box; width: 100%; min-height: 44px; padding: 10px; background: var(--theme-surface-2); color: inherit; border: 1px solid #888; border-radius: 6px; }
+.commercial-dialog input[type=checkbox] { margin-inline-end: 10px; width: 18px; height: 18px; }
+.commercial-dialog fieldset { border: 1px solid #888; border-radius: 8px; }
+.commercial-dialog [role=alert], .commercial-page [role=alert] { padding: 12px; border: 1px solid #ad3232; }

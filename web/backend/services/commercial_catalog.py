@@ -12,12 +12,15 @@ from datetime import date
 from typing import Any
 
 
-CATALOG_VERSION = "2026-07-30"
+CATALOG_VERSION = "2026-09-30-v2"
 CATALOG_CURRENCY = "USD"
-CATALOG_EFFECTIVE_DATE = date(2026, 7, 30).isoformat()
+CATALOG_EFFECTIVE_DATE = date(2026, 9, 30).isoformat()
 GIB = 1024 * 1024 * 1024
 
-BASE_PLAN_IDS = ("forms", "website", "business", "business_plus")
+CORE_MODULE_IDS = ("forms", "website", "ecommerce")
+LEGACY_PLAN_IDS = ("business", "business_plus")
+# Compatibility name for catalog consumers; these are independent modules.
+BASE_PLAN_IDS = CORE_MODULE_IDS
 ADD_ON_IDS = (
     "branded_madar_subdomain",
     "additional_storage_5gb",
@@ -41,6 +44,7 @@ CAPABILITIES = (
     "standard_data_analysis",
     "page_builder",
     "website_publish",
+    "ecommerce",
     "image_uploads",
     "expanded_data_analysis",
     "data_cleaning",
@@ -77,8 +81,12 @@ _WEBSITE_CAPABILITIES = {
     "website_publish",
     "image_uploads",
     "standard_hosted_address",
+    "reservations",
+    "reservation_management",
+    "internal_calendar",
 }
 _BUSINESS_CAPABILITIES = _WEBSITE_CAPABILITIES | {
+    "ecommerce",
     "data_import",
     "standard_data_analysis",
     "expanded_data_analysis",
@@ -379,8 +387,47 @@ PRODUCTS.update(
 )
 
 
+# Legacy definitions are historical display data, never entitlement authority.
+for _legacy in LEGACY_PLAN_IDS:
+    PRODUCTS[_legacy].update(type="legacy_plan", deprecated=True, publicly_available=False)
+
+MODULE_CAPABILITIES = {
+    "forms": _FORMS_CAPABILITIES | {"data_exports", "expanded_data_analysis", "data_cleaning", "charts"},
+    "website": {"page_builder", "website_publish", "image_uploads", "standard_hosted_address",
+                "reservations", "reservation_management", "internal_calendar", "reservation_analytics"},
+    "ecommerce": {"ecommerce", "image_uploads", "standard_hosted_address"},
+}
+for _module, _name, _minor, _storage, _order in (
+    ("forms", "Madar Forms", 1500, GIB, 10),
+    ("website", "Madar Website", 2000, 2*GIB, 20),
+    ("ecommerce", "Madar Commerce", 2000, 5*GIB, 30),
+):
+    PRODUCTS[_module] = _plan(_module, _name, _minor, _storage, MODULE_CAPABILITIES[_module], _order,
+                            "Independently assigned core module; bundle pricing is resolved by price book.", ())
+    PRODUCTS[_module].update(type="core_module", price_book_id="launch_2026", sales_activation_required=True)
+
+
+def normalize_module_ids(module_ids) -> tuple[str, ...]:
+    if not isinstance(module_ids, (list, tuple, set, frozenset)) or not module_ids:
+        raise ValueError("A non-empty core module set is required")
+    if any(not isinstance(module, str) or module not in CORE_MODULE_IDS for module in module_ids):
+        raise ValueError("Unknown core module")
+    if len(set(module_ids)) != len(module_ids):
+        raise ValueError("Duplicate core module")
+    return tuple(sorted(module_ids))
+
+
+def module_entitlements(module_ids) -> tuple[set[str], dict[str, Any]]:
+    modules = normalize_module_ids(module_ids)
+    capabilities = set().union(*(MODULE_CAPABILITIES[module] for module in modules))
+    allowances = deepcopy(PRODUCTS[modules[0]]["allowances"])
+    allowances["storage_bytes"] = max(PRODUCTS[module]["allowances"]["storage_bytes"] for module in modules)
+    allowances["published_websites"] = 1 if "website" in modules else 0
+    return capabilities, allowances
+
+
 def validate_catalog() -> None:
-    expected_ids = set(BASE_PLAN_IDS) | set(ADD_ON_IDS)
+    expected_ids = set(CORE_MODULE_IDS) | set(LEGACY_PLAN_IDS) | set(ADD_ON_IDS)
     if set(PRODUCTS) != expected_ids:
         raise RuntimeError("Commercial catalog identifiers are incomplete or unexpected.")
     for product_id, product in PRODUCTS.items():
@@ -414,6 +461,10 @@ def get_catalog(*, public_only: bool = False) -> dict[str, Any]:
         "currency": CATALOG_CURRENCY,
         "effective_date": CATALOG_EFFECTIVE_DATE,
         "manual_activation": True,
+        "contract_version": "2.0",
+        "core_module_ids": list(CORE_MODULE_IDS),
+        "price_book_id": "launch_2026",
+        "sales_activation_required": True,
         "products": products,
     }
 

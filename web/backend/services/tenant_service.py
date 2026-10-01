@@ -5,6 +5,7 @@ from fastapi import HTTPException, Request, Response
 from database import service_supabase
 from services.auth_service import require_regular_user
 from services.tenant_lifecycle_service import tenant_is_active
+from services.entitlement_service import require_any_entitlement
 
 
 @dataclass(frozen=True)
@@ -141,6 +142,7 @@ def require_builder_write_access(
     if context.role not in {"owner", "admin", "member"}:
         raise HTTPException(status_code=403, detail="Builder write access required")
 
+    require_any_entitlement(context.tenant_id, {"forms", "page_builder"}, message="Commercial builder access is required.")
     return context
 
 
@@ -157,4 +159,6 @@ def require_builder_admin_access(
     if context.role not in {"owner", "admin"}:
         raise HTTPException(status_code=403, detail="Builder admin access required")
 
+    if request.method in {"POST", "PUT", "PATCH"}:
+        require_any_entitlement(context.tenant_id, {"forms", "page_builder"}, message="Commercial builder access is required.")
     return context

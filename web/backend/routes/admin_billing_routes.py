@@ -1,7 +1,10 @@
 from datetime import datetime, timezone
+from calendar import monthrange
+from typing import Literal
+from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Request, Response
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict, field_validator, model_validator
 
 from classes import (
     AdminBillingUpdateRequest,
@@ -11,6 +14,9 @@ from classes import (
     AdminTokenAllocationRequest,
 )
 from services.audit_service import record_audit_event
+from services.commercial_access_service import apply_commercial_command, resolve_commercial_access
+from services.commercial_catalog import CATALOG_VERSION, get_product
+from services.observability_service import CORRELATION_ID, correlation_id
 from services.auth_service import require_system_admin
 from services.billing_service import apply_verified_billing_update
 from services.commercial_billing_service import (
@@ -296,3 +302,244 @@ def update_tenant_feature(
         "success": True,
         "data": feature,
     }
+
+
+class CommercialCommandRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    expected_revision: int = Field(..., ge=1, strict=True)
+    idempotency_key: str = Field(..., min_length=16, max_length=128)
+    reason: str = Field(..., min_length=3, max_length=1000)
+    reference: str | None = Field(default=None, max_length=200)
+
+    @field_validator("reason")
+    @classmethod
+    def clean_reason(cls, value):
+        value = value.strip()
+        if len(value) < 3:
+            raise ValueError("A reason is required")
+        return value
+
+
+class CommercialGrantRequest(CommercialCommandRequest):
+    module_ids: list[Literal["forms", "website", "ecommerce"]] = Field(..., min_length=1, max_length=3)
+    valid_from: datetime
+    valid_until: datetime
+    supersedes_period_id: UUID | None = None
+
+    @model_validator(mode="after")
+    def dated_grant(self):
+        if self.valid_from.tzinfo is None or self.valid_until.tzinfo is None or self.valid_until <= self.valid_from:
+            raise ValueError("A finite ordered access period with timezone is required")
+        return self
+
+
+class CommercialPaymentRequest(CommercialGrantRequest):
+    method: Literal["cash", "bank_transfer", "other_manual"]
+    actual_minor: int = Field(..., ge=1, le=1000000000000, strict=True)
+    billing_months: int = Field(..., ge=1, le=120, strict=True)
+    paid_at: datetime
+    currency: Literal["USD"] = "USD"
+    receipt_reference: str = Field(..., min_length=1, max_length=200)
+    override_reason: str | None = Field(default=None, min_length=3, max_length=1000)
+
+    @model_validator(mode="after")
+    def payment_evidence(self):
+        if self.paid_at.tzinfo is None:
+            raise ValueError("Payment time must include timezone")
+        offset = self.valid_from.year * 12 + self.valid_from.month - 1 + self.billing_months
+        year, month = divmod(offset, 12)
+        expected_end = self.valid_from.replace(year=year, month=month + 1,
+            day=min(self.valid_from.day, monthrange(year, month + 1)[1]))
+        if self.valid_until != expected_end:
+            raise ValueError("Paid access dates must match the billing months")
+        # The database validates the server quote after durable replay. A
+        # catalog price change must not invalidate an identical payment retry.
+        if self.override_reason is not None and len(self.override_reason.strip()) < 3:
+            raise ValueError("An amount override requires a reason")
+        if not self.receipt_reference.strip():
+            raise ValueError("A payment reference is required")
+        return self
+
+
+class CommercialRevokeRequest(CommercialCommandRequest):
+    period_id: UUID
+
+
+def _commercial_command(tenant_id: int, payload: CommercialCommandRequest, operation: str,
+                        request: Request, response: Response, *, quote=None):
+    # Future Billing Admin permission hook: keep this one authorization seam.
+    admin = _admin(request, response)
+    request_id = CORRELATION_ID.get() or correlation_id(request.headers.get("X-Request-ID"))
+    response.headers["X-Request-ID"] = request_id
+    command = payload.model_dump(mode="json", exclude_none=True)
+    command.pop("idempotency_key")
+    result = apply_commercial_command(
+        tenant_id=tenant_id, actor_user_id=admin["id"], operation=operation,
+        idempotency_key=payload.idempotency_key, request_id=request_id,
+        command=command, quote=quote,
+    )
+    return {"success": True, "commercial_access": result}
+
+
+@router.get("/tenants/{tenant_id}/access-history")
+def inspect_commercial_access_history(tenant_id: int, request: Request, response: Response):
+    _admin(request, response)
+    state = resolve_commercial_access(tenant_id)
+    response.headers["Cache-Control"] = "no-store"
+    try:
+        history = {}
+        for key, table, fields in (
+            ("events", "commercial_access_events", "id,operation,actor_user_id,aal,request_id,revision,result,created_at"),
+            ("periods", "commercial_access_periods", "id,source_type,plan_id,module_ids,price_snapshot,valid_from,valid_until,revoked_at,revoked_by,created_at"),
+            ("payments", "commercial_manual_payments", "id,module_ids,plan_id,price_snapshot,expected_minor,actual_minor,currency,method,paid_at,valid_from,valid_until,billing_months,receipt_reference,corrects_payment_id,reason,override_reason,created_at"),
+        ):
+            history[key] = service_supabase.table(table).select(fields).eq("tenant_id", tenant_id).order("created_at", desc=True).limit(100).execute().data or []
+    except Exception as error:
+        raise HTTPException(status_code=503, detail={"code": "commercial_dependency_unavailable", "message": "Commercial history is unavailable."}) from error
+    return {"success": True, "commercial_access": state, **history}
+
+
+@router.post("/tenants/{tenant_id}/suspend")
+def suspend_commercial_access(tenant_id: int, payload: CommercialCommandRequest, request: Request, response: Response):
+    return _commercial_command(tenant_id, payload, "suspend", request, response)
+
+
+@router.post("/tenants/{tenant_id}/reactivate")
+def reactivate_commercial_access(tenant_id: int, payload: CommercialCommandRequest, request: Request, response: Response):
+    return _commercial_command(tenant_id, payload, "reactivate", request, response)
+
+
+@router.post("/tenants/{tenant_id}/manual-payments")
+def record_commercial_manual_payment(tenant_id: int, payload: CommercialPaymentRequest, request: Request, response: Response):
+    # The canonical SQL price-book resolver quotes after durable replay.
+    quote = None
+    return _commercial_command(tenant_id, payload, "manual_payment", request, response, quote=quote)
+
+
+@router.post("/tenants/{tenant_id}/complimentary-access")
+def grant_complimentary_access(tenant_id: int, payload: CommercialGrantRequest, request: Request, response: Response):
+    return _commercial_command(tenant_id, payload, "complimentary", request, response)
+
+
+@router.post("/tenants/{tenant_id}/revoke-access")
+def revoke_commercial_access(tenant_id: int, payload: CommercialRevokeRequest, request: Request, response: Response):
+    return _commercial_command(tenant_id, payload, "revoke", request, response)
+
+
+class CommercialPaymentCorrectionRequest(CommercialCommandRequest):
+    payment_id: UUID
+    actual_minor: int = Field(..., ge=1, le=1000000000000, strict=True)
+    paid_at: datetime
+    receipt_reference: str = Field(..., min_length=1, max_length=200)
+    override_reason: str | None = Field(default=None, min_length=3, max_length=1000)
+
+    @model_validator(mode="after")
+    def correction_evidence(self):
+        if self.paid_at.tzinfo is None or not self.receipt_reference.strip():
+            raise ValueError("Dated payment evidence and reference are required")
+        if self.override_reason is not None and len(self.override_reason.strip()) < 3:
+            raise ValueError("An override requires a reason")
+        return self
+
+
+@router.post("/tenants/{tenant_id}/correct-payment")
+def correct_commercial_manual_payment(tenant_id: int, payload: CommercialPaymentCorrectionRequest, request: Request, response: Response):
+    return _commercial_command(tenant_id, payload, "correct_payment", request, response)
+
+
+@router.post("/tenants/{tenant_id}/review-inactive")
+def review_inactive_commercial_access(tenant_id: int, payload: CommercialCommandRequest, request: Request, response: Response):
+    return _commercial_command(tenant_id, payload, "review_inactive", request, response)
+
+
+class CommercialModuleAssignmentRequest(CommercialCommandRequest):
+    module_ids: list[Literal["forms", "website", "ecommerce"]] = Field(..., max_length=3)
+    price_books: dict[Literal["forms", "website", "ecommerce"], str] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def module_set(self):
+        if len(self.module_ids) != len(set(self.module_ids)) or set(self.price_books)-set(self.module_ids):
+            raise ValueError("Unique modules and matching price-book bases are required")
+        return self
+
+
+@router.post("/tenants/{tenant_id}/modules")
+def assign_commercial_modules(tenant_id: int, payload: CommercialModuleAssignmentRequest, request: Request, response: Response):
+    return _commercial_command(tenant_id, payload, "assign_modules", request, response)
+
+
+@router.get("/tenants/{tenant_id}/modules")
+def inspect_commercial_modules(tenant_id: int, request: Request, response: Response):
+    _admin(request, response)
+    response.headers["Cache-Control"] = "no-store"
+    state=resolve_commercial_access(tenant_id)
+    if state.get("contract_version",114)<115:
+        raise HTTPException(status_code=503,detail={"code":"commercial_upgrade_required","message":"Module administration requires schema 115."})
+    tenant=service_supabase.table("tenants").select("tenant_id,brand_name,owner_name").eq("tenant_id",tenant_id).limit(1).execute().data or []
+    hold=service_supabase.table("tenant_commercial_state").select("commercial_suspended_at,commercial_suspended_by,commercial_suspension_reason").eq("tenant_id",tenant_id).limit(1).execute().data or []
+    return {"success":True,"tenant":tenant[0] if tenant else None,"commercial_access":state,
+            "entitlements":get_tenant_entitlements(tenant_id,commercial_snapshot=state),"hold":hold[0] if hold else None}
+
+
+@router.get("/price-books")
+def inspect_price_books(request: Request, response: Response):
+    _admin(request,response)
+    response.headers["Cache-Control"] = "no-store"
+    try:
+        books=service_supabase.table("commercial_price_books").select("id,version,effective_from,currency,billing_interval,standalone_minor,bundle_minor,sales_start_at,sales_end_at").order("effective_from").execute().data or []
+    except Exception as error:
+        raise HTTPException(status_code=503,detail={"code":"commercial_dependency_unavailable","message":"Price-book configuration is unavailable."}) from error
+    now = datetime.now(timezone.utc)
+    for book in books:
+        start = book.get("sales_start_at")
+        end = book.get("sales_end_at")
+        book["new_sales_active"] = bool(start and datetime.fromisoformat(start.replace("Z", "+00:00")) <= now and (not end or datetime.fromisoformat(end.replace("Z", "+00:00")) > now))
+    return {"success":True,"price_books":books}
+
+
+class CommercialModuleQuoteRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    module_ids: list[Literal["forms", "website", "ecommerce"]] = Field(..., max_length=3)
+    price_books: dict[Literal["forms", "website", "ecommerce"], str] = Field(default_factory=dict)
+    billing_months: int = Field(default=1, ge=1, le=120, strict=True)
+
+    @model_validator(mode="after")
+    def module_set(self):
+        if len(self.module_ids) != len(set(self.module_ids)) or set(self.price_books)-set(self.module_ids):
+            raise ValueError("Unique modules and matching price-book bases are required")
+        return self
+
+
+@router.post("/tenants/{tenant_id}/modules/quote")
+def quote_commercial_modules(tenant_id: int, payload: CommercialModuleQuoteRequest, request: Request, response: Response):
+    _admin(request, response)
+    response.headers["Cache-Control"] = "no-store"
+    state = resolve_commercial_access(tenant_id)
+    if state.get("contract_version", 114) < 115:
+        raise HTTPException(status_code=503, detail={"code": "commercial_upgrade_required", "message": "Quoting requires schema 115."})
+    try:
+        quote = service_supabase.rpc("quote_commercial_modules", {
+            "p_tenant_id": tenant_id,
+            "r": payload.model_dump(exclude={"billing_months"}),
+        }).execute().data
+        if (not isinstance(quote, dict) or not isinstance(quote.get("revision"), int)
+            or isinstance(quote.get("revision"), bool) or quote["revision"] < 1
+            or not isinstance(quote.get("module_basis"), dict)
+            or set(quote["module_basis"]) != set(payload.module_ids)
+            or not isinstance(quote.get("pricing"), dict)
+            or quote["pricing"].get("module_ids") != sorted(payload.module_ids)
+            or not isinstance(quote["pricing"].get("recurring_minor"), int)
+            or isinstance(quote["pricing"].get("recurring_minor"), bool)
+            or not isinstance(quote["pricing"].get("price_groups"), list)
+            or (payload.module_ids and not quote["pricing"]["price_groups"])
+            or any(not isinstance(basis, dict) or not isinstance(basis.get("price_book_id"), str)
+                   for basis in quote["module_basis"].values())):
+            raise ValueError("invalid_quote")
+        quote["expected_payment_minor"] = quote["pricing"]["recurring_minor"] * payload.billing_months
+        quote["billing_months"] = payload.billing_months
+        quote["payment_eligible"] = bool(quote["pricing"].get("module_ids")) and all(group.get("grandfathered") or group.get("new_sales_active") for group in quote["pricing"].get("price_groups", []))
+        return {"success": True, "quote": quote}
+    except Exception as error:
+        if getattr(error, "code", None) in {"22023", "P0002"}:
+            raise HTTPException(status_code=409, detail={"code": "commercial_price_book_unavailable", "message": "No eligible commercial basis can quote this module set."}) from error
+        raise HTTPException(status_code=503, detail={"code": "commercial_dependency_unavailable", "message": "Commercial quote is unavailable."}) from error

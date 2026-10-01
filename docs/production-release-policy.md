@@ -255,17 +255,26 @@ queried directly. Its SHA must match state and its reported compatibility range
 must contain the live schema. Candidate rollback bounds are descriptive metadata
 today; retained-target attestation is the operative rollback check.
 
-Production was observed at schema 113 for this change. The current candidate
-bridge contract is schema range `113..114`, target `114`, class
-`forward-compatible`, rollback metadata `113..113`, and the checksum-pinned
-`migrations-114.json`. Migrations through 113 are applied production history
-and remain immutable. Only after bridge acceptance at schema 113 may the
-coordinator create a verified source-schema-113 backup and execute migration
-114. It installs a service-role-only, invoker-rights public-site runtime context
-RPC. The candidate backend uses the complete preexisting site resolution path
-only while that RPC is definitively absent before migration. Network/database
-errors remain fail-closed. Once schema advances beyond 113, recovery is
-forward-repair-only. The schema-113 asset-visibility bridge remains historical.
+The current candidate bridges schema `114..115`, targets `115`, and uses
+`migrations-115.json` with class `forward-compatible` and rollback metadata
+`114..114`. Migrations through 114 remain immutable. The candidate reads the
+schema-099 commercial resolver at schema 114; new commercial mutations fail
+closed with `commercial_upgrade_required` until migration 115 is complete.
+Only after bridge acceptance and a verified schema-114 backup may the
+coordinator apply 115. This adds reversible tenant commercial holds, snapshot
+product assignments, revision-checked commands and immutable financial/event
+history guards. No assignment or payment is inferred from historical usage.
+Existing production configuration of commercial enforcement is not changed;
+explicit holds take precedence over its temporary bypass.
+
+After advancement to 115, the prior application cannot enforce holds and its
+schema range ends at 114. Recovery is forward repair only; never serve the prior
+binary at 115. Changes to `web/deployment/releases` require the existing governed
+control-plane upgrade workflow before this candidate can be deployed. No such
+upgrade or deployment is authorized by this development change.
+
+The earlier schema-113 to 114 public-runtime bridge and schema-112 to 113
+asset-visibility bridge remain immutable historical release contracts.
 
 The preceding schema-109 bridge used `migrations-110-112.json`. Migration 110
 atomically creates the durable e-commerce order notification intent with the

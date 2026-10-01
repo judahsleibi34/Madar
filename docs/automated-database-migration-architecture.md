@@ -37,13 +37,15 @@ migration manifest. It does not make every migration automatic, does not merge
 release promotion and schema mutation into one rollback domain, and does not
 provide automatic downgrade SQL.
 
-The schema-113 to schema-114 bridge follows this ordering. Its candidate
-backend retains the complete existing site/settings/project resolution path
-only when PostgREST definitively reports that the new service-role runtime
-context RPC is absent. Migration 114 installs that RPC so a hosted public-site
-startup resolves the active tenant, bound publication, and site settings in one
-remote read. Other RPC errors remain fail-closed. The candidate can be accepted
-at schema 113 before the guarded post-acceptance migration runs.
+The schema-114 to schema-115 commercial bridge follows this ordering. The
+candidate can read the existing schema-099 access snapshot at schema 114, but
+new hold/access commands require the resolver's schema-115 contract marker.
+After bridge acceptance, a verified schema-114 backup precedes migration 115.
+The active application then sees holds, assignment snapshots and revision
+checks. Explicit commercial holds apply even while the existing operator plan
+bypass remains configured; no global enforcement setting is activated.
+The prior binary cannot enforce holds and cannot be reused after the schema
+advances. Post-transition recovery is forward repair only.
 
 Protected control-plane releases may be authorized through the root-owned
 one-command workflow described in
@@ -469,7 +471,19 @@ health evidence, dirty/different release, checksum drift, missing predecessor,
 or a ledger already beyond target fails before mutation. No tenant/business
 table is queried or changed.
 
-### Current schema 114 bridge
+### Current schema 115 bridge
+
+The source contract is schema 114, compatible range `114..115`, target 115 and
+checksum-pinned `migrations-115.json`. Mutation availability is explicit during
+the bridge: reads use the existing ledger while commands return a controlled
+upgrade-required response until 115. The migration adds current holds without
+truncating paid periods and extends the existing RPC boundary with optimistic
+revisions, replay and full safe before/after audit context. Retained schema-114
+code is incompatible after advancement. Protected release metadata requires a
+governed controller upgrade; no migration/controller change is executed as part
+of local implementation validation.
+
+### Earlier schema 114 bridge
 
 Production enters this release at schema 113. The release contract accepts
 `113..114`, targets 114, and lists only the checksum-pinned migration 114 in
