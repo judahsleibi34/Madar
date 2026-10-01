@@ -302,3 +302,10 @@ describe("DashboardSidebar navigation hierarchy", () => {
     ).toBeTruthy();
   });
 });
+
+
+it("shows only supported Platform Administration destinations", () => {
+  render(<MemoryRouter><DashboardSidebar user={{ account_kind: "platform", user_type: "admin" }} showNotifications /></MemoryRouter>);
+  for (const label of ["Dashboard", "Users / Tenants", "Account Access", "Security", "Settings"]) expect(screen.getByRole("button", { name: label, exact: true })).toBeTruthy();
+  for (const label of ["Workspace", "Online Store", "My Plan", "CV Rerank", "Home", "Notifications"]) expect(screen.queryByRole("button", { name: label, exact: true })).toBeNull();
+});

@@ -140,6 +140,7 @@ export default function DashboardSidebar({
   showNotifications = false,
 }) {
   const { t, i18n } = useTranslation(["dashboard"]);
+  const isPlatformAdmin = user?.account_kind === "platform" && user?.user_type === "admin";
   const navigate = useNavigate();
   const location = useLocation();
   const sidebarRef = useRef(null);
@@ -524,14 +525,19 @@ export default function DashboardSidebar({
           aria-label={t("sidebar.navigation")}
           onClickCapture={expandWorkspaceSidebar}
         >
-          {showNotifications && (
+          {!isPlatformAdmin && showNotifications && (
             <NotificationBell
               className="admin-sidebar-notifications"
               onNavigate={onNavigate}
             />
           )}
 
-          {primaryNavItems.slice(0, 2).map((item) => {
+          {(isPlatformAdmin ? [
+            { path: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+            { path: "/admin/users", label: "Users / Tenants", icon: ShieldCheck },
+            { path: "/admin/account-access", label: "Account Access", icon: ShieldCheck },
+            { path: "/settings/security", label: "Security", icon: ShieldCheck },
+          ] : primaryNavItems.slice(0, 2)).map((item) => {
             const active = isActive(item.path);
 
             return (
@@ -546,7 +552,7 @@ export default function DashboardSidebar({
             );
           })}
 
-          <div className="admin-sidebar-group">
+          {!isPlatformAdmin && <div className="admin-sidebar-group">
             <SidebarRow
                 active={workspaceRouteActive}
                 activeClassName="active-parent"
@@ -601,9 +607,9 @@ export default function DashboardSidebar({
                   })}
                 </div>
               )}
-          </div>
+          </div>}
 
-          <div className="admin-sidebar-group">
+          {!isPlatformAdmin && <div className="admin-sidebar-group">
             <SidebarRow
               active={ecommerceRouteActive}
               activeClassName="active-parent"
@@ -659,9 +665,9 @@ export default function DashboardSidebar({
                 })}
               </div>
             )}
-          </div>
+          </div>}
 
-          {primaryNavItems.slice(2).map((item) => {
+          {!isPlatformAdmin && primaryNavItems.slice(2).map((item) => {
             const active = isActive(item.path);
 
             return (

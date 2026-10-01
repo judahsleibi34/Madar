@@ -73,12 +73,13 @@ export default function App() {
 
   const normalizedUserType = normalizeUserType(user?.user_type);
   const isAdminUser = normalizedUserType === "admin";
+  const isPlatformAdmin = isAdminUser && user?.account_kind === "platform";
   const hostedTenant = getBrandedMadarSubdomain(window.location.hostname);
   const isTenantSiteRoute = Boolean(hostedTenant) || isTenantSiteRoutePath(location.pathname);
   const isDashboardRoute = isDashboardRoutePath(location.pathname);
   const isEcommerceRoute = location.pathname.startsWith("/ecommerce");
   const errorSurface = getRouteErrorSurface(location.pathname, { isAdminUser });
-  const weeklyScreenTimeSeconds = useWeeklyScreenTime(isLoggedIn ? user : null);
+  const weeklyScreenTimeSeconds = useWeeklyScreenTime(isLoggedIn && !isPlatformAdmin ? user : null);
 
   const getCurrentReturnTo = () =>
     encodeURIComponent(
@@ -98,6 +99,7 @@ export default function App() {
       id: userInfo?.id || "",
       auth_id: userInfo?.auth_id || "",
       tenant_id: userInfo?.tenant_id || "",
+      account_kind: userInfo?.account_kind || "platform",
       first_name: firstName,
       last_name: lastName,
       name: fullName,
@@ -280,6 +282,7 @@ export default function App() {
       || !isLoggedIn
       || !user?.id
       || !user?.tenant_id
+      || isPlatformAdmin
       || !isMadarPwaHost(window.location)
     ) return undefined;
 
@@ -331,7 +334,7 @@ export default function App() {
       document.removeEventListener("visibilitychange", handleVisibility);
       navigator.serviceWorker?.removeEventListener?.("message", handleServiceWorkerMessage);
     };
-  }, [authChecked, isLoggedIn, user?.id, user?.tenant_id]);
+  }, [authChecked, isLoggedIn, isPlatformAdmin, user?.id, user?.tenant_id]);
 
   useEffect(() => {
     const closeSidebarTimer = window.setTimeout(() => {
@@ -762,6 +765,7 @@ export default function App() {
           homeLabel={isDashboardRoute ? "Return to dashboard" : "Return home"}
         >
           {isDashboardRoute
+            && !isPlatformAdmin
             && authChecked
             && isLoggedIn
             && (user?.tenant_id || isAdminUser)

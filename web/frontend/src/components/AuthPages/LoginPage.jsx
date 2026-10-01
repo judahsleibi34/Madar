@@ -4,6 +4,7 @@ import { Eye, EyeOff } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { postAuthJson, readApiError, readApiErrorCode } from "../../utils/apiClient";
+import PlatformMfaEnrollment from "./PlatformMfaEnrollment";
 import AuthToast from "./AuthToast";
 import { formatAuthValidationToastMessage, normalizeAuthMessage } from "./authMessages";
 import {
@@ -43,6 +44,7 @@ export default function LoginPage({
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [needsEnrollment, setNeedsEnrollment] = useState(false);
   const [mfaStep, setMfaStep] = useState(null);
   const [mfaCode, setMfaCode] = useState("");
   const [isMfaSubmitting, setIsMfaSubmitting] = useState(false);
@@ -188,6 +190,12 @@ export default function LoginPage({
         return;
       }
 
+      if (data.mfa_enrollment_required) {
+        setFormData(prev => ({ ...prev, password: "" }));
+        setNeedsEnrollment(true);
+        return;
+      }
+
       if (data.mfa_required) {
         const factors = Array.isArray(data.factors) ? data.factors : [];
         const firstFactorId = factors[0]?.id || "";
@@ -327,6 +335,7 @@ export default function LoginPage({
   };
 
   const resetMfaStep = () => {
+    setNeedsEnrollment(false);
     setMfaStep(null);
     setMfaCode("");
     setErrors((prev) => ({
@@ -336,6 +345,8 @@ export default function LoginPage({
     setStatusMessage("");
     setAuthToast(null);
   };
+
+  if (needsEnrollment) return <PlatformMfaEnrollment onLoginSuccess={onLoginSuccess} onCancel={resetMfaStep} />;
 
   return (
     <main className="login-page" dir={pageDir}>

@@ -68,7 +68,7 @@ const getFactorLabel = (factor, fallback) => {
   return factor?.friendly_name || factor?.factor_type?.toUpperCase?.() || fallback;
 };
 
-export default function SecurityMfaPage({ lang = "en", embedded = false, cacheKey = "current" }) {
+export default function SecurityMfaPage({ lang = "en", embedded = false, cacheKey = "current", onVerified }) {
   const { t } = useTranslation("dashboard");
   const isArabic = lang === "ar";
 
@@ -194,6 +194,7 @@ export default function SecurityMfaPage({ lang = "en", embedded = false, cacheKe
       setVerificationCode("");
       setFriendlyName("");
       setSuccess(t("securityMfa.messages.verified"));
+      await onVerified?.();
       clearCachedMfaStatus(cacheKey);
       await loadStatus({ force: true });
     } catch (verifyError) {
