@@ -184,7 +184,7 @@ class AdminAal2EnforcementTests(unittest.TestCase):
         )
         get_aal.assert_not_called()
 
-    def test_basic_admin_route_does_not_require_aal2(self):
+    def test_platform_admin_basic_route_also_requires_aal2(self):
         client = build_auth_client()
 
         with patch.object(
@@ -200,8 +200,8 @@ class AdminAal2EnforcementTests(unittest.TestCase):
         ), patch.object(auth_service, "get_current_aal") as get_aal:
             response = client.get("/admin/basic", cookies={"madar_access_token": "access"})
 
-        self.assertEqual(response.status_code, 200)
-        get_aal.assert_not_called()
+        self.assertEqual(response.status_code, 403)
+        get_aal.assert_called_once()
 
     def test_sensitive_admin_routes_opt_into_aal2(self):
         app = FastAPI()

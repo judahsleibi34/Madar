@@ -15,6 +15,7 @@ from classes import (
 from database import service_supabase, supabase
 from services.auth_service import (
     build_user_payload,
+    is_platform_admin,
     get_authenticated_user_row,
     normalize_user_type,
     set_auth_cookies,
@@ -221,7 +222,7 @@ def mfa_status(request: Request, response: Response):
     aal = get_authenticator_assurance_level()
 
     return {
-        "mfa_required": bool((settings or {}).get("mfa_required")),
+        "mfa_required": is_platform_admin(user_data) or bool((settings or {}).get("mfa_required")),
         "mfa_required_at": (settings or {}).get("mfa_required_at"),
         "mfa_grace_until": (settings or {}).get("mfa_grace_until"),
         "last_aal2_at": (settings or {}).get("last_aal2_at"),

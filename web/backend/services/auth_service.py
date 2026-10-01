@@ -514,6 +514,13 @@ def get_authenticated_user_row(
     return auth_user, user_data
 
 
+def is_platform_admin(user_data: dict | None) -> bool:
+    return (
+        str((user_data or {}).get("account_kind") or "platform").strip().lower() == "platform"
+        and normalize_user_type((user_data or {}).get("user_type")) == "admin"
+    )
+
+
 def require_system_admin(
     request: Request,
     response: Response | None = None,
@@ -529,10 +536,10 @@ def require_system_admin(
     )
     user_type = normalize_user_type(user_data.get("user_type"))
 
-    if user_type != "admin":
+    if user_type != "admin" or not is_platform_admin(user_data):
         raise HTTPException(status_code=403, detail="Admin access is required")
 
-    if require_aal2:
+    if require_aal2 or is_platform_admin(user_data):
         require_current_session_aal2()
 
     return auth_user, user_data

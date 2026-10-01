@@ -9,6 +9,7 @@ from database import service_supabase, supabase
 from classes import EmailVerificationResendRequest, SignUpRequest, LogIn, UpdatePassword
 from services.rate_limit_service import enforce_auth_rate_limit
 from services.auth_service import (
+    is_platform_admin,
     set_auth_cookies,
     delete_auth_cookies,
     build_user_payload,
@@ -882,12 +883,13 @@ def login(user: LogIn, response: Response, request: Request):
         mfa_enrollment_recommended = False
 
         if (
-            is_admin_mfa_login_enforcement_enabled()
-            and normalize_user_type(local_user.get("user_type")) == "admin"
+            is_platform_admin(local_user)
+            or (is_admin_mfa_login_enforcement_enabled()
+                and normalize_user_type(local_user.get("user_type")) == "admin")
         ):
             security_settings = get_user_security_settings(local_user.get("id"))
 
-            if security_settings and security_settings.get("mfa_required"):
+            if is_platform_admin(local_user) or (security_settings and security_settings.get("mfa_required")):
                 try:
                     mfa_client = create_pending_mfa_client(
                         {

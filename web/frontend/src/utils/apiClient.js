@@ -4,6 +4,12 @@ export const CSRF_COOKIE_NAME = "madar_csrf_token";
 const UNSAFE_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 export const API_URL = import.meta.env.VITE_API_URL || "/api";
 
+let adminStepUpHandler = null;
+export function registerAdminStepUpHandler(handler) {
+  adminStepUpHandler = handler;
+  return () => { if (adminStepUpHandler === handler) adminStepUpHandler = null; };
+}
+
 let csrfToken = "";
 let refreshSessionPromise = null;
 let refreshCsrfPromise = null;
@@ -159,7 +165,7 @@ const isInvalidCsrfResponse = async (response) => {
 };
 
 export const apiFetch = async (input, init = {}) => {
-  const { skipAuthRefresh = false, ...fetchInit } = init;
+  const { skipAuthRefresh = false, skipAdminStepUp = false, ...fetchInit } = init;
   const method = String(fetchInit.method || "GET").toUpperCase();
   const headers = new Headers(fetchInit.headers || {});
   const inputUrl = typeof input === "string" ? input : input?.url || "";
@@ -221,6 +227,7 @@ export const apiFetch = async (input, init = {}) => {
       retryHeaders.set(CSRF_HEADER_NAME, refreshedToken);
       return apiFetch(input, {
         ...fetchInit,
+        skipAdminStepUp,
         headers: retryHeaders,
         skipAuthRefresh: true,
       });
@@ -249,6 +256,7 @@ export const apiFetch = async (input, init = {}) => {
       if (UNSAFE_METHODS.has(method) && getCsrfToken()) retryHeaders.set(CSRF_HEADER_NAME, getCsrfToken());
       return apiFetch(input, {
         ...fetchInit,
+        skipAdminStepUp,
         headers: retryHeaders,
         skipAuthRefresh: true,
       });
@@ -291,6 +299,7 @@ export const apiFetch = async (input, init = {}) => {
 
         return apiFetch(input, {
           ...fetchInit,
+          skipAdminStepUp,
           headers: retryHeaders,
           skipAuthRefresh: true,
         });
@@ -302,6 +311,22 @@ export const apiFetch = async (input, init = {}) => {
     }
   }
 
+  const url = new URL(inputUrl, window.location.origin);
+  const apiBase = new URL(getApiUrl("/"), window.location.origin);
+  const isSharedAdminApi = url.origin === apiBase.origin &&
+    url.pathname.startsWith(`${apiBase.pathname}admin/`) &&
+    !url.pathname.startsWith(`${apiBase.pathname}admin/billing/`);
+  if (adminStepUpHandler && isSharedAdminApi && response.status === 403) {
+    const data = await response.clone().json().catch(() => null);
+    if (readApiErrorCode(data) === "aal2_required") {
+      const verification = adminStepUpHandler();
+      if (!skipAdminStepUp && (method === "GET" || method === "HEAD")) {
+        if (await verification && !init.signal?.aborted) return apiFetch(input, { ...init, skipAdminStepUp: true });
+      }
+      // Mutations return their original rejection immediately, allowing the UI
+      // to revoke stale confirmation. MFA can never replay a mutation.
+    }
+  }
   return response;
 };
 

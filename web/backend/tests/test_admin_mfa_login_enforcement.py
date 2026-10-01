@@ -45,7 +45,7 @@ def auth_response(auth_id="auth-1"):
 
 
 class AdminMfaLoginEnforcementTests(unittest.TestCase):
-    def test_flag_off_preserves_existing_login_behavior(self):
+    def test_platform_admin_requires_mfa_even_with_flag_off(self):
         client = build_auth_client()
 
         with patch.object(auth_routes, "enforce_auth_rate_limit"), \
@@ -54,17 +54,19 @@ class AdminMfaLoginEnforcementTests(unittest.TestCase):
              patch.object(auth_routes, "is_admin_mfa_login_enforcement_enabled", return_value=False), \
              patch.object(auth_routes, "set_auth_cookies", return_value="csrf") as set_auth_cookies, \
              patch.object(auth_routes, "set_pending_mfa_cookie") as set_pending_mfa_cookie, \
-             patch.object(auth_routes, "record_security_event"):
+             patch.object(auth_routes, "record_security_event"), \
+             patch.object(auth_routes, "get_user_security_settings", return_value={"mfa_required": False}), \
+             patch.object(auth_routes, "create_pending_mfa_client", return_value=SimpleNamespace()), \
+             patch.object(auth_routes, "verified_totp_factors_for_client", return_value=[{"id": "factor", "status": "verified"}]):
             response = client.post(
                 "/auth/login",
                 json={"email": "admin@example.com", "password": "password123"},
             )
 
         self.assertEqual(response.status_code, 200)
-        self.assertNotIn("mfa_required", response.json())
-        set_auth_cookies.assert_called_once()
-        self.assertEqual(set_auth_cookies.call_args.args[1:], ("aal1-access", "aal1-refresh"))
-        set_pending_mfa_cookie.assert_not_called()
+        self.assertTrue(response.json()["mfa_required"])
+        set_auth_cookies.assert_not_called()
+        set_pending_mfa_cookie.assert_called_once()
 
     def test_regular_user_unchanged_when_flag_enabled(self):
         client = build_auth_client()

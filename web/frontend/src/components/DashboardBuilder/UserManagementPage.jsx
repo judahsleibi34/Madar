@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import PageDeleteConfirmModal from "../PageBuilder/modals/PageDeleteConfirmModal";
 import LoadingBar from "../common/LoadingBar";
-import { apiFetch } from "../../utils/apiClient";
+import { apiFetch, readApiErrorCode, readApiError } from "../../utils/apiClient";
 import {
   getUserManagementLabels,
 } from "../../content";
@@ -119,6 +119,8 @@ export default function UserManagementPage({ currentUser, lang = "en" }) {
   const activeLang = lang === "ar" ? "ar" : "en";
   const labels = getUserManagementLabels(activeLang);
   const [users, setUsers] = useState([]);
+  const [loadState, setLoadState] = useState("loading");
+  const [rowRevision, setRowRevision] = useState(0);
   const [searchInput, setSearchInput] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [page, setPage] = useState(1);
@@ -161,6 +163,7 @@ export default function UserManagementPage({ currentUser, lang = "en" }) {
 
   const loadUsers = useCallback(async ({ silent = false, force = false } = {}) => {
     if (!isAdmin) {
+      setLoadState("error");
       setLoading(false);
       setRefreshing(false);
       showToast("error", labels.forbidden);
@@ -173,6 +176,7 @@ export default function UserManagementPage({ currentUser, lang = "en" }) {
       setLoading(true);
     }
 
+    setLoadState("loading");
     try {
       const cacheKey = `${page}:${pageSize}:${searchTerm}`;
       const cachedPage = userPageCacheRef.current.get(cacheKey);
@@ -180,6 +184,7 @@ export default function UserManagementPage({ currentUser, lang = "en" }) {
         cachedPage && Date.now() - cachedPage.loadedAt < USER_PAGE_CACHE_MS;
 
       if (!force && cacheIsFresh) {
+        setLoadState("loaded");
         setUsers(cachedPage.users);
         setPagination(cachedPage.pagination);
         setLoading(false);
@@ -201,7 +206,12 @@ export default function UserManagementPage({ currentUser, lang = "en" }) {
       });
 
       if (!response.ok) {
-        throw new Error(labels.loadError);
+        const data = await response.json().catch(() => null);
+        if (readApiErrorCode(data) === "aal2_required") {
+          setDeleteTargetUser(null);
+          setRowRevision(value => value + 1);
+        }
+        throw new Error(readApiError(data, labels.loadError));
       }
 
       const data = await response.json();
@@ -220,9 +230,11 @@ export default function UserManagementPage({ currentUser, lang = "en" }) {
         loadedAt: Date.now(),
       });
 
+      setLoadState("loaded");
       setUsers(nextUsers);
       setPagination(nextPagination);
     } catch (loadError) {
+      setLoadState("error");
       showToast("error", loadError.message || labels.loadError);
     } finally {
       setLoading(false);
@@ -241,9 +253,9 @@ export default function UserManagementPage({ currentUser, lang = "en" }) {
 
   useEffect(() => {
     return deferEffectStateUpdate(() => {
-      loadUsers({ silent: users.length > 0 });
+      loadUsers();
     });
-  }, [loadUsers, users.length]);
+  }, [loadUsers]);
 
   const changePageSize = (nextPageSize) => {
     setPage(1);
@@ -274,7 +286,12 @@ export default function UserManagementPage({ currentUser, lang = "en" }) {
       });
 
       if (!response.ok) {
-        throw new Error(labels.loadError);
+        const data = await response.json().catch(() => null);
+        if (readApiErrorCode(data) === "aal2_required") {
+          setDeleteTargetUser(null);
+          setRowRevision(value => value + 1);
+        }
+        throw new Error(readApiError(data, labels.loadError));
       }
 
       userPageCacheRef.current.clear();
@@ -302,7 +319,11 @@ export default function UserManagementPage({ currentUser, lang = "en" }) {
 
       if (!response.ok) {
         const data = await response.json().catch(() => null);
-        throw new Error(data?.detail || labels.loadError);
+        if (readApiErrorCode(data) === "aal2_required") {
+          setDeleteTargetUser(null);
+          setRowRevision(value => value + 1);
+        }
+        throw new Error(readApiError(data, labels.loadError));
       }
 
       userPageCacheRef.current.clear();
@@ -334,7 +355,7 @@ export default function UserManagementPage({ currentUser, lang = "en" }) {
         </button>
       </header>)}
 
-      <div className="user-management-stats">
+      {loadState === "loaded" && <div className="user-management-stats">
         <article>
           <UsersRound size={18} />
           <span>{labels.shownUsers}</span>
@@ -350,7 +371,7 @@ export default function UserManagementPage({ currentUser, lang = "en" }) {
           <span>{labels.activePlans}</span>
           <strong>{stats.active}</strong>
         </article>
-      </div>
+      </div>}
 
       <div className="user-management-toolbar">
         <Search size={18} />
@@ -396,10 +417,10 @@ export default function UserManagementPage({ currentUser, lang = "en" }) {
       <div className="user-management-list">
         {loading ? (
           <UserManagementSkeleton labels={labels} />
-        ) : users.length ? (
+        ) : loadState === "error" ? <p role="alert">{labels.loadError}</p> : users.length ? (
           users.map((user) => (
             <UserRow
-              key={user.id}
+              key={`${user.id}:${rowRevision}`}
               user={user}
               onRoleSave={saveRole}
               onRequestDelete={setDeleteTargetUser}

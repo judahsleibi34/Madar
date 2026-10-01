@@ -321,6 +321,10 @@ export default function AdminAccountAccessPage({
       });
 
       const data = await readApiResponse(response);
+      if (response.status === 403 && data?.detail?.code === "aal2_required") {
+        setAccessRequest(null);
+        setCode("");
+      }
 
       if (!response.ok) {
         throw new Error(
@@ -372,6 +376,10 @@ export default function AdminAccountAccessPage({
       });
 
       const data = await readApiResponse(response);
+      if (response.status === 403 && data?.detail?.code === "aal2_required") {
+        setAccessRequest(null);
+        setCode("");
+      }
 
       if (!response.ok) {
         throw new Error(

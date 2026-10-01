@@ -6,8 +6,8 @@ async function provision(page, { aal1 = false, legacy = false, conflict = false,
     if (url.origin !== "http://127.0.0.1:5179") return route.abort();
     if (!url.pathname.startsWith("/api/")) return route.continue();
     const json = data => route.fulfill({ json: data });
-    if (url.pathname === "/api/auth/user_status") return json({ logged_in: true, user: { id: 7, user_type: "admin", first_name: "Synthetic", email: "synthetic@example.invalid" }, csrf_token: "synthetic-browser-csrf" });
-    if (url.pathname === "/api/auth/mfa/status") return json({ factors: [{ id: "synthetic-factor", status: "verified" }] });
+    if (url.pathname === "/api/auth/user_status") return json({ logged_in: true, user: { id: 7, account_kind: "platform", user_type: "admin", first_name: "Synthetic", email: "synthetic@example.invalid" }, csrf_token: "synthetic-browser-csrf" });
+    if (url.pathname === "/api/auth/mfa/status") return json({ aal: { current_level: aal1 ? "aal1" : "aal2" }, factors: [{ id: "synthetic-factor", status: "verified" }] });
     if (url.pathname === "/api/auth/mfa/enroll/verify") { aal1 = false; return json({ success: true }); }
     if (url.pathname.startsWith("/api/admin/billing/")) {
       if (route.request().method() === "POST" && !url.pathname.endsWith("/quote")) {

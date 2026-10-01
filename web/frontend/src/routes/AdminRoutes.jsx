@@ -1,6 +1,7 @@
 ﻿import { lazy } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 
+import PlatformAdminGate from "../components/DashboardBuilder/PlatformAdminGate";
 import RouteSuspense from "../components/common/RouteSuspense";
 import { appShellContent } from "../content";
 import { DashboardLoadingElement, DashboardShell, RestrictedAccessWindow } from "./shared";
@@ -11,14 +12,11 @@ const AdminAccountAccessPage = lazy(() =>
   import("../components/DashboardBuilder/AdminAccountAccessPage")
 );
 const SettingsPage = lazy(() => import("../components/DashboardBuilder/SettingsPage"));
-const NotificationsPage = lazy(() =>
-  import("../components/DashboardBuilder/NotificationsPage")
-);
 const UserManagementPage = lazy(() =>
   import("../components/DashboardBuilder/UserManagementPage")
 );
 
-export default function AdminRoutes({
+function AdminContent({
   lang,
   onGoToDashboard,
   onUserUpdated,
@@ -91,11 +89,6 @@ export default function AdminRoutes({
         />
 
         <Route
-          path="/notifications/*"
-          element={renderShell(<NotificationsPage user={user} />)}
-        />
-
-        <Route
           path="/page-builder/*"
           element={renderRestrictedPage(
             appShellContent.restrictedAccess.workspaceOnly
@@ -161,4 +154,11 @@ export default function AdminRoutes({
       </Routes>
     </RouteSuspense>
   );
+}
+
+export default function AdminRoutes(props) {
+  if (props.user?.account_kind === "platform" && props.user?.user_type === "admin") {
+    return <PlatformAdminGate key={props.user.id} user={props.user} onLogout={props.shellProps.onLogout}><AdminContent {...props} /></PlatformAdminGate>;
+  }
+  return <AdminContent {...props} />;
 }
