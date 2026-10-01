@@ -16,7 +16,7 @@ from supabase_auth.errors import (
     AuthSessionMissingError,
 )
 
-from database import service_supabase, supabase
+from database import create_supabase_auth_client, service_supabase, supabase
 from services.account_lifecycle_service import (
     ACTIVE_ACCOUNT_STATUS,
     effective_account_status,
@@ -94,7 +94,8 @@ def _refresh_session_once(refresh_token: str):
         if cached:
             return cached[1], cached[2], cached[3]
 
-        auth_response = supabase.auth.refresh_session(refresh_token)
+        auth_client = create_supabase_auth_client()
+        auth_response = auth_client.auth.refresh_session(refresh_token)
         auth_user = _get_auth_value(auth_response, "user")
         session = _get_auth_value(auth_response, "session")
 
@@ -102,13 +103,13 @@ def _refresh_session_once(refresh_token: str):
             raise RuntimeError("Session refresh returned no active session")
 
         access_token = _get_auth_value(session, "access_token")
-        next_refresh_token = _get_auth_value(session, "refresh_token") or refresh_token
+        next_refresh_token = _get_auth_value(session, "refresh_token")
 
-        if not access_token:
-            raise RuntimeError("Session refresh returned no access token")
+        if not access_token or not next_refresh_token:
+            raise RuntimeError("Session refresh returned incomplete credentials")
 
         if not auth_user:
-            auth_user_response = supabase.auth.get_user(access_token)
+            auth_user_response = auth_client.auth.get_user(access_token)
             auth_user = _get_auth_value(auth_user_response, "user")
 
         if not auth_user:
@@ -435,11 +436,18 @@ def get_authenticated_user_row(
         raise HTTPException(status_code=401, detail="Invalid or expired session")
 
     if response and next_access_token and next_refresh_token:
-        set_auth_cookies(
-            response,
-            next_access_token,
-            next_refresh_token,
-        )
+        if (next_access_token, next_refresh_token) != (access_token, refresh_token):
+            set_auth_cookies(response, next_access_token, next_refresh_token)
+        else:
+            # A delayed read must not overwrite a newer MFA/refresh credential
+            # pair with unchanged cookies from the request it authenticated.
+            set_csrf_cookie(response, create_csrf_token(
+                access_token=next_access_token, refresh_token=next_refresh_token,
+            ))
+            set_session_activity_cookie(response)
+
+    # Only provider-validated credentials reach request-local MFA/assurance.
+    request.state.auth_session = (auth_user, next_access_token, next_refresh_token)
 
     with traced_operation("user_profile"):
         user_response = (
@@ -540,20 +548,66 @@ def require_system_admin(
         raise HTTPException(status_code=403, detail="Admin access is required")
 
     if require_aal2 or is_platform_admin(user_data):
-        require_current_session_aal2()
+        require_current_session_aal2(request, response)
 
     return auth_user, user_data
 
 
-def get_current_aal() -> dict:
+def get_request_auth_client(request: Request, response: Response | None = None):
+    client = getattr(request.state, "auth_client", None)
+    if client is not None:
+        return client
+    validated = getattr(request.state, "auth_session", None)
+    if not validated:
+        raise HTTPException(status_code=401, detail="Authenticated session is required")
+    auth_user, access_token, refresh_token = validated
+    client = create_supabase_auth_client()
     try:
-        get_aal = getattr(supabase.auth.mfa, "get_authenticator_assurance_level", None)
+        restored = client.auth.set_session(access_token, refresh_token or "")
+    except Exception as error:
+        if is_definitive_auth_failure(error):
+            raise HTTPException(status_code=401, detail="Invalid or expired session") from error
+        raise SessionRefreshUnavailable() from error
+    restored_user = _get_auth_value(restored, "user")
+    if str(_get_auth_value(restored_user, "id") or "") != str(_get_auth_value(auth_user, "id") or ""):
+        raise HTTPException(status_code=401, detail="Invalid or expired session")
+    request.state.auth_client = client
+    persist_auth_client_session(request, response)
+    return client
+
+
+def persist_auth_client_session(request: Request, response: Response | None):
+    client = getattr(request.state, "auth_client", None)
+    validated = getattr(request.state, "auth_session", None)
+    if client is None or not validated:
+        return
+    session = client.auth.get_session()
+    session_user = _get_auth_value(session, "user")
+    if str(_get_auth_value(session_user, "id") or "") != str(_get_auth_value(validated[0], "id") or ""):
+        raise HTTPException(status_code=401, detail="Invalid or expired session")
+    access_token = _get_auth_value(session, "access_token")
+    refresh_token = _get_auth_value(session, "refresh_token")
+    if not access_token or (validated[2] and not refresh_token):
+        raise HTTPException(status_code=401, detail="Invalid or expired session")
+    if not refresh_token:
+        return
+    if (access_token, refresh_token) != validated[1:]:
+        request.state.auth_session = (validated[0], access_token, refresh_token)
+        if response is not None:
+            set_auth_cookies(response, access_token, refresh_token)
+
+
+def get_current_aal(request: Request, response: Response | None = None) -> dict:
+    try:
+        client = get_request_auth_client(request, response)
+        get_aal = getattr(client.auth.mfa, "get_authenticator_assurance_level", None)
 
         if not get_aal:
             return {}
 
         aal_response = get_aal()
         data = _get_auth_value(aal_response, "data") or aal_response
+        persist_auth_client_session(request, response)
 
         return {
             "current_level": _get_auth_value(data, "current_level")
@@ -571,8 +625,8 @@ def get_current_aal() -> dict:
         return {}
 
 
-def require_current_session_aal2() -> dict:
-    aal = get_current_aal()
+def require_current_session_aal2(request: Request, response: Response | None = None) -> dict:
+    aal = get_current_aal(request, response)
 
     if aal.get("current_level") != "aal2":
         raise HTTPException(

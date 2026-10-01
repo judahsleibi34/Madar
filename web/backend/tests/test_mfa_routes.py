@@ -28,6 +28,10 @@ def auth_context():
 
 
 class MfaRoutesTests(unittest.TestCase):
+    def setUp(self):
+        self.enterContext(patch.object(mfa_routes, "get_request_auth_client", side_effect=lambda *_args: mfa_routes.supabase))
+        self.enterContext(patch.object(mfa_routes, "persist_auth_client_session"))
+
     def test_status_returns_safe_settings_and_factors(self):
         client = build_client()
         factors_response = SimpleNamespace(
@@ -93,7 +97,7 @@ class MfaRoutesTests(unittest.TestCase):
         with patch.object(mfa_routes, "get_authenticated_user_row", return_value=auth_context()), \
              patch.object(mfa_routes, "get_user_security_settings", return_value={"mfa_required": True}), \
              patch.object(mfa_routes.supabase.auth.mfa, "challenge", return_value=challenge_response) as challenge, \
-             patch.object(mfa_routes.supabase.auth.mfa, "verify", return_value=SimpleNamespace(data={})) as verify, \
+             patch.object(mfa_routes.supabase.auth.mfa, "verify", return_value=SimpleNamespace(access_token="aal2-access", refresh_token="aal2-refresh")) as verify, \
              patch.object(mfa_routes, "get_authenticator_assurance_level", return_value={"current_level": "aal2"}), \
              patch.object(mfa_routes, "mark_aal2_verified") as mark_aal2_verified, \
              patch.object(mfa_routes, "record_mfa_event") as record_mfa_event:
@@ -157,7 +161,7 @@ class MfaRoutesTests(unittest.TestCase):
         with patch.object(mfa_routes, "get_authenticated_user_row", return_value=auth_context()), \
              patch.object(mfa_routes, "get_user_security_settings", return_value={"mfa_required": True}), \
              patch.object(mfa_routes.supabase.auth.mfa, "challenge", return_value=challenge_response), \
-             patch.object(mfa_routes.supabase.auth.mfa, "verify", return_value=SimpleNamespace(data={})), \
+             patch.object(mfa_routes.supabase.auth.mfa, "verify", return_value=SimpleNamespace(access_token="aal2-access", refresh_token="aal2-refresh")), \
              patch.object(mfa_routes, "get_authenticator_assurance_level", return_value={}), \
              patch.object(mfa_routes, "mark_aal2_verified") as mark_aal2_verified, \
              patch.object(mfa_routes, "record_mfa_event"):

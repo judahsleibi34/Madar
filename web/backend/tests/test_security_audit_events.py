@@ -58,6 +58,9 @@ class FakeSupabaseTableClient:
 
 
 class SecurityAuditEventTests(unittest.TestCase):
+    def setUp(self):
+        self.enterContext(patch.object(auth_routes, "create_supabase_auth_client", side_effect=lambda: auth_routes.supabase))
+
     def test_successful_login_records_security_audit_event(self):
         client = build_auth_client()
         auth_response = SimpleNamespace(

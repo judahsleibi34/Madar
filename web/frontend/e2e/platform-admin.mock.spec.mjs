@@ -103,7 +103,7 @@ test("real FastAPI cookie jar: primary login, challenge, verify and admin admiss
     const url = new URL(route.request().url());
     if (url.origin !== "http://127.0.0.1:5179") return route.abort();
     if (!url.pathname.startsWith("/api/")) return route.continue();
-    if (url.pathname.startsWith("/api/auth/")) {
+    if (["/api/auth/", "/api/admin/users", "/api/admin/billing/", "/api/fixture/"].some(prefix => url.pathname.startsWith(prefix))) {
       if (url.pathname.endsWith("/login/challenge")) challengeCookie = await route.request().headerValue("cookie") || "";
       const response = await route.fetch({ url: "http://127.0.0.1:18091" + url.pathname.slice(4) });
       if (url.pathname === "/api/auth/login") pendingHeaders = response.headersArray().filter(header => header.name.toLowerCase() === "set-cookie");
@@ -133,4 +133,46 @@ test("real FastAPI cookie jar: primary login, challenge, verify and admin admiss
   const after = await context.cookies();
   expect(after.some(cookie => cookie.name === "madar_mfa_pending")).toBe(false);
   expect(after.some(cookie => cookie.name === "madar_access_token" && cookie.httpOnly)).toBe(true);
+  const stats = () => page.evaluate(async () => (await fetch("/api/fixture/stats")).json());
+  const advance = async downgrade => {
+    const csrf = (await context.cookies()).find(cookie => cookie.name === "madar_csrf_token").value;
+    await page.evaluate(async ({ csrf, downgrade }) => {
+      const response = await fetch("/api/fixture/advance", { method: "POST", headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf }, body: JSON.stringify({ seconds: 931, downgrade }) });
+      if (!response.ok) throw new Error("Could not advance synthetic provider clock");
+    }, { csrf, downgrade });
+  };
+  expect((await stats()).verify_count).toBe(1);
+  await page.goto("/admin/users");
+  await expect(page.getByText("Lifecycle Administrator", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "MFA verification required" })).toHaveCount(0);
+  await advance(false);
+  const assurance = await page.evaluate(async () => (await fetch("/api/auth/mfa/status")).json());
+  expect(assurance.aal).toMatchObject({ current_level: "aal2", next_level: "aal2" });
+  expect(assurance.factors.some(factor => factor.status === "verified")).toBe(true);
+  expect((await stats()).refresh_count).toBe(1);
+  await page.goto("/admin/tenants/42/commercial");
+  await expect(page.getByRole("heading", { name: "Commercial access", exact: true })).toBeVisible();
+  const confirm = async name => {
+    await page.getByRole("button", { name, exact: true }).click();
+    await page.getByLabel("Required reason").fill("Synthetic reason");
+    await page.getByLabel(/I have reviewed/).check();
+    await page.getByRole("button", { name: "Confirm action" }).click();
+  };
+  await confirm("Suspend commercial access");
+  await expect(page.getByText(/Held since/)).toBeVisible();
+  expect((await stats()).verify_count).toBe(1);
+  await advance(true);
+  await confirm("Reactivate commercial access");
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByRole("heading", { name: "MFA verification required" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Set up authenticator" })).toHaveCount(0);
+  await dialog.getByLabel("Verification code", { exact: true }).fill("123456");
+  await dialog.getByRole("button", { name: "Verify account", exact: true }).click();
+  await expect(dialog.getByRole("alert")).toContainText("Account verified");
+  await expect(dialog.getByRole("button", { name: "Confirm action" })).toBeDisabled();
+  expect(await stats()).toMatchObject({ attempts: 2, successes: 1, verify_count: 2 });
+  await dialog.getByLabel(/I have reviewed/).check();
+  await dialog.getByRole("button", { name: "Confirm action" }).click();
+  await expect(page.getByText("No administrative hold")).toBeVisible();
+  expect(await stats()).toMatchObject({ attempts: 3, successes: 2 });
 });

@@ -168,6 +168,9 @@ class FakeSupabase:
 
 
 class SignupRoutesTests(unittest.TestCase):
+    def setUp(self):
+        self.enterContext(patch.object(auth_routes, "create_supabase_auth_client", side_effect=lambda: auth_routes.supabase))
+
     def test_legacy_immediate_tenant_provisioning_is_blocked(self):
         with self.assertRaises(onboarding_service.HTTPException) as raised:
             onboarding_service.create_onboarded_tenant(

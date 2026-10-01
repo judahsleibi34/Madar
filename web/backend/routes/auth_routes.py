@@ -5,7 +5,7 @@ from fastapi import APIRouter, HTTPException, Request, Response
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, UUID4
 
-from database import service_supabase, supabase
+from database import create_supabase_auth_client, service_supabase, supabase
 from classes import EmailVerificationResendRequest, SignUpRequest, LogIn, UpdatePassword
 from services.rate_limit_service import enforce_auth_rate_limit
 from services.auth_service import (
@@ -248,7 +248,7 @@ def recover_or_remove_orphaned_auth_user(clean_email: str, password: str):
 
     if email_confirmed_at is missing or email_confirmed_at is not None:
         try:
-            auth_response = supabase.auth.sign_in_with_password(
+            auth_response = create_supabase_auth_client().auth.sign_in_with_password(
                 {"email": clean_email, "password": password}
             )
             authenticated_user = getattr(auth_response, "user", None)
@@ -809,7 +809,7 @@ def login(user: LogIn, response: Response, request: Request):
         enforce_auth_rate_limit(request, "login", clean_email)
 
         with timed_operation("auth_provider"):
-            auth_response = supabase.auth.sign_in_with_password(
+            auth_response = create_supabase_auth_client().auth.sign_in_with_password(
                 {
                     "email": clean_email,
                     "password": user.password,
@@ -1221,7 +1221,7 @@ def change_password(
             )
 
         try:
-            verify_response = supabase.auth.sign_in_with_password(
+            verify_response = create_supabase_auth_client().auth.sign_in_with_password(
                 {
                     "email": clean_email,
                     "password": current_password,
@@ -1260,7 +1260,7 @@ def change_password(
             )
 
         try:
-            new_session = supabase.auth.sign_in_with_password(
+            new_session = create_supabase_auth_client().auth.sign_in_with_password(
                 {
                     "email": clean_email,
                     "password": new_password,
