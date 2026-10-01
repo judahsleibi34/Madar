@@ -288,7 +288,9 @@ def validate_cookie_write_origin(request: Request, allowed_origins: set[str]) ->
     if request.method.upper() in SAFE_METHODS:
         return None
 
-    if not request_has_auth_cookie(request):
+    # Pending MFA sessions are restricted credentials too, even before normal
+    # access/refresh cookies (and their session-bound CSRF token) exist.
+    if not request_has_auth_cookie(request) and not request.cookies.get("madar_mfa_pending"):
         return None
 
     request_origin = origin_from_request(request)

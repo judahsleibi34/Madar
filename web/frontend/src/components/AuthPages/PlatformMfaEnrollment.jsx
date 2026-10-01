@@ -34,6 +34,6 @@ export default function PlatformMfaEnrollment({ onLoginSuccess, onCancel }) {
       <button disabled={busy}>{busy ? "Verifying…" : "Verify account"}</button>
     </form>}
     {error && <p role="alert">{error}</p>}
-    <button type="button" disabled={busy} onClick={onCancel}>Return to sign in</button>
+    <button type="button" disabled={busy} onClick={async () => { if (await onCancel() === false) setError("Could not cancel MFA login. Try again."); }}>Return to sign in</button>
   </section></main>;
 }

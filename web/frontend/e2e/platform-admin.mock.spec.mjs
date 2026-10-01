@@ -95,3 +95,42 @@ test("platform notification URL redirects without mounting tenant services", asy
   await expect(page.getByRole("heading", { name: "Dashboard", exact: true })).toBeVisible();
   expect(counts.tenantCalls()).toBe(0);
 });
+
+test("real FastAPI cookie jar: primary login, challenge, verify and admin admission", async ({ page, context }) => {
+  test.skip(!process.env.MADAR_MFA_COOKIE_FIXTURE_COMMAND, "Requires the locked loopback-only FastAPI cookie fixture");
+  let challengeCookie = "", pendingHeaders = [];
+  await page.route("**/*", async route => {
+    const url = new URL(route.request().url());
+    if (url.origin !== "http://127.0.0.1:5179") return route.abort();
+    if (!url.pathname.startsWith("/api/")) return route.continue();
+    if (url.pathname.startsWith("/api/auth/")) {
+      if (url.pathname.endsWith("/login/challenge")) challengeCookie = await route.request().headerValue("cookie") || "";
+      const response = await route.fetch({ url: "http://127.0.0.1:18091" + url.pathname.slice(4) });
+      if (url.pathname === "/api/auth/login") pendingHeaders = response.headersArray().filter(header => header.name.toLowerCase() === "set-cookie");
+      return route.fulfill({ response });
+    }
+    if (url.pathname.startsWith("/api/admin/users")) return route.fulfill({ json: { users: [], pagination: { total_count: 0 } } });
+    return route.fulfill({ status: 403, json: { detail: "Unexpected tenant endpoint" } });
+  });
+  await page.goto("/login"); await page.getByLabel("Email", { exact: true }).fill("synthetic@example.com"); await page.getByLabel("Password", { exact: true }).fill("synthetic-password"); await page.getByRole("button", { name: "Log In", exact: true }).click();
+  await expect(page.locator('input[autocomplete="one-time-code"]')).toBeVisible();
+  const before = await context.cookies();
+  expect(before.some(cookie => cookie.name === "madar_mfa_pending" && cookie.httpOnly && cookie.path === "/")).toBe(true);
+  expect(before.some(cookie => cookie.name === "madar_access_token" || cookie.name === "madar_refresh_token")).toBe(false);
+  expect(pendingHeaders.some(header => header.value.includes("madar_mfa_pending=") && header.value.includes("Max-Age=300"))).toBe(true);
+  await page.getByRole("button", { name: "Back to login", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Log In", exact: true })).toBeVisible();
+  expect((await context.cookies()).some(cookie => cookie.name === "madar_mfa_pending")).toBe(false);
+  await page.getByRole("button", { name: "Log In", exact: true }).click();
+  await expect(page.locator('input[autocomplete="one-time-code"]')).toBeVisible();
+  await page.locator('input[autocomplete="one-time-code"]').fill("000000"); await page.locator('button[type="submit"]').click();
+  await expect(page.getByText("Could not verify MFA code", { exact: true }).first()).toBeVisible();
+  expect((await context.cookies()).some(cookie => cookie.name === "madar_access_token")).toBe(false);
+  expect((await context.cookies()).some(cookie => cookie.name === "madar_mfa_pending")).toBe(true);
+  await page.locator('input[autocomplete="one-time-code"]').fill("123456"); await page.locator('button[type="submit"]').click();
+  await expect(page.getByRole("heading", { name: "Dashboard", exact: true })).toBeVisible();
+  expect(challengeCookie).toContain("madar_mfa_pending=");
+  const after = await context.cookies();
+  expect(after.some(cookie => cookie.name === "madar_mfa_pending")).toBe(false);
+  expect(after.some(cookie => cookie.name === "madar_access_token" && cookie.httpOnly)).toBe(true);
+});

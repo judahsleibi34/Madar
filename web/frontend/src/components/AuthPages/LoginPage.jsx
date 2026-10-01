@@ -334,7 +334,14 @@ export default function LoginPage({
     }
   };
 
-  const resetMfaStep = () => {
+  const resetMfaStep = async () => {
+    try {
+      const { response, data } = await postAuthJson("/auth/mfa/login/cancel", {});
+      if (!response.ok) throw new Error(readApiError(data));
+    } catch (error) {
+      showAuthToast({ type: "error", title: t("login.mfaFailed"), message: error.message });
+      return false;
+    }
     setNeedsEnrollment(false);
     setMfaStep(null);
     setMfaCode("");
