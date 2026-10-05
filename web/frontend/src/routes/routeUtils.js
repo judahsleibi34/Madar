@@ -6,6 +6,8 @@ export function normalizeUserType(value) {
 
 export function isTenantSiteRoutePath(pathname) {
   return (
+    pathname.startsWith("/academy/") ||
+    pathname === "/academy" ||
     pathname.startsWith("/site/") ||
     pathname.startsWith("/forms/") ||
     pathname.startsWith("/store/") ||
@@ -24,6 +26,8 @@ export function isDashboardRoutePath(pathname) {
     pathname.startsWith(DASHBOARD_ROUTES.calendar) ||
     pathname.startsWith(DASHBOARD_ROUTES.agenda) ||
     pathname.startsWith(DASHBOARD_ROUTES.archive) ||
+    pathname.startsWith(DASHBOARD_ROUTES.elearning) ||
+    pathname.startsWith("/my-learning") ||
     pathname.startsWith(DASHBOARD_ROUTES.ecommerce) ||
     pathname.startsWith(DASHBOARD_ROUTES.notifications) ||
     pathname.startsWith(DASHBOARD_ROUTES.myPlan) ||
@@ -58,6 +62,7 @@ export function getSafePostLoginPath(userInfo, returnTo) {
     DASHBOARD_ROUTES.archive,
     DASHBOARD_ROUTES.ecommerce,
     DASHBOARD_ROUTES.myPlan,
+    "/my-learning",
   ];
 
   const isAdminOnlyPath = adminOnlyPaths.some((path) =>

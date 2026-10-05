@@ -31,6 +31,7 @@ def get_current_tenant_context(
     response: Response | None = None,
     *,
     allow_admin_account_access: bool = True,
+    allow_learner: bool = False,
 ) -> TenantContext:
     auth_user, user_data = require_regular_user(
         request,
@@ -54,6 +55,14 @@ def get_current_tenant_context(
     tenant_id = _as_int(tenant_id, "tenant_id")
     user_id = _as_int(user_id, "id")
 
+    if allow_learner:
+        from services.hosted_address_service import request_hosted_tenant
+        hosted = request_hosted_tenant(request)
+        if hosted:
+            websites = service_supabase.table("website_settings").select("tenant_id").eq("subdomain", hosted).limit(1).execute().data or []
+            if not websites or websites[0].get("tenant_id") != tenant_id:
+                raise HTTPException(403, detail="Academy tenant does not match session")
+
     membership_response = (
         service_supabase.table("tenant_memberships")
         .select("*")
@@ -70,6 +79,8 @@ def get_current_tenant_context(
 
     if not membership:
         raise HTTPException(status_code=403, detail="Active tenant membership required")
+    if membership.get("role") == "learner" and not allow_learner:
+        raise HTTPException(403, detail="Staff workspace access required")
 
     if not tenant_is_active(tenant_id):
         raise HTTPException(
@@ -96,11 +107,13 @@ def require_active_tenant_member(
     response: Response | None = None,
     *,
     allow_admin_account_access: bool = True,
+    allow_learner: bool = False,
 ) -> TenantContext:
     return get_current_tenant_context(
         request,
         response,
         allow_admin_account_access=allow_admin_account_access,
+        allow_learner=allow_learner,
     )
 
 

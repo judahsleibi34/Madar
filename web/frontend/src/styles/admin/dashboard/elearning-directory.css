@@ -1,0 +1,25 @@
+.elearning-directory-list { display: grid; gap: 0; overflow: hidden; }
+.elearning-directory-list > .ecommerce-list-header h2 { margin: 0; }
+.elearning-directory-row { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto auto; gap: 16px; align-items: start; padding: 16px 20px; border-top: 1px solid var(--theme-border); }
+.elearning-directory-row-icon { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 12px; color: var(--theme-primary); background: rgba(var(--theme-primary-rgb), 0.08); }
+.elearning-directory-row-copy { min-width: 0; }
+.elearning-directory-row-copy h2 { margin: 0 0 4px; font-size: var(--font-size-md); }
+.elearning-directory-row-copy .elearning-directory-email { margin: 0; line-height: 1.4; overflow-wrap: anywhere; }
+.elearning-directory-row > .elearning-course-status { margin-block-start: 6px; }
+.elearning-directory-row-copy h2 a { color: var(--theme-text); text-decoration: none; }
+.elearning-directory-description { margin: 8px 0 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.elearning-directory-row-actions { display: flex; gap: 8px; }
+.elearning-directory-row-actions button { width: 40px; height: 40px; min-height: 40px; color: var(--theme-primary); }
+.elearning-directory-row-actions button:focus-visible { outline: 2px solid var(--theme-primary); outline-offset: 2px; border-radius: 4px; }
+.elearning-directory-row-copy .elearning-course-counts { display: flex; flex-wrap: wrap; gap: 8px 24px; margin: 8px 0; }
+.elearning-directory-row-copy .elearning-course-counts div { display: flex; align-items: baseline; gap: 8px; }
+.elearning-directory-row-copy .elearning-course-counts dd { margin: 0; }
+.elearning-directory-dates { display: flex; flex-wrap: wrap; gap: 8px 24px; margin: 12px 0 0; color: var(--theme-text-muted); font-size: var(--font-size-xs); }
+.elearning-directory-dates div { display: flex; gap: 8px; }
+.elearning-directory-dates dd { margin: 0; }
+@media (max-width: 640px) {
+  .elearning-directory-row { grid-template-columns: 44px minmax(0, 1fr); gap: 12px; padding: 16px; }
+  .elearning-directory-row > .elearning-course-status { grid-column: 2; justify-self: start; }
+  .elearning-directory-row-actions { grid-column: 2; }
+  .elearning-directory-dates div { flex-wrap: wrap; }
+}

@@ -1,0 +1,47 @@
+.academy-management-hub { max-width: 1200px; }
+.academy-management-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.25rem; margin-block: 1.5rem; }
+.academy-management-card { padding: 1.5rem; display: flex; flex-direction: column; align-items: flex-start; gap: .8rem; min-width: 0; }
+.academy-management-card h2, .academy-management-card p { margin: 0; }
+.academy-management-card p { color: var(--color-text-muted); line-height: 1.6; }
+.academy-management-card > .elearning-course-actions, .academy-management-card > a { margin-block-start: auto; }
+.academy-management-access { padding: 1.5rem; }
+.academy-management-card-heading { display: flex; align-items: center; gap: .75rem; min-width: 0; }
+.academy-management-card-heading > svg { flex: 0 0 24px; }
+.academy-management-card-heading > span { min-width: 0; overflow-wrap: anywhere; }
+@media (max-width: 900px) { .academy-management-grid { grid-template-columns: 1fr; } }
+
+.academy-access-header { padding-block-end: 1.25rem; border-block-end: 1px solid var(--color-border); }
+.academy-access-header h2 { margin: 0; font-size: 1.5rem; line-height: 1.3; }
+.academy-access-header p { margin: .5rem 0 0; color: var(--color-text-muted); line-height: 1.5; }
+.academy-management-access fieldset { border: 0; margin: 0; padding: 0; min-width: 0; display: grid; gap: 1.5rem; }
+.academy-access-toggle { display: flex; align-items: center; justify-content: space-between; gap: 1.5rem; padding-block: 1.25rem; border-block-end: 1px solid var(--color-border); cursor: pointer; }
+.academy-access-setting-copy { display: grid; gap: .35rem; min-width: 0; }
+.academy-access-setting-copy strong { font-size: .95rem; }
+.academy-access-setting-copy small { color: var(--color-text-muted); line-height: 1.5; font-size: .875rem; }
+.academy-access-switch { position: relative; display: inline-flex; align-items: center; flex: 0 0 48px; height: 44px; }
+.academy-access-switch input[type="checkbox"] { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; z-index: 1; }
+.academy-access-switch-track { display: block; width: 48px; height: 28px; border-radius: 999px; border: 1px solid var(--color-border); background: var(--color-surface-muted, var(--color-border)); transition: background .15s ease; }
+.academy-access-switch-track::after { content: ""; display: block; width: 20px; height: 20px; margin: 3px; border-radius: 50%; background: var(--color-text-inverse); box-shadow: 0 1px 3px #0003; transition: transform .15s ease; }
+.academy-access-switch input:checked + .academy-access-switch-track { background: var(--color-primary); border-color: var(--color-primary); }
+.academy-access-switch input:checked + .academy-access-switch-track::after { transform: translateX(20px); }
+[dir="rtl"] .academy-access-switch input:checked + .academy-access-switch-track::after { transform: translateX(-20px); }
+.academy-access-switch input:focus-visible + .academy-access-switch-track { outline: 2px solid var(--color-primary); outline-offset: 4px; }
+.academy-management-access fieldset:disabled .academy-access-switch { opacity: .55; }
+.academy-access-registration { display: grid; grid-template-columns: minmax(160px, 1fr) minmax(240px, 480px); align-items: center; gap: .5rem 1.5rem; }
+.academy-management-access .elearning-field { min-width: 0; font-weight: 600; }
+.academy-access-registration select, .academy-email-domains input { width: 100%; min-width: 0; min-height: 48px; padding: .7rem .85rem; background: var(--color-surface); color: var(--color-text); border: 1px solid var(--color-border); border-radius: .65rem; font: inherit; }
+.academy-access-registration p { grid-column: 2; margin: 0; font-size: .875rem; color: var(--color-text-muted); line-height: 1.5; }
+.academy-management-access .academy-email-domains { width: min(100%, 480px); margin-inline-start: auto; display: grid; gap: .5rem; }
+.academy-email-domains small { color: var(--color-text-muted); line-height: 1.5; font-size: .875rem; font-weight: 400; }
+.academy-access-footer { display: flex; justify-content: flex-end; padding-block-start: 1.25rem; border-block-start: 1px solid var(--color-border); }
+.academy-access-footer button { min-height: 46px; }
+@media (max-width: 600px) {
+  .academy-management-access { padding: 1.25rem; }
+  .academy-access-registration { grid-template-columns: minmax(0, 1fr); gap: .6rem; }
+  .academy-access-registration p { grid-column: 1; }
+  .academy-management-access .academy-email-domains { width: 100%; }
+  .academy-access-footer button { width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .academy-access-switch-track, .academy-access-switch-track::after { transition: none; }
+}

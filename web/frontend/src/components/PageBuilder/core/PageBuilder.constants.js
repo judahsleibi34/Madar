@@ -113,6 +113,11 @@ export const alignmentOptions = [
 export const elementTypes = [
   { id: "reservationRequest", label: "Date request", group: "Bookings" },
   { id: "reservationFixedSlots", label: "Fixed slots", group: "Bookings" },
+  { id: "academyFeaturedCourses", label: "Featured Courses", group: "Academy" },
+  { id: "academyCourseCollection", label: "Course Collection", group: "Academy" },
+  { id: "academyPlans", label: "Plans / Pricing", group: "Academy" },
+  { id: "academyInstructors", label: "Instructors", group: "Academy" },
+  { id: "academyContinueLearning", label: "Continue Learning", group: "Academy" },
   { id: "heading", label: "Heading", group: "Content" },
   { id: "text", label: "Text", group: "Content" },
   { id: "button", label: "Button", group: "Content" },

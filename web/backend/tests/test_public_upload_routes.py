@@ -503,12 +503,12 @@ class PublicUploadRouteTests(unittest.TestCase):
         })
         self.visibility_patch.stop()
         try:
-            with patch.object(app_module, "service_supabase", draft), patch.object(
+            with patch("services.elearning_player_service.media_access", return_value=True), patch.object(app_module, "service_supabase", draft), patch.object(
                 app_module, "get_authenticated_user_row",
-                return_value=(object(), {"tenant_id": 1}),
+                return_value=(object(), {"tenant_id": 1, "id": 7}),
             ):
                 own = self.client.get(f"/uploads/{storage_key}")
-            with patch.object(app_module, "service_supabase", draft), patch.object(
+            with patch("services.elearning_player_service.media_access", return_value=True), patch.object(app_module, "service_supabase", draft), patch.object(
                 app_module, "get_authenticated_user_row",
                 return_value=(object(), {"tenant_id": 2}),
             ):
@@ -693,3 +693,16 @@ class PublicUploadRouteTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+    def test_learning_media_gate_is_enforced_for_authenticated_same_tenant_users(self):
+        key = "tenant_1/builder_assets/0123456789abcdef0123456789abcdef.png"
+        store = AssetVisibilityStore({"builder_assets": [{"id": "asset-1", "tenant_id": 1, "storage_key": key, "status": "active", "metadata": {"usage": "elearning_content"}}]})
+        self.visibility_patch.stop()
+        try:
+            for allowed, status in [(False, 404), (True, 200)]:
+                with patch.object(app_module, "service_supabase", store), patch.object(app_module, "get_authenticated_user_row", return_value=(object(), {"id": 7, "tenant_id": 1})), patch("services.elearning_player_service.media_access", return_value=allowed) as gate:
+                    response = self.client.get(f"/uploads/{key}")
+                    self.assertEqual(response.status_code, status)
+                    gate.assert_called_once_with(1, 7, key)
+        finally:
+            self.visibility_patch.start()

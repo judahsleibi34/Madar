@@ -1,0 +1,31 @@
+.learning-shell { min-height: 100dvh; background: var(--color-background, #f5f7fa); color: var(--color-text, #172b4d); }
+.learning-shell-header { display: flex; align-items: center; gap: 1rem; padding: 1rem 1.5rem; border-block-end: 1px solid #dce3eb; background: var(--color-surface, white); }
+.learning-shell-header button { background: transparent; border: 0; color: inherit; cursor: pointer; padding: .5rem; }
+.learning-shell-brand { display: flex; align-items: center; gap: .7rem; font-weight: 700; color: inherit; text-decoration: none; }
+.learning-shell-user { margin-inline-start: auto; }
+.learning-shell-layout { display: grid; grid-template-columns: 240px minmax(0, 1fr); }
+.learning-shell-sidebar { padding: 1.5rem 1rem; background: var(--color-surface, white); min-height: calc(100dvh - 80px); border-inline-end: 1px solid #dce3eb; }
+.learning-shell-sidebar nav { display: grid; gap: .5rem; }
+.learning-shell-sidebar a { display: flex; align-items: center; gap: .75rem; padding: .85rem; color: inherit; text-decoration: none; border-radius: .65rem; }
+.learning-shell-sidebar a.active { background: var(--color-primary-soft, #e9f2ff); color: #185cab; font-weight: 600; }
+.learning-shell-content { min-width: 0; padding: 1.5rem; }
+.learning-drawer-toggle, .learning-drawer-backdrop { display: none; }
+@media (max-width: 900px) {
+  .learning-shell-layout { grid-template-columns: minmax(0, 1fr); }
+  .learning-shell-header { padding: .6rem; gap: .4rem; flex-wrap: wrap; }
+  .learning-shell-user { font-size: .85rem; }
+  .learning-drawer-toggle { display: inline-flex; }
+  .learning-shell-sidebar { display: none; position: fixed; inset-block: 70px 0; inset-inline-start: 0; width: min(280px, 85vw); z-index: 51; overflow-y: auto; }
+  .learning-shell-sidebar.is-open { display: block; }
+  .learning-drawer-backdrop { display: block; position: fixed; inset: 70px 0 0; z-index: 50; border: 0; background: var(--color-overlay, rgba(0, 0, 0, .35)); }
+  .learning-shell-content { padding: .75rem; }
+}
+@media (prefers-reduced-motion: reduce) { .learning-shell * { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
+
+.learning-shell-logo { width: 36px; height: 36px; object-fit: contain; }
+.learning-shell-user { display: flex; align-items: center; gap: .4rem; color: inherit; text-decoration: none; }
+.learning-admin-link { font-size: .8rem; color: inherit; }
+.learning-drawer-close { display: none; }
+@media (max-width: 900px) {
+ .learning-drawer-close { display: block; margin-inline-start: auto; background: transparent; border: 0; color: inherit; padding: .5rem; }
+}

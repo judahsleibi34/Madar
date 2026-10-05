@@ -110,6 +110,14 @@ describe("BuilderProjectChooser", () => {
       .toBe("/page-builder/projects/recent-project/pages"));
   });
 
+  it("keeps normal Builder entry scoped to website projects", async () => {
+    listBuilderProjects.mockResolvedValue({ projects: [{ id: "website", name: "Website" }], pagination: { has_more: false } });
+    render(<MemoryRouter><BuilderProjectChooser autoEnterProject usageProfile="website" /><LocationProbe /></MemoryRouter>);
+    await waitFor(() => expect(screen.getByTestId("location").textContent).toBe("/page-builder/projects/website/pages"));
+    expect(listBuilderProjects).toHaveBeenCalledWith({ limit: 20, offset: 0, usageProfile: "website" });
+    expect(createBuilderProject).not.toHaveBeenCalled();
+  });
+
   it("creates and enters a project automatically when none exists", async () => {
     listBuilderProjects.mockResolvedValue({
       projects: [],

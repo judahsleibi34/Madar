@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate the production schema-114 to schema-115 forward release."""
+"""Validate the production schema-114 to schema-134 forward release."""
 
 from __future__ import annotations
 
@@ -13,11 +13,11 @@ ROOT = Path(__file__).resolve().parents[2]
 BASELINE = "1e6b739a43759309a45ede2dff28a859209e4a64"
 
 SOURCE_SCHEMA = 114
-TARGET_SCHEMA = 115
-MANIFEST_NAME = "migrations-115.json"
+TARGET_SCHEMA = 134
+MANIFEST_NAME = "migrations-115-134.json"
 
 # Migrations 100-114 have already been applied to production and are no
-# longer part of the active 114 -> 115 execution manifest. Keep them
+# longer part of the active 114 -> 134 execution manifest. Keep them
 # explicitly checksum-pinned so narrowing the active manifest cannot make
 # already-applied production history mutable.
 APPLIED_PRODUCTION_MIGRATIONS = {
@@ -88,6 +88,25 @@ EXPECTED = {
         "115_reconcile_commercial_access.sql",
         "forward-compatible",
     ),
+    116: ("116_create_elearning_settings.sql", "expand-only"),
+    117: ("117_create_elearning_courses.sql", "expand-only"),
+    118: ("118_create_elearning_groups_and_instructors.sql", "expand-only"),
+    119: ("119_create_elearning_structure.sql", "expand-only"),
+    120: ("120_create_elearning_participation.sql", "expand-only"),
+    121: ("121_add_elearning_course_deletion.sql", "expand-only"),
+    122: ("122_manage_elearning_enrollments.sql", "expand-only"),
+    123: ("123_create_elearning_content_blocks.sql", "expand-only"),
+    124: ("124_add_elearning_learner_player.sql", "expand-only"),
+    125: ("125_integrate_elearning_access_assignments.sql", "expand-only"),
+    126: ("126_create_elearning_assessments.sql", "expand-only"),
+    127: ("127_add_elearning_assessment_placements.sql", "expand-only"),
+    128: ("128_integrate_commerce_learning_entitlements.sql", "expand-only"),
+    129: ("129_add_elearning_credentials.sql", "expand-only"),
+    130: ("130_add_fixed_learning_academy.sql", "expand-only"),
+    131: ("131_add_academy_builder_integration.sql", "expand-only"),
+    132: ("132_expand_academy_builder_methodology.sql", "expand-only"),
+    133: ("133_guard_elearning_group_names_and_deletion.sql", "expand-only"),
+    134: ("134_add_elearning_instructor_deletion.sql", "expand-only"),
 }
 
 
@@ -133,7 +152,7 @@ def validate(root: Path = ROOT) -> list[str]:
 
         # Schema 100-114 is already live in production. These migrations
         # must remain immutable even though the active execution manifest
-        # begins at schema 114 and therefore contains only migration 115.
+        # begins at schema 114 and contains migrations 115 through the target schema.
         for number, (filename, checksum) in (
             APPLIED_PRODUCTION_MIGRATIONS.items()
         ):
@@ -181,7 +200,7 @@ def validate(root: Path = ROOT) -> list[str]:
             and release["migration_manifest"] == MANIFEST_NAME
         ):
             errors.append(
-                "release must bridge production schema 114 to 115 "
+                f"release must bridge production schema {SOURCE_SCHEMA} to {TARGET_SCHEMA} "
                 "with rollback bounded at schema 114"
             )
 
@@ -201,9 +220,9 @@ def validate(root: Path = ROOT) -> list[str]:
 
         entries = manifest["migrations"]
 
-        if [int(entry["number"]) for entry in entries] != [115]:
+        if [int(entry["number"]) for entry in entries] != sorted(EXPECTED):
             errors.append(
-                "forward manifest must contain migration 115"
+                f"forward manifest must contain migrations {SOURCE_SCHEMA + 1}..{TARGET_SCHEMA}"
             )
 
         previous = SOURCE_SCHEMA

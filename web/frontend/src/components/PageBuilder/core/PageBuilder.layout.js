@@ -1351,3 +1351,10 @@ export const createMovedFreeElement = (element, position) => ({
   ...element,
   position,
 });
+
+export function moveBuilderSection(sections, id, offset) {
+  const index = sections.findIndex(section => section.id === id), target = index + offset;
+  if (index < 0 || target < 0 || target >= sections.length) return sections;
+  const next = [...sections]; [next[index], next[target]] = [next[target], next[index]];
+  return next;
+}

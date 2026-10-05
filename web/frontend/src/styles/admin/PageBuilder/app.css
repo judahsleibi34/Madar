@@ -4400,6 +4400,22 @@ summary {
   line-height: 1.6;
 }
 
+.builder-project-loading-card .page-secondary-action {
+  color: var(--madar-text);
+  border: 1px solid var(--madar-border);
+  border-radius: 8px;
+  padding: 0.65rem 1rem;
+  background: var(--madar-surface);
+  font: inherit;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.builder-project-loading-card button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
 @media (max-width: 720px) {
   .builder-project-loading {
     min-height: calc(100vh - 64px);

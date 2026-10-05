@@ -2680,16 +2680,14 @@ def get_active_tenant_membership(tenant_id: int, user_id: int):
     )
 
 
-def get_tenant_staff_membership(tenant_id: int, user_id: int):
-    return first_row(
-        service_supabase.table("tenant_memberships")
+def get_tenant_staff_membership(tenant_id: int, user_id: int, *, active_only=True):
+    query = (service_supabase.table("tenant_memberships")
         .select("*")
         .eq("tenant_id", tenant_id)
-        .eq("user_id", user_id)
-        .eq("status", "active")
-        .limit(1)
-        .execute()
-    )
+        .eq("user_id", user_id))
+    if active_only:
+        query = query.eq("status", "active")
+    return first_row(query.limit(1).execute())
 
 
 def get_tenant_site_access(settings: dict, user_row: dict):
@@ -2701,7 +2699,14 @@ def get_tenant_site_access(settings: dict, user_row: dict):
 
     staff_membership = get_tenant_staff_membership(tenant_id, user_id)
     if staff_membership:
+        if staff_membership.get("role") == "learner":
+            return None
         return {**staff_membership, "_access_kind": "staff"}
+
+    # A suspended learner must never enter the historical owner fallback.
+    membership = get_tenant_staff_membership(tenant_id, user_id, active_only=False)
+    if membership and membership.get("role") == "learner":
+        return None
 
     if (
         str(settings.get("user_id") or "") == str(user_id or "")
@@ -2832,15 +2837,20 @@ def reconcile_site_record_owner_after_commit(table_name: str, row: dict, identit
         return row
 
 @router.post("/sites/{subdomain}/auth/register")
-def register_tenant_visitor(
+def register_tenant_visitor(subdomain: str, payload: TenantRegisterRequest, request: Request):
+    return register_tenant_account(subdomain, payload, request)
+
+
+def register_tenant_account(
     subdomain: str,
     payload: TenantRegisterRequest,
     request: Request,
+    *, academy_context: dict | None = None,
 ):
     clean_subdomain = normalize_subdomain(subdomain)
     settings = resolve_website_settings(clean_subdomain, request=request)
     tenant_id = resolve_tenant_id(settings)
-    project = get_bound_published_project(settings)
+    project = get_bound_published_project(settings) if academy_context is None else None
     clean_email = normalize_email(payload.email)
     name_parts = payload.full_name.strip().split(None, 1)
     first_name = name_parts[0]
@@ -2862,7 +2872,7 @@ def register_tenant_visitor(
                 "options": {
                     "email_redirect_to": canonical_tenant_url(
                         settings.get("subdomain") or clean_subdomain,
-                        "/shop",
+                        academy_context["return_to"] if academy_context else "/shop",
                     ),
                     "data": {"first_name": first_name, "last_name": last_name},
                 },
@@ -2878,8 +2888,8 @@ def register_tenant_visitor(
                 "first_name": first_name,
                 "last_name": last_name,
                 "email": clean_email,
-                "tenant_id": None,
-                "account_kind": "site_visitor",
+                "tenant_id": tenant_id if academy_context else None,
+                "account_kind": "platform" if academy_context else "site_visitor",
                 "account_status": "pending_verification",
                 "email_verified": False,
                 "email_verified_at": None,
@@ -2890,21 +2900,22 @@ def register_tenant_visitor(
             raise HTTPException(status_code=400, detail="Could not create account")
         local_user_id = local_user["id"]
 
-        membership_result = service_supabase.table("tenant_site_memberships").insert(
+        membership_result = service_supabase.table("tenant_memberships" if academy_context else "tenant_site_memberships").insert(
             {
                 "tenant_id": tenant_id,
                 "user_id": local_user["id"],
                 "auth_id": auth_user_id,
-                "role": "customer",
+                "role": "learner" if academy_context else "customer",
                 "status": "active",
-                "source": "registered",
+                **({} if academy_context else {"source": "registered"}),
             }
         ).execute()
         membership = first_row(membership_result)
         if not membership:
             raise HTTPException(status_code=400, detail="Could not create account")
 
-        assign_project_role(
+        if not academy_context:
+            assign_project_role(
             membership_id=int(membership["id"]),
             tenant_id=tenant_id,
             project=project,
@@ -2920,7 +2931,7 @@ def register_tenant_visitor(
     except HTTPException:
         if local_user_id:
             try:
-                service_supabase.table("tenant_site_memberships").delete().eq("user_id", local_user_id).execute()
+                service_supabase.table("tenant_memberships" if academy_context else "tenant_site_memberships").delete().eq("user_id", local_user_id).execute()
                 service_supabase.table("users").delete().eq("id", local_user_id).execute()
             except Exception:
                 pass
@@ -2934,7 +2945,7 @@ def register_tenant_visitor(
         logger.warning("public.tenant_signup_failed", extra={"tenant_id": tenant_id, "error_type": type(error).__name__})
         if local_user_id:
             try:
-                service_supabase.table("tenant_site_memberships").delete().eq("user_id", local_user_id).execute()
+                service_supabase.table("tenant_memberships" if academy_context else "tenant_site_memberships").delete().eq("user_id", local_user_id).execute()
                 service_supabase.table("users").delete().eq("id", local_user_id).execute()
             except Exception:
                 pass
@@ -2953,6 +2964,10 @@ def login_tenant_visitor(
     request: Request,
     response: Response,
 ):
+    return login_tenant_account(subdomain, payload, request, response)
+
+
+def login_tenant_account(subdomain, payload, request, response, *, allow_learning_membership=False):
     clean_subdomain = normalize_subdomain(subdomain)
     settings = resolve_website_settings(clean_subdomain, request=request)
     tenant_id = resolve_tenant_id(settings)
@@ -2969,7 +2984,11 @@ def login_tenant_visitor(
             raise HTTPException(status_code=403, detail="Please verify your email before logging in")
 
         user_row = get_local_user_by_auth_id(str(auth_response.user.id))
-        if not user_row or not get_tenant_site_access(settings, user_row):
+        access = get_tenant_site_access(settings, user_row) if user_row else None
+        if not access and user_row and allow_learning_membership and user_row.get("tenant_id") == tenant_id:
+            membership = get_tenant_staff_membership(tenant_id, user_row.get("id"))
+            access = membership if membership and membership.get("role") == "learner" else None
+        if not user_row or not access:
             raise HTTPException(status_code=403, detail="This account does not belong to this website")
 
         user_row, _ = synchronize_verified_account(auth_response.user, user_row)

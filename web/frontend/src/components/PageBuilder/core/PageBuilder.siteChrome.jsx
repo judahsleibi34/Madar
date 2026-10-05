@@ -37,6 +37,9 @@ export const createSiteChromeRenderers = ({
   publicRuntime = false,
   selectPage,
   setSelected,
+  navigateUrl,
+  navigationDestinations = [],
+  authenticated = false,
 }) => {
   const renderSiteHeader = () => {
     const site = project.siteChrome || defaultSiteChrome;
@@ -53,7 +56,8 @@ export const createSiteChromeRenderers = ({
     const logoSrc = logoProps.src;
     const logoWidth = Math.min(240, Math.max(16, Number(site.logoWidth) || defaultSiteChrome.logoWidth));
     const brandLabel = String(site.brand ?? "").trim();
-    const headerButtonLabel = String(site.headerButtonLabel ?? "").trim();
+    const headerDestination = navigationDestinations.find(item => item.href === site.headerButtonHref);
+    const headerButtonLabel = headerDestination?.requiresAuth && !authenticated ? "" : String(site.headerButtonLabel ?? "").trim();
     const headerActionPage = headerButtonLabel
       ? findPageByNavigationReference(
           project.pages,
@@ -73,6 +77,7 @@ export const createSiteChromeRenderers = ({
       const targetPage = findPageByNavigationReference(project.pages, targetValue);
 
       if (targetPage) selectPage(targetPage.id);
+      else if (navigateUrl && getSafeFooterLinkUrl(site.headerButtonHref, headerButtonLabel)) navigateUrl(site.headerButtonHref);
     };
 
     return (
@@ -200,6 +205,8 @@ export const createSiteChromeRenderers = ({
     };
     const isVisibleFooterItem = (value) => {
       const normalizedValue = String(value || "").trim();
+      const destination = navigationDestinations.find(item => item.href === normalizedValue);
+      if (destination?.requiresAuth && !authenticated) return false;
       return !/^page_[a-z0-9-]{8,}$/i.test(normalizedValue) || Boolean(resolveFooterPageLink(normalizedValue));
     };
     const visiblePageLinks = pageLinks.filter(isVisibleFooterItem);
@@ -225,6 +232,7 @@ export const createSiteChromeRenderers = ({
       const target = resolveFooterPageLink(label);
 
       if (target) selectPage(target.id);
+      else if (navigateUrl && getSafeFooterLinkUrl(label, label)) navigateUrl(label);
     };
 
     return (
@@ -278,14 +286,14 @@ export const createSiteChromeRenderers = ({
           {visiblePageLinks.length > 0 && <div className="ecommerce-footer-column ecommerce-footer-quick-links">
             <h4>{footerShopTitle}</h4>
             <div className="ecommerce-footer-links-grid">
-              {visiblePageLinks.map((item) => <button type="button" key={item} onClick={() => navigateFooterLink(item)}>{resolveFooterPageLink(item)?.name || item}</button>)}
+              {visiblePageLinks.map((item) => <button type="button" key={item} onClick={() => navigateFooterLink(item)}>{resolveFooterPageLink(item)?.name || navigationDestinations.find(destination => destination.href === item)?.label || item}</button>)}
             </div>
           </div>}
 
           {visibleHelpLinks.length > 0 && <div className="ecommerce-footer-column ecommerce-footer-quick-links">
             <h4>{footerHelpTitle}</h4>
             <div className="ecommerce-footer-links-grid">
-              {visibleHelpLinks.map((item) => <button type="button" key={item} onClick={() => navigateFooterLink(item)}>{resolveFooterPageLink(item)?.name || item}</button>)}
+              {visibleHelpLinks.map((item) => <button type="button" key={item} onClick={() => navigateFooterLink(item)}>{resolveFooterPageLink(item)?.name || navigationDestinations.find(destination => destination.href === item)?.label || item}</button>)}
             </div>
           </div>}
 

@@ -188,6 +188,16 @@ describe("builder project cloud API", () => {
     );
   });
 
+  it("requests separate website and Academy project lists from the existing API", async () => {
+    apiFetch.mockResolvedValue(jsonResponse({ projects: [] }));
+    await listBuilderProjects({ usageProfile: "website" });
+    await listBuilderProjects({ usageProfile: "academy" });
+    expect(apiFetch.mock.calls.map(call => call[0])).toEqual([
+      "/api/builder/projects?limit=20&offset=0&usage_profile=website",
+      "/api/builder/projects?limit=20&offset=0&usage_profile=academy",
+    ]);
+  });
+
   it("sets the explicit live project with the builder client contract", async () => {
     apiFetch.mockResolvedValueOnce(jsonResponse({
       binding: { project_id: "project-2" },

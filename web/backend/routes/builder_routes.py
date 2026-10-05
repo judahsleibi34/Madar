@@ -174,6 +174,8 @@ BUILDER_ASSET_EXTENSIONS = {
     "image/png": ".png",
     "image/jpeg": ".jpg",
     "image/webp": ".webp",
+    "audio/mpeg": ".mp3",
+    "audio/wav": ".wav",
     "video/mp4": ".mp4",
     "video/webm": ".webm",
     "application/pdf": ".pdf",
@@ -745,6 +747,7 @@ def validate_publish_schema(
     *,
     project_schema_version: Any = None,
     tenant_id: int | None = None,
+    allow_relative_button_urls: bool = False,
 ) -> tuple[dict[str, Any], int]:
     """Revalidate persisted builder JSON and its supported schema version at publish."""
 
@@ -1020,7 +1023,7 @@ def validate_publish_schema(
                             action_url,
                             field_name="Button action URL",
                             allow_empty=False,
-                            allow_relative=False,
+                            allow_relative=allow_relative_button_urls,
                         )
                     except HTTPException:
                         raise HTTPException(
@@ -1056,6 +1059,7 @@ def validate_publish_schema(
 
 
 class BuilderProjectCreate(BaseModel):
+    usage_profile: str = Field(default="website", pattern="^(website|academy)$")
     name: str = Field(..., min_length=1)
     slug: str = Field(..., min_length=1)
     draft_schema: dict[str, Any] = Field(default_factory=dict)
@@ -1674,7 +1678,22 @@ async def upload_builder_asset(
     file: UploadFile = File(...),
 ):
     ecommerce_product_media = request.scope.get("madar_asset_usage") == "ecommerce_product_media"
-    if ecommerce_product_media:
+    elearning_logo = request.scope.get("madar_asset_usage") == "elearning_logo"
+    elearning_course_cover = request.scope.get("madar_asset_usage") == "elearning_course_cover"
+    elearning_content = request.scope.get("madar_asset_usage") == "elearning_content"
+    elearning_image = elearning_logo or elearning_course_cover
+    if elearning_image or elearning_content:
+        from services.elearning_access_service import authorize_elearning_context
+        from services.elearning_settings_service import settings_available
+        context = require_active_tenant_member(request, response, allow_admin_account_access=False)
+        authorize_elearning_context(context, "elearning.structure.manage" if elearning_content else "elearning.courses.manage" if elearning_course_cover else "elearning.manage")
+        if elearning_content:
+            from services.elearning_content_service import require_available
+            require_available()
+        if not elearning_content and not settings_available(117 if elearning_course_cover else 116):
+            raise HTTPException(status_code=503, detail={"code": "elearning_courses_upgrade_required" if elearning_course_cover else "elearning_upgrade_required", "message": "E-Learning requires a database upgrade"})
+        require_entitlement(context.tenant_id, "image_uploads")
+    elif ecommerce_product_media:
         context = require_active_tenant_member(
             request,
             response,
@@ -1698,7 +1717,15 @@ async def upload_builder_asset(
         "application/msword",
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     } or (not declared_content_type and source_extension in {".pdf", ".doc", ".docx"})
-    asset_kind = "video" if is_declared_video else "document" if is_declared_document else "image"
+    is_declared_audio = declared_content_type.startswith("audio/") or (not declared_content_type and source_extension in {".mp3", ".wav"})
+    asset_kind = "audio" if is_declared_audio else "video" if is_declared_video else "document" if is_declared_document else "image"
+    if is_declared_audio and not elearning_content:
+        raise HTTPException(status_code=400, detail="Audio uploads require a lesson content context")
+    if elearning_content and asset_kind not in {"audio", "video"}:
+        raise HTTPException(status_code=400, detail="Lesson media must be MP3, WAV, MP4, or WebM")
+
+    if elearning_image and asset_kind != "image":
+        raise HTTPException(status_code=400, detail="Please upload a PNG, JPG, or WebP image")
 
     if ecommerce_product_media and asset_kind not in {"image", "video"}:
         raise HTTPException(
@@ -1708,7 +1735,9 @@ async def upload_builder_asset(
 
     if declared_content_type and declared_content_type not in BUILDER_ASSET_EXTENSIONS:
         detail = (
-            "Please upload an MP4 or WebM video"
+            "Please upload an MP3 or WAV audio file"
+            if is_declared_audio
+            else "Please upload an MP4 or WebM video"
             if is_declared_video
             else "Please upload a PDF, DOC, or DOCX document"
             if declared_content_type.startswith("application/")
@@ -1720,6 +1749,8 @@ async def upload_builder_asset(
         "image/png": {".png"},
         "image/jpeg": {".jpg", ".jpeg"},
         "image/webp": {".webp"},
+        "audio/mpeg": {".mp3"},
+        "audio/wav": {".wav"},
         "video/mp4": {".mp4"},
         "video/webm": {".webm"},
         "application/pdf": {".pdf"},
@@ -1739,9 +1770,11 @@ async def upload_builder_asset(
         BUILDER_VIDEO_MAX_BYTES
         if asset_kind == "video"
         else BUILDER_DOCUMENT_MAX_BYTES
-        if asset_kind == "document"
+        if asset_kind in {"document", "audio"}
         else BUILDER_ASSET_MAX_BYTES
     )
+    if elearning_image:
+        read_limit = 5 * 1024 * 1024
     file_size = file.size
     if file_size is None:
         current_position = file.file.tell()
@@ -1757,8 +1790,11 @@ async def upload_builder_asset(
         detail = (
             "Video file must be 250MB or smaller"
             if asset_kind == "video"
+            else "Audio file must be 50MB or smaller"
+            if asset_kind == "audio"
             else "Document file must be 50MB or smaller"
             if asset_kind == "document"
+            else "Image file must be 5MB or smaller" if elearning_image
             else "Image file must be 25MB or smaller"
         )
         raise HTTPException(status_code=413, detail=detail)
@@ -1769,7 +1805,9 @@ async def upload_builder_asset(
 
     if not detected_content_type:
         detail = (
-            "Please upload an MP4 or WebM video"
+            "Please upload an MP3 or WAV audio file"
+            if asset_kind == "audio"
+            else "Please upload an MP4 or WebM video"
             if asset_kind == "video"
             else "Please upload a PDF, DOC, or DOCX document"
             if asset_kind == "document"
@@ -1794,6 +1832,8 @@ async def upload_builder_asset(
             detail=f"{detected_kind.title()} filename does not match the file content",
         )
 
+    if elearning_content and not detected_content_type.startswith(("audio/", "video/")):
+        raise HTTPException(status_code=400, detail="Lesson media must contain audio or video")
     extension = BUILDER_ASSET_EXTENSIONS[detected_content_type]
     filename = f"{uuid4().hex}{extension}"
     target_dir, target_path, tenant_dir = get_builder_asset_target(context.tenant_id, filename)
@@ -1850,8 +1890,11 @@ async def upload_builder_asset(
         detail = (
             "Video file must be 250MB or smaller"
             if asset_kind == "video"
+            else "Audio file must be 50MB or smaller"
+            if asset_kind == "audio"
             else "Document file must be 50MB or smaller"
             if asset_kind == "document"
+            else "Image file must be 5MB or smaller" if elearning_image
             else "Image file must be 25MB or smaller"
         )
         raise HTTPException(status_code=413, detail=detail) from error
@@ -1995,7 +2038,7 @@ async def upload_builder_asset(
         request=request,
         tenant_id=context.tenant_id,
         actor_user_id=context.user_id,
-        action="ecommerce.product_media_uploaded" if ecommerce_product_media else "builder.asset_uploaded",
+        action="elearning.content.media_uploaded" if elearning_content else "elearning.course_cover_uploaded" if elearning_course_cover else "elearning.logo_uploaded" if elearning_logo else "ecommerce.product_media_uploaded" if ecommerce_product_media else "builder.asset_uploaded",
         target_type="ecommerce_product_media" if ecommerce_product_media else "builder_asset",
         target_id=filename,
         metadata={
@@ -2144,6 +2187,8 @@ def update_builder_site_binding(
     require_supported_builder_client(request)
     context = require_builder_context(request, response, require_builder_admin_access)
     project = get_project_for_tenant(binding.project_id, context.tenant_id)
+    if project.get("usage_profile") == "academy":
+        raise HTTPException(400, "Academy landing pages cannot replace the main website")
     if (
         str(project.get("status") or "").lower() != "published"
         or not isinstance(project.get("published_schema"), dict)
@@ -2286,18 +2331,21 @@ def list_builder_projects(
     response: Response,
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
+    usage_profile: Optional[str] = Query(default=None, pattern="^(website|academy)$"),
 ):
     context = require_builder_context(request, response, require_active_tenant_member)
 
-    projects_response = (
+    projects_query = (
         service_supabase.table("builder_projects")
         .select("*")
         .eq("tenant_id", context.tenant_id)
         .neq("status", "archived")
         .order("updated_at", desc=True)
         .range(offset, offset + limit)
-        .execute()
     )
+    if usage_profile:
+        projects_query = projects_query.eq("usage_profile", usage_profile)
+    projects_response = projects_query.execute()
     projects, pagination = pagination_response(projects_response.data or [], limit, offset)
 
     return {
@@ -2324,10 +2372,19 @@ def create_builder_project(
     )
 
     draft_schema = assert_json_object(project.draft_schema)
+    if project.usage_profile == "academy":
+        from services.elearning_settings_service import settings_available
+        from services.academy_builder_service import validate_academy_schema
+        if context.role not in {"owner", "admin"}:
+            raise HTTPException(403, "Academy management access required")
+        if not settings_available(131):
+            raise HTTPException(503, detail={"code": "academy_builder_upgrade_required"})
+        validate_academy_schema(draft_schema)
     require_schema_asset_tenant(draft_schema, context.tenant_id)
     payload = {
         "tenant_id": context.tenant_id,
         "owner_user_id": context.user_id,
+        **({"usage_profile": "academy"} if project.usage_profile == "academy" else {}),
         "name": normalize_name(project.name),
         "slug": normalize_slug(project.slug),
         "status": "draft",
@@ -2660,6 +2717,9 @@ def update_builder_project(
                 "Archived projects cannot be edited.",
             ),
         )
+    if existing_project.get("usage_profile") == "academy" and project.draft_schema is not None:
+        from services.academy_builder_service import validate_academy_schema
+        validate_academy_schema(project.draft_schema)
     current_revision = _project_revision(existing_project)
     requested_expected_revision = getattr(project, "expected_revision", None)
     if "draft_revision" in existing_project and requested_expected_revision is None:
@@ -3266,6 +3326,9 @@ def publish_builder_project(
     require_supported_builder_client(request)
     context = require_builder_context(request, response, require_builder_write_access)
     project = get_project_for_tenant(project_id, context.tenant_id)
+    if project.get("usage_profile") == "academy":
+        from services.academy_builder_service import validate_academy_schema
+        validate_academy_schema(project.get("draft_schema") or {})
     entitlement = require_publish_entitlement(context.tenant_id)
     website_settings = require_public_subdomain(context.tenant_id, context.user_id)
     current_revision = _project_revision(project)
@@ -3287,6 +3350,7 @@ def publish_builder_project(
         project.get("draft_schema") or {},
         project_schema_version=project.get("schema_version"),
         tenant_id=context.tenant_id,
+        allow_relative_button_urls=project.get("usage_profile") == "academy",
     )
     require_schema_asset_tenant(validated_schema, context.tenant_id)
     if schema_contains_element_type(validated_schema, "reservationBlock"):
@@ -3326,7 +3390,7 @@ def publish_builder_project(
     # Migration 072 performs an unambiguous first publication binding inside
     # this same RPC transaction. Never follow a successful RPC with a second
     # activation write: that would recreate the old hybrid-publication window.
-    binding_created = not bool(website_settings.get("published_project_id"))
+    binding_created = project.get("usage_profile") != "academy" and not bool(website_settings.get("published_project_id"))
     if binding_created:
         website_settings = {**website_settings, "published_project_id": project_id}
 
@@ -3360,6 +3424,7 @@ def publish_builder_project(
             ),
             "tenant_id": website_settings.get("tenant_id"),
             "published_project_id": website_settings.get("published_project_id"),
+            **({"academy_project_id": project_id} if project.get("usage_profile") == "academy" else {}),
         },
     }
 

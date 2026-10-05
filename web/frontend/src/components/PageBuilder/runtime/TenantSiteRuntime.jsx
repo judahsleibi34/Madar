@@ -1,4 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { getBuilderWorkspaceFromPath, getBuilderProjectBasePath } from "../core/PageBuilder.workspaceRouting";
+import { getAcademyNavigationDestinations } from "../core/PageBuilder.academyProfile";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { defaultSiteChrome, fieldTypes, viewports } from "../core/PageBuilder.constants";
 import {
@@ -457,8 +459,10 @@ const decodePathSegment = (value) => {
 };
 
 // eslint-disable-next-line react-refresh/only-export-components
-export const getBuilderPreviewBasePath = (projectId) =>
-  `/page-builder/projects/${encodeURIComponent(String(projectId || ""))}/preview`;
+export const getBuilderPreviewBasePath = (projectId, workspace = "page-builder") =>
+  `/${workspace}/projects/${encodeURIComponent(String(projectId || ""))}/preview`;
+
+const AcademyPreviewProvider = lazy(() => import("../../ELearning/ELearningAcademy").then(module => ({ default: module.AcademyBuilderPreviewProvider })));
 
 export default function TenantSiteRuntime({ draftPreview = false, siteIdentifier = "" } = {}) {
   const params = useParams();
@@ -479,7 +483,7 @@ export default function TenantSiteRuntime({ draftPreview = false, siteIdentifier
     presentationZoom: runtimePresentationZoom,
   } = runtimeLayout;
   const activePath = location.pathname;
-  const previewBasePath = getBuilderPreviewBasePath(projectId);
+  const previewBasePath = getBuilderPreviewBasePath(projectId, getBuilderWorkspaceFromPath(location.pathname));
   const runtimeBasePath = draftPreview ? previewBasePath : (siteIdentifier ? "/" : `/site/${cleanSubdomain}`);
   const directStandaloneFormId = params.formId
     ? decodePathSegment(params.formId)
@@ -498,6 +502,7 @@ export default function TenantSiteRuntime({ draftPreview = false, siteIdentifier
     ? decodePathSegment(standaloneFormMatch[1])
     : "");
   const [project, setProject] = useState(null);
+  const [academyPreviewIdentifier, setAcademyPreviewIdentifier] = useState(null);
   const effectiveRuntimeLogicalWidth = runtimeLogicalWidth;
   const effectiveRuntimePresentationZoom = runtimePresentationZoom;
   const [publicSiteProfile, setPublicSiteProfile] = useState(null);
@@ -782,6 +787,7 @@ export default function TenantSiteRuntime({ draftPreview = false, siteIdentifier
     if (draftPreview) {
       let cancelled = false;
       setProject(null);
+      setAcademyPreviewIdentifier(null);
       setPublicationBoundary(null);
       setPublicSiteState("loading");
       if (!projectId) {
@@ -796,6 +802,7 @@ export default function TenantSiteRuntime({ draftPreview = false, siteIdentifier
           const serverDraft = record?.draft_schema;
           if (serverDraft && typeof serverDraft === "object") {
             setProject(serverDraft);
+            if (record.usage_profile === "academy") import("../../../services/elearningSettings").then(({ fetchELearningSettings }) => fetchELearningSettings()).then(settings => { if (!cancelled) setAcademyPreviewIdentifier(settings.academy_management?.subdomain || settings.academy?.subdomain); }).catch(() => { if (!cancelled) setPublicSiteState("unavailable"); });
             setPublicSiteState("ready");
           } else {
             setPublicSiteState("unavailable");
@@ -2243,6 +2250,9 @@ export default function TenantSiteRuntime({ draftPreview = false, siteIdentifier
     preview: true,
     publicRuntime: true,
     selectPage: selectCanvasPage,
+    navigateUrl: academyPreviewIdentifier ? url => navigate(url) : undefined,
+    navigationDestinations: academyPreviewIdentifier ? getAcademyNavigationDestinations(`/academy/${academyPreviewIdentifier}`) : [],
+    authenticated: Boolean(academyPreviewIdentifier),
     setSelected: () => {},
   });
 
@@ -2368,9 +2378,7 @@ export default function TenantSiteRuntime({ draftPreview = false, siteIdentifier
       activePage?.id !== authEntryPage?.id ||
       authElementTypes.has(element.type);
 
-    return (
-      <main key={activePage.id} className="tenant-runtime-page" data-page-id={activePage.id}>
-        <SiteRenderer
+    const canvas = (<SiteRenderer
           project={project}
           activePage={activePage}
           viewportMode={runtimeViewport}
@@ -2383,9 +2391,8 @@ export default function TenantSiteRuntime({ draftPreview = false, siteIdentifier
           filterElement={filterElement}
           getDirectElementPosition={(element) => getRuntimeDirectPosition(element, runtimeViewport)}
           canvasStyle={{ "--site-runtime-logical-width": `${effectiveRuntimeLogicalWidth}px` }}
-        />
-      </main>
-    );
+        />);
+    return <main key={activePage.id} className="tenant-runtime-page" data-page-id={activePage.id}>{academyPreviewIdentifier ? <Suspense fallback={null}><AcademyPreviewProvider identifier={academyPreviewIdentifier}>{canvas}</AcademyPreviewProvider></Suspense> : canvas}</main>;
   };
 
   // eslint-disable-next-line no-unused-vars
@@ -2574,7 +2581,7 @@ export default function TenantSiteRuntime({ draftPreview = false, siteIdentifier
       {draftPreview && (
         <div className="tenant-draft-preview-bar">
           <strong>{runtimeCopy.runtime.draftPreview}</strong>
-          <Link to={`/page-builder/projects/${encodeURIComponent(projectId)}`}>
+          <Link to={getBuilderProjectBasePath(projectId, getBuilderWorkspaceFromPath(location.pathname))}>
             {runtimeCopy.runtime.backToBuilder}
           </Link>
         </div>

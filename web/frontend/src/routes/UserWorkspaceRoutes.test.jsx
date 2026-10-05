@@ -13,6 +13,9 @@ vi.mock("./shared", () => ({
 vi.mock("../components/DashboardBuilder/SecurityMfaPage", () => ({
   default: () => <div>Dedicated security page</div>,
 }));
+vi.mock("../services/elearningSettings", () => ({ fetchELearningSettings: vi.fn(async () => ({ settings: {}, available: true })) }));
+vi.mock("../services/elearningCourses", () => ({ fetchCourses: vi.fn(async () => ({ courses: [], available: true, has_more: false })) }));
+vi.mock("../components/DashboardBuilder/ELearningSettingsPage", () => ({ default: () => <h1>E-Learning Settings</h1> }));
 vi.mock("../components/DashboardBuilder/SettingsPage", () => ({
   default: ({ initialTab }) => (
     <div>{initialTab === "security" ? "Tabbed security settings" : "General settings page"}</div>
@@ -173,4 +176,9 @@ describe("workspace settings routes", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Open agenda" }));
     expect(await screen.findByText("Calendar mounted for missing in agenda view")).toBeTruthy();
   });
+});
+
+it.each([["/e-learning", "Courses"], ["/e-learning/courses", "Courses"], ["/e-learning/groups", "Groups"], ["/e-learning/instructors", "Instructors"], ["/e-learning/settings", "E-Learning Settings"]])("opens normalized E-Learning page at %s", async (pathname, heading) => {
+  render(<MemoryRouter initialEntries={[pathname]}><UserWorkspaceRoutes {...routeProps} /></MemoryRouter>);
+  expect(await screen.findByRole("heading", { name: heading })).toBeTruthy();
 });

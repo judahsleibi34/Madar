@@ -9,7 +9,8 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.testclient import TestClient
 
-from routes import builder_routes
+from routes import builder_routes, elearning_routes, elearning_courses_routes
+from services import elearning_settings_service
 from services.tenant_service import TenantContext
 from services.storage_quota_service import StorageSafetyError
 from services.url_validation import validate_public_url
@@ -50,6 +51,8 @@ def build_client():
         allow_headers=["*"],
     )
     app.include_router(builder_routes.router)
+    app.include_router(elearning_routes.router)
+    app.include_router(elearning_courses_routes.router)
     return TestClient(app)
 
 
@@ -145,6 +148,42 @@ class BuilderAssetUploadTests(unittest.TestCase):
             files={"file": (filename, content, content_type)},
             headers=headers,
         )
+
+    def test_elearning_logo_upload_validates_image_and_uses_tenant_storage(self):
+        with patch.object(elearning_settings_service, "settings_available", return_value=True):
+            response = self.client.post("/elearning/logo/upload", files={"file": ("logo.png", PNG_BYTES, "image/png")})
+        self.assertEqual(response.status_code, 200)
+        self.assertRegex(response.json()["asset_url"], r"^/uploads/tenant_1/builder_assets/[a-f0-9]{32}\.png$")
+        self.assertEqual(builder_routes.reserve_storage.call_args.kwargs["tenant_id"], 1)
+        builder_routes.require_entitlement.assert_called_with(1, "image_uploads")
+        self.record_audit_event.assert_called_once()
+        self.assertEqual(self.record_audit_event.call_args.kwargs["action"], "elearning.logo_uploaded")
+
+    def test_course_cover_reuses_upload_pipeline_and_requires_schema_117(self):
+        with patch.object(elearning_settings_service, "settings_available", return_value=True) as available:
+            response = self.client.post("/elearning/courses/cover/upload", files={"file": ("cover.png", PNG_BYTES, "image/png")})
+        self.assertEqual(response.status_code, 200, response.text)
+        available.assert_called_with(117)
+        self.assertEqual(self.record_audit_event.call_args.kwargs["action"], "elearning.course_cover_uploaded")
+        with patch.object(elearning_settings_service, "settings_available", return_value=False):
+            response = self.client.post("/elearning/courses/cover/upload", files={"file": ("cover.png", PNG_BYTES, "image/png")})
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(response.json()["detail"]["code"], "elearning_courses_upgrade_required")
+
+    def test_elearning_upload_rejects_members_and_preupgrade_schema(self):
+        with patch.object(builder_routes, "require_active_tenant_member", return_value=TenantContext(tenant_id=1, user_id=2, auth_id="auth-1", role="member", membership_status="active", user={}, membership={})):
+            self.assertEqual(self.client.post("/elearning/logo/upload", files={"file": ("logo.png", PNG_BYTES, "image/png")}).status_code, 403)
+        with patch.object(elearning_settings_service, "settings_available", return_value=False):
+            self.assertEqual(self.client.post("/elearning/logo/upload", files={"file": ("logo.png", PNG_BYTES, "image/png")}).status_code, 503)
+        builder_routes.reserve_storage.assert_not_called()
+
+    def test_elearning_upload_rejects_video_svg_and_large_images(self):
+        with patch.object(elearning_settings_service, "settings_available", return_value=True):
+            for filename, content, mime, status in [("logo.svg", SVG_BYTES, "image/svg+xml", 400), ("video.mp4", MP4_BYTES, "video/mp4", 400), ("logo.png", PNG_BYTES + bytes(5 * 1024 * 1024), "image/png", 413)]:
+                with self.subTest(filename=filename):
+                    response = self.client.post("/elearning/logo/upload", files={"file": (filename, content, mime)})
+                    self.assertEqual(response.status_code, status)
+        builder_routes.reserve_storage.assert_not_called()
 
     def post_product_media(self, content, filename="asset.png", content_type="image/png"):
         return self.client.post(

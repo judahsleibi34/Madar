@@ -41,7 +41,7 @@ class Query:
         self.db.queries.append(self.table)
         table = self.db.setdefault(self.table, [])
         def matches(row, kind, key, value):
-            if kind == "eq": return row.get(key) == value
+            if kind == "eq": return (row.get("settings") or {}).get(key.split("->>")[1]) == value if key.startswith("settings->>") else row.get(key) == value
             if kind == "in": return row.get(key) in value
             if kind == "contains": return set(value) <= set(row.get(key) or [])
             return str(row.get(key) or "") <= str(value)
@@ -394,6 +394,30 @@ class AssetRegistryTests(unittest.TestCase):
             "ecommerce_products", "ecommerce_product_variants", "ecommerce_products",
         ])
 
+    def test_academy_public_images_require_enabled_catalog_and_never_publish_lesson_media(self):
+        client = Client()
+        key = "tenant_17/builder_assets/0123456789abcdef0123456789abcdef.png"
+        url = "/uploads/" + key
+        client.data["website_settings"] = [{"tenant_id": 17, "subdomain": "academy"}]
+        client.data["elearning_settings"] = [{"tenant_id": 17, "settings": {"enabled": True, "academy_enabled": True, "academy_hero_image": url}}]
+        def public():
+            return asset_registry_service.nonproject_asset_reference_count(tenant_id=17, storage_key=key, public_only=True, client=client)
+        self.assertEqual(public(), 1)
+        client.data["elearning_settings"][0]["settings"]["academy_enabled"] = False
+        self.assertEqual(public(), 0)
+        client.data["elearning_settings"][0]["settings"].update(academy_enabled=True, academy_hero_image="")
+        client.data["elearning_courses"] = [{"tenant_id": 17, "cover_asset": url, "status": "published", "access_type": "free", "catalog_visible": True}]
+        self.assertEqual(public(), 1)
+        for field, value in [("status", "draft"), ("access_type", "private"), ("catalog_visible", False)]:
+            row = client.data["elearning_courses"][0]
+            previous = row[field]; row[field] = value
+            self.assertEqual(public(), 0)
+            row[field] = previous
+        client.data["elearning_courses"] = []
+        client.data["elearning_content_blocks"] = [{"tenant_id": 17, "media_id": "media"}]
+        self.assertEqual(public(), 0)
+        self.assertEqual(asset_registry_service.nonproject_asset_reference_count(tenant_id=18, storage_key=key, public_only=True, client=client), 0)
+
     def test_cleanup_is_dry_run_by_default_and_rechecks_checksum(self):
         client = Client()
         with tempfile.TemporaryDirectory() as root:
@@ -461,3 +485,62 @@ class AssetRegistryTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ELearningAssetReferenceTests(unittest.TestCase):
+    def test_saved_logo_is_retained_but_does_not_grant_public_visibility(self):
+        client = Client()
+        key = "tenant_17/builder_assets/" + "a" * 32 + ".png"
+        client.data["elearning_settings"] = [{"tenant_id": 17, "settings": {"logo_url": "/uploads/" + key}}]
+        self.assertEqual(asset_registry_service.nonproject_asset_reference_count(tenant_id=17, storage_key=key, client=client), 1)
+        self.assertEqual(asset_registry_service.nonproject_asset_reference_count(tenant_id=17, storage_key=key, public_only=True, client=client), 0)
+        self.assertEqual(asset_registry_service.nonproject_asset_reference_count(tenant_id=18, storage_key=key, client=client), 0)
+        client.data["elearning_settings"][0]["settings"]["logo_url"] = ""
+        self.assertEqual(asset_registry_service.nonproject_asset_reference_count(tenant_id=17, storage_key=key, client=client), 0)
+
+
+    def test_saved_and_archived_course_covers_are_retained_without_public_access(self):
+        client = Client()
+        key = "tenant_17/builder_assets/" + "b" * 32 + ".png"
+        client.data["elearning_courses"] = [{"tenant_id": 17, "cover_asset": "/uploads/" + key, "status": "archived"}]
+        self.assertEqual(asset_registry_service.nonproject_asset_reference_count(tenant_id=17, storage_key=key, client=client), 1)
+        self.assertEqual(asset_registry_service.nonproject_asset_reference_count(tenant_id=17, storage_key=key, public_only=True, client=client), 0)
+        self.assertEqual(asset_registry_service.nonproject_asset_reference_count(tenant_id=18, storage_key=key, client=client), 0)
+        client.data["elearning_courses"][0]["cover_asset"] = ""
+        self.assertEqual(asset_registry_service.nonproject_asset_reference_count(tenant_id=17, storage_key=key, client=client), 0)
+
+    def test_course_missing_table_is_tolerated_but_other_failures_propagate(self):
+        client = Client()
+        key = "tenant_17/builder_assets/" + "b" * 32 + ".png"
+        original_table = client.table
+        class MissingTable(Exception):
+            code = "42P01"
+        def missing_table(name):
+            if name == "elearning_courses":
+                raise MissingTable("table absent on bridge schema")
+            return original_table(name)
+        with patch.object(client, "table", side_effect=missing_table):
+            self.assertEqual(asset_registry_service.nonproject_asset_reference_count(tenant_id=17, storage_key=key, client=client), 0)
+        def failed_table(name):
+            if name == "elearning_courses":
+                raise RuntimeError("database unavailable")
+            return original_table(name)
+        with patch.object(client, "table", side_effect=failed_table):
+            with self.assertRaises(RuntimeError):
+                asset_registry_service.nonproject_asset_reference_count(tenant_id=17, storage_key=key, client=client)
+
+    def test_bridge_missing_table_is_tolerated_but_database_failures_propagate(self):
+        client = Client()
+        key = "tenant_17/builder_assets/" + "a" * 32 + ".png"
+        original_table = client.table
+        class MissingTable(Exception):
+            code = "PGRST205"
+        def missing_table(name):
+            if name == "elearning_settings":
+                raise MissingTable("table absent on bridge schema")
+            return original_table(name)
+        with patch.object(client, "table", side_effect=missing_table):
+            self.assertEqual(asset_registry_service.nonproject_asset_reference_count(tenant_id=17, storage_key=key, client=client), 0)
+        with patch.object(client, "table", side_effect=RuntimeError("database unavailable")):
+            with self.assertRaises(RuntimeError):
+                asset_registry_service.nonproject_asset_reference_count(tenant_id=17, storage_key=key, client=client)

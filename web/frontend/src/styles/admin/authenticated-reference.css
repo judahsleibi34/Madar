@@ -556,7 +556,7 @@
 
   .admin-dashboard-layout-builder.sidebar-open .admin-sidebar :where(
     .admin-sidebar-brand-text,
-    .admin-sidebar-nav button > span,
+    .admin-sidebar-nav :is(button, a) > span,
     .admin-sidebar-logout > span,
     .admin-sidebar-user-info,
     .theme-toggle-label,
@@ -578,7 +578,7 @@
   .admin-sidebar.dashboard-sidebar
   :where(
     .admin-sidebar-brand-text,
-    .admin-sidebar-nav button > span,
+    .admin-sidebar-nav :is(button, a) > span,
     .admin-sidebar-logout > span,
     .admin-sidebar-user-info,
     .theme-toggle-label,
@@ -593,7 +593,7 @@
   :where(
     .admin-sidebar-brand,
     .admin-sidebar-search,
-    .admin-sidebar-nav button,
+    .admin-sidebar-nav :is(button, a),
     .admin-sidebar-logout,
     .admin-sidebar-utility,
     .admin-sidebar-theme-row,
@@ -998,7 +998,7 @@
   .admin-dashboard-layout.authenticated-shell.admin-dashboard-layout-builder
     > .admin-sidebar.dashboard-sidebar:not(.is-workspace-collapsed)
     .admin-sidebar-nav
-    :is(.admin-sidebar-row, .notification-bell-button),
+    :is(.admin-sidebar-row, .notification-bell-button, .admin-sidebar-subnav > a),
   .admin-dashboard-layout.authenticated-shell.admin-dashboard-layout-builder
     > .admin-sidebar.dashboard-sidebar:not(.is-workspace-collapsed)
     .admin-sidebar-settings-group

@@ -8,7 +8,7 @@ import { getChangePasswordContent } from "../../content";
 
 const API_URL = import.meta.env.VITE_API_URL || "/api";
 
-export default function ChangePasswordPage({ lang = "en" }) {
+export default function ChangePasswordPage({ lang = "en", backPath = "/settings", backLabel }) {
   const navigate = useNavigate();
   const isArabic = lang === "ar";
   const t = getChangePasswordContent(lang);
@@ -150,10 +150,10 @@ export default function ChangePasswordPage({ lang = "en" }) {
         <button
           className="change-password-back"
           type="button"
-          onClick={() => navigate("/settings")}
+          onClick={() => navigate(backPath)}
         >
           <ArrowLeft size={18} />
-          {t.backToSettings}
+          {backLabel || t.backToSettings}
         </button>
 
         <header className="change-password-heading app-page-intro">
@@ -188,7 +188,7 @@ export default function ChangePasswordPage({ lang = "en" }) {
             <button
               className="change-password-cancel"
               type="button"
-              onClick={() => navigate("/settings")}
+              onClick={() => navigate(backPath)}
               disabled={isSubmitting}
             >
               {t.cancel}

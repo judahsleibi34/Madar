@@ -1,0 +1,15 @@
+.elearning-settings .elearning-description-textarea,
+.elearning-course-form .elearning-description-textarea,
+.elearning-field .elearning-description-textarea {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  min-height: 144px;
+  max-height: 320px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  resize: vertical;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

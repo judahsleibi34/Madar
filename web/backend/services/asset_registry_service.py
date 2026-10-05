@@ -11,7 +11,7 @@ from database import service_supabase
 from services.upload_config import assert_path_within_root
 from services.storage_quota_service import release_storage, sha256_file
 
-ASSET_URL_PATTERN = re.compile(r"^/uploads/(?P<key>tenant_(?P<tenant>[1-9][0-9]*)/builder_assets/[a-f0-9]{32}\.(?:png|jpg|webp|mp4|webm|pdf|doc|docx))$")
+ASSET_URL_PATTERN = re.compile(r"^/uploads/(?P<key>tenant_(?P<tenant>[1-9][0-9]*)/builder_assets/[a-f0-9]{32}\.(?:png|jpg|webp|mp4|webm|pdf|doc|docx|mp3|wav))$")
 
 
 def _now() -> datetime:
@@ -87,14 +87,17 @@ def nonproject_asset_reference_count(
         return 0
     database_client = client or service_supabase
     url = f"/uploads/{storage_key}"
+    site_rows_cache = [settings_row] if settings_row is not None else None
+    academy_enabled_cache = None
     def site_count() -> int:
-        settings = [settings_row] if settings_row is not None else []
-        if settings_row is None:
-            settings = getattr(
+        nonlocal site_rows_cache
+        if site_rows_cache is None:
+            site_rows_cache = getattr(
                 database_client.table("website_settings")
                 .select("*")
                 .eq("tenant_id", int(tenant_id)).limit(1).execute(), "data", None,
             ) or []
+        settings = site_rows_cache
         if not settings or (public_only and not (settings[0].get("subdomain") or settings[0].get("standard_path_slug"))):
             return 0
         result = sum(settings[0].get(field) == url for field in ("logo_url", "loading_image_url"))
@@ -140,7 +143,93 @@ def nonproject_asset_reference_count(
             parent_query = parent_query.eq("status", "active")
         return int(bool(getattr(parent_query.limit(1).execute(), "data", None)))
 
+    def academy_public_enabled() -> bool:
+        nonlocal academy_enabled_cache
+        if academy_enabled_cache is not None:
+            return academy_enabled_cache
+        if site_rows_cache is None:
+            site_count()
+        website = site_rows_cache[0] if site_rows_cache else {}
+        if not website.get("subdomain") or not url.endswith((".png", ".jpg", ".webp")):
+            academy_enabled_cache = False
+            return False
+        cfg_rows = getattr(database_client.table("elearning_settings").select("settings")
+                           .eq("tenant_id", int(tenant_id)).limit(1).execute(), "data", None) or []
+        cfg = cfg_rows[0].get("settings", {}) if cfg_rows else {}
+        academy_enabled_cache = cfg.get("enabled") is True and cfg.get("academy_enabled") is True
+        return academy_enabled_cache
+
+    def elearning_count() -> int:
+        # Only Academy presentation images become public, never lesson media.
+        # Missing bridge tables preserve the previous private rules.
+        try:
+            if public_only and not academy_public_enabled():
+                return 0
+            rows = getattr(database_client.table("elearning_settings")
+                .select("settings").eq("tenant_id", int(tenant_id))
+                .limit(1).execute(), "data", None) or []
+        except Exception as error:
+            if getattr(error, "code", None) not in {"PGRST205", "42P01"}:
+                raise
+            return 0
+        cfg = rows[0].get("settings", {}) if rows else {}
+        count = sum(cfg.get(field) == url for field in ("logo_url", "academy_hero_image"))
+        if public_only and not count and site_rows_cache and site_rows_cache[0].get("academy_project_id"):
+            from services.academy_builder_service import validate_academy_schema
+            projects = getattr(database_client.table("builder_projects").select("published_schema,status")
+                .eq("tenant_id", int(tenant_id)).eq("id", site_rows_cache[0]["academy_project_id"])
+                .eq("usage_profile", "academy").eq("status", "published").limit(1).execute(), "data", None) or []
+            if projects and projects[0].get("published_schema"):
+                schema = validate_academy_schema(projects[0]["published_schema"])
+                count += int(storage_key in extract_builder_asset_references(schema, tenant_id=tenant_id))
+        return count
+
+    def elearning_course_count() -> int:
+        try:
+            if public_only and not academy_public_enabled():
+                return 0
+            query = database_client.table("elearning_courses").select("id")                .eq("tenant_id", int(tenant_id)).eq("cover_asset", url)
+            if public_only:
+                query = query.eq("status", "published").eq("catalog_visible", True).in_("access_type", ["free", "paid"])
+            rows = getattr(query.limit(1).execute(), "data", None) or []
+        except Exception as error:
+            if getattr(error, "code", None) not in {"PGRST205", "42P01"}:
+                raise
+            return 0
+        return int(bool(rows))
+
+    def elearning_content_count() -> int:
+        if public_only:
+            return 0
+        try:
+            assets = getattr(database_client.table("builder_assets").select("id")
+                .eq("tenant_id", int(tenant_id)).eq("storage_key", storage_key)
+                .limit(1).execute(), "data", None) or []
+            if not assets:
+                return 0
+            rows = getattr(database_client.table("elearning_content_blocks").select("id")
+                .eq("tenant_id", int(tenant_id)).eq("media_id", assets[0]["id"])
+                .limit(1).execute(), "data", None) or []
+        except Exception as error:
+            if getattr(error, "code", None) not in {"PGRST205", "42P01"}:
+                raise
+            return 0
+        if rows:
+            return 1
+        try:
+            refs = getattr(database_client.table("elearning_assessment_media_refs").select("id")
+                .eq("tenant_id", int(tenant_id)).eq("media_id", assets[0]["id"])
+                .limit(1).execute(), "data", None) or []
+        except Exception as error:
+            if getattr(error, "code", None) not in {"PGRST205", "42P01"}:
+                raise
+            return 0
+        return int(bool(refs))
+
     lookups = {
+        "elearning_content": elearning_content_count,
+        "elearning": elearning_count,
+        "elearning_course": elearning_course_count,
         "site": site_count,
         "category": lambda: taxonomy_count("ecommerce_categories"),
         "brand": lambda: taxonomy_count("ecommerce_brands"),
@@ -153,7 +242,10 @@ def nonproject_asset_reference_count(
         "ecommerce_brand": "brand",
         "ecommerce_product": "product",
     }.get(usage_hint) if public_only else None
-    order = ([preferred] if preferred else []) + [name for name in lookups if name != preferred]
+    lookup_order = list(lookups)
+    if public_only:
+        lookup_order = ["site", "category", "brand", "product", "variant", "elearning", "elearning_course", "elearning_content"]
+    order = ([preferred] if preferred else []) + [name for name in lookup_order if name != preferred]
     count = 0
     for name in order:
         count += lookups[name]()

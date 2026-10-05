@@ -21,6 +21,8 @@ vi.mock("../components/EcommerceStore/EcommerceStorefront", () => ({
   default: () => <div>External ecommerce storefront</div>,
 }));
 
+vi.mock("../components/ELearning/ELearningAcademy", () => ({ default: ({ subdomain }) => <div>Academy:{subdomain}</div>, HostedAcademyLearning: ({ subdomain }) => <div>Learning:{subdomain}</div> }));
+
 function LocationProbe() {
   const location = useLocation();
   return <output aria-label="current location">{`${location.pathname}${location.search}`}</output>;
@@ -64,4 +66,14 @@ describe("TenantSiteRoutes storefront connection", () => {
       expect(screen.getByLabelText("current location").textContent).toBe(path);
     }
   );
+});
+
+
+it("mounts the fixed Academy and learner runtime on the existing tenant host", async () => {
+  const view = render(<MemoryRouter initialEntries={["/academy/courses"]}><TenantSiteRoutes /></MemoryRouter>);
+  expect(await screen.findByText("Academy:madar-demo")).toBeTruthy();
+  view.unmount();
+  render(<MemoryRouter initialEntries={["/my-learning/courses/course/lessons/lesson"]}><TenantSiteRoutes /></MemoryRouter>);
+  expect(await screen.findByText("Learning:madar-demo")).toBeTruthy();
+  expect(screen.queryByText("Builder website runtime:madar-demo")).toBeNull();
 });

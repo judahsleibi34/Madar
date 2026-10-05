@@ -199,20 +199,23 @@ const normalizeBuilderElementShape = (element, path = "element") => {
     });
   }
   normalized.action = normalizeElementAction(element.action);
-  normalized.richTextColors = compactRichTextRanges(element.richTextColors);
-  normalized.richTextSizes = compactRichTextRanges(element.richTextSizes);
-  normalized.richTextStyles = compactRichTextRanges(element.richTextStyles);
-  for (const collectionName of ["richTextSizes", "richTextStyles"]) {
-    normalized[collectionName] = normalized[collectionName].map((range) => {
-      if (!Object.hasOwn(range, "fontSize")) return range;
-      const parsed = parseBuilderTextFontSize(range.fontSize);
-      if (parsed === null) {
-        const safeRange = { ...range };
-        delete safeRange.fontSize;
-        return safeRange;
-      }
-      return { ...range, fontSize: `${parsed}px` };
-    });
+  // Data widgets configure their presentation in academy; rich-text fields are not part of their server contract.
+  if (!normalized.type.startsWith("academy")) {
+    normalized.richTextColors = compactRichTextRanges(element.richTextColors);
+    normalized.richTextSizes = compactRichTextRanges(element.richTextSizes);
+    normalized.richTextStyles = compactRichTextRanges(element.richTextStyles);
+    for (const collectionName of ["richTextSizes", "richTextStyles"]) {
+      normalized[collectionName] = normalized[collectionName].map((range) => {
+        if (!Object.hasOwn(range, "fontSize")) return range;
+        const parsed = parseBuilderTextFontSize(range.fontSize);
+        if (parsed === null) {
+          const safeRange = { ...range };
+          delete safeRange.fontSize;
+          return safeRange;
+        }
+        return { ...range, fontSize: `${parsed}px` };
+      });
+    }
   }
   if (Array.isArray(normalized.textBlockFormats) && normalized.textBlockFormats.length) {
     let repairedContent = String(normalized.content || "");
@@ -515,6 +518,32 @@ export const getBuilderProjectName = (project) =>
 export const getBuilderProjectSlug = (project, record) =>
   normalizeProjectSlug(record?.slug || project?.slug || project?.siteChrome?.subdomain || project?.siteChrome?.brandName || project?.name);
 
+const prepareAcademyEditorCanvas = (project, record) => {
+  if (record?.usage_profile !== "academy" || !project) return project;
+  // The original Academy seed used rows. Hydrate it through the same placement
+  // engine as the website Builder, retaining IDs and source section names.
+  // This is an in-memory editor model; only an explicit edit/Save persists it.
+  return {
+    ...project,
+    directLayoutVersion: 4,
+    pages: project.pages.map(page => {
+      if (page.canvasLayoutVersion === 1 && page.sections.length === 1 && page.sections[0].isPageCanvas) return page;
+      const canvas = mergeSectionsIntoPageCanvas(page, page.sections.map(section => convertSectionToDirectLayout(section)));
+      return { ...canvas, sections: canvas.sections.map(section => ({
+        ...section,
+        // Data widgets have a strict persisted contract. Source labels are
+        // editor provenance and must not expand that public data contract.
+        freeElements: section.freeElements.map(element => {
+          if (!element.type.startsWith("academy")) return element;
+          const persistable = { ...element };
+          delete persistable.sourceSectionName;
+          return persistable;
+        }),
+      })) };
+    }),
+  };
+};
+
 export const getDraftProjectFromRecord = (record) => {
   if (!record?.draft_schema || typeof record.draft_schema !== "object" || Array.isArray(record.draft_schema)) {
     return null;
@@ -524,7 +553,7 @@ export const getDraftProjectFromRecord = (record) => {
     ...stripEditorOnlyState(record.draft_schema),
     ...(record.status ? { status: record.status } : {}),
   });
-  return withLocalProjectEditorDefaults(project);
+  return withLocalProjectEditorDefaults(prepareAcademyEditorCanvas(project, record));
 };
 
 export const getDraftProjectFromRecordWithRepairs = (record) => {
@@ -538,7 +567,7 @@ export const getDraftProjectFromRecordWithRepairs = (record) => {
   });
   return {
     ...result,
-    project: result.project ? withLocalProjectEditorDefaults(result.project) : null,
+    project: result.project ? withLocalProjectEditorDefaults(prepareAcademyEditorCanvas(result.project, record)) : null,
   };
 };
 

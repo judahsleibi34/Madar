@@ -11,7 +11,7 @@ from urllib.parse import urlparse
 from fastapi import Request, Response
 from starlette.responses import JSONResponse
 
-from services.hosted_address_service import hosted_tenant_from_hostname
+from services.hosted_address_service import hosted_tenant_from_hostname, request_hosted_tenant
 
 SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
 AUTH_COOKIE_NAMES = {"madar_access_token", "madar_refresh_token"}
@@ -33,6 +33,7 @@ CSRF_EXEMPT_PATHS = {
 CSRF_EXEMPT_PATTERNS = (
     re.compile(r"^/public/sites/[^/]+/forms/[^/]+/submissions$"),
     re.compile(r"^/public/sites/[^/]+/auth/(?:register|login|logout)$"),
+    re.compile(r"^/public/academies/[^/]+/auth/(?:register|login)$"),
     re.compile(r"^/public/sites/[^/]+/events$"),
     re.compile(r"^/public/reservations/[0-9a-fA-F-]+/cancel$"),
 )
@@ -269,9 +270,9 @@ def origin_from_request(request: Request) -> str | None:
 
 
 def tenant_public_origin_matches_request(request: Request, request_origin: str | None) -> bool:
-    if not request_origin or not request.url.path.startswith("/public/sites/"):
+    if not request_origin:
         return False
-    match = re.match(r"^/public/sites/([^/]+)(?:/|$)", request.url.path)
+    match = re.match(r"^/public/(?:sites|academies)/([^/]+)(?:/|$)", request.url.path)
     if not match:
         return False
     parsed = urlparse(request_origin)
@@ -303,6 +304,16 @@ def validate_cookie_write_origin(request: Request, allowed_origins: set[str]) ->
 
     if tenant_public_origin_matches_request(request, request_origin):
         return None
+
+    # Tenant-hosted learner pages use the same-origin API proxy. Trust only the
+    # tenant identity carried by the verified Host, never arbitrary Origin labels.
+    if request_origin:
+        parsed = urlparse(request_origin)
+        origin_tenant = hosted_tenant_from_hostname(parsed.hostname)
+        canonical_origin = f"https://{parsed.hostname}" if parsed.hostname else ""
+        if request_origin in {canonical_origin, canonical_origin + ":443"} and parsed.scheme == "https" and not parsed.username and not parsed.password and origin_tenant:
+            if origin_tenant == request_hosted_tenant(request):
+                return None
 
     return JSONResponse(
         status_code=403,

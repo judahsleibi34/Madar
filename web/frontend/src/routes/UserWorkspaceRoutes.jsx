@@ -2,6 +2,7 @@ import { lazy } from "react";
 import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 
 import RouteSuspense from "../components/common/RouteSuspense";
+import { ELearningRouteSkeleton } from "../components/ELearning/ELearningSkeleton";
 import EcommerceRouteSkeleton from "../components/DashboardBuilder/EcommerceRouteSkeleton";
 import { getBuilderProjectIdFromPath } from "../components/PageBuilder/core/PageBuilder.workspaceRouting";
 import { appShellContent } from "../content";
@@ -9,6 +10,8 @@ import { DASHBOARD_ROUTES } from "../config/routes";
 import { DashboardLoadingElement, DashboardShell, RestrictedAccessWindow } from "./shared";
 
 const ChangePasswordPage = lazy(() => import("../components/DashboardBuilder/ChangePasswordPage"));
+const ELearningPlayer = lazy(() => import("../components/ELearning/ELearningPlayer"));
+const ELearningWorkspace = lazy(() => import("../components/ELearning/ELearningWorkspace"));
 const SettingsPage = lazy(() => import("../components/DashboardBuilder/SettingsPage"));
 const UserDashboard = lazy(() => import("../components/DashboardBuilder/UserDashboard"));
 const MyPlanPage = lazy(() => import("../components/DashboardBuilder/MyPlanPage"));
@@ -42,6 +45,7 @@ const BuilderFormPreviewPage = lazy(() =>
 const TenantSiteRuntime = lazy(() =>
   import("../components/PageBuilder/runtime/TenantSiteRuntime")
 );
+const AcademyLandingPageEntry = lazy(() => import("../components/ELearning/AcademyLandingPageEntry"));
 const PageBuilder = lazy(() => import("../components/PageBuilder"));
 const BuilderProjectChooser = lazy(() =>
   import("../components/PageBuilder/workspace/BuilderProjectChooser")
@@ -56,6 +60,7 @@ function BuilderWorkspaceEntry({ workspace = "page-builder", ...pageBuilderProps
         workspace={workspace}
         autoEnterProject={workspace === "page-builder"}
         autoOpenSingleProject
+        usageProfile="website"
       />
     );
   }
@@ -80,6 +85,7 @@ export default function UserWorkspaceRoutes({
     location.pathname.startsWith("/calendar") ||
     location.pathname.startsWith("/agenda") ||
     location.pathname.startsWith("/archive");
+  const isELearningLoadingPath = (location.pathname.startsWith("/e-learning") || location.pathname.startsWith("/my-learning"));
   const isEcommerceLoadingPath = location.pathname.startsWith("/ecommerce");
 
   const renderShell = (children, options = {}) => (
@@ -119,15 +125,25 @@ export default function UserWorkspaceRoutes({
                 lang: location.pathname.startsWith("/page-builder") ? "en" : lang,
               }
             )
+          : location.pathname.startsWith("/my-learning")
+            ? <ELearningRouteSkeleton pathname={location.pathname} lang={lang} label={lang === "ar" ? "جارٍ التحميل" : "Loading E-learning"} />
+          : isELearningLoadingPath
+            ? renderShell(<ELearningRouteSkeleton pathname={location.pathname} lang={lang} label={lang === "ar" ? "جارٍ التحميل" : "Loading E-learning"} />)
           : isEcommerceLoadingPath
             ? renderShell(<EcommerceRouteSkeleton pathname={location.pathname} lang={lang} label={lang === "ar" ? "\u062c\u0627\u0631\u064d \u0627\u0644\u062a\u062d\u0645\u064a\u0644" : "Loading Online Store"} />)
             : renderShell(<DashboardLoadingElement pathname={location.pathname} lang={lang} />)
       }
       lang={lang}
       variant={isBuilderLoadingPath ? "builder" : "dashboard"}
-      delay={isEcommerceLoadingPath ? 0 : undefined}
+      delay={isEcommerceLoadingPath || isELearningLoadingPath ? 0 : undefined}
     >
       <Routes key={`${user?.tenant_id || "unknown"}:${user?.id || "anonymous"}`}>
+        <Route path="/e-learning/landing-page/projects/:projectId/*" element={renderShell(
+          <AcademyLandingPageEntry user={user} templateLang={lang} appThemeMode={themeMode} onAppThemeModeChange={shellProps.onThemeModeChange} />,
+          { isPageBuilderShell: true, lang: "en" }
+        )} />
+        <Route path="/my-learning/*" element={<ELearningPlayer key={`${user?.tenant_id}:${user?.id}`} />} />
+        <Route path="/e-learning/*" element={renderShell(<ELearningWorkspace key={`${user?.tenant_id}:${user?.id}`} user={user} />)} />
       <Route
         path="/dashboard/*"
         element={renderShell(

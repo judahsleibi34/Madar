@@ -32,6 +32,7 @@ export default function BuilderProjectChooser({
   workspace = "page-builder",
   autoEnterProject = false,
   autoOpenSingleProject = false,
+  usageProfile,
 }) {
   const navigate = useNavigate();
   const automaticEntryStartedRef = useRef(false);
@@ -42,7 +43,7 @@ export default function BuilderProjectChooser({
 
   useEffect(() => {
     let cancelled = false;
-    listBuilderProjects({ limit: 20, offset: 0 })
+    listBuilderProjects({ limit: 20, offset: 0, ...(usageProfile ? { usageProfile } : {}) })
       .then(({ projects: records, pagination: nextPagination }) => {
         if (cancelled) return;
         if (autoEnterProject) {
@@ -80,7 +81,7 @@ export default function BuilderProjectChooser({
         setStatus("error");
       });
     return () => { cancelled = true; };
-  }, [autoEnterProject, autoOpenSingleProject, navigate, workspace]);
+  }, [autoEnterProject, autoOpenSingleProject, navigate, usageProfile, workspace]);
 
   const loadMoreProjects = async () => {
     if (status === "loading-more" || !pagination.has_more) return;
@@ -91,6 +92,7 @@ export default function BuilderProjectChooser({
       const result = await listBuilderProjects({
         limit: pagination.limit,
         offset: nextOffset,
+        ...(usageProfile ? { usageProfile } : {}),
       });
       setProjects((current) => {
         const byId = new Map(current.map((project) => [project.id, project]));

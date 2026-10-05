@@ -30,6 +30,8 @@ const PrivacyAndTermsPage = ({ lang }) => (
   </>
 );
 
+const CredentialVerification = lazy(() => import("../components/ELearning/CredentialVerification"));
+
 const LoginPage = lazy(() => import("../components/AuthPages/LoginPage"));
 const SignUpPage = lazy(() => import("../components/AuthPages/SignUpPage"));
 const ForgotPasswordPage = lazy(() => import("../components/AuthPages/ForgotPasswordPage"));
@@ -90,6 +92,7 @@ export default function PublicRoutes({
       variant={skeletonVariant}
     >
       <Routes>
+        <Route path="verify/credential/:token" element={<CredentialVerification />} />
         <Route
           element={
             <MainLayout

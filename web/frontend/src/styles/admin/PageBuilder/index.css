@@ -11,3 +11,15 @@
 @import "./data-analysis/visualization.css";
 @import "./theme-consistency.css";
 @import "./button-colors.css";
+
+.page-builder .academy-section.academy-builder-empty {
+  margin: 0;
+  padding: 1rem;
+  border: 1px dashed var(--madar-border);
+  border-radius: 12px;
+  background: var(--madar-surface);
+  color: var(--madar-text);
+}
+
+.page-builder .academy-builder-empty h2 { margin: 0 0 0.5rem; }
+.page-builder .academy-builder-empty p { margin: 0; line-height: 1.5; }

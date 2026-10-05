@@ -1,0 +1,30 @@
+.elearning-player-progress { margin-block: 1rem 1.5rem; }
+.elearning-player-progress > div { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .5rem; }
+.elearning-player-progress progress { width: 100%; height: .7rem; accent-color: var(--color-primary); }
+.elearning-player-layout { display: grid; gap: 1.5rem; align-items: start; }
+.elearning-player-layout.has-lesson { grid-template-columns: minmax(220px, 1fr) minmax(0, 3fr); }
+.elearning-player-outline { padding: 1.25rem; min-width: 0; }
+.elearning-player-outline h3 { display: flex; flex-wrap: wrap; gap: .5rem; justify-content: space-between; }
+.elearning-player-outline ol { list-style: none; padding: 0; display: grid; gap: .75rem; }
+.elearning-player-outline li { display: flex; align-items: start; gap: .5rem; overflow-wrap: anywhere; }
+.elearning-player-outline li svg { flex-shrink: 0; }
+.elearning-player-outline a[aria-current="page"] { font-weight: 700; }
+.elearning-player-label { font-size: .8rem; }
+.elearning-player-reading { min-width: 0; }
+.elearning-player-blocks { padding: 1.5rem; border-radius: 1rem; background: var(--color-surface); line-height: 1.8; }
+.elearning-player-lesson-actions { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 1rem; padding: 1rem; margin-block-start: 1.5rem; }
+@media (max-width: 850px) { .elearning-player-layout.has-lesson { grid-template-columns: 1fr; } .elearning-player-blocks { padding: 1rem; } }
+
+.elearning-outline-toggle { display: none; }
+@media (max-width: 850px) {
+ .elearning-outline-toggle { display: inline-flex; margin-block-end: 1rem; }
+ .elearning-player-layout.has-lesson .elearning-player-outline { display: none; }
+ .elearning-player-layout.has-lesson .elearning-player-outline.is-open { display: block; max-height: 65dvh; overflow-y: auto; }
+}
+.elearning-outline-backdrop, .elearning-outline-close { display: none; }
+@media (max-width: 850px) {
+ .elearning-player-layout .elearning-player-outline { display: none; }
+ .elearning-player-layout .elearning-player-outline.is-open { display: block; position: fixed; inset-block: 0; inset-inline-start: 0; width: min(320px, 90vw); max-height: 100dvh; overflow-y: auto; z-index: 61; margin: 0; }
+ .elearning-outline-close { display: inline-flex; }
+ .elearning-outline-backdrop { display: block; position: fixed; inset: 0; z-index: 60; border: 0; background: var(--color-overlay, rgba(0, 0, 0, .35)); }
+}

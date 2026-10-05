@@ -1,0 +1,85 @@
+{
+  "release_sha": "CURRENT",
+  "migrations": [
+    {
+      "number": 115,
+      "path": "web/database/migrations/115_reconcile_commercial_access.sql",
+      "sha256": "e40bfdd49294438e11698934fcc37ba0dcb0a534a51890c26702b13763883f34",
+      "from_schema": 114,
+      "to_schema": 115,
+      "compatibility": "forward-compatible"
+    },
+    {
+      "number": 116,
+      "path": "web/database/migrations/116_create_elearning_settings.sql",
+      "sha256": "bf9e9c0fad74140701ab47e6a6c5b36241f3516ca4be8abba25e3de3eb1d4d53",
+      "from_schema": 115,
+      "to_schema": 116,
+      "compatibility": "expand-only"
+    },
+    {
+      "number": 117,
+      "path": "web/database/migrations/117_create_elearning_courses.sql",
+      "sha256": "3058dcf972460ae9de8b4c149a39d41979198d129263a0ce917fd00df2918c38",
+      "from_schema": 116,
+      "to_schema": 117,
+      "compatibility": "expand-only"
+    },
+    {
+      "number": 118,
+      "path": "web/database/migrations/118_create_elearning_groups_and_instructors.sql",
+      "sha256": "3befce4964496ddd7991e445d0b65559cf7b7c7ea948ee94b31d0052a8fda30d",
+      "from_schema": 117,
+      "to_schema": 118,
+      "compatibility": "expand-only"
+    },
+    {
+      "number": 119,
+      "path": "web/database/migrations/119_create_elearning_structure.sql",
+      "sha256": "c78afefebc58df2a0f36774766b3b53fd427dc2aebf28ac5f9b94c28c9b61995",
+      "from_schema": 118,
+      "to_schema": 119,
+      "compatibility": "expand-only"
+    },
+    {
+      "number": 120,
+      "path": "web/database/migrations/120_create_elearning_participation.sql",
+      "sha256": "ea4bc8c3e4b7c72e2e8fc63059512f8a5232287e6a680b7d5c041555a472dbe6",
+      "from_schema": 119,
+      "to_schema": 120,
+      "compatibility": "expand-only"
+    },
+    {
+      "number": 121,
+      "path": "web/database/migrations/121_add_elearning_course_deletion.sql",
+      "sha256": "b64b80b835ca83d7230d433d7873daaee51747799b358cb2ca7aa375c31a5cce",
+      "from_schema": 120,
+      "to_schema": 121,
+      "compatibility": "expand-only"
+    },
+    {
+      "number": 122,
+      "path": "web/database/migrations/122_manage_elearning_enrollments.sql",
+      "sha256": "4e52b529c33351c6faace0f3f1fad78987839fb7dff6230086dc7c81367052b8",
+      "from_schema": 121,
+      "to_schema": 122,
+      "compatibility": "expand-only"
+    },
+    {
+      "number": 123,
+      "from_schema": 122,
+      "to_schema": 123,
+      "compatibility": "expand-only",
+      "path": "web/database/migrations/123_create_elearning_content_blocks.sql",
+      "sha256": "9e6979f19a6dd716d701b216066fb0fecb4290442493d3db6e4e2b1845ff6cb9"
+    },
+    {
+      "number": 124,
+      "path": "web/database/migrations/124_add_elearning_learner_player.sql",
+      "sha256": "c4d40aa2203318d5364276b61d8747fc2008ef34691ef5658f60a105934d405f",
+      "from_schema": 123,
+      "to_schema": 124,
+      "compatibility": "expand-only"
+    }
+  ]
+}

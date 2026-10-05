@@ -18,11 +18,11 @@ export const getBuilderWorkspacePath = (projectId, tabId = "design", workspace =
   `${getBuilderProjectBasePath(projectId, workspace)}/${workspaceSegments[tabId] || workspaceSegments.design}`;
 
 export const getBuilderProjectIdFromPath = (pathname = "") => {
-  const match = String(pathname).match(/^\/(?:page-builder|builder-responses|builder-data)\/projects\/([^/?#]+)/);
+  const match = String(pathname).match(/^\/(?:e-learning\/landing-page|page-builder|builder-responses|builder-data)\/projects\/([^/?#]+)/);
   return match ? decodeURIComponent(match[1]) : "";
 };
 
 export const getBuilderWorkspaceFromPath = (pathname = "") => {
-  const match = String(pathname).match(/^\/(page-builder|builder-responses|builder-data)(?:[/?#]|$)/);
+  const match = String(pathname).match(/^\/(e-learning\/landing-page|page-builder|builder-responses|builder-data)(?:[/?#]|$)/);
   return match?.[1] || "page-builder";
 };

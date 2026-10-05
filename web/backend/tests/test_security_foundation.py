@@ -104,6 +104,14 @@ class SecurityFoundationTests(unittest.TestCase):
         def public_tenant_auth(action: str):
             return {"ok": True}
 
+        @app.post("/public/academies/example/auth/{action}")
+        def public_academy_auth(action: str):
+            return {"ok": True}
+
+        @app.post("/public/academies/management/landing")
+        def academy_management():
+            return {"ok": True}
+
         @app.post("/public/sites/example/events")
         def public_site_event():
             return {"ok": True}
@@ -328,6 +336,8 @@ class SecurityFoundationTests(unittest.TestCase):
             "/public/sites/example/auth/register",
             "/public/sites/example/auth/login",
             "/public/sites/example/auth/logout",
+            "/public/academies/example/auth/register",
+            "/public/academies/example/auth/login",
             "/public/sites/example/events",
             "/public/reservations/33333333-3333-4333-8333-333333333333/cancel",
             "/auth/email-verification/resend",
@@ -358,6 +368,22 @@ class SecurityFoundationTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 403)
         self.assertEqual(response.json()["detail"], "Invalid CSRF token")
+
+    def test_academy_management_requires_csrf_even_with_authentication(self):
+        client = self.build_origin_client()
+        response = client.post("/public/academies/management/landing", headers={"Origin":"https://app.example.com"}, cookies={"madar_access_token":"access-token"})
+        self.assertEqual(response.status_code,403)
+        self.assertEqual(response.json()["detail"],"Invalid CSRF token")
+
+    def test_hosted_learner_origin_requires_same_verified_tenant_host(self):
+        from services.request_security import tenant_public_origin_matches_request
+        for path in ["/public/academies/example/auth/login", "/public/sites/example/auth/login"]:
+            request = Request({"type":"http", "method":"POST", "path":path, "headers":[(b"host",b"api.example.com")]})
+            self.assertTrue(tenant_public_origin_matches_request(request,"https://example.madarportal.com"))
+            self.assertFalse(tenant_public_origin_matches_request(request,"https://foreign.madarportal.com"))
+        for host,origin,allowed in [("example.madarportal.com","https://example.madarportal.com",True),("example.madarportal.com","https://foreign.madarportal.com",False),("api.example.com","https://example.madarportal.com",False),("example.madarportal.com","http://example.madarportal.com",False),("example.madarportal.com","https://example.madarportal.com:444",False)]:
+            request = Request({"type":"http","method":"POST","path":"/protected-write","headers":[(b"host",host.encode()),(b"origin",origin.encode()),(b"cookie",b"madar_access_token=access-token")]})
+            self.assertEqual(validate_cookie_write_origin(request,set()) is None,allowed)
 
     def test_auth_cookies_issue_csrf_token(self):
         client = self.build_origin_client()

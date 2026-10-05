@@ -4805,6 +4805,10 @@ body.theme-dark .runtime-language-switch button:hover:not(.active),
   align-items: start;
 }
 
+.publish-console-academy > .publish-link-panel {
+  grid-column: 1 / -1;
+}
+
 .publish-status-panel {
   grid-column: 1 / -1;
 }
@@ -5432,15 +5436,20 @@ body.theme-dark .publish-empty-note,
 
 .publish-workspace .publish-link-card-body {
   grid-template-columns: minmax(0, 1fr) minmax(168px, 188px);
-  align-items: center;
-  gap: 20px;
-  min-height: 230px;
-  padding: 20px;
+  align-items: start;
+  gap: 24px;
+  min-height: 0;
+  padding: 24px;
 }
 
 .publish-workspace .publish-link-main {
-  align-content: center;
-  gap: 14px;
+  align-content: start;
+  gap: 18px;
+}
+
+.publish-workspace .publish-form-meta .publish-card-note {
+  margin: 0;
+  line-height: 1.5;
 }
 
 .publish-workspace .publish-link-main > .publish-card-note {
