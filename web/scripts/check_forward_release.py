@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate the production schema-114 to schema-115 forward release."""
+"""Validate the production schema-114 to schema-116 forward release."""
 
 from __future__ import annotations
 
@@ -13,8 +13,8 @@ ROOT = Path(__file__).resolve().parents[2]
 BASELINE = "1e6b739a43759309a45ede2dff28a859209e4a64"
 
 SOURCE_SCHEMA = 114
-TARGET_SCHEMA = 115
-MANIFEST_NAME = "migrations-115.json"
+TARGET_SCHEMA = 116
+MANIFEST_NAME = "migrations-115-116.json"
 
 # Migrations 100-114 have already been applied to production and are no
 # longer part of the active 114 -> 115 execution manifest. Keep them
@@ -84,6 +84,7 @@ APPLIED_PRODUCTION_MIGRATIONS = {
 }
 
 EXPECTED = {
+    116: ("116_reconcile_ecommerce_product_saves.sql", "forward-compatible"),
     115: (
         "115_reconcile_commercial_access.sql",
         "forward-compatible",
@@ -181,7 +182,7 @@ def validate(root: Path = ROOT) -> list[str]:
             and release["migration_manifest"] == MANIFEST_NAME
         ):
             errors.append(
-                "release must bridge production schema 114 to 115 "
+                "release must bridge production schema 114 to 116 "
                 "with rollback bounded at schema 114"
             )
 
@@ -201,9 +202,9 @@ def validate(root: Path = ROOT) -> list[str]:
 
         entries = manifest["migrations"]
 
-        if [int(entry["number"]) for entry in entries] != [115]:
+        if [int(entry["number"]) for entry in entries] != [115, 116]:
             errors.append(
-                "forward manifest must contain migration 115"
+                "forward manifest must contain migrations 115 and 116"
             )
 
         previous = SOURCE_SCHEMA

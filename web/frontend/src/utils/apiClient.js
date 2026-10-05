@@ -92,6 +92,10 @@ export const readApiErrorCode = (data) => {
     return data.code;
   }
 
+  if (Array.isArray(data?.detail)) {
+    const issue = data.detail.find(item => ["OPTION_NAME_CONFLICT", "OPTION_VALUE_CONFLICT"].includes(item?.type));
+    if (issue) return issue.type;
+  }
   if (typeof data?.detail?.code === "string" && data.detail.code.trim()) {
     return data.detail.code;
   }

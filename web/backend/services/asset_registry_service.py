@@ -140,12 +140,22 @@ def nonproject_asset_reference_count(
             parent_query = parent_query.eq("status", "active")
         return int(bool(getattr(parent_query.limit(1).execute(), "data", None)))
 
+    def history_count() -> int:
+        if public_only:
+            return 0  # Historical order media must never grant public visibility.
+        for snapshot in ("product_snapshot", "variant_snapshot"):
+            result = database_client.table("ecommerce_order_items").select("id").eq("tenant_id", int(tenant_id)).filter(snapshot + "->images", "cs", json.dumps([url])).limit(1).execute()
+            if getattr(result, "data", None):
+                return 1
+        return 0
+
     lookups = {
         "site": site_count,
         "category": lambda: taxonomy_count("ecommerce_categories"),
         "brand": lambda: taxonomy_count("ecommerce_brands"),
         "product": product_count,
         "variant": variant_count,
+        "history": history_count,
     }
     preferred = {
         "ecommerce_landing_slide": "site",
