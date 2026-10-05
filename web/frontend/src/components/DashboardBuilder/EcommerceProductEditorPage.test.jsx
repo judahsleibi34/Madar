@@ -357,7 +357,7 @@ describe("EcommerceProductEditor variant inventory", () => {
     expect(payload.variants[0]).toMatchObject({ id: variantId, sku: "SHIRT-L-BLACK", inventory_quantity: 7, option_value_ids: [large, black] });
   });
 
-  it("expands legacy combined sizes while preserving colors and total inventory", async () => {
+  it("explicitly converts legacy combined sizes while preserving colors and total inventory", async () => {
     const sizeOption = "11111111-1111-4111-8111-111111111111";
     const colorOption = "22222222-2222-4222-8222-222222222222";
     const sm = "33333333-3333-4333-8333-333333333333";
@@ -384,6 +384,11 @@ describe("EcommerceProductEditor variant inventory", () => {
     fetchEcommerceCatalog.mockResolvedValue(catalog([product]));
     renderEditor({ initialCatalog: catalog([product]), productId: "product-1" });
 
+    expect(await screen.findByDisplayValue("S/M")).toBeTruthy();
+    expect(screen.getByDisplayValue("L/XL")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", {name:/S\/M: Split/}));
+    await screen.findByDisplayValue("S");
+    fireEvent.click(screen.getByRole("button", {name:/L\/XL: Split/}));
     for (const size of ["S", "M", "L", "XL"]) expect(await screen.findByDisplayValue(size)).toBeTruthy();
     expect(screen.queryByDisplayValue("S/M")).toBeNull();
     expect(screen.queryByDisplayValue("L/XL")).toBeNull();

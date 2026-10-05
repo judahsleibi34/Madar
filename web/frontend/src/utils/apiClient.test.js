@@ -389,3 +389,8 @@ describe("expired-session mutation recovery", () => {
     expect(fetchCall(2)[1].headers.get("X-CSRF-Token")).toBe("renewed");
   });
 });
+
+it("keeps specific option validation conflict codes",()=>{
+ const error=createApiError({status:422},{detail:[{type:"OPTION_VALUE_CONFLICT",loc:["body"],msg:"Duplicate value"}]});
+ expect(error.code).toBe("OPTION_VALUE_CONFLICT");
+});

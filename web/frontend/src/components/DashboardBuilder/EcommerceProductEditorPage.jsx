@@ -1,3 +1,4 @@
+import { hydrateVariantGroups, buildVariantInventoryPayload, combinedSizeNames, splitLegacySizeGroup, splitLegacyOptionValue, catalogSaveErrorMessage, editVariantColor, stableOrder } from "./utils/productVariantIdentity";
 import { getEcommerceCacheScope } from "./utils/ecommerceAdminCache";
 import { ProductEditorSkeleton } from "./CommerceLoadingLayouts";
 import { notifyCommerceAction } from "../../utils/commerceActionToast";
@@ -29,10 +30,6 @@ const emptyProduct = (currency = "USD") => ({
 
 const validHex = (value) => /^#[0-9a-f]{6}$/i.test(String(value || ""));
 const isCombinedSize = (value) => /[/,+&]|\s+(?:or|او)\s+/i.test(String(value || "").trim());
-const splitCombinedSize = (value) => String(value || "").trim()
-  .split(/\s*(?:[/,+&]|\s+(?:or|او)\s+)\s*/i)
-  .map((item) => item.trim())
-  .filter(Boolean);
 const emptyVariantColor = () => ({
   id: uuid(), valueId: uuid(), colorName: "", colorValue: "#111111", quantity: 0,
   sku: "", barcode: null, price_override: null, compare_at_price_override: null,
@@ -51,6 +48,7 @@ const variantInventoryIsFilled = (groups) => {
 };
 
 const productSaveErrorMessage = (error, t) => {
+  if (error?.code && error.code.endsWith("_CONFLICT")) return catalogSaveErrorMessage(error, t);
   const status = Number(error?.status || 0);
   if (status === 400) return t("admin.productErrorInvalidRequest");
   if (status === 401) return t("admin.productErrorSignedOut");
@@ -95,61 +93,6 @@ const productMediaUploadErrorMessage = (error, file, t) => {
   return t("commerce:errors.uploadMedia");
 };
 
-const hydrateVariantGroups = (product) => {
-  const options = product?.options || [];
-  const variants = (product?.variants || []).filter((variant) => variant.active !== false);
-  const colorOption = options.find((option) => String(option.code || "").toLocaleLowerCase() === "color")
-    || options.find((option) => String(option.name_translations?.en || "").trim().toLocaleLowerCase() === "color")
-    || options.find((option) => option.display_type === "color")
-    || options.find((option) => (option.values || []).some((value) => validHex(value.color_hex)));
-  const variantOption = options.find((option) => option.id !== colorOption?.id);
-  const valueById = new Map(options.flatMap((option) => (option.values || []).map((value) => [value.id, value])));
-  const groups = [];
-  const groupById = new Map();
-
-  for (const variant of variants) {
-    const selected = (variant.option_value_ids || []).map((id) => valueById.get(id)).filter(Boolean);
-    const variantValue = selected.find((value) => (variantOption?.values || []).some((candidate) => candidate.id === value.id));
-    const colorValue = selected.find((value) => (colorOption?.values || []).some((candidate) => candidate.id === value.id));
-    const fallbackName = selected.filter((value) => value.id !== colorValue?.id).map((value) => value.value_translations?.en || value.code).join(" / ");
-    const sourceName = variantValue?.value_translations?.en || fallbackName || "";
-    const splitNames = variantOption?.code === "size" && isCombinedSize(sourceName) ? splitCombinedSize(sourceName) : [sourceName];
-    const sourceQuantity = Number(variant.inventory_quantity || 0);
-    const baseQuantity = Math.floor(sourceQuantity / splitNames.length);
-    const remainder = sourceQuantity % splitNames.length;
-    splitNames.forEach((name, index) => {
-      const groupKey = splitNames.length > 1 ? `${variantValue?.id || variant.id}:${name.toLocaleLowerCase()}` : (variantValue?.id || variant.id);
-      let group = groupById.get(groupKey);
-      if (!group) {
-        group = { id: splitNames.length > 1 ? uuid() : (variantValue?.id || variant.id), name, colors: [] };
-        groups.push(group);
-        groupById.set(groupKey, group);
-      }
-      group.colors.push({
-        ...variant,
-        id: splitNames.length > 1 ? uuid() : variant.id,
-        sku: splitNames.length > 1 ? "" : variant.sku,
-        barcode: splitNames.length > 1 ? null : variant.barcode,
-        valueId: colorValue?.id || uuid(),
-        colorName: colorValue?.value_translations?.en || "",
-        colorValue: colorValue?.color_hex || "",
-        quantity: baseQuantity + (index < remainder ? 1 : 0),
-      });
-    });
-  }
-
-  return {
-    variantOptionId: variantOption?.id || uuid(),
-    colorOptionId: colorOption?.id || uuid(),
-    variantGroups: groups,
-    hadVariantInventory: Boolean(options.length || variants.length),
-    ...(variants.length ? {
-      track_inventory: variants.some((variant) => variant.track_inventory !== false),
-      low_stock_threshold: Number(variants[0].low_stock_threshold ?? product?.low_stock_threshold ?? 5),
-      allow_backorder: variants.some((variant) => Boolean(variant.allow_backorder)),
-    } : {}),
-  };
-};
 
 function Checkbox({ checked, onChange, children, ariaLabel }) {
   return <label className="ecommerce-editor-checkbox">
@@ -323,12 +266,7 @@ export function EcommerceProductEditor({ user, productId, embedded = false, init
       ? { ...group, colors: [...group.colors, emptyVariantColor()] }
       : group),
   }));
-  const changeVariantColor = (groupId, colorId, change) => setForm((current) => ({
-    ...current,
-    variantGroups: current.variantGroups.map((group) => group.id === groupId
-      ? { ...group, colors: group.colors.map((color) => color.id === colorId ? { ...color, ...change } : color) }
-      : group),
-  }));
+  const changeVariantColor = (groupId, colorId, change) => setForm(current => ({...current, variantGroups:editVariantColor(current.variantGroups,groupId,colorId,change)}));
   const removeVariantColor = (groupId, colorId) => setForm((current) => ({
     ...current,
     variantGroups: current.variantGroups.map((group) => group.id === groupId && group.colors.length > 1
@@ -337,9 +275,15 @@ export function EcommerceProductEditor({ user, productId, embedded = false, init
   }));
   const validateVariantInventory = () => {
     if (form.status === "active" && form.hadVariantInventory && !form.variantGroups.length) return t("admin.validationSellableVariant");
+    if (form.nativeVariantInventory) {
+      const variants = form.variants.filter(v => v.active !== false);
+      if (form.status === "active" && !variants.length) return t("admin.validationSellableVariant");
+      if (variants.some(v => !Number.isInteger(Number(v.inventory_quantity)) || Number(v.inventory_quantity)<0)) return t("admin.validationColorQuantity");
+      return "";
+    }
     const names = form.variantGroups.map((group) => group.name.trim().toLocaleLowerCase());
     if (names.some((name) => !name)) return t("admin.validationVariantName");
-    if (form.variantGroups.some((group) => isCombinedSize(group.name))) return t("admin.validationCombinedSize");
+    if (form.variantGroups.some((group) => isCombinedSize(group.name) && !(form.options || []).some(option => option.values.some(value => value.id===group.id && value.value_translations?.en===group.name)))) return t("admin.validationCombinedSize");
     if (new Set(names).size !== names.length) return t("admin.validationDuplicateVariantName");
     const globalColors = new Map();
     for (const group of form.variantGroups) {
@@ -440,75 +384,6 @@ export function EcommerceProductEditor({ user, productId, embedded = false, init
     }
   };
 
-  const buildVariantInventoryPayload = () => {
-    if (!form.variantGroups.length) return { options: [], variants: [] };
-    const colorValues = [];
-    const colorValueByName = new Map();
-    for (const group of form.variantGroups) {
-      for (const color of group.colors) {
-        const key = color.colorName.trim().toLocaleLowerCase();
-        if (!colorValueByName.has(key)) {
-          const value = {
-            id: color.valueId,
-            code: code(`color-${colorValues.length + 1}-${color.colorName}`, `color-${colorValues.length + 1}`),
-            value_translations: localized(color.colorName),
-            color_hex: color.colorValue.toUpperCase(),
-            sort_order: colorValues.length,
-            active: true,
-          };
-          colorValues.push(value);
-          colorValueByName.set(key, value);
-        }
-      }
-    }
-    const options = [
-      {
-        id: form.variantOptionId,
-        code: "size",
-        name_translations: { en: "Size", ar: "المقاس" },
-        required: true,
-        display_type: "text",
-        sort_order: 0,
-        values: form.variantGroups.map((group, index) => ({
-          id: group.id,
-          code: code(`variant-${index + 1}-${group.name}`, `variant-${index + 1}`),
-          value_translations: localized(group.name),
-          color_hex: null,
-          sort_order: index,
-          active: true,
-        })),
-      },
-      {
-        id: form.colorOptionId,
-        code: "color",
-        name_translations: { en: "Color" },
-        required: true,
-        display_type: "color",
-        sort_order: 1,
-        values: colorValues,
-      },
-    ];
-    const variants = form.variantGroups.flatMap((group, groupIndex) => group.colors.map((color, colorIndex) => {
-      const selectedColor = colorValueByName.get(color.colorName.trim().toLocaleLowerCase());
-      const generatedSku = `${form.sku || skuCode(form.translations.en.name, autoSkuSuffix)}-${groupIndex + 1}-${colorIndex + 1}-${color.id.replace(/-/g, "").slice(0, 6).toUpperCase()}`;
-      return {
-        id: color.id,
-        sku: String(color.sku || generatedSku).trim().slice(0, 120),
-        barcode: color.barcode || null,
-        price_override: color.price_override === "" || color.price_override == null ? null : Number(color.price_override),
-        compare_at_price_override: color.compare_at_price_override === "" || color.compare_at_price_override == null ? null : Number(color.compare_at_price_override),
-        track_inventory: Boolean(form.track_inventory),
-        inventory_quantity: Number(color.quantity),
-        low_stock_threshold: Number(form.low_stock_threshold || 0),
-        allow_backorder: Boolean(form.allow_backorder),
-        images: color.images || [],
-        active: true,
-        option_value_ids: [group.id, selectedColor.id],
-      };
-    }));
-    return { options, variants };
-  };
-
   const submit = async (event) => {
     event.preventDefault();
     const validationError = validateMerchantForm();
@@ -519,7 +394,7 @@ export function EcommerceProductEditor({ user, productId, embedded = false, init
     }
     setState((current) => ({ ...current, saving: true, error: "" }));
     try {
-      const inventory = buildVariantInventoryPayload();
+      const inventory = buildVariantInventoryPayload(form, autoSkuSuffix);
       const productForm = { ...form };
       delete productForm.variantGroups;
       delete productForm.variantOptionId;
@@ -529,6 +404,9 @@ export function EcommerceProductEditor({ user, productId, embedded = false, init
       delete productForm.variants;
       const payload = {
         ...productForm,
+        expected_catalog_version:inventory.expected_catalog_version,
+        expected_inventory_version:inventory.expected_inventory_version,
+        preserve_inventory:inventory.preserve_inventory,
         category_id: form.category_ids[0] || null,
         category_ids: form.category_ids,
         slug: code(form.slug || form.translations.en.name, "product"),
@@ -555,6 +433,7 @@ export function EcommerceProductEditor({ user, productId, embedded = false, init
       };
       const savedProduct = await saveEcommerceItem("products", productId, payload, { scope });
       notifyCommerceAction({ type: "success", title: t("admin.savedTitle", { item: t("admin.productSingular") }), message: t("admin.changesSaved") });
+      if (savedProduct?.product) setForm(current => ({...current,...savedProduct.product,...hydrateVariantGroups(savedProduct.product)}));
       onSaved?.(savedProduct);
     } catch (error) {
       const message = productSaveErrorMessage(error, t);
@@ -575,8 +454,9 @@ export function EcommerceProductEditor({ user, productId, embedded = false, init
     }
     setState((current) => ({ ...current, saving: true, error: "" }));
     try {
-      const inventory = buildVariantInventoryPayload();
-      await saveEcommerceProductVariants(productId, inventory, { scope });
+      const inventory = buildVariantInventoryPayload(form, autoSkuSuffix);
+      const saved = await saveEcommerceProductVariants(productId, inventory, { scope });
+      if (saved?.product) setForm(current => ({...current,...saved.product,...hydrateVariantGroups(saved.product)}));
       notifyCommerceAction({ type: "success", title: t("admin.savedTitle", { item: t("merchant.variants") }), message: t("admin.changesSaved") });
     } catch (error) {
       const message = productSaveErrorMessage(error, t);
@@ -730,7 +610,7 @@ export function EcommerceProductEditor({ user, productId, embedded = false, init
           <div><h2>{t("merchant.variantsInventory")}</h2><p>{t("admin.variantCardsHelp")}</p></div>
         </header>
         <div className="ecommerce-variant-card-list">
-          {form.variantGroups.map((group, groupIndex) => {
+          {!form.nativeVariantInventory && form.variantGroups.map((group, groupIndex) => {
             const expanded = expandedVariants[group.id] !== false;
             const total = group.colors.reduce((sum, color) => sum + (Number.isInteger(Number(color.quantity)) && Number(color.quantity) >= 0 ? Number(color.quantity) : 0), 0);
             const label = group.name.trim() || t("admin.untitledVariant", { count: groupIndex + 1 });
@@ -775,9 +655,18 @@ export function EcommerceProductEditor({ user, productId, embedded = false, init
             </article>;
           })}
         </div>
+        {form.nativeVariantInventory && form.variants.filter(v => v.active !== false).sort(stableOrder).map(variant => <label key={variant.id}>{variant.sku}<input aria-label={variant.sku} type="number" min="0" value={variant.inventory_quantity} onChange={event => update("variants",form.variants.map(v => v.id===variant.id ? {...v,inventory_quantity:Number(event.target.value)} : v))} /></label>)}
+        {!form.nativeVariantInventory && form.variantGroups.filter(group => combinedSizeNames(group.name).length>1).map(group => <button key={group.id} type="button" onClick={async()=>{
+          try {const variantGroups=await splitLegacySizeGroup(form,group.id);setForm(current=>({...current,variantGroups}));}
+          catch {setState(current=>({...current,error:t("commerce:errors.legacySizeMerge")}));}
+        }}>{group.name}: {t("merchant.splitLegacySizes")}</button>)}
+        {form.nativeVariantInventory && form.options.flatMap(option=>option.values.filter(value=>value.active!==false && combinedSizeNames(value.value_translations?.en).length>1).map(value=><button key={value.id} type="button" onClick={async()=>{
+          try {const inventory=await splitLegacyOptionValue(form,option.id,value.id);setForm(current=>({...current,...inventory}));}
+          catch {setState(current=>({...current,error:t("commerce:errors.legacySizeMerge")}));}
+        }}>{value.value_translations.en}: {t("merchant.splitLegacySizes")}</button>))}
         <div className="ecommerce-variant-editor-actions">
-          <button type="button" className="ecommerce-add-variant-button" onClick={addVariantGroup}><Plus size={16} />{t("admin.addSize")}</button>
-          {productId && variantInventoryIsFilled(form.variantGroups) && <button type="button" className="ecommerce-save-variants-button" disabled={state.saving} onClick={saveVariants}><Save size={16} />{state.saving ? t("merchant.saving") : t("merchant.saveVariants")}</button>}
+          {!form.nativeVariantInventory && <button type="button" className="ecommerce-add-variant-button" onClick={addVariantGroup}><Plus size={16} />{t("admin.addSize")}</button>}
+          {productId && (form.nativeVariantInventory || variantInventoryIsFilled(form.variantGroups)) && <button type="button" className="ecommerce-save-variants-button" disabled={state.saving} onClick={saveVariants}><Save size={16} />{state.saving ? t("merchant.saving") : t("merchant.saveVariants")}</button>}
         </div>
         {form.variantGroups.length > 0 && <div className="ecommerce-variant-inventory-settings">
           <p>{t("admin.variantStartingStockHelp")}</p>

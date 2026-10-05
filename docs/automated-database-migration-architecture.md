@@ -613,3 +613,17 @@ blueprint and `production-release-policy.md` in the same change. Tests must map
 new or changed invariants to executable behavior. A main-targeting change is not
 ready while any locally executable mandatory gate fails or any untested safety
 claim is represented as proven.
+
+## Ecommerce schema116 reconciliation bridge
+
+The current bridge retains source114 and rollback metadata114, preserves immutable
+commercial migration115, and targets116 with migrations-115-116.json. Commercial
+holds/access behavior remains unchanged. Catalog writes fail closed until116 installs
+service-only V3 atomic product, brand/category/tag/aggregate/publication/registry
+commands. Historical identities remain tenant-scoped and uniqueness covers inactive
+rows; final-valid swaps defer semantic checks only within V3. Separate catalog and
+inventory guards permit descriptive edits without overwriting checkout stock.
+
+Promotion does not execute migrations. Follow the governed control-plane upgrade,
+verified backup and known-good bridge sequence. Preserve forward-repair recovery
+after the existing rollback bound; no deployment or production mutation is authorized.

@@ -147,9 +147,9 @@ class AutomaticMigrationControlPlaneTests(unittest.TestCase):
                         "http://127.0.0.1:3200", self.sha, "green"
                     )
 
-    def test_current_manifest_and_rollback_contract_cover_schema_114_to_115(self):
+    def test_current_manifest_and_rollback_contract_cover_schema_114_to_116(self):
         self.assertEqual(self.source_schema, 114)
-        self.assertEqual(self.target_schema, 115)
+        self.assertEqual(self.target_schema, 116)
         self.assertEqual(self.metadata["schema"]["compatible_min"], 114)
         self.assertEqual(
             self.metadata["schema"]["rollback_compatible_min"],
@@ -161,7 +161,7 @@ class AutomaticMigrationControlPlaneTests(unittest.TestCase):
         )
         self.assertEqual(
             [entry["number"] for entry in self.manifest["migrations"]],
-            [115],
+            [115, 116],
         )
 
     def test_fresh_104_source_manifest_at_schema_105_requires_same_release_backup(self):

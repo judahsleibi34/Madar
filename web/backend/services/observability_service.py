@@ -217,7 +217,7 @@ def metrics_access_allowed(*, client_host: str | None, authorization: str | None
 
 
 class JsonFormatter(logging.Formatter):
-    SAFE_EXTRA = ("correlation_id", "security_event_id", "error_code", "error_type", "status_code", "duration_ms", "timings", "method", "route")
+    SAFE_EXTRA = ("correlation_id", "security_event_id", "error_code", "error_type", "status_code", "duration_ms", "timings", "method", "route", "tenant_id", "user_id", "product_id", "sqlstate", "constraint", "operation_stage")
     converter = time.gmtime
 
     def format(self, record: logging.LogRecord) -> str:
