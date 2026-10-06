@@ -1,5 +1,12 @@
 # Madar production release acceptance policy
 
+Active local-Supabase integration profile: **schema115 only**, migration class
+`none`, migration policy `none`, no selected migration manifest. Retained bridge
+examples below describe reviewed migration history/future work and authorize no
+SQL for this profile. Main's 116..135 artifacts remain checksum-verified; features
+requiring those schemas retain their existing unavailable/upgrade-required gates.
+Production installation, promotion and migration require separate approval.
+
 Last implementation review: 2026-10-05
 
 ## A. Purpose and authority
@@ -255,7 +262,7 @@ queried directly. Its SHA must match state and its reported compatibility range
 must contain the live schema. Candidate rollback bounds are descriptive metadata
 today; retained-target attestation is the operative rollback check.
 
-The current candidate bridges schema `114..135`, targets `135`, and uses
+The retained future learning bridge spans schema `114..135`, targets `135`, and uses
 `migrations-115-135.json` with class `forward-compatible` and rollback metadata
 `114..114`. Migrations through 114 remain immutable. The candidate reads the
 schema-099 commercial resolver at schema 114; new commercial mutations fail

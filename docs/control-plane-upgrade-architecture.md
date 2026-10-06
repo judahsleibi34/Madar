@@ -1,5 +1,12 @@
 # Privileged control-plane upgrade architecture
 
+Active local-Supabase integration profile: **schema115 only**, migration class
+`none`, migration policy `none`, no selected migration manifest. Retained bridge
+examples below describe reviewed migration history/future work and authorize no
+SQL for this profile. Main's 116..135 artifacts remain checksum-verified; features
+requiring those schemas retain their existing unavailable/upgrade-required gates.
+Production installation, promotion and migration require separate approval.
+
 ## Purpose and authority
 
 This document explains the security architecture and operator workflow for
@@ -374,8 +381,8 @@ The reviewed `local-supabase-schema115` deployment profile declares minimum,
 maximum, target and rollback schema115, migration class `none`, policy `none`,
 and no selected migration manifest. `check_forward_release.py` validates that
 whole exact contract and continues to verify all historical checksum pins and
-the unchanged 115/116 migration manifest. The preceding bridge descriptor is
-retained as `schema-114-116-bridge.json` for migration regression tests; it is
+the unchanged 115/116 and 115..135 migration manifests. The preceding descriptors are
+retained as `schema-114-116-bridge.json` and `schema-114-135-bridge.json` for regression tests; it is
 not the selected release contract. Neither schema114 nor schema116 passes this
 candidate's compatibility gate. Any future schema transition needs its own
 reviewed bridge contract. No automatic migration was invoked in rehearsal.

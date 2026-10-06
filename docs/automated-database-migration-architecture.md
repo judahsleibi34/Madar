@@ -1,5 +1,12 @@
 # Automated database migration architecture
 
+Active local-Supabase integration profile: **schema115 only**, migration class
+`none`, migration policy `none`, no selected migration manifest. Retained bridge
+examples below describe reviewed migration history/future work and authorize no
+SQL for this profile. Main's 116..135 artifacts remain checksum-verified; features
+requiring those schemas retain their existing unavailable/upgrade-required gates.
+Production installation, promotion and migration require separate approval.
+
 Last implementation review: 2026-10-04
 
 ## 1. Purpose, authority, and scope
