@@ -1,3 +1,4 @@
+import AcademyDataBlock from "../blocks/AcademyDataBlock";
 import PageBuilderCarousel from "../ui/PageBuilderCarousel";
 import AutoFitDirectText from "./PageBuilder.autoFitText";
 import LazyBuilderVideo from "./LazyBuilderVideo";
@@ -245,6 +246,7 @@ export const createElementRenderer = ({
       renderMode,
     });
     if (overridden !== undefined) return overridden;
+    if (element.type.startsWith("academy")) return <div key={element.id} {...commonProps}><AcademyDataBlock element={element} editing={!preview} /></div>;
 
     if (element.type === "heading") {
       return <AutoFitDirectText preserveFontSize as="div" fitKey={`${element.content}:${JSON.stringify(element.textBlockFormats || [])}:${element.styles?.fontSize || ""}:${element.styles?.fontFamily || ""}:${element.styles?.lineHeight || ""}:${JSON.stringify(element.richTextSizes || [])}:${JSON.stringify(element.richTextStyles || [])}`} key={`${element.id}:${element.content}:${JSON.stringify(element.textBlockFormats || [])}`} {...commonProps} {...getEditableTextProps(element)} onMouseUp={(event) => captureCanvasTextSelection(event, "content", null, element.id)}>{renderRichTextBlocks(element, getTextRanges(element, "content"))}</AutoFitDirectText>;

@@ -138,6 +138,7 @@ export const createElement = (type = "text", overrides = {}) => {
     connectedFormId: "",
     action: createAction(),
     styles: {
+      ...(type.startsWith("academy") ? { width: "100%", alignSelf: "stretch" } : {}),
       color: "var(--theme-text)",
       backgroundColor: "",
       borderRadius: "16px",
@@ -455,6 +456,8 @@ export const createElement = (type = "text", overrides = {}) => {
     },
   };
 
+  const academyHeadings = { academyInstructors: "Instructors", academyFeaturedCourses: "Featured Courses", academyCourseCollection: "Explore Courses", academyPlans: "Choose your access", academyContinueLearning: "Continue Learning" };
+  if (academyHeadings[type]) presets[type] = { name: academyHeadings[type], academy: { heading: academyHeadings[type], maxItems: 4, variant: "grid" } };
   return {
     ...base,
     ...(presets[type] || {}),

@@ -1,4 +1,4 @@
-import { viewports } from "./PageBuilder.constants";
+import { viewports, getBuilderElementName } from "./PageBuilder.constants";
 import { createPosition, createSection } from "./PageBuilder.factories";
 import { clampElementToBounds } from "./PageBuilder.bounds";
 
@@ -1130,8 +1130,8 @@ export const getProjectOverlapWarnings = ({
                 page: page.name || "Untitled page",
                 section: section.name || "Untitled section",
                 viewport: viewportName,
-                first: element.name || element.type || "Component",
-                second: other.name || other.type || "Component",
+                first: getBuilderElementName(element),
+                second: getBuilderElementName(other),
               });
             }
           });
@@ -1351,3 +1351,10 @@ export const createMovedFreeElement = (element, position) => ({
   ...element,
   position,
 });
+
+export function moveBuilderSection(sections, id, offset) {
+  const index = sections.findIndex(section => section.id === id), target = index + offset;
+  if (index < 0 || target < 0 || target >= sections.length) return sections;
+  const next = [...sections]; [next[index], next[target]] = [next[target], next[index]];
+  return next;
+}

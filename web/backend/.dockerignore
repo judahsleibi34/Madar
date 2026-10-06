@@ -3,6 +3,7 @@ __pycache__
 .venv/
 venv/
 madar_back/
+madar_env/
 cv_reranker/
 .pytest_cache
 .coverage

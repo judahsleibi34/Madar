@@ -1,4 +1,5 @@
 import { Fragment, forwardRef, useCallback, useLayoutEffect, useRef, useState } from "react";
+import { ACADEMY_DATA_COMPONENT_TYPES } from "./PageBuilder.academyProfile";
 
 import { getRowCarouselElements } from "./PageBuilder.elementLayout";
 import {
@@ -24,7 +25,7 @@ import {
   normalizeArtboardViewportMode,
 } from "./PageBuilder.artboard";
 
-const intrinsicHeightElementTypes = new Set(["heading", "text", "list"]);
+const intrinsicHeightElementTypes = new Set(["heading", "text", "list", ...ACADEMY_DATA_COMPONENT_TYPES]);
 const compactDividerTypes = new Set(["divider", "thinDivider"]);
 
 const measurableElementTypes = new Set([

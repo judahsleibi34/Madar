@@ -3,10 +3,15 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
   Home,
+  GraduationCap,
+  BookOpen,
+  Users,
   Archive,
   LayoutDashboard,
   GalleryHorizontalEnd,
   PanelsTopLeft,
+  LayoutTemplate,
+  Globe,
   ClipboardList,
   CalendarDays,
   Database,
@@ -90,7 +95,6 @@ function getUserRole(user) {
 
 function SidebarRow({
   active = false,
-  activeClassName = "active",
   controls,
   expanded,
   icon: Icon,
@@ -104,7 +108,7 @@ function SidebarRow({
     <button
       type="button"
       className={`admin-sidebar-row ${
-        active ? activeClassName : ""
+        active && !expandable ? "active" : ""
       }`.trim()}
       onClick={onClick}
       title={label}
@@ -188,6 +192,12 @@ export default function DashboardSidebar({
       location.pathname === path ||
       location.pathname.startsWith(`${path}/`),
   );
+  const elearningRouteActive = location.pathname === DASHBOARD_ROUTES.elearning ||
+    location.pathname.startsWith(`${DASHBOARD_ROUTES.elearning}/`);
+  const [elearningExpansion, setELearningExpansion] = useState({
+    open: elearningRouteActive,
+    pathname: location.pathname,
+  });
   const [workspaceExpansion, setWorkspaceExpansion] = useState({
     open: workspaceRouteActive,
     pathname: location.pathname,
@@ -200,13 +210,20 @@ export default function DashboardSidebar({
     open: settingsRouteActive,
     pathname: location.pathname,
   });
+  const compactSidebarRouteActive = workspaceRouteActive ||
+    /^\/e-learning\/landing-page\/projects\/[^/]+(?:\/|$)/.test(location.pathname);
   const [workspaceSidebarCollapsed, setWorkspaceSidebarCollapsed] =
     useState(true);
+  const [previousCompactRouteActive, setPreviousCompactRouteActive] = useState(compactSidebarRouteActive);
+  if (previousCompactRouteActive !== compactSidebarRouteActive) {
+    setPreviousCompactRouteActive(compactSidebarRouteActive);
+    setWorkspaceSidebarCollapsed(true);
+  }
   const isWorkspaceSidebarCollapsed =
-    workspaceRouteActive && workspaceSidebarCollapsed;
+    compactSidebarRouteActive && workspaceSidebarCollapsed;
 
   useEffect(() => {
-    if (!workspaceRouteActive || isWorkspaceSidebarCollapsed) return undefined;
+    if (!compactSidebarRouteActive || isWorkspaceSidebarCollapsed) return undefined;
 
     const handleOutsidePointerDown = (event) => {
       if (sidebarRef.current?.contains(event.target)) return;
@@ -217,7 +234,7 @@ export default function DashboardSidebar({
     return () => {
       document.removeEventListener("pointerdown", handleOutsidePointerDown);
     };
-  }, [isWorkspaceSidebarCollapsed, workspaceRouteActive]);
+  }, [isWorkspaceSidebarCollapsed, compactSidebarRouteActive]);
 
   const activeThemeMode =
     themeMode === "dark" || themeMode === "light"
@@ -339,6 +356,16 @@ export default function DashboardSidebar({
       icon: ShoppingBag,
     },
   ];
+  const elearningItems = [
+    { label: t("sidebar.elearningCourses", { defaultValue: "Courses" }), path: DASHBOARD_ROUTES.elearningCourses, icon: BookOpen },
+    { label: t("sidebar.elearningGroups", { defaultValue: "Groups" }), path: DASHBOARD_ROUTES.elearningGroups, icon: Users },
+    { label: t("sidebar.elearningInstructors", { defaultValue: "Instructors" }), path: DASHBOARD_ROUTES.elearningInstructors, icon: GraduationCap },
+    { label: t("elearning.academy.learningPlans"), path: DASHBOARD_ROUTES.elearningPlans, icon: CreditCard },
+    { label: t("elearning.academy.landingPage"), path: "/e-learning/landing-page", icon: LayoutTemplate },
+    { label: t("elearning.academy.academyAccess"), path: "/e-learning/academy-access", icon: Globe },
+    { label: t("sidebar.settings"), path: DASHBOARD_ROUTES.elearningSettings, icon: Settings },
+  ];
+
   const workspaceLabel = t("sidebar.workspace", {
     defaultValue: "Workspace",
   });
@@ -346,6 +373,8 @@ export default function DashboardSidebar({
     workspaceExpansion.pathname === location.pathname
       ? workspaceExpansion.open
       : workspaceRouteActive;
+  const elearningIsExpanded = elearningExpansion.pathname === location.pathname
+    ? elearningExpansion.open : elearningRouteActive;
   const ecommerceIsExpanded = ecommerceExpansion.open;
   const settingsIsExpanded =
     settingsExpansion.pathname === location.pathname
@@ -427,6 +456,7 @@ export default function DashboardSidebar({
     });
 
     if (nextOpen) {
+      setELearningExpansion({ open: false, pathname: location.pathname });
       setWorkspaceExpansion({
         open: false,
         pathname: location.pathname,
@@ -439,6 +469,9 @@ export default function DashboardSidebar({
   };
 
   const isActive = (path) => {
+    if (path === "/my-learning") {
+      return location.pathname === path || location.pathname.startsWith(`${path}/courses/`);
+    }
     if (path === PUBLIC_ROUTES.home) {
       return location.pathname === PUBLIC_ROUTES.home;
     }
@@ -492,7 +525,7 @@ export default function DashboardSidebar({
             </span>
           </button>
 
-          {workspaceRouteActive && (
+          {compactSidebarRouteActive && (
             <button
               type="button"
               className="admin-sidebar-workspace-collapse"
@@ -554,8 +587,6 @@ export default function DashboardSidebar({
 
           {!isPlatformAdmin && <div className="admin-sidebar-group">
             <SidebarRow
-                active={workspaceRouteActive}
-                activeClassName="active-parent"
                 controls="dashboard-sidebar-workspace"
                 expanded={workspaceIsExpanded}
                 icon={PanelsTopLeft}
@@ -569,6 +600,7 @@ export default function DashboardSidebar({
                   });
 
                   if (nextOpen) {
+                    setELearningExpansion({ open: false, pathname: location.pathname });
                     setEcommerceExpansion({
                       open: false,
                       pathname: location.pathname,
@@ -611,8 +643,6 @@ export default function DashboardSidebar({
 
           {!isPlatformAdmin && <div className="admin-sidebar-group">
             <SidebarRow
-              active={ecommerceRouteActive}
-              activeClassName="active-parent"
               controls="dashboard-sidebar-ecommerce"
               expanded={ecommerceIsExpanded}
               icon={ShoppingBag}
@@ -626,6 +656,7 @@ export default function DashboardSidebar({
                 });
 
                 if (nextOpen) {
+                  setELearningExpansion({ open: false, pathname: location.pathname });
                   setWorkspaceExpansion({
                     open: false,
                     pathname: location.pathname,
@@ -667,6 +698,39 @@ export default function DashboardSidebar({
             )}
           </div>}
 
+          {!isPlatformAdmin && <div className="admin-sidebar-group">
+            <SidebarRow
+              controls="dashboard-sidebar-elearning"
+              expanded={elearningIsExpanded}
+              icon={GraduationCap}
+              label={t("sidebar.elearning")}
+              onClick={() => {
+                const nextOpen = !elearningIsExpanded;
+                setELearningExpansion({ open: nextOpen, pathname: location.pathname });
+                if (nextOpen) {
+                  setWorkspaceExpansion({ open: false, pathname: location.pathname });
+                  setEcommerceExpansion({ open: false, pathname: location.pathname });
+                  setSettingsExpansion({ open: false, pathname: location.pathname });
+                }
+              }}
+            />
+            {elearningIsExpanded && <div className="admin-sidebar-subnav" id="dashboard-sidebar-elearning">
+              {elearningItems.map((item) => {
+                const Icon = item.icon;
+                const active = item.path === "/e-learning/academy-access"
+                  ? isActive(item.path) || isActive("/e-learning/settings/academy")
+                  : item.path === DASHBOARD_ROUTES.elearningSettings
+                    ? location.pathname === item.path
+                    : isActive(item.path);
+                return <Link key={item.path} to={item.path} className={active ? "active" : ""}
+                  aria-current={active ? "page" : undefined} title={item.label}
+                  onClick={() => { if (typeof onNavigate === "function") onNavigate(); }}>
+                  <Icon size={16} aria-hidden="true" /><span>{item.label}</span>
+                </Link>;
+              })}
+            </div>}
+          </div>}
+
           {!isPlatformAdmin && primaryNavItems.slice(2).map((item) => {
             const active = isActive(item.path);
 
@@ -689,8 +753,6 @@ export default function DashboardSidebar({
           className="admin-sidebar-group admin-sidebar-settings-group"
         >
           <SidebarRow
-            active={settingsRouteActive}
-            activeClassName="active-parent"
             controls="dashboard-sidebar-settings"
             expanded={settingsIsExpanded}
             icon={Settings}

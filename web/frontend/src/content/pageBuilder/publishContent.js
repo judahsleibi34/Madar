@@ -3,6 +3,7 @@ const publishContentEn = {
   title: "Publish site",
   description:
     "Publish the Builder website and its standalone form links from one place.",
+  academyDescription: "Publish your Academy landing page and share its public link.",
   statusTitle: "Site status",
   projectLabel: "Builder project",
   stateLabel: "Site state",

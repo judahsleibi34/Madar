@@ -79,7 +79,6 @@
 }
 
 .authenticated-shell .admin-sidebar :where(button, a).active,
-.authenticated-shell .admin-sidebar :where(button, a).active-parent,
 .authenticated-shell .admin-sidebar :where(button, a)[aria-current="page"] {
   background: var(--color-primary);
   color: var(--color-text-inverse);

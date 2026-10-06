@@ -1,4 +1,4 @@
-import { render } from '@testing-library/react';
+import { fireEvent, render } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { createSiteChromeRenderers } from './PageBuilder.siteChrome';
@@ -106,4 +106,24 @@ describe('optional responsive site footer groups', () => {
     expect(grid?.textContent).toContain('Visa');
     expect(grid?.textContent).not.toContain('Help');
   });
+});
+
+it('uses safe Academy destinations in the native footer and hides personalized guest links', () => {
+ const navigateUrl = vi.fn();
+ const project = { pages: [{ id: 'home', slug: '/', name: 'Home' }], siteChrome: { showFooter: true, footerShopLinks: '/academy/testing/courses\n/my-learning' } };
+ const navigationDestinations = [{ label: 'Courses', href: '/academy/testing/courses' }, { label: 'My Learning', href: '/my-learning', requiresAuth: true }];
+ const renderers = createSiteChromeRenderers({ project, activePage: project.pages[0], selected: {}, preview: true, selectPage: vi.fn(), setSelected: vi.fn(), navigateUrl, navigationDestinations, authenticated: false });
+ const mounted = render(renderers.renderSiteFooter());
+ expect(mounted.queryByRole('button', { name: 'My Learning' })).toBeNull();
+ fireEvent.click(mounted.getByRole('button', { name: 'Courses' }));
+ expect(navigateUrl).toHaveBeenCalledWith('/academy/testing/courses');
+ mounted.unmount();
+});
+it('keeps native My Learning header actions authenticated', () => {
+ const project = { pages: [{ id: 'home', name: 'Home', slug: '/' }], siteChrome: { showHeader: true, brand: 'Academy', headerButtonLabel: 'Resume', headerButtonHref: '/my-learning' } };
+ const args = { project, activePage: project.pages[0], selected: {}, preview: true, selectPage: vi.fn(), setSelected: vi.fn(), navigationDestinations: [{ label: 'My Learning', href: '/my-learning', requiresAuth: true }], navigateUrl: vi.fn() };
+ const guest = render(createSiteChromeRenderers(args).renderSiteHeader());
+ expect(guest.queryByRole('button', { name: 'Resume' })).toBeNull();guest.unmount();
+ const learner = render(createSiteChromeRenderers({ ...args, authenticated: true }).renderSiteHeader());
+ fireEvent.click(learner.getAllByRole('button', { name: 'Resume' })[0]);expect(args.navigateUrl).toHaveBeenCalledWith('/my-learning');learner.unmount();
 });

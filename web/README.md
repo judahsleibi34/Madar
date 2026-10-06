@@ -117,7 +117,63 @@ Native browser/operating-system notifications:
 - Each user must click **Enable system notifications** on the Notifications
   page once per browser/device and grant the browser permission prompt.
 
+### Isolated local database for development
+
+If `web/.env` points to a database shared with production, use a separate local
+Supabase stack instead of applying development migrations to that database.
+Install Docker Engine and ensure your user can access its local Unix socket,
+then run from the repository root:
+
+```bash
+python3 web/scripts/start_local_database.py
+cd web/backend
+python run_local.py --local-db
+```
+
+Activate the backend virtual environment before starting the API. The setup
+helper uses Supabase CLI 2.119.0 through `npx`, validates the migration trees,
+starts the Docker stack defined by `web/supabase/config.toml`, and applies pending
+migrations with an explicit `--local`. It preserves existing local data and does
+not link, push, or reset a hosted project. Initial startup downloads the local
+Supabase images. Docker volumes retain the local database between starts.
+
+The helper verifies the declared schema target and both E-Learning tables through
+the local API before creating `web/.env.database.local` with permissions 0600.
+This ignored file contains local credentials only; `web/.env` is preserved.
+The `--local-db` launcher refuses missing configuration and hosted database URLs.
+It loads the schema compatibility range from `deployment/releases/release.json`
+so health readiness checks use the current release contract after local migrations.
+Restart any existing API process before using this launcher. The frontend's
+normal development proxy already targets `127.0.0.1:8000`.
+
+Create a separate account using the app's sign-up flow. Production accounts,
+tenants and courses are not copied. Supabase Studio is available at
+`http://127.0.0.1:54323`; local email is captured by Supabase's mail testing service.
+For an existing local test account, add `MADAR_TEST_EMAIL`, `MADAR_TEST_PASSWORD`
+and `MADAR_TEST_AUTO_LOGIN="true"` to the ignored `web/.env.database.local` file,
+then restart the API with `run_local.py --local-db`. The local launcher signs in
+through the normal password flow when the app checks its session. Credentials
+stay on the backend; this feature requires development mode, a local database,
+and localhost requests. Set `MADAR_TEST_AUTO_LOGIN="false"` to test sign-out or
+other accounts. The database setup helper preserves these settings on reruns.
+Stop the stack without removing its data with:
+
+```bash
+cd web
+npx --yes supabase@2.119.0 stop
+```
+
+
 Rate limiting and request-size controls:
+
+For native local development without Docker or Redis, activate your backend
+virtual environment and run `python run_local.py` from `web/backend` instead of
+`uvicorn app:app --reload`. Stop the existing API process first. This launcher
+loads `web/.env`, keeps rate limiting enabled, and explicitly permits the
+in-memory fallback when Redis is unavailable. It serves the API on
+`127.0.0.1:8000` and refuses production configuration. Counters are local to the
+process and reset on restart; use the normal Redis-backed runtime for production.
+
 
 - `REDIS_URL`
 - `RATE_LIMIT_ENABLED`

@@ -99,11 +99,12 @@ export const mapBackendUserToBuilderUser = (backendUser, roleId = "") => ({
   authId: backendUser?.auth_id || backendUser?.authId || "",
 });
 
-export const listBuilderProjects = async ({ limit = 20, offset = 0 } = {}) => {
+export const listBuilderProjects = async ({ limit = 20, offset = 0, usageProfile } = {}) => {
   const query = new URLSearchParams({
     limit: String(limit),
     offset: String(offset),
   });
+  if (usageProfile) query.set("usage_profile", usageProfile);
   const response = await apiFetch(getApiUrl(`/builder/projects?${query}`), {
     method: "GET",
     cache: "no-store",

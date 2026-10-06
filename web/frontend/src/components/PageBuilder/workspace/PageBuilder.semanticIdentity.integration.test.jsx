@@ -12,7 +12,10 @@ const apiMocks = vi.hoisted(() => ({
   publishBuilderProject: vi.fn(),
   updateBuilderProject: vi.fn(),
   updateWebsiteSettings: vi.fn(),
+  fetchELearningSettings: vi.fn(),
 }));
+
+vi.mock("../../../services/elearningSettings", () => ({ fetchELearningSettings: apiMocks.fetchELearningSettings }));
 
 vi.mock("../services/PageBuilder.api", async (importOriginal) => ({
   ...(await importOriginal()),
@@ -95,6 +98,7 @@ describe("mounted PageBuilder semantic acknowledgement", () => {
     localStorage.clear();
     builderInitialProjectLoadPromises.clear();
     vi.clearAllMocks();
+    apiMocks.fetchELearningSettings.mockResolvedValue({ available: false });
     vi.spyOn(window, "confirm").mockReturnValue(true);
     apiMocks.fetchWebsiteSettings.mockResolvedValue({ subdomain: "semantic-test" });
     apiMocks.updateWebsiteSettings.mockResolvedValue({ subdomain: "semantic-test" });
@@ -141,6 +145,17 @@ describe("mounted PageBuilder semantic acknowledgement", () => {
     vi.useRealTimers();
     vi.restoreAllMocks();
     builderInitialProjectLoadPromises.clear();
+  });
+
+  it("renders recovery choices for a missing routed project instead of a retry-only dead end", async () => {
+    apiMocks.fetchBuilderProject.mockRejectedValueOnce({ status: 404 });
+    apiMocks.fetchELearningSettings.mockResolvedValue({ available: true, academy_management: { full_builder_available: true } });
+    render(<MemoryRouter initialEntries={[`/page-builder/projects/${projectId}/pages/sections`]}><PageBuilder user={user} /></MemoryRouter>);
+    expect(await screen.findByRole("heading", { name: "This project link is unavailable" })).toBeTruthy();
+    expect(await screen.findByRole("button", { name: "Open Academy Builder" })).toBeTruthy();
+    expect(apiMocks.updateBuilderProject).not.toHaveBeenCalled();
+    expect(apiMocks.publishBuilderProject).not.toHaveBeenCalled();
+    expect(screen.queryByLabelText("Page name")).toBeNull();
   });
 
   it("sends an explicit sidebar Save click to the backend even when the draft is already acknowledged", async () => {
@@ -806,4 +821,47 @@ describe("mounted PageBuilder semantic acknowledgement", () => {
       await waitFor(() => expect(frame.textContent).toContain("New copied data"));
     }
   });
+  it("keeps Academy on the native Pages, Themes, Header/Footer and history workflow", async () => {
+    const schema = { ...structuredClone(schemaA), forms: [], usage_profile: "academy" };
+    apiMocks.fetchBuilderProject.mockResolvedValue({ id: projectId, usage_profile: "academy", name: "Academy", draft_revision: 100, draft_schema: schema });
+    render(<MemoryRouter initialEntries={[`/page-builder/projects/${projectId}/pages`]}><PageBuilder user={user} /></MemoryRouter>);
+    expect((await screen.findByLabelText("Page name")).value).toBe("Home");
+    expect(screen.getByRole("button", { name: "New page" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Undo last builder change" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Redo builder change" })).toBeTruthy();
+    expect(document.querySelector(".workspace-tabs").textContent).not.toContain("Themes");
+    expect(screen.getByRole("tab", { name: /^Themes/ })).toBeTruthy();
+    expect(document.querySelector(".workspace-tabs").textContent).toContain("Header & Footer");
+    expect(document.querySelector(".workspace-tabs").textContent).toContain("Publish");
+    expect(document.querySelector(".workspace-tabs").textContent).not.toContain("Forms");
+    expect(document.querySelector(".workspace-tabs").textContent).not.toContain("Reservations");
+    fireEvent.change(screen.getByLabelText("Page name"), { target: { value: "Academy Home" } });
+    fireEvent.click(screen.getByRole("button", { name: "Undo last builder change" }));
+    await waitFor(() => expect(screen.getByLabelText("Page name").value).toBe("Home"));
+    fireEvent.click(screen.getByRole("button", { name: "Redo builder change" }));
+    await waitFor(() => expect(screen.getByLabelText("Page name").value).toBe("Academy Home"));
+    fireEvent.click(screen.getByRole("button", { name: /^Save$/i }));
+    await waitFor(() => expect(apiMocks.updateBuilderProject).toHaveBeenCalled());
+    expect(apiMocks.updateBuilderProject.mock.calls.at(-1)[1].draft_schema.pages[0].name).toBe("Academy Home");
+    expect(apiMocks.updateWebsiteSettings).not.toHaveBeenCalled();
+  });
+
+  it.each(["website", "academy"])("uses the same editor shell and section controls for %s projects", async usage_profile => {
+    const schema = { ...structuredClone(schemaA), forms: [] };
+    apiMocks.fetchBuilderProject.mockResolvedValue({ id: projectId, usage_profile, name: "Saved project", draft_revision: 100, draft_schema: schema });
+    const { container } = render(<MemoryRouter initialEntries={[`/page-builder/projects/${projectId}/pages`]}><PageBuilder user={user} /></MemoryRouter>);
+    await screen.findByLabelText("Page name");
+    for (const selector of [".builder-sidebar", ".builder-canvas-shell", ".builder-inspector", ".builder-subbar"]) {
+      expect(container.querySelectorAll(selector)).toHaveLength(1);
+    }
+    expect(container.querySelector(".workspace-tabs").textContent).not.toContain("Themes");
+    fireEvent.click(screen.getByRole("tab", { name: /^Sections/ }));
+    expect(container.querySelectorAll(".builder-section-composition")).toHaveLength(0);
+    expect(screen.queryByRole("button", { name: "Add section" })).toBeNull();
+    expect(screen.getByRole("heading", { name: "Components" })).toBeTruthy();
+    expect(container.querySelector(".section-component-palette").textContent.includes("Featured Courses")).toBe(usage_profile === "academy");
+    fireEvent.click(screen.getByRole("tab", { name: /^Themes/ }));
+    expect(container.querySelector(".builder-themes-panel")).toBeTruthy();
+  });
+
 });

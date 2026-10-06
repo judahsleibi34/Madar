@@ -40,6 +40,7 @@ const buildQrUrl = (data, version) => {
 
 export default function PageBuilderPublishTab({
   project,
+  usageProfile = "website",
   liveSitePath = "",
   hasConfiguredSubdomain = false,
   openWebsiteSettings,
@@ -54,7 +55,8 @@ export default function PageBuilderPublishTab({
   const [publicQrVersion, setPublicQrVersion] = useState(1);
   const [formQrVersions, setFormQrVersions] = useState({});
   const content = getPublishContent(lang);
-  const forms = Array.isArray(project.forms) ? project.forms : [];
+  const isAcademy = usageProfile === "academy";
+  const forms = !isAcademy && Array.isArray(project.forms) ? project.forms : [];
   const publishSubdomain = sanitizeSubdomain(project?.publish?.subdomain || "");
   const legacyLiveSubdomain = sanitizeSubdomain(
     String(liveSitePath || "").match(/^\/site\/([^/]+)/)?.[1] || ""
@@ -69,7 +71,7 @@ export default function PageBuilderPublishTab({
   const isFormPublished = (form) => (
     Array.isArray(publishedFormIds) ? publishedFormIds.includes(form.id) : isPublished
   );
-  const resolvedLiveSitePath = isPublished ? configuredLiveSitePath || liveSitePath : "";
+  const resolvedLiveSitePath = isPublished ? (usageProfile === "academy" ? liveSitePath : configuredLiveSitePath || liveSitePath) : "";
   const productionAppOrigin = getProductionAppOrigin();
   const publicLink = resolvedLiveSitePath
     ? (/^https:\/\//.test(resolvedLiveSitePath) ? resolvedLiveSitePath : `${productionAppOrigin}${resolvedLiveSitePath}`)
@@ -145,11 +147,11 @@ export default function PageBuilderPublishTab({
       <header className="workspace-header publish-site-header">
         <div>
           <h2>{content.title}</h2>
-          <p>{content.description}</p>
+          <p>{isAcademy ? content.academyDescription : content.description}</p>
         </div>
       </header>
 
-      <div className="publish-console">
+      <div className={`publish-console${isAcademy ? " publish-console-academy" : ""}`}>
         <section className="publish-panel publish-status-panel">
           <div className="publish-panel-title">
             <h3>{content.statusTitle}</h3>
@@ -252,7 +254,7 @@ export default function PageBuilderPublishTab({
             </div>
           </section>
 
-        <section className="publish-panel publish-link-panel publish-forms-panel">
+        {!isAcademy && <section className="publish-panel publish-link-panel publish-forms-panel">
           <div className="publish-panel-title">
             <h3>{content.formLinkTitle}</h3>
             <strong>{content.formLabel}</strong>
@@ -359,7 +361,7 @@ export default function PageBuilderPublishTab({
               {content.noFormToShare}
             </div>
           )}
-        </section>
+        </section>}
       </div>
     </div>
   );

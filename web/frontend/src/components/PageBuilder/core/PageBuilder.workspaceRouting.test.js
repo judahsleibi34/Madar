@@ -24,4 +24,13 @@ describe("explicit builder project routes", () => {
     expect(getBuilderWorkspacePath("project-a")).not.toBe(getBuilderWorkspacePath("project-b"));
     expect(getBuilderProjectIdFromPath("/page-builder/pages")).toBe("");
   });
+
+  it("keeps Academy workspaces in the dedicated E-Learning namespace", () => {
+    const workspace = "e-learning/landing-page";
+    const path = getBuilderWorkspacePath("academy-owner", "publish", workspace);
+    expect(path).toBe("/e-learning/landing-page/projects/academy-owner/publish");
+    expect(getBuilderProjectIdFromPath(path)).toBe("academy-owner");
+    expect(getBuilderWorkspaceFromPath(path)).toBe(workspace);
+    expect(getBuilderWorkspacePath("academy-owner", "chrome", workspace)).toContain("/e-learning/landing-page/projects/academy-owner/header-footer");
+  });
 });

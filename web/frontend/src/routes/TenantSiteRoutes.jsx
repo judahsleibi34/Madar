@@ -11,6 +11,9 @@ const EcommerceStorefront = lazy(() =>
   import("../components/EcommerceStore/EcommerceStorefront")
 );
 
+const ELearningAcademy = lazy(() => import("../components/ELearning/ELearningAcademy"));
+const HostedAcademyLearning = lazy(() => import("../components/ELearning/ELearningAcademy").then(m => ({ default: m.HostedAcademyLearning })));
+
 function HostedStorefront({ subdomain }) {
   if (!subdomain) return <Navigate to="/" replace />;
   return <EcommerceStorefront subdomain={subdomain} />;
@@ -83,12 +86,15 @@ export default function TenantSiteRoutes() {
       <Routes>
         {hostedTenant ? (
           <>
+            <Route path="/academy/*" element={<ELearningAcademy subdomain={hostedTenant} />} />
+            <Route path="/my-learning/*" element={<HostedAcademyLearning subdomain={hostedTenant} />} />
             <Route path="/shop/*" element={<HostedStorefront subdomain={hostedTenant} />} />
             <Route path="/forms/:formId" element={<TenantSiteRuntime siteIdentifier={hostedTenant} />} />
             <Route path="/*" element={<TenantSiteRuntime siteIdentifier={hostedTenant} />} />
           </>
         ) : (
           <>
+            <Route path="/academy/:subdomain/*" element={<ELearningAcademy />} />
             <Route path="/forms/:subdomain/:formId" element={<LegacyTenantRedirect prefix="" />} />
             <Route path="/store/:subdomain/*" element={<LegacyTenantRedirect prefix="/shop" />} />
             <Route path="/ecommerce-preview/:subdomain/*" element={<AdminStorePreview />} />

@@ -1,7 +1,8 @@
 ﻿import { lazy } from "react";
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 
 import PlatformAdminGate from "../components/DashboardBuilder/PlatformAdminGate";
+import { ELearningRouteSkeleton } from "../components/ELearning/ELearningSkeleton";
 import RouteSuspense from "../components/common/RouteSuspense";
 import { appShellContent } from "../content";
 import { DashboardLoadingElement, DashboardShell, RestrictedAccessWindow } from "./shared";
@@ -11,6 +12,7 @@ const Dashboard = lazy(() => import("../components/DashboardBuilder/Dashboard"))
 const AdminAccountAccessPage = lazy(() =>
   import("../components/DashboardBuilder/AdminAccountAccessPage")
 );
+const ELearningWorkspace = lazy(() => import("../components/ELearning/ELearningWorkspace"));
 const SettingsPage = lazy(() => import("../components/DashboardBuilder/SettingsPage"));
 const UserManagementPage = lazy(() =>
   import("../components/DashboardBuilder/UserManagementPage")
@@ -25,6 +27,8 @@ function AdminContent({
   user,
   weeklyScreenTimeSeconds = 0,
 }) {
+  const location = useLocation();
+  const isELearningLoadingPath = location.pathname.startsWith("/e-learning");
   const renderShell = (children, options = {}) => (
     <DashboardShell
       {...shellProps}
@@ -49,11 +53,14 @@ function AdminContent({
 
   return (
     <RouteSuspense
-      fallback={<DashboardLoadingElement pathname="/dashboard" lang={lang} />}
+      fallback={isELearningLoadingPath
+        ? renderShell(<ELearningRouteSkeleton pathname={location.pathname} lang={lang} label={lang === "ar" ? "جارٍ التحميل" : "Loading E-learning"} />)
+        : <DashboardLoadingElement pathname="/dashboard" lang={lang} />}
       lang={lang}
       variant="dashboard"
     >
       <Routes>
+        <Route path="/e-learning/*" element={renderShell(<ELearningWorkspace key={`${user?.tenant_id}:${user?.id}`} user={user} />)} />
         <Route
           path="/dashboard/*"
           element={renderShell(

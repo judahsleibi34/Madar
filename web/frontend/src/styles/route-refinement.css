@@ -3165,20 +3165,9 @@ body.theme-dark .page-builder .builder-toast,
   min-width: 0;
 }
 
-.admin-sidebar .admin-sidebar-row.active-parent {
-  background: var(--sidebar-accent) !important;
-  border: 1px solid var(--sidebar-accent) !important;
-  color: var(--theme-text-inverse) !important;
-  box-shadow: 0 10px 22px rgba(var(--theme-primary-rgb), 0.2) !important;
-}
-.admin-sidebar .admin-sidebar-row.active-parent :is(.admin-sidebar-row-label, span, svg) {
-  color: var(--theme-text-inverse) !important;
-}
-
-
 .admin-sidebar
   .admin-sidebar-settings-group
-  > .admin-sidebar-row[aria-expanded="true"]:not(.active-parent):not(:hover) {
+  > .admin-sidebar-row[aria-expanded="true"]:not(:hover) {
   border: 0 !important;
   background: transparent !important;
   box-shadow: none !important;
@@ -3250,6 +3239,13 @@ body.theme-dark .page-builder .builder-toast,
   > .language-toggle-button:hover {
   background: var(--theme-surface-2) !important;
   color: var(--sidebar-accent) !important;
+}
+
+/* Keep the selected destination visible over the shared transparent row reset. */
+.admin-sidebar .admin-sidebar-subnav > :is(button, a).active,
+.admin-sidebar .admin-sidebar-subnav > :is(button, a)[aria-current="page"] {
+  background: var(--color-primary) !important;
+  color: var(--color-text-inverse) !important;
 }
 
 .admin-sidebar .admin-sidebar-subnav > :is(button, a) > svg,
@@ -3387,7 +3383,7 @@ body.theme-dark .page-builder .builder-toast,
 
 .admin-dashboard-layout-builder .admin-sidebar :where(
   .admin-sidebar-brand-text,
-  .admin-sidebar-nav button > span,
+  .admin-sidebar-nav :is(button, a) > span,
   .admin-sidebar-theme-row .theme-toggle-label,
   .admin-sidebar-logout > span,
   .admin-sidebar-user-info,
@@ -3399,7 +3395,7 @@ body.theme-dark .page-builder .builder-toast,
 
 .admin-dashboard-layout-builder .admin-sidebar :where(
   .admin-sidebar-brand,
-  .admin-sidebar-nav button,
+  .admin-sidebar-nav :is(button, a),
   .admin-sidebar-theme-row,
   .admin-sidebar-logout,
   .admin-sidebar-user,

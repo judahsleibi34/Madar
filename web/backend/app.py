@@ -42,6 +42,17 @@ from routes.public_site_routes import build_authorized_public_schema, router as 
 from routes.server_status_routes import router as server_status_router
 from routes.user_routes import router as user_router
 from routes.website_routes import router as website_router
+from routes.elearning_routes import router as elearning_router
+from routes.elearning_courses_routes import router as elearning_courses_router
+from routes.elearning_directory_routes import router as elearning_directory_router
+from routes.elearning_participation_routes import router as elearning_participation_router
+from routes.elearning_player_routes import router as elearning_player_router
+from routes.elearning_commerce_routes import router as elearning_commerce_router
+from routes.elearning_academy_routes import router as elearning_academy_router
+from routes.elearning_relationships_routes import router as elearning_relationships_router
+from routes.elearning_assessments_routes import router as elearning_assessments_router
+from routes.elearning_structure_routes import router as elearning_structure_router
+from routes.elearning_content_routes import router as elearning_content_router
 
 from services.auth_service import get_authenticated_user_row, require_regular_user
 from services.builder_asset_storage import (
@@ -110,6 +121,8 @@ PUBLIC_UPLOAD_MEDIA_TYPES = {
     ".jpg": "image/jpeg",
     ".jpeg": "image/jpeg",
     ".webp": "image/webp",
+    ".mp3": "audio/mpeg",
+    ".wav": "audio/wav",
     ".mp4": "video/mp4",
     ".webm": "video/webm",
     ".pdf": "application/pdf",
@@ -318,7 +331,9 @@ def _legacy_asset_visibility(*, tenant_id: int, storage_key: str, request: Reque
     try:
         _, user = get_authenticated_user_row(request, response, allow_admin_account_access=False)
         if int(user.get("tenant_id")) == tenant_id:
-            return True, True
+            from services.elearning_player_service import media_access
+            if media_access(tenant_id, int(user["id"]), storage_key):
+                return True, True
     except Exception:
         pass
     return False, False
@@ -370,7 +385,9 @@ def _asset_visibility(*, tenant_id: int, storage_key: str, request: Request, res
     try:
         _, user = get_authenticated_user_row(request, response, allow_admin_account_access=False)
         if int(user.get("tenant_id")) == tenant_id:
-            return True, True
+            from services.elearning_player_service import media_access
+            if media_access(tenant_id, int(user["id"]), storage_key):
+                return True, True
     except Exception:
         pass
     return False, False
@@ -405,7 +422,7 @@ def get_public_builder_asset(
     except ValueError as error:
         raise _managed_asset_failure(404) from error
 
-    if not re.fullmatch(r"[a-f0-9]{32}\.(?:png|jpg|jpeg|webp|mp4|webm|pdf|doc|docx)", safe_filename):
+    if not re.fullmatch(r"[a-f0-9]{32}\.(?:png|jpg|jpeg|webp|mp4|webm|pdf|doc|docx|mp3|wav)", safe_filename):
         raise _managed_asset_failure(404)
 
     public_root = PUBLIC_UPLOADS_DIR.resolve()
@@ -481,6 +498,19 @@ app.include_router(auth_router)
 app.include_router(health_router)
 app.include_router(user_router)
 app.include_router(website_router)
+app.include_router(elearning_router)
+app.include_router(elearning_courses_router)
+app.include_router(elearning_directory_router)
+app.include_router(elearning_structure_router)
+app.include_router(elearning_content_router)
+app.include_router(elearning_participation_router)
+from routes.elearning_credentials_routes import router as elearning_credentials_router
+app.include_router(elearning_credentials_router)
+app.include_router(elearning_player_router)
+app.include_router(elearning_commerce_router)
+app.include_router(elearning_academy_router)
+app.include_router(elearning_relationships_router)
+app.include_router(elearning_assessments_router)
 app.include_router(password_router)
 app.include_router(mfa_router)
 app.include_router(installation_router)

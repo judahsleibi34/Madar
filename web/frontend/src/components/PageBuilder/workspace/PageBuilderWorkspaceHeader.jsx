@@ -46,12 +46,12 @@ export default function PageBuilderWorkspaceHeader({
       <PageBuilderSubbar
         preview={preview}
         hideWorkspaceTabs={hideWorkspaceTabs}
-        historyControls={historyControls}
+        historyControls={activeTab === "publish" ? null : historyControls}
         viewports={viewports}
         viewport={viewport}
         setViewport={setViewport}
         renderWorkspaceNavigator={renderWorkspaceNavigator}
-        artboardCameraControls={artboardCameraControls}
+        artboardCameraControls={activeTab === "publish" ? null : artboardCameraControls}
       />
     </>
   );

@@ -131,3 +131,12 @@ describe("published button actions", () => {
     })).toBeNull();
   });
 });
+
+it("allows safe relative Academy actions through the shared runtime while retaining ordinary website policy", () => {
+ const element = { type: "button", action: { type: "openUrl", url: "/academy/testing/courses" } };
+ const openExternal = vi.fn();
+ expect(getButtonActionIssue({element,getStoredUrlError})).toMatchObject({issue_type:"invalid_button_url"});
+ expect(runPublicElementAction({element,getStoredUrlError,allowRelative:true,openExternal})).toMatchObject({handled:true});
+ expect(openExternal).toHaveBeenCalledWith("/academy/testing/courses",true);
+ for (const url of ["//evil.test", "javascript:alert(1)"]) expect(getButtonActionIssue({element:{...element,action:{type:"openUrl",url}},getStoredUrlError,allowRelative:true})).not.toBeNull();
+});

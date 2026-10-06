@@ -1,6 +1,8 @@
 import { useEffect } from "react";
 
 const routes = [
+  [/^\/my-learning(?:\/|$)/, () => import("../components/ELearning/ELearningPlayer")],
+  [/^\/e-learning(?:\/|$)/, () => import("../components/ELearning/ELearningWorkspace")],
   [/^\/ecommerce\/products\/(?:new|[^/]+\/edit)(?:\/|$)/, () => import("../components/DashboardBuilder/EcommerceProductEditorPage")],
   [/^\/ecommerce\/delivery(?:\/|$)/, () => import("../components/DashboardBuilder/EcommerceDeliveryPage")],
   [/^\/ecommerce\/orders(?:\/|$)/, () => import("../components/DashboardBuilder/EcommerceOrdersPage")],

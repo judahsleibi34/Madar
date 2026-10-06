@@ -894,6 +894,43 @@ class BuilderFormSubmissionTests(unittest.TestCase):
         self.assertEqual(over_limit.status_code, 422)
         self.assertEqual(negative_offset.status_code, 422)
 
+    def test_academy_owner_cannot_guess_another_owners_project_or_legacy_user_url(self):
+        fake_supabase = FakeSupabase()
+        foreign = {"id": "other-academy", "tenant_id": 2, "owner_user_id": 20, "usage_profile": "academy", "status": "draft", "name": "Private Academy", "draft_schema": {"private": "content"}, "draft_revision": 1}
+        fake_supabase.tables["builder_projects"].append(foreign)
+        client = build_builder_client(fake_supabase)
+        with patch.object(builder_routes, "service_supabase", fake_supabase), \
+             patch.object(builder_routes, "require_active_tenant_member", return_value=fake_context()), \
+             patch.object(builder_routes, "require_builder_write_access", return_value=fake_context()):
+            for path in ["/builder/projects/other-academy", "/users/20/builder/projects/other-academy"]:
+                read = client.get(path)
+                write = client.put(path, headers={"X-Madar-Builder-Contract": "cloud-draft-v1"}, json={"name": "Stolen", "expected_revision": 1})
+                self.assertIn(read.status_code, (403, 404))
+                self.assertIn(write.status_code, (403, 404))
+                self.assertNotIn("Private Academy", read.text)
+                self.assertNotIn("content", read.text)
+        self.assertEqual(foreign["name"], "Private Academy")
+        self.assertEqual(foreign["draft_revision"], 1)
+
+    def test_builder_project_list_filters_profile_before_pagination_and_keeps_tenant_scope(self):
+        fake_supabase = FakeSupabase()
+        fake_supabase.tables["builder_projects"] = [
+            {"id": "academy", "tenant_id": 1, "usage_profile": "academy", "status": "draft", "updated_at": "2026-10-05T14:00:00Z"},
+            {"id": "website", "tenant_id": 1, "usage_profile": "website", "status": "draft", "updated_at": "2026-10-05T13:00:00Z"},
+            {"id": "foreign", "tenant_id": 2, "usage_profile": "website", "status": "draft", "updated_at": "2026-10-05T15:00:00Z"},
+            {"id": "archived", "tenant_id": 1, "usage_profile": "website", "status": "archived", "updated_at": "2026-10-05T16:00:00Z"},
+        ]
+        client = build_builder_client(fake_supabase)
+        with patch.object(builder_routes, "service_supabase", fake_supabase), \
+             patch.object(builder_routes, "require_active_tenant_member", return_value=fake_context()):
+            website = client.get("/builder/projects?usage_profile=website&limit=1").json()
+            academy = client.get("/builder/projects?usage_profile=academy&limit=1").json()
+            invalid = client.get("/builder/projects?usage_profile=unknown")
+        self.assertEqual([row["id"] for row in website["projects"]], ["website"])
+        self.assertFalse(website["pagination"]["has_more"])
+        self.assertEqual([row["id"] for row in academy["projects"]], ["academy"])
+        self.assertEqual(invalid.status_code, 422)
+
 
     def test_project_form_submissions_list_requires_auth(self):
         fake_supabase = FakeSupabase()

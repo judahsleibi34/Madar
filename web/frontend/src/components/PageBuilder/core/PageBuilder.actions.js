@@ -27,7 +27,7 @@ export const normalizeElementAction = (value = {}) => {
   };
 };
 
-export const getButtonActionIssue = ({ element, pages = [], getStoredUrlError }) => {
+export const getButtonActionIssue = ({ element, pages = [], getStoredUrlError, allowRelative = false }) => {
   if (!["button", "imageButton"].includes(element?.type)) return null;
   const action = normalizeElementAction(element.action);
 
@@ -37,7 +37,7 @@ export const getButtonActionIssue = ({ element, pages = [], getStoredUrlError })
   if (action.type === "openUrl" && action.url) {
     const error = getStoredUrlError?.(action.url, {
       fieldName: "Button action URL",
-      allowRelative: false,
+      allowRelative,
       allowEmpty: false,
     });
     if (error) return { issue_type: "invalid_button_url", action_type: action.type, message: error };
@@ -53,9 +53,10 @@ export const runPublicElementAction = ({
   openExternal,
   showMessage,
   showUnavailable,
+  allowRelative = false,
 }) => {
   const action = normalizeElementAction(element?.action);
-  const issue = getButtonActionIssue({ element, pages, getStoredUrlError });
+  const issue = getButtonActionIssue({ element, pages, getStoredUrlError, allowRelative });
   if (issue) {
     showUnavailable?.("This button action is unavailable.");
     return { handled: false, issue };

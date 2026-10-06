@@ -1546,6 +1546,33 @@
   line-height: 1.2;
 }
 
+.page-builder .publish-workspace .publish-panel-title {
+  align-items: center;
+  padding: 20px 24px;
+}
+
+.page-builder .publish-workspace .publish-panel-title h3 {
+  margin: 0;
+}
+
+.page-builder .publish-workspace {
+  width: min(100%, 1200px);
+}
+
+@media (min-width: 701px) {
+  .page-builder .publish-workspace .publish-link-actions {
+    grid-template-columns: repeat(2, max-content);
+    width: fit-content;
+    max-width: 100%;
+    gap: 12px;
+  }
+
+  .page-builder .publish-workspace .publish-link-actions :is(a, button) {
+    min-height: 40px;
+    padding-inline: 16px;
+  }
+}
+
 .page-builder .reservation-editor-empty {
   min-height: 156px;
   padding: 20px;
@@ -2522,3 +2549,11 @@ body.theme-dark .page-builder .responses-results-page > .responses-results-heade
 .page-builder .workspace-page .workspace-card-carousel .product-carousel-dot.is-active {
   background: var(--theme-primary) !important;
 }
+
+/* Academy data controls follow native Inspector spacing and toggle rows. */
+.page-builder .builder-inspector :is(.academy-content-inspector, .academy-content-choices) { min-width: 0; margin: 0; padding: 0; border: 0; }
+.page-builder .builder-inspector .academy-content-inspector { display: grid; gap: 12px; }
+.page-builder .builder-inspector :is(.academy-content-inspector, .academy-content-choices) > legend { padding: 0; margin-block-end: 10px; color: var(--pb-text); font-size: 12px; font-weight: 700; }
+.page-builder .builder-inspector .academy-content-choices { display: grid; gap: 4px; }
+.page-builder .builder-inspector .academy-content-choice { min-height: 36px !important; width: 100%; }
+.page-builder .builder-inspector .academy-content-choice > span { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; line-height: 1.5; }

@@ -62,3 +62,9 @@ describe("Platform commercial route", () => {
     expect(getSafePostLoginPath({ user_type: "user" }, "/admin/tenants/42/commercial")).not.toBe("/admin/tenants/42/commercial");
   });
 });
+
+it("classifies E-Learning settings as an authenticated dashboard route", () => {
+  expect(isDashboardRoutePath("/e-learning/settings")).toBe(true);
+});
+
+it("keeps learner pages in the dashboard shell", () => { expect(isDashboardRoutePath("/my-learning/courses/c/lessons/l")).toBe(true); });

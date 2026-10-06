@@ -26,6 +26,15 @@ const labels = {
   "sidebar.products": "Products",
   "sidebar.storeTheme": "Store theme",
   "sidebar.socialLinks": "Social links",
+  "sidebar.elearning": "E-Learning",
+  "elearning.player.myLearning": "My Learning",
+  "elearning.commerce.catalog": "Course Catalog",
+  "elearning.commerce.myPlans": "My Plans",
+  "elearning.commerce.plansPricing": "Plans / Pricing",
+  "elearning.academy.learningPlans": "Learning Plans",
+  "elearning.academy.academyAccess": "Academy & Access",
+  "elearning.academy.landingPage": "Landing Page",
+  "elearning.certificates.myCertificates": "My Certificates",
   "sidebar.cvRerank": "CV Rerank",
   "sidebar.store": "Store",
   "sidebar.pageBuilder": "Page Builder",
@@ -109,6 +118,7 @@ describe("DashboardSidebar navigation hierarchy", () => {
       "Dashboard",
       "Workspace",
       "Online Store",
+      "E-Learning",
       "CV Rerank",
       "My Plan",
     ]);
@@ -155,7 +165,8 @@ describe("DashboardSidebar navigation hierarchy", () => {
     const ecommerce = screen.getByRole("button", { name: "Online Store" });
 
     expect(ecommerce.getAttribute("aria-expanded")).toBe("true");
-    expect(ecommerce.classList.contains("active-parent")).toBe(true);
+    expect(ecommerce.classList.contains("active-parent")).toBe(false);
+    expect(ecommerce.classList.contains("active")).toBe(false);
 
     const categories = screen.getByRole("link", { name: "Categories" });
     expect(categories.getAttribute("aria-current")).toBe("page");
@@ -224,7 +235,8 @@ describe("DashboardSidebar navigation hierarchy", () => {
 
     expect(sidebar.classList.contains("is-workspace-collapsed")).toBe(true);
     expect(workspace.getAttribute("aria-expanded")).toBe("true");
-    expect(workspace.classList.contains("active-parent")).toBe(true);
+    expect(workspace.classList.contains("active-parent")).toBe(false);
+    expect(workspace.classList.contains("active")).toBe(false);
     expect(workspace.hasAttribute("aria-current")).toBe(false);
     expect(activeChild.getAttribute("aria-current")).toBe("page");
     expect(
@@ -281,12 +293,23 @@ describe("DashboardSidebar navigation hierarchy", () => {
     expect(sidebar.classList.contains("is-workspace-collapsed")).toBe(true);
   });
 
+  it("uses the compact sidebar for the dedicated Academy Builder with manual expansion", () => {
+    renderSidebar("/e-learning/landing-page/projects/academy-1/pages");
+    const sidebar = screen.getByLabelText("Dashboard sidebar");
+    expect(sidebar.classList.contains("is-workspace-collapsed")).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "Expand sidebar" }));
+    expect(sidebar.classList.contains("is-workspace-collapsed")).toBe(false);
+    fireEvent.pointerDown(document.body);
+    expect(sidebar.classList.contains("is-workspace-collapsed")).toBe(true);
+  });
+
   it("keeps settings above the account and reuses all utility actions", () => {
     const props = renderSidebar("/settings");
     const settings = screen.getAllByRole("button", { name: "Settings" })[0];
 
     expect(settings.getAttribute("aria-expanded")).toBe("true");
-    expect(settings.classList.contains("active-parent")).toBe(true);
+    expect(settings.classList.contains("active-parent")).toBe(false);
+    expect(settings.classList.contains("active")).toBe(false);
     expect(screen.getByRole("button", { name: "Language" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Theme" })).toBeTruthy();
 
@@ -308,4 +331,47 @@ it("shows only supported Platform Administration destinations", () => {
   render(<MemoryRouter><DashboardSidebar user={{ account_kind: "platform", user_type: "admin" }} showNotifications /></MemoryRouter>);
   for (const label of ["Dashboard", "Users / Tenants", "Account Access", "Security", "Settings"]) expect(screen.getByRole("button", { name: label, exact: true })).toBeTruthy();
   for (const label of ["Workspace", "Online Store", "My Plan", "CV Rerank", "Home", "Notifications"]) expect(screen.queryByRole("button", { name: label, exact: true })).toBeNull();
+});
+
+it("expands E-Learning and highlights only its active Settings child", () => {
+  renderSidebar("/e-learning/settings");
+  const parent = screen.getByRole("button", { name: "E-Learning" });
+  expect(parent.getAttribute("aria-expanded")).toBe("true");
+  expect(parent.classList.contains("active-parent")).toBe(false);
+  expect(parent.classList.contains("active")).toBe(false);
+  const settings = within(document.getElementById("dashboard-sidebar-elearning")).getByRole("link", { name: "Settings" });
+  expect(settings.getAttribute("href")).toBe("/e-learning/settings");
+  expect(settings.getAttribute("aria-current")).toBe("page");
+});
+
+
+it("expands E-Learning without navigating and opens its Settings child", () => {
+  const props = renderSidebar();
+  const parent = screen.getByRole("button", { name: "E-Learning" });
+  expect(parent.getAttribute("aria-expanded")).toBe("false");
+  fireEvent.click(parent);
+  expect(parent.getAttribute("aria-expanded")).toBe("true");
+  expect(props.onNavigate).not.toHaveBeenCalled();
+  const settings = within(document.getElementById("dashboard-sidebar-elearning")).getByRole("link", { name: "Settings" });
+  fireEvent.click(settings);
+  expect(props.onNavigate).toHaveBeenCalledTimes(1);
+  expect(settings.getAttribute("aria-current")).toBe("page");
+  fireEvent.click(parent);
+  expect(document.getElementById("dashboard-sidebar-elearning")).toBeNull();
+});
+
+it("closes E-Learning when another sidebar section opens", () => {
+  renderSidebar();
+  fireEvent.click(screen.getByRole("button", { name: "E-Learning" }));
+  fireEvent.click(screen.getByRole("button", { name: "Online Store" }));
+  expect(screen.getByRole("button", { name: "E-Learning" }).getAttribute("aria-expanded")).toBe("false");
+});
+
+it.each(["/e-learning/courses", "/e-learning/courses/course-a/structure", "/e-learning/groups", "/e-learning/instructors", "/e-learning/plans"])("keeps normalized E-Learning navigation and highlights one child at %s", (path) => {
+  renderSidebar(path);
+  const group = document.getElementById("dashboard-sidebar-elearning");
+  const links = within(group).getAllByRole("link");
+  expect(links.map((link) => link.textContent.trim())).toEqual(["Courses", "Groups", "Instructors", "Learning Plans", "Landing Page", "Academy & Access", "Settings"]);
+  expect(links.filter((link) => link.getAttribute("aria-current") === "page")).toHaveLength(1);
+  expect(screen.getByRole("button", { name: "E-Learning" }).classList.contains("active")).toBe(false);
 });

@@ -5,11 +5,28 @@ import {
   buildFormConnectionUpdate,
   cleanBuilderProject,
   getDraftProjectFromRecord,
+  getDraftProjectFromRecordWithRepairs,
   normalizeBuilderProjectShape,
   repairDuplicateProjectIds,
 } from "./PageBuilder.project";
 
 describe("cleanBuilderProject", () => {
+  it("opens row-based Academy content on the native continuous canvas without mutating saved data", () => {
+    const record = { usage_profile: "academy", draft_schema: { defaultPageId: "home", pages: [{ id: "home", name: "Home", slug: "/", sections: [
+      { id: "hero", name: "Hero", rows: [{ id: "row", columns: [{ id: "column", elements: [{ id: "title", type: "heading", content: "My Academy" }] }] }] },
+      { id: "courses", name: "Courses", rows: [{ id: "row2", columns: [{ id: "column2", elements: [{ id: "catalog", type: "academyCourseCollection", academy: { maxItems: 4 } }] }] }] },
+    ] }] } };
+    const original = structuredClone(record);
+    const loaded = getDraftProjectFromRecordWithRepairs(record).project;
+    expect(loaded.pages[0].sections).toHaveLength(1);
+    expect(loaded.pages[0].sections[0]).toMatchObject({ mode: "direct", isPageCanvas: true });
+    expect(loaded.pages[0].sections[0].freeElements.map(element => element.id)).toEqual(["title", "catalog"]);
+    expect(loaded.pages[0].sections[0].freeElements[0].content).toBe("My Academy");
+    expect(loaded.pages[0].sections[0].freeElements[1]).not.toHaveProperty("sourceSectionName");
+    expect(record).toEqual(original);
+    expect(getDraftProjectFromRecord({ ...record, draft_schema: loaded }).pages).toEqual(loaded.pages);
+    expect(getDraftProjectFromRecord({ ...record, usage_profile: "website" }).pages[0].sections).toHaveLength(2);
+  });
   it("ignores legacy server editor selection and hydrates the persisted default locally", () => {
     const loaded = getDraftProjectFromRecord({
       status: "draft",
@@ -536,4 +553,15 @@ describe("cleanBuilderProject", () => {
 
     expect(Object.hasOwn(project, "responsiveLayout")).toBe(false);
   });
+});
+
+it('keeps native Academy widgets editable without adding rich-text fields rejected by their server contract', () => {
+  const kinds = ['academyFeaturedCourses', 'academyCourseCollection', 'academyPlans', 'academyContinueLearning', 'academyInstructors'];
+  const project = cleanBuilderProject({ usage_profile: 'academy', pages: [createPage('Home', [createSection({ rows: [{ id: 'row', columns: [{ id: 'col', elements: kinds.map(type => createElement(type)) }] }] })])] });
+  const elements = project.pages.flatMap(page => page.sections.flatMap(getSectionElements));
+  expect(elements.map(element => element.type)).toEqual(kinds);
+  for (const element of elements) {
+    expect(Object.keys(element).filter(key => key.startsWith('richText'))).toEqual([]);
+    expect(element.academy.heading).toBeTruthy();
+  }
 });

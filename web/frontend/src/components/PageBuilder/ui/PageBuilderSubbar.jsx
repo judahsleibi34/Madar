@@ -13,10 +13,10 @@ export default function PageBuilderSubbar({
       <div className="builder-subbar">
         <div className="builder-subbar-inner">
           {renderWorkspaceNavigator()}
-          <div className="builder-subbar-actions">
+          {(historyControls || artboardCameraControls) && <div className="builder-subbar-actions">
             {historyControls}
             {artboardCameraControls}
-          </div>
+          </div>}
         </div>
       </div>
     );

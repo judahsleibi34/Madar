@@ -75,6 +75,7 @@ export function buildStorefrontSeo({
   productDetail,
   category,
   view,
+  publicPage,
 }) {
   const brand = String(site?.brand || site?.footer_store_name || "").trim();
   const growth = site?.growth || {};
@@ -117,6 +118,12 @@ export function buildStorefrontSeo({
   } else if (canonical && brand) {
     structuredData = { "@context": SCHEMA_ORIGIN, "@type": "Organization", name: brand, url: canonical };
     if (image) structuredData.logo = image;
+  }
+
+  if (publicPage) {
+    title = String(publicPage.title || title);
+    description = String(publicPage.description || description);
+    canonical = privateView ? "" : safePublicUrl(publicPage.path, origin);
   }
 
   return {

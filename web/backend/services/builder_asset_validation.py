@@ -32,6 +32,10 @@ def detect_builder_asset_content_type(content: bytes) -> str | None:
         return "video/mp4"
     if content.startswith(b"\x1a\x45\xdf\xa3"):
         return "video/webm"
+    if len(content) >= 12 and content[:4] == b"RIFF" and content[8:12] == b"WAVE":
+        return "audio/wav"
+    if content.startswith(b"ID3") or (len(content) >= 4 and content[0] == 0xff and content[1] & 0xe0 == 0xe0):
+        return "audio/mpeg"
     if content.startswith(b"%PDF-"):
         return "application/pdf"
     if content.startswith(b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"):
@@ -105,9 +109,59 @@ def _validate_doc(path: Path) -> None:
 
 
 def validate_builder_asset_file(path: Path, content_type: str) -> None:
-    if content_type == "application/pdf":
+    if content_type in {"audio/mpeg", "audio/wav"}:
+        _validate_audio(path, content_type)
+    elif content_type == "application/pdf":
         _validate_pdf(path)
     elif content_type == "application/msword":
         _validate_doc(path)
     elif content_type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
         _validate_docx(path)
+
+
+def _validate_audio(path: Path, content_type: str) -> None:
+    if content_type == 'audio/wav':
+        import wave
+        try:
+            with wave.open(str(path), 'rb') as audio:
+                if not 1 <= audio.getnchannels() <= 8 or not 8000 <= audio.getframerate() <= 192000 or audio.getnframes() < 1:
+                    raise BuilderAssetValidationError('builder_asset_audio_invalid')
+                expected = audio.getnframes() * audio.getnchannels() * audio.getsampwidth()
+                actual = 0
+                while chunk := audio.readframes(8192):
+                    actual += len(chunk)
+                if actual != expected:
+                    raise BuilderAssetValidationError('builder_asset_audio_truncated')
+        except (wave.Error, EOFError, OSError) as error:
+            raise BuilderAssetValidationError('builder_asset_audio_invalid') from error
+        return
+    # MPEG Layer III frame validation; do not accept an ID3 signature alone.
+    with path.open('rb') as source:
+        size = path.stat().st_size
+        header = source.read(10)
+        offset = 0
+        if header[:3] == b'ID3':
+            if len(header) < 10 or any(value & 0x80 for value in header[6:10]):
+                raise BuilderAssetValidationError('builder_asset_audio_invalid')
+            offset = 10 + sum(value << shift for value, shift in zip(header[6:10], (21, 14, 7, 0)))
+            if header[5] & 0x10: offset += 10
+        frames = 0
+        while offset + 4 <= size:
+            source.seek(offset)
+            header = source.read(4)
+            if header[:3] == b'TAG' and size - offset == 128: break
+            bits = int.from_bytes(header, 'big')
+            version, layer = (bits >> 19) & 3, (bits >> 17) & 3
+            bitrate_index, rate_index = (bits >> 12) & 15, (bits >> 10) & 3
+            if bits >> 21 != 0x7ff or version == 1 or layer != 1 or bitrate_index in (0, 15) or rate_index == 3:
+                raise BuilderAssetValidationError('builder_asset_audio_invalid')
+            rates = (44100, 48000, 32000)
+            rate = rates[rate_index] // (1 if version == 3 else 2 if version == 2 else 4)
+            bitrates = (0,32,40,48,56,64,80,96,112,128,160,192,224,256,320) if version == 3 else (0,8,16,24,32,40,48,56,64,80,96,112,128,144,160)
+            length = (144 if version == 3 else 72) * bitrates[bitrate_index] * 1000 // rate + ((bits >> 9) & 1)
+            if offset + length > size:
+                raise BuilderAssetValidationError('builder_asset_audio_truncated')
+            offset += length
+            frames += 1
+        if not frames or (offset != size and size - offset != 128):
+            raise BuilderAssetValidationError('builder_asset_audio_invalid')

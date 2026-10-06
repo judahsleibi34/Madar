@@ -113,6 +113,11 @@ export const alignmentOptions = [
 export const elementTypes = [
   { id: "reservationRequest", label: "Date request", group: "Bookings" },
   { id: "reservationFixedSlots", label: "Fixed slots", group: "Bookings" },
+  { id: "academyFeaturedCourses", label: "Featured Courses", group: "Academy" },
+  { id: "academyCourseCollection", label: "Course Collection", group: "Academy" },
+  { id: "academyPlans", label: "Plans / Pricing", group: "Academy" },
+  { id: "academyInstructors", label: "Instructors", group: "Academy" },
+  { id: "academyContinueLearning", label: "Continue Learning", group: "Academy" },
   { id: "heading", label: "Heading", group: "Content" },
   { id: "text", label: "Text", group: "Content" },
   { id: "button", label: "Button", group: "Content" },
@@ -134,6 +139,15 @@ export const elementTypes = [
   { id: "registrationBlock", label: "Registration Form", group: "Auth" },
   { id: "formBlock", label: "Form Block", group: "Connected" },
 ];
+
+export const getBuilderElementName = (element = {}) => {
+  const name = String(element.name || "").trim();
+  const type = String(element.type || "").trim();
+  const label = elementTypes.find(item => item.id === (name || type))?.label;
+  if (label) return label;
+  if (name && name !== type) return name;
+  return type ? type.replace(/([a-z0-9])([A-Z])/g, "$1 $2").replace(/[_-]+/g, " ").replace(/^./, char => char.toUpperCase()) : "Element";
+};
 
 export const fieldTypes = [
   { id: "shortText", label: "Short answer", group: "Text", input: "text" },

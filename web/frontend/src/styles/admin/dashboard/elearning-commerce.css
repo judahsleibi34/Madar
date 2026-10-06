@@ -1,0 +1,44 @@
+.elearning-plan-card, .elearning-plan-form { display: grid; gap: var(--space-4); padding: var(--space-5); min-width: 0; overflow-wrap: anywhere; }
+.elearning-plan-card h2, .elearning-plan-card p { margin: 0; }
+.elearning-course-choice { display: flex; align-items: center; gap: var(--space-3); padding-block: var(--space-2); }
+dialog.elearning-dialog .elearning-course-choice { display: flex; }
+dialog.elearning-dialog .elearning-course-choice input { width: 18px; height: 18px; min-height: 0; flex: 0 0 auto; margin: 0; }
+.elearning-plan-option { border-block-end: 1px solid var(--theme-border); padding-block: var(--space-4); display: grid; gap: var(--space-3); }
+.elearning-plan-form fieldset { min-width: 0; border: 0; border-radius: 0; }
+@media (max-width: 600px) { .elearning-plan-form, .elearning-plan-card { padding: var(--space-4); } }
+
+/* Match directory rows and override the shared modal's column-label layout. */
+dialog.ecommerce-modal.elearning-dialog .elearning-plan-courses { border: 0; margin: 0; padding: 0; background: var(--color-surface); }
+.elearning-plan-courses legend { padding: 0; margin-block-end: .5rem; color: var(--color-text); font-size: .875rem; font-weight: 700; }
+dialog.ecommerce-modal.elearning-dialog .elearning-plan-courses .elearning-course-choice { display: flex; flex-direction: row; align-items: center; justify-content: flex-start; gap: .75rem; padding: .85rem .25rem; margin: 0; min-height: 48px; color: var(--color-text); font-size: .875rem; font-weight: 500; border-block-end: 1px solid var(--color-border); cursor: pointer; }
+dialog.ecommerce-modal.elearning-dialog .elearning-plan-courses .elearning-course-choice:last-child { border-block-end: 0; }
+dialog.ecommerce-modal.elearning-dialog .elearning-plan-courses input[type="checkbox"] { width: 20px; height: 20px; min-height: 0; padding: 0; flex: 0 0 20px; margin: 0; accent-color: var(--color-primary); }
+.elearning-plan-courses .elearning-course-choice span { min-width: 0; overflow-wrap: anywhere; line-height: 1.5; }
+/* The shared modal footer assumes 24px padding; this form uses smaller mobile gutters. */
+dialog.ecommerce-modal.elearning-dialog .elearning-plan-form > footer { position: static; margin: 0; bottom: auto; padding: 1rem 0 0; }
+
+/* A wider plan window keeps pricing and course choices together on desktop. */
+dialog.ecommerce-modal.elearning-dialog.elearning-plan-dialog { width: min(920px, calc(100vw - 32px)); }
+.elearning-plan-options { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; gap: 1.5rem; min-width: 0; }
+.elearning-plan-options > .ecommerce-field-grid { min-width: 0; }
+.elearning-plan-form .elearning-plan-status-help { margin: -.5rem 0 0; color: var(--color-text-muted); font-size: .875rem; line-height: 1.5; }
+dialog.elearning-plan-dialog .elearning-plan-form > footer .ecommerce-primary-button { background: var(--color-primary) !important; color: var(--color-text-inverse) !important; border: 0 !important; }
+dialog.elearning-plan-dialog .elearning-plan-form > footer .ecommerce-primary-button:disabled { opacity: .6 !important; cursor: not-allowed; }
+dialog.elearning-plan-dialog .elearning-plan-form > footer .ecommerce-primary-button[aria-busy="true"] { cursor: wait; }
+@media (max-width: 760px) { .elearning-plan-options { grid-template-columns: minmax(0, 1fr); } }
+/* Preserve the plan action's red identity over the global disabled-action reset. */
+body .admin-dashboard-layout .admin-dashboard-page dialog.elearning-plan-dialog .elearning-plan-form > footer .ecommerce-primary-button:disabled {
+  background: var(--color-primary) !important;
+  color: var(--color-text-inverse) !important;
+  -webkit-text-fill-color: var(--color-text-inverse) !important;
+  border: 1px solid var(--color-primary) !important;
+  opacity: .6 !important;
+}
+
+.elearning-plans-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1rem; min-height: 320px; padding: 2.5rem 1.5rem; text-align: center; background: var(--color-surface); }
+.elearning-plans-empty .elearning-plans-empty-icon { display: grid; place-items: center; width: 64px; height: 64px; border-radius: 1rem; background: var(--color-primary-soft); color: var(--color-primary); }
+.elearning-plans-empty h2 { margin: 0; font-size: 1.5rem; line-height: 1.35; color: var(--color-text); }
+.elearning-plans-empty p { max-width: 480px; margin: 0; color: var(--color-text-muted); line-height: 1.6; }
+.elearning-plans-empty button { margin-block-start: .5rem; }
+@media (max-width: 600px) { .elearning-plans-empty { min-height: 280px; padding: 2rem 1.25rem; } .elearning-plans-empty h2 { font-size: 1.25rem; } .elearning-plans-empty button { width: 100%; justify-content: center; } }
+.elearning-plans-empty :is(h2, p) { text-align: center; }
