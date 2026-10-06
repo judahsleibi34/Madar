@@ -76,3 +76,17 @@ prefer runtime-only rollback against the current local database/storage. Restori
 the pre-cutover checkpoint would discard later writes and requires a separate
 reviewed recovery decision. Take a new verified checkpoint at the approved write
 freeze. Never execute backup restoration against the live target in rehearsal.
+
+
+## Verification-link logging
+
+Prepare a new gateway LDS template with `prepare_gateway_logging.py`, its exact
+reviewed input SHA256 and a new output path. The helper changes only the access
+log formatter to PATH(NQ:ORIG_OR_PATH), drops Referer, and refuses overwritten
+output or unexpected input. Set MADAR_SAFE_ENVOY_LDS_TEMPLATE to that prepared
+path when using the gateway overlay. See Envoy's documented PATH(NQ) formatter:
+https://www.envoyproxy.io/docs/envoy/v1.35.5/configuration/observability/access_log/usage
+Frontend/stable proxy sources now log paths without query/Referer and protect
+exact verification callback locations from normal access/error request logging.
+No production proxy logging changed. Verify edge/Cloudflare logging handling at
+approval; do not log or export real verification/session credentials in tests.

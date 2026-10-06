@@ -384,3 +384,16 @@ The installed controller must agree with this exact candidate contract before
 an approved deployment. That remains a governed production change, not part of
 pre-cutover engineering. Existing provenance, backup, deployment lock, exact-main,
 readiness, traffic, worker and observation gates remain unchanged.
+
+
+### Credential-safe callback proxy logs
+
+Prepared frontend/stable proxies log method and normalized URI without query or
+Referer. Exact verification callback locations suppress access logs and reduce
+request-bearing error logging to critical failures. The prepared local gateway
+LDS template uses Envoy PATH(NQ:ORIG_OR_PATH) and omits Referer, generated to a new
+file by a checksum-guarded helper. Set MADAR_SAFE_ENVOY_LDS_TEMPLATE to that
+reviewed file before loading the gateway overlay. Existing API callbacks,
+upstreams, port bindings and routing headers are unchanged. No live proxy was
+reloaded. This protected proxy source still needs governed installation approval;
+edge logging policies remain an operator gate.

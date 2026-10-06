@@ -46,6 +46,8 @@ jobs:
             --volume "$PWD/web/supabase:/app/supabase:ro" \
             --volume "$PWD/web/scripts:/test-repository/scripts:ro" \
             --volume "$PWD/web/deployment:/test-repository/deployment:ro" \
+            --volume "$PWD/web/precutover:/test-repository/precutover:ro" \
+            --volume "$PWD/web/frontend/nginx.conf.template:/test-repository/frontend/nginx.conf.template:ro" \
             --volume "$PWD/web/database:/workspace/database:ro" \
             --volume "$PWD/web/supabase:/workspace/supabase:ro" \
             --volume "$PWD/web/database:/database:ro" \
