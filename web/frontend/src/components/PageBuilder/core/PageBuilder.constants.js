@@ -140,6 +140,15 @@ export const elementTypes = [
   { id: "formBlock", label: "Form Block", group: "Connected" },
 ];
 
+export const getBuilderElementName = (element = {}) => {
+  const name = String(element.name || "").trim();
+  const type = String(element.type || "").trim();
+  const label = elementTypes.find(item => item.id === (name || type))?.label;
+  if (label) return label;
+  if (name && name !== type) return name;
+  return type ? type.replace(/([a-z0-9])([A-Z])/g, "$1 $2").replace(/[_-]+/g, " ").replace(/^./, char => char.toUpperCase()) : "Element";
+};
+
 export const fieldTypes = [
   { id: "shortText", label: "Short answer", group: "Text", input: "text" },
   { id: "paragraph", label: "Long answer", group: "Text", input: "textarea" },

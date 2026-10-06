@@ -3,12 +3,13 @@ import { createContext, useContext } from "react";
 import { Link } from "react-router-dom";
 import { getBrandedMadarSubdomain } from "../../../utils/hostedAddress";
 import { useTranslation } from "react-i18next";
+import { getBuilderElementName } from "../core/PageBuilder.constants";
 export const AcademyCompositionContext = createContext(null);
 export default function AcademyDataBlock({ element, editing = false }) {
   const runtime = useContext(AcademyCompositionContext);
   const { t } = useTranslation("dashboard");
   const config = element.academy || {};
-  const heading = config.heading || element.name;
+  const heading = config.heading || getBuilderElementName(element);
   const setupKeys = { academyFeaturedCourses: "featured", academyCourseCollection: "courses", academyPlans: "plans", academyInstructors: "instructors", academyContinueLearning: "continue" };
   const empty = (key = setupKeys[element.type]) => editing ? <section className="academy-section academy-builder-empty" data-academy-component={element.type}>
     <h2>{heading}</h2>{config.description && <p>{config.description}</p>}

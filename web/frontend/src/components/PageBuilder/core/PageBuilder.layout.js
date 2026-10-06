@@ -1,4 +1,4 @@
-import { viewports } from "./PageBuilder.constants";
+import { viewports, getBuilderElementName } from "./PageBuilder.constants";
 import { createPosition, createSection } from "./PageBuilder.factories";
 import { clampElementToBounds } from "./PageBuilder.bounds";
 
@@ -1130,8 +1130,8 @@ export const getProjectOverlapWarnings = ({
                 page: page.name || "Untitled page",
                 section: section.name || "Untitled section",
                 viewport: viewportName,
-                first: element.name || element.type || "Component",
-                second: other.name || other.type || "Component",
+                first: getBuilderElementName(element),
+                second: getBuilderElementName(other),
               });
             }
           });

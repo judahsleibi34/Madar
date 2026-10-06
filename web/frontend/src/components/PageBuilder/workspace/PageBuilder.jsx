@@ -51,6 +51,7 @@ import {
   builderTabs as allBuilderTabs,
   alignmentOptions,
   elementTypes as allElementTypes,
+  getBuilderElementName,
   fieldTypes,
   workflowStepTypes,
   permissionGroups,
@@ -2630,7 +2631,7 @@ export default function PageBuilder({
     }
 
     const copy = cloneWithNewIds(clipboard.element);
-    copy.name = `${clipboard.element.name || "Element"} Copy`;
+    copy.name = `${getBuilderElementName(clipboard.element)} Copy`;
 
     if (targetLocation.isFree) {
       copy.mode = "direct";
@@ -5712,7 +5713,7 @@ export default function PageBuilder({
         targetSectionId: targetSection.id,
         viewportName: viewport,
       }));
-      showToast(`Moved ${selectedElement.name || "component"} to ${targetSection.name || "section"}.`);
+      showToast(`Moved ${getBuilderElementName(selectedElement)} to ${targetSection.name || "section"}.`);
     } else if (sourceLocation && finalPreview.previewPosition) {
       updateSections((sections) => commitDirectElementInteraction(sections, {
         elementId: selectedElement.id,
@@ -6496,10 +6497,10 @@ export default function PageBuilder({
             if (preview || !effectiveSelectedElementIds.includes(element.id)) return null;
             return (
               <SelectionBoundary frameStyle={frameStyle} elementId={element.id}>
-                <button type="button" className="direct-move-handle" aria-label={"Move " + (element.name || "component")} title="Drag to move in any direction" onPointerDown={(event) => startDrag(event, element, "move", true)}>
+                <button type="button" className="direct-move-handle" aria-label={"Move " + getBuilderElementName(element)} title="Drag to move in any direction" onPointerDown={(event) => startDrag(event, element, "move", true)}>
                   <Move size={13} aria-hidden="true" />
                 </button>
-                <button type="button" className="direct-resize-handle" aria-label={"Resize " + (element.name || "component")} title="Drag to resize the box" onPointerDown={(event) => startDrag(event, element, "resize", true)} />
+                <button type="button" className="direct-resize-handle" aria-label={"Resize " + getBuilderElementName(element)} title="Drag to resize the box" onPointerDown={(event) => startDrag(event, element, "resize", true)} />
               </SelectionBoundary>
             );
           }}
@@ -6545,7 +6546,7 @@ export default function PageBuilder({
               <option value="">Choose a layer</option>
               {activePageLayers.map(({ element, sectionName }) => (
                 <option value={element.id} key={element.id}>
-                  {element.name || element.type} · {sectionName}{element.layer === "behindText" ? " · Behind text" : ""}
+                  {getBuilderElementName(element)} · {sectionName === "Page Canvas" ? "Page" : sectionName}{element.layer === "behindText" ? " · Behind text" : ""}
                 </option>
               ))}
             </select>
@@ -6671,7 +6672,7 @@ export default function PageBuilder({
         <div className="inspector-group">
           <h3>{selectedElement.type === "reservationBlock" ? "Reservation" : "Element"}</h3>
           {selectedElement.type !== "reservationBlock" && (
-            <label>Name<input value={selectedElement.name} onChange={(event) => updateSelectedElement({ name: event.target.value })} /></label>
+            <label>Name<input value={getBuilderElementName(selectedElement)} onChange={(event) => updateSelectedElement({ name: event.target.value })} /></label>
           )}
           {selectedElement.type.startsWith("academy") && <AcademyDataInspector key={selectedElement.id} element={selectedElement} onChange={updateSelectedElement} />}
           {selectedElement.type === "logoSlider" && (
