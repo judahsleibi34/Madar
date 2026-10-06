@@ -11,15 +11,15 @@ def management_profile(tenant_id):
     """Owner-only navigation metadata; reuse persisted Builder state without seeding."""
     from database import service_supabase
     from services.elearning_settings_service import settings_available
-    if not settings_available(131):
+    if not settings_available(132):
         return None
-    websites = service_supabase.table("website_settings").select("subdomain,academy_project_id" + (",academy_editor_project_id" if settings_available(132) else "")).eq("tenant_id", tenant_id).limit(1).execute().data or []
+    websites = service_supabase.table("website_settings").select("subdomain,academy_project_id" + (",academy_editor_project_id" if settings_available(133) else "")).eq("tenant_id", tenant_id).limit(1).execute().data or []
     projects = service_supabase.table("builder_projects").select("id,status,draft_revision,published_revision,last_published_at,draft_schema,published_schema").eq("tenant_id", tenant_id).eq("usage_profile", "academy").neq("status", "archived").order("created_at").limit(1).execute().data or []
     editor = websites[0].get("academy_editor_project_id") if websites else None
-    if editor and settings_available(132):
+    if editor and settings_available(133):
         bound = service_supabase.table("builder_projects").select("*").eq("tenant_id", tenant_id).eq("id", editor).eq("usage_profile", "academy").neq("status", "archived").limit(1).execute().data or []
         if bound: projects = bound
-    return {"editor_project_id": editor, "full_builder_available": settings_available(132), "subdomain": websites[0].get("subdomain") if websites else None, "published_project_id": websites[0].get("academy_project_id") if websites else None, "landing_project": projects[0] if projects else None}
+    return {"editor_project_id": editor, "full_builder_available": settings_available(133), "subdomain": websites[0].get("subdomain") if websites else None, "published_project_id": websites[0].get("academy_project_id") if websites else None, "landing_project": projects[0] if projects else None}
 
 
 def validate_academy_schema(schema):
@@ -32,7 +32,7 @@ def validate_academy_schema(schema):
         if isinstance(value, dict):
             return value.get("type") == "academyInstructors" or any(has_instructors(child) for child in value.values())
         return isinstance(value, list) and any(has_instructors(child) for child in value)
-    if (len(schema["pages"]) > 1 or has_instructors(schema)) and not settings_available(132):
+    if (len(schema["pages"]) > 1 or has_instructors(schema)) and not settings_available(133):
         raise HTTPException(503, detail={"code": "academy_builder_upgrade_required"})
     reserved = {"courses", "plans", "login", "signup", "auth", "my-learning", "account", "checkout", "assessments", "api", "admin", "dashboard", "settings", "builder", "page-builder"}
     import re
@@ -97,7 +97,7 @@ def validate_academy_schema(schema):
 
 
 def default_landing(settings, subdomain):
-    """Translate saved schema-130 presentation without overwriting it."""
+    """Translate saved schema-131 presentation without overwriting it."""
     def uid(prefix):
         return f"{prefix}_{uuid4().hex}"
     def element(kind, content="", **extra):

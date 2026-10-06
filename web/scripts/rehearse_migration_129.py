@@ -26,7 +26,7 @@ with psycopg.connect(rehearsal,autocommit=True) as db:
    # Strip only the outer transaction to prove full DDL rollback on an isolated DB.
    with db.transaction(force_rollback=True): db.execute(path.read_text().removeprefix('begin;').removesuffix('commit;\n'))
    assert db.execute("select schema_version from public.application_schema_state where contract_key='core'").fetchone()[0]==128
-   assert db.execute("select to_regclass('public.elearning_credentials')").fetchone()[0] is None
+   assert db.execute("select to_regclass('public.ecommerce_offerings')").fetchone()[0] is None
    print('Migration 129 transaction rollback verified',flush=True)
   db.execute(path.read_text())
  print('Fresh migrations 001..129 applied; target',db.execute("select schema_version from public.application_schema_state where contract_key='core'").fetchone()[0],flush=True)
@@ -35,7 +35,7 @@ os.environ['ELEARNING_SYNTHETIC_DATABASE_DSN']=rehearsal
 os.environ['PYTHONPATH']=str(root/'backend')
 import sys,unittest
 sys.path.insert(0,str(root/'backend'));sys.path.insert(0,str(root/'backend/tests'))
-suite=unittest.defaultTestLoader.loadTestsFromNames(['test_elearning_credentials_database','test_elearning_commerce_database','test_elearning_placements_database','test_elearning_assessments_database','test_elearning_relationships_database','test_elearning_player_database','test_elearning_content_database','test_elearning_structure_database','test_elearning_course_deletion_database','test_elearning_enrollment_management_database'])
+suite=unittest.defaultTestLoader.loadTestsFromNames(['test_elearning_commerce_database','test_elearning_placements_database','test_elearning_assessments_database','test_elearning_relationships_database','test_elearning_player_database','test_elearning_content_database','test_elearning_structure_database','test_elearning_course_deletion_database','test_elearning_enrollment_management_database'])
 result=unittest.TextTestRunner(verbosity=2).run(suite)
 if not result.wasSuccessful(): raise SystemExit(1)
 with psycopg.connect(dsn,autocommit=True) as db:

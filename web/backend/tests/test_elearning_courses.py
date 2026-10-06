@@ -102,7 +102,7 @@ class ELearningCourseTests(unittest.TestCase):
         self.assertEqual(self.http.put(f"/elearning/courses/{course['id']}", json={"name": "Stale", "expected_revision": 1}).status_code, 409)
         self.assertEqual(self.db.rows["elearning_courses"][0]["status"], "archived")
 
-    def test_pre117_list_is_empty_and_all_writes_fail_without_querying_course_table(self):
+    def test_pre118_list_is_empty_and_all_writes_fail_without_querying_course_table(self):
         with patch.object(service, "courses_available", return_value=False):
             self.assertEqual(self.http.get("/elearning/courses").json(), {"available": False, "courses": [], "has_more": False})
             self.assertEqual(self.http.post("/elearning/courses", json={"name": "Bridge"}).status_code, 503)
@@ -159,13 +159,13 @@ class ELearningCourseTests(unittest.TestCase):
 
 
 class ELearningCourseSchemaGateTests(unittest.TestCase):
-    def test_settings_are_available_on_116_but_courses_require_117(self):
+    def test_settings_are_available_on_117_but_courses_require_118(self):
         database = Client()
         with patch.object(settings, "service_supabase", database):
-            for schema_version, course_available in [(114, False), (115, False), (116, False), (117, True)]:
+            for schema_version, course_available in [(114, False), (115, False), (116, False), (117, False), (118, True)]:
                 database.rows["application_schema_state"] = [{"contract_key": "core", "schema_version": schema_version}]
                 self.assertEqual(service.courses_available(), course_available)
-                self.assertEqual(settings.settings_available(), schema_version >= 116)
+                self.assertEqual(settings.settings_available(), schema_version >= 117)
 
 class CourseDeletionAPITests(unittest.TestCase):
     def setUp(self):
@@ -186,7 +186,7 @@ class CourseDeletionAPITests(unittest.TestCase):
             self.assertIn(response.status_code,(400,422))
         self.db.rpc.assert_not_called()
 
-    def test_pre121_and_members_fail_closed(self):
+    def test_pre122_and_members_fail_closed(self):
         with patch.object(service,'settings_available',return_value=False):
             self.assertEqual(self.http.request('DELETE',f'/elearning/courses/{self.course}',json=self.payload).status_code,503)
         self.member.role='member'

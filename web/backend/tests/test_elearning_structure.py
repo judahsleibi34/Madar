@@ -57,7 +57,7 @@ class ELearningStructureTests(unittest.TestCase):
             self.assertEqual(self.http.get(self.base + f"/lessons/{self.item}").status_code, 503)
             self.db.rpc.assert_not_called()
 
-    def test_pre117_read_fails_closed_without_querying_course_table(self):
+    def test_pre118_read_fails_closed_without_querying_course_table(self):
         with patch.object(service, "structure_available", return_value=False), patch.object(service, "settings_available", return_value=False):
             self.assertEqual(self.http.get(self.base + "/structure").status_code, 503)
             self.db.table.assert_not_called()

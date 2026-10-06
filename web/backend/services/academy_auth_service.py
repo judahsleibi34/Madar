@@ -27,6 +27,6 @@ def academy_auth_settings(identifier, request):
     website = resolve_website_settings(identifier, request=request)
     tenant_id = resolve_tenant_id(website)
     settings = get_settings(tenant_id)
-    if not settings_available(131) or not settings["enabled"] or not settings["academy_enabled"]:
+    if not settings_available(132) or not settings["enabled"] or not settings["academy_enabled"]:
         raise HTTPException(404, "Academy unavailable")
     return website, tenant_id, settings

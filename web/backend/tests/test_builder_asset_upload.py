@@ -159,11 +159,11 @@ class BuilderAssetUploadTests(unittest.TestCase):
         self.record_audit_event.assert_called_once()
         self.assertEqual(self.record_audit_event.call_args.kwargs["action"], "elearning.logo_uploaded")
 
-    def test_course_cover_reuses_upload_pipeline_and_requires_schema_117(self):
+    def test_course_cover_reuses_upload_pipeline_and_requires_schema_118(self):
         with patch.object(elearning_settings_service, "settings_available", return_value=True) as available:
             response = self.client.post("/elearning/courses/cover/upload", files={"file": ("cover.png", PNG_BYTES, "image/png")})
         self.assertEqual(response.status_code, 200, response.text)
-        available.assert_called_with(117)
+        available.assert_called_with(118)
         self.assertEqual(self.record_audit_event.call_args.kwargs["action"], "elearning.course_cover_uploaded")
         with patch.object(elearning_settings_service, "settings_available", return_value=False):
             response = self.client.post("/elearning/courses/cover/upload", files={"file": ("cover.png", PNG_BYTES, "image/png")})

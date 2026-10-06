@@ -77,7 +77,7 @@ class ELearningSettings(BaseModel):
         return validate_public_url(value, field_name="Platform image URL")
 
 
-def settings_available(minimum_schema=116):
+def settings_available(minimum_schema=117):
     rows = (service_supabase.table("application_schema_state")
             .select("schema_version").eq("contract_key", "core").limit(1).execute()).data or []
     if not rows:
@@ -109,7 +109,7 @@ def require_owned_image(tenant_id, image_url):
 def save_settings(tenant_id, settings):
     require_owned_image(tenant_id, settings.logo_url)
     require_owned_image(tenant_id, settings.academy_hero_image)
-    if settings.academy_enabled and not settings_available(130):
+    if settings.academy_enabled and not settings_available(131):
         raise HTTPException(503, detail="Academy requires the database upgrade")
     if settings.academy_featured_courses:
         ids = [str(value) for value in settings.academy_featured_courses]

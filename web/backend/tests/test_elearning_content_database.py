@@ -20,6 +20,7 @@ class ELearningContentDatabaseTests(unittest.TestCase):
 
     def setUp(self):
         self.db=psycopg.connect(DSN);self.addCleanup(self.db.close)
+        self.existing_block_ids = self.db.execute("select id from public.elearning_content_blocks order by id").fetchall()
         self.tenant=self.db.execute("insert into public.tenants(brand_name,owner_name) values('Content test','Local') returning tenant_id").fetchone()[0]
         auth=uuid4();email=f'{auth}@example.com'
         self.db.execute('insert into auth.users(id,email) values(%s,%s)',(auth,email))
@@ -75,7 +76,7 @@ class ELearningContentDatabaseTests(unittest.TestCase):
         cases=[{'type':'quiz','content':{'version':1}}, {'type':'text','content':{'version':1,'body':' '}}, {'type':'audio','media_id':foreign,'content':{'version':1}}, {'type':'audio','media_id':video,'content':{'version':1}}, {'type':'audio','media_id':audio,'content':{'version':1}}, {'type':'video','media_id':str(uuid4()),'content':{'version':1}}]
         for payload in cases:
             with self.subTest(payload=payload),self.assertRaises(psycopg.errors.InvalidParameterValue),self.db.transaction(): self.command(payload=payload)
-        self.assertEqual(self.db.execute('select count(*) from public.elearning_content_blocks').fetchone()[0],0)
+        self.assertEqual(self.db.execute('select id from public.elearning_content_blocks order by id').fetchall(), self.existing_block_ids)
 
     def test_permissions_stale_revision_confirmation_and_archived_parent(self):
         block=self.command()['blocks'][0]['id']
@@ -104,7 +105,7 @@ class ELearningContentDatabaseTests(unittest.TestCase):
         for lesson in copied['sections'][1]['lessons']:
             self.assertEqual(len(self.db.execute('select public.get_elearning_content(%s,%s,%s)',(self.tenant,self.course,lesson['id'])).fetchone()[0]['blocks']),1)
         result=self.db.execute("select public.delete_elearning_course(%s,%s,%s,1,%s,'Content test',true)",(self.tenant,self.course,self.user,copied['revision'])).fetchone()[0]
-        self.assertTrue(result['deleted']);self.assertEqual(self.db.execute('select count(*) from public.elearning_content_blocks').fetchone()[0],0)
+        self.assertTrue(result['deleted']);self.assertEqual(self.db.execute('select id from public.elearning_content_blocks order by id').fetchall(), self.existing_block_ids)
 
     def test_tenant_purge_removes_content_but_ordinary_lesson_delete_is_restricted(self):
         self.command(payload={"type":"audio","media_id":self.media(),"content":{"version":1}})

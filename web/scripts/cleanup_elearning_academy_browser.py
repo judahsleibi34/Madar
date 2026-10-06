@@ -10,7 +10,7 @@ config=dotenv_values(root/'.env.database.local');url=urlsplit(config['SUPABASE_D
 assert url.hostname in {'localhost','127.0.0.1','::1'} and url.port==54322
 assert fixture['tenant_id']==3 and fixture['user_id']==1 and len(fixture['courses'])<=7 and len(fixture['templates'])<=1 and len(fixture['plans'])<=3
 with psycopg.connect(config['SUPABASE_DB_URL']) as db:
- assert db.execute("select schema_version from application_schema_state where contract_key='core'").fetchone()[0]==130
+ assert db.execute("select schema_version from application_schema_state where contract_key='core'").fetchone()[0]==131
  db.execute('select pg_advisory_xact_lock(125,3)')
  # Privileged deletion is allowed solely for exact temporary local fixtures.
  for cid in fixture['courses']:

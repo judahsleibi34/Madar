@@ -6,7 +6,7 @@ from services.elearning_settings_service import settings_available, get_settings
 
 
 def call(name, member, **args):
-    if not settings_available(124):
+    if not settings_available(125):
         raise HTTPException(503, detail={"code": "elearning_player_upgrade_required"})
     try:
         return service_supabase.rpc(name, {"p_tenant_id": member.tenant_id, "p_user_id": member.user_id, **args}).execute().data
@@ -34,7 +34,7 @@ def course(member, course_id, lesson_id=None, complete=False):
 
 def media_access(tenant_id, user_id, storage_key):
     # Old compatible schemas retain their existing file rules; player APIs fail closed.
-    if not settings_available(124): return True
+    if not settings_available(125): return True
     result = service_supabase.rpc("elearning_learner_media_access", {"p_tenant_id": tenant_id, "p_user_id": user_id, "p_storage_key": storage_key}).execute().data
     if result is not None and type(result) is not bool: raise ValueError("Invalid learning media authorization")
     return result is not False

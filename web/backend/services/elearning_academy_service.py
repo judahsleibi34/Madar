@@ -25,7 +25,7 @@ def profile(tenant_id, website):
 
 
 def storefront(tenant_id, website, actor=None, course_id=None):
-    if not settings_available(130):
+    if not settings_available(131):
         raise HTTPException(503, detail={"code": "academy_upgrade_required"})
     try:
         result = service_supabase.rpc("get_elearning_academy", {
@@ -65,12 +65,12 @@ def storefront(tenant_id, website, actor=None, course_id=None):
                 break
     from services.academy_builder_service import default_landing, validate_academy_schema
     landing = default_landing(get_settings(tenant_id), website["subdomain"])
-    if settings_available(131) and website.get("academy_project_id"):
+    if settings_available(132) and website.get("academy_project_id"):
         projects = service_supabase.table("builder_projects").select("published_schema,status").eq("id", website["academy_project_id"]).eq("tenant_id", tenant_id).eq("usage_profile", "academy").limit(1).execute().data or []
         if projects and projects[0].get("status") == "published" and projects[0].get("published_schema"):
             landing = validate_academy_schema(projects[0]["published_schema"])
     instructors = []
-    if settings_available(132):
+    if settings_available(133):
         instructors = service_supabase.rpc("get_academy_public_instructors", {"p_tenant_id": tenant_id, "p_course_ids": [card["id"] for card in result["courses"]]}).execute().data or []
     site = profile(tenant_id, website)
     if actor and actor.role in {"owner", "admin"}:
@@ -81,7 +81,7 @@ def storefront(tenant_id, website, actor=None, course_id=None):
 def member_profile(tenant_id):
     # Navigation only, no commerce/account data and no second branding store.
     cfg = get_settings(tenant_id)
-    if not cfg["enabled"] or not cfg["academy_enabled"] or not settings_available(130):
+    if not cfg["enabled"] or not cfg["academy_enabled"] or not settings_available(131):
         return None
     rows = (service_supabase.table("website_settings").select("subdomain,brand,logo_url,description,ecommerce_theme")
             .eq("tenant_id", tenant_id).limit(1).execute()).data or []

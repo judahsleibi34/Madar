@@ -49,9 +49,9 @@ cards. Completed courses expose their outline for review.
   explicit idempotent completion using session identity, with audit recording.
 
 Clients never supply tenant, user or enrollment IDs for learner authority.
-All new runtime APIs fail closed before schema 124. Earlier administration APIs
-retain their original schema gates. The release bridge is 114..124 and pins
-`migrations-115-124.json`; prior migrations/manifests remain immutable.
+All new runtime APIs fail closed before schema 125. Earlier administration APIs
+retain their original schema gates. The release bridge is 114..125 and pins
+`migrations-115-125.json`; prior migrations/manifests remain immutable.
 
 ## Media
 
@@ -68,12 +68,12 @@ added to production behavior or used in this phase's browser verification.
 ## Local validation — 2026-10-04
 
 Used the existing local test account and generated loopback Docker PostgreSQL
-configuration. Fresh migrations 001..124 succeeded on a marked disposable
-database. Migration 124 DDL/schema-state rollback was verified, followed by 75
+configuration. Fresh migrations 001..125 succeeded on a marked disposable
+database. Migration 125 DDL/schema-state rollback was verified, followed by 75
 SQL tests covering learner authority, draft/archive filtering, sequence,
 explicit idempotent completion, shared reports, media locks, cross-course
 relationships, client RPC denial and earlier learning lifecycle regressions.
-The rehearsal database was removed. The rehearsed migration and version 124
+The rehearsal database was removed. The rehearsed migration and version 125
 ledger entry were then applied only to the local development database.
 
 Actual Chrome clicks: Dashboard → E-Learning → My Learning → Open Course →

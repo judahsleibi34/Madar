@@ -36,7 +36,7 @@ class AcademyCompositionTests(unittest.TestCase):
             schema['pages'][0]['sections'][1]['rows'][0]['columns'][0]['elements'][0]['academy']=config
             with self.assertRaises(HTTPException): validate_academy_schema(schema)
 
-    def test_public_pages_and_instructors_use_schema_132_without_private_payloads(self):
+    def test_public_pages_and_instructors_use_schema_133_without_private_payloads(self):
         from unittest.mock import patch
         schema=deepcopy(self.schema)
         schema['pages'].append({'id':'about','name':'About','slug':'/about','sections':[]})

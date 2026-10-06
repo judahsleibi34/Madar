@@ -1690,7 +1690,7 @@ async def upload_builder_asset(
         if elearning_content:
             from services.elearning_content_service import require_available
             require_available()
-        if not elearning_content and not settings_available(117 if elearning_course_cover else 116):
+        if not elearning_content and not settings_available(118 if elearning_course_cover else 117):
             raise HTTPException(status_code=503, detail={"code": "elearning_courses_upgrade_required" if elearning_course_cover else "elearning_upgrade_required", "message": "E-Learning requires a database upgrade"})
         require_entitlement(context.tenant_id, "image_uploads")
     elif ecommerce_product_media:
@@ -2377,7 +2377,7 @@ def create_builder_project(
         from services.academy_builder_service import validate_academy_schema
         if context.role not in {"owner", "admin"}:
             raise HTTPException(403, "Academy management access required")
-        if not settings_available(131):
+        if not settings_available(132):
             raise HTTPException(503, detail={"code": "academy_builder_upgrade_required"})
         validate_academy_schema(draft_schema)
     require_schema_asset_tenant(draft_schema, context.tenant_id)

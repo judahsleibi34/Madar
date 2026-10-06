@@ -39,7 +39,7 @@ class CompletionPayload(BaseModel):
 
 
 def participation_available():
-    return settings_available(120)
+    return settings_available(121)
 
 
 def require_available():
@@ -112,7 +112,7 @@ class EnrollmentStatusPayload(BaseModel):
 
 
 def require_enrollment_management():
-    if not settings_available(122):
+    if not settings_available(123):
         raise HTTPException(503, detail={"code": "elearning_enrollment_upgrade_required", "message": "Enrollment management requires the database upgrade."})
 
 

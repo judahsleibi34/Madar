@@ -10,7 +10,7 @@ The existing local test account was reused; no account was created.
 | Check | Result |
 | --- | --- |
 | Dependency lock validator | Pass; dependency manifests/lockfiles unchanged |
-| Migration tree validator | Pass; 123 mirrored migrations; only existing 013/014 historical warnings |
+| Migration tree validator | Pass; 124 mirrored migrations; only existing 013/014 historical warnings |
 | Migration transition validator | Pass |
 | Forward release validator | Pass; active bridge 114..123 |
 | Tracked secret hygiene | Pass |
@@ -31,15 +31,15 @@ entire suite, including release/control-plane tests. SQL suites skipped by that
 runner execute separately against a marked disposable loopback database;
 other optional database/environment skips remain governed by their test guards.
 
-All migrations 001..123 applied from scratch in a new disposable database on
-the local Docker PostgreSQL server. Migration 123's complete DDL/schema-state
+All migrations 001..124 applied from scratch in a new disposable database on
+the local Docker PostgreSQL server. Migration 124's complete DDL/schema-state
 transaction was rolled back and its absence verified before forward application.
 SQL checks cover media ownership/type/status, tenant/course/lesson/block scope,
 concurrent revision conflicts, ordering, duplicate content, archive/restore,
 confirmed deletion, protected-reference rollback and tenant purge including
 managed media. The marked database was removed afterward. The rehearsed
 migration then advanced only the generated loopback development database from
-122 to 123 and recorded version 123 in its local Supabase migration ledger.
+123 to 124 and recorded version 124 in its local Supabase migration ledger.
 Production migration history and prior tracked SQL/manifests were not edited.
 
 Chrome created a temporary lesson containing Text → Audio → Text → Video,

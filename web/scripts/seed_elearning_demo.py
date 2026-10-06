@@ -43,8 +43,8 @@ def local_configuration():
 def resolve_owner(db, email):
     row = db.execute("select u.tenant_id,u.id from public.users u join public.tenant_memberships m on(m.tenant_id,m.user_id,m.auth_id)=(u.tenant_id,u.id,u.auth_id) join public.tenants t on t.tenant_id=u.tenant_id and t.lifecycle_state='active' where lower(u.email)=lower(%s) and u.account_status='active' and m.status='active' and m.role in ('owner','admin')", (email,)).fetchone()
     if not row: raise RuntimeError("Local test account needs an active owner/admin membership")
-    if db.execute("select schema_version from public.application_schema_state where contract_key='core'").fetchone()[0] not in {120, 121, 122, 123}:
-        raise RuntimeError("Apply the verified local schema 120, 121, 122 or 123 before seeding")
+    if db.execute("select schema_version from public.application_schema_state where contract_key='core'").fetchone()[0] not in {121, 122, 123, 124}:
+        raise RuntimeError("Apply the verified local schema 121, 122, 123 or 124 before seeding")
     return row
 
 

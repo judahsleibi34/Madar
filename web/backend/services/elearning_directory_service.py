@@ -36,7 +36,7 @@ class DeleteCommand(ArchiveCommand):
 
 
 def require_group_management_upgrade():
-    if not settings_available(133):
+    if not settings_available(134):
         raise HTTPException(503, detail={"code": "elearning_directory_upgrade_required"})
 
 
@@ -66,7 +66,7 @@ def delete_group(tenant_id, user_id, item_id, payload):
 
 
 def delete_instructor(tenant_id, user_id, item_id, payload):
-    if not settings_available(134):
+    if not settings_available(135):
         raise HTTPException(503, detail={"code": "elearning_directory_upgrade_required"})
     return database_operation(lambda: service_supabase.rpc("delete_elearning_instructor", {
         "p_tenant_id": tenant_id, "p_actor_id": user_id, "p_instructor_id": str(item_id),
@@ -81,7 +81,7 @@ def table(kind):
 
 
 def directory_available():
-    return settings_available(118)
+    return settings_available(119)
 
 
 def require_available():

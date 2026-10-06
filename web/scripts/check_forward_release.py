@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate the production schema-114 to schema-134 forward release."""
+"""Validate the production schema-114 to schema-135 forward release."""
 
 from __future__ import annotations
 
@@ -13,11 +13,11 @@ ROOT = Path(__file__).resolve().parents[2]
 BASELINE = "1e6b739a43759309a45ede2dff28a859209e4a64"
 
 SOURCE_SCHEMA = 114
-TARGET_SCHEMA = 134
-MANIFEST_NAME = "migrations-115-134.json"
+TARGET_SCHEMA = 135
+MANIFEST_NAME = "migrations-115-135.json"
 
 # Migrations 100-114 have already been applied to production and are no
-# longer part of the active 114 -> 134 execution manifest. Keep them
+# longer part of the active 114 -> 135 execution manifest. Keep them
 # explicitly checksum-pinned so narrowing the active manifest cannot make
 # already-applied production history mutable.
 APPLIED_PRODUCTION_MIGRATIONS = {
@@ -88,25 +88,26 @@ EXPECTED = {
         "115_reconcile_commercial_access.sql",
         "forward-compatible",
     ),
-    116: ("116_create_elearning_settings.sql", "expand-only"),
-    117: ("117_create_elearning_courses.sql", "expand-only"),
-    118: ("118_create_elearning_groups_and_instructors.sql", "expand-only"),
-    119: ("119_create_elearning_structure.sql", "expand-only"),
-    120: ("120_create_elearning_participation.sql", "expand-only"),
-    121: ("121_add_elearning_course_deletion.sql", "expand-only"),
-    122: ("122_manage_elearning_enrollments.sql", "expand-only"),
-    123: ("123_create_elearning_content_blocks.sql", "expand-only"),
-    124: ("124_add_elearning_learner_player.sql", "expand-only"),
-    125: ("125_integrate_elearning_access_assignments.sql", "expand-only"),
-    126: ("126_create_elearning_assessments.sql", "expand-only"),
-    127: ("127_add_elearning_assessment_placements.sql", "expand-only"),
-    128: ("128_integrate_commerce_learning_entitlements.sql", "expand-only"),
-    129: ("129_add_elearning_credentials.sql", "expand-only"),
-    130: ("130_add_fixed_learning_academy.sql", "expand-only"),
-    131: ("131_add_academy_builder_integration.sql", "expand-only"),
-    132: ("132_expand_academy_builder_methodology.sql", "expand-only"),
-    133: ("133_guard_elearning_group_names_and_deletion.sql", "expand-only"),
-    134: ("134_add_elearning_instructor_deletion.sql", "expand-only"),
+    116: ("116_reconcile_ecommerce_product_saves.sql", "forward-compatible"),
+    117: ("117_create_elearning_settings.sql", "expand-only"),
+    118: ("118_create_elearning_courses.sql", "expand-only"),
+    119: ("119_create_elearning_groups_and_instructors.sql", "expand-only"),
+    120: ("120_create_elearning_structure.sql", "expand-only"),
+    121: ("121_create_elearning_participation.sql", "expand-only"),
+    122: ("122_add_elearning_course_deletion.sql", "expand-only"),
+    123: ("123_manage_elearning_enrollments.sql", "expand-only"),
+    124: ("124_create_elearning_content_blocks.sql", "expand-only"),
+    125: ("125_add_elearning_learner_player.sql", "expand-only"),
+    126: ("126_integrate_elearning_access_assignments.sql", "expand-only"),
+    127: ("127_create_elearning_assessments.sql", "expand-only"),
+    128: ("128_add_elearning_assessment_placements.sql", "expand-only"),
+    129: ("129_integrate_commerce_learning_entitlements.sql", "expand-only"),
+    130: ("130_add_elearning_credentials.sql", "expand-only"),
+    131: ("131_add_fixed_learning_academy.sql", "expand-only"),
+    132: ("132_add_academy_builder_integration.sql", "expand-only"),
+    133: ("133_expand_academy_builder_methodology.sql", "expand-only"),
+    134: ("134_guard_elearning_group_names_and_deletion.sql", "expand-only"),
+    135: ("135_add_elearning_instructor_deletion.sql", "expand-only"),
 }
 
 
@@ -178,6 +179,12 @@ def validate(root: Path = ROOT) -> list[str]:
                     "applied production migration changed: "
                     f"{number:03d}_{filename.split('_', 1)[1]}"
                 )
+
+        # Main's catalog transition already owns 116; PR rebasing may not rewrite it.
+        for tree in ("database", "supabase"):
+            catalog = root / f"web/{tree}/migrations/116_reconcile_ecommerce_product_saves.sql"
+            if not catalog.is_file() or digest(catalog) != "6227c1f50f19282f6cd58aa5ada1b2795f5cc63ca674f9447bbdbd44011b2208":
+                errors.append(f"canonical main catalog migration changed: {tree}")
 
         release = json.loads(
             (release_dir / "release.json").read_text(

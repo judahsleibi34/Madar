@@ -8,7 +8,7 @@ No auth users, invitations, messages, payment records or content blocks are
 created. Learner profiles are contact records, with reserved `.invalid` emails.
 No production migration automatically inserts demo data.
 
-From the repository root, after local migration 120 is applied:
+From the repository root, after local migration 121 is applied:
 
 ```bash
 web/backend/madar_env/bin/python web/scripts/seed_elearning_demo.py

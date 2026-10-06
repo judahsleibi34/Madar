@@ -5,7 +5,7 @@ Tenant Learning Labels remain presentation-only; routes, tables and navigation
 keep normalized names. Settings, course/directory management, Structure,
 Learners and Progress retain their existing services and schema gates.
 
-## Lesson content (schema 123)
+## Lesson content (schema 124)
 
 `elearning_content_blocks` stores `id`, `tenant_id`, `course_id`, `lesson_id`,
 `type`, optional `title`, versioned `content`, optional `media_id`, explicit
@@ -99,9 +99,9 @@ can serve later learner pages and page-builder integration.
 
 ## Release and validation
 
-Migration 123 is an expand-only 122-to-123 transition mirrored between database
+Migration 124 is an expand-only 123-to-124 transition mirrored between database
 and Supabase trees. Earlier SQL/manifests are immutable. The active release
-bridges 114..123 with `migrations-115-123.json`; content remains unavailable before
+bridges 114..124 with `migrations-115-124.json`; content remains unavailable before
 123. Updating protected release metadata requires the governed control-plane
 upgrade before any eventual production deployment. Production mutation is not
 authorized by this local development task.

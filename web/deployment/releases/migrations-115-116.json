@@ -11,11 +11,11 @@
     },
     {
       "number": 116,
-      "path": "web/database/migrations/116_create_elearning_settings.sql",
-      "sha256": "bf9e9c0fad74140701ab47e6a6c5b36241f3516ca4be8abba25e3de3eb1d4d53",
+      "path": "web/database/migrations/116_reconcile_ecommerce_product_saves.sql",
+      "sha256": "6227c1f50f19282f6cd58aa5ada1b2795f5cc63ca674f9447bbdbd44011b2208",
       "from_schema": 115,
       "to_schema": 116,
-      "compatibility": "expand-only"
+      "compatibility": "forward-compatible"
     }
   ]
 }

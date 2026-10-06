@@ -11,16 +11,16 @@
     },
     {
       "number": 116,
-      "path": "web/database/migrations/116_create_elearning_settings.sql",
-      "sha256": "bf9e9c0fad74140701ab47e6a6c5b36241f3516ca4be8abba25e3de3eb1d4d53",
+      "path": "web/database/migrations/116_reconcile_ecommerce_product_saves.sql",
+      "sha256": "6227c1f50f19282f6cd58aa5ada1b2795f5cc63ca674f9447bbdbd44011b2208",
       "from_schema": 115,
       "to_schema": 116,
-      "compatibility": "expand-only"
+      "compatibility": "forward-compatible"
     },
     {
       "number": 117,
-      "path": "web/database/migrations/117_create_elearning_courses.sql",
-      "sha256": "3058dcf972460ae9de8b4c149a39d41979198d129263a0ce917fd00df2918c38",
+      "path": "web/database/migrations/117_create_elearning_settings.sql",
+      "sha256": "272c9821b1ce2522bb65af7d04bc302a12be569bf1f180bcf4a60fc413712eb3",
       "from_schema": 116,
       "to_schema": 117,
       "compatibility": "expand-only"

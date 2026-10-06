@@ -26,7 +26,7 @@ with psycopg.connect(rehearsal,autocommit=True) as db:
    # Strip only the outer transaction to prove full DDL rollback on an isolated DB.
    with db.transaction(force_rollback=True): db.execute(path.read_text().removeprefix('begin;').removesuffix('commit;\n'))
    assert db.execute("select schema_version from public.application_schema_state where contract_key='core'").fetchone()[0]==131
-   assert db.execute("select count(*) from information_schema.columns where table_schema='public' and table_name='website_settings' and column_name='academy_editor_project_id'").fetchone()[0]==0
+   assert db.execute("select to_regprocedure('public.validate_academy_builder_schema(jsonb)')").fetchone()[0] is None
    print('Migration 132 transaction rollback verified',flush=True)
   db.execute(path.read_text())
  print('Fresh migrations 001..132 applied; target',db.execute("select schema_version from public.application_schema_state where contract_key='core'").fetchone()[0],flush=True)

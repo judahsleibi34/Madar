@@ -63,7 +63,7 @@ class StructureCommand(Payload):
 
 
 def structure_available():
-    return settings_available(119)
+    return settings_available(120)
 
 
 def require_available():
@@ -89,7 +89,7 @@ def translate_error(error):
 
 def get_structure(tenant_id, course_id):
     if not structure_available():
-        if not settings_available(117):
+        if not settings_available(118):
             raise HTTPException(503, detail={"code": "elearning_structure_upgrade_required", "message": "Structure management requires the database upgrade."})
         rows = service_supabase.table("elearning_courses").select("id").eq("tenant_id", tenant_id).eq("id", str(course_id)).limit(1).execute().data or []
         if not rows: raise HTTPException(404, "Course not found")

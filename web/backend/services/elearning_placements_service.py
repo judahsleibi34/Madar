@@ -23,7 +23,7 @@ class PlacementCommand(Payload):
 
 
 def available():
-    if not settings_available(127): raise HTTPException(503,detail={'code':'assessment_upgrade_required','message':'Assessment placements require the database upgrade.'})
+    if not settings_available(128): raise HTTPException(503,detail={'code':'assessment_upgrade_required','message':'Assessment placements require the database upgrade.'})
 
 
 def listing(member,course,section=None):

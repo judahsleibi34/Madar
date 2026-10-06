@@ -66,7 +66,7 @@ class Revocation(Confirmation):
 
 
 def available():
-    if not settings_available(129):
+    if not settings_available(130):
         raise HTTPException(503, 'Certificates require a database upgrade')
 
 

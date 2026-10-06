@@ -11,32 +11,32 @@
     },
     {
       "number": 116,
-      "path": "web/database/migrations/116_create_elearning_settings.sql",
-      "sha256": "bf9e9c0fad74140701ab47e6a6c5b36241f3516ca4be8abba25e3de3eb1d4d53",
+      "path": "web/database/migrations/116_reconcile_ecommerce_product_saves.sql",
+      "sha256": "6227c1f50f19282f6cd58aa5ada1b2795f5cc63ca674f9447bbdbd44011b2208",
       "from_schema": 115,
       "to_schema": 116,
-      "compatibility": "expand-only"
+      "compatibility": "forward-compatible"
     },
     {
       "number": 117,
-      "path": "web/database/migrations/117_create_elearning_courses.sql",
-      "sha256": "3058dcf972460ae9de8b4c149a39d41979198d129263a0ce917fd00df2918c38",
+      "path": "web/database/migrations/117_create_elearning_settings.sql",
+      "sha256": "272c9821b1ce2522bb65af7d04bc302a12be569bf1f180bcf4a60fc413712eb3",
       "from_schema": 116,
       "to_schema": 117,
       "compatibility": "expand-only"
     },
     {
       "number": 118,
-      "path": "web/database/migrations/118_create_elearning_groups_and_instructors.sql",
-      "sha256": "3befce4964496ddd7991e445d0b65559cf7b7c7ea948ee94b31d0052a8fda30d",
+      "path": "web/database/migrations/118_create_elearning_courses.sql",
+      "sha256": "6234e99011f17d038f6950d4f56276eabaf0eee093125f544e43ceee97b407cc",
       "from_schema": 117,
       "to_schema": 118,
       "compatibility": "expand-only"
     },
     {
       "number": 119,
-      "path": "web/database/migrations/119_create_elearning_structure.sql",
-      "sha256": "c78afefebc58df2a0f36774766b3b53fd427dc2aebf28ac5f9b94c28c9b61995",
+      "path": "web/database/migrations/119_create_elearning_groups_and_instructors.sql",
+      "sha256": "2e1d9527a5b87b8315d540777a3c1f3cdb73bd3829a9aa95701c1e6fc3274cbe",
       "from_schema": 118,
       "to_schema": 119,
       "compatibility": "expand-only"

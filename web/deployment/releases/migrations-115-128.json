@@ -11,104 +11,104 @@
     },
     {
       "number": 116,
-      "path": "web/database/migrations/116_create_elearning_settings.sql",
-      "sha256": "bf9e9c0fad74140701ab47e6a6c5b36241f3516ca4be8abba25e3de3eb1d4d53",
+      "path": "web/database/migrations/116_reconcile_ecommerce_product_saves.sql",
+      "sha256": "6227c1f50f19282f6cd58aa5ada1b2795f5cc63ca674f9447bbdbd44011b2208",
       "from_schema": 115,
       "to_schema": 116,
-      "compatibility": "expand-only"
+      "compatibility": "forward-compatible"
     },
     {
       "number": 117,
-      "path": "web/database/migrations/117_create_elearning_courses.sql",
-      "sha256": "3058dcf972460ae9de8b4c149a39d41979198d129263a0ce917fd00df2918c38",
+      "path": "web/database/migrations/117_create_elearning_settings.sql",
+      "sha256": "272c9821b1ce2522bb65af7d04bc302a12be569bf1f180bcf4a60fc413712eb3",
       "from_schema": 116,
       "to_schema": 117,
       "compatibility": "expand-only"
     },
     {
       "number": 118,
-      "path": "web/database/migrations/118_create_elearning_groups_and_instructors.sql",
-      "sha256": "3befce4964496ddd7991e445d0b65559cf7b7c7ea948ee94b31d0052a8fda30d",
+      "path": "web/database/migrations/118_create_elearning_courses.sql",
+      "sha256": "6234e99011f17d038f6950d4f56276eabaf0eee093125f544e43ceee97b407cc",
       "from_schema": 117,
       "to_schema": 118,
       "compatibility": "expand-only"
     },
     {
       "number": 119,
-      "path": "web/database/migrations/119_create_elearning_structure.sql",
-      "sha256": "c78afefebc58df2a0f36774766b3b53fd427dc2aebf28ac5f9b94c28c9b61995",
+      "path": "web/database/migrations/119_create_elearning_groups_and_instructors.sql",
+      "sha256": "2e1d9527a5b87b8315d540777a3c1f3cdb73bd3829a9aa95701c1e6fc3274cbe",
       "from_schema": 118,
       "to_schema": 119,
       "compatibility": "expand-only"
     },
     {
       "number": 120,
-      "path": "web/database/migrations/120_create_elearning_participation.sql",
-      "sha256": "ea4bc8c3e4b7c72e2e8fc63059512f8a5232287e6a680b7d5c041555a472dbe6",
+      "path": "web/database/migrations/120_create_elearning_structure.sql",
+      "sha256": "8184815679668f8c5a4f01b2600fc099f38cfc5a154d90b9ed12a7c8207da4ea",
       "from_schema": 119,
       "to_schema": 120,
       "compatibility": "expand-only"
     },
     {
       "number": 121,
-      "path": "web/database/migrations/121_add_elearning_course_deletion.sql",
-      "sha256": "b64b80b835ca83d7230d433d7873daaee51747799b358cb2ca7aa375c31a5cce",
+      "path": "web/database/migrations/121_create_elearning_participation.sql",
+      "sha256": "b22801d4ad85c97c141c958d1178a3d51892befca42330d91d2aa581f1c274b1",
       "from_schema": 120,
       "to_schema": 121,
       "compatibility": "expand-only"
     },
     {
       "number": 122,
-      "path": "web/database/migrations/122_manage_elearning_enrollments.sql",
-      "sha256": "4e52b529c33351c6faace0f3f1fad78987839fb7dff6230086dc7c81367052b8",
+      "path": "web/database/migrations/122_add_elearning_course_deletion.sql",
+      "sha256": "05ba86ed549fd90743ff33cb705cacb3596602caa4acaa3220a5664e0ecf3aad",
       "from_schema": 121,
       "to_schema": 122,
       "compatibility": "expand-only"
     },
     {
       "number": 123,
+      "path": "web/database/migrations/123_manage_elearning_enrollments.sql",
+      "sha256": "032fda00f01c3dbdc007789c4d1665aa9d61525525b261f4d5440d758ccfb167",
       "from_schema": 122,
       "to_schema": 123,
-      "compatibility": "expand-only",
-      "path": "web/database/migrations/123_create_elearning_content_blocks.sql",
-      "sha256": "9e6979f19a6dd716d701b216066fb0fecb4290442493d3db6e4e2b1845ff6cb9"
-    },
-    {
-      "number": 124,
-      "path": "web/database/migrations/124_add_elearning_learner_player.sql",
-      "sha256": "c4d40aa2203318d5364276b61d8747fc2008ef34691ef5658f60a105934d405f",
-      "from_schema": 123,
-      "to_schema": 124,
       "compatibility": "expand-only"
     },
     {
+      "number": 124,
+      "from_schema": 123,
+      "to_schema": 124,
+      "compatibility": "expand-only",
+      "path": "web/database/migrations/124_create_elearning_content_blocks.sql",
+      "sha256": "dd4a619933764a91b5851aaedc196ab3b25e99496c7752c00998279df4239bda"
+    },
+    {
       "number": 125,
-      "path": "web/database/migrations/125_integrate_elearning_access_assignments.sql",
-      "sha256": "572bc3704798b8242067b3ab93719ea0598e26ca00dc43b5b938b03da7908190",
+      "path": "web/database/migrations/125_add_elearning_learner_player.sql",
+      "sha256": "97621af53c07e6bd956b05e7244d169ec72210abb51ba85f0aba95e264ebc044",
       "from_schema": 124,
       "to_schema": 125,
       "compatibility": "expand-only"
     },
     {
       "number": 126,
-      "path": "web/database/migrations/126_create_elearning_assessments.sql",
-      "sha256": "f147a8d67722d174f22f0ce838397d867c4631feb6a1464617adc382e4cabf9b",
+      "path": "web/database/migrations/126_integrate_elearning_access_assignments.sql",
+      "sha256": "5cbc52a5281f19215db1a32458df1d2a357e75c5f591360c8c41c570978a4f51",
       "from_schema": 125,
       "to_schema": 126,
       "compatibility": "expand-only"
     },
     {
       "number": 127,
-      "path": "web/database/migrations/127_add_elearning_assessment_placements.sql",
-      "sha256": "83c51568609c0f73ac6c150853c4bfa9346c00498b0e0c1f5345a3efb0bc0ead",
+      "path": "web/database/migrations/127_create_elearning_assessments.sql",
+      "sha256": "58d4d1097a6fa9cdabb35608ab3bdf19acf266b6931406659fc59550b0f064ef",
       "from_schema": 126,
       "to_schema": 127,
       "compatibility": "expand-only"
     },
     {
       "number": 128,
-      "path": "web/database/migrations/128_integrate_commerce_learning_entitlements.sql",
-      "sha256": "d0f6ffe05319797bb691c68fd3c13cabb49d74ac9553e226a0f41cca28c62ea7",
+      "path": "web/database/migrations/128_add_elearning_assessment_placements.sql",
+      "sha256": "5d2fcf2cb307e3cca09a95d98e6ff517ce4d6ce9576ec696bd3c39c6797ab0a0",
       "from_schema": 127,
       "to_schema": 128,
       "compatibility": "expand-only"

@@ -8,7 +8,7 @@ from dotenv import dotenv_values
 root=Path(__file__).resolve().parents[1]
 dsn=dotenv_values(root/'.env.database.local')['SUPABASE_DB_URL'];url=urlsplit(dsn)
 assert url.hostname in {'localhost','127.0.0.1','::1'} and url.port==54322
-name='madar_groups_rehearsal_133'
+name='madar_academy_rehearsal_133'
 with psycopg.connect(dsn,autocommit=True) as db:
  if db.execute('select 1 from pg_database where datname=%s',(name,)).fetchone():
   marker=db.execute("select shobj_description(oid,'pg_database') from pg_database where datname=%s",(name,)).fetchone()[0]
@@ -23,25 +23,21 @@ with psycopg.connect(rehearsal,autocommit=True) as db:
  db.execute('set client_min_messages=warning');db.execute(bootstrap);db.execute('alter table auth.users add column email text')
  for path in sorted((root/'database/migrations').glob('*.sql')):
   if path.name.startswith('133_'):
-   legacy_tenant=db.execute("insert into public.tenants(brand_name,owner_name) values('Legacy groups','Local') returning tenant_id").fetchone()[0]
-   db.execute("insert into public.elearning_groups(tenant_id,name) values(%s,'Legacy'),(%s,' LEGACY ')",(legacy_tenant,legacy_tenant))
    # Strip only the outer transaction to prove full DDL rollback on an isolated DB.
    with db.transaction(force_rollback=True): db.execute(path.read_text().removeprefix('begin;').removesuffix('commit;\n'))
    assert db.execute("select schema_version from public.application_schema_state where contract_key='core'").fetchone()[0]==132
-   assert db.execute("select count(*) from pg_proc where proname='delete_elearning_group'").fetchone()[0]==0
+   assert db.execute("select count(*) from information_schema.columns where table_schema='public' and table_name='website_settings' and column_name='academy_editor_project_id'").fetchone()[0]==0
    print('Migration 133 transaction rollback verified',flush=True)
   db.execute(path.read_text())
- assert db.execute('select count(*) from public.elearning_groups where tenant_id=%s',(legacy_tenant,)).fetchone()[0]==2
- db.execute("update public.elearning_groups set description='Legacy data retained' where tenant_id=%s",(legacy_tenant,))
- print('Legacy duplicate records and non-name edits retained',flush=True)
  print('Fresh migrations 001..133 applied; target',db.execute("select schema_version from public.application_schema_state where contract_key='core'").fetchone()[0],flush=True)
 # Connection string remains private; invoke database tests in-process.
 os.environ['ELEARNING_SYNTHETIC_DATABASE_DSN']=rehearsal
 os.environ['PYTHONPATH']=str(root/'backend')
-os.environ['MADAR_ENV_FILE']=str(root/'.env.database.local')
 import sys,unittest
 sys.path.insert(0,str(root/'backend'));sys.path.insert(0,str(root/'backend/tests'))
-modules=['test_elearning_group_management_database.GroupManagementDatabaseTests','test_elearning_relationships_database.RelationshipsDatabaseTests','test_elearning_player_database.ELearningPlayerDatabaseTests']
+modules=['test_academy_integration_database','test_elearning_academy_database','test_elearning_credentials_database','test_elearning_commerce_database','test_elearning_placements_database','test_elearning_assessments_database','test_elearning_relationships_database','test_elearning_player_database','test_elearning_content_database','test_elearning_structure_database','test_elearning_course_deletion_database','test_elearning_enrollment_management_database']
+if '--academy-only' in sys.argv:
+ modules=['test_academy_integration_database','test_elearning_academy_database']
 suite=unittest.defaultTestLoader.loadTestsFromNames(modules)
 result=unittest.TextTestRunner(verbosity=2).run(suite)
 if not result.wasSuccessful(): raise SystemExit(1)

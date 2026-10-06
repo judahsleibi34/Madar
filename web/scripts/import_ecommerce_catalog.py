@@ -272,31 +272,25 @@ def apply_catalog(client, settings: dict, catalog: dict, archive_unlisted: bool)
     tag_ids = _upsert_taxonomy(client, "ecommerce_tags", tenant_id, catalog["tags"])
     product_ids = {}
     for row in catalog["products"]:
-        product_id = _resolved_id(client, "ecommerce_products", tenant_id, row)
-        product_ids[row["slug"]] = product_id
-        fields = {key: value for key, value in row.items() if key not in {"category_slug", "brand_slug", "tag_slugs", "attributes", "options", "variants"}}
-        fields.update({
-            "id": product_id,
-            "tenant_id": tenant_id,
-            "created_by": None,
-            "category_id": category_ids[row["category_slug"]],
-            "brand_id": brand_ids[row["brand_slug"]],
-            "brand": next(brand["name"] for brand in catalog["brands"] if brand["slug"] == row["brand_slug"]),
-            "status": "draft",
-        })
-        client.table("ecommerce_products").upsert(fields, on_conflict="id").execute()
-        client.rpc("save_ecommerce_product_aggregate_v2_safe", {
-            "p_tenant_id": tenant_id,
-            "p_product_id": product_id,
-            "p_attributes": row["attributes"],
-            "p_options": row["options"],
-            "p_variants": row["variants"],
-        }).execute()
-        client.table("ecommerce_product_tags").delete().eq("tenant_id", tenant_id).eq("product_id", product_id).execute()
-        links = [{"tenant_id": tenant_id, "product_id": product_id, "tag_id": tag_ids[slug]} for slug in row["tag_slugs"]]
-        if links:
-            client.table("ecommerce_product_tags").insert(links).execute()
-        client.table("ecommerce_products").update({"status": "active"}).eq("tenant_id", tenant_id).eq("id", product_id).execute()
+        existing = _rows(client.table("ecommerce_products").select("id").eq("tenant_id", tenant_id).eq("slug", row["slug"]).limit(1).execute())
+        product_id = str(existing[0]["id"]) if existing else row["id"]
+        fields = {key:value for key,value in row.items() if key not in {"id","category_slug","brand_slug","tag_slugs","attributes","options","variants"}}
+        fields.update({"brand_id":brand_ids[row["brand_slug"]], "status":"active"})
+        params = {
+            "p_tenant_id":tenant_id, "p_product":fields,
+            "p_category_ids":[category_ids[row["category_slug"]]],
+            "p_tag_ids":[tag_ids[slug] for slug in row["tag_slugs"]],
+            "p_aggregate":{key:row[key] for key in ("attributes","options","variants")},
+        }
+        if existing:
+            snapshot = client.rpc("read_ecommerce_product_catalog_v3_safe", {"p_tenant_id":tenant_id,"p_product_id":product_id}).execute().data
+            fields.update(expected_catalog_version=snapshot["catalog_version"],expected_inventory_version=snapshot["inventory_version"])
+            params["p_product_id"] = product_id
+            result = client.rpc("update_ecommerce_product_v3_safe",params).execute()
+        else:
+            params.update(p_product_id=product_id,p_user_id=None)
+            result = client.rpc("create_ecommerce_product_v3_safe",params).execute()
+        product_ids[row["slug"]] = str(result.data["id"])
 
     archived = {"brands": 0, "categories": 0, "tags": 0, "products": 0}
     if archive_unlisted:

@@ -91,7 +91,7 @@ class EcommerceProductVariantTests(unittest.TestCase):
                 "values": [{"id": VALUE_ID, "code": "matte", "value_translations": {"en": "Matte"}}],
             }], variants=[]))
 
-    def test_color_metadata_is_sent_through_the_v2_aggregate_rpc(self):
+    def test_color_metadata_is_sent_through_the_v3_aggregate_rpc(self):
         product = ProductPayload(**product_payload(
             options=[{"id": OPTION_ID, "code": "finish", "display_type": "color", "name_translations": {"en": "Finish"}, "values": [
                 {"id": VALUE_ID, "code": "red", "value_translations": {"en": "Red"}, "color_hex": "#E53935"},
@@ -127,7 +127,7 @@ class EcommerceProductVariantTests(unittest.TestCase):
         with patch.object(ecommerce_routes, "service_supabase", service):
             ecommerce_routes._save_product_aggregate(7, PRODUCT_ID, product)
 
-        self.assertEqual(service.calls[0][0], "save_ecommerce_product_aggregate_v2_safe")
+        self.assertEqual(service.calls[0][0], "save_ecommerce_product_aggregate_v3_safe")
         option = service.calls[0][1]["p_options"][0]
         self.assertEqual(option["display_type"], "color")
         self.assertEqual(option["values"][0]["color_hex"], "#E53935")
@@ -197,7 +197,7 @@ class EcommerceProductVariantTests(unittest.TestCase):
             ]}],
             variants=[{"id": VARIANT_ID, "sku": "SHIRT-BLACK", "inventory_quantity": 4, "option_value_ids": [VALUE_ID]}],
         )
-        self.assertEqual(set(payload.model_dump().keys()), {"options", "variants"})
+        self.assertEqual(set(payload.model_dump().keys()), {"options", "variants", "expected_catalog_version", "expected_inventory_version", "preserve_inventory"})
 
     def test_variant_only_route_preserves_product_fields_and_attributes(self):
         existing = {
@@ -223,8 +223,8 @@ class EcommerceProductVariantTests(unittest.TestCase):
         with patch.object(ecommerce_routes, "_require_ecommerce_access", return_value=SimpleNamespace(tenant_id=7)), \
              patch.object(ecommerce_routes, "_require_role"), \
              patch.object(ecommerce_routes, "_tenant_row", return_value=existing), \
-             patch.object(ecommerce_routes, "_catalog_for_tenant", side_effect=[{"products": [existing]}, {"products": [updated]}]), \
-             patch.object(ecommerce_routes, "_save_product_aggregate") as save_aggregate, \
+             patch.object(ecommerce_routes, "_load_catalog_product", return_value=existing), \
+             patch.object(ecommerce_routes, "_save_product_aggregate", return_value=updated) as save_aggregate, \
              patch.object(ecommerce_routes, "_product_data") as save_product_fields, \
              patch.object(ecommerce_routes, "invalidate_ecommerce_cache"):
             result = ecommerce_routes.update_product_variants(PRODUCT_ID, payload, object(), Response())

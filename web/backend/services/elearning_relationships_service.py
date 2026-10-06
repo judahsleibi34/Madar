@@ -32,7 +32,7 @@ class RelationshipCommand(BaseModel):
 
 
 def call(name, tenant_id, **args):
-    if not settings_available(125): raise HTTPException(503,detail={'code':'elearning_assignments_upgrade_required'})
+    if not settings_available(126): raise HTTPException(503,detail={'code':'elearning_assignments_upgrade_required'})
     try: return service_supabase.rpc(name,{'p_tenant_id':tenant_id,**args}).execute().data
     except APIError as error:
         if error.code=='P0002': raise HTTPException(404,'Learning assignment or eligible user not found') from error

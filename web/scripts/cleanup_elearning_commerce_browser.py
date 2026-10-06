@@ -10,7 +10,7 @@ config=dotenv_values(root/'.env.database.local');url=urlsplit(config['SUPABASE_D
 assert url.hostname in ('localhost','127.0.0.1','::1') and url.port==54322
 assert fixture['tenant_id']==3 and len(fixture['courses'])<=6 and len(fixture['plans'])<=4
 with psycopg.connect(config['SUPABASE_DB_URL']) as db:
- assert db.execute("select schema_version from public.application_schema_state where contract_key='core'").fetchone()[0]==128
+ assert db.execute("select schema_version from public.application_schema_state where contract_key='core'").fetchone()[0]==129
  db.execute('select pg_advisory_xact_lock(125,%s)',(fixture['tenant_id'],))
  rows=db.execute('select id,order_id,offering_id from public.ecommerce_checkouts where tenant_id=%s and offering_id=any(%s::uuid[])',(fixture['tenant_id'],fixture['plans'])).fetchall()
  assert all(str(row[0]) in fixture['checkouts'] for row in rows)
@@ -37,4 +37,4 @@ with psycopg.connect(config['SUPABASE_DB_URL']) as db:
    assert group[0].startswith('Commerce Verification ')
    assert db.execute('select count(*) from public.elearning_group_courses where group_id=%s',(gid,)).fetchone()[0]==0
    db.execute('delete from public.elearning_groups where tenant_id=%s and id=%s',(fixture['tenant_id'],gid))
- print('Removed only exact local verification courses, offerings/products, checkouts/orders, payment events, entitlements and groups. Existing users and learning history retained. Schema 128.')
+ print('Removed only exact local verification courses, offerings/products, checkouts/orders, payment events, entitlements and groups. Existing users and learning history retained. Schema 129.')

@@ -26,10 +26,10 @@ are private/no-store and vary on Cookie. A validated active member of that exact
 tenant can receive personalized state; a foreign session receives only the
 public projection. Client tenant/user query parameters are not an authority.
 
-Migration 130 adds only a service-role RPC, `get_elearning_academy`. It consumes
+Migration 131 adds only a service-role RPC, `get_elearning_academy`. It consumes
 `elearning_catalog_eligible`, `elearning_course_cta` and the existing learner
-runtime. Anonymous/authenticated SQL roles cannot execute it. Before schema 130,
-Academy endpoints fail closed. No applied migration through 129 was changed.
+runtime. Anonymous/authenticated SQL roles cannot execute it. Before schema 131,
+Academy endpoints fail closed. No applied migration through 130 was changed.
 
 The public projection includes published catalog-visible free/paid courses,
 active relevant Commerce offerings, active instructor names, published section
@@ -74,10 +74,10 @@ existing tenant authentication and resumes a bounded same-Academy path with a
 full reload; mutations still require an explicit user action and backend access.
 
 See [local verification](verification/elearning-academy/README.md). Production
-was not modified or deployed. Local schema is 130; release metadata, mirrored
+was not modified or deployed. Local schema is 131; release metadata, mirrored
 migration, checksums and policy documentation include this expansion.
 
-## Academy management and visual authoring (schema 131)
+## Academy management and visual authoring (schema 132)
 
 `E-Learning → Academy` is a management hub with distinct Edit Landing Page,
 Open Academy and Open Student Platform actions. Platform enablement and learner

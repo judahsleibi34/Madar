@@ -50,7 +50,7 @@ def initialize_landing(request: Request, response: Response):
     if builder_actor.tenant_id != actor.tenant_id or builder_actor.user_id != actor.user_id:
         raise HTTPException(403, detail={"code": "academy_management_forbidden"})
     require_any_entitlement(actor.tenant_id, {"page_builder"}, message="An active page-builder plan is required.")
-    if not settings_available(132):
+    if not settings_available(133):
         raise HTTPException(503, detail={"code": "academy_builder_upgrade_required"})
     website_rows = service_supabase.table("website_settings").select("subdomain").eq("tenant_id", actor.tenant_id).limit(1).execute().data or []
     if not website_rows or not website_rows[0].get("subdomain"):

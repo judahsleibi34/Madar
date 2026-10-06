@@ -8,7 +8,7 @@ root=Path(__file__).resolve().parents[1];path=Path('/tmp/madar-credential-browse
 assert fixture['tenant_id']==3 and fixture['user_id']==1 and fixture.get('arabic_course') in fixture['courses']
 assert 'security' not in fixture
 with psycopg.connect(dsn) as db:
- assert db.execute("select schema_version from application_schema_state where contract_key='core'").fetchone()[0]==129
+ assert db.execute("select schema_version from application_schema_state where contract_key='core'").fetchone()[0]==130
  foreign_tenant=db.execute("insert into tenants(brand_name,owner_name) values('Credential Isolation Fixture','Local Fixture') returning tenant_id").fetchone()[0]
  def user(tenant,role):
   auth=uuid4();email=f'credential-fixture-{auth}@example.com';db.execute('insert into auth.users(id,email) values(%s,%s)',(auth,email));uid=db.execute("insert into users(auth_id,first_name,last_name,email,tenant_id,account_status,email_verified) values(%s,'Credential','Fixture',%s,%s,'active',true) returning id",(auth,email,tenant)).fetchone()[0];db.execute("insert into tenant_memberships(tenant_id,user_id,auth_id,role,status) values(%s,%s,%s,%s,'active')",(tenant,uid,auth,role));return uid,str(auth)

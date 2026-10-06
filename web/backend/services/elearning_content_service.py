@@ -86,7 +86,7 @@ class ContentCommand(Payload):
 
 
 def require_available():
-    if not settings_available(123):
+    if not settings_available(124):
         raise HTTPException(503, detail={'code': 'elearning_content_upgrade_required', 'message': 'Lesson content requires the database upgrade.'})
 
 

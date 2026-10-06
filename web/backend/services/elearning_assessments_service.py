@@ -138,7 +138,7 @@ class Submission(Payload):
 
 
 def call(name,tenant_id,**args):
-    if not settings_available(126): raise HTTPException(503,detail={'code':'assessment_upgrade_required','message':'Assessments require the database upgrade.'})
+    if not settings_available(127): raise HTTPException(503,detail={'code':'assessment_upgrade_required','message':'Assessments require the database upgrade.'})
     try: return service_supabase.rpc(name,{'p_tenant_id':tenant_id,**args}).execute().data
     except APIError as error:
         code=error.message

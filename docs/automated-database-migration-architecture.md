@@ -614,13 +614,13 @@ new or changed invariants to executable behavior. A main-targeting change is not
 ready while any locally executable mandatory gate fails or any untested safety
 claim is represented as proven.
 
-## E-Learning management bridge (schemas 116 through 123)
+## E-Learning management bridge (schemas 117 through 124)
 
-The active bridge supports schemas 114 through 130 and retains migrations 115 through 120
-unchanged in the contiguous `migrations-115-134.json` manifest. Migration 116
+The active bridge supports schemas 114 through 135 and preserves main migrations
+115 and 116 in the contiguous `migrations-115-135.json` manifest. Migration 117
 adds tenant-owned E-Learning JSON configuration and a service-role-only atomic
 merge RPC. Tenant owner/admin API authorization is mandatory; database access
-is denied to anonymous and authenticated clients. Before schema 116, settings
+is denied to anonymous and authenticated clients. Before schema 117, settings
 reads return defaults with `available=false`, and saves return the controlled
 `elearning_upgrade_required` response without touching the new table. No
 learner runtime is introduced.
@@ -633,33 +633,33 @@ repair. This metadata change touches protected `web/deployment/releases` and
 requires the governed exact-SHA control-plane upgrade before deployment. No
 production migration or deployment is performed as part of development.
 
-Migration 117 adds `elearning_courses` with tenant ownership, managed cover asset
+Migration 118 adds `elearning_courses` with tenant ownership, managed cover asset
 references, status/access constraints, timestamps and optimistic revisions. It is
-expand-only, requires schema 116 and advances the schema guard transactionally.
+expand-only, requires schema 117 and advances the schema guard transactionally.
 RLS and revoked client grants restrict access to the service role; the backend
 enforces active tenant owner/admin membership and scopes every query to that
 tenant. Course list reads return `available=false` with no rows before schema
-117; detail reads, mutations and cover uploads return the controlled
+118; detail reads, mutations and cover uploads return the controlled
 `elearning_courses_upgrade_required` error without querying the course table.
-Settings continue to function at schema 116. Cover uploads reuse the managed
+Settings continue to function at schema 117. Cover uploads reuse the managed
 image pipeline and entitlement; saved course covers, including archived courses,
 retain registered assets without granting public visibility. Missing-table
 reference checks tolerate only PGRST205/42P01; other failures propagate.
 
-The checksum-pinned contiguous manifest is `migrations-115-134.json`; previously
-published manifests and SQL 115/116/117/118 remain unchanged. Local validation must
+The checksum-pinned contiguous manifest is `migrations-115-135.json`; previously
+published manifests and SQL 115/117/118/119 remain unchanged. Local validation must
 cover schema-gated behavior, tenant/role isolation, optimistic conflicts, image
 ownership/retention, migration mirror/checksum integrity and release transitions.
 Deployment still requires the existing backup-first migration and protected
-control-plane contract. Structure counts become active at schema 119; learner counts become active at schema 120; publishing a course does not activate learner access or payments.
+control-plane contract. Structure counts become active at schema 120; learner counts become active at schema 121; publishing a course does not activate learner access or payments.
 
-### Group and instructor management (schema 118)
+### Group and instructor management (schema 119)
 
-Migration 118 is an expand-only, transactionally guarded 117-to-118 transition
+Migration 119 is an expand-only, transactionally guarded 118-to-119 transition
 adding tenant-owned `elearning_groups` and `elearning_instructors`. The active
-bridge accepts 114 through 132, targets 132 and uses the checksum-pinned
-`migrations-115-134.json` manifest. SQL and prior manifests through 118 remain
-unchanged. Lists return unavailable empty results before 118; detail reads and
+bridge accepts 114 through 135, targets 135 and uses the checksum-pinned
+`migrations-115-135.json` manifest. SQL and prior manifests through 119 remain
+unchanged. Lists return unavailable empty results before 119; detail reads and
 mutations fail closed with `elearning_directory_upgrade_required`. Settings and
 courses retain their earlier schema gates. Both new tables enable RLS and grant
 only SELECT/INSERT/UPDATE to service_role; anonymous/authenticated clients and
@@ -671,9 +671,9 @@ future work. Production rollout requires the same governed protected-controller
 upgrade, known-good bridge, verified backup and forward-repair contract; local
 Docker migration verification does not authorize production changes.
 
-### Course Structure Builder (schema 119)
+### Course Structure Builder (schema 120)
 
-Migration 119 is an expand-only, guarded 118-to-119 transaction. It adds generic
+Migration 120 is an expand-only, guarded 119-to-120 transaction. It adds generic
 `elearning_sections` and `elearning_lessons` metadata and a separate course
 `structure_revision`. Composite parent foreign keys enforce tenant/course
 ownership. Deferred unique sibling positions permit atomic swaps; every
@@ -685,10 +685,10 @@ only the service role can execute the mutation RPC. Anonymous/authenticated
 clients have no table or RPC access. The API additionally checks session
 permissions and never accepts client tenant/user IDs or arbitrary positions.
 
-Before 119, structure reads return unavailable empty results after verifying
-course ownership at schema 117+, and structure writes fail closed without
-touching the new objects. Before 117, even structure reads fail closed. Course
-reads batch active counts at 119 and use zeros earlier. Archived sections retain
+Before 120, structure reads return unavailable empty results after verifying
+course ownership at schema 118+, and structure writes fail closed without
+touching the new objects. Before 118, even structure reads fail closed. Course
+reads batch active counts at 120 and use zeros earlier. Archived sections retain
 lessons and are excluded, with their descendants, from active counts. Lesson
 moves preserve IDs and only target an unarchived section in the same course.
 Section duplication copies section/lesson metadata as Draft; content blocks do
@@ -696,18 +696,18 @@ not exist yet. Empty-section/lesson deletion requires explicit confirmation;
 sections containing any lessons cannot be deleted. Future content relations
 must restrict permanent deletion until their retention contract is implemented.
 
-The active manifest is `migrations-115-134.json`; earlier SQL and manifests are
+The active manifest is `migrations-115-135.json`; earlier SQL and manifests are
 retained unchanged. Local validation covers real PostgreSQL ordering,
 concurrent commands, tenant isolation, schema gates, grants and checksums.
-Lesson routes host the schema-123 Content Builder described below.
+Lesson routes host the schema-124 Content Builder described below.
 Structure introduces no learner delivery. Participation
-at schema 120 is governed by the additional contract below. Deployment retains the governed
+at schema 121 is governed by the additional contract below. Deployment retains the governed
 control-plane upgrade, known-good bridge, verified backup and forward-repair
 requirements above.
 
-### Learner participation (schema 120)
+### Learner participation (schema 121)
 
-Migration 120 expands 119 to 120 transactionally. It creates tenant-owned learner
+Migration 121 expands 120 to 121 transactionally. It creates tenant-owned learner
 contact profiles, course enrollments and lesson completion records with composite
 tenant/course foreign keys and restricted RLS/grants. Profiles create no auth
 accounts or invitations. Owner/admin-only APIs inject session identity. Enrollment
@@ -720,22 +720,22 @@ No percentage is stored: course, section and lesson reports join completion
 records to currently eligible published lessons. Draft/archived content is
 excluded from the denominator; archived learners/enrollments are excluded from
 active counts. Completion foreign keys prevent deleting referenced lessons;
-archiving retains history. Pre-120 mutations/progress reads fail closed and
+archiving retains history. Pre-121 mutations/progress reads fail closed and
 course learner counts remain zero. Learner lists are unavailable empty results
-before 120. The schema-119 structure count RPC remains unchanged; participation
-counts are batched through a new schema-120 RPC.
+before 121. The schema-120 structure count RPC remains unchanged; participation
+counts are batched through a new schema-121 RPC.
 
-The active manifest is migrations-115-134.json, preserving SQL/manifests through
-119. No migration inserts dummy data. The separate development seed requires
+The active manifest is migrations-115-135.json, preserving SQL/manifests through
+120. No migration inserts dummy data. The separate development seed requires
 the generated loopback local environment and a running local Supabase Docker
 container, resolves the configured test account's current tenant, uses stable
 IDs/ownership markers and refuses unrelated records on reset/cleanup. Production
 changes remain unauthorized; governed control-plane upgrade, verified backup,
 known-good bridge and forward repair remain mandatory deployment constraints.
 
-### Confirmed course deletion (schema 121)
+### Confirmed course deletion (schema 122)
 
-Migration 121 is an expand-only 120-to-121 transaction adding a service-role-only
+Migration 122 is an expand-only 121-to-122 transaction adding a service-role-only
 course deletion RPC. No direct table DELETE grant is added. Owner/admin APIs
 require explicit confirmation, the exact course name, and expected course and
 structure revisions. The RPC verifies membership, locks the course (also used
@@ -743,17 +743,17 @@ by structure/participation commands), rejects stale revisions, and atomically
 removes course completions, enrollments, lessons, sections and the course.
 Learner contact profiles and managed asset files remain; normal reference-based
 asset retention/cleanup still applies. Unexpected future foreign-key references
-block deletion and roll back the complete transaction. Before 121, deletion
+block deletion and roll back the complete transaction. Before 122, deletion
 fails closed and course cards expose deletion_available=false. Migration SQL
-and manifests through 120 remain immutable; active metadata targets 132 with
-the contiguous migrations-115-134.json manifest. Production deployment/mutation
+and manifests through 121 remain immutable; active metadata targets 135 with
+the contiguous migrations-115-135.json manifest. Production deployment/mutation
 is not performed; all existing protected-controller, backup and bridge gates
 remain mandatory.
 
 
-### Course enrollment management (schema 122)
+### Course enrollment management (schema 123)
 
-Migration 122 expands 121 to 122 without changing course/structure entities.
+Migration 123 expands 122 to 123 without changing course/structure entities.
 Existing learner contact records gain an optional reference to Madar users;
 no accounts are created or auto-linked. New enrollment commands select active
 users with active membership in the session tenant, atomically link their
@@ -765,15 +765,15 @@ column; cancellation/suspension require confirmation and expected status.
 Reactivation retains completion history and validates linked user membership.
 Existing progress reads retain active-only semantics; enrollment reports include
 inactive history through the same published-lesson calculator. Payment/group
-fields are null until integrated. Pre-122 management fails closed. The active
-manifest is migrations-115-134.json, preserving all earlier SQL/manifests.
+fields are null until integrated. Pre-123 management fails closed. The active
+manifest is migrations-115-135.json, preserving all earlier SQL/manifests.
 No production mutation, account creation, payment engine or group assignment
 occurs. Existing governed release, backup and forward-repair gates still apply.
 
 
-### Lesson content blocks (schema 123)
+### Lesson content blocks (schema 124)
 
-Migration 123 expands 122 to 123 transactionally with tenant/course/lesson-owned
+Migration 124 expands 123 to 124 transactionally with tenant/course/lesson-owned
 ordered content blocks and per-lesson content revisions. Initial typed content
 handlers accept text, audio and video; publication is inherited from the lesson.
 Existing course locks serialize revision-checked writes, and owner/admin
@@ -787,9 +787,9 @@ is restricted while blocks remain. Tenant purge retains its cascade semantics.
 
 Managed audio extends the shared file registry/storage/validation pipeline with
 MP3/WAV; block references retain active and archived media without granting
-public visibility. Content reads, mutations and uploads fail closed before 123.
+public visibility. Content reads, mutations and uploads fail closed before 124.
 Earlier E-Learning functionality keeps its existing schema gates. The bridge
-supports 114..134, targets 132 and pins the contiguous migrations-115-134.json
+supports 114..135, targets 135 and pins the contiguous migrations-115-135.json
 manifest; all earlier SQL/manifests stay immutable. Protected release metadata
 requires the existing governed control-plane upgrade before deployment. No
 production migration/deployment is part of local development. See
@@ -798,9 +798,9 @@ and validation. Existing bridge-first, verified-backup and forward-repair gates
 remain mandatory.
 
 
-### Learner runtime (schema 124)
+### Learner runtime (schema 125)
 
-Migration 124 adds service-role-only learner read, completion and media-access
+Migration 125 adds service-role-only learner read, completion and media-access
 RPCs without new tables. Active users/memberships, user-linked active learner
 profiles and active enrollments gate published course/section/lesson content.
 The existing get_elearning_progress calculator supplies all percentages and
@@ -813,15 +813,15 @@ Completion is explicit and idempotent in elearning_lesson_completions and locks
 the course against enrollment/structure changes. Opening does not complete a
 lesson; no started-state or stored percentage is invented. Upload commercial
 gates remain intact. Existing non-learning file rules and admin preview remain.
-Player endpoints fail closed before 124. Compatibility is 114..134 with the
-checksum-pinned migrations-115-134.json manifest; earlier SQL/manifests remain
+Player endpoints fail closed before 125. Compatibility is 114..135 with the
+checksum-pinned migrations-115-135.json manifest; earlier SQL/manifests remain
 immutable. The usual bridge, backup, protected-controller and forward-repair
 release gates still apply. No production changes are authorized by local tests.
 
 
-### Additive learning access and assignments (schema 125)
+### Additive learning access and assignments (schema 126)
 
-Migration 125 expands 124 with tenant-scoped group membership/course relations,
+Migration 126 expands 125 with tenant-scoped group membership/course relations,
 independent access grants and separate course/group instructor assignments.
 Existing manual/free enrollments are backfilled to grants without changing
 status or completion history. A central resolver combines valid grants with
@@ -837,16 +837,16 @@ access. Publication,
 sequence and learning-media rules remain intact. Instructor relationships never
 create enrollments; optional user links validate tenant membership. Purchase is
 a reserved grant type constrained against issuance until governed Commerce
-integration. New mutations fail closed before 125; existing pre-125 features
-retain their schema gates. The active manifest is migrations-115-134.json with
-114..134 compatibility, preserving earlier SQL/manifests. Existing protected
+integration. New mutations fail closed before 126; existing pre-126 features
+retain their schema gates. The active manifest is migrations-115-135.json with
+114..135 compatibility, preserving earlier SQL/manifests. Existing protected
 controller, bridge-first, backup and forward-repair release gates still apply.
 No production action is authorized by local verification.
 
 
-### Objective E-Learning assessments (schema 126)
+### Objective E-Learning assessments (schema 127)
 
-Migration 126 adds generic assessments, typed questions, private immutable attempt
+Migration 127 adds generic assessments, typed questions, private immutable attempt
 snapshots, answers, and retained audio references. The existing lesson block
 references the engine; existing enrollment grants, sequencing and lesson-based
 progress remain authoritative. Required published assessments gate new explicit
@@ -855,15 +855,15 @@ whitelisted questions and never return private grading configuration. Attempts
 and answers have no direct service-role SELECT or client write grants. Authoring
 and attempt submission use tenant/course transaction locks; uploads retain the
 commercial review gate. Historical audio remains referenced until its attempts
-are purged. Expand-only compatibility is 114..134; the active checksum manifest
-is migrations-115-134.json. Rehearse transaction rollback and all scoped access,
+are purged. Expand-only compatibility is 114..135; the active checksum manifest
+is migrations-115-135.json. Rehearse transaction rollback and all scoped access,
 submission and completion checks on a marked local database before deployment.
 Production mutation, protected path and source validation rules remain mandatory.
 
 
-### Assessment placements and formal completion (schema 127)
+### Assessment placements and formal completion (schema 128)
 
-Migration 127 extends the existing assessment engine with explicit Lesson,
+Migration 128 extends the existing assessment engine with explicit Lesson,
 Section and Course placements. Existing lesson block IDs and endpoints remain
 compatible. Attempts and passing results are placement/enrollment scoped;
 attachment never grants access or shares an attempt budget. Composite foreign
@@ -878,16 +878,16 @@ course metadata, lesson completions and required passing attempt proofs.
 Migration backfills previously established eligible-lesson completion; later
 requirements cannot revoke historical completion. Completion events have no
 direct client/service writes or reads and reject UPDATE. Authorized course/tenant
-purge retains cascade behavior. New placement APIs fail closed before 127.
-The active checksum manifest is migrations-115-134.json with 114..134 compatibility;
+purge retains cascade behavior. New placement APIs fail closed before 128.
+The active checksum manifest is migrations-115-135.json with 114..135 compatibility;
 earlier SQL/manifests remain immutable. Local rollback, rehearsal, security and
 release validators are mandatory. Production mutation is not part of this phase;
 bridge-first, verified backup, protected-controller and forward-repair rules apply.
 
 
-### Commerce learning entitlements (schema 128)
+### Commerce learning entitlements (schema 129)
 
-Migration 128 extends existing Commerce products and orders with generic offerings,
+Migration 129 extends existing Commerce products and orders with generic offerings,
 provider checkout/event records and purchase-time entitlement terms. Learning owns
 only offering/course associations and consumes server-confirmed entitlements in
 the existing additive grant resolver. Billing type and resource scope are independent.
@@ -896,23 +896,23 @@ archived and explicitly non-catalog courses are excluded. Entitlement does not c
 enrollment except for an explicitly requested course checkout. Subscription expiry,
 refunds and reversals remove only Purchase access and retain learning history.
 Formal completion and the lesson progress engine remain unchanged. New APIs fail
-closed before schema 128. Existing production payment paths are unchanged; live
+closed before schema 129. Existing production payment paths are unchanged; live
 learning payments are disabled. The development test adapter requires an explicit
 flag, APP_ENV=development, loopback database on port 54322 and local requests.
-The active checksum manifest is migrations-115-134.json, compatibility 114..134.
+The active checksum manifest is migrations-115-135.json, compatibility 114..135.
 Earlier applied migrations/manifests remain immutable. Bridge-first promotion,
 verified backup, protected-controller upgrade and forward-repair rules still apply.
 Local feature verification does not authorize production mutation or deployment.
 
 
-### Formal-completion credentials (schema 129)
+### Formal-completion credentials (schema 130)
 
-Migration 129 adds tenant templates, course certificate configuration and immutable
+Migration 130 adds tenant templates, course certificate configuration and immutable
 issued credential snapshots. An AFTER INSERT hook consumes the existing formal
 course completion event, atomically issuing at most one course credential per
 completion. It does not compute progress or assessment eligibility. Historical
 completions require explicit owner/admin backfill; enabling alone never backfills.
-All credential APIs fail closed before schema 129. Client roles and service_role
+All credential APIs fail closed before schema 130. Client roles and service_role
 have no direct table mutation or private issuance-hook permission. Authorized
 RPCs enforce tenant membership, owner/admin management and learner ownership.
 Public verification exposes only seven safe fields under an independent secure
@@ -927,7 +927,7 @@ foreign keys protect credential history from ordinary deletion, including tenant
 purge when credentials exist. Archives, deactivation and commerce expiry/refunds
 do not change credential status. Reissue UI is deferred.
 
-The active manifest is migrations-115-134.json with compatibility 114..134 and
+The active manifest is migrations-115-135.json with compatibility 114..135 and
 rollback compatibility 114 only. Earlier applied SQL and manifests are unchanged.
 Rehearse fresh application and transaction rollback on marked disposable local
 PostgreSQL before applying to the local development database. Production remains
@@ -938,33 +938,60 @@ to advisory-fixed versions in both requirements and constraints. The backend
 image context excludes the local madar_env virtualenv. These are source-only
 changes; local image builds/tests and dependency audits do not deploy anything.
 
-The schema-130 Academy projection is service-only and fails closed before 130.
+The schema-131 Academy projection is service-only and fails closed before 131.
 It publishes only catalog-eligible courses and relevant active offerings, uses the
 existing access/progress/credential engines for authenticated state, and leaves
 lesson content private. Fixed presentation content uses existing tenant settings;
 there are no layout blocks or new commerce/progress tables.
 
 
-Academy integration (schema 131) uses existing Builder projects with immutable
+Academy integration (schema 132) uses existing Builder projects with immutable
 usage profiles and tenant-scoped Academy bindings. Database and server checks
 exclude forms, bookings, code and private learner payloads from landing schemas.
 Atomic Builder publication preserves the separate main website binding. Open
 registration creates existing platform users with learner tenant memberships;
 verification activates that membership without provisioning owner privileges.
 Staff context is denied to learner memberships, while existing learning engines
-remain authoritative. Schema 130 remains immutable. The active compatibility
-range is 114..134 and manifest migrations-115-134.json. Protected controller,
+remain authoritative. Schema 131 remains immutable. The active compatibility
+range is 114..135 and manifest migrations-115-135.json. Protected controller,
 bridge-first, backup and forward-repair rules remain mandatory. Local verification
 does not authorize production migration, deployment or control-plane upgrades.
 
-Academy Builder expansion (schema 132) retains the shared Builder project/page/layout/chrome/history/publication models. The additive editor binding is tenant/profile checked and clears on deletion; atomic owner-only initialization recovers missing/archived bindings without replacing the separate published snapshot. Public presentation pages cannot use fixed learning/auth/checkout route names. Instructor cards expose only active identities assigned to public catalog-eligible courses; contact emails and account references remain private. Full Academy initialization fails closed until 132. Applied migrations through 131 stay immutable; production migration/deployment/control-plane upgrades are not authorized by local development.
+Academy Builder expansion (schema 133) retains the shared Builder project/page/layout/chrome/history/publication models. The additive editor binding is tenant/profile checked and clears on deletion; atomic owner-only initialization recovers missing/archived bindings without replacing the separate published snapshot. Public presentation pages cannot use fixed learning/auth/checkout route names. Instructor cards expose only active identities assigned to public catalog-eligible courses; contact emails and account references remain private. Full Academy initialization fails closed until 133. Applied migrations through 132 stay immutable; production migration/deployment/control-plane upgrades are not authorized by local development.
 
 
-## Group identity and deletion (schema 133)
+## Group identity and deletion (schema 134)
 
-Migration 133 adds tenant-scoped normalized group-name enforcement for new names (case and whitespace insensitive, including archived records). Existing duplicate groups and their relationships are retained unchanged; same-name edits remain available for legacy records. Transaction advisory locking serializes name checks. The service-only delete RPC checks active owner/admin membership, tenant, confirmation and expected revision under the existing relationship lock. Group memberships, course/instructor assignments and group grants cascade; users, courses, enrollments and progress history remain. Other grant sources retain access. New group create/update/delete require schema 133; prior reads and archive remain bridge compatible. Applied migrations through 132 are immutable. The active manifest is migrations-115-134.json; compatibility is 114..134. Local verification does not authorize production deployment or migration.
+Migration 134 adds tenant-scoped normalized group-name enforcement for new names (case and whitespace insensitive, including archived records). Existing duplicate groups and their relationships are retained unchanged; same-name edits remain available for legacy records. Transaction advisory locking serializes name checks. The service-only delete RPC checks active owner/admin membership, tenant, confirmation and expected revision under the existing relationship lock. Group memberships, course/instructor assignments and group grants cascade; users, courses, enrollments and progress history remain. Other grant sources retain access. New group create/update/delete require schema 134; prior reads and archive remain bridge compatible. Applied migrations through 133 are immutable. The active manifest is migrations-115-135.json; compatibility is 114..135. Local verification does not authorize production deployment or migration.
 
 
-## Instructor deletion (schema 134)
+## Instructor deletion (schema 135)
 
-Migration 134 adds a service-only instructor deletion RPC, requiring active tenant owner/admin membership, explicit confirmation and expected revision under the existing relationship lock. Course/group instructor assignments cascade through existing FKs; linked user accounts, courses, groups, enrollments and progress remain. The API fails closed before schema 134. Earlier migrations through 133 are immutable. The active checksum manifest is migrations-115-134.json with 114..134 compatibility; production deployment/migration remain unauthorized by local work.
+Migration 135 adds a service-only instructor deletion RPC, requiring active tenant owner/admin membership, explicit confirmation and expected revision under the existing relationship lock. Course/group instructor assignments cascade through existing FKs; linked user accounts, courses, groups, enrollments and progress remain. The API fails closed before schema 135. Earlier migrations through 134 are immutable. The active checksum manifest is migrations-115-135.json with 114..135 compatibility; production deployment/migration remain unauthorized by local work.
+
+## Ecommerce schema116 reconciliation bridge
+
+The ecommerce bridge on main retains source114 and rollback metadata114, preserves immutable
+commercial migration115, and targets116 with migrations-115-116.json. Commercial
+holds/access behavior remains unchanged. Catalog writes fail closed until116 installs
+service-only V3 atomic product, brand/category/tag/aggregate/publication/registry
+commands. Historical identities remain tenant-scoped and uniqueness covers inactive
+rows; final-valid swaps defer semantic checks only within V3. Separate catalog and
+inventory guards permit descriptive edits without overwriting checkout stock.
+
+Promotion does not execute migrations. Follow the governed control-plane upgrade,
+verified backup and known-good bridge sequence. Preserve forward-repair recovery
+after the existing rollback bound; no deployment or production mutation is authorized.
+
+## PR #165 migration namespace reconciliation
+
+Main already reserves migration 116 for ecommerce catalog reconciliation. Its SQL,
+mirror and historical migrations-115-116.json manifest are preserved byte for byte.
+The unpublished E-Learning migrations have been rebased from 116–134 to 117–135;
+all learning schema gates, transition guards and checksum manifests follow that
+sequence. The combined bridge supports 114..135, targets 135, and uses
+migrations-115-135.json. Rollback compatibility remains 114 only. Promotion,
+verified backup, protected control-plane upgrade and forward repair requirements
+remain unchanged. Existing development databases with the old unpublished learning
+sequence require a disposable database rebuild; their old schema numbers must not
+be treated as this release’s migration ledger. No production mutation is authorized.

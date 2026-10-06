@@ -128,7 +128,7 @@ class RelationshipsDatabaseTests(unittest.TestCase):
 
     def test_purchase_requires_commerce_and_client_mutation_forbidden(self):
         schema = self.db.execute("select schema_version from public.application_schema_state where contract_key='core'").fetchone()[0]
-        if schema < 128:
+        if schema < 129:
             with self.assertRaises(psycopg.errors.CheckViolation):
                 with self.db.transaction():self.db.execute("insert into public.elearning_access_grants(tenant_id,course_id,enrollment_id,grant_type) values(%s,%s,%s,'purchase')",(self.tenant,self.course,self.enrollment))
         else:
@@ -138,4 +138,4 @@ class RelationshipsDatabaseTests(unittest.TestCase):
         for table in ['elearning_access_grants','elearning_group_members','elearning_group_courses','elearning_course_instructors','elearning_group_instructors']:
             for role in ['anon','authenticated','service_role']:
                 self.assertFalse(self.db.execute("select has_table_privilege(%s,%s,'INSERT')",(role,'public.'+table)).fetchone()[0])
-        self.assertFalse(self.db.execute("select has_function_privilege('service_role','public.manage_elearning_participation_schema124(integer,uuid,integer,text,jsonb)','EXECUTE')").fetchone()[0])
+        self.assertFalse(self.db.execute("select has_function_privilege('service_role','public.manage_elearning_participation_schema125(integer,uuid,integer,text,jsonb)','EXECUTE')").fetchone()[0])

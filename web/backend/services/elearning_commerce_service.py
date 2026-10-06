@@ -43,7 +43,7 @@ class LocalEvent(Payload):
 
 
 def call(name, actor, **args):
-    if not settings_available(128):
+    if not settings_available(129):
         raise HTTPException(503, detail={"code": "learning_commerce_upgrade_required"})
     return player_call(name, actor, **args)
 

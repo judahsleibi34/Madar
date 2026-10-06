@@ -38,6 +38,17 @@ class TenantSupabase:
         self.rows = rows
         self.queries = []
 
+    def rpc(self, name, params):
+        # Exercise the current RPC boundary plus the legacy fallback's row scoping.
+        assert name == "read_ecommerce_catalog_v3_safe"
+        assert params == {"p_tenant_id": 7}
+        class MissingRpc:
+            def execute(self):
+                error = Exception("PGRST202 missing snapshot RPC")
+                error.code = "PGRST202"
+                raise error
+        return MissingRpc()
+
     def table(self, name):
         query = TenantQuery(name, self.rows)
         self.queries.append(query)

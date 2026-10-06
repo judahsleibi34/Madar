@@ -26,7 +26,7 @@ class ELearningDatabaseTests(unittest.TestCase):
         self.tenant = self.db.execute("insert into public.tenants(brand_name,owner_name) values('Local E-Learning test','Local') returning tenant_id").fetchone()[0]
 
     def test_schema_and_service_only_access(self):
-        self.assertGreaterEqual(self.db.execute("select schema_version from public.application_schema_state where contract_key='core'").fetchone()[0], 117)
+        self.assertGreaterEqual(self.db.execute("select schema_version from public.application_schema_state where contract_key='core'").fetchone()[0], 118)
         for table in ("elearning_settings", "elearning_courses"):
             self.assertTrue(self.db.execute("select relrowsecurity from pg_class where oid=%s::regclass", (table,)).fetchone()[0])
             for role in ("anon", "authenticated"):

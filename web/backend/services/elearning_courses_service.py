@@ -43,7 +43,7 @@ class CourseDelete(CourseCommand):
 
 
 def courses_available():
-    return settings_available(117)
+    return settings_available(118)
 
 
 def require_courses_available():
@@ -63,7 +63,7 @@ def present_courses(rows, tenant_id):
         participation = service_supabase.rpc("get_elearning_participation_counts", {"p_tenant_id": tenant_id, "p_course_ids": [row["id"] for row in rows]}).execute().data or {}
         for key, value in participation.items():
             counts[key] = {**counts.get(key, {}), **value}
-    deletion_available = settings_available(121) if rows else False
+    deletion_available = settings_available(122) if rows else False
     return [present_course(row, counts.get(row["id"]), deletion_available) for row in rows]
 
 
@@ -87,21 +87,21 @@ def create_course(tenant_id, user_id, payload):
         raise HTTPException(status_code=400, detail="New courses must be draft or published")
     require_owned_image(tenant_id, payload.cover_asset)
     row = {**payload.model_dump(exclude_none=True), "tenant_id": tenant_id, "created_by": user_id}
-    if not settings_available(128):
+    if not settings_available(129):
         if row.get("catalog_visible") is False:
             raise HTTPException(503, "Catalog configuration requires the database upgrade")
         row.pop("catalog_visible", None)
     rows = service_supabase.table("elearning_courses").insert(row).execute().data or []
     if not rows:
         raise RuntimeError("Course insert failed")
-    return present_course(rows[0], deletion_available=settings_available(121))
+    return present_course(rows[0], deletion_available=settings_available(122))
 
 
 def update_course(tenant_id, course_id, payload):
     current = get_course(tenant_id, course_id)
     require_owned_image(tenant_id, payload.cover_asset)
     row = payload.model_dump(exclude={"expected_revision"}, exclude_none=True)
-    if not settings_available(128):
+    if not settings_available(129):
         if "catalog_visible" in row:
             raise HTTPException(503, "Catalog configuration requires the database upgrade")
     row["revision"] = payload.expected_revision + 1
@@ -134,7 +134,7 @@ def duplicate_course(tenant_id, user_id, course_id, expected_revision):
 
 
 def delete_course(tenant_id, user_id, course_id, payload):
-    if not settings_available(121):
+    if not settings_available(122):
         raise HTTPException(503, detail={"code": "elearning_course_delete_upgrade_required", "message": "Course deletion requires the database upgrade."})
     if not payload.confirmed:
         raise HTTPException(400, "Permanent deletion must be confirmed")

@@ -2365,13 +2365,7 @@ def _attach_public_variant_options(
     product_ids = list(dict.fromkeys(str(product.get("id") or "") for product in products if product.get("id")))
     if not product_ids:
         return
-    option_rows = _optional_p1a_rows(
-        service_supabase.table("ecommerce_product_options")
-        .select("id,product_id,name_translations,display_type,sort_order")
-        .eq("tenant_id", tenant_id)
-        .in_("product_id", product_ids)
-        .order("sort_order")
-    )
+    option_rows = _current_ecommerce_option_rows(tenant_id, product_ids=product_ids, columns="id,product_id,name_translations,display_type,sort_order")
     if option_rows is None:
         return
     options_by_product: dict[str, list[dict[str, Any]]] = {}
@@ -2451,6 +2445,20 @@ def _attach_public_variant_options(
         product["variant_options"] = summaries
 
 
+
+def _current_ecommerce_option_rows(tenant_id: int, *, product_id=None, product_ids=None, columns="product_id"):
+    # SELECT * is compatible before/after 116; whitelist the public fields after
+    # filtering new active membership. No internal metadata is serialized.
+    query = service_supabase.table("ecommerce_product_options").select("*").eq("tenant_id", tenant_id)
+    if product_id is not None:
+        query = query.eq("product_id", product_id)
+    if product_ids is not None:
+        query = query.in_("product_id", product_ids)
+    result = _optional_p1a_rows(query.order("sort_order").order("id"))
+    if result is None:
+        return None
+    fields = columns.split(",")
+    return [{key: row[key] for key in fields if key in row} for row in result if row.get("active", True)]
 
 def _catalog_payload(
     *,
@@ -2606,12 +2614,7 @@ def _catalog_product_payload(
     attribute_rows = _optional_p1a_rows(service_supabase.table("ecommerce_product_attributes").select("id,name_translations,value_translations,sort_order").eq("tenant_id", tenant_id).eq("product_id", product_id).order("sort_order"))
     if attribute_rows is None:
         return {"product": product, "category": category, "categories": categories, "tags": tags, "attributes": [], "options": [], "variants": []}
-    try:
-        option_rows = rows(service_supabase.table("ecommerce_product_options").select("id,code,name_translations,required,sort_order,display_type").eq("tenant_id", tenant_id).eq("product_id", product_id).order("sort_order").execute())
-    except Exception as error:
-        if "display_type" not in str(error).lower() and "schema cache" not in str(error).lower():
-            raise
-        option_rows = rows(service_supabase.table("ecommerce_product_options").select("id,code,name_translations,required,sort_order").eq("tenant_id", tenant_id).eq("product_id", product_id).order("sort_order").execute())
+    option_rows = _current_ecommerce_option_rows(tenant_id, product_id=product_id, columns="id,code,name_translations,required,sort_order,display_type") or []
     for option in option_rows:
         option["display_type"] = option.get("display_type") or "text"
     option_ids = [str(item["id"]) for item in option_rows]
@@ -3353,7 +3356,7 @@ def reconcile_public_store_cart(
         .execute()
     )
     by_id = {str(product.get("id")): product for product in product_rows}
-    optional_options = _optional_p1a_rows(service_supabase.table("ecommerce_product_options").select("product_id").eq("tenant_id", tenant_id).in_("product_id", requested_product_ids))
+    optional_options = _current_ecommerce_option_rows(tenant_id, product_ids=requested_product_ids)
     option_rows = optional_options or []
     variant_product_ids = {str(item.get("product_id")) for item in option_rows}
     requested_variant_ids = list(dict.fromkeys(str(item.variant_id) for item in payload.items if item.variant_id))
