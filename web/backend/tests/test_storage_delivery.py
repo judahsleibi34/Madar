@@ -103,3 +103,39 @@ class StorageDeliveryTests(unittest.TestCase):
             for query in ('token=fixture&type=recovery&redirect_to=https://attacker.example', 'token=fixture&type=unsupported', 'token=fixture&type=signup&unexpected=1'):
                 r = self.client.get('/auth/v1/verify?' + query)
                 self.assertEqual(r.status_code, 400)
+
+
+class AuthCallbackTransportTests(unittest.TestCase):
+    def setUp(self):
+        self.client = TestClient(app_module.app)
+
+    def test_verification_and_recovery_redirect_without_provider_url(self):
+        from types import SimpleNamespace
+        for kind, path in [('signup', '/verify-email'), ('recovery', '/reset-password?request_token=fixture')]:
+            location='https://madarportal.com'+path+'#access_token=synthetic-test-value'
+            with patch.dict(os.environ, {'FRONTEND_PRIMARY_URL':'https://madarportal.com','SUPABASE_URL':'http://madar-supabase:8000'}), patch('routes.auth_callback_routes.requests.Session') as session:
+                session.return_value.__enter__.return_value.get.return_value=SimpleNamespace(status_code=302,headers={'Location':location})
+                r=self.client.get('/auth/v1/verify',params={'token':'synthetic-test-value','type':kind,'redirect_to':'https://madarportal.com'+path},follow_redirects=False)
+                call=session.return_value.__enter__.return_value.get.call_args
+            self.assertEqual(r.status_code,303)
+            self.assertEqual(r.headers['location'],location)
+            self.assertEqual(r.headers['cache-control'],'no-store')
+            self.assertEqual(r.headers['referrer-policy'],'no-referrer')
+            self.assertEqual(call.args[0],'http://madar-supabase:8000/auth/v1/verify')
+            self.assertFalse(call.kwargs['allow_redirects'])
+
+    def test_upstream_internal_or_unapproved_redirect_is_rejected(self):
+        from types import SimpleNamespace
+        for location in ['http://madar-supabase:8000/', 'https://attacker.example/', 'https://madarportal.com/unapproved']:
+            with patch.dict(os.environ, {'FRONTEND_PRIMARY_URL':'https://madarportal.com'}), patch('routes.auth_callback_routes.requests.Session') as session:
+                session.return_value.__enter__.return_value.get.return_value=SimpleNamespace(status_code=302,headers={'Location':location})
+                r=self.client.get('/auth/v1/verify?token=synthetic-test-value&type=signup',follow_redirects=False)
+            self.assertEqual(r.status_code,502)
+            self.assertNotIn('location',r.headers)
+            self.assertNotIn(location,r.text)
+
+    def test_duplicate_callback_parameters_do_not_contact_auth(self):
+        with patch('routes.auth_callback_routes.requests.Session') as session:
+            r=self.client.get('/auth/v1/verify?token=fixture&token=other&type=signup')
+            session.assert_not_called()
+        self.assertEqual(r.status_code,400)
