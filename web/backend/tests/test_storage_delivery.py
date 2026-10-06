@@ -154,4 +154,3 @@ class AuthCallbackTransportTests(unittest.TestCase):
             r=self.client.get('/auth/v1/verify?token=fixture&token=other&type=signup')
             session.assert_not_called()
         self.assertEqual(r.status_code,400)
-
