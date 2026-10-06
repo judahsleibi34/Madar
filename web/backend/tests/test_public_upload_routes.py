@@ -149,22 +149,13 @@ class PublicUploadRouteTests(unittest.TestCase):
 
     def test_managed_builder_asset_falls_back_to_durable_storage(self):
         self.asset_path.unlink()
-        signed_url = "https://project.supabase.co/storage/v1/object/sign/builder-assets/exact?token=test"
-        with patch.object(
-            app_module, "create_builder_asset_signed_url", return_value=signed_url
-        ) as create_signed_url:
-            response = self.client.get(
-                "/uploads/tenant_1/builder_assets/0123456789abcdef0123456789abcdef.png",
-                follow_redirects=False,
-            )
-
-        self.assertEqual(response.status_code, 307)
-        self.assertEqual(response.headers["location"], signed_url)
-        self.assertEqual(response.headers["cache-control"], "private, no-store")
-        create_signed_url.assert_called_once_with(
-            storage_key="tenant_1/builder_assets/0123456789abcdef0123456789abcdef.png",
-            expires_in=60,
-        )
+        from fastapi.responses import Response
+        with patch.object(app_module, 'stream_storage_object', return_value=Response(PNG_BYTES, media_type='image/png')) as stream:
+            response = self.client.get('/uploads/tenant_1/builder_assets/0123456789abcdef0123456789abcdef.png', follow_redirects=False)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.content, PNG_BYTES)
+        self.assertNotIn('location', response.headers)
+        self.assertEqual(stream.call_args.kwargs['bucket'], 'builder-assets')
 
     def test_local_video_supports_http_byte_ranges(self):
         video_path = self.asset_dir / "abcdefabcdefabcdefabcdefabcdefab.mp4"
@@ -241,8 +232,8 @@ class PublicUploadRouteTests(unittest.TestCase):
     def test_tenant_a_local_asset_is_not_served_from_tenant_b_path(self):
         with patch.object(
             app_module,
-            "create_builder_asset_signed_url",
-            side_effect=app_module.BuilderAssetStorageError("not_found"),
+            "stream_storage_object",
+            side_effect=app_module._managed_asset_failure(404),
         ):
             response = self.client.get(
                 "/uploads/tenant_2/builder_assets/0123456789abcdef0123456789abcdef.png"
@@ -335,7 +326,7 @@ class PublicUploadRouteTests(unittest.TestCase):
         self.visibility_patch.stop()
         try:
             with patch.object(app_module, "service_supabase", store), patch.object(
-                app_module, "create_builder_asset_signed_url", side_effect=app_module.BuilderAssetStorageError("not_found"),
+                app_module, "stream_storage_object", side_effect=app_module._managed_asset_failure(404),
             ):
                 response = self.client.get(f"/uploads/{key}")
         finally:
@@ -347,7 +338,7 @@ class PublicUploadRouteTests(unittest.TestCase):
         self.asset_path.unlink()
         with patch.object(
             app_module, "download_builder_asset",
-            side_effect=app_module.BuilderAssetStorageError("not_found"),
+            side_effect=app_module._managed_asset_failure(404),
         ):
             response = self.client.get(f"/uploads/tenant_1/builder_assets/{self.asset_path.name}?w=320")
         self.assertEqual(response.status_code, 404)

@@ -1,0 +1,18 @@
+# Prepared production configuration only: requires operator-owned SMTP variables.
+services:
+  auth:
+    environment:
+      API_EXTERNAL_URL: https://api.madarportal.com/auth/v1
+      GOTRUE_SITE_URL: https://madarportal.com
+      GOTRUE_URI_ALLOW_LIST: https://madarportal.com/verify-email,https://madarportal.com/reset-password
+      GOTRUE_MAILER_URLPATHS_INVITE: /auth/v1/verify
+      GOTRUE_MAILER_URLPATHS_CONFIRMATION: /auth/v1/verify
+      GOTRUE_MAILER_URLPATHS_RECOVERY: /auth/v1/verify
+      GOTRUE_MAILER_URLPATHS_EMAIL_CHANGE: /auth/v1/verify
+      GOTRUE_MAILER_AUTOCONFIRM: "false"
+      GOTRUE_SMTP_HOST: ${SMTP_HOST:?operator SMTP host required}
+      GOTRUE_SMTP_PORT: ${SMTP_PORT:?operator SMTP port required}
+      GOTRUE_SMTP_USER: ${SMTP_USER:?operator SMTP user required}
+      GOTRUE_SMTP_PASS: ${SMTP_PASS:?operator SMTP password required}
+      GOTRUE_SMTP_ADMIN_EMAIL: ${SMTP_ADMIN_EMAIL:?operator sender required}
+      GOTRUE_SMTP_SENDER_NAME: ${SMTP_SENDER_NAME:?operator sender name required}

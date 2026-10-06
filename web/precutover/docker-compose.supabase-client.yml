@@ -1,0 +1,19 @@
+# Opt-in overlay only. Never load into an active release before cutover approval.
+# Overlay with web/docker-compose.yml and the release topology.
+services:
+  backend:
+    networks:
+      - default
+      - parser_internal
+      - remote_ingestion_internal
+      - supabase_client
+  notification-worker:
+    networks: [default, supabase_client]
+  calendar-sync-worker:
+    networks: [default, supabase_client]
+  data-deletion-worker:
+    networks: [default, supabase_client]
+networks:
+  supabase_client:
+    external: true
+    name: madar-supabase-client

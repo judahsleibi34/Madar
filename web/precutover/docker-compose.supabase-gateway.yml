@@ -1,0 +1,11 @@
+# Overlay with the isolated Supabase base and madar-local overrides.
+services:
+  api-gw:
+    networks:
+      default: {}
+      madar_client:
+        aliases: [madar-supabase]
+networks:
+  madar_client:
+    external: true
+    name: madar-supabase-client
