@@ -1,0 +1,1021 @@
+{
+  "inventory_version": 1,
+  "review_date": "2026-10-06",
+  "scope": "entries exactly classify direct privileged Supabase references in application Python according to the unchanged checker. Related credential consumers and operational paths are separately listed below. Services often rely on authorized caller identity/tenant; service-role access bypasses RLS. This inventory records actual access paths and is not proof that every operation is independently authorized. No credential values are included.",
+  "provenance": {
+    "canonical_added_commit": "1ea26a7c2cb23ba2e2941c096be59bf09d275a18",
+    "restored_from_commit": "28c659aac61edd61bbb9077b3ac1b1c217a8feea",
+    "historical_deletion_commit": "ef3e2c1a36294d9ce96feeae048811a8cb299ac9",
+    "reviewed_source_base": "748aaf7d7d1d4ee664f512aa38ec83c8019130e6",
+    "historical_entries": 52,
+    "retained_existing_paths": 50,
+    "added_current_paths": 16,
+    "removed_stale_paths": [
+      "web/backend/routes/admin_commercial_routes.py",
+      "web/backend/services/tenant_selection_service.py"
+    ]
+  },
+  "review_method": [
+    "Search all fetched refs and reachable Git objects for canonical/equivalent inventory; restore latest canonical version rather than inventing an allowlist.",
+    "Review current privileged functions, credential factories/headers, trusted caller context, tenant filters, global aggregates, Auth/admin flows and guarded RPCs; compare historical file classifications with current source.",
+    "Cross-check alias/injected client and HTTP/DB/SMTP/VAPID/Redis/provider/control-plane/worker configuration consumers outside the checker scope.",
+    "Read existing production deployment metadata/configuration shape without collecting or publishing secret values; keep all runtime and production changes outside this correction."
+  ],
+  "reference_documents": [
+    "docs/production-release-policy.md",
+    "docs/MADAR_AUTO_DEPLOY_MERGE_CONTRACT.md",
+    "docs/production-incident-remediation-2026-08-25/21-supabase-secret-key-compatibility.md",
+    "docs/ecosystem-readiness-audit-2026-08-24/05-multitenancy-review.md",
+    "docs/elearning-settings.md",
+    "docs/elearning-content-architecture.md",
+    "docs/elearning-learner-player.md",
+    "docs/elearning-academy.md"
+  ],
+  "entries": [
+    {
+      "path": "web/backend/app.py",
+      "boundary": "public_asset_registry_or_verified_private_preview",
+      "reviewed_functions": [
+        "_asset_visibility",
+        "_legacy_asset_visibility"
+      ]
+    },
+    {
+      "path": "web/backend/data_analysis/ai/token_metering.py",
+      "boundary": "tenant_scoped_metering_from_authorized_analysis_request",
+      "reviewed_functions": [
+        "ensure_monthly_allocation",
+        "finalize_tokens",
+        "get_model_multipliers",
+        "get_token_summary",
+        "release_tokens",
+        "reserve_tokens"
+      ]
+    },
+    {
+      "path": "web/backend/data_analysis/ai/usage.py",
+      "boundary": "Authorized analysis caller supplies user/tenant for daily usage and reservation RPCs; a deliberate internal cross-user aggregate enforces global daily AI budget limits and is not a tenant record listing.",
+      "reviewed_functions": [
+        "get_daily_ai_usage",
+        "get_global_daily_ai_usage",
+        "increment_daily_ai_usage",
+        "reserve_daily_ai_usage"
+      ]
+    },
+    {
+      "path": "web/backend/database.py",
+      "boundary": "protected_client_factory",
+      "reviewed_functions": []
+    },
+    {
+      "path": "web/backend/routes/admin_billing_routes.py",
+      "boundary": "platform_admin_request_aal2",
+      "reviewed_functions": [
+        "inspect_commercial_access_history",
+        "inspect_commercial_modules",
+        "inspect_commercial_state",
+        "inspect_price_books",
+        "quote_commercial_modules",
+        "set_subdomain_grandfathering"
+      ]
+    },
+    {
+      "path": "web/backend/routes/admin_profile_routes.py",
+      "boundary": "platform_admin_self_profile_read_and_aal2_mutations",
+      "reviewed_functions": [
+        "update_admin_profile",
+        "upload_admin_avatar"
+      ]
+    },
+    {
+      "path": "web/backend/routes/auth_routes.py",
+      "boundary": "verified_auth_or_pending_auth_protocol",
+      "reviewed_functions": [
+        "change_password",
+        "email_verification_status",
+        "get_auth_user_by_email",
+        "get_auth_user_by_id",
+        "get_local_user_by_auth_id",
+        "get_local_user_by_email",
+        "login",
+        "recover_or_remove_orphaned_auth_user",
+        "signup"
+      ]
+    },
+    {
+      "path": "web/backend/routes/builder_routes.py",
+      "boundary": "verified_membership_role_capability_and_tenant_resource",
+      "reviewed_functions": [
+        "archive_builder_project",
+        "bind_first_published_project_if_unbound",
+        "create_builder_project",
+        "create_builder_site_member",
+        "delete_builder_form_record",
+        "delete_builder_site_member",
+        "get_builder_form_record",
+        "get_builder_form_submission",
+        "get_builder_reservation",
+        "get_form_submission_submitters",
+        "get_project_for_tenant",
+        "get_public_project_binding",
+        "get_site_members_for_project",
+        "get_website_settings_record",
+        "list_builder_form_drafts",
+        "list_builder_form_submissions",
+        "list_builder_projects",
+        "list_builder_reservations",
+        "publish_builder_project",
+        "publish_project_atomically",
+        "read_site_visit_metrics",
+        "unpublish_builder_project",
+        "update_builder_form_record_answers",
+        "update_builder_form_submission_status",
+        "update_builder_project",
+        "update_builder_reservation_status",
+        "update_builder_site_binding",
+        "update_builder_site_member"
+      ]
+    },
+    {
+      "path": "web/backend/routes/calendar_routes.py",
+      "boundary": "verified_membership_role_capability_and_tenant_resource",
+      "reviewed_functions": [
+        "_calendar_workspace_payload",
+        "add_task_dependency",
+        "archive_task",
+        "calendar_oauth_callback",
+        "create_calendar",
+        "create_event",
+        "create_sync_connection",
+        "create_task",
+        "delete_event",
+        "delete_task",
+        "dependency_would_cycle",
+        "ensure_default_calendar",
+        "event_conflicts",
+        "event_history",
+        "event_rows",
+        "exclude_occurrence",
+        "export_calendar",
+        "import_calendar_ics",
+        "list_archived_tasks",
+        "list_calendar_members",
+        "list_invitation_reviews",
+        "list_sync_conflicts",
+        "load_connections",
+        "load_invitation_reviews",
+        "load_tasks",
+        "mark_pending_connection_failed",
+        "queue_task_to_provider",
+        "remove_empty_connection_calendar",
+        "remove_incomplete_sync_connection",
+        "replace_event_children",
+        "reservation_events_for_range",
+        "resolve_invitation_review",
+        "resolve_sync_conflict",
+        "reusable_pending_connection",
+        "set_connection_inbound_sync",
+        "share_calendar",
+        "sync_task_reminder",
+        "tenant_calendar",
+        "tenant_connection",
+        "tenant_event",
+        "tenant_task",
+        "unlink_task_sync",
+        "update_event",
+        "update_task",
+        "validate_active_task_owner",
+        "validate_project_reference",
+        "workspace_linked_task_event_ids",
+        "workspace_task_rows",
+        "write_change"
+      ]
+    },
+    {
+      "path": "web/backend/routes/ecommerce_routes.py",
+      "boundary": "verified_membership_role_capability_and_tenant_resource",
+      "reviewed_functions": [
+        "_attach_product_aggregates",
+        "_attach_product_categories",
+        "_attach_product_tags",
+        "_catalog_brands_for_tenant",
+        "_catalog_categories_for_tenant",
+        "_catalog_for_tenant",
+        "_catalog_products_for_tenant",
+        "_catalog_schema_version",
+        "_catalog_tags_for_tenant",
+        "_execute_catalog_rpc",
+        "_merchant_order_detail",
+        "_replace_product_categories",
+        "_replace_product_tags",
+        "_require_multi_category_storage",
+        "_store_currency_for_tenant",
+        "_store_currency_locked",
+        "_store_theme_for_tenant",
+        "_sync_catalog_image_assets",
+        "_tenant_row",
+        "_validate_featured_rows",
+        "collect_order_payment",
+        "create_brand",
+        "create_category",
+        "create_custom_delivery_area",
+        "create_tag",
+        "delete_brand",
+        "delete_category",
+        "delete_custom_delivery_area",
+        "delete_tag",
+        "get_delivery_areas",
+        "get_delivery_pricing",
+        "get_loyalty_rule",
+        "list_orders",
+        "revoke_loyalty_entitlement",
+        "transition_order_status",
+        "update_brand",
+        "update_category",
+        "update_delivery_areas",
+        "update_delivery_pricing",
+        "update_loyalty_rule",
+        "update_store_growth",
+        "update_store_landing_page",
+        "update_store_settings",
+        "update_store_social_links",
+        "update_store_theme",
+        "update_tag"
+      ]
+    },
+    {
+      "path": "web/backend/routes/elearning_academy_routes.py",
+      "boundary": "Landing initialization requires learning owner/admin and matching Builder actor, active builder entitlement, owned assets and schema133; tenant comes from authenticated context. Public Academy auth uses the existing tenant-host binding and shared verification lifecycle.",
+      "reviewed_functions": [
+        "initialize_landing"
+      ]
+    },
+    {
+      "path": "web/backend/routes/elearning_assessments_routes.py",
+      "boundary": "Audio enumeration requires learning owner/admin, a course resolved in that tenant and schema128; builder_assets query is tenant-scoped. Learner operations use the separate active-member context and guarded assessment RPCs.",
+      "reviewed_functions": [
+        "placed_audio"
+      ]
+    },
+    {
+      "path": "web/backend/routes/elearning_content_routes.py",
+      "boundary": "Learning content owner/admin capability is resolved before course/lesson RPCs; audio enumeration is tenant-scoped and uploads reuse Builder quota, ownership and registration checks.",
+      "reviewed_functions": [
+        "existing_audio"
+      ]
+    },
+    {
+      "path": "web/backend/routes/mfa_routes.py",
+      "boundary": "verified_auth_or_pending_auth_protocol",
+      "reviewed_functions": [
+        "get_local_user_for_pending_mfa"
+      ]
+    },
+    {
+      "path": "web/backend/routes/password_routes.py",
+      "boundary": "verified_auth_or_pending_auth_protocol",
+      "reviewed_functions": [
+        "claim_password_reset_request",
+        "clear_password_reset_request",
+        "create_password_reset_request",
+        "finish_password_reset_request",
+        "get_local_user_by_auth_id",
+        "mark_password_reset_requested",
+        "password_reset"
+      ]
+    },
+    {
+      "path": "web/backend/routes/public_contact_routes.py",
+      "boundary": "public_host_binding_or_rate_limited_public_intake",
+      "reviewed_functions": [
+        "submit_public_contact"
+      ]
+    },
+    {
+      "path": "web/backend/routes/public_site_routes.py",
+      "boundary": "public_host_binding_or_rate_limited_public_intake",
+      "reviewed_functions": [
+        "_attach_public_variant_options",
+        "_catalog_product_payload",
+        "_current_ecommerce_option_rows",
+        "_read_public_catalog_rows",
+        "attach_site_record_owner",
+        "authorize_site_resource",
+        "build_public_site_response",
+        "cancel_public_builder_reservation",
+        "create_public_store_order",
+        "execute",
+        "finalize_public_quiz_attempt",
+        "get_active_tenant_membership",
+        "get_bound_published_project",
+        "get_local_user_by_auth_id",
+        "get_public_builder_form_draft",
+        "get_public_order_confirmation",
+        "get_public_store_delivery_areas",
+        "get_public_store_discounts",
+        "get_public_store_loyalty",
+        "get_published_form_for_site",
+        "get_tenant_staff_membership",
+        "insert_builder_form_submission",
+        "insert_builder_reservation",
+        "list_public_builder_form_drafts",
+        "reconcile_public_store_cart",
+        "record_public_site_visit",
+        "register_tenant_account",
+        "resolve_public_site_runtime_context",
+        "resolve_website_settings",
+        "save_public_builder_form_draft",
+        "schema_090_missing_draft_name",
+        "start_public_quiz_attempt",
+        "submit_public_builder_form",
+        "write_public_form_draft"
+      ]
+    },
+    {
+      "path": "web/backend/routes/user_routes.py",
+      "boundary": "verified_self_identity_or_authorized_admin_caller",
+      "reviewed_functions": [
+        "delete_old_avatar_if_storage_url",
+        "update_user_profile",
+        "upload_avatar_to_storage",
+        "upload_user_avatar"
+      ]
+    },
+    {
+      "path": "web/backend/services/academy_builder_service.py",
+      "boundary": "Internal management navigation receives a trusted tenant from the learning owner/admin caller; website/project reads constrain tenant and academy usage profile, with schema132/133 availability guards.",
+      "reviewed_functions": [
+        "management_profile"
+      ]
+    },
+    {
+      "path": "web/backend/services/account_lifecycle_service.py",
+      "boundary": "internal_worker_or_authorized_command_with_durable_tenant_context",
+      "reviewed_functions": [
+        "_assert_local_email_available",
+        "cleanup_stale_pending_accounts",
+        "get_local_user_by_auth_id",
+        "synchronize_verified_account"
+      ]
+    },
+    {
+      "path": "web/backend/services/admin_account_access_service.py",
+      "boundary": "internal_service_explicit_identity_tenant_arguments_from_authorized_caller",
+      "reviewed_functions": [
+        "_candidate_requests",
+        "end_admin_account_access_session",
+        "generate_permission_code",
+        "get_user_by_email",
+        "get_user_by_id",
+        "resolve_admin_account_access_user",
+        "verify_permission_code"
+      ]
+    },
+    {
+      "path": "web/backend/services/admin_user_service.py",
+      "boundary": "internal_service_explicit_identity_tenant_arguments_from_authorized_caller",
+      "reviewed_functions": [
+        "_assert_not_last_system_admin",
+        "_load_admin_target",
+        "delete_user_account",
+        "list_users_with_features",
+        "update_user_type"
+      ]
+    },
+    {
+      "path": "web/backend/services/asset_registry_service.py",
+      "boundary": "internal_service_explicit_identity_tenant_arguments_from_authorized_caller",
+      "reviewed_functions": [
+        "cleanup_expired_builder_assets",
+        "delete_builder_asset_registration",
+        "nonproject_asset_reference_count",
+        "project_asset_is_persisted",
+        "reconcile_project_asset_references",
+        "refresh_builder_asset_reference_state",
+        "register_builder_asset"
+      ]
+    },
+    {
+      "path": "web/backend/services/audit_service.py",
+      "boundary": "internal_service_explicit_identity_tenant_arguments_from_authorized_caller",
+      "reviewed_functions": [
+        "record_audit_event"
+      ]
+    },
+    {
+      "path": "web/backend/services/auth_service.py",
+      "boundary": "verified_self_identity_or_authorized_admin_caller",
+      "reviewed_functions": [
+        "get_authenticated_user_row",
+        "mark_local_email_verified"
+      ]
+    },
+    {
+      "path": "web/backend/services/billing_service.py",
+      "boundary": "internal_service_explicit_identity_tenant_arguments_from_authorized_caller",
+      "reviewed_functions": [
+        "apply_billing_webhook_event",
+        "get_billing_summary_for_tenant",
+        "get_billing_webhook_event",
+        "get_current_billing_state",
+        "get_existing_feature_for_tenant",
+        "persist_feature_selection"
+      ]
+    },
+    {
+      "path": "web/backend/services/builder_asset_storage.py",
+      "boundary": "internal_service_explicit_identity_tenant_arguments_from_authorized_caller",
+      "reviewed_functions": [
+        "create_builder_asset_signed_url",
+        "delete_builder_asset",
+        "download_builder_asset",
+        "ensure_builder_asset_bucket",
+        "store_builder_asset"
+      ]
+    },
+    {
+      "path": "web/backend/services/calendar_authorization_service.py",
+      "boundary": "internal_service_explicit_identity_tenant_arguments_from_authorized_caller",
+      "reviewed_functions": [
+        "list_accessible_calendars",
+        "resolve_calendar_access"
+      ]
+    },
+    {
+      "path": "web/backend/services/calendar_connection_sync_queue_service.py",
+      "boundary": "internal_worker_or_authorized_command_with_durable_tenant_context",
+      "reviewed_functions": [
+        "claim_connection_sync_jobs",
+        "eligible_inbound_connections",
+        "enqueue_connection_sync",
+        "finish_connection_sync_job",
+        "get_connection_sync_queue_metrics",
+        "mark_connection_sync_failed",
+        "process_connection_sync_job"
+      ]
+    },
+    {
+      "path": "web/backend/services/calendar_reminder_service.py",
+      "boundary": "internal_worker_or_authorized_command_with_durable_tenant_context",
+      "reviewed_functions": [
+        "enqueue_due_calendar_reminders",
+        "finalize_calendar_reminder_deliveries",
+        "mark_calendar_reminder_delivery"
+      ]
+    },
+    {
+      "path": "web/backend/services/calendar_sync_service.py",
+      "boundary": "internal_worker_or_authorized_command_with_durable_tenant_context",
+      "reviewed_functions": [
+        "_push_local_changes",
+        "_sync_connection_with_client",
+        "_sync_google_attendees",
+        "_upsert_external_event",
+        "authorization_url",
+        "consume_oauth_state",
+        "delete_provider_event",
+        "disconnect_connection",
+        "disconnect_connection_for_deletion"
+      ]
+    },
+    {
+      "path": "web/backend/services/calendar_task_archive_service.py",
+      "boundary": "internal_service_explicit_identity_tenant_arguments_from_authorized_caller",
+      "reviewed_functions": [
+        "archive_ended_calendar_tasks"
+      ]
+    },
+    {
+      "path": "web/backend/services/calendar_task_sync_queue_service.py",
+      "boundary": "internal_worker_or_authorized_command_with_durable_tenant_context",
+      "reviewed_functions": [
+        "_credentials",
+        "_load_job_state",
+        "claim_task_sync_jobs",
+        "complete_task_sync_delete",
+        "enqueue_task_sync",
+        "finish_task_sync_job",
+        "get_task_sync_queue_metrics",
+        "process_task_sync_job"
+      ]
+    },
+    {
+      "path": "web/backend/services/commercial_access_service.py",
+      "boundary": "Resolution receives the caller-selected authorized tenant; commercial mutation routes verify platform admin/AAL2 before passing tenant and actor to the transaction RPC. The service supplies p_aal=aal2 after that caller check, not as independent session verification.",
+      "reviewed_functions": [
+        "apply_commercial_command",
+        "resolve_commercial_access"
+      ]
+    },
+    {
+      "path": "web/backend/services/commercial_billing_service.py",
+      "boundary": "internal_service_explicit_identity_tenant_arguments_from_authorized_caller",
+      "reviewed_functions": [
+        "allocate_tokens",
+        "assign_addon",
+        "request_addon"
+      ]
+    },
+    {
+      "path": "web/backend/services/data_deletion_service.py",
+      "boundary": "Authorized requester/operator routes create durable deletion requests with snapshot tenant/user subjects; internal leased worker executes steps from that verified request. Helpers are privileged and must not be called with untrusted arbitrary target identifiers.",
+      "reviewed_functions": [
+        "cancel_deletion_request",
+        "claim_deletion_requests",
+        "create_deletion_request",
+        "get_deletion_metrics",
+        "get_deletion_request",
+        "list_deletion_requests",
+        "process_deletion_request"
+      ]
+    },
+    {
+      "path": "web/backend/services/elearning_academy_service.py",
+      "boundary": "Public host binding supplies the tenant; catalog projection uses guarded schema131+ RPCs and published academy projects scoped by tenant. Optional continuing-learning state is read only for an authenticated actor in that tenant.",
+      "reviewed_functions": [
+        "member_profile",
+        "storefront"
+      ]
+    },
+    {
+      "path": "web/backend/services/elearning_assessments_service.py",
+      "boundary": "Schema127+ RPC facade passes tenant and caller-resolved author or learner identity; author routes require owner/admin and learner routes require active membership. SQL RPCs enforce assessment ownership, enrollment and attempt rules.",
+      "reviewed_functions": [
+        "call"
+      ]
+    },
+    {
+      "path": "web/backend/services/elearning_commerce_service.py",
+      "boundary": "Schema129+ commerce uses the authenticated learner tenant/user through the player RPC facade. Payment simulation additionally requires the explicitly enabled non-production local-test adapter and owned local-test checkout; no production provider credentials are invented.",
+      "reviewed_functions": [
+        "simulate"
+      ]
+    },
+    {
+      "path": "web/backend/services/elearning_content_service.py",
+      "boundary": "Owner/admin route supplies trusted tenant, course/lesson and actor; schema120+ read/command RPCs validate resource linkage and optimistic revision. This service is not an independent request authenticator.",
+      "reviewed_functions": [
+        "execute_command",
+        "get_content"
+      ]
+    },
+    {
+      "path": "web/backend/services/elearning_courses_service.py",
+      "boundary": "Authenticated learning owner/admin caller and schema118+ route gates; course queries/mutations constrain tenant and course, validate owned cover assets and revisions. Deletion uses schema122+ guarded actor-aware RPC.",
+      "reviewed_functions": [
+        "archive_course",
+        "create_course",
+        "delete_course",
+        "get_course",
+        "list_courses",
+        "present_courses",
+        "update_course"
+      ]
+    },
+    {
+      "path": "web/backend/services/elearning_credentials_service.py",
+      "boundary": "Schema130+ certificate RPC facade accepts only tenant/user context from owner/admin or active learner callers; public verification passes a verification token to the limited verification RPC under rate limiting. No direct credential/answer table access is granted by this inventory.",
+      "reviewed_functions": [
+        "call"
+      ]
+    },
+    {
+      "path": "web/backend/services/elearning_directory_service.py",
+      "boundary": "Owner/admin directory routes constrain every query by current tenant; deletes pass tenant, actor, revision and confirmation to schema134/135 guarded RPCs. The table factory is internal, not an authorization boundary by itself.",
+      "reviewed_functions": [
+        "delete_group",
+        "delete_instructor",
+        "table"
+      ]
+    },
+    {
+      "path": "web/backend/services/elearning_participation_service.py",
+      "boundary": "Trusted owner/admin caller supplies tenant/user; learner rows constrain tenant and id, changes use revision guards, and participation/enrollment RPCs validate course/actor with schema121/123+ gates.",
+      "reviewed_functions": [
+        "command",
+        "enrollment_candidates",
+        "enrollment_report",
+        "list_learners",
+        "manage_enrollments",
+        "progress",
+        "save_learner"
+      ]
+    },
+    {
+      "path": "web/backend/services/elearning_player_service.py",
+      "boundary": "Active learning member caller supplies tenant/user to schema125+ learner RPCs; enrollment/progression/media checks occur in the RPC. Older-schema media fallback retains the existing Builder visibility checks rather than granting anonymous private access.",
+      "reviewed_functions": [
+        "call",
+        "media_access"
+      ]
+    },
+    {
+      "path": "web/backend/services/elearning_relationships_service.py",
+      "boundary": "Schema126+ assignment RPCs receive trusted tenant and actor from owner/admin routes; SQL validates eligible identities, ownership, active assignments and explicit confirmations.",
+      "reviewed_functions": [
+        "call"
+      ]
+    },
+    {
+      "path": "web/backend/services/elearning_settings_service.py",
+      "boundary": "Learning owner/admin caller supplies tenant; settings reads/merge RPC constrain tenant, owned image queries validate registry tenant/type/status, and featured course checks constrain tenant/catalog eligibility. Schema-state probe is a deliberate internal global read.",
+      "reviewed_functions": [
+        "get_settings",
+        "require_owned_image",
+        "save_settings",
+        "settings_available"
+      ]
+    },
+    {
+      "path": "web/backend/services/elearning_structure_service.py",
+      "boundary": "Owner/admin caller supplies tenant/course/actor; reads constrain tenant and course or use the guarded RPC, mutations require schema119+ and optimistic structure revision.",
+      "reviewed_functions": [
+        "execute_command",
+        "get_structure"
+      ]
+    },
+    {
+      "path": "web/backend/services/email_verification_service.py",
+      "boundary": "verified_self_identity_or_authorized_admin_caller",
+      "reviewed_functions": [
+        "_attempt_count",
+        "_record_attempt",
+        "_update_delivery_state"
+      ]
+    },
+    {
+      "path": "web/backend/services/entitlement_service.py",
+      "boundary": "internal_service_explicit_identity_tenant_arguments_from_authorized_caller",
+      "reviewed_functions": [
+        "_canonical_records",
+        "_legacy_features",
+        "get_operational_usage",
+        "get_workspace_seat_usage",
+        "increment_operational_usage"
+      ]
+    },
+    {
+      "path": "web/backend/services/identity_service.py",
+      "boundary": "verified_self_identity_or_authorized_admin_caller",
+      "reviewed_functions": [
+        "assert_canonical_email_available",
+        "find_auth_user_by_email",
+        "get_auth_user_by_id"
+      ]
+    },
+    {
+      "path": "web/backend/services/installation_service.py",
+      "boundary": "internal_service_explicit_identity_tenant_arguments_from_authorized_caller",
+      "reviewed_functions": [
+        "bind_push_subscription",
+        "disable_installation_notifications",
+        "list_user_installations",
+        "register_installation",
+        "revoke_installation_push_bindings",
+        "revoke_user_installation"
+      ]
+    },
+    {
+      "path": "web/backend/services/notification_delivery_queue_service.py",
+      "boundary": "internal_worker_or_authorized_command_with_durable_tenant_context",
+      "reviewed_functions": [
+        "claim_deliveries",
+        "cleanup_delivery_data",
+        "finish_delivery",
+        "get_delivery_channel_metrics",
+        "get_delivery_metrics",
+        "resolve_outbox_notification"
+      ]
+    },
+    {
+      "path": "web/backend/services/notification_delivery_service.py",
+      "boundary": "internal_worker_or_authorized_command_with_durable_tenant_context",
+      "reviewed_functions": [
+        "_deliver_email",
+        "_deliver_internal",
+        "_deliver_web_push",
+        "_has_active_membership"
+      ]
+    },
+    {
+      "path": "web/backend/services/notification_outbox_service.py",
+      "boundary": "internal_worker_or_authorized_command_with_durable_tenant_context",
+      "reviewed_functions": [
+        "claim_notifications",
+        "enqueue_notification",
+        "get_queue_metrics",
+        "mark_notification_result"
+      ]
+    },
+    {
+      "path": "web/backend/services/notification_preference_service.py",
+      "boundary": "internal_service_explicit_identity_tenant_arguments_from_authorized_caller",
+      "reviewed_functions": [
+        "list_notification_preferences",
+        "preference_enabled",
+        "set_notification_preference"
+      ]
+    },
+    {
+      "path": "web/backend/services/notification_service.py",
+      "boundary": "internal_service_explicit_identity_tenant_arguments_from_authorized_caller",
+      "reviewed_functions": [
+        "create_tenant_notification_event",
+        "list_user_notifications",
+        "mark_all_notifications_read",
+        "mark_notification_read",
+        "revoke_all_web_push_subscriptions",
+        "revoke_web_push_subscription",
+        "upsert_web_push_subscription"
+      ]
+    },
+    {
+      "path": "web/backend/services/observability_service.py",
+      "boundary": "Deliberate cross-tenant operational count queries are reachable through loopback or configured metrics-token access in health_routes; returned metrics are aggregates, not an independently authorized tenant data API.",
+      "reviewed_functions": [
+        "operational_snapshot"
+      ]
+    },
+    {
+      "path": "web/backend/services/screen_time_service.py",
+      "boundary": "internal_service_explicit_identity_tenant_arguments_from_authorized_caller",
+      "reviewed_functions": [
+        "_schema_before_screen_time",
+        "get_weekly_screen_time",
+        "record_screen_time"
+      ]
+    },
+    {
+      "path": "web/backend/services/site_permission_service.py",
+      "boundary": "internal_service_explicit_identity_tenant_arguments_from_authorized_caller",
+      "reviewed_functions": [
+        "assign_project_role",
+        "get_project_role"
+      ]
+    },
+    {
+      "path": "web/backend/services/storage_quota_service.py",
+      "boundary": "internal_service_explicit_identity_tenant_arguments_from_authorized_caller",
+      "reviewed_functions": [
+        "finish_storage",
+        "get_tenant_storage_usage",
+        "release_storage",
+        "reserve_storage",
+        "sync_tenant_storage_quota"
+      ]
+    },
+    {
+      "path": "web/backend/services/tenant_lifecycle_service.py",
+      "boundary": "internal_worker_or_authorized_command_with_durable_tenant_context",
+      "reviewed_functions": [
+        "tenant_is_active"
+      ]
+    },
+    {
+      "path": "web/backend/services/tenant_service.py",
+      "boundary": "internal_service_explicit_identity_tenant_arguments_from_authorized_caller",
+      "reviewed_functions": [
+        "get_current_tenant_context"
+      ]
+    },
+    {
+      "path": "web/backend/services/user_security_settings_service.py",
+      "boundary": "verified_self_identity_or_authorized_admin_caller",
+      "reviewed_functions": [
+        "get_user_security_settings",
+        "get_user_security_settings_by_auth_id",
+        "upsert_user_security_settings"
+      ]
+    },
+    {
+      "path": "web/backend/services/website_settings_service.py",
+      "boundary": "internal_service_explicit_identity_tenant_arguments_from_authorized_caller",
+      "reviewed_functions": [
+        "ensure_settings_for_tenant",
+        "get_settings_for_tenant",
+        "save_settings_for_tenant"
+      ]
+    },
+    {
+      "path": "web/backend/workers/calendar_sync_worker.py",
+      "boundary": "internal_worker_or_authorized_command_with_durable_tenant_context",
+      "reviewed_functions": [
+        "_set_task_failure",
+        "process_job"
+      ]
+    }
+  ],
+  "related_privileged_paths": [
+    {
+      "path": "web/backend/cv_reranker/alembic/env.py",
+      "boundary": "Separate CV operator Alembic DB connection entrypoint. Presence is not migration scheduling; never executed for this correction."
+    },
+    {
+      "path": "web/backend/cv_reranker/app/auth/sessions.py",
+      "boundary": "Separate CV application Auth session persistence uses its configured DB and authenticated identity/session ownership."
+    },
+    {
+      "path": "web/backend/cv_reranker/app/auth/tokens.py",
+      "boundary": "Separate CV application JWT signing/validation uses its own configured secret and issuer/audience; no Madar Supabase service credential."
+    },
+    {
+      "path": "web/backend/cv_reranker/app/core/config.py",
+      "boundary": "Separate bundled CV application owns its DB/worker DB and JWT/provider configuration; not wired into Madar production Compose. Values are environment configuration, not this inventory."
+    },
+    {
+      "path": "web/backend/cv_reranker/app/db/session.py",
+      "boundary": "Separate CV application SQLAlchemy DB/worker engine factories; callers use active-user ownership or durable worker jobs, using the separate component configuration."
+    },
+    {
+      "path": "web/backend/cv_reranker/app/services/jobs/worker.py",
+      "boundary": "Separate CV worker performs internal durable job claiming with row locks/worker ownership; not a Madar notification/calendar/deletion worker."
+    },
+    {
+      "path": "web/backend/data_analysis/ai/settings.py",
+      "boundary": "Server-owned OpenAI/DeepSeek provider credentials; analysis requests are authorized and metered before provider execution. Credentials are not model-input or browser response data."
+    },
+    {
+      "path": "web/backend/local_dev_auth.py",
+      "boundary": "Explicit local development test-identity helper using direct DB configuration; rejects production/remote conditions before development credential bootstrap."
+    },
+    {
+      "path": "web/backend/routes/billing_routes.py",
+      "boundary": "Indirect privileged billing services: tenant context for self-service operations; webhook authorization requires configured provider secret before durable event application."
+    },
+    {
+      "path": "web/backend/run_local.py",
+      "boundary": "Opt-in local development runner; supplies isolated local configuration to local_dev_auth, not the production Compose entrypoint."
+    },
+    {
+      "path": "web/backend/services/email_service.py",
+      "boundary": "Server SMTP for administrator access permission-code delivery after authorized admin request; production requires configured SMTP and disallows development delivery fallback."
+    },
+    {
+      "path": "web/backend/services/form_draft_service.py",
+      "boundary": "Server HMAC draft token creation/validation; public-site caller additionally binds form/project/tenant and lifecycle. Signing fallback does not grant database privileges to the browser."
+    },
+    {
+      "path": "web/backend/services/mfa_login_service.py",
+      "boundary": "Request-local Auth client plus Redis-backed pending MFA handoff; bound cookie/flow validation, session AAL2 checked before final admin login. No shared privileged Auth client session mutation."
+    },
+    {
+      "path": "web/backend/services/onboarding_service.py",
+      "boundary": "Injected privileged client performs global subdomain uniqueness lookup for verified signup; former combined provisioning entrypoint fails closed and requires pending-verification lifecycle."
+    },
+    {
+      "path": "web/backend/services/pending_verification_context.py",
+      "boundary": "Server-signed expiring pending-verification cookie bound to identity; never a grant of active tenant membership."
+    },
+    {
+      "path": "web/backend/services/rate_limit_service.py",
+      "boundary": "Internal Redis connection and identity/IP/action-scoped limits; production requires limits and fail-closed behavior, not an exposed Redis endpoint."
+    },
+    {
+      "path": "web/backend/services/readiness_service.py",
+      "boundary": "Internal server-key health/schema/Auth MFA policy probes; no user-selectable SQL or provider target. Public readiness reports status only, and diagnostic/metrics access is separately protected."
+    },
+    {
+      "path": "web/backend/services/request_security.py",
+      "boundary": "Server CSRF signer/verifier and origin/cookie protection; production configuration requires independent CSRF secret. Compatibility fallback is server-side only."
+    },
+    {
+      "path": "web/backend/services/runtime_config.py",
+      "boundary": "Server configuration loader classifies secret fields, validates production guards and prevents secret config exposure; handles variable names without publishing values."
+    },
+    {
+      "path": "web/backend/services/storage_delivery_service.py",
+      "boundary": "Server-only Storage key over internal Supabase; fixed avatars public route or builder visibility-authorized caller. Validated path, no upstream redirects, MIME/Range/cache relay and no credential/URL response exposure."
+    },
+    {
+      "path": "web/backend/services/supabase_api_key.py",
+      "boundary": "Credential-aware Supabase client/header factory; opaque server keys use apikey only and legacy JWT keys retain compatible server headers. Callers determine authorization."
+    },
+    {
+      "path": "web/backend/services/web_push_config.py",
+      "boundary": "Server VAPID configuration; only public key/subject/enablement may enter public_config, private key remains server-side and only approved deliveries consume it."
+    },
+    {
+      "path": "web/backend/workers/data_deletion_worker.py",
+      "boundary": "Indirect privileged deletion queue consumer: claimed durable request/lease and recorded subjects drive phased deletion; no public worker trigger."
+    },
+    {
+      "path": "web/backend/workers/notification_worker.py",
+      "boundary": "Indirect service-role queue consumer: internal claim/resolve/delivery functions and durable tenant/user ownership checks; SMTP/VAPID delivery only for validated jobs."
+    }
+  ],
+  "operational_privileged_groups": [
+    {
+      "paths": [
+        "web/deployment/bin/madar-auto-deploy",
+        "web/deployment/bin/madar-auto-deploy-legacy-entrypoint",
+        "web/deployment/bin/madar-control-plane-guard",
+        "web/deployment/bin/madar-control-plane-upgrade",
+        "web/deployment/bin/madar-install-control-plane",
+        "web/deployment/bin/madar-migrate",
+        "web/deployment/bin/madar-production-deploy",
+        "web/deployment/bin/madar-provision-production-config",
+        "web/deployment/bin/madar-provision-supabase-secret",
+        "web/deployment/bin/madar-release-deploy",
+        "web/deployment/bin/madar-switch-traffic"
+      ],
+      "boundary": "Operator/control-plane authority only. Installed runtime entrypoints enforce madar identity, exact-main/provenance/locking/readiness gates. Root-only installation/provisioning/upgrading validates protected paths and approval state; controller/migration code is not executed by this inventory. Guard-only entrypoint is read-only."
+    },
+    {
+      "paths": [
+        "web/deployment/lib/migration_executor.py",
+        "web/deployment/lib/supabase_ledger_reconciliation.py",
+        "web/deployment/lib/environment_file.py"
+      ],
+      "boundary": "Privileged orchestration internals: protected environment parsing, explicit approved direct PostgreSQL migration/ledger operations under state/lock/manifest/backup gates. Active schema115 none policy selects no SQL. No operation was invoked for this correction."
+    },
+    {
+      "paths": [
+        "web/backend/scripts/apply_entitlement_mapping.py",
+        "web/backend/scripts/backfill_avatar_storage.py",
+        "web/backend/scripts/cleanup_builder_assets.py",
+        "web/backend/scripts/cleanup_pending_accounts.py",
+        "web/backend/scripts/compose_tenant_landing.py",
+        "web/backend/scripts/inventory_configuration.py",
+        "web/backend/scripts/reconcile_builder_project_assets.py",
+        "web/backend/scripts/reconcile_storage.py",
+        "web/backend/scripts/report_entitlement_migration.py",
+        "web/backend/scripts/validate_runtime_configuration.py",
+        "web/backend/scripts/verify_rls_grants.py",
+        "web/backend/scripts/verify_website_settings_tenant_ids.py"
+      ],
+      "boundary": "Operator-invoked administrative/verification/configuration tools using configured service-role or direct DB authority; write tools require their explicit apply scope and authorized target. Read-only inspectors are not authorization enforcement. None executed against a database during this correction."
+    },
+    {
+      "paths": [
+        "web/scripts/backup_madar.sh",
+        "web/scripts/backup_support.py",
+        "web/scripts/madar_alert_hook.sh",
+        "web/scripts/rehearse_backup.py",
+        "web/scripts/replicate_backup_offhost.sh",
+        "web/scripts/replicate_latest_node1.py",
+        "web/scripts/replicate_latest_offhost.sh",
+        "web/scripts/restore_madar.sh",
+        "web/scripts/verify_backup.sh",
+        "web/scripts/verify_latest_backup.sh"
+      ],
+      "boundary": "Operator or scheduled backup/verification/replication/restore authority uses protected configuration and provider credentials; scheduled service credential handling, backup manifests/checksums and restore-specific approval apply. No backup/restore/helper was invoked here."
+    },
+    {
+      "paths": [
+        "web/scripts/cleanup_academy_full_builder_browser.py",
+        "web/scripts/cleanup_academy_integration_browser.py",
+        "web/scripts/cleanup_elearning_academy_browser.py",
+        "web/scripts/cleanup_elearning_commerce_browser.py",
+        "web/scripts/cleanup_elearning_credentials_browser.py",
+        "web/scripts/import_ecommerce_catalog.py",
+        "web/scripts/prepare_selfhost_rehearsal.py",
+        "web/scripts/rehearse_authenticated_checkout.py",
+        "web/scripts/rehearse_migration_071.sh",
+        "web/scripts/rehearse_migration_072.sh",
+        "web/scripts/rehearse_migration_073.sh",
+        "web/scripts/rehearse_migration_074.sh",
+        "web/scripts/rehearse_migration_075.sh",
+        "web/scripts/rehearse_migration_083.sh",
+        "web/scripts/rehearse_migration_093.sh",
+        "web/scripts/rehearse_migration_095.sh",
+        "web/scripts/rehearse_migration_096.sh",
+        "web/scripts/rehearse_migration_097.sh",
+        "web/scripts/rehearse_migration_099.sh",
+        "web/scripts/rehearse_migration_101.py",
+        "web/scripts/rehearse_migration_102.sh",
+        "web/scripts/rehearse_migration_105.sh",
+        "web/scripts/rehearse_migration_115.sh",
+        "web/scripts/rehearse_migration_116.py",
+        "web/scripts/rehearse_migration_127.py",
+        "web/scripts/rehearse_migration_128.py",
+        "web/scripts/rehearse_migration_129.py",
+        "web/scripts/rehearse_migration_130.py",
+        "web/scripts/rehearse_migration_131.py",
+        "web/scripts/rehearse_migration_132.py",
+        "web/scripts/rehearse_migration_133.py",
+        "web/scripts/rehearse_migration_134.py",
+        "web/scripts/rehearse_migration_135.py",
+        "web/scripts/rehearse_migrations_076_079.sh",
+        "web/scripts/rehearse_schema96_mfa.py",
+        "web/scripts/rehearse_schema96_real_runtime.py",
+        "web/scripts/seed_elearning_demo.py",
+        "web/scripts/setup_elearning_credential_isolation.py",
+        "web/scripts/start_local_database.py"
+      ],
+      "boundary": "Explicit development/E2E/rehearsal/cleanup operator entrypoints own their isolated test database or tenant fixture. Source presence does not authorize executing SQL or bypassing each tool's local-target/apply preflight. None were run during this correction."
+    }
+  ],
+  "runtime_distribution": {
+    "configuration_source": "protected server environment; values never included",
+    "service_role_consumers": [
+      "backend",
+      "notification-worker",
+      "calendar-sync-worker",
+      "data-deletion-worker"
+    ],
+    "direct_database_configuration": "SUPABASE_DB_URL is explicitly blanked in those production Compose services; direct PostgreSQL authority belongs to approved operator tools/controller paths.",
+    "frontend_and_isolated_processing": "Frontend, parser-worker and remote-ingestion-worker receive no Supabase service key in their explicit environment declarations.",
+    "local_supabase": "Prepared external network is an internal bridge, with gateway alias madar-supabase; published host ports remain loopback.",
+    "authorization_gate": "Schema115, migration policy none, no selected manifest. Inventory restoration never enables a migration or grants database privileges."
+  }
+}
