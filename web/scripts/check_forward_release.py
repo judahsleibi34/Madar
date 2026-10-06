@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate the production schema-114 to schema-135 forward release."""
+"""Validate pinned migration history and the reviewed active release contract."""
 
 from __future__ import annotations
 
@@ -81,6 +81,7 @@ APPLIED_PRODUCTION_MIGRATIONS = {
         "114_consolidate_public_site_runtime.sql",
         "73db3729be8b15f5fc2e18f0584315a16cb47555db7fc691900067b3a1582f6f",
     ),
+    115: ("115_reconcile_commercial_access.sql", "e40bfdd49294438e11698934fcc37ba0dcb0a534a51890c26702b13763883f34"),
 }
 
 EXPECTED = {
@@ -193,24 +194,40 @@ def validate(root: Path = ROOT) -> list[str]:
         )
 
         schema = release["schema"]
+        if release.get("deployment_profile") not in {None, "local-supabase-schema115"}:
+            errors.append("unknown deployment profile")
 
-        if not (
-            int(schema["compatible_min"]) == SOURCE_SCHEMA
-            <= TARGET_SCHEMA
-            == int(schema["compatible_max"])
-            == int(schema["target"])
-            and int(schema["rollback_compatible_min"]) == SOURCE_SCHEMA
-            == int(schema["rollback_compatible_max"])
-            and schema["migration_class"] == "forward-compatible"
-            and release["migration_policy"]
-            == "automatic-after-known-good-backup-first-forward-repair"
-            and release["migration_manifest"] == MANIFEST_NAME
-        ):
-            errors.append(
-                f"release must bridge production schema {SOURCE_SCHEMA} to {TARGET_SCHEMA} "
-                "with rollback bounded at schema 114"
-            )
-
+        if release.get("deployment_profile") == "local-supabase-schema115":
+            expected_schema = {
+                "compatible_min": 115, "compatible_max": 115, "target": 115,
+                "migration_class": "none", "rollback_compatible_min": 115,
+                "rollback_compatible_max": 115,
+            }
+            if (schema != expected_schema or release.get("migration_policy") != "none"
+                    or "migration_manifest" in release):
+                errors.append("local Supabase candidate must be exact schema115 with no migration selected")
+        else:
+            if not (
+                int(schema["compatible_min"]) == SOURCE_SCHEMA
+                <= TARGET_SCHEMA
+                == int(schema["compatible_max"])
+                == int(schema["target"])
+                and int(schema["rollback_compatible_min"]) == SOURCE_SCHEMA
+                == int(schema["rollback_compatible_max"])
+                and schema["migration_class"] == "forward-compatible"
+                and release["migration_policy"]
+                == "automatic-after-known-good-backup-first-forward-repair"
+                and release["migration_manifest"] == MANIFEST_NAME
+            ):
+                errors.append(
+                    f"release must bridge production schema {SOURCE_SCHEMA} to {TARGET_SCHEMA} "
+                    "with rollback bounded at schema 114"
+                )
+        # Retention is not execution permission. Freeze the canonical-main future
+        # inventory so changing SQL and its manifest together cannot widen this
+        # exact non-migrating release without a separately reviewed contract.
+        if digest(release_dir / MANIFEST_NAME) != "fe1258bab5f6359a598edc9d34f66e20555f93c5ce5fe911ec13d88b8bd4d7ae":
+            errors.append("retained canonical-main migration manifest changed")
         manifest = json.loads(
             (release_dir / MANIFEST_NAME).read_text(
                 encoding="utf-8"

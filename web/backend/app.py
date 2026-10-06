@@ -14,7 +14,7 @@ from database import service_supabase
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, JSONResponse
 from PIL import Image, ImageOps, UnidentifiedImageError
 
 from data_analysis.routes.analysis_routes import router as analysis_router
@@ -27,6 +27,7 @@ from routes.admin_account_access_routes import router as admin_account_access_ro
 from routes.admin_profile_routes import router as admin_profile_router
 from routes.admin_user_routes import router as admin_user_router
 from routes.auth_routes import router as auth_router
+from routes.auth_callback_routes import router as auth_callback_router
 from routes.billing_routes import router as billing_router
 from routes.data_deletion_routes import router as data_deletion_router
 from routes.calendar_routes import router as calendar_router
@@ -40,6 +41,8 @@ from routes.password_routes import router as password_router
 from routes.public_contact_routes import router as public_contact_router
 from routes.public_site_routes import build_authorized_public_schema, router as public_site_router
 from routes.server_status_routes import router as server_status_router
+from routes.storage_delivery_routes import router as storage_delivery_router
+from services.storage_delivery_service import stream_storage_object
 from routes.user_routes import router as user_router
 from routes.website_routes import router as website_router
 from routes.elearning_routes import router as elearning_router
@@ -57,7 +60,6 @@ from routes.elearning_content_routes import router as elearning_content_router
 from services.auth_service import get_authenticated_user_row, require_regular_user
 from services.builder_asset_storage import (
     BuilderAssetStorageError,
-    create_builder_asset_signed_url,
     download_builder_asset,
 )
 from services.asset_registry_service import (
@@ -483,17 +485,15 @@ def get_public_builder_asset(
             headers=response_headers,
         )
 
-    try:
-        signed_url = create_builder_asset_signed_url(storage_key=storage_key, expires_in=60)
-    except BuilderAssetStorageError as error:
-        raise _managed_asset_failure(404) from error
-    return RedirectResponse(
-        url=signed_url,
-        status_code=307,
-        headers={"Cache-Control": "private, no-store"},
+    if private_preview:
+        response_headers['Vary'] = 'Cookie, Authorization'
+    return stream_storage_object(
+        bucket='builder-assets', path=storage_key, request=request, headers=response_headers,
     )
 
 
+app.include_router(storage_delivery_router)
+app.include_router(auth_callback_router)
 app.include_router(auth_router)
 app.include_router(health_router)
 app.include_router(user_router)

@@ -1,0 +1,13 @@
+# Overlay with the isolated Supabase base and madar-local overrides.
+services:
+  api-gw:
+    volumes:
+      - ${MADAR_SAFE_ENVOY_LDS_TEMPLATE:?prepared safe gateway template required}:/etc/envoy/lds.template.yaml:ro
+    networks:
+      default: {}
+      madar_client:
+        aliases: [madar-supabase]
+networks:
+  madar_client:
+    external: true
+    name: madar-supabase-client

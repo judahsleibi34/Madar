@@ -1330,9 +1330,69 @@ Main already reserves migration 116 for ecommerce catalog reconciliation. Its SQ
 mirror and historical migrations-115-116.json manifest are preserved byte for byte.
 The unpublished E-Learning migrations have been rebased from 116–134 to 117–135;
 all learning schema gates, transition guards and checksum manifests follow that
-sequence. The combined bridge supports 114..135, targets 135, and uses
-migrations-115-135.json. Rollback compatibility remains 114 only. Promotion,
+sequence. The retained learning bridge supports 114..135, targets 135, and uses
+migrations-115-135.json; it is archived as schema-114-135-bridge.json and is
+not selected by the active local-Supabase release contract. Rollback compatibility remains 114 only. Promotion,
 verified backup, protected control-plane upgrade and forward repair requirements
 remain unchanged. Existing development databases with the old unpublished learning
 sequence require a disposable database rebuild; their old schema numbers must not
 be treated as this release’s migration ledger. No production mutation is authorized.
+
+
+## Optional local Supabase client topology (pre-cutover preparation)
+
+The candidate release controller accepts the opt-in setting
+`MADAR_SUPABASE_CLIENT_NETWORK=madar-supabase-client`. It appends the immutable
+application client overlay after normal release topology for startup, config
+validation and candidate cleanup. This does not use MADAR_COMPOSE_OVERRIDE and
+does not select staging frontend API origins. Preflight requires exactly
+`SUPABASE_URL=http://madar-supabase:8000` and attests the external network is an
+internal Docker bridge. Backend and three queue workers join it; parser/remote
+networks remain unchanged. The local Supabase gateway must have the stable alias;
+connectivity is verified by normal readiness and separate worker probes.
+
+The option is absent by default. This is a protected controller source change;
+installation still requires explicit governed approval. It adds no port, schema,
+migration mode, timer action, worker handoff, traffic switch or promotion bypass.
+Core schema 115 was used in pre-cutover rehearsal. The existing 116 manifest must
+not be invoked for this migration. Refer to `web/precutover/README.md` and the
+private operator cutover report before proposing production execution.
+
+
+### Exact schema-115 local Supabase candidate contract
+
+The reviewed `local-supabase-schema115` deployment profile declares minimum,
+maximum, target and rollback schema115, migration class `none`, policy `none`,
+and no selected migration manifest. `check_forward_release.py` validates that
+whole exact contract and continues to verify all historical checksum pins and
+the unchanged 115/116 and 115..135 migration manifests. The preceding descriptors are
+retained as `schema-114-116-bridge.json` and `schema-114-135-bridge.json` for regression tests; it is
+not the selected release contract. Neither schema114 nor schema116 passes this
+candidate's compatibility gate. Any future schema transition needs its own
+reviewed bridge contract. No automatic migration was invoked in rehearsal.
+
+The installed controller must agree with this exact candidate contract before
+an approved deployment. That remains a governed production change, not part of
+pre-cutover engineering. Existing provenance, backup, deployment lock, exact-main,
+readiness, traffic, worker and observation gates remain unchanged.
+
+The migration namespace validator allows only the checksum-verified retained
+116..135 artifacts beyond this exact schema115 no-migration target, using the
+byte-pinned canonical-main migrations-115-135.json inventory. It rejects136,
+renamed/changed retained files, altered manifests or historical files, and any
+schema115 descriptor that selects a migration. Retention never authorizes SQL.
+No migration file was changed; learning features keep their existing schema gates
+and remain unavailable at115 wherever they require117..135.
+
+
+### Credential-safe callback proxy logs
+
+Prepared frontend/stable proxies log method and normalized URI without query or
+Referer. Exact verification callback locations suppress access logs and reduce
+request-bearing error logging to critical failures. The prepared local gateway
+LDS template uses Envoy PATH(NQ:ORIG_OR_PATH) and omits Referer, generated to a new
+file by a checksum-guarded helper. Set MADAR_SAFE_ENVOY_LDS_TEMPLATE to that
+reviewed file before loading the gateway overlay. Existing API callbacks,
+upstreams, port bindings and routing headers are unchanged. No live proxy was
+reloaded. This protected proxy source still needs governed installation approval;
+edge logging policies remain an operator gate.

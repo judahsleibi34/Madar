@@ -2,7 +2,7 @@ import os
 import logging
 import hashlib
 from pathlib import Path
-from urllib.parse import quote
+from urllib.parse import quote, unquote, urlsplit
 from uuid import uuid4
 
 from fastapi import APIRouter, File, HTTPException, Request, Response, UploadFile
@@ -57,16 +57,12 @@ def detect_image_content_type(content: bytes, uploaded_content_type: str = "") -
 
 
 def get_storage_public_url(bucket: str, path: str) -> str:
-    if not SUPABASE_URL:
-        raise HTTPException(
-            status_code=500,
-            detail="SUPABASE_URL is not configured",
-        )
-
-    clean_path = path.strip().lstrip("/")
-    encoded_path = quote(clean_path, safe="/")
-
-    return f"{SUPABASE_URL}/storage/v1/object/public/{bucket}/{encoded_path}"
+    if bucket != AVATAR_BUCKET:
+        raise HTTPException(400, detail='Only avatars have public delivery URLs')
+    from services.storage_delivery_service import validate_object_path
+    encoded_path = quote(validate_object_path(path), safe='/')
+    base = os.getenv('PUBLIC_API_URL', '').rstrip('/') or '/api'
+    return f'{base}/assets/avatars/{encoded_path}'
 
 
 def upload_avatar_to_storage(storage_path: str, content: bytes, content_type: str):
@@ -95,13 +91,15 @@ def delete_old_avatar_if_storage_url(old_avatar: str, auth_id: str) -> str | Non
     if not old_avatar:
         return None
 
-    marker = f"/storage/v1/object/public/{AVATAR_BUCKET}/"
-
-    if marker not in old_avatar:
+    parsed_path = urlsplit(old_avatar).path
+    marker = next((m for m in ("/assets/avatars/", f"/storage/v1/object/public/{AVATAR_BUCKET}/") if m in parsed_path), None)
+    if marker is None:
         return None
 
     try:
-        storage_path = old_avatar.split(marker, 1)[1].split("?", 1)[0]
+        storage_path = unquote(parsed_path.split(marker, 1)[1])
+        from services.storage_delivery_service import validate_object_path
+        validate_object_path(storage_path)
 
         if not storage_path.startswith(f"users/{auth_id}/"):
             return None

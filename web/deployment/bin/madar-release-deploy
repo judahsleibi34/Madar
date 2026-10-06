@@ -575,6 +575,33 @@ class DockerGitOperations:
         env["MADAR_STORAGE_ROOT"] = str(self._storage_root())
         return env
 
+    def _supabase_client_files(self) -> list[str]:
+        network = os.getenv("MADAR_SUPABASE_CLIENT_NETWORK", "").strip()
+        if not network:
+            return []
+        if network != "madar-supabase-client" or self.release_root is None:
+            raise RuntimeError("supabase_client_network_invalid")
+        overlay = self.release_root / "web/precutover/docker-compose.supabase-client.yml"
+        if not overlay.is_file() or overlay.is_symlink():
+            raise RuntimeError("supabase_client_overlay_missing")
+        return ["-f", str(overlay)]
+
+    def _validate_supabase_client_network(self) -> None:
+        if not self._supabase_client_files():
+            return
+        if os.getenv("SUPABASE_URL", "").rstrip("/") != "http://madar-supabase:8000":
+            raise RuntimeError("supabase_client_url_invalid")
+        try:
+            networks = json.loads(self.run(
+                ["docker", "network", "inspect", "madar-supabase-client"], capture=True,
+            ))
+        except (ValueError, subprocess.CalledProcessError) as error:
+            raise RuntimeError("supabase_client_network_unavailable") from error
+        if (not isinstance(networks, list) or len(networks) != 1
+                or networks[0].get("Internal") is not True
+                or networks[0].get("Driver") != "bridge"):
+            raise RuntimeError("supabase_client_network_must_be_internal_bridge")
+
     def _compose(
         self, sha: str, slot: str, images: dict[str, str], *args: str,
         workers_active: bool = False,
@@ -588,6 +615,7 @@ class DockerGitOperations:
             files.extend(["-f", str(Path(override).resolve())])
         elif self.compose_file is None:
             files.extend(["-f", str(WEB_ROOT / "deployment" / "docker-compose.release.yml")])
+        files.extend(self._supabase_client_files())
         profiles = ["--profile", "workers"]
         if self.schema_version() >= 83:
             profiles.extend(["--profile", "deletion-worker"])
@@ -612,6 +640,7 @@ class DockerGitOperations:
             tag, separator, expected_id = recorded.partition("@")
             if separator != "@" or self._digest(tag) != f"{tag}@{expected_id}":
                 raise RuntimeError(f"candidate_image_identity_changed:{component}")
+        self._validate_supabase_client_network()
         self._compose(sha, slot, images, "config", "--quiet")
         self.run([sys.executable, str(self.release_root / "web/scripts/check_migrations.py")])
         self.run([
@@ -1197,6 +1226,7 @@ class DockerGitOperations:
             files.extend(["-f", str(Path(override).resolve())])
         elif self.compose_file is None:
             files.extend(["-f", str(WEB_ROOT / "deployment" / "docker-compose.release.yml")])
+        files.extend(self._supabase_client_files())
         environment = dict(os.environ)
         subnets = SLOT_SUBNETS[slot]
         environment.update({
