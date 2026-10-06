@@ -47,7 +47,8 @@ Builder assets keep the existing visibility RPC, publication filters, and
 same-tenant private preview checks. Storage fallback streams bytes instead of
 redirecting. Range, If-Range, If-None-Match, If-Modified-Since and storage response
 MIME/length/range/ETag/Last-Modified are retained. Provider errors and redirects
-are never relayed; private previews use no-store. Local files and responsive
+are never relayed; main's API-key compatibility helper sends opaque sb_secret keys
+only as apikey and preserves the legacy JWT dual-header path; private previews use no-store. Local files and responsive
 image behavior retain their existing paths. Service keys remain server-side.
 
 ## Auth and mail

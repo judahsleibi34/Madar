@@ -67,7 +67,14 @@ class LocalSupabaseReleaseContractTests(unittest.TestCase):
         bridge = json.loads((releases / 'schema-114-135-bridge.json').read_text())
         self.assertEqual(bridge['schema']['target'], 135)
         self.assertEqual(bridge['migration_manifest'], manifest.name)
-        self.assertEqual(validator.validate(), [])
+        with tempfile.TemporaryDirectory() as name:
+            root=Path(name);(root/'web').mkdir()
+            (root/'web/deployment').symlink_to(WEB_ROOT/'deployment',target_is_directory=True)
+            for tree in ['database','supabase']:
+                target=WEB_ROOT/tree
+                if not target.exists():target=Path('/workspace')/tree
+                (root/'web'/tree).symlink_to(target,target_is_directory=True)
+            self.assertEqual(validator.validate(root), [])
 
     def test_future_namespace_tampering_is_rejected_by_both_validators(self):
         import shutil

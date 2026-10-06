@@ -6,6 +6,7 @@ import httpx
 from fastapi import HTTPException, Request, Response
 from fastapi.responses import StreamingResponse
 from starlette.background import BackgroundTask
+from services.supabase_api_key import supabase_api_headers
 
 
 def validate_object_path(path: str) -> str:
@@ -27,7 +28,7 @@ def stream_storage_object(*, bucket: str, path: str, request: Request, headers: 
         if upstream is not None:
             upstream.close()
         client.close()
-    forwarded = {'apikey': key, 'Authorization': f'Bearer {key}', 'Accept-Encoding': 'identity'}
+    forwarded = {**supabase_api_headers(key), 'Accept-Encoding': 'identity'}
     for name in ('Range', 'If-Range', 'If-None-Match', 'If-Modified-Since'):
         if name in request.headers:
             forwarded[name] = request.headers[name]
