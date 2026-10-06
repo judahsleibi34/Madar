@@ -253,6 +253,23 @@ def check_production_lineage(errors: list[str]) -> None:
             (REPO_ROOT / "deployment/releases/release.json").read_text(encoding="utf-8")
         )
         release_target = int(release["schema"]["target"])
+        # The schema115 cutover release selects no SQL, while preserving the
+        # reviewed, unapplied 116 file. Do not delete or renumber that history.
+        retained_future = None
+        if release.get("deployment_profile") == "local-supabase-schema115":
+            expected_schema = {
+                "compatible_min": 115, "compatible_max": 115, "target": 115,
+                "migration_class": "none", "rollback_compatible_min": 115,
+                "rollback_compatible_max": 115,
+            }
+            if (release["schema"] != expected_schema or release.get("migration_policy") != "none"
+                    or "migration_manifest" in release):
+                raise ValueError("invalid schema115 non-migrating contract")
+            manifest = json.loads((REPO_ROOT / "deployment/releases/migrations-115-116.json").read_text())
+            entries = [entry for entry in manifest["migrations"] if entry["number"] == 116]
+            if len(entries) != 1 or entries[0]["path"] != "web/database/migrations/116_reconcile_ecommerce_product_saves.sql":
+                raise ValueError("retained schema116 artifact invalid")
+            retained_future = entries[0]
         if frozen["production_baseline"] != "1e6b739a43759309a45ede2dff28a859209e4a64" or len(frozen["files"]) != 198:
             raise ValueError("invalid immutable lineage manifest")
         for relative, checksum in frozen["files"].items():
@@ -265,6 +282,10 @@ def check_production_lineage(errors: list[str]) -> None:
                 relative = path.relative_to(REPO_ROOT.parent).as_posix()
                 if number <= 99 and relative not in frozen["files"]:
                     errors.append(f"unexpected historical migration: {relative}")
+                if (number == 116 and retained_future is not None
+                        and path.name == "116_reconcile_ecommerce_product_saves.sql"
+                        and digest(path) == retained_future["sha256"]):
+                    continue
                 if number > release_target:
                     errors.append(
                         f"unexpected migration beyond release target {release_target}: {relative}"

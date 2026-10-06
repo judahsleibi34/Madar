@@ -993,3 +993,8 @@ The installed controller must agree with this exact candidate contract before
 an approved deployment. That remains a governed production change, not part of
 pre-cutover engineering. Existing provenance, backup, deployment lock, exact-main,
 readiness, traffic, worker and observation gates remain unchanged.
+
+The migration namespace validator allows only the checksum-verified retained
+116 artifact beyond this exact schema115 no-migration target. It still rejects
+117, renamed/changed 116 files, altered historical files, and any schema115
+descriptor that selects a migration. No migration file was changed.

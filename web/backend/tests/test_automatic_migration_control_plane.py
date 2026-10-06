@@ -117,6 +117,16 @@ class AutomaticMigrationControlPlaneTests(unittest.TestCase):
             self.manifest["migrations"][-1]["to_schema"]
         )
         self.resume_schema = self.source_schema + 1
+        # Keep migration regression fixtures bound to their original bridge,
+        # independently of the current non-migrating cutover descriptor.
+        installed = tempfile.TemporaryDirectory()
+        self.addCleanup(installed.cleanup)
+        installed_root = Path(installed.name)
+        installed_releases = installed_root / "deployment/releases"
+        installed_releases.mkdir(parents=True)
+        (installed_releases / "release.json").write_text(json.dumps(self.metadata))
+        (installed_releases / self.metadata["migration_manifest"]).write_text(json.dumps(self.manifest))
+        self.module.WEB_ROOT = installed_root
 
     def test_same_origin_api_must_report_frontend_release_and_slot(self):
         operations = self.module.DockerGitOperations.__new__(
