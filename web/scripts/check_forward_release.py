@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate the production schema-114 to schema-116 forward release."""
+"""Validate pinned migration history and the reviewed active release contract."""
 
 from __future__ import annotations
 
@@ -169,23 +169,32 @@ def validate(root: Path = ROOT) -> list[str]:
 
         schema = release["schema"]
 
-        if not (
-            int(schema["compatible_min"]) == SOURCE_SCHEMA
-            <= TARGET_SCHEMA
-            == int(schema["compatible_max"])
-            == int(schema["target"])
-            and int(schema["rollback_compatible_min"]) == SOURCE_SCHEMA
-            == int(schema["rollback_compatible_max"])
-            and schema["migration_class"] == "forward-compatible"
-            and release["migration_policy"]
-            == "automatic-after-known-good-backup-first-forward-repair"
-            and release["migration_manifest"] == MANIFEST_NAME
-        ):
-            errors.append(
-                "release must bridge production schema 114 to 116 "
-                "with rollback bounded at schema 114"
-            )
-
+        if release.get("deployment_profile") == "local-supabase-schema115":
+            expected_schema = {
+                "compatible_min": 115, "compatible_max": 115, "target": 115,
+                "migration_class": "none", "rollback_compatible_min": 115,
+                "rollback_compatible_max": 115,
+            }
+            if (schema != expected_schema or release.get("migration_policy") != "none"
+                    or "migration_manifest" in release):
+                errors.append("local Supabase candidate must be exact schema115 with no migration selected")
+        else:
+            if not (
+                int(schema["compatible_min"]) == SOURCE_SCHEMA
+                <= TARGET_SCHEMA
+                == int(schema["compatible_max"])
+                == int(schema["target"])
+                and int(schema["rollback_compatible_min"]) == SOURCE_SCHEMA
+                == int(schema["rollback_compatible_max"])
+                and schema["migration_class"] == "forward-compatible"
+                and release["migration_policy"]
+                == "automatic-after-known-good-backup-first-forward-repair"
+                and release["migration_manifest"] == MANIFEST_NAME
+            ):
+                errors.append(
+                    "release must bridge production schema 114 to 116 "
+                    "with rollback bounded at schema 114"
+                )
         manifest = json.loads(
             (release_dir / MANIFEST_NAME).read_text(
                 encoding="utf-8"

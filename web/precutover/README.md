@@ -2,8 +2,8 @@
 
 These overlays are opt-in preparation. They do not deploy, promote, execute SQL
 migrations, or change the active release. Keep core schema 115. Do not invoke the
-current release controller's automatic migration policy: its manifest includes
-116. Candidate source remains a forward descendant of the serving release.
+prior bridge's automatic migration policy: its retained manifest includes
+116. This candidate selects no migration and accepts only schema115. Candidate source remains a forward descendant of the serving release.
 
 ## Internal client bridge
 

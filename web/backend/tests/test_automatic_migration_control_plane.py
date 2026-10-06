@@ -99,7 +99,7 @@ class AutomaticMigrationControlPlaneTests(unittest.TestCase):
         self.module = load_release_cli()
         self.sha = "a" * 40
         self.metadata = json.loads(
-            (WEB_ROOT / "deployment/releases/release.json").read_text(
+            (WEB_ROOT / "deployment/releases/schema-114-116-bridge.json").read_text(
                 encoding="utf-8"
             )
         )
@@ -307,7 +307,7 @@ class AutomaticMigrationControlPlaneTests(unittest.TestCase):
         events: list[str] = []
         operations = FakeOperations(release_root, events, schema=schema)
         compatibility = self.module.Compatibility.load(
-            WEB_ROOT / "deployment/releases/release.json"
+            WEB_ROOT / "deployment/releases/schema-114-116-bridge.json"
         )
         operations.compatibility = compatibility
         return state_root, operations, compatibility, events

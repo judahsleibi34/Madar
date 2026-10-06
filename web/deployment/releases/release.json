@@ -1,14 +1,14 @@
 {
   "release_metadata_version": 1,
+  "deployment_profile": "local-supabase-schema115",
   "schema": {
-    "compatible_min": 114,
-    "compatible_max": 116,
-    "target": 116,
-    "migration_class": "forward-compatible",
-    "rollback_compatible_min": 114,
-    "rollback_compatible_max": 114
+    "compatible_min": 115,
+    "compatible_max": 115,
+    "target": 115,
+    "migration_class": "none",
+    "rollback_compatible_min": 115,
+    "rollback_compatible_max": 115
   },
-  "migration_policy": "automatic-after-known-good-backup-first-forward-repair",
-  "notes": "Schema 114 to 115 commercial authority reconciliation. Assignment remains in subscriptions/catalog; access periods and reversible admin holds are authoritative for effective use. Candidate uses schema-099 resolver on schema 114, with mutations unavailable until 115. After verified backup and bridge acceptance, migration 115 adds holds, snapshot assignment, expected revisions and immutable event/payment guards. Schema-114 application cannot enforce holds: forward repair only after migration, no fallback to the prior binary. V2 modular product assignment and prepared launch_2026 price book; explicit reviewed mapping required for legacy assignments, no production sales/enforcement activation. Catalog schema116 adds canonical history, atomic brand/category/product saves and separate inventory guards. Writes fail closed until116. Preserve schema115 commercial behavior and forward-repair rollback bounds.",
-  "migration_manifest": "migrations-115-116.json"
+  "migration_policy": "none",
+  "notes": "Non-migrating local Supabase cutover candidate, tested only on core schema115. Preserve all applied schema history and existing manifest files. No automatic migration selected; schema116 catalog writes remain gated. Rollback requires the validated compatible local runtime and local data, never hosted HTTP APIs."
 }

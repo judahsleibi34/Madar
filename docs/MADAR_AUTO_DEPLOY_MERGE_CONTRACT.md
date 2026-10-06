@@ -818,3 +818,21 @@ migration mode, timer action, worker handoff, traffic switch or promotion bypass
 Core schema 115 was used in pre-cutover rehearsal. The existing 116 manifest must
 not be invoked for this migration. Refer to `web/precutover/README.md` and the
 private operator cutover report before proposing production execution.
+
+
+### Exact schema-115 local Supabase candidate contract
+
+The reviewed `local-supabase-schema115` deployment profile declares minimum,
+maximum, target and rollback schema115, migration class `none`, policy `none`,
+and no selected migration manifest. `check_forward_release.py` validates that
+whole exact contract and continues to verify all historical checksum pins and
+the unchanged 115/116 migration manifest. The preceding bridge descriptor is
+retained as `schema-114-116-bridge.json` for migration regression tests; it is
+not the selected release contract. Neither schema114 nor schema116 passes this
+candidate's compatibility gate. Any future schema transition needs its own
+reviewed bridge contract. No automatic migration was invoked in rehearsal.
+
+The installed controller must agree with this exact candidate contract before
+an approved deployment. That remains a governed production change, not part of
+pre-cutover engineering. Existing provenance, backup, deployment lock, exact-main,
+readiness, traffic, worker and observation gates remain unchanged.
