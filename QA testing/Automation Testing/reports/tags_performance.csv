@@ -1,8 +1,0 @@
-name,type,seconds,details
-Login Page,document_load,8.659,TTFB=418.7ms; DOM=8619.9ms; Full=8620.1ms
-Login -> Dashboard,user_flow,4.798,
-Dashboard Page,document_load,0.391,TTFB=362.5ms; DOM=376.3ms; Full=377.2ms
-Tags Page,document_load,0.398,TTFB=345.5ms; DOM=360.3ms; Full=361.4ms
-Tags Page UI Ready,ui_ready,7.005,Measured until Add tag button became clickable
-Dashboard -> Tags,user_flow,0.111,Online Store click -> Tags Add button clickable
-Add Tag Modal,interaction,0.046,Add tag click -> dialog visible

@@ -98,3 +98,9 @@ env13-8
 
 # Local Codex working/verification artifacts
 .codex/
+/.tmp/
+
+# Generated QA reports and local investigation/model files
+/QA testing/Automation Testing/reports/
+/backend-auth-discovery.txt
+/Modelfile.deepseek32k
