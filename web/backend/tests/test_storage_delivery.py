@@ -105,6 +105,21 @@ class StorageDeliveryTests(unittest.TestCase):
                 self.assertEqual(r.status_code, 400)
 
 
+    def test_streaming_preserves_main_opaque_and_legacy_key_header_compatibility(self):
+        for key in ['sb_secret_synthetic_fixture_not_a_credential', 'synthetic-legacy-service-role-jwt']:
+            with self.subTest(key_kind='opaque' if key.startswith('sb_secret_') else 'legacy'):
+                self.calls=[]
+                with self.transport(), patch.dict(os.environ, {'SUPABASE_SERVICE_KEY': key}):
+                    response=self.client.get('/assets/avatars/photo.png')
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(self.calls[0].headers['apikey'], key)
+                if key.startswith('sb_secret_'):
+                    self.assertNotIn('authorization', self.calls[0].headers)
+                else:
+                    self.assertEqual(self.calls[0].headers['authorization'], 'Bearer '+key)
+                self.assertNotIn(key, str(response.headers))
+
+
 class AuthCallbackTransportTests(unittest.TestCase):
     def setUp(self):
         self.client = TestClient(app_module.app)
@@ -140,16 +155,3 @@ class AuthCallbackTransportTests(unittest.TestCase):
             session.assert_not_called()
         self.assertEqual(r.status_code,400)
 
-    def test_streaming_preserves_main_opaque_and_legacy_key_header_compatibility(self):
-        for key in ['sb_secret_synthetic_fixture_not_a_credential', 'synthetic-legacy-service-role-jwt']:
-            with self.subTest(key_kind='opaque' if key.startswith('sb_secret_') else 'legacy'):
-                self.calls=[]
-                with self.transport(), patch.dict(os.environ, {'SUPABASE_SERVICE_KEY': key}):
-                    response=self.client.get('/assets/avatars/photo.png')
-                self.assertEqual(response.status_code, 200)
-                self.assertEqual(self.calls[0].headers['apikey'], key)
-                if key.startswith('sb_secret_'):
-                    self.assertNotIn('authorization', self.calls[0].headers)
-                else:
-                    self.assertEqual(self.calls[0].headers['authorization'], 'Bearer '+key)
-                self.assertNotIn(key, str(response.headers))
