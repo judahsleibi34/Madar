@@ -81,6 +81,7 @@ APPLIED_PRODUCTION_MIGRATIONS = {
         "114_consolidate_public_site_runtime.sql",
         "73db3729be8b15f5fc2e18f0584315a16cb47555db7fc691900067b3a1582f6f",
     ),
+    115: ("115_reconcile_commercial_access.sql", "e40bfdd49294438e11698934fcc37ba0dcb0a534a51890c26702b13763883f34"),
 }
 
 EXPECTED = {
@@ -168,6 +169,8 @@ def validate(root: Path = ROOT) -> list[str]:
         )
 
         schema = release["schema"]
+        if release.get("deployment_profile") not in {None, "local-supabase-schema115"}:
+            errors.append("unknown deployment profile")
 
         if release.get("deployment_profile") == "local-supabase-schema115":
             expected_schema = {

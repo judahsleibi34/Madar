@@ -36,3 +36,24 @@ class LocalSupabaseReleaseContractTests(unittest.TestCase):
             for field in ['target','compatible_min','compatible_max','rollback_compatible_min','rollback_compatible_max']:
                 edited={**original,'schema':{**original['schema'],field:116}};(release_dir/'release.json').write_text(json.dumps(edited))
                 self.assertTrue(validator.validate(root))
+
+
+    def test_exact_candidate_policy_cannot_create_backup_or_execute_SQL(self):
+        from unittest.mock import patch
+        from types import SimpleNamespace
+        from test_automatic_migration_control_plane import load_release_cli
+        module=load_release_cli()
+        release=json.loads((WEB_ROOT/'deployment/releases/release.json').read_text())
+        with tempfile.TemporaryDirectory() as name:
+            root=Path(name);release_dir=root/'web/deployment/releases';release_dir.mkdir(parents=True)
+            (release_dir/'release.json').write_text(json.dumps(release))
+            state=root/'state';state.mkdir()
+            sha='a'*40
+            (state/'state.json').write_text(json.dumps({'active_slot':'green','known_good_release':{'sha':sha,'slot':'green'},'in_progress_release':None,'rollback_failure':None}))
+            def forbidden(*args,**kwargs):raise AssertionError('database or backup execution is forbidden')
+            operations=SimpleNamespace(release_root=root,verify_source=lambda sha:None,schema_version=forbidden)
+            compatibility=module.Compatibility.load(release_dir/'release.json')
+            with patch.object(module,'WEB_ROOT',root/'web'),patch.object(module,'LockedMigrationExecutor',side_effect=forbidden),patch.object(module,'_create_verified_migration_backup',side_effect=forbidden):
+                result=module.automatic_migrate_known_good(sha=sha,state_root=state,compatibility=compatibility,operations=operations)
+            self.assertEqual(result['status'],'not_requested')
+            self.assertFalse((state/'migrations').exists())
