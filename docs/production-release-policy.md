@@ -955,3 +955,23 @@ inventory guards permit descriptive edits without overwriting checkout stock.
 Promotion does not execute migrations. Follow the governed control-plane upgrade,
 verified backup and known-good bridge sequence. Preserve forward-repair recovery
 after the existing rollback bound; no deployment or production mutation is authorized.
+
+
+## Optional local Supabase client topology (pre-cutover preparation)
+
+The candidate release controller accepts the opt-in setting
+`MADAR_SUPABASE_CLIENT_NETWORK=madar-supabase-client`. It appends the immutable
+application client overlay after normal release topology for startup, config
+validation and candidate cleanup. This does not use MADAR_COMPOSE_OVERRIDE and
+does not select staging frontend API origins. Preflight requires exactly
+`SUPABASE_URL=http://madar-supabase:8000` and attests the external network is an
+internal Docker bridge. Backend and three queue workers join it; parser/remote
+networks remain unchanged. The local Supabase gateway must have the stable alias;
+connectivity is verified by normal readiness and separate worker probes.
+
+The option is absent by default. This is a protected controller source change;
+installation still requires explicit governed approval. It adds no port, schema,
+migration mode, timer action, worker handoff, traffic switch or promotion bypass.
+Core schema 115 was used in pre-cutover rehearsal. The existing 116 manifest must
+not be invoked for this migration. Refer to `web/precutover/README.md` and the
+private operator cutover report before proposing production execution.

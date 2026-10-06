@@ -21,8 +21,13 @@ before using these overlays. Never attach live applications during rehearsal.
 The application overlay combines with `web/docker-compose.yml` and release
 network settings. The gateway overlay combines with the two local Supabase
 Compose files. Persistence requires including overlays in future authorized
-startup commands; the current controller does not automatically load these.
-Any controller integration is separately reviewed under production release policy.
+startup commands; the candidate controller appends the application overlay only when
+`MADAR_SUPABASE_CLIENT_NETWORK=madar-supabase-client` is explicitly configured.
+Its preflight requires the exact internal URL and an internal Docker bridge.
+The normal release overlay remains active, so this does not select staging
+frontend origins. Startup and isolated cleanup use the same file list.
+This protected controller change requires a separately approved governed
+installation; it has not been installed. Promotion and migration gates are unchanged.
 
 ## Browser delivery
 
