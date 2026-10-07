@@ -1,8 +1,10 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const postAuthJson = vi.fn();
+
+afterEach(cleanup);
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
@@ -26,13 +28,14 @@ vi.mock("react-i18next", () => ({
       "signup.success": "Account created",
       "validation.required": "This field is required.",
       "validation.invalidEmail": "Enter a valid email.",
+      "verification.providerUnavailable": "Email verification is temporarily unavailable. Please try again shortly.",
     }[key] || options.defaultValue || key),
   }),
 }));
 
-vi.mock("../../utils/apiClient", () => ({
+vi.mock("../../utils/apiClient", async (importOriginal) => ({
+  ...(await importOriginal()),
   postAuthJson: (...args) => postAuthJson(...args),
-  readApiError: () => "",
 }));
 
 import SignUpPage from "./SignUpPage";
@@ -92,5 +95,38 @@ describe("signup terms consent", () => {
       "/auth/signup",
       expect.objectContaining({ terms_accepted: true })
     );
+  });
+});
+
+describe("signup API error classification", () => {
+  beforeEach(() => postAuthJson.mockReset());
+
+  const submitSignup = () => {
+    render(<MemoryRouter><SignUpPage lang="en" /></MemoryRouter>);
+    fillRequiredAccountFields();
+    fireEvent.click(screen.getByRole("checkbox"));
+    fireEvent.click(screen.getByRole("button", { name: "Create Account" }));
+  };
+
+  it.each([
+    { code: "email_verification_delivery_failed", message: "The account could not be created because the verification email was not sent." },
+    { detail: { code: "email_verification_delivery_failed", message: "The account could not be created because the verification email was not sent." } },
+  ])("shows a provider message for delivery failure without blaming the email field: %j", async (data) => {
+    postAuthJson.mockResolvedValue({ response: { ok: false, status: 503 }, data });
+    submitSignup();
+    await waitFor(() => expect(screen.getByText("Email verification is temporarily unavailable. Please try again shortly.")).toBeTruthy());
+    expect(screen.queryByText("Enter a valid email.")).toBeNull();
+    expect(screen.getByPlaceholderText("Email").getAttribute("aria-invalid")).not.toBe("true");
+  });
+
+  it.each([
+    { status: 400, detail: "Invalid email address" },
+    { status: 422, detail: [{ loc: ["body", "email"], msg: "value is not a valid email address" }] },
+  ])("keeps malformed-email API errors on the email field: %j", async ({ status, detail }) => {
+    postAuthJson.mockResolvedValue({ response: { ok: false, status }, data: { detail } });
+    submitSignup();
+    await waitFor(() => expect(screen.getByText("Enter a valid email.")).toBeTruthy());
+    expect(screen.queryByText("Email verification is temporarily unavailable. Please try again shortly.")).toBeNull();
+    expect(screen.getByPlaceholderText("Email").getAttribute("aria-invalid")).toBe("true");
   });
 });

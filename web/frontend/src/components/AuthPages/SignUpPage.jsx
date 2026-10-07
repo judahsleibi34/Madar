@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Eye, EyeOff } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { postAuthJson, readApiError } from "../../utils/apiClient";
+import { postAuthJson, readApiError, readApiErrorCode } from "../../utils/apiClient";
 import AuthToast from "./AuthToast";
 import { formatAuthValidationToastMessage, normalizeAuthMessage } from "./authMessages";
 import { rememberPendingVerificationEmail } from "./emailVerification";
@@ -203,10 +203,8 @@ export default function SignUpPage({
       nextErrors.acceptedTerms = t("signup.termsRequired");
     }
 
-    if (safeDetail.includes("email")) {
-      nextErrors.email = safeDetail.includes("registered")
-        ? ""
-        : t("validation.invalidEmail");
+    if (/^(?:invalid email(?: address)?|email(?: address)? is (?:invalid|not valid)|please enter a valid email(?: address)?)[.!]?$/.test(safeDetail.trim())) {
+      nextErrors.email = t("validation.invalidEmail");
     }
 
     if (safeDetail.includes("subdomain") && safeDetail.includes("taken")) {
@@ -337,6 +335,16 @@ export default function SignUpPage({
   };
 
   const applyApiErrors = (response, data) => {
+    if (readApiErrorCode(data) === "email_verification_delivery_failed") {
+      const message = t("verification.providerUnavailable");
+      setStatusMessage(message);
+      showAuthToast({ type: "error", title: t("signup.signupFailed"), message });
+      return true;
+    }
+
+    // Provider/server failures do not describe invalid form input.
+    if (response.status >= 500) return false;
+
     if (response.status === 422 && Array.isArray(data.detail)) {
       const newErrors = {};
 
