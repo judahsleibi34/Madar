@@ -5,6 +5,7 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 WEB_ROOT = Path(os.getenv("MADAR_TEST_REPOSITORY_ROOT") or Path(__file__).resolve().parents[2])
 sys.path.insert(0, str(WEB_ROOT))
@@ -14,6 +15,9 @@ from deployment.lib.runtime_authority import load_worker_authority
 
 class RecoveryControllerTests(unittest.TestCase):
     def setUp(self):
+        authorization = patch("deployment.lib.provider_recovery.require_provider_recovery_authorization")
+        self.authorize = authorization.start()
+        self.addCleanup(authorization.stop)
         self.contract = RecoveryContract("a"*40, "b"*40, "c"*40, "green",
             {"backend": "sha256:"+"d"*64, "frontend": "sha256:"+"e"*64},
             {key: "f"*64 for key in ("environment", "state", "upstream", "worker_authority", "controller")},

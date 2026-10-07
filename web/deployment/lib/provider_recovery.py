@@ -145,6 +145,7 @@ class ProviderRecoveryTransaction:
 
     def _activate_locked(self, contract: RecoveryContract, metadata: dict) -> dict:
         contract.validate(metadata)
+        require_provider_recovery_authorization(contract)
         self.ops.authorize(contract)
         path = self.root / "provider-recovery.json"
         if path.exists():
