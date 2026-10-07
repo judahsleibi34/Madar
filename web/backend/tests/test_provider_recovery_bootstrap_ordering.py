@@ -6,11 +6,11 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import patch, Mock
 
 WEB_ROOT = Path(os.getenv("MADAR_TEST_REPOSITORY_ROOT") or Path(__file__).resolve().parents[2])
 sys.path.insert(0, str(WEB_ROOT))
-from deployment.lib.provider_recovery_bootstrap import issue_authorization, TrustedRecoveryBootstrap, installation_interlock
+from deployment.lib.provider_recovery_bootstrap import issue_authorization, TrustedRecoveryBootstrap, installation_interlock, ProductionBootstrapOperations
 from deployment.lib.provider_recovery_runtime import digest
 from deployment.lib.control_plane_upgrade_authorization import require_upgrade_authorization
 import test_provider_recovery_controller as fixtures
@@ -45,6 +45,31 @@ class BootstrapOrderingTests(unittest.TestCase):
             result=TrustedRecoveryBootstrap(Operations()).install(self.contract,self.metadata,digest(self.contract.__dict__))
         self.assertEqual(calls,['trusted','stage','static','dry-run','fresh-no-credential','install-interlock','quiesce','install','attest','transition','witness','credential'])
         self.assertFalse(result['activated'])
+
+    def test_canonical_staging_repository_is_not_transaction_or_backup(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            transaction = root / "staging" / "exact-source-unique"
+            candidate = transaction / "repository"
+            candidate.mkdir(parents=True)
+            backups = root / "backups"
+            backups.mkdir()
+            system = Mock()
+            system.backup_root = backups
+            system.stage_candidate.return_value = (transaction, candidate)
+            with patch('deployment.lib.control_plane_upgrade.SystemOperations', return_value=system):
+                operations = ProductionBootstrapOperations(object())
+            staged, backup = operations.stage_candidate(self.contract.sha)
+            system.resolve_candidate.assert_called_once_with(self.contract.sha, dry_run=False)
+            system.stage_candidate.assert_called_once_with(self.contract.sha)
+            self.assertEqual(staged, candidate)
+            self.assertEqual(backup.parent, backups)
+            self.assertNotEqual(backup, transaction)
+            self.assertNotEqual(backup, candidate)
+            self.assertFalse(backup.exists())
+            backup.mkdir()
+            with self.assertRaisesRegex(RuntimeError, 'recovery_installation_backup_already_exists'):
+                operations.stage_candidate(self.contract.sha)
 
     def test_untrusted_installer_and_credential_issuer_are_rejected(self):
         with patch('deployment.lib.provider_recovery_bootstrap.os.geteuid',return_value=1000):

@@ -153,7 +153,14 @@ class ProductionBootstrapOperations:
         # Resolve immutable current main with the existing canonical remote,
         # ancestry, clean-worktree and hook-free protected staging checks.
         self.system.resolve_candidate(sha, dry_run=False)
-        return self.system.stage_candidate(sha)
+        transaction, candidate = self.system.stage_candidate(sha)
+        # Canonical staging returns its transaction parent and repository,
+        # whereas recovery installation consumes a repository and an empty
+        # backup destination. Never use either staging path as that backup.
+        backup = self.system.backup_root / ("provider402-" + transaction.name)
+        if backup.exists() or backup.is_symlink():
+            raise RuntimeError("recovery_installation_backup_already_exists")
+        return candidate, backup
 
     def static_preflight(self, candidate):
         self.system.static_preflight(candidate)

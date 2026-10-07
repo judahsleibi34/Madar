@@ -453,6 +453,12 @@ over accepted Auth sessions and never routes to hosted Supabase HTTP.
 
 ### Fresh provider402 bootstrap ordering
 
+The recovery installation adapter translates canonical staging's transaction
+parent/repository pair into the actual repository plus a separate, fresh backup
+path under the protected backup root. Static validation and both installer
+invocations use that repository. A staging directory can never be selected as
+an installation backup, and an existing backup destination is rejected.
+
 Initial installation is a root-only operation from trusted protected source,
 bound to the complete exact contract and completed rehearsal record. It retains
 the canonical current-origin/main resolver, staging, static preflight, installer
