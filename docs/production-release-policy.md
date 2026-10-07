@@ -1463,3 +1463,9 @@ credential/interlock. Phase 2 still requires all exact rehearsal gates; Phase 3
 still independently requires Phase-2 authorization. Installation never switches
 traffic, starts consumers or executes migrations. There is no skip-auth flag or
 arbitrary-ref resolver. Normal deployment/upgrade authorization is unchanged.
+
+A root-written pending installation interlock is armed before quiescing/install.
+It contains no bearer token and authorizes no runtime operation. Ordinary
+mutators fail closed while it exists. Only successful installation attestation
+can advance this exact interlock to the issued one-time credential; failure
+retains the pending interlock for operator review. No prior credential is reused.

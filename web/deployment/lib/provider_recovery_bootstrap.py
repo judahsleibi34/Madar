@@ -27,6 +27,13 @@ def exclusive_lock(path: Path):
         yield
 
 
+def installation_interlock(contract):
+    return {"version": 1, "approved_sha": contract.sha, "operation": PROFILE,
+            "schema": 115, "context_sha256": digest(contract.__dict__),
+            "rehearsal_sha256": contract.rehearsal_digest,
+            "status": "provider_recovery_installing"}
+
+
 def issue_authorization(contract: RecoveryContract, runtime: Path):
     """Write a one-time root credential bound to the complete reviewed packet.
 
@@ -49,8 +56,10 @@ def issue_authorization(contract: RecoveryContract, runtime: Path):
         raise RuntimeError("recovery_installation_witness_invalid")
     credential = runtime / "authorized.credential"
     interlock = runtime / "in-progress.json"
-    if credential.exists() or interlock.exists():
+    if credential.exists() or credential.is_symlink():
         raise RuntimeError("recovery_existing_authorization_requires_operator_review")
+    if json.loads(protected(interlock).read_text()) != installation_interlock(contract):
+        raise RuntimeError("recovery_installation_interlock_invalid")
     token = secrets.token_urlsafe(48)
     document = {"version": 1, "approved_sha": contract.sha, "operation": PROFILE,
                 "schema": 115, "context_sha256": digest(contract.__dict__),
@@ -97,6 +106,7 @@ class TrustedRecoveryBootstrap:
             # Root exact-contract approval and completed evidence authorize
             # installation only. No bearer credential exists at this boundary.
             self.ops.require_fresh_installation()
+            self.ops.begin_installation(contract)
             self.ops.quiesce_normal_automation()
             # Guard again after timer shutdown; no readiness waiver is used.
             contract.validate_origin(self.ops.origin_evidence())
@@ -167,6 +177,22 @@ class ProductionBootstrapOperations:
         if self.receipt.exists() or self.receipt.is_symlink():
             raise RuntimeError("recovery_controller_transition_already_present")
 
+    def begin_installation(self, contract):
+        # Credential-free pending interlock blocks every ordinary mutator while
+        # root holds installation locks. It cannot authorize a runtime action.
+        from deployment.lib.control_plane_upgrade import require_root_directory
+        require_root_directory(self.runtime.parent, mode=0o711, create=True)
+        require_root_directory(self.runtime, mode=0o711, create=True)
+        for name, value in (("schema-contract.json", self.recovery.metadata()),
+                            ("contract.json", contract.__dict__),
+                            ("in-progress.json", installation_interlock(contract))):
+            path = self.runtime / name
+            fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+            with os.fdopen(fd, "w") as handle:
+                json.dump(value, handle, sort_keys=True)
+                handle.flush(); os.fsync(handle.fileno())
+            if name == "in-progress.json": os.chmod(path, 0o644)
+
     def record_installation(self, contract):
         from deployment.lib.control_plane_upgrade import require_root_directory
         require_root_directory(self.runtime, mode=0o711, create=True)
@@ -177,14 +203,10 @@ class ProductionBootstrapOperations:
         os.chmod(witness, 0o600)
 
     def issue_authorization(self, contract):
-        for name in ("schema-contract.json", "contract.json"):
-            path = self.runtime / name
-            if path.exists() or path.is_symlink():
-                raise RuntimeError("recovery_existing_authorization_requires_operator_review")
-        atomic_json(self.runtime / "schema-contract.json", self.recovery.metadata())
-        os.chmod(self.runtime / "schema-contract.json", 0o600)
-        atomic_json(self.runtime / "contract.json", contract.__dict__)
-        os.chmod(self.runtime / "contract.json", 0o600)
+        # Pending files were exclusively written before installation. Do not
+        # overwrite or refresh them while attesting the installed controller.
+        if json.loads(protected(self.runtime / "contract.json", private=True).read_text()) != contract.__dict__:
+            raise RuntimeError("recovery_authorization_contract_changed")
         return issue_authorization(contract, self.runtime)
 
     def quiesce_normal_automation(self):

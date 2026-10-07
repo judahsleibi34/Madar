@@ -87,6 +87,7 @@ class InfrastructureTests(unittest.TestCase):
             def require_fresh_installation(self): self.calls.append("fresh")
             def record_installation(self, contract): self.calls.append("installed_witness")
             def issue_authorization(self, contract): self.calls.append("authorization")
+            def begin_installation(self, contract): self.calls.append("install-interlock")
             def quiesce_normal_automation(self): self.calls.append("quiesce")
             def installer_apply(self, *args): self.calls.append("install")
             def verify_installed_controller(self, sha): self.calls.append("verify_installed")
@@ -103,7 +104,7 @@ class InfrastructureTests(unittest.TestCase):
         ops.calls.clear()
         with patch("deployment.lib.provider_recovery_phases.require_completed_evidence"), patch("deployment.lib.provider_recovery_bootstrap.os.geteuid", return_value=0):
             result = bootstrap.install(self.contract, self.metadata, digest(self.contract.__dict__))
-        self.assertEqual(ops.calls, ["trusted", "stage", "preflight", "dry_run", "fresh", "quiesce", "install", "verify_installed", "receipt", "installed_witness", "authorization"])
+        self.assertEqual(ops.calls, ["trusted", "stage", "preflight", "dry_run", "fresh", "install-interlock", "quiesce", "install", "verify_installed", "receipt", "installed_witness", "authorization"])
         self.assertFalse(result["activated"])
 
     def test_unprotected_or_symlinked_checkpoint_is_rejected(self):

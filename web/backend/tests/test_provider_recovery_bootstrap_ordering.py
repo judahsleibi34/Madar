@@ -10,7 +10,7 @@ from unittest.mock import patch
 
 WEB_ROOT = Path(os.getenv("MADAR_TEST_REPOSITORY_ROOT") or Path(__file__).resolve().parents[2])
 sys.path.insert(0, str(WEB_ROOT))
-from deployment.lib.provider_recovery_bootstrap import issue_authorization, TrustedRecoveryBootstrap
+from deployment.lib.provider_recovery_bootstrap import issue_authorization, TrustedRecoveryBootstrap, installation_interlock
 from deployment.lib.provider_recovery_runtime import digest
 from deployment.lib.control_plane_upgrade_authorization import require_upgrade_authorization
 import test_provider_recovery_controller as fixtures
@@ -34,6 +34,7 @@ class BootstrapOrderingTests(unittest.TestCase):
             def static_preflight(self, candidate): calls.append('static')
             def installer_dry_run(self, candidate, backup): calls.append('dry-run')
             def require_fresh_installation(self): calls.append('fresh-no-credential')
+            def begin_installation(self, contract): calls.append('install-interlock')
             def quiesce_normal_automation(self): calls.append('quiesce')
             def installer_apply(self, *args): calls.append('install')
             def verify_installed_controller(self, sha): calls.append('attest')
@@ -42,7 +43,7 @@ class BootstrapOrderingTests(unittest.TestCase):
             def issue_authorization(self, contract): calls.append('credential')
         with patch('deployment.lib.provider_recovery_bootstrap.os.geteuid',return_value=0), patch('deployment.lib.provider_recovery_phases.require_completed_evidence'):
             result=TrustedRecoveryBootstrap(Operations()).install(self.contract,self.metadata,digest(self.contract.__dict__))
-        self.assertEqual(calls,['trusted','stage','static','dry-run','fresh-no-credential','quiesce','install','attest','transition','witness','credential'])
+        self.assertEqual(calls,['trusted','stage','static','dry-run','fresh-no-credential','install-interlock','quiesce','install','attest','transition','witness','credential'])
         self.assertFalse(result['activated'])
 
     def test_untrusted_installer_and_credential_issuer_are_rejected(self):
@@ -62,6 +63,7 @@ class BootstrapOrderingTests(unittest.TestCase):
                 with self.assertRaises(FileNotFoundError):issue_authorization(self.contract,root)
                 self.assertFalse((root/'authorized.credential').exists())
                 (root/'installation.json').write_text(json.dumps(witness))
+                (root/'in-progress.json').write_text(json.dumps(installation_interlock(self.contract)))
                 credential=issue_authorization(self.contract,root)
                 self.assertEqual(credential.stat().st_mode & 0o777,0o600)
                 with self.assertRaisesRegex(RuntimeError,'recovery_existing_authorization_requires_operator_review'):
