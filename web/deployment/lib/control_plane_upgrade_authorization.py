@@ -54,6 +54,7 @@ def require_upgrade_authorization(
     required_operation: str | None = None,
     required_schema: int | None = None,
     require_rehearsal: bool = False,
+    required_context_digest: str | None = None,
 ) -> None:
     """Reject deployment races while a root upgrader owns orchestration.
 
@@ -103,6 +104,11 @@ def require_upgrade_authorization(
         or (required_operation is not None and authorization.get("operation") != required_operation)
         or (required_schema is not None and state.get("schema") != required_schema)
         or (required_schema is not None and authorization.get("schema") != required_schema)
+        or (required_context_digest is not None and (
+            not re.fullmatch(r"[0-9a-f]{64}", required_context_digest)
+            or state.get("context_sha256") != required_context_digest
+            or authorization.get("context_sha256") != required_context_digest
+        ))
         or (
             require_rehearsal
             and (

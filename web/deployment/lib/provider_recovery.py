@@ -119,9 +119,11 @@ class RecoveryOperations(Protocol):
     def verify_local_rollback(self, contract: RecoveryContract) -> None: ...
 
 
-def require_provider_recovery_authorization(sha: str) -> None:
-    require_upgrade_authorization(sha, required_operation=PROFILE,
-                                 required_schema=115, require_rehearsal=True)
+def require_provider_recovery_authorization(contract: RecoveryContract) -> None:
+    digest = hashlib.sha256(json.dumps(contract.__dict__, sort_keys=True).encode()).hexdigest()
+    require_upgrade_authorization(contract.sha, required_operation=PROFILE,
+                                 required_schema=115, require_rehearsal=True,
+                                 required_context_digest=digest)
 
 
 def reject_ordinary_operation(state_root: Path) -> None:
