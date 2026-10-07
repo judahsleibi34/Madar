@@ -39,6 +39,8 @@ def git_output(repository_root: Path, *args: str) -> str:
 
 def main() -> int:
     require_upgrade_authorization(None)
+    from deployment.lib.provider_recovery import reject_ordinary_operation
+    reject_ordinary_operation(Path(os.getenv("MADAR_DEPLOY_STATE_ROOT", "/var/lib/madar/releases")))
     parser = argparse.ArgumentParser()
 
     parser.add_argument(

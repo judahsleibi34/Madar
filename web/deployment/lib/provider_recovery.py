@@ -68,6 +68,18 @@ class RecoveryContract:
         expected = {"sha": self.origin_sha, "slot": self.origin_slot,
                     "installed_sha": self.installed_sha, "schema": 115,
                     "production_fingerprints": self.production_fingerprints}
+        transition = evidence.get("controller_transition")
+        if transition is not None:
+            context = hashlib.sha256(json.dumps(self.__dict__, sort_keys=True).encode()).hexdigest()
+            if (transition.get("contract_digest") != context
+                    or transition.get("old_sha") != self.installed_sha
+                    or transition.get("new_sha") != self.sha
+                    or transition.get("old_controller_digest") != self.production_fingerprints["controller"]
+                    or not re.fullmatch(r"[0-9a-f]{64}", str(transition.get("new_controller_digest", "")))):
+                raise RuntimeError("provider_recovery_controller_transition_invalid")
+            expected["installed_sha"] = self.sha
+            expected["production_fingerprints"] = dict(
+                self.production_fingerprints, controller=transition["new_controller_digest"])
         if any(evidence.get(key) != value for key, value in expected.items()):
             raise RuntimeError("provider_recovery_origin_changed")
         if any(evidence.get(key) is not True for key in (
@@ -112,6 +124,9 @@ class RecoveryOperations(Protocol):
     def target_evidence(self) -> dict: ...
     def prepare_candidate(self, contract: RecoveryContract, slot: str) -> None: ...
     def inhibit_all_workers(self) -> None: ...
+    def capture_pre_switch_state(self) -> dict: ...
+    def restore_pre_switch_state(self, snapshot: dict) -> None: ...
+    def register_fallback(self) -> None: ...
     def require_all_workers_off(self) -> None: ...
     def switch_recovery_traffic(self, contract: RecoveryContract, slot: str) -> None: ...
     def smoke_recovery(self, contract: RecoveryContract, slot: str) -> None: ...
@@ -128,7 +143,7 @@ def require_provider_recovery_authorization(contract: RecoveryContract) -> None:
 
 def reject_ordinary_operation(state_root: Path) -> None:
     """Prevent ordinary automation or migration from taking over recovery."""
-    if (state_root / "provider-recovery.json").exists():
+    if (state_root / "provider-recovery.json").exists() or (state_root / "provider-recovery.json").is_symlink():
         raise RuntimeError("provider_recovery_requires_separate_operator_exit")
 
 
@@ -138,6 +153,9 @@ class ProviderRecoveryTransaction:
         self.ops = operations
 
     def activate(self, contract: RecoveryContract, metadata: dict) -> dict:
+        contract.validate(metadata)
+        from deployment.lib.provider_recovery_phases import require_activation_evidence
+        require_activation_evidence(contract, metadata)
         self.root.mkdir(parents=True, exist_ok=True, mode=0o700)
         with (self.root / "deploy.lock").open("a+") as lock:
             fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -145,6 +163,8 @@ class ProviderRecoveryTransaction:
 
     def _activate_locked(self, contract: RecoveryContract, metadata: dict) -> dict:
         contract.validate(metadata)
+        from deployment.lib.provider_recovery_phases import require_activation_evidence
+        require_activation_evidence(contract, metadata)
         require_provider_recovery_authorization(contract)
         self.ops.authorize(contract)
         path = self.root / "provider-recovery.json"
@@ -156,22 +176,31 @@ class ProviderRecoveryTransaction:
         generation = hashlib.sha256(json.dumps(contract.__dict__, sort_keys=True).encode()).hexdigest()
         state = {"version": 1, "profile": PROFILE, "phase": "prepared", "sha": contract.sha,
                  "slot": slot, "schema": 115, "migration_policy": "none", "worker_owner": "RECOVERY",
+                 "context_digest": generation,
                  "checkpoint_digest": contract.checkpoint_digest,
                  "rollback_runtime_digest": contract.rollback_runtime_digest,
                  "restore_database_on_rollback": False}
+        # Candidate and fallback were human-tested in Phase 1. Check the
+        # exact private candidate before touching serving/worker state.
+        self.ops.prepare_candidate(contract, slot)
+        contract.validate_target(self.ops.target_evidence())
+        previous = self.ops.capture_pre_switch_state()
         # Durable interlock precedes every production operation. A crash never
         # silently resumes normal deployment or starts old-slot consumers.
         atomic_json(path, state)
         try:
-            self.ops.prepare_candidate(contract, slot)
+            # Recheck unchanged origin immediately before inhibiting either
+            # slot. No candidate starts while retained consumers can write.
             contract.validate_origin(self.ops.origin_evidence())
-            contract.validate_target(self.ops.target_evidence())
             self.ops.inhibit_all_workers()
             self.ops.require_all_workers_off()
             with runtime_mutation_lock(self.root):
                 write_worker_authority(self.root, generation=generation, owner="RECOVERY",
                     old={"sha": contract.origin_sha, "slot": contract.origin_slot},
                     candidate={"sha": contract.sha, "slot": slot})
+            self.ops.register_fallback()
+            contract.validate_target(self.ops.target_evidence())
+            self.ops.require_all_workers_off()
             state["phase"] = "switch_pending"
             atomic_json(path, state)
             self.ops.switch_recovery_traffic(contract, slot)
@@ -184,8 +213,13 @@ class ProviderRecoveryTransaction:
             # Switching may have succeeded before an exception/timeout. Never
             # route to hosted HTTP, reactivate workers, or restore old Auth.
             if state["phase"] != "switch_pending":
-                state["phase"] = "pre_switch_failed_operator_review_required"
+                state["phase"] = "pre_switch_compensation_pending"
                 atomic_json(path, state)
+                # Compensate only before a switch could have accepted traffic.
+                # This restores pre-existing worker/state configuration; it
+                # never routes traffic or restores database/session data.
+                self.ops.restore_pre_switch_state(previous)
+                path.unlink()
                 raise
             state["phase"] = "rollback_pending"
             atomic_json(path, state)
@@ -196,3 +230,29 @@ class ProviderRecoveryTransaction:
             state["phase"] = "local_rollback_active"
             atomic_json(path, state)
             raise
+
+    def rollback(self, contract: RecoveryContract, metadata: dict) -> dict:
+        """Governed runtime rollback; never restore DB/Auth or hosted traffic."""
+        contract.validate(metadata)
+        from deployment.lib.provider_recovery_phases import require_activation_evidence
+        require_activation_evidence(contract, metadata)
+        require_provider_recovery_authorization(contract)
+        self.ops.authorize(contract)
+        with (self.root / "deploy.lock").open("a+") as lock:
+            fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            path = self.root / "provider-recovery.json"
+            state = json.loads(path.read_text())
+            context = hashlib.sha256(json.dumps(contract.__dict__, sort_keys=True).encode()).hexdigest()
+            if (state.get("context_digest") != context or state.get("phase") not in {
+                    "active", "switch_pending", "rollback_pending", "local_rollback_active"}):
+                raise RuntimeError("provider_recovery_rollback_state_invalid")
+            contract.validate_target(self.ops.target_evidence())
+            self.ops.require_all_workers_off()
+            state["phase"] = "rollback_pending"
+            atomic_json(path, state)
+            self.ops.switch_local_rollback(contract)
+            self.ops.verify_local_rollback(contract)
+            self.ops.require_all_workers_off()
+            state["phase"] = "local_rollback_active"
+            atomic_json(path, state)
+            return state

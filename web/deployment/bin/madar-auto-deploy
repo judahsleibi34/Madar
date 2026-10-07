@@ -36,6 +36,10 @@ readonly CONTROL_ROOT="${MADAR_CONTROL_PLANE_ROOT:-/opt/madar/control-plane/depl
 readonly DEPLOY_SCRIPT="${MADAR_PRODUCTION_DEPLOY_BIN:-$CONTROL_ROOT/bin/madar-production-deploy}"
 readonly RELEASE_DEPLOY="${MADAR_RELEASE_DEPLOY_BIN:-$CONTROL_ROOT/bin/madar-release-deploy}"
 readonly STATE_ROOT="${MADAR_DEPLOY_STATE_ROOT:-/var/lib/madar/releases}"
+if [[ -e "$STATE_ROOT/provider-recovery.json" || -L "$STATE_ROOT/provider-recovery.json" ]]; then
+    echo "[madar-auto-deploy] ERROR: provider_recovery_requires_separate_operator_exit" >&2
+    exit 1
+fi
 readonly -a RUNTIME_PATHS=(
   web/backend
   web/frontend

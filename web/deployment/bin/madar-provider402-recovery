@@ -1,0 +1,10 @@
+#!/usr/bin/python3 -IB
+"""Root-installed provider402 launcher with a clean fixed environment."""
+import os
+import sys
+
+safe = {"PATH": "/usr/sbin:/usr/bin:/sbin:/bin", "HOME": "/root", "LANG": "C.UTF-8", "LC_ALL": "C.UTF-8"}
+os.environ.clear()
+os.environ.update(safe)
+os.execve("/usr/bin/python3", ["/usr/bin/python3", "-I", "-B",
+          "/opt/madar/control-plane/deployment/lib/provider_recovery_entry.py", *sys.argv[1:]], safe)

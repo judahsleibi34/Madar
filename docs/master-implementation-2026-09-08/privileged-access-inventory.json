@@ -1003,6 +1003,19 @@
         "web/scripts/start_local_database.py"
       ],
       "boundary": "Explicit development/E2E/rehearsal/cleanup operator entrypoints own their isolated test database or tenant fixture. Source presence does not authorize executing SQL or bypassing each tool's local-target/apply preflight. None were run during this correction."
+    },
+    {
+      "paths": [
+        "web/deployment/bin/madar-provider402-recovery",
+        "web/deployment/lib/provider_recovery.py",
+        "web/deployment/lib/provider_recovery_runtime.py",
+        "web/deployment/lib/provider_recovery_bootstrap.py",
+        "web/deployment/lib/provider_recovery_entry.py",
+        "web/deployment/lib/provider_recovery_phases.py",
+        "web/deployment/lib/provider_recovery_preparation.py",
+        "web/deployment/lib/provider_recovery_prepare_entry.py"
+      ],
+      "boundary": "Separately operator-authorized root provider402 recovery. Fixed canonical paths, protected contract digest and root credential; exact schema115 and no migrations. Privileged Supabase calls are read-only health/linkage evidence. Explicit Docker worker inhibition, passive local runtime registration and separate recovery traffic mutation are gated. Runtime-only local rollback never restores Auth or uses hosted HTTP. No activation by merging; incomplete rehearsals must block production."
     }
   ],
   "runtime_distribution": {

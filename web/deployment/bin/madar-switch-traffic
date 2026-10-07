@@ -91,6 +91,8 @@ def main() -> int:
     require_production_mutation_identity(SCRIPT)
     slot = sys.argv[1]
     state_root = Path(os.environ["MADAR_DEPLOY_STATE_ROOT"]).resolve()
+    from deployment.lib.provider_recovery import reject_ordinary_operation
+    reject_ordinary_operation(state_root)
     if not state_root.is_dir() or state_root == Path("/"):
         raise RuntimeError("deploy_state_root_invalid")
     with runtime_mutation_lock(state_root):

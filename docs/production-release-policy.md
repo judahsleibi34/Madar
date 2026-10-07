@@ -1413,3 +1413,53 @@ unchanged. The separate durable recovery state rejects ordinary release and
 migration ownership, and local runtime rollback must preserve current Auth
 sessions. A protected production adapter and exact-image rehearsal are
 required before activation review.
+
+Provider402 sign-in recovery is a separate explicit root-authorized operation;
+normal deployment, automatic deployment, migration and ordinary traffic switching
+must reject its durable state. A source merge never authorizes installation or
+activation. Its protected bootstrap retains the canonical remote, source/image,
+schema115, no-migration, installer backup, provenance and unrelated-health gates.
+See `docs/provider402-signin-recovery.md` and the exact recovery validation report;
+missing human or live fixture proof is a NO-GO.
+
+### Protected provider402 phase separation
+
+`PREPARE_AND_REHEARSE` runs through the fixed-path `madar-provider402-prepare`
+launcher and a root-protected private-resource adapter. It checks exact source,
+images, schema115, no migrations, actual provider402 origin/provenance, a verified
+checkpoint, private target health and source write-fence validation. It does not
+require human Auth or completed runtime rollback evidence to start the private
+candidate and fallback. It cannot mutate production traffic, worker authority,
+configuration or slots. Preparation receipts do not authorize activation.
+
+`AUTHORIZE_ACTIVATION` requires all fifteen completed rehearsal gates, including
+human Auth, MFA/AAL2, tenant isolation, business write denial, both-slot worker
+inhibition, traffic/interruption rehearsal, passive fallback, runtime-only local
+rollback and failure injections. A root-protected receipt binds the exact source,
+image IDs, schema contract, checkpoint, provider402 evidence, production
+fingerprints and completed rehearsal digest. Changing an input invalidates it.
+
+`ACTIVATE_RECOVERY`, controller installation, credential issuance and production
+traffic changes independently require that completed receipt. No fixture switch,
+environment flag or Phase-1 receipt waives it. Normal deployment, schema recovery,
+forward repair and migration checks remain unchanged. Recovery rollback changes
+only runtimes using the current local provider; it never restores a checkpoint
+over accepted Auth sessions and never routes to hosted Supabase HTTP.
+
+### Fresh provider402 bootstrap ordering
+
+Initial installation is a root-only operation from trusted protected source,
+bound to the complete exact contract and completed rehearsal record. It retains
+the canonical current-origin/main resolver, staging, static preflight, installer
+dry run, checkpoint/provenance validation and production locks. It does not
+require a bearer credential before the installer can issue one. Installation
+and installed-controller attestation precede an exclusive protected installation
+witness and one-time contract-bound credential. An existing credential/interlock
+or installation witness rejects fresh installation rather than refreshing it.
+No untrusted/non-root entrypoint can issue the credential.
+
+Subsequent activation authorization and runtime operations require that
+credential/interlock. Phase 2 still requires all exact rehearsal gates; Phase 3
+still independently requires Phase-2 authorization. Installation never switches
+traffic, starts consumers or executes migrations. There is no skip-auth flag or
+arbitrary-ref resolver. Normal deployment/upgrade authorization is unchanged.

@@ -47,3 +47,85 @@ fallback without replacing serving production, and exercises the existing
 protected traffic driver. Human exact-image login/MFA tests are also required.
 A fake operations adapter or past human tests are not evidence for production
 activation. No command should be improvised to bypass the installed guard.
+
+## Protected infrastructure implementation
+
+The fixed-path `madar-provider402-recovery` root launcher clears the caller
+process environment and accepts only an operation plus the approved complete
+contract digest. It cannot select an arbitrary Docker endpoint, shell driver,
+production directory, credential or callback URL. Root-staged bootstrap code
+must come from the existing trusted canonical-remote bundle staging and protected
+filesystem preflight; running a caller-writable repository copy with sudo is
+not the trusted installation procedure.
+
+Preparation requires root-protected exact contract, verified local checkpoint
+and exact-image rehearsal evidence including human Auth. It creates a separate
+provider402 credential/interlock. Passive fallback registration precedes
+installation. Installation then reuses the existing staging, installer dry run,
+backup and installed-controller verification, with auto-deploy service/timer
+quiesced and runtime-masked. The root transition receipt binds the original
+controller hash to its approved new immutable source; it permits no environment,
+upstream, release-state or worker-authority discrepancy. The interlock remains
+on installation failure; automation does not resume itself.
+
+The activation transaction takes the deploy lock, guards the known provider402
+origin again, inhibits both blue/green consumer sets with restart policy `no`,
+and persists RECOVERY authority before preparing the recovery candidate. The
+separate recovery traffic driver accepts only the contract candidate or its
+registered passive local fallback. Normal traffic switching, migrations and
+auto-deployment reject the durable recovery interlock, even when authorization
+credentials are absent. Unknown interrupted phases require operator review.
+
+Candidate and fallback use separate private Docker bridges, the same protected
+local-provider configuration, and shared persistent recovery Redis. Their
+frontend `backend` aliases cannot cross-route. The only helper is the isolated
+HTTP parser; no notification, calendar or deletion consumer is created. Rollback
+changes only traffic/runtime; local PostgreSQL/Auth state and recovery Redis
+remain intact, preserving newly accepted sessions. No hosted HTTP fallback,
+checkpoint restoration or worker reactivation occurs.
+
+These are implementation rules, not evidence of completed activation readiness.
+The ignored validation report must prove live production-shaped fixture traffic,
+rollback and exact-image operator Auth before approving production use.
+
+### Protected provider402 phase separation
+
+`PREPARE_AND_REHEARSE` runs through the fixed-path `madar-provider402-prepare`
+launcher and a root-protected private-resource adapter. It checks exact source,
+images, schema115, no migrations, actual provider402 origin/provenance, a verified
+checkpoint, private target health and source write-fence validation. It does not
+require human Auth or completed runtime rollback evidence to start the private
+candidate and fallback. It cannot mutate production traffic, worker authority,
+configuration or slots. Preparation receipts do not authorize activation.
+
+`AUTHORIZE_ACTIVATION` requires all fifteen completed rehearsal gates, including
+human Auth, MFA/AAL2, tenant isolation, business write denial, both-slot worker
+inhibition, traffic/interruption rehearsal, passive fallback, runtime-only local
+rollback and failure injections. A root-protected receipt binds the exact source,
+image IDs, schema contract, checkpoint, provider402 evidence, production
+fingerprints and completed rehearsal digest. Changing an input invalidates it.
+
+`ACTIVATE_RECOVERY`, controller installation, credential issuance and production
+traffic changes independently require that completed receipt. No fixture switch,
+environment flag or Phase-1 receipt waives it. Normal deployment, schema recovery,
+forward repair and migration checks remain unchanged. Recovery rollback changes
+only runtimes using the current local provider; it never restores a checkpoint
+over accepted Auth sessions and never routes to hosted Supabase HTTP.
+
+### Fresh provider402 bootstrap ordering
+
+Initial installation is a root-only operation from trusted protected source,
+bound to the complete exact contract and completed rehearsal record. It retains
+the canonical current-origin/main resolver, staging, static preflight, installer
+dry run, checkpoint/provenance validation and production locks. It does not
+require a bearer credential before the installer can issue one. Installation
+and installed-controller attestation precede an exclusive protected installation
+witness and one-time contract-bound credential. An existing credential/interlock
+or installation witness rejects fresh installation rather than refreshing it.
+No untrusted/non-root entrypoint can issue the credential.
+
+Subsequent activation authorization and runtime operations require that
+credential/interlock. Phase 2 still requires all exact rehearsal gates; Phase 3
+still independently requires Phase-2 authorization. Installation never switches
+traffic, starts consumers or executes migrations. There is no skip-auth flag or
+arbitrary-ref resolver. Normal deployment/upgrade authorization is unchanged.

@@ -17,6 +17,9 @@ class RecoveryControllerTests(unittest.TestCase):
     def setUp(self):
         authorization = patch("deployment.lib.provider_recovery.require_provider_recovery_authorization")
         self.authorize = authorization.start()
+        evidence = patch("deployment.lib.provider_recovery_phases.require_activation_evidence")
+        evidence.start()
+        self.addCleanup(evidence.stop)
         self.addCleanup(authorization.stop)
         self.contract = RecoveryContract("a"*40, "b"*40, "c"*40, "green",
             {"backend": "sha256:"+"d"*64, "frontend": "sha256:"+"e"*64},
@@ -79,6 +82,9 @@ class RecoveryControllerTests(unittest.TestCase):
             def target_evidence(self): return test.target
             def prepare_candidate(self, contract, slot): self.calls.append("prepare")
             def inhibit_all_workers(self): self.calls.append("inhibit")
+            def capture_pre_switch_state(self): return {}
+            def restore_pre_switch_state(self, snapshot): self.calls.append("compensate")
+            def register_fallback(self): self.calls.append("register_fallback")
             def require_all_workers_off(self): self.calls.append("workers_off")
             def switch_recovery_traffic(self, contract, slot): self.calls.append("switch")
             def smoke_recovery(self, contract, slot):
@@ -98,6 +104,7 @@ class RecoveryControllerTests(unittest.TestCase):
                 self.assertEqual(load_worker_authority(root)["owner"], "RECOVERY")
                 self.assertFalse(json.loads((root / "provider-recovery.json").read_text())["restore_database_on_rollback"])
                 with self.assertRaises(RuntimeError): reject_ordinary_operation(root)
+                self.assertLess(ops.calls.index("prepare"), ops.calls.index("inhibit"))
                 self.assertLess(ops.calls.index("inhibit"), ops.calls.index("switch"))
                 self.assertNotIn("activate_workers", ops.calls)
                 if fail: self.assertIn("local_rollback", ops.calls)
@@ -108,15 +115,17 @@ class RecoveryControllerTests(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 require_upgrade_authorization("a"*40, interlock=Path(temporary)/"absent.json", required_operation="provider402-signin", required_schema=115, require_rehearsal=True)
 
-    def test_pre_switch_failure_keeps_interlock_without_routing_or_worker_restore(self):
+    def test_private_candidate_failure_leaves_production_state_unchanged(self):
         class Operations:
             def authorize(self, contract): pass
             def origin_evidence(inner): return self.origin
             def target_evidence(inner): return self.target
+            def inhibit_all_workers(inner): pass
+            def require_all_workers_off(inner): pass
             def prepare_candidate(inner, contract, slot): raise RuntimeError("fixture_prepare_failure")
             def switch_local_rollback(inner, contract): self.fail("pre-switch failure must not change traffic")
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             with self.assertRaises(RuntimeError):
                 ProviderRecoveryTransaction(root, Operations()).activate(self.contract, self.metadata)
-            self.assertEqual(json.loads((root/"provider-recovery.json").read_text())["phase"], "pre_switch_failed_operator_review_required")
+            self.assertFalse((root/"provider-recovery.json").exists())

@@ -43,6 +43,7 @@ declare -a tracked_files=(
   bin/madar-release-deploy
   bin/madar-migrate
   bin/madar-switch-traffic
+  bin/madar-provider402-recovery
   lib/__init__.py
   lib/control_plane_filesystem.py
   lib/environment_file.py
@@ -51,6 +52,14 @@ declare -a tracked_files=(
   lib/migration_executor.py
   lib/release_deployer.py
   lib/runtime_authority.py
+  lib/provider_recovery.py
+  lib/provider_recovery_runtime.py
+  lib/provider_recovery_bootstrap.py
+  lib/provider_recovery_entry.py
+  lib/provider_recovery_phases.py
+  lib/provider_recovery_preparation.py
+  lib/provider_recovery_prepare_entry.py
+  bin/madar-provider402-prepare
   releases/release.json
   releases/schema-96-recovery.json
   proxy/docker-compose.yml

@@ -1,0 +1,7 @@
+#!/usr/bin/python3 -IB
+"""Private rehearsal launcher; no production operation can be selected."""
+import os
+import sys
+safe={'PATH':'/usr/sbin:/usr/bin:/sbin:/bin','HOME':'/root','LANG':'C.UTF-8','LC_ALL':'C.UTF-8'}
+os.execve('/usr/bin/python3',['/usr/bin/python3','-I','-B',
+    '/var/lib/madar-control-plane/provider402/preparation-source/web/deployment/lib/provider_recovery_prepare_entry.py',*sys.argv[1:]],safe)
