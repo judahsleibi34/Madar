@@ -84,7 +84,17 @@ def provider_request_allowed(request: httpx.Request) -> bool:
         return (bool(re.fullmatch(r"/rest/v1/[a-z_]+", path))
                 or path in {"/auth/v1/health", "/auth/v1/user", "/auth/v1/factors"}
                 or bool(re.fullmatch(r"/storage/v1/object/(?:public/)?(?:avatars|builder-assets)/.+", path)))
-    if REQUEST_OPERATION.get() not in AUTH_PATHS:
+    operation = REQUEST_OPERATION.get()
+    if (method == "POST" and path == "/auth/v1/token"
+            and request.url.params.get("grant_type") == "refresh_token"
+            and operation is not None and operation[0] == "GET"
+            and request_allowed(*operation)
+            and operation[1] not in {"/", "/health/live", "/health/version", "/health/ready", "/health/recovery"}
+            and not operation[1].startswith("/assets/avatars/")):
+        # Authenticated read helpers may rotate an expired session. This is
+        # session activity, not permission to write from a business GET.
+        return True
+    if operation not in AUTH_PATHS:
         return False
     if method == "POST" and path == "/auth/v1/token":
         return request.url.params.get("grant_type") in {"password", "refresh_token"}

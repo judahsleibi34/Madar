@@ -99,3 +99,12 @@ class RecoveryFenceTests(unittest.TestCase):
         with patch.object(app_module, "_legacy_asset_visibility", return_value=(False, False)) as legacy:
             self.assertEqual(app_module._asset_visibility(tenant_id=1, storage_key="fixture", request=request, response=Response()), (False, False))
             legacy.assert_called_once()
+
+    def test_authenticated_read_refresh_does_not_admit_business_or_other_auth_writes(self):
+        marker = recovery.REQUEST_OPERATION.set(("GET", "/builder/projects"))
+        self.addCleanup(recovery.REQUEST_OPERATION.reset, marker)
+        self.assertTrue(recovery.provider_request_allowed(httpx.Request("POST", "http://madar-supabase:8000/auth/v1/token?grant_type=refresh_token")))
+        self.assertFalse(recovery.provider_request_allowed(httpx.Request("POST", "http://madar-supabase:8000/auth/v1/token?grant_type=password")))
+        self.assertFalse(recovery.provider_request_allowed(httpx.Request("POST", "http://madar-supabase:8000/rest/v1/builder_projects", json={})))
+        recovery.REQUEST_OPERATION.set(("GET", "/health/ready"))
+        self.assertFalse(recovery.provider_request_allowed(httpx.Request("POST", "http://madar-supabase:8000/auth/v1/token?grant_type=refresh_token")))
