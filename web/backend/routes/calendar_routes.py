@@ -1064,7 +1064,9 @@ def queue_task_to_provider(
 
 def _calendar_workspace_payload(context, start: datetime, end: datetime) -> dict[str, Any]:
     with traced_operation("calendar_lookup"):
-        ensure_default_calendar(context)
+        from services.provider_recovery import restricted
+        if not restricted():
+            ensure_default_calendar(context)
         accesses = list_accessible_calendars(context)
     access_by_id = {str(access.calendar.get("id")): access for access in accesses}
     full_detail_ids = [calendar_id for calendar_id, access in access_by_id.items() if access.role in {"editor", "owner"}]

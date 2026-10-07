@@ -73,5 +73,6 @@ def diagnostics(request: Request):
 
 @router.get("/recovery")
 def recovery_status():
-    from services.provider_recovery import enabled
-    return {"restricted": enabled(), "business_writes_enabled": not enabled()}
+    from services.provider_recovery import restricted
+    fenced = restricted()
+    return {"restricted": fenced, "business_writes_enabled": not fenced}

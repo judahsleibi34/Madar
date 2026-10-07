@@ -28,6 +28,14 @@ READ_PATHS = (
     r"/(?:users/[1-9][0-9]*/)?builder/projects(?:/[A-Za-z0-9-]+)?",
     r"/assets/avatars/[^\\]+", r"/uploads/tenant_[1-9][0-9]*/builder_assets/[A-Za-z0-9_.-]+",
 )
+# Reviewed normal-candidate reads only; the narrower sign-in recovery profile
+# does not inherit these. Provider writes/RPCs remain fenced for every handler.
+TRANSITION_READ_PATHS = (
+    r"/notifications", r"/calendar/bootstrap",
+    r"/builder/reservations(?:/[A-Za-z0-9-]+)?",
+    r"/(?:users/[1-9][0-9]*/)?builder/projects/[A-Za-z0-9-]+/form-submissions",
+    r"/ecommerce/(?:catalog|orders(?:/[0-9a-fA-F-]{36})?)",
+)
 AUDIT_ACTIONS = frozenset({
     "auth.login_succeeded", "auth.login_failed", "auth.mfa_login_challenge_started",
     "auth.mfa_login_verified", "auth.mfa_login_failed", "auth.mfa_verified",
@@ -44,8 +52,14 @@ def enabled() -> bool:
     return value == PROFILE
 
 
+def restricted() -> bool:
+    from services.business_write_authority import restricted as transition_restricted
+    # Validate an installed transition authority even while recovery is enabled.
+    return transition_restricted() or enabled()
+
+
 def require_existing_account(user: dict, *, active: bool, email_matches: bool) -> None:
-    if enabled() and (not active or not email_matches or user.get("email_verified") is False):
+    if restricted() and (not active or not email_matches or user.get("email_verified") is False):
         raise HTTPException(status_code=503, detail=DETAIL)
 
 
@@ -54,7 +68,12 @@ def request_allowed(method: str, path: str) -> bool:
         return False
     if (method, path) in AUTH_PATHS:
         return True
-    return method in {"GET", "HEAD"} and any(re.fullmatch(p, path) for p in READ_PATHS)
+    patterns = READ_PATHS
+    if not enabled():
+        from services.business_write_authority import restricted as transition_restricted
+        if transition_restricted():
+            patterns += TRANSITION_READ_PATHS
+    return method in {"GET", "HEAD"} and any(re.fullmatch(p, path) for p in patterns)
 
 
 class RecoveryMiddleware:
@@ -62,7 +81,14 @@ class RecoveryMiddleware:
         self.app = app
 
     async def __call__(self, scope, receive, send):
-        if scope["type"] != "http" or not enabled():
+        if scope["type"] != "http":
+            return await self.app(scope, receive, send)
+        try:
+            fenced = restricted()
+        except (RuntimeError, OSError, ValueError):
+            return await JSONResponse({"detail": DETAIL}, status_code=503,
+                headers={"Cache-Control": "no-store", "Retry-After": "300"})(scope, receive, send)
+        if not fenced:
             return await self.app(scope, receive, send)
         method, path = scope["method"], scope["path"]
         if not request_allowed(method, path):
@@ -85,6 +111,17 @@ def provider_request_allowed(request: httpx.Request) -> bool:
                 or path in {"/auth/v1/health", "/auth/v1/user", "/auth/v1/factors"}
                 or bool(re.fullmatch(r"/storage/v1/object/(?:public/)?(?:avatars|builder-assets)/.+", path)))
     operation = REQUEST_OPERATION.get()
+    if (not enabled() and method == "POST" and path == "/rest/v1/rpc/resolve_commercial_access"
+            and operation is not None and operation[0] in {"GET", "HEAD"}
+            and request_allowed(*operation)):
+        # Schema115 defines this exact SQL function STABLE, containing only
+        # SELECTs. Commercial authorization remains active during fenced reads.
+        try:
+            data = json.loads(request.content)
+        except (ValueError, UnicodeError):
+            return False
+        return (isinstance(data, dict) and set(data) == {"p_tenant_id"}
+                and type(data["p_tenant_id"]) is int and data["p_tenant_id"] > 0)
     if (method == "POST" and path == "/auth/v1/token"
             and request.url.params.get("grant_type") == "refresh_token"
             and operation is not None and operation[0] == "GET"
@@ -121,7 +158,7 @@ class RecoveryTransport(httpx.BaseTransport):
         self.transport = transport
 
     def handle_request(self, request):
-        if enabled() and not provider_request_allowed(request):
+        if restricted() and not provider_request_allowed(request):
             raise HTTPException(status_code=503, detail=DETAIL)
         return self.transport.handle_request(request)
 
@@ -130,6 +167,14 @@ class RecoveryTransport(httpx.BaseTransport):
 
 
 def validate_configuration() -> None:
+    from services.business_write_authority import read_authority
+    authority = read_authority()
+    if authority is not None and (
+            os.getenv("SUPABASE_URL") != "http://madar-supabase:8000" or
+            os.getenv("MADAR_SUPABASE_CLIENT_NETWORK") != "madar-supabase-client" or
+            os.getenv("SCHEMA_COMPATIBLE_MIN") != "115" or
+            os.getenv("SCHEMA_COMPATIBLE_MAX") != "115"):
+        raise RuntimeError("business_write_authority_runtime_contract_invalid")
     if not enabled():
         return
     if (os.getenv("SUPABASE_URL") != "http://madar-supabase:8000" or

@@ -1,0 +1,4 @@
+#!/bin/sh
+set -eu
+exec /usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin HOME=/root \
+    /usr/bin/python3 -IB /opt/madar/control-plane/deployment/lib/provider_local_transition_entry.py "$@"

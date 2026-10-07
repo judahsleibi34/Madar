@@ -1475,3 +1475,23 @@ It contains no bearer token and authorizes no runtime operation. Ordinary
 mutators fail closed while it exists. Only successful installation attestation
 can advance this exact interlock to the issued one-time credential; failure
 retains the pending interlock for operator review. No prior credential is reused.
+
+### Provider402 graduation to normal local production
+
+Recovery exit uses only `madar-local-provider-transition` and its fixed protected
+contract/evidence paths. It requires all final migration, checkpoint, independent
+restore, off-host, SMTP, security and rehearsal gates; the ordinary deployer,
+forward-repair and schema-recovery protections remain unchanged. Schema115 and
+migration policy/class `none`, with no manifest, are mandatory throughout.
+
+The normal local backend remains application-fenced through preparation, single
+worker handoff and traffic switch. A root-owned read-only directory mount binds
+write authority to exact source/schema/contract. Finalization alone grants writes
+after the exact production smoke record passes. Unknown or missing authority
+fails closed. Notification-worker email is explicitly disabled. Worker ownership
+is durable and all retained/archived hosted consumers remain inhibited.
+
+Rollback is a governed current-data runtime switch to the rehearsed local
+fallback, preceded by write fencing and worker quiescence. It never restores a
+checkpoint or routes traffic to hosted Supabase. Automatic deployment remains
+inhibited until its local topology/provenance is independently attested.

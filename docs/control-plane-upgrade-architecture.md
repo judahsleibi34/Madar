@@ -480,3 +480,47 @@ It contains no bearer token and authorizes no runtime operation. Ordinary
 mutators fail closed while it exists. Only successful installation attestation
 can advance this exact interlock to the issued one-time credential; failure
 retains the pending interlock for operator review. No prior credential is reused.
+
+### Governed graduation to the local provider
+
+`madar-local-provider-transition` is a separate fixed-path root transaction.
+Ordinary deployment still rejects provider402 state. Graduation requires the
+installed exact canonical source/images, existing protected recovery credential
+and Phase-2 receipt, a new contract-bound exclusive graduation authorization,
+final typed reconciliation, synthetic-account cleanup, source-fence evidence,
+a fresh complete checkpoint with independent restore and off-host proof, Auth
+SMTP, local service health and private transition/failure-injection evidence.
+No operation executes a migration, imports hosted sessions, or restores a DB.
+
+Preparation archives the inactive hosted containers with restart policy `no`,
+preserves their complete Redis container storage, and starts the exact normal local candidate on an
+internal bridge. Both consumer sets must be stopped before exactly one new
+owner is designated. Notification, calendar and deletion workers start in that
+order with individual health checks; notification email remains disabled.
+Only the newly created exact-source backend/consumers join the existing internal
+recovery network. Existing Redis/fallback topology is unchanged. The candidate
+preserves recovery Redis and Auth/security configuration; no keys, accepted
+sessions or historical queues are cleared or replayed. Consumer restart policies
+remain `no`; only governed single-owner operations may start them.
+
+The normal backend mounts a root-owned authority directory read-only. Its
+schema115/source/contract-bound authority begins as `READ_ONLY` and applies the
+existing request and provider mutation fences. Missing, untrusted or changed
+authority denies requests. A switch to the normal runtime preserves this fence.
+Only the finalization transaction, after every bound production smoke gate,
+publishes normal local configuration/release ownership, retires hosted writers,
+and atomically grants `NORMAL` writes. No process restart is needed to grant or
+revoke writes. Recovery-profile runtimes remain fenced regardless of this file.
+Fenced normal-candidate reads retain commercial authorization through only the
+schema115 `resolve_commercial_access(integer)` STABLE SQL lookup. Other RPCs
+remain denied. Calendar bootstrap reads do not create default calendars.
+
+Interrupted handoff/switch keeps a durable rollback-required state. Governed
+rollback fences the candidate, inhibits consumers, restores RECOVERY ownership
+and switches only to the registered local-compatible runtime using current
+Auth/DB/Storage state. Even after normal writes, no checkpoint rewind is allowed.
+Deployment requires checkpoint freshness. Runtime-only rollback still verifies
+the bound archive's integrity and restore proof, but does not expire merely
+because that deployment checkpoint is older than its freshness window.
+The normal automation interlock remains retained until separately attested;
+graduation does not automatically re-enable deployment or migration automation.

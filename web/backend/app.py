@@ -346,7 +346,7 @@ def _legacy_asset_visibility(*, tenant_id: int, storage_key: str, request: Reque
 
 
 def _asset_visibility(*, tenant_id: int, storage_key: str, request: Request, response: Response) -> tuple[bool, bool]:
-    from services.provider_recovery import enabled as recovery_enabled
+    from services.provider_recovery import restricted as recovery_enabled
     if recovery_enabled():
         # Reuse the complete schema115 authorization path without invoking
         # a POST RPC through the provider write fence.

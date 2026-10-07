@@ -490,7 +490,7 @@ def get_authenticated_user_row(
             },
         )
 
-    from services.provider_recovery import enabled as recovery_enabled
+    from services.provider_recovery import restricted as recovery_enabled
     if not recovery_enabled() and normalize_user_type(user_data.get("user_type")) == "admin":
         try:
             from services.admin_account_access_service import resolve_admin_account_access_user
