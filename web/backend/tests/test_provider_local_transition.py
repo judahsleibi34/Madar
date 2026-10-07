@@ -15,6 +15,9 @@ from deployment.lib.provider_local_transition import (
     GATES, SMOKE_GATES, LocalProviderTransition, LocalTransitionContract, validate_evidence,
 )
 from deployment.lib.provider_recovery_runtime import digest
+from deployment.lib.provider_local_auth_configuration import (
+    CALLBACKS, SMTP_KEYS, configuration_changes, validate_preparation_evidence,
+)
 
 
 class Operations:
@@ -186,3 +189,50 @@ class LocalTransitionTests(unittest.TestCase):
             self.tx.rollback(self.contract, self.metadata)
         self.assertIn("verify_runtime_rollback_inputs", self.ops.calls)
         self.assertEqual(self.ops.mode, "READ_ONLY")
+
+    def test_smtp_preparation_cannot_authorize_normal_activation(self):
+        report = copy.deepcopy(self.report)
+        report["gates"]["auth_smtp"] = "PENDING"
+        contract = replace(self.contract, evidence_digest=digest(report))
+        validate_preparation_evidence(contract, report)
+        with self.assertRaisesRegex(RuntimeError, "mandatory_gate_incomplete"):
+            validate_evidence(contract, report)
+        for gate in GATES - {"auth_smtp"}:
+            altered = copy.deepcopy(report)
+            altered["gates"][gate] = "FAIL"
+            with self.subTest(gate=gate), self.assertRaises(RuntimeError):
+                validate_preparation_evidence(replace(contract, evidence_digest=digest(altered)), altered)
+        with self.assertRaisesRegex(RuntimeError, "evidence_changed"):
+            validate_preparation_evidence(replace(contract, evidence_digest="f" * 64), report)
+
+    def test_auth_mail_configuration_is_gmail_starttls_and_exact_public_callbacks_only(self):
+        values = {key: "synthetic-fixture" for key in SMTP_KEYS}
+        values.update(SMTP_HOST="smtp.gmail.com", SMTP_PORT="587", SMTP_USER="fixture@example.invalid",
+                      SMTP_ADMIN_EMAIL="fixture@example.invalid")
+        result = configuration_changes(values)
+        self.assertEqual(result["API_EXTERNAL_URL"], "https://api.madarportal.com")
+        self.assertEqual({key: result[key] for key in CALLBACKS}, CALLBACKS)
+        for key, bad in (("SMTP_PORT", "465"), ("SMTP_HOST", "other.example.invalid"),
+                         ("SMTP_PASS", ""), ("SMTP_ADMIN_EMAIL", "other@example.invalid"),
+                         ("SMTP_SENDER_NAME", "invalid\nvalue")):
+            with self.subTest(key=key), self.assertRaises(RuntimeError):
+                configuration_changes({**values, key: bad})
+
+    def test_worker_repair_cannot_start_consumers_during_recovery_or_preparation(self):
+        self.prepared()
+        with self.assertRaisesRegex(RuntimeError, "phase_or_binding"):
+            self.tx.restart_worker(self.contract, self.metadata, "notification")
+        self.assertNotIn("restart_existing_worker", self.ops.calls)
+
+    def test_normal_worker_repair_is_authorized_exact_owner_only_without_promotion(self):
+        self.switched()
+        self.tx.finalize(self.contract, self.metadata)
+        before = dict(self.ops.fp)
+        self.tx.restart_worker(self.contract, self.metadata, "notification")
+        self.assertIn("restart_existing_worker", self.ops.calls)
+        self.assertEqual(self.ops.fp, before)
+        self.ops.authorized = False
+        with self.assertRaisesRegex(RuntimeError, "authorization"):
+            self.tx.restart_worker(self.contract, self.metadata, "calendar-sync")
+        with self.assertRaisesRegex(RuntimeError, "worker_kind"):
+            self.tx.restart_worker(self.contract, self.metadata, "unknown")

@@ -223,3 +223,23 @@ class LocalProviderTransition:
             self.ops.verify_local_fallback_serving()
             self._record(state, "local_rollback_active")
             return state
+
+    def restart_worker(self, contract, metadata, kind):
+        """Repair only the existing normal owner, never hand off or promote."""
+        if kind not in {"notification", "calendar-sync", "data-deletion"}:
+            raise RuntimeError("local_transition_worker_kind_invalid")
+        if os.geteuid() != 0:
+            raise RuntimeError("local_transition_root_entry_required")
+        contract.validate(metadata)
+        self.ops.require_authorization(contract)
+        validate_evidence(contract, self.ops.evidence())
+        self.ops.verify_runtime_rollback_inputs(contract)
+        with exclusive_lock(self.root / "deploy.lock"):
+            state = self._state(contract, {"normal"})
+            self.ops.require_write_authority(contract, "NORMAL")
+            self.ops.require_single_owner(contract)
+            self.ops.restart_existing_worker(contract, kind)
+            self.ops.require_single_owner(contract)
+            if state["fingerprints"] != self.ops.fingerprints():
+                raise RuntimeError("local_transition_repair_changed_authority")
+            return state

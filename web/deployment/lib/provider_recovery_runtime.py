@@ -56,7 +56,7 @@ def protected(path: Path, *, private=False) -> Path:
     return path
 
 
-def readonly_configuration(path: Path) -> Path:
+def readonly_configuration(path: Path, *, private=True) -> Path:
     """Existing operator-owned private configuration is read-only input.
 
     This trust rule never applies to authorization, executable code, or receipts.
@@ -74,7 +74,7 @@ def readonly_configuration(path: Path) -> Path:
             raise RuntimeError("recovery_readonly_configuration_untrusted")
         if stat.st_mode & 0o020 and stat.st_uid != operator:
             raise RuntimeError("recovery_readonly_configuration_untrusted")
-    if path.stat().st_mode & 0o077:
+    if private and path.stat().st_mode & 0o077:
         raise RuntimeError("recovery_readonly_configuration_not_private")
     return path
 

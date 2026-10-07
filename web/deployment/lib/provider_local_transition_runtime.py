@@ -6,6 +6,7 @@ writes, schema change, checkpoint restore or hosted-provider traffic operation.
 from dataclasses import asdict
 from datetime import datetime, timezone
 import json
+import ipaddress
 import os
 from pathlib import Path
 import pwd
@@ -48,6 +49,12 @@ class ProductionLocalTransitionOperations:
         for key in ("SUPABASE_ANON_KEY", "SUPABASE_SERVICE_KEY", "CSRF_SECRET", "SESSION_ACTIVITY_SECRET", "PENDING_VERIFICATION_SECRET"):
             if self.config.get(key) != self.recovery.config.get(key):
                 raise RuntimeError("local_transition_session_configuration_changed")
+        from deployment.lib.provider_recovery_runtime import readonly_configuration
+        legacy = {}
+        load_environment_file(readonly_configuration(self.recovery.paths.production_env), environ=legacy)
+        for key in ("CALENDAR_CREDENTIALS_SECRET", "COMMERCIAL_ENTITLEMENTS_ENFORCED"):
+            if self.config.get(key) != legacy.get(key):
+                raise RuntimeError("local_transition_existing_application_configuration_changed")
         self.command = self.recovery.command
         self.inspect = self.recovery.inspect
 
@@ -72,7 +79,7 @@ class ProductionLocalTransitionOperations:
         state = json.loads(protected(self.transaction_path, private=True).read_text())
         if state.get("contract_digest") != digest(asdict(contract)) or state.get("phase") not in phases:
             raise RuntimeError("local_transition_operation_phase_invalid")
-        if state["phase"] == "rollback_pending":
+        if state["phase"] in {"rollback_pending", "normal"}:
             self.verify_runtime_rollback_inputs(contract)
         else:
             self.verify_immutable_inputs(contract)
@@ -139,6 +146,18 @@ class ProductionLocalTransitionOperations:
         reconciliation = json.loads(protected(ROOT / "reconciliation.json", private=True).read_text())
         if digest(reconciliation) != contract.reconciliation_digest:
             raise RuntimeError("local_transition_reconciliation_changed")
+        # Existing native configuration belongs to the operator, not the root
+        # controller. Its protected reconciliation attestation pins the exact
+        # three inputs consumed by Compose; it is never trusted as executable
+        # controller code or an authorization receipt.
+        from deployment.lib.provider_recovery_runtime import readonly_configuration
+        native = reconciliation.get("native_configuration_fingerprints", {})
+        if set(native) != {".env", "docker-compose.yml", "docker-compose.madar-local.yml"}:
+            raise RuntimeError("local_transition_native_configuration_binding_missing")
+        for name, expected in native.items():
+            path = readonly_configuration(Path("/opt/madar/local-supabase") / name, private=name == ".env")
+            if file_digest(path) != expected:
+                raise RuntimeError("local_transition_native_configuration_changed")
 
     def require_recovery_active(self, context):
         # Runtime-owned release files are untrusted until bound to the protected
@@ -274,7 +293,20 @@ class ProductionLocalTransitionOperations:
             self.command(["docker", "stop", name])
             self.command(["docker", "rename", name, name+"-legacy-"+suffix])
         network = f"madar-{self.slot}-local-transition"
-        self.command(["docker", "network", "create", "--internal", network])
+        # Normal workers need outbound HTTPS. No host port is published and
+        # the separate Supabase client bridge remains internal and unchanged.
+        ids = self.command(["docker", "network", "ls", "-q"]).splitlines()
+        existing = json.loads(self.command(["docker", "network", "inspect", *ids]))
+        occupied = [ipaddress.ip_network(item["Subnet"]) for row in existing
+                    for item in row.get("IPAM", {}).get("Config") or [] if item.get("Subnet")]
+        routes = json.loads(self.command(["ip", "-j", "route"]))
+        occupied += [ipaddress.ip_network(row["dst"], strict=False) for row in routes
+                     if row.get("dst") not in {None, "default"}]
+        choices = [subnet for subnet in ipaddress.ip_network("10.253.0.0/16").subnets(new_prefix=24)
+                   if not any(subnet.overlaps(other) for other in occupied if other.version == 4)]
+        if not choices:
+            raise RuntimeError("local_transition_private_network_capacity_unavailable")
+        self.command(["docker", "network", "create", "--driver", "bridge", "--subnet", str(choices[0]), network])
         # Legacy Redis is retained intact (including its writable layer). The
         # normal candidate uses the tested recovery Redis without clearing,
         # importing or replaying keys, sessions or historical queue entries.
@@ -354,10 +386,25 @@ class ProductionLocalTransitionOperations:
 
     def start_and_verify_worker(self, contract, kind):
         self.require_phase(contract, {"handoff_pending"})
+        self._start_exact_worker(contract, kind)
+
+    def restart_existing_worker(self, contract, kind):
+        self.require_phase(contract, {"normal"})
+        self.require_write_authority(contract, "NORMAL")
+        self._start_exact_worker(contract, kind)
+
+    def _start_exact_worker(self, contract, kind):
+        if kind not in {"notification", "calendar-sync", "data-deletion"}:
+            raise RuntimeError("local_transition_worker_kind_invalid")
         self.require_single_owner(contract)
         name = f"madar-{self.slot}-{kind}-worker"
         row = self.inspect(name)
-        if row["Image"] != contract.images["backend"]:
+        env = dict(item.split("=", 1) for item in row["Config"].get("Env", []))
+        if (row["Image"] != contract.images["backend"]
+                or row["Config"].get("Labels", {}).get("com.madar.local-transition") != digest(asdict(contract))
+                or env.get("SUPABASE_URL") != "http://madar-supabase:8000"
+                or env.get("EMAIL_CHANNEL_ENABLED") != "false"
+                or row["HostConfig"]["RestartPolicy"]["Name"] != "no"):
             raise RuntimeError("local_transition_worker_image_invalid")
         self.command(["docker", "start", name])
         port = {"notification": 8090, "calendar-sync": 8091, "data-deletion": 8094}[kind]

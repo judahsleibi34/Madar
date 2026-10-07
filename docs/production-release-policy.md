@@ -1495,3 +1495,10 @@ Rollback is a governed current-data runtime switch to the rehearsed local
 fallback, preceded by write fencing and worker quiescence. It never restores a
 checkpoint or routes traffic to hosted Supabase. Automatic deployment remains
 inhibited until its local topology/provenance is independently attested.
+
+Protected `auth-configure` preparation may configure only native GoTrue using
+the approved Gmail/STARTTLS secret file after the other final migration proofs
+pass. It grants no traffic, worker or write authorization. Canonical callbacks
+use `https://api.madarportal.com/auth/v1/verify` and exact frontend verify/reset
+redirects; no extra `/api` prefix is introduced. Notification email remains off.
+Normal graduation continues to require all gates, including verified Auth SMTP.

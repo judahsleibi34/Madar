@@ -494,7 +494,8 @@ No operation executes a migration, imports hosted sessions, or restores a DB.
 
 Preparation archives the inactive hosted containers with restart policy `no`,
 preserves their complete Redis container storage, and starts the exact normal local candidate on an
-internal bridge. Both consumer sets must be stopped before exactly one new
+unpublished application bridge with outbound HTTPS capability. The separate
+`madar-supabase-client` bridge remains internal. Both consumer sets must be stopped before exactly one new
 owner is designated. Notification, calendar and deletion workers start in that
 order with individual health checks; notification email remains disabled.
 Only the newly created exact-source backend/consumers join the existing internal
@@ -524,3 +525,29 @@ the bound archive's integrity and restore proof, but does not expire merely
 because that deployment checkpoint is older than its freshness window.
 The normal automation interlock remains retained until separately attested;
 graduation does not automatically re-enable deployment or migration automation.
+
+`auth-configure` is a bounded preparation operation under the same protected
+root entry. It requires the existing recovery Phase-2 credential, exact source,
+schema115, fresh independently restored checkpoint, final reconciliation and all
+graduation proofs except SMTP, which must explicitly be PENDING. It cannot issue
+normal authorization, start consumers, change traffic, or grant business writes.
+It authenticates Gmail on port587 with certificate-verified STARTTLS and checks
+the sender without generating mail. Only native GoTrue receives the six approved
+SMTP variables and the exact public mediated verification/recovery callbacks.
+The prior native configuration is quarantined. The pinned Auth image, native
+Auth ledger, password/MFA fingerprints and current database are preserved.
+Subsequent normal authorization still requires SMTP PASS with all other gates.
+Existing operator-owned native Compose/environment files are read-only inputs
+pinned by the protected reconciliation digest. Public Compose templates receive
+no authority to execute controller code or mint credentials; the environment
+file remains private. Mail/callback editing preserves every other native line,
+including its original secret quoting. Failure repairs only the prior native
+configuration and pinned Auth runtime, never the current database or sessions.
+After SMTP preparation, create the final coordinated checkpoint/reconciliation
+packet with the resulting native input fingerprints before normal authorization.
+Normal consumers retain restart policy `no`. Protected `restart-worker` repairs
+only the already designated normal owner under the deploy lock, with the same
+source/image/configuration/credential bindings and no traffic or ownership
+change. It cannot start a consumer from any recovery/preparation state, use a
+hosted provider, or enable notification email. Runtime repair preserves current
+data and does not expire solely with the old deployment checkpoint's age.

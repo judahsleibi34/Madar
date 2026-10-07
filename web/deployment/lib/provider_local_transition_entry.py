@@ -15,11 +15,15 @@ from deployment.lib.provider_recovery_runtime import digest, protected
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("operation", choices=("authorize", "prepare", "handoff", "switch", "finalize", "rollback"))
+    parser.add_argument("operation", choices=("auth-configure", "authorize", "prepare", "handoff", "switch", "finalize", "rollback", "restart-worker"))
     parser.add_argument("--approved-contract", required=True)
+    parser.add_argument("--worker", choices=("notification", "calendar-sync", "data-deletion"))
     args = parser.parse_args()
+    if (args.operation == "restart-worker") != (args.worker is not None):
+        parser.error("worker argument is required only for restart-worker")
     if os.geteuid() != 0:
         raise RuntimeError("local_transition_root_entry_required")
+    os.umask(0o077)
     protected(Path(__file__).resolve())
     packet = json.loads(protected(ROOT / "contract.json", private=True).read_text())
     contract = LocalTransitionContract(**packet)
@@ -33,7 +37,10 @@ def main():
     if alias.stat().st_ino != credential.stat().st_ino:
         raise RuntimeError("local_transition_credential_alias_invalid")
     ops = ProductionLocalTransitionOperations()
-    if args.operation == "authorize":
+    if args.operation == "auth-configure":
+        from deployment.lib.provider_local_auth_configuration import configure_auth
+        configure_auth(ops, contract)
+    elif args.operation == "authorize":
         from deployment.lib.provider_recovery_bootstrap import exclusive_lock
         ops.recovery.authorize(ops.recovery.contract)
         validate_evidence(contract, ops.evidence())
@@ -54,6 +61,8 @@ def main():
                 handle.write("\n")
                 handle.flush()
                 os.fsync(handle.fileno())
+    elif args.operation == "restart-worker":
+        LocalProviderTransition(ops.state, ops).restart_worker(contract, metadata, args.worker)
     else:
         getattr(LocalProviderTransition(ops.state, ops), args.operation)(contract, metadata)
     print("protected_normal_local_operation_complete")
