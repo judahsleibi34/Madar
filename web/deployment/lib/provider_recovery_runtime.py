@@ -158,7 +158,9 @@ class ProductionRecoveryOperations:
             # never honor replacement objects during provenance checks.
             if args[1:3] != ["-C", str(self.paths.repository)]:
                 raise RuntimeError("recovery_git_repository_escape")
-            args = ["git", "--no-replace-objects", "-c",
+            # status may refresh the index even though it is a read operation.
+            # Never let root replace the operator-owned checkout's index.
+            args = ["git", "--no-optional-locks", "--no-replace-objects", "-c",
                     "safe.directory="+str(self.paths.repository), *args[1:]]
         result = subprocess.run(args, input=input, env=env, capture_output=True, text=True, timeout=240)
         if result.returncode:

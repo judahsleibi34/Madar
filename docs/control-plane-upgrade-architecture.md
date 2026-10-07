@@ -453,6 +453,11 @@ over accepted Auth sessions and never routes to hosted Supabase HTTP.
 
 ### Fresh provider402 bootstrap ordering
 
+Root recovery provenance reads disable Git optional locks as well as replacement
+objects. A clean-worktree status check cannot refresh or replace the canonical
+operator-owned Git index. Canonical fetch/staging continues through the existing
+operator identity and trusted resolver.
+
 The recovery installation adapter translates canonical staging's transaction
 parent/repository pair into the actual repository plus a separate, fresh backup
 path under the protected backup root. Static validation and both installer

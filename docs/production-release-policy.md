@@ -1448,6 +1448,10 @@ over accepted Auth sessions and never routes to hosted Supabase HTTP.
 
 ### Fresh provider402 bootstrap ordering
 
+Root recovery Git status/provenance reads disable optional index updates and
+replacement objects. They must preserve the operator-owned canonical index;
+fetch/staging retains the existing operator identity and exact-main policy.
+
 The recovery installation adapter translates canonical staging's transaction
 parent/repository pair into the actual repository plus a separate, fresh backup
 path under the protected backup root. Static validation and both installer
