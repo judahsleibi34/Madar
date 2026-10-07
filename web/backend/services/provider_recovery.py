@@ -24,7 +24,7 @@ AUTH_PATHS = frozenset({
 READ_PATHS = (
     r"/", r"/health/(?:live|version|ready|recovery)",
     r"/auth/(?:user_status|mfa/status|mfa/factors)",
-    r"/users/[1-9][0-9]*/info", r"/(?:users/[1-9][0-9]*/)?website/settings",
+    r"/admin/profile/info", r"/users/[1-9][0-9]*/info", r"/(?:users/[1-9][0-9]*/)?website/settings",
     r"/(?:users/[1-9][0-9]*/)?builder/projects(?:/[A-Za-z0-9-]+)?",
     r"/assets/avatars/[^\\]+", r"/uploads/tenant_[1-9][0-9]*/builder_assets/[A-Za-z0-9_.-]+",
 )

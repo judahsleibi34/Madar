@@ -50,6 +50,9 @@ class RecoveryFenceTests(unittest.TestCase):
         self.assertEqual(response.status_code, 403)
 
     def test_login_is_admitted_but_signup_and_mfa_enrollment_never_are(self):
+        self.assertTrue(recovery.request_allowed("GET", "/admin/profile/info"))
+        self.assertFalse(recovery.request_allowed("POST", "/admin/profile/info"))
+        self.assertFalse(recovery.request_allowed("PUT", "/admin/profile/profile"))
         self.assertNotEqual(self.client.post("/auth/login", json={}).status_code, 503)
         for path in ("/auth/signup", "/auth/mfa/enroll", "/auth/mfa/login/enroll", "/password/forgot"):
             self.assertEqual(self.client.post(path).status_code, 503)
