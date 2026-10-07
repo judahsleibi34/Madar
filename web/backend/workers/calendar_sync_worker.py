@@ -274,6 +274,8 @@ def schedule_periodic_inbound(
 
 
 def main() -> int:
+    from services.provider_recovery import prohibit_worker_start
+    prohibit_worker_start()
     configure_structured_logging()
     if os.getenv("CALENDAR_SYNC_WORKER_ENABLED", "false").strip().lower() not in {
         "1",

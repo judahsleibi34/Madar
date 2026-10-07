@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any, Iterator
 
 
-WORKER_OWNERS = {"OLD", "NONE", "CANDIDATE"}
+WORKER_OWNERS = {"OLD", "NONE", "CANDIDATE", "RECOVERY"}
 
 
 def _atomic_json(path: Path, payload: dict[str, Any]) -> None:

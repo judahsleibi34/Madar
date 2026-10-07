@@ -219,6 +219,8 @@ class HealthHandler(BaseHTTPRequestHandler):
 
 
 def main() -> int:
+    from services.provider_recovery import prohibit_worker_start
+    prohibit_worker_start()
     configure_structured_logging()
     if os.getenv("NOTIFICATION_WORKER_ENABLED", "false").strip().lower() not in {"1", "true", "yes", "on"}:
         logger.info("notification_worker.disabled")

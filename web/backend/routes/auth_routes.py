@@ -856,6 +856,8 @@ def login(user: LogIn, response: Response, request: Request):
             effective_account_status(local_user) != ACTIVE_ACCOUNT_STATUS
             or (provider_email and normalize_email(local_user.get("email")) != provider_email)
         )
+        from services.provider_recovery import require_existing_account
+        require_existing_account(local_user, active=not requires_lifecycle_sync, email_matches=not requires_lifecycle_sync)
         if requires_lifecycle_sync:
             local_user, activated = synchronize_verified_account(
                 auth_response.user,

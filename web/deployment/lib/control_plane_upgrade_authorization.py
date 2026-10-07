@@ -75,6 +75,8 @@ def require_upgrade_authorization(
         state = json.loads(interlock.read_text(encoding="utf-8"))
     except (OSError, ValueError) as error:
         raise RuntimeError("control_plane_upgrade_interlock_invalid") from error
+    if state.get("operation") == "provider402-signin" and required_operation != "provider402-signin":
+        raise RuntimeError("provider_recovery_operation_not_authorized")
     credential_root = os.getenv("CREDENTIALS_DIRECTORY", "").strip()
     credential = (
         Path(credential_root) / "madar-control-plane-upgrade"

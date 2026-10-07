@@ -297,7 +297,9 @@ def get_website_settings(
         tenant_id = context.tenant_id
         authenticated_user_id = context.user_id
 
-        website = ensure_settings_for_tenant(tenant_id, authenticated_user_id)
+        from services.provider_recovery import enabled as recovery_enabled
+        website = (get_settings_for_tenant(tenant_id, authenticated_user_id)
+                   if recovery_enabled() else ensure_settings_for_tenant(tenant_id, authenticated_user_id))
 
         return {
             "success": True,

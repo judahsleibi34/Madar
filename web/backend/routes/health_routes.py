@@ -69,3 +69,9 @@ def diagnostics(request: Request):
         },
         "notification_channels": get_delivery_channel_metrics(),
     }
+
+
+@router.get("/recovery")
+def recovery_status():
+    from services.provider_recovery import enabled
+    return {"restricted": enabled(), "business_writes_enabled": not enabled()}

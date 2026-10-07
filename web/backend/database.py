@@ -6,6 +6,7 @@ import httpx
 import dotenv
 from supabase import Client, ClientOptions
 
+from services.provider_recovery import RecoveryTransport, validate_configuration
 from services.supabase_api_key import create_api_key_compatible_client
 
 logger = logging.getLogger(__name__)
@@ -65,6 +66,7 @@ BACKEND_ENV_PATH = load_backend_environment()
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY")
 SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
+validate_configuration()
 
 if not SUPABASE_URL or not SUPABASE_ANON_KEY:
     raise RuntimeError("Missing Supabase environment variables")
@@ -105,7 +107,7 @@ def create_supabase_client(supabase_key: str) -> Client:
         retries=2,
     )
     http_client = httpx.Client(
-        transport=transport,
+        transport=RecoveryTransport(transport),
         timeout=httpx.Timeout(timeout_seconds, connect=10.0),
         limits=httpx.Limits(
             max_connections=50,

@@ -107,6 +107,8 @@ class ReleaseDeployer:
         self.lock_file = state_root / "deploy.lock"
 
     def _state(self) -> dict[str, Any]:
+        if (self.state_root / "provider-recovery.json").exists():
+            raise RuntimeError("provider_recovery_requires_separate_operator_exit")
         try:
             state = json.loads(self.state_file.read_text(encoding="utf-8"))
             return state if isinstance(state, dict) else {}

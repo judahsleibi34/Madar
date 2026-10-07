@@ -465,6 +465,10 @@ def get_authenticated_user_row(
 
     if auth_user_email_is_verified(auth_user):
         provider_email = canonical_auth_email(auth_user)
+        from services.provider_recovery import require_existing_account
+        require_existing_account(user_data,
+            active=effective_account_status(user_data) == ACTIVE_ACCOUNT_STATUS,
+            email_matches=not provider_email or normalize_email(user_data.get("email")) == provider_email)
         if (
             effective_account_status(user_data) != ACTIVE_ACCOUNT_STATUS
             or (
@@ -486,7 +490,8 @@ def get_authenticated_user_row(
             },
         )
 
-    if normalize_user_type(user_data.get("user_type")) == "admin":
+    from services.provider_recovery import enabled as recovery_enabled
+    if not recovery_enabled() and normalize_user_type(user_data.get("user_type")) == "admin":
         try:
             from services.admin_account_access_service import resolve_admin_account_access_user
 

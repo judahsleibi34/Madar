@@ -195,6 +195,10 @@ def require_normal_user(request: Request, response: Response):
 ALLOWED_CSRF_ORIGINS = get_allowed_origins(FRONTEND_URLS)
 
 
+from services.provider_recovery import RecoveryMiddleware
+app.add_middleware(RecoveryMiddleware)
+
+
 @app.middleware("http")
 async def csrf_origin_middleware(request: Request, call_next):
     blocked_response = validate_cookie_write_origin(request, ALLOWED_CSRF_ORIGINS)
@@ -342,6 +346,11 @@ def _legacy_asset_visibility(*, tenant_id: int, storage_key: str, request: Reque
 
 
 def _asset_visibility(*, tenant_id: int, storage_key: str, request: Request, response: Response) -> tuple[bool, bool]:
+    from services.provider_recovery import enabled as recovery_enabled
+    if recovery_enabled():
+        # Reuse the complete schema115 authorization path without invoking
+        # a POST RPC through the provider write fence.
+        return _legacy_asset_visibility(tenant_id=tenant_id, storage_key=storage_key, request=request, response=response)
     try:
         result = service_supabase.rpc(
             "get_managed_asset_visibility_context",

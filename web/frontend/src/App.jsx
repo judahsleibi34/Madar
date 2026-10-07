@@ -6,6 +6,7 @@ import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
 import CommerceActionToast from "./components/DashboardBuilder/CommerceActionToast";
+import RecoveryBanner from "./components/common/RecoveryBanner";
 import ScrollToTop from "./components/DashboardBuilder/ScrollToTop";
 import EcommerceRouteSkeleton from "./components/DashboardBuilder/EcommerceRouteSkeleton";
 import PageSkeleton from "./components/common/PageSkeleton";
@@ -754,6 +755,7 @@ export default function App() {
 
   return (
     <>
+      <RecoveryBanner />
       <ScrollToTop />
       <CommerceActionToast />
       <RouteSuspense fallback={routeFallback} lang={lang} variant="public-page" delay={isTenantSiteRoute || isEcommerceRoute ? 0 : undefined}>

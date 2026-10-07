@@ -66,6 +66,8 @@ def run_batch(*, worker_id: str, batch_size: int) -> int:
 
 
 def main() -> int:
+    from services.provider_recovery import prohibit_worker_start
+    prohibit_worker_start()
     configure_structured_logging()
     if os.getenv("DATA_DELETION_WORKER_ENABLED", "false").strip().lower() not in {"1", "true", "yes", "on"}:
         logger.info("deletion.worker_disabled")

@@ -2135,6 +2135,8 @@ def main() -> int:
     load_production_path_contract()
     repo = Path(os.environ["MADAR_PRODUCTION_REPO"]).resolve()
     state_root = Path(os.environ["MADAR_DEPLOY_STATE_ROOT"]).resolve()
+    from deployment.lib.provider_recovery import reject_ordinary_operation
+    reject_ordinary_operation(state_root)
     env_file = Path(os.environ["MADAR_ENV_FILE"]).resolve()
     if args.refresh_active_workers or args.refresh_active_runtime:
         load_active_runtime_environment(env_file)

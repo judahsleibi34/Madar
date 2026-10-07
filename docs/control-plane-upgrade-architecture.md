@@ -404,3 +404,13 @@ reviewed file before loading the gateway overlay. Existing API callbacks,
 upstreams, port bindings and routing headers are unchanged. No live proxy was
 reloaded. This protected proxy source still needs governed installation approval;
 edge logging policies remain an operator gate.
+
+## Provider402 restricted recovery contract
+
+See [provider402 sign-in recovery](provider402-signin-recovery.md). This source
+adds an explicitly scoped transaction contract and application fence; it does
+not authorize installation or activation. Normal readiness gates remain
+unchanged. The separate durable recovery state rejects ordinary release and
+migration ownership, and local runtime rollback must preserve current Auth
+sessions. A protected production adapter and exact-image rehearsal are
+required before activation review.
