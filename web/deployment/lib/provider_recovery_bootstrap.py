@@ -292,6 +292,41 @@ class ProductionBootstrapOperations:
     def quiesce_normal_automation(self):
         # Explicit separate upgrade, not the ordinary quiesce method which
         # issues a release credential. Never auto-resume on failure/recovery.
+        from deployment.lib.control_plane_upgrade import BACKUP_TIMERS, validate_backup_timer_states
+        if os.geteuid() != 0:
+            raise RuntimeError("recovery_root_bootstrap_required")
+        pending = json.loads(protected(self.runtime / "in-progress.json").read_text())
+        if pending != installation_interlock(self.recovery.contract):
+            raise RuntimeError("recovery_installation_interlock_invalid")
+        if (self.runtime / "authorized.credential").exists():
+            raise RuntimeError("recovery_existing_authorization_requires_operator_review")
+        services = tuple(name.replace(".timer", ".service") for name in BACKUP_TIMERS)
+        # A scheduled timer may be stopped; a running backup must complete.
+        # Inspect the complete set before making any automation changes.
+        for unit in services:
+            if self.system.systemctl_state(unit)["active"] not in ("inactive", "failed"):
+                raise RuntimeError("recovery_backup_operation_running")
+        timers = validate_backup_timer_states({
+            name: self.system.systemctl_state(name) for name in BACKUP_TIMERS
+        })
+        snapshot = self.receipt.parent / "installation-automation.json"
+        if snapshot.exists() or snapshot.is_symlink():
+            raise RuntimeError("recovery_installation_automation_snapshot_exists")
+        atomic_json(snapshot, {"contract_digest": digest(self.recovery.contract.__dict__),
+            "source": self.recovery.contract.sha, "backup_timer_states": timers,
+            "automatic_resumption_authorized": False})
+        os.chmod(snapshot, 0o600)
+        descriptor = os.open(snapshot.parent, os.O_DIRECTORY)
+        try: os.fsync(descriptor)
+        finally: os.close(descriptor)
+        for unit in BACKUP_TIMERS:
+            self.recovery.command(["systemctl", "stop", unit])
+        for unit in BACKUP_TIMERS:
+            if self.system.systemctl_state(unit)["active"] != "inactive":
+                raise RuntimeError("recovery_backup_timer_not_quiesced")
+        for unit in services:
+            if self.system.systemctl_state(unit)["active"] not in ("inactive", "failed"):
+                raise RuntimeError("recovery_backup_operation_running")
         for unit in ("madar-auto-deploy.timer", "madar-auto-deploy.service"):
             self.recovery.command(["systemctl", "stop", unit])
         self.recovery.command(["systemctl", "mask", "--runtime", "madar-auto-deploy.timer", "madar-auto-deploy.service"])

@@ -33,6 +33,13 @@ forward-repair and schema-recovery protections are unchanged.
 
 ## A. Purpose and authority
 
+Provider402 installation requires backup operations to finish and all four
+backup timers to be stopped before controller apply. Trusted bootstrap records
+their original states in a root-private exact-contract snapshot and verifies
+quiescence. The pending installation interlock grants no runtime authority;
+normal upgrade credential issuance and installer backup checks are unchanged.
+Automation resumption remains a separate governed decision after recovery.
+
 This document is the maintained engineering specification of Madar's production
 release safety contract. A candidate is accepted only after the immutable
 release state machine records it as `known_good`; fetching or building a commit,

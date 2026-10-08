@@ -143,6 +143,13 @@ code-trust decision.
 
 ## Locks and one-time authorization
 
+The provider402 trusted installer also quiesces all four backup timers before
+installer apply. It first rejects running backup services and records the timer
+states in a private, exact-contract installation snapshot. It then stops and
+verifies the timers and rechecks backup services. This uses the credential-free
+pending installation interlock, never ordinary upgrade authorization, and does
+not cancel backups or automatically resume timers after failure or recovery.
+
 Provider402 installation consumes the immutable preparation record
 `provider402/rehearsal.json`: exact contract/source/images/schema115,
 non-migrating policy, provider402/provenance, checkpoint and private target

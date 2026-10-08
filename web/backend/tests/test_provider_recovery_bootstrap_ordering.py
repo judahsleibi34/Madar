@@ -79,6 +79,74 @@ class BootstrapOrderingTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError,'recovery_root_authorization_required'):
                 issue_authorization(self.contract,Path('/does-not-exist'))
 
+    def automation_operations(self, root):
+        operations, _ = self.legacy_operations(root)
+        (operations.runtime / 'in-progress.json').write_text(json.dumps(
+            installation_interlock(operations.recovery.contract)))
+        operations.system = Mock()
+        states = {name: {'active': 'active', 'enabled': 'enabled'} for name in BACKUP_TIMERS}
+        services = {name.replace('.timer', '.service'): {'active': 'inactive', 'enabled': 'static'}
+                    for name in BACKUP_TIMERS}
+        operations.system.systemctl_state.side_effect = lambda name: dict((states | services)[name])
+        def command(args):
+            if args[:2] == ['systemctl', 'stop'] and args[2] in states:
+                states[args[2]]['active'] = 'inactive'
+            return ''
+        operations.recovery.command.side_effect = command
+        return operations, states, services
+
+    def test_scheduled_backups_quiesce_without_issuing_release_authorization(self):
+        with tempfile.TemporaryDirectory() as temp, patch(
+                'deployment.lib.provider_recovery_bootstrap.protected', side_effect=lambda p, **kw: p), patch(
+                'deployment.lib.provider_recovery_bootstrap.os.geteuid', return_value=0):
+            operations, states, _ = self.automation_operations(Path(temp))
+            operations.quiesce_normal_automation()
+            saved = operations.receipt.parent / 'installation-automation.json'
+            snapshot = json.loads(saved.read_text())
+            self.assertEqual(snapshot['contract_digest'], digest(operations.recovery.contract.__dict__))
+            self.assertEqual(snapshot['backup_timer_states'], {
+                name: {'active': 'active', 'enabled': 'enabled'} for name in BACKUP_TIMERS})
+            self.assertFalse(snapshot['automatic_resumption_authorized'])
+            self.assertEqual(saved.stat().st_mode & 0o777, 0o600)
+            self.assertTrue(all(state['active'] == 'inactive' for state in states.values()))
+            operations.system.arm_interlock.assert_not_called()
+            self.assertFalse((operations.runtime / 'authorized.credential').exists())
+
+    @patch('deployment.lib.provider_recovery_bootstrap.os.geteuid', return_value=0)
+    def test_active_backup_rejects_before_any_quiesce(self, _root):
+        with tempfile.TemporaryDirectory() as temp, patch(
+                'deployment.lib.provider_recovery_bootstrap.protected', side_effect=lambda p, **kw: p):
+            operations, _, services = self.automation_operations(Path(temp))
+            services[next(iter(services))]['active'] = 'active'
+            with self.assertRaisesRegex(RuntimeError, 'backup_operation_running'):
+                operations.quiesce_normal_automation()
+            operations.recovery.command.assert_not_called()
+            self.assertFalse((operations.receipt.parent / 'installation-automation.json').exists())
+
+    @patch('deployment.lib.provider_recovery_bootstrap.os.geteuid', return_value=0)
+    def test_untrusted_or_changed_pending_interlock_cannot_quiesce(self, _root):
+        with tempfile.TemporaryDirectory() as temp, patch(
+                'deployment.lib.provider_recovery_bootstrap.protected', side_effect=lambda p, **kw: p):
+            operations, _, _ = self.automation_operations(Path(temp))
+            with patch('deployment.lib.provider_recovery_bootstrap.os.geteuid', return_value=1000):
+                with self.assertRaisesRegex(RuntimeError, 'root_bootstrap_required'):
+                    operations.quiesce_normal_automation()
+            (operations.runtime / 'in-progress.json').write_text('{}')
+            with self.assertRaisesRegex(RuntimeError, 'installation_interlock_invalid'):
+                operations.quiesce_normal_automation()
+            operations.recovery.command.assert_not_called()
+
+    @patch('deployment.lib.provider_recovery_bootstrap.os.geteuid', return_value=0)
+    def test_timer_stop_failure_prevents_installation_and_preserves_snapshot(self, _root):
+        with tempfile.TemporaryDirectory() as temp, patch(
+                'deployment.lib.provider_recovery_bootstrap.protected', side_effect=lambda p, **kw: p):
+            operations, _, _ = self.automation_operations(Path(temp))
+            operations.recovery.command.side_effect = lambda args: ''
+            with self.assertRaisesRegex(RuntimeError, 'backup_timer_not_quiesced'):
+                operations.quiesce_normal_automation()
+            self.assertTrue((operations.receipt.parent / 'installation-automation.json').exists())
+            self.assertFalse((operations.runtime / 'authorized.credential').exists())
+
     def test_witness_required_second_issuance_denied_and_contract_bound(self):
         with tempfile.TemporaryDirectory() as temp:
             root=Path(temp)
