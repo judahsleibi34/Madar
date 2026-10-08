@@ -216,6 +216,10 @@ class ProductionLocalTransitionOperations:
         directory.mkdir(mode=0o755, exist_ok=True)
         if directory.is_symlink() or directory.stat().st_uid != 0 or directory.stat().st_mode & 0o022:
             raise RuntimeError("local_transition_write_directory_untrusted")
+        # The root launcher deliberately uses umask 077. This non-secret,
+        # read-only-mounted directory must remain traversable by the backend
+        # UID; mkdir(mode=0755) alone would silently create mode 0700.
+        os.chmod(directory, 0o755)
         atomic_json(directory / "authority.json", {"version": 1, "schema": 115,
             "release_sha": contract.sha, "contract_digest": digest(asdict(contract)), "mode": mode})
         os.chmod(directory / "authority.json", 0o444)
