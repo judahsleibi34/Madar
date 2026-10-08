@@ -14,7 +14,8 @@ PREPARE = "PREPARE_AND_REHEARSE"
 AUTHORIZE = "AUTHORIZE_ACTIVATION"
 ACTIVATE = "ACTIVATE_RECOVERY"
 ACTIVATION_RECEIPT = Path("/var/lib/madar-control-plane/provider402/activation-authorization.json")
-ACTIVATION_REHEARSAL = Path("/var/lib/madar-control-plane/provider402/rehearsal.json")
+PREPARATION_REHEARSAL = Path("/var/lib/madar-control-plane/provider402/rehearsal.json")
+ACTIVATION_REHEARSAL = Path("/var/lib/madar-control-plane/provider402/completed-rehearsal.json")
 MANDATORY_GATES = frozenset({
     "human_auth", "invalid_password", "logout_relogin", "refresh_persistence",
     "accessible_mfa", "aal2", "tenant_isolation", "business_write_fence",
@@ -36,13 +37,13 @@ def sha256(value):
 def preparation_binding(contract: RecoveryContract, metadata: dict):
     contract.validate(metadata)
     fields = asdict(contract)
-    # Completed evidence cannot hash itself. The preparation identity binds
-    # all immutable inputs; the final contract additionally binds the report.
+    # Preparation evidence cannot hash itself. The preparation identity binds
+    # all immutable inputs; the contract additionally binds that frozen report.
     fields.pop("rehearsal_digest")
     return {"contract": fields, "schema_contract": metadata}
 
 
-def validate_completed_rehearsal(contract, metadata, report):
+def validate_preparation_rehearsal(contract, metadata, report):
     expected = sha256(preparation_binding(contract, metadata))
     if (report.get("format") != 2 or report.get("phase") != PREPARE
             or report.get("preparation_binding") != expected
@@ -54,11 +55,8 @@ def validate_completed_rehearsal(contract, metadata, report):
     if set(preconditions) != PRECONDITIONS or any(value != "PASS" for value in preconditions.values()):
         raise RuntimeError("recovery_preparation_evidence_incomplete")
     checks = report.get("checks", {})
-    if set(checks) != MANDATORY_GATES:
-        raise RuntimeError("recovery_activation_evidence_missing")
-    for name in sorted(MANDATORY_GATES):
-        if checks[name] != "PASS":
-            raise RuntimeError("recovery_activation_evidence_incomplete:" + name)
+    if set(checks) != MANDATORY_GATES or any(value not in {"PASS", "PENDING"} for value in checks.values()):
+        raise RuntimeError("recovery_preparation_gate_shape_invalid")
     origin = report.get("origin_evidence")
     if not isinstance(origin, dict):
         raise RuntimeError("recovery_provider_evidence_missing")
@@ -66,22 +64,44 @@ def validate_completed_rehearsal(contract, metadata, report):
     return sha256(origin)
 
 
-def require_completed_evidence(contract, metadata, report_path=ACTIVATION_REHEARSAL):
-    """Validate rehearsal inputs before installation; never authorize traffic."""
+def validate_completed_rehearsal(contract, metadata, report):
+    provider_digest = validate_preparation_rehearsal(contract, metadata, report)
+    checks = report.get("checks", {})
+    if set(checks) != MANDATORY_GATES:
+        raise RuntimeError("recovery_activation_evidence_missing")
+    for name in sorted(MANDATORY_GATES):
+        if checks[name] != "PASS":
+            raise RuntimeError("recovery_activation_evidence_incomplete:" + name)
+    human = report.get("human_evidence")
+    if (not isinstance(human, dict) or human.get("source_sha") != contract.sha
+            or human.get("images") != contract.images
+            or human.get("results") != {"existing_login": "PASS", "accessible_mfa_aal2": "PASS",
+                "tenant_dashboard_read": "PASS", "business_mutation_denied": "PASS"}):
+        raise RuntimeError("recovery_exact_image_human_evidence_missing")
+    return provider_digest
+
+
+def require_preparation_evidence(contract, metadata, report_path=PREPARATION_REHEARSAL):
+    """Immutable pre-human installation inputs; never authorize activation.
+
+    Completion is a separate root-protected record. Updating final human or
+    rollback evidence must not rewrite the contract/credential needed to
+    prepare the environment in which that evidence is obtained.
+    """
     from deployment.lib.provider_recovery_runtime import protected, file_digest
     report_path = protected(report_path, private=True)
     if file_digest(report_path) != contract.rehearsal_digest:
         raise RuntimeError("recovery_rehearsal_digest_changed")
     report = json.loads(report_path.read_text())
-    validate_completed_rehearsal(contract, metadata, report)
+    validate_preparation_rehearsal(contract, metadata, report)
     return report
 
 
 def authorize_activation(contract, metadata, report_path, receipt_path=ACTIVATION_RECEIPT):
     """Phase 2: issue a root-protected receipt after every required gate passes.
 
-    No caller option can waive a gate. Credential issuance is a separate final
-    step and must consume this receipt before accepting activation operations.
+    No caller option can waive a gate. The installed-controller credential is
+    required here; activation additionally consumes this completed receipt.
     """
     from deployment.lib.provider_recovery_runtime import protected, file_digest
     import os
@@ -89,8 +109,7 @@ def authorize_activation(contract, metadata, report_path, receipt_path=ACTIVATIO
         raise RuntimeError("recovery_root_authorization_required")
     report_path = protected(report_path, private=True)
     report_digest = file_digest(report_path)
-    if report_digest != contract.rehearsal_digest:
-        raise RuntimeError("recovery_rehearsal_digest_changed")
+    require_preparation_evidence(contract, metadata)
     report = json.loads(report_path.read_text())
     provider_digest = validate_completed_rehearsal(contract, metadata, report)
     if receipt_path.exists() or receipt_path.is_symlink():
@@ -100,6 +119,8 @@ def authorize_activation(contract, metadata, report_path, receipt_path=ACTIVATIO
     receipt = {"format": 2, "phase": AUTHORIZE, "contract_digest": sha256(asdict(contract)),
                "preparation_binding": sha256(preparation_binding(contract, metadata)),
                "schema": 115, "rehearsal_digest": report_digest,
+               "preparation_evidence_digest": contract.rehearsal_digest,
+               "human_evidence_digest": sha256(report["human_evidence"]),
                "provider_evidence_digest": provider_digest,
                "authorized_at": datetime.now(timezone.utc).isoformat()}
     atomic_json(receipt_path, receipt)
@@ -111,6 +132,7 @@ def require_activation_evidence(contract, metadata, receipt_path=ACTIVATION_RECE
                                 report_path=ACTIVATION_REHEARSAL):
     """Mandatory at every production mutation boundary, never a preparation flag."""
     from deployment.lib.provider_recovery_runtime import protected, file_digest
+    require_preparation_evidence(contract, metadata)
     receipt = json.loads(protected(receipt_path, private=True).read_text())
     report = json.loads(protected(report_path, private=True).read_text())
     provider_digest = validate_completed_rehearsal(contract, metadata, report)
@@ -118,8 +140,9 @@ def require_activation_evidence(contract, metadata, receipt_path=ACTIVATION_RECE
             or receipt.get("contract_digest") != sha256(asdict(contract))
             or receipt.get("preparation_binding") != sha256(preparation_binding(contract, metadata))
             or receipt.get("schema") != 115
-            or receipt.get("rehearsal_digest") != contract.rehearsal_digest
-            or file_digest(report_path) != contract.rehearsal_digest
+            or receipt.get("preparation_evidence_digest") != contract.rehearsal_digest
+            or receipt.get("rehearsal_digest") != file_digest(report_path)
+            or receipt.get("human_evidence_digest") != sha256(report["human_evidence"])
             or receipt.get("provider_evidence_digest") != provider_digest):
         raise RuntimeError("recovery_activation_authorization_invalid")
     return receipt

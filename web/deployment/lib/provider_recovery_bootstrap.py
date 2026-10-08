@@ -43,11 +43,12 @@ def issue_authorization(contract: RecoveryContract, runtime: Path):
     """
     if os.geteuid() != 0:
         raise RuntimeError("recovery_root_authorization_required")
-    from deployment.lib.provider_recovery_phases import require_completed_evidence
-    # Installed-controller witness precedes issuance. This credential alone
-    # cannot activate traffic: Phase 2 and every Phase-3 guard remain required.
+    from deployment.lib.provider_recovery_phases import require_preparation_evidence
+    # Installed-controller witness and immutable preparation evidence precede
+    # issuance. This credential alone cannot activate traffic: completed
+    # exact-image human/rollback evidence and Phase 2 remain mandatory.
     metadata = json.loads(protected(runtime / "schema-contract.json").read_text())
-    require_completed_evidence(contract, metadata)
+    require_preparation_evidence(contract, metadata)
     protected(runtime / "contract.json", private=True)
     stored = json.loads((runtime / "contract.json").read_text())
     if stored != contract.__dict__:
@@ -81,7 +82,7 @@ class TrustedRecoveryBootstrap:
     """Installation ordering shared by the root launcher and fixture rehearsal.
 
     Installation methods must be the existing trusted staging/filesystem/backup
-    operations. Completed evidence and explicit root approval precede install;
+    operations. Preparation evidence and explicit root approval precede install;
     the credential is issued only after successful installation attestation.
     """
     def __init__(self, operations):
@@ -93,8 +94,8 @@ class TrustedRecoveryBootstrap:
         contract.validate(metadata)
         if approved_digest != digest(contract.__dict__):
             raise RuntimeError("recovery_operator_contract_digest_mismatch")
-        from deployment.lib.provider_recovery_phases import require_completed_evidence
-        require_completed_evidence(contract, metadata)
+        from deployment.lib.provider_recovery_phases import require_preparation_evidence
+        require_preparation_evidence(contract, metadata)
         with self.ops.upgrade_lock(), self.ops.deploy_lock():
             # No timer, worker, config or installation changes before these
             # independent fresh checks have completed.
@@ -104,7 +105,7 @@ class TrustedRecoveryBootstrap:
             candidate, backup = self.ops.stage_candidate(contract.sha)
             self.ops.static_preflight(candidate)
             self.ops.installer_dry_run(candidate, backup)
-            # Root exact-contract approval and completed evidence authorize
+            # Root exact-contract approval and preparation evidence authorize
             # installation only. No bearer credential exists at this boundary.
             self.ops.require_fresh_installation()
             self.ops.begin_installation(contract)

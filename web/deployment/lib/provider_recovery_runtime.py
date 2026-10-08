@@ -122,12 +122,12 @@ class ProductionRecoveryOperations:
     def __init__(self, paths: RecoveryPaths, contract: RecoveryContract, *, ports=None):
         self.paths, self.contract = paths, contract
         if paths == RecoveryPaths():
-            # Production adopts only the exact private runtimes whose human and
-            # rollback evidence was authorized, rather than rebuilding different
-            # configuration after the operator has tested them.
-            from deployment.lib.provider_recovery_phases import require_completed_evidence, preparation_binding, sha256
+            # Installation pins the exact prepared private runtimes. Runtime
+            # operations separately require completed exact-image human and
+            # rollback evidence through the mandatory Phase-2 receipt.
+            from deployment.lib.provider_recovery_phases import require_preparation_evidence, preparation_binding, sha256
             metadata = json.loads(protected(Path("/var/lib/madar-control-plane/provider402/schema-contract.json"), private=True).read_text())
-            require_completed_evidence(contract, metadata)
+            require_preparation_evidence(contract, metadata)
             binding = sha256(preparation_binding(contract, metadata))
             directory = Path("/var/lib/madar-control-plane/provider402/rehearsals") / binding
             paths = replace(paths, target_env=directory/"configuration.env",
@@ -219,8 +219,8 @@ class ProductionRecoveryOperations:
         return json.loads(protected(Path("/var/lib/madar-control-plane/provider402/schema-contract.json"), private=True).read_text())
 
     def rehearsal(self):
-        from deployment.lib.provider_recovery_phases import require_completed_evidence
-        require_completed_evidence(self.contract, self.metadata())
+        from deployment.lib.provider_recovery_phases import require_preparation_evidence
+        require_preparation_evidence(self.contract, self.metadata())
         return True
 
     def target_sql(self, sql):

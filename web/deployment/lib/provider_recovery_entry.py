@@ -31,10 +31,10 @@ def main():
     metadata = json.loads(protected(PACKET.parent / "schema-contract.json", private=True).read_text())
     contract.validate(metadata)
     if args.operation == "install":
-        # Fresh root installation consumes completed evidence, not a credential
+        # Fresh root installation consumes immutable preparation evidence, not a credential
         # that can only exist after the installed-controller attestation.
-        from deployment.lib.provider_recovery_phases import require_completed_evidence
-        require_completed_evidence(contract, metadata)
+        from deployment.lib.provider_recovery_phases import require_preparation_evidence
+        require_preparation_evidence(contract, metadata)
         operations = ProductionRecoveryOperations(paths, contract)
         TrustedRecoveryBootstrap(ProductionBootstrapOperations(operations)).install(
             contract, metadata, args.approved_contract)
@@ -51,8 +51,8 @@ def main():
     from deployment.lib.provider_recovery import require_provider_recovery_authorization
     require_provider_recovery_authorization(contract)
     if args.operation == "authorize-activation":
-        from deployment.lib.provider_recovery_phases import authorize_activation
-        authorize_activation(contract, metadata, paths.rehearsal)
+        from deployment.lib.provider_recovery_phases import authorize_activation, ACTIVATION_REHEARSAL
+        authorize_activation(contract, metadata, ACTIVATION_REHEARSAL)
         print("protected_recovery_activation_authorized")
         return
     operations = ProductionRecoveryOperations(paths, contract)

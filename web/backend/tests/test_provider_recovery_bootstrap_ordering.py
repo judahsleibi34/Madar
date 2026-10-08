@@ -42,7 +42,7 @@ class BootstrapOrderingTests(unittest.TestCase):
             def record_controller_transition(self, contract): calls.append('transition')
             def record_installation(self, contract): calls.append('witness')
             def issue_authorization(self, contract): calls.append('credential')
-        with patch('deployment.lib.provider_recovery_bootstrap.os.geteuid',return_value=0), patch('deployment.lib.provider_recovery_phases.require_completed_evidence'):
+        with patch('deployment.lib.provider_recovery_bootstrap.os.geteuid',return_value=0), patch('deployment.lib.provider_recovery_phases.require_preparation_evidence'):
             result=TrustedRecoveryBootstrap(Operations()).install(self.contract,self.metadata,digest(self.contract.__dict__))
         self.assertEqual(calls,['trusted','stage','static','dry-run','fresh-no-credential','install-interlock','quiesce','install','attest','transition','witness','credential'])
         self.assertFalse(result['activated'])
@@ -85,7 +85,7 @@ class BootstrapOrderingTests(unittest.TestCase):
             for name,value in [('contract.json',self.contract.__dict__),('schema-contract.json',self.metadata)]:
                 (root/name).write_text(json.dumps(value))
             witness={'contract_digest':digest(self.contract.__dict__),'source':self.contract.sha,'installed':True}
-            with patch('deployment.lib.provider_recovery_bootstrap.os.geteuid',return_value=0), patch('deployment.lib.provider_recovery_bootstrap.protected',side_effect=lambda p,**kw:p), patch('deployment.lib.provider_recovery_phases.require_completed_evidence'):
+            with patch('deployment.lib.provider_recovery_bootstrap.os.geteuid',return_value=0), patch('deployment.lib.provider_recovery_bootstrap.protected',side_effect=lambda p,**kw:p), patch('deployment.lib.provider_recovery_phases.require_preparation_evidence'):
                 with self.assertRaises(FileNotFoundError):issue_authorization(self.contract,root)
                 self.assertFalse((root/'authorized.credential').exists())
                 (root/'installation.json').write_text(json.dumps(witness))

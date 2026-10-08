@@ -9,6 +9,17 @@ Production installation, promotion and migration require separate approval.
 
 Last implementation review: 2026-10-05
 
+Provider402 preparation and activation use separate protected evidence records.
+Trusted root installation validates immutable preparation preconditions and
+issues its one-time credential only after attestation/witness; it grants no
+traffic or worker authority. Human/rollback evidence may be pending at that
+preparation boundary. Phase 2 requires the separate completed rehearsal with
+all mandatory gates PASS and human results for the exact SHA/image pair. Its
+receipt pins preparation, completed report and human-evidence digests, checked
+again at every Phase-3 boundary. Updating completion never rewrites or reissues
+the preparation credential. Normal deployment, schema/forward repair and
+migration protections remain unchanged.
+
 Provider402 bootstrap may replace a credential-free legacy normal-upgrade
 `quiesced` interlock only through its trusted installation transaction. The
 exact old record is bound into the approved recovery contract, must match the
@@ -1450,8 +1461,9 @@ rollback and failure injections. A root-protected receipt binds the exact source
 image IDs, schema contract, checkpoint, provider402 evidence, production
 fingerprints and completed rehearsal digest. Changing an input invalidates it.
 
-`ACTIVATE_RECOVERY`, controller installation, credential issuance and production
-traffic changes independently require that completed receipt. No fixture switch,
+`ACTIVATE_RECOVERY` and production traffic changes independently require that
+completed receipt. Installation and credential issuance require immutable
+preparation evidence and trusted root attestation. No fixture switch,
 environment flag or Phase-1 receipt waives it. Normal deployment, schema recovery,
 forward repair and migration checks remain unchanged. Recovery rollback changes
 only runtimes using the current local provider; it never restores a checkpoint
@@ -1470,7 +1482,7 @@ invocations use that repository. A staging directory can never be selected as
 an installation backup, and an existing backup destination is rejected.
 
 Initial installation is a root-only operation from trusted protected source,
-bound to the complete exact contract and completed rehearsal record. It retains
+bound to the complete exact contract and immutable preparation record. It retains
 the canonical current-origin/main resolver, staging, static preflight, installer
 dry run, checkpoint/provenance validation and production locks. It does not
 require a bearer credential before the installer can issue one. Installation

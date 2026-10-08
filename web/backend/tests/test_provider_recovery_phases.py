@@ -13,6 +13,7 @@ sys.path.insert(0,str(WEB_ROOT))
 from deployment.lib.provider_recovery import ProviderRecoveryTransaction
 from deployment.lib.provider_recovery_phases import (PREPARE, AUTHORIZE, MANDATORY_GATES, PRECONDITIONS,
     preparation_binding, sha256, validate_completed_rehearsal, PreparationTransaction, require_activation_evidence)
+from deployment.lib.provider_recovery_phases import validate_preparation_rehearsal, require_preparation_evidence, authorize_activation
 from deployment.lib.provider_recovery_preparation import PrivatePreparationOperations
 import test_provider_recovery_controller as fixtures
 
@@ -23,7 +24,54 @@ class PhaseTests(unittest.TestCase):
         self.report={'format':2,'phase':PREPARE,'schema':115,'production_modified':False,'migrations_executed':False,
             'preparation_binding':sha256(preparation_binding(self.contract,self.metadata)),
             'origin_evidence':self.origin,'preconditions':{key:'PASS' for key in PRECONDITIONS},
-            'checks':{key:'PASS' for key in MANDATORY_GATES}}
+            'checks':{key:'PASS' for key in MANDATORY_GATES},
+            'human_evidence':{'source_sha':self.contract.sha,'images':self.contract.images,
+                'results':{'existing_login':'PASS','accessible_mfa_aal2':'PASS',
+                    'tenant_dashboard_read':'PASS','business_mutation_denied':'PASS'}}}
+
+    def test_pending_preparation_can_install_but_never_activate(self):
+        report=copy.deepcopy(self.report)
+        report['checks']={key:'PENDING' for key in MANDATORY_GATES}
+        report.pop('human_evidence')
+        validate_preparation_rehearsal(self.contract,self.metadata,report)
+        with self.assertRaisesRegex(RuntimeError,'recovery_activation_evidence_incomplete'):
+            validate_completed_rehearsal(self.contract,self.metadata,report)
+        report['preconditions']['valid_checkpoint']='PENDING'
+        with self.assertRaisesRegex(RuntimeError,'preparation_evidence_incomplete'):
+            validate_preparation_rehearsal(self.contract,self.metadata,report)
+
+    def test_completion_does_not_rewrite_preparation_contract_or_credential(self):
+        import hashlib
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);prepared=copy.deepcopy(self.report)
+            prepared['checks']={key:'PENDING' for key in MANDATORY_GATES};prepared.pop('human_evidence')
+            preparation=root/'prepared.json';preparation.write_text(json.dumps(prepared))
+            contract=replace(self.contract,rehearsal_digest=hashlib.sha256(preparation.read_bytes()).hexdigest())
+            completed=root/'completed.json';completed.write_text(json.dumps(self.report))
+            receipt=root/'receipt.json'
+            with patch('deployment.lib.provider_recovery_runtime.protected',side_effect=lambda p,**kw:p), patch(
+                    'deployment.lib.provider_recovery_phases.require_preparation_evidence',
+                    side_effect=lambda c,m: require_preparation_evidence(c,m,preparation)), patch(
+                    'deployment.lib.provider_recovery.require_provider_recovery_authorization'), patch(
+                    'os.geteuid',return_value=0):
+                issued=authorize_activation(contract,self.metadata,completed,receipt)
+                self.assertEqual(issued['preparation_evidence_digest'],contract.rehearsal_digest)
+                self.assertEqual(issued['rehearsal_digest'],hashlib.sha256(completed.read_bytes()).hexdigest())
+                self.assertEqual(issued['human_evidence_digest'],sha256(self.report['human_evidence']))
+                require_activation_evidence(contract,self.metadata,receipt,completed)
+                completed.write_bytes(completed.read_bytes()+b' ')
+                with self.assertRaisesRegex(RuntimeError,'activation_authorization_invalid'):
+                    require_activation_evidence(contract,self.metadata,receipt,completed)
+                completed.write_text(json.dumps(self.report))
+                preparation.write_bytes(preparation.read_bytes()+b' ')
+                with self.assertRaisesRegex(RuntimeError,'rehearsal_digest_changed'):
+                    require_activation_evidence(contract,self.metadata,receipt,completed)
+
+    def test_historical_human_images_cannot_authorize_current_images(self):
+        for changed in ({'source_sha':'9'*40},{'images':{**self.contract.images,'backend':'sha256:'+'9'*64}}):
+            report=copy.deepcopy(self.report);report['human_evidence'].update(changed)
+            with self.subTest(changed=changed),self.assertRaisesRegex(RuntimeError,'exact_image_human_evidence_missing'):
+                validate_completed_rehearsal(self.contract,self.metadata,report)
 
     def test_preparation_does_not_need_human_or_rollback(self):
         test=self

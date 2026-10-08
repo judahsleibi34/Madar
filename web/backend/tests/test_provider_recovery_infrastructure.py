@@ -102,7 +102,7 @@ class InfrastructureTests(unittest.TestCase):
             bootstrap.install(self.contract, self.metadata, digest(self.contract.__dict__))
         self.assertNotIn("quiesce", ops.calls)
         ops.calls.clear()
-        with patch("deployment.lib.provider_recovery_phases.require_completed_evidence"), patch("deployment.lib.provider_recovery_bootstrap.os.geteuid", return_value=0):
+        with patch("deployment.lib.provider_recovery_phases.require_preparation_evidence"), patch("deployment.lib.provider_recovery_bootstrap.os.geteuid", return_value=0):
             result = bootstrap.install(self.contract, self.metadata, digest(self.contract.__dict__))
         self.assertEqual(ops.calls, ["trusted", "stage", "preflight", "dry_run", "fresh", "install-interlock", "quiesce", "install", "verify_installed", "receipt", "installed_witness", "authorization"])
         self.assertFalse(result["activated"])
