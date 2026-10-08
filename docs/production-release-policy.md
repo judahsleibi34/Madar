@@ -54,7 +54,16 @@ Provider byte backup accepts plaintext HTTP only at the exact host-loopback
 gateway `127.0.0.1:18000`, paired with the reviewed local session endpoint
 `127.0.0.1:15432`, project-scoped PostgreSQL user and explicit local SSL policy.
 Transaction pooling and arbitrary plaintext provider destinations are rejected.
-Hosted provider backups retain their HTTPS requirement.
+Hosted provider backups retain their HTTPS requirement. Governed production
+handoff uses direct native PostgreSQL (`supabase-db:5432`, role `postgres`), never
+either pooler. Each scheduled job resolves the healthy, unpublished native DB's
+private IPv4 address from its fixed Docker service and canonical stack directory;
+the address is confined to the child libpq environment and is never persisted.
+Wrong service identity, public bindings, unhealthy DB, ambiguous networks or
+non-private addressing fail closed. Existing hosted backup configuration remains
+unchanged until the exact-bound normal-local finalization publishes its pre-image
+and the six reviewed database fields. The session-route allowance above remains
+only for previously reviewed isolated captures, not scheduled local production.
 
 The governed provider402 traffic switch enforces canonical query/referrer-safe
 proxy logging before serving recovery authentication, including runtime-only

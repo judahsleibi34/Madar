@@ -30,9 +30,9 @@ class NativeBackupConfigurationTests(unittest.TestCase):
             path = Path(directory) / 'backup.env'; path.write_text(body); path.chmod(0o600)
             values = {}; load_environment_file(path, environ=values)
         self.assertEqual(values['PGPASSWORD'], native['POSTGRES_PASSWORD'])
-        self.assertEqual(values['PGUSER'], 'postgres.fixture')
-        self.assertEqual(values['PGHOST'], '127.0.0.1')
-        self.assertEqual(values['PGPORT'], '15432')
+        self.assertEqual(values['PGUSER'], 'postgres')
+        self.assertEqual(values['PGHOST'], 'supabase-db')
+        self.assertEqual(values['PGPORT'], '5432')
         self.assertEqual(values['PGSSLMODE'], 'disable')
 
     def test_invalid_native_inputs_cannot_be_published(self):
@@ -90,6 +90,34 @@ class CallbackProxyConfigurationTests(unittest.TestCase):
 
 
 class ScheduledBackupTransportTests(unittest.TestCase):
+    def test_direct_resolver_rejects_wrong_identity_and_unsafe_networks(self):
+        spec = importlib.util.spec_from_file_location('backup_support_direct', WEB / 'scripts/backup_support.py')
+        module = importlib.util.module_from_spec(spec); spec.loader.exec_module(module)
+        good = {'running': True, 'health': 'healthy', 'service': 'db',
+                'directory': '/opt/madar/local-supabase', 'publications': {},
+                'networks': {'native': {'IPAddress': '172.19.0.2'}}}
+        from subprocess import CompletedProcess
+        with patch.object(module.subprocess, 'run', return_value=CompletedProcess([], 0, json.dumps(good))):
+            self.assertEqual(module.direct_local_database_address(), '172.19.0.2')
+        for change in ({'running': False}, {'health': 'unhealthy'}, {'service': 'pooler'},
+                       {'directory': '/other'}, {'publications': {'5432/tcp': [{}]}},
+                       {'networks': {}}, {'networks': {'a': {}, 'b': {}}},
+                       *({'networks': {'native': {'IPAddress': address}}}
+                         for address in ('8.8.8.8', '127.0.0.1', '0.0.0.0', '169.254.1.2', '::1'))):
+            with self.subTest(changed_fields=sorted(change)), patch.object(module.subprocess, 'run',
+                    return_value=CompletedProcess([], 0, json.dumps({**good, **change}))):
+                with self.assertRaisesRegex(module.BackupError, 'direct_database_unavailable'):
+                    module.direct_local_database_address()
+
+    def test_scheduled_local_backup_rejects_both_poolers(self):
+        spec = importlib.util.spec_from_file_location('backup_support_poolers', WEB / 'scripts/backup_support.py')
+        module = importlib.util.module_from_spec(spec); spec.loader.exec_module(module)
+        for port in ('15432', '16543'):
+            with patch.dict(os.environ, {'PGHOST': 'supabase-db', 'PGPORT': port,
+                'PGUSER': 'postgres', 'PGDATABASE': 'postgres', 'PGSSLMODE': 'disable'}, clear=True):
+                self.assertFalse(module.direct_local_database_shape())
+
+
     def test_exact_internal_alias_uses_loopback_and_requires_matching_local_database(self):
         spec = importlib.util.spec_from_file_location('backup_support_local_transport', WEB / 'scripts/backup_support.py')
         module = importlib.util.module_from_spec(spec); spec.loader.exec_module(module)
@@ -98,14 +126,15 @@ class ScheduledBackupTransportTests(unittest.TestCase):
             (root / 'production.env').write_text('SUPABASE_URL=http://madar-supabase:8000\nSUPABASE_SERVICE_KEY=synthetic-fixture-placeholder\n')
             (root / 'state.json').write_text(json.dumps({'known_good_release':{'sha':'a'*40}}))
             env = {'CREDENTIALS_DIRECTORY':str(root),'MADAR_DEPLOY_STATE_ROOT':str(root),
-                   'PGHOST':'127.0.0.1','PGPORT':'15432','PGUSER':'postgres.fixture','PGDATABASE':'postgres'}
+                   'PGHOST':'supabase-db','PGPORT':'5432','PGUSER':'postgres','PGDATABASE':'postgres','PGSSLMODE':'disable'}
             class Response:
                 def __enter__(self): return self
                 def __exit__(self,*_): return False
                 def read(self): return json.dumps({'release_sha':'a'*40,'build_timestamp':'fixture'}).encode()
-            with patch.dict(os.environ,env,clear=True), patch.object(module.urllib.request,'urlopen',return_value=Response()), patch.object(module.os,'execve') as execute:
+            with patch.dict(os.environ,env,clear=True), patch.object(module.urllib.request,'urlopen',return_value=Response()), patch.object(module.os,'execve') as execute, patch.object(module,'direct_local_database_address',return_value='172.19.0.2'):
                 module.scheduled(Path('/fixture/backup_madar.sh'))
                 self.assertEqual(execute.call_args.args[2]['SUPABASE_URL'],'http://127.0.0.1:18000')
+                self.assertEqual(execute.call_args.args[2]['PGHOSTADDR'],'172.19.0.2')
                 os.environ['PGHOST']='hosted.invalid'
                 execute.reset_mock()
                 with self.assertRaisesRegex(module.BackupError,'database_configuration_mismatch'):

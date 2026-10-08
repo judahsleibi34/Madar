@@ -23,7 +23,7 @@ def native_backup_changes(native):
     if (not password or not isinstance(password, str) or '\n' in password or '\r' in password
             or not isinstance(tenant, str) or not re.fullmatch(r'[A-Za-z0-9_-]{1,128}', tenant)):
         raise RuntimeError('local_backup_native_configuration_invalid')
-    return {'PGHOST': '127.0.0.1', 'PGPORT': '15432', 'PGUSER': 'postgres.' + tenant,
+    return {'PGHOST': 'supabase-db', 'PGPORT': '5432', 'PGUSER': 'postgres',
             'PGPASSWORD': password, 'PGDATABASE': 'postgres', 'PGSSLMODE': 'disable'}
 
 

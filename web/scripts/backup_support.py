@@ -10,6 +10,7 @@ import argparse
 import ast
 from datetime import datetime, timezone
 import hashlib
+import ipaddress
 import json
 import os
 from pathlib import Path, PurePosixPath
@@ -298,6 +299,37 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
         raise BackupError('provider_redirect_rejected')
 
 
+def direct_local_database_address() -> str:
+    """Resolve only the healthy native DB; never persist a Docker bridge address."""
+    shape = ('{"running":{{json .State.Running}},"health":{{json .State.Health.Status}},'
+             '"service":{{json (index .Config.Labels "com.docker.compose.service")}},'
+             '"directory":{{json (index .Config.Labels "com.docker.compose.project.working_dir")}},'
+             '"publications":{{json .HostConfig.PortBindings}},'
+             '"networks":{{json .NetworkSettings.Networks}}}')
+    try:
+        result = subprocess.run(['docker', 'inspect', '--format', shape, 'supabase-db'],
+                                capture_output=True, text=True, timeout=10, check=True)
+        value = json.loads(result.stdout)
+        networks = value['networks']
+        if (value['running'] is not True or value['health'] != 'healthy'
+                or value['service'] != 'db' or value['directory'] != '/opt/madar/local-supabase'
+                or value['publications'] or len(networks) != 1):
+            raise ValueError('identity')
+        address = ipaddress.ip_address(next(iter(networks.values()))['IPAddress'])
+        if (address.version != 4 or not address.is_private or address.is_loopback
+                or address.is_link_local or address.is_unspecified or address.is_multicast):
+            raise ValueError('address')
+        return str(address)
+    except (OSError, subprocess.SubprocessError, ValueError, KeyError, TypeError, StopIteration):
+        raise BackupError('local_backup_direct_database_unavailable') from None
+
+
+def direct_local_database_shape() -> bool:
+    return all(os.environ.get(key) == value for key, value in {
+        'PGHOST': 'supabase-db', 'PGPORT': '5432', 'PGUSER': 'postgres',
+        'PGDATABASE': 'postgres', 'PGSSLMODE': 'disable'}.items())
+
+
 def provider_snapshot(root: Path, backup_id: str) -> None:
     base = os.environ.get('SUPABASE_URL', '').rstrip('/')
     parsed = urlsplit(base)
@@ -308,6 +340,9 @@ def provider_snapshot(root: Path, backup_id: str) -> None:
              and os.environ.get('PGDATABASE') == 'postgres'
              and os.environ.get('PGSSLMODE') == 'disable'
              and re.fullmatch(r'postgres\.[A-Za-z0-9_-]{1,128}', os.environ.get('PGUSER', '')))
+    if (base == 'http://127.0.0.1:18000' and direct_local_database_shape()
+            and os.environ.get('PGHOSTADDR') == direct_local_database_address()):
+        local = True
     if ((parsed.scheme != 'https' and not local) or not parsed.hostname or parsed.username or parsed.password
             or parsed.query or parsed.fragment or parsed.path or not key):
         raise BackupError('provider_configuration_invalid')
@@ -417,10 +452,9 @@ def scheduled(script: Path) -> None:
     # other provider endpoints are never rewritten.
     if found['SUPABASE_URL'] == 'http://madar-supabase:8000':
         found['SUPABASE_URL'] = 'http://127.0.0.1:18000'
-        if (os.environ.get('PGHOST') != '127.0.0.1' or os.environ.get('PGPORT') != '15432'
-                or not os.environ.get('PGUSER', '').startswith('postgres.')
-                or os.environ.get('PGDATABASE') != 'postgres'):
+        if not direct_local_database_shape():
             raise BackupError('local_backup_database_configuration_mismatch')
+        found['PGHOSTADDR'] = direct_local_database_address()
     env = dict(os.environ, **found, MADAR_RELEASE_SHA=release['sha'],
                MADAR_BUILD_TIMESTAMP=live['build_timestamp'], MADAR_PROVIDER_BACKUP_REQUIRED='true')
     os.execve('/bin/bash', ['bash', str(script)], env)
