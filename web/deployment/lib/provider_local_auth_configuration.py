@@ -39,12 +39,13 @@ def configuration_changes(values):
 
 
 def validate_preparation_evidence(contract, report):
-    from deployment.lib.provider_local_transition import validate_evidence
+    from deployment.lib.provider_local_transition import validate_evidence, required_gates
     # Only this bounded preparation step admits SMTP PENDING. It cannot issue
     # the normal authorization receipt or call any normal runtime operation.
     gates = report.get("gates", {})
-    if set(gates) != GATES or gates.get("auth_smtp") != "PENDING" or any(
-            gates[key] != "PASS" for key in GATES - {"auth_smtp"}):
+    required = required_gates(report)
+    if set(gates) != required or gates.get("auth_smtp") != "PENDING" or any(
+            gates[key] != "PASS" for key in required - {"auth_smtp"}):
         raise RuntimeError("local_auth_preparation_gate_incomplete")
     from dataclasses import replace
     ready = {**report, "gates": {**gates, "auth_smtp": "PASS"}}

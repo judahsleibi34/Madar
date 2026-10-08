@@ -57,6 +57,16 @@ class LocalTransitionContract:
             raise RuntimeError("local_transition_fingerprint_binding_invalid")
 
 
+def required_gates(report):
+    from deployment.lib.provider_recovery_phases import EMERGENCY_MODE
+    mode = report.get("acceptance_mode", "human")
+    if mode == "human":
+        return GATES
+    if mode == EMERGENCY_MODE:
+        return (GATES - {"human_auth"}) | {"automated_auth"}
+    raise RuntimeError("local_transition_unknown_acceptance_mode")
+
+
 def validate_evidence(contract, report):
     if (digest(report) != contract.evidence_digest or report.get("schema") != 115
             or report.get("source_sha") != contract.sha or report.get("images") != contract.images
@@ -69,9 +79,7 @@ def validate_evidence(contract, report):
         raise RuntimeError("local_transition_evidence_binding_invalid")
     from deployment.lib.provider_recovery_phases import EMERGENCY_MODE
     mode = report.get("acceptance_mode", "human")
-    if mode not in {"human", EMERGENCY_MODE}:
-        raise RuntimeError("local_transition_unknown_acceptance_mode")
-    required = GATES if mode == "human" else (GATES - {"human_auth"}) | {"automated_auth"}
+    required = required_gates(report)
     if mode == EMERGENCY_MODE and not re.fullmatch(r"[0-9a-f]{64}", report.get("auth_acceptance_digest", "")):
         raise RuntimeError("local_transition_acceptance_binding_missing")
     gates = report.get("gates", {})

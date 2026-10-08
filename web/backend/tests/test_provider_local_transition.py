@@ -205,6 +205,24 @@ class LocalTransitionTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "evidence_changed"):
             validate_preparation_evidence(replace(contract, evidence_digest="f" * 64), report)
 
+    def test_emergency_smtp_preparation_preserves_all_other_gates(self):
+        from deployment.lib.provider_recovery_phases import EMERGENCY_MODE
+        report = copy.deepcopy(self.report)
+        report.update(acceptance_mode=EMERGENCY_MODE, auth_acceptance_digest="a"*64)
+        report["gates"].pop("human_auth")
+        report["gates"].update(automated_auth="PASS", auth_smtp="PENDING")
+        contract = replace(self.contract, evidence_digest=digest(report))
+        validate_preparation_evidence(contract, report)
+        with self.assertRaisesRegex(RuntimeError, "mandatory_gate_incomplete"):
+            validate_evidence(contract, report)
+        for gate in set(report["gates"])-{"auth_smtp"}:
+            altered = copy.deepcopy(report); altered["gates"][gate]="PENDING"
+            with self.subTest(gate=gate), self.assertRaises(RuntimeError):
+                validate_preparation_evidence(replace(contract, evidence_digest=digest(altered)), altered)
+        altered = copy.deepcopy(report); altered["acceptance_mode"]="skip"
+        with self.assertRaises(RuntimeError):
+            validate_preparation_evidence(replace(contract, evidence_digest=digest(altered)), altered)
+
     def test_auth_mail_configuration_is_gmail_starttls_and_exact_public_callbacks_only(self):
         values = {key: "synthetic-fixture" for key in SMTP_KEYS}
         values.update(SMTP_HOST="smtp.gmail.com", SMTP_PORT="587", SMTP_USER="fixture@example.invalid",

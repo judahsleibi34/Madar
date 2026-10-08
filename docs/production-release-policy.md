@@ -1610,3 +1610,7 @@ deployment, migration, provenance, worker, rollback and all other recovery gates
 remain unchanged. Historical human results remain historical evidence only.
 This policy does not authorize activation by itself; protected credentials and
 Phase-2 receipts remain mandatory.
+
+SMTP preparation consumes the same explicit acceptance-mode gate set as normal
+graduation. Only `auth_smtp` may be PENDING at this preparation boundary; all
+other emergency or default gates and their exact-bound evidence remain required.
