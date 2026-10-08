@@ -33,6 +33,14 @@ forward-repair and schema-recovery protections are unchanged.
 
 ## A. Purpose and authority
 
+The governed provider402 traffic switch enforces canonical query/referrer-safe
+proxy logging before serving recovery authentication, including runtime-only
+local rollback. Publication is part of traffic switching, not a pre-switch
+production mutation. It uses the installed proxy service and pinned image;
+failed publication follows the existing local-compatible rollback rule. SMTP
+configuration reuses the same guard. Normal deployment readiness and all
+recovery authorization, worker, schema and migration checks remain unchanged.
+
 Provider402 installation requires backup operations to finish and all four
 backup timers to be stopped before controller apply. Trusted bootstrap records
 their original states in a root-private exact-contract snapshot and verifies

@@ -23,14 +23,14 @@ def require_safe_proxy_source(config):
             raise RuntimeError('local_auth_proxy_callback_logging_unsafe')
 
 
-def ensure_callback_safe_proxy(ops, contract):
+def publish_callback_safe_proxy(ops, recovery, source_sha):
+    """Publish safe logs inside an already-authorized governed traffic change."""
     if os.geteuid() != 0:
         raise RuntimeError('local_auth_proxy_root_required')
-    recovery = ops.recovery
     path = protected(recovery.paths.controller / 'proxy/nginx.conf')
     expected = path.read_text().strip()
     canonical = ops.command(['git', '-C', str(recovery.paths.repository), 'show',
-                             contract.sha + ':web/deployment/proxy/nginx.conf']).strip()
+                             source_sha + ':web/deployment/proxy/nginx.conf']).strip()
     if expected != canonical:
         raise RuntimeError('local_auth_proxy_canonical_source_changed')
     require_safe_proxy_source(expected)
@@ -58,6 +58,7 @@ def ensure_callback_safe_proxy(ops, contract):
                  '--mount', 'type=bind,src=' + str(path) + ',dst=/etc/nginx/nginx.conf,readonly',
                  '--mount', 'type=bind,src=' + str(recovery.paths.upstream.parent) + ',dst=/etc/nginx/madar,readonly',
                  '--tmpfs', '/tmp:rw,noexec,nosuid,size=16m,uid=101,gid=101',
+                 '--tmpfs', '/var/cache/nginx:rw,noexec,nosuid,size=32m,uid=101,gid=101',
                  match[1], 'nginx', '-t'])
     # Use the installed, attested systemd/Compose service. Its pinned image,
     # loopback bindings and directory-mounted active upstream remain intact.
@@ -65,6 +66,11 @@ def ensure_callback_safe_proxy(ops, contract):
     active = ops.command(['docker', 'exec', recovery.paths.proxy, 'nginx', '-T'])
     if expected not in active:
         raise RuntimeError('local_auth_proxy_publication_failed')
+
+
+def ensure_callback_safe_proxy(ops, contract):
+    recovery = ops.recovery
+    publish_callback_safe_proxy(ops, recovery, contract.sha)
     state = recovery.paths.state / 'provider-recovery.json'
     import json
     recovery.smoke_recovery(recovery.contract, json.loads(state.read_text())['slot'])

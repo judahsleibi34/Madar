@@ -568,6 +568,10 @@ class ProductionRecoveryOperations:
             raise RuntimeError("recovery_stable_runtime_mismatch")
         self.trace.append("smoke:"+slot)
 
+    def prepare_proxy_publication(self):
+        from deployment.lib.provider_local_proxy_configuration import publish_callback_safe_proxy
+        publish_callback_safe_proxy(self, self, self.contract.sha)
+
     def switch(self,slot):
         self.authorize(self.contract)
         with runtime_mutation_lock(self.paths.state):
@@ -601,6 +605,12 @@ class ProductionRecoveryOperations:
             descriptor=os.open(path.parent,os.O_RDONLY | os.O_DIRECTORY)
             try: os.fsync(descriptor)
             finally: os.close(descriptor)
+            # Controller installation replaces the source inode, not an old
+            # running single-file bind. Publish redacted logging through the
+            # installed service before it can serve recovery Auth traffic.
+            # This is inside the governed switch/rollback boundary, after
+            # worker inhibition and private readiness, never before authorization.
+            self.prepare_proxy_publication()
             self.command(["docker","exec",self.paths.proxy,"nginx","-t"])
             self.command(["docker","exec",self.paths.proxy,"nginx","-s","reload"])
             self.smoke_recovery(self.contract,slot)

@@ -172,6 +172,14 @@ class PrivatePreparationOperations(ProductionRecoveryOperations):
             'sha':contract.sha,'slot':slot,'schema':115,'restore_database_on_rollback':False})
         self.require_all_workers_off()
 
+    def prepare_proxy_publication(self):
+        # This capability has only private scoped paths/resources and cannot
+        # restart the production service. Its proxy discards Docker logs;
+        # production always uses the canonical publication implementation.
+        self.require_isolated()
+        if self.inspect(self.paths.proxy)['HostConfig'].get('LogConfig', {}).get('Type') != 'none':
+            raise RuntimeError('recovery_private_proxy_logging_enabled')
+
     def save_preparation_report(self, report):
         self.require_isolated()
         path=self.paths.rehearsal

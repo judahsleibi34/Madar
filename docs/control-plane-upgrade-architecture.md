@@ -143,6 +143,14 @@ code-trust decision.
 
 ## Locks and one-time authorization
 
+Provider402 traffic switching publishes canonical callback-safe proxy logging
+before recovery Auth traffic is served. A running legacy single-file bind is
+recreated only through the installed, attested proxy service, after offline
+syntax validation and inside the authorized switch/rollback boundary. Private
+preparation cannot invoke that production service: its checked scoped proxy
+must discard Docker logs. No fixture flag or CLI parameter selects this behavior
+in production, and Phase-2 authorization remains mandatory.
+
 The provider402 trusted installer also quiesces all four backup timers before
 installer apply. It first rejects running backup services and records the timer
 states in a private, exact-contract installation snapshot. It then stops and
