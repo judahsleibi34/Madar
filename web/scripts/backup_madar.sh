@@ -41,7 +41,7 @@ paths=(
 
 if (( DRY_RUN )); then
   printf 'backup_path=%s\n' "$backup_path"
-  printf 'pg_dump --format=custom --no-owner --no-acl --file=%s/database.dump <libpq environment>\n' "$backup_path"
+  printf 'pg_dump --format=custom --file=%s/database.dump <libpq environment>\n' "$backup_path"
   for entry in "${paths[@]}"; do
     printf 'copy %s -> %s/files/%s\n' "${entry#*:}" "$backup_path" "${entry%%:*}"
   done
@@ -86,7 +86,15 @@ log "backup.start destination=$backup_path"
 if [[ "${MADAR_PROVIDER_BACKUP_REQUIRED:-false}" == true ]]; then
   python3 "$support" provider-before "$work_path"
 fi
-pg_dump --format=custom --no-owner --no-acl \
+# Preserve ownership and grants in the archive. Ordinary restore tooling still
+# selects its reviewed --no-owner/--no-acl policy; native coordinated recovery
+# needs the original managed-schema role permissions to restore exactly.
+dump_options=(--format=custom)
+if [[ -n "${MADAR_BACKUP_SNAPSHOT:-}" ]]; then
+  [[ "$MADAR_BACKUP_SNAPSHOT" =~ ^[0-9A-Fa-f]+-[0-9A-Fa-f]+-[0-9]+$ ]] || die "invalid exported snapshot"
+  dump_options+=("--snapshot=$MADAR_BACKUP_SNAPSHOT")
+fi
+pg_dump "${dump_options[@]}" \
   --file="$work_path/database.dump"
 pg_restore --list "$work_path/database.dump" >/dev/null
 

@@ -1,4 +1,5 @@
 import hashlib
+import json
 import importlib.util
 import os
 from pathlib import Path
@@ -15,6 +16,86 @@ spec = importlib.util.spec_from_file_location("rehearse_backup", REHEARSAL_PATH)
 rehearsal = importlib.util.module_from_spec(spec)
 assert spec.loader is not None
 spec.loader.exec_module(rehearsal)
+
+
+class CoordinatedCheckpointTests(unittest.TestCase):
+    def setUp(self):
+        spec = importlib.util.spec_from_file_location('coordinated_backup_support', ROOT/'scripts/backup_support.py')
+        self.backup = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(self.backup)
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name)
+        self.directory = self.root/'coordinated'
+        self.directory.mkdir(mode=0o700)
+        purposes = ['database_dump', 'roles', 'native_storage', 'native_configuration',
+                    'function_cache', 'managed_storage', 'production_configuration',
+                    'controller_state', 'images', 'schema_ledgers', 'auth_metadata',
+                    'independent_restore']
+        self.entries = []
+        for purpose in purposes:
+            path = self.directory/purpose
+            path.write_bytes(b'unit-test-only recovery artifact')
+            path.chmod(0o600)
+            self.entries.append({'purpose':purpose,'path':purpose,'size':path.stat().st_size,
+                                 'sha256':self.backup.digest(path)})
+        checks = ['schema115', 'all_public_tables', 'auth', 'mfa', 'foreign_keys',
+                  'storage_metadata', 'storage_bytes', 'storage_xattrs', 'asset_delivery',
+                  'tenant_isolation', 'runtime_readiness', 'no_migrations', 'no_workers',
+                  'no_email', 'private_topology']
+        self.proof = {'checks':dict.fromkeys(checks, True),
+                      'database_dump_sha256':self.entries[0]['sha256']}
+        self.write_proof()
+        self.manifest = {'schema':115,'restore_verified':True,'files':self.entries}
+        self.write_manifest()
+
+    def write_manifest(self):
+        path = self.directory/'manifest.json'
+        path.write_text(json.dumps(self.manifest))
+        path.chmod(0o600)
+
+    def write_proof(self):
+        path = self.directory/'independent_restore'
+        path.write_text(json.dumps(self.proof))
+        entry = next(x for x in self.entries if x['purpose']=='independent_restore')
+        entry.update(size=path.stat().st_size, sha256=self.backup.digest(path))
+
+    def test_complete_bound_private_checkpoint(self):
+        self.backup.verify_coordinated_checkpoint(self.root)
+
+    def test_corrupt_native_storage_rejected(self):
+        (self.directory/'native_storage').write_bytes(b'changed')
+        with self.assertRaisesRegex(self.backup.BackupError,'integrity_failed'):
+            self.backup.verify_coordinated_checkpoint(self.root)
+
+    def test_missing_configuration_rejected(self):
+        self.manifest['files'] = [e for e in self.entries if e['purpose']!='native_configuration']
+        self.write_manifest()
+        with self.assertRaisesRegex(self.backup.BackupError,'incomplete'):
+            self.backup.verify_coordinated_checkpoint(self.root)
+
+    def test_changed_dump_invalidates_restore_proof(self):
+        self.proof['database_dump_sha256'] = '0'*64
+        self.write_proof(); self.write_manifest()
+        with self.assertRaisesRegex(self.backup.BackupError,'restore_proof_invalid'):
+            self.backup.verify_coordinated_checkpoint(self.root)
+
+    def test_failed_runtime_or_unverified_restore_rejected(self):
+        self.proof['checks']['runtime_readiness'] = False
+        self.write_proof(); self.write_manifest()
+        with self.assertRaisesRegex(self.backup.BackupError,'restore_proof_invalid'):
+            self.backup.verify_coordinated_checkpoint(self.root)
+        self.manifest['restore_verified'] = False; self.write_manifest()
+        with self.assertRaisesRegex(self.backup.BackupError,'restore_unverified'):
+            self.backup.verify_coordinated_checkpoint(self.root)
+
+    def test_public_escrow_and_path_escape_rejected(self):
+        (self.directory/'native_configuration').chmod(0o644)
+        with self.assertRaisesRegex(self.backup.BackupError,'integrity_failed'):
+            self.backup.verify_coordinated_checkpoint(self.root)
+        self.entries[3]['path']='../native_configuration'; self.write_manifest()
+        with self.assertRaisesRegex(self.backup.BackupError,'path_invalid'):
+            self.backup.verify_coordinated_checkpoint(self.root)
 
 
 class BackupToolingTests(unittest.TestCase):
@@ -97,6 +178,38 @@ class BackupToolingTests(unittest.TestCase):
         result = self.run_script("backup_madar.sh", "--dry-run")
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("MADAR_BACKUP_DIR", result.stderr)
+
+    def test_exported_snapshot_preserves_archive_ownership_and_acl(self):
+        with tempfile.TemporaryDirectory() as root:
+            env = self.backup_environment(root)
+            env["PATH"] = self.fake_postgres_tools(root)
+            env["MADAR_BACKUP_SNAPSHOT"] = "00000001-00000002-1"
+            arguments = Path(root) / "dump-arguments"
+            executable = Path(root) / "fake-bin" / "pg_dump"
+            executable.write_text(
+                "#!/bin/sh\n"
+                f"printf '%s\\n' \"$@\" > '{arguments}'\n"
+                "for arg in \"$@\"; do\n"
+                "  case \"$arg\" in --file=*) printf fixture > \"${arg#*=}\";; esac\n"
+                "done\n"
+            )
+            result = self.run_script("backup_madar.sh", env=env)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            actual = arguments.read_text().splitlines()
+            self.assertIn("--snapshot=00000001-00000002-1", actual)
+            self.assertIn("--format=custom", actual)
+            self.assertNotIn("--no-owner", actual)
+            self.assertNotIn("--no-acl", actual)
+
+    def test_invalid_exported_snapshot_is_not_published(self):
+        with tempfile.TemporaryDirectory() as root:
+            env = self.backup_environment(root)
+            env["PATH"] = self.fake_postgres_tools(root)
+            env["MADAR_BACKUP_SNAPSHOT"] = "invalid snapshot"
+            result = self.run_script("backup_madar.sh", env=env)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("invalid exported snapshot", result.stderr)
+            self.assertFalse((Path(root) / "backups" / "madar-20260720T000000Z").exists())
 
     def test_backup_dry_run_constructs_commands_without_executing(self):
         with tempfile.TemporaryDirectory() as root:

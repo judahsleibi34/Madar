@@ -30,7 +30,9 @@ assert manifest.get("status") == "complete"
 assert re.fullmatch(r"madar-[0-9]{8}T[0-9]{6}Z", manifest.get("backup_id", ""))
 assert manifest.get("database", {}).get("dump") == "database.dump"
 assert manifest.get("checksums") == "SHA256SUMS"
-assert manifest.get("configuration", {}).get("values_included") is False
+configuration = manifest.get("configuration", {}).get("values_included")
+assert configuration is False or (configuration is True and
+    manifest.get("coordinated_checkpoint") == "coordinated/manifest.json")
 PY
 fi
 python3 "$(dirname "$0")/backup_support.py" verify "$backup_path" || die "checksum verification failed or backup contract invalid"

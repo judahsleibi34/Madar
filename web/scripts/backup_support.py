@@ -105,11 +105,18 @@ def verify(root: Path, *, dump: bool = True) -> dict:
                 or not BACKUP_ID.fullmatch(manifest.get('backup_id', ''))
                 or manifest.get('database', {}).get('dump') != 'database.dump'
                 or manifest.get('checksums') != 'SHA256SUMS'
-                or manifest.get('configuration', {}).get('values_included') is not False
+                or type(manifest.get('configuration', {}).get('values_included')) is not bool
                 or set(manifest.get('file_sets', [])) != set(FILE_SETS)
                 or manifest.get('created_at') != manifest.get('backup_id', '')[6:]):
             raise BackupError('backup_manifest_invalid')
         datetime.strptime(manifest['created_at'], '%Y%m%dT%H%M%SZ')
+        coordinated = manifest.get('coordinated_checkpoint')
+        if manifest['configuration']['values_included'] is True:
+            if coordinated != 'coordinated/manifest.json':
+                raise BackupError('coordinated_checkpoint_required')
+            verify_coordinated_checkpoint(root)
+        elif coordinated is not None:
+            raise BackupError('coordinated_checkpoint_configuration_undeclared')
         for name in ('MANIFEST.txt', 'CONFIGURATION-INVENTORY.txt'):
             if not (root / name).is_file():
                 raise BackupError('missing_backup_member')
@@ -141,6 +148,46 @@ def verify(root: Path, *, dump: bool = True) -> dict:
         if result.returncode:
             raise BackupError('database_dump_unreadable')
     return manifest
+
+
+def verify_coordinated_checkpoint(root: Path) -> None:
+    """Verify opt-in native recovery escrow without relaxing ordinary backups."""
+    directory = real_path(root / 'coordinated')
+    manifest_path = real_path(directory / 'manifest.json', directory=False)
+    if directory.stat().st_mode & 0o077 or manifest_path.stat().st_mode & 0o077:
+        raise BackupError('coordinated_checkpoint_integrity_failed')
+    checkpoint = json.loads(manifest_path.read_text())
+    if checkpoint.get('schema') != 115 or checkpoint.get('restore_verified') is not True:
+        raise BackupError('coordinated_checkpoint_restore_unverified')
+    purposes = {'database_dump', 'roles', 'native_storage', 'native_configuration',
+                'function_cache', 'managed_storage', 'production_configuration',
+                'controller_state', 'images', 'schema_ledgers', 'auth_metadata',
+                'independent_restore'}
+    entries = checkpoint.get('files', [])
+    if (len(entries) != len(purposes)
+            or {entry.get('purpose') for entry in entries} != purposes):
+        raise BackupError('coordinated_checkpoint_incomplete')
+    seen = set()
+    for entry in entries:
+        relative = PurePosixPath(entry['path'])
+        if relative.is_absolute() or '..' in relative.parts or str(relative) in seen:
+            raise BackupError('coordinated_checkpoint_path_invalid')
+        seen.add(str(relative))
+        file = real_path(directory / relative, directory=False)
+        if (not file.is_file() or file.is_symlink() or file.stat().st_mode & 0o077
+                or file.stat().st_size != entry['size'] or digest(file) != entry['sha256']):
+            raise BackupError('coordinated_checkpoint_integrity_failed')
+    proof_entry = next(entry for entry in entries if entry['purpose'] == 'independent_restore')
+    proof = json.loads((root / 'coordinated' / proof_entry['path']).read_text())
+    required = {'schema115', 'all_public_tables', 'auth', 'mfa', 'foreign_keys',
+                'storage_metadata', 'storage_bytes', 'storage_xattrs', 'asset_delivery',
+                'tenant_isolation', 'runtime_readiness', 'no_migrations', 'no_workers',
+                'no_email', 'private_topology'}
+    if (set(proof.get('checks', {})) != required
+            or any(value is not True for value in proof['checks'].values())
+            or proof.get('database_dump_sha256') != next(
+                entry['sha256'] for entry in entries if entry['purpose'] == 'database_dump')):
+        raise BackupError('coordinated_checkpoint_restore_proof_invalid')
 
 
 def atomic_text(path: Path, text: str, mode: int = 0o600) -> None:

@@ -33,6 +33,24 @@ forward-repair and schema-recovery protections are unchanged.
 
 ## A. Purpose and authority
 
+Coordinated local-Supabase checkpoints may opt into protected configuration
+escrow in a format-3 backup. They explicitly declare configuration values are
+included and bind a schema115 coordinated manifest covering the database,
+roles, native Storage/xattrs, native configuration/init dependencies, function
+cache, managed files, production/controller state, images, ledgers and Auth
+metadata. Backup verification and Node1 replication require the complete
+checksum-bound independent restore proof, including private runtime/asset and
+tenant-isolation checks. Ordinary backups still exclude configuration values;
+the opt-in does not change routing, credentials, deployment or migration policy.
+Custom dumps retain ownership and ACL metadata. The ordinary restore command
+keeps its existing explicit ownership/ACL policy; pinned native recovery can
+restore the original managed role permissions from the same archive.
+A coordinated capture may supply a validated exported snapshot while holding
+its read-only exporting connection open. The dump and opaque per-table restore
+comparisons then share one consistent database snapshot. Scheduled backups keep
+their existing default snapshot behavior; this does not fence or mutate source
+data and does not authorize any configuration publication.
+
 The governed provider402 traffic switch enforces canonical query/referrer-safe
 proxy logging before serving recovery authentication, including runtime-only
 local rollback. Publication is part of traffic switching, not a pre-switch
