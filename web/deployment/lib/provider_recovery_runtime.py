@@ -292,7 +292,15 @@ class ProductionRecoveryOperations:
             if result_bytes.returncode or installed.read_bytes()!=result_bytes.stdout:
                 raise RuntimeError("recovery_controller_provenance_changed")
         if self.paths.controller_transition.exists():
-            result["controller_transition"] = read_json(self.paths.controller_transition)
+            transition = read_json(self.paths.controller_transition)
+            if (self.contract.repair_context_digest is not None
+                    and transition.get("contract_digest") == self.contract.repair_context_digest
+                    and transition.get("new_sha") == self.contract.installed_sha):
+                # Prior unused install is independently checked by the trusted
+                # repair installer. It is not the new installation transition.
+                pass
+            else:
+                result["controller_transition"] = transition
         result["controller_provenance_valid"]=True
         self.trace.append("origin402")
         return result

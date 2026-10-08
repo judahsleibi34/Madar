@@ -177,6 +177,11 @@ class ProductionBootstrapOperations:
         self.system.verify_installed_controller(sha)
 
     def require_fresh_installation(self):
+        # A separately bound, unused pre-activation installation may be repaired.
+        # Ordinary fresh installation still cannot refresh any credential.
+        if self.recovery.contract.repair_context_digest is not None:
+            self.require_unused_installation_repair()
+            return
         # Reject an earlier credential/interlock, even for the same contract.
         # Installation is never a reusable credential refresh endpoint.
         for name in ("contract.json", "authorized.credential", "madar-control-plane-upgrade", "installation.json"):
@@ -186,6 +191,120 @@ class ProductionBootstrapOperations:
         if self.receipt.exists() or self.receipt.is_symlink():
             raise RuntimeError("recovery_controller_transition_already_present")
         self.legacy_quiesced_interlock()
+
+    def require_unused_installation_repair(self):
+        """Validate the existing unused credential and exact prior attestation.
+
+        No runtime activation can use this path. It is available only inside
+        the root-approved canonical installer, before any traffic/ownership
+        transition, and consumes/archives the previous authorization.
+        """
+        import re
+        from deployment.lib.provider_recovery_runtime import file_digest
+        from deployment.lib.control_plane_upgrade_authorization import require_upgrade_authorization
+        from deployment.lib.provider_recovery_phases import EMERGENCY_MODE, AUTOMATED_AUTH_CHECKS
+        packet = self.receipt.parent / "repair-prior.json"
+        prior = json.loads(protected(packet, private=True).read_text())
+        old = prior["contract_document"]
+        context = digest(old)
+        c = self.recovery.contract
+        if (context != c.repair_context_digest or old["sha"] != c.installed_sha
+                or old["origin_sha"] != c.origin_sha or old["origin_slot"] != c.origin_slot):
+            raise RuntimeError("recovery_repair_prior_context_changed")
+        allowed = {"authorized.credential", "madar-control-plane-upgrade", "contract.json",
+                   "schema-contract.json", "installation.json", "in-progress.json"}
+        if set(prior["live_file_digests"]) != allowed:
+            raise RuntimeError("recovery_repair_prior_authorization_incomplete")
+        for relative, expected in prior["live_file_digests"].items():
+            if relative not in allowed or file_digest(protected(self.runtime / relative, private=True if relative != "in-progress.json" else False)) != expected:
+                raise RuntimeError("recovery_repair_prior_authorization_changed")
+        auxiliary = {"controller-transition.json", "activation-authorization.json", "installation-automation.json"}
+        if set(prior["live_aux_file_digests"]) != auxiliary:
+            raise RuntimeError("recovery_repair_prior_receipts_incomplete")
+        for name, expected in prior["live_aux_file_digests"].items():
+            if file_digest(protected(self.receipt.parent / name, private=True)) != expected:
+                raise RuntimeError("recovery_repair_prior_receipt_changed")
+        os.environ["CREDENTIALS_DIRECTORY"] = str(self.runtime)
+        require_upgrade_authorization(old["sha"], required_operation=PROFILE,
+            required_schema=115, require_rehearsal=True, required_context_digest=context)
+        if json.loads(protected(self.runtime / "installation.json", private=True).read_text()) != {
+                "contract_digest": context, "source": old["sha"], "installed": True}:
+            raise RuntimeError("recovery_repair_prior_witness_changed")
+        phase2 = json.loads(protected(self.receipt.parent / "activation-authorization.json", private=True).read_text())
+        completed = prior["completed_report"]
+        if (json.loads(prior["completed_raw"]) != completed
+                or phase2 != prior["activation_receipt"] or phase2.get("contract_digest") != context
+                or phase2.get("phase") != "AUTHORIZE_ACTIVATION"
+                or phase2.get("rehearsal_digest") != hashlib.sha256(prior["completed_raw"].encode()).hexdigest()
+                or any(v != "PASS" for v in completed["checks"].values())
+                or completed.get("acceptance_mode") != EMERGENCY_MODE
+                or "human_evidence" in completed):
+            raise RuntimeError("recovery_repair_prior_phase2_invalid")
+        evidence = completed["automated_evidence"]
+        authorization = prior["operator_authorization"]
+        binding_contract = dict(old); binding_contract.pop("rehearsal_digest")
+        if (authorization["preparation_binding"] != digest({"contract": binding_contract, "schema_contract": prior["schema_metadata"]})
+                or completed["operator_authorization_digest"] != digest(authorization)
+                or evidence["source_sha"] != old["sha"] or evidence["images"] != old["images"]
+                or evidence["checks"] != {key: "PASS" for key in AUTOMATED_AUTH_CHECKS}
+                or phase2["auth_acceptance_digest"] != digest({"mode": EMERGENCY_MODE, "authorization": authorization, "evidence": evidence})):
+            raise RuntimeError("recovery_repair_prior_evidence_changed")
+        transition = json.loads(protected(self.receipt, private=True).read_text())
+        if transition != prior["controller_transition"] or transition["contract_digest"] != context or transition["new_sha"] != old["sha"]:
+            raise RuntimeError("recovery_repair_prior_transition_changed")
+        # The explicit repair attests all original files. Only known bytecode
+        # from the previous source-only install may be archived, never executed.
+        entries = []
+        for path in sorted(self.recovery.paths.controller.rglob("*")):
+            if path.is_symlink():
+                raise RuntimeError("recovery_repair_controller_symlink")
+            if not path.is_file():
+                continue
+            protected(path)
+            if path.parent.name == "__pycache__":
+                match = re.fullmatch(r"([A-Za-z_]\w*)[.]cpython-\d+(?:[.]opt-[12])?[.]pyc", path.name)
+                if not match or not (path.parent.parent / (match[1] + ".py")).is_file():
+                    raise RuntimeError("recovery_repair_unrecognized_cache")
+                continue
+            entries.append((str(path.relative_to(self.recovery.paths.controller)), file_digest(path)))
+        if digest(entries) != transition["new_controller_digest"]:
+            raise RuntimeError("recovery_repair_protected_controller_changed")
+        if any((self.recovery.paths.state / name).exists() for name in (
+                "provider-recovery.json", "provider-recovery-fallback.json", "provider-recovery-traffic.json")):
+            raise RuntimeError("recovery_repair_already_activated")
+        if self.recovery.fingerprints() != c.production_fingerprints:
+            raise RuntimeError("recovery_repair_production_changed")
+        origin = self.recovery.origin_evidence()
+        c.validate_origin(origin)
+        return prior
+
+    def retire_unused_installation(self, contract):
+        """Archive the old authority under both locks; never refresh a token."""
+        self.require_unused_installation_repair()
+        from deployment.lib.control_plane_upgrade import require_root_directory
+        archive = self.receipt.parent / "retired-unused-installations" / datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S.%fZ")
+        require_root_directory(archive.parent, mode=0o700, create=True)
+        archive.mkdir(mode=0o700)
+        require_root_directory(archive, mode=0o700)
+        # Preserve every old credential/witness/receipt before making it invalid.
+        for name in ("authorized.credential", "madar-control-plane-upgrade", "contract.json", "schema-contract.json", "installation.json", "in-progress.json"):
+            source = protected(self.runtime / name)
+            with (archive / name).open("xb") as handle:
+                os.fchmod(handle.fileno(), 0o600); handle.write(source.read_bytes()); handle.flush(); os.fsync(handle.fileno())
+        for source in (self.receipt, self.receipt.parent / "activation-authorization.json", self.receipt.parent / "installation-automation.json"):
+            with (archive / source.name).open("xb") as handle:
+                os.fchmod(handle.fileno(), 0o600); handle.write(protected(source, private=True).read_bytes()); handle.flush(); os.fsync(handle.fileno())
+        atomic_json(archive / "retirement.json", {"previous_context": contract.repair_context_digest,
+            "replacement_context": digest(contract.__dict__), "runtime_activated": False})
+        # Atomic pending interlock first: there is never an unguarded interval.
+        atomic_json(self.runtime / "in-progress.json", installation_interlock(contract))
+        os.chmod(self.runtime / "in-progress.json", 0o644)
+        for name in ("authorized.credential", "madar-control-plane-upgrade", "contract.json", "schema-contract.json", "installation.json"):
+            (self.runtime / name).unlink()
+        self.receipt.unlink()
+        (self.receipt.parent / "activation-authorization.json").unlink()
+        (self.receipt.parent / "installation-automation.json").unlink()
+        return archive
 
     def legacy_quiesced_interlock(self):
         """Accept only an explicitly pinned, credential-free old quiesce.
@@ -225,7 +344,10 @@ class ProductionBootstrapOperations:
         from deployment.lib.control_plane_upgrade import require_root_directory
         require_root_directory(self.runtime.parent, mode=0o711, create=True)
         require_root_directory(self.runtime, mode=0o711, create=True)
-        legacy = self.legacy_quiesced_interlock()
+        repairing = contract.repair_context_digest is not None
+        if repairing:
+            self.retire_unused_installation(contract)
+        legacy = None if repairing else self.legacy_quiesced_interlock()
         if legacy is not None:
             from deployment.lib.provider_recovery_runtime import file_digest
             # Keep the protected history durably; never remove the original
@@ -256,6 +378,10 @@ class ProductionBootstrapOperations:
                             ("contract.json", contract.__dict__),
                             ("in-progress.json", installation_interlock(contract))):
             path = self.runtime / name
+            if name == "in-progress.json" and repairing:
+                if json.loads(protected(path).read_text()) != value:
+                    raise RuntimeError("recovery_repair_pending_interlock_changed")
+                continue
             if name == "in-progress.json" and legacy is not None:
                 # Recheck after archival. Atomic replacement has no interval
                 # during which ordinary deployment loses its interlock.

@@ -1614,3 +1614,28 @@ Phase-2 receipts remain mandatory.
 SMTP preparation consumes the same explicit acceptance-mode gate set as normal
 graduation. Only `auth_smtp` may be PENDING at this preparation boundary; all
 other emergency or default gates and their exact-bound evidence remain required.
+
+### Source-only provider402 controller identity and unused-install repair
+
+Protected recovery/prepare/normal entrypoints disable bytecode writes before
+controller imports and reject existing Python caches before loading controller
+modules. Trusted direct module imports use `python3 -IB`; the helper package also
+disables subsequent bytecode writes. Bare entrypoint execution re-executes in
+the same isolated `-IB` interpreter before loading any controller module. Installation builds an explicit source-only tree, archives the old
+tree (including caches) and publishes atomically. Fingerprints continue to hash
+**every** installed file; source, manifests, configuration and authorization are
+not excluded. Cached substitute code is rejected, never executed.
+
+The existing pre-activation installed-but-unused transaction can be repaired
+only by an explicit root-approved canonical contract containing the previous
+context digest. The trusted installer verifies the live old one-time credential,
+witness, Phase-2 receipt, exact previous evidence, all non-cache attested files,
+unchanged production fingerprints and absence of any traffic/ownership activation.
+Only recognized paired Python cache files may be archived in this narrowly
+bounded repair attestation. Under both locks it preserves prior credentials and
+receipts, atomically replaces the interlock with credential-free pending state,
+and retires the old unused credential. A new credential is issued only after
+canonical reinstallation and attestation. This cannot repair an active recovery,
+refresh/reuse an authorization, waive Phase2, alter traffic, or restore data.
+The explicit installer inventory also includes the existing normal-local
+transition entrypoint, launcher and six helper modules.

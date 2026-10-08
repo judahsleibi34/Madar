@@ -38,8 +38,14 @@ class RecoveryContract:
     rollback_runtime_digest: str
     rehearsal_digest: str
     legacy_quiesced_interlock_digest: str | None = None
+    repair_context_digest: str | None = None
 
     def validate(self, metadata: dict[str, Any]) -> None:
+        if self.repair_context_digest is not None and (
+                not re.fullmatch(r"[0-9a-f]{64}", self.repair_context_digest)
+                or self.sha == self.installed_sha
+                or self.legacy_quiesced_interlock_digest is not None):
+            raise RuntimeError("recovery_repair_contract_invalid")
         if self.legacy_quiesced_interlock_digest is not None and (
                 not re.fullmatch(r"[0-9a-f]{64}", self.legacy_quiesced_interlock_digest)
                 or self.installed_sha != self.origin_sha):

@@ -4,6 +4,19 @@ import json
 from pathlib import Path
 import os
 import sys
+
+# Direct trusted execution must have the same source-only import policy as -IB.
+sys.dont_write_bytecode = True
+if __name__ == "__main__":
+    if not sys.flags.isolated or not sys.flags.dont_write_bytecode:
+        safe = {"PATH": "/usr/sbin:/usr/bin:/sbin:/bin", "HOME": "/root",
+                "LANG": "C.UTF-8", "LC_ALL": "C.UTF-8"}
+        os.execve(sys.executable, [sys.executable, "-I", "-B",
+                  str(Path(__file__).resolve()), *sys.argv[1:]], safe)
+    controller = Path(__file__).resolve().parents[1]
+    if any(path.name == "__pycache__" or path.suffix in {".pyc", ".pyo"}
+           for path in controller.rglob("*")):
+        raise SystemExit("protected_controller_bytecode_present")
 sys.path.insert(0,str(Path(__file__).resolve().parents[2]))
 from deployment.lib.provider_recovery import RecoveryContract
 from deployment.lib.provider_recovery_phases import PreparationTransaction, preparation_binding, sha256

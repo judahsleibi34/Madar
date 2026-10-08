@@ -56,6 +56,13 @@ declare -a tracked_files=(
   lib/provider_recovery_runtime.py
   lib/provider_recovery_bootstrap.py
   lib/provider_recovery_entry.py
+  lib/provider_local_transition.py
+  lib/provider_local_transition_runtime.py
+  lib/provider_local_transition_entry.py
+  lib/provider_local_auth_configuration.py
+  lib/provider_local_proxy_configuration.py
+  lib/provider_local_backup_configuration.py
+  bin/madar-local-provider-transition
   lib/provider_recovery_phases.py
   lib/provider_recovery_preparation.py
   lib/provider_recovery_prepare_entry.py
@@ -99,7 +106,7 @@ declare -a operational_scripts=(
 
 # Dry-run and apply deliberately execute the exact same read-only static
 # filesystem contract before either reporting success or mutating a target.
-/usr/bin/python3 -I "$deployment_root/lib/control_plane_filesystem.py" \
+/usr/bin/python3 -IB "$deployment_root/lib/control_plane_filesystem.py" \
   --source-root "$repo_root" \
   --backup-root "$backup_root"
 
@@ -265,6 +272,13 @@ chmod 0644 "$stage_root/CONTROL_PLANE_SOURCE_SHA"
 find "$stage_root" -type d -exec chown root:madar {} +
 find "$stage_root" -type d -exec chmod 0750 {} +
 
+# No runtime bytecode is copied from the candidate or retained installation.
+# Keep every other file in the trusted tree fingerprint; never ignore caches.
+if find "$stage_root" \( -name __pycache__ -o -name '*.pyc' -o -name '*.pyo' \) -print -quit | grep -q .; then
+  echo "protected controller stage contains bytecode" >&2
+  exit 1
+fi
+
 # Publish an exact controller tree in one filesystem operation. Linux
 # renameat2(RENAME_EXCHANGE) leaves either the old or the new complete tree at
 # the authoritative path; it never creates a remove-then-move gap. Refuse to
@@ -274,7 +288,7 @@ if [[ -e "$install_root" || -L "$install_root" ]]; then
     echo "installed control-plane root must be a real directory" >&2
     exit 1
   }
-  /usr/bin/python3 -I - "$stage_root" "$install_root" <<'PY'
+  /usr/bin/python3 -IB - "$stage_root" "$install_root" <<'PY'
 import ctypes
 import os
 import sys
@@ -306,7 +320,7 @@ for script in "${operational_scripts[@]}"; do
 done
 # Application-owned nonsecret state, created without root write authority over
 # an application-owned path. Backups themselves stay private mode 0700.
-runuser -u madar -- /usr/bin/python3 -I -c 'from pathlib import Path; p=Path("/var/lib/madar/backup-state"); assert not p.is_symlink(); p.mkdir(mode=0o755,exist_ok=True); p.chmod(0o755)'
+runuser -u madar -- /usr/bin/python3 -IB -c 'from pathlib import Path; p=Path("/var/lib/madar/backup-state"); assert not p.is_symlink(); p.mkdir(mode=0o755,exist_ok=True); p.chmod(0o755)'
 install -o root -g root -m 0755 \
   "$alert_hook_source" /usr/local/lib/madar/madar_alert_hook.sh
 for unit in "${units[@]}"; do
