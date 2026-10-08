@@ -12,6 +12,7 @@ import json
 import os
 from pathlib import Path
 import secrets
+from datetime import datetime, timezone
 
 from deployment.lib.provider_recovery import PROFILE, RecoveryContract
 from deployment.lib.provider_recovery_runtime import digest, protected
@@ -177,12 +178,45 @@ class ProductionBootstrapOperations:
     def require_fresh_installation(self):
         # Reject an earlier credential/interlock, even for the same contract.
         # Installation is never a reusable credential refresh endpoint.
-        for name in ("contract.json", "authorized.credential", "in-progress.json", "installation.json"):
+        for name in ("contract.json", "authorized.credential", "madar-control-plane-upgrade", "installation.json"):
             path = self.runtime / name
             if path.exists() or path.is_symlink():
                 raise RuntimeError("recovery_existing_authorization_requires_operator_review")
         if self.receipt.exists() or self.receipt.is_symlink():
             raise RuntimeError("recovery_controller_transition_already_present")
+        self.legacy_quiesced_interlock()
+
+    def legacy_quiesced_interlock(self):
+        """Accept only an explicitly pinned, credential-free old quiesce.
+
+        This does not authorize a runtime operation or clear an interlock.
+        Trusted installation preserves the original and atomically replaces
+        it with a credential-free pending-install interlock under both locks.
+        """
+        from deployment.lib.provider_recovery_runtime import file_digest
+        from deployment.lib.control_plane_upgrade import BACKUP_TIMERS, validate_backup_timer_states
+        contract = self.recovery.contract
+        path = self.runtime / "in-progress.json"
+        expected = contract.legacy_quiesced_interlock_digest
+        if not path.exists() and not path.is_symlink():
+            if expected is not None:
+                raise RuntimeError("recovery_expected_legacy_interlock_missing")
+            return None
+        protected(path)
+        if expected is None or file_digest(path) != expected:
+            raise RuntimeError("recovery_existing_authorization_requires_operator_review")
+        document = json.loads(path.read_text())
+        if (set(document) != {"version", "approved_sha", "authorization_sha256", "backup_timer_states", "status"}
+                or document["version"] != 2 or document["status"] != "quiesced"
+                or document["authorization_sha256"] is not None
+                or document["approved_sha"] != contract.installed_sha
+                or contract.installed_sha != contract.origin_sha):
+            raise RuntimeError("recovery_legacy_interlock_not_quiesced")
+        validate_backup_timer_states(document["backup_timer_states"])
+        for unit in ("madar-auto-deploy.service", *(name.replace(".timer", ".service") for name in BACKUP_TIMERS)):
+            if self.recovery.command(["systemctl", "show", "--property=ActiveState", "--value", unit]) != "inactive":
+                raise RuntimeError("recovery_legacy_upgrade_operation_active")
+        return path
 
     def begin_installation(self, contract):
         # Credential-free pending interlock blocks every ordinary mutator while
@@ -190,10 +224,48 @@ class ProductionBootstrapOperations:
         from deployment.lib.control_plane_upgrade import require_root_directory
         require_root_directory(self.runtime.parent, mode=0o711, create=True)
         require_root_directory(self.runtime, mode=0o711, create=True)
+        legacy = self.legacy_quiesced_interlock()
+        if legacy is not None:
+            from deployment.lib.provider_recovery_runtime import file_digest
+            # Keep the protected history durably; never remove the original
+            # interlock before the replacement is ready. Both deploy/upgrade
+            # locks are held and ordinary mutation remains blocked throughout.
+            archive_root = self.receipt.parent / "retired-quiesced-interlocks"
+            require_root_directory(archive_root, mode=0o700, create=True)
+            archive = archive_root / datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S.%fZ")
+            require_root_directory(archive, mode=0o700, create=True)
+            saved = archive / "in-progress.json"
+            with saved.open("xb") as handle:
+                os.chmod(saved, 0o600)
+                handle.write(legacy.read_bytes()); handle.flush(); os.fsync(handle.fileno())
+            if file_digest(saved) != contract.legacy_quiesced_interlock_digest:
+                raise RuntimeError("recovery_legacy_interlock_archive_changed")
+            atomic_json(archive / "receipt.json", {
+                "contract_digest": digest(contract.__dict__), "source": contract.sha,
+                "legacy_sha": contract.installed_sha,
+                "legacy_interlock_digest": contract.legacy_quiesced_interlock_digest,
+                "backup_timer_states_preserved": True, "runtime_authorization_issued": False,
+            })
+            os.chmod(archive / "receipt.json", 0o600)
+            for directory in (archive, archive_root, self.receipt.parent):
+                descriptor = os.open(directory, os.O_DIRECTORY)
+                try: os.fsync(descriptor)
+                finally: os.close(descriptor)
         for name, value in (("schema-contract.json", self.recovery.metadata()),
                             ("contract.json", contract.__dict__),
                             ("in-progress.json", installation_interlock(contract))):
             path = self.runtime / name
+            if name == "in-progress.json" and legacy is not None:
+                # Recheck after archival. Atomic replacement has no interval
+                # during which ordinary deployment loses its interlock.
+                if self.legacy_quiesced_interlock() != path:
+                    raise RuntimeError("recovery_legacy_interlock_changed")
+                atomic_json(path, value)
+                os.chmod(path, 0o644)
+                descriptor = os.open(self.runtime, os.O_DIRECTORY)
+                try: os.fsync(descriptor)
+                finally: os.close(descriptor)
+                continue
             fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
             with os.fdopen(fd, "w") as handle:
                 json.dump(value, handle, sort_keys=True)

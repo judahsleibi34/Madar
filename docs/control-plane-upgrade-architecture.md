@@ -143,6 +143,18 @@ code-trust decision.
 
 ## Locks and one-time authorization
 
+Provider402 trusted installation may supersede an older normal-upgrade quiesce
+only when its exact protected file digest is included in the recovery contract.
+The record must be version 2, `quiesced`, credential-free, and for the same
+installed/serving legacy SHA, with valid preserved backup-timer state. Every
+deployment/backup operation must be inactive; any recovery credential, witness,
+or prior controller transition rejects the operation. After canonical staging
+and installer dry-run, under both locks, the trusted installer archives the
+original record privately with a durable receipt, then atomically replaces it
+with the pending-install interlock. It never leaves an unprotected interval,
+restores automation, grants runtime authorization, or modifies normal upgrade
+authorization. Missing/unpinned/changed/authorized records fail closed.
+
 The upgrader holds an exclusive root-owned `upgrade.lock` for its entire
 transaction. During current-production preflight it also acquires the normal
 `/var/lib/madar/releases/deploy.lock`, proving no release or migration is

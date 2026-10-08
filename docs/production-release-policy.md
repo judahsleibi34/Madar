@@ -9,6 +9,17 @@ Production installation, promotion and migration require separate approval.
 
 Last implementation review: 2026-10-05
 
+Provider402 bootstrap may replace a credential-free legacy normal-upgrade
+`quiesced` interlock only through its trusted installation transaction. The
+exact old record is bound into the approved recovery contract, must match the
+installed/serving legacy SHA, and requires all upgrade/backup operations to be
+inactive. The original timer snapshot is archived privately and the pending
+installation interlock replaces it atomically under both locks. This grants no
+runtime authority; installation attestation, witness, one-time credential and
+complete Phase-2 authorization remain required. Unknown, changed, active or
+already-authorized interlocks reject installation. Normal deployment,
+forward-repair and schema-recovery protections are unchanged.
+
 ## A. Purpose and authority
 
 This document is the maintained engineering specification of Madar's production

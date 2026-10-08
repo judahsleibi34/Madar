@@ -13,6 +13,7 @@ sys.path.insert(0, str(WEB_ROOT))
 from deployment.lib.provider_recovery_bootstrap import issue_authorization, TrustedRecoveryBootstrap, installation_interlock, ProductionBootstrapOperations
 from deployment.lib.provider_recovery_runtime import digest
 from deployment.lib.control_plane_upgrade_authorization import require_upgrade_authorization
+from deployment.lib.control_plane_upgrade import BACKUP_TIMERS
 import test_provider_recovery_controller as fixtures
 
 
@@ -110,3 +111,87 @@ class BootstrapOrderingTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             with self.assertRaisesRegex(RuntimeError,'control_plane_recovery_authorization_required'):
                 require_upgrade_authorization(self.contract.sha,interlock=Path(temp)/'missing',required_operation='provider402-signin')
+
+    def legacy_operations(self, root, *, pinned=True):
+        import hashlib
+        runtime = root / 'runtime'
+        runtime.mkdir(mode=0o711)
+        document = {'version': 2, 'approved_sha': self.contract.installed_sha,
+            'authorization_sha256': None, 'status': 'quiesced',
+            'backup_timer_states': {name: {'active': 'inactive', 'enabled': 'disabled'} for name in BACKUP_TIMERS}}
+        path = runtime / 'in-progress.json'
+        path.write_text(json.dumps(document)); path.chmod(0o644)
+        contract = replace(self.contract, origin_sha=self.contract.installed_sha,
+            legacy_quiesced_interlock_digest=hashlib.sha256(path.read_bytes()).hexdigest() if pinned else None)
+        recovery = Mock(contract=contract)
+        recovery.command.return_value = 'inactive'
+        recovery.metadata.return_value = self.metadata
+        operations = ProductionBootstrapOperations.__new__(ProductionBootstrapOperations)
+        operations.recovery = recovery
+        operations.runtime = runtime
+        operations.receipt = root / 'packet' / 'controller-transition.json'
+        operations.receipt.parent.mkdir(mode=0o700)
+        return operations, document
+
+    def test_legacy_quiesce_requires_exact_contract_pin(self):
+        with tempfile.TemporaryDirectory() as temp, patch(
+                'deployment.lib.provider_recovery_bootstrap.protected', side_effect=lambda p, **kw: p):
+            operations, _ = self.legacy_operations(Path(temp), pinned=False)
+            with self.assertRaisesRegex(RuntimeError, 'existing_authorization'):
+                operations.require_fresh_installation()
+            self.assertTrue((operations.runtime / 'in-progress.json').exists())
+
+    def test_pinned_quiesce_preserved_and_replacement_never_authorizes_runtime(self):
+        def test_directory(path, *, create=False, mode=0o700):
+            if create:
+                path.mkdir(mode=mode, exist_ok=True); path.chmod(mode)
+        with tempfile.TemporaryDirectory() as temp, patch(
+                'deployment.lib.provider_recovery_bootstrap.protected', side_effect=lambda p, **kw: p), patch(
+                'deployment.lib.control_plane_upgrade.require_root_directory', side_effect=test_directory):
+            operations, document = self.legacy_operations(Path(temp))
+            operations.require_fresh_installation()
+            operations.begin_installation(operations.recovery.contract)
+            archives = list((operations.receipt.parent / 'retired-quiesced-interlocks').glob('*/in-progress.json'))
+            self.assertEqual(len(archives), 1)
+            self.assertEqual(json.loads(archives[0].read_text()), document)
+            self.assertEqual(archives[0].stat().st_mode & 0o777, 0o600)
+            self.assertEqual(json.loads((operations.runtime / 'in-progress.json').read_text()),
+                installation_interlock(operations.recovery.contract))
+            self.assertFalse((operations.runtime / 'authorized.credential').exists())
+            with patch.dict(os.environ, {'CREDENTIALS_DIRECTORY': str(operations.runtime)}), self.assertRaises(RuntimeError):
+                require_upgrade_authorization(operations.recovery.contract.sha,
+                    interlock=operations.runtime / 'in-progress.json', required_operation='provider402-signin')
+
+    def test_legacy_changed_digest_active_operation_and_existing_credential_rejected(self):
+        with tempfile.TemporaryDirectory() as temp, patch(
+                'deployment.lib.provider_recovery_bootstrap.protected', side_effect=lambda p, **kw: p):
+            operations, _ = self.legacy_operations(Path(temp))
+            operations.recovery.command.return_value = 'active'
+            with self.assertRaisesRegex(RuntimeError, 'legacy_upgrade_operation_active'):
+                operations.require_fresh_installation()
+            operations.recovery.command.return_value = 'inactive'
+            credential = operations.runtime / 'authorized.credential'
+            credential.write_text('synthetic-placeholder')
+            with self.assertRaisesRegex(RuntimeError, 'existing_authorization'):
+                operations.require_fresh_installation()
+            credential.unlink()
+            path = operations.runtime / 'in-progress.json'
+            path.write_bytes(path.read_bytes() + b' ')
+            with self.assertRaisesRegex(RuntimeError, 'existing_authorization'):
+                operations.require_fresh_installation()
+
+    def test_even_pinned_authorized_or_wrong_source_interlock_is_rejected(self):
+        import hashlib
+        for changed in ({'authorization_sha256': '9'*64}, {'approved_sha': '9'*40},
+                        {'status': 'provider_recovery_authorized'}, {'version': 1},
+                        {'operation': 'provider402-signin'}):
+            with self.subTest(changed=changed), tempfile.TemporaryDirectory() as temp, patch(
+                    'deployment.lib.provider_recovery_bootstrap.protected', side_effect=lambda p, **kw: p):
+                operations, document = self.legacy_operations(Path(temp))
+                document.update(changed)
+                path = operations.runtime / 'in-progress.json'
+                path.write_text(json.dumps(document))
+                operations.recovery.contract = replace(operations.recovery.contract,
+                    legacy_quiesced_interlock_digest=hashlib.sha256(path.read_bytes()).hexdigest())
+                with self.assertRaisesRegex(RuntimeError, 'legacy_interlock_not_quiesced'):
+                    operations.require_fresh_installation()

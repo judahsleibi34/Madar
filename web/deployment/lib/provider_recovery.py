@@ -37,8 +37,13 @@ class RecoveryContract:
     checkpoint_digest: str
     rollback_runtime_digest: str
     rehearsal_digest: str
+    legacy_quiesced_interlock_digest: str | None = None
 
     def validate(self, metadata: dict[str, Any]) -> None:
+        if self.legacy_quiesced_interlock_digest is not None and (
+                not re.fullmatch(r"[0-9a-f]{64}", self.legacy_quiesced_interlock_digest)
+                or self.installed_sha != self.origin_sha):
+            raise RuntimeError("provider_recovery_legacy_interlock_binding_invalid")
         for value in (self.sha, self.origin_sha, self.installed_sha):
             if not re.fullmatch(r"[0-9a-f]{40}", value):
                 raise RuntimeError("provider_recovery_sha_invalid")
