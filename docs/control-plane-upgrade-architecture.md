@@ -619,3 +619,23 @@ backups map only the exact internal Supabase API alias to its loopback host API,
 and require matching local database settings. Other endpoints remain unchanged.
 Publication does not run a backup, refresh a marker or enable a timer: actual
 complete backup, independent restore and off-host proofs remain mandatory.
+
+
+### Operator-authorized emergency automated Auth acceptance
+
+The separately named `operator-authorized-automated-exact-images-v1` mode is
+available only for this protected provider402 transaction. It replaces the
+`human_auth` evidence gate with `automated_auth`; it never creates or relabels
+`human_evidence`. A root-private, fixed-path operator authorization record must
+contain explicit Madar operator approval, the exact preparation binding
+(source/images/schema/checkpoint/provider/provenance), and an expiry no longer
+than 24 hours. The completed protected report must bind that record digest and
+actual isolated exact-image password, invalid-password, logout, refresh, TOTP,
+AAL2, tenant/dashboard, cross-tenant, business-fence and browser/API checks.
+Customer credentials and secrets are not used or recorded. Missing, pending,
+expired or changed evidence rejects authorization and every activation boundary.
+Normal graduation must consume the same acceptance mode and digest. Normal
+deployment, migration, provenance, worker, rollback and all other recovery gates
+remain unchanged. Historical human results remain historical evidence only.
+This policy does not authorize activation by itself; protected credentials and
+Phase-2 receipts remain mandatory.

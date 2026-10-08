@@ -29,6 +29,68 @@ PRECONDITIONS = frozenset({
     "private_target_health", "write_fence_source_validation",
 })
 
+EMERGENCY_MODE = "operator-authorized-automated-exact-images-v1"
+EMERGENCY_AUTHORIZATION = Path("/var/lib/madar-control-plane/provider402/emergency-operator-authorization.json")
+AUTOMATED_AUTH_CHECKS = frozenset({
+    "password_login", "invalid_password", "logout_invalidation", "refresh_rotation",
+    "totp_challenge_verification", "aal2_required", "tenant_dashboard_read",
+    "cross_tenant_denial", "recovery_business_mutation_denied", "browser_api_connectivity",
+})
+
+
+def acceptance_gates(report):
+    mode = report.get("acceptance_mode", "human")
+    if mode == "human":
+        return MANDATORY_GATES
+    if mode == EMERGENCY_MODE:
+        return (MANDATORY_GATES - {"human_auth"}) | {"automated_auth"}
+    raise RuntimeError("recovery_unknown_acceptance_mode")
+
+
+def validate_automated_acceptance(contract, metadata, report, authorization, *, authorized_at=None):
+    """Explicit operator exception, never represented as human verification."""
+    if "human_evidence" in report:
+        raise RuntimeError("recovery_emergency_must_not_claim_human_evidence")
+    now = datetime.now(timezone.utc)
+    try:
+        effective = now if authorized_at is None else datetime.fromisoformat(authorized_at)
+        issued = datetime.fromisoformat(authorization["issued_at"])
+        expires = datetime.fromisoformat(authorization["expires_at"])
+    except (KeyError, TypeError, ValueError):
+        raise RuntimeError("recovery_emergency_authorization_invalid") from None
+    if (issued.tzinfo is None or expires.tzinfo is None or not issued <= effective < expires
+            or effective.tzinfo is None or effective > now
+            or (expires-issued).total_seconds() > 86400
+            or authorization.get("scope") != EMERGENCY_MODE
+            or authorization.get("operator") != "Madar production operator"
+            or authorization.get("explicitly_authorized") is not True
+            or authorization.get("preparation_binding") != sha256(preparation_binding(contract, metadata))):
+        raise RuntimeError("recovery_emergency_authorization_invalid")
+    evidence = report.get("automated_evidence", {})
+    if (evidence.get("source_sha") != contract.sha or evidence.get("images") != contract.images
+            or evidence.get("schema") != 115 or evidence.get("isolated_fixture") is not True
+            or evidence.get("customer_credentials_used") is not False
+            or evidence.get("sensitive_values_recorded") is not False
+            or evidence.get("migrations_executed") is not False
+            or evidence.get("checks") != {key: "PASS" for key in AUTOMATED_AUTH_CHECKS}
+            or report.get("operator_authorization_digest") != sha256(authorization)):
+        raise RuntimeError("recovery_exact_image_automated_evidence_missing")
+    return sha256({"mode": EMERGENCY_MODE, "authorization": authorization, "evidence": evidence})
+
+
+def auth_acceptance_digest(contract, metadata, report, *, authorized_at=None):
+    if report.get("acceptance_mode", "human") == EMERGENCY_MODE:
+        from deployment.lib.provider_recovery_runtime import protected
+        authorization = json.loads(protected(EMERGENCY_AUTHORIZATION, private=True).read_text())
+        return validate_automated_acceptance(contract, metadata, report, authorization, authorized_at=authorized_at)
+    human = report.get("human_evidence")
+    if (not isinstance(human, dict) or human.get("source_sha") != contract.sha
+            or human.get("images") != contract.images
+            or human.get("results") != {"existing_login": "PASS", "accessible_mfa_aal2": "PASS",
+                "tenant_dashboard_read": "PASS", "business_mutation_denied": "PASS"}):
+        raise RuntimeError("recovery_exact_image_human_evidence_missing")
+    return sha256(human)
+
 
 def sha256(value):
     return hashlib.sha256(json.dumps(value, sort_keys=True).encode()).hexdigest()
@@ -55,7 +117,7 @@ def validate_preparation_rehearsal(contract, metadata, report):
     if set(preconditions) != PRECONDITIONS or any(value != "PASS" for value in preconditions.values()):
         raise RuntimeError("recovery_preparation_evidence_incomplete")
     checks = report.get("checks", {})
-    if set(checks) != MANDATORY_GATES or any(value not in {"PASS", "PENDING"} for value in checks.values()):
+    if set(checks) != acceptance_gates(report) or any(value not in {"PASS", "PENDING"} for value in checks.values()):
         raise RuntimeError("recovery_preparation_gate_shape_invalid")
     origin = report.get("origin_evidence")
     if not isinstance(origin, dict):
@@ -64,20 +126,15 @@ def validate_preparation_rehearsal(contract, metadata, report):
     return sha256(origin)
 
 
-def validate_completed_rehearsal(contract, metadata, report):
+def validate_completed_rehearsal(contract, metadata, report, *, authorized_at=None):
     provider_digest = validate_preparation_rehearsal(contract, metadata, report)
     checks = report.get("checks", {})
-    if set(checks) != MANDATORY_GATES:
+    if set(checks) != acceptance_gates(report):
         raise RuntimeError("recovery_activation_evidence_missing")
-    for name in sorted(MANDATORY_GATES):
+    for name in sorted(acceptance_gates(report)):
         if checks[name] != "PASS":
             raise RuntimeError("recovery_activation_evidence_incomplete:" + name)
-    human = report.get("human_evidence")
-    if (not isinstance(human, dict) or human.get("source_sha") != contract.sha
-            or human.get("images") != contract.images
-            or human.get("results") != {"existing_login": "PASS", "accessible_mfa_aal2": "PASS",
-                "tenant_dashboard_read": "PASS", "business_mutation_denied": "PASS"}):
-        raise RuntimeError("recovery_exact_image_human_evidence_missing")
+    auth_acceptance_digest(contract, metadata, report, authorized_at=authorized_at)
     return provider_digest
 
 
@@ -120,7 +177,9 @@ def authorize_activation(contract, metadata, report_path, receipt_path=ACTIVATIO
                "preparation_binding": sha256(preparation_binding(contract, metadata)),
                "schema": 115, "rehearsal_digest": report_digest,
                "preparation_evidence_digest": contract.rehearsal_digest,
-               "human_evidence_digest": sha256(report["human_evidence"]),
+               "acceptance_mode": report.get("acceptance_mode", "human"),
+               "human_evidence_digest": (sha256(report["human_evidence"]) if report.get("acceptance_mode", "human") == "human" else None),
+               "auth_acceptance_digest": auth_acceptance_digest(contract, metadata, report),
                "provider_evidence_digest": provider_digest,
                "authorized_at": datetime.now(timezone.utc).isoformat()}
     atomic_json(receipt_path, receipt)
@@ -135,14 +194,16 @@ def require_activation_evidence(contract, metadata, receipt_path=ACTIVATION_RECE
     require_preparation_evidence(contract, metadata)
     receipt = json.loads(protected(receipt_path, private=True).read_text())
     report = json.loads(protected(report_path, private=True).read_text())
-    provider_digest = validate_completed_rehearsal(contract, metadata, report)
+    provider_digest = validate_completed_rehearsal(contract, metadata, report, authorized_at=receipt.get("authorized_at"))
     if (receipt.get("format") != 2 or receipt.get("phase") != AUTHORIZE
             or receipt.get("contract_digest") != sha256(asdict(contract))
             or receipt.get("preparation_binding") != sha256(preparation_binding(contract, metadata))
             or receipt.get("schema") != 115
             or receipt.get("preparation_evidence_digest") != contract.rehearsal_digest
             or receipt.get("rehearsal_digest") != file_digest(report_path)
-            or receipt.get("human_evidence_digest") != sha256(report["human_evidence"])
+            or receipt.get("acceptance_mode", "human") != report.get("acceptance_mode", "human")
+            or receipt.get("auth_acceptance_digest") != auth_acceptance_digest(contract, metadata, report, authorized_at=receipt.get("authorized_at"))
+            or receipt.get("human_evidence_digest") != (sha256(report["human_evidence"]) if report.get("acceptance_mode", "human") == "human" else None)
             or receipt.get("provider_evidence_digest") != provider_digest):
         raise RuntimeError("recovery_activation_authorization_invalid")
     return receipt

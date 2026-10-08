@@ -67,8 +67,15 @@ def validate_evidence(contract, report):
             or report.get("unexplained_differences") != 0
             or report.get("database_restore_on_runtime_rollback") is not False):
         raise RuntimeError("local_transition_evidence_binding_invalid")
+    from deployment.lib.provider_recovery_phases import EMERGENCY_MODE
+    mode = report.get("acceptance_mode", "human")
+    if mode not in {"human", EMERGENCY_MODE}:
+        raise RuntimeError("local_transition_unknown_acceptance_mode")
+    required = GATES if mode == "human" else (GATES - {"human_auth"}) | {"automated_auth"}
+    if mode == EMERGENCY_MODE and not re.fullmatch(r"[0-9a-f]{64}", report.get("auth_acceptance_digest", "")):
+        raise RuntimeError("local_transition_acceptance_binding_missing")
     gates = report.get("gates", {})
-    if set(gates) != GATES or any(value != "PASS" for value in gates.values()):
+    if set(gates) != required or any(value != "PASS" for value in gates.values()):
         raise RuntimeError("local_transition_mandatory_gate_incomplete")
 
 

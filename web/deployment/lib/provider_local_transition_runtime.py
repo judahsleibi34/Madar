@@ -59,7 +59,14 @@ class ProductionLocalTransitionOperations:
         self.inspect = self.recovery.inspect
 
     def evidence(self):
-        return json.loads(protected(ROOT / "evidence.json", private=True).read_text())
+        report = json.loads(protected(ROOT / "evidence.json", private=True).read_text())
+        from deployment.lib.provider_recovery_phases import ACTIVATION_REHEARSAL, ACTIVATION_RECEIPT, auth_acceptance_digest
+        completed = json.loads(protected(ACTIVATION_REHEARSAL, private=True).read_text())
+        if report.get("acceptance_mode", "human") != completed.get("acceptance_mode", "human"):
+            raise RuntimeError("local_transition_acceptance_mode_changed")
+        if report.get("acceptance_mode", "human") != "human" and report.get("auth_acceptance_digest") != auth_acceptance_digest(self.recovery.contract, self.recovery.metadata(), completed, authorized_at=json.loads(protected(ACTIVATION_RECEIPT, private=True).read_text())["authorized_at"]):
+            raise RuntimeError("local_transition_acceptance_digest_changed")
+        return report
 
     def fingerprints(self):
         result = self.recovery.fingerprints()

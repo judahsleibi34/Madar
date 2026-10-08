@@ -1489,7 +1489,9 @@ must reject its durable state. A source merge never authorizes installation or
 activation. Its protected bootstrap retains the canonical remote, source/image,
 schema115, no-migration, installer backup, provenance and unrelated-health gates.
 See `docs/provider402-signin-recovery.md` and the exact recovery validation report;
-missing human or live fixture proof is a NO-GO.
+missing accepted Auth evidence or live fixture proof is a NO-GO. Exact-image
+human verification remains the default; only the explicit protected emergency
+automated acceptance policy below provides an alternative.
 
 ### Protected provider402 phase separation
 
@@ -1502,7 +1504,7 @@ candidate and fallback. It cannot mutate production traffic, worker authority,
 configuration or slots. Preparation receipts do not authorize activation.
 
 `AUTHORIZE_ACTIVATION` requires all fifteen completed rehearsal gates, including
-human Auth, MFA/AAL2, tenant isolation, business write denial, both-slot worker
+accepted Auth evidence, MFA/AAL2, tenant isolation, business write denial, both-slot worker
 inhibition, traffic/interruption rehearsal, passive fallback, runtime-only local
 rollback and failure injections. A root-protected receipt binds the exact source,
 image IDs, schema contract, checkpoint, provider402 evidence, production
@@ -1588,3 +1590,23 @@ pre-image. Application/worker configuration receives no backup database password
 Backup freshness still requires a real completed verified backup and off-host
 proof. Neither connectivity publication nor controller installation attests a
 backup or starts automation.
+
+
+### Operator-authorized emergency automated Auth acceptance
+
+The separately named `operator-authorized-automated-exact-images-v1` mode is
+available only for this protected provider402 transaction. It replaces the
+`human_auth` evidence gate with `automated_auth`; it never creates or relabels
+`human_evidence`. A root-private, fixed-path operator authorization record must
+contain explicit Madar operator approval, the exact preparation binding
+(source/images/schema/checkpoint/provider/provenance), and an expiry no longer
+than 24 hours. The completed protected report must bind that record digest and
+actual isolated exact-image password, invalid-password, logout, refresh, TOTP,
+AAL2, tenant/dashboard, cross-tenant, business-fence and browser/API checks.
+Customer credentials and secrets are not used or recorded. Missing, pending,
+expired or changed evidence rejects authorization and every activation boundary.
+Normal graduation must consume the same acceptance mode and digest. Normal
+deployment, migration, provenance, worker, rollback and all other recovery gates
+remain unchanged. Historical human results remain historical evidence only.
+This policy does not authorize activation by itself; protected credentials and
+Phase-2 receipts remain mandatory.
