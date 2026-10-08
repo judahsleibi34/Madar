@@ -104,6 +104,8 @@ def configure_auth(ops, contract):
         ops.require_all_workers_off()
         ops.verify_local_fallback()
         smtp_preflight(values)
+        from deployment.lib.provider_local_proxy_configuration import ensure_callback_safe_proxy
+        ensure_callback_safe_proxy(ops, contract)
         path = readonly_configuration(NATIVE / ".env")
         native_owner = path.stat()
         before = {}
@@ -182,5 +184,6 @@ def configure_auth(ops, contract):
             "preparation_contract_digest": digest(contract.__dict__), "native_image": current["Image"],
             "auth_smtp": "PASS", "starttls": "PASS", "authentication": "PASS", "sender": "PASS",
             "public_mediated_callbacks": "PASS", "application_migrations_executed": False,
+            "stable_proxy_callback_redaction": "PASS",
             "auth_ledger_unchanged": True, "password_and_mfa_fingerprints_unchanged": True,
             "database_restore": False, "email_generated": False, "workers_started": False})

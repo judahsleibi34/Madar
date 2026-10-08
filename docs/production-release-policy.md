@@ -1529,3 +1529,15 @@ pass. It grants no traffic, worker or write authorization. Canonical callbacks
 use `https://api.madarportal.com/auth/v1/verify` and exact frontend verify/reset
 redirects; no extra `/api` prefix is introduced. Notification email remains off.
 Normal graduation continues to require all gates, including verified Auth SMTP.
+
+Auth SMTP preparation must verify callback-safe effective stable-proxy logging
+before enabling public verification/recovery links. Legacy bind-mount replacement
+uses only the protected transaction's canonical-config preflight and installed
+proxy service; no manual upstream or controller edit is permitted.
+
+Normal local finalization also publishes exact-bound local backup connectivity
+through the existing private backup-service environment, retaining a protected
+pre-image. Application/worker configuration receives no backup database password.
+Backup freshness still requires a real completed verified backup and off-host
+proof. Neither connectivity publication nor controller installation attests a
+backup or starts automation.

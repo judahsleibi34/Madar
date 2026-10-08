@@ -158,6 +158,11 @@ class ProductionLocalTransitionOperations:
             path = readonly_configuration(Path("/opt/madar/local-supabase") / name, private=name == ".env")
             if file_digest(path) != expected:
                 raise RuntimeError("local_transition_native_configuration_changed")
+        from deployment.lib.provider_local_backup_configuration import verify_backup_input
+        phase = None
+        if self.transaction_path.exists():
+            phase = json.loads(protected(self.transaction_path, private=True).read_text()).get("phase")
+        verify_backup_input(ROOT, reconciliation, contract, phase)
 
     def require_recovery_active(self, context):
         # Runtime-owned release files are untrusted until bound to the protected
@@ -470,6 +475,12 @@ class ProductionLocalTransitionOperations:
 
     def commit_normal_release_state(self, contract):
         self.require_phase(contract, {"resume_pending"})
+        from deployment.lib.provider_local_backup_configuration import publish_backup_configuration
+        from deployment.lib.provider_recovery_runtime import readonly_configuration
+        native = {}
+        load_environment_file(readonly_configuration(Path("/opt/madar/local-supabase/.env"), private=True), environ=native)
+        reconciliation = json.loads(protected(ROOT / "reconciliation.json", private=True).read_text())
+        publish_backup_configuration(ROOT, reconciliation, contract, native)
         # Configuration publication is a reviewed transaction output, not a
         # manual env edit. Preserve the old protected input and recovery state.
         old = self.recovery.paths.production_env

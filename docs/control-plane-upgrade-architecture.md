@@ -584,3 +584,23 @@ source/image/configuration/credential bindings and no traffic or ownership
 change. It cannot start a consumer from any recovery/preparation state, use a
 hosted provider, or enable notification email. Runtime repair preserves current
 data and does not expire solely with the old deployment checkpoint's age.
+
+Before enabling Auth email callbacks, the protected `auth-configure` transaction
+also verifies the stable proxy's effective configuration. A legacy single-file
+bind mount may retain the old inode after controller installation. If needed,
+the transaction preflights the exact canonical callback-safe configuration in a
+networkless, read-only container using the pinned nginx image, then recreates
+only the existing proxy through its installed systemd/Compose service. It
+preserves upstreams, slots, worker ownership and the current local database;
+serving recovery and worker inhibition are checked immediately afterward.
+
+Normal graduation binds the existing private backup environment's before-digest
+in reconciliation. Finalization preserves it in a protected archive and publishes
+only the six PostgreSQL connection fields for the local loopback session pooler.
+Native database credentials never enter backend or worker environments. The
+protected publication receipt binds before/after configuration and the exact
+transition contract; unaccounted edits reject all later operations. Scheduled
+backups map only the exact internal Supabase API alias to its loopback host API,
+and require matching local database settings. Other endpoints remain unchanged.
+Publication does not run a backup, refresh a marker or enable a timer: actual
+complete backup, independent restore and off-host proofs remain mandatory.

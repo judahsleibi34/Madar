@@ -358,6 +358,16 @@ def scheduled(script: Path) -> None:
         live = json.load(response)
     if live.get('release_sha') != release['sha'] or not re.fullmatch(r'[0-9a-f]{40}', release['sha']):
         raise BackupError('backup_live_release_mismatch')
+    # The internal application alias deliberately does not resolve from host
+    # backup services. Only this exact local topology maps to its loopback API.
+    # Keys still come from the protected production credential; hosted and
+    # other provider endpoints are never rewritten.
+    if found['SUPABASE_URL'] == 'http://madar-supabase:8000':
+        found['SUPABASE_URL'] = 'http://127.0.0.1:18000'
+        if (os.environ.get('PGHOST') != '127.0.0.1' or os.environ.get('PGPORT') != '15432'
+                or not os.environ.get('PGUSER', '').startswith('postgres.')
+                or os.environ.get('PGDATABASE') != 'postgres'):
+            raise BackupError('local_backup_database_configuration_mismatch')
     env = dict(os.environ, **found, MADAR_RELEASE_SHA=release['sha'],
                MADAR_BUILD_TIMESTAMP=live['build_timestamp'], MADAR_PROVIDER_BACKUP_REQUIRED='true')
     os.execve('/bin/bash', ['bash', str(script)], env)
