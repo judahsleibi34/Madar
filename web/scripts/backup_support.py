@@ -302,7 +302,13 @@ def provider_snapshot(root: Path, backup_id: str) -> None:
     base = os.environ.get('SUPABASE_URL', '').rstrip('/')
     parsed = urlsplit(base)
     key = os.environ.get('SUPABASE_SERVICE_KEY', '')
-    if (parsed.scheme != 'https' or not parsed.hostname or parsed.username or parsed.password
+    local = (base == 'http://127.0.0.1:18000'
+             and os.environ.get('PGHOST') == '127.0.0.1'
+             and os.environ.get('PGPORT') == '15432'
+             and os.environ.get('PGDATABASE') == 'postgres'
+             and os.environ.get('PGSSLMODE') == 'disable'
+             and re.fullmatch(r'postgres\.[A-Za-z0-9_-]{1,128}', os.environ.get('PGUSER', '')))
+    if ((parsed.scheme != 'https' and not local) or not parsed.hostname or parsed.username or parsed.password
             or parsed.query or parsed.fragment or parsed.path or not key):
         raise BackupError('provider_configuration_invalid')
     before = json.loads((root / 'provider-inventory.json').read_text())

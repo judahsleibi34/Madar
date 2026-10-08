@@ -97,6 +97,31 @@ class CoordinatedCheckpointTests(unittest.TestCase):
         with self.assertRaisesRegex(self.backup.BackupError,'path_invalid'):
             self.backup.verify_coordinated_checkpoint(self.root)
 
+    def test_exact_loopback_provider_with_session_database_is_supported(self):
+        environment = {'SUPABASE_URL':'http://127.0.0.1:18000',
+            'SUPABASE_SERVICE_KEY':'synthetic-only', 'PGHOST':'127.0.0.1',
+            'PGPORT':'15432', 'PGDATABASE':'postgres', 'PGSSLMODE':'disable',
+            'PGUSER':'postgres.synthetic'}
+        with mock.patch.dict(os.environ, environment, clear=True):
+            # Validation reaches inventory access; no network or secret is used.
+            with self.assertRaises(FileNotFoundError):
+                self.backup.provider_snapshot(self.root, 'madar-20261008T000000Z')
+
+    def test_plaintext_provider_requires_exact_loopback_and_session_route(self):
+        environment = {'SUPABASE_URL':'http://127.0.0.1:18000',
+            'SUPABASE_SERVICE_KEY':'synthetic-only', 'PGHOST':'127.0.0.1',
+            'PGPORT':'15432', 'PGDATABASE':'postgres', 'PGSSLMODE':'disable',
+            'PGUSER':'postgres.synthetic'}
+        for override in ({'SUPABASE_URL':'http://example.invalid'},
+                         {'SUPABASE_URL':'http://127.0.0.1:18001'},
+                         {'PGPORT':'16543'}, {'PGHOST':'example.invalid'},
+                         {'PGUSER':'postgres'}, {'PGDATABASE':'other'},
+                         {'PGSSLMODE':'require'}):
+            with self.subTest(override=override), mock.patch.dict(
+                    os.environ, {**environment, **override}, clear=True):
+                with self.assertRaisesRegex(self.backup.BackupError,'provider_configuration_invalid'):
+                    self.backup.provider_snapshot(self.root, 'madar-20261008T000000Z')
+
 
 class BackupToolingTests(unittest.TestCase):
     def run_script(self, name, *args, env=None):

@@ -50,6 +50,11 @@ its read-only exporting connection open. The dump and opaque per-table restore
 comparisons then share one consistent database snapshot. Scheduled backups keep
 their existing default snapshot behavior; this does not fence or mutate source
 data and does not authorize any configuration publication.
+Provider byte backup accepts plaintext HTTP only at the exact host-loopback
+gateway `127.0.0.1:18000`, paired with the reviewed local session endpoint
+`127.0.0.1:15432`, project-scoped PostgreSQL user and explicit local SSL policy.
+Transaction pooling and arbitrary plaintext provider destinations are rejected.
+Hosted provider backups retain their HTTPS requirement.
 
 The governed provider402 traffic switch enforces canonical query/referrer-safe
 proxy logging before serving recovery authentication, including runtime-only
