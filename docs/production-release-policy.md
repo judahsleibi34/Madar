@@ -1970,3 +1970,16 @@ states only after normal local backup/restore/Node 1 completion. No obsolete
 hosted backup job is resumed during preparation. Nonsecret backup-health marker
 reads accept the established readable 0644 mode; secret and credential readers
 continue to require private permissions.
+
+
+Detached continuation allocation is now bound to current RECOVERY worker ownership,
+protected active-local-rollback state and local-fallback traffic identities, not
+the historical recovery origin slot. Exact retained container/image/specification
+and network bindings, stopped target resources, free sockets and stopped Docker
+reservations, Redis locality, candidate/archive names and a non-overlapping subnet
+are checked by the SAME read-only feasibility path before authorization and under
+the deployment locks immediately before staging. The exact target/ports/retained
+writer/Redis/subnet are sealed in the new plan; changed allocation fails closed,
+without stopping or displacing existing resources. Saved normal runtime and
+post-handoff retained-writer fencing use that sealed allocation. Historical
+transactions, consumed attempts and currently serving recovery stay unchanged.

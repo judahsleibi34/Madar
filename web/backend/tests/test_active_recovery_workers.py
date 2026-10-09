@@ -56,7 +56,7 @@ class WorkerHandoffTests(unittest.TestCase):
         contract=LocalTransitionContract('a'*40,self.plan.candidate_images,'f'*64,'f'*64,'2'*64,'3'*64,fp)
         self.c=Candidate(contract)
         deps={'runtimes':{name:{'container_id':row['Id'],'image_id':row['Image'],'spec_sha256':spec(row)} for name,row in self.c.rows.items() if name.startswith('madar-green-')}}
-        bindings=dict(self.plan.retained_inputs);bindings['runtime_dependencies']=digest(deps);self.plan=replace(self.plan,retained_inputs=bindings)
+        bindings=dict(self.plan.retained_inputs);bindings['runtime_dependencies']=digest(deps);self.plan=replace(self.plan,retained_inputs=bindings,candidate_destination={'retained_source_sha':'f'*40})
         self.root=base/self.plan.digest;self.root.mkdir()
         (self.root/'runtime-dependencies.json').write_text(json.dumps(deps))
         runtimes={kind:{'id':self.c.inspect(self.c.name(kind))['Id'],'image':self.c.inspect(self.c.name(kind))['Image'],

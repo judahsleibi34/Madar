@@ -74,6 +74,10 @@ class DetachedCandidateTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError,'already_exists'):self.c.require_free_destinations()
         self.assertEqual(len(calls),1);self.assertEqual(calls[0][1:3],['ps','-a'])
 
+    def test_retired_name_collision_prevents_any_effect(self):
+        self.c.command=lambda args:'madar-green-backend-retired-'+self.plan.digest[:12]
+        with self.assertRaisesRegex(RuntimeError,'already_exists'):self.c.require_free_destinations()
+
     def test_existing_network_prevents_any_effect(self):
         self.c.command=lambda args:self.c.network_name if args[1]=='network' else ''
         with self.assertRaisesRegex(RuntimeError,'already_exists'):self.c.require_free_destinations()
@@ -199,7 +203,7 @@ class DetachedCandidateTests(unittest.TestCase):
         (local/'configuration.env').write_text('synthetic')
         fingerprints=dict(self.plan.retained_inputs)
         for key,path in [('recovery_contract',recovery/'contract.json'),('schema_contract',recovery/'schema-contract.json'),('local_configuration',local/'configuration.env')]:fingerprints[key]=file_digest(path)
-        plan=replace(self.plan,retained_inputs=fingerprints);root=base/plan.digest;root.mkdir()
+        plan=replace(self.plan,retained_inputs=fingerprints,candidate_destination={'slot':'green','backend_port':8201,'frontend_port':3200,'retained_slot':'blue','retained_source_sha':'9'*40,'redis_name':'madar-provider402-rehearsal-000000000000-candidate-redis','redis_network':'madar-provider402-rehearsal-000000000000-candidate-blue-runtime','redis_network_id':'a'*64,'subnet':'10.253.0.0/24'});root=base/plan.digest;root.mkdir()
         (root/'authorization.json').write_text(json.dumps({**self.auth,'plan_sha256':plan.digest}))
         contract=replace(self.contract,recovery_context=digest(asdict(old)))
         (root/'candidate-contract.json').write_text(json.dumps({'version':1,'plan_sha256':plan.digest,'contract':asdict(contract)}))

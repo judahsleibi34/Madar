@@ -65,7 +65,7 @@ class ActiveRecoveryWorkerHandoff:
             contract=self.candidate.contract
             other='blue' if self.candidate.slot=='green' else 'green'
             owner=write_worker_authority(self.state,generation=digest(asdict(contract)),owner='CANDIDATE',
-                old={'sha':self.candidate.recovery.contract.origin_sha,'slot':other},candidate={'sha':contract.sha,'slot':self.candidate.slot})
+                old={'sha':self.plan.candidate_destination['retained_source_sha'],'slot':other},candidate={'sha':contract.sha,'slot':self.candidate.slot})
             identity=pwd.getpwnam('madar')
             os.chown(self.state/'worker-ownership.json',identity.pw_uid,identity.pw_gid)
             exclusive(self.root/'worker-owner.json',encoded({'version':1,'plan_sha256':self.plan.digest,'authority':owner,

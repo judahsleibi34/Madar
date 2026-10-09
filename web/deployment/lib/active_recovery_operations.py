@@ -68,6 +68,7 @@ class ProductionActiveRecoveryOperations:
             if any(timers.ops.systemctl_state(name)['active']!='inactive' for name in prior):
                 raise RuntimeError('retry_timer_not_quiesced')
         readonly_configuration(Path('/var/lib/madar/backup-state/latest.json'),private=False)
+        if self.candidate is None:self.verify_candidate_feasibility(plan)
         if observe_retained_inputs() != plan.retained_inputs:
             raise RuntimeError('continuation_retained_inputs_changed')
         for key in ('local_transaction', 'recovery_transaction'):
@@ -141,13 +142,28 @@ class ProductionActiveRecoveryOperations:
         operator=pwd.getpwnam('madar')
         os.chown(marker,operator.pw_uid,operator.pw_gid);os.chmod(marker,0o644)
 
-    def stage_detached_read_only_candidate(self, plan, root):
+    def candidate_contract(self,plan):
         old = json.loads(protected(INPUTS['recovery_contract'],private=True).read_text())
         mapping = {'environment':'production_configuration','state':'release_state','upstream':'upstream',
             'worker_authority':'worker_authority','controller':'controller','recovery':'recovery_transaction','traffic':'traffic'}
-        contract = LocalTransitionContract(plan.source_sha,dict(plan.candidate_images),digest(old),
+        return LocalTransitionContract(plan.source_sha,dict(plan.candidate_images),digest(old),
             plan.checkpoint_manifest_sha256,plan.reconciliation_execution_sha256,plan.acceptance_execution_sha256,
             {key:plan.retained_inputs[value] for key,value in mapping.items()})
+
+    def verify_candidate_feasibility(self,plan):
+        if plan.candidate_destination is None:raise RuntimeError('continuation_candidate_destination_required')
+        result=DetachedRecoveryCandidate.read_only_feasibility(plan,self.candidate_contract(plan),self.root)
+        from deployment.lib.active_recovery_candidate import require_unreserved_ports
+        from deployment.lib.active_recovery_boot_installation import UNITS,DROPIN
+        paths=[UNITS/('madar-normal-local-'+kind+'-'+plan.digest[:12]+'.service') for kind in ('boot','fallback')]
+        if any(path.exists() or path.is_symlink() for path in (*paths,DROPIN)):
+            raise RuntimeError('continuation_exclusive_service_already_exists')
+        require_unreserved_ports(self.runtime,(29501,39501,39502))
+        return result
+
+    def stage_detached_read_only_candidate(self, plan, root):
+        self.verify_candidate_feasibility(plan)
+        contract=self.candidate_contract(plan)
         self.candidate = DetachedRecoveryCandidate(plan,contract,root)
         self.candidate.stage()
         self.workers = ActiveRecoveryWorkerHandoff(plan,self.candidate,root,self.source.verify)
