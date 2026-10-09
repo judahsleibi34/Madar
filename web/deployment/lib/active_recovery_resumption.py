@@ -41,6 +41,7 @@ class ResumptionPlan:
     restore_customer_database: bool = False
     convergence_seconds: int = 180
     compensation_seconds: int = 60
+    prior_backup_timer_preimage: dict | None = None
 
     def validate(self):
         if not re.fullmatch(r'[0-9a-f]{40}', self.source_sha):
@@ -53,6 +54,11 @@ class ResumptionPlan:
                 or self.restore_customer_database is not False or self.convergence_seconds != 180
                 or self.compensation_seconds != 60):
             raise RuntimeError('resumption_scope_invalid')
+        prior=self.prior_backup_timer_preimage
+        if prior is not None and (not isinstance(prior,dict)
+                or set(prior)!={'plan_sha256','evidence_sha256','timer_preimage_sha256'}
+                or any(not HASH.fullmatch(str(value)) for value in prior.values())):
+            raise RuntimeError('resumption_prior_timer_binding_invalid')
         if set(self.candidate_images) != {'backend','frontend'} or any(
                 not re.fullmatch(r'sha256:[0-9a-f]{64}', str(value)) for value in self.candidate_images.values()):
             raise RuntimeError('resumption_candidate_images_invalid')

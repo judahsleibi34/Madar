@@ -10,8 +10,35 @@ from pathlib import Path
 from deployment.lib.active_recovery_resumption import ROOT
 from deployment.lib.active_recovery_inputs import INPUTS
 from deployment.lib.emergency_routing_repair import Runtime,UPSTREAM,exclusive,encoded
-from deployment.lib.provider_recovery_runtime import protected,file_digest
+from deployment.lib.provider_recovery_runtime import protected,file_digest,digest
 from deployment.lib.control_plane_upgrade import SystemOperations,BACKUP_TIMERS,validate_backup_timer_states,BACKUP_BUSY_STATES
+
+def prior_backup_timer_states(plan):
+    """Previous failed-attempt timer snapshot is data, never reused authority."""
+    binding=getattr(plan,'prior_backup_timer_preimage',None)
+    if binding is None:return None
+    root=ROOT/binding['plan_sha256']
+    if root==ROOT/plan.digest:raise RuntimeError('retry_timer_same_attempt_denied')
+    names=('authorization.json','plan.json','events.jsonl','backup-timer-preimage.json')
+    paths={name:protected(root/name,private=True) for name in names}
+    hashes={name:file_digest(path) for name,path in paths.items()}
+    if (digest(hashes)!=binding['evidence_sha256']
+            or hashes['plan.json']!=binding['plan_sha256']
+            or hashes['backup-timer-preimage.json']!=binding['timer_preimage_sha256']):
+        raise RuntimeError('retry_timer_evidence_changed')
+    saved=json.loads(paths['plan.json'].read_text())
+    receipt=json.loads(paths['authorization.json'].read_text())
+    events=[json.loads(line) for line in paths['events.jsonl'].read_text().splitlines()]
+    if (receipt.get('operation')!='active-local-rollback-resumption'
+            or receipt.get('plan_sha256')!=binding['plan_sha256']
+            or receipt.get('source_bundle_sha256')!=saved.get('source_bundle_sha256')
+            or saved.get('retained_inputs')!=plan.retained_inputs
+            or [row.get('phase') for row in events]!=['authorized','detached_candidate_pending','detached_candidate_failed']
+            or any(row.get('plan_sha256')!=binding['plan_sha256'] for row in events)
+            or (root/'candidate-contract.json').exists() or (root/'candidate-identities.json').exists()):
+        raise RuntimeError('retry_timer_prior_attempt_not_applicable')
+    return validate_backup_timer_states(json.loads(paths['backup-timer-preimage.json'].read_text()))
+
 
 class ActiveRecoveryControllerRepair:
     def __init__(self,plan,candidate,root,source_guard,*,operations=None,runtime=None):
@@ -127,8 +154,14 @@ class ActiveRecoveryBackupTimers:
             raise RuntimeError('controller_resume_timer_quiesce_failed')
     def quiesce(self):
         self.guard()
-        states=validate_backup_timer_states({name:self.ops.systemctl_state(name) for name in BACKUP_TIMERS})
+        current=validate_backup_timer_states({name:self.ops.systemctl_state(name) for name in BACKUP_TIMERS})
+        prior=prior_backup_timer_states(self.plan)
+        if prior is not None and any(row['active']!='inactive' for row in current.values()):
+            raise RuntimeError('retry_timer_not_quiesced')
+        states=prior if prior is not None else current
         exclusive(self.root/'backup-timer-preimage.json',encoded(states))
-        for name,row in states.items():
+        if prior is not None:
+            exclusive(self.root/'backup-timer-retry-observation.json',encoded({'prior':self.plan.prior_backup_timer_preimage,'observed_current':current}))
+        for name,row in current.items():
             if row['active']=='active':self.ops.command('continuation_backup_timer_stop',['/usr/bin/systemctl','stop',name])
         self.require_quiesced()

@@ -104,3 +104,42 @@ class ControllerResumeTests(unittest.TestCase):
         self.phase='controller_resume_pending';self.write_phase()
         with self.assertRaisesRegex(RuntimeError,'timer_quiesce_failed'):self.repair.install()
         self.assertNotIn('installer_apply',self.ops.calls)
+
+    def previous_failed_timer_attempt(self):
+        from deployment.lib.provider_recovery_runtime import digest,file_digest
+        base=self.root.parent
+        saved={'source_bundle_sha256':'c'*64,'retained_inputs':self.plan.retained_inputs}
+        raw=json.dumps(saved,sort_keys=True).encode();old_digest=hashlib.sha256(raw).hexdigest()
+        old=base/old_digest;old.mkdir();(old/'plan.json').write_bytes(raw)
+        (old/'authorization.json').write_text(json.dumps({'operation':'active-local-rollback-resumption','plan_sha256':old_digest,'source_bundle_sha256':'c'*64}))
+        (old/'events.jsonl').write_text(''.join(json.dumps({'phase':phase,'plan_sha256':old_digest})+'\n' for phase in ('authorized','detached_candidate_pending','detached_candidate_failed')))
+        states={name:{'enabled':'enabled','active':'active'} for name in BACKUP_TIMERS}
+        (old/'backup-timer-preimage.json').write_text(json.dumps(states,sort_keys=True)+'\n')
+        hashes={name:file_digest(old/name) for name in ('authorization.json','plan.json','events.jsonl','backup-timer-preimage.json')}
+        self.plan.prior_backup_timer_preimage={'plan_sha256':old_digest,'evidence_sha256':digest(hashes),'timer_preimage_sha256':hashes['backup-timer-preimage.json']}
+        self.phase='detached_candidate_pending';self.write_phase()
+        for name in BACKUP_TIMERS:self.ops.states[name]['active']='inactive'
+        return old,states
+
+    def test_retry_keeps_original_timer_states_without_starting_obsolete_jobs(self):
+        old,states=self.previous_failed_timer_attempt();previous=(old/'backup-timer-preimage.json').read_bytes()
+        ActiveRecoveryBackupTimers(self.plan,self.root,self.repair.source_guard,operations=self.ops).quiesce()
+        self.assertEqual(json.loads((self.root/'backup-timer-preimage.json').read_text()),states)
+        self.assertEqual((old/'backup-timer-preimage.json').read_bytes(),previous)
+        self.assertEqual(self.ops.calls,[])
+        self.assertTrue((self.root/'backup-timer-retry-observation.json').exists())
+
+    def test_modified_previous_attempt_denied_before_timer_effect(self):
+        old,_=self.previous_failed_timer_attempt()
+        with (old/'events.jsonl').open('a') as stream:stream.write('{}\n')
+        with self.assertRaisesRegex(RuntimeError,'evidence_changed'):
+            ActiveRecoveryBackupTimers(self.plan,self.root,self.repair.source_guard,operations=self.ops).quiesce()
+        self.assertEqual(self.ops.calls,[]);self.assertFalse((self.root/'backup-timer-preimage.json').exists())
+
+    def test_previous_candidate_or_reactivated_timer_denied(self):
+        old,_=self.previous_failed_timer_attempt();(old/'candidate-contract.json').write_text('{}')
+        timer=ActiveRecoveryBackupTimers(self.plan,self.root,self.repair.source_guard,operations=self.ops)
+        with self.assertRaisesRegex(RuntimeError,'not_applicable'):timer.quiesce()
+        (old/'candidate-contract.json').unlink();self.ops.states[BACKUP_TIMERS[0]]['active']='active'
+        with self.assertRaisesRegex(RuntimeError,'not_quiesced'):timer.quiesce()
+        self.assertEqual(self.ops.calls,[])
