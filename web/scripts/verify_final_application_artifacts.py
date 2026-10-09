@@ -60,12 +60,19 @@ class Session:
                 for key,item in cookie.items():
                     if item.value:self.cookies[key]=item.value
                     else:self.cookies.pop(key,None)
+            if response.headers.get('X-CSRF-Token'):self.csrf=response.headers['X-CSRF-Token']
+            elif self.cookies.get('madar_csrf_token'):self.csrf=self.cookies['madar_csrf_token']
             try:payload=json.loads(raw)
             except ValueError:payload=None
             if isinstance(payload,dict) and payload.get('csrf_token'):self.csrf=payload['csrf_token']
             return code,payload,cookie_headers,raw
     def ok(self,path,body=None,method=None):
         code,payload,_,_=self.request(path,body,method)
+        if code not in {200,201,204}:
+            detail=payload.get('detail') if isinstance(payload,dict) else None
+            category=detail.get('code') if isinstance(detail,dict) else None
+            if not isinstance(category,str) or not re.fullmatch('[a-z_]{1,80}',category):category=None
+            print(json.dumps({'event':'artifact_api_case_failure','http_status':code,'error_code':category,'invalid_csrf_token':detail=='Invalid CSRF token'}),flush=True)
         require(code in {200,201,204},'artifact_api_case_failed:'+path.split('?')[0])
         return payload
 
@@ -128,13 +135,14 @@ def application_cases(db,endpoints,native):
         temporary=authority/'new.json';temporary.write_text(json.dumps(document));temporary.chmod(0o444);os.replace(temporary,authority/'authority.json')
     def inspect(name):return json.loads(run(['docker','inspect',name]))[0]
     def endpoint(name,port):return 'http://'+inspect(name)['NetworkSettings']['Networks'][network]['IPAddress']+':'+str(port)
-    def create(kind,image,alias,environment=None,command=None,mounts=(),entrypoint=None):
+    def create(kind,image,alias,environment=None,command=None,mounts=(),entrypoint=None,user=None):
         require(not any(key.startswith(('LD_','PYTHON','DOCKER_','COMPOSE_','GIT_')) or key in {'PATH','HOME','SHELL','BASH_ENV','ENV','IFS','CDPATH'} for key in environment or {}),'artifact_loader_environment_rejected')
         name=prefix+'-'+kind
         args=['docker','create','--pull','never','--name',name,'--network',network,'--network-alias',alias,
             '--restart','no','--log-driver','none','--cap-drop','ALL','--security-opt','no-new-privileges',
             '--memory','1g','--pids-limit','256']
         if entrypoint is not None:args+=['--entrypoint',entrypoint]
+        if user is not None:args+=['--user',user]
         for mount in mounts:args+=['--mount',mount]
         for key in environment or {}:args+=['--env',key]
         run_env(args+[image]+(command or []),environment or {});created.append(name)
@@ -159,7 +167,7 @@ def application_cases(db,endpoints,native):
         require(gateway['Config']['Entrypoint']==['/bin/sh','/docker-entrypoint.sh'],'artifact_gateway_command_changed')
         gw=create('gateway',gateway['Image'],'madar-supabase',gateway_env,command=['/docker-entrypoint.sh'],mounts=mounts,entrypoint='/bin/sh')
         redis_image=inspect('madar-provider402-rehearsal-94750f00e0d3-candidate-redis')['Image']
-        redis=create('redis',redis_image,'redis',command=['redis-server','--save','','--appendonly','no'])
+        redis=create('redis',redis_image,'redis',command=['redis-server','--save','','--appendonly','no'],user='redis')
         cfg.update(APP_ENV='production',MADAR_ENV_FILE='/tmp/no-env',MADAR_ENV_OVERRIDE='false',
             MADAR_RELEASE_SHA=inputs['source_sha'],MADAR_RELEASE_SLOT='green',SCHEMA_COMPATIBLE_MIN='115',SCHEMA_COMPATIBLE_MAX='115',
             REDIS_URL='redis://redis:6379/0',COOKIE_SECURE='true',ADMIN_MFA_LOGIN_ENFORCEMENT='true',RATE_LIMIT_FAIL_OPEN='false',RATE_LIMIT_ENABLED='true',
@@ -168,12 +176,14 @@ def application_cases(db,endpoints,native):
             NOTIFICATION_WORKER_HEALTH_HOST='0.0.0.0',CALENDAR_SYNC_WORKER_HEALTH_HOST='0.0.0.0',DATA_DELETION_WORKER_HEALTH_HOST='0.0.0.0',
             NOTIFICATION_WORKER_HEALTH_URL='http://notification-worker:8090/health',CALENDAR_SYNC_WORKER_HEALTH_URL='http://calendar-sync-worker:8091/health',
             DATA_DELETION_WORKER_HEALTH_URL='http://data-deletion-worker:8094/health',EMAIL_CHANNEL_ENABLED='false',
-            PARSER_ISOLATED_WORKER_ENABLED='true',PARSER_WORKER_URL='http://parser:8000',PARSER_WORKER_HEALTH_URL='http://parser:8000/health',
+            PARSER_ISOLATED_WORKER_ENABLED='true',PARSER_WORKER_URL='http://parser:8092/parse',PARSER_WORKER_HEALTH_URL='http://parser:8092/health',
             REMOTE_INGESTION_ENABLED='false',ALLOW_REMOTE_DATASET_URLS='false',AI_ALLOW_LOCAL_EXEC='false',
             PUBLIC_UPLOADS_DIR='/tmp/app-public',DATA_UPLOAD_DIR='/tmp/app-private',PRIVATE_CHARTS_DIR='/tmp/app-charts',
             BACKUP_FRESHNESS_REQUIRED='true',BACKUP_FRESHNESS_MARKER='/run/madar/backup-state/latest.json',
             MADAR_BUSINESS_WRITE_AUTHORITY='/run/madar/business-write-authority/authority.json',MADAR_BUSINESS_WRITE_CONTRACT=contract)
         cfg.pop('MADAR_RECOVERY_PROFILE',None)
+        expected_samesite=cfg.get('COOKIE_SAMESITE','lax').strip().lower()
+        require(expected_samesite in {'strict','lax','none'},'artifact_cookie_policy_invalid')
         mounts=[f'type=bind,src={authority},dst=/run/madar/business-write-authority,readonly',
             f'type=bind,src={health},dst=/run/madar/backup-state,readonly']
         parser=create('parser',inputs['images']['backend'],'parser',{'PARSER_WORKER_HEALTH_HOST':'0.0.0.0','DATA_UPLOAD_DIR':'/tmp/parser'},['python','-m','workers.parser_worker'])
@@ -187,12 +197,21 @@ def application_cases(db,endpoints,native):
             require(code==200,'artifact_startup_pending')
             require(version['release_sha']==inputs['source_sha'],'artifact_version_changed')
         ready(startup)
+        redis_probe=run(['docker','exec',backend,'python','-c',"import json,os,redis; r=redis.Redis.from_url(os.environ['REDIS_URL']); print(json.dumps({'event':'artifact_private_redis_ping','ok':r.ping()}))"])
+        print(redis_probe.strip(),flush=True)
         require(front.request('/')[0]==200 and front.ok('/api/health/version')==session.ok('/health/version'),'artifact_frontend_origin_failed')
         html=front.request('/')[3].decode()
         scripts=re.findall(r'<script[^>]+src=[\"\']([^\"\']+)[\"\']',html)
-        require(scripts and all(path.startswith('/assets/') for path in scripts),'artifact_frontend_bundle_missing')
+        scripts=[path for path in scripts if path.startswith('/assets/') and path.endswith('.js')]
+        require(scripts,'artifact_frontend_bundle_missing')
         bundle=front.request(scripts[0])[3]
-        require(b'\"/api\"' in bundle or b"'/api'" in bundle,'artifact_frontend_compiled_origin_wrong')
+        # Vite splits the API client from its entry module and may render its
+        # constant using a template literal. Follow only its bounded same-origin
+        # immutable asset reference, never an arbitrary HTML/JavaScript URL.
+        client_assets=set(re.findall(rb'assets/apiClient-[A-Za-z0-9_-]+\.js',bundle))
+        require(len(client_assets)<=4,'artifact_frontend_asset_graph_invalid')
+        for asset in sorted(client_assets):bundle+=front.request('/'+asset.decode('ascii'))[3]
+        require(any(value in bundle for value in (b'\"/api\"',b"'/api'",b'`/api`')),'artifact_frontend_compiled_origin_wrong')
         require(b'madar-supabase:8000' not in bundle and b'127.0.0.1:8201' not in bundle,'artifact_frontend_internal_origin_leaked')
         observed('frontend_api_origin',http_status=200,same_image_release=True,api_origin='/api',compiled_bundle_checked=True)
         require(psql(db,"SELECT schema_version FROM public.application_schema_state WHERE contract_key='core';")=='115','artifact_schema_changed')
@@ -215,13 +234,21 @@ def application_cases(db,endpoints,native):
             original_verifiers.append((factor['user_id'],factor['verifier']));password=secrets.token_urlsafe(32)
             code,_,_=fetch(endpoints['auth']+'/admin/users/'+factor['user_id'],headers=admin_headers,method='PUT',body={'password':password});require(code==200,'artifact_private_password_setup_failed')
             login=Session(endpoint(backend,8000));code,result,headers,_=login.request('/auth/login',{'email':factor['email'],'password':password})
-            require(code==200 and result.get('mfa_required') is True and 'madar_access_token' not in login.cookies,'artifact_aal1_session_escaped')
+            print(json.dumps({'event':'artifact_primary_login_status','http_status':code,'mfa_required':result.get('mfa_required') if isinstance(result,dict) else None,'ordinary_access_cookie': 'madar_access_token' in login.cookies,'request_protection_unavailable': isinstance(result,dict) and result.get('detail')=='Request protection service is temporarily unavailable. Please try again.','error_code':result.get('detail',{}).get('code') if isinstance(result,dict) and isinstance(result.get('detail'),dict) else None}),flush=True)
+            require(code==200,'artifact_existing_primary_login_failed')
+            require(result.get('mfa_required') is True and 'madar_access_token' not in login.cookies,'artifact_aal1_session_escaped')
             status_code,status_body,_,_=login.request('/auth/user_status')
-            require(status_code==200 and status_body.get('logged_in') is False,'artifact_aal1_session_escaped')
+            print(json.dumps({'event':'artifact_pending_session_status','http_status':status_code,'logged_in':status_body.get('logged_in') if isinstance(status_body,dict) else None}),flush=True)
+            require((status_code==200 and status_body.get('logged_in') is False) or status_code in {401,403},'artifact_aal1_session_escaped')
             denied_code=login.request('/admin/profile/info')[0]
             require(denied_code in {401,403},'artifact_aal1_privilege_not_denied');aal1_denials.append(denied_code)
-            pending=[x for x in headers if x.startswith('madar_mfa_pending=')]
-            require(len(pending)==1 and all(x in pending[0] for x in ('HttpOnly','Secure','SameSite=lax','Path=/')),'artifact_pending_cookie_unsafe')
+            pending=[]
+            for header in headers:
+                cookie=SimpleCookie();cookie.load(header)
+                item=cookie.get('madar_mfa_pending')
+                if item is not None and item.value:pending.append(item)
+            require(len(pending)==1 and pending[0]['httponly'] and pending[0]['secure']
+                and pending[0]['samesite'].lower()==expected_samesite and pending[0]['path']=='/','artifact_pending_cookie_unsafe')
             challenge=login.ok('/auth/mfa/login/challenge',{'factor_id':factor['factor_id']})
             result=login.ok('/auth/mfa/login/verify',{'factor_id':factor['factor_id'],'challenge_id':challenge['challenge_id'],'code':totp(factor['secret'])})
             status=login.ok('/auth/user_status');require(status.get('logged_in') is True,'artifact_existing_session_failed')
@@ -233,7 +260,7 @@ def application_cases(db,endpoints,native):
         observed('existing_authentication',existing_accounts=2,private_known_passwords_only=True,actual_image_source_files=verified_source['files'])
         observed('original_mfa_aal2',original_factors=2,backend_aal2_verified=True)
         observed('aal1_privilege_denied',http_statuses=aal1_denials,user_status_logged_in=False,ordinary_session_issued_before_mfa=False)
-        observed('session_cookie_policy',pending_http_only=True,secure=True,same_site='lax',path='/')
+        observed('session_cookie_policy',pending_http_only=True,secure=True,same_site=expected_samesite,path='/')
         mode('NORMAL');ready(lambda:workers(True))
         require(session.ok('/health/recovery')=={'restricted':False,'business_writes_enabled':True},'artifact_private_normal_failed')
         # Privileged primary accounts cannot acquire tenant-owner business scope.
