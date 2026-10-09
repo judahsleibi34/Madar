@@ -1067,3 +1067,7 @@ controls before routing. Failures retain their phase/type and sanitized stack
 locations in the protected journal; customer rows and configuration values are
 never diagnostics. All post-publication compensation preserves current local
 PostgreSQL and returns to verified restrictions or maintenance.
+
+The compensated continuation may permit append-only audit growth between preparation and execution. It proves the exact original audit prefix (count and complete row hash) unchanged at the bound timestamp, rejects backdated insertions/deletions/edits, and keeps all other 95 public table roots and security-critical identities exact. The original snapshot remains historical data; source fencing captures the actual latest snapshot. This exception grants no business-write permission.
+
+The state-F database binding also hashes Auth users/identities (excluding only last-sign-in and updated timestamps), complete original MFA factors, storage metadata/buckets, table ownership/ACL/RLS settings and policy expressions inside PostgreSQL. Only a SHA-256 root is emitted. Changes to credentials, factors, tenant records or authorization catalogs require a new baseline and plan.

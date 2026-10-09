@@ -287,13 +287,31 @@ class ProductionActiveRecoveryOperations:
         ActiveRecoveryNormalPublication(plan,self.candidate,root,self.source.verify,self.kernel).publish()
         authority.grant()
 
+    def sustained_normal_rounds(self, check):
+        first=None;successes=0
+        with verification_window(self.runtime,180):
+            while True:
+                self.runtime.budget(1)
+                try:result=check()
+                except AvailabilityFailure:first=None;successes=0
+                else:
+                    successes+=1
+                    if first is None:first=time.monotonic()
+                    if successes>=3 and time.monotonic()-first>=5:return result
+                time.sleep(self.runtime.budget(1))
+
     def verify_normal_acceptance(self, plan):
         started = datetime.now(timezone.utc).isoformat()
         self.verify_actual_execution_evidence(plan)
-        self.converge(lambda: (verify_native_continuation_dependencies(plan,self.root,self.runtime),self.kernel.normal()),180)
-        # Actual public requests are independently read after local readiness.
+        # Every round includes native identity, singleton workers, authority,
+        # direct readiness and actual public requests. Only bounded availability
+        # failures may reset convergence; integrity/security failures abort.
         from deployment.lib.active_recovery_artifact_evidence import public_normal_observations
-        observations = public_normal_observations(plan,self.candidate.slot)
+        def round_check():
+            verify_native_continuation_dependencies(plan,self.root,self.runtime)
+            self.kernel.normal()
+            return public_normal_observations(plan,self.candidate.slot)
+        observations = self.sustained_normal_rounds(round_check)
         exclusive(self.root/'normal-acceptance.json',encoded({'operation':'actual-normal-runtime-verification',
             'plan_sha256':plan.digest,'source_sha':plan.source_sha,'images':plan.candidate_images,
             'started_at':started,'finished_at':datetime.now(timezone.utc).isoformat(),

@@ -92,3 +92,37 @@ class ConcreteOperationsTests(unittest.TestCase):
             self.assertEqual((self.ops.root/'backup-health-preimage.json').stat().st_mode&0o777,0o600)
             self.assertEqual(marker.stat().st_mode&0o777,0o644)
             self.assertEqual(json.loads(marker.read_text()),{'verified':True})
+
+
+class SustainedNormalTests(unittest.TestCase):
+    def setUp(self):
+        self.ops=ProductionActiveRecoveryOperations.__new__(ProductionActiveRecoveryOperations)
+        self.ops.runtime=SimpleNamespace(budget=Mock(return_value=0))
+    def test_requires_three_complete_rounds_spanning_five_seconds(self):
+        check=Mock(return_value={'verified':'actual round'})
+        with patch('deployment.lib.active_recovery_operations.verification_window'), \
+             patch('deployment.lib.active_recovery_operations.time.sleep'), \
+             patch('deployment.lib.active_recovery_operations.time.monotonic',side_effect=[0,5]):
+            self.assertEqual(self.ops.sustained_normal_rounds(check),{'verified':'actual round'})
+        self.assertEqual(check.call_count,3)
+    def test_transient_availability_resets_success_count(self):
+        from deployment.lib.emergency_routing_repair import AvailabilityFailure
+        check=Mock(side_effect=[True,True,AvailabilityFailure('warming'),True,True,True])
+        with patch('deployment.lib.active_recovery_operations.verification_window'), \
+             patch('deployment.lib.active_recovery_operations.time.sleep'), \
+             patch('deployment.lib.active_recovery_operations.time.monotonic',side_effect=[0,5,10]):
+            self.assertTrue(self.ops.sustained_normal_rounds(check))
+        self.assertEqual(check.call_count,6)
+    def test_integrity_failure_is_not_retried(self):
+        check=Mock(side_effect=RuntimeError('identity_changed'))
+        with patch('deployment.lib.active_recovery_operations.verification_window'), \
+             self.assertRaisesRegex(RuntimeError,'identity_changed'):
+            self.ops.sustained_normal_rounds(check)
+        self.assertEqual(check.call_count,1)
+    def test_overall_deadline_stops_verification(self):
+        from deployment.lib.emergency_routing_repair import VerificationDeadline
+        self.ops.runtime.budget.side_effect=VerificationDeadline('expired')
+        check=Mock()
+        with patch('deployment.lib.active_recovery_operations.verification_window'), \
+             self.assertRaises(VerificationDeadline):self.ops.sustained_normal_rounds(check)
+        check.assert_not_called()

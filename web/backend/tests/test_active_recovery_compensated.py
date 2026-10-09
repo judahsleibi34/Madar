@@ -11,7 +11,7 @@ from deployment.lib.provider_recovery_runtime import digest
 class CompensatedHistoryTests(unittest.TestCase):
     def setUp(self):
         self.plan = SimpleNamespace(digest='a'*64, source_sha='b'*40, source_bundle_sha256='c'*64,
-                                   candidate_images={'backend':'sha256:'+'d'*64,'frontend':'sha256:'+'e'*64},acceptance_execution_sha256='f'*64)
+                                   candidate_destination={'slot':'green'}, candidate_images={'backend':'sha256:'+'d'*64,'frontend':'sha256:'+'e'*64},acceptance_execution_sha256='f'*64)
         p=self.plan
         self.records={
             'authorization.json':{'operation':'active-local-rollback-resumption','plan_sha256':p.digest,'source_bundle_sha256':p.source_bundle_sha256},
@@ -25,7 +25,7 @@ class CompensatedHistoryTests(unittest.TestCase):
                 'observations':{key:{'http_status':200,'body':body} for key,body in (
                     ('frontend',{}),('api',{}),('readiness',{'ready':True}),
                     ('recovery',{'restricted':False,'business_writes_enabled':True}),
-                    ('version',{'release_sha':p.source_sha,'schema_compatible_min':115,'schema_compatible_max':115}))}},
+                    ('version',{'release_sha':p.source_sha,'release_slot':'green','schema_compatible_min':115,'schema_compatible_max':115}))}},
             'write-boundary.json':{'plan_sha256':p.digest,'source_sha':p.source_sha,'source_bundle_sha256':p.source_bundle_sha256,
                 'began_at':'2026-10-09T19:08:10+00:00','customer_database_restore_permitted':False,'normal_writes_may_have_occurred':True},
             'write-authority/authority.json':{'mode':'READ_ONLY','schema':115,'release_sha':p.source_sha},
@@ -105,3 +105,47 @@ class RetainedSpecificationTests(unittest.TestCase):
         self.assertFalse(historical_retained_spec_matches(row,original,fence,'d'*64))
         row['State']['Running']=True
         self.assertFalse(historical_retained_spec_matches(row,original,fence,'c'*64))
+
+
+class AuditExtensionTests(unittest.TestCase):
+    def setUp(self):
+        roots=[{'table':'audit_logs','count':2,'sha256':'a'*64},
+               {'table':'customer_fixture','count':1,'sha256':'b'*64}]
+        self.baseline={'previous_plan_sha256':'c'*64,'database_snapshot_sha256':'d'*64,
+            'database_snapshot':{'table_roots':roots},
+            'database_metadata':{'users':18,'audit_max_created_at':'2026-10-09 20:00:00+00'}}
+        self.current=copy.deepcopy(self.baseline)
+        self.current['database_snapshot_sha256']='e'*64
+        self.current['database_snapshot']['table_roots'][0]={'table':'audit_logs','count':3,'sha256':'f'*64}
+        self.current['database_metadata']['audit_max_created_at']='2026-10-09 21:00:00+00'
+    def verify(self, prefix=None):
+        from deployment.lib.active_recovery_compensated import verify_audit_extension
+        with patch('deployment.lib.active_recovery_compensated.inspect_history',return_value=(object(),'/fixture',{},{})), \
+             patch('deployment.lib.active_recovery_fallback.CurrentDataFallback'), \
+             patch('deployment.lib.active_recovery_reconciliation.CurrentLocalReconciliation') as observer:
+            observer.return_value.query.return_value=prefix or [self.baseline['database_snapshot']['table_roots'][0]]
+            result=verify_audit_extension(self.baseline,self.current,runtime=object())
+            self.assertIn('created_at <=',observer.return_value.query.call_args.args[0])
+            self.assertIn('COLLATE "C"',observer.return_value.query.call_args.args[0])
+            return result
+    def test_new_audit_append_preserves_bound_original_snapshot_as_history(self):
+        current=copy.deepcopy(self.current)
+        self.assertEqual(self.verify(),self.baseline)
+        self.assertEqual(self.current,current)
+    def test_changed_original_audit_row_or_backdated_insert_rejected(self):
+        for count,root in ((2,'0'*64),(3,'a'*64),(1,'a'*64)):
+            with self.subTest(count=count,root=root), self.assertRaisesRegex(RuntimeError,'preexisting_audit_data_changed'):
+                self.verify([{'table':'audit_logs','count':count,'sha256':root}])
+    def test_changed_customer_root_or_deleted_audit_row_rejected(self):
+        for index,key,value in ((1,'sha256','0'*64),(0,'count',1)):
+            current=copy.deepcopy(self.current)
+            self.current['database_snapshot']['table_roots'][index][key]=value
+            with self.assertRaisesRegex(RuntimeError,'non_audit_customer_data_changed'):self.verify()
+            self.current=current
+    def test_changed_auth_metadata_rejected(self):
+        self.current['database_metadata']['users']=19
+        with self.assertRaisesRegex(RuntimeError,'metadata_changed'):self.verify()
+    def test_invalid_unbound_cutoff_rejected(self):
+        for value in (None,'2026-10-09 20:00:00',"2026-10-09'; SELECT secret"):
+            self.baseline['database_metadata']['audit_max_created_at']=value
+            with self.assertRaisesRegex(RuntimeError,'cutoff_invalid'):self.verify()

@@ -2074,3 +2074,5 @@ No state-F production execution is authorized by this source implementation.
 A faithful post-compensation lifecycle rehearsal, actual future-release restricted
 backup pipeline/private restore, final exact-image acceptance, mandatory CI and
 complete exact-source/plan operator approval remain prerequisites.
+
+NORMAL runtime acceptance must sustain at least three complete native/worker/authority/direct-readiness/public-request rounds over at least five seconds within one 180-second verification deadline. Availability transitions reset the streak; integrity failures immediately invoke governed compensation.

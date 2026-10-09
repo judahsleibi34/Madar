@@ -61,6 +61,7 @@ def validate_history(plan, records):
             or observations['readiness']['body'].get('ready') is not True
             or observations['recovery']['body'] != {'restricted': False, 'business_writes_enabled': True}
             or version.get('release_sha') != plan.source_sha
+            or version.get('release_slot') != plan.candidate_destination['slot']
             or version.get('schema_compatible_min') != 115 or version.get('schema_compatible_max') != 115
             or boundary.get('plan_sha256') != plan.digest
             or boundary.get('source_sha') != plan.source_sha
@@ -284,7 +285,27 @@ def observe_compensated_state(plan_sha256, runtime=None):
     reconciliation=CurrentLocalReconciliation(plan,root,runtime,lambda:None,fallback.verify_registered_runtime)
     snapshot,snapshot_hash=reconciliation.snapshot()
     if len(snapshot['table_roots'])!=96:raise RuntimeError('compensated_public_table_inventory_changed')
-    metadata=reconciliation.query("SELECT json_build_object('users',(SELECT count(*) FROM auth.users),'identities',(SELECT count(*) FROM auth.identities),'mfa_factors',(SELECT count(*) FROM auth.mfa_factors),'storage_objects',(SELECT count(*) FROM storage.objects))::text;")
+    # Customer credentials remain inside PostgreSQL. Hash complete Auth,
+    # storage and authorization catalogs; emit no passwords, factors or rows.
+    security_sql="""SELECT json_build_object('security_root',encode(sha256(convert_to(
+      jsonb_build_object(
+        'users',(SELECT jsonb_agg(to_jsonb(t)-'last_sign_in_at'-'updated_at' ORDER BY id) FROM auth.users t),
+        'identities',(SELECT jsonb_agg(to_jsonb(t)-'last_sign_in_at'-'updated_at' ORDER BY id) FROM auth.identities t),
+        'mfa_factors',(SELECT jsonb_agg(to_jsonb(t) ORDER BY id) FROM auth.mfa_factors t),
+        'storage_objects',(SELECT jsonb_agg(to_jsonb(t) ORDER BY id) FROM storage.objects t),
+        'storage_buckets',(SELECT jsonb_agg(to_jsonb(t) ORDER BY id) FROM storage.buckets t),
+        'tables',(SELECT jsonb_agg(jsonb_build_object('schema',n.nspname,'name',c.relname,
+          'owner',pg_get_userbyid(c.relowner),'acl',c.relacl,'rls',c.relrowsecurity,'force_rls',c.relforcerowsecurity)
+          ORDER BY n.nspname,c.relname) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+          WHERE n.nspname IN ('public','auth','storage') AND c.relkind IN ('r','p')),
+        'policies',(SELECT jsonb_agg(to_jsonb(t) ORDER BY schemaname,tablename,policyname)
+          FROM pg_policies t WHERE schemaname IN ('public','auth','storage'))
+      )::text,'UTF8')),'hex'))::text;"""
+    metadata=reconciliation.query("SELECT json_build_object('users',(SELECT count(*) FROM auth.users),'identities',(SELECT count(*) FROM auth.identities),'mfa_factors',(SELECT count(*) FROM auth.mfa_factors),'storage_objects',(SELECT count(*) FROM storage.objects),'audit_max_created_at',(SELECT max(created_at)::text FROM public.audit_logs))::text;")
+    security=reconciliation.query(security_sql)
+    if len(security)!=1 or not HASH.fullmatch(str(security[0].get('security_root'))):
+        raise RuntimeError('compensated_security_catalog_invalid')
+    if len(metadata)==1:metadata[0].update(security[0])
     if len(metadata)!=1:raise RuntimeError('compensated_database_metadata_invalid')
     return {'version': 1, 'state': 'post_normal_compensated_recovery', 'previous_plan_sha256': plan_sha256,
         'historical_evidence': history, 'installed_controller': installed, 'startup': startup,
@@ -295,7 +316,8 @@ def observe_compensated_state(plan_sha256, runtime=None):
             'replace':'controller exact-source installer and attested continuation boot drop-in',
             'retain':'all historical records, candidate images, containers, units, volumes and checkpoints',
             'obsolete':'stopped hosted application resources and consumed boot actor; never restart old writers'},
-        'database_authority': 'current_local', 'database_snapshot_sha256':snapshot_hash,
+        'database_authority': 'current_local', 'database_snapshot_sha256':snapshot_hash,'database_snapshot':snapshot,
+        'audit_append_only_permitted':True,
         'database_metadata':metadata[0], 'public_tables':96, 'schema': 115, 'restore_customer_database': False}
 
 
@@ -322,6 +344,8 @@ def verify_compensated_binding(binding, runtime=None, *, staged_plan=None):
                 for name in extra):
             raise RuntimeError('compensated_new_resource_identity_changed')
         observed=dict(observed,resources={k:v for k,v in observed['resources'].items() if k not in extra})
+    if baseline.get('audit_append_only_permitted') is True:
+        observed=verify_audit_extension(baseline,observed,runtime)
     if observed != baseline:
         raise RuntimeError('compensated_current_state_changed')
     return observed
@@ -419,3 +443,39 @@ def lifecycle_state(records):
     if 'candidate-identities.json' in records:return 'B_CANDIDATE_STAGED'
     if phase in {'authorized','detached_candidate_pending','detached_candidate_failed'}:return 'A_ORIGINAL_RESTRICTED_RECOVERY'
     raise RuntimeError('compensated_lifecycle_not_classifiable')
+
+
+def verify_audit_extension(baseline,observed,runtime=None):
+    """Permit only new audit rows, after proving every bound old row unchanged.
+
+    Preparation snapshot metadata remains immutable historical DATA. Later
+    source-fence reconciliation records the complete latest live snapshot.
+    Native identity, all other tables and security-critical controls stay exact.
+    """
+    if baseline['database_snapshot_sha256']==observed['database_snapshot_sha256']:
+        return observed
+    from datetime import datetime
+    from deployment.lib.emergency_routing_repair import Runtime
+    from deployment.lib.active_recovery_fallback import CurrentDataFallback
+    from deployment.lib.active_recovery_reconciliation import CurrentLocalReconciliation
+    expected={r['table']:r for r in baseline['database_snapshot']['table_roots']}
+    actual={r['table']:r for r in observed['database_snapshot']['table_roots']}
+    if (set(expected)!=set(actual) or any(expected[k]!=actual[k] for k in expected if k!='audit_logs')
+            or actual['audit_logs']['count']<expected['audit_logs']['count']):
+        raise RuntimeError('compensated_non_audit_customer_data_changed')
+    before=baseline['database_metadata'];after=observed['database_metadata']
+    if {k:v for k,v in before.items() if k!='audit_max_created_at'}!={k:v for k,v in after.items() if k!='audit_max_created_at'}:
+        raise RuntimeError('compensated_database_metadata_changed')
+    cutoff=before['audit_max_created_at']
+    if not isinstance(cutoff,str) or not re.fullmatch(r'[0-9T :+.Z-]{10,40}',cutoff) or datetime.fromisoformat(cutoff).tzinfo is None:
+        raise RuntimeError('compensated_audit_cutoff_invalid')
+    previous,root,_,_=inspect_history(baseline['previous_plan_sha256'])
+    runtime=runtime or Runtime();fallback=CurrentDataFallback(previous,root,runtime=runtime)
+    reconciliation=CurrentLocalReconciliation(previous,root,runtime,lambda:None,fallback.verify_registered_runtime)
+    sql="SELECT json_build_object('table','audit_logs','count',count(*),'sha256',encode(sha256(convert_to(coalesce(string_agg(row_sha,'' ORDER BY row_sha COLLATE \"C\"),''),'UTF8')),'hex'))::text FROM (SELECT encode(sha256(convert_to(to_jsonb(t)::text,'UTF8')),'hex') AS row_sha FROM public.audit_logs t WHERE created_at <= '"+cutoff+"'::timestamptz) rows;"
+    prefix=reconciliation.query(sql)
+    if prefix!=[expected['audit_logs']]:raise RuntimeError('compensated_preexisting_audit_data_changed')
+    # Comparison projects only the explicitly permitted append extension. This
+    # does not relabel the old snapshot as current execution or create evidence.
+    return dict(observed,database_snapshot=baseline['database_snapshot'],
+        database_snapshot_sha256=baseline['database_snapshot_sha256'],database_metadata=before)
