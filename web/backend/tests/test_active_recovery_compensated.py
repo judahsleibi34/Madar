@@ -158,3 +158,33 @@ class BackupPreparationAuditTests(unittest.TestCase):
              patch('deployment.lib.active_recovery_compensated.verify_audit_extension',return_value=baseline) as audit:
             self.assertEqual(verify_compensated_binding(binding),baseline)
             audit.assert_called_once_with(baseline,baseline,None,backup_preparation=True)
+
+class TransientRecoveryBackupTests(unittest.TestCase):
+    def setUp(self):
+        self.baseline={'previous_plan_sha256':'a'*64,'resources':{'madar-green-frontend':{'image_id':'sha256:'+'b'*64}}}
+        self.binding={'baseline':self.baseline,'baseline_sha256':digest(self.baseline),'pre_grant_backup':{}}
+        self.plan=SimpleNamespace(digest='c'*64,candidate_destination={'post_compensation':self.binding})
+        self.name='madar-recovery-backup-'+self.plan.digest[:12]
+        self.resource={'container_id':'d'*64,'image_id':'sha256:'+'b'*64,'spec_sha256':'e'*64,
+            'running':True,'status':'running','restart':'no','networks':{'native':'f'*64}}
+        self.observed=dict(self.baseline,resources={**self.baseline['resources'],self.name:self.resource})
+    def test_only_exact_plan_owned_backup_proxy_is_projected(self):
+        with patch('deployment.lib.active_recovery_compensated.observe_compensated_state',return_value=self.observed):
+            self.assertEqual(verify_compensated_binding(self.binding,recovery_backup=(self.plan,self.resource)),self.baseline)
+            with self.assertRaisesRegex(RuntimeError,'current_state_changed'):verify_compensated_binding(self.binding)
+    def test_changed_image_identity_spec_network_and_status_rejected(self):
+        for key,value in (('container_id','0'*64),('image_id','sha256:'+'0'*64),('spec_sha256','0'*64),
+                          ('networks',{}),('running',False),('status','exited'),('restart','always')):
+            changed=dict(self.resource,**{key:value})
+            observed=dict(self.observed,resources={**self.observed['resources'],self.name:changed})
+            with patch('deployment.lib.active_recovery_compensated.observe_compensated_state',return_value=observed):
+                with self.subTest(key=key),self.assertRaisesRegex(RuntimeError,'backup_resource_changed'):
+                    verify_compensated_binding(self.binding,recovery_backup=(self.plan,self.resource))
+    def test_foreign_extra_resource_and_simultaneous_staging_rejected(self):
+        observed=dict(self.observed,resources={**self.observed['resources'],'foreign':self.resource})
+        with patch('deployment.lib.active_recovery_compensated.observe_compensated_state',return_value=observed):
+            with self.assertRaisesRegex(RuntimeError,'backup_resource_changed'):
+                verify_compensated_binding(self.binding,recovery_backup=(self.plan,self.resource))
+        with patch('deployment.lib.active_recovery_compensated.observe_compensated_state',return_value=self.observed):
+            with self.assertRaisesRegex(RuntimeError,'backup_resource_changed'):
+                verify_compensated_binding(self.binding,recovery_backup=(self.plan,self.resource),staged_plan=self.plan)

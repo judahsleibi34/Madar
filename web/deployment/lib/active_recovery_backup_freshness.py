@@ -101,7 +101,10 @@ class RecoveryBackupContext:
             raise RuntimeError('recovery_backup_retained_backend_changed')
         return {'capture_release_sha':self.release_sha,'database_read_only':True,'host_ports':False}
     def guard(self):
-        self.ops.verify_frozen_source(self.plan);self.ops.verify_compensated_state()
+        self.ops.verify_frozen_source(self.plan)
+        from deployment.lib.active_recovery_compensated import verify_compensated_binding
+        verify_compensated_binding(self.plan.candidate_destination["post_compensation"],self.runtime,
+            recovery_backup=(self.plan,self.resource) if self.container is not None else None)
         self.ops.require_no_normal_write_authority();self.ops.require_all_consumers_stopped()
         auth=json.loads(protected(self.root/'authorization.json',private=True).read_text())
         if self.root!=BASE/self.plan.digest or auth.get('operation')!='current-data-recovery-backup-before-normal' or auth.get('plan_sha256')!=self.plan.digest or auth.get('source_bundle_sha256')!=self.plan.source_bundle_sha256:
@@ -144,6 +147,9 @@ class RecoveryBackupContext:
         row=next(iter(self.runtime.inspect([self.container]).values()))
         if row['HostConfig']['PortBindings'] or not row['State']['Running']:raise RuntimeError('recovery_backup_proxy_not_private')
         self.pid=row['State']['Pid'];self.proxy_spec=spec(row);self.attachments=row['NetworkSettings']['Networks']
+        self.resource={'container_id':row['Id'],'image_id':row['Image'],'spec_sha256':self.proxy_spec,
+            'running':row['State']['Running'],'status':row['State']['Status'],'restart':row['HostConfig']['RestartPolicy']['Name'],
+            'networks':{k:v['NetworkID'] for k,v in self.attachments.items()}}
         # Docker start is asynchronous. Require the actual retained version
         # through this private namespace before starting the restricted child.
         deadline=time.monotonic()+30
@@ -160,7 +166,7 @@ class RecoveryBackupContext:
             time.sleep(min(.2,deadline-time.monotonic()))
         exclusive(self.root/'capture-context.json',encoded({'plan_sha256':self.plan.digest,'approved_source_sha':self.plan.source_sha,
             'captured_release':self.release,'container_id':self.container,'image_id':row['Image'],'spec_sha256':self.proxy_spec,
-            'native_database_id':db['Id'],'database_read_only':True,'consumers_started':False}))
+            'native_database_id':db['Id'],'resource':self.resource,'database_read_only':True,'consumers_started':False}))
     def capture(self,env,descriptor,identity):
         row=next(iter(self.runtime.inspect([self.container]).values()))
         if row['State']['Pid']!=self.pid or spec(row)!=self.proxy_spec or row['NetworkSettings']['Networks']!=self.attachments:raise RuntimeError('recovery_backup_proxy_changed')

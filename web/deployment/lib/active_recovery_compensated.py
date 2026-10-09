@@ -325,13 +325,24 @@ def observe_compensated_state(plan_sha256, runtime=None, *, backup_preparation=F
         'database_metadata':metadata[0], 'public_tables':96, 'schema': 115, 'restore_customer_database': False}
 
 
-def verify_compensated_binding(binding, runtime=None, *, staged_plan=None):
+def verify_compensated_binding(binding, runtime=None, *, staged_plan=None, recovery_backup=None):
     if not isinstance(binding, dict) or set(binding) not in ({'baseline','baseline_sha256'},{'baseline','baseline_sha256','pre_grant_backup'}):
         raise RuntimeError('compensated_binding_invalid')
     baseline = binding['baseline']
     if not isinstance(baseline, dict) or digest(baseline) != binding['baseline_sha256']:
         raise RuntimeError('compensated_baseline_hash_changed')
     observed = observe_compensated_state(baseline.get('previous_plan_sha256'),runtime,backup_preparation='pre_grant_backup' in binding)
+    if recovery_backup is not None:
+        plan,resource=recovery_backup
+        name='madar-recovery-backup-'+plan.digest[:12]
+        if (plan.candidate_destination.get('post_compensation')!=binding or 'pre_grant_backup' not in binding
+                or not HASH.fullmatch(str(plan.digest)) or staged_plan is not None
+                or resource.get('image_id')!=baseline['resources']['madar-green-frontend']['image_id']
+                or resource.get('running') is not True or resource.get('status')!='running' or resource.get('restart')!='no'
+                or set(observed['resources'])-set(baseline['resources'])!={name}
+                or observed['resources'].get(name)!=resource):
+            raise RuntimeError('compensated_recovery_backup_resource_changed')
+        observed=dict(observed,resources={k:v for k,v in observed['resources'].items() if k!=name})
     if staged_plan is not None:
         extra=set(observed['resources'])-set(baseline['resources'])
         prefix='madar-normal-'+staged_plan.digest[:12]
