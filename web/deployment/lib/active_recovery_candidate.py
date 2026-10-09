@@ -255,7 +255,7 @@ class DetachedRecoveryCandidate(ProductionLocalTransitionOperations):
             from deployment.lib.active_recovery_inputs import registered_fallback_names
             verify_compensated_binding(compensated,runtime)
             previous,previous_root,_,_=inspect_history(compensated['baseline']['previous_plan_sha256'])
-            CurrentDataFallback(previous,previous_root,runtime=runtime).verify()
+            CurrentDataFallback(previous,previous_root,runtime=runtime).verify(backup_preparation='pre_grant_backup' in compensated)
         else:verify(runtime)
         inputs = runtime.input_bytes()
         old = RecoveryContract(**json.loads(inputs['recovery_contract']))

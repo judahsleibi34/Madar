@@ -149,3 +149,12 @@ class AuditExtensionTests(unittest.TestCase):
         for value in (None,'2026-10-09 20:00:00',"2026-10-09'; SELECT secret"):
             self.baseline['database_metadata']['audit_max_created_at']=value
             with self.assertRaisesRegex(RuntimeError,'cutoff_invalid'):self.verify()
+
+class BackupPreparationAuditTests(unittest.TestCase):
+    def test_backup_preparation_propagates_to_append_only_observation(self):
+        baseline={'previous_plan_sha256':'a'*64,'audit_append_only_permitted':True}
+        binding={'baseline':baseline,'baseline_sha256':digest(baseline),'pre_grant_backup':{}}
+        with patch('deployment.lib.active_recovery_compensated.observe_compensated_state',return_value=baseline), \
+             patch('deployment.lib.active_recovery_compensated.verify_audit_extension',return_value=baseline) as audit:
+            self.assertEqual(verify_compensated_binding(binding),baseline)
+            audit.assert_called_once_with(baseline,baseline,None,backup_preparation=True)

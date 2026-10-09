@@ -63,7 +63,7 @@ class ResumptionPlan:
             compensated=destination.get('post_compensation')
             if compensated is not None:
                 if ('previous_candidate' in destination or not isinstance(compensated,dict)
-                        or set(compensated)!={'baseline','baseline_sha256'}
+                        or set(compensated) not in ({'baseline','baseline_sha256'},{'baseline','baseline_sha256','pre_grant_backup'})
                         or not HASH.fullmatch(str(compensated['baseline_sha256']))
                         or not isinstance(compensated['baseline'],dict)
                         or digest(compensated['baseline'])!=compensated['baseline_sha256']
@@ -73,6 +73,12 @@ class ResumptionPlan:
                         or compensated['baseline'].get('database_authority')!='current_local'
                         or not HASH.fullmatch(str(compensated['baseline'].get('previous_plan_sha256')))):
                     raise RuntimeError('resumption_compensated_binding_invalid')
+                repair=compensated.get('pre_grant_backup')
+                if repair is not None and (not isinstance(repair,dict)
+                        or set(repair)!={'operation','marker_sha256','latest_sha256'}
+                        or repair.get('operation')!='current-data-recovery-backup-before-normal'
+                        or any(not HASH.fullmatch(str(repair.get(k))) for k in ('marker_sha256','latest_sha256'))):
+                    raise RuntimeError('resumption_pre_grant_backup_binding_invalid')
             if (set(destination)!=fields|optional or destination['slot'] not in {'blue','green'}
                     or destination['retained_slot'] not in {'blue','green'} or destination['slot']==destination['retained_slot']
                     or (destination['backend_port'],destination['frontend_port'])!={'blue':(8101,3100),'green':(8201,3200)}[destination['slot']]

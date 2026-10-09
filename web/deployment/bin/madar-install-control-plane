@@ -77,6 +77,7 @@ declare -a tracked_files=(
   lib/active_recovery_operations.py
   lib/active_recovery_artifact_evidence.py
   lib/active_recovery_backup.py
+  lib/active_recovery_backup_freshness.py
   lib/active_recovery_execution.py
   lib/active_recovery_boot_installation.py
   lib/active_recovery_workers.py
