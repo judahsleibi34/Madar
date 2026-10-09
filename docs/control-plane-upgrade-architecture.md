@@ -958,3 +958,15 @@ Exact prior local LATEST bytes are archived before the marker points to this new
 verified local data. No historical backup directory or Node 1 LATEST is replaced,
 and capture retention cannot touch historical scopes. This connects the verified
 new backup to the unchanged configured timers without creating another checkpoint.
+
+
+A fresh active-rollback retry may bind the root-protected original backup-timer
+preimage of a consumed pre-candidate staging failure. The new plan binds the old
+plan, authorization, phase journal and timer snapshot bytes; it accepts only the
+exact authorized/pending/failed sequence, unchanged retained runtime inputs and
+no candidate contract/identity. This snapshot is data, never reused authorization.
+Timers must remain idle/inactive and are restored to their ORIGINAL configured
+states only after normal local backup/restore/Node 1 completion. No obsolete
+hosted backup job is resumed during preparation. Nonsecret backup-health marker
+reads accept the established readable 0644 mode; secret and credential readers
+continue to require private permissions.

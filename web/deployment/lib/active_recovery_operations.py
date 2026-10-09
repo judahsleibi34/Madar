@@ -60,6 +60,14 @@ class ProductionActiveRecoveryOperations:
 
     def verify_active_rollback_inputs(self, plan):
         self.verify_frozen_source(plan)
+        from deployment.lib.active_recovery_controller import prior_backup_timer_states
+        prior=prior_backup_timer_states(plan)
+        if prior is not None:
+            timers=ActiveRecoveryBackupTimers(plan,self.root,self.source.verify)
+            timers.require_idle_services()
+            if any(timers.ops.systemctl_state(name)['active']!='inactive' for name in prior):
+                raise RuntimeError('retry_timer_not_quiesced')
+        readonly_configuration(Path('/var/lib/madar/backup-state/latest.json'),private=False)
         if observe_retained_inputs() != plan.retained_inputs:
             raise RuntimeError('continuation_retained_inputs_changed')
         for key in ('local_transaction', 'recovery_transaction'):
@@ -123,7 +131,7 @@ class ProductionActiveRecoveryOperations:
     def quiesce_backup_timers_before_staging(self, plan, root):
         ActiveRecoveryBackupTimers(plan,root,self.source.verify).quiesce()
         marker = Path('/var/lib/madar/backup-state/latest.json')
-        exclusive(root/'backup-health-preimage.json',readonly_configuration(marker).read_bytes())
+        exclusive(root/'backup-health-preimage.json',readonly_configuration(marker,private=False).read_bytes())
         data = coordinated_health_marker(CHECKPOINT,RESTORE,
             approved_execution_digest=plan.checkpoint_execution_sha256,
             protected_file=protected,now=datetime.now(timezone.utc))

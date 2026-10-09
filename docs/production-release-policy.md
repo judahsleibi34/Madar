@@ -1958,3 +1958,15 @@ and capture retention cannot touch historical scopes. This connects the verified
 new backup to the unchanged configured timers without creating another checkpoint.
 
 The post-normal logical restore uses role names from the exact verified checkpoint as NOLOGIN prerequisites for native policy definitions. It does not execute role/password SQL or claim restored role authorization; the coordinated restore evidence retains that separate scope.
+
+
+A fresh active-rollback retry may bind the root-protected original backup-timer
+preimage of a consumed pre-candidate staging failure. The new plan binds the old
+plan, authorization, phase journal and timer snapshot bytes; it accepts only the
+exact authorized/pending/failed sequence, unchanged retained runtime inputs and
+no candidate contract/identity. This snapshot is data, never reused authorization.
+Timers must remain idle/inactive and are restored to their ORIGINAL configured
+states only after normal local backup/restore/Node 1 completion. No obsolete
+hosted backup job is resumed during preparation. Nonsecret backup-health marker
+reads accept the established readable 0644 mode; secret and credential readers
+continue to require private permissions.

@@ -1,5 +1,8 @@
 """Concrete-driver ordering and fail-closed regressions, not production proof."""
 import os
+import tempfile
+import json
+import pwd
 from pathlib import Path
 import sys
 from types import SimpleNamespace
@@ -63,3 +66,29 @@ class ConcreteOperationsTests(unittest.TestCase):
             calls=Mock();calls.attach_mock(authority.return_value.guard,'guard');calls.attach_mock(publication.return_value.publish,'publish');calls.attach_mock(authority.return_value.grant,'grant')
             self.ops.commit_normal_release_and_grant_writes(self.ops.plan,self.ops.root)
             self.assertEqual([call[0] for call in calls.mock_calls],['guard','publish','grant'])
+
+    def test_public_backup_health_marker_accepts_0644_and_preserves_private_preimage(self):
+        from deployment.lib import active_recovery_operations as module
+        from deployment.lib.provider_recovery_runtime import readonly_configuration
+        with tempfile.TemporaryDirectory() as directory:
+            base=Path(directory);marker=base/'latest.json';marker.write_text('{"old_health":true}');marker.chmod(0o644)
+            self.ops.root=base/'new-attempt';self.ops.root.mkdir()
+            self.ops.plan.checkpoint_execution_sha256='b'*64
+            identity=SimpleNamespace(pw_uid=os.getuid(),pw_gid=os.getgid())
+            real_path=Path
+            def trusted_fixture_ancestors(value):
+                stat=os.lstat(value)
+                # Only the test's world-writable tmp ancestor is modeled as a
+                # production parent. The leaf's real 0644 permissions are kept.
+                return SimpleNamespace(st_uid=0,st_mode=0o40755) if value==Path('/tmp') else stat
+            def path(value):return marker if value=='/var/lib/madar/backup-state/latest.json' else real_path(value)
+            with patch.object(module,'Path',side_effect=path),patch.object(module,'ActiveRecoveryBackupTimers') as timers, \
+                 patch.object(module,'coordinated_health_marker',return_value={'verified':True}), \
+                 patch.object(module.pwd,'getpwnam',return_value=identity),patch.object(Path,'lstat',trusted_fixture_ancestors):
+                with self.assertRaisesRegex(RuntimeError,'not_private'):readonly_configuration(marker)
+                self.ops.quiesce_backup_timers_before_staging(self.ops.plan,self.ops.root)
+                timers.return_value.quiesce.assert_called_once()
+            self.assertEqual(json.loads((self.ops.root/'backup-health-preimage.json').read_text()),{'old_health':True})
+            self.assertEqual((self.ops.root/'backup-health-preimage.json').stat().st_mode&0o777,0o600)
+            self.assertEqual(marker.stat().st_mode&0o777,0o644)
+            self.assertEqual(json.loads(marker.read_text()),{'verified':True})
