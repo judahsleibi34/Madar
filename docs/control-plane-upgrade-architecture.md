@@ -983,3 +983,13 @@ writer/Redis/subnet are sealed in the new plan; changed allocation fails closed,
 without stopping or displacing existing resources. Saved normal runtime and
 post-handoff retained-writer fencing use that sealed allocation. Historical
 transactions, consumed attempts and currently serving recovery stay unchanged.
+
+A stopped Docker port declaration may be retained during detached staging ONLY
+for the exact two already-retired known-good backend/frontend containers named
+by the protected local-transition contract digest. Source labels, original
+known-good image identities, loopback role ports, stopped state and restart=no
+are independently verified and their IDs/specifications sealed in the NEW plan.
+These archived resources are neither started, displaced nor edited. Host sockets
+must still be free; unknown, changed, running or restartable declarations reject
+preflight/staging. This narrow retirement predicate never permits reuse of a
+live port or arbitrary stopped Docker reservation.

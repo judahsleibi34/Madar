@@ -58,7 +58,7 @@ class ResumptionPlan:
         destination=self.candidate_destination
         if destination is not None:
             import ipaddress
-            fields={'slot','backend_port','frontend_port','retained_slot','retained_source_sha','redis_name','redis_network','redis_network_id','subnet'}
+            fields={'slot','backend_port','frontend_port','retained_slot','retained_source_sha','redis_name','redis_network','redis_network_id','subnet','retired_port_declarations'}
             if (set(destination)!=fields or destination['slot'] not in {'blue','green'}
                     or destination['retained_slot'] not in {'blue','green'} or destination['slot']==destination['retained_slot']
                     or (destination['backend_port'],destination['frontend_port'])!={'blue':(8101,3100),'green':(8201,3200)}[destination['slot']]
@@ -69,6 +69,14 @@ class ResumptionPlan:
                     or ipaddress.ip_network(destination['subnet']).prefixlen!=24
                     or not ipaddress.ip_network(destination['subnet']).subnet_of(ipaddress.ip_network('10.253.0.0/16'))):
                 raise RuntimeError('resumption_candidate_destination_invalid')
+            retired=destination['retired_port_declarations']
+            if not isinstance(retired,dict) or len(retired)>2:raise RuntimeError('resumption_retired_declarations_invalid')
+            for name,value in retired.items():
+                if (not re.fullmatch('madar-'+destination['slot']+'-(backend|frontend)-legacy-[0-9a-f]{12}',name)
+                        or set(value)!={'container_id','image_id','spec_sha256'}
+                        or not HASH.fullmatch(value['container_id']) or not HASH.fullmatch(value['spec_sha256'])
+                        or not re.fullmatch('sha256:[0-9a-f]{64}',value['image_id'])):
+                    raise RuntimeError('resumption_retired_declarations_invalid')
         prior=self.prior_backup_timer_preimage
         if prior is not None and (not isinstance(prior,dict)
                 or set(prior)!={'plan_sha256','evidence_sha256','timer_preimage_sha256'}

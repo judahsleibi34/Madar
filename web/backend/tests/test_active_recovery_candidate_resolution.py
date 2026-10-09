@@ -29,7 +29,7 @@ class ResolutionTests(unittest.TestCase):
                     'HostConfig':{'RestartPolicy':{'Name':'no'}},'State':{'Running':slot=='blue' and kind in ('backend','frontend')},'Mounts':[],'NetworkSettings':{'Networks':{self.net:{'NetworkID':'d'*64}}}}
         self.rows[self.prefix+'-redis']={'State':{'Running':True},'Config':{'Labels':{'com.madar.recovery.profile':'provider402-signin'}},'Mounts':[{'Type':'volume','Destination':'/data'}],'NetworkSettings':{'Networks':{self.net:{}}}}
         self.packet={'runtimes':{n:{'container_id':r['Id'],'image_id':r['Image'],'spec_sha256':spec(r),'networks':{self.net:'d'*64}} for n,r in self.rows.items() if n.startswith('madar-blue-') or n.startswith('madar-green-')},'networks':{self.net:{'Id':'d'*64}}}
-        self.rt=Mock();self.rt.inspect.side_effect=lambda names:{n:copy.deepcopy(self.rows[n]) for n in names}
+        self.rt=Mock();self.rt.command.return_value='';self.rt.inspect.side_effect=lambda names:{n:copy.deepcopy(self.rows[n]) for n in names}
         self.rt.network.return_value={'Name':self.net,'Id':'d'*64,'Driver':'bridge','Internal':True}
         for target,value in [('deployment.lib.active_recovery_inputs.INPUTS',self.paths),('deployment.lib.active_recovery_candidate.protected',lambda p,**kw:p),
             ('deployment.lib.provider_recovery_runtime.readonly_configuration',lambda p,**kw:p),
@@ -92,3 +92,18 @@ class ResolutionTests(unittest.TestCase):
         locked=source.split('with self.ops.upgrade_lock(), self.ops.deploy_lock():',1)[1]
         self.assertLess(locked.index('verify_active_rollback_inputs'),locked.index('stage_detached_read_only_candidate'))
         self.assertIn('self.verify_candidate_feasibility(plan)',inspect.getsource(__import__('deployment.lib.active_recovery_operations',fromlist=['ProductionActiveRecoveryOperations']).ProductionActiveRecoveryOperations.stage_detached_read_only_candidate))
+
+    def test_only_exact_retired_nonrestarting_declaration_can_share_free_port(self):
+        row=copy.deepcopy(self.rows['madar-green-backend']);row.update(Name='/madar-green-backend-legacy-000000000000')
+        row['HostConfig']['PortBindings']={'8000/tcp':[{'HostIp':'127.0.0.1','HostPort':'8201'}]}
+        allowed={row['Name'][1:]:{'container_id':row['Id'],'image_id':row['Image'],'spec_sha256':spec(row)}}
+        self.rt.command.side_effect=lambda argv:json.dumps([row]) if argv[1]=='inspect' else 'id'
+        require_unreserved_ports(self.rt,(8201,3200),allowed)
+        for change in ('running','restart','identity','image'):
+            altered=copy.deepcopy(row)
+            if change=='running':altered['State']['Running']=True
+            elif change=='restart':altered['HostConfig']['RestartPolicy']['Name']='always'
+            elif change=='identity':altered['Id']='different'
+            else:altered['Image']='different'
+            self.rt.command.side_effect=lambda argv:json.dumps([altered]) if argv[1]=='inspect' else 'id'
+            with self.subTest(change=change),self.assertRaisesRegex(RuntimeError,'already_reserved'):require_unreserved_ports(self.rt,(8201,3200),allowed)

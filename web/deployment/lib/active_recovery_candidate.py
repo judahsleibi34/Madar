@@ -28,18 +28,23 @@ RECOVERY = Path('/var/lib/madar-control-plane/provider402')
 KINDS = ('notification', 'calendar-sync', 'data-deletion')
 
 
-def require_unreserved_ports(runtime, ports):
+def require_unreserved_ports(runtime, ports, retired=None):
     """Check host sockets AND stopped Docker reservations without displacing any."""
     for port in ports:
         with socket.socket() as listener:
             try:listener.bind(('127.0.0.1',port))
             except OSError as error:
                 raise RuntimeError('detached_port_unavailable_'+str(port)+'_errno_'+str(error.errno)) from None
+    retired=retired or {}
     ids=runtime.command(['docker','ps','-aq']).splitlines()
     for row in json.loads(runtime.command(['docker','inspect',*ids])) if ids else []:
         for bindings in (row['HostConfig'].get('PortBindings') or {}).values():
             if any(str(b.get('HostPort')) in {str(p) for p in ports} for b in bindings or []):
-                raise RuntimeError('detached_port_already_reserved')
+                binding=retired.get(row.get('Name','').lstrip('/'))
+                if (binding is None or row['Id']!=binding['container_id'] or row['Image']!=binding['image_id']
+                        or spec(row)!=binding['spec_sha256'] or row['State']['Running']
+                        or row['HostConfig']['RestartPolicy']['Name']!='no'):
+                    raise RuntimeError('detached_port_already_reserved')
 
 
 def resolve_candidate_destination(plan, runtime=None):
@@ -98,11 +103,32 @@ def resolve_candidate_destination(plan, runtime=None):
             or network not in packet['runtimes'][f'madar-{slot}-backend']['networks']):
         raise RuntimeError('detached_destination_redis_network_invalid')
     ports={'blue':(8101,3100),'green':(8201,3200)}[slot]
-    require_unreserved_ports(runtime,ports)
+    # Previous governed normal-local preparation already retired these exact
+    # known-good containers. Their stopped declarations are not live listeners.
+    # No other stopped reservation is permitted; none is modified or started.
+    retired={};all_names=runtime.command(['docker','ps','-a','--format','{{.Names}}']).splitlines()
+    suffix=local.get('contract_digest','')[:12]
+    for role,port in zip(('backend','frontend'),ports):
+        name=f'madar-{slot}-{role}-legacy-'+suffix
+        if name not in all_names:continue
+        old_contract=protected(INPUTS['local_contract'],private=True)
+        if file_digest(old_contract)!=plan.retained_inputs['local_contract'] or digest(json.loads(old_contract.read_text()))!=local.get('contract_digest'):
+            raise RuntimeError('detached_retirement_contract_changed')
+        row=runtime.inspect([name])[name]
+        container_port={'backend':'8000/tcp','frontend':'8080/tcp'}[role]
+        expected_ports={container_port:[{'HostIp':'127.0.0.1','HostPort':str(port)}]}
+        image=known.get('images',{}).get(role,'').split('@')[-1]
+        if (known.get('slot')!=slot or row['Image']!=image
+                or row['Config'].get('Labels',{}).get('org.opencontainers.image.revision')!=known['sha']
+                or row['State']['Running'] or row['HostConfig']['RestartPolicy']['Name']!='no'
+                or row['HostConfig'].get('PortBindings')!=expected_ports):
+            raise RuntimeError('detached_retired_port_declaration_invalid')
+        retired[name]={'container_id':row['Id'],'image_id':row['Image'],'spec_sha256':spec(row)}
+    require_unreserved_ports(runtime,ports,retired)
     probe=DetachedRecoveryCandidate.__new__(DetachedRecoveryCandidate);probe.command=runtime.command
     return {'slot':slot,'backend_port':ports[0],'frontend_port':ports[1],
         'retained_slot':retained,'retained_source_sha':next(iter(sources)),
-        'redis_name':redis_name,'redis_network':network,'redis_network_id':net['Id'],'subnet':probe.free_subnet()}
+        'redis_name':redis_name,'redis_network':network,'redis_network_id':net['Id'],'subnet':probe.free_subnet(),'retired_port_declarations':retired}
 
 
 class DetachedRecoveryCandidate(ProductionLocalTransitionOperations):
@@ -288,7 +314,7 @@ class DetachedRecoveryCandidate(ProductionLocalTransitionOperations):
         networks = self.command(['docker','network','ls','--format','{{.Name}}']).splitlines()
         if self.network_name in networks:
             raise RuntimeError('detached_resource_already_exists')
-        require_unreserved_ports(self,(self.backend_port,self.frontend_port))
+        require_unreserved_ports(self,(self.backend_port,self.frontend_port),(self.plan.candidate_destination or {}).get('retired_port_declarations',{}))
 
     @classmethod
     def read_only_feasibility(cls,plan,contract,root):
