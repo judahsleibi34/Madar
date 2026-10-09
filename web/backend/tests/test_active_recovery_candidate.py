@@ -87,7 +87,8 @@ class DetachedCandidateTests(unittest.TestCase):
             if args[1]=='inspect':return json.dumps([{'HostConfig':{'PortBindings':{'8000/tcp':[{'HostPort':'8201'}]}}}])
             return 'abc' if args[1:3]==['ps','-aq'] else ''
         self.c.command=command
-        with self.assertRaisesRegex(RuntimeError,'already_reserved'):self.c.require_free_destinations()
+        with patch('deployment.lib.active_recovery_candidate.socket.socket'):
+            with self.assertRaisesRegex(RuntimeError,'already_reserved'):self.c.require_free_destinations()
 
     def test_modified_image_or_running_standby_rejected(self):
         self.c.inspect=lambda name:self.row(name)
@@ -120,6 +121,29 @@ class DetachedCandidateTests(unittest.TestCase):
             'HostConfig':{'RestartPolicy':{'Name':'no'},'PortBindings':bindings},'State':{'Running':kind not in KINDS},
             'Config':{'Env':['MADAR_RELEASE_SHA='+self.contract.sha,'MADAR_BUSINESS_WRITE_CONTRACT='+digest(asdict(self.contract))]},
             'Mounts':[{'Source':str(self.c.root/'write-authority'),'Destination':'/run/madar/business-write-authority','RW':False}]}
+
+    def test_previous_candidate_retirement_requires_new_stage_authorization(self):
+        self.c.require_authorization=lambda contract:(_ for _ in ()).throw(RuntimeError('fresh_authorization_required'))
+        self.c.command=lambda args:self.fail('mutation without fresh authorization')
+        with self.assertRaisesRegex(RuntimeError,'fresh_authorization_required'):self.c.retire_previous_candidate()
+
+    def test_retirement_stops_only_bound_unpublished_services_preserving_records(self):
+        previous={'binding':{'plan_sha256':'5'*64,'evidence_sha256':'6'*64},
+                  'rows':{kind:{'Id':kind+'-bound'} for kind in ('backend','frontend','parser',*KINDS)}}
+        calls=[];self.c.command=lambda args:calls.append(args);self.c.inspect=lambda identity:{'State':{'Running':False}}
+        self.c.plan=__import__('types').SimpleNamespace(digest=self.plan.digest,candidate_destination={'retired_port_declarations':{}})
+        before=(self.c.root/'authorization.json').read_bytes()
+        with patch('deployment.lib.active_recovery_candidate.inspect_previous_candidate',return_value=previous),patch('deployment.lib.active_recovery_candidate.require_unreserved_ports'):
+            self.c.retire_previous_candidate()
+            with self.assertRaises(FileExistsError):self.c.retire_previous_candidate()
+        self.assertEqual(calls,[['docker','stop',kind+'-bound'] for kind in ('frontend','backend','parser')])
+        self.assertEqual((self.c.root/'authorization.json').read_bytes(),before)
+        self.assertTrue((self.c.root/'previous-candidate-retirement.json').exists())
+
+    def test_changed_previous_candidate_stops_before_any_effect(self):
+        self.c.command=lambda args:self.fail('changed binding mutated')
+        with patch('deployment.lib.active_recovery_candidate.inspect_previous_candidate',side_effect=RuntimeError('previous_candidate_evidence_changed')):
+            with self.assertRaisesRegex(RuntimeError,'evidence_changed'):self.c.retire_previous_candidate()
 
     def test_unhealthy_database_rejects_read_only_acceptance(self):
         self.c.inspect=lambda name:self.row(name);self.c.require_write_authority=lambda *args:None

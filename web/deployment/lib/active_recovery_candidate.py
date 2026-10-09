@@ -28,9 +28,92 @@ RECOVERY = Path('/var/lib/madar-control-plane/provider402')
 KINDS = ('notification', 'calendar-sync', 'data-deletion')
 
 
-def require_unreserved_ports(runtime, ports, retired=None):
+def verify_lifecycle_networks(row, networks, primary, alias=None, *, created_worker=False):
+    """A CREATED declaration is not a running endpoint; both bind exact objects."""
+    attached=row['NetworkSettings']['Networks']
+    if set(attached)!=set(networks):raise RuntimeError('network_attachment_changed')
+    if created_worker:
+        if row['State'].get('Status')!='created' or row['State']['Running']:
+            raise RuntimeError('network_created_worker_phase_changed')
+        if row['HostConfig'].get('NetworkMode')!=primary:
+            raise RuntimeError('network_primary_changed')
+        for name,value in attached.items():
+            if value.get('NetworkID') not in ('',networks[name]) or value.get('EndpointID') or value.get('IPAddress'):
+                raise RuntimeError('network_created_endpoint_changed')
+    elif any(attached[name].get('NetworkID')!=networks[name] for name in networks):
+        raise RuntimeError('network_attachment_changed')
+    if alias is not None:
+        if set(attached[primary].get('Aliases') or [])!={alias}:
+            raise RuntimeError('network_role_changed')
+        if any(attached[name].get('Aliases') for name in networks if name!=primary):
+            raise RuntimeError('network_secondary_alias_changed')
+
+
+def worker_spec_matches(row, expected, *, started_worker=False):
+    """Docker first start changes only OomKillDisable false to null.
+
+    Retain the original receipt hash. This is not a general spec normalization:
+    only a governed business-worker lifecycle may compare the observed null to
+    the originally recorded false; true and every other alteration still fail.
+    """
+    if spec(row)==expected:return True
+    if not started_worker or row['HostConfig'].get('OomKillDisable',False) is not None:return False
+    previous=dict(row,HostConfig=dict(row['HostConfig'],OomKillDisable=False))
+    return spec(previous)==expected
+
+
+def inspect_previous_candidate(plan, runtime=None):
+    """Bind a pre-publication failed candidate as data, never reused authority."""
+    binding=(plan.candidate_destination or {}).get('previous_candidate')
+    if binding is None:return None
+    runtime=runtime or Runtime();root=ROOT/binding['plan_sha256']
+    names=('authorization.json','plan.json','events.jsonl','candidate-contract.json','candidate-identities.json')
+    paths={name:protected(root/name,private=True) for name in names}
+    paths['write-authority/authority.json']=protected(root/'write-authority/authority.json',private=False)
+    hashes={name:file_digest(path) for name,path in paths.items()}
+    if hashes['plan.json']!=binding['plan_sha256'] or digest(hashes)!=binding['evidence_sha256']:
+        raise RuntimeError('previous_candidate_evidence_changed')
+    from deployment.lib.active_recovery_resumption import ResumptionPlan
+    previous=ResumptionPlan(**json.loads(paths['plan.json'].read_text()));previous.validate()
+    receipt=json.loads(paths['authorization.json'].read_text())
+    events=[json.loads(line) for line in paths['events.jsonl'].read_text().splitlines()]
+    if (previous.digest!=binding['plan_sha256'] or previous.digest==plan.digest
+            or receipt.get('operation')!='active-local-rollback-resumption'
+            or receipt.get('plan_sha256')!=previous.digest
+            or receipt.get('source_bundle_sha256')!=previous.source_bundle_sha256
+            or previous.retained_inputs!=plan.retained_inputs or previous.fallback!=plan.fallback
+            or [row.get('phase') for row in events]!=['authorized','detached_candidate_pending','detached_candidate_failed']
+            or any(row.get('plan_sha256')!=previous.digest for row in events)
+            or any((root/name).exists() for name in ('installed-controller.json','worker-owner.json','boot-installation.json','upstream-preimage.conf'))):
+        raise RuntimeError('previous_candidate_not_prepublication_failure')
+    value=DetachedRecoveryCandidate.from_saved_runtime(previous,root,lambda:None)
+    value.verify_recorded_runtime();value.require_write_authority(value.contract,'READ_ONLY')
+    rows={kind:value.inspect(value.name(kind)) for kind in ('backend','frontend','parser',*KINDS)}
+    for kind,row in rows.items():
+        if (row['Image']!=previous.candidate_images['frontend' if kind=='frontend' else 'backend']
+                or row['HostConfig']['RestartPolicy']['Name']!='no'
+                or (kind in KINDS and (row['State'].get('Status')!='created' or row['State']['Running']))
+                or (kind not in KINDS and row['State'].get('Status') not in ('running','exited'))):
+            raise RuntimeError('previous_candidate_lifecycle_changed')
+        if kind in ('backend','frontend'):
+            port={'backend':value.backend_port,'frontend':value.frontend_port}[kind]
+            container_port={'backend':'8000/tcp','frontend':'8080/tcp'}[kind]
+            if row['HostConfig'].get('PortBindings')!={container_port:[{'HostIp':'127.0.0.1','HostPort':str(port)}]}:
+                raise RuntimeError('previous_candidate_port_changed')
+            if row['State']['Running']:
+                _,version=value.health_json(value.endpoint(kind)+('/api' if kind=='frontend' else '')+'/health/version')
+                _,fence=value.health_json(value.endpoint(kind)+('/api' if kind=='frontend' else '')+'/health/recovery')
+                if version.get('release_sha')!=previous.source_sha or fence!={'restricted':True,'business_writes_enabled':False}:
+                    raise RuntimeError('previous_candidate_endpoint_changed')
+    return {'root':root,'candidate':value,'rows':rows,'binding':binding}
+
+
+def require_unreserved_ports(runtime, ports, retired=None, planned=None):
     """Check host sockets AND stopped Docker reservations without displacing any."""
+    planned=planned or {}
+    planned_ports={str(b['HostPort']) for row in planned.values() if row['State']['Running'] for values in (row['HostConfig'].get('PortBindings') or {}).values() for b in values or []}
     for port in ports:
+        if str(port) in planned_ports:continue
         with socket.socket() as listener:
             try:listener.bind(('127.0.0.1',port))
             except OSError as error:
@@ -42,7 +125,7 @@ def require_unreserved_ports(runtime, ports, retired=None):
             if any(str(b.get('HostPort')) in {str(p) for p in ports} for b in bindings or []):
                 binding=retired.get(row.get('Name','').lstrip('/'))
                 if (binding is None or row['Id']!=binding['container_id'] or row['Image']!=binding['image_id']
-                        or spec(row)!=binding['spec_sha256'] or row['State']['Running']
+                        or spec(row)!=binding['spec_sha256'] or (row['State']['Running'] and row['Id'] not in planned)
                         or row['HostConfig']['RestartPolicy']['Name']!='no'):
                     raise RuntimeError('detached_port_already_reserved')
 
@@ -124,11 +207,20 @@ def resolve_candidate_destination(plan, runtime=None):
                 or row['HostConfig'].get('PortBindings')!=expected_ports):
             raise RuntimeError('detached_retired_port_declaration_invalid')
         retired[name]={'container_id':row['Id'],'image_id':row['Image'],'spec_sha256':spec(row)}
-    require_unreserved_ports(runtime,ports,retired)
+    previous=inspect_previous_candidate(plan,runtime)
+    planned={}
+    if previous:
+        if previous['candidate'].slot!=slot:raise RuntimeError('previous_candidate_slot_changed')
+        for role in ('backend','frontend'):
+            row=previous['rows'][role];planned[row['Id']]=row
+            retired[row['Name'].lstrip('/')]={'container_id':row['Id'],'image_id':row['Image'],'spec_sha256':spec(row)}
+    require_unreserved_ports(runtime,ports,retired,planned)
     probe=DetachedRecoveryCandidate.__new__(DetachedRecoveryCandidate);probe.command=runtime.command
-    return {'slot':slot,'backend_port':ports[0],'frontend_port':ports[1],
+    destination={'slot':slot,'backend_port':ports[0],'frontend_port':ports[1],
         'retained_slot':retained,'retained_source_sha':next(iter(sources)),
         'redis_name':redis_name,'redis_network':network,'redis_network_id':net['Id'],'subnet':probe.free_subnet(),'retired_port_declarations':retired}
+    if previous:destination['previous_candidate']=previous['binding']
+    return destination
 
 
 class DetachedRecoveryCandidate(ProductionLocalTransitionOperations):
@@ -314,7 +406,9 @@ class DetachedRecoveryCandidate(ProductionLocalTransitionOperations):
         networks = self.command(['docker','network','ls','--format','{{.Name}}']).splitlines()
         if self.network_name in networks:
             raise RuntimeError('detached_resource_already_exists')
-        require_unreserved_ports(self,(self.backend_port,self.frontend_port),(self.plan.candidate_destination or {}).get('retired_port_declarations',{}))
+        previous=inspect_previous_candidate(self.plan)
+        planned={row['Id']:row for kind,row in previous['rows'].items() if kind in ('backend','frontend')} if previous else {}
+        require_unreserved_ports(self,(self.backend_port,self.frontend_port),(self.plan.candidate_destination or {}).get('retired_port_declarations',{}),planned)
 
     @classmethod
     def read_only_feasibility(cls,plan,contract,root):
@@ -360,6 +454,25 @@ class DetachedRecoveryCandidate(ProductionLocalTransitionOperations):
             if self.plan.fallback[role] != {'container_id':row['id'],'image_id':row['image'],'spec_sha256':row['spec_sha256']}:
                 raise RuntimeError('detached_registered_fallback_changed')
 
+    def retire_previous_candidate(self):
+        """Fresh approval may stop only exact unpublished READ_ONLY services."""
+        self.require_authorization(self.contract)
+        previous=inspect_previous_candidate(self.plan)
+        if previous is None:return
+        from deployment.lib.emergency_routing_repair import exclusive,encoded
+        selected={kind:previous['rows'][kind]['Id'] for kind in ('frontend','backend','parser')}
+        exclusive(self.root/'previous-candidate-retirement.json',encoded({'plan_sha256':self.plan.digest,
+            'previous_candidate':previous['binding'],'stopped_ids':selected}))
+        for kind,identity in selected.items():
+            # Never update configuration, remove resources or touch the three
+            # CREATED business workers. Stop only the freshly bound exact IDs.
+            self.require_authorization(self.contract)
+            inspect_previous_candidate(self.plan)
+            self.command(['docker','stop',identity])
+            if self.inspect(identity)['State']['Running']:raise RuntimeError('previous_candidate_stop_failed')
+        inspect_previous_candidate(self.plan)
+        require_unreserved_ports(self,(self.backend_port,self.frontend_port),self.plan.candidate_destination['retired_port_declarations'])
+
     def stage(self):
         self.require_authorization(self.contract)
         self.require_feasible()
@@ -367,6 +480,7 @@ class DetachedRecoveryCandidate(ProductionLocalTransitionOperations):
         # Verify pinned provider/fallback/fences once more immediately before
         # effects. No container rename, old authority or public route change.
         self.verify_retained_inputs()
+        self.retire_previous_candidate()
         redis = self.inspect(self.redis_name)
         net = json.loads(self.command(['docker','network','inspect',self.redis_network]))[0]
         if (not redis['State']['Running'] or self.redis_network not in redis['NetworkSettings']['Networks']
@@ -440,10 +554,9 @@ class DetachedRecoveryCandidate(ProductionLocalTransitionOperations):
                 raise RuntimeError('detached_runtime_receipt_changed')
             expected = {self.network_name,'madar-supabase-client',self.redis_network} if kind in {'backend',*KINDS} else {self.network_name}
             attached=row['NetworkSettings']['Networks']
-            if set(attached) != expected or any(attached[name]['NetworkID'] != record['networks'][name] for name in expected):
-                raise RuntimeError('detached_network_attachment_changed')
-            if kind in {'backend',*KINDS} and (('backend' if kind=='backend' else kind+'-worker') not in (attached[self.network_name].get('Aliases') or [])):
-                raise RuntimeError('detached_network_role_changed')
+            verify_lifecycle_networks(row,{name:record['networks'][name] for name in expected},self.network_name,
+                ('backend' if kind=='backend' else kind+'-worker') if kind in {'backend',*KINDS} else None,
+                created_worker=kind in KINDS)
 
     def endpoint(self, kind):
         if kind not in {'backend','frontend'}:raise RuntimeError('detached_endpoint_invalid')

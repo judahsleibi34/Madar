@@ -29,13 +29,19 @@ def prior_backup_timer_states(plan):
     saved=json.loads(paths['plan.json'].read_text())
     receipt=json.loads(paths['authorization.json'].read_text())
     events=[json.loads(line) for line in paths['events.jsonl'].read_text().splitlines()]
+    previous_candidate=(getattr(plan,'candidate_destination',None) or {}).get('previous_candidate')
+    has_candidate=(root/'candidate-contract.json').exists() or (root/'candidate-identities.json').exists()
+    if has_candidate:
+        if not previous_candidate or previous_candidate['plan_sha256']!=binding['plan_sha256']:
+            raise RuntimeError('retry_timer_prior_attempt_not_applicable_candidate_not_bound')
+        from deployment.lib.active_recovery_candidate import inspect_previous_candidate
+        inspect_previous_candidate(plan)
     if (receipt.get('operation')!='active-local-rollback-resumption'
             or receipt.get('plan_sha256')!=binding['plan_sha256']
             or receipt.get('source_bundle_sha256')!=saved.get('source_bundle_sha256')
             or saved.get('retained_inputs')!=plan.retained_inputs
             or [row.get('phase') for row in events]!=['authorized','detached_candidate_pending','detached_candidate_failed']
-            or any(row.get('plan_sha256')!=binding['plan_sha256'] for row in events)
-            or (root/'candidate-contract.json').exists() or (root/'candidate-identities.json').exists()):
+            or any(row.get('plan_sha256')!=binding['plan_sha256'] for row in events)):
         raise RuntimeError('retry_timer_prior_attempt_not_applicable')
     return validate_backup_timer_states(json.loads(paths['backup-timer-preimage.json'].read_text()))
 

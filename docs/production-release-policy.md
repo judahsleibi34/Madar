@@ -1993,3 +1993,29 @@ These archived resources are neither started, displaced nor edited. Host sockets
 must still be free; unknown, changed, running or restartable declarations reject
 preflight/staging. This narrow retirement predicate never permits reuse of a
 live port or arbitrary stopped Docker reservation.
+
+
+Created normal-local business standbys bind exact container/image/configuration
+and declared network names/role aliases to the existing bridge object IDs.
+Before first start Docker may leave NetworkID empty; this allowance applies ONLY
+to State.Status=created, Running=false, the exact primary NetworkMode and no
+allocated endpoint/IP. Changed or extra networks/aliases/objects still reject.
+The governed single-owner handoff records a new root-private, plan/CID-bound
+start intent before starting each worker. After start, runtime verification
+requires populated exact network IDs and all identity, owner, fencing and health
+checks. Docker's observed OomKillDisable=false to null first-start metadata change
+is compared against the original receipt only for governed business-worker
+starts; all other specification bytes remain bound. Original receipts are never
+rewritten. Repeated start commands cannot overwrite the exclusive start intents.
+The same narrow comparison permits safe stopping during compensation; it grants
+no start/write authority. Production deployment still requires fresh approval.
+
+Fresh authorization may include the narrow pre-publication candidate retirement
+specified in the control-plane architecture. Original failed-attempt evidence and
+all customer data remain; no historical authorization is replayed. Read-only
+preflight must identify exact retained loopback owners and verify their READ_ONLY
+state. The fresh operation stops only their unpublished backend/frontend/parser,
+then requires free sockets before staging newly accepted exact-source images.
+Old CREATED business consumers remain unstarted. Unknown ownership, altered
+protected bytes/identities/configuration/networks or a post-publication prior
+attempt reject this continuation. No database restore or migration is authorized.

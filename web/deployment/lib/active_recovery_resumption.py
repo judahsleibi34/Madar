@@ -59,7 +59,8 @@ class ResumptionPlan:
         if destination is not None:
             import ipaddress
             fields={'slot','backend_port','frontend_port','retained_slot','retained_source_sha','redis_name','redis_network','redis_network_id','subnet','retired_port_declarations'}
-            if (set(destination)!=fields or destination['slot'] not in {'blue','green'}
+            optional={'previous_candidate'} if 'previous_candidate' in destination else set()
+            if (set(destination)!=fields|optional or destination['slot'] not in {'blue','green'}
                     or destination['retained_slot'] not in {'blue','green'} or destination['slot']==destination['retained_slot']
                     or (destination['backend_port'],destination['frontend_port'])!={'blue':(8101,3100),'green':(8201,3200)}[destination['slot']]
                     or not re.fullmatch('[0-9a-f]{40}',destination['retained_source_sha'])
@@ -70,9 +71,12 @@ class ResumptionPlan:
                     or not ipaddress.ip_network(destination['subnet']).subnet_of(ipaddress.ip_network('10.253.0.0/16'))):
                 raise RuntimeError('resumption_candidate_destination_invalid')
             retired=destination['retired_port_declarations']
-            if not isinstance(retired,dict) or len(retired)>2:raise RuntimeError('resumption_retired_declarations_invalid')
+            previous=destination.get('previous_candidate')
+            if previous is not None and (set(previous)!={'plan_sha256','evidence_sha256'} or any(not HASH.fullmatch(str(v)) for v in previous.values())):
+                raise RuntimeError('resumption_previous_candidate_invalid')
+            if not isinstance(retired,dict) or len(retired)>(4 if previous else 2):raise RuntimeError('resumption_retired_declarations_invalid')
             for name,value in retired.items():
-                if (not re.fullmatch('madar-'+destination['slot']+'-(backend|frontend)-legacy-[0-9a-f]{12}',name)
+                if (not (re.fullmatch('madar-'+destination['slot']+'-(backend|frontend)-legacy-[0-9a-f]{12}',name) or (previous and re.fullmatch('madar-normal-'+previous['plan_sha256'][:12]+'-(backend|frontend)',name)))
                         or set(value)!={'container_id','image_id','spec_sha256'}
                         or not HASH.fullmatch(value['container_id']) or not HASH.fullmatch(value['spec_sha256'])
                         or not re.fullmatch('sha256:[0-9a-f]{64}',value['image_id'])):

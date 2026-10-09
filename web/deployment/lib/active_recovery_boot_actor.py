@@ -8,7 +8,7 @@ import json
 from pathlib import Path
 from deployment.lib.active_recovery_resumption import ActiveRecoveryResumption, ROOT, PHASES
 from deployment.lib.active_recovery_source import FrozenContinuationSource
-from deployment.lib.active_recovery_candidate import DetachedRecoveryCandidate
+from deployment.lib.active_recovery_candidate import worker_spec_matches,DetachedRecoveryCandidate
 from deployment.lib.active_recovery_workers import ActiveRecoveryWorkerHandoff
 from deployment.lib.active_recovery_runtime import ActiveRecoveryRuntime
 from deployment.lib.active_recovery_boot import ActiveRecoveryNormalBoot
@@ -115,7 +115,7 @@ class ActiveRecoveryBootActor:
                 expected=bindings['runtimes'][kind]
                 rows=self.runtime.inspect([expected['id']])
                 row=next(value for value in rows.values() if value['Id']==expected['id'])
-                if row['Image']!=expected['image'] or spec(row)!=expected['spec_sha256']:
+                if row['Image']!=expected['image'] or not worker_spec_matches(row,expected['spec_sha256'],started_worker=kind in ('notification','calendar-sync','data-deletion')):
                     raise RuntimeError('boot_actor_compensation_identity_changed')
                 self.runtime.command(['docker','update','--restart=no',row['Id']])
                 self.runtime.command(['docker','stop',row['Id']])

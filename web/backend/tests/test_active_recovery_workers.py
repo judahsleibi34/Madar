@@ -95,6 +95,29 @@ class WorkerHandoffTests(unittest.TestCase):
     def test_changed_owner_or_candidate_spec_rejected(self):
         self.w.establish_owner();name='madar-green-notification-worker';self.c.rows[name]['Image']='sha256:'+'0'*64
         with self.assertRaisesRegex(RuntimeError,'active_spec_changed'):self.w.verify_owner()
+    def test_unauthorized_start_after_ownership_is_rejected(self):
+        self.w.establish_owner()
+        self.c.rows['madar-green-notification-worker']['State']['Running']=True
+        with self.assertRaisesRegex(RuntimeError,'started_early'):self.w.verify_owner()
+
+    def test_changed_start_permit_is_rejected(self):
+        self.w.establish_owner();self.w.start_standbys()
+        (self.root/'worker-start-notification.json').write_text('{}')
+        with self.assertRaisesRegex(RuntimeError,'start_permission_changed'):self.w.verify_owner()
+
+    def test_first_start_metadata_transition_keeps_original_receipt(self):
+        for kind in KINDS:self.c.rows[self.c.name(kind)]['HostConfig']['OomKillDisable']=False
+        bindings=json.loads((self.root/'candidate-identities.json').read_text())
+        for kind in KINDS:bindings['runtimes'][kind]['spec_sha256']=spec(self.c.inspect(self.c.name(kind)))
+        (self.root/'candidate-identities.json').write_text(json.dumps(bindings))
+        self.w.establish_owner();self.w.start_standbys()
+        before=(self.root/'candidate-identities.json').read_bytes()
+        for kind in KINDS:self.c.rows['madar-green-'+kind+'-worker']['HostConfig']['OomKillDisable']=None
+        self.w.verify_owner()
+        self.assertEqual((self.root/'candidate-identities.json').read_bytes(),before)
+        self.c.rows['madar-green-notification-worker']['HostConfig']['OomKillDisable']=True
+        with self.assertRaisesRegex(RuntimeError,'active_spec_changed'):self.w.verify_owner()
+
     def test_compensation_stops_by_original_candidate_ids(self):
         self.w.establish_owner();self.w.start_standbys();self.phase='compensation_pending';self.save_phase();self.w.stop_consumers()
         self.assertTrue(all(not self.c.inspect('madar-green-'+kind+'-worker')['State']['Running'] for kind in KINDS))
