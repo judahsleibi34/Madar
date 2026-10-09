@@ -993,3 +993,37 @@ These archived resources are neither started, displaced nor edited. Host sockets
 must still be free; unknown, changed, running or restartable declarations reject
 preflight/staging. This narrow retirement predicate never permits reuse of a
 live port or arbitrary stopped Docker reservation.
+
+
+Created normal-local business standbys bind exact container/image/configuration
+and declared network names/role aliases to the existing bridge object IDs.
+Before first start Docker may leave NetworkID empty; this allowance applies ONLY
+to State.Status=created, Running=false, the exact primary NetworkMode and no
+allocated endpoint/IP. Changed or extra networks/aliases/objects still reject.
+The governed single-owner handoff records a new root-private, plan/CID-bound
+start intent before starting each worker. After start, runtime verification
+requires populated exact network IDs and all identity, owner, fencing and health
+checks. Docker's observed OomKillDisable=false to null first-start metadata change
+is compared against the original receipt only for governed business-worker
+starts; all other specification bytes remain bound. Original receipts are never
+rewritten. Repeated start commands cannot overwrite the exclusive start intents.
+The same narrow comparison permits safe stopping during compensation; it grants
+no start/write authority. Production deployment still requires fresh approval.
+
+A new continuation may bind a retained detached candidate only when its original
+protected journal is exactly authorized/pending/failed before publication. The
+old plan, authorization, journal, candidate contract/identities and READ_ONLY
+write-authority bytes are hashed as data in the NEW plan; they issue no authority.
+Exact bridge objects, configurations, image/container identities, role endpoints,
+three never-started CREATED consumers and unchanged fallback/transaction inputs
+must pass the corrected read-only verifier. Shared preflight/staging resolution
+recognizes only those exact already-published detached loopback ports as planned
+retirement; all unrelated reservations still fail closed. Fresh authorization
+permits stopping ONLY that unpublished backend/frontend/parser by exact ID,
+recording a new exclusive retirement receipt and checking actual free sockets
+before creating the new-source candidate. All original resources, networks,
+volumes and protected records remain. The three old CREATED business workers are
+never started. New source/image acceptance cannot be relabeled from the old
+candidate. Existing original timer states are usable only with this independently
+bound pre-publication failure proof; timers resume after verified normal backup.
+Failure before public handoff leaves the original restricted fallback serving.

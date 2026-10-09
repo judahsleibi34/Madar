@@ -21,9 +21,9 @@ class ActiveRuntimeTests(unittest.TestCase):
         for i,kind in enumerate(sorted(ROLES)):
             attached={'normal','madar-supabase-client','redis'} if kind in {'backend',*KINDS} else {'normal'}
             row={'Id':str(i).zfill(64),'Image':self.plan.candidate_images['frontend' if kind=='frontend' else 'backend'],
-                 'Name':'/renamed-'+kind,'Config':{},'Mounts':[], 'HostConfig':{'RestartPolicy':{'Name':'no'}},
+                 'Name':'/renamed-'+kind,'Config':{},'Mounts':[], 'HostConfig':{'RestartPolicy':{'Name':'no'},'NetworkMode':'normal'},
                  'State':{'Running':True},'NetworkSettings':{'Networks':{name:{'NetworkID':self.networks[name],
-                 'IPAddress':'10.0.0.5','Aliases':['backend' if kind=='backend' else kind+'-worker']} for name in attached}}}
+                 'IPAddress':'10.0.0.5','Aliases':(['backend' if kind=='backend' else kind+'-worker'] if name=='normal' else [])} for name in attached}}}
             self.rows[kind]=row
         self.record={'version':1,'plan_sha256':self.plan.digest,'source_sha':self.plan.source_sha,'mode':'READ_ONLY',
             'loopback_ports':{'backend':8201,'frontend':3200},'networks':self.networks,
@@ -57,7 +57,9 @@ class ActiveRuntimeTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError,'owner_changed'):self.verifier.identities(workers_started=True)
     def test_workers_must_remain_stopped_before_handoff(self):
         with self.assertRaisesRegex(RuntimeError,'identity_changed'):self.verifier.identities(workers_started=False)
-        for kind in KINDS:self.rows[kind]['State']['Running']=False
+        for kind in KINDS:
+            self.rows[kind]['State']={'Running':False,'Status':'created'}
+            for network in self.rows[kind]['NetworkSettings']['Networks'].values():network['NetworkID']='';network['IPAddress']=''
         self.verifier.identities(workers_started=False)
     def test_missing_parser_or_changed_receipt_fails(self):
         self.record['runtimes'].pop('parser');self.save()

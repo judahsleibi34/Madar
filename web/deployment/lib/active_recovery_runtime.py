@@ -5,7 +5,7 @@ network IDs cannot. This component issues no authorization and changes nothing.
 """
 import json
 from pathlib import Path
-from deployment.lib.active_recovery_candidate import KINDS
+from deployment.lib.active_recovery_candidate import KINDS,verify_lifecycle_networks,worker_spec_matches
 from deployment.lib.emergency_routing_repair import Runtime, spec
 from deployment.lib.provider_recovery_runtime import protected
 
@@ -40,18 +40,16 @@ class ActiveRecoveryRuntime:
         for kind, expected in binding['runtimes'].items():
             row = self.candidate.inspect(expected['id'])
             image = self.plan.candidate_images['frontend' if kind == 'frontend' else 'backend']
-            if (expected != {'id':row['Id'], 'image':row['Image'], 'spec_sha256':spec(row)}
+            if (expected['id']!=row['Id'] or expected['image']!=row['Image']
+                    or not worker_spec_matches(row,expected['spec_sha256'],started_worker=workers_started and kind in KINDS)
                     or row['Image'] != image or row['HostConfig']['RestartPolicy']['Name'] != 'no'
                     or (require_running and row['State']['Running'] is not (workers_started or kind not in KINDS))):
                 raise RuntimeError('active_runtime_identity_changed')
             attached = row['NetworkSettings']['Networks']
             wanted = {self.candidate.network_name, 'madar-supabase-client', self.candidate.redis_network} if kind in {'backend', *KINDS} else {self.candidate.network_name}
-            if set(attached) != wanted or any(attached[name]['NetworkID'] != binding['networks'][name] for name in wanted):
-                raise RuntimeError('active_runtime_attachment_changed')
-            if kind in {'backend', *KINDS}:
-                alias = 'backend' if kind == 'backend' else kind+'-worker'
-                if alias not in (attached[self.candidate.network_name].get('Aliases') or []):
-                    raise RuntimeError('active_runtime_role_changed')
+            verify_lifecycle_networks(row,{name:binding['networks'][name] for name in wanted},self.candidate.network_name,
+                ('backend' if kind=='backend' else kind+'-worker') if kind in {'backend',*KINDS} else None,
+                created_worker=kind in KINDS and not workers_started)
             result[kind] = row
         if workers_started:
             owner = self.workers.verify_owner()

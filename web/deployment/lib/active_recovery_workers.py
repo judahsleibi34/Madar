@@ -11,7 +11,7 @@ import pwd
 import time
 from pathlib import Path
 from deployment.lib.active_recovery_resumption import ROOT
-from deployment.lib.active_recovery_candidate import KINDS
+from deployment.lib.active_recovery_candidate import KINDS,worker_spec_matches
 from deployment.lib.emergency_routing_repair import spec,exclusive,encoded,AvailabilityFailure
 from deployment.lib.provider_recovery_runtime import protected,digest
 from deployment.lib.runtime_authority import write_worker_authority,load_worker_authority,runtime_mutation_lock
@@ -85,7 +85,17 @@ class ActiveRecoveryWorkerHandoff:
         if set(record['active'])!={'backend','frontend',*KINDS}:raise RuntimeError('worker_handoff_active_inventory_changed')
         for kind,identity in record['active'].items():
             row=self.candidate.inspect(identity);expected=binding['runtimes'][kind]
-            if identity!=expected['id'] or row['Image']!=expected['image'] or spec(row)!=expected['spec_sha256']:
+            started=False
+            if kind in KINDS:
+                intent=self.root/('worker-start-'+kind+'.json')
+                if intent.exists():
+                    permit=json.loads(protected(intent,private=True).read_text())
+                    if permit!={'plan_sha256':self.plan.digest,'container_id':identity}:
+                        raise RuntimeError('worker_handoff_start_permission_changed')
+                    started=True
+                if row['State']['Running'] and not started:
+                    raise RuntimeError('worker_handoff_standby_started_early')
+            if identity!=expected['id'] or row['Image']!=expected['image'] or not worker_spec_matches(row,expected['spec_sha256'],started_worker=started):
                 raise RuntimeError('worker_handoff_active_spec_changed')
         active_ids=set(record['active'].values())
         for name in self.candidate.command(['docker','ps','-a','--format','{{.Names}}']).splitlines():
@@ -98,6 +108,7 @@ class ActiveRecoveryWorkerHandoff:
         self.guard({'controller_resumed'});record=self.verify_owner()
         for kind in KINDS:
             self.guard({'controller_resumed'});self.verify_owner()
+            exclusive(self.root/('worker-start-'+kind+'.json'),encoded({'plan_sha256':self.plan.digest,'container_id':record['active'][kind]}))
             self.candidate.command(['docker','start',record['active'][kind]])
         deadline=time.monotonic()+60
         while True:
