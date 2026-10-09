@@ -128,12 +128,13 @@ def application_cases(db,endpoints,native):
         temporary=authority/'new.json';temporary.write_text(json.dumps(document));temporary.chmod(0o444);os.replace(temporary,authority/'authority.json')
     def inspect(name):return json.loads(run(['docker','inspect',name]))[0]
     def endpoint(name,port):return 'http://'+inspect(name)['NetworkSettings']['Networks'][network]['IPAddress']+':'+str(port)
-    def create(kind,image,alias,environment=None,command=None,mounts=()):
+    def create(kind,image,alias,environment=None,command=None,mounts=(),entrypoint=None):
         require(not any(key.startswith(('LD_','PYTHON','DOCKER_','COMPOSE_','GIT_')) or key in {'PATH','HOME','SHELL','BASH_ENV','ENV','IFS','CDPATH'} for key in environment or {}),'artifact_loader_environment_rejected')
         name=prefix+'-'+kind
         args=['docker','create','--pull','never','--name',name,'--network',network,'--network-alias',alias,
             '--restart','no','--log-driver','none','--cap-drop','ALL','--security-opt','no-new-privileges',
             '--memory','1g','--pids-limit','256']
+        if entrypoint is not None:args+=['--entrypoint',entrypoint]
         for mount in mounts:args+=['--mount',mount]
         for key in environment or {}:args+=['--env',key]
         run_env(args+[image]+(command or []),environment or {});created.append(name)
@@ -155,7 +156,8 @@ def application_cases(db,endpoints,native):
         mounts=[f'type=bind,src={native_dir}/{name},dst={dest},readonly' for name,dest in [
             ('docker-entrypoint.sh','/docker-entrypoint.sh'),('cds.yaml','/etc/envoy/cds.yaml'),
             ('envoy.yaml','/etc/envoy/envoy.yaml'),('lds.template.yaml','/etc/envoy/lds.template.yaml')]]
-        gw=create('gateway',gateway['Image'],'madar-supabase',gateway_env,mounts=mounts)
+        require(gateway['Config']['Entrypoint']==['/bin/sh','/docker-entrypoint.sh'],'artifact_gateway_command_changed')
+        gw=create('gateway',gateway['Image'],'madar-supabase',gateway_env,command=['/docker-entrypoint.sh'],mounts=mounts,entrypoint='/bin/sh')
         redis_image=inspect('madar-provider402-rehearsal-94750f00e0d3-candidate-redis')['Image']
         redis=create('redis',redis_image,'redis',command=['redis-server','--save','','--appendonly','no'])
         cfg.update(APP_ENV='production',MADAR_ENV_FILE='/tmp/no-env',MADAR_ENV_OVERRIDE='false',
