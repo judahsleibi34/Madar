@@ -1,5 +1,10 @@
 """Acceptance-client regression using a real owned HTTP fixture, no authorization."""
-import importlib.util
+import ast
+import re
+import urllib.error
+import urllib.request
+from http.cookies import SimpleCookie
+from types import SimpleNamespace
 import json
 import os
 from pathlib import Path
@@ -9,9 +14,16 @@ import unittest
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 WEB=Path(os.getenv('MADAR_TEST_REPOSITORY_ROOT') or Path(__file__).resolve().parents[2])
-sys.path.insert(0,str(WEB))
-spec=importlib.util.spec_from_file_location('artifact_verifier_http_fixture',WEB/'scripts/verify_final_application_artifacts.py')
-module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+# Exercise the real HTTP client without importing the root-only execution runner.
+path=WEB/'scripts/verify_final_application_artifacts.py'
+source=ast.parse(path.read_text())
+client=next(node for node in source.body if isinstance(node,ast.ClassDef) and node.name=='Session')
+namespace={'urllib':urllib,'json':json,'SimpleCookie':SimpleCookie,'re':re}
+def require(value,category):
+    if not value:raise RuntimeError(category)
+namespace['require']=require
+exec(compile(ast.Module(body=[client],type_ignores=[]),str(path),'exec'),namespace)
+module=SimpleNamespace(Session=namespace['Session'])
 
 class ArtifactHttpSessionTests(unittest.TestCase):
     def test_cookie_and_header_renewal_is_used_for_next_write(self):
