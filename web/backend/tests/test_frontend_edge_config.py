@@ -35,7 +35,7 @@ class FrontendEdgeConfigTests(unittest.TestCase):
     def test_same_origin_api_proxy_preserves_trusted_forwarding_context(self):
         nginx = (ROOT / "frontend" / "nginx.conf.template").read_text(encoding="utf-8")
         self.assertIn("location ^~ /api/", nginx)
-        self.assertIn("proxy_pass http://backend:8000/", nginx)
+        self.assertIn("proxy_pass http://madar_backend_runtime/", nginx)
         self.assertIn("proxy_set_header Host $host", nginx)
         self.assertIn("proxy_set_header X-Forwarded-Host $host", nginx)
         self.assertIn("proxy_set_header X-Forwarded-Proto $madar_forwarded_proto", nginx)
@@ -53,7 +53,7 @@ class FrontendEdgeConfigTests(unittest.TestCase):
         nginx = (ROOT / "frontend" / "nginx.conf.template").read_text(encoding="utf-8")
         vite = (ROOT / "frontend" / "vite.config.js").read_text(encoding="utf-8")
         self.assertIn("location ^~ /uploads/ {", nginx)
-        self.assertIn("proxy_pass http://backend:8000;", nginx)
+        self.assertIn("proxy_pass http://madar_backend_runtime;", nginx)
         self.assertIn('"/uploads": {', vite)
         self.assertNotIn("location /uploads/ {\n        try_files", nginx)
 

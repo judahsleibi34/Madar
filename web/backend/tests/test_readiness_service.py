@@ -392,3 +392,28 @@ class ReadinessServiceTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+class CoordinatedBackupHealthTests(unittest.TestCase):
+    def test_exact_checkpoint_identity_is_not_relabelled_as_regular_backup(self):
+        with tempfile.TemporaryDirectory() as folder:
+            marker=Path(folder)/'latest.json';now=datetime.now(timezone.utc)
+            value={'format':2,'scope':'complete-coordinated-checkpoint','schema':115,
+                'checkpoint_id':'checkpoint-'+now.strftime('%Y%m%dT%H%M%SZ'),'created_at':now.isoformat(),
+                'verified':True,'manifest_sha256':'a'*64,'execution_sha256':'b'*64}
+            marker.write_text(json.dumps(value))
+            with patch.dict(os.environ,{'BACKUP_FRESHNESS_REQUIRED':'true','BACKUP_FRESHNESS_MARKER':str(marker),'BACKUP_MAX_AGE_SECONDS':'3600'}):
+                self.assertEqual(readiness_service.check_backup_freshness(),'ok')
+                for key,wrong in [('scope','database-only'),('schema',116),('checkpoint_id','madar-'+now.strftime('%Y%m%dT%H%M%SZ')),
+                    ('execution_sha256','PASS'),('verified',False),('format',True),('created_at',None)]:
+                    marker.write_text(json.dumps({**value,key:wrong}))
+                    with self.subTest(key=key):self.assertEqual(readiness_service.check_backup_freshness(),'invalid')
+
+    def test_touching_or_copying_marker_does_not_renew_source_checkpoint_age(self):
+        with tempfile.TemporaryDirectory() as folder:
+            marker=Path(folder)/'latest.json';old=datetime.now(timezone.utc)-timedelta(days=3)
+            marker.write_text(json.dumps({'format':2,'scope':'complete-coordinated-checkpoint','schema':115,
+                'checkpoint_id':'checkpoint-'+old.strftime('%Y%m%dT%H%M%SZ'),'created_at':old.isoformat(),
+                'verified':True,'manifest_sha256':'a'*64,'execution_sha256':'b'*64}))
+            os.utime(marker,None)
+            with patch.dict(os.environ,{'BACKUP_FRESHNESS_REQUIRED':'true','BACKUP_FRESHNESS_MARKER':str(marker),'BACKUP_MAX_AGE_SECONDS':'3600'}):
+                self.assertEqual(readiness_service.check_backup_freshness(),'stale')

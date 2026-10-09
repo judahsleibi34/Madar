@@ -46,7 +46,23 @@ def run(command: list[str], *, phase: str, timeout: int = 180, input: str | None
     if result.returncode:
         # pg_restore errors can contain COPY rows or SQL literals. Never emit
         # raw database output, even into the sanitized evidence report.
-        raise RehearsalError(f"{phase}:exit_{result.returncode}")
+        category = "unspecified"
+        # Never print SQL, COPY rows, role names or credentials. Only fixed
+        # diagnostic categories from the actual subprocess error are retained.
+        for label, pattern in (("unsupported_archive_version", r'unsupported version .* in file header'),
+                               ("unrecognized_configuration", r'unrecognized configuration parameter'),
+                               ("missing_extension_control", r'could not open extension control file'),
+                               ("extension_prerequisite", r'must be preloaded|extension .* requires|not in shared_preload_libraries'),
+                               ("duplicate_object", r'already exists'),
+                               ("missing_library", r'could not load library|could not access file'),
+                               ("missing_role", r'role "[^"\n]+" does not exist'),
+                               ("missing_extension", r'extension "[^"\n]+" is not available'),
+                               ("permission_denied", r'permission denied'),
+                               ("required_preload", r'must be loaded via shared_preload_libraries')):
+            if re.search(pattern, result.stderr or "", re.IGNORECASE):
+                category = label
+                break
+        raise RehearsalError(f"{phase}:exit_{result.returncode}:{category}")
     return result.stdout
 
 
@@ -73,7 +89,37 @@ def file_inventory(root: Path) -> dict[str, str]:
     return files
 
 
-def rehearse(backup: Path, image: str, migration: Path | None = None, *, target_schema: int | None = None, new_tables: tuple[str, ...] = ()) -> dict:
+def logical_role_prerequisites(backup: Path, manifest: dict) -> str:
+    """Restore role names only, NOLOGIN; never execute saved role/password SQL.
+
+    Supabase RLS policies reference more roles than anon/authenticated/service_role.
+    This does not prove role attributes, memberships or platform authorization.
+    """
+    names = {"anon", "authenticated", "service_role"}
+    if manifest.get("coordinated_checkpoint"):
+        if manifest["coordinated_checkpoint"] != "coordinated/manifest.json":
+            raise RehearsalError("coordinated_manifest_path_invalid")
+        coordinated = backup / "coordinated"
+        packet = json.loads(regular_source(str(coordinated / "manifest.json")).read_text())
+        entries = [entry for entry in packet.get("files", []) if Path(entry["path"]).name.endswith("roles.sql")]
+        if len(entries) != 1:
+            raise RehearsalError("coordinated_roles_inventory_missing")
+        entry = entries[0]
+        relative = Path(entry["path"])
+        if relative.is_absolute() or ".." in relative.parts:
+            raise RehearsalError("coordinated_roles_path_invalid")
+        file = regular_source(str(coordinated / relative))
+        if file.stat().st_size != entry["size"] or hashlib.sha256(file.read_bytes()).hexdigest() != entry["sha256"]:
+            raise RehearsalError("coordinated_roles_inventory_changed")
+        selected = set(re.findall(r"^CREATE ROLE ([a-zA-Z_][a-zA-Z0-9_]*);$", file.read_text(), re.MULTILINE))
+        if not names.issubset(selected):
+            raise RehearsalError("coordinated_roles_inventory_incomplete")
+        names |= selected
+    names.discard("postgres")  # initdb already created the isolated superuser.
+    return "".join(f'CREATE ROLE "{name}" NOLOGIN;\n' for name in sorted(names))
+
+
+def rehearse(backup: Path, image: str, migration: Path | None = None, *, target_schema: int | None = None, new_tables: tuple[str, ...] = (), postgres_preload: tuple[str, ...] = ()) -> dict:
     if not re.fullmatch(r"[a-zA-Z0-9./:_-]+@sha256:[0-9a-f]{64}", image):
         raise RehearsalError("postgres_image_must_be_digest_pinned")
     if migration is not None and (type(target_schema) is not int or target_schema <= 0):
@@ -82,6 +128,9 @@ def rehearse(backup: Path, image: str, migration: Path | None = None, *, target_
         raise RehearsalError("target_contract_requires_migration")
     if len(set(new_tables)) != len(new_tables) or any(not re.fullmatch(r"[a-z][a-z0-9_]*", table) for table in new_tables):
         raise RehearsalError("invalid_expected_new_tables")
+    if (len(postgres_preload) != len(set(postgres_preload))
+            or any(name not in {"pg_cron", "pg_net"} for name in postgres_preload)):
+        raise RehearsalError("unsupported_restore_preload")
     regular_source(str(backup / "database.dump"))
     migration_mount = readonly_file_mount(str(migration), "/migration.sql") if migration else None
     manifest = json.loads((backup / "manifest.json").read_text())
@@ -93,7 +142,9 @@ def rehearse(backup: Path, image: str, migration: Path | None = None, *, target_
     result = {"backup_id": manifest["backup_id"], "backup_timestamp": manifest["created_at"],
               "backup_schema": int(manifest["database"]["schema_version"]),
               "dump_sha256": dump_hash, "image": image, "container": name,
-              "network": "none", "platform_recovery_proven": False}
+              "network": "none", "platform_recovery_proven": False,
+              "role_attributes_restored": False, "ownership_and_acls_restored": False,
+              "postgres_preload": list(postgres_preload), "scheduled_jobs_enabled": False}
     # A private readable copy decouples backup ownership from the image
     # account database; initdb requires a named non-root UID. The parent stays
     # mode 0700 and only this file is mounted, read-only, into the container.
@@ -115,10 +166,17 @@ def rehearse(backup: Path, image: str, migration: Path | None = None, *, target_
                "--mount", dump_mount]
     if migration_mount:
         command += ["--mount", migration_mount]
+    preload = " -c shared_preload_libraries=" + ",".join(postgres_preload) if postgres_preload else ""
+    if "pg_cron" in postgres_preload:
+        preload += " -c cron.launch_active_jobs=off"
+    if "pg_net" in postgres_preload:
+        # The extension may be created, but its worker cannot connect to the
+        # restored database or drain copied HTTP requests. No such DB exists.
+        preload += " -c pg_net.database_name=madar_restore_disabled"
     command += ["--entrypoint", "sh", image, "-ec",
                 "initdb -D /restore-data/pgdata -U postgres --auth=trust >/dev/null; "
                 "exec postgres -D /restore-data/pgdata -k /tmp -c listen_addresses='' "
-                "-c log_statement=none -c log_min_error_statement=panic"]
+                "-c log_statement=none -c log_min_error_statement=panic" + preload]
     created = False
     started = time.monotonic()
     try:
@@ -132,9 +190,20 @@ def rehearse(backup: Path, image: str, migration: Path | None = None, *, target_
         else:
             raise RehearsalError("database_start_timeout")
         psql = psql_command(name, attach_stdin=True)
+        checks = []
+        if "pg_cron" in postgres_preload:
+            checks.append("SELECT current_setting('cron.launch_active_jobs') = 'off';")
+        if "pg_net" in postgres_preload:
+            checks.extend(["SELECT current_setting('pg_net.database_name') = 'madar_restore_disabled';",
+                           "SELECT NOT EXISTS(SELECT 1 FROM pg_database WHERE datname = 'madar_restore_disabled');"])
+        if checks:
+            actual = run(psql, phase="disabled_background_jobs", input="\n".join(checks)).splitlines()
+            if actual != ["t"] * len(checks):
+                raise RehearsalError("restore_background_jobs_not_disabled")
+        result["background_job_settings_verified"] = True
         # Logical dumps exclude cluster roles. NOLOGIN prerequisites only; this
         # rehearsal must never be mistaken for a live authorization bootstrap.
-        run(psql, phase="role_prerequisites", input="CREATE ROLE anon NOLOGIN; CREATE ROLE authenticated NOLOGIN; CREATE ROLE service_role NOLOGIN;\n")
+        run(psql, phase="role_prerequisites", input=logical_role_prerequisites(backup, manifest))
         restore_started = time.monotonic()
         run(["docker", "exec", name, "pg_restore", "--exit-on-error", "--single-transaction",
              "--no-owner", "--no-acl", "-h", "/tmp", "-U", "postgres", "-d", "postgres", "/backup.dump"], phase="full_database_restore")
@@ -250,12 +319,13 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("backup", type=Path)
     parser.add_argument("--postgres-image", required=True)
+    parser.add_argument("--postgres-preload", choices=("pg_cron", "pg_net"), action="append", default=[])
     parser.add_argument("--migration", type=Path)
     parser.add_argument("--target-schema", type=int)
     parser.add_argument("--new-table", action="append", default=[])
     args = parser.parse_args()
     try:
-        report = rehearse(args.backup, args.postgres_image, args.migration, target_schema=args.target_schema, new_tables=tuple(args.new_table))
+        report = rehearse(args.backup, args.postgres_image, args.migration, target_schema=args.target_schema, new_tables=tuple(args.new_table), postgres_preload=tuple(args.postgres_preload))
     except (RehearsalError, OSError, ValueError, KeyError) as error:
         print(json.dumps({"status": "failed", "error": str(error) if isinstance(error, RehearsalError) else type(error).__name__}))
         return 1

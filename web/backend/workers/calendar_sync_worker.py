@@ -175,6 +175,9 @@ def process_job(job: dict[str, Any]) -> str:
 
 
 def process_sync_batch(*, limit: int = 10, worker_id: str | None = None) -> int:
+    from services.provider_recovery import worker_consumption_allowed
+    if not worker_consumption_allowed():
+        return 0
     selected_worker = worker_id or f"{socket.gethostname()}:{uuid.uuid4().hex[:12]}"
     jobs = claim_task_sync_jobs(worker_id=selected_worker, limit=limit)
     for job in jobs:
@@ -242,6 +245,9 @@ def process_connection_job(job: dict[str, Any]) -> str:
 def process_connection_batch(
     *, limit: int = 2, worker_id: str | None = None
 ) -> int:
+    from services.provider_recovery import worker_consumption_allowed
+    if not worker_consumption_allowed():
+        return 0
     selected_worker = worker_id or f"{socket.gethostname()}:{uuid.uuid4().hex[:12]}"
     jobs = claim_connection_sync_jobs(
         worker_id=selected_worker, limit=limit
@@ -261,6 +267,9 @@ def process_connection_batch(
 def schedule_periodic_inbound(
     *, interval_seconds: int, limit: int = 20
 ) -> int:
+    from services.provider_recovery import worker_consumption_allowed
+    if not worker_consumption_allowed():
+        return 0
     connections = eligible_inbound_connections(
         interval_seconds=interval_seconds, limit=limit
     )
@@ -309,6 +318,14 @@ def main() -> int:
     try:
         STATE["healthy"] = True
         while not STOP_EVENT.is_set():
+            from services.provider_recovery import worker_consumption_status
+            allowed, authority_valid = worker_consumption_status()
+            if not allowed:
+                STATE["healthy"] = authority_valid
+                STATE["consuming"] = False
+                STOP_EVENT.wait(1.0)
+                continue
+            STATE["consuming"] = True
             try:
                 now = datetime.now(timezone.utc)
                 if now >= next_schedule_at:

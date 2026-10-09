@@ -1639,3 +1639,320 @@ canonical reinstallation and attestation. This cannot repair an active recovery,
 refresh/reuse an authorization, waive Phase2, alter traffic, or restore data.
 The explicit installer inventory also includes the existing normal-local
 transition entrypoint, launcher and six helper modules.
+
+
+### Repeated local runtime rollback
+
+The governed normal-local `rollback` operation also accepts its completed
+`local_rollback_active` phase so an operator can repeat current-data fallback
+routing after a runtime address change. It retains the same credential,
+exact-contract evidence, archive integrity, production fingerprint, write-fence
+and worker-inhibition checks. It grants no writes, starts no consumers, restores
+no data and provides no graduation/resumption operation. Lost volatile recovery
+credentials remain a blocking condition; this change cannot regenerate them.
+
+### Independently approved emergency routing for active local rollback
+
+`web/deployment/lib/emergency_routing_repair.py` is a standalone standard-library
+package for the exact already-active `local_rollback_active` incident. Its fresh
+operator approval binds the reviewed code digest, immutable recovery and local
+transaction bytes, registered fallback, exact running container IDs/images/
+configuration, networks, schema115 and READ_ONLY/consumer authority. Approval is
+issued exclusively in its new root-private durable namespace only after the
+operator approves that exact independently observed plan. It consumes no old
+acceptance PASS record and recreates no `/run` credential, witness or interlock.
+It grants no normal deployment, graduation, worker-start, migration, restore or
+business-write authority. The existing controller, receipts, checkpoints and
+transaction bytes remain unchanged. A separate routing audit records the overlay;
+normal-production resumption must independently account for that overlay.
+
+The reviewed bootstrap hashes the exact source and plan before executing source
+as root. The additive protected installation publishes only the new package,
+`madar-emergency-routing.service`, and a root-only proxy startup gate drop-in.
+Nginx uses fixed loopback backend/frontend endpoints 29401/39401. Before every new
+forwarded connection the relay independently resolves and validates the approved
+fallback's current role/address, local provider, live schema, readiness, write
+fence and stopped canonical/retained consumers. It caches no Docker IP. The
+persistent approval permits only the same identities and original bound state
+until revoked or any binding changes. Reboot/service restart does not mint a new
+approval or depend on volatile `/run` records. Unavailable or changed authority
+returns 503; unverified destinations receive no customer traffic.
+
+Routing reconciliation holds existing deploy/runtime locks, records exclusive
+pre-images and audit events, validates candidate Nginx configuration before
+atomic publication, revalidates immediately before publication, reloads and
+checks stable/public frontend/API, live identity/readiness/fence and proxy health.
+On failure it restores the exact pre-image only when independently safe now.
+The known reversed-IP pre-image is preserved but compensated with a bounded
+Nginx 503 maintenance route. Failed maintenance publication/reload stops only
+the Madar proxy with restart disabled and closes its systemd startup gate;
+failed final stop is reported as critical, never as successful rollback.
+Every failure retains its package, authorization, pre-images and audit evidence.
+Only an explicit governed invocation can retry publication. This service does
+not consume queues, mutate database contents or change original write authority.
+Production apply requires separate explicit operator approval after review of
+the exact operation, affected resources, customer impact and compensation plan.
+
+The emergency Nginx include also supplies a loopback frontend router on 39402.
+It routes API, uploads and existing legacy backend paths through the verified
+backend relay, preserving existing rewrites and the independently inspected
+frontend security headers. Other frontend paths retain the original frontend
+behavior. This prevents the frontend image's static backend DNS cache from
+reintroducing stale addresses. Public verification includes frontend `/api`
+readiness, identity, recovery status and the write-denial probe.
+
+A fresh emergency retry from verified 503 maintenance uses a new source/plan
+approval and exclusive sibling package/authorization/audit namespace. It preserves
+the original installed relay, authorization, status, audits, service and drop-in
+byte-for-byte. A new 91 retry drop-in replaces only the reviewed effective startup
+gate; collisions or unknown startup controls refuse the operation. The old relay
+continues under its original authority; that authority cannot approve new code.
+Candidate validation through sustained activation has a hard 180-second wall-clock
+watchdog, with remaining-budget command and HTTP timeouts. Each convergence round
+checks exact live identities, transaction/write fences and stopped consumers,
+then proves the intended loopback frontend router is serving the bound backend
+identity. Only transient availability errors are retried. Three consecutive full
+successful rounds spanning at least five seconds, including public readiness,
+recovery restriction, denied writes and healthy proxy, are required. Integrity
+failures abort immediately. Failure-stage/type and monotonic timing are sanitized
+and recorded exclusively in the new audit. Compensation has a separate 60-second
+watchdog before the existing proxy-only shutdown fallback (two 30-second commands).
+No historical receipt is rewritten, no image is rebuilt, and no database restore,
+write grant, migration or worker start occurs.
+
+### Normal-local preparation after emergency availability recovery
+
+Forward transition verification must reject historical `restore_verified` flags
+and aggregate PASS summaries as proof for a supplemented coordinated manifest.
+The fresh, explicitly approved evidence digest must bind a root-protected
+`restore-execution.json` packet, the exact manifest and complete restored file
+inventory, retained runner/transcript bytes, successful network-isolated execution,
+and a separately retained independently restored off-host receipt. A changed
+manifest needs new verification. No validator emits production authorization.
+Runtime-only rollback retains its integrity checks and never restores that backup.
+
+The protected read-only write-authority directory is mounted into the normal
+backend and all three normal workers. Worker polls, claims and scheduling stay
+in standby until the root authority grants NORMAL; missing/invalid authority
+fails closed. Standby health is not permission to consume jobs. Recovery-profile
+workers still cannot start. No source test grants production write authority.
+
+The emergency relay pins the old controller, protected inputs and consumer
+inventory. Normal preparation must fail before changing authority or renaming
+containers while public upstreams still use its loopback listeners. A separately
+governed, verified READ_ONLY routing handoff is required first. Merely allowing
+`local_rollback_active` or reconstructing lost /run credentials is prohibited.
+The current source does not yet supply that fresh active-transaction resumption
+adapter; these guards must not be presented as a completed writable cutover.
+
+`checkpoint_execution_proof` validates scope and byte bindings only; it does not
+establish execution provenance from JSON or approve a runner. A trusted restore
+supervisor and its actual independent execution still have to be verified. The
+existing online Node 1 SSH replica is unencrypted; encryption must be described
+accurately rather than inferred from the separate age-backup mechanism.
+
+The logical restore runner can preload only pg_cron/pg_net. It verifies cron job
+launching is off and pg_net is assigned an absent database before restoring any
+data. Role prerequisites use verified role names with NOLOGIN, never saved
+password SQL. Its result excludes role attributes, ownership/ACLs and complete
+coordinated/platform recovery. It cannot issue a normal-production PASS.
+
+
+The independently executed sealed-checkpoint component restore uses a networkless
+native PostgreSQL with the original cluster bootstrap identity, preserved roles,
+membership grantors, database ownership and ACLs. Internal archive hardlinks are
+materialized as independent files; unsafe paths/links/devices and changed bytes
+fail closed. A completed quarantine can be independently measured again without
+overwriting it. Every restored controller/configuration file remains inactive.
+Native Storage attributes omitted by tar are derived only from the exact restored
+database; all object versions must have identical bytes, every file must map,
+and an independent read-only source comparison must match every attribute.
+Only a new private restore quarantine receives these attributes. Original backup
+manifests and historical restore flags remain unchanged. Off-host verification
+reads the exact fourteen-file Node 1 replica and restores its database anew;
+no remote write, decryption-key export, new capture or historical evidence reuse
+is needed. Component recovery is not private platform/application acceptance.
+
+
+Detached normal-local candidate preparation reuses the existing configuration and
+application factory under a NEW exact-plan root-private continuation receipt.
+The only permitted stage is the one durably claimed pending detached preparation;
+missing /run credentials do not authorize or prevent that fresh operation.
+Candidate images must bind the accepted source revision. Every retained input,
+registered fallback identity and local provider restriction is rechecked before
+effects. Existing namespaces, ports (including stopped Docker reservations) or
+candidate resources reject staging; no existing resource is overwritten.
+New names avoid the emergency relay's pinned business-consumer inventory. The
+candidate has a separate traversable read-only authority directory, while its
+three business standbys remain stopped. Backend/frontend destinations use the
+inactive slot's fixed loopback ports and never persist Docker-assigned IPs.
+The component has no traffic-publication, controller-installation, consumer-start
+or NORMAL-write-grant operation. A complete independently validated continuation
+adapter and fresh explicit cutover approval remain required. These development
+regressions are not independent platform restore or production acceptance proof.
+
+Normal-local candidates use the verified canonical backup-health directory through
+a read-only directory bind. They never inherit the disputed provider preparation
+marker, and atomic scheduled-marker replacements remain visible without restarting
+an accepted image. A format-2 health datum preserves the sealed checkpoint's
+actual `checkpoint-<UTC>` identity and manifest creation time. It can only be
+constructed after exact complete thirteen-component approved restore validation;
+component-only or old PASS packets cannot satisfy that gate. The datum grants no
+authority. Source timestamps determine age, so copying/touching cannot renew it.
+The subsequent genuine scheduled verifier can publish its existing format-1
+marker into the same canonical directory. Any initial publication must preserve
+the previous marker under the new governed transaction and have explicit approval.
+Privileged child configuration rejects process-loader, PATH, shell and Git
+controls; root's command search path remains fixed after application values.
+
+
+Fresh active-rollback preparation also binds a fixed retained dependency
+inventory: all eleven native services, the registered fallback's Redis and both
+canonical release slots. Native/Redis health and all six stopped consumers are
+checked before staging. Container IDs, exact images, secret-free specification
+hashes, network IDs and bridge/IPAM configuration are pinned; ephemeral container
+IP addresses are excluded. These hashes are observations to the new plan, never
+historical authorization. No production installation is authorized by these
+source changes or isolated restore results.
+
+
+The current-data compensation verifier uses the fresh continuation's protected
+receipt and compensation phase, revoked positive write authority, exact retained
+fallback/native identities and all stopped consumers. It resolves role addresses
+again for every verification. It intentionally does not require the superseded
+installed controller hash to remain old after an authorized installation, and
+never changes or relabels the old authorization. The original transactions and
+native configuration must remain unchanged. This verifier is not yet a complete
+relay installer or writable bootstrap; source unit tests do not authorize its
+production use. No checkpoint restore is a compensation operation.
+
+
+Fresh worker handoff occurs only after sustained public READ_ONLY publication and
+controller resumption. It reuses the existing CANDIDATE single-owner authority,
+archives exact ownership bytes and renames stopped inactive-slot resources into
+unique retained names before naming the accepted candidate canonically. Identity
+and collision checks precede effects; no resource/volume is deleted. Three new
+workers may start only as healthy non-consuming READ_ONLY standbys, with bounded
+startup checks and exact source/image/specification bindings. Compensation stops
+bound candidate IDs even if renaming was interrupted. The retained origin SHA
+comes from the existing recovery contract, not the candidate revision. These
+source components still require a complete governed bootstrap and fresh cutover
+approval before any production invocation.
+
+The continuation quiesces configured backup timers through its fresh durable
+authorization before detached staging or initial coordinated-marker publication.
+Exact timer states are saved once; installation verifies and reuses that protected
+preimage without overwriting it. Active backup services or automatic deployment
+block this operation. Runtime validation after canonical naming uses the original
+six candidate container IDs, image/specification digests and network IDs, allowing
+IP reassignment while rejecting changed roles, ownership or write restrictions.
+These source components still require the complete reviewed continuation entrypoint
+and fresh exact cutover approval; unit tests do not authorize production effects.
+
+The positive authority effect component requires a NEW root-private exact-source
+receipt, durable write-grant-pending boundary, completed read-only/standby phases,
+new controller attestation, executing prerequisite verifier and complete actual
+read-only runtime/owner checks. It saves the prior authority and write boundary
+once before atomically publishing NORMAL using the reviewed directory-permission
+fix. Revocation does not require compensation journaling. It does not create
+acceptance proof, publish normal release state or constitute a complete cutover
+entrypoint; fresh operator approval and the complete adapter remain mandatory.
+
+Current-local reconciliation observes all public table row counts and canonical
+JSON SHA-256 roots in one read-only repeatable snapshot, with schema115 in that
+same snapshot. Catalog and retained runtime bindings must remain unchanged. No
+rows, password verifiers or secret values are emitted, and no migration/ledger
+repair is permitted. The retained origin-slot writer fence is a separate guarded
+effect after sustained read-only handoff; it stops only original bound backend
+and frontend IDs and retains their containers. Read-only reconciliation records
+do not themselves authorize production or prove current-source app acceptance.
+
+The fresh normal configuration/state publication is distinct from the write
+grant. It executes only after the durable write-boundary event and successful
+read-only runtime/owner checks. It archives exact current environment, release
+state, traffic and backup configuration under the new root-private plan, then
+publishes local connectivity and a schema115/no-migration known-good overlay.
+Historical recovery transactions and authorization stay intact. Canonical runtime
+outputs retain the madar identity; secret-bearing archives stay root-private.
+These outputs do not grant writes or enable automation and do not substitute
+for independently executing application acceptance or a complete cutover adapter.
+
+Compensation listeners use an additive exact-plan service and two NEW loopback
+ports. The source package is root-private, source-only and hash-checked under an
+isolated interpreter before serving and before every connection. Until fresh
+compensation phase/receipt, revoked write authority and stopped consumers verify,
+listeners fail closed. Installation validates a staged .service unit, refuses
+existing units/records and preserves the original emergency service and drop-ins.
+This component does not publish routing or constitute normal boot resumption.
+
+Durable candidate contract bindings may be reconstructed from new protected
+records for read-only boot inspection/revocation. Reconstruction verifies the
+new receipt, accepted source/images and unchanged local configuration without
+reusing stage permission or old emergency runtime authorization. It starts no
+container, grants no write authority and never reconstructs /run credentials.
+The worker verifier follows each real health contract: notification/deletion
+require HTTP200 plus status=ok; calendar requires HTTP200 plus healthy=true; all
+three require consuming=false while the positive authority remains READ_ONLY.
+
+Prospective normal boot resumption requires the completed NEW continuation,
+actual accepted source/image/backup evidence and bound runtime IDs/specifications.
+It fences writes before starting those exact IDs, verifies native locality and
+schema115, and requires three complete direct read-only rounds spanning five
+seconds within180 seconds before restoring NORMAL. Lost /run credentials and
+historical PASS records grant nothing. Failure after its first effect must invoke
+current-data compensation. This source component still requires the complete
+reviewed adapter, boot service/drop-in installer and fresh prospective approval.
+
+Read-only public convergence alone does not permit controller/owner changes.
+The handoff captures the actual proxy instance and old Nginx worker PIDs before
+reload, then requires all old workers to exit while a new generation serves the
+accepted candidate. This drain shares the same180-second deadline; it never
+forces client connections closed. A proxy restart/image/specification change
+aborts. Only after drain may the pinned old controller/worker inventory change.
+
+Future boot-gate preparation is additive: retain the old emergency drop-ins and
+effective unit bytes, validate a new exact-plan oneshot service and a NEW92
+override, and enable it without starting it during staging. The listener unit
+must match its protected receipt and be active. Existing normal boot overrides
+are never silently replaced. The boot entrypoint must implement both completed
+NORMAL resumption and interrupted current-data recovery before this installation
+can form part of an approved executable cutover.
+
+### Executable active-rollback normal continuation
+
+The frozen `resume_active_recovery.py` bootstrap is the only new normal
+continuation entrypoint. Its exact source inventory and canonical plan hashes
+must be explicitly approved. It accepts no driver or production-path override.
+Before authorization it independently validates the existing coordinated restore,
+original-factor compatibility, reconciliation and NEW final application execution.
+Application evidence must bind the final source and backend/frontend image IDs,
+unchanged local configuration, schema115 and actual isolated API cases. It must
+cover backend existing-account MFA/AAL2, pending-cookie protection, tenant denial,
+business permissions, forms, reservations, builder, schema115 ecommerce, readiness,
+worker fencing and current-data runtime rollback. No human result is implied.
+
+Production effects use the reviewed resumption components in their existing
+order. Public read-only convergence and old Nginx worker drain precede installation
+and ownership changes. Configuration publication precedes the positive grant;
+actual normal runtime/public verification and post-normal local restore/Node 1
+replication precede completion and backup timer resumption. All historical
+transactions, credentials, receipts, checkpoints and emergency installation files
+remain preserved. Compensation revokes writes, stops bound consumers and serves
+the registered fallback against CURRENT local data, or fails closed to maintenance.
+There is no customer database restoration or migration in this operation.
+
+Post-normal backups use the existing ordinary format3 implementation in a new
+per-plan directory. A real private logical restore and append-only Node 1 checksum
+verification are required. The previously verified coordinated checkpoint retains
+its original manifest and evidence scope; ordinary post-normal backup proof does
+not claim a full native platform or bare-host disaster restore. Final approval is
+requested only after implementation, mandatory checks and exact-artifact execution
+have passed. No production invocation is authorized by these source changes.
+
+The post-normal backup is created once in its new temporary per-plan namespace.
+After actual restore and append-only Node 1 verification, that same directory is
+published with rename-noreplace into the existing configured ordinary backup root.
+Exact prior local LATEST bytes are archived before the marker points to this new
+verified local data. No historical backup directory or Node 1 LATEST is replaced,
+and capture retention cannot touch historical scopes. This connects the verified
+new backup to the unchanged configured timers without creating another checkpoint.

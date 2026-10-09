@@ -142,6 +142,10 @@ class LocalProviderTransition:
             self.ops.require_recovery_active(contract.recovery_context)
             self.ops.require_all_workers_off()
             self.ops.verify_local_fallback()
+            # The installed emergency relay pins existing records, controller
+            # and consumers. Candidate creation/renaming must not invalidate
+            # the relay while it still owns public traffic.
+            self.ops.require_emergency_routing_handoff_complete()
             state = {"version": 1, "contract_digest": digest(asdict(contract)),
                      "sha": contract.sha, "images": contract.images, "schema": 115,
                      "migration_policy": "none", "database_restore": False,
@@ -227,8 +231,12 @@ class LocalProviderTransition:
         validate_evidence(contract, self.ops.evidence())
         self.ops.verify_runtime_rollback_inputs(contract)
         with exclusive_lock(self.root / "deploy.lock"):
+            # A completed fallback may need the same governed rollback again
+            # after container addresses change. All authorization and live-input
+            # checks above still apply; this never resumes normal production.
             state = self._state(contract, {"prepare_pending", "prepared", "handoff_pending", "workers_ready",
-                "switch_pending", "serving_read_only", "rollback_required", "resume_pending", "normal", "rollback_pending"})
+                "switch_pending", "serving_read_only", "rollback_required", "resume_pending", "normal", "rollback_pending",
+                "local_rollback_active"})
             self._record(state, "rollback_pending")
             self.ops.set_write_authority(contract, "READ_ONLY")
             self.ops.inhibit_all_workers()

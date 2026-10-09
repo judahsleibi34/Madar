@@ -30,21 +30,27 @@ class ProductionLocalTransitionOperations:
             Path("/var/lib/madar-control-plane/provider402/contract.json"), private=True).read_text()))
         self.recovery = ProductionRecoveryOperations(RecoveryPaths(), recovery)
         self.root = ROOT
-        self.transaction_path = ROOT / "transaction.json"
+        self.transaction_path = self.root / "transaction.json"
         self.state = self.recovery.paths.state
         self.slot = recovery.origin_slot
         self.redis_name = self.recovery.paths.prefix + "-redis"
         recovery_slot = "blue" if recovery.origin_slot == "green" else "green"
         self.redis_network = self.recovery.paths.prefix + "-" + recovery_slot + "-runtime"
+        self._load_configuration(self.root / "configuration.env")
+
+    def _load_configuration(self, configuration):
+        """Shared strict local/session configuration; this grants no authority."""
         self.config = {}
-        load_environment_file(protected(ROOT / "configuration.env", private=True), environ=self.config)
+        load_environment_file(protected(configuration, private=True), environ=self.config)
         if (self.config.get("SUPABASE_URL") != "http://madar-supabase:8000"
                 or self.config.get("MADAR_SUPABASE_CLIENT_NETWORK") != "madar-supabase-client"
                 or not all(self.config.get(key) for key in ("SUPABASE_ANON_KEY", "SUPABASE_SERVICE_KEY", "CSRF_SECRET"))
                 or any(".supabase.co" in value for value in self.config.values())
                 or self.config.get("EMAIL_CHANNEL_ENABLED", "false") != "false"
                 or self.config.get("MADAR_RECOVERY_PROFILE", "")
-                or any(key.startswith(("LD_", "PYTHON", "DOCKER_", "COMPOSE_")) for key in self.config)):
+                or any(key.startswith(("LD_", "PYTHON", "DOCKER_", "COMPOSE_", "GIT_"))
+                    or key in {"PATH", "HOME", "SHELL", "BASH_ENV", "ENV", "IFS", "CDPATH"}
+                    for key in self.config)):
             raise RuntimeError("local_transition_configuration_invalid")
         for key in ("SUPABASE_ANON_KEY", "SUPABASE_SERVICE_KEY", "CSRF_SECRET", "SESSION_ACTIVITY_SECRET", "PENDING_VERIFICATION_SECRET"):
             if self.config.get(key) != self.recovery.config.get(key):
@@ -59,7 +65,7 @@ class ProductionLocalTransitionOperations:
         self.inspect = self.recovery.inspect
 
     def evidence(self):
-        report = json.loads(protected(ROOT / "evidence.json", private=True).read_text())
+        report = json.loads(protected(self.root / "evidence.json", private=True).read_text())
         from deployment.lib.provider_recovery_phases import ACTIVATION_REHEARSAL, ACTIVATION_RECEIPT, auth_acceptance_digest
         completed = json.loads(protected(ACTIVATION_REHEARSAL, private=True).read_text())
         if report.get("acceptance_mode", "human") != completed.get("acceptance_mode", "human"):
@@ -76,7 +82,7 @@ class ProductionLocalTransitionOperations:
 
     def require_authorization(self, contract):
         self.recovery.authorize(self.recovery.contract)
-        receipt = json.loads(protected(ROOT / "authorization.json", private=True).read_text())
+        receipt = json.loads(protected(self.root / "authorization.json", private=True).read_text())
         if receipt != {"version": 1, "operation": "normal-local-provider", "schema": 115,
                 "contract_digest": digest(asdict(contract)), "evidence_digest": contract.evidence_digest}:
             raise RuntimeError("local_transition_authorization_invalid")
@@ -100,10 +106,22 @@ class ProductionLocalTransitionOperations:
 
     def verify_immutable_inputs(self, contract):
         self.verify_runtime_rollback_inputs(contract)
-        manifest = json.loads(protected(ROOT / "checkpoint" / "manifest.json", private=True).read_text())
+        manifest = json.loads(protected(self.root / "checkpoint" / "manifest.json", private=True).read_text())
         created = datetime.fromisoformat(manifest["created_at"])
         if created.tzinfo is None or not 0 <= (datetime.now(timezone.utc)-created).total_seconds() <= 129600:
             raise RuntimeError("local_transition_checkpoint_not_fresh")
+        # Historical PASS summaries and restore_verified flags cannot prove a
+        # later supplemented manifest. The execution packet's digest must be
+        # independently included in a fresh authorization, never inferred from
+        # the aggregate gate report. Runtime-only rollback does not restore this
+        # snapshot and deliberately retains its existing integrity-only path.
+        report = self.evidence()
+        if digest(report) != contract.evidence_digest:
+            raise RuntimeError("local_transition_evidence_binding_invalid")
+        from deployment.lib.checkpoint_execution_proof import verify_checkpoint_execution
+        verify_checkpoint_execution(self.root / "checkpoint", self.root / "restore-execution.json",
+            approved_execution_digest=report.get("restore_execution_digest"),
+            protected_file=protected, now=datetime.now(timezone.utc))
 
     def verify_runtime_rollback_inputs(self, contract):
         # Runtime-only rollback preserves current DB/Auth/Storage and never
@@ -130,14 +148,19 @@ class ProductionLocalTransitionOperations:
                 raise RuntimeError("local_transition_native_service_unhealthy")
             if any(item["HostIp"] != "127.0.0.1" for bindings in row["NetworkSettings"]["Ports"].values() for item in bindings or []):
                 raise RuntimeError("local_transition_native_public_port")
-        manifest_path = protected(ROOT / "checkpoint" / "manifest.json", private=True)
+        manifest_path = protected(self.root / "checkpoint" / "manifest.json", private=True)
         if file_digest(manifest_path) != contract.checkpoint_digest:
             raise RuntimeError("local_transition_checkpoint_changed")
         manifest = json.loads(manifest_path.read_text())
         created = datetime.fromisoformat(manifest["created_at"])
+        sealed = type(manifest.get("version")) is int and manifest.get("version") == 1 and manifest.get("sealed") is True
         if (created.tzinfo is None or created > datetime.now(timezone.utc)
-                or manifest.get("schema") != 115 or manifest.get("restore_verified") is not True):
+                or manifest.get("schema") != 115
+                or (not sealed and manifest.get("restore_verified") is not True)):
             raise RuntimeError("local_transition_checkpoint_unverified")
+        # Sealed checkpoints never inherit a restore_verified marker. Their
+        # separately retained actual restore execution is checked by the
+        # forward-operation gate; runtime rollback never restores this data.
         required = {"database", "roles", "storage", "auth_metadata", "application_storage", "native_config", "production_config", "images", "controller", "schema", "ledgers"}
         if not required.issubset({item["kind"] for item in manifest["files"]}):
             raise RuntimeError("local_transition_checkpoint_incomplete")
@@ -150,7 +173,7 @@ class ProductionLocalTransitionOperations:
             file = protected(manifest_path.parent / path, private=True)
             if file.stat().st_size != item["size"] or file_digest(file) != item["sha256"]:
                 raise RuntimeError("local_transition_checkpoint_integrity_failed")
-        reconciliation = json.loads(protected(ROOT / "reconciliation.json", private=True).read_text())
+        reconciliation = json.loads(protected(self.root / "reconciliation.json", private=True).read_text())
         if digest(reconciliation) != contract.reconciliation_digest:
             raise RuntimeError("local_transition_reconciliation_changed")
         # Existing native configuration belongs to the operator, not the root
@@ -169,7 +192,7 @@ class ProductionLocalTransitionOperations:
         phase = None
         if self.transaction_path.exists():
             phase = json.loads(protected(self.transaction_path, private=True).read_text()).get("phase")
-        verify_backup_input(ROOT, reconciliation, contract, phase)
+        verify_backup_input(self.root, reconciliation, contract, phase)
 
     def require_recovery_active(self, context):
         # Runtime-owned release files are untrusted until bound to the protected
@@ -201,7 +224,7 @@ class ProductionLocalTransitionOperations:
             "serving_read_only", "rollback_required", "resume_pending", "normal", "rollback_pending"}
         state = self.require_phase(contract, {"resume_pending"} if mode == "NORMAL" else phases)
         if mode == "NORMAL":
-            smoke = json.loads(protected(ROOT / "final-smoke.json", private=True).read_text())
+            smoke = json.loads(protected(self.root / "final-smoke.json", private=True).read_text())
             from deployment.lib.provider_local_transition import SMOKE_GATES
             gates = smoke.get("gates", {})
             if (set(gates) != SMOKE_GATES or any(value != "PASS" for value in gates.values())
@@ -212,7 +235,17 @@ class ProductionLocalTransitionOperations:
                 raise RuntimeError("local_transition_write_grant_smoke_invalid")
             self.require_single_owner(contract)
             self.verify_private_candidate(contract, workers_required=True)
-        directory = ROOT / "write-authority"
+        self._publish_write_authority(contract, mode)
+
+    def _publish_write_authority(self, contract, mode):
+        """Effect helper; callers must prove their governed grant/revocation.
+
+        Shared permissions implement the reviewed umask correction. This is not
+        an authorization entrypoint and does not consume historical PASS data.
+        """
+        if os.geteuid() != 0 or mode not in {"READ_ONLY", "NORMAL"}:
+            raise RuntimeError("local_transition_write_publication_denied")
+        directory = self.root / "write-authority"
         directory.mkdir(mode=0o755, exist_ok=True)
         if directory.is_symlink() or directory.stat().st_uid != 0 or directory.stat().st_mode & 0o022:
             raise RuntimeError("local_transition_write_directory_untrusted")
@@ -225,7 +258,7 @@ class ProductionLocalTransitionOperations:
         os.chmod(directory / "authority.json", 0o444)
 
     def require_write_authority(self, contract, mode):
-        value = json.loads(protected(ROOT / "write-authority" / "authority.json").read_text())
+        value = json.loads(protected(self.root / "write-authority" / "authority.json").read_text())
         if value != {"version": 1, "schema": 115, "release_sha": contract.sha,
                 "contract_digest": digest(asdict(contract)), "mode": mode}:
             raise RuntimeError("local_transition_write_authority_changed")
@@ -253,19 +286,21 @@ class ProductionLocalTransitionOperations:
             "PRIVATE_CHARTS_DIR": "/app/private_generated_charts", "BACKUP_FRESHNESS_REQUIRED": "true"})
         for key in ("MADAR_RECOVERY_PROFILE", "MADAR_BUSINESS_WRITE_AUTHORITY", "MADAR_BUSINESS_WRITE_CONTRACT"):
             config.pop(key, None)
-        if not worker:
-            config.update({"MADAR_BUSINESS_WRITE_AUTHORITY": "/run/madar/business-write-authority/authority.json",
-                "MADAR_BUSINESS_WRITE_CONTRACT": digest(asdict(contract))})
+        config.update({"MADAR_BUSINESS_WRITE_AUTHORITY": "/run/madar/business-write-authority/authority.json",
+            "MADAR_BUSINESS_WRITE_CONTRACT": digest(asdict(contract))})
         return config
 
-    def _create_application(self, contract, name, alias, *, worker=None):
-        network = f"madar-{self.slot}-local-transition"
+    def _create_application(self, contract, name, alias, *, worker=None, network=None, loopback_port=None):
+        network = network or f"madar-{self.slot}-local-transition"
+        if loopback_port is not None and (worker is not None or loopback_port != {"blue": 8101, "green": 8201}[self.slot]):
+            raise RuntimeError("local_transition_backend_port_invalid")
         cfg = self._env(contract, worker=worker is not None)
         args = ["docker", "create", "--name", name, "--network", network, "--network-alias", alias,
                 "--restart", "no", "--log-driver", "none", "--label", "com.madar.local-transition="+digest(asdict(contract))]
-        if worker is None:
-            args += ["--mount", f"type=bind,src={ROOT}/write-authority,dst=/run/madar/business-write-authority,readonly"]
-        else:
+        if loopback_port is not None:
+            args += ["--publish", f"127.0.0.1:{loopback_port}:8000"]
+        args += ["--mount", f"type=bind,src={self.root}/write-authority,dst=/run/madar/business-write-authority,readonly"]
+        if worker is not None:
             port = {"notification": 8090, "calendar-sync": 8091, "data-deletion": 8094}[worker]
             args += ["--health-cmd", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:"+str(port)+"/health',timeout=3)\"",
                      "--health-interval", "10s", "--health-timeout", "5s", "--health-retries", "3"]
@@ -275,18 +310,26 @@ class ProductionLocalTransitionOperations:
             if source.is_symlink() or not source.is_dir():
                 raise RuntimeError("local_transition_application_storage_missing")
             args += ["--mount", f"type=bind,src={source},dst={destination}"]
-        marker = protected(Path(cfg["BACKUP_FRESHNESS_MARKER"]))
-        args += ["--mount", f"type=bind,src={marker},dst={marker},readonly"]
+        args += ["--mount", self._backup_marker_mount(cfg)]
         for key in cfg:
             args += ["--env", key]
         args += [contract.images["backend"]]
         if worker:
             args += ["python", "-m", "workers."+worker.replace("-", "_")+"_worker"]
-        self.command(args, env={"PATH": "/usr/bin:/bin", **cfg})
+        self.command(args, env={**cfg, "PATH": "/usr/bin:/bin"})
         self.command(["docker", "network", "connect", "madar-supabase-client", name])
         # Attach only the newly created, exact-source application process.
         # Existing recovery Redis/fallback topology is never changed here.
         self.command(["docker", "network", "connect", self.redis_network, name])
+
+    def _backup_marker_mount(self, cfg):
+        marker = protected(Path(cfg["BACKUP_FRESHNESS_MARKER"]))
+        return f"type=bind,src={marker},dst={marker},readonly"
+
+    def require_emergency_routing_handoff_complete(self):
+        upstream = protected(self.recovery.paths.upstream).read_text()
+        if any(f"127.0.0.1:{port}" in upstream for port in (29401, 39401, 39402)):
+            raise RuntimeError("local_transition_emergency_handoff_required")
 
     def prepare_normal_candidate(self, contract):
         self.require_phase(contract, {"prepare_pending"})
@@ -338,7 +381,7 @@ class ProductionLocalTransitionOperations:
                 "--restart", "no", "--log-driver", "none"]
         for key in cfg:
             args += ["--env", key]
-        self.command(args+[contract.images["frontend"]], env={"PATH": "/usr/bin:/bin", **cfg})
+        self.command(args+[contract.images["frontend"]], env={**cfg, "PATH": "/usr/bin:/bin"})
         for kind in ("notification", "calendar-sync", "data-deletion"):
             self._create_application(contract, f"madar-{self.slot}-{kind}-worker", kind+"-worker", worker=kind)
 
@@ -467,7 +510,7 @@ class ProductionLocalTransitionOperations:
             raise RuntimeError("local_transition_serving_identity_invalid")
 
     def final_smoke(self, contract):
-        report = json.loads(protected(ROOT / "final-smoke.json", private=True).read_text())
+        report = json.loads(protected(self.root / "final-smoke.json", private=True).read_text())
         if report.get("contract_digest") != digest(asdict(contract)) or report.get("production_fingerprints") != self.fingerprints():
             raise RuntimeError("local_transition_final_smoke_binding_invalid")
         return report.get("gates", {})
@@ -490,12 +533,12 @@ class ProductionLocalTransitionOperations:
         from deployment.lib.provider_recovery_runtime import readonly_configuration
         native = {}
         load_environment_file(readonly_configuration(Path("/opt/madar/local-supabase/.env"), private=True), environ=native)
-        reconciliation = json.loads(protected(ROOT / "reconciliation.json", private=True).read_text())
-        publish_backup_configuration(ROOT, reconciliation, contract, native)
+        reconciliation = json.loads(protected(self.root / "reconciliation.json", private=True).read_text())
+        publish_backup_configuration(self.root, reconciliation, contract, native)
         # Configuration publication is a reviewed transaction output, not a
         # manual env edit. Preserve the old protected input and recovery state.
         old = self.recovery.paths.production_env
-        archive = ROOT / "retired-production.env"
+        archive = self.root / "retired-production.env"
         with archive.open("xb") as handle:
             handle.write(old.read_bytes())
             handle.flush()

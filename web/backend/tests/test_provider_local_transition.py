@@ -97,6 +97,15 @@ class LocalTransitionTests(unittest.TestCase):
         self.tx.handoff(self.contract, self.metadata)
         self.tx.switch(self.contract, self.metadata)
 
+    def test_live_emergency_route_blocks_candidate_mutation(self):
+        with patch.object(self.ops, "require_emergency_routing_handoff_complete",
+                          side_effect=RuntimeError("emergency_handoff_required")):
+            with self.assertRaisesRegex(RuntimeError, "emergency_handoff_required"):
+                self.tx.prepare(self.contract, self.metadata)
+        self.assertFalse(self.tx.path.exists())
+        self.assertNotIn("write:READ_ONLY", self.ops.calls)
+        self.assertNotIn("prepare_normal_candidate", self.ops.calls)
+
     def test_business_writes_stay_off_until_every_smoke_gate_passes(self):
         self.switched()
         self.assertEqual(self.ops.mode, "READ_ONLY")
@@ -190,6 +199,37 @@ class LocalTransitionTests(unittest.TestCase):
         self.assertIn("verify_runtime_rollback_inputs", self.ops.calls)
         self.assertEqual(self.ops.mode, "READ_ONLY")
 
+    def test_completed_local_rollback_can_repeat_without_granting_writes(self):
+        self.prepared()
+        self.tx.rollback(self.contract, self.metadata)
+        self.ops.calls.clear()
+        state = self.tx.rollback(self.contract, self.metadata)
+        self.assertEqual(state["phase"], "local_rollback_active")
+        self.assertFalse(state["normal_writes_ever_enabled"])
+        self.assertEqual(self.ops.mode, "READ_ONLY")
+        self.assertLess(self.ops.calls.index("inhibit_all_workers"),
+                        self.ops.calls.index("switch_current_data_local_fallback"))
+        self.assertIn("verify_local_fallback_serving", self.ops.calls)
+        self.assertFalse(any("restore" in call or "start" in call for call in self.ops.calls))
+        for operation in ("prepare", "handoff", "switch", "finalize"):
+            with self.subTest(operation=operation), self.assertRaises(RuntimeError):
+                getattr(self.tx, operation)(self.contract, self.metadata)
+
+    def test_completed_rollback_retry_retains_authorization_evidence_and_fingerprints(self):
+        self.prepared()
+        self.tx.rollback(self.contract, self.metadata)
+        before = self.tx.path.read_bytes()
+        for failure in ("authorization", "evidence", "fingerprint"):
+            with self.subTest(failure=failure):
+                self.ops.calls.clear()
+                self.ops.authorized = failure != "authorization"
+                self.report["gates"]["tenant_isolation"] = "FAIL" if failure == "evidence" else "PASS"
+                self.ops.fp["environment"] = "f" * 64 if failure == "fingerprint" else "a" * 64
+                with self.assertRaises(RuntimeError):
+                    self.tx.rollback(self.contract, self.metadata)
+                self.assertNotIn("switch_current_data_local_fallback", self.ops.calls)
+                self.assertEqual(self.tx.path.read_bytes(), before)
+
     def test_smtp_preparation_cannot_authorize_normal_activation(self):
         report = copy.deepcopy(self.report)
         report["gates"]["auth_smtp"] = "PENDING"
@@ -264,6 +304,7 @@ class WriteAuthorityPermissionsTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             ops = runtime.ProductionLocalTransitionOperations.__new__(runtime.ProductionLocalTransitionOperations)
+            ops.root = root
             ops.require_phase = lambda *args: {"phase": "prepare_pending"}
             contract = SimpleNamespace(sha="a" * 40)
             previous = os.umask(0o077)
@@ -283,3 +324,29 @@ class WriteAuthorityPermissionsTests(unittest.TestCase):
                     directory.chmod(0o755)
             finally:
                 os.umask(previous)
+
+
+class WorkerAuthorityMountTests(unittest.TestCase):
+    def test_each_normal_worker_has_the_same_read_only_authority_mount(self):
+        from deployment.lib import provider_local_transition_runtime as runtime
+        from types import SimpleNamespace
+        ops = runtime.ProductionLocalTransitionOperations.__new__(runtime.ProductionLocalTransitionOperations)
+        ops.root = runtime.ROOT
+        ops.config = {"BACKUP_FRESHNESS_MARKER": "/fixture/backup-marker"}
+        ops.slot = "green"
+        ops.redis_name = "fixture-redis"
+        ops.redis_network = "fixture-redis-network"
+        contract = SimpleNamespace(sha="a"*40, images={"backend":"sha256:"+"b"*64})
+        for kind in ("notification", "calendar-sync", "data-deletion"):
+            with self.subTest(kind=kind), patch.object(runtime, "asdict", return_value={"sha":contract.sha}), patch.object(
+                    runtime, "protected", side_effect=lambda path, **_: path), patch.object(
+                    Path, "is_symlink", return_value=False), patch.object(Path, "is_dir", return_value=True):
+                calls=[]
+                ops.command=lambda argv, **kwargs: calls.append((argv,kwargs))
+                ops._create_application(contract, "unit-worker", "unit-alias", worker=kind)
+                argv,kwargs=calls[0]
+                expected=f"type=bind,src={runtime.ROOT}/write-authority,dst=/run/madar/business-write-authority,readonly"
+                self.assertIn(expected, argv)
+                env=kwargs["env"]
+                self.assertEqual(env["MADAR_BUSINESS_WRITE_AUTHORITY"], "/run/madar/business-write-authority/authority.json")
+                self.assertEqual(env["MADAR_BUSINESS_WRITE_CONTRACT"], digest({"sha":contract.sha}))
