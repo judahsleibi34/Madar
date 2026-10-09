@@ -133,6 +133,9 @@ class ActiveRecoveryBootActor:
             self.candidate._publish_write_authority(self.candidate.contract,'READ_ONLY')
             self.candidate.require_write_authority(self.candidate.contract,'READ_ONLY')
             self.workers.stop_consumers()
+            if (getattr(self.plan,'candidate_destination',None) or {}).get('post_compensation'):
+                from deployment.lib.active_recovery_controller import ActiveRecoveryBackupTimers
+                ActiveRecoveryBackupTimers(self.plan,self.root,self.source.verify).quiesce_compensation()
             self.compensation.publish(self.fallback_public_round)
             transaction.event('restricted_fallback')
         except Exception:
@@ -145,14 +148,25 @@ class ActiveRecoveryBootActor:
                 try:transaction.event('compensation_failed',exception_type='CompensationFailure')
                 except OSError:pass
             raise
+    def early_recovery(self):
+        compensated=(getattr(self.plan,'candidate_destination',None) or {}).get('post_compensation')
+        if not compensated:
+            if observe_retained_inputs()!=self.plan.retained_inputs:raise RuntimeError('boot_actor_early_recovery_changed')
+            verify(self.runtime);return
+        from deployment.lib.active_recovery_compensated import inspect_history
+        from deployment.lib.active_recovery_boot_installation import verify_post_compensation_boot
+        verify_post_compensation_boot(self.plan,self.root,self.runtime)
+        if observe_retained_inputs(post_compensation=True)!=self.plan.retained_inputs:
+            raise RuntimeError('boot_actor_early_recovery_changed')
+        previous,previous_root,_,_=inspect_history(compensated['baseline']['previous_plan_sha256'])
+        CurrentDataFallback(previous,previous_root,runtime=self.runtime).verify()
+
     def resume(self):
         phase=self.phase()
         if phase in EARLY_PHASES:
             # No public handoff occurred. Preserve the exact functioning original
             # route/helper rather than activating an unnecessary replacement.
-            if observe_retained_inputs()!=self.plan.retained_inputs:
-                raise RuntimeError('boot_actor_early_recovery_changed')
-            verify(self.runtime)
+            self.early_recovery()
             return {'phase':phase,'mode':'ORIGINAL_RESTRICTED_RECOVERY'}
         self.assemble()
         if phase=='normal':
@@ -172,8 +186,7 @@ class ActiveRecoveryBootActor:
     def proxy_gate(self):
         phase=self.phase()
         if phase in EARLY_PHASES:
-            if observe_retained_inputs()!=self.plan.retained_inputs:raise RuntimeError('boot_actor_early_recovery_changed')
-            verify(self.runtime);return
+            self.early_recovery();return
         self.assemble()
         if phase=='normal':
             self.completed_evidence();self.native();self.kernel.normal(require_public=False)

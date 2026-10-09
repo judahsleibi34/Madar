@@ -17,6 +17,15 @@ def prior_backup_timer_states(plan):
     """Previous failed-attempt timer snapshot is data, never reused authority."""
     binding=getattr(plan,'prior_backup_timer_preimage',None)
     if binding is None:return None
+    compensated=(getattr(plan,'candidate_destination',None) or {}).get('post_compensation')
+    if compensated:
+        from deployment.lib.active_recovery_compensated import inspect_history
+        previous,previous_root,records,hashes=inspect_history(compensated['baseline']['previous_plan_sha256'])
+        if (binding['plan_sha256']!=previous.digest or hashes!=compensated['baseline']['historical_evidence']
+                or digest(hashes)!=binding['evidence_sha256']
+                or hashes['backup-timer-preimage.json']!=binding['timer_preimage_sha256']):
+            raise RuntimeError('retry_compensated_timer_evidence_changed')
+        return validate_backup_timer_states(records['backup-timer-preimage.json'])
     root=ROOT/binding['plan_sha256']
     if root==ROOT/plan.digest:raise RuntimeError('retry_timer_same_attempt_denied')
     names=('authorization.json','plan.json','events.jsonl','backup-timer-preimage.json')
@@ -88,6 +97,14 @@ class ActiveRecoveryControllerRepair:
         ActiveRecoveryBackupTimers(self.plan,self.root,self.source_guard,operations=self.ops).quiesce()
     def install(self):
         route=self.guard();bundle=self.source_guard()
+        if (getattr(self.plan,'candidate_destination',None) or {}).get('post_compensation'):
+            from deployment.lib.active_recovery_inputs import controller_tree_digest
+            if (controller_tree_digest()!=self.plan.retained_inputs['controller_tree']
+                    or file_digest(protected(INPUTS['controller']))!=self.plan.retained_inputs['controller']):
+                raise RuntimeError('controller_resume_installed_preimage_changed')
+            exclusive(self.root/'controller-preimage-attestation.json',encoded({'plan_sha256':self.plan.digest,
+                'tree_sha256':self.plan.retained_inputs['controller_tree'],
+                'source_marker_sha256':self.plan.retained_inputs['controller'],'customer_database_restore':False}))
         if not isinstance(bundle,dict) or bundle.get('source_sha')!=self.plan.source_sha or not isinstance(bundle.get('files'),dict):
             raise RuntimeError('controller_resume_frozen_bundle_missing')
         self.quiesce_backup_timers()
@@ -124,6 +141,11 @@ class ActiveRecoveryControllerRepair:
         states=validate_backup_timer_states(json.loads(protected(self.root/'backup-timer-preimage.json',private=True).read_text()))
         for name,row in states.items():
             if row['active']=='active':self.ops.command('continuation_backup_timer_restore',['/usr/bin/systemctl','start',name])
+        observed=validate_backup_timer_states({name:self.ops.systemctl_state(name) for name in states})
+        if observed!=states:raise RuntimeError('controller_resume_backup_timer_restoration_changed')
+        exclusive(self.root/'backup-timers-resumed.json',encoded({'version':1,'plan_sha256':self.plan.digest,
+            'source_sha':self.plan.source_sha,'observed_states':observed,'database_provider':'local',
+            'historical_timer_preimage_modified':False}))
         # Automatic deployment intentionally remains disabled until a separately
         # attested recovery-interlock supersession; no historical receipt deletion.
 
@@ -146,6 +168,26 @@ class ActiveRecoveryBackupTimers:
                 or events[-1].get('phase') not in {'detached_candidate_pending','controller_resume_pending'}):
             raise RuntimeError('backup_quiesce_phase_denied')
         self.require_idle_services()
+    def quiesce_compensation(self):
+        """Stop only documented schedules after partial NORMAL timer resumption."""
+        self.source_guard()
+        if os.geteuid()!=0 or self.root!=ROOT/self.plan.digest:
+            raise RuntimeError('backup_compensation_fresh_root_required')
+        receipt=json.loads(protected(self.root/'authorization.json',private=True).read_text())
+        events=[json.loads(line) for line in protected(self.root/'events.jsonl',private=True).read_text().splitlines()]
+        if (receipt.get('operation')!='active-local-rollback-resumption' or receipt.get('plan_sha256')!=self.plan.digest
+                or receipt.get('source_bundle_sha256')!=self.plan.source_bundle_sha256
+                or not events or events[-1].get('phase')!='compensation_pending'
+                or any(row.get('plan_sha256')!=self.plan.digest for row in events)):
+            raise RuntimeError('backup_compensation_phase_denied')
+        failures=[]
+        for name in BACKUP_TIMERS:
+            try:
+                self.ops.command('continuation_compensation_timer_stop',['/usr/bin/systemctl','stop',name])
+                if self.ops.systemctl_state(name)['active']!='inactive':raise RuntimeError('backup_compensation_timer_active')
+            except Exception as error:failures.append(type(error).__name__)
+        if failures:raise RuntimeError('backup_compensation_quiesce_incomplete')
+
     def require_idle_services(self):
         services={name:self.ops.systemctl_state(name.replace('.timer','.service')) for name in BACKUP_TIMERS}
         if any(row['active'] in BACKUP_BUSY_STATES or row['active'] not in {'inactive','failed'} for row in services.values()):

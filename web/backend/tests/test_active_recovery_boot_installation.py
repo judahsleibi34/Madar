@@ -54,3 +54,62 @@ class BootInstallationTests(unittest.TestCase):
         name='madar-normal-local-fallback-'+self.plan.digest[:12]+'.service';(self.units/name).write_bytes(b'changed')
         with self.assertRaisesRegex(RuntimeError,'listener_service_changed'):self.install.install()
         self.assertEqual(self.calls,[])
+
+class CompensatedBootInstallationTests(BootInstallationTests):
+    """Already-installed 92/boot/listener state, never a fresh-install fixture."""
+    def setUp(self):
+        super().setUp()
+        self.previous='c'*64
+        self.old_boot='madar-normal-local-boot-'+self.previous[:12]+'.service'
+        self.old_listener='madar-normal-local-fallback-'+self.previous[:12]+'.service'
+        (self.units/self.old_boot).write_bytes(b'consumed boot')
+        (self.units/self.old_listener).write_bytes(b'preserved listener')
+        self.dropin.write_bytes(b'previous installed normal boot control')
+        files={str(p):hashlib.sha256(p.read_bytes()).hexdigest() for p in (self.dropin,self.old,self.units/self.old_boot,self.units/self.old_listener)}
+        self.plan.candidate_destination={'post_compensation':{'baseline':{'previous_plan_sha256':self.previous,'startup':{'files':files}}}}
+        record={'plan_sha256':self.plan.digest,'source_bundle_sha256':self.plan.source_bundle_sha256,
+                'service':self.old_listener,'unit_sha256':files[str(self.units/self.old_listener)],'reused_from_plan':self.previous}
+        (self.root/'fallback-listener-installation.json').write_text(json.dumps(record))
+        self.states={self.old_boot:{'enabled':'enabled','active':'inactive'},self.old_listener:{'enabled':'enabled','active':'active'}}
+        def command(label,args):
+            self.calls.append((label,args))
+            if label=='continuation_boot_disable_consumed':self.states[self.old_boot]['enabled']='disabled'
+            return SimpleNamespace(stdout='post-compensation effective proxy')
+        self.install.ops=SimpleNamespace(command=command,systemctl_state=lambda name:self.states[name])
+    # Original A tests live in the parent; do not reinterpret their expected state.
+    def test_additive_override_preserves_old_records_without_running_boot_actor(self):
+        self.install.install()
+        self.assertEqual((self.units/self.old_boot).read_bytes(),b'consumed boot')
+        self.assertEqual((self.units/self.old_listener).read_bytes(),b'preserved listener')
+        self.assertEqual(self.old.read_bytes(),b'original emergency')
+        self.assertEqual((self.root/'proxy-boot-dropin-preimage.conf').read_bytes(),b'previous installed normal boot control')
+        self.assertIn(self.install.name,self.dropin.read_text())
+        self.assertNotIn(self.old_boot,self.dropin.read_text())
+        self.assertEqual(self.states[self.old_boot],{'enabled':'disabled','active':'inactive'})
+        self.assertTrue((self.root/'boot-supersession-intent.json').exists())
+        self.assertFalse(any('--now' in args for _,args in self.calls))
+    def test_existing_override_is_never_overwritten(self):
+        # State F allows only the exact reviewed preimage, never arbitrary 92.
+        self.dropin.write_bytes(b'unknown')
+        with self.assertRaisesRegex(RuntimeError,'preimage_changed'):self.install.install()
+        self.assertEqual(self.dropin.read_bytes(),b'unknown');self.assertEqual(self.calls,[])
+    def test_modified_listener_unit_blocks_preparation(self):
+        (self.units/self.old_listener).write_bytes(b'changed')
+        with self.assertRaisesRegex(RuntimeError,'listener_service_changed'):self.install.install()
+        self.assertEqual(self.calls,[])
+    def test_interruption_before_replace_preserves_serving_preimage(self):
+        original=self.dropin.read_bytes()
+        with patch('deployment.lib.active_recovery_boot_installation.os.replace',side_effect=OSError('injected')):
+            with self.assertRaises(OSError):self.install.install()
+        self.assertEqual(self.dropin.read_bytes(),original)
+        self.assertEqual(self.states[self.old_boot]['enabled'],'enabled')
+        self.assertTrue((self.root/'boot-supersession-intent.json').exists())
+    def test_interruption_after_replace_never_replays_installation(self):
+        command=self.install.ops.command
+        def fail(label,args):
+            if label=='continuation_boot_daemon_reload':raise RuntimeError('injected')
+            return command(label,args)
+        self.install.ops.command=fail
+        with self.assertRaisesRegex(RuntimeError,'injected'):self.install.install()
+        self.assertEqual((self.units/self.old_boot).read_bytes(),b'consumed boot')
+        with self.assertRaises(FileExistsError):self.install.install()

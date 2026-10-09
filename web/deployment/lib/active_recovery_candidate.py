@@ -140,6 +140,10 @@ def resolve_candidate_destination(plan, runtime=None):
     from deployment.lib.active_recovery_inputs import INPUTS,observe_runtime_dependencies
     from deployment.lib.provider_recovery_runtime import readonly_configuration
     runtime=runtime or Runtime()
+    compensated=(plan.candidate_destination or {}).get('post_compensation')
+    if compensated:
+        from deployment.lib.active_recovery_compensated import resolve_compensated_destination
+        return resolve_compensated_destination(compensated,runtime)
     packet,binding=observe_runtime_dependencies(runtime)
     if binding!=plan.retained_inputs['runtime_dependencies']:
         raise RuntimeError('detached_destination_runtime_changed')
@@ -244,12 +248,20 @@ class DetachedRecoveryCandidate(ProductionLocalTransitionOperations):
         # Runtime identity, rather than historical PASS claims, determines the
         # registered fallback and its private configuration namespace.
         runtime = Runtime()
-        verify(runtime)
+        compensated=(plan.candidate_destination or {}).get('post_compensation')
+        if compensated:
+            from deployment.lib.active_recovery_compensated import verify_compensated_binding, inspect_history
+            from deployment.lib.active_recovery_fallback import CurrentDataFallback
+            from deployment.lib.active_recovery_inputs import registered_fallback_names
+            verify_compensated_binding(compensated,runtime)
+            previous,previous_root,_,_=inspect_history(compensated['baseline']['previous_plan_sha256'])
+            CurrentDataFallback(previous,previous_root,runtime=runtime).verify()
+        else:verify(runtime)
         inputs = runtime.input_bytes()
         old = RecoveryContract(**json.loads(inputs['recovery_contract']))
         if contract.recovery_context != digest(asdict(old)):
             raise RuntimeError('detached_recovery_context_changed')
-        _, _, names, _ = identities(inputs)
+        names=registered_fallback_names(runtime) if compensated else identities(inputs)[2]
         rows = runtime.inspect(list(names.values()))
         for role, name in names.items():
             if plan.fallback[role] != {'container_id': rows[name]['Id'],
@@ -450,14 +462,20 @@ class DetachedRecoveryCandidate(ProductionLocalTransitionOperations):
 
     def verify_retained_inputs(self):
         runtime = Runtime()
-        observation, _ = verify(runtime)
-        if observe_retained_inputs() != self.plan.retained_inputs:
+        compensated=(self.plan.candidate_destination or {}).get('post_compensation')
+        if compensated:
+            from deployment.lib.active_recovery_compensated import verify_compensated_binding
+            saved=self.root/'candidate-identities.json'
+            verify_compensated_binding(compensated,runtime,staged_plan=self.plan if saved.exists() else None)
+        else:
+            observation, _ = verify(runtime)
+            _, _, names, _ = identities(runtime.input_bytes())
+            for role, name in names.items():
+                row = observation['runtimes'][name]
+                if self.plan.fallback[role] != {'container_id':row['id'],'image_id':row['image'],'spec_sha256':row['spec_sha256']}:
+                    raise RuntimeError('detached_registered_fallback_changed')
+        if observe_retained_inputs(post_compensation=bool(compensated)) != self.plan.retained_inputs:
             raise RuntimeError('detached_retained_input_changed')
-        _, _, names, _ = identities(runtime.input_bytes())
-        for role, name in names.items():
-            row = observation['runtimes'][name]
-            if self.plan.fallback[role] != {'container_id':row['id'],'image_id':row['image'],'spec_sha256':row['spec_sha256']}:
-                raise RuntimeError('detached_registered_fallback_changed')
 
     def staging_check(self, operation, callback, *args, **kwargs):
         """Attach a source-defined operation name; never store command/secret text."""

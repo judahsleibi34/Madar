@@ -54,7 +54,7 @@ def controller_tree_digest():
     return hashlib.sha256(json.dumps(entries,sort_keys=True,separators=(',',':')).encode()).hexdigest()
 
 
-def observe_retained_inputs():
+def observe_retained_inputs(*, post_compensation=False):
     result={}
     for key,path in INPUTS.items():
         # Canonical runtime state and native gateway data belong to the madar
@@ -66,11 +66,11 @@ def observe_retained_inputs():
         reader=readonly_configuration if key in OPERATOR_CONFIGURATION else protected
         result[key]=file_digest(reader(path,private=key in PRIVATE_CONFIGURATION))
     result['controller_tree']=controller_tree_digest()
-    result['runtime_dependencies']=observe_runtime_dependencies()[1]
+    result['runtime_dependencies']=observe_runtime_dependencies(fallback_names=post_compensation)[1]
     return result
 
 
-def observe_runtime_dependencies(runtime=None):
+def observe_runtime_dependencies(runtime=None, *, fallback_names=False):
     """Pin retained native, Redis and canonical slot resources without IPs.
 
     These are measured inputs, not permission to consume historical acceptance.
@@ -80,7 +80,12 @@ def observe_runtime_dependencies(runtime=None):
     from deployment.lib.emergency_routing_repair import Runtime,identities,spec
     from deployment.lib.provider_recovery_runtime import SERVICES,digest
     runtime=runtime or Runtime()
-    _,_,fallback,_=identities(runtime.input_bytes())
+    if fallback_names:
+        # Caller must independently verify a post-compensation contract; this
+        # only observes the fixed registered names and grants no authority.
+        fallback=registered_fallback_names(runtime)
+    else:
+        _,_,fallback,_=identities(runtime.input_bytes())
     suffix='-local-fallback-backend'
     if not fallback['backend'].endswith(suffix):raise RuntimeError('resumption_dependency_namespace_invalid')
     prefix=fallback['backend'][:-len(suffix)]
@@ -137,3 +142,14 @@ def verify_native_continuation_dependencies(plan,root,runtime=None):
     if pending:raise AvailabilityFailure('continuation_native_activation_pending')
     runtime.schema()
     return {'schema':115,'native_services':len(SERVICES),'database_authority':'local'}
+
+
+def registered_fallback_names(runtime):
+    """Names derived from immutable preparation inputs; no authorization claim."""
+    from deployment.lib.emergency_routing_repair import digest as preparation_digest
+    inputs=runtime.input_bytes()
+    contract=json.loads(inputs['recovery_contract']);schema=json.loads(inputs['schema_contract'])
+    fields=dict(contract);fields.pop('rehearsal_digest')
+    binding=preparation_digest({'contract':fields,'schema_contract':schema})
+    prefix='madar-provider402-rehearsal-'+binding[:12]+'-candidate-local-fallback'
+    return {role:prefix+'-'+role for role in ('backend','frontend')}

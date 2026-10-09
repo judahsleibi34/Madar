@@ -42,6 +42,20 @@ class ProductionActiveRecoveryOperations:
         self.runtime.expected_nginx_sha256 = plan.retained_inputs['proxy_configuration']
         self.candidate = self.workers = self.kernel = self.handoff = self.controller = None
 
+    def compensated_binding(self):
+        return (getattr(self.plan,'candidate_destination',None) or {}).get('post_compensation')
+
+    def verify_compensated_state(self):
+        from deployment.lib.active_recovery_compensated import verify_compensated_binding
+        return verify_compensated_binding(self.compensated_binding(),self.runtime,
+            staged_plan=self.plan if self.candidate is not None else None)
+
+    def observe_inputs(self):
+        if self.compensated_binding() and (self.root/'boot-installation.json').exists():
+            from deployment.lib.active_recovery_boot_installation import verify_post_compensation_boot
+            verify_post_compensation_boot(self.plan,self.root,self.runtime)
+        return observe_retained_inputs(post_compensation=bool(self.compensated_binding()))
+
     def verify_frozen_source(self, plan):
         if plan != self.plan: raise RuntimeError('continuation_plan_changed')
         return self.source.verify()
@@ -71,18 +85,30 @@ class ProductionActiveRecoveryOperations:
         from deployment.lib.active_recovery_backup import verify_backup_execution_context
         verify_backup_execution_context(self.package)
         if self.candidate is None:self.verify_candidate_feasibility(plan)
-        if observe_retained_inputs() != plan.retained_inputs:
+        if self.compensated_binding():self.verify_compensated_state()
+        if self.observe_inputs() != plan.retained_inputs:
             raise RuntimeError('continuation_retained_inputs_changed')
         for key in ('local_transaction', 'recovery_transaction'):
             if json.loads(INPUTS[key].read_text()).get('phase') != 'local_rollback_active':
                 raise RuntimeError('continuation_active_rollback_required')
 
     def verify_emergency_installation(self, plan):
+        if self.compensated_binding():
+            observed=self.verify_compensated_state()
+            if observed['emergency_installation_sha256']!=plan.emergency_installation_sha256:
+                raise RuntimeError('continuation_emergency_installation_changed')
+            return
         # Exact existing files/process/listeners, including the successful retry.
         if digest(legacy_installation(self.runtime)) != plan.emergency_installation_sha256:
             raise RuntimeError('continuation_emergency_installation_changed')
 
     def verify_restricted_fallback(self, plan):
+        if self.compensated_binding() and not (self.root/'installed-controller.json').exists():
+            from deployment.lib.active_recovery_compensated import inspect_history
+            from deployment.lib.active_recovery_fallback import CurrentDataFallback
+            previous,previous_root,_,_=inspect_history(self.compensated_binding()['baseline']['previous_plan_sha256'])
+            if previous.fallback!=plan.fallback:raise RuntimeError('continuation_fallback_changed')
+            return CurrentDataFallback(previous,previous_root,runtime=self.runtime).verify_registered_runtime()
         if self.candidate is None or not (self.root/'installed-controller.json').exists():
             packet, _ = verify(self.runtime)
             _, _, names, _ = identities(self.runtime.input_bytes())
@@ -94,7 +120,7 @@ class ProductionActiveRecoveryOperations:
             self.actor().fallback.verify_registered_runtime()
 
     def require_all_consumers_stopped(self):
-        observe_runtime_dependencies(self.runtime)
+        observe_runtime_dependencies(self.runtime,fallback_names=bool(self.compensated_binding()))
 
     def require_no_normal_write_authority(self):
         authority = json.loads(protected(INPUTS['write_authority']).read_text())
@@ -103,7 +129,7 @@ class ProductionActiveRecoveryOperations:
         self.runtime.schema()
 
     def capture_verified_runtime_dependencies(self, plan):
-        packet, sha = observe_runtime_dependencies(self.runtime)
+        packet, sha = observe_runtime_dependencies(self.runtime,fallback_names=bool(self.compensated_binding()))
         if sha != plan.retained_inputs['runtime_dependencies']:
             raise RuntimeError('continuation_dependency_changed')
         return packet
@@ -158,9 +184,11 @@ class ProductionActiveRecoveryOperations:
         from deployment.lib.active_recovery_candidate import require_unreserved_ports
         from deployment.lib.active_recovery_boot_installation import UNITS,DROPIN
         paths=[UNITS/('madar-normal-local-'+kind+'-'+plan.digest[:12]+'.service') for kind in ('boot','fallback')]
-        if any(path.exists() or path.is_symlink() for path in (*paths,DROPIN)):
+        controls=paths if self.compensated_binding() else [*paths,DROPIN]
+        if any(path.exists() or path.is_symlink() for path in controls):
             raise RuntimeError('continuation_exclusive_service_already_exists')
-        require_unreserved_ports(self.runtime,(29501,39501,39502))
+        if self.compensated_binding():self.verify_compensated_state()
+        else:require_unreserved_ports(self.runtime,(29501,39501,39502))
         return result
 
     def stage_detached_read_only_candidate(self, plan, root):
@@ -170,7 +198,7 @@ class ProductionActiveRecoveryOperations:
         self.candidate.stage()
         self.workers = ActiveRecoveryWorkerHandoff(plan,self.candidate,root,self.source.verify)
         self.kernel = ActiveRecoveryRuntime(plan,self.candidate,root,self.source.verify,self.workers,runtime=self.runtime)
-        self.handoff = ReadOnlyRoutingHandoff(plan,self.candidate,root,runtime=self.runtime)
+        self.handoff = ReadOnlyRoutingHandoff(plan,self.candidate,root,runtime=self.runtime,observer=self.observe_inputs)
         self.controller = ActiveRecoveryControllerRepair(plan,self.candidate,root,self.source.verify,runtime=self.runtime)
 
     def converge(self, check, seconds):
@@ -291,7 +319,11 @@ class ProductionActiveRecoveryOperations:
         self.source.verify()
         # A failed fence cannot skip stopping the independently bound consumers.
         try: self.candidate._publish_write_authority(self.candidate.contract,'READ_ONLY')
-        finally: self.workers.stop_consumers()
+        finally:
+            try:self.workers.stop_consumers()
+            finally:
+                if self.compensated_binding():
+                    ActiveRecoveryBackupTimers(plan,self.root,self.source.verify).quiesce_compensation()
         self.candidate.require_write_authority(self.candidate.contract,'READ_ONLY')
     def publish_verified_current_data_fallback(self, plan, root, deadline_seconds):
         if deadline_seconds != 60: raise RuntimeError('continuation_compensation_deadline_changed')

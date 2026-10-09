@@ -143,3 +143,24 @@ class ControllerResumeTests(unittest.TestCase):
         (old/'candidate-contract.json').unlink();self.ops.states[BACKUP_TIMERS[0]]['active']='active'
         with self.assertRaisesRegex(RuntimeError,'not_quiesced'):timer.quiesce()
         self.assertEqual(self.ops.calls,[])
+
+class CompensationTimerTests(unittest.TestCase):
+    def test_partial_normal_resumption_stops_every_documented_timer(self):
+        from types import SimpleNamespace
+        import tempfile
+        from unittest.mock import patch
+        from deployment.lib.active_recovery_controller import ActiveRecoveryBackupTimers,BACKUP_TIMERS
+        with tempfile.TemporaryDirectory() as temp:
+            base=Path(temp);plan=SimpleNamespace(digest='a'*64,source_bundle_sha256='b'*64)
+            root=base/plan.digest;root.mkdir()
+            (root/'authorization.json').write_text(json.dumps({'operation':'active-local-rollback-resumption',
+                'plan_sha256':plan.digest,'source_bundle_sha256':plan.source_bundle_sha256}))
+            (root/'events.jsonl').write_text(json.dumps({'plan_sha256':plan.digest,'phase':'compensation_pending'})+'\n')
+            states={name:('active' if i<2 else 'inactive') for i,name in enumerate(BACKUP_TIMERS)};commands=[]
+            def command(label,args):commands.append(args);states[args[-1]]='inactive'
+            ops=SimpleNamespace(command=command,systemctl_state=lambda name:{'active':states[name]})
+            with patch('deployment.lib.active_recovery_controller.ROOT',base),patch('deployment.lib.active_recovery_controller.protected',side_effect=lambda p,**kw:p),patch('deployment.lib.active_recovery_controller.os.geteuid',return_value=0):
+                ActiveRecoveryBackupTimers(plan,root,lambda:None,operations=ops).quiesce_compensation()
+            self.assertEqual(set(states.values()),{'inactive'})
+            self.assertEqual([args[-1] for args in commands],list(BACKUP_TIMERS))
+            self.assertTrue(all(args[:2]==['/usr/bin/systemctl','stop'] and args[-1].endswith('.timer') for args in commands))
