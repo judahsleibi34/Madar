@@ -1027,3 +1027,23 @@ never started. New source/image acceptance cannot be relabeled from the old
 candidate. Existing original timer states are usable only with this independently
 bound pre-publication failure proof; timers resume after verified normal backup.
 Failure before public handoff leaves the original restricted fallback serving.
+
+Detached-port feasibility uses Docker-compatible SO_REUSEADDR and an exclusive
+bind+listen probe, never SO_REUSEPORT. Retired TCP TIME_WAIT connections are not
+live resource owners; a real listener still rejects, and exact stopped Docker
+reservations/identities are checked separately. The same probe runs before
+approval and immediately after governed retirement under both locks. Disposable
+real Docker reproduction demonstrated the frozen no-reuse probe failing errno98
+with no listener while a replacement could start, and the corrected complete
+retirement/replacement sequence preserves its independent restricted fallback.
+Historical failed-attempt messages remain unrecoverable; this demonstrated
+mechanism must not be relabeled as a captured historical exception.
+
+Staging failures append sanitized diagnostics to the existing protected journal:
+source-defined operation, phase, exception type, source-relative function/line
+traceback and numeric OS errno when available. No exception message, command,
+configuration value, locals, customer information or source line is recorded.
+The plan/source hashes and append-only timestamp bind the diagnostic to the
+frozen executed source. Original receipts/journals are never rewritten, and a
+recorded failure remains consumed. Pre-publication failure preserves the working
+restricted route; post-publication failures retain existing compensation rules.

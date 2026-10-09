@@ -115,7 +115,12 @@ def require_unreserved_ports(runtime, ports, retired=None, planned=None):
     for port in ports:
         if str(port) in planned_ports:continue
         with socket.socket() as listener:
-            try:listener.bind(('127.0.0.1',port))
+            # Match Docker's listener semantics: TIME_WAIT is not a live owner.
+            # No SO_REUSEPORT; bind+listen still rejects a competing listener.
+            listener.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1)
+            try:
+                listener.bind(('127.0.0.1',port))
+                listener.listen(1)
             except OSError as error:
                 raise RuntimeError('detached_port_unavailable_'+str(port)+'_errno_'+str(error.errno)) from None
     retired=retired or {}
@@ -454,10 +459,17 @@ class DetachedRecoveryCandidate(ProductionLocalTransitionOperations):
             if self.plan.fallback[role] != {'container_id':row['id'],'image_id':row['image'],'spec_sha256':row['spec_sha256']}:
                 raise RuntimeError('detached_registered_fallback_changed')
 
+    def staging_check(self, operation, callback, *args, **kwargs):
+        """Attach a source-defined operation name; never store command/secret text."""
+        try:return callback(*args,**kwargs)
+        except Exception as error:
+            if not hasattr(error,'madar_staging_operation'):error.madar_staging_operation=operation
+            raise
+
     def retire_previous_candidate(self):
         """Fresh approval may stop only exact unpublished READ_ONLY services."""
         self.require_authorization(self.contract)
-        previous=inspect_previous_candidate(self.plan)
+        previous=self.staging_check('retirement-identities',inspect_previous_candidate,self.plan)
         if previous is None:return
         from deployment.lib.emergency_routing_repair import exclusive,encoded
         selected={kind:previous['rows'][kind]['Id'] for kind in ('frontend','backend','parser')}
@@ -467,20 +479,20 @@ class DetachedRecoveryCandidate(ProductionLocalTransitionOperations):
             # Never update configuration, remove resources or touch the three
             # CREATED business workers. Stop only the freshly bound exact IDs.
             self.require_authorization(self.contract)
-            inspect_previous_candidate(self.plan)
-            self.command(['docker','stop',identity])
+            self.staging_check('retirement-identities',inspect_previous_candidate,self.plan)
+            self.staging_check('retirement-stop-'+kind,self.command,['docker','stop',identity])
             if self.inspect(identity)['State']['Running']:raise RuntimeError('previous_candidate_stop_failed')
-        inspect_previous_candidate(self.plan)
-        require_unreserved_ports(self,(self.backend_port,self.frontend_port),self.plan.candidate_destination['retired_port_declarations'])
+        self.staging_check('post-retirement-identities',inspect_previous_candidate,self.plan)
+        self.staging_check('post-retirement-ports',require_unreserved_ports,self,(self.backend_port,self.frontend_port),self.plan.candidate_destination['retired_port_declarations'])
 
     def stage(self):
         self.require_authorization(self.contract)
-        self.require_feasible()
-        self.verify_image_source()
+        self.staging_check('candidate-feasibility',self.require_feasible)
+        self.staging_check('candidate-images',self.verify_image_source)
         # Verify pinned provider/fallback/fences once more immediately before
         # effects. No container rename, old authority or public route change.
-        self.verify_retained_inputs()
-        self.retire_previous_candidate()
+        self.staging_check('retained-inputs',self.verify_retained_inputs)
+        self.staging_check('previous-candidate-retirement',self.retire_previous_candidate)
         redis = self.inspect(self.redis_name)
         net = json.loads(self.command(['docker','network','inspect',self.redis_network]))[0]
         if (not redis['State']['Running'] or self.redis_network not in redis['NetworkSettings']['Networks']
@@ -492,20 +504,20 @@ class DetachedRecoveryCandidate(ProductionLocalTransitionOperations):
         from deployment.lib.emergency_routing_repair import exclusive,encoded
         exclusive(self.root/'candidate-contract.json',encoded({'version':1,'plan_sha256':self.plan.digest,'contract':asdict(self.contract)}))
         self.set_write_authority(self.contract,'READ_ONLY')
-        self.command(['docker','network','create','--driver','bridge','--subnet',subnet,self.network_name])
-        self.command(['docker','run','--pull','never','-d','--name',self.name('parser'),'--network',self.network_name,
+        self.staging_check('candidate-network-create',self.command,['docker','network','create','--driver','bridge','--subnet',subnet,self.network_name])
+        self.staging_check('candidate-parser-create',self.command,['docker','run','--pull','never','-d','--name',self.name('parser'),'--network',self.network_name,
             '--network-alias','parser','--restart','no','--log-driver','none',
             '--env','PARSER_WORKER_HEALTH_HOST=0.0.0.0','--env','PARSER_WORKER_PORT=8000',
             '--env','DATA_UPLOAD_DIR=/tmp/local-parser',self.contract.images['backend'],'python','-m','workers.parser_worker'])
-        self._create_application(self.contract,self.name('backend'),'backend',network=self.network_name,loopback_port=self.backend_port)
-        self.command(['docker','start',self.name('backend')])
+        self.staging_check('candidate-backend-create',self._create_application,self.contract,self.name('backend'),'backend',network=self.network_name,loopback_port=self.backend_port)
+        self.staging_check('candidate-backend-start',self.command,['docker','start',self.name('backend')])
         cfg={'MADAR_CSP_CONNECT_SRC':"'self' https://api.madarportal.com",'MADAR_PUBLIC_SITE_DOMAIN':'madarportal.com','MADAR_HSTS':'max-age=31536000'}
         args=['docker','run','--pull','never','-d','--name',self.name('frontend'),'--network',self.network_name,
             '--restart','no','--log-driver','none','--publish',f'127.0.0.1:{self.frontend_port}:8080']
         for key in cfg:args += ['--env',key]
-        self.command(args+[self.contract.images['frontend']],env={**cfg,'PATH':'/usr/bin:/bin'})
+        self.staging_check('candidate-frontend-create',self.command,args+[self.contract.images['frontend']],env={**cfg,'PATH':'/usr/bin:/bin'})
         for kind in KINDS:
-            self._create_application(self.contract,self.name(kind),kind+'-worker',worker=kind,network=self.network_name)
+            self.staging_check('candidate-'+kind+'-create',self._create_application,self.contract,self.name(kind),kind+'-worker',worker=kind,network=self.network_name)
         self.verify_identities()
         self.require_write_authority(self.contract,'READ_ONLY')
         rows = {kind:self.inspect(self.name(kind)) for kind in ("backend","frontend","parser",*KINDS)}

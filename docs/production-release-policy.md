@@ -2019,3 +2019,13 @@ then requires free sockets before staging newly accepted exact-source images.
 Old CREATED business consumers remain unstarted. Unknown ownership, altered
 protected bytes/identities/configuration/networks or a post-publication prior
 attempt reject this continuation. No database restore or migration is authorized.
+
+Staging port checks distinguish retired TCP TIME_WAIT from live listeners using
+exclusive bind+listen with SO_REUSEADDR, retaining strict Docker identity and
+reservation checks and prohibiting SO_REUSEPORT. Actual real Docker lifecycle
+regressions, including interruption and a separate serving fallback, are required
+for this correction. A subsequent passing preflight does not prove a historical
+failure cause. Future failures retain only sanitized operation/type/phase and
+source-relative traceback/errno in the protected append-only journal; messages,
+locals, command text and private data are excluded. Consumed approvals remain
+unusable and fresh deployment approval remains mandatory.
