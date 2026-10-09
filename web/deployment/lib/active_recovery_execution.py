@@ -76,7 +76,13 @@ def verify_original_factor_execution(manifest_sha256):
 
 
 def verify_local_reconciliation_execution(plan):
-    report,_=actual_inline_execution(RECONCILIATION,plan.reconciliation_execution_sha256,
+    compensated=(getattr(plan,'candidate_destination',None) or {}).get('post_compensation')
+    source_sha=getattr(plan,'source_sha','')
+    if compensated and not re.fullmatch('[0-9a-f]{40}',source_sha):
+        raise RuntimeError('actual_reconciliation_source_invalid')
+    path=(PREPARATION/('local-post-compensation-reconciliation-'+source_sha)/'actual-execution.json'
+          if compensated else RECONCILIATION)
+    report,_=actual_inline_execution(path,plan.reconciliation_execution_sha256,
         'root-supervised-current-local-read-only-reconciliation','web/scripts/observe_current_local_reconciliation.py',source_directory='source')
     packet=report.get('snapshot',{})
     roots=packet.get('table_roots',[])

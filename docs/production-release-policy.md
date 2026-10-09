@@ -2076,3 +2076,5 @@ backup pipeline/private restore, final exact-image acceptance, mandatory CI and
 complete exact-source/plan operator approval remain prerequisites.
 
 NORMAL runtime acceptance must sustain at least three complete native/worker/authority/direct-readiness/public-request rounds over at least five seconds within one 180-second verification deadline. Availability transitions reset the streak; integrity failures immediately invoke governed compensation.
+
+Post-compensation continuation requires a new independently executed read-only reconciliation at the root-private `normal-local-preparation/local-post-compensation-reconciliation-<exact source SHA>/actual-execution.json` path. Its actual invocation, immutable runner, transcript hash and retained-resource scope must match the new plan. Historical pre-install reconciliation remains historical data and cannot satisfy this current-state gate. Original prepublication reconciliation rules remain unchanged.
