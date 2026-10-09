@@ -82,7 +82,7 @@ class CurrentLocalReconciliation:
         if digest(dependencies)!=self.plan.retained_inputs['runtime_dependencies']:
             raise RuntimeError('reconciliation_retained_binding_changed')
         selected={}
-        slot=self.candidate.recovery.contract.origin_slot
+        slot=self.plan.candidate_destination['retained_slot']
         for role in ('backend','frontend'):
             name=f'madar-{slot}-{role}';expected=dependencies['runtimes'][name];row=self.candidate.inspect(expected['container_id'])
             if row['Image']!=expected['image_id'] or spec(row)!=expected['spec_sha256']:

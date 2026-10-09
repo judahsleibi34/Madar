@@ -28,11 +28,117 @@ RECOVERY = Path('/var/lib/madar-control-plane/provider402')
 KINDS = ('notification', 'calendar-sync', 'data-deletion')
 
 
+def require_unreserved_ports(runtime, ports, retired=None):
+    """Check host sockets AND stopped Docker reservations without displacing any."""
+    for port in ports:
+        with socket.socket() as listener:
+            try:listener.bind(('127.0.0.1',port))
+            except OSError as error:
+                raise RuntimeError('detached_port_unavailable_'+str(port)+'_errno_'+str(error.errno)) from None
+    retired=retired or {}
+    ids=runtime.command(['docker','ps','-aq']).splitlines()
+    for row in json.loads(runtime.command(['docker','inspect',*ids])) if ids else []:
+        for bindings in (row['HostConfig'].get('PortBindings') or {}).values():
+            if any(str(b.get('HostPort')) in {str(p) for p in ports} for b in bindings or []):
+                binding=retired.get(row.get('Name','').lstrip('/'))
+                if (binding is None or row['Id']!=binding['container_id'] or row['Image']!=binding['image_id']
+                        or spec(row)!=binding['spec_sha256'] or row['State']['Running']
+                        or row['HostConfig']['RestartPolicy']['Name']!='no'):
+                    raise RuntimeError('detached_port_already_reserved')
+
+
+def resolve_candidate_destination(plan, runtime=None):
+    """Observe current ownership/identities; never use historical origin_slot as allocation."""
+    from deployment.lib.active_recovery_inputs import INPUTS,observe_runtime_dependencies
+    from deployment.lib.provider_recovery_runtime import readonly_configuration
+    runtime=runtime or Runtime()
+    packet,binding=observe_runtime_dependencies(runtime)
+    if binding!=plan.retained_inputs['runtime_dependencies']:
+        raise RuntimeError('detached_destination_runtime_changed')
+    values={}
+    for key in ('worker_authority','release_state','traffic','recovery_transaction','local_transaction'):
+        path=INPUTS[key]
+        reader=protected if key=='local_transaction' else readonly_configuration
+        if file_digest(reader(path,private=True))!=plan.retained_inputs[key]:
+            raise RuntimeError('detached_destination_ownership_changed')
+        values[key]=json.loads(path.read_text())
+    owner=values['worker_authority'];traffic=values['traffic'];recovery=values['recovery_transaction'];local=values['local_transaction']
+    retained=owner.get('candidate',{}).get('slot')
+    recovery_sha=traffic.get('sha')
+    if (owner.get('owner')!='RECOVERY' or retained not in {'blue','green'}
+            or owner.get('candidate',{}).get('sha')!=recovery_sha
+            or recovery.get('slot')!=retained or recovery.get('sha')!=recovery_sha
+            or local.get('sha')!=recovery_sha
+            or any(v.get('phase')!='local_rollback_active' for v in (recovery,local))
+            or traffic.get('slot')!='local-fallback' or traffic.get('provider')!='local'
+            or traffic.get('schema')!=115 or traffic.get('database_restore') is not False):
+        raise RuntimeError('detached_destination_recovery_ownership_invalid')
+    known=values['release_state'].get('known_good_release',{})
+    if known.get('schema')!=115 or known.get('slot')!=owner.get('old',{}).get('slot') or known.get('sha')!=owner.get('old',{}).get('sha'):
+        raise RuntimeError('detached_destination_release_identity_invalid')
+    slot='green' if retained=='blue' else 'blue'
+    names=[f'madar-{slot}-{kind}' for kind in ('backend','frontend',*(k+'-worker' for k in KINDS))]
+    rows=runtime.inspect(names+[f'madar-{retained}-backend',f'madar-{retained}-frontend'])
+    for name,row in rows.items():
+        bound=packet['runtimes'][name]
+        if row['Id']!=bound['container_id'] or row['Image']!=bound['image_id'] or spec(row)!=bound['spec_sha256']:
+            raise RuntimeError('detached_destination_runtime_changed')
+    for name in names:
+        row=rows[name]
+        if (row['State']['Running'] or row['HostConfig']['RestartPolicy']['Name']!='no'
+                or row['Config'].get('Labels',{}).get('org.opencontainers.image.revision')!=recovery_sha):
+            raise RuntimeError('detached_destination_retained_slot_invalid')
+    sources={rows[f'madar-{retained}-{role}']['Config'].get('Labels',{}).get('org.opencontainers.image.revision') for role in ('backend','frontend')}
+    if len(sources)!=1 or not next(iter(sources)):
+        raise RuntimeError('detached_destination_retained_writer_invalid')
+    _,_,fallback,_=identities(runtime.input_bytes())
+    prefix=fallback['backend'].removesuffix('-local-fallback-backend')
+    redis_name=prefix+'-redis';network=prefix+'-'+retained+'-runtime'
+    redis=runtime.inspect([redis_name])[redis_name];net=runtime.network(network)
+    if (not redis['State']['Running'] or network not in redis['NetworkSettings']['Networks']
+            or redis['Config'].get('Labels',{}).get('com.madar.recovery.profile')!='provider402-signin'
+            or not any(m['Type']=='volume' and m['Destination']=='/data' for m in redis['Mounts'])
+            or net['Name']!=network or net['Id']!=packet['networks'][network]['Id']
+            or net['Driver']!='bridge' or net['Internal'] is not True
+            or network not in packet['runtimes'][f'madar-{slot}-backend']['networks']):
+        raise RuntimeError('detached_destination_redis_network_invalid')
+    ports={'blue':(8101,3100),'green':(8201,3200)}[slot]
+    # Previous governed normal-local preparation already retired these exact
+    # known-good containers. Their stopped declarations are not live listeners.
+    # No other stopped reservation is permitted; none is modified or started.
+    retired={};all_names=runtime.command(['docker','ps','-a','--format','{{.Names}}']).splitlines()
+    suffix=local.get('contract_digest','')[:12]
+    for role,port in zip(('backend','frontend'),ports):
+        name=f'madar-{slot}-{role}-legacy-'+suffix
+        if name not in all_names:continue
+        old_contract=protected(INPUTS['local_contract'],private=True)
+        if file_digest(old_contract)!=plan.retained_inputs['local_contract'] or digest(json.loads(old_contract.read_text()))!=local.get('contract_digest'):
+            raise RuntimeError('detached_retirement_contract_changed')
+        row=runtime.inspect([name])[name]
+        container_port={'backend':'8000/tcp','frontend':'8080/tcp'}[role]
+        expected_ports={container_port:[{'HostIp':'127.0.0.1','HostPort':str(port)}]}
+        image=known.get('images',{}).get(role,'').split('@')[-1]
+        if (known.get('slot')!=slot or row['Image']!=image
+                or row['Config'].get('Labels',{}).get('org.opencontainers.image.revision')!=known['sha']
+                or row['State']['Running'] or row['HostConfig']['RestartPolicy']['Name']!='no'
+                or row['HostConfig'].get('PortBindings')!=expected_ports):
+            raise RuntimeError('detached_retired_port_declaration_invalid')
+        retired[name]={'container_id':row['Id'],'image_id':row['Image'],'spec_sha256':spec(row)}
+    require_unreserved_ports(runtime,ports,retired)
+    probe=DetachedRecoveryCandidate.__new__(DetachedRecoveryCandidate);probe.command=runtime.command
+    return {'slot':slot,'backend_port':ports[0],'frontend_port':ports[1],
+        'retained_slot':retained,'retained_source_sha':next(iter(sources)),
+        'redis_name':redis_name,'redis_network':network,'redis_network_id':net['Id'],'subnet':probe.free_subnet(),'retired_port_declarations':retired}
+
+
 class DetachedRecoveryCandidate(ProductionLocalTransitionOperations):
     def __init__(self, plan, contract, root):
         plan.validate()
         self.plan, self.contract, self.root = plan, contract, Path(root)
         self.require_fresh_stage()
+        self._configure(plan,contract,root)
+
+    def _configure(self,plan,contract,root):
         if (contract.sha != plan.source_sha or contract.images != plan.candidate_images
                 or contract.checkpoint_digest != plan.checkpoint_manifest_sha256
                 or contract.reconciliation_digest != plan.reconciliation_execution_sha256
@@ -72,10 +178,9 @@ class DetachedRecoveryCandidate(ProductionLocalTransitionOperations):
         # legacy preparation authorization. The fresh receipt remains mandatory.
         self.recovery = ProductionRecoveryOperations(paths, old)
         self.state = self.recovery.paths.state
-        self.slot = 'green' if old.origin_slot == 'blue' else 'blue'
-        self.redis_name = prefix + '-redis'
-        recovery_slot = 'green' if old.origin_slot == 'blue' else 'blue'
-        self.redis_network = prefix + '-' + recovery_slot + '-runtime'
+        destination=resolve_candidate_destination(plan,runtime)
+        if destination!=plan.candidate_destination:raise RuntimeError('detached_destination_plan_changed')
+        self.slot=destination['slot'];self.redis_name=destination['redis_name'];self.redis_network=destination['redis_network']
         self._load_configuration(configuration)
         self.prefix = 'madar-normal-' + plan.digest[:12]
         self.network_name = self.prefix + '-runtime'
@@ -103,7 +208,9 @@ class DetachedRecoveryCandidate(ProductionLocalTransitionOperations):
         if file_digest(old_path)!=plan.retained_inputs['recovery_contract'] or file_digest(metadata_path)!=plan.retained_inputs['schema_contract']:
             raise RuntimeError('saved_candidate_recovery_inputs_changed')
         old=RecoveryContract(**json.loads(old_path.read_text()))
-        slot='green' if old.origin_slot=='blue' else 'blue'
+        destination=plan.candidate_destination
+        if destination is None:raise RuntimeError('saved_candidate_destination_missing')
+        slot=destination['slot']
         value=cls.__new__(cls)
         value.plan,value.contract,value.root=plan,contract,root
         value.slot=slot;value.prefix='madar-normal-'+plan.digest[:12];value.network_name=value.prefix+'-runtime'
@@ -125,7 +232,7 @@ class DetachedRecoveryCandidate(ProductionLocalTransitionOperations):
         # to consume historical acceptance or reconstruct expired credentials.
         paths=replace(RecoveryPaths(),target_env=RECOVERY/'rehearsals'/binding/'configuration.env',prefix=prefix)
         value.recovery=ProductionRecoveryOperations(paths,old)
-        value.state=value.recovery.paths.state;value.redis_name=prefix+'-redis';value.redis_network=prefix+'-'+slot+'-runtime'
+        value.state=value.recovery.paths.state;value.redis_name=destination['redis_name'];value.redis_network=destination['redis_network']
         value.backend_port={'blue':8101,'green':8201}[slot];value.frontend_port={'blue':3100,'green':3200}[slot]
         if file_digest(protected(LOCAL/'configuration.env',private=True))!=plan.retained_inputs['local_configuration']:
             raise RuntimeError('saved_candidate_configuration_changed')
@@ -201,20 +308,29 @@ class DetachedRecoveryCandidate(ProductionLocalTransitionOperations):
 
     def require_free_destinations(self):
         names = self.command(['docker','ps','-a','--format','{{.Names}}']).splitlines()
-        if any(self.name(kind) in names for kind in ('backend','frontend','parser',*KINDS)):
+        archives={f'madar-{self.slot}-'+(kind+'-worker' if kind in KINDS else kind)+'-retired-'+self.plan.digest[:12] for kind in ('backend','frontend',*KINDS)}
+        if archives.intersection(names) or any(self.name(kind) in names for kind in ('backend','frontend','parser',*KINDS)):
             raise RuntimeError('detached_resource_already_exists')
         networks = self.command(['docker','network','ls','--format','{{.Name}}']).splitlines()
         if self.network_name in networks:
             raise RuntimeError('detached_resource_already_exists')
-        for port in (self.backend_port,self.frontend_port):
-            with socket.socket() as listener:
-                try:listener.bind(('127.0.0.1',port))
-                except OSError:raise RuntimeError('detached_port_in_use') from None
-        ids = self.command(['docker','ps','-aq']).splitlines()
-        for row in json.loads(self.command(['docker','inspect',*ids])) if ids else []:
-            for bindings in (row['HostConfig'].get('PortBindings') or {}).values():
-                if any(str(binding.get('HostPort')) in {str(self.backend_port),str(self.frontend_port)} for binding in bindings or []):
-                    raise RuntimeError('detached_port_already_reserved')
+        require_unreserved_ports(self,(self.backend_port,self.frontend_port),(self.plan.candidate_destination or {}).get('retired_port_declarations',{}))
+
+    @classmethod
+    def read_only_feasibility(cls,plan,contract,root):
+        value=cls.__new__(cls);value.plan=plan;value.contract=contract;value.root=Path(root)
+        value._configure(plan,contract,root)
+        value.require_feasible();value.verify_image_source();value.verify_retained_inputs()
+        return dict(plan.candidate_destination)
+
+    def require_feasible(self):
+        self.require_free_destinations()
+        if resolve_candidate_destination(self.plan)!=self.plan.candidate_destination:
+            raise RuntimeError('detached_destination_plan_changed')
+        if (self.slot!=self.plan.candidate_destination['slot']
+                or self.backend_port!=self.plan.candidate_destination['backend_port']
+                or self.frontend_port!=self.plan.candidate_destination['frontend_port']):
+            raise RuntimeError('detached_destination_object_changed')
 
     def free_subnet(self):
         ids = self.command(['docker','network','ls','-q']).splitlines()
@@ -246,7 +362,7 @@ class DetachedRecoveryCandidate(ProductionLocalTransitionOperations):
 
     def stage(self):
         self.require_authorization(self.contract)
-        self.require_free_destinations()
+        self.require_feasible()
         self.verify_image_source()
         # Verify pinned provider/fallback/fences once more immediately before
         # effects. No container rename, old authority or public route change.
@@ -258,7 +374,7 @@ class DetachedRecoveryCandidate(ProductionLocalTransitionOperations):
                 or not net['Internal'] or net['Driver'] != 'bridge'
                 or not any(m['Type']=='volume' and m['Destination']=='/data' for m in redis['Mounts'])):
             raise RuntimeError('detached_recovery_redis_unavailable')
-        subnet = self.free_subnet()
+        subnet = self.plan.candidate_destination['subnet']
         from deployment.lib.emergency_routing_repair import exclusive,encoded
         exclusive(self.root/'candidate-contract.json',encoded({'version':1,'plan_sha256':self.plan.digest,'contract':asdict(self.contract)}))
         self.set_write_authority(self.contract,'READ_ONLY')
