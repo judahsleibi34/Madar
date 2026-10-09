@@ -126,3 +126,21 @@ class InfrastructureTests(unittest.TestCase):
         self.assertEqual(ops.runtime_endpoint("blue","backend"),"http://172.30.1.2:8000")
         ops.command=lambda args:json.dumps([{"Internal":False,"Driver":"bridge"}])
         with self.assertRaises(RuntimeError):ops.runtime_endpoint("blue","backend")
+
+
+class ReassignedRuntimeEndpointTests(unittest.TestCase):
+    def test_fallback_endpoints_follow_container_roles_after_address_reassignment(self):
+        ops = ProductionRecoveryOperations.__new__(ProductionRecoveryOperations)
+        ops.paths = replace(RecoveryPaths(), prefix="fixture-recovery")
+        ops.ports = {"local-fallback": (29401, 39401)}
+        addresses = {"backend": "10.254.202.4", "frontend": "10.254.202.5"}
+        def inspect(name):
+            kind = name.rsplit("-", 1)[1]
+            return {"NetworkSettings": {"Networks": {
+                "fixture-recovery-local-fallback-runtime": {"IPAddress": addresses[kind]}}}}
+        ops.inspect = inspect
+        ops.command = lambda args: json.dumps([{"Internal": True, "Driver": "bridge"}])
+        self.assertEqual(ops.runtime_endpoint("local-fallback", "backend"), "http://10.254.202.4:8000")
+        addresses.update(backend="10.254.202.5", frontend="10.254.202.4")
+        self.assertEqual(ops.runtime_endpoint("local-fallback", "backend"), "http://10.254.202.5:8000")
+        self.assertEqual(ops.runtime_endpoint("local-fallback", "frontend"), "http://10.254.202.4:8080")

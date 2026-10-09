@@ -333,15 +333,33 @@ def check_backup_freshness() -> str:
         if not 0 <= age <= maximum_age:
             return "stale"
         state = json.loads(path.read_text())
-        if (state.get('format') != 1 or state.get('verified') is not True
-                or state.get('backup_id') != 'madar-' + state.get('created_at', '')
+        if (state.get('verified') is not True
                 or not re.fullmatch(r'[0-9a-f]{64}', state.get('manifest_sha256', ''))):
             return "invalid"
-        created = datetime.strptime(state['created_at'], '%Y%m%dT%H%M%SZ').replace(tzinfo=timezone.utc)
+        if type(state.get('format')) is int and state['format'] == 1:
+            if state.get('backup_id') != 'madar-' + state.get('created_at', ''):
+                return "invalid"
+            created = datetime.strptime(state['created_at'], '%Y%m%dT%H%M%SZ').replace(tzinfo=timezone.utc)
+        elif type(state.get('format')) is int and state['format'] == 2:
+            # A separately approved, actually restored sealed checkpoint keeps
+            # its exact identity and source timestamp. It is not relabelled as
+            # an ordinary historical backup. This health datum grants no writes.
+            if (state.get('scope') != 'complete-coordinated-checkpoint'
+                    or state.get('schema') != 115
+                    or not re.fullmatch(r'checkpoint-[0-9]{8}T[0-9]{6}Z',state.get('checkpoint_id',''))
+                    or not re.fullmatch(r'[0-9a-f]{64}',state.get('execution_sha256',''))):
+                return "invalid"
+            created = datetime.fromisoformat(state['created_at'])
+            if created.tzinfo is None:
+                return "invalid"
+        else:
+            return "invalid"
         age = (datetime.now(timezone.utc) - created).total_seconds()
         return "ok" if 0 <= age <= maximum_age else "stale"
-    except (OSError, ValueError):
+    except OSError:
         return "missing" if required else "unavailable"
+    except (ValueError, TypeError, KeyError):
+        return "invalid"
 
 
 def check_admin_mfa_policy() -> str:

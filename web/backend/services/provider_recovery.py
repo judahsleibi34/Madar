@@ -190,3 +190,19 @@ def validate_configuration() -> None:
 def prohibit_worker_start() -> None:
     if enabled():
         raise RuntimeError("recovery_queue_consumers_prohibited")
+
+
+def worker_consumption_status() -> tuple[bool, bool]:
+    """Standby may be healthy, but it cannot claim jobs without write authority.
+
+    Re-read the root authority on each poll. Invalid/missing installed authority
+    fails closed; ordinary workers keep their existing deployment policy.
+    """
+    try:
+        return not restricted(), True
+    except (RuntimeError, OSError, ValueError):
+        return False, False
+
+
+def worker_consumption_allowed() -> bool:
+    return worker_consumption_status()[0]

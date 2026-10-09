@@ -51,6 +51,9 @@ def process_resolution_batch(
     finish: Callable[..., bool] = mark_notification_result,
     concurrency: int = 1,
 ) -> int:
+    from services.provider_recovery import worker_consumption_allowed
+    if not worker_consumption_allowed():
+        return 0
     rows = claim(limit=limit)
     def process(row: dict[str, Any]) -> None:
         outbox_id = str(row.get("id") or "")
@@ -93,6 +96,9 @@ def process_batch(
     concurrency: int = 1,
 ) -> int:
     """Process independently retryable delivery rows, never broad outbox rows."""
+    from services.provider_recovery import worker_consumption_allowed
+    if not worker_consumption_allowed():
+        return 0
     rows = claim(limit=limit)
 
     def process(row: dict[str, Any]) -> None:
@@ -198,7 +204,7 @@ class HealthHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path == "/health":
             status = 200 if STATE["healthy"] else 503
-            body = json.dumps({"status": "ok" if status == 200 else "starting", "last_poll_at": STATE["last_poll_at"]}).encode()
+            body = json.dumps({"status": "ok" if status == 200 else "starting", "last_poll_at": STATE["last_poll_at"], "consuming": bool(STATE.get("consuming", False))}).encode()
             self.send_response(status)
             self.send_header("Content-Type", "application/json")
             self.send_header("Content-Length", str(len(body)))
@@ -237,6 +243,14 @@ def main() -> int:
     cleanup_due_at = time.monotonic()
     try:
         while not STOP_EVENT.is_set():
+            from services.provider_recovery import worker_consumption_status
+            allowed, authority_valid = worker_consumption_status()
+            if not allowed:
+                STATE["healthy"] = authority_valid
+                STATE["consuming"] = False
+                STOP_EVENT.wait(1.0)
+                continue
+            STATE["consuming"] = True
             try:
                 archive_ended_calendar_tasks(limit=batch_size)
             except Exception as error:

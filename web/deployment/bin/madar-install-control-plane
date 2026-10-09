@@ -58,6 +58,32 @@ declare -a tracked_files=(
   lib/provider_recovery_entry.py
   lib/provider_local_transition.py
   lib/provider_local_transition_runtime.py
+  lib/coordinated_checkpoint.py
+  lib/coordinated_archive_restore.py
+  lib/coordinated_storage_restore.py
+  lib/emergency_routing_repair.py
+  lib/checkpoint_execution_proof.py
+  lib/active_recovery_inputs.py
+  lib/active_recovery_source.py
+  lib/active_recovery_runtime.py
+  lib/active_recovery_proxy.py
+  lib/active_recovery_reconciliation.py
+  lib/active_recovery_publication.py
+  lib/active_recovery_write_authority.py
+  lib/active_recovery_listener.py
+  lib/active_recovery_boot.py
+  lib/active_recovery_boot_actor.py
+  lib/active_recovery_operations.py
+  lib/active_recovery_artifact_evidence.py
+  lib/active_recovery_backup.py
+  lib/active_recovery_execution.py
+  lib/active_recovery_boot_installation.py
+  lib/active_recovery_workers.py
+  lib/active_recovery_controller.py
+  lib/active_recovery_resumption.py
+  lib/active_recovery_candidate.py
+  lib/active_recovery_handoff.py
+  lib/active_recovery_fallback.py
   lib/provider_local_transition_entry.py
   lib/provider_local_auth_configuration.py
   lib/provider_local_proxy_configuration.py

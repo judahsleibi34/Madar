@@ -35,7 +35,7 @@ class HealthHandler(BaseHTTPRequestHandler):
             return
         if self.path == "/health":
             status = 200 if STATE["healthy"] else 503
-            body = json.dumps({"status": "ok" if status == 200 else "starting", "last_poll_at": STATE["last_poll_at"]}).encode()
+            body = json.dumps({"status": "ok" if status == 200 else "starting", "last_poll_at": STATE["last_poll_at"], "consuming": bool(STATE.get("consuming", False))}).encode()
             content_type = "application/json"
         else:
             metrics = get_deletion_metrics()
@@ -50,6 +50,9 @@ class HealthHandler(BaseHTTPRequestHandler):
 
 
 def run_batch(*, worker_id: str, batch_size: int) -> int:
+    from services.provider_recovery import worker_consumption_allowed
+    if not worker_consumption_allowed():
+        return 0
     requests = claim_deletion_requests(worker_id=worker_id, limit=batch_size)
     for request in requests:
         try:
@@ -83,6 +86,14 @@ def main() -> int:
     poll = max(1.0, min(float(os.getenv("DATA_DELETION_WORKER_POLL_SECONDS", "10")), 60.0))
     try:
         while not STOP_EVENT.is_set():
+            from services.provider_recovery import worker_consumption_status
+            allowed, authority_valid = worker_consumption_status()
+            if not allowed:
+                STATE["healthy"] = authority_valid
+                STATE["consuming"] = False
+                STOP_EVENT.wait(1.0)
+                continue
+            STATE["consuming"] = True
             try:
                 processed = run_batch(worker_id=worker_id, batch_size=batch_size)
             except Exception as error:

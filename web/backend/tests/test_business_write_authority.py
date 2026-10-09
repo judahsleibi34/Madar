@@ -121,3 +121,11 @@ class BusinessWriteAuthorityTests(unittest.TestCase):
                 calendar_routes._calendar_workspace_payload(SimpleNamespace(),
                     datetime.now(timezone.utc), datetime.now(timezone.utc))
             create.assert_not_called()
+
+    def test_worker_consumption_follows_root_authority_without_restart(self):
+        self.assertFalse(recovery.worker_consumption_allowed())
+        self.data["mode"] = "NORMAL"
+        self.write()
+        self.assertTrue(recovery.worker_consumption_allowed())
+        self.path.unlink()
+        self.assertFalse(recovery.worker_consumption_allowed())

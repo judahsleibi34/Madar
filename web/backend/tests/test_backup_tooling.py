@@ -60,6 +60,17 @@ class CoordinatedCheckpointTests(unittest.TestCase):
         entry = next(x for x in self.entries if x['purpose']=='independent_restore')
         entry.update(size=path.stat().st_size, sha256=self.backup.digest(path))
 
+    def test_logical_native_role_names_are_nologin_only(self):
+        import importlib.util
+        script = Path(__file__).resolve().parents[2] / "scripts" / "rehearse_backup.py"
+        spec = importlib.util.spec_from_file_location("native_role_rehearsal", script)
+        module = importlib.util.module_from_spec(spec); spec.loader.exec_module(module)
+        result = module.logical_role_prerequisites(Path("/unused"), {}, additional_roles=("supabase_auth_admin", "postgres"))
+        self.assertIn('CREATE ROLE "supabase_auth_admin" NOLOGIN;', result)
+        self.assertNotIn('CREATE ROLE "postgres"', result)
+        with self.assertRaises(module.RehearsalError):
+            module.logical_role_prerequisites(Path("/unused"), {}, additional_roles=("unsafe;SQL",))
+
     def test_complete_bound_private_checkpoint(self):
         self.backup.verify_coordinated_checkpoint(self.root)
 
@@ -327,6 +338,57 @@ class BackupToolingTests(unittest.TestCase):
             result = self.run_script("restore_madar.sh", "--dry-run", backup, env=env)
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn("pg_restore", result.stdout)
+
+    def test_restore_preload_launches_no_scheduled_jobs(self):
+        with tempfile.TemporaryDirectory() as root:
+            backup = Path(root)
+            (backup/'database.dump').write_bytes(b'unit fixture')
+            (backup/'manifest.json').write_text('{"backup_id":"fixture","created_at":"fixture","database":{"schema_version":115}}')
+            calls=[]
+            def run(command, *, phase, **kwargs):
+                calls.append((command,phase,kwargs))
+                if phase == 'disabled_background_jobs': return 'f\n'
+                return ''
+            with mock.patch.object(rehearsal, 'run', side_effect=run), mock.patch.object(
+                    rehearsal.subprocess, 'run', return_value=SimpleNamespace(returncode=0)):
+                with self.assertRaisesRegex(rehearsal.RehearsalError, 'background_jobs_not_disabled'):
+                    rehearsal.rehearse(backup,'postgres@sha256:'+'a'*64,postgres_preload=('pg_cron','pg_net'))
+            startup=next(command for command,phase,_ in calls if phase=='database_start')
+            self.assertIn('cron.launch_active_jobs=off', startup[-1])
+            self.assertIn('pg_net.database_name=madar_restore_disabled', startup[-1])
+            self.assertNotIn('role_prerequisites',[phase for _,phase,_ in calls])
+
+    def test_restore_refuses_arbitrary_preload_code(self):
+        with self.assertRaisesRegex(rehearsal.RehearsalError, 'unsupported_restore_preload'):
+            rehearsal.rehearse(Path('/unneeded'), 'postgres@sha256:'+'a'*64, postgres_preload=('untrusted',))
+
+    def test_coordinated_logical_roles_are_nologin_and_never_replay_credentials(self):
+        with tempfile.TemporaryDirectory() as directory:
+            backup = Path(directory)
+            coordinated = backup / "coordinated"
+            coordinated.mkdir()
+            roles = coordinated / "1-roles.sql"
+            roles.write_text("CREATE ROLE postgres;\nCREATE ROLE anon;\nCREATE ROLE authenticated;\n"
+                             "CREATE ROLE service_role;\nCREATE ROLE supabase_auth_admin;\n"
+                             "ALTER ROLE supabase_auth_admin PASSWORD 'fixture-secret';\n")
+            import hashlib
+            packet = {"files": [{"path": "1-roles.sql", "size": roles.stat().st_size,
+                                  "sha256": hashlib.sha256(roles.read_bytes()).hexdigest()}]}
+            (coordinated / "manifest.json").write_text(json.dumps(packet))
+            sql = rehearsal.logical_role_prerequisites(backup, {"coordinated_checkpoint": "coordinated/manifest.json"})
+            self.assertIn('CREATE ROLE "supabase_auth_admin" NOLOGIN;', sql)
+            self.assertNotIn('CREATE ROLE "postgres"', sql)
+            self.assertNotIn('PASSWORD', sql)
+            self.assertNotIn('fixture-secret', sql)
+            roles.write_text(roles.read_text() + '-- changed\n')
+            with self.assertRaisesRegex(rehearsal.RehearsalError, 'inventory_changed'):
+                rehearsal.logical_role_prerequisites(backup, {"coordinated_checkpoint": "coordinated/manifest.json"})
+
+    def test_restore_failure_records_only_fixed_sanitized_category(self):
+        result = SimpleNamespace(returncode=1, stdout='', stderr='role "fixture-secret" does not exist\nCOPY private values')
+        with mock.patch.object(rehearsal.subprocess, 'run', return_value=result):
+            with self.assertRaisesRegex(rehearsal.RehearsalError, '^restore:exit_1:missing_role$'):
+                rehearsal.run(['fixture-command'], phase='restore')
 
     def test_rehearsal_attaches_stdin_only_for_stdin_driven_psql(self):
         with tempfile.TemporaryDirectory() as root:
