@@ -114,6 +114,31 @@ def load_saved_resumption_plan(root):
     return plan
 
 
+def sanitized_staging_failure(error):
+    """Useful stack locations without exception messages, locals or source lines."""
+    web=Path(__file__).resolve().parents[2]
+    frames=[];tb=error.__traceback__
+    while tb is not None:
+        code=tb.tb_frame.f_code
+        try:relative=Path(code.co_filename).resolve().relative_to(web).as_posix()
+        except ValueError:relative=None
+        if relative and relative.startswith(('deployment/','scripts/')) and re.fullmatch(r'[A-Za-z_][A-Za-z0-9_]{0,80}',code.co_name):
+            frames.append({'file':relative,'function':code.co_name,'line':tb.tb_lineno})
+        tb=tb.tb_next
+    allowed={'candidate-feasibility','candidate-images','retained-inputs','previous-candidate-retirement',
+        'retirement-identities','retirement-stop-frontend','retirement-stop-backend','retirement-stop-parser',
+        'post-retirement-identities','post-retirement-ports','candidate-network-create','candidate-parser-create',
+        'candidate-backend-create','candidate-backend-start','candidate-frontend-create',
+        'candidate-notification-create','candidate-calendar-sync-create','candidate-data-deletion-create'}
+    operation=getattr(error,'madar_staging_operation',None)
+    result={'operation':operation if type(operation) is str and operation in allowed else (frames[-1]['function'] if frames else 'staging'),
+        'phase':'detached_candidate_pending','exception_type':type(error).__name__,
+        'traceback':frames[-16:],'messages_redacted':True}
+    context=error.__context__
+    if isinstance(context,OSError) and type(context.errno) is int:result['os_errno']=context.errno
+    return result
+
+
 class ActiveRecoveryResumption:
     """Ordering protocol: read-only public handoff precedes protected mutations.
 
@@ -209,7 +234,7 @@ class ActiveRecoveryResumption:
                 self.ops.verify_active_rollback_inputs(self.plan)
                 self.ops.verify_emergency_installation(self.plan)
             except Exception as error:
-                self.event('detached_candidate_failed',exception_type=type(error).__name__)
+                self.event('detached_candidate_failed',exception_type=type(error).__name__,failure=sanitized_staging_failure(error))
                 raise
             self.event('detached_candidate_ready')
             # Safe compensation must exist before the first public publication.

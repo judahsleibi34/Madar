@@ -69,9 +69,13 @@ class ResolutionTests(unittest.TestCase):
         with patch('deployment.lib.active_recovery_candidate.resolve_candidate_destination',return_value={**destination,'subnet':'10.253.1.0/24'}):
             with self.assertRaisesRegex(RuntimeError,'plan_changed'):c.require_feasible()
     def test_shared_preflight_and_stage_recheck_use_same_feasibility_method(self):
-        import inspect
-        self.assertIn('value.require_feasible()',inspect.getsource(DetachedRecoveryCandidate.read_only_feasibility))
-        self.assertIn('self.require_feasible()',inspect.getsource(DetachedRecoveryCandidate.stage))
+        c=DetachedRecoveryCandidate.__new__(DetachedRecoveryCandidate)
+        c.require_authorization=lambda contract:None;c.contract=object()
+        with patch.object(DetachedRecoveryCandidate,'_configure'),patch.object(DetachedRecoveryCandidate,'require_feasible',side_effect=RuntimeError('feasibility_failed')) as check:
+            with self.assertRaisesRegex(RuntimeError,'feasibility_failed'):
+                DetachedRecoveryCandidate.read_only_feasibility(self.plan,c.contract,Path(self.tmp.name))
+            with self.assertRaisesRegex(RuntimeError,'feasibility_failed'):c.stage()
+            self.assertEqual(check.call_count,2)
     def test_host_port_busy_and_stopped_docker_reservation_are_both_checked(self):
         # Exercise the real helper, independent of resolver fixture mocks.
         with patch('deployment.lib.active_recovery_candidate.socket.socket') as socket:
