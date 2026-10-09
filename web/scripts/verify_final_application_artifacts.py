@@ -208,13 +208,16 @@ def application_cases(db,endpoints,native):
         factors=json.loads(psql(db,"SELECT jsonb_agg(jsonb_build_object('factor_id',f.id,'user_id',u.id,'secret',f.secret,'email',u.email,'verifier',u.encrypted_password)) FROM auth.mfa_factors f JOIN auth.users u ON u.id=f.user_id WHERE f.status='verified' AND f.factor_type='totp';"))
         require(len(factors)==2,'artifact_original_factors_changed')
         admin_headers={'apikey':native['SERVICE_ROLE_KEY'],'Authorization':'Bearer '+native['SERVICE_ROLE_KEY']}
-        admins=[]
+        admins=[];aal1_denials=[]
         for factor in factors:
             original_verifiers.append((factor['user_id'],factor['verifier']));password=secrets.token_urlsafe(32)
             code,_,_=fetch(endpoints['auth']+'/admin/users/'+factor['user_id'],headers=admin_headers,method='PUT',body={'password':password});require(code==200,'artifact_private_password_setup_failed')
             login=Session(endpoint(backend,8000));code,result,headers,_=login.request('/auth/login',{'email':factor['email'],'password':password})
             require(code==200 and result.get('mfa_required') is True and 'madar_access_token' not in login.cookies,'artifact_aal1_session_escaped')
-            require(login.request('/auth/user_status')[0] in {401,403},'artifact_aal1_privilege_not_denied')
+            status_code,status_body,_,_=login.request('/auth/user_status')
+            require(status_code==200 and status_body.get('logged_in') is False,'artifact_aal1_session_escaped')
+            denied_code=login.request('/admin/profile/info')[0]
+            require(denied_code in {401,403},'artifact_aal1_privilege_not_denied');aal1_denials.append(denied_code)
             pending=[x for x in headers if x.startswith('madar_mfa_pending=')]
             require(len(pending)==1 and all(x in pending[0] for x in ('HttpOnly','Secure','SameSite=lax','Path=/')),'artifact_pending_cookie_unsafe')
             challenge=login.ok('/auth/mfa/login/challenge',{'factor_id':factor['factor_id']})
@@ -227,7 +230,7 @@ def application_cases(db,endpoints,native):
             admins.append(login)
         observed('existing_authentication',existing_accounts=2,private_known_passwords_only=True,actual_image_source_files=verified_source['files'])
         observed('original_mfa_aal2',original_factors=2,backend_aal2_verified=True)
-        observed('aal1_privilege_denied',http_statuses=[401,403],ordinary_session_issued_before_mfa=False)
+        observed('aal1_privilege_denied',http_statuses=aal1_denials,user_status_logged_in=False,ordinary_session_issued_before_mfa=False)
         observed('session_cookie_policy',pending_http_only=True,secure=True,same_site='lax',path='/')
         mode('NORMAL');ready(lambda:workers(True))
         require(session.ok('/health/recovery')=={'restricted':False,'business_writes_enabled':True},'artifact_private_normal_failed')
@@ -241,10 +244,17 @@ def application_cases(db,endpoints,native):
         admin_id=psql(db,"SELECT id FROM public.users WHERE user_type='admin' ORDER BY id LIMIT 1;")
         for owner in owners:
             state=json.loads(psql(db,'SELECT public.resolve_commercial_access('+str(owner['tenant_id'])+');'))
-            request={'reason':'Owned private artifact fixture','expected_revision':state['revision'],'plan_id':'business_plus',
+            modern=psql(db,"SELECT EXISTS(SELECT 1 FROM public.commercial_price_books WHERE sales_start_at<=statement_timestamp() AND (sales_end_at IS NULL OR sales_end_at>statement_timestamp()));")=='t'
+            def commercial(operation,request):
+                command='SELECT public.apply_commercial_access_command('+str(owner['tenant_id'])+','+admin_id+",'aal2',"+quote(operation)+','+quote(str(uuid.uuid4()))+",'private-artifact-case',"+quote(json.dumps({'request':request,'quote':{}}))+'::jsonb);'
+                psql(db,command)
+            if modern:
+                commercial('assign_modules',{'reason':'Owned private artifact fixture','expected_revision':state['revision'],'module_ids':['forms','website','ecommerce'],'price_books':{}})
+                state=json.loads(psql(db,'SELECT public.resolve_commercial_access('+str(owner['tenant_id'])+');'))
+            request={'reason':'Owned private artifact fixture','expected_revision':state['revision'],
                 'valid_from':datetime.now(timezone.utc).isoformat(),'valid_until':(datetime.now(timezone.utc)+timedelta(days=1)).isoformat()}
-            command='SELECT public.apply_commercial_access_command('+str(owner['tenant_id'])+','+admin_id+",'aal2','complimentary',"+quote(str(uuid.uuid4()))+",'private-artifact-case',"+quote(json.dumps({'request':request,'quote':{}}))+'::jsonb);'
-            psql(db,command)
+            request.update({'module_ids':['forms','website','ecommerce']} if modern else {'plan_id':'business_plus'})
+            commercial('complimentary',request)
             password=secrets.token_urlsafe(32);original_verifiers.append((str(owner['auth_id']),owner['verifier']))
             code,_,_=fetch(endpoints['auth']+'/admin/users/'+str(owner['auth_id']),headers=admin_headers,method='PUT',body={'password':password});require(code==200,'artifact_owner_password_setup_failed')
             owner_login=Session(endpoint(backend,8000));owner_login.ok('/auth/login',{'email':owner['email'],'password':password});owner_sessions.append(owner_login)
