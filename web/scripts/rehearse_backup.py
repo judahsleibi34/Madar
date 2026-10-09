@@ -89,13 +89,15 @@ def file_inventory(root: Path) -> dict[str, str]:
     return files
 
 
-def logical_role_prerequisites(backup: Path, manifest: dict) -> str:
+def logical_role_prerequisites(backup: Path, manifest: dict, *, additional_roles: tuple[str, ...] = ()) -> str:
     """Restore role names only, NOLOGIN; never execute saved role/password SQL.
 
     Supabase RLS policies reference more roles than anon/authenticated/service_role.
     This does not prove role attributes, memberships or platform authorization.
     """
-    names = {"anon", "authenticated", "service_role"}
+    if any(not re.fullmatch(r"[a-zA-Z_][a-zA-Z0-9_]*", name) for name in additional_roles):
+        raise RehearsalError("logical_role_name_invalid")
+    names = {"anon", "authenticated", "service_role", *additional_roles}
     if manifest.get("coordinated_checkpoint"):
         if manifest["coordinated_checkpoint"] != "coordinated/manifest.json":
             raise RehearsalError("coordinated_manifest_path_invalid")
@@ -119,7 +121,7 @@ def logical_role_prerequisites(backup: Path, manifest: dict) -> str:
     return "".join(f'CREATE ROLE "{name}" NOLOGIN;\n' for name in sorted(names))
 
 
-def rehearse(backup: Path, image: str, migration: Path | None = None, *, target_schema: int | None = None, new_tables: tuple[str, ...] = (), postgres_preload: tuple[str, ...] = ()) -> dict:
+def rehearse(backup: Path, image: str, migration: Path | None = None, *, target_schema: int | None = None, new_tables: tuple[str, ...] = (), postgres_preload: tuple[str, ...] = (), additional_roles: tuple[str, ...] = ()) -> dict:
     if not re.fullmatch(r"[a-zA-Z0-9./:_-]+@sha256:[0-9a-f]{64}", image):
         raise RehearsalError("postgres_image_must_be_digest_pinned")
     if migration is not None and (type(target_schema) is not int or target_schema <= 0):
@@ -203,7 +205,7 @@ def rehearse(backup: Path, image: str, migration: Path | None = None, *, target_
         result["background_job_settings_verified"] = True
         # Logical dumps exclude cluster roles. NOLOGIN prerequisites only; this
         # rehearsal must never be mistaken for a live authorization bootstrap.
-        run(psql, phase="role_prerequisites", input=logical_role_prerequisites(backup, manifest))
+        run(psql, phase="role_prerequisites", input=logical_role_prerequisites(backup, manifest, additional_roles=additional_roles))
         restore_started = time.monotonic()
         run(["docker", "exec", name, "pg_restore", "--exit-on-error", "--single-transaction",
              "--no-owner", "--no-acl", "-h", "/tmp", "-U", "postgres", "-d", "postgres", "/backup.dump"], phase="full_database_restore")

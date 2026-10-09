@@ -1956,3 +1956,5 @@ Exact prior local LATEST bytes are archived before the marker points to this new
 verified local data. No historical backup directory or Node 1 LATEST is replaced,
 and capture retention cannot touch historical scopes. This connects the verified
 new backup to the unchanged configured timers without creating another checkpoint.
+
+The post-normal logical restore uses role names from the exact verified checkpoint as NOLOGIN prerequisites for native policy definitions. It does not execute role/password SQL or claim restored role authorization; the coordinated restore evidence retains that separate scope.

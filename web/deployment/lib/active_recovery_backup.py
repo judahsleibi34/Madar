@@ -11,6 +11,7 @@ import json
 import os
 from pathlib import Path
 import pwd
+import re
 import shlex
 import subprocess
 import tarfile
@@ -103,7 +104,19 @@ def capture_and_replicate(plan,root,package,source_guard,kernel):
     digests=row.get('RepoDigests',[])
     if not digests:raise RuntimeError('normal_backup_restore_image_digest_missing')
     from scripts.rehearse_backup import rehearse
-    restore=rehearse(backup,digests[0],postgres_preload=('pg_cron','pg_net'))
+    # The exact independently restored checkpoint supplies only role NAMES
+    # required by native policy definitions. NOLOGIN prerequisites do not
+    # restore historical credentials, owners, memberships or authorization.
+    from deployment.lib.active_recovery_execution import CHECKPOINT
+    checkpoint_manifest=json.loads(protected(CHECKPOINT/'manifest.json',private=True).read_text())
+    roles=protected(CHECKPOINT/'roles.sql',private=True)
+    entries=[row for row in checkpoint_manifest['files'] if row['path']=='roles.sql']
+    if len(entries)!=1 or file_digest(roles)!=entries[0]['sha256']:
+        raise RuntimeError('normal_backup_restore_role_inventory_changed')
+    role_names=tuple(sorted(set(re.findall(r'^CREATE ROLE ([a-zA-Z_][a-zA-Z0-9_]*);$',roles.read_text(),re.MULTILINE))))
+    if not {'anon','authenticated','service_role'}.issubset(role_names):
+        raise RuntimeError('normal_backup_restore_role_inventory_missing')
+    restore=rehearse(backup,digests[0],postgres_preload=('pg_cron','pg_net'),additional_roles=role_names)
     if restore.get('status')!='logical_database_and_file_restore_passed' or restore.get('backup_schema')!=115:
         raise RuntimeError('normal_backup_actual_restore_incomplete')
     sums=backup_support.digest(backup/'SHA256SUMS')

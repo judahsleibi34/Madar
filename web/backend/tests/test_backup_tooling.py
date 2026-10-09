@@ -60,6 +60,17 @@ class CoordinatedCheckpointTests(unittest.TestCase):
         entry = next(x for x in self.entries if x['purpose']=='independent_restore')
         entry.update(size=path.stat().st_size, sha256=self.backup.digest(path))
 
+    def test_logical_native_role_names_are_nologin_only(self):
+        import importlib.util
+        script = Path(__file__).resolve().parents[2] / "scripts" / "rehearse_backup.py"
+        spec = importlib.util.spec_from_file_location("native_role_rehearsal", script)
+        module = importlib.util.module_from_spec(spec); spec.loader.exec_module(module)
+        result = module.logical_role_prerequisites(Path("/unused"), {}, additional_roles=("supabase_auth_admin", "postgres"))
+        self.assertIn('CREATE ROLE "supabase_auth_admin" NOLOGIN;', result)
+        self.assertNotIn('CREATE ROLE "postgres"', result)
+        with self.assertRaises(module.RehearsalError):
+            module.logical_role_prerequisites(Path("/unused"), {}, additional_roles=("unsafe;SQL",))
+
     def test_complete_bound_private_checkpoint(self):
         self.backup.verify_coordinated_checkpoint(self.root)
 
