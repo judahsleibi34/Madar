@@ -254,3 +254,32 @@ class LocalTransitionTests(unittest.TestCase):
             self.tx.restart_worker(self.contract, self.metadata, "calendar-sync")
         with self.assertRaisesRegex(RuntimeError, "worker_kind"):
             self.tx.restart_worker(self.contract, self.metadata, "unknown")
+
+
+class WriteAuthorityPermissionsTests(unittest.TestCase):
+    @unittest.skipUnless(os.geteuid() == 0, "real protected ownership requires root")
+    def test_private_launcher_umask_keeps_authority_readable_and_fails_closed(self):
+        from deployment.lib import provider_local_transition_runtime as runtime
+        from types import SimpleNamespace
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            ops = runtime.ProductionLocalTransitionOperations.__new__(runtime.ProductionLocalTransitionOperations)
+            ops.require_phase = lambda *args: {"phase": "prepare_pending"}
+            contract = SimpleNamespace(sha="a" * 40)
+            previous = os.umask(0o077)
+            try:
+                with patch.object(runtime, "ROOT", root), patch.object(runtime, "asdict", return_value={"sha": contract.sha}):
+                    for _ in range(2):
+                        ops.set_write_authority(contract, "READ_ONLY")
+                        directory = root / "write-authority"
+                        self.assertEqual(directory.stat().st_mode & 0o777, 0o755)
+                        authority = directory / "authority.json"
+                        self.assertEqual(authority.stat().st_mode & 0o777, 0o444)
+                        self.assertEqual(json.loads(authority.read_text())["mode"], "READ_ONLY")
+                    directory.chmod(0o777)
+                    with self.assertRaisesRegex(RuntimeError, "write_directory_untrusted"):
+                        ops.set_write_authority(contract, "READ_ONLY")
+                    self.assertEqual(directory.stat().st_mode & 0o777, 0o777)
+                    directory.chmod(0o755)
+            finally:
+                os.umask(previous)
