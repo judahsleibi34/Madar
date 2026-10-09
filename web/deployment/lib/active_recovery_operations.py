@@ -68,6 +68,8 @@ class ProductionActiveRecoveryOperations:
             if any(timers.ops.systemctl_state(name)['active']!='inactive' for name in prior):
                 raise RuntimeError('retry_timer_not_quiesced')
         readonly_configuration(Path('/var/lib/madar/backup-state/latest.json'),private=False)
+        from deployment.lib.active_recovery_backup import verify_backup_execution_context
+        verify_backup_execution_context(self.package)
         if self.candidate is None:self.verify_candidate_feasibility(plan)
         if observe_retained_inputs() != plan.retained_inputs:
             raise RuntimeError('continuation_retained_inputs_changed')
@@ -239,6 +241,8 @@ class ProductionActiveRecoveryOperations:
         self.controller.ops.verify_installed_controller(plan.source_sha)
 
     def verify_final_write_grant_prerequisites(self, plan):
+        from deployment.lib.active_recovery_backup import verify_backup_execution_context
+        verify_backup_execution_context(self.package)
         self.require_exact_source_and_images(plan)
         self.verify_read_only_acceptance(plan)
         self.verify_single_owner_and_standbys(plan)

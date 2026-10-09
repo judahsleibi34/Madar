@@ -10,6 +10,7 @@ import argparse
 import ast
 from datetime import datetime, timezone
 import hashlib
+import fcntl
 import ipaddress
 import json
 import os
@@ -19,6 +20,7 @@ import shutil
 import stat
 import subprocess
 import tempfile
+import time
 import urllib.request
 from urllib.parse import quote, urlsplit
 
@@ -299,8 +301,62 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
         raise BackupError('provider_redirect_rejected')
 
 
+# A governed root caller can pass a sealed, anonymous, nonsecret address lease
+# to a child with NO supplementary groups. No Docker socket or IP environment
+# override is trusted. The fd survives bash and its Python provider subprocess.
+LOCAL_DATABASE_FD = 'MADAR_LOCAL_DATABASE_BINDING_FD'
+DATABASE_SEALS = fcntl.F_SEAL_WRITE | fcntl.F_SEAL_GROW | fcntl.F_SEAL_SHRINK | fcntl.F_SEAL_SEAL
+
+
+def sealed_local_database_binding() -> int:
+    if os.geteuid() != 0 or LOCAL_DATABASE_FD in os.environ:
+        raise BackupError('local_backup_binding_root_required')
+    address = direct_local_database_address()
+    fd = os.memfd_create('madar-native-backup-address', os.MFD_ALLOW_SEALING)
+    try:
+        # fd 9 belongs to backup_madar.sh's existing backup lock.
+        inherited = fcntl.fcntl(fd, fcntl.F_DUPFD_CLOEXEC, 64)
+        os.close(fd)
+        fd = inherited
+        os.fchmod(fd, 0o400)
+        payload = json.dumps({'version': 1, 'address': address,
+                              'expires': time.monotonic() + 7200}).encode()
+        os.write(fd, payload)
+        fcntl.fcntl(fd, fcntl.F_ADD_SEALS, DATABASE_SEALS)
+        return fd
+    except BaseException:
+        os.close(fd)
+        raise
+
+
+def leased_local_database_address() -> str:
+    try:
+        raw = os.environ[LOCAL_DATABASE_FD]
+        if not re.fullmatch(r'[0-9]{1,6}', raw):
+            raise ValueError('descriptor')
+        fd = int(raw)
+        metadata = os.fstat(fd)
+        if (fd < 64 or metadata.st_uid != 0 or not stat.S_ISREG(metadata.st_mode)
+                or stat.S_IMODE(metadata.st_mode) != 0o400 or metadata.st_size > 4096
+                or fcntl.fcntl(fd, fcntl.F_GET_SEALS) != DATABASE_SEALS):
+            raise ValueError('authority')
+        value = json.loads(os.pread(fd, 4096, 0))
+        remaining = value['expires'] - time.monotonic()
+        address = ipaddress.ip_address(value['address'])
+        if (set(value) != {'version', 'address', 'expires'} or value['version'] != 1
+                or not 0 < remaining <= 7200 or address.version != 4
+                or not address.is_private or address.is_loopback or address.is_link_local
+                or address.is_unspecified or address.is_multicast):
+            raise ValueError('lease')
+        return str(address)
+    except (OSError, ValueError, KeyError, TypeError):
+        raise BackupError('local_backup_binding_invalid') from None
+
+
 def direct_local_database_address() -> str:
     """Resolve only the healthy native DB; never persist a Docker bridge address."""
+    if LOCAL_DATABASE_FD in os.environ:
+        return leased_local_database_address()
     shape = ('{"running":{{json .State.Running}},"health":{{json .State.Health.Status}},'
              '"service":{{json (index .Config.Labels "com.docker.compose.service")}},'
              '"directory":{{json (index .Config.Labels "com.docker.compose.project.working_dir")}},'
