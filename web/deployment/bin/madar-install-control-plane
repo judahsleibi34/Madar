@@ -63,6 +63,7 @@ declare -a tracked_files=(
   lib/coordinated_storage_restore.py
   lib/emergency_routing_repair.py
   lib/checkpoint_execution_proof.py
+  lib/active_recovery_compensated.py
   lib/active_recovery_inputs.py
   lib/active_recovery_source.py
   lib/active_recovery_runtime.py

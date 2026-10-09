@@ -50,6 +50,23 @@ class ActiveRecoveryFallbackInstallation:
             '[Install]\nWantedBy=multi-user.target\n').encode()
     def install(self):
         self.guard();unit=UNITS/self.name
+        compensated=(getattr(self.plan,'candidate_destination',None) or {}).get('post_compensation')
+        if compensated:
+            from deployment.lib.active_recovery_compensated import verify_compensated_binding,inspect_history
+            verify_compensated_binding(compensated,staged_plan=self.plan)
+            previous,previous_root,records,_=inspect_history(compensated['baseline']['previous_plan_sha256'])
+            old=records['fallback-listener-installation.json'];old_unit=protected(UNITS/old['service'])
+            if file_digest(old_unit)!=old['unit_sha256'] or self.ops.systemctl_state(old['service'])!={'enabled':'enabled','active':'active'}:
+                raise RuntimeError('fallback_reuse_installed_identity_changed')
+            # A NEW measured reconciliation record, never an old authorization.
+            # Old source remains frozen and enforces stopped-consumer READ_ONLY
+            # current-data fallback; no source/image approval is transferred.
+            exclusive(self.root/'fallback-listener-installation.json',encoded({'version':1,'plan_sha256':self.plan.digest,
+                'source_bundle_sha256':self.plan.source_bundle_sha256,'service':old['service'],
+                'unit_sha256':old['unit_sha256'],'loopback_ports':FALLBACK_PORTS,
+                'historical_installation_modified':False,'reused_from_plan':previous.digest,
+                'reused_source_bundle_sha256':previous.source_bundle_sha256}))
+            return old['service']
         if unit.exists() or unit.is_symlink() or (self.root/'fallback-listener-installation.json').exists():
             raise FileExistsError('fallback_installation_namespace_used')
         for port in FALLBACK_PORTS.values():

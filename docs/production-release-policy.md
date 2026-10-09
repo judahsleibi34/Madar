@@ -2037,3 +2037,42 @@ failure cause. Future failures retain only sanitized operation/type/phase and
 source-relative traceback/errno in the protected append-only journal; messages,
 locals, command text and private data are excluded. Consumed approvals remain
 unusable and fresh deployment approval remains mandatory.
+
+### Post-NORMAL compensated continuation (state F)
+
+A published/installed NORMAL attempt later compensated to restricted recovery
+must not use the original pre-installation baseline. A fresh plan embeds the
+independently measured `post_compensation` contract inside its destination;
+older plan serialization and consumed authorization bytes remain unchanged.
+The read-only observer verifies the genuine exact-image acceptance, protected
+NORMAL observations and grant boundary, complete compensation chronology,
+revoked authority, unchanged transactions/native provider/fallback, all stopped
+consumers, frozen original installed source, complete installed tree, production
+checkout, proxy controls, retained resources and quiesced backup controls.
+Historical records are data and grant no new authority.
+
+The same state-bound resolver checks the opposite stopped slot's actual original
+container/image/specification identities and exclusive sockets before approval
+and staging under both locks. Only the recorded retained-writer restart-policy
+change may explain a historical specification difference; the new baseline pins
+all current bytes exactly. Obsolete hosted containers remain stopped evidence
+and are never a database or runtime rollback destination. Redis attachment is
+resolved from the verified installed continuation, not a slot-name assumption.
+
+The unchanged restricted listener may be reused only with independently measured
+frozen source/unit and live READ_ONLY behavior. A new reconciliation record names
+that exact resource and its historical source; it does not claim a new install.
+The consumed boot unit is retained but disabled in the freshly authorized
+operation. Only the measured `92-normal-local-continuation.conf` is atomically
+superseded after its exact preimage and replacement intent are durably archived;
+all other controls are preserved and effective dependencies are re-attested.
+Blind reinstall, additional conflicting Requires gates, consumed replay and
+old-data restoration remain prohibited. Controller supersession requires its
+complete exact preimage immediately before the governed installer.
+
+No state-F production execution is authorized by this source implementation.
+A faithful post-compensation lifecycle rehearsal, actual future-release restricted
+backup pipeline/private restore, final exact-image acceptance, mandatory CI and
+complete exact-source/plan operator approval remain prerequisites.
+
+NORMAL runtime acceptance must sustain at least three complete native/worker/authority/direct-readiness/public-request rounds over at least five seconds within one 180-second verification deadline. Availability transitions reset the streak; integrity failures immediately invoke governed compensation.

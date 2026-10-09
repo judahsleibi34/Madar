@@ -1047,3 +1047,27 @@ The plan/source hashes and append-only timestamp bind the diagnostic to the
 frozen executed source. Original receipts/journals are never rewritten, and a
 recorded failure remains consumed. Pre-publication failure preserves the working
 restricted route; post-publication failures retain existing compensation rules.
+
+### Compensated post-publication baseline
+
+`active_recovery_compensated.py` observes state F separately from the original
+prepublication observer. Original installed-source and emergency effective-unit
+gates remain unchanged. Fresh source-bound plans embed the measured baseline,
+including historical consumed execution as data, revoked NORMAL authority,
+current installed tree, startup/backup controls and exact retained runtimes.
+No historical receipt is rewritten or converted into new authority.
+
+The continuation rechecks actual stopped-slot ownership, immutable resource
+specifications, Redis/network identity and exclusive sockets under both locks.
+The previous restricted listener remains installed; the consumed boot actor
+requires explicit controlled supersession. The future installer preserves its
+unit, archives the exact 92 preimage and installation intent, publishes the new
+92 atomically, disables only the consumed boot actor and attests effective
+controls before routing. Failures retain their phase/type and sanitized stack
+locations in the protected journal; customer rows and configuration values are
+never diagnostics. All post-publication compensation preserves current local
+PostgreSQL and returns to verified restrictions or maintenance.
+
+The compensated continuation may permit append-only audit growth between preparation and execution. It proves the exact original audit prefix (count and complete row hash) unchanged at the bound timestamp, rejects backdated insertions/deletions/edits, and keeps all other 95 public table roots and security-critical identities exact. The original snapshot remains historical data; source fencing captures the actual latest snapshot. This exception grants no business-write permission.
+
+The state-F database binding also hashes Auth users/identities (excluding only last-sign-in and updated timestamps), complete original MFA factors, storage metadata/buckets, table ownership/ACL/RLS settings and policy expressions inside PostgreSQL. Only a SHA-256 root is emitted. Changes to credentials, factors, tenant records or authorization catalogs require a new baseline and plan.

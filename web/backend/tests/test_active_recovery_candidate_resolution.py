@@ -82,7 +82,8 @@ class ResolutionTests(unittest.TestCase):
             socket.return_value.__enter__.return_value.bind.side_effect=OSError(98,'in use')
             with self.assertRaisesRegex(RuntimeError,'8201_errno_98'):require_unreserved_ports(self.rt,(8201,3200))
         self.rt.command.side_effect=lambda argv:json.dumps([{'HostConfig':{'PortBindings':{'8000/tcp':[{'HostPort':'8201'}]}}}]) if argv[1]=='inspect' else 'id'
-        with self.assertRaisesRegex(RuntimeError,'already_reserved'):require_unreserved_ports(self.rt,(8201,3200))
+        with patch('deployment.lib.active_recovery_candidate.socket.socket'),self.assertRaisesRegex(RuntimeError,'already_reserved'):
+            require_unreserved_ports(self.rt,(8201,3200))
 
     def test_invalid_recovery_phase_cannot_allocate_even_with_new_file_hash(self):
         path=self.paths['local_transaction'];data=json.loads(path.read_text());data['phase']='normal';path.write_text(json.dumps(data));self.plan.retained_inputs['local_transaction']=file_digest(path)
@@ -103,7 +104,9 @@ class ResolutionTests(unittest.TestCase):
         row['HostConfig']['PortBindings']={'8000/tcp':[{'HostIp':'127.0.0.1','HostPort':'8201'}]}
         allowed={row['Name'][1:]:{'container_id':row['Id'],'image_id':row['Image'],'spec_sha256':spec(row)}}
         self.rt.command.side_effect=lambda argv:json.dumps([row]) if argv[1]=='inspect' else 'id'
-        require_unreserved_ports(self.rt,(8201,3200),allowed)
+        # Docker declarations are synthetic; do not probe occupied production ports.
+        with patch('deployment.lib.active_recovery_candidate.socket.socket'):
+            require_unreserved_ports(self.rt,(8201,3200),allowed)
         for change in ('running','restart','identity','image'):
             altered=copy.deepcopy(row)
             if change=='running':altered['State']['Running']=True
@@ -111,4 +114,4 @@ class ResolutionTests(unittest.TestCase):
             elif change=='identity':altered['Id']='different'
             else:altered['Image']='different'
             self.rt.command.side_effect=lambda argv:json.dumps([altered]) if argv[1]=='inspect' else 'id'
-            with self.subTest(change=change),self.assertRaisesRegex(RuntimeError,'already_reserved'):require_unreserved_ports(self.rt,(8201,3200),allowed)
+            with patch('deployment.lib.active_recovery_candidate.socket.socket'),self.subTest(change=change),self.assertRaisesRegex(RuntimeError,'already_reserved'):require_unreserved_ports(self.rt,(8201,3200),allowed)

@@ -59,14 +59,28 @@ class ResumptionPlan:
         if destination is not None:
             import ipaddress
             fields={'slot','backend_port','frontend_port','retained_slot','retained_source_sha','redis_name','redis_network','redis_network_id','subnet','retired_port_declarations'}
-            optional={'previous_candidate'} if 'previous_candidate' in destination else set()
+            optional={key for key in ('previous_candidate','post_compensation') if key in destination}
+            compensated=destination.get('post_compensation')
+            if compensated is not None:
+                if ('previous_candidate' in destination or not isinstance(compensated,dict)
+                        or set(compensated)!={'baseline','baseline_sha256'}
+                        or not HASH.fullmatch(str(compensated['baseline_sha256']))
+                        or not isinstance(compensated['baseline'],dict)
+                        or digest(compensated['baseline'])!=compensated['baseline_sha256']
+                        or compensated['baseline'].get('state')!='post_normal_compensated_recovery'
+                        or compensated['baseline'].get('schema')!=115
+                        or compensated['baseline'].get('restore_customer_database') is not False
+                        or compensated['baseline'].get('database_authority')!='current_local'
+                        or not HASH.fullmatch(str(compensated['baseline'].get('previous_plan_sha256')))):
+                    raise RuntimeError('resumption_compensated_binding_invalid')
             if (set(destination)!=fields|optional or destination['slot'] not in {'blue','green'}
                     or destination['retained_slot'] not in {'blue','green'} or destination['slot']==destination['retained_slot']
                     or (destination['backend_port'],destination['frontend_port'])!={'blue':(8101,3100),'green':(8201,3200)}[destination['slot']]
                     or not re.fullmatch('[0-9a-f]{40}',destination['retained_source_sha'])
                     or not HASH.fullmatch(destination['redis_network_id'])
                     or not re.fullmatch('madar-provider402-rehearsal-[0-9a-f]{12}-candidate-redis',destination['redis_name'])
-                    or destination['redis_network']!=destination['redis_name'][:-6]+'-'+destination['retained_slot']+'-runtime'
+                    or (not compensated and destination['redis_network']!=destination['redis_name'][:-6]+'-'+destination['retained_slot']+'-runtime')
+                    or (compensated and not re.fullmatch(re.escape(destination['redis_name'][:-6])+'-(blue|green)-runtime',destination['redis_network']))
                     or ipaddress.ip_network(destination['subnet']).prefixlen!=24
                     or not ipaddress.ip_network(destination['subnet']).subnet_of(ipaddress.ip_network('10.253.0.0/16'))):
                 raise RuntimeError('resumption_candidate_destination_invalid')
@@ -76,7 +90,7 @@ class ResumptionPlan:
                 raise RuntimeError('resumption_previous_candidate_invalid')
             if not isinstance(retired,dict) or len(retired)>(4 if previous else 2):raise RuntimeError('resumption_retired_declarations_invalid')
             for name,value in retired.items():
-                if (not (re.fullmatch('madar-'+destination['slot']+'-(backend|frontend)-legacy-[0-9a-f]{12}',name) or (previous and re.fullmatch('madar-normal-'+previous['plan_sha256'][:12]+'-(backend|frontend)',name)))
+                if (not (re.fullmatch('madar-'+destination['slot']+'-(backend|frontend)-legacy-[0-9a-f]{12}',name) or (compensated and re.fullmatch('madar-'+destination['slot']+'-(backend|frontend)',name)) or (previous and re.fullmatch('madar-normal-'+previous['plan_sha256'][:12]+'-(backend|frontend)',name)))
                         or set(value)!={'container_id','image_id','spec_sha256'}
                         or not HASH.fullmatch(value['container_id']) or not HASH.fullmatch(value['spec_sha256'])
                         or not re.fullmatch('sha256:[0-9a-f]{64}',value['image_id'])):
@@ -275,13 +289,16 @@ class ActiveRecoveryResumption:
                 self.event('normal')
                 self.ops.restore_configured_backup_timers(self.plan,self.root)
             except Exception as error:
-                self.compensate(type(error).__name__)
+                failure=sanitized_staging_failure(error)
+                failure['phase']=self.phase
+                failure['operation']=failure['traceback'][-1]['function'] if failure['traceback'] else 'continuation'
+                self.compensate(type(error).__name__,failure=failure)
                 raise
         return {'plan_sha256':self.plan.digest,'phase':self.phase}
 
-    def compensate(self, exception_type):
+    def compensate(self, exception_type, *, failure=None):
         # Failure to retain a report must not prevent compensation.
-        try:self.event('compensation_pending',exception_type=exception_type)
+        try:self.event('compensation_pending',exception_type=exception_type,**({'failure':failure} if failure is not None else {}))
         except OSError:pass
         try:
             self.ops.fence_normal_writes_and_stop_consumers(self.plan)
