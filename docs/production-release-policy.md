@@ -59,6 +59,14 @@ handoff uses direct native PostgreSQL (`supabase-db:5432`, role `postgres`), nev
 either pooler. Each scheduled job resolves the healthy, unpublished native DB's
 private IPv4 address from its fixed Docker service and canonical stack directory;
 the address is confined to the child libpq environment and is never persisted.
+The governed post-cutover backup child runs as `madar` with empty supplementary
+groups and no-new-privileges. Its root coordinator resolves the native DB and
+hands off only a root-owned, sealed anonymous address descriptor, bounded to the
+backup deadline. The child never receives Docker access. Provider subprocesses
+validate the same descriptor; untrusted descriptors and stale leases fail closed.
+A read-only database/credential/managed-file execution gate runs before staging
+and again before the final write grant. Nonsecret canonical path configuration
+retains its 0644 permissions; secret backup and provider credentials remain private.
 Wrong service identity, public bindings, unhealthy DB, ambiguous networks or
 non-private addressing fail closed. Existing hosted backup configuration remains
 unchanged until the exact-bound normal-local finalization publishes its pre-image

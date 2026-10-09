@@ -25,11 +25,77 @@ from deployment.lib.emergency_routing_repair import exclusive, encoded
 
 ENVIRONMENT={'PATH':'/usr/sbin:/usr/bin:/sbin:/bin','LANG':'C.UTF-8','LC_ALL':'C.UTF-8'}
 
-def checked(args, *, env=None, user=None, timeout=1800, stdin=None):
+def checked(args, *, env=None, user=None, timeout=1800, stdin=None, pass_fds=()):
+    if user is not None:args=['/usr/bin/setpriv','--no-new-privs',*args]
     result=subprocess.run(args,env=env or ENVIRONMENT,user=user,group=user,extra_groups=[] if user is not None else None,
-        stdin=stdin,capture_output=True,text=True,timeout=timeout)
-    if result.returncode:raise RuntimeError('normal_backup_command_failed')
+        stdin=stdin,capture_output=True,text=True,timeout=timeout,pass_fds=pass_fds)
+    if result.returncode:
+        # Never retain raw child output: it can contain private paths or values.
+        codes = {'local_backup_direct_database_unavailable', 'local_backup_binding_invalid',
+                 'local_backup_database_configuration_mismatch', 'backup_live_release_mismatch',
+                 'retention_minimum_two'}
+        code = next((line[7:] for line in result.stderr.splitlines()
+                     if line.startswith('ERROR: ') and line[7:] in codes), 'child_exit_nonzero')
+        raise RuntimeError('normal_backup_command_failed:' + code)
     return result.stdout
+
+def verify_backup_execution_context(package):
+    """Read-only gate with the exact uid/gid, empty groups and sealed DB lease.
+
+    Recovery's version endpoint deliberately differs from known-good normal
+    production; the scheduled release-match check remains mandatory at capture.
+    This gate tests direct libpq and every managed source before any write grant.
+    No dump, freshness publication, retention, service or customer write occurs.
+    """
+    from scripts import backup_support
+    identity = pwd.getpwnam('madar')
+    cfg = {}
+    load_environment_file(readonly_configuration(INPUTS['backup_configuration'], private=True), environ=cfg)
+    if any(key.startswith(('LD_', 'PYTHON', 'DOCKER_', 'GIT_')) or key in {
+            'PATH', 'HOME', 'BASH_ENV', 'ENV', 'SHELL', 'CREDENTIALS_DIRECTORY',
+            backup_support.LOCAL_DATABASE_FD} for key in cfg):
+        raise RuntimeError('normal_backup_environment_invalid')
+    env = {**ENVIRONMENT, **cfg, 'HOME':'/home/madar', 'PGCONNECT_TIMEOUT':'5'}
+    expected = {'PGHOST':'supabase-db', 'PGPORT':'5432', 'PGUSER':'postgres',
+                'PGDATABASE':'postgres', 'PGSSLMODE':'disable'}
+    if any(env.get(key) != value for key, value in expected.items()):
+        raise RuntimeError('normal_backup_database_configuration_mismatch')
+    descriptor = backup_support.sealed_local_database_binding()
+    try:
+        address = json.loads(os.pread(descriptor,4096,0))['address']
+        env['PGHOSTADDR'] = address
+        code = """import json,os,pathlib,subprocess
+if os.getgroups():raise RuntimeError('backup_supplementary_groups_present')
+if not pathlib.Path('/etc/madar/production.env').is_file():raise RuntimeError('backup_credential_missing')
+with open('/etc/madar/production.env','rb') as source:source.read()
+roots=[pathlib.Path(os.environ.get(key, '/var/lib/madar/storage/'+name)) for key,name in (
+ ('MADAR_BUILDER_ASSETS_DIR','uploads'),('MADAR_PRIVATE_UPLOADS_DIR','private_uploads'),
+ ('MADAR_GENERATED_ARTIFACTS_DIR','private_generated_charts'),('MADAR_AVATARS_DIR','avatar_uploads'))]
+def denied(error):raise RuntimeError('backup_managed_source_denied')
+for root in roots:
+ if root.is_symlink() or not root.is_dir():raise RuntimeError('backup_managed_source_missing')
+ for base,dirs,files in os.walk(root,onerror=denied):
+  for name in dirs+files:
+   path=pathlib.Path(base)/name
+   if path.is_symlink():raise RuntimeError('backup_managed_source_symlink')
+   if path.is_file():
+    with path.open('rb') as source:
+     while source.read(1024*1024):pass
+result=subprocess.run(['/usr/bin/psql','-X','-At','-v','ON_ERROR_STOP=1','-c',
+ "BEGIN READ ONLY; SELECT schema_version FROM public.application_schema_state WHERE contract_key='core'; COMMIT;"],
+ capture_output=True,text=True,timeout=15)
+if result.returncode or '115' not in result.stdout.splitlines():raise RuntimeError('backup_direct_postgresql_unavailable')
+print(json.dumps({'uid':os.getuid(),'gid':os.getgid(),'supplementary_groups':os.getgroups(),
+ 'schema':115,'database_read_only':True,'managed_sources_readable':True,'credential_readable':True}))
+"""
+        result = json.loads(checked(['/usr/bin/python3','-I','-B','-c',code], env=env,
+                                    user=identity.pw_uid, timeout=120))
+    finally:
+        os.close(descriptor)
+    if backup_support.direct_local_database_address() != address:
+        raise RuntimeError('normal_backup_database_address_changed')
+    return result
+
 
 def remote_receiver(package,plan,backup,sums,filesystem_uuid):
     # Freeze only reviewed non-secret code at a NEW append-only Node 1 path.
@@ -65,6 +131,7 @@ runpy.run_path(sys.argv[0],run_name='__main__')
         '-o','ControlPath=none','-o','ConnectTimeout=10','madar-node1-lan',shlex.join(args)]
 
 def capture_and_replicate(plan,root,package,source_guard,kernel):
+    from scripts import backup_support
     source_guard();kernel.normal()
     acceptance=verify_artifact_acceptance(plan)
     replica=acceptance['node1_replica']
@@ -78,20 +145,31 @@ def capture_and_replicate(plan,root,package,source_guard,kernel):
     if not scope.parent.is_dir() or scope.parent.is_symlink():raise RuntimeError('normal_backup_parent_missing')
     scope.mkdir(mode=0o700);os.chown(scope,identity.pw_uid,identity.pw_gid)
     cfg={};load_environment_file(readonly_configuration(INPUTS['backup_configuration'],private=True),environ=cfg)
-    paths={};load_environment_file(protected(Path('/opt/madar/control-plane/deployment/production-paths.conf')),environ=paths)
+    paths={};load_environment_file(protected(Path('/opt/madar/control-plane/deployment/production-paths.conf')),environ=paths,require_private=False)
     # Configuration data cannot select a shell/interpreter/loader or credentials.
-    if any(key.startswith(('LD_','PYTHON','DOCKER_','GIT_')) or key in {'PATH','HOME','BASH_ENV','ENV','SHELL','CREDENTIALS_DIRECTORY'} for key in cfg):
+    if any(key.startswith(('LD_','PYTHON','DOCKER_','GIT_')) or key in {'PATH','HOME','BASH_ENV','ENV','SHELL','CREDENTIALS_DIRECTORY',backup_support.LOCAL_DATABASE_FD} for key in cfg):
         raise RuntimeError('normal_backup_environment_invalid')
     env={**ENVIRONMENT,**cfg,**paths,'HOME':'/home/madar','CREDENTIALS_DIRECTORY':'/etc/madar',
         'MADAR_BACKUP_DIR':str(scope),'MADAR_BACKUP_FRESHNESS_MARKER':'','MADAR_BACKUP_STATE_DIR':'',
-        'MADAR_BACKUP_KEEP_COUNT':'1','MADAR_PROVIDER_BACKUP_REQUIRED':'true'}
+        'MADAR_BACKUP_KEEP_COUNT':'2','MADAR_PROVIDER_BACKUP_REQUIRED':'true',
+        'PGOPTIONS':'-c default_transaction_read_only=on'}
     for name in ('backup_support.py','backup_madar.sh','verify_backup.sh'):
         actual=Path('/usr/local/lib/madar')/name
         expected=package/'source/web/scripts'/name
         if file_digest(protected(actual))!=file_digest(protected(expected,private=True)):
             raise RuntimeError('normal_backup_installed_helper_changed')
-    checked(['/usr/bin/python3','-I','-B','/usr/local/lib/madar/backup_support.py','scheduled',
-        '/usr/local/lib/madar/backup_madar.sh'],env=env,user=identity.pw_uid)
+    descriptor = backup_support.sealed_local_database_binding()
+    try:
+        address = json.loads(os.pread(descriptor,4096,0))['address']
+        env[backup_support.LOCAL_DATABASE_FD] = str(descriptor)
+        checked(['/usr/bin/python3','-I','-B','/usr/local/lib/madar/backup_support.py','scheduled',
+            '/usr/local/lib/madar/backup_madar.sh'],env=env,user=identity.pw_uid,pass_fds=(descriptor,))
+    finally:
+        os.close(descriptor)
+    # A restart/address change during capture invalidates the lease and backup.
+    if backup_support.direct_local_database_address() != address:
+        raise RuntimeError('normal_backup_database_address_changed')
+
     backups=list(scope.glob('madar-*'))
     if len(backups)!=1 or not backups[0].is_dir():raise RuntimeError('normal_backup_output_invalid')
     backup=backups[0]
