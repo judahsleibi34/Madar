@@ -169,3 +169,44 @@ class CompensationPublicationTests(unittest.TestCase):
         with patch('deployment.lib.active_recovery_fallback.Relay') as listener:
             with self.assertRaisesRegex(RuntimeError,'source_guard_required'):restricted_listeners(self.verifier,None)
             listener.assert_not_called()
+
+class BackupPreparationReadinessTests(FreshFallbackRuntimeTests):
+    """Preparation is observation only; forwarding remains fully ready-gated."""
+    def setUp(self):
+        super().setUp()
+        self.ready={'ready':False,'components':{k:'ok' for k in ('database','auth','schema','storage','redis','environment','admin_mfa_policy','parser_isolation')}}
+        self.ready['components'].update(backup_freshness='stale',notification_worker='disabled')
+        self.r.fetch=lambda url:(503,json.dumps(self.ready).encode())
+        original=self.r.json_http
+        def strict(url):
+            if url.endswith('/health/ready'):
+                from deployment.lib.emergency_routing_repair import AvailabilityFailure
+                raise AvailabilityFailure('http_temporarily_unavailable')
+            return original(url)
+        self.r.json_http=strict
+    def test_resolves_actual_role_addresses(self):
+        result=self.f.verify(backup_preparation=True)
+        self.assertEqual(result['backend'][1],8000);self.assertEqual(result['frontend'][1],8080)
+        self.r.rows['registered-backend']['NetworkSettings']['Networks']['internal']['IPAddress']='10.0.0.88'
+        self.assertEqual(self.f.verify(backup_preparation=True)['backend'][0],'10.0.0.88')
+    def test_stale_only_preparation_cannot_pass_normal_forwarding(self):
+        from deployment.lib.emergency_routing_repair import AvailabilityFailure
+        self.f.verify(backup_preparation=True)
+        with self.assertRaises(AvailabilityFailure):self.f.verify()
+    def test_unhealthy_security_or_native_component_is_never_a_backup_exception(self):
+        for key in ('database','auth','schema','storage','redis','environment','admin_mfa_policy','parser_isolation'):
+            self.ready['components'][key]='failed'
+            with self.subTest(key=key),self.assertRaisesRegex(RuntimeError,'readiness_failed'):self.f.verify(backup_preparation=True)
+            self.ready['components'][key]='ok'
+    def test_preparation_never_accepts_an_active_consumer_or_positive_grant(self):
+        name=next(n for n in self.r.rows if n.startswith('madar-'))
+        self.r.rows[name]['State']['Running']=True
+        with self.assertRaisesRegex(RuntimeError,'consumer_not_stopped'):self.f.verify(backup_preparation=True)
+        self.r.rows[name]['State']['Running']=False
+        self.authority['mode']='NORMAL';self.save()
+        with self.assertRaisesRegex(RuntimeError,'not_fenced'):self.f.verify(backup_preparation=True)
+    def test_unknown_degraded_reason_or_http_failure_is_not_suppressed(self):
+        self.ready['components']['unknown']='stale'
+        with self.assertRaisesRegex(RuntimeError,'readiness_failed'):self.f.verify(backup_preparation=True)
+        self.r.fetch=lambda url:(500,json.dumps(self.ready).encode())
+        with self.assertRaisesRegex(RuntimeError,'readiness_failed'):self.f.verify(backup_preparation=True)

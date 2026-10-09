@@ -83,9 +83,13 @@ class ReconciliationScopeTests(unittest.TestCase):
             'snapshot':packet,'snapshot_sha256':digest(packet)}
         plan=SimpleNamespace(source_sha='c'*40,candidate_destination={'post_compensation':{'baseline_sha256':'d'*64}},
             retained_inputs=inputs,reconciliation_execution_sha256='e'*64)
-        with patch('deployment.lib.active_recovery_execution.actual_inline_execution',return_value=(report,{})) as actual:
+        from deployment.lib import active_recovery_execution as module
+        namespace=PREPARATION/('local-post-compensation-reconciliation-'+'c'*40)
+        path=namespace/'run-123456abcdef'/'actual-execution.json'
+        index=unittest.mock.Mock();index.read_text.return_value=json.dumps({'execution':str(path)})
+        with patch.object(module,'protected',return_value=index),patch.object(module,'actual_inline_execution',return_value=(report,{})) as actual:
             self.assertEqual(verify_local_reconciliation_execution(plan)['tables'],1)
-            self.assertEqual(actual.call_args.args[0],PREPARATION/('local-post-compensation-reconciliation-'+'c'*40)/'actual-execution.json')
+            self.assertEqual(actual.call_args.args[0],path)
             report['retained_inputs']={'historical':'b'*64}
             with self.assertRaisesRegex(RuntimeError,'scope_invalid'):verify_local_reconciliation_execution(plan)
     def test_original_recovery_record_path_remains_unchanged(self):
@@ -100,3 +104,12 @@ class ReconciliationScopeTests(unittest.TestCase):
         from deployment.lib.active_recovery_execution import verify_local_reconciliation_execution
         plan=SimpleNamespace(source_sha='../foreign',candidate_destination={'post_compensation':{'fixture':True}})
         with self.assertRaisesRegex(RuntimeError,'source_invalid'):verify_local_reconciliation_execution(plan)
+
+    def test_compensated_index_cannot_transfer_foreign_execution(self):
+        from types import SimpleNamespace
+        from deployment.lib import active_recovery_execution as module
+        plan=SimpleNamespace(source_sha='c'*40,candidate_destination={'post_compensation':{'fixture':True}},reconciliation_execution_sha256='e'*64)
+        index=unittest.mock.Mock();index.read_text.return_value=json.dumps({'execution':'/foreign/run-123456abcdef/actual-execution.json'})
+        with patch.object(module,'protected',return_value=index),patch.object(module,'actual_inline_execution') as actual:
+            with self.assertRaisesRegex(RuntimeError,'record_path_invalid'):module.verify_local_reconciliation_execution(plan)
+            actual.assert_not_called()

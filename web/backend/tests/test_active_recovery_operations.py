@@ -126,3 +126,25 @@ class SustainedNormalTests(unittest.TestCase):
         with patch('deployment.lib.active_recovery_operations.verification_window'), \
              self.assertRaises(VerificationDeadline):self.ops.sustained_normal_rounds(check)
         check.assert_not_called()
+
+class BackupFirstMarkerPreservationTests(unittest.TestCase):
+    def test_staging_keeps_verified_fresh_marker_and_archives_exact_bytes(self):
+        from deployment.lib import active_recovery_operations as module
+        from types import SimpleNamespace
+        with tempfile.TemporaryDirectory() as directory:
+            base=Path(directory);marker=base/'latest.json';marker.write_text('{"fixture_fresh":true}');before=marker.read_bytes()
+            root=base/'attempt';root.mkdir()
+            ops=object.__new__(module.ProductionActiveRecoveryOperations);ops.source=SimpleNamespace(verify=lambda:None)
+            ops.package=base/'package';ops.runtime=object()
+            plan=SimpleNamespace(candidate_destination={'post_compensation':{'pre_grant_backup':{'fixture':True}}})
+            real_path=Path
+            def mapped(value):return marker if value=='/var/lib/madar/backup-state/latest.json' else real_path(value)
+            with (patch.object(module,'Path',side_effect=mapped),patch.object(module,'ActiveRecoveryBackupTimers') as timers,
+                 patch.object(module,'readonly_configuration',side_effect=lambda p,**kw:p),
+                 patch.object(module,'coordinated_health_marker') as historical,
+                 patch('deployment.lib.active_recovery_backup_freshness.require_publication') as verified):
+                ops.quiesce_backup_timers_before_staging(plan,root)
+                verified.assert_called_once_with(plan,ops.package,ops.runtime);historical.assert_not_called()
+                timers.return_value.quiesce.assert_called_once()
+            self.assertEqual(marker.read_bytes(),before)
+            self.assertEqual((root/'backup-health-preimage.json').read_bytes(),before)

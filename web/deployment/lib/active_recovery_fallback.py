@@ -42,7 +42,7 @@ class CurrentDataFallback:
             authority.get('release_sha')==self.plan.source_sha and candidate.get('plan_sha256')==self.plan.digest and
             candidate.get('source_sha')==self.plan.source_sha,'fallback_normal_authority_not_fenced')
 
-    def verify_registered_runtime(self):
+    def verify_registered_runtime(self, *, backup_preparation=False):
         # Observation only: does not authorize forwarding, publication or writes.
         for key in UNCHANGED:
             reader=readonly_configuration if key in {'recovery_transaction','fallback','native_configuration','native_compose','native_override','gateway_bootstrap','gateway_cds','gateway_lds'} else protected
@@ -79,9 +79,17 @@ class CurrentDataFallback:
         require(endpoints['backend'][0]!=endpoints['frontend'][0],'fallback_role_collision')
         self.runtime.schema()
         backend='http://%s:%d'%endpoints['backend']
-        ready=self.runtime.json_http(backend+'/health/ready');version=self.runtime.json_http(backend+'/health/version')
-        require(ready.get('ready') is True and all(ready.get('components',{}).get(k)=='ok' for k in ('database','auth','schema','storage')),
-            'fallback_readiness_failed')
+        if backup_preparation:
+            status,body=self.runtime.fetch(backend+'/health/ready');ready=json.loads(body)
+            require(status in (200,503),'fallback_readiness_failed')
+        else:ready=self.runtime.json_http(backend+'/health/ready')
+        core_keys=('database','auth','schema','storage','redis','environment','admin_mfa_policy','parser_isolation') if backup_preparation else ('database','auth','schema','storage')
+        core=all(ready.get('components',{}).get(k)=='ok' for k in core_keys)
+        stale_only=(backup_preparation and ready.get('ready') is False and ready.get('components',{}).get('backup_freshness')=='stale'
+            and all(value in ('ok','disabled','stale') for value in ready.get('components',{}).values())
+            and [key for key,value in ready.get('components',{}).items() if value=='stale']==['backup_freshness'])
+        require(core and (ready.get('ready') is True or stale_only),'fallback_readiness_failed')
+        version=self.runtime.json_http(backend+'/health/version')
         source=initial['backend']['Config'].get('Labels',{}).get('org.opencontainers.image.revision')
         require(version.get('release_sha')==source and version.get('release_slot')=='local-fallback' and
             version.get('schema_compatible_min')==version.get('schema_compatible_max')==115,'fallback_version_invalid')
@@ -94,7 +102,7 @@ class CurrentDataFallback:
                 current['NetworkSettings']['Networks']==row['NetworkSettings']['Networks'],'fallback_changed_during_verification')
         return endpoints
 
-    def verify(self):
+    def verify(self, *, backup_preparation=False):
         self.require_compensation_authority()
         dependencies=json.loads(protected(self.root/'runtime-dependencies.json',private=True).read_text())
         require(digest(dependencies)==self.plan.retained_inputs['runtime_dependencies'],'fallback_dependency_record_changed')
@@ -107,7 +115,7 @@ class CurrentDataFallback:
         old_ids=[dependencies['runtimes'][name]['container_id'] for name in expected_consumers]
         for row in self.runtime.inspect([*consumers,*old_ids]).values():
             require(row['State']['Running'] is False and row['HostConfig']['RestartPolicy']['Name']=='no','fallback_consumer_not_stopped')
-        endpoints=self.verify_registered_runtime()
+        endpoints=self.verify_registered_runtime(backup_preparation=backup_preparation)
         self.require_compensation_authority()
         return endpoints
 

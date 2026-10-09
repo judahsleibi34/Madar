@@ -131,7 +131,7 @@ def measured_controller(plan, records):
             'installation_receipt_sha256': digest(records['installed-controller.json'])}
 
 
-def measured_startup(plan, records, runtime):
+def measured_startup(plan, records, runtime, *, backup_preparation=False):
     """Bind ALL current proxy controls and retained continuation boot resources."""
     units = Path('/etc/systemd/system')
     proxy = units / 'madar-release-proxy.service'
@@ -182,10 +182,10 @@ def measured_startup(plan, records, runtime):
             for port in listener['loopback_ports'].values():
                 if not any(re.search(r'127\.0\.0\.1:'+str(port)+r'\s',line) and 'pid='+pid+',' in line for line in sockets):
                     raise RuntimeError('compensated_listener_owner_changed')
-            runtime.denied('http://127.0.0.1:29501')
-            if runtime.json_http('http://127.0.0.1:29501/health/recovery')!={'restricted':True,'business_writes_enabled':False}:
+            if not backup_preparation:runtime.denied('http://127.0.0.1:29501')
+            if not backup_preparation and runtime.json_http('http://127.0.0.1:29501/health/recovery')!={'restricted':True,'business_writes_enabled':False}:
                 raise RuntimeError('compensated_listener_not_readonly')
-            runtime.http_status('http://127.0.0.1:39501/')
+            if not backup_preparation:runtime.http_status('http://127.0.0.1:39501/')
             process={'pid':int(pid),'command_sha256':digest([arg.decode() for arg in command]),'no_new_privileges':True}
         states[name] = {'active': expected_active, 'enabled': 'enabled', 'effective_sha256': digest(fields),'process':process}
     effective = runtime.command(['systemctl', 'show', 'madar-release-proxy.service',
@@ -197,7 +197,7 @@ def measured_startup(plan, records, runtime):
     return {'files': files, 'services': states, 'proxy_effective_sha256': digest(fields)}
 
 
-def observe_compensated_state(plan_sha256, runtime=None):
+def observe_compensated_state(plan_sha256, runtime=None, *, backup_preparation=False):
     """No mutation, old authorization consumed; all current safety gates enforced."""
     from deployment.lib.emergency_routing_repair import Runtime, legacy_installation, spec
     from deployment.lib.active_recovery_inputs import INPUTS, PRIVATE_CONFIGURATION, observe_runtime_dependencies
@@ -206,11 +206,11 @@ def observe_compensated_state(plan_sha256, runtime=None):
     runtime = runtime or Runtime()
     plan, root, records, history = inspect_history(plan_sha256)
     fallback = CurrentDataFallback(plan, root, runtime=runtime)
-    fallback.verify()  # Actual revoked grant, ALL stopped consumers, native and role checks.
+    fallback.verify(backup_preparation=backup_preparation)  # Actual revoked grant, ALL stopped consumers, native and role checks.
     if readonly_configuration(INPUTS['upstream'], private=False).read_bytes() != FALLBACK_ROUTE:
         raise RuntimeError('compensated_registered_route_changed')
     installed = measured_controller(plan, records)
-    startup = measured_startup(plan, records, runtime)
+    startup = measured_startup(plan, records, runtime,backup_preparation=backup_preparation)
     # Verify original emergency installation bytes as retained evidence. Its live
     # effective proxy controls are verified by measured_startup, not the A gate.
     emergency = legacy_installation(runtime, live=False)
@@ -271,18 +271,22 @@ def observe_compensated_state(plan_sha256, runtime=None):
     image=re.search(rb'image:\s*nginx:alpine@(sha256:[0-9a-f]{64})',compose)
     if (image is None or proxy.get('Image')!=image[1].decode()
             or proxy.get('State',{}).get('Running') is not True
-            or proxy.get('State',{}).get('Health',{}).get('Status')!='healthy'
+            or (not backup_preparation and proxy.get('State',{}).get('Health',{}).get('Status')!='healthy')
             or proxy.get('HostConfig',{}).get('NetworkMode')!='host'):
         raise RuntimeError('compensated_serving_proxy_not_verified')
     fallback_backend=next(r for r in rows.values() if r['Id']==plan.fallback['backend']['container_id'])
-    runtime.verify_public({'source_sha':fallback_backend['Config']['Labels']['org.opencontainers.image.revision']})
+    if not backup_preparation:runtime.verify_public({'source_sha':fallback_backend['Config']['Labels']['org.opencontainers.image.revision']})
+    else:
+        for url in ('https://madarportal.com/','https://api.madarportal.com/'):
+            status,_=runtime.fetch(url)
+            if status not in (200,503):raise RuntimeError('compensated_backup_preparation_public_status_invalid')
     resources = {name: {'container_id': row['Id'], 'image_id': row['Image'], 'spec_sha256': spec(row),
         'running': row['State']['Running'], 'status': row['State']['Status'],
         'restart': row['HostConfig']['RestartPolicy']['Name'],
         'networks': {k: v['NetworkID'] for k, v in row['NetworkSettings']['Networks'].items()}}
         for name, row in rows.items()}
     from deployment.lib.active_recovery_reconciliation import CurrentLocalReconciliation
-    reconciliation=CurrentLocalReconciliation(plan,root,runtime,lambda:None,fallback.verify_registered_runtime)
+    reconciliation=CurrentLocalReconciliation(plan,root,runtime,lambda:None,lambda:fallback.verify_registered_runtime(backup_preparation=backup_preparation))
     snapshot,snapshot_hash=reconciliation.snapshot()
     if len(snapshot['table_roots'])!=96:raise RuntimeError('compensated_public_table_inventory_changed')
     # Customer credentials remain inside PostgreSQL. Hash complete Auth,
@@ -321,13 +325,24 @@ def observe_compensated_state(plan_sha256, runtime=None):
         'database_metadata':metadata[0], 'public_tables':96, 'schema': 115, 'restore_customer_database': False}
 
 
-def verify_compensated_binding(binding, runtime=None, *, staged_plan=None):
-    if not isinstance(binding, dict) or set(binding) != {'baseline', 'baseline_sha256'}:
+def verify_compensated_binding(binding, runtime=None, *, staged_plan=None, recovery_backup=None):
+    if not isinstance(binding, dict) or set(binding) not in ({'baseline','baseline_sha256'},{'baseline','baseline_sha256','pre_grant_backup'}):
         raise RuntimeError('compensated_binding_invalid')
     baseline = binding['baseline']
     if not isinstance(baseline, dict) or digest(baseline) != binding['baseline_sha256']:
         raise RuntimeError('compensated_baseline_hash_changed')
-    observed = observe_compensated_state(baseline.get('previous_plan_sha256'), runtime)
+    observed = observe_compensated_state(baseline.get('previous_plan_sha256'),runtime,backup_preparation='pre_grant_backup' in binding)
+    if recovery_backup is not None:
+        plan,resource=recovery_backup
+        name='madar-recovery-backup-'+plan.digest[:12]
+        if (plan.candidate_destination.get('post_compensation')!=binding or 'pre_grant_backup' not in binding
+                or not HASH.fullmatch(str(plan.digest)) or staged_plan is not None
+                or resource.get('image_id')!=baseline['resources']['madar-green-frontend']['image_id']
+                or resource.get('running') is not True or resource.get('status')!='running' or resource.get('restart')!='no'
+                or set(observed['resources'])-set(baseline['resources'])!={name}
+                or observed['resources'].get(name)!=resource):
+            raise RuntimeError('compensated_recovery_backup_resource_changed')
+        observed=dict(observed,resources={k:v for k,v in observed['resources'].items() if k!=name})
     if staged_plan is not None:
         extra=set(observed['resources'])-set(baseline['resources'])
         prefix='madar-normal-'+staged_plan.digest[:12]
@@ -345,7 +360,7 @@ def verify_compensated_binding(binding, runtime=None, *, staged_plan=None):
             raise RuntimeError('compensated_new_resource_identity_changed')
         observed=dict(observed,resources={k:v for k,v in observed['resources'].items() if k not in extra})
     if baseline.get('audit_append_only_permitted') is True:
-        observed=verify_audit_extension(baseline,observed,runtime)
+        observed=verify_audit_extension(baseline,observed,runtime,backup_preparation="pre_grant_backup" in binding)
     if observed != baseline:
         raise RuntimeError('compensated_current_state_changed')
     return observed
@@ -445,7 +460,7 @@ def lifecycle_state(records):
     raise RuntimeError('compensated_lifecycle_not_classifiable')
 
 
-def verify_audit_extension(baseline,observed,runtime=None):
+def verify_audit_extension(baseline,observed,runtime=None, *, backup_preparation=False):
     """Permit only new audit rows, after proving every bound old row unchanged.
 
     Preparation snapshot metadata remains immutable historical DATA. Later
@@ -471,7 +486,7 @@ def verify_audit_extension(baseline,observed,runtime=None):
         raise RuntimeError('compensated_audit_cutoff_invalid')
     previous,root,_,_=inspect_history(baseline['previous_plan_sha256'])
     runtime=runtime or Runtime();fallback=CurrentDataFallback(previous,root,runtime=runtime)
-    reconciliation=CurrentLocalReconciliation(previous,root,runtime,lambda:None,fallback.verify_registered_runtime)
+    reconciliation=CurrentLocalReconciliation(previous,root,runtime,lambda:None,lambda:fallback.verify_registered_runtime(backup_preparation=backup_preparation))
     sql="SELECT json_build_object('table','audit_logs','count',count(*),'sha256',encode(sha256(convert_to(coalesce(string_agg(row_sha,'' ORDER BY row_sha COLLATE \"C\"),''),'UTF8')),'hex'))::text FROM (SELECT encode(sha256(convert_to(to_jsonb(t)::text,'UTF8')),'hex') AS row_sha FROM public.audit_logs t WHERE created_at <= '"+cutoff+"'::timestamptz) rows;"
     prefix=reconciliation.query(sql)
     if prefix!=[expected['audit_logs']]:raise RuntimeError('compensated_preexisting_audit_data_changed')

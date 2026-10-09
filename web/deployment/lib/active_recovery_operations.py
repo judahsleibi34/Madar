@@ -40,6 +40,7 @@ class ProductionActiveRecoveryOperations:
         self.source = FrozenContinuationSource(plan, self.package)
         self.runtime = Runtime()
         self.runtime.expected_nginx_sha256 = plan.retained_inputs['proxy_configuration']
+        self.backup_preparation=False
         self.candidate = self.workers = self.kernel = self.handoff = self.controller = None
 
     def compensated_binding(self):
@@ -74,6 +75,8 @@ class ProductionActiveRecoveryOperations:
 
     def verify_active_rollback_inputs(self, plan):
         self.verify_frozen_source(plan)
+        from deployment.lib.active_recovery_backup_freshness import declaration,require_publication
+        if declaration(plan) and not self.backup_preparation:require_publication(plan,self.package,self.runtime)
         from deployment.lib.active_recovery_controller import prior_backup_timer_states
         prior=prior_backup_timer_states(plan)
         if prior is not None:
@@ -108,7 +111,7 @@ class ProductionActiveRecoveryOperations:
             from deployment.lib.active_recovery_fallback import CurrentDataFallback
             previous,previous_root,_,_=inspect_history(self.compensated_binding()['baseline']['previous_plan_sha256'])
             if previous.fallback!=plan.fallback:raise RuntimeError('continuation_fallback_changed')
-            return CurrentDataFallback(previous,previous_root,runtime=self.runtime).verify_registered_runtime()
+            return CurrentDataFallback(previous,previous_root,runtime=self.runtime).verify_registered_runtime(backup_preparation=self.backup_preparation)
         if self.candidate is None or not (self.root/'installed-controller.json').exists():
             packet, _ = verify(self.runtime)
             _, _, names, _ = identities(self.runtime.input_bytes())
@@ -161,6 +164,12 @@ class ProductionActiveRecoveryOperations:
         ActiveRecoveryBackupTimers(plan,root,self.source.verify).quiesce()
         marker = Path('/var/lib/madar/backup-state/latest.json')
         exclusive(root/'backup-health-preimage.json',readonly_configuration(marker,private=False).read_bytes())
+        from deployment.lib.active_recovery_backup_freshness import declaration,require_publication
+        if declaration(plan):
+            # Keep the genuinely fresh ordinary backup; never overwrite it with
+            # the historical checkpoint marker after backup-first publication.
+            require_publication(plan,self.package,self.runtime)
+            return
         data = coordinated_health_marker(CHECKPOINT,RESTORE,
             approved_execution_digest=plan.checkpoint_execution_sha256,
             protected_file=protected,now=datetime.now(timezone.utc))
