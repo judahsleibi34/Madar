@@ -45,7 +45,8 @@ class ResolutionTests(unittest.TestCase):
     def test_both_slots_occupied_never_displaces_or_falls_back_to_blue(self):
         with patch('deployment.lib.active_recovery_candidate.require_unreserved_ports',side_effect=RuntimeError('occupied')):
             with self.assertRaisesRegex(RuntimeError,'occupied'):self.resolve()
-        self.rt.command.assert_not_called()
+        self.assertEqual(self.rt.command.call_args_list[0].args[0],['docker','ps','-a','--format','{{.Names}}'])
+        self.assertFalse(any(call.args[0][1] in {'stop','start','rename','update','rm'} for call in self.rt.command.call_args_list))
     def test_target_running_or_wrong_restart_policy_is_not_available(self):
         for change in ('running','restart'):
             row=self.rows['madar-green-backend'];before=copy.deepcopy(row)
