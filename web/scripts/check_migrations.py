@@ -255,15 +255,24 @@ def check_production_lineage(errors: list[str]) -> None:
         release_target = int(release["schema"]["target"])
         # Preserve reviewed main's future namespace without selecting any SQL.
         retained_future = {}
-        if release.get("deployment_profile") == "local-supabase-schema115":
+        profile = release.get("deployment_profile")
+        if profile in {"local-supabase-schema115", "local-supabase-schema115-136"}:
             expected_schema = {
                 "compatible_min": 115, "compatible_max": 115, "target": 115,
                 "migration_class": "none", "rollback_compatible_min": 115,
                 "rollback_compatible_max": 115,
             }
-            if (release["schema"] != expected_schema or release.get("migration_policy") != "none"
-                    or "migration_manifest" in release):
-                raise ValueError("invalid schema115 non-migrating contract")
+            if profile == "local-supabase-schema115-136":
+                expected_schema.update(compatible_max=136, target=136,
+                                       migration_class="forward-compatible")
+                valid_policy = (release.get("migration_policy") ==
+                                "automatic-after-known-good-backup-first-forward-repair"
+                                and release.get("migration_manifest") == "migrations-116-136.json")
+            else:
+                valid_policy = (release.get("migration_policy") == "none"
+                                and "migration_manifest" not in release)
+            if release["schema"] != expected_schema or not valid_policy:
+                raise ValueError("invalid schema115 release contract")
             manifest_path = REPO_ROOT / "deployment/releases/migrations-115-135.json"
             if digest(manifest_path) != "fe1258bab5f6359a598edc9d34f66e20555f93c5ce5fe911ec13d88b8bd4d7ae":
                 raise ValueError("retained canonical-main migration manifest changed")
@@ -296,9 +305,10 @@ def check_production_lineage(errors: list[str]) -> None:
                 if number <= 99 and relative not in frozen["files"]:
                     errors.append(f"unexpected historical migration: {relative}")
                 retained = retained_future.get(number)
-                if (retained is not None
-                        and retained["path"] == "web/database/migrations/" + path.name
-                        and digest(path) == retained["sha256"]):
+                if retained is not None:
+                    if (retained["path"] != "web/database/migrations/" + path.name
+                            or digest(path) != retained["sha256"]):
+                        errors.append(f"checksum-pinned migration changed: {relative}")
                     continue
                 if number > release_target:
                     errors.append(

@@ -1,9 +1,17 @@
 # Automated database migration architecture
 
+The active candidate descriptor now selects the existing schema115..136 bridge
+and checksum-pinned migrations116..136. The former exact115/no-SQL descriptor
+is retained as `schema-115-local.json`; historical SQL and manifests remain
+unchanged. This is upgrade preparation, not production authorization. Production
+continues serving its accepted schema115 application until exact-image acceptance,
+current-data application/migration rehearsal, forward-repair validation and one
+complete governed operation have passed and received explicit approval.
+
 The new unselected local source115 bridge uses `schema-115-136-bridge.json` and
 `migrations-116-136.json`. The manifest is exactly the historical 115..136
 manifest's suffix, excluding already-applied commercial migration115. Historical
-SQL/checksums/descriptors stay unchanged, as does the active115/no-SQL profile.
+SQL/checksums/descriptors stay unchanged; the exact115/no-SQL profile is retained.
 The existing executor supplies checksum, backup, advisory-lock, transaction and
 resume guards. This candidate descriptor supplies no production permission or
 proof of runtime compatibility. Exact-source/images must pass acceptance at115
@@ -14,8 +22,8 @@ The referral candidate retains an additional checksum-pinned, unselected
 manifest and its pinned history remain unchanged. `check_migrations.py` accepts
 only the exact additional 136 artifact and verifies the old entries are
 identical; `check_forward_release.py` also validates this additional pinned
-candidate and exact namespace 001..136. Unknown future migrations still fail. Main's active schema115 profile
-still selects no SQL. Migration136 requires schema135 and adds tenant-private
+candidate and exact namespace 001..136. Unknown future migrations still fail. The historical schema115 profile
+still selects no SQL; the new upgrade candidate selects only116..136. Migration136 requires schema135 and adds tenant-private
 referrals plus monetary reward/reversal records tied atomically to a verified
 first learning purchase. Runtime endpoints and enabling referrals fail closed
 before schema136. Historical rewards keep their amount/currency; local payment
@@ -24,8 +32,8 @@ activation and production migration are outside this candidate. A separately
 accepted bridge, backup and approved upgrade are required before production use.
 
 
-Active local-Supabase integration profile: **schema115 only**, migration class
-`none`, migration policy `none`, no selected migration manifest. Retained bridge
+Previous local-Supabase integration profile: **schema115 only**, migration class
+`none`, migration policy `none`, now retained as `schema-115-local.json`. Retained bridge
 examples below describe reviewed migration history/future work and authorize no
 SQL for this profile. Main's 116..135 artifacts remain checksum-verified; features
 requiring those schemas retain their existing unavailable/upgrade-required gates.

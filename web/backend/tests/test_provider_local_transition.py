@@ -70,7 +70,7 @@ class LocalTransitionTests(unittest.TestCase):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         self.root = Path(temporary.name)
-        self.metadata = json.loads((WEB_ROOT / "deployment/releases/release.json").read_text())
+        self.metadata = json.loads((WEB_ROOT / "deployment/releases/schema-115-local.json").read_text())
         fp = {key: "a" * 64 for key in ("environment", "state", "upstream", "worker_authority", "controller", "recovery", "traffic")}
         self.report = {"schema": 115, "source_sha": "a" * 40,
             "images": {"backend": "sha256:"+"a"*64, "frontend": "sha256:"+"b"*64},

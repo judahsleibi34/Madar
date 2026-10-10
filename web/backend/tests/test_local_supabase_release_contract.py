@@ -30,12 +30,17 @@ class LocalSupabaseReleaseContractTests(unittest.TestCase):
             self.assertFalse(validator.schema115_bridge_valid({**bridge,'schema':{**bridge['schema'],key:value}}))
         self.assertFalse(validator.schema115_bridge_valid({**bridge,'migration_manifest':'migrations-115-136.json'}))
 
-    def test_exact_schema115_candidate_does_not_select_migrations(self):
-        release=json.loads((WEB_ROOT/'deployment/releases/release.json').read_text())
+    def test_retained_exact_schema115_candidate_does_not_select_migrations(self):
+        release=json.loads((WEB_ROOT/'deployment/releases/schema-115-local.json').read_text())
         self.assertEqual(release['deployment_profile'],'local-supabase-schema115')
         self.assertEqual(release['migration_policy'],'none')
         self.assertNotIn('migration_manifest',release)
         self.assertEqual(release['schema'],{'compatible_min':115,'compatible_max':115,'target':115,'migration_class':'none','rollback_compatible_min':115,'rollback_compatible_max':115})
+
+    def test_active_release_selects_only_the_exact_schema115_to136_contract(self):
+        release=json.loads((WEB_ROOT/'deployment/releases/release.json').read_text())
+        self.assertTrue(validator.schema115_bridge_valid(release))
+        self.assertEqual(release['migration_manifest'],'migrations-116-136.json')
 
     def test_validator_rejects_automatic_policy_and_schema_drift(self):
         import shutil
@@ -47,7 +52,7 @@ class LocalSupabaseReleaseContractTests(unittest.TestCase):
                 if not target.exists():target=Path('/workspace')/tree
                 (root/'web'/tree).symlink_to(target,target_is_directory=True)
             self.assertEqual(validator.validate(root),[])
-            original=json.loads((release_dir/'release.json').read_text())
+            original=json.loads((release_dir/'schema-115-local.json').read_text())
             for field,value in [('migration_policy','automatic-after-known-good-backup-first-forward-repair'),('migration_manifest','migrations-115-116.json')]:
                 edited={**original,field:value};(release_dir/'release.json').write_text(json.dumps(edited))
                 self.assertTrue(validator.validate(root))
@@ -78,7 +83,7 @@ class LocalSupabaseReleaseContractTests(unittest.TestCase):
         from types import SimpleNamespace
         from test_automatic_migration_control_plane import load_release_cli
         module=load_release_cli()
-        release=json.loads((WEB_ROOT/'deployment/releases/release.json').read_text())
+        release=json.loads((WEB_ROOT/'deployment/releases/schema-115-local.json').read_text())
         with tempfile.TemporaryDirectory() as name:
             root=Path(name);release_dir=root/'web/deployment/releases';release_dir.mkdir(parents=True)
             (release_dir/'release.json').write_text(json.dumps(release))
