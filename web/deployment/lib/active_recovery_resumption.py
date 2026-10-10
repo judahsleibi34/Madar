@@ -136,7 +136,7 @@ class ResumptionPlan:
 
 
 def controller_revision(plan):
-    return getattr(plan,'controller_source_sha',None) or plan.source_sha
+    return getattr(plan,'controller_source_sha',None) or getattr(plan,'source_sha','')
 
 
 def plan_document(plan):
