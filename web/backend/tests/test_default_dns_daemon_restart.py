@@ -14,11 +14,16 @@ import sys
 import tempfile
 import time
 import unittest
+from types import SimpleNamespace
+from unittest.mock import patch
 
 WEB=Path(os.getenv('MADAR_TEST_REPOSITORY_ROOT') or Path(__file__).resolve().parents[2])
 sys.path.insert(0,str(WEB))
 from deployment.lib.active_recovery_candidate import default_dns_spec_matches,worker_spec_matches
 from deployment.lib.emergency_routing_repair import spec
+from deployment.lib.emergency_routing_repair import Runtime
+from deployment.lib.active_recovery_boot import ActiveRecoveryNormalBoot
+from deployment.lib.normal_boot_repair import unit_bytes
 
 
 @unittest.skipUnless(os.getenv('MADAR_PRIVATE_DOCKER_RESTART_TEST')=='1',
@@ -104,3 +109,53 @@ class DefaultDNSDaemonRestartTests(unittest.TestCase):
             bad=copy.deepcopy(reloaded);bad['HostConfig'][field]=value
             self.assertFalse(worker_spec_matches(bad,expected,started_worker=True))
         self.docker('rm',self.cid)
+
+    def test_corrected_boot_sequence_restarts_exact_private_ids_after_daemon_reload(self):
+        """Real Docker lifecycle plus actual boot sequence; health callbacks are
+        fixture checks, not production/application/database acceptance."""
+        kinds=('parser','backend','frontend','notification','calendar-sync','data-deletion')
+        identities={'parser':self.cid};expected={}
+        image=os.environ['MADAR_PRIVATE_DOCKER_TEST_IMAGE']
+        for kind in kinds[1:]:
+            identities[kind]=self.docker('create','--name',self.root.name+'-'+kind,'--network','none',
+                '--restart','no','--cap-drop','ALL','--security-opt','no-new-privileges',
+                '--read-only','--entrypoint','/bin/sh',image,'-c','sleep 300')
+        for kind,cid in identities.items():
+            row=json.loads(self.docker('inspect',cid))[0];expected[kind]=(row['Image'],spec(row))
+            self.docker('start',cid);self.docker('stop','--time','1',cid)
+            if kind not in kinds[3:]:
+                row=json.loads(self.docker('inspect',cid))[0];expected[kind]=(row['Image'],spec(row))
+        self.stop();self.launch()
+        base=self.root/'boot';base.mkdir();root=base/('a'*64);root.mkdir()
+        plan=SimpleNamespace(digest='a'*64,source_bundle_sha256='b'*64)
+        (root/'authorization.json').write_text(json.dumps({'operation':'active-local-rollback-resumption',
+            'plan_sha256':plan.digest,'source_bundle_sha256':plan.source_bundle_sha256}))
+        (root/'events.jsonl').write_text(json.dumps({'phase':'normal','plan_sha256':plan.digest})+'\n')
+        authority=root/'fixture-authority.json';authority.write_text(json.dumps({'mode':'NORMAL'}))
+        calls=[]
+        def source_guard():
+            for kind,cid in identities.items():
+                row=json.loads(self.docker('inspect',cid))[0]
+                self.assertEqual(row['Id'],cid);self.assertEqual(row['Image'],expected[kind][0])
+                self.assertTrue(worker_spec_matches(row,expected[kind][1],started_worker=kind in kinds[3:]))
+        def require(contract,mode):self.assertEqual(json.loads(authority.read_text())['mode'],mode)
+        def publish(contract,mode):calls.append(mode);authority.write_text(json.dumps({'mode':mode}))
+        def command(args):
+            self.assertEqual(args[0],'docker');require(None,'READ_ONLY');return self.docker(*args[1:])
+        candidate=SimpleNamespace(contract=None,_publish_write_authority=publish,require_write_authority=require,
+            inspect=lambda cid:json.loads(self.docker('inspect',cid))[0],command=command)
+        def identity(**kwargs):source_guard();return {kind:{'Id':cid} for kind,cid in identities.items()}
+        def readonly(**kwargs):
+            require(None,'READ_ONLY');source_guard()
+            self.assertTrue(all(json.loads(self.docker('inspect',cid))[0]['State']['Running'] for cid in identities.values()))
+        def normal(**kwargs):require(None,'NORMAL');source_guard()
+        kernel=SimpleNamespace(identities=identity,read_only=readonly,normal=normal)
+        audit=[]
+        boot=ActiveRecoveryNormalBoot(plan,root,candidate,kernel,source_guard,lambda:None,lambda:None,
+            lambda:self.fail('successful private restart must not compensate'),runtime=Runtime(),audit=lambda stage,**kw:audit.append(stage))
+        with patch('deployment.lib.active_recovery_boot.ROOT',base),patch('deployment.lib.active_recovery_boot.protected',side_effect=lambda path,**kw:path):
+            self.assertEqual(boot.execute()['mode'],'NORMAL')
+        self.assertEqual(calls,['READ_ONLY','NORMAL']);self.assertEqual(audit,['begin','normal_verified'])
+        body=unit_bytes('fixture.service','frozen resume','fixture-listener.service').decode()
+        self.assertIn('WantedBy=multi-user.target docker.service',body);self.assertIn('PartOf=docker.service',body)
+        for cid in identities.values():self.docker('rm','--force',cid)

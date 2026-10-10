@@ -1,5 +1,11 @@
 # Madar Auto-Deploy Merge Contract
 
+Completed-NORMAL boot repair is separately hash-approved and changes no
+application image, production checkout, customer database or automatic-deploy
+timer. Its source-role attestation preserves legitimate distinct controller and
+application SHAs, while live upgrade readiness remains mandatory. Source fixes
+do not update old frozen boot actors or permit consumed-authorization replay.
+
 An additional unselected source115-to-136 bridge and migrations116..136 manifest
 preserve the exact historical SQL/checksums without changing the active115
 no-migration release. Selection requires separately accepted compatible images,

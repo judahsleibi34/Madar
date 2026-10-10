@@ -16,13 +16,15 @@ from deployment.lib.provider_recovery_runtime import protected
 
 class ActiveRecoveryNormalBoot:
     def __init__(self,plan,root,candidate,runtime_verifier,source_guard,completed_evidence,
-                 live_native_verifier,compensate_current_data,*,runtime=None):
+                 live_native_verifier,compensate_current_data,*,runtime=None,audit=None):
         if not all(callable(check) for check in (source_guard,completed_evidence,live_native_verifier,compensate_current_data)):
             raise RuntimeError('normal_boot_independent_guards_required')
         self.plan,self.root,self.candidate,self.runtime_verifier=plan,Path(root),candidate,runtime_verifier
         self.source_guard,self.completed_evidence=source_guard,completed_evidence
         self.live_native_verifier,self.compensate_current_data=live_native_verifier,compensate_current_data
         self.runtime=runtime or Runtime()
+        if audit is not None and not callable(audit):raise RuntimeError('normal_boot_audit_required')
+        self.audit=audit
     def guard(self):
         self.source_guard()
         if os.geteuid()!=0 or self.root!=ROOT/self.plan.digest:raise RuntimeError('normal_boot_fresh_root_required')
@@ -37,6 +39,7 @@ class ActiveRecoveryNormalBoot:
         self.runtime_verifier.identities(workers_started=True,require_running=False)
         self.source_guard()
     def event(self,stage,**fields):
+        if self.audit is not None:return self.audit(stage,**fields)
         path=self.root/'boot-events.jsonl'
         if path.exists():protected(path,private=True)
         descriptor=os.open(path,os.O_WRONLY|os.O_APPEND|os.O_CREAT|os.O_NOFOLLOW,0o600)

@@ -1,5 +1,19 @@
 # Madar production release acceptance policy
 
+Completed schema115 NORMAL may legitimately bind an application SHA distinct
+from the production/controller checkout SHA. Privileged preflight classifies
+that split only from the backend's read-only authority mount, the complete
+original completion/publication, unchanged installed controller bytes and exact
+source roles. It then performs all existing live application/readiness checks
+against the actual application SHA. It never rewrites either revision/state.
+A stopped completed-NORMAL release may receive a separately approved, immutable
+boot-resource repair using its original resource identities as DATA. The repair
+changes only its owned boot gate, preserves original receipts/source, fences
+before exact-ID startup and records a NEW audit. Failure revokes authority,
+stops bound workers and uses existing maintenance/proxy-stop compensation;
+stopped GREEN is never implicitly started. This source change alone installs
+nothing and authorizes no migration or image promotion.
+
 The unselected `schema-115-136-bridge.json` candidate starts from the actual
 local schema115 and selects only `migrations-116-136.json`. Every entry is the
 identical checksum-pinned suffix of historical `migrations-115-136.json`;

@@ -130,9 +130,21 @@ runpy.run_path(sys.argv[0],run_name='__main__')
         '-o','StrictHostKeyChecking=yes','-o','UpdateHostKeys=no','-o','ControlMaster=no',
         '-o','ControlPath=none','-o','ConnectTimeout=10','madar-node1-lan',shlex.join(args)]
 
-def capture_and_replicate(plan,root,package,source_guard,kernel, *, recovery_context=None):
+def capture_and_replicate(plan,root,package,source_guard,kernel, *, recovery_context=None,authorizing_context=None):
     from scripts import backup_support
     source_guard()
+    if authorizing_context is not None:
+        import re
+        if (recovery_context is not None or set(authorizing_context)!={'plan_sha256','source_bundle_sha256'}
+                or any(not re.fullmatch('[0-9a-f]{64}',value) for value in authorizing_context.values())
+                or Path(root)!=Path('/var/lib/madar-control-plane/normal-local-resumption')/authorizing_context['plan_sha256']
+                or file_digest(protected(Path(package)/'source-bundle.json',private=True))!=authorizing_context['source_bundle_sha256']):
+            raise RuntimeError('normal_backup_fresh_boot_binding_invalid')
+        receipt=json.loads(protected(Path(root)/'authorization.json',private=True).read_text())
+        document=json.loads(protected(Path(package)/'plan.json',private=True).read_text())
+        if (receipt!={'operation':'repair-completed-normal-boot',**authorizing_context}
+                or document.get('original_plan_sha256')!=plan.digest):
+            raise RuntimeError('normal_backup_fresh_boot_authorization_required')
     if recovery_context is None:kernel.normal()
     else:recovery_context.guard()
     acceptance=verify_artifact_acceptance(plan)
@@ -142,7 +154,8 @@ def capture_and_replicate(plan,root,package,source_guard,kernel, *, recovery_con
     started=datetime.now(timezone.utc).isoformat()
     identity=pwd.getpwnam('madar')
     canonical=Path('/var/lib/madar/backups')
-    scope=canonical/(('normal-local-' if recovery_context is None else 'recovery-before-normal-')+plan.digest)
+    scope_digest=plan.digest if authorizing_context is None else authorizing_context['plan_sha256']
+    scope=canonical/(('normal-local-' if recovery_context is None else 'recovery-before-normal-')+scope_digest)
     if scope.exists() or scope.is_symlink():raise FileExistsError('normal_backup_scope_exists')
     if not scope.parent.is_dir() or scope.parent.is_symlink():raise RuntimeError('normal_backup_parent_missing')
     scope.mkdir(mode=0o700);os.chown(scope,identity.pw_uid,identity.pw_gid)
@@ -211,6 +224,9 @@ def capture_and_replicate(plan,root,package,source_guard,kernel, *, recovery_con
             for child in sorted(backup.iterdir()):tar.add(child,arcname=child.name,recursive=True)
         archive.seek(0)
         replica_plan=plan if recovery_context is None else recovery_context.replica_plan
+        if authorizing_context is not None:
+            from types import SimpleNamespace
+            replica_plan=SimpleNamespace(digest=scope_digest)
         output=checked(remote_receiver(package,replica_plan,backup,sums,replica['filesystem_uuid']),stdin=archive)
     remote=json.loads(output)
     if (remote.get('operation')!='actual-append-only-normal-backup-replica' or remote.get('plan_sha256')!=replica_plan.digest
@@ -239,12 +255,17 @@ def capture_and_replicate(plan,root,package,source_guard,kernel, *, recovery_con
     try:os.fsync(descriptor)
     finally:os.close(descriptor)
     backup_support.verify(backup)
-    exclusive(root/('post-cutover-backup.json' if recovery_context is None else 'verified-recovery-backup.json'),encoded({'operation':('actual-post-normal-backup-restore-replica' if recovery_context is None else 'actual-pre-normal-current-data-backup-restore-replica'),
-        'plan_sha256':plan.digest,'source_sha':plan.source_sha,'images':plan.candidate_images,'schema':115,
+    receipt_name='post-boot-backup.json' if authorizing_context is not None else ('post-cutover-backup.json' if recovery_context is None else 'verified-recovery-backup.json')
+    receipt={'operation':('actual-post-normal-backup-restore-replica' if recovery_context is None else 'actual-pre-normal-current-data-backup-restore-replica'),
+        'plan_sha256':scope_digest,
+        'source_sha':plan.source_sha,'images':plan.candidate_images,'schema':115,
         'captured_release_sha':expected_source,
         'started_at':started,'finished_at':datetime.now(timezone.utc).isoformat(),
         'local_path':str(backup),'sha256sums_sha256':sums,'restore':restore,'node1':remote,
-        'customer_database_restored':False,'migration_executed':False,'historical_backups_modified':False}))
+        'customer_database_restored':False,'migration_executed':False,'historical_backups_modified':False}
+    if authorizing_context is not None:
+        receipt.update(runtime_plan_sha256=plan.digest,authorizing_context=authorizing_context)
+    exclusive(root/receipt_name,encoded(receipt))
     # Publish freshness only after actual local restore and complete remote proof.
     backup_support.publish_marker(backup,canonical/'LATEST',Path('/var/lib/madar/backup-state'))
     os.chown(canonical/'LATEST',identity.pw_uid,identity.pw_gid)
