@@ -49,6 +49,20 @@ def verify_lifecycle_networks(row, networks, primary, alias=None, *, created_wor
             raise RuntimeError('network_secondary_alias_changed')
 
 
+def default_dns_spec_matches(row, expected):
+    """Compare Docker's two encodings of an unset DNS list against the old hash.
+
+    A daemon reload can persist null as []. Never change the recorded digest or
+    normalize other fields: an explicit resolver, missing field or any unrelated
+    change must still match its exact recorded specification.
+    """
+    if spec(row)==expected:return True
+    host=row['HostConfig']
+    if 'Dns' not in host or host['Dns'] not in (None,[]):return False
+    previous=dict(row,HostConfig=dict(host,Dns=[] if host['Dns'] is None else None))
+    return spec(previous)==expected
+
+
 def worker_spec_matches(row, expected, *, started_worker=False):
     """Docker first start changes only OomKillDisable false to null.
 
@@ -56,10 +70,10 @@ def worker_spec_matches(row, expected, *, started_worker=False):
     only a governed business-worker lifecycle may compare the observed null to
     the originally recorded false; true and every other alteration still fail.
     """
-    if spec(row)==expected:return True
+    if default_dns_spec_matches(row,expected):return True
     if not started_worker or row['HostConfig'].get('OomKillDisable',False) is not None:return False
     previous=dict(row,HostConfig=dict(row['HostConfig'],OomKillDisable=False))
-    return spec(previous)==expected
+    return default_dns_spec_matches(previous,expected)
 
 
 def inspect_previous_candidate(plan, runtime=None):

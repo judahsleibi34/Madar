@@ -1,5 +1,25 @@
 # Madar production release acceptance policy
 
+The unselected `schema-115-136-bridge.json` candidate starts from the actual
+local schema115 and selects only `migrations-116-136.json`. Every entry is the
+identical checksum-pinned suffix of historical `migrations-115-136.json`;
+historical manifests/descriptors and active schema115/no-SQL release are unchanged.
+Source-contract validation is not application acceptance or deployment permission.
+Exact-image acceptance at115 and136, current-data restore/migration rehearsal,
+forward-repair/reboot verification and fresh governed approval remain mandatory.
+Old schema115-only applications may serve only before the first SQL advancement.
+
+Normal container specification comparison accepts Docker's two encodings of an
+unset DNS list (`null` and `[]`) against the original full specification hash.
+It never rewrites that hash or accepts explicit DNS servers, missing fields or
+other specification alterations. Governed worker first-start OOM comparison
+retains its separate lifecycle restriction. This comparison grants no startup,
+installation or write authority and does not update frozen installed boot actors.
+New governed boot-unit preparation includes Docker-service activation/restart
+dependencies as well as host boot. It preserves the fence-before-start and
+completed-continuation identity gates and never starts a unit during preparation.
+Installing or superseding a historical unit requires fresh exact-source approval.
+
 The referral candidate retains an additional checksum-pinned, unselected
 `migrations-115-136.json` / `schema-114-136-bridge.json` pair. The 115..135
 manifest and its pinned history remain unchanged. `check_migrations.py` accepts

@@ -42,6 +42,9 @@ class BootInstallationTests(unittest.TestCase):
         self.assertIn('check-proxy-gate',content)
         self.assertFalse(any('--now' in args for label,args in self.calls))
         self.assertEqual(self.calls[-1][0],'continuation_boot_enable')
+        body=(self.units/self.install.name).read_text()
+        self.assertIn('PartOf=docker.service\n',body)
+        self.assertIn('WantedBy=multi-user.target docker.service\n',body)
     def test_existing_override_is_never_overwritten(self):
         self.dropin.write_bytes(b'prior')
         with self.assertRaises(FileExistsError):self.install.install()
@@ -88,6 +91,9 @@ class CompensatedBootInstallationTests(BootInstallationTests):
         self.assertEqual(self.states[self.old_boot],{'enabled':'disabled','active':'inactive'})
         self.assertTrue((self.root/'boot-supersession-intent.json').exists())
         self.assertFalse(any('--now' in args for _,args in self.calls))
+        body=(self.units/self.install.name).read_text()
+        self.assertIn('PartOf=docker.service\n',body)
+        self.assertIn('WantedBy=multi-user.target docker.service\n',body)
     def test_existing_override_is_never_overwritten(self):
         # State F allows only the exact reviewed preimage, never arbitrary 92.
         self.dropin.write_bytes(b'unknown')

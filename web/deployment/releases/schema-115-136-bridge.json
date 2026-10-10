@@ -1,0 +1,15 @@
+{
+  "release_metadata_version": 1,
+  "deployment_profile": "local-supabase-schema115-136",
+  "schema": {
+    "compatible_min": 115,
+    "compatible_max": 136,
+    "target": 136,
+    "migration_class": "forward-compatible",
+    "rollback_compatible_min": 115,
+    "rollback_compatible_max": 115
+  },
+  "migration_policy": "automatic-after-known-good-backup-first-forward-repair",
+  "migration_manifest": "migrations-116-136.json",
+  "notes": "Unselected schema115-to-136 bridge candidate. Promote and independently accept the exact compatible application at schema115 before creating and verifying a current-data backup and applying only checksum-pinned transitions116..136 in order. Prior schema115-only applications are rollback-compatible only before the first SQL commit; after advancement retain the compatible bridge for forward repair. Current local customer data remains authoritative. Historical manifests and SQL are immutable. No referral payouts, redemptions or payment-provider activation. This descriptor alone authorizes no deployment or SQL."
+}

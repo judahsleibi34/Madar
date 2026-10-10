@@ -12,6 +12,24 @@ validator=importlib.util.module_from_spec(spec);spec.loader.exec_module(validato
 
 
 class LocalSupabaseReleaseContractTests(unittest.TestCase):
+    def test_unselected_schema115_bridge_preserves_every_historical_sql_binding(self):
+        from hashlib import sha256
+        releases=WEB_ROOT/'deployment/releases'
+        old_path=releases/'migrations-115-136.json'
+        self.assertEqual(sha256(old_path.read_bytes()).hexdigest(),
+                         '7ce4527369df9f48be3830074e94838686bd74f9895d4a5480d67b78f5860e7f')
+        old=json.loads(old_path.read_text())
+        new=json.loads((releases/'migrations-116-136.json').read_text())
+        self.assertEqual(new['migrations'],old['migrations'][1:])
+        self.assertEqual([entry['number'] for entry in new['migrations']],list(range(116,137)))
+        self.assertEqual(new['migrations'][0]['from_schema'],115)
+        bridge=json.loads((releases/'schema-115-136-bridge.json').read_text())
+        self.assertTrue(validator.schema115_bridge_valid(bridge))
+        self.assertEqual(json.loads((releases/'schema-114-136-bridge.json').read_text())['schema']['compatible_min'],114)
+        for key,value in [('compatible_min',114),('compatible_max',135),('target',135),('rollback_compatible_max',136)]:
+            self.assertFalse(validator.schema115_bridge_valid({**bridge,'schema':{**bridge['schema'],key:value}}))
+        self.assertFalse(validator.schema115_bridge_valid({**bridge,'migration_manifest':'migrations-115-136.json'}))
+
     def test_exact_schema115_candidate_does_not_select_migrations(self):
         release=json.loads((WEB_ROOT/'deployment/releases/release.json').read_text())
         self.assertEqual(release['deployment_profile'],'local-supabase-schema115')
@@ -36,6 +54,23 @@ class LocalSupabaseReleaseContractTests(unittest.TestCase):
             for field in ['target','compatible_min','compatible_max','rollback_compatible_min','rollback_compatible_max']:
                 edited={**original,'schema':{**original['schema'],field:116}};(release_dir/'release.json').write_text(json.dumps(edited))
                 self.assertTrue(validator.validate(root))
+
+    def test_exact_new_bridge_selection_is_valid_but_history_rewrite_is_not(self):
+        import shutil
+        with tempfile.TemporaryDirectory() as name:
+            root=Path(name);release_dir=root/'web/deployment/releases';release_dir.mkdir(parents=True)
+            shutil.copytree(WEB_ROOT/'deployment/releases',release_dir,dirs_exist_ok=True)
+            for tree in ('database','supabase'):
+                source=WEB_ROOT/tree
+                if not source.exists():source=Path('/workspace')/tree
+                (root/'web'/tree).symlink_to(source,target_is_directory=True)
+            bridge=json.loads((release_dir/'schema-115-136-bridge.json').read_text())
+            (release_dir/'release.json').write_text(json.dumps(bridge))
+            self.assertEqual(validator.validate(root),[])
+            path=release_dir/'migrations-116-136.json';new=json.loads(path.read_text())
+            new['migrations'].insert(0,json.loads((release_dir/'migrations-115-136.json').read_text())['migrations'][0])
+            path.write_text(json.dumps(new))
+            self.assertTrue(validator.validate(root))
 
 
     def test_exact_candidate_policy_cannot_create_backup_or_execute_SQL(self):

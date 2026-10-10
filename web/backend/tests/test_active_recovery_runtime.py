@@ -74,3 +74,16 @@ class ActiveRuntimeTests(unittest.TestCase):
         for row in self.rows.values():row['State']['Running']=False
         self.verifier.identities(workers_started=True,require_running=False)
         self.assertTrue(all(not row['State']['Running'] for row in self.rows.values()))
+
+    def test_boot_accepts_only_default_dns_serialization_on_same_stopped_ids(self):
+        for kind,row in self.rows.items():
+            row['HostConfig']['Dns']=None
+            self.record['runtimes'][kind]['spec_sha256']=spec(row)
+            row['HostConfig']['Dns']=[]
+            row['State']['Running']=False
+        self.save()
+        self.verifier.identities(workers_started=True,require_running=False)
+        self.assertTrue(all(not row['State']['Running'] for row in self.rows.values()))
+        self.rows['backend']['HostConfig']['Dns']=['1.1.1.1']
+        with self.assertRaisesRegex(RuntimeError,'identity_changed'):
+            self.verifier.identities(workers_started=True,require_running=False)

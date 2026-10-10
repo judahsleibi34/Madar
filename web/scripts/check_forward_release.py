@@ -15,6 +15,21 @@ BASELINE = "1e6b739a43759309a45ede2dff28a859209e4a64"
 SOURCE_SCHEMA = 114
 TARGET_SCHEMA = 135
 MANIFEST_NAME = "migrations-115-135.json"
+SCHEMA115_BRIDGE_PROFILE = "local-supabase-schema115-136"
+SCHEMA115_BRIDGE_MANIFEST = "migrations-116-136.json"
+SCHEMA115_BRIDGE_SCHEMA = {
+    "compatible_min": 115, "compatible_max": 136, "target": 136,
+    "migration_class": "forward-compatible", "rollback_compatible_min": 115,
+    "rollback_compatible_max": 115,
+}
+
+
+def schema115_bridge_valid(release: dict) -> bool:
+    return (type(release.get("release_metadata_version")) is int and release["release_metadata_version"] == 1
+            and release.get("deployment_profile") == SCHEMA115_BRIDGE_PROFILE
+            and release.get("schema") == SCHEMA115_BRIDGE_SCHEMA
+            and release.get("migration_manifest") == SCHEMA115_BRIDGE_MANIFEST
+            and release.get("migration_policy") == "automatic-after-known-good-backup-first-forward-repair")
 
 # Migrations 100-114 have already been applied to production and are no
 # longer part of the active 114 -> 135 execution manifest. Keep them
@@ -194,7 +209,7 @@ def validate(root: Path = ROOT) -> list[str]:
         )
 
         schema = release["schema"]
-        if release.get("deployment_profile") not in {None, "local-supabase-schema115"}:
+        if release.get("deployment_profile") not in {None, "local-supabase-schema115", SCHEMA115_BRIDGE_PROFILE}:
             errors.append("unknown deployment profile")
 
         if release.get("deployment_profile") == "local-supabase-schema115":
@@ -206,6 +221,9 @@ def validate(root: Path = ROOT) -> list[str]:
             if (schema != expected_schema or release.get("migration_policy") != "none"
                     or "migration_manifest" in release):
                 errors.append("local Supabase candidate must be exact schema115 with no migration selected")
+        elif release.get("deployment_profile") == SCHEMA115_BRIDGE_PROFILE:
+            if not schema115_bridge_valid(release):
+                errors.append("local Supabase bridge must span schema115..136 with rollback bounded at115")
         else:
             if not (
                 int(schema["compatible_min"]) == SOURCE_SCHEMA
@@ -317,6 +335,17 @@ def validate(root: Path = ROOT) -> list[str]:
         if (database.read_bytes() != supabase.read_bytes()
                 or digest(database) != referral["sha256"]):
             errors.append("retained referral candidate mirror/checksum invalid")
+
+        # New source115 contract reuses the identical historical SQL entries;
+        # it must not replay commercial migration115 or rewrite either old manifest.
+        source115_path = release_dir / SCHEMA115_BRIDGE_MANIFEST
+        source115 = json.loads(source115_path.read_text())
+        if (digest(source115_path) != "2ea53a9b24f1d82dd4b3d6390779ad571a30483c3eed3fedb94391d7c3eec4e5"
+                or source115 != {"release_sha":"CURRENT", "migrations":referral_entries[1:]}):
+            errors.append("schema115 bridge migration history changed")
+        bridge = json.loads((release_dir / "schema-115-136-bridge.json").read_text())
+        if not schema115_bridge_valid(bridge):
+            errors.append("schema115 bridge descriptor invalid")
 
         for tree in ("database", "supabase"):
             versions = sorted(

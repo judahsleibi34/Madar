@@ -1,5 +1,14 @@
 # Automated database migration architecture
 
+The new unselected local source115 bridge uses `schema-115-136-bridge.json` and
+`migrations-116-136.json`. The manifest is exactly the historical 115..136
+manifest's suffix, excluding already-applied commercial migration115. Historical
+SQL/checksums/descriptors stay unchanged, as does the active115/no-SQL profile.
+The existing executor supplies checksum, backup, advisory-lock, transaction and
+resume guards. This candidate descriptor supplies no production permission or
+proof of runtime compatibility. Exact-source/images must pass acceptance at115
+and136 and a current-data migration/forward-repair rehearsal before selection.
+
 The referral candidate retains an additional checksum-pinned, unselected
 `migrations-115-136.json` / `schema-114-136-bridge.json` pair. The 115..135
 manifest and its pinned history remain unchanged. `check_migrations.py` accepts
