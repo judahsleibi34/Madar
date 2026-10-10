@@ -1,5 +1,15 @@
 # Privileged control-plane upgrade architecture
 
+`migration_terminal` explicitly classifies a completed schema115 NORMAL
+continuation using the same independently measured source-role/positive-authority
+attestation as current preflight. It does not route that exceptional origin
+through a nonexistent ordinary release checkout, fabricate release metadata or
+infer acceptance from a missing file. Policy must be `none`, schema must remain
+115, and a conflicting ordinary migration namespace rejects. The ordinary
+missing/invalid contract and migration terminality gates are unchanged. This is
+read-only classification; installed controller/boot packages retain their bytes
+until a separately authorized governed supersession.
+
 `completed_normal_baseline` independently measures a completed local schema115
 continuation before classifying its legitimate controller/application revision
 split. Current preflight keeps production/controller identities distinct and

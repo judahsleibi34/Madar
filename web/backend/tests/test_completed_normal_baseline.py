@@ -1,6 +1,7 @@
 import hashlib
 import json
 import os
+import subprocess
 from pathlib import Path
 import sys
 import tempfile
@@ -10,6 +11,7 @@ from unittest.mock import patch
 
 WEB=Path(os.getenv('MADAR_TEST_REPOSITORY_ROOT') or Path(__file__).resolve().parents[2]);sys.path.insert(0,str(WEB))
 from deployment.lib import completed_normal_baseline as m
+from deployment.lib.control_plane_upgrade import SystemOperations, UpgradeError, CommandResult
 
 class CompletedNormalBaselineTests(unittest.TestCase):
     def setUp(self):
@@ -21,7 +23,7 @@ class CompletedNormalBaselineTests(unittest.TestCase):
         self.inputs={k:self.base/k for k in ('controller','production_configuration','backup_configuration','release_state','traffic')}
         self.inputs['controller'].write_text(self.controller)
         self.library=self.base/'lib';self.library.mkdir();self.code=self.library/'fixture.py';self.code.write_text('immutable')
-        self.state={'active_slot':'blue','known_good_release':{'slot':'blue','sha':self.app,'images':self.plan.candidate_images,'provider':'local','schema':115,'schema_compatible_min':115,'schema_compatible_max':115},'in_progress_release':None,'rollback_failure':None}
+        self.state={'active_slot':'blue','known_good_release':{'slot':'blue','sha':self.app,'images':self.plan.candidate_images,'provider':'local','schema':115,'schema_compatible_min':115,'schema_compatible_max':115,'runtime_only_rollback':True,'migration_policy':'none'},'in_progress_release':None,'rollback_failure':None}
         self.write('authorization.json',{'operation':'active-local-rollback-resumption','plan_sha256':self.root.name,'source_bundle_sha256':self.bundle})
         self.write('events.jsonl',None,body=json.dumps({'phase':'normal','plan_sha256':self.root.name})+'\n')
         required={'normal-acceptance.json','post-cutover-backup.json','installed-controller.json','worker-owner.json','normal-publication.json'}
@@ -61,5 +63,73 @@ class CompletedNormalBaselineTests(unittest.TestCase):
     def test_unknown_execution_files_fail_closed(self):
         self.completion['retained_execution_files']['unbound.json']='0'*64;self.write('normal-completion.json',self.completion)
         with self.assertRaisesRegex(RuntimeError,'execution_incomplete'):self.call()
+
+    def operations(self):
+        operations=object.__new__(SystemOperations)
+        operations.state_root=self.base
+        operations.repository_head=lambda:self.controller
+        operations.installed_sha=lambda:self.controller
+        authority=self.root/'write-authority';authority.mkdir()
+        (authority/'authority.json').write_text(json.dumps({'mode':'NORMAL','release_sha':self.app,'schema':115}))
+        container=[{'Mounts':[{'Destination':'/run/madar/business-write-authority',
+            'Type':'bind','RW':False,'Source':str(authority)}]}]
+        operations.command=lambda *args,**kwargs:CommandResult(json.dumps(container),'',0)
+        self.inputs['release_state']=self.base/'state.json'
+        self.inputs['release_state'].write_text(json.dumps(self.state))
+        publication=json.loads((self.root/'normal-publication.json').read_text())
+        publication['published_sha256']['release_state']=self.sha(self.inputs['release_state'])
+        self.write('normal-publication.json',publication)
+        self.completion['retained_execution_files']['normal-publication.json']=self.sha(self.root/'normal-publication.json')
+        self.write('normal-completion.json',self.completion)
+        return operations
+
+    def test_completed_normal_terminal_uses_real_receipts_without_creating_release(self):
+        operations=self.operations()
+        self.assertEqual(operations.migration_terminal(self.app,115),'not_requested')
+        self.assertEqual(operations.migration_origin_state(self.app,115,115),'not_requested')
+        self.assertFalse((self.base/'releases').exists())
+        self.assertEqual(self.call()['controller_sha'],self.controller)
+
+    def test_completed_normal_terminal_rejects_changed_execution(self):
+        operations=self.operations();self.write('normal-acceptance.json',{'altered':True})
+        with self.assertRaisesRegex(UpgradeError,'completed_normal_migration_contract_invalid'):
+            operations.migration_terminal(self.app,115)
+
+    def test_completed_normal_terminal_requires_positive_authority(self):
+        operations=self.operations()
+        (self.root/'write-authority/authority.json').write_text(json.dumps({'mode':'READ_ONLY','release_sha':self.app,'schema':115}))
+        with self.assertRaisesRegex(UpgradeError,'completed_normal_migration_contract_invalid'):
+            operations.migration_terminal(self.app,115)
+
+    def test_completed_normal_terminal_rejects_schema_advancement(self):
+        operations=self.operations()
+        with self.assertRaisesRegex(UpgradeError,'completed_normal_migration_contract_invalid'):
+            operations.migration_terminal(self.app,116)
+        with self.assertRaisesRegex(UpgradeError,'migration_terminal_schema_mismatch'):
+            operations.migration_origin_state(self.app,115,116)
+
+    def test_completed_normal_terminal_rejects_conflicting_migration_history(self):
+        operations=self.operations();(self.base/'migrations'/self.app).mkdir(parents=True)
+        with self.assertRaisesRegex(UpgradeError,'completed_normal_migration_state_conflict'):
+            operations.migration_terminal(self.app,115)
+
+    def test_missing_ordinary_contract_still_fails(self):
+        operations=self.operations()
+        self.state['known_good_release'].pop('runtime_only_rollback')
+        self.inputs['release_state'].write_text(json.dumps(self.state))
+        with self.assertRaisesRegex(UpgradeError,'known_good_release_contract_missing'):
+            operations.migration_terminal(self.app,115)
+
+    def test_changed_migration_policy_cannot_be_classified_as_no_sql(self):
+        operations=self.operations()
+        self.state['known_good_release']['migration_policy']='automatic-after-known-good-backup-first-forward-repair'
+        self.inputs['release_state'].write_text(json.dumps(self.state))
+        with self.assertRaisesRegex(UpgradeError,'completed_normal_migration_contract_invalid'):
+            operations.migration_terminal(self.app,115)
+
+    def test_isolated_bootstrap_can_import_measured_completed_attestor(self):
+        code="import runpy,sys;runpy.run_path(sys.argv[1],run_name='fixture');from deployment.lib.completed_normal_baseline import discover_split"
+        result=subprocess.run([sys.executable,'-I','-B','-c',code,str(WEB/'deployment/lib/control_plane_upgrade.py')],capture_output=True,text=True,timeout=20)
+        self.assertEqual(result.returncode,0,result.stderr)
 
 if __name__=='__main__':unittest.main()
