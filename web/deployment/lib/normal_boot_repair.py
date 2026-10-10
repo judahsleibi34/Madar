@@ -250,8 +250,7 @@ class NormalBootRepair:
             self.ops.command('boot_repair_initial_resume',['systemctl','start',self.name],timeout=300)
             self.verify_public_normal();self.event('public_normal_verified')
         except Exception as error:
-            self.event('failed',exception_type=type(error).__name__)
-            self.actor.compensate();raise
+            self.failed_startup(error);raise
         # Reuse the already tested ordinary backup/restore/append-only replica
         # implementation in a NEW authorization namespace. Never touch old scopes.
         from deployment.lib.active_recovery_backup import capture_and_replicate
@@ -267,10 +266,20 @@ class NormalBootRepair:
         finally:os.close(descriptor)
         try:self.verify_public_normal()
         except Exception as error:
-            self.event('failed',exception_type=type(error).__name__)
-            self.actor.compensate();raise
+            self.failed_startup(error);raise
         self.event('complete')
         return {'mode':'NORMAL','schema':115,'plan_sha256':self.digest,'backup_restored_and_replicated':True}
+    def failed_startup(self,error):
+        # Stop a possibly still executing oneshot before fencing. A completed
+        # oneshot has no application ExecStop: bound runtimes are handled below.
+        self.ops.command('boot_repair_stop_failed_actor',['systemctl','stop',self.name],check=False,timeout=60)
+        rows=[json.loads(line) for line in protected(self.root/'events.jsonl',private=True).read_text().splitlines()]
+        if any(row.get('plan_sha256')!=self.digest for row in rows):
+            raise RuntimeError('boot_repair_failure_audit_changed')
+        compensated=any(row.get('stage')=='compensated' for row in rows)
+        try:self.event('failed',exception_type=type(error).__name__,compensation_already_completed=compensated)
+        except OSError:pass
+        if not compensated:self.actor.compensate()
     def resume(self):
         self.authorized=True
         with self.locks():
