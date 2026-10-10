@@ -1533,8 +1533,17 @@ class SystemOperations:
         self.require_clean_repository()
         production_sha = self.repository_head()
         installed_sha = self.installed_sha()
+        state=json_file(self.state_root/'state.json','release_state_invalid')
+        serving_sha=production_sha
+        source_roles=None
+        if (state.get('known_good_release') or {}).get('sha')!=production_sha:
+            from deployment.lib.completed_normal_baseline import discover_split
+            try:source_roles=discover_split(self,state,production_sha,installed_sha)
+            except (RuntimeError,ValueError,KeyError,IndexError) as error:
+                raise UpgradeError('completed_normal_source_roles_invalid') from error
+            serving_sha=source_roles['application_sha']
         serving = self.attest_serving(
-            production_sha,
+            serving_sha,
             current_origin=True,
         )
         timer = self.systemctl_state("madar-auto-deploy.timer")
@@ -1554,6 +1563,7 @@ class SystemOperations:
             "schema": serving["schema"],
             "migration": serving["migration"],
             "timer": timer,
+            "source_roles":source_roles,
         }
 
     def current_recovery_preflight(

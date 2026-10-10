@@ -1,5 +1,30 @@
 # Privileged control-plane upgrade architecture
 
+`completed_normal_baseline` independently measures a completed local schema115
+continuation before classifying its legitimate controller/application revision
+split. Current preflight keeps production/controller identities distinct and
+attests live health against the actual accepted application SHA. Changed source,
+publication, completion, images or schema fail closed. Historical completion
+cannot authorize any fresh installation or restart.
+
+An exact-package `repair_completed_normal_boot.py` operation may supersede only
+the original continuation-owned boot drop-in/unit activation. Its NEW plan,
+receipt and audit bind the complete current installed tree and original resource
+contract. It reuses the existing boot verifier/write fence/singleton/readiness
+machinery with a new measured execution-source fence; historical frozen source
+is measured as DATA, never imported or relabelled. The controller checkout and
+application images remain unchanged. Docker and host activation dependencies
+are installed only after explicit approval. Configuration rollback before
+startup restores the exact owned drop-in preimage; startup failure uses existing
+current-data-preserving maintenance/proxy-stop compensation and forbids replay.
+The already enabled native backup timers are preserved. A fresh ordinary backup
+uses the existing restricted execution, private restore and append-only Node 1
+replica implementation in the NEW repair authorization namespace. Its receipt
+distinguishes that new permission from the historical runtime contract. Backup
+or remote replica failure is reported without pretending completion or reverting
+otherwise healthy original NORMAL; security/readiness failures still fence and
+compensate. Historical backups and receipts are never overwritten.
+
 Docker daemon reload may serialize an unset container DNS list from null to [].
 The full original specification remains bound: only these two equivalent default
 representations are compared, without changing historical receipts. Explicit DNS

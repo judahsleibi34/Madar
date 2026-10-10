@@ -48,6 +48,8 @@ declare -a tracked_files=(
   lib/control_plane_filesystem.py
   lib/environment_file.py
   lib/control_plane_upgrade.py
+  lib/completed_normal_baseline.py
+  lib/normal_boot_repair.py
   lib/control_plane_upgrade_authorization.py
   lib/migration_executor.py
   lib/release_deployer.py
