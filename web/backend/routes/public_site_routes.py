@@ -2917,6 +2917,10 @@ def register_tenant_account(
         if not membership:
             raise HTTPException(status_code=400, detail="Could not create account")
 
+        if academy_context and academy_context.get("referral_code"):
+            from services.academy_referral_service import attach
+            attach(tenant_id, local_user_id, academy_context["referral_code"])
+
         if not academy_context:
             assign_project_role(
             membership_id=int(membership["id"]),

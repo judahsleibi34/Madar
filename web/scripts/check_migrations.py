@@ -272,6 +272,17 @@ def check_production_lineage(errors: list[str]) -> None:
             if [entry["number"] for entry in entries] != list(range(115, 136)):
                 raise ValueError("retained future namespace invalid")
             retained_future = {entry["number"]: entry for entry in entries if entry["number"] > 115}
+            # Referral candidate history is retained but never selected by schema115.
+            referral_manifest_path = REPO_ROOT / "deployment/releases/migrations-115-136.json"
+            if digest(referral_manifest_path) != "7ce4527369df9f48be3830074e94838686bd74f9895d4a5480d67b78f5860e7f":
+                raise ValueError("retained referral candidate manifest changed")
+            referral_entries = json.loads(referral_manifest_path.read_text())["migrations"]
+            if (referral_entries[:-1] != entries
+                    or referral_entries[-1]["number"] != 136
+                    or referral_entries[-1]["from_schema"] != 135
+                    or referral_entries[-1]["to_schema"] != 136):
+                raise ValueError("retained referral candidate namespace invalid")
+            retained_future[136] = referral_entries[-1]
         if frozen["production_baseline"] != "1e6b739a43759309a45ede2dff28a859209e4a64" or len(frozen["files"]) != 198:
             raise ValueError("invalid immutable lineage manifest")
         for relative, checksum in frozen["files"].items():

@@ -1,0 +1,620 @@
+{
+  "version": 1,
+  "name": "Madar Learning",
+  "defaultPageId": "madar-home",
+  "activePageId": "madar-home",
+  "pages": [
+    {
+      "id": "madar-home",
+      "name": "Home",
+      "slug": "/",
+      "isDefault": true,
+      "access": "public",
+      "sections": [
+        {
+          "id": "madar-hero",
+          "name": "madar-hero",
+          "layout": {
+            "width": "full",
+            "paddingY": "none"
+          },
+          "rows": [
+            {
+              "id": "madar-hero-row",
+              "layout": {
+                "columns": 2,
+                "align": "center",
+                "gap": "large"
+              },
+              "columns": [
+                {
+                  "id": "madar-hero-col-0",
+                  "layout": {
+                    "align": "left"
+                  },
+                  "elements": [
+                    {
+                      "id": "madar-element-1",
+                      "type": "text",
+                      "content": "MADAR LEARNING  /  YOUR NEXT CHAPTER",
+                      "styles": {},
+                      "action": {
+                        "type": "none"
+                      }
+                    },
+                    {
+                      "id": "madar-element-2",
+                      "type": "heading",
+                      "content": "Big ambitions. Small steps. Real learning.",
+                      "styles": {},
+                      "action": {
+                        "type": "none"
+                      },
+                      "textBlockFormats": [
+                        "h1"
+                      ]
+                    },
+                    {
+                      "id": "madar-element-3",
+                      "type": "text",
+                      "content": "Build the skills that move you forward. Discover focused courses, learn at your own pace, and keep your progress in one place.",
+                      "styles": {},
+                      "action": {
+                        "type": "none"
+                      }
+                    },
+                    {
+                      "id": "madar-element-4",
+                      "type": "button",
+                      "content": "Start your learning journey",
+                      "styles": {
+                        "borderRadius": "12px",
+                        "padding": "16px 24px"
+                      },
+                      "action": {
+                        "type": "openUrl",
+                        "url": "/academy/testing/login?register=1"
+                      },
+                      "backgroundColor": "#852c21",
+                      "textColor": "#ffffff",
+                      "hoverBackgroundColor": "#6f241b",
+                      "hoverTextColor": "#ffffff"
+                    },
+                    {
+                      "id": "madar-element-5",
+                      "type": "text",
+                      "content": "Already part of Madar? Log in from the header to continue.",
+                      "styles": {},
+                      "action": {
+                        "type": "none"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "id": "madar-hero-col-1",
+                  "layout": {
+                    "align": "left"
+                  },
+                  "elements": [
+                    {
+                      "id": "madar-element-6",
+                      "type": "text",
+                      "content": "A LITTLE PROGRESS, EVERY DAY",
+                      "styles": {},
+                      "action": {
+                        "type": "none"
+                      }
+                    },
+                    {
+                      "id": "madar-element-7",
+                      "type": "heading",
+                      "content": "Make room for something new.",
+                      "styles": {},
+                      "action": {
+                        "type": "none"
+                      },
+                      "textBlockFormats": [
+                        "h2"
+                      ]
+                    },
+                    {
+                      "id": "madar-element-8",
+                      "type": "text",
+                      "content": "Discover a course that interests you.\nFollow clear lessons and practical activities.\nPick up right where you left off.",
+                      "styles": {},
+                      "action": {
+                        "type": "none"
+                      }
+                    },
+                    {
+                      "id": "madar-element-9",
+                      "type": "text",
+                      "content": "YOUR JOURNEY\n01  Find your focus\n02  Build your understanding\n03  Put it into practice",
+                      "styles": {},
+                      "action": {
+                        "type": "none"
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "madar-principles",
+          "name": "madar-principles",
+          "layout": {
+            "width": "full",
+            "paddingY": "none"
+          },
+          "rows": [
+            {
+              "id": "madar-principles-row",
+              "layout": {
+                "columns": 1,
+                "align": "center",
+                "gap": "large"
+              },
+              "columns": [
+                {
+                  "id": "madar-principles-col-0",
+                  "layout": {
+                    "align": "left"
+                  },
+                  "elements": [
+                    {
+                      "id": "madar-element-10",
+                      "type": "text",
+                      "content": "LEARNING, MADE PERSONAL",
+                      "styles": {},
+                      "action": {
+                        "type": "none"
+                      }
+                    },
+                    {
+                      "id": "madar-element-11",
+                      "type": "heading",
+                      "content": "A place to start. A reason to keep going.",
+                      "styles": {},
+                      "action": {
+                        "type": "none"
+                      },
+                      "textBlockFormats": [
+                        "h2"
+                      ]
+                    },
+                    {
+                      "id": "madar-element-12",
+                      "type": "text",
+                      "content": "From your first lesson to your next milestone, Madar gives your learning a clear path.",
+                      "styles": {},
+                      "action": {
+                        "type": "none"
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "madar-features",
+          "name": "madar-features",
+          "layout": {
+            "width": "full",
+            "paddingY": "none"
+          },
+          "rows": [
+            {
+              "id": "madar-features-row",
+              "layout": {
+                "columns": 3,
+                "align": "center",
+                "gap": "large"
+              },
+              "columns": [
+                {
+                  "id": "madar-features-col-0",
+                  "layout": {
+                    "align": "left"
+                  },
+                  "elements": [
+                    {
+                      "id": "madar-element-13",
+                      "type": "text",
+                      "content": "01  /  DISCOVER",
+                      "styles": {},
+                      "action": {
+                        "type": "none"
+                      }
+                    },
+                    {
+                      "id": "madar-element-14",
+                      "type": "heading",
+                      "content": "Find your next skill.",
+                      "styles": {},
+                      "action": {
+                        "type": "none"
+                      },
+                      "textBlockFormats": [
+                        "h2"
+                      ]
+                    },
+                    {
+                      "id": "madar-element-15",
+                      "type": "text",
+                      "content": "Explore the course catalog and choose what you want to learn next.",
+                      "styles": {},
+                      "action": {
+                        "type": "none"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "id": "madar-features-col-1",
+                  "layout": {
+                    "align": "left"
+                  },
+                  "elements": [
+                    {
+                      "id": "madar-element-16",
+                      "type": "text",
+                      "content": "02  /  LEARN",
+                      "styles": {},
+                      "action": {
+                        "type": "none"
+                      }
+                    },
+                    {
+                      "id": "madar-element-17",
+                      "type": "heading",
+                      "content": "Move at your pace.",
+                      "styles": {},
+                      "action": {
+                        "type": "none"
+                      },
+                      "textBlockFormats": [
+                        "h2"
+                      ]
+                    },
+                    {
+                      "id": "madar-element-18",
+                      "type": "text",
+                      "content": "Work through structured lessons with text, audio, video, and assessments where available.",
+                      "styles": {},
+                      "action": {
+                        "type": "none"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "id": "madar-features-col-2",
+                  "layout": {
+                    "align": "left"
+                  },
+                  "elements": [
+                    {
+                      "id": "madar-element-19",
+                      "type": "text",
+                      "content": "03  /  CONTINUE",
+                      "styles": {},
+                      "action": {
+                        "type": "none"
+                      }
+                    },
+                    {
+                      "id": "madar-element-20",
+                      "type": "heading",
+                      "content": "Keep your momentum.",
+                      "styles": {},
+                      "action": {
+                        "type": "none"
+                      },
+                      "textBlockFormats": [
+                        "h2"
+                      ]
+                    },
+                    {
+                      "id": "madar-element-21",
+                      "type": "text",
+                      "content": "Return to your learning dashboard, follow your progress, and continue your courses.",
+                      "styles": {},
+                      "action": {
+                        "type": "none"
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "madar-courses",
+          "name": "madar-courses",
+          "layout": {
+            "width": "full",
+            "paddingY": "none"
+          },
+          "rows": [
+            {
+              "id": "madar-courses-row",
+              "layout": {
+                "columns": 1,
+                "align": "center",
+                "gap": "large"
+              },
+              "columns": [
+                {
+                  "id": "madar-courses-col-0",
+                  "layout": {
+                    "align": "left"
+                  },
+                  "elements": [
+                    {
+                      "id": "madar-element-22",
+                      "type": "academyCourseCollection",
+                      "content": "",
+                      "styles": {},
+                      "action": {
+                        "type": "none"
+                      },
+                      "academy": {
+                        "heading": "Find something worth learning.",
+                        "description": "Explore the courses currently available on Madar.",
+                        "maxItems": 4
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "madar-how",
+          "name": "madar-how",
+          "layout": {
+            "width": "full",
+            "paddingY": "none"
+          },
+          "rows": [
+            {
+              "id": "madar-how-row",
+              "layout": {
+                "columns": 2,
+                "align": "center",
+                "gap": "large"
+              },
+              "columns": [
+                {
+                  "id": "madar-how-col-0",
+                  "layout": {
+                    "align": "left"
+                  },
+                  "elements": [
+                    {
+                      "id": "madar-element-23",
+                      "type": "text",
+                      "content": "FROM CURIOUS TO CONFIDENT",
+                      "styles": {},
+                      "action": {
+                        "type": "none"
+                      }
+                    },
+                    {
+                      "id": "madar-element-24",
+                      "type": "heading",
+                      "content": "Your next step is a simple one.",
+                      "styles": {},
+                      "action": {
+                        "type": "none"
+                      },
+                      "textBlockFormats": [
+                        "h2"
+                      ]
+                    },
+                    {
+                      "id": "madar-element-25",
+                      "type": "text",
+                      "content": "Create an account, choose a course, and make learning part of your day.",
+                      "styles": {},
+                      "action": {
+                        "type": "none"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "id": "madar-how-col-1",
+                  "layout": {
+                    "align": "left"
+                  },
+                  "elements": [
+                    {
+                      "id": "madar-element-26",
+                      "type": "heading",
+                      "content": "01  Make it yours.",
+                      "styles": {},
+                      "action": {
+                        "type": "none"
+                      },
+                      "textBlockFormats": [
+                        "h2"
+                      ]
+                    },
+                    {
+                      "id": "madar-element-27",
+                      "type": "text",
+                      "content": "Sign up for your own learning account.",
+                      "styles": {},
+                      "action": {
+                        "type": "none"
+                      }
+                    },
+                    {
+                      "id": "madar-element-28",
+                      "type": "heading",
+                      "content": "02  Find your course.",
+                      "styles": {},
+                      "action": {
+                        "type": "none"
+                      },
+                      "textBlockFormats": [
+                        "h2"
+                      ]
+                    },
+                    {
+                      "id": "madar-element-29",
+                      "type": "text",
+                      "content": "Explore topics and choose the right starting point.",
+                      "styles": {},
+                      "action": {
+                        "type": "none"
+                      }
+                    },
+                    {
+                      "id": "madar-element-30",
+                      "type": "heading",
+                      "content": "03  Keep showing up.",
+                      "styles": {},
+                      "action": {
+                        "type": "none"
+                      },
+                      "textBlockFormats": [
+                        "h2"
+                      ]
+                    },
+                    {
+                      "id": "madar-element-31",
+                      "type": "text",
+                      "content": "Sign in to your dashboard to learn, continue, and track your progress.",
+                      "styles": {},
+                      "action": {
+                        "type": "none"
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "madar-cta",
+          "name": "madar-cta",
+          "layout": {
+            "width": "full",
+            "paddingY": "none"
+          },
+          "rows": [
+            {
+              "id": "madar-cta-row",
+              "layout": {
+                "columns": 1,
+                "align": "center",
+                "gap": "large"
+              },
+              "columns": [
+                {
+                  "id": "madar-cta-col-0",
+                  "layout": {
+                    "align": "left"
+                  },
+                  "elements": [
+                    {
+                      "id": "madar-element-32",
+                      "type": "text",
+                      "content": "A NEW CHAPTER STARTS WITH YOU",
+                      "styles": {},
+                      "action": {
+                        "type": "none"
+                      }
+                    },
+                    {
+                      "id": "madar-element-33",
+                      "type": "heading",
+                      "content": "What will you learn next?",
+                      "styles": {},
+                      "action": {
+                        "type": "none"
+                      },
+                      "textBlockFormats": [
+                        "h2"
+                      ]
+                    },
+                    {
+                      "id": "madar-element-34",
+                      "type": "text",
+                      "content": "Give your curiosity somewhere to go.",
+                      "styles": {},
+                      "action": {
+                        "type": "none"
+                      }
+                    },
+                    {
+                      "id": "madar-element-35",
+                      "type": "button",
+                      "content": "Create your account",
+                      "styles": {
+                        "borderRadius": "12px",
+                        "padding": "16px 24px"
+                      },
+                      "action": {
+                        "type": "openUrl",
+                        "url": "/academy/testing/login?register=1"
+                      },
+                      "backgroundColor": "#852c21",
+                      "textColor": "#ffffff",
+                      "hoverBackgroundColor": "#6f241b",
+                      "hoverTextColor": "#ffffff"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "forms": [],
+  "collections": [],
+  "workflows": [],
+  "roles": [],
+  "users": [],
+  "theme": {
+    "background": "#f4f0e8",
+    "surface": "#fffdfa",
+    "softSurface": "#f8f4ed",
+    "text": "#162033",
+    "muted": "#5b6474",
+    "primary": "#852c21",
+    "accent": "#852c21",
+    "accentDark": "#6f241b",
+    "buttonText": "#ffffff",
+    "fontFamily": "Inter"
+  },
+  "siteChrome": {
+    "showHeader": true,
+    "showFooter": true,
+    "brand": "Madar Learning",
+    "footerStoreName": "Madar Learning",
+    "logoUrl": "",
+    "headerAlign": "split",
+    "headerButtonLabel": "",
+    "footerShopLinks": "",
+    "footerHelpLinks": "",
+    "description": "A little progress. A world of possibility.",
+    "rights": "",
+    "contactEmail": "",
+    "phone": "",
+    "footerSocialLinks": "",
+    "footerPaymentMethods": ""
+  }
+}

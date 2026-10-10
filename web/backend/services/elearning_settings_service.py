@@ -1,5 +1,6 @@
 """Tenant-owned, extensible learning configuration; no learning runtime yet."""
 from typing import Literal
+from decimal import Decimal
 from uuid import UUID
 from fastapi import HTTPException
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, field_validator, model_validator
@@ -27,6 +28,16 @@ def normalize_academy_email_domain(value):
 
 class ELearningSettings(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    referral_rewards_enabled: StrictBool = False
+    referral_reward_amount: Decimal = Field(default=Decimal("0.00"), ge=0, max_digits=14, decimal_places=2)
+    referral_reward_currency: str = Field(default="USD", pattern=r"^[A-Z]{3}$")
+
+    @model_validator(mode="after")
+    def require_referral_amount(self):
+        if self.referral_rewards_enabled and self.referral_reward_amount <= 0:
+            raise ValueError("Referral reward amount must be positive")
+        return self
 
     academy_registration: Literal["open", "invitation_only", "email_domain"] = "invitation_only"
     academy_email_domains: list[str] = Field(default_factory=list, max_length=20)
@@ -107,6 +118,8 @@ def require_owned_image(tenant_id, image_url):
 
 
 def save_settings(tenant_id, settings):
+    if settings.referral_rewards_enabled and not settings_available(136):
+        raise HTTPException(503, detail={"code": "academy_referrals_upgrade_required"})
     require_owned_image(tenant_id, settings.logo_url)
     require_owned_image(tenant_id, settings.academy_hero_image)
     if settings.academy_enabled and not settings_available(131):

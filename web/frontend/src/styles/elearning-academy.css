@@ -10,6 +10,31 @@
 .academy-header button { border:1px solid var(--color-border); border-radius:.6rem; background:var(--color-surface); color:var(--color-text); padding:.4rem .7rem; cursor:pointer; }
 .academy-header .academy-menu { display:none; }
 .academy-main { max-width:1240px; margin:auto; padding:1.5rem clamp(1rem,3vw,3rem) 4rem; }
+.academy-presentation > .academy-main { max-width:none; padding:0; }
+.academy-landing-region { overflow-x:clip; }
+.academy-landing-region .site-renderer-artboard > :is(.built-site-header,.built-site-footer) { width:var(--site-bleed-logical-width,100%); max-width:none; margin-left:var(--site-bleed-offset-x,0); }
+.academy-landing-region .built-site-header-inner { max-width:1200px; margin-inline:auto; }
+.academy-landing-region .built-site-header-actions { display:flex; align-items:center; gap:1rem; flex-shrink:0; }
+.academy-landing-region .built-site-header-inner { display:flex; justify-content:space-between; flex-wrap:wrap; }
+.academy-landing-region .built-site-header-actions button { border:1px solid var(--color-border); border-radius:.6rem; padding:.5rem .75rem; background:transparent; color:inherit; cursor:pointer; }
+.academy-landing-region .builder-canvas:is(.viewport-tablet,.viewport-mobile) .built-site-header-actions { display:none; }
+.academy-landing-region .builder-canvas:is(.viewport-tablet,.viewport-mobile) .built-site-header-inner { display:grid; }
+.academy-landing-region .built-site-mobile-menu-panel > a { display:block; padding:.75rem; }
+.academy-landing-region .builder-canvas .built-site-footer { padding:28px 24px 20px; }
+.academy-landing-region .built-site-footer .ecommerce-footer-grid { width:min(100%,1180px); gap:24px; }
+.academy-landing-region .built-site-footer .ecommerce-footer-brand { gap:12px; }
+.academy-landing-region .built-site-footer .ecommerce-footer-logo { width:40px; height:40px; }
+.academy-landing-region .built-site-footer .footer-logo-fallback { border:1px solid color-mix(in srgb,var(--workspace-footer-text) 40%,transparent); border-radius:10px; font-size:20px; box-shadow:none; }
+.academy-landing-region .built-site-footer .ecommerce-footer-logo-row h3 { font-size:20px; line-height:1.3; }
+.academy-landing-region .built-site-footer .ecommerce-footer-bottom { max-width:1180px; margin-top:24px; padding-top:16px; display:flex; justify-content:space-between; flex-wrap:wrap; gap:12px 24px; text-align:start; }
+.academy-landing-region .built-site-footer .powered-by-madar { padding:0; background:transparent; box-shadow:none; }
+@media(max-width:520px) {
+  .academy-landing-region .builder-canvas .built-site-footer { padding:24px 20px 20px; }
+  .academy-landing-region .built-site-footer .ecommerce-footer-bottom { flex-direction:column; align-items:center; text-align:center; }
+}
+.academy-learner { min-height:calc(100dvh - 128px); }
+.academy-learner-intro { padding-block:1rem; }
+.academy-learner-intro > p { color:var(--academy-muted); line-height:1.6; }
 .academy h1,.academy h2,.academy h3 { text-wrap:balance; line-height:1.15; overflow-wrap:anywhere; }
 .academy-hero { display:grid; grid-template-columns:1.2fr 1fr; gap:3rem; align-items:center; padding:clamp(2rem,6vw,5rem) 0; }
 .academy-hero h1 { font-size:clamp(2.5rem,5vw,4.4rem); letter-spacing:-.03em; margin:1rem 0; }
@@ -41,6 +66,29 @@
 .academy-footer { padding:3rem clamp(1rem,6vw,5rem); border-top:1px solid var(--color-border); display:flex; flex-wrap:wrap; align-items:center; gap:1.5rem; color:var(--academy-muted); }
 .academy-footer p { flex:1; }
 .academy-filters { display:flex; gap:1rem; flex-wrap:wrap; margin:2rem 0; }
+.academy-catalog-heading { margin:12px 0 32px; }
+.academy-catalog-heading h1 { margin:0 0 12px; font-size:32px; }
+.academy-catalog-heading p { margin:0; color:var(--academy-muted); line-height:1.6; }
+.academy-catalog-layout { display:grid; grid-template-columns:250px minmax(0,1fr); gap:32px; align-items:start; }
+.academy-catalog .academy-filters { margin:0; padding:22px; display:flex; flex-direction:column; gap:22px; border:1px solid color-mix(in srgb,var(--academy-text) 12%,var(--academy-surface)); border-radius:14px; background:var(--academy-surface); box-shadow:0 7px 25px color-mix(in srgb,var(--academy-text) 4%,transparent); }
+.academy-filters h2 { display:flex; align-items:center; gap:8px; margin:0; font-size:14px; font-weight:650; }
+.academy-catalog .academy-filters label { font-size:13px; font-weight:500; }
+.academy-search-control,.academy-select-control { display:block; position:relative; }
+.academy-catalog .academy-filters :is(input,select) { width:100%; height:44px; padding:0 40px 0 14px; padding-inline:14px 40px; border:1px solid color-mix(in srgb,var(--academy-text) 15%,var(--academy-surface)); border-radius:12px; color:var(--academy-text); background:var(--academy-surface); font-size:14px; outline:none; }
+.academy-catalog .academy-filters select { appearance:none; cursor:pointer; }
+.academy-catalog .academy-filters :is(input,select):focus { border-color:var(--academy-accent); box-shadow:0 0 0 3px color-mix(in srgb,var(--academy-accent) 12%,transparent); }
+.academy-search-control svg,.academy-select-control svg { position:absolute; inset-inline-end:14px; top:13px; pointer-events:none; color:var(--academy-muted); }
+.academy-results-count { color:var(--academy-muted); font-size:13px; margin:0 0 16px; }
+.academy-catalog-results .academy-section { margin:0; }
+.academy-catalog-results .academy-section h2 { margin:0; font-size:20px; }
+.academy-catalog-results .academy-grid { grid-template-columns:repeat(auto-fill,minmax(min(100%,230px),1fr)); gap:20px; }
+.academy-catalog-results .academy-card { display:flex; flex-direction:column; border-radius:14px; border-color:color-mix(in srgb,var(--academy-text) 12%,var(--academy-surface)); }
+.academy-catalog-results .academy-card-body { flex:1; padding:20px; font-size:14px; }
+.academy-catalog-results .academy-card h3 { font-size:18px; line-height:1.4; }
+.academy-catalog-results .academy-card .academy-button { min-height:44px; font-size:14px; }
+.academy-catalog-empty { padding:32px; border-radius:14px; background:var(--academy-surface); color:var(--academy-muted); }
+@media(max-width:800px) { .academy-catalog-layout { grid-template-columns:1fr; gap:24px; } .academy-catalog .academy-filters { display:grid; grid-template-columns:1fr 1fr; gap:16px; } .academy-filters h2 { grid-column:1 / -1; } }
+@media(max-width:480px) { .academy-catalog .academy-filters { grid-template-columns:1fr; } .academy-catalog-heading h1 { font-size:28px; } }
 .academy label { display:flex; flex-direction:column; gap:.6rem; }
 .academy input,.academy select { padding:.8rem; border:1px solid var(--color-border); border-radius:.6rem; background:var(--color-surface); color:var(--color-text); max-width:100%; min-width:0; }
 .academy-detail { display:grid; grid-template-columns:1fr 1.1fr; align-items:center; gap:3rem; margin:2rem 0; }
@@ -64,3 +112,77 @@
 @media (max-width: 600px) { .academy-data-variant-compact .academy-card { grid-template-columns: 1fr; } }
 
 .academy-utility-header { justify-content: flex-end; min-height: 44px; padding-block: 8px; }
+
+/* Madar's editable landing template; other Academy projects retain their design. */
+.academy-landing-region .academy-signup-link { background:var(--theme-primary); color:var(--theme-on-primary, var(--theme-text-inverse)); padding:12px 20px; border-radius:10px; font-weight:700; }
+.madar-learning-landing .site-section { padding:48px 32px; }
+.madar-learning-landing .site-row { align-items:center; }
+.madar-learning-landing .site-column { gap:20px; }
+.madar-learning-landing .builder-element-heading :is(h1,h2,h3,p) { margin:0; font-weight:750; letter-spacing:-.045em; line-height:1.08; }
+.madar-learning-landing .builder-element-text { line-height:1.75; color:var(--theme-text-soft); }
+.madar-learning-landing [data-landing-section="madar-hero"] { padding-block:72px; }
+.madar-learning-landing [data-landing-section="madar-hero"] .site-row { grid-template-columns:1.15fr 1fr; gap:64px; }
+.madar-learning-landing [data-landing-section="madar-hero"] h1 { font-size:64px; }
+.madar-learning-landing [data-landing-section="madar-hero"] .site-column:first-child > .builder-element-text:first-child,
+.madar-learning-landing [data-landing-section="madar-principles"] .builder-element-text:first-child,
+.madar-learning-landing [data-landing-section="madar-how"] .builder-element-text:first-child,
+.madar-learning-landing [data-landing-section="madar-cta"] .builder-element-text:first-child { color:var(--theme-primary); font-size:12px; font-weight:750; letter-spacing:.12em; }
+.madar-learning-landing [data-landing-section="madar-hero"] .site-column:last-child { background:var(--theme-surface); border:1px solid var(--theme-border); border-radius:28px; padding:36px; box-shadow:18px 18px 0 color-mix(in srgb,var(--theme-primary) 12%,transparent); }
+.madar-learning-landing [data-landing-section="madar-hero"] .site-column:last-child h2 { font-size:36px; }
+.madar-learning-landing [data-landing-section="madar-hero"] .site-column:last-child > .builder-element-text:last-child { border-top:1px solid var(--theme-border); padding-top:24px; white-space:pre-line; line-height:2; }
+.madar-learning-landing [data-landing-section="madar-principles"] { padding-bottom:12px; }
+.madar-learning-landing [data-landing-section="madar-principles"] h2,
+.madar-learning-landing [data-landing-section="madar-how"] .site-column:first-child h2 { font-size:42px; }
+.madar-learning-landing [data-landing-section="madar-features"] .site-row { grid-template-columns:repeat(3,minmax(0,1fr)); gap:24px; align-items:stretch; }
+.madar-learning-landing [data-landing-section="madar-features"] .site-column { padding:28px; border:1px solid var(--theme-border); border-radius:18px; background:var(--theme-surface); }
+.madar-learning-landing [data-landing-section="madar-features"] h2 { font-size:24px; }
+.madar-learning-landing [data-landing-section="madar-features"] .builder-element-text:first-child { color:var(--theme-primary); font-size:12px; font-weight:750; letter-spacing:.08em; }
+.madar-learning-landing [data-landing-section="madar-courses"] .academy-section { margin:0; }
+.madar-learning-landing [data-landing-section="madar-courses"] h2 { font-size:36px; }
+.madar-learning-landing [data-landing-section="madar-how"] .site-row { grid-template-columns:1fr 1fr; gap:72px; }
+.madar-learning-landing [data-landing-section="madar-how"] .site-column:last-child h2 { font-size:22px; }
+.madar-learning-landing [data-landing-section="madar-cta"] { margin:24px 32px 64px; padding:44px; border-radius:24px; background:var(--theme-surface); border:1px solid var(--theme-border); }
+.madar-learning-landing [data-landing-section="madar-cta"] h2 { font-size:42px; }
+.madar-learning-landing .builder-element-button { width:fit-content; max-width:100%; font-weight:700; }
+.madar-learning-landing .builder-canvas:is(.viewport-tablet,.viewport-mobile) .site-section { padding:32px 22px; }
+.madar-learning-landing .builder-canvas:is(.viewport-tablet,.viewport-mobile) :is([data-landing-section="madar-hero"],[data-landing-section="madar-how"]) .site-row { grid-template-columns:1fr; gap:32px; }
+.madar-learning-landing .builder-canvas:is(.viewport-tablet,.viewport-mobile) [data-landing-section="madar-hero"] h1 { font-size:42px; }
+.madar-learning-landing .builder-canvas.viewport-mobile [data-landing-section="madar-features"] .site-row { grid-template-columns:1fr; }
+.madar-learning-landing .builder-canvas.viewport-mobile [data-landing-section="madar-cta"] { margin:16px 20px 32px; }
+.madar-learning-landing .builder-canvas.viewport-mobile :is([data-landing-section="madar-principles"],[data-landing-section="madar-how"],[data-landing-section="madar-cta"]) h2 { font-size:32px; }
+.academy-login { background:var(--academy-surface); border:1px solid var(--color-border); padding:32px; border-radius:20px; box-shadow:0 12px 40px color-mix(in srgb,var(--academy-text) 6%,transparent); }
+.academy-landing-region .built-site-mobile-menu-panel > .academy-signup-link { color:var(--theme-text-inverse); }
+
+.academy { font-family:var(--theme-font-family,Inter,Arial,sans-serif); }
+.academy :is(button,input,select,textarea) { font-family:inherit; }
+.academy-header { background:var(--academy-surface); color:var(--academy-text); border-color:var(--theme-border); }
+.academy-brand { font-size:16px; font-weight:650; }
+.academy-brand-mark { width:40px; height:40px; display:grid; place-items:center; flex-shrink:0; border-radius:10px; background:var(--academy-accent); color:var(--theme-on-primary,var(--theme-text-inverse)); font-weight:750; }
+.academy-header nav .academy-nav-signup { padding:12px 20px; border-radius:10px; background:var(--academy-accent); color:var(--theme-on-primary,var(--theme-text-inverse)); font-weight:700; }
+.academy-page-links,.academy-account-links { display:flex; align-items:center; flex-wrap:wrap; gap:1.2rem; }
+@media(min-width:901px) {
+ .academy-header { display:grid; grid-template-columns:minmax(0,1fr) auto minmax(0,1fr); }
+ .academy-header nav { display:contents; }
+ .academy-page-links { justify-self:center; }
+ .academy-account-links { justify-self:end; }
+}
+.madar-learning-landing .builder-canvas.viewport-desktop .built-site-header-inner { display:grid; grid-template-columns:minmax(0,1fr) auto minmax(0,1fr); }
+.madar-learning-landing .builder-canvas.viewport-desktop .built-site-nav { justify-self:center; }
+.madar-learning-landing .builder-canvas.viewport-desktop .built-site-header-actions { justify-self:end; }
+.academy-auth { display:flex; flex-direction:column; min-height:100dvh; }
+.academy-auth > .academy-header { min-height:79px; padding:16px max(24px,calc((100% - 1180px)/2)); }
+.academy-auth > .academy-main { width:100%; flex:1; display:grid; place-items:center; padding:48px 24px; }
+.academy-auth .academy-login { width:min(100%,440px); max-width:440px; margin:0; padding:36px; gap:24px; background:var(--academy-surface); border-color:var(--theme-border); }
+.academy-login h1 { margin:0 0 8px; font-size:32px; line-height:1.15; font-weight:750; letter-spacing:-.035em; }
+.academy-login label { font-size:14px; line-height:1.5; font-weight:550; }
+.academy-login input { min-height:48px; background:var(--academy-background); color:var(--academy-text); border-color:var(--theme-border); font-size:16px; border-radius:10px; }
+.academy-login > button { min-height:48px; border-radius:10px; font-size:14px; line-height:1.4; font-weight:650; cursor:pointer; }
+.academy-login > button[type="button"] { border:1px solid var(--theme-border); background:var(--academy-surface); color:var(--academy-accent); }
+.academy-login > a { color:var(--academy-muted); font-size:14px; text-align:center; }
+.academy-auth > .academy-footer { padding:24px max(24px,calc((100% - 1180px)/2)); gap:20px; background:var(--academy-accent); color:var(--theme-on-primary,var(--theme-text-inverse)); border:0; font-size:13px; }
+@media(max-width:600px) {
+ .academy-auth > .academy-header { padding:16px 20px; }
+ .academy-auth > .academy-main { padding:32px 20px; }
+ .academy-auth .academy-login { padding:28px 24px; }
+ .academy-auth > .academy-footer { align-items:center; text-align:center; }
+}

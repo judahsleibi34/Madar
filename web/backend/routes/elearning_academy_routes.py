@@ -76,6 +76,7 @@ class AcademyLoginRequest(TenantLoginRequest):
 
 class AcademyRegisterRequest(TenantRegisterRequest):
     return_to: str = Field(default="", max_length=2048)
+    referral_code: UUID | None = None
 
 
 def auth_return(payload, website, request):
@@ -118,5 +119,5 @@ def register(identifier: str, payload: AcademyRegisterRequest, request: Request)
     verification_target = target
     if target == main_base or target.startswith(main_base + "/"):
         verification_target = "/academy" + target[len(main_base):]
-    result = register_tenant_account(identifier, payload, request, academy_context={"return_to": f"/academy/login?returnTo={quote(verification_target, safe='')}"})
+    result = register_tenant_account(identifier, payload, request, academy_context={"return_to": f"/academy/login?returnTo={quote(verification_target, safe='')}", "referral_code": str(payload.referral_code) if payload.referral_code else None})
     return {**result, "return_to": target}

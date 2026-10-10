@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { createSiteChromeRenderers } from "../PageBuilder/core/PageBuilder.siteChrome";
 import { resolveStrictPublishedPageByPath, getPublicPagePath } from "../PageBuilder/core/PageBuilder.routing";
@@ -15,7 +15,7 @@ import { runPublicElementAction } from "../PageBuilder/core/PageBuilder.actions"
 import { getStoredUrlError } from "../PageBuilder/core/PageBuilder.url";
 import "../../styles/admin/PageBuilder/index.css";
 
-export default function AcademyBuilderLanding({ schema, basePath = "", authenticated = false }) {
+export default function AcademyBuilderLanding({ schema, basePath = "", authenticated = false, registration }) {
   const navigate = useNavigate();
   const params = useParams();
   const activePage = resolveStrictPublishedPageByPath(schema?.pages, `/${params["*"] || ""}`, schema?.defaultPageId);
@@ -41,8 +41,13 @@ export default function AcademyBuilderLanding({ schema, basePath = "", authentic
       openExternal: url => { const target = new URL(url, window.location.origin); if (target.origin === window.location.origin) navigate(target.pathname + target.search + target.hash); else window.location.assign(target.href); },
     }),
   });
-  const { renderSiteHeader, renderSiteFooter } = createSiteChromeRenderers({ project: schema || { pages: [] }, activePage, selected: { type: "", id: "" }, preview: true, publicRuntime: true, selectPage, setSelected: () => {}, navigateUrl: url => navigate(url), navigationDestinations: getAcademyNavigationDestinations(basePath), authenticated });
+  const renderHeaderActions = () => <>
+    <Link className="academy-login-link" to={`${basePath}/login`}>{t("elearning.learner.logIn")}</Link>
+    {["open", "email_domain"].includes(registration) && <Link className="academy-signup-link" to={`${basePath}/login?register=1`}>{t("elearning.learner.signUp")}</Link>}
+    <button type="button" onClick={() => i18n.changeLanguage(i18n.language.startsWith("ar") ? "en" : "ar")}>{i18n.language.startsWith("ar") ? "English" : "العربية"}</button>
+  </>;
+  const { renderSiteHeader, renderSiteFooter } = createSiteChromeRenderers({ project: schema || { pages: [] }, activePage, selected: { type: "", id: "" }, preview: true, publicRuntime: true, selectPage, setSelected: () => {}, navigateUrl: url => navigate(url), navigationDestinations: getAcademyNavigationDestinations(basePath), authenticated, renderHeaderActions });
   if (!schema) return null;
   if (!activePage) return <p role="alert">{t("elearning.academy.pageNotFound")}</p>;
-  return <div ref={containerRef} dir="ltr" className="academy-landing-region tenant-runtime-page" style={getPageBuilderThemeVars(schema.theme)}><SiteRenderer project={schema} activePage={activePage} {...profile} canvasStyle={{ direction: i18n.dir() }} availablePresentationWidth={width} renderElement={renderElement} carouselElementTypes={carouselElementTypes} filterElement={element => ACADEMY_COMPONENT_TYPES.has(element.type)} renderSiteHeader={renderSiteHeader} renderSiteFooter={renderSiteFooter} className="academy-builder-landing" /></div>;
+  return <div ref={containerRef} dir="ltr" className={`academy-landing-region tenant-runtime-page${schema.name === "Madar Learning" ? " madar-learning-landing" : ""}`} style={getPageBuilderThemeVars(schema.theme)}><SiteRenderer project={schema} activePage={activePage} {...profile} canvasStyle={{ direction: i18n.dir() }} availablePresentationWidth={width} renderElement={renderElement} carouselElementTypes={carouselElementTypes} filterElement={element => ACADEMY_COMPONENT_TYPES.has(element.type)} renderSiteHeader={renderSiteHeader} renderSiteFooter={renderSiteFooter} className="academy-builder-landing" getSectionProps={section => ({ "data-landing-section": section.id })} /></div>;
 }

@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { Menu, X, GraduationCap } from "lucide-react";
+import { Menu, X } from "lucide-react";
 import { getBrandedMadarSubdomain } from "../../utils/hostedAddress";
 import { resolveMediaUrl } from "../../utils/media";
 import "../../styles/elearning-academy.css";
@@ -13,13 +13,17 @@ export default function AcademyNav({ site, authenticated = false, hasPlans = fal
   const [open, setOpen] = useState(false);
   const base = academyPath(site);
   return <header className={`academy-header${utility ? " academy-utility-header" : ""}`} dir={i18n.dir()}>
-    {!utility && <Link className="academy-brand" to={base}>{site.logo_url ? <img src={resolveMediaUrl(site.logo_url)} alt="" /> : <GraduationCap aria-hidden="true" />}<span>{site.brand}</span></Link>}
+    {!utility && <Link className="academy-brand" to={base}>{site.logo_url ? <img src={resolveMediaUrl(site.logo_url)} alt="" /> : <span className="academy-brand-mark" aria-hidden="true">{site.brand?.slice(0, 1).toUpperCase()}</span>}<span>{site.brand}</span></Link>}
     <button className="academy-menu" aria-label={t("elearning.academy.menu")} aria-expanded={open} onClick={() => setOpen(!open)}>{open ? <X /> : <Menu />}</button>
     <nav aria-label={t("elearning.academy.navigation")} className={open ? "is-open" : ""} onClick={() => setOpen(false)}>
+      <div className="academy-page-links">
       <Link to={base}>{t("elearning.academy.home")}</Link><Link to={`${base}/courses`}>{t("elearning.academy.courses")}</Link>
       {hasPlans && <Link to={`${base}/plans`}>{t("elearning.academy.plans")}</Link>}
-      {authenticated ? <><Link to="/my-learning">{t("elearning.player.myLearning")}</Link><Link to="/my-learning/plans">{t("elearning.commerce.myPlans")}</Link><Link to="/my-learning/certificates">{t("elearning.certificates.myCertificates")}</Link></> : <><Link to={`${base}/login`}>{t("elearning.academy.signIn")}</Link>{["open", "email_domain"].includes(site.academy_registration) && <Link to={`${base}/login?register=1`}>{t("elearning.learner.createAccount")}</Link>}</>}
+      </div>
+      <div className="academy-account-links">
+      {authenticated ? <Link to={`${base}/dashboard`}>{t("elearning.player.myLearning")}</Link> : <><Link to={`${base}/login`}>{t("elearning.learner.logIn")}</Link>{["open", "email_domain"].includes(site.academy_registration) && <Link className="academy-nav-signup" to={`${base}/login?register=1`}>{t("elearning.learner.signUp")}</Link>}</>}
       <button onClick={() => i18n.changeLanguage(i18n.language.startsWith("ar") ? "en" : "ar")}>{i18n.language.startsWith("ar") ? "English" : "العربية"}</button>
+      </div>
     </nav>
   </header>;
 }

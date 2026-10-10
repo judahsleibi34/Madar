@@ -1,10 +1,13 @@
 import { learningDescription } from "../../utils/elearningPresentation";
 import AcademyBuilderLanding from "./AcademyBuilderLanding";
+import madarLearningLanding from "../../content/pageBuilder/madarLearningLanding.json";
+import { getPageBuilderThemeVars } from "../PageBuilder/core/PageBuilder.theme";
+import { getAcademyAppearance } from "../../services/academyAppearance";
 import { AcademyCompositionContext } from "../PageBuilder/blocks/AcademyDataBlock";
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { Link, Navigate, Route, Routes, useLocation, useNavigate, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { Award, BookOpen, ArrowUpRight } from "lucide-react";
+import { Award, BookOpen, ArrowUpRight, Search, SlidersHorizontal, ChevronDown } from "lucide-react";
 import { fetchAcademy, academyReturnPath, loginAcademy, registerAcademy } from "../../services/elearningAcademy";
 import ELearningLearnerShell from "./ELearningLearnerShell";
 import * as commerce from "../../services/elearningCommerce";
@@ -35,33 +38,56 @@ export default function ELearningAcademy({ subdomain }) {
 }
 
 function AcademyContent({ data, refresh }) {
+  if (import.meta.env.DEV && import.meta.env.VITE_MADAR_LOCAL_LANDING_PREVIEW === "true" && data.site.subdomain === "testing") data = { ...data, landing: madarLearningLanding };
   const { t, i18n } = useTranslation("dashboard");
-  const site = data.site, base = academyPath(site), location = useLocation();
+  const site = getAcademyAppearance(data.site, data.landing);
+  const base = academyPath(site), location = useLocation();
+  useEffect(() => {
+    const code = new URLSearchParams(location.search).get("ref");
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(code || "")) {
+      try { sessionStorage.setItem(`academy-referral:${site.subdomain}`, code); } catch { /* Signup can also read the URL directly. */ }
+    }
+  }, [location.search, site.subdomain]);
+  const authPage = /\/login\/?$/.test(location.pathname);
   const view = location.pathname.endsWith("/courses") ? "catalog" : /\/login$/.test(location.pathname) ? "checkout" : "landing";
-  const presentation = !/^\/(courses|plans|login)(\/|$)/.test(location.pathname.slice(base.length));
+  const presentation = !/^\/(courses|plans|login|dashboard)(\/|$)/.test(location.pathname.slice(base.length));
+  const learnerSurface = data.authenticated && !presentation && !/\/login$/.test(location.pathname);
+  const publishedHeader = presentation && data.landing && (data.landing.siteChrome ? data.landing.siteChrome.showHeader : true);
   const selected = data.courses.find(c => location.pathname.endsWith(`/courses/${c.id}`));
-  const theme = Object.fromEntries(Object.entries(site.theme || {}).filter(([, v]) => /^#[a-f0-9]{6}$/i.test(v)).map(([k, v]) => [`--academy-${k}`, v]));
-  const Surface = data.authenticated ? ELearningLearnerShell : GuestSurface;
-  return <AcademyContext.Provider value={{ data, refresh }}><Surface site={site}><div className="academy" dir={i18n.dir()} lang={i18n.language} style={theme}>
+  const builderTheme = getPageBuilderThemeVars(data.landing?.theme || site.theme);
+  const theme = { ...builderTheme, "--academy-accent": builderTheme["--theme-primary"], "--academy-background": builderTheme["--theme-bg"], "--academy-surface": builderTheme["--theme-surface"], "--academy-text": builderTheme["--theme-text"], "--academy-muted": builderTheme["--theme-text-soft"] };
+  const Surface = learnerSurface ? ELearningLearnerShell : GuestSurface;
+  return <AcademyContext.Provider value={{ data, refresh }}><Surface site={site}><div className={`academy${presentation ? " academy-presentation" : ""}${learnerSurface ? " academy-learner" : ""}${authPage ? " academy-auth" : ""}`} dir={i18n.dir()} lang={i18n.language} style={theme}>
     <StorefrontSeo origin={window.location.origin} storePath={selected ? `${base}/courses/${selected.id}` : base} locale={i18n.language} site={{ ...site, brand: selected ? `${selected.name} | ${site.brand}` : site.brand, description: learningDescription(selected?.description) || site.description }} view={view} publicPage={{ title: selected ? `${selected.name} | ${site.brand}` : `${view === "catalog" ? `${t("elearning.academy.courses")} | ` : ""}${site.brand}`, description: learningDescription(selected?.description) || site.description, path: location.pathname }} />
-    {!data.authenticated && <AcademyNav site={site} authenticated={false} hasPlans={data.plans.length > 0} utility={presentation && Boolean(data.landing?.siteChrome?.showHeader)} />}
+    {!learnerSurface && !publishedHeader && <AcademyNav site={site} authenticated={data.authenticated} hasPlans={data.plans.length > 0} />}
     <main className="academy-main"><Routes>
       <Route index element={<AcademyPresentation data={data} />} />
+      <Route path="dashboard" element={data.authenticated ? <LearnerHome data={data} /> : <Navigate to={`${base}/login?returnTo=${encodeURIComponent(`${base}/dashboard`)}`} replace />} />
       <Route path="courses" element={<Catalog data={data} />} />
       <Route path="courses/:courseId" element={<Details data={data} refresh={refresh} />} />
       <Route path="plans" element={<Plans data={data} refresh={refresh} />} />
       <Route path="login" element={<AcademyLogin data={data} refresh={refresh} />} />
       <Route path="*" element={<AcademyPresentation data={data} />} />
     </Routes></main>
-    {(!presentation || !data.landing?.siteChrome?.showFooter) && <footer className="academy-footer"><strong>{site.brand}</strong><p>{site.description}</p><Link to={`${base}/courses`}>{t("elearning.academy.explore")}</Link><span>Madar</span></footer>}
+    {!learnerSurface && (!presentation || !data.landing?.siteChrome?.showFooter) && <footer className="academy-footer"><strong>{site.brand}</strong><p>{site.description}</p><Link to={`${base}/courses`}>{t("elearning.academy.explore")}</Link><span>Madar</span></footer>}
   </div></Surface></AcademyContext.Provider>;
 }
 
 function AcademyPresentation({ data }) {
-  return <AcademyCompositionContext.Provider value={{ data, renderCollection: (heading, courses) => <Collection title={heading} courses={courses} site={data.site} />, renderPlans: plans => <PlanCards data={{ ...data, plans }} preview /> }}><AcademyBuilderLanding schema={data.landing} authenticated={data.authenticated} basePath={academyPath(data.site)} /></AcademyCompositionContext.Provider>;
+  return <AcademyCompositionContext.Provider value={{ data, renderCollection: (heading, courses) => <Collection title={heading} courses={courses} site={data.site} />, renderPlans: plans => <PlanCards data={{ ...data, plans }} preview /> }}><AcademyBuilderLanding schema={data.landing} authenticated={data.authenticated} registration={data.site.academy_registration} basePath={academyPath(data.site)} /></AcademyCompositionContext.Provider>;
 }
 
 function GuestSurface({ children }) { return children; }
+
+function LearnerHome({ data }) {
+  const { t } = useTranslation("dashboard");
+  const continuing = data.continue_courses || [];
+  return <>
+    <header className="academy-learner-intro"><h1>{t("elearning.academy.home")}</h1><p>{t("elearning.player.intro")}</p><Link className="academy-button" to="/my-learning">{t("elearning.player.myLearning")}</Link></header>
+    <Collection title={t("elearning.player.continue")} courses={continuing} site={data.site} />
+    <Collection title={t("elearning.academy.explore")} courses={data.courses} site={data.site} link />
+  </>;
+}
 
 function CourseCard({ course, site }) {
   const { t } = useTranslation("dashboard");
@@ -90,7 +116,21 @@ function Collection({ title, courses, site, link = false }) {
 function Catalog({ data }) {
   const { t } = useTranslation("dashboard"); const [query, setQuery] = useState(""), [access, setAccess] = useState("");
   const filtered = data.courses.filter(c => `${c.name} ${learningDescription(c.description)} ${c.instructors.map(i => i.name).join(" ")}`.toLocaleLowerCase().includes(query.toLocaleLowerCase()) && (!access || c.access_type === access));
-  return <><h1>{t("elearning.academy.courses")}</h1><div className="academy-filters"><label>{t("elearning.academy.search")}<input type="search" value={query} onChange={e => setQuery(e.target.value)} /></label><label>{t("elearning.academy.access")}<select value={access} onChange={e => setAccess(e.target.value)}><option value="">{t("elearning.academy.all")}</option><option value="free">{t("elearning.academy.free")}</option><option value="paid">{t("elearning.academy.paid")}</option></select></label></div><Collection title={t("elearning.academy.explore")} courses={filtered} site={data.site} />{!filtered.length && <p>{t("elearning.academy.empty")}</p>}</>;
+  return <div className="academy-catalog">
+    <header className="academy-catalog-heading"><h1>{t("elearning.academy.courses")}</h1><p>{t("elearning.academy.catalogIntro")}</p></header>
+    <div className="academy-catalog-layout">
+      <aside className="academy-filters" aria-label={t("elearning.academy.filters")}>
+        <h2><SlidersHorizontal size={17} aria-hidden="true" />{t("elearning.academy.filters")}</h2>
+        <label>{t("elearning.academy.search")}<span className="academy-search-control"><input type="search" value={query} onChange={e => setQuery(e.target.value)} /><Search size={18} aria-hidden="true" /></span></label>
+        <label>{t("elearning.academy.access")}<span className="academy-select-control"><select value={access} onChange={e => setAccess(e.target.value)}><option value="">{t("elearning.academy.all")}</option><option value="free">{t("elearning.academy.free")}</option><option value="paid">{t("elearning.academy.paid")}</option></select><ChevronDown size={17} aria-hidden="true" /></span></label>
+      </aside>
+      <div className="academy-catalog-results">
+        <p className="academy-results-count" role="status">{t("elearning.academy.results", { count: filtered.length })}</p>
+        <Collection title={t("elearning.academy.explore")} courses={filtered} site={data.site} />
+        {!filtered.length && <p className="academy-catalog-empty">{t("elearning.academy.empty")}</p>}
+      </div>
+    </div>
+  </div>;
 }
 function PrimaryAction({ course, card = false }) {
   const { data, refresh } = useContext(AcademyContext), { t } = useTranslation("dashboard"), navigate = useNavigate();
@@ -151,15 +191,24 @@ function AcademyLogin({ data }) {
   const { t } = useTranslation("dashboard"), location = useLocation();
   const [email, setEmail] = useState(""), [password, setPassword] = useState(""), [name, setName] = useState(""), [registering, setRegistering] = useState(new URLSearchParams(location.search).get("register") === "1" && ["open", "email_domain"].includes(data.site.academy_registration)), [verification, setVerification] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState(null);
   const base = academyPath(data.site), requested = new URLSearchParams(location.search).get("returnTo");
-  const target = academyReturnPath(requested, base, window.location.origin, true);
+  const safeTarget = academyReturnPath(requested, base, window.location.origin, true);
+  const target = safeTarget === base || safeTarget.split(/[?#]/)[0] === `${base}/login` ? `${base}/dashboard` : safeTarget;
   async function submit(e) {
     e.preventDefault(); setBusy(true); setError(null);
     try {
       const payload = { email, password, return_to: target };
-      if (registering) { const result = await registerAcademy(data.site.subdomain, { ...payload, full_name: name }); setVerification(result.requires_email_verification); setRegistering(false); }
+      if (registering) {
+        let referralCode = new URLSearchParams(location.search).get("ref");
+        try { referralCode ||= sessionStorage.getItem(`academy-referral:${data.site.subdomain}`); } catch { /* Storage is optional. */ }
+        const result = await registerAcademy(data.site.subdomain, { ...payload, full_name: name, ...(referralCode ? { referral_code: referralCode } : {}) });
+        try { sessionStorage.removeItem(`academy-referral:${data.site.subdomain}`); } catch { /* Storage is optional. */ }
+        if (result.requires_email_verification) { setVerification(true); setRegistering(false); }
+        else { const session = await loginAcademy(data.site.subdomain, payload); window.location.assign(session.return_to); }
+      }
       else { const result = await loginAcademy(data.site.subdomain, payload); window.location.assign(result.return_to); }
     } catch (failure) { setError(failure); } finally { setBusy(false); }
   }
+  if (data.authenticated) return <Navigate to={target} replace />;
   return <form className="academy-login" onSubmit={submit}><h1>{t(registering ? "elearning.learner.createAccount" : "elearning.academy.signIn")}</h1>
     {verification && <p role="status">{t("elearning.learner.verifyEmail")}</p>}
     {registering && <label>{t("elearning.learner.name")}<input autoComplete="name" required value={name} onChange={e => setName(e.target.value)} /></label>}

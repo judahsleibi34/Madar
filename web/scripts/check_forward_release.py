@@ -295,6 +295,29 @@ def validate(root: Path = ROOT) -> list[str]:
 
             previous = number
 
+        # Retain the referral candidate without changing the active schema115
+        # release or the immutable 115..135 execution manifest.
+        referral_path = release_dir / "migrations-115-136.json"
+        if digest(referral_path) != "7ce4527369df9f48be3830074e94838686bd74f9895d4a5480d67b78f5860e7f":
+            errors.append("retained referral candidate manifest changed")
+        referral_entries = json.loads(referral_path.read_text())["migrations"]
+        if referral_entries[:-1] != entries or len(referral_entries) != len(entries) + 1:
+            errors.append("retained referral candidate history invalid")
+        if not referral_entries:
+            raise ValueError("retained referral candidate manifest empty")
+        referral = referral_entries[-1]
+        filename = "136_add_academy_referral_rewards.sql"
+        if (referral["number"] != 136 or referral["from_schema"] != 135
+                or referral["to_schema"] != 136
+                or referral["compatibility"] != "forward-compatible"
+                or referral["path"] != "web/database/migrations/" + filename):
+            errors.append("retained referral candidate transition invalid")
+        database = root / "web/database/migrations" / filename
+        supabase = root / "web/supabase/migrations" / filename
+        if (database.read_bytes() != supabase.read_bytes()
+                or digest(database) != referral["sha256"]):
+            errors.append("retained referral candidate mirror/checksum invalid")
+
         for tree in ("database", "supabase"):
             versions = sorted(
                 int(path.name.split("_", 1)[0])
@@ -303,10 +326,10 @@ def validate(root: Path = ROOT) -> list[str]:
                 ).glob("*.sql")
             )
 
-            if versions != list(range(1, TARGET_SCHEMA + 1)):
+            if versions != list(range(1, 137)):
                 errors.append(
                     "migration namespace must contain exactly "
-                    f"001 through {TARGET_SCHEMA:03d}: {tree}"
+                    f"001 through 136: {tree}"
                 )
 
     except (OSError, KeyError, ValueError, TypeError) as error:

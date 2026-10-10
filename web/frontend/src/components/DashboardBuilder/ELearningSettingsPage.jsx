@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Save, Settings2, BookOpen, ListOrdered, Award, Palette, Info, Upload } from "lucide-react";
+import { Save, Settings2, BookOpen, ListOrdered, Award, Palette, Info, Upload, Gift } from "lucide-react";
 import { elearningTerminologyGroups } from "../../config/elearningTerminology";
 import { resolveMediaUrl } from "../../utils/media";
 import { useELearningTerminology } from "../../hooks/useELearningTerminology";
@@ -52,6 +52,7 @@ export default function ELearningSettingsPage({ user }) {
   const { t, i18n } = useTranslation("dashboard");
   const { updateSettings } = useELearningTerminology();
   const [settings, setSettings] = useState(null);
+  const [referralsAvailable, setReferralsAvailable] = useState(false);
   const [available, setAvailable] = useState(false);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -64,7 +65,7 @@ export default function ELearningSettingsPage({ user }) {
   useEffect(() => {
     let cancelled = false;
     fetchELearningSettings().then((data) => {
-      if (!cancelled) { setSettings(data.settings); setAvailable(data.available); }
+      if (!cancelled) { setSettings(data.settings); setAvailable(data.available); setReferralsAvailable(Boolean(data.referrals_available)); }
     }).catch((failure) => {
       if (!cancelled) setError(failure.status === 403 ? "forbidden" : "loadError");
     }).finally(() => { if (!cancelled) setLoading(false); });
@@ -156,6 +157,21 @@ export default function ELearningSettingsPage({ user }) {
             </label>)}
           </div>
         </section>; })}
+        <section className="settings-card" aria-labelledby="elearning-referrals">
+          <header className="elearning-card-heading"><span className="elearning-card-icon"><Gift size={20} aria-hidden="true" /></span><div><h3 id="elearning-referrals">{t("elearning.referrals.settings")}</h3><p>{t("elearning.referrals.settingsHelp")}</p></div></header>
+          {!referralsAvailable && <p role="status">{t("elearning.referrals.upgradeRequired")}</p>}
+          <fieldset disabled={!referralsAvailable} className="settings-form-grid">
+            <label className="elearning-toggle"><span>{t("elearning.referrals.enable")}</span><input type="checkbox" role="switch" checked={Boolean(settings.referral_rewards_enabled)} onChange={event => update("referral_rewards_enabled", event.target.checked)} /></label>
+            <label className="elearning-field"><span>{t("elearning.referrals.amount")}</span><input type="number" min={settings.referral_rewards_enabled ? "0.01" : "0"} max="999999999999.99" step="0.01" required value={settings.referral_reward_amount ?? "0.00"} onChange={event => update("referral_reward_amount", event.target.value)} /></label>
+            <label className="elearning-field"><span>{t("elearning.referrals.currency")}</span>
+              <select required value={settings.referral_reward_currency || "USD"} onChange={event => update("referral_reward_currency", event.target.value)}>
+                {["USD", "ILS", "EUR"].map(currency => <option key={currency} value={currency}>{t(`elearning.referrals.currencies.${currency}`)}</option>)}
+                {settings.referral_reward_currency && !["USD", "ILS", "EUR"].includes(settings.referral_reward_currency) && <option value={settings.referral_reward_currency}>{settings.referral_reward_currency}</option>}
+              </select>
+            </label>
+            <p>{t("elearning.referrals.termsHelp")}</p>
+          </fieldset>
+        </section>
         <div className="elearning-actions"><button className="settings-save-button" type="submit" disabled={saving || uploading || !available}><Save size={16} aria-hidden="true" />{t(saving ? "elearning.saving" : "elearning.save")}</button></div>
       </fieldset>
       {saved && <p role="status" className="elearning-feedback">{t("elearning.saved")}</p>}

@@ -1,5 +1,20 @@
 # Madar production release acceptance policy
 
+The referral candidate retains an additional checksum-pinned, unselected
+`migrations-115-136.json` / `schema-114-136-bridge.json` pair. The 115..135
+manifest and its pinned history remain unchanged. `check_migrations.py` accepts
+only the exact additional 136 artifact and verifies the old entries are
+identical; `check_forward_release.py` also validates this additional pinned
+candidate and exact namespace 001..136. Unknown future migrations still fail. Main's active schema115 profile
+still selects no SQL. Migration136 requires schema135 and adds tenant-private
+referrals plus monetary reward/reversal records tied atomically to a verified
+first learning purchase. Runtime endpoints and enabling referrals fail closed
+before schema136. Historical rewards keep their amount/currency; local payment
+simulation is displayed separately. Payouts, redemption, payment-provider
+activation and production migration are outside this candidate. A separately
+accepted bridge, backup and approved upgrade are required before production use.
+
+
 Active local-Supabase integration profile: **schema115 only**, migration class
 `none`, migration policy `none`, no selected migration manifest. Retained bridge
 examples below describe reviewed migration history/future work and authorize no

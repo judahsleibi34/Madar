@@ -25,7 +25,7 @@ class ELearningSettingsTests(unittest.TestCase):
         self.addCleanup(self.availability.stop)
 
     def test_reads_and_writes_use_session_tenant(self):
-        values = service.ELearningSettings(platform_name="Shared Learning", course_label="Workshop").model_dump()
+        values = service.ELearningSettings(platform_name="Shared Learning", course_label="Workshop").model_dump(mode="json")
         with patch.object(service, "get_settings", return_value=values) as read:
             result = self.client.get("/elearning/settings")
         self.assertEqual(result.json()["settings"]["course_label"], "Workshop")
@@ -101,7 +101,7 @@ class ELearningSettingsTests(unittest.TestCase):
             self.assertEqual(service.get_settings(17)["course_label"], "Workshop")
             query.select.return_value.eq.assert_called_once_with("tenant_id", 17)
             service.save_settings(17, service.ELearningSettings())
-            client.rpc.assert_called_once_with("save_elearning_settings", {"p_tenant_id": 17, "p_settings": service.ELearningSettings().model_dump()})
+            client.rpc.assert_called_once_with("save_elearning_settings", {"p_tenant_id": 17, "p_settings": service.ELearningSettings().model_dump(mode="json")})
 
     def test_database_failure_returns_safe_error(self):
         with patch.object(service, "get_settings", side_effect=RuntimeError("internal SQL secret")):

@@ -9,3 +9,5 @@ export const fetchMyLearning = (offset = 0) => request(`?offset=${offset}`);
 export const fetchLearningCourse = (course) => request(`/courses/${encodeURIComponent(course)}`);
 export const fetchLearningLesson = (course, lesson) => request(`/courses/${encodeURIComponent(course)}/lessons/${encodeURIComponent(lesson)}`);
 export const completeLearningLesson = (course, lesson) => request(`/courses/${encodeURIComponent(course)}/lessons/${encodeURIComponent(lesson)}/completion`, "POST");
+
+export const fetchReferralAccount = () => request("/referrals");

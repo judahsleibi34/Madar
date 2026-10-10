@@ -40,6 +40,7 @@ export const createSiteChromeRenderers = ({
   navigateUrl,
   navigationDestinations = [],
   authenticated = false,
+  renderHeaderActions,
 }) => {
   const renderSiteHeader = () => {
     const site = project.siteChrome || defaultSiteChrome;
@@ -128,6 +129,8 @@ export const createSiteChromeRenderers = ({
             </button>
           )}
 
+          {renderHeaderActions && <div className="built-site-header-actions">{renderHeaderActions()}</div>}
+
           {publicRuntime && (
             <details className="built-site-mobile-menu">
               <summary aria-label="Open navigation menu">
@@ -136,6 +139,7 @@ export const createSiteChromeRenderers = ({
                 <span aria-hidden="true" />
               </summary>
               <div className="built-site-mobile-menu-panel">
+                {renderHeaderActions?.()}
                 {navigablePages.map((page) => (
                   <button
                     type="button"

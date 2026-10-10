@@ -19,6 +19,13 @@ def my_learning(request: Request, response: Response, limit: int = Query(50, ge=
     return operation(lambda: service.my_learning(actor, limit, offset))
 
 
+@router.get("/referrals")
+def referrals(request: Request, response: Response):
+    actor = member(request, response)
+    from services import academy_referral_service
+    return operation(lambda: academy_referral_service.account(actor))
+
+
 @router.get("/courses/{course_id}")
 def course(course_id: UUID, request: Request, response: Response):
     actor = member(request, response)

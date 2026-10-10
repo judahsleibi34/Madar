@@ -23,7 +23,7 @@ def get_settings(request: Request, response: Response):
     try:
         available = service.settings_available()
         settings = service.get_settings(context.tenant_id) if available else service.ELearningSettings().model_dump()
-        return {"success": True, "settings": settings, "available": available, "academy": member_profile(context.tenant_id) if settings.get("academy_enabled") else None, "academy_management": management_profile(context.tenant_id) if available else None}
+        return {"success": True, "settings": settings, "available": available, "referrals_available": service.settings_available(136), "academy": member_profile(context.tenant_id) if settings.get("academy_enabled") else None, "academy_management": management_profile(context.tenant_id) if available else None}
     except HTTPException:
         raise
     except Exception:

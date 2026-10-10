@@ -17,6 +17,7 @@ import "../../styles/admin/dashboard/elearning-player.css";
 import useLearningDrawer from "../../hooks/useLearningDrawer";
 import ChangePasswordPage from "../DashboardBuilder/ChangePasswordPage";
 import ELearningLearnerShell from "./ELearningLearnerShell";
+import LearnerAccount from "./LearnerAccount";
 
 import { MyCertificates, CredentialView } from "./ELearningCertificates";
 
@@ -63,11 +64,6 @@ export default function ELearningPlayer() {
   return <ELearningTerminologyContext.Provider value={terminology}><ELearningLearnerShell site={state.data.academy}><main className="ecommerce-page elearning-management elearning-player" dir={i18n.dir()} lang={i18n.language}>
     <Routes><Route index element={<MyLearning />} /><Route path="account" element={<LearnerAccount />} /><Route path="account/password" element={<ChangePasswordPage lang={i18n.language.startsWith("ar") ? "ar" : "en"} backPath="/my-learning/account" backLabel={t("elearning.learner.account")} />} /><Route path="certificates" element={<MyCertificates />} /><Route path="certificates/:credentialId" element={<CredentialView />} /><Route path="catalog" element={<ELearningCatalog />} /><Route path="plans" element={<MyLearningPlans />} /><Route path="courses/:courseId" element={<CourseEntry />} /><Route path="courses/:courseId/lessons/:lessonId" element={<CourseEntry />} /><Route path="courses/:courseId/assessments/:placementId" element={<CourseEntry />} /><Route path="*" element={<ErrorState error={{ status: 404 }} retry={state.retry} />} /></Routes>
   </main></ELearningLearnerShell></ELearningTerminologyContext.Provider>;
-}
-
-function LearnerAccount() {
-  const { t } = useTranslation("dashboard");
-  return <section className="ecommerce-list-card"><h1>{t("elearning.learner.account")}</h1><p>{t("elearning.learner.accountHelp")}</p><Link to="/my-learning/account/password">{t("elearning.learner.changePassword")}</Link></section>;
 }
 
 function MyLearning() {
