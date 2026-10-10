@@ -1,5 +1,12 @@
 # Madar Auto-Deploy Merge Contract
 
+An additional unselected source115-to-136 bridge and migrations116..136 manifest
+preserve the exact historical SQL/checksums without changing the active115
+no-migration release. Selection requires separately accepted compatible images,
+current-data rehearsal and governed production approval. Default-DNS container
+specification comparison tolerates only Docker's null/empty-list encoding change;
+it grants no authority and does not silently update installed frozen boot code.
+
 The referral candidate retains an additional checksum-pinned, unselected
 `migrations-115-136.json` / `schema-114-136-bridge.json` pair. The 115..135
 manifest and its pinned history remain unchanged. `check_migrations.py` accepts

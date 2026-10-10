@@ -1,5 +1,22 @@
 # Privileged control-plane upgrade architecture
 
+Docker daemon reload may serialize an unset container DNS list from null to [].
+The full original specification remains bound: only these two equivalent default
+representations are compared, without changing historical receipts. Explicit DNS
+servers or other altered specifications still reject; the existing governed
+worker first-start OOM exception remains separately restricted. Development code
+does not change an installed frozen boot actor. Supersession still requires an
+exact-source governed operation and measured installation preimages; consumed
+cutovers cannot be replayed to install this correction.
+
+Newly governed normal boot units are wanted by both multi-user.target and
+docker.service and participate in Docker service restarts. Requires/After still
+order native Docker and the existing compensation listener before the unchanged
+completed-NORMAL guard, write fence, exact-ID startup and sustained validation.
+Enabling a staged unit does not start it. Existing installed units retain their
+bytes until explicitly approved supersession; source changes alone do not repair
+their missing daemon-restart dependency.
+
 Active local-Supabase integration profile: **schema115 only**, migration class
 `none`, migration policy `none`, no selected migration manifest. Retained bridge
 examples below describe reviewed migration history/future work and authorize no
