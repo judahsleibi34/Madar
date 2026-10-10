@@ -169,12 +169,12 @@ class ProductionActiveRecoveryOperations:
 
     def quiesce_backup_timers_before_staging(self, plan, root):
         ActiveRecoveryBackupTimers(plan,root,self.source.verify).quiesce()
+        marker = Path('/var/lib/madar/backup-state/latest.json')
+        exclusive(root/'backup-health-preimage.json',readonly_configuration(marker,private=False).read_bytes())
         from deployment.lib.active_recovery_retained_fallback import declaration as retained,verify_backup
         if retained(plan):
             verify_backup(plan)
             return
-        marker = Path('/var/lib/madar/backup-state/latest.json')
-        exclusive(root/'backup-health-preimage.json',readonly_configuration(marker,private=False).read_bytes())
         from deployment.lib.active_recovery_backup_freshness import declaration,require_publication
         if declaration(plan):
             # Keep the genuinely fresh ordinary backup; never overwrite it with
