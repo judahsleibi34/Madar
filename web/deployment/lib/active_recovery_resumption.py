@@ -63,7 +63,7 @@ class ResumptionPlan:
             compensated=destination.get('post_compensation')
             if compensated is not None:
                 if ('previous_candidate' in destination or not isinstance(compensated,dict)
-                        or set(compensated) not in ({'baseline','baseline_sha256'},{'baseline','baseline_sha256','pre_grant_backup'})
+                        or set(compensated) not in ({'baseline','baseline_sha256'},{'baseline','baseline_sha256','pre_grant_backup'},{'baseline','baseline_sha256','retained_fallback'})
                         or not HASH.fullmatch(str(compensated['baseline_sha256']))
                         or not isinstance(compensated['baseline'],dict)
                         or digest(compensated['baseline'])!=compensated['baseline_sha256']
@@ -73,6 +73,13 @@ class ResumptionPlan:
                         or compensated['baseline'].get('database_authority')!='current_local'
                         or not HASH.fullmatch(str(compensated['baseline'].get('previous_plan_sha256')))):
                     raise RuntimeError('resumption_compensated_binding_invalid')
+                retained=compensated.get('retained_fallback')
+                if retained is not None and (not isinstance(retained,dict)
+                        or set(retained)!={'operation','backup_plan_sha256','backup_receipt_sha256','backup_publication_sha256'}
+                        or retained.get('operation')!='reuse-verified-compensated-local-release'
+                        or any(not HASH.fullmatch(str(retained.get(k))) for k in (
+                            'backup_plan_sha256','backup_receipt_sha256','backup_publication_sha256'))):
+                    raise RuntimeError('resumption_retained_fallback_binding_invalid')
                 repair=compensated.get('pre_grant_backup')
                 if repair is not None and (not isinstance(repair,dict)
                         or set(repair)!={'operation','marker_sha256','latest_sha256'}

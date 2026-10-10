@@ -37,10 +37,23 @@ class ActiveRecoveryBootInstallation:
         expected_service='madar-normal-local-fallback-'+self.plan.digest[:12]+'.service'
         if compensated:
             prior=compensated['baseline']['previous_plan_sha256']
-            if listeners.get('reused_from_plan')!=prior:raise RuntimeError('boot_installation_reused_listener_not_bound')
-            expected_service='madar-normal-local-fallback-'+prior[:12]+'.service'
-            expected_hash=compensated['baseline']['startup']['files'].get(str(UNITS/expected_service))
-            if listeners.get('unit_sha256')!=expected_hash:raise RuntimeError('boot_installation_reused_listener_changed')
+            old_service='madar-normal-local-fallback-'+prior[:12]+'.service'
+            if compensated.get('retained_fallback'):
+                intent=json.loads(protected(self.root/'fallback-supersession-intent.json',private=True).read_text())
+                expected_hash=compensated['baseline']['startup']['files'][str(UNITS/old_service)]
+                if (listeners.get('superseded_listener')!=old_service or listeners.get('retained_local_fallback') is not True
+                        or intent.get('plan_sha256')!=self.plan.digest or intent.get('source_bundle_sha256')!=self.plan.source_bundle_sha256
+                        or intent.get('previous_service')!=old_service or intent.get('previous_unit_sha256')!=expected_hash
+                        or intent.get('replacement_service')!=expected_service or intent.get('replacement_unit_sha256')!=listeners.get('unit_sha256')
+                        or file_digest(protected(UNITS/old_service))!=expected_hash
+                        or file_digest(protected(self.root/'fallback-unit-preimage.service',private=True))!=expected_hash
+                        or self.ops.systemctl_state(old_service)!={'enabled':'disabled','active':'inactive'}):
+                    raise RuntimeError('boot_installation_listener_supersession_changed')
+            else:
+                if listeners.get('reused_from_plan')!=prior:raise RuntimeError('boot_installation_reused_listener_not_bound')
+                expected_service=old_service
+                expected_hash=compensated['baseline']['startup']['files'].get(str(UNITS/expected_service))
+                if listeners.get('unit_sha256')!=expected_hash:raise RuntimeError('boot_installation_reused_listener_changed')
         if (listeners.get('plan_sha256')!=self.plan.digest or listeners.get('source_bundle_sha256')!=self.plan.source_bundle_sha256
                 or listeners.get('service')!=expected_service):
             raise RuntimeError('boot_installation_listener_binding_changed')
@@ -119,6 +132,9 @@ def verify_post_compensation_boot(plan,root,runtime):
     compensated=(plan.candidate_destination or {}).get('post_compensation')
     if not compensated:raise RuntimeError('boot_supersession_contract_required')
     root=Path(root);baseline=compensated['baseline']['startup'];previous=compensated['baseline']['previous_plan_sha256']
+    if compensated.get('retained_fallback'):
+        # Recheck the new listener and the unmodified consumed preimage.
+        verify_retained_listener_supersession(plan,root,runtime)
     receipt=json.loads(protected(root/'boot-installation.json',private=True).read_text())
     intent=json.loads(protected(root/'boot-supersession-intent.json',private=True).read_text())
     name='madar-normal-local-boot-'+plan.digest[:12]+'.service'
@@ -153,3 +169,23 @@ def verify_post_compensation_boot(plan,root,runtime):
     if states!={'ActiveState':'inactive','UnitFileState':'disabled'}:
         raise RuntimeError('boot_supersession_consumed_actor_not_disabled')
     return receipt
+
+
+def verify_retained_listener_supersession(plan,root,runtime):
+    root=Path(root);binding=plan.candidate_destination['post_compensation'];previous=binding['baseline']['previous_plan_sha256']
+    old='madar-normal-local-fallback-'+previous[:12]+'.service';new='madar-normal-local-fallback-'+plan.digest[:12]+'.service'
+    record=json.loads(protected(root/'fallback-listener-installation.json',private=True).read_text())
+    intent=json.loads(protected(root/'fallback-supersession-intent.json',private=True).read_text())
+    expected=binding['baseline']['startup']['files'][str(UNITS/old)]
+    if (record.get('plan_sha256')!=plan.digest or record.get('source_bundle_sha256')!=plan.source_bundle_sha256
+            or record.get('service')!=new or record.get('superseded_listener')!=old
+            or intent.get('plan_sha256')!=plan.digest or intent.get('source_bundle_sha256')!=plan.source_bundle_sha256
+            or intent.get('previous_service')!=old or intent.get('previous_unit_sha256')!=expected
+            or intent.get('replacement_service')!=new or intent.get('replacement_unit_sha256')!=record.get('unit_sha256')
+            or file_digest(protected(UNITS/old))!=expected
+            or file_digest(protected(root/'fallback-unit-preimage.service',private=True))!=expected
+            or file_digest(protected(UNITS/new))!=record.get('unit_sha256')):
+        raise RuntimeError('retained_listener_supersession_changed')
+    for name,wanted in ((old,{'ActiveState':'inactive','UnitFileState':'disabled'}),(new,{'ActiveState':'active','UnitFileState':'enabled'})):
+        state=dict(line.split('=',1) for line in runtime.command(['systemctl','show',name,'--property=ActiveState,UnitFileState','--no-pager']).splitlines())
+        if state!=wanted:raise RuntimeError('retained_listener_supersession_state_changed')

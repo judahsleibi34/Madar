@@ -21,7 +21,7 @@ EXECUTABLES_BASE=Path('/run')
 def declaration(plan):
     return ((getattr(plan,'candidate_destination',None) or {}).get('post_compensation') or {}).get('pre_grant_backup')
 
-def require_publication(plan,package,runtime=None):
+def require_publication(plan,package,runtime=None, *, verify_availability=True):
     if declaration(plan) is None:return
     runtime=runtime or Runtime();root=BASE/plan.digest
     auth=json.loads(protected(root/'authorization.json',private=True).read_text())
@@ -53,6 +53,7 @@ def require_publication(plan,package,runtime=None):
             or receipt.get('captured_release_sha')!=manifest['release']['git_sha']
             or manifest['backup_id']!=record.get('backup_id')):
         raise RuntimeError('recovery_backup_restore_replica_not_proven')
+    if not verify_availability:return record
     from deployment.lib.active_recovery_compensated import inspect_history
     from deployment.lib.active_recovery_fallback import CurrentDataFallback
     previous,previous_root,_,_=inspect_history(plan.candidate_destination['post_compensation']['baseline']['previous_plan_sha256'])

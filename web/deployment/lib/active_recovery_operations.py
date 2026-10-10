@@ -40,7 +40,8 @@ class ProductionActiveRecoveryOperations:
         self.source = FrozenContinuationSource(plan, self.package)
         self.runtime = Runtime()
         self.runtime.expected_nginx_sha256 = plan.retained_inputs['proxy_configuration']
-        self.backup_preparation=False
+        from deployment.lib.active_recovery_retained_fallback import declaration
+        self.backup_preparation=bool(declaration(plan))
         self.candidate = self.workers = self.kernel = self.handoff = self.controller = None
 
     def compensated_binding(self):
@@ -77,6 +78,8 @@ class ProductionActiveRecoveryOperations:
         self.verify_frozen_source(plan)
         from deployment.lib.active_recovery_backup_freshness import declaration,require_publication
         if declaration(plan) and not self.backup_preparation:require_publication(plan,self.package,self.runtime)
+        from deployment.lib.active_recovery_retained_fallback import declaration as retained,verify_backup
+        if retained(plan):verify_backup(plan)
         from deployment.lib.active_recovery_controller import prior_backup_timer_states
         prior=prior_backup_timer_states(plan)
         if prior is not None:
@@ -106,6 +109,10 @@ class ProductionActiveRecoveryOperations:
             raise RuntimeError('continuation_emergency_installation_changed')
 
     def verify_restricted_fallback(self, plan):
+        from deployment.lib.active_recovery_retained_fallback import declaration,verify_runtime
+        if declaration(plan):
+            self.require_no_normal_write_authority()
+            return verify_runtime(plan,self.runtime)
         if self.compensated_binding() and not (self.root/'installed-controller.json').exists():
             from deployment.lib.active_recovery_compensated import inspect_history
             from deployment.lib.active_recovery_fallback import CurrentDataFallback
@@ -162,6 +169,10 @@ class ProductionActiveRecoveryOperations:
 
     def quiesce_backup_timers_before_staging(self, plan, root):
         ActiveRecoveryBackupTimers(plan,root,self.source.verify).quiesce()
+        from deployment.lib.active_recovery_retained_fallback import declaration as retained,verify_backup
+        if retained(plan):
+            verify_backup(plan)
+            return
         marker = Path('/var/lib/madar/backup-state/latest.json')
         exclusive(root/'backup-health-preimage.json',readonly_configuration(marker,private=False).read_bytes())
         from deployment.lib.active_recovery_backup_freshness import declaration,require_publication

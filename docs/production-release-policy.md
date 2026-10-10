@@ -2082,3 +2082,25 @@ Post-compensation continuation requires a new independently executed read-only r
 Failed read-only reconciliation executions remain at their original paths. A later successful run creates a new immutable source snapshot and execution record; only successful actual executions receive a new exact-hash index. Foreign paths, source namespaces and execution hashes fail closed.
 
 A state-F plan may declare a source-bound `pre_grant_backup` with exact ordinary LATEST and health-marker preimages. Read-only preparation may observe readiness 503 solely for stale backup freshness while database, Auth, schema, storage, Redis, environment, MFA policy, parser isolation, identities, transactions and consumer fences remain verified. This observation does not authorize forwarding, worker startup or writes. The hash-gated `finish_compensated_normal.py` first consumes a separate append-only, exact-plan recovery-backup namespace. It captures current authoritative data with a root-sealed database lease and an unprivileged, no-new-privileges, empty-group child with Docker denied. A private portless unprivileged Nginx proxy exposes the genuinely retained installed release's version; no normal release is invented. Independent native logical restore and distinct append-only Node 1 replication must pass before ordinary freshness publication. The unchanged normal bootstrap then requires the protected backup publication, sustained full fallback/public/proxy readiness and every normal source-bound gate. Test backups are never promoted; no checkpoint date, historical receipt or customer database is restored or changed. A failed backup-first attempt remains consumed and stops before candidate creation.
+
+
+### Schema-115 continuation after routing restoration
+
+A freshly approved state-F continuation may retain the already-compensated local
+release as its READ_ONLY fallback. It binds the completed routing-only operation
+as historical data and independently verifies current container/image/specification,
+loopback ownership, network objects, revoked authority and stopped original workers.
+The fallback requires healthy core services and genuinely current ordinary backup
+freshness; only intentionally stopped business-worker readiness remains unavailable.
+This does not satisfy NORMAL readiness. Original registered fallback records and
+expired preparation markers remain unchanged.
+
+The existing continuation listener may be superseded on its existing ports only
+under fresh exact-source authority, after detached candidate verification. Preserve
+its exact unit and attested preimage; validate the replacement before stopping the
+consumed listener and restore the prior service if activation fails. Retain the
+working green route throughout preparation. Preserve the genuinely verified current
+backup rather than rewriting its marker with a historical checkpoint timestamp.
+The normal source fence preserves this explicitly verified READ_ONLY rollback
+release; all other source, tenant, worker, final grant, backup and boot gates remain
+mandatory. This profile authorizes no migrations or customer database restoration.

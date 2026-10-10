@@ -81,6 +81,18 @@ class CurrentLocalReconciliation:
         dependencies=json.loads(protected(self.root/'runtime-dependencies.json',private=True).read_text())
         if digest(dependencies)!=self.plan.retained_inputs['runtime_dependencies']:
             raise RuntimeError('reconciliation_retained_binding_changed')
+        from deployment.lib.active_recovery_retained_fallback import declaration,verify_runtime
+        if declaration(self.plan):
+            # This is the explicitly retained READ_ONLY rollback, not an old
+            # writer. Its revoked root authority and stopped old consumers are
+            # independently rechecked before and after reconciliation.
+            from deployment.lib.active_recovery_boot_installation import verify_post_compensation_boot
+            from deployment.lib.emergency_routing_repair import Runtime
+            runtime=Runtime();verify_post_compensation_boot(self.plan,self.root,runtime)
+            verify_runtime(self.plan,runtime)
+            exclusive(self.root/'retained-writer-fence.json',encoded({'version':1,'plan_sha256':self.plan.digest,
+                'retained_read_only_fallback':True,'database_restore':False,'retained_container_ids':{}}))
+            self.source_guard();return
         selected={}
         slot=self.plan.candidate_destination['retained_slot']
         for role in ('backend','frontend'):

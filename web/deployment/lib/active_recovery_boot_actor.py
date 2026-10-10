@@ -159,7 +159,11 @@ class ActiveRecoveryBootActor:
         if observe_retained_inputs(post_compensation=True)!=self.plan.retained_inputs:
             raise RuntimeError('boot_actor_early_recovery_changed')
         previous,previous_root,_,_=inspect_history(compensated['baseline']['previous_plan_sha256'])
-        CurrentDataFallback(previous,previous_root,runtime=self.runtime).verify()
+        from deployment.lib.active_recovery_retained_fallback import declaration
+        if declaration(self.plan):
+            CurrentDataFallback(previous,previous_root,runtime=self.runtime).verify(backup_preparation=True)
+            self.fallback.verify()
+        else:CurrentDataFallback(previous,previous_root,runtime=self.runtime).verify()
 
     def resume(self):
         phase=self.phase()
