@@ -101,3 +101,20 @@ def discover_split(operations,state,production_sha,installed_sha):
     if authority.get('mode')!='NORMAL' or authority.get('release_sha')!=binding['application_sha'] or authority.get('schema')!=115:
         raise RuntimeError('completed_normal_positive_authority_required')
     return binding
+
+def attest_runtime(operations,state):
+    """Use the completed continuation's exact-ID live verifier, read-only.
+
+    Its image IDs and parser/worker inventory differ from an ordinary release;
+    never synthesize a registry reference or skip specification/ownership checks.
+    """
+    from types import SimpleNamespace
+    from deployment.lib.active_recovery_boot_actor import ActiveRecoveryBootActor
+    binding=discover_split(operations,state,operations.repository_head(),operations.installed_sha())
+    root=Path(binding['completion_root']);plan=load_saved_resumption_plan(root)
+    source=SimpleNamespace(verify=lambda:historical_source(plan))
+    actor=ActiveRecoveryBootActor(plan,root,BASE/('normal-source-'+plan.source_bundle_sha256),source=source)
+    actor.assemble();actor.completed_evidence();actor.kernel.normal()
+    if discover_split(operations,state,operations.repository_head(),operations.installed_sha())!=binding:
+        raise RuntimeError('completed_normal_runtime_source_changed')
+    return binding

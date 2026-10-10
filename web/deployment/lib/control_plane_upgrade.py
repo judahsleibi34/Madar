@@ -30,6 +30,11 @@ from typing import Any
 LIB_ROOT = Path(__file__).resolve().parent
 if str(LIB_ROOT) not in sys.path:
     sys.path.insert(0, str(LIB_ROOT))
+# Both the source and installed layouts contain deployment/ below this trusted
+# parent. Isolated launcher execution must find its measured sibling package.
+PACKAGE_ROOT = LIB_ROOT.parent.parent
+if str(PACKAGE_ROOT) not in sys.path:
+    sys.path.insert(0, str(PACKAGE_ROOT))
 
 from control_plane_filesystem import (
     FilesystemPreflightError,
@@ -680,6 +685,24 @@ class SystemOperations:
             self.state_root / "state.json", "release_state_invalid"
         )
         known_good = release_state.get("known_good_release") or {}
+        if known_good.get("sha") == sha and known_good.get("runtime_only_rollback") is True:
+            # A completed NORMAL continuation has a protected execution contract,
+            # not an ordinary immutable release checkout. Re-attest that exact
+            # contract and positive authority; a missing file alone proves nothing.
+            from deployment.lib.completed_normal_baseline import discover_split
+            try:
+                binding = discover_split(
+                    self, release_state, self.repository_head(), self.installed_sha()
+                )
+            except (RuntimeError, ValueError, KeyError, IndexError) as error:
+                raise UpgradeError("completed_normal_migration_contract_invalid") from error
+            if (binding["application_sha"] != sha or schema != 115
+                    or known_good.get("migration_policy") != "none"):
+                raise UpgradeError("completed_normal_migration_contract_invalid")
+            migration_dir = self.state_root / "migrations" / sha
+            if migration_dir.exists() or migration_dir.is_symlink():
+                raise UpgradeError("completed_normal_migration_state_conflict")
+            return "not_requested"
         if known_good.get("sha") == sha and known_good.get("schema_recovery") is True:
             active_slot = str(release_state.get("active_slot") or "")
             fallback_value = release_state.get("compatible_fallback_release")
@@ -1209,6 +1232,19 @@ class SystemOperations:
         *,
         allow_refreshable_workers: bool = False,
     ) -> None:
+        if known_good.get("runtime_only_rollback") is True:
+            from deployment.lib.completed_normal_baseline import attest_runtime
+            state = json_file(self.state_root / "state.json", "release_state_invalid")
+            if allow_refreshable_workers or state.get("known_good_release") != known_good:
+                raise UpgradeError("completed_normal_runtime_contract_invalid")
+            try:
+                binding = attest_runtime(self, state)
+            except (RuntimeError, ValueError, KeyError, IndexError) as error:
+                raise UpgradeError("completed_normal_runtime_contract_invalid") from error
+            if (state.get("active_slot") != slot
+                    or binding["application_sha"] != known_good.get("sha")):
+                raise UpgradeError("completed_normal_runtime_contract_invalid")
+            return
         images = known_good.get("images") or {}
         if not isinstance(images, dict):
             raise UpgradeError("known_good_image_state_invalid")

@@ -1,5 +1,18 @@
 # Madar production release acceptance policy
 
+Completed NORMAL schema115 continuation migration terminality is established
+from its existing protected completion, publication, measured controller/source
+roles and current positive NORMAL authority. Its `runtime_only_rollback` origin
+must declare migration policy `none`, remain at schema115, and have no conflicting
+ordinary migration namespace. This explicit classification returns
+`not_requested` without creating an ordinary release directory or transferring
+acceptance evidence. Ordinary releases still require their immutable release
+contract. All live serving, image, readiness and exact-candidate checks remain.
+Live image attestation for this origin uses the existing continuation verifier:
+exact six IDs, immutable image IDs, specifications/networks, positive authority,
+singleton ownership and consuming workers. It does not invent ordinary registry
+references, a worker image or an ordinary parser/ingestion inventory.
+
 Completed schema115 NORMAL may legitimately bind an application SHA distinct
 from the production/controller checkout SHA. Privileged preflight classifies
 that split only from the backend's read-only authority mount, the complete
