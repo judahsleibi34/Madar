@@ -35,6 +35,7 @@ def validate_history(plan, records):
     normal = records['normal-acceptance.json']
     boundary = records['write-boundary.json']
     authority = records['write-authority/authority.json']
+    from deployment.lib.active_recovery_resumption import controller_revision
     if (auth.get('operation') != 'active-local-rollback-resumption'
             or auth.get('plan_sha256') != plan.digest
             or auth.get('source_bundle_sha256') != plan.source_bundle_sha256
@@ -44,6 +45,7 @@ def validate_history(plan, records):
         raise RuntimeError('compensated_history_invalid')
     if (installed.get('plan_sha256') != plan.digest
             or installed.get('source_sha') != plan.source_sha
+            or installed.get('controller_source_sha',plan.source_sha) != controller_revision(plan)
             or installed.get('source_bundle_sha256') != plan.source_bundle_sha256
             or installed.get('historical_authorization_reused') is not False
             or installed.get('volatile_credential_reconstructed') is not False):
@@ -105,12 +107,13 @@ def measured_controller(plan, records):
     be imported as a new execution source or substitute for source attestation.
     """
     from deployment.lib.active_recovery_inputs import CONTROL, controller_tree_digest
+    from deployment.lib.active_recovery_resumption import controller_revision
     package = Path('/var/lib/madar-control-plane/normal-local-preparation') / ('normal-source-' + plan.source_bundle_sha256)
     manifest_path = protected(package / 'source-bundle.json', private=True)
     if file_digest(manifest_path) != plan.source_bundle_sha256:
         raise RuntimeError('compensated_original_source_package_changed')
     bundle = json.loads(manifest_path.read_text())
-    if bundle.get('source_sha') != plan.source_sha or bundle.get('version') != 1:
+    if bundle.get('source_sha') != controller_revision(plan) or bundle.get('version') != 1:
         raise RuntimeError('compensated_original_source_package_invalid')
     measured = {}
     for relative, expected in bundle['files'].items():
@@ -124,9 +127,9 @@ def measured_controller(plan, records):
             if file_digest(protected(installed)) != expected:
                 raise RuntimeError('compensated_installed_source_not_attested')
             measured[relative] = expected
-    if not measured or protected(CONTROL / 'CONTROL_PLANE_SOURCE_SHA').read_text().strip() != plan.source_sha:
+    if not measured or protected(CONTROL / 'CONTROL_PLANE_SOURCE_SHA').read_text().strip() != controller_revision(plan):
         raise RuntimeError('compensated_installed_revision_changed')
-    return {'source_sha': plan.source_sha, 'source_files': measured,
+    return {'source_sha': controller_revision(plan), 'source_files': measured,
             'complete_tree_sha256': controller_tree_digest(),
             'installation_receipt_sha256': digest(records['installed-controller.json'])}
 
@@ -220,7 +223,8 @@ def observe_compensated_state(plan_sha256, runtime=None, *, backup_preparation=F
     # effective proxy controls are verified by measured_startup, not the A gate.
     emergency = legacy_installation(runtime, live=False)
     head = runtime.command(['runuser', '-u', 'madar', '--', 'git', '--no-optional-locks', '-c', 'core.hooksPath=/dev/null', '-c', 'core.fsmonitor=false', '-C', '/srv/madar/production', 'rev-parse', 'HEAD'])
-    if head != plan.source_sha:
+    from deployment.lib.active_recovery_resumption import controller_revision
+    if head != controller_revision(plan):
         raise RuntimeError('compensated_production_checkout_changed')
     status = runtime.command(['runuser', '-u', 'madar', '--', 'git', '--no-optional-locks', '-c', 'core.hooksPath=/dev/null', '-c', 'core.fsmonitor=false', '-C', '/srv/madar/production', 'status', '--porcelain', '--untracked-files=no'])
     if status:

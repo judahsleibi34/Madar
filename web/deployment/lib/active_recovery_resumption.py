@@ -43,10 +43,13 @@ class ResumptionPlan:
     compensation_seconds: int = 60
     prior_backup_timer_preimage: dict | None = None
     candidate_destination: dict | None = None
+    controller_source_sha: str | None = None
 
     def validate(self):
         if not re.fullmatch(r'[0-9a-f]{40}', self.source_sha):
             raise RuntimeError('resumption_source_invalid')
+        if self.controller_source_sha is not None and not re.fullmatch(r'[0-9a-f]{40}',self.controller_source_sha):
+            raise RuntimeError('resumption_controller_source_invalid')
         for key in ('source_bundle_sha256', 'checkpoint_manifest_sha256', 'checkpoint_execution_sha256',
                     'reconciliation_execution_sha256', 'acceptance_execution_sha256', 'emergency_installation_sha256'):
             if not HASH.fullmatch(getattr(self, key)):
@@ -129,7 +132,18 @@ class ResumptionPlan:
 
     @property
     def digest(self):
-        return digest(asdict(self))
+        return digest(plan_document(self))
+
+
+def controller_revision(plan):
+    return getattr(plan,'controller_source_sha',None) or plan.source_sha
+
+
+def plan_document(plan):
+    # Preserve canonical bytes/digests of every existing consumed plan.
+    value=asdict(plan)
+    if value.get('controller_source_sha') is None:value.pop('controller_source_sha',None)
+    return value
 
 
 def load_saved_resumption_plan(root):
@@ -216,7 +230,7 @@ class ActiveRecoveryResumption:
                 'source_bundle_sha256':self.plan.source_bundle_sha256,
                 'authorized_at':datetime.now(timezone.utc).isoformat()},stream,sort_keys=True)
             stream.write('\n');stream.flush();os.fsync(stream.fileno())
-        for name,payload in [('plan.json',asdict(self.plan)),('runtime-dependencies.json',dependencies)]:
+        for name,payload in [('plan.json',plan_document(self.plan)),('runtime-dependencies.json',dependencies)]:
             with (self.root/name).open('x') as stream:
                 os.fchmod(stream.fileno(),0o600)
                 json.dump(payload,stream,sort_keys=True)
@@ -234,7 +248,7 @@ class ActiveRecoveryResumption:
         plan_path=protected(self.root/'plan.json',private=True)
         if file_digest(plan_path)!=self.plan.digest:raise RuntimeError('resumption_sealed_plan_bytes_changed')
         saved=json.loads(plan_path.read_text())
-        if saved!=asdict(self.plan):raise RuntimeError('resumption_sealed_plan_changed')
+        if saved!=plan_document(self.plan):raise RuntimeError('resumption_sealed_plan_changed')
         dependencies=json.loads(protected(self.root/'runtime-dependencies.json',private=True).read_text())
         if digest(dependencies)!=self.plan.retained_inputs['runtime_dependencies']:
             raise RuntimeError('resumption_dependency_capture_changed')

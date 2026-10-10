@@ -7,7 +7,7 @@ Public sustained READ_ONLY handoff must precede every installed-code mutation.
 import json
 import os
 from pathlib import Path
-from deployment.lib.active_recovery_resumption import ROOT
+from deployment.lib.active_recovery_resumption import ROOT,controller_revision
 from deployment.lib.active_recovery_inputs import INPUTS
 from deployment.lib.emergency_routing_repair import Runtime,UPSTREAM,exclusive,encoded
 from deployment.lib.provider_recovery_runtime import protected,file_digest,digest
@@ -105,13 +105,14 @@ class ActiveRecoveryControllerRepair:
             exclusive(self.root/'controller-preimage-attestation.json',encoded({'plan_sha256':self.plan.digest,
                 'tree_sha256':self.plan.retained_inputs['controller_tree'],
                 'source_marker_sha256':self.plan.retained_inputs['controller'],'customer_database_restore':False}))
-        if not isinstance(bundle,dict) or bundle.get('source_sha')!=self.plan.source_sha or not isinstance(bundle.get('files'),dict):
+        revision=controller_revision(self.plan)
+        if not isinstance(bundle,dict) or bundle.get('source_sha')!=revision or not isinstance(bundle.get('files'),dict):
             raise RuntimeError('controller_resume_frozen_bundle_missing')
         self.quiesce_backup_timers()
         # Fetch/checkout changes occur only through existing governed exact-main
         # operations after approval. No source is developed in the staging tree.
-        self.ops.resolve_candidate(self.plan.source_sha,dry_run=False)
-        transaction,staged=self.ops.stage_candidate(self.plan.source_sha)
+        self.ops.resolve_candidate(revision,dry_run=False)
+        transaction,staged=self.ops.stage_candidate(revision)
         tree=self.ops.static_preflight(staged)
         for relative,expected in bundle['files'].items():
             path=Path(relative)
@@ -125,12 +126,13 @@ class ActiveRecoveryControllerRepair:
         self.ops.installer_dry_run(staged,backup)
         self.guard();self.source_guard()
         if self.ops.protected_tree_digest(staged)!=tree:raise RuntimeError('controller_resume_staged_source_changed')
-        self.ops.installer_apply(staged,backup,self.plan.source_sha)
-        self.ops.advance_production_checkout(self.plan.source_sha)
-        self.ops.verify_install(self.plan.source_sha,backup)
+        self.ops.installer_apply(staged,backup,revision)
+        self.ops.advance_production_checkout(revision)
+        self.ops.verify_install(revision,backup)
         if UPSTREAM.read_bytes()!=route:raise RuntimeError('controller_resume_installer_changed_route')
         exclusive(self.root/'installed-controller.json',encoded({'version':1,'plan_sha256':self.plan.digest,
             'source_sha':self.plan.source_sha,'source_bundle_sha256':self.plan.source_bundle_sha256,
+            'controller_source_sha':revision,
             'staged_tree_sha256':tree,'backup_path':str(backup),'staging_transaction':str(transaction),
             'historical_authorization_reused':False,'volatile_credential_reconstructed':False}))
         self.guard()

@@ -11,7 +11,7 @@ import pwd
 from pathlib import Path
 import time
 
-from deployment.lib.active_recovery_resumption import ROOT
+from deployment.lib.active_recovery_resumption import ROOT,controller_revision
 from deployment.lib.active_recovery_source import FrozenContinuationSource
 from deployment.lib.active_recovery_inputs import INPUTS, observe_retained_inputs, observe_runtime_dependencies, verify_native_continuation_dependencies
 from deployment.lib.active_recovery_execution import CHECKPOINT, RESTORE, verify_original_factor_execution, verify_local_reconciliation_execution
@@ -282,11 +282,11 @@ class ProductionActiveRecoveryOperations:
     def require_exact_source_and_images(self, plan):
         self.source.verify(); self.candidate.verify_image_source()
         self.kernel.identities(workers_started=True)
-        if protected(INPUTS['controller']).read_text().strip() != plan.source_sha:
+        if protected(INPUTS['controller']).read_text().strip() != controller_revision(plan):
             raise RuntimeError('continuation_installed_source_changed')
         # Resolves current origin/main and forward ancestry without deployment.
-        self.controller.ops.resolve_candidate(plan.source_sha,dry_run=False)
-        self.controller.ops.verify_installed_controller(plan.source_sha)
+        self.controller.ops.resolve_candidate(controller_revision(plan),dry_run=False)
+        self.controller.ops.verify_installed_controller(controller_revision(plan))
 
     def verify_final_write_grant_prerequisites(self, plan):
         from deployment.lib.active_recovery_backup import verify_backup_execution_context

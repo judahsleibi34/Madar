@@ -123,3 +123,30 @@ class RetainedListenerInstallationTests(unittest.TestCase):
         self.old.write_bytes(b'altered old unit')
         with self.assertRaisesRegex(RuntimeError,'preimage_changed'):self.fixture.install.install()
         self.assertEqual(self.fixture.calls,[])
+
+class SeparateControllerIdentityTests(unittest.TestCase):
+    def test_absent_controller_revision_preserves_historical_plan_digest(self):
+        from deployment.lib.active_recovery_resumption import ResumptionPlan
+        from deployment.lib.active_recovery_inputs import KEYS
+        identity={'container_id':'b'*64,'image_id':'sha256:'+'c'*64,'spec_sha256':'d'*64}
+        plan=lambda:ResumptionPlan('a'*40,'b'*64,{'backend':'sha256:'+'c'*64,'frontend':'sha256:'+'d'*64},{key:'e'*64 for key in KEYS},{'backend':identity,'frontend':identity},'f'*64,'1'*64,'2'*64,'3'*64,'4'*64)
+        from dataclasses import asdict,replace
+        from deployment.lib.active_recovery_resumption import plan_document,controller_revision
+        from deployment.lib.provider_recovery_runtime import digest
+        original=plan();legacy=asdict(original);legacy.pop('controller_source_sha')
+        self.assertEqual(original.digest,digest(legacy))
+        self.assertEqual(plan_document(original),legacy)
+        self.assertEqual(controller_revision(original),original.source_sha)
+        changed=replace(original,controller_source_sha='9'*40)
+        changed.validate();self.assertNotEqual(changed.digest,original.digest)
+        self.assertEqual(changed.source_sha,original.source_sha)
+        self.assertEqual(changed.candidate_images,original.candidate_images)
+        self.assertEqual(controller_revision(changed),'9'*40)
+    def test_invalid_controller_binding_fails_closed(self):
+        from deployment.lib.active_recovery_resumption import ResumptionPlan
+        from deployment.lib.active_recovery_inputs import KEYS
+        identity={'container_id':'b'*64,'image_id':'sha256:'+'c'*64,'spec_sha256':'d'*64}
+        plan=lambda:ResumptionPlan('a'*40,'b'*64,{'backend':'sha256:'+'c'*64,'frontend':'sha256:'+'d'*64},{key:'e'*64 for key in KEYS},{'backend':identity,'frontend':identity},'f'*64,'1'*64,'2'*64,'3'*64,'4'*64)
+        from dataclasses import replace
+        with self.assertRaisesRegex(RuntimeError,'controller_source_invalid'):
+            replace(plan(),controller_source_sha='not-a-revision').validate()

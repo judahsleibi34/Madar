@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 import json
 import os
 from pathlib import Path
-from deployment.lib.active_recovery_resumption import ROOT
+from deployment.lib.active_recovery_resumption import ROOT,controller_revision
 from deployment.lib.emergency_routing_repair import exclusive, encoded
 from deployment.lib.provider_recovery_runtime import protected
 from deployment.lib.runtime_authority import runtime_mutation_lock
@@ -40,6 +40,7 @@ class ActiveRecoveryWriteAuthority:
             raise RuntimeError('write_boundary_phase_denied')
         installed=json.loads(protected(self.root/'installed-controller.json',private=True).read_text())
         if (installed.get('plan_sha256')!=self.plan.digest or installed.get('source_sha')!=self.plan.source_sha
+                or installed.get('controller_source_sha',self.plan.source_sha)!=controller_revision(self.plan)
                 or installed.get('source_bundle_sha256')!=self.plan.source_bundle_sha256
                 or installed.get('historical_authorization_reused') is not False
                 or installed.get('volatile_credential_reconstructed') is not False):

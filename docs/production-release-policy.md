@@ -2104,3 +2104,12 @@ backup rather than rewriting its marker with a historical checkpoint timestamp.
 The normal source fence preserves this explicitly verified READ_ONLY rollback
 release; all other source, tenant, worker, final grant, backup and boot gates remain
 mandatory. This profile authorizes no migrations or customer database restoration.
+
+A continuation may explicitly bind a separate `controller_source_sha` while
+retaining the accepted application `source_sha` and immutable image pair. The
+controller package, exact-main installer, production checkout and installed-tree
+attestation bind the controller revision; image labels, application runtime,
+write-authority release, ordinary backups and application acceptance continue to
+bind the unchanged application revision. Existing authorization bytes/digests are
+preserved by omitting an absent controller revision from canonical serialization.
+No acceptance is transferred to another application revision or image.

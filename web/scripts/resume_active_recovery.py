@@ -35,7 +35,7 @@ def measure(package,approved_source,approved_plan):
     if hashlib.sha256(bundle).hexdigest()!=approved_source or hashlib.sha256(plan).hexdigest()!=approved_plan:
         raise RuntimeError('continuation_bootstrap_approved_bytes_changed')
     manifest=json.loads(bundle);saved=json.loads(plan)
-    if saved.get('source_bundle_sha256')!=approved_source or manifest.get('source_sha')!=saved.get('source_sha'):
+    if saved.get('source_bundle_sha256')!=approved_source or manifest.get('source_sha')!=(saved.get('controller_source_sha') or saved.get('source_sha')):
         raise RuntimeError('continuation_bootstrap_source_plan_mismatch')
     files=manifest.get('files',{})
     if not isinstance(files,dict) or not files:raise RuntimeError('continuation_bootstrap_inventory_missing')

@@ -27,7 +27,8 @@ class FrozenContinuationSource:
         if file_digest(manifest_path)!=self.plan.source_bundle_sha256:
             raise RuntimeError('continuation_source_manifest_bytes_changed')
         manifest=json.loads(manifest_path.read_text())
-        if digest(manifest)!=self.plan.source_bundle_sha256 or type(manifest.get('version')) is not int or manifest.get('version')!=1 or manifest.get('source_sha')!=self.plan.source_sha:
+        from deployment.lib.active_recovery_resumption import controller_revision
+        if digest(manifest)!=self.plan.source_bundle_sha256 or type(manifest.get('version')) is not int or manifest.get('version')!=1 or manifest.get('source_sha')!=controller_revision(self.plan):
             raise RuntimeError('continuation_source_manifest_changed')
         files=manifest.get('files',{})
         if not isinstance(files,dict) or not REQUIRED.issubset(files):
