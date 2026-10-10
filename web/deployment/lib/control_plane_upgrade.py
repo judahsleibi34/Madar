@@ -1232,6 +1232,19 @@ class SystemOperations:
         *,
         allow_refreshable_workers: bool = False,
     ) -> None:
+        if known_good.get("runtime_only_rollback") is True:
+            from deployment.lib.completed_normal_baseline import attest_runtime
+            state = json_file(self.state_root / "state.json", "release_state_invalid")
+            if allow_refreshable_workers or state.get("known_good_release") != known_good:
+                raise UpgradeError("completed_normal_runtime_contract_invalid")
+            try:
+                binding = attest_runtime(self, state)
+            except (RuntimeError, ValueError, KeyError, IndexError) as error:
+                raise UpgradeError("completed_normal_runtime_contract_invalid") from error
+            if (state.get("active_slot") != slot
+                    or binding["application_sha"] != known_good.get("sha")):
+                raise UpgradeError("completed_normal_runtime_contract_invalid")
+            return
         images = known_good.get("images") or {}
         if not isinstance(images, dict):
             raise UpgradeError("known_good_image_state_invalid")

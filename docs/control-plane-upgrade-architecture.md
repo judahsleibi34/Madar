@@ -9,6 +9,10 @@ infer acceptance from a missing file. Policy must be `none`, schema must remain
 missing/invalid contract and migration terminality gates are unchanged. This is
 read-only classification; installed controller/boot packages retain their bytes
 until a separately authorized governed supersession.
+Its live image/inventory check reuses `ActiveRecoveryBootActor` assembly and the
+read-only `ActiveRecoveryRuntime.normal` verifier; no boot/startup/compensation
+method runs during dry-run. Existing completed evidence and all running resources
+are re-attested rather than converted into synthetic ordinary release metadata.
 
 `completed_normal_baseline` independently measures a completed local schema115
 continuation before classifying its legitimate controller/application revision

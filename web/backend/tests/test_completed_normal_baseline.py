@@ -132,4 +132,28 @@ class CompletedNormalBaselineTests(unittest.TestCase):
         result=subprocess.run([sys.executable,'-I','-B','-c',code,str(WEB/'deployment/lib/control_plane_upgrade.py')],capture_output=True,text=True,timeout=20)
         self.assertEqual(result.returncode,0,result.stderr)
 
+    def test_completed_runtime_reuses_exact_continuation_verification(self):
+        operations=self.operations()
+        with patch('deployment.lib.active_recovery_boot_actor.ActiveRecoveryBootActor') as actor:
+            result=m.attest_runtime(operations,self.state)
+        actor.return_value.assemble.assert_called_once_with()
+        actor.return_value.completed_evidence.assert_called_once_with()
+        actor.return_value.kernel.normal.assert_called_once_with()
+        self.assertEqual(result['application_sha'],self.app)
+
+    def test_continuation_image_attestation_does_not_fabricate_worker_reference(self):
+        operations=self.operations()
+        with patch.object(m,'attest_runtime',return_value=self.call()) as verify:
+            operations.attest_active_images('blue',self.state['known_good_release'])
+        verify.assert_called_once_with(operations,self.state)
+        self.assertNotIn('worker',self.state['known_good_release']['images'])
+        with self.assertRaisesRegex(UpgradeError,'completed_normal_runtime_contract_invalid'):
+            operations.attest_active_images('blue',self.state['known_good_release'],allow_refreshable_workers=True)
+
+    def test_changed_runtime_identity_is_not_accepted(self):
+        operations=self.operations()
+        with patch.object(m,'attest_runtime',side_effect=RuntimeError('active_runtime_identity_changed')):
+            with self.assertRaisesRegex(UpgradeError,'completed_normal_runtime_contract_invalid'):
+                operations.attest_active_images('blue',self.state['known_good_release'])
+
 if __name__=='__main__':unittest.main()
