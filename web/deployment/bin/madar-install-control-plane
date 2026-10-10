@@ -64,6 +64,7 @@ declare -a tracked_files=(
   lib/emergency_routing_repair.py
   lib/checkpoint_execution_proof.py
   lib/active_recovery_compensated.py
+  lib/active_recovery_retained_fallback.py
   lib/active_recovery_inputs.py
   lib/active_recovery_source.py
   lib/active_recovery_runtime.py

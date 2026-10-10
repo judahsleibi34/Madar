@@ -77,7 +77,8 @@ def verify_original_factor_execution(manifest_sha256):
 
 def verify_local_reconciliation_execution(plan):
     compensated=(getattr(plan,'candidate_destination',None) or {}).get('post_compensation')
-    source_sha=getattr(plan,'source_sha','')
+    from deployment.lib.active_recovery_resumption import controller_revision
+    source_sha=controller_revision(plan)
     if compensated and not re.fullmatch('[0-9a-f]{40}',source_sha):
         raise RuntimeError('actual_reconciliation_source_invalid')
     path=RECONCILIATION

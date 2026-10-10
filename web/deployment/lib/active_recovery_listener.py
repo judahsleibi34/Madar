@@ -51,7 +51,9 @@ class ActiveRecoveryFallbackInstallation:
     def install(self):
         self.guard();unit=UNITS/self.name
         compensated=(getattr(self.plan,'candidate_destination',None) or {}).get('post_compensation')
-        if compensated:
+        from deployment.lib.active_recovery_retained_fallback import declaration,verify_backup,verify_runtime
+        retained=declaration(self.plan)
+        if compensated and not retained:
             from deployment.lib.active_recovery_compensated import verify_compensated_binding,inspect_history
             verify_compensated_binding(compensated,staged_plan=self.plan)
             previous,previous_root,records,_=inspect_history(compensated['baseline']['previous_plan_sha256'])
@@ -69,7 +71,18 @@ class ActiveRecoveryFallbackInstallation:
             return old['service']
         if unit.exists() or unit.is_symlink() or (self.root/'fallback-listener-installation.json').exists():
             raise FileExistsError('fallback_installation_namespace_used')
-        for port in FALLBACK_PORTS.values():
+        previous=None
+        if retained:
+            from deployment.lib.active_recovery_compensated import verify_compensated_binding,inspect_history
+            verify_compensated_binding(compensated,staged_plan=self.plan)
+            verify_backup(self.plan);verify_runtime(self.plan,__import__('deployment.lib.emergency_routing_repair',fromlist=['Runtime']).Runtime())
+            old,old_root,records,_=inspect_history(compensated['baseline']['previous_plan_sha256'])
+            previous=records['fallback-listener-installation.json']['service']
+            old_unit=protected(UNITS/previous)
+            if file_digest(old_unit)!=records['fallback-listener-installation.json']['unit_sha256']:
+                raise RuntimeError('fallback_supersession_preimage_changed')
+            exclusive(self.root/'fallback-unit-preimage.service',old_unit.read_bytes())
+        for port in (() if retained else FALLBACK_PORTS.values()):
             with socket.socket() as test:test.bind(('127.0.0.1',port))
         body=self.content()
         exclusive(self.root/self.name,body)
@@ -77,11 +90,29 @@ class ActiveRecoveryFallbackInstallation:
         self.guard()
         # Exclusive root publication; old emergency units/drop-ins are untouched.
         exclusive(unit,body);unit.chmod(0o644)
-        self.ops.command('continuation_listener_reload',['/usr/bin/systemctl','daemon-reload'])
-        self.ops.command('continuation_listener_enable',['/usr/bin/systemctl','enable','--now',self.name])
-        if self.ops.systemctl_state(self.name)!={'enabled':'enabled','active':'active'}:
-            raise RuntimeError('fallback_installation_service_not_active')
+        if previous:
+            exclusive(self.root/'fallback-supersession-intent.json',encoded({'plan_sha256':self.plan.digest,
+                'source_bundle_sha256':self.plan.source_bundle_sha256,'previous_service':previous,
+                'previous_unit_sha256':file_digest(protected(UNITS/previous)),
+                'replacement_service':self.name,'replacement_unit_sha256':file_digest(unit),
+                'historical_unit_modified':False}))
+            self.ops.command('continuation_listener_disable_consumed',['/usr/bin/systemctl','disable','--now',previous])
+        try:
+            self.ops.command('continuation_listener_reload',['/usr/bin/systemctl','daemon-reload'])
+            self.ops.command('continuation_listener_enable',['/usr/bin/systemctl','enable','--now',self.name])
+            if self.ops.systemctl_state(self.name)!={'enabled':'enabled','active':'active'}:
+                raise RuntimeError('fallback_installation_service_not_active')
+        except Exception:
+            if previous:
+                # Own exact new unit only; retain all bytes/records. The previous
+                # restricted listener remains fail-closed if its marker is stale.
+                if file_digest(protected(unit))!=__import__('hashlib').sha256(body).hexdigest():
+                    raise RuntimeError('fallback_supersession_replacement_changed') from None
+                self.ops.command('continuation_listener_stop_failed',['/usr/bin/systemctl','disable','--now',self.name])
+                self.ops.command('continuation_listener_restore_previous',['/usr/bin/systemctl','enable','--now',previous])
+            raise
         exclusive(self.root/'fallback-listener-installation.json',encoded({'version':1,'plan_sha256':self.plan.digest,
             'source_bundle_sha256':self.plan.source_bundle_sha256,'service':self.name,'unit_sha256':file_digest(unit),
-            'loopback_ports':FALLBACK_PORTS,'historical_installation_modified':False}))
+            'loopback_ports':FALLBACK_PORTS,'historical_installation_modified':False,
+            **({'superseded_listener':previous,'retained_local_fallback':True} if previous else {})}))
         return self.name

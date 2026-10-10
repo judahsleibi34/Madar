@@ -11,7 +11,7 @@ import re
 import sys
 from deployment.lib.provider_recovery_runtime import protected,digest,file_digest
 
-REQUIRED=frozenset({'web/deployment/lib/active_recovery_backup_freshness.py','web/scripts/finish_compensated_normal.py','web/scripts/verify_final_application_artifacts.py','web/scripts/backup_support.py','web/scripts/backup_madar.sh','web/scripts/verify_backup.sh','web/scripts/rehearse_backup.py','web/scripts/normal_backup_replica.py','web/scripts/resume_active_recovery.py','web/deployment/lib/active_recovery_operations.py','web/deployment/lib/active_recovery_artifact_evidence.py','web/deployment/lib/active_recovery_backup.py','web/deployment/lib/active_recovery_boot_actor.py','web/deployment/lib/active_recovery_execution.py','web/scripts/boot_active_recovery.py','web/deployment/lib/active_recovery_resumption.py',
+REQUIRED=frozenset({'web/deployment/lib/active_recovery_retained_fallback.py','web/deployment/lib/active_recovery_backup_freshness.py','web/scripts/finish_compensated_normal.py','web/scripts/verify_final_application_artifacts.py','web/scripts/backup_support.py','web/scripts/backup_madar.sh','web/scripts/verify_backup.sh','web/scripts/rehearse_backup.py','web/scripts/normal_backup_replica.py','web/scripts/resume_active_recovery.py','web/deployment/lib/active_recovery_operations.py','web/deployment/lib/active_recovery_artifact_evidence.py','web/deployment/lib/active_recovery_backup.py','web/deployment/lib/active_recovery_boot_actor.py','web/deployment/lib/active_recovery_execution.py','web/scripts/boot_active_recovery.py','web/deployment/lib/active_recovery_resumption.py',
     'web/deployment/lib/active_recovery_source.py','web/deployment/lib/active_recovery_runtime.py','web/deployment/lib/active_recovery_boot_installation.py','web/deployment/lib/active_recovery_proxy.py','web/deployment/lib/active_recovery_boot.py','web/deployment/lib/active_recovery_listener.py','web/scripts/serve_active_recovery_fallback.py','web/deployment/lib/active_recovery_reconciliation.py','web/deployment/lib/active_recovery_publication.py','web/deployment/lib/active_recovery_write_authority.py','web/deployment/lib/active_recovery_workers.py','web/deployment/lib/active_recovery_controller.py','web/deployment/lib/active_recovery_compensated.py','web/deployment/lib/active_recovery_inputs.py',
     'web/deployment/lib/active_recovery_candidate.py','web/deployment/lib/active_recovery_handoff.py',
     'web/deployment/lib/active_recovery_fallback.py','web/deployment/lib/checkpoint_execution_proof.py',
@@ -27,7 +27,8 @@ class FrozenContinuationSource:
         if file_digest(manifest_path)!=self.plan.source_bundle_sha256:
             raise RuntimeError('continuation_source_manifest_bytes_changed')
         manifest=json.loads(manifest_path.read_text())
-        if digest(manifest)!=self.plan.source_bundle_sha256 or type(manifest.get('version')) is not int or manifest.get('version')!=1 or manifest.get('source_sha')!=self.plan.source_sha:
+        from deployment.lib.active_recovery_resumption import controller_revision
+        if digest(manifest)!=self.plan.source_bundle_sha256 or type(manifest.get('version')) is not int or manifest.get('version')!=1 or manifest.get('source_sha')!=controller_revision(self.plan):
             raise RuntimeError('continuation_source_manifest_changed')
         files=manifest.get('files',{})
         if not isinstance(files,dict) or not REQUIRED.issubset(files):

@@ -33,8 +33,15 @@ class CurrentDataFallback:
             receipt.get('plan_sha256')==self.plan.digest and receipt.get('source_bundle_sha256')==self.plan.source_bundle_sha256,
             'fallback_fresh_authorization_changed')
         events=[json.loads(line) for line in protected(self.root/'events.jsonl',private=True).read_text().splitlines()]
+        from deployment.lib.active_recovery_retained_fallback import declaration
+        allowed={'compensation_pending','restricted_fallback'}
+        if declaration(self.plan):
+            # Fresh candidate authority is READ_ONLY below; ALL consumers must
+            # also be stopped in verify(). No early phase can grant writes.
+            allowed|={'detached_candidate_ready','read_only_handoff_pending','read_only_serving',
+                'controller_resume_pending','controller_resumed'}
         require(events and all(e.get('plan_sha256')==self.plan.digest for e in events) and
-            events[-1].get('phase') in {'compensation_pending','restricted_fallback'},'fallback_compensation_not_authorized')
+            events[-1].get('phase') in allowed,'fallback_compensation_not_authorized')
         # Positive normal authority must already be revoked before forwarding.
         authority=json.loads(protected(self.root/'write-authority/authority.json').read_text())
         candidate=json.loads(protected(self.root/'candidate-identities.json',private=True).read_text())
@@ -43,6 +50,8 @@ class CurrentDataFallback:
             candidate.get('source_sha')==self.plan.source_sha,'fallback_normal_authority_not_fenced')
 
     def verify_registered_runtime(self, *, backup_preparation=False):
+        from deployment.lib.active_recovery_retained_fallback import declaration,verify_runtime
+        retained=declaration(self.plan)
         # Observation only: does not authorize forwarding, publication or writes.
         for key in UNCHANGED:
             reader=readonly_configuration if key in {'recovery_transaction','fallback','native_configuration','native_compose','native_override','gateway_bootstrap','gateway_cds','gateway_lds'} else protected
@@ -59,6 +68,7 @@ class CurrentDataFallback:
                 'running':row['State']['Running'],'networks':{k:v['NetworkID'] for k,v in row['NetworkSettings']['Networks'].items()}}==expected,
                 'fallback_native_identity_changed')
             require(row['State']['Running'] and row['State'].get('Health',{}).get('Status')=='healthy','fallback_native_unhealthy')
+        if retained:return verify_runtime(self.plan,self.runtime)
         rows=self.runtime.inspect([entry['container_id'] for entry in self.plan.fallback.values()]);by_id={row['Id']:row for row in rows.values()}
         endpoints={};initial={}
         for role,expected in self.plan.fallback.items():

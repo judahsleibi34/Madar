@@ -35,6 +35,7 @@ def validate_history(plan, records):
     normal = records['normal-acceptance.json']
     boundary = records['write-boundary.json']
     authority = records['write-authority/authority.json']
+    from deployment.lib.active_recovery_resumption import controller_revision
     if (auth.get('operation') != 'active-local-rollback-resumption'
             or auth.get('plan_sha256') != plan.digest
             or auth.get('source_bundle_sha256') != plan.source_bundle_sha256
@@ -44,6 +45,7 @@ def validate_history(plan, records):
         raise RuntimeError('compensated_history_invalid')
     if (installed.get('plan_sha256') != plan.digest
             or installed.get('source_sha') != plan.source_sha
+            or installed.get('controller_source_sha',plan.source_sha) != controller_revision(plan)
             or installed.get('source_bundle_sha256') != plan.source_bundle_sha256
             or installed.get('historical_authorization_reused') is not False
             or installed.get('volatile_credential_reconstructed') is not False):
@@ -105,12 +107,13 @@ def measured_controller(plan, records):
     be imported as a new execution source or substitute for source attestation.
     """
     from deployment.lib.active_recovery_inputs import CONTROL, controller_tree_digest
+    from deployment.lib.active_recovery_resumption import controller_revision
     package = Path('/var/lib/madar-control-plane/normal-local-preparation') / ('normal-source-' + plan.source_bundle_sha256)
     manifest_path = protected(package / 'source-bundle.json', private=True)
     if file_digest(manifest_path) != plan.source_bundle_sha256:
         raise RuntimeError('compensated_original_source_package_changed')
     bundle = json.loads(manifest_path.read_text())
-    if bundle.get('source_sha') != plan.source_sha or bundle.get('version') != 1:
+    if bundle.get('source_sha') != controller_revision(plan) or bundle.get('version') != 1:
         raise RuntimeError('compensated_original_source_package_invalid')
     measured = {}
     for relative, expected in bundle['files'].items():
@@ -124,9 +127,9 @@ def measured_controller(plan, records):
             if file_digest(protected(installed)) != expected:
                 raise RuntimeError('compensated_installed_source_not_attested')
             measured[relative] = expected
-    if not measured or protected(CONTROL / 'CONTROL_PLANE_SOURCE_SHA').read_text().strip() != plan.source_sha:
+    if not measured or protected(CONTROL / 'CONTROL_PLANE_SOURCE_SHA').read_text().strip() != controller_revision(plan):
         raise RuntimeError('compensated_installed_revision_changed')
-    return {'source_sha': plan.source_sha, 'source_files': measured,
+    return {'source_sha': controller_revision(plan), 'source_files': measured,
             'complete_tree_sha256': controller_tree_digest(),
             'installation_receipt_sha256': digest(records['installed-controller.json'])}
 
@@ -197,7 +200,7 @@ def measured_startup(plan, records, runtime, *, backup_preparation=False):
     return {'files': files, 'services': states, 'proxy_effective_sha256': digest(fields)}
 
 
-def observe_compensated_state(plan_sha256, runtime=None, *, backup_preparation=False):
+def observe_compensated_state(plan_sha256, runtime=None, *, backup_preparation=False, retained_route=False):
     """No mutation, old authorization consumed; all current safety gates enforced."""
     from deployment.lib.emergency_routing_repair import Runtime, legacy_installation, spec
     from deployment.lib.active_recovery_inputs import INPUTS, PRIVATE_CONFIGURATION, observe_runtime_dependencies
@@ -207,7 +210,12 @@ def observe_compensated_state(plan_sha256, runtime=None, *, backup_preparation=F
     plan, root, records, history = inspect_history(plan_sha256)
     fallback = CurrentDataFallback(plan, root, runtime=runtime)
     fallback.verify(backup_preparation=backup_preparation)  # Actual revoked grant, ALL stopped consumers, native and role checks.
-    if readonly_configuration(INPUTS['upstream'], private=False).read_bytes() != FALLBACK_ROUTE:
+    route = FALLBACK_ROUTE
+    route_evidence = None
+    if retained_route:
+        from deployment.lib.active_recovery_retained_fallback import measure_routing_restoration
+        route, route_evidence = measure_routing_restoration(plan, root, records, runtime)
+    if readonly_configuration(INPUTS['upstream'], private=False).read_bytes() != route:
         raise RuntimeError('compensated_registered_route_changed')
     installed = measured_controller(plan, records)
     startup = measured_startup(plan, records, runtime,backup_preparation=backup_preparation)
@@ -215,7 +223,8 @@ def observe_compensated_state(plan_sha256, runtime=None, *, backup_preparation=F
     # effective proxy controls are verified by measured_startup, not the A gate.
     emergency = legacy_installation(runtime, live=False)
     head = runtime.command(['runuser', '-u', 'madar', '--', 'git', '--no-optional-locks', '-c', 'core.hooksPath=/dev/null', '-c', 'core.fsmonitor=false', '-C', '/srv/madar/production', 'rev-parse', 'HEAD'])
-    if head != plan.source_sha:
+    from deployment.lib.active_recovery_resumption import controller_revision
+    if head != controller_revision(plan):
         raise RuntimeError('compensated_production_checkout_changed')
     status = runtime.command(['runuser', '-u', 'madar', '--', 'git', '--no-optional-locks', '-c', 'core.hooksPath=/dev/null', '-c', 'core.fsmonitor=false', '-C', '/srv/madar/production', 'status', '--porcelain', '--untracked-files=no'])
     if status:
@@ -311,7 +320,7 @@ def observe_compensated_state(plan_sha256, runtime=None, *, backup_preparation=F
         raise RuntimeError('compensated_security_catalog_invalid')
     if len(metadata)==1:metadata[0].update(security[0])
     if len(metadata)!=1:raise RuntimeError('compensated_database_metadata_invalid')
-    return {'version': 1, 'state': 'post_normal_compensated_recovery', 'previous_plan_sha256': plan_sha256,
+    result = {'version': 1, 'state': 'post_normal_compensated_recovery', 'previous_plan_sha256': plan_sha256,
         'historical_evidence': history, 'installed_controller': installed, 'startup': startup,
         'emergency_installation_sha256': digest(emergency), 'production_checkout': head,
         'worker_authority_sha256': digest(owner['authority']), 'resources': resources,
@@ -323,15 +332,20 @@ def observe_compensated_state(plan_sha256, runtime=None, *, backup_preparation=F
         'database_authority': 'current_local', 'database_snapshot_sha256':snapshot_hash,'database_snapshot':snapshot,
         'audit_append_only_permitted':True,
         'database_metadata':metadata[0], 'public_tables':96, 'schema': 115, 'restore_customer_database': False}
+    if retained_route:
+        result['routing_restoration'] = route_evidence
+    return result
 
 
 def verify_compensated_binding(binding, runtime=None, *, staged_plan=None, recovery_backup=None):
-    if not isinstance(binding, dict) or set(binding) not in ({'baseline','baseline_sha256'},{'baseline','baseline_sha256','pre_grant_backup'}):
+    if not isinstance(binding, dict) or set(binding) not in ({'baseline','baseline_sha256'},{'baseline','baseline_sha256','pre_grant_backup'},{'baseline','baseline_sha256','retained_fallback'}):
         raise RuntimeError('compensated_binding_invalid')
     baseline = binding['baseline']
     if not isinstance(baseline, dict) or digest(baseline) != binding['baseline_sha256']:
         raise RuntimeError('compensated_baseline_hash_changed')
-    observed = observe_compensated_state(baseline.get('previous_plan_sha256'),runtime,backup_preparation='pre_grant_backup' in binding)
+    kwargs={'backup_preparation':bool({'pre_grant_backup','retained_fallback'}&set(binding))}
+    if 'retained_fallback' in binding:kwargs['retained_route']=True
+    observed = observe_compensated_state(baseline.get('previous_plan_sha256'),runtime,**kwargs)
     if recovery_backup is not None:
         plan,resource=recovery_backup
         name='madar-recovery-backup-'+plan.digest[:12]
@@ -360,7 +374,7 @@ def verify_compensated_binding(binding, runtime=None, *, staged_plan=None, recov
             raise RuntimeError('compensated_new_resource_identity_changed')
         observed=dict(observed,resources={k:v for k,v in observed['resources'].items() if k not in extra})
     if baseline.get('audit_append_only_permitted') is True:
-        observed=verify_audit_extension(baseline,observed,runtime,backup_preparation="pre_grant_backup" in binding)
+        observed=verify_audit_extension(baseline,observed,runtime,backup_preparation=bool({"pre_grant_backup","retained_fallback"}&set(binding)))
     if observed != baseline:
         raise RuntimeError('compensated_current_state_changed')
     return observed

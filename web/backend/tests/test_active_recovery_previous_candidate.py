@@ -1,5 +1,5 @@
 """Bound pre-publication continuation tests; no runtime acceptance claims."""
-from dataclasses import asdict
+from deployment.lib.active_recovery_resumption import plan_document
 import copy,json,os,sys,tempfile,unittest
 from pathlib import Path
 from types import SimpleNamespace
@@ -13,7 +13,7 @@ class PreviousCandidateTests(unittest.TestCase):
     def setUp(self):
         self.fixture=candidate_tests.DetachedCandidateTests();self.fixture.setUp();self.addCleanup(self.fixture.doCleanups)
         self.previous=self.fixture.plan;self.root=self.fixture.c.root
-        (self.root/'plan.json').write_text(json.dumps(asdict(self.previous),sort_keys=True))
+        (self.root/'plan.json').write_text(json.dumps(plan_document(self.previous),sort_keys=True))
         for name in ('candidate-contract.json','candidate-identities.json'):(self.root/name).write_text('{}')
         (self.root/'write-authority').mkdir();(self.root/'write-authority/authority.json').write_text('{}')
         (self.root/'events.jsonl').write_text(''.join(json.dumps({'phase':p,'plan_sha256':self.previous.digest})+'\n' for p in ('authorized','detached_candidate_pending','detached_candidate_failed')))

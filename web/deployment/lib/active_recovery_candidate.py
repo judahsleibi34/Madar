@@ -255,7 +255,7 @@ class DetachedRecoveryCandidate(ProductionLocalTransitionOperations):
             from deployment.lib.active_recovery_inputs import registered_fallback_names
             verify_compensated_binding(compensated,runtime)
             previous,previous_root,_,_=inspect_history(compensated['baseline']['previous_plan_sha256'])
-            CurrentDataFallback(previous,previous_root,runtime=runtime).verify(backup_preparation='pre_grant_backup' in compensated)
+            CurrentDataFallback(previous,previous_root,runtime=runtime).verify(backup_preparation=bool({'pre_grant_backup','retained_fallback'} & set(compensated)))
         else:verify(runtime)
         inputs = runtime.input_bytes()
         old = RecoveryContract(**json.loads(inputs['recovery_contract']))
@@ -382,7 +382,10 @@ class DetachedRecoveryCandidate(ProductionLocalTransitionOperations):
             raise RuntimeError('detached_backup_marker_destination_changed')
         readonly_configuration(source,private=False)
         marker=json.loads(source.read_text())
-        if (marker.get('format') != 2 or marker.get('verified') is not True
+        from deployment.lib.active_recovery_retained_fallback import declaration,verify_backup
+        if declaration(self.plan):
+            verify_backup(self.plan)
+        elif (marker.get('format') != 2 or marker.get('verified') is not True
                 or marker.get('scope') != 'complete-coordinated-checkpoint' or marker.get('schema') != 115
                 or marker.get('manifest_sha256') != self.plan.checkpoint_manifest_sha256
                 or marker.get('execution_sha256') != self.plan.checkpoint_execution_sha256):

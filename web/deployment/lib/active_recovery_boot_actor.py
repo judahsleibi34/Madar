@@ -6,7 +6,7 @@ NORMAL requires the retained source-bound completion and post-cutover execution.
 """
 import json
 from pathlib import Path
-from deployment.lib.active_recovery_resumption import ActiveRecoveryResumption, ROOT, PHASES
+from deployment.lib.active_recovery_resumption import ActiveRecoveryResumption, ROOT, PHASES,controller_revision,plan_document
 from deployment.lib.active_recovery_source import FrozenContinuationSource
 from deployment.lib.active_recovery_candidate import worker_spec_matches,DetachedRecoveryCandidate
 from deployment.lib.active_recovery_workers import ActiveRecoveryWorkerHandoff
@@ -34,8 +34,7 @@ class ActiveRecoveryBootActor:
         plan_path=protected(self.root/'plan.json',private=True)
         if file_digest(plan_path)!=self.plan.digest:raise RuntimeError('boot_actor_plan_bytes_changed')
         saved=json.loads(plan_path.read_text())
-        from dataclasses import asdict
-        if (self.root!=ROOT/self.plan.digest or saved!=asdict(self.plan)
+        if (self.root!=ROOT/self.plan.digest or saved!=plan_document(self.plan)
                 or receipt.get('operation')!='active-local-rollback-resumption'
                 or receipt.get('plan_sha256')!=self.plan.digest
                 or receipt.get('source_bundle_sha256')!=self.plan.source_bundle_sha256):
@@ -70,7 +69,7 @@ class ActiveRecoveryBootActor:
                 raise RuntimeError('boot_actor_completed_execution_changed')
         # Installed source must still be the approved source, not just a retained
         # historical successful installer transcript.
-        if protected(INPUTS['controller']).read_text().strip()!=self.plan.source_sha:
+        if protected(INPUTS['controller']).read_text().strip()!=controller_revision(self.plan):
             raise RuntimeError('boot_actor_installed_source_changed')
         manifest=self.source.verify()
         for relative,expected in manifest['files'].items():
@@ -159,7 +158,11 @@ class ActiveRecoveryBootActor:
         if observe_retained_inputs(post_compensation=True)!=self.plan.retained_inputs:
             raise RuntimeError('boot_actor_early_recovery_changed')
         previous,previous_root,_,_=inspect_history(compensated['baseline']['previous_plan_sha256'])
-        CurrentDataFallback(previous,previous_root,runtime=self.runtime).verify()
+        from deployment.lib.active_recovery_retained_fallback import declaration
+        if declaration(self.plan):
+            CurrentDataFallback(previous,previous_root,runtime=self.runtime).verify(backup_preparation=True)
+            self.fallback.verify()
+        else:CurrentDataFallback(previous,previous_root,runtime=self.runtime).verify()
 
     def resume(self):
         phase=self.phase()
