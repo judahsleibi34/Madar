@@ -1,5 +1,22 @@
 # Madar production release acceptance policy
 
+The existing root-owned write-authority reader now additionally accepts a fresh
+version2 grant for the exact local115..136 bridge. It requires the exact115/136
+range, an integer observed schema within that range, exact application release
+SHA and contract digest, and matching runtime compatibility configuration.
+Legacy version1 grants remain115-only; changing their fields cannot widen them.
+READ_ONLY request/provider/consumer fencing remains in force at every intermediate
+schema. Root must separately issue the new source-bound authority during an
+approved handoff; this reader change grants no production permission.
+
+The active candidate descriptor now selects the existing schema115..136 bridge
+and checksum-pinned migrations116..136. The former exact115/no-SQL descriptor
+is retained as `schema-115-local.json`; historical SQL and manifests remain
+unchanged. This is upgrade preparation, not production authorization. Production
+continues serving its accepted schema115 application until exact-image acceptance,
+current-data application/migration rehearsal, forward-repair validation and one
+complete governed operation have passed and received explicit approval.
+
 Completed NORMAL schema115 continuation migration terminality is established
 from its existing protected completion, publication, measured controller/source
 roles and current positive NORMAL authority. Its `runtime_only_rollback` origin
@@ -30,7 +47,7 @@ nothing and authorizes no migration or image promotion.
 The unselected `schema-115-136-bridge.json` candidate starts from the actual
 local schema115 and selects only `migrations-116-136.json`. Every entry is the
 identical checksum-pinned suffix of historical `migrations-115-136.json`;
-historical manifests/descriptors and active schema115/no-SQL release are unchanged.
+historical manifests/descriptors and the retained schema115/no-SQL release are unchanged.
 Source-contract validation is not application acceptance or deployment permission.
 Exact-image acceptance at115 and136, current-data restore/migration rehearsal,
 forward-repair/reboot verification and fresh governed approval remain mandatory.
@@ -52,8 +69,8 @@ The referral candidate retains an additional checksum-pinned, unselected
 manifest and its pinned history remain unchanged. `check_migrations.py` accepts
 only the exact additional 136 artifact and verifies the old entries are
 identical; `check_forward_release.py` also validates this additional pinned
-candidate and exact namespace 001..136. Unknown future migrations still fail. Main's active schema115 profile
-still selects no SQL. Migration136 requires schema135 and adds tenant-private
+candidate and exact namespace 001..136. Unknown future migrations still fail. The historical schema115 profile
+still selects no SQL; the new upgrade candidate selects only116..136. Migration136 requires schema135 and adds tenant-private
 referrals plus monetary reward/reversal records tied atomically to a verified
 first learning purchase. Runtime endpoints and enabling referrals fail closed
 before schema136. Historical rewards keep their amount/currency; local payment
@@ -62,8 +79,8 @@ activation and production migration are outside this candidate. A separately
 accepted bridge, backup and approved upgrade are required before production use.
 
 
-Active local-Supabase integration profile: **schema115 only**, migration class
-`none`, migration policy `none`, no selected migration manifest. Retained bridge
+Previous local-Supabase integration profile: **schema115 only**, migration class
+`none`, migration policy `none`, now retained as `schema-115-local.json`. Retained bridge
 examples below describe reviewed migration history/future work and authorize no
 SQL for this profile. Main's 116..135 artifacts remain checksum-verified; features
 requiring those schemas retain their existing unavailable/upgrade-required gates.

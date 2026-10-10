@@ -1,5 +1,22 @@
 # Privileged control-plane upgrade architecture
 
+The existing root-owned write-authority reader now additionally accepts a fresh
+version2 grant for the exact local115..136 bridge. It requires the exact115/136
+range, an integer observed schema within that range, exact application release
+SHA and contract digest, and matching runtime compatibility configuration.
+Legacy version1 grants remain115-only; changing their fields cannot widen them.
+READ_ONLY request/provider/consumer fencing remains in force at every intermediate
+schema. Root must separately issue the new source-bound authority during an
+approved handoff; this reader change grants no production permission.
+
+The active candidate descriptor now selects the existing schema115..136 bridge
+and checksum-pinned migrations116..136. The former exact115/no-SQL descriptor
+is retained as `schema-115-local.json`; historical SQL and manifests remain
+unchanged. This is upgrade preparation, not production authorization. Production
+continues serving its accepted schema115 application until exact-image acceptance,
+current-data application/migration rehearsal, forward-repair validation and one
+complete governed operation have passed and received explicit approval.
+
 `migration_terminal` explicitly classifies a completed schema115 NORMAL
 continuation using the same independently measured source-role/positive-authority
 attestation as current preflight. It does not route that exceptional origin
@@ -56,8 +73,8 @@ Enabling a staged unit does not start it. Existing installed units retain their
 bytes until explicitly approved supersession; source changes alone do not repair
 their missing daemon-restart dependency.
 
-Active local-Supabase integration profile: **schema115 only**, migration class
-`none`, migration policy `none`, no selected migration manifest. Retained bridge
+Previous local-Supabase integration profile: **schema115 only**, migration class
+`none`, migration policy `none`, now retained as `schema-115-local.json`. Retained bridge
 examples below describe reviewed migration history/future work and authorize no
 SQL for this profile. Main's 116..135 artifacts remain checksum-verified; features
 requiring those schemas retain their existing unavailable/upgrade-required gates.

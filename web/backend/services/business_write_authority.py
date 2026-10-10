@@ -28,8 +28,23 @@ def read_authority() -> dict | None:
     value = json.loads(AUTHORITY_PATH.read_text())
     if not isinstance(value, dict):
         raise RuntimeError("business_write_authority_binding_invalid")
-    if (set(value) != {"version", "schema", "release_sha", "contract_digest", "mode"}
-            or type(value["version"]) is not int or value["version"] != 1 or value["schema"] != 115
+    fields = {"version", "schema", "release_sha", "contract_digest", "mode"}
+    version = value.get("version")
+    if type(version) is not int or version not in {1, 2}:
+        raise RuntimeError("business_write_authority_binding_invalid")
+    if version == 2:
+        fields |= {"compatible_min", "compatible_max"}
+        # This is the reviewed local115->136 bridge, not arbitrary permission
+        # to widen an older grant. Root must issue a fresh release-bound grant.
+        if (type(value.get("compatible_min")) is not int
+                or type(value.get("compatible_max")) is not int
+                or value["compatible_min"] != 115 or value["compatible_max"] != 136
+                or os.getenv("SCHEMA_COMPATIBLE_MIN") != "115"
+                or os.getenv("SCHEMA_COMPATIBLE_MAX") != "136"):
+            raise RuntimeError("business_write_authority_binding_invalid")
+    if (set(value) != fields
+            or type(value.get("schema")) is not int
+            or not 115 <= value["schema"] <= (136 if version == 2 else 115)
             or value["release_sha"] != os.getenv("MADAR_RELEASE_SHA")
             or not re.fullmatch(r"[0-9a-f]{40}", str(value["release_sha"]))
             or value["contract_digest"] != contract
