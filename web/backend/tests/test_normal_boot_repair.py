@@ -1,5 +1,6 @@
 import os
 import hashlib
+import json
 from pathlib import Path
 import sys
 from types import SimpleNamespace
@@ -63,5 +64,17 @@ class NormalBootRepairTests(unittest.TestCase):
     def test_fresh_authorization_is_required_before_audit_publication(self):
         operation=NormalBootRepair.__new__(NormalBootRepair);operation.authorized=False
         with self.assertRaisesRegex(RuntimeError,'fresh_approval'):operation.event('begin')
+    def test_failed_child_compensation_is_not_published_twice(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            operation=NormalBootRepair.__new__(NormalBootRepair);operation.root=Path(temporary)
+            operation.digest='a'*64;operation.name='fixture.service';operation.ops=Mock();operation.actor=Mock();operation.event=Mock()
+            (operation.root/'events.jsonl').write_text(json.dumps({'plan_sha256':operation.digest,'stage':'compensated'})+'\n')
+            with patch('deployment.lib.normal_boot_repair.protected',side_effect=lambda path,**kw:path):
+                operation.failed_startup(RuntimeError('fixture'))
+                operation.actor.compensate.assert_not_called()
+                (operation.root/'events.jsonl').write_text(json.dumps({'plan_sha256':operation.digest,'stage':'normal_verified'})+'\n')
+                operation.failed_startup(RuntimeError('fixture'))
+                operation.actor.compensate.assert_called_once()
+            self.assertEqual(operation.ops.command.call_count,2)
 
 if __name__=='__main__':unittest.main()
