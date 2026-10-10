@@ -40,6 +40,12 @@ class NormalBootRepairTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError,'compensation_incomplete'):actor.compensate()
             publication.return_value.maintenance_or_stop_proxy.assert_called_once()
         actor.stop_bound_runtimes_for_failed_compensation.assert_called_once()
+    def test_initial_audit_io_failure_cannot_prevent_fencing(self):
+        actor=self.actor();actor.audit.side_effect=[OSError('fixture denied'),None]
+        with patch('deployment.lib.normal_boot_repair.CompensationPublication'):
+            actor.compensate()
+        actor.candidate._publish_write_authority.assert_called_once_with(actor.candidate.contract,'READ_ONLY')
+        actor.workers.stop_consumers.assert_called_once()
     def test_invalid_original_plan_cannot_select_a_path(self):
         with self.assertRaisesRegex(RuntimeError,'original_plan_invalid'):
             NormalBootRepair({'original_plan_sha256':'../other'},'/frozen')

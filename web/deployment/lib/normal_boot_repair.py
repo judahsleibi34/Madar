@@ -43,7 +43,8 @@ def dropin_bytes(name,command):
 class RepairActor(ActiveRecoveryBootActor):
     """Compensation is new-audit maintenance; historical phase stays untouched."""
     def compensate(self):
-        self.audit('compensation_pending')
+        try:self.audit('compensation_pending')
+        except OSError:pass
         failures=[]
         try:
             self.candidate._publish_write_authority(self.candidate.contract,'READ_ONLY')
@@ -142,6 +143,8 @@ class NormalBootRepair:
             raise RuntimeError('boot_repair_dropin_inventory_changed')
         if (UNITS/self.name).exists() or self.root.exists():raise RuntimeError('boot_repair_namespace_already_consumed')
         from deployment.lib.active_recovery_backup import verify_backup_execution_context
+        from deployment.lib.active_recovery_artifact_evidence import verify_artifact_acceptance
+        verify_artifact_acceptance(self.plan)
         for name in ('backup_support.py','backup_madar.sh','verify_backup.sh'):
             if file_digest(protected(Path('/usr/local/lib/madar')/name))!=file_digest(protected(self.package/'source/web/scripts'/name,private=True)):
                 raise RuntimeError('normal_backup_installed_helper_changed')
