@@ -28,6 +28,14 @@ from deployment.lib.emergency_routing_repair import exclusive
 from deployment.lib.provider_recovery_runtime import protected,readonly_configuration,file_digest
 
 
+@contextmanager
+def protected_creation_mode():
+    """Root staging must not inherit a permissive launcher umask."""
+    previous=os.umask(0o077)
+    try:yield
+    finally:os.umask(previous)
+
+
 class CompletedNormalUpgrade:
     """Root orchestrates; actual release mutation remains User/Group madar.
 
@@ -197,6 +205,10 @@ class CompletedNormalUpgrade:
 
     def execute(self):
         if os.geteuid()!=0:raise RuntimeError('completed_upgrade_root_required')
+        with protected_creation_mode():
+            return self._execute()
+
+    def _execute(self):
         self.preflight()
         self.lock=acquire_lock(self.ops.upgrade_root/'upgrade.lock',create=False)
         try:

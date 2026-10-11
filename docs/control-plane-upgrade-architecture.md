@@ -1,5 +1,10 @@
 # Privileged control-plane upgrade architecture
 
+The completed-NORMAL root coordinator explicitly uses umask0077 throughout
+execution, including Git staging and installer subprocesses, and restores the
+caller mask afterward. A permissive launcher cannot create0666 contracts or
+0777 staging parents. Existing root-protection checks remain unchanged.
+
 Fresh completed-NORMAL preflight requires the existing root upgrade lock and
 no unrelated volatile upgrade interlock. It executes the real restricted
 read-only backup-context gate before any write grant. A quiesce rejection
