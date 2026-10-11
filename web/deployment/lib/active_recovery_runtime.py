@@ -14,12 +14,14 @@ CORE = frozenset({'database', 'auth', 'schema', 'storage'})
 PENDING = frozenset({'notification_worker', 'calendar_sync_worker', 'calendar_sync_queue', 'data_deletion_worker'})
 
 class ActiveRecoveryRuntime:
-    def __init__(self, plan, candidate, root, source_guard, worker_handoff, *, runtime=None):
-        if not callable(source_guard):
+    def __init__(self, plan, candidate, root, source_guard, worker_handoff, *, runtime=None,
+                 spec_matcher=worker_spec_matches):
+        if not callable(source_guard) or not callable(spec_matcher):
             raise RuntimeError('active_runtime_source_guard_required')
         self.plan, self.candidate, self.root = plan, candidate, Path(root)
         self.source_guard, self.workers = source_guard, worker_handoff
         self.runtime = runtime or Runtime()
+        self.spec_matcher = spec_matcher
 
     def identities(self, *, workers_started, require_running=True):
         self.source_guard()
@@ -41,7 +43,7 @@ class ActiveRecoveryRuntime:
             row = self.candidate.inspect(expected['id'])
             image = self.plan.candidate_images['frontend' if kind == 'frontend' else 'backend']
             if (expected['id']!=row['Id'] or expected['image']!=row['Image']
-                    or not worker_spec_matches(row,expected['spec_sha256'],started_worker=workers_started and kind in KINDS)
+                    or not self.spec_matcher(row,expected['spec_sha256'],started_worker=workers_started and kind in KINDS)
                     or row['Image'] != image or row['HostConfig']['RestartPolicy']['Name'] != 'no'
                     or (require_running and row['State']['Running'] is not (workers_started or kind not in KINDS))):
                 raise RuntimeError('active_runtime_identity_changed')

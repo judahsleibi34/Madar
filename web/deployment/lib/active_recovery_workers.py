@@ -17,10 +17,11 @@ from deployment.lib.provider_recovery_runtime import protected,digest
 from deployment.lib.runtime_authority import write_worker_authority,load_worker_authority,runtime_mutation_lock
 
 class ActiveRecoveryWorkerHandoff:
-    def __init__(self,plan,candidate,root,source_guard):
-        if not callable(source_guard):raise RuntimeError('worker_handoff_frozen_source_guard_required')
+    def __init__(self,plan,candidate,root,source_guard,*,spec_matcher=worker_spec_matches):
+        if not callable(source_guard) or not callable(spec_matcher):raise RuntimeError('worker_handoff_frozen_source_guard_required')
         self.plan,self.candidate,self.root,self.source_guard=plan,candidate,Path(root),source_guard
         self.state=Path('/var/lib/madar/releases')
+        self.spec_matcher=spec_matcher
     def guard(self,phases):
         self.source_guard()
         if os.geteuid()!=0 or self.root!=ROOT/self.plan.digest:raise RuntimeError('worker_handoff_fresh_root_required')
@@ -95,7 +96,7 @@ class ActiveRecoveryWorkerHandoff:
                     started=True
                 if row['State']['Running'] and not started:
                     raise RuntimeError('worker_handoff_standby_started_early')
-            if identity!=expected['id'] or row['Image']!=expected['image'] or not worker_spec_matches(row,expected['spec_sha256'],started_worker=started):
+            if identity!=expected['id'] or row['Image']!=expected['image'] or not self.spec_matcher(row,expected['spec_sha256'],started_worker=started):
                 raise RuntimeError('worker_handoff_active_spec_changed')
         active_ids=set(record['active'].values())
         for name in self.candidate.command(['docker','ps','-a','--format','{{.Names}}']).splitlines():

@@ -11,6 +11,11 @@ destination rather than transient Docker response ordering. Changed mount bytes
 or permissions still fail. Historical hashes remain unchanged; the six-service
 origin write fence allows only a bounded ordering comparison of those exact
 objects. This does not permit image, identity, configuration or security changes.
+The completed-origin admission and superseding boot verification use that same
+bounded comparison for the protected original six runtime IDs and worker-owner
+checks. Legacy continuation defaults remain order-sensitive; historical hashes
+are never rewritten. Actual Docker inspection must cover reordered mounts and
+reject modified objects before this source is accepted.
 
 The admitted compatible candidate explicitly reads the current ordinary
 `/var/lib/madar/backup-state/latest.json` through its existing read-only Compose

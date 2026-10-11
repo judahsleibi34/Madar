@@ -13,6 +13,10 @@ object and all other configuration fields. The historical raw hashes stay intact
 The origin fence may compare at most six unchanged mount objects in their former
 ordering; it never accepts changed paths, permissions, duplicate destinations or
 other specification changes. New sealed records use deterministic measurement.
+Completed-origin admission and superseding boot select this same comparator in
+their original-runtime and worker-owner verifiers. This selection applies only
+to the assembled protected origin inventory; legacy continuation callers retain
+their default comparison. Historical records remain unchanged.
 
 The completed-NORMAL Compose environment binds backup freshness to the existing
 ordinary backup-state mount. The special origin's runtime uses that marker even

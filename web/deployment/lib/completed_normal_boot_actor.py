@@ -114,7 +114,7 @@ class CompletedNormalBootActor:
     def origin(self):
         # New measured code executes; the old frozen package is historical DATA.
         from deployment.lib.active_recovery_resumption import load_saved_resumption_plan
-        from deployment.lib.completed_normal_baseline import historical_source
+        from deployment.lib.completed_normal_baseline import historical_source,bind_origin_specification_verifiers
         from deployment.lib.active_recovery_boot_actor import ActiveRecoveryBootActor
         from deployment.lib.active_recovery_boot import ActiveRecoveryNormalBoot
         roles=self.contract['source_roles'];old_root=Path(roles['completion_root'])
@@ -127,6 +127,7 @@ class CompletedNormalBootActor:
             source=SimpleNamespace(verify=source),audit=lambda stage,**kw:self.event('origin_'+stage,
                 **{key:value for key,value in kw.items() if key in {'exception_type','mode','schema'}}))
         actor.assemble()
+        bind_origin_specification_verifiers(actor)
         def completion():
             self.guard()
             if (self.root/'candidate-runtime.json').exists() or (self.root/'migration-intent.json').exists():

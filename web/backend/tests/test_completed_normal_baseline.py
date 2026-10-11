@@ -139,6 +139,9 @@ class CompletedNormalBaselineTests(unittest.TestCase):
         actor.return_value.assemble.assert_called_once_with()
         actor.return_value.completed_evidence.assert_called_once_with()
         actor.return_value.kernel.normal.assert_called_once_with()
+        from deployment.lib.completed_normal_resources import origin_spec_matches
+        self.assertIs(actor.return_value.kernel.spec_matcher,origin_spec_matches)
+        self.assertIs(actor.return_value.workers.spec_matcher,origin_spec_matches)
         self.assertEqual(result['application_sha'],self.app)
 
     def test_continuation_image_attestation_does_not_fabricate_worker_reference(self):

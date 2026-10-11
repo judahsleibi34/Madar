@@ -114,7 +114,19 @@ def attest_runtime(operations,state):
     root=Path(binding['completion_root']);plan=load_saved_resumption_plan(root)
     source=SimpleNamespace(verify=lambda:historical_source(plan))
     actor=ActiveRecoveryBootActor(plan,root,BASE/('normal-source-'+plan.source_bundle_sha256),source=source)
-    actor.assemble();actor.completed_evidence();actor.kernel.normal()
+    actor.assemble();bind_origin_specification_verifiers(actor)
+    actor.completed_evidence();actor.kernel.normal()
     if discover_split(operations,state,operations.repository_head(),operations.installed_sha())!=binding:
         raise RuntimeError('completed_normal_runtime_source_changed')
     return binding
+
+def bind_origin_specification_verifiers(actor):
+    """Use the bounded unordered-mount comparator only for measured origin IDs.
+
+    Historical raw hashes remain unchanged. The ordinary old continuation keeps
+    its strict default; this new source-bound admission/boot path opts in after
+    assembling the protected completed origin, not an arbitrary new candidate.
+    """
+    from deployment.lib.completed_normal_resources import origin_spec_matches
+    actor.kernel.spec_matcher=origin_spec_matches
+    actor.workers.spec_matcher=origin_spec_matches
