@@ -38,6 +38,12 @@ def digest(value: dict) -> str:
     return hashlib.sha256(encoded(value)).hexdigest()
 
 
+def prepared_path(contract, state_root):
+    """Fresh admission cannot adopt an earlier candidate's mutable record."""
+    validate_contract(contract)
+    return Path(state_root)/('prepared-completed-normal-'+digest(contract)+'.json')
+
+
 def validate_contract(value: dict) -> None:
     if not isinstance(value, dict) or set(value) != {
         "version", "operation", "source_roles", "origin", "candidate",

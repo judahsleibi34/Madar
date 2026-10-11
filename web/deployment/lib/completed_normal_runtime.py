@@ -224,7 +224,8 @@ def seal_candidate_stage(contract, *, source_guard,model_loader,runtime,state_ro
     with runtime_mutation_lock(Path(state_root)):
         source_guard();require_fresh_authorization(contract)
         runtimes,networks=validate_model(contract,model_loader(),runtime,phase='staged')
-        prepared=json.loads(readonly_configuration(Path(state_root)/'prepared-release.json',private=True).read_text())
+        from deployment.lib.completed_normal_admission import prepared_path
+        prepared=json.loads(readonly_configuration(prepared_path(contract,state_root),private=True).read_text())
         if (prepared.get('release_sha')!=contract['candidate']['source_sha']
                 or prepared.get('candidate_slot')!=contract['candidate']['slot']
                 or prepared.get('status')!='candidate_validated_workers_inactive'

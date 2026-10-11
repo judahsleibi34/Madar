@@ -56,12 +56,22 @@ class CompletedNormalReleaseHandoffTests(unittest.TestCase):
         (self.path/'state.json').write_text(json.dumps(self.original))
         self.prepared={'release_sha':'c'*40,'candidate_slot':'green','schema':115,'images':{},'prepared_at':'2026-10-11T00:00:00Z',
             'status':'candidate_validated_workers_inactive'}
-        (self.path/'prepared-release.json').write_text(json.dumps(self.prepared))
+        cli.prepared_release_path(self.path,self.ops).write_text(json.dumps(self.prepared))
+        (self.path/'prepared-release.json').write_text('retained prior candidate evidence')
         self.mode='READ_ONLY'
         def require(c,*,mode=None,**kw):
             if mode is not None and mode!=self.mode:raise RuntimeError('fixture_candidate_not_fenced')
             return {'mode':self.mode}
         p=patch.object(admission,'require_candidate_authority',side_effect=require);p.start();self.addCleanup(p.stop)
+    def test_prepared_state_is_exclusive_to_this_admission_without_replacing_legacy_record(self):
+        path=cli.prepared_release_path(self.path,self.ops)
+        self.assertNotEqual(path,cli.prepared_release_path(self.path))
+        changed=copy.deepcopy(self.contract);changed['candidate']['controller_sha']='e'*40
+        other=Operations(self.path,changed)
+        self.assertNotEqual(path,cli.prepared_release_path(self.path,other))
+        self.ops.origin_fenced=True;self.activate()
+        self.assertEqual((self.path/'prepared-release.json').read_text(),'retained prior candidate evidence')
+
     def activate(self):
         return cli.activate_prepared_release(sha='c'*40,slot='green',state_root=self.path,operations=self.ops)
     def test_actual_handoff_publishes_none_before_stop_and_exclusive_candidate_before_start(self):

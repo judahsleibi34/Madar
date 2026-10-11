@@ -1,5 +1,10 @@
 # Privileged control-plane upgrade architecture
 
+Completed-NORMAL prepare/activate/publish/adopt stages use a mutable prepared
+record scoped to the complete fresh admission digest. The root staging seal
+reads that same path. A matching application SHA and slot cannot adopt another
+operation’s prepared resources; existing ordinary prepared records stay intact.
+
 The completed-NORMAL root coordinator explicitly uses umask0077 throughout
 execution, including Git staging and installer subprocesses, and restores the
 caller mask afterward. A permissive launcher cannot create0666 contracts or
