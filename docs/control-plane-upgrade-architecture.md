@@ -1,5 +1,9 @@
 # Privileged control-plane upgrade architecture
 
+The installed upgrade launcher passes both `-I` and `-B` to its implementation,
+so a read-only invocation cannot create bytecode and invalidate the installed
+source fence. Existing historical installed-tree measurements remain unchanged.
+
 After the admitted coordinator completes backup/restore/replication and timer
 activation, it appends a completion selector to current ordinary release state.
 The selector is historical DATA, never new authorization. The read-only upgrade
