@@ -1,0 +1,17 @@
+{
+  "release_metadata_version": 1,
+  "schema": {
+    "compatible_min": 141,
+    "compatible_max": 143,
+    "target": 143,
+    "migration_class": "forward-compatible",
+    "rollback_compatible_min": 141,
+    "rollback_compatible_max": 141,
+    "excluded_versions": [
+      142
+    ]
+  },
+  "migration_policy": "automatic-after-known-good-backup-first-forward-repair",
+  "notes": "Unselected learning-only141→143 candidate. Exchange142 is unchanged and excluded. Production115 and the existing application141 database are unchanged; no production deployment authority.",
+  "migration_manifest": "migrations-141-143-learning.json"
+}

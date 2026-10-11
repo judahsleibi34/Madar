@@ -30,6 +30,8 @@ export default function ResponsesToolbar({
   data,
   updateActiveForm,
   showToast,
+  views = RESPONSE_VIEWS,
+  settingsEnabled = true,
 }) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const settingsMenuRef = useRef(null);
@@ -57,7 +59,7 @@ export default function ResponsesToolbar({
   return (
     <section className="responses-workspace-toolbar" aria-label={t.responseTools}>
       <div className="responses-view-tabs" role="tablist" aria-label={t.responseViews}>
-        {RESPONSE_VIEWS.map(([view, label]) => (
+        {views.map(([view, label]) => (
           <button
             key={view}
             type="button"
@@ -115,7 +117,7 @@ export default function ResponsesToolbar({
         </div>
       ) : null}
 
-      <div className="responses-settings-menu" ref={settingsMenuRef}>
+      {settingsEnabled && <div className="responses-settings-menu" ref={settingsMenuRef}>
         <button
           type="button"
           className="responses-settings-trigger"
@@ -140,7 +142,7 @@ export default function ResponsesToolbar({
             />
           </div>
         ) : null}
-      </div>
+      </div>}
     </section>
   );
 }

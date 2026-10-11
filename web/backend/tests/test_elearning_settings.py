@@ -6,6 +6,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 from routes import elearning_routes as routes
 from services import elearning_settings_service as service
+from services.academy_capability_service import CAPABILITY_REQUIREMENTS
 
 
 class ELearningSettingsTests(unittest.TestCase):
@@ -23,6 +24,9 @@ class ELearningSettingsTests(unittest.TestCase):
         self.availability = patch.object(service, "settings_available", return_value=True)
         self.availability.start()
         self.addCleanup(self.availability.stop)
+        grants = patch("services.academy_capability_service.capabilities", return_value={key: True for key in CAPABILITY_REQUIREMENTS})
+        grants.start()
+        self.addCleanup(grants.stop)
 
     def test_reads_and_writes_use_session_tenant(self):
         values = service.ELearningSettings(platform_name="Shared Learning", course_label="Workshop").model_dump(mode="json")
@@ -101,7 +105,8 @@ class ELearningSettingsTests(unittest.TestCase):
             self.assertEqual(service.get_settings(17)["course_label"], "Workshop")
             query.select.return_value.eq.assert_called_once_with("tenant_id", 17)
             service.save_settings(17, service.ELearningSettings())
-            client.rpc.assert_called_once_with("save_elearning_settings", {"p_tenant_id": 17, "p_settings": service.ELearningSettings().model_dump(mode="json")})
+            expected = service.ELearningSettings(course_label="Workshop").model_dump(mode="json")
+            client.rpc.assert_called_once_with("save_elearning_settings", {"p_tenant_id": 17, "p_settings": expected})
 
     def test_database_failure_returns_safe_error(self):
         with patch.object(service, "get_settings", side_effect=RuntimeError("internal SQL secret")):

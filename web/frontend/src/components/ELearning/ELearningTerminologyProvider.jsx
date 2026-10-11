@@ -21,7 +21,7 @@ export default function ELearningTerminologyProvider({ children }) {
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [attempt]);
-  const value = useMemo(() => ({ labels: getELearningTerminology(settings), loading, error, updateSettings,
+  const value = useMemo(() => ({ settings, labels: getELearningTerminology(settings), loading, error, updateSettings,
     retry: () => { setError(null); setLoading(true); setAttempt((current) => current + 1); } }), [settings, loading, error, updateSettings]);
   return <ELearningTerminologyContext.Provider value={value}>{children}</ELearningTerminologyContext.Provider>;
 }

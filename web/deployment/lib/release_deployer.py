@@ -53,6 +53,12 @@ class Compatibility:
     migration_class: str
     rollback_schema_min: int
     rollback_schema_max: int
+    excluded_schemas: tuple[int, ...] = ()
+
+    def accepts_schema(self, version: int, *, rollback: bool = False) -> bool:
+        minimum = self.rollback_schema_min if rollback else self.schema_min
+        maximum = self.rollback_schema_max if rollback else self.schema_max
+        return minimum <= version <= maximum and version not in self.excluded_schemas
 
     @classmethod
     def load(cls, path: Path) -> "Compatibility":
@@ -64,7 +70,12 @@ class Compatibility:
             migration_class=str(raw["migration_class"]),
             rollback_schema_min=int(raw["rollback_compatible_min"]),
             rollback_schema_max=int(raw["rollback_compatible_max"]),
+            excluded_schemas=tuple(raw.get("excluded_versions", [])),
         )
+        if result.excluded_schemas and (result.excluded_schemas != (142,) or result.schema_min != 141 or result.schema_max != 143 or result.target_schema != 143):
+            raise ValueError("unsupported schema branch exclusions")
+        if result.schema_min <= 142 <= result.schema_max and result.target_schema == 143 and result.excluded_schemas != (142,):
+            raise ValueError("learning branch must exclude schema142")
         if result.migration_class not in {"none", "expand-only", "forward-compatible", "coordinated", "breaking"}:
             raise ValueError("unsupported migration compatibility class")
         if not result.schema_min <= result.target_schema <= result.schema_max:
@@ -409,7 +420,7 @@ class ReleaseDeployer:
                     "target": self.compatibility.target_schema,
                     "migration_class": self.compatibility.migration_class,
                 }
-                if not self.compatibility.schema_min <= schema <= self.compatibility.schema_max:
+                if not self.compatibility.accepts_schema(schema):
                     raise RuntimeError("candidate_schema_incompatible")
                 known_good = state.get("known_good_release")
                 if known_good:

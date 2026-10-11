@@ -1,7 +1,7 @@
 export const ACADEMY_COMPONENT_TYPES = new Set([
   "heading", "text", "button", "image", "imageButton", "imageCardButton", "card",
   "carousel", "logoSlider", "list", "divider", "thinDivider", "metric",
-  "academyFeaturedCourses", "academyCourseCollection", "academyPlans", "academyContinueLearning", "academyInstructors",
+  "academyFeaturedCourses", "academyCourseCollection", "academyPlans", "academyContinueLearning", "academyInstructors", "academyContact", "academyExchangeOpportunities", "academyProgrammeInfo", "academyForm",
 ]);
 export const ACADEMY_DATA_COMPONENT_TYPES = new Set([...ACADEMY_COMPONENT_TYPES].filter(type => type.startsWith("academy")));
 

@@ -7,6 +7,7 @@ from database import service_supabase
 
 
 PREFERENCE_CATEGORIES = {
+    "learning": {"in_app", "push", "email"},
     "calendar": {"in_app", "push", "email"},
     "reservations": {"in_app", "push"},
     "forms": {"in_app", "push"},
@@ -17,6 +18,8 @@ PREFERENCE_CATEGORIES = {
 def notification_category(*, event_type: Any = None, source_type: Any = None) -> str:
     event_value = str(event_type or "").lower()
     source_value = str(source_type or "").lower()
+    if event_value.startswith("learning_") or source_value.startswith("elearning_"):
+        return "learning"
     if "calendar" in event_value or source_value in {"calendar_event", "calendar_task"}:
         return "calendar"
     if "reservation" in event_value or "reservation" in source_value:

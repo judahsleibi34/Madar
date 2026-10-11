@@ -1,0 +1,70 @@
+{
+  "course": "66f1f177-0199-43fd-8795-484da04239d6",
+  "sections": [
+    "91251145-b0dc-4289-8575-711a52883c11",
+    "05864a46-fc1d-4459-a8df-a8619f1e190b",
+    "b4da4c49-b5f5-42cf-9945-5d31dd29141c",
+    "6b077245-9f4a-4076-b6c2-433a9cb3395f",
+    "7d6a4b54-a64b-4c26-b809-50ee0dc77913",
+    "e70e6f2d-489c-442a-a952-410d378fef43",
+    "8a99f107-2ab6-4903-8717-b707c1073381",
+    "62430d6b-e710-4ec7-b37c-cd170b0f7991",
+    "2697fb46-a872-482d-990d-7945229a78ce",
+    "6ac0e79d-068f-4741-bba7-3979a53dd444"
+  ],
+  "topics": 89,
+  "transcripts": 89,
+  "picture_practices": 89,
+  "speaking_practices": 89,
+  "part_reviews": 10,
+  "milestones": [
+    {
+      "section": "05864a46-fc1d-4459-a8df-a8619f1e190b",
+      "placement": "a30deb7a-00aa-48e6-86c7-af13f7548b12",
+      "level": "A1",
+      "questions": 55,
+      "objective": 50,
+      "written": 2,
+      "speaking": 3
+    },
+    {
+      "section": "6b077245-9f4a-4076-b6c2-433a9cb3395f",
+      "placement": "b2bb4465-0d19-452d-8be3-e11f45cff979",
+      "level": "A2",
+      "questions": 55,
+      "objective": 50,
+      "written": 2,
+      "speaking": 3
+    },
+    {
+      "section": "e70e6f2d-489c-442a-a952-410d378fef43",
+      "placement": "09f4631e-9bc8-4a6a-9dcc-bae96c297360",
+      "level": "B1",
+      "questions": 55,
+      "objective": 50,
+      "written": 2,
+      "speaking": 3
+    },
+    {
+      "section": "62430d6b-e710-4ec7-b37c-cd170b0f7991",
+      "placement": "be83d37e-bdb7-4741-9274-8e1897d6f881",
+      "level": "B2",
+      "questions": 55,
+      "objective": 50,
+      "written": 2,
+      "speaking": 3
+    },
+    {
+      "section": "6ac0e79d-068f-4741-bba7-3979a53dd444",
+      "placement": "154ee296-03d4-4dd6-b0d4-850b79c12e2f",
+      "level": "C1",
+      "questions": 55,
+      "objective": 50,
+      "written": 2,
+      "speaking": 3
+    }
+  ],
+  "certificates": 5,
+  "original_course_seeded": false,
+  "method": "real owner API in isolated schema143 database"
+}

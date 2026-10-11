@@ -1,0 +1,8 @@
+{
+  "private_bucket": true,
+  "dry_run_preserves_bytes": true,
+  "unused_object_deleted": true,
+  "released_bytes": 32044,
+  "selected_recording_retained": true,
+  "repeat_idempotent": true
+}

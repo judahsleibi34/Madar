@@ -1,0 +1,41 @@
+.academy-theme-controls { margin: 0; min-width: 0; }
+.academy-theme-branding { padding-bottom: 24px; margin-bottom: 24px; border-bottom: 1px solid var(--theme-border); }
+.academy-theme-logo-row { display: flex; align-items: center; gap: 16px; margin-block: 18px; }
+.academy-theme-logo-tile { display: grid; place-items: center; flex: 0 0 80px; width: 80px; height: 80px; padding: 12px; box-sizing: border-box; background: var(--theme-bg-soft); border: 1px solid var(--theme-border); border-radius: 16px; color: var(--theme-text-muted); }
+.academy-theme-logo-tile img { width: 100%; height: 100%; object-fit: contain; }
+.academy-theme-logo-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; min-width: 0; }
+.academy-theme-logo-actions small { flex-basis: 100%; color: var(--theme-text-muted); font-size: 12px; line-height: 1.5; }
+.academy-theme-upload { cursor: pointer; }
+.academy-theme-logo-actions .elearning-file-input { position: absolute; width: 1px; height: 1px; padding: 0; border: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.academy-theme-remove { border: 0; background: transparent; color: var(--theme-text-muted); cursor: pointer; font: inherit; font-size: 12px; text-decoration: underline; }
+.academy-theme-field { display: grid; gap: 8px; font-size: 13px; font-weight: 700; }
+.academy-theme-field :is(input, select) { width: 100%; min-width: 0; box-sizing: border-box; min-height: 44px; padding: 10px 12px; background: var(--theme-bg-soft); color: var(--theme-text); border: 1px solid var(--color-border-control); border-radius: 10px; font: inherit; font-weight: 400; }
+.academy-theme-field :is(input, select):focus-visible { outline: 2px solid var(--theme-primary); outline-offset: 2px; }
+.academy-theme-page .ecommerce-theme-color-row input[type="text"] { box-sizing: border-box; }
+.academy-theme-advanced { margin-top: 12px; color: var(--theme-text-muted); }
+.academy-theme-advanced summary { cursor: pointer; padding-block: 10px; font-size: 13px; font-weight: 700; }
+.academy-theme-presets { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
+.academy-theme-typography { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 20px; }
+.academy-theme-footer { gap: 12px; flex-wrap: wrap; }
+.academy-theme-publish-help { color: var(--theme-text-muted); font-size: 12px; line-height: 1.6; margin-bottom: 0; }
+.academy-theme-preview-shell { overflow: hidden; border: 1px solid var(--theme-border); border-radius: 14px; background: var(--theme-bg-soft); padding: 0; }
+.academy-theme-sample { background: var(--theme-bg); color: var(--theme-text); overflow: hidden; min-height: 610px; width: 100%; margin-inline: auto; transition: max-width 180ms ease; }
+.academy-theme-sample.is-mobile { max-width: 390px; }
+.academy-theme-sample header { display: flex; align-items: center; gap: 12px; padding: 24px; background: var(--theme-header-background); border-bottom: 1px solid var(--theme-border); }
+.academy-theme-sample header img { width: 44px; height: 44px; object-fit: contain; }
+.academy-theme-sample header strong { min-width: 0; overflow-wrap: anywhere; }
+.academy-theme-sample header > span { margin-inline-start: auto; color: var(--theme-text-soft); font-size: 12px; }
+.academy-theme-sample section { padding: 54px 32px 36px; }
+.academy-theme-sample section small { color: var(--theme-primary); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; }
+.academy-theme-sample section h3 { font-family: inherit; color: var(--theme-text); font-size: 32px; font-weight: 800; line-height: 1.15; margin-block: 14px; }
+.academy-theme-sample p { color: var(--theme-text-soft); font-family: inherit; font-size: 14px; line-height: 1.6; }
+.academy-theme-preview-button { display: inline-block; margin-top: 12px; padding: 12px 20px; background: var(--theme-primary); color: var(--theme-on-primary); border-radius: var(--madar-radius); font-size: 13px; }
+.academy-theme-preview-card { margin: 0 32px 36px; padding: 24px; background: var(--theme-surface); border-radius: var(--madar-radius); }
+.academy-theme-course-swatches { display: flex; gap: 10px; }
+.academy-theme-course-swatches i { flex: 1; height: 48px; border-radius: var(--madar-radius); background: var(--theme-bg-soft); border: 1px solid var(--theme-border); }
+.academy-theme-sample footer { display: flex; flex-direction: column; gap: 12px; padding: 28px 32px; background: var(--theme-surface); border-top: 1px solid var(--theme-border); color: var(--theme-text-soft); font-size: 12px; }
+.academy-theme-sample.is-mobile section { padding-inline: 24px; }
+.academy-theme-sample.is-mobile section h3 { font-size: 28px; }
+.academy-theme-sample.is-mobile header > span { display: none; }
+@media (max-width: 620px) { .academy-theme-typography { grid-template-columns: 1fr; } .academy-theme-logo-row { align-items: flex-start; } .academy-theme-footer > button { flex: 1 1 auto; } .academy-theme-page .ecommerce-theme-preview-toolbar > a { max-width: 100%; } }
+@media (prefers-reduced-motion: reduce) { .academy-theme-sample { transition: none; } }

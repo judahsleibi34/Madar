@@ -80,3 +80,19 @@ def local_event(checkout_id: UUID, payload: service.LocalEvent, request: Request
         audit(request, actor, "local_payment_" + payload.state, checkout_id)
         return result
     return operation(execute)
+
+
+@router.post('/payments/webhook')
+async def payment_webhook(request: Request):
+    from fastapi import HTTPException
+    from services import learning_payment_provider as payments
+    from services.elearning_settings_service import settings_available
+    name, provider = payments.configured_provider()
+    if not settings_available(129): raise HTTPException(503, 'Learning commerce requires an upgrade')
+    body = await request.body()
+    if len(body) > 1024 * 1024: raise HTTPException(413, 'Webhook too large')
+    try:
+        event = provider.verify_webhook(body, request.headers)
+    except payments.InvalidPaymentSignature as error:
+        raise HTTPException(400, 'Payment verification failed') from error
+    return operation(lambda: payments.apply_verified_event(name, event))

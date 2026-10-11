@@ -5729,6 +5729,7 @@ body.theme-dark .publish-empty-note,
   background: var(--madar-surface-soft) !important;
   background-image: none !important;
   color: var(--madar-text) !important;
+  -webkit-text-fill-color: var(--madar-text) !important;
   box-shadow: none !important;
 }
 .forms-simple-workbench .forms-builder-actions {

@@ -1,0 +1,423 @@
+Reproduced native backend failure/error traces — 2026-10-11
+Paths normalized; synthetic MFA cookie redacted. No assertions modified.
+
+======================================================================
+ERROR: test_app_middleware (unittest.loader._FailedTest.test_app_middleware)
+----------------------------------------------------------------------
+ImportError: Failed to import test module: test_app_middleware
+Traceback (most recent call last):
+  File "/usr/lib/python3.12/unittest/loader.py", line 394, in _find_test_path
+    module = self._get_module_from_name(name)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/unittest/loader.py", line 337, in _get_module_from_name
+    __import__(name)
+  File "web/backend/tests/test_app_middleware.py", line 9, in <module>
+    from app import app
+  File "web/backend/app.py", line 101, in <module>
+    RUNTIME_CONFIGURATION = validate_runtime_configuration()
+                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "web/backend/services/runtime_config.py", line 189, in validate_runtime_configuration
+    raise RuntimeError("required production configuration is missing: " + ",".join(missing))
+RuntimeError: required production configuration is missing: REDIS_URL
+
+
+======================================================================
+ERROR: test_application_import_uses_writable_ci_storage_as_non_root (test_backend_ci_environment.BackendCiEnvironmentTests.test_application_import_uses_writable_ci_storage_as_non_root)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "web/backend/tests/test_backend_ci_environment.py", line 176, in test_application_import_uses_writable_ci_storage_as_non_root
+    command = _named_run_command(WORKFLOW, "Run backend tests")
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "web/backend/tests/test_backend_ci_environment.py", line 29, in _named_run_command
+    lines = workflow.read_text(encoding="utf-8").splitlines()
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/pathlib.py", line 1029, in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors) as f:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/pathlib.py", line 1015, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: 'web/.github/workflows/backend-check.yml'
+
+======================================================================
+ERROR: test_backend_ci_mounts_frontend_vite_config_read_only (test_backend_ci_environment.BackendCiEnvironmentTests.test_backend_ci_mounts_frontend_vite_config_read_only)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "web/backend/tests/test_backend_ci_environment.py", line 167, in test_backend_ci_mounts_frontend_vite_config_read_only
+    command = _named_run_command(WORKFLOW, "Run backend tests")
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "web/backend/tests/test_backend_ci_environment.py", line 29, in _named_run_command
+    lines = workflow.read_text(encoding="utf-8").splitlines()
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/pathlib.py", line 1029, in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors) as f:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/pathlib.py", line 1015, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: 'web/.github/workflows/backend-check.yml'
+
+======================================================================
+ERROR: test_backend_ci_uses_safe_complete_hermetic_environment (test_backend_ci_environment.BackendCiEnvironmentTests.test_backend_ci_uses_safe_complete_hermetic_environment)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "web/backend/tests/test_backend_ci_environment.py", line 108, in test_backend_ci_uses_safe_complete_hermetic_environment
+    command = _named_run_command(WORKFLOW, "Run backend tests")
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "web/backend/tests/test_backend_ci_environment.py", line 29, in _named_run_command
+    lines = workflow.read_text(encoding="utf-8").splitlines()
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/pathlib.py", line 1029, in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors) as f:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/pathlib.py", line 1015, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: 'web/.github/workflows/backend-check.yml'
+
+======================================================================
+ERROR: test_ci_uses_git_capable_test_target_without_expanding_runtime_image (test_backend_ci_environment.BackendCiEnvironmentTests.test_ci_uses_git_capable_test_target_without_expanding_runtime_image)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "web/backend/tests/test_backend_ci_environment.py", line 64, in test_ci_uses_git_capable_test_target_without_expanding_runtime_image
+    workflow = WORKFLOW.read_text(encoding="utf-8")
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/pathlib.py", line 1029, in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors) as f:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/pathlib.py", line 1015, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: 'web/.github/workflows/backend-check.yml'
+
+======================================================================
+ERROR: test_business_write_authority (unittest.loader._FailedTest.test_business_write_authority)
+----------------------------------------------------------------------
+ImportError: Failed to import test module: test_business_write_authority
+Traceback (most recent call last):
+  File "/usr/lib/python3.12/unittest/loader.py", line 394, in _find_test_path
+    module = self._get_module_from_name(name)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/unittest/loader.py", line 337, in _get_module_from_name
+    __import__(name)
+  File "web/backend/tests/test_business_write_authority.py", line 11, in <module>
+    import app as app_module
+  File "web/backend/app.py", line 101, in <module>
+    RUNTIME_CONFIGURATION = validate_runtime_configuration()
+                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "web/backend/services/runtime_config.py", line 189, in validate_runtime_configuration
+    raise RuntimeError("required production configuration is missing: " + ",".join(missing))
+RuntimeError: required production configuration is missing: REDIS_URL
+
+
+======================================================================
+ERROR: test_provider_recovery (unittest.loader._FailedTest.test_provider_recovery)
+----------------------------------------------------------------------
+ImportError: Failed to import test module: test_provider_recovery
+Traceback (most recent call last):
+  File "/usr/lib/python3.12/unittest/loader.py", line 394, in _find_test_path
+    module = self._get_module_from_name(name)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/unittest/loader.py", line 337, in _get_module_from_name
+    __import__(name)
+  File "web/backend/tests/test_provider_recovery.py", line 8, in <module>
+    import app as app_module
+  File "web/backend/app.py", line 101, in <module>
+    RUNTIME_CONFIGURATION = validate_runtime_configuration()
+                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "web/backend/services/runtime_config.py", line 189, in validate_runtime_configuration
+    raise RuntimeError("required production configuration is missing: " + ",".join(missing))
+RuntimeError: required production configuration is missing: REDIS_URL
+
+
+======================================================================
+ERROR: test_attempt_migration_serializes_limits_and_finalize_with_row_lock (test_public_quiz_security.PublicQuizSecurityTests.test_attempt_migration_serializes_limits_and_finalize_with_row_lock)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "web/backend/tests/test_public_quiz_security.py", line 97, in test_attempt_migration_serializes_limits_and_finalize_with_row_lock
+    database_sql = (web_root / "database/migrations/082_create_public_quiz_attempts.sql").read_text(encoding="utf-8")
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/pathlib.py", line 1029, in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors) as f:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/pathlib.py", line 1015, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/workspace/database/migrations/082_create_public_quiz_attempts.sql'
+
+======================================================================
+ERROR: test_public_site_runtime (unittest.loader._FailedTest.test_public_site_runtime)
+----------------------------------------------------------------------
+ImportError: Failed to import test module: test_public_site_runtime
+Traceback (most recent call last):
+  File "/usr/lib/python3.12/unittest/loader.py", line 394, in _find_test_path
+    module = self._get_module_from_name(name)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/unittest/loader.py", line 337, in _get_module_from_name
+    __import__(name)
+  File "web/backend/tests/test_public_site_runtime.py", line 12, in <module>
+    from app import app
+  File "web/backend/app.py", line 101, in <module>
+    RUNTIME_CONFIGURATION = validate_runtime_configuration()
+                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "web/backend/services/runtime_config.py", line 189, in validate_runtime_configuration
+    raise RuntimeError("required production configuration is missing: " + ",".join(missing))
+RuntimeError: required production configuration is missing: REDIS_URL
+
+
+======================================================================
+ERROR: test_public_upload_routes (unittest.loader._FailedTest.test_public_upload_routes)
+----------------------------------------------------------------------
+ImportError: Failed to import test module: test_public_upload_routes
+Traceback (most recent call last):
+  File "/usr/lib/python3.12/unittest/loader.py", line 394, in _find_test_path
+    module = self._get_module_from_name(name)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/unittest/loader.py", line 337, in _get_module_from_name
+    __import__(name)
+  File "web/backend/tests/test_public_upload_routes.py", line 12, in <module>
+    import app as app_module
+  File "web/backend/app.py", line 101, in <module>
+    RUNTIME_CONFIGURATION = validate_runtime_configuration()
+                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "web/backend/services/runtime_config.py", line 189, in validate_runtime_configuration
+    raise RuntimeError("required production configuration is missing: " + ",".join(missing))
+RuntimeError: required production configuration is missing: REDIS_URL
+
+
+======================================================================
+ERROR: test_publication_isolation (unittest.loader._FailedTest.test_publication_isolation)
+----------------------------------------------------------------------
+ImportError: Failed to import test module: test_publication_isolation
+Traceback (most recent call last):
+  File "/usr/lib/python3.12/unittest/loader.py", line 394, in _find_test_path
+    module = self._get_module_from_name(name)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/unittest/loader.py", line 337, in _get_module_from_name
+    __import__(name)
+  File "web/backend/tests/test_publication_isolation.py", line 11, in <module>
+    from app import app
+  File "web/backend/app.py", line 101, in <module>
+    RUNTIME_CONFIGURATION = validate_runtime_configuration()
+                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "web/backend/services/runtime_config.py", line 189, in validate_runtime_configuration
+    raise RuntimeError("required production configuration is missing: " + ",".join(missing))
+RuntimeError: required production configuration is missing: REDIS_URL
+
+
+======================================================================
+ERROR: test_storage_delivery (unittest.loader._FailedTest.test_storage_delivery)
+----------------------------------------------------------------------
+ImportError: Failed to import test module: test_storage_delivery
+Traceback (most recent call last):
+  File "/usr/lib/python3.12/unittest/loader.py", line 394, in _find_test_path
+    module = self._get_module_from_name(name)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/unittest/loader.py", line 337, in _get_module_from_name
+    __import__(name)
+  File "web/backend/tests/test_storage_delivery.py", line 7, in <module>
+    import app as app_module
+  File "web/backend/app.py", line 101, in <module>
+    RUNTIME_CONFIGURATION = validate_runtime_configuration()
+                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "web/backend/services/runtime_config.py", line 189, in validate_runtime_configuration
+    raise RuntimeError("required production configuration is missing: " + ",".join(missing))
+RuntimeError: required production configuration is missing: REDIS_URL
+
+
+======================================================================
+FAIL: test_base_plan_capability_matrix (test_commercial_entitlements.EntitlementMatrixTests.test_base_plan_capability_matrix)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "web/backend/tests/test_commercial_entitlements.py", line 162, in test_base_plan_capability_matrix
+    self.assertNotIn("page_builder", forms)
+AssertionError: 'page_builder' unexpectedly found in {'image_uploads', 'reservation_analytics', 'website_publish', 'private_google_drive', 'standard_data_analysis', 'hosted_email_mailbox', 'page_builder', 'branded_madar_subdomain', 'charts', 'public_form_links', 'ocr', 'ai_analytics', 'data_exports', 'internal_calendar', 'reservation_management', 'data_cleaning', 'response_overview', 'response_management', 'standard_hosted_address', 'expanded_data_analysis', 'ecommerce', 'priority_support', 'forms', 'custom_domain', 'data_import', 'reservations'}
+
+======================================================================
+FAIL: test_branded_subdomain_requires_addon_or_reviewed_grandfathering (test_commercial_entitlements.EntitlementMatrixTests.test_branded_subdomain_requires_addon_or_reviewed_grandfathering)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "web/backend/tests/test_commercial_entitlements.py", line 198, in test_branded_subdomain_requires_addon_or_reviewed_grandfathering
+    self.assertNotIn("branded_madar_subdomain", state["capabilities"])
+AssertionError: 'branded_madar_subdomain' unexpectedly found in ['ai_analytics', 'branded_madar_subdomain', 'charts', 'custom_domain', 'data_cleaning', 'data_exports', 'data_import', 'ecommerce', 'expanded_data_analysis', 'forms', 'hosted_email_mailbox', 'image_uploads', 'internal_calendar', 'ocr', 'page_builder', 'priority_support', 'private_google_drive', 'public_form_links', 'reservation_analytics', 'reservation_management', 'reservations', 'response_management', 'response_overview', 'standard_data_analysis', 'standard_hosted_address', 'website_publish']
+
+======================================================================
+FAIL: test_cancelled_expired_past_due_and_malformed_states_grant_nothing (test_commercial_entitlements.EntitlementMatrixTests.test_cancelled_expired_past_due_and_malformed_states_grant_nothing)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "web/backend/tests/test_commercial_entitlements.py", line 341, in test_cancelled_expired_past_due_and_malformed_states_grant_nothing
+    self.assertEqual(state["capabilities"], [])
+AssertionError: Lists differ: ['ai_analytics', 'branded_madar_subdomain'[452 chars]ish'] != []
+
+First list contains 26 additional elements.
+First extra element 0:
+'ai_analytics'
+
++ []
+- ['ai_analytics',
+-  'branded_madar_subdomain',
+-  'charts',
+-  'custom_domain',
+-  'data_cleaning',
+-  'data_exports',
+-  'data_import',
+-  'ecommerce',
+-  'expanded_data_analysis',
+-  'forms',
+-  'hosted_email_mailbox',
+-  'image_uploads',
+-  'internal_calendar',
+-  'ocr',
+-  'page_builder',
+-  'priority_support',
+-  'private_google_drive',
+-  'public_form_links',
+-  'reservation_analytics',
+-  'reservation_management',
+-  'reservations',
+-  'response_management',
+-  'response_overview',
+-  'standard_data_analysis',
+-  'standard_hosted_address',
+-  'website_publish']
+
+======================================================================
+FAIL: test_duplicate_entitled_subscription_is_rejected (test_commercial_entitlements.EntitlementMatrixTests.test_duplicate_entitled_subscription_is_rejected)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "web/backend/tests/test_commercial_entitlements.py", line 308, in test_duplicate_entitled_subscription_is_rejected
+    with self.assertRaises(HTTPException) as context:
+AssertionError: HTTPException not raised
+
+======================================================================
+FAIL: test_inactive_subscription_grants_nothing (test_commercial_entitlements.EntitlementMatrixTests.test_inactive_subscription_grants_nothing)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "web/backend/tests/test_commercial_entitlements.py", line 318, in test_inactive_subscription_grants_nothing
+    self.assertEqual(state["source"], "canonical_inactive")
+AssertionError: 'operator_configuration_override' != 'canonical_inactive'
+- operator_configuration_override
++ canonical_inactive
+
+
+======================================================================
+FAIL: test_missing_subscription_fails_closed (test_commercial_entitlements.EntitlementMatrixTests.test_missing_subscription_fails_closed)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "web/backend/tests/test_commercial_entitlements.py", line 269, in test_missing_subscription_fails_closed
+    self.assertEqual(state["capabilities"], [])
+AssertionError: Lists differ: ['ai_analytics', 'branded_madar_subdomain'[452 chars]ish'] != []
+
+First list contains 26 additional elements.
+First extra element 0:
+'ai_analytics'
+
++ []
+- ['ai_analytics',
+-  'branded_madar_subdomain',
+-  'charts',
+-  'custom_domain',
+-  'data_cleaning',
+-  'data_exports',
+-  'data_import',
+-  'ecommerce',
+-  'expanded_data_analysis',
+-  'forms',
+-  'hosted_email_mailbox',
+-  'image_uploads',
+-  'internal_calendar',
+-  'ocr',
+-  'page_builder',
+-  'priority_support',
+-  'private_google_drive',
+-  'public_form_links',
+-  'reservation_analytics',
+-  'reservation_management',
+-  'reservations',
+-  'response_management',
+-  'response_overview',
+-  'standard_data_analysis',
+-  'standard_hosted_address',
+-  'website_publish']
+
+======================================================================
+FAIL: test_storage_addons_aggregate_exact_bytes (test_commercial_entitlements.EntitlementMatrixTests.test_storage_addons_aggregate_exact_bytes)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "web/backend/tests/test_commercial_entitlements.py", line 177, in test_storage_addons_aggregate_exact_bytes
+    self.assertEqual(state["allowances"]["storage_bytes"], 12 * GIB)
+AssertionError: 10737418240 != 12884901888
+
+======================================================================
+FAIL: test_unknown_active_plan_and_dependency_failure_fail_closed (test_commercial_entitlements.EntitlementMatrixTests.test_unknown_active_plan_and_dependency_failure_fail_closed)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "web/backend/tests/test_commercial_entitlements.py", line 350, in test_unknown_active_plan_and_dependency_failure_fail_closed
+    self.assertEqual(state["capabilities"], [])
+AssertionError: Lists differ: ['ai_analytics', 'branded_madar_subdomain'[452 chars]ish'] != []
+
+First list contains 26 additional elements.
+First extra element 0:
+'ai_analytics'
+
++ []
+- ['ai_analytics',
+-  'branded_madar_subdomain',
+-  'charts',
+-  'custom_domain',
+-  'data_cleaning',
+-  'data_exports',
+-  'data_import',
+-  'ecommerce',
+-  'expanded_data_analysis',
+-  'forms',
+-  'hosted_email_mailbox',
+-  'image_uploads',
+-  'internal_calendar',
+-  'ocr',
+-  'page_builder',
+-  'priority_support',
+-  'private_google_drive',
+-  'public_form_links',
+-  'reservation_analytics',
+-  'reservation_management',
+-  'reservations',
+-  'response_management',
+-  'response_overview',
+-  'standard_data_analysis',
+-  'standard_hosted_address',
+-  'website_publish']
+
+======================================================================
+FAIL: test_workspace_seat_addons_aggregate (test_commercial_entitlements.EntitlementMatrixTests.test_workspace_seat_addons_aggregate)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "web/backend/tests/test_commercial_entitlements.py", line 194, in test_workspace_seat_addons_aggregate
+    self.assertEqual(entitlement_service.get_workspace_seat_capacity(7), 8)
+AssertionError: 10000 != 8
+
+======================================================================
+FAIL: test_real_response_preserves_cookie_and_jar_reaches_prefixed_challenge (test_mfa_login_cookie_handoff.MfaCookieHandoffTests.test_real_response_preserves_cookie_and_jar_reaches_prefixed_challenge)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "web/backend/tests/test_mfa_login_cookie_handoff.py", line 29, in test_real_response_preserves_cookie_and_jar_reaches_prefixed_challenge
+    for attribute in ["HttpOnly", "Secure", "SameSite=lax", "Path=/"]: self.assertIn(attribute, header)
+                                                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'SameSite=lax' not found in 'madar_mfa_pending="[REDACTED SYNTHETIC COOKIE]"; HttpOnly; Max-Age=300; Path=/; SameSite=none; Secure'
+
+======================================================================
+FAIL: test_all_required_components_ready (test_readiness_service.ReadinessServiceTests.test_all_required_components_ready)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "web/backend/tests/test_readiness_service.py", line 306, in test_all_required_components_ready
+    self.assertIs(result["ready"], True)
+AssertionError: False is not True
+
+======================================================================
+FAIL: test_explicit_optional_redis_outage_is_ready (test_readiness_service.ReadinessServiceTests.test_explicit_optional_redis_outage_is_ready)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "web/backend/tests/test_readiness_service.py", line 336, in test_explicit_optional_redis_outage_is_ready
+    self.assertIs(result["ready"], True)
+AssertionError: False is not True
+

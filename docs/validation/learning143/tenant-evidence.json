@@ -1,0 +1,8 @@
+{
+  "other_tenant_owner": {
+    "recording": 404,
+    "review": 403,
+    "course": 404
+  },
+  "no_foreign_evidence_returned": true
+}

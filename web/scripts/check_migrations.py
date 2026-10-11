@@ -8,6 +8,34 @@ import re
 import sys
 from collections import defaultdict
 from pathlib import Path
+import importlib.util
+
+_candidate_spec = importlib.util.spec_from_file_location("madar_eduhope_candidate", Path(__file__).with_name("eduhope_candidate.py"))
+_candidate = importlib.util.module_from_spec(_candidate_spec)
+_candidate_spec.loader.exec_module(_candidate)
+validated_entries = _candidate.validated_entries
+
+_academy_spec = importlib.util.spec_from_file_location("madar_academy_candidate", Path(__file__).with_name("academy_candidate.py"))
+_academy_candidate = importlib.util.module_from_spec(_academy_spec)
+_academy_spec.loader.exec_module(_academy_candidate)
+validated_academy_entries = _academy_candidate.validated_entries
+_owner_spec = importlib.util.spec_from_file_location("madar_academy_owner_candidate", Path(__file__).with_name("academy_owner_candidate.py"))
+_owner_candidate = importlib.util.module_from_spec(_owner_spec)
+_owner_spec.loader.exec_module(_owner_candidate)
+validated_owner_entries = _owner_candidate.validated_entries
+_forms_spec = importlib.util.spec_from_file_location("madar_forms_candidate", Path(__file__).with_name("elearning_forms_candidate.py"))
+_forms_candidate = importlib.util.module_from_spec(_forms_spec)
+_forms_spec.loader.exec_module(_forms_candidate)
+validated_forms_entries = _forms_candidate.validated_entries
+_exchange_spec = importlib.util.spec_from_file_location("madar_exchange_forms_candidate", Path(__file__).with_name("exchange_forms_candidate.py"))
+_exchange_candidate = importlib.util.module_from_spec(_exchange_spec)
+_exchange_spec.loader.exec_module(_exchange_candidate)
+validated_exchange_entries = _exchange_candidate.validated_entries
+
+_learning_spec = importlib.util.spec_from_file_location("madar_learning_path_gate", Path(__file__).with_name("check_learning_migration_path.py"))
+_learning_candidate = importlib.util.module_from_spec(_learning_spec)
+_learning_spec.loader.exec_module(_learning_candidate)
+validate_learning_path = _learning_candidate.validate
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -283,6 +311,15 @@ def check_production_lineage(errors: list[str]) -> None:
                     or referral_entries[-1]["to_schema"] != 136):
                 raise ValueError("retained referral candidate namespace invalid")
             retained_future[136] = referral_entries[-1]
+            retained_future.update({entry["number"]: entry for entry in validated_entries(REPO_ROOT.parent)})
+            retained_future.update({entry["number"]: entry for entry in validated_academy_entries(REPO_ROOT.parent)})
+            retained_future.update({entry["number"]: entry for entry in validated_owner_entries(REPO_ROOT.parent)})
+            retained_future.update({entry["number"]: entry for entry in validated_forms_entries(REPO_ROOT.parent)})
+            retained_future.update({entry["number"]: entry for entry in validated_exchange_entries(REPO_ROOT.parent)})
+            learning=validate_learning_path(REPO_ROOT.parent)
+            if learning['status']=='finalized':
+                learning_manifest=json.loads((REPO_ROOT.parent / learning['manifest_path']).read_text())
+                retained_future.update({entry['number']:entry for entry in learning_manifest['migrations']})
         if frozen["production_baseline"] != "1e6b739a43759309a45ede2dff28a859209e4a64" or len(frozen["files"]) != 198:
             raise ValueError("invalid immutable lineage manifest")
         for relative, checksum in frozen["files"].items():
@@ -309,6 +346,10 @@ def check_production_lineage(errors: list[str]) -> None:
 
 def main() -> int:
     errors: list[str] = []
+    try:
+        validate_learning_path(REPO_ROOT.parent)
+    except (OSError, ValueError, TypeError, KeyError) as error:
+        errors.append(f"learning migration reservation invalid: {error}")
     check_production_lineage(errors)
     warnings: list[str] = []
     trees = {

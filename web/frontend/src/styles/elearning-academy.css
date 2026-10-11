@@ -186,3 +186,9 @@
  .academy-auth .academy-login { padding:28px 24px; }
  .academy-auth > .academy-footer { align-items:center; text-align:center; }
 }
+
+.academy-page-links a[aria-current="page"] { color:var(--academy-accent); text-decoration:underline; text-underline-offset:5px; }
+.academy-public-opportunity { padding:24px; overflow-wrap:anywhere; }
+.academy-public-opportunity summary { cursor:pointer; color:var(--academy-accent); }
+.academy-public-opportunity dl div { margin-block:12px; }
+.academy-public-opportunity dd { margin-inline:0; white-space:pre-wrap; }

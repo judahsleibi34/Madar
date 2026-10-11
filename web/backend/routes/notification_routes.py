@@ -21,6 +21,7 @@ from services.notification_service import (
     revoke_web_push_subscription,
     upsert_web_push_subscription,
 )
+from services.elearning_settings_service import settings_available
 from services.notification_preference_service import (
     PREFERENCE_CATEGORIES,
     list_notification_preferences,
@@ -60,6 +61,7 @@ def _current_context(request: Request, response: Response):
         request,
         response,
         allow_admin_account_access=False,
+        allow_learner=True,
     )
 
 
@@ -132,6 +134,7 @@ def get_preferences(request: Request, response: Response):
             "enabled": override_map.get(f"{category}:{channel}", True),
         }
         for category, channels in PREFERENCE_CATEGORIES.items()
+        if category != "learning" or settings_available(137)
         for channel in sorted(channels)
     ]
     return {"success": True, "preferences": preferences}
@@ -144,6 +147,8 @@ def update_preferences(
     response: Response,
 ):
     context = _current_context(request, response)
+    if preference.category == "learning" and not settings_available(137):
+        raise HTTPException(status_code=503, detail="Learning notification preferences require schema 137")
     try:
         saved = set_notification_preference(
             tenant_id=context.tenant_id,

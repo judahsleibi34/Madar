@@ -50,6 +50,7 @@ declare -a tracked_files=(
   lib/control_plane_upgrade.py
   lib/control_plane_upgrade_authorization.py
   lib/migration_executor.py
+  lib/learning_migration_path.py
   lib/release_deployer.py
   lib/runtime_authority.py
   lib/provider_recovery.py

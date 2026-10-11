@@ -1,0 +1,20 @@
+{
+  "parts": 10,
+  "completed_synthetic_topics": 89,
+  "mixed_exams": 5,
+  "questions_per_exam": 55,
+  "speaking_per_exam": 3,
+  "written_per_exam": 2,
+  "passing_threshold": 65,
+  "independent_issued_levels": [
+    "A1",
+    "A2",
+    "B1",
+    "B2",
+    "C1"
+  ],
+  "pending_next_part_locks_verified": 4,
+  "canonical_completion": true,
+  "review_method": "authorized human-review API test decisions; primary browser also verifies manual review controls",
+  "original_course_seeded": false
+}

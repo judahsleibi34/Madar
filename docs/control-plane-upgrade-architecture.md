@@ -1,5 +1,16 @@
 # Privileged control-plane upgrade architecture
 
+## Exact learning migration route dependency
+
+The installer includes `lib/learning_migration_path.py` alongside the migration
+executor that imports it. This source-pinned helper authorizes only the exact
+finalized, unselected141→143 learning candidate, its bridge and SQL mirrors;
+Exchange142 is excluded. Runtime/health identity and orchestration enforce the
+explicit exclusion. Installing this protected controller dependency still needs
+the governed exact-SHA workflow before production use. No installer, timer,
+traffic or application database operation was performed. See the production
+policy's learning-only candidate section for execution and compatibility rules.
+
 Active local-Supabase integration profile: **schema115 only**, migration class
 `none`, migration policy `none`, no selected migration manifest. Retained bridge
 examples below describe reviewed migration history/future work and authorize no

@@ -33,6 +33,20 @@ export const formsTabContent = {
       descriptionExampleFormatting: "Description and example formatting",
     },
     labels: {
+      libraryTitle: "Form library",
+      type: "Type",
+      formName: "Form name",
+      namePlaceholder: "Name this form",
+      general: "General",
+      logic: "Logic",
+      saveForm: "Save form",
+      savePublishForm: "Save & publish form",
+      saving: "Saving...",
+      whenQuestion: "When question",
+      hasAnswer: "Has answer",
+      then: "Then",
+      thisQuestion: "This question",
+      addPageAfter: "Add page after this page",
       titlePage: "Title page",
       page: "Page",
       currentForm: "Current form",
@@ -172,6 +186,20 @@ export const formsTabContent = {
     },
   },
   ar: {},
+};
+
+const en = formsTabContent.en;
+formsTabContent.ar = {
+  ...en,
+  toolbar: {...en.toolbar, undo: "تراجع", redo: "إعادة", bold: "عريض", italic: "مائل", underline: "تسطير", bullets: "قائمة نقطية", numbers: "قائمة مرقمة", alignLeft: "محاذاة لليسار", alignCenter: "محاذاة للوسط", alignRight: "محاذاة لليمين", justify: "ضبط المحاذاة", textStyle: "نمط النص", text: "نص", heading1: "عنوان 1", heading2: "عنوان 2", heading3: "عنوان 3", leftToRight: "من اليسار إلى اليمين", rightToLeft: "من اليمين إلى اليسار", textColor: "لون النص", backgroundColor: "لون الخلفية", descriptionExampleFormatting: "تنسيق الوصف والمثال"},
+  labels: {...en.labels,
+    libraryTitle: "مكتبة النماذج", type: "النوع", formName: "اسم النموذج", namePlaceholder: "أدخل اسم النموذج", general: "عام", logic: "المنطق الشرطي", saveForm: "حفظ النموذج", savePublishForm: "حفظ النموذج ونشره", saving: "جارٍ الحفظ...",
+    whenQuestion: "عندما يكون السؤال", hasAnswer: "له إجابة", then: "عندها", thisQuestion: "هذا السؤال", show: "إظهار", hide: "إخفاء", addPageAfter: "إضافة صفحة بعد هذه الصفحة",
+    titlePage: "صفحة العنوان", page: "الصفحة", currentForm: "النموذج الحالي", untitledForm: "نموذج بلا عنوان", language: "اللغة", english: "الإنجليزية", arabic: "العربية", addQuestion: "إضافة سؤال", addPage: "إضافة صفحة", formActions: "إجراءات النموذج", formSettings: "إعدادات النموذج", previewForm: "معاينة النموذج", successMessage: "رسالة النجاح", pageDescription: "وصف الصفحة", untitledQuestion: "سؤال بلا عنوان", question: "السؤال", description: "الوصف", example: "مثال", answerOptions: "خيارات الإجابة", addOption: "إضافة خيار", insertOptionBelow: "إضافة خيار أدناه", deleteOption: "حذف الخيار", required: "مطلوب", moveQuestionUp: "نقل السؤال لأعلى", moveQuestionDown: "نقل السؤال لأسفل", duplicate: "تكرار", deleteQuestion: "حذف السؤال", addQuestionHere: "إضافة سؤال هنا", quizOptions: "إعدادات النموذج", closeSettings: "إغلاق الإعدادات", conditionalLogic: "المنطق الشرطي", addRule: "إضافة شرط", deleteRule: "حذف الشرط", answer: "الإجابة", close: "إغلاق", save: "حفظ", formControls: "أدوات النموذج"
+  },
+  messages: {...en.messages, newForm: "نموذج جديد", emptyPageTitle: "لا توجد أسئلة بعد", emptyPageBody: "أضف سؤالاً إلى هذه الصفحة.", noLogicRules: "لا توجد شروط بعد.", deleteQuestionConfirm: "هل تريد حذف هذا السؤال؟", deleteFormPageTitle: "حذف صفحة النموذج", keepPage: "الاحتفاظ بالصفحة", deletePage: "حذف الصفحة"},
+  placeholders: {...en.placeholders, question: "السؤال", shownUnderQuestion: "يظهر أسفل السؤال", example: "مثال للإجابة", pageDescription: "أضف وصفاً للصفحة", option: "الخيار {number}"},
+  counts: {questions: "الأسئلة", pages: "الصفحات", responses: "الردود", quiz: "اختبار", form: "نموذج"}
 };
 
 export function getFormsTabContent(lang = "en") {

@@ -41,6 +41,7 @@ class TextContent(Payload):
 class MediaContent(Payload):
     version: Literal[1] = 1
     caption: str = Field(default='', max_length=4000)
+    transcript: str = Field(default='', max_length=20000)
 
 
 class BlockDetails(Payload):

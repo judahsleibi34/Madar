@@ -23,7 +23,10 @@ def get_settings(request: Request, response: Response):
     try:
         available = service.settings_available()
         settings = service.get_settings(context.tenant_id) if available else service.ELearningSettings().model_dump()
-        return {"success": True, "settings": settings, "available": available, "referrals_available": service.settings_available(136), "academy": member_profile(context.tenant_id) if settings.get("academy_enabled") else None, "academy_management": management_profile(context.tenant_id) if available else None}
+        from services.academy_capability_service import capabilities, SETTINGS_CAPABILITIES
+        grants = capabilities(context.tenant_id)
+        settings = {key: value for key, value in settings.items() if key not in SETTINGS_CAPABILITIES or grants[SETTINGS_CAPABILITIES[key]]}
+        return {"capabilities": grants, "success": True, "settings": settings, "available": available, "referrals_available": service.settings_available(136), "academy": member_profile(context.tenant_id) if settings.get("academy_enabled") else None, "academy_management": management_profile(context.tenant_id) if available else None}
     except HTTPException:
         raise
     except Exception:
@@ -40,6 +43,8 @@ def save_settings(settings: service.ELearningSettings, request: Request, respons
         saved = service.save_settings(context.tenant_id, settings)
         record_audit_event(request=request, actor_user_id=context.user_id, tenant_id=context.tenant_id,
                            action="elearning.settings_updated", target_type="elearning_settings", target_id=context.tenant_id)
+        from services.academy_capability_service import permitted_settings
+        saved = permitted_settings(context.tenant_id, saved)
         return {"success": True, "settings": saved, "available": True, "academy": member_profile(context.tenant_id) if saved.get("academy_enabled") else None}
     except HTTPException:
         raise

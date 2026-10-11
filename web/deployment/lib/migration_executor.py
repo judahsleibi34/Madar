@@ -16,6 +16,11 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
+if __package__:
+    from .learning_migration_path import authorize_manifest as authorize_learning_manifest
+else:
+    # The isolated privileged controller imports from its trusted lib directory.
+    from learning_migration_path import authorize_manifest as authorize_learning_manifest
 
 
 def utc_now() -> str:
@@ -52,6 +57,7 @@ class Migration:
 class MigrationManifest:
     release_sha: str
     migrations: tuple[Migration, ...]
+    excluded_schemas: tuple[int, ...] = ()
 
     @classmethod
     def load(cls, path: Path, repository_root: Path) -> "MigrationManifest":
@@ -63,6 +69,14 @@ class MigrationManifest:
             raise ValueError("migration manifest release_sha is invalid")
         migrations: list[Migration] = []
         previous = None
+        learning_branch = False
+        # A skipped version is a reviewed branch, never a general gap allowance.
+        for entry in raw.get("migrations") or []:
+            if int(entry["from_schema"]) + 1 != int(entry["to_schema"]):
+                if (int(entry["from_schema"]), int(entry["to_schema"])) != (141, 143):
+                    raise ValueError("migration schema transition is invalid")
+                authorize_learning_manifest(repository_root, path, raw)
+                learning_branch = True
         for entry in raw.get("migrations") or []:
             relative = Path(str(entry["path"]))
             migration_path = (repository_root / relative).resolve()
@@ -78,7 +92,9 @@ class MigrationManifest:
             )
             if migration.compatibility not in {"expand-only", "forward-compatible"}:
                 raise ValueError("automatic executor accepts expand/forward-compatible migrations only")
-            if migration.to_schema != migration.number or migration.from_schema + 1 != migration.to_schema:
+            if migration.to_schema != migration.number or (
+                migration.from_schema + 1 != migration.to_schema and not learning_branch
+            ):
                 raise ValueError("migration schema transition is invalid")
             if previous is not None and migration.from_schema != previous:
                 raise ValueError("migration manifest is not contiguous")
@@ -86,7 +102,12 @@ class MigrationManifest:
             migrations.append(migration)
         if not migrations:
             raise ValueError("migration manifest is empty")
-        return cls(release_sha=release_sha, migrations=tuple(migrations))
+        return cls(release_sha=release_sha, migrations=tuple(migrations),
+                   excluded_schemas=(142,) if learning_branch else ())
+
+    def accepts_schema(self, schema: int) -> bool:
+        return (self.migrations[0].from_schema <= schema <= self.migrations[-1].to_schema
+                and schema not in self.excluded_schemas)
 
 
 class LockedMigrationExecutor:
@@ -162,9 +183,8 @@ class LockedMigrationExecutor:
                 current = self._schema(cursor)
                 state["observed_schema"] = current
                 atomic_json(self.state_file, state)
-                minimum = self.manifest.migrations[0].from_schema
                 target = self.manifest.migrations[-1].to_schema
-                if current < minimum or current > target:
+                if not self.manifest.accepts_schema(current):
                     raise RuntimeError(f"unexpected_schema:{current}")
                 for migration in self.manifest.migrations:
                     if current >= migration.to_schema:

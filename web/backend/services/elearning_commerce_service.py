@@ -83,6 +83,9 @@ def account(actor):
 
 
 def checkout(actor, payload, request):
+    if not local_adapter_enabled():
+        from services.learning_payment_provider import checkout as provider_checkout
+        return provider_checkout(actor, payload)
     adapter(request)
     return call("create_commerce_learning_checkout", actor, p_offering_id=str(payload.offering_id), p_course_id=str(payload.course_id) if payload.course_id else None, p_idempotency_key=str(payload.idempotency_key), p_provider="local_test")
 

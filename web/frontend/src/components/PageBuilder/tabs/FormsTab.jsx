@@ -172,6 +172,18 @@ export default function FormsTab({
   fieldTypes,
   selected,
   lang = "en",
+  features = {},
+  libraryTitle,
+  libraryHelp = "Create forms, edit questions, and place them on your pages.",
+  sidebarFields,
+  settingsFields,
+  renderFieldSettings,
+  responseCount,
+  previewWithoutSave = false,
+  canAddField = true,
+  canAddPage = true,
+  editorLabels = {},
+  constraints = {},
 
   selectForm,
   selectPage,
@@ -206,6 +218,7 @@ export default function FormsTab({
   setQuizOptionsOpen,
 }) {
   const copy = getFormsTabContent(lang);
+  const supports = feature => features[feature] !== false;
   const [questionType, setQuestionType] = useState("shortText");
   const [showPublishPanel, setShowPublishPanel] = useState(false);
   const [templateId, setTemplateId] = useState("");
@@ -290,8 +303,8 @@ export default function FormsTab({
   const getFieldType = (type) =>
     fieldTypes.find((item) => item.id === type) || legacyFieldTypes[type] || fieldTypes[0];
   const getVisibleFieldTypes = (currentType = "") => {
-    const visibleTypes = commonFieldTypes.map((typeId) => getFieldType(typeId));
-    if (currentType && !commonFieldTypes.includes(currentType)) {
+    const visibleTypes = (features.fieldTypes || commonFieldTypes).map((typeId) => getFieldType(typeId));
+    if (currentType && !(features.fieldTypes || commonFieldTypes).includes(currentType)) {
       return [getFieldType(currentType), ...visibleTypes];
     }
     return visibleTypes;
@@ -301,6 +314,7 @@ export default function FormsTab({
   const placements = activeForm ? getFormPlacements(activeForm.id) : [];
   const getFriendlyPageTitle = (section, sectionIndex) => {
     const title = section.title || "";
+    if (constraints.required && sectionIndex === 0) return title;
     const legacyMatch = title.match(/^Section\s+(\d+)$/i);
     return legacyMatch
       ? `${copy.labels.page} ${legacyMatch[1]}`
@@ -467,10 +481,10 @@ export default function FormsTab({
     (activeForm.logicRules || []).filter((rule) => rule.targetFieldId === fieldId);
 
   const getVisibilityRuleText = (rule) => {
-    const action = rule.action === "hide" ? "Hidden" : "Shown";
+    const action = rule.action === "hide" ? copy.labels.hide : copy.labels.show;
     const sourceName = getFieldDisplayName(rule.sourceFieldId);
     const answer = String(rule.value || "").trim() || copy.labels.answer;
-    return `${action} when "${sourceName}" is "${answer}"`;
+    return `${action} · ${sourceName} · ${answer}`;
   };
 
   const setPrimaryLanguage = (nextLanguage) => {
@@ -738,7 +752,7 @@ export default function FormsTab({
     if (!openFormPreviewPage || isSavingForm) return;
     setIsSavingForm(true);
     try {
-      const saved = saveProject ? await saveProject({ silent: true }) : true;
+      const saved = !previewWithoutSave && saveProject ? await saveProject({ silent: true }) : true;
       if (saved) openFormPreviewPage(activeForm.id);
     } finally {
       setIsSavingForm(false);
@@ -811,13 +825,13 @@ export default function FormsTab({
         <aside className="simple-add-question" aria-label={copy.labels.formControls}>
           <div className="forms-panel-heading">
             <div>
-              <h2>Form library</h2>
+              <h2>{libraryTitle || copy.labels.libraryTitle}</h2>
             </div>
             <span className="forms-count" aria-label={`${project.forms.length} forms`}>
               {project.forms.length}
             </span>
           </div>
-          <p className="panel-help">Create forms, edit questions, and place them on your pages.</p>
+          <p className="panel-help">{libraryHelp}</p>
           <div className="forms-sidebar-stats" aria-label="Current form summary">
             <div>
               <span>{copy.counts.questions}</span>
@@ -829,10 +843,10 @@ export default function FormsTab({
             </div>
             <div>
               <span>{copy.counts.responses}</span>
-              <strong>{activeForm.responses.length}</strong>
+              <strong>{responseCount ?? activeForm.responses.length}</strong>
             </div>
             <div>
-              <span>Type</span>
+              <span>{copy.labels.type}</span>
               <strong>{activeForm.mode === "quiz" ? copy.counts.quiz : copy.counts.form}</strong>
             </div>
           </div>
@@ -848,16 +862,18 @@ export default function FormsTab({
             </select>
           </label>
           <label>
-            Form name
+            {editorLabels.name || copy.labels.formName}
             <input
-              value={activeForm.name || activeForm.title || ""}
-              placeholder="Name this form"
+              required={constraints.required}
+              maxLength={constraints.formText}
+              value={constraints.required ? activeForm.name || "" : activeForm.name || activeForm.title || ""}
+              placeholder={copy.labels.namePlaceholder}
               onChange={(event) =>
                 updateActiveForm((form) => ({ ...form, name: event.target.value }))
               }
             />
           </label>
-          <div className="form-library-file-actions">
+          {supports("import") && (<><div className="form-library-file-actions">
             <FormButton icon={Upload} onClick={() => formImportInputRef.current?.click()}>Import form</FormButton>
             <input
               ref={formImportInputRef}
@@ -874,12 +890,12 @@ export default function FormsTab({
               {importGuideCopied ? "Copied" : "Copy ChatGPT guide"}
             </FormButton>
             <pre>{FORM_IMPORT_GUIDE}</pre>
-          </details>
+          </details></>)}
           <FormButton className="forms-primary-action" icon={Plus} onClick={addForm}>
             {copy.messages.newForm}
           </FormButton>
 
-          <div className="forms-secondary-actions">
+          {supports("templates") && (<div className="forms-secondary-actions">
             <label>
               {copy.labels.templates}
               <select value={templateId} onChange={(event) => applyTemplate(event.target.value)}>
@@ -891,9 +907,9 @@ export default function FormsTab({
                 ))}
               </select>
             </label>
-          </div>
+          </div>)}
 
-          <label>
+          {supports("localization") && (<><label>
             {copy.labels.language}
             <select
               value={primaryLanguage}
@@ -913,9 +929,9 @@ export default function FormsTab({
               />
               {formatCopy(copy.messages.addTranslations, { language: getLanguageName(translationLanguage) })}
             </label>
-          </div>
+          </div></>)}
 
-          <details className="simple-action-group forms-theme-action-group">
+          {supports("theme") && (<details className="simple-action-group forms-theme-action-group">
             <summary className="simple-action-group-title">Form colors</summary>
             <div className="forms-theme-action-body">
               <div className="forms-theme-grid">
@@ -945,8 +961,9 @@ export default function FormsTab({
                 Reset form colors
               </FormButton>
             </div>
-          </details>
+          </details>)}
 
+          {sidebarFields}
           <label>
             {copy.labels.addQuestion}
             <select value={questionType} onChange={(event) => setQuestionType(event.target.value)}>
@@ -958,10 +975,10 @@ export default function FormsTab({
             </select>
           </label>
           <div className="forms-builder-actions">
-            <FormButton variant="primary" icon={Plus} onClick={() => addQuestion()}>
+            <FormButton variant="primary" icon={Plus} disabled={!canAddField} onClick={() => addQuestion()}>
               {copy.labels.addQuestion}
             </FormButton>
-            <FormButton icon={ListPlus} onClick={addFormSection}>
+            <FormButton icon={ListPlus} disabled={!canAddPage} onClick={() => addFormSection()}>
               {copy.labels.addPage}
             </FormButton>
           </div>
@@ -969,7 +986,7 @@ export default function FormsTab({
             <section className="simple-action-group forms-form-actions-group">
               <span className="simple-action-group-title">{copy.labels.formActions}</span>
               <FormButton variant="primary" icon={Save} disabled={isSavingForm} onClick={saveForm}>
-                {isSavingForm ? "Publishing..." : publishProject ? "Save & publish form" : "Save form"}
+                {isSavingForm ? copy.labels.saving : publishProject ? copy.labels.savePublishForm : copy.labels.saveForm}
               </FormButton>
               <FormButton icon={Settings} onClick={() => setQuizOptionsOpen(true)}>
                 {copy.labels.formSettings}
@@ -977,16 +994,16 @@ export default function FormsTab({
               <FormButton icon={Eye} disabled={isSavingForm} onClick={previewForm}>
                 {copy.labels.previewForm}
               </FormButton>
-              <FormButton variant="primary" icon={Send} onClick={() => setShowPublishPanel((value) => !value)}>
+              {supports("placement") && (<FormButton variant="primary" icon={Send} onClick={() => setShowPublishPanel((value) => !value)}>
                 {copy.labels.placeForm}
-              </FormButton>
-              <FormButton
+              </FormButton>)}
+{Boolean(deleteActiveForm) && (              <FormButton
                 variant="danger"
                 icon={Trash2}
                 onClick={deleteCurrentForm}
               >
                 {copy.labels.deleteForm}
-              </FormButton>
+              </FormButton>)}
             </section>
 
           </div>
@@ -1063,7 +1080,7 @@ export default function FormsTab({
               className={`forms-section-sheet simple-section-sheet ${sectionIndex === 0 ? "form-intro-page" : ""}`}
               key={section.id}
             >
-              <div className="question-format-toolbar form-page-description-toolbar" role="toolbar" aria-label={copy.labels.pageDescription}>
+              {supports("richText") && (<div className="question-format-toolbar form-page-description-toolbar" role="toolbar" aria-label={copy.labels.pageDescription}>
                 <select aria-label={copy.toolbar.textStyle} defaultValue="text" onChange={(event) => getActiveFormTextTarget() ? applyTargetTextStyle(getActiveFormTextTarget(), event.target.value) : applyPageTextStyle(section, event.target.value)}>
                   <option value="text">{copy.toolbar.text}</option><option value="h1">{copy.toolbar.heading1}</option><option value="h2">{copy.toolbar.heading2}</option><option value="h3">{copy.toolbar.heading3}</option>
                 </select>
@@ -1074,9 +1091,12 @@ export default function FormsTab({
                 <button type="button" title={copy.toolbar.rightToLeft} onMouseDown={(event) => { event.preventDefault(); getActiveFormTextTarget() ? setActiveFormTextDirection("rtl") : updatePageTextStyle(section, { direction: "rtl", textAlign: "right" }); }}>{copy.toolbar.directionRtlShort}</button>
                 <label className="question-toolbar-color" title={copy.toolbar.textColor}><Baseline size={16} aria-hidden="true" /><input type="color" defaultValue="#162033" onChange={(event) => getActiveFormTextTarget() ? applyTargetColor(getActiveFormTextTarget(), "color", event.target.value) : updatePageTextStyle(section, { color: event.target.value })} /></label>
                 <label className="question-toolbar-color" title={copy.toolbar.backgroundColor}><Highlighter size={16} aria-hidden="true" /><input type="color" defaultValue="#fffdfa" onChange={(event) => getActiveFormTextTarget() ? applyTargetColor(getActiveFormTextTarget(), "backgroundColor", event.target.value) : updatePageTextStyle(section, { backgroundColor: event.target.value })} /></label>
-              </div>
+              </div>)}
               <div className="forms-section-heading">
                 <input
+                  aria-label={sectionIndex === 0 ? editorLabels.title : `${copy.labels.page} ${sectionIndex + 1}`}
+                  required={sectionIndex === 0 && constraints.required}
+                  maxLength={constraints.formText}
                   value={getFriendlyPageTitle(section, sectionIndex)}
                   placeholder={sectionIndex === 0 ? copy.labels.titlePage : `${copy.labels.page} ${sectionIndex + 1}`}
                   dir={section.titleStyle?.direction || formDirection}
@@ -1104,7 +1124,9 @@ export default function FormsTab({
                 </FormButton>
               </div>
 
-              <textarea
+              {(supports("pageDescription") || sectionIndex === 0) && (<textarea
+                aria-label={copy.labels.pageDescription}
+                maxLength={constraints.description}
                 value={section.description || ""}
                 placeholder={copy.placeholders.pageDescription}
                 dir={section.descriptionStyle?.direction || formDirection}
@@ -1116,7 +1138,7 @@ export default function FormsTab({
                 onChange={(event) =>
                   updateFormSection(section.id, { description: event.target.value })
                 }
-              />
+              />)}
 
               {sectionIndex === 0 && (
                 <div className="form-page-intro" style={{ display: "none" }} aria-hidden="true">
@@ -1329,7 +1351,7 @@ export default function FormsTab({
                       key={field.id}
                       onClick={() => setSelected({ type: "field", id: field.id })}
                     >
-                    <div className="question-format-toolbar question-card-toolbar" role="toolbar" aria-label={copy.toolbar.descriptionExampleFormatting}>
+                    {supports("richText") && (<div className="question-format-toolbar question-card-toolbar" role="toolbar" aria-label={copy.toolbar.descriptionExampleFormatting}>
                       <select aria-label={copy.toolbar.textStyle} defaultValue="text" onChange={(event) => applyTargetTextStyle(getActiveTextTarget(field), event.target.value)}>
                         <option value="text">{copy.toolbar.text}</option><option value="h1">{copy.toolbar.heading1}</option><option value="h2">{copy.toolbar.heading2}</option><option value="h3">{copy.toolbar.heading3}</option>
                       </select>
@@ -1340,11 +1362,14 @@ export default function FormsTab({
                       <button type="button" title={copy.toolbar.rightToLeft} onMouseDown={(event) => { event.preventDefault(); setTextDirection(field, "rtl"); }}>{copy.toolbar.directionRtlShort}</button>
                       <label className="question-toolbar-color" title={copy.toolbar.textColor}><Baseline size={16} aria-hidden="true" /><input type="color" defaultValue="#162033" onChange={(event) => applyTargetColor(getActiveTextTarget(field), "color", event.target.value)} /></label>
                       <label className="question-toolbar-color" title={copy.toolbar.backgroundColor}><Highlighter size={16} aria-hidden="true" /><input type="color" defaultValue="#fffdfa" onChange={(event) => applyTargetColor(getActiveTextTarget(field), "backgroundColor", event.target.value)} /></label>
-                    </div>
+                    </div>)}
                     <div className="simple-question-main">
                       <span className="question-index">{fieldIndex + 1}</span>
                       <input
                         className="question-title-input"
+                        aria-label={`${copy.labels.question} ${fieldIndex + 1}`}
+                        required={constraints.required}
+                        maxLength={constraints.fieldText}
                         data-field-id={field.id}
                         data-field-key="label"
                         dir={formDirection}
@@ -1356,6 +1381,7 @@ export default function FormsTab({
                         }
                       />
                       <select
+                        aria-label={`${editorLabels.fieldType || copy.labels.question} ${fieldIndex + 1}`}
                         value={field.type}
                         onChange={(event) =>
                           updateFormField(field.id, { type: event.target.value })
@@ -1687,6 +1713,7 @@ export default function FormsTab({
                       )}
                     </div>
 
+                    {renderFieldSettings?.(field)}
                     <footer className="question-actions simple-question-actions">
                       <div className="question-toggle-controls">
                         <label className="checkbox-control">
@@ -1710,7 +1737,7 @@ export default function FormsTab({
                       </div>
                       <FormButton icon={ChevronUp} title={copy.labels.moveQuestionUp} onClick={() => moveFormField(field.id, "up")} />
                       <FormButton icon={ChevronDown} title={copy.labels.moveQuestionDown} onClick={() => moveFormField(field.id, "down")} />
-                      <FormButton icon={Copy} onClick={() => duplicateFormField(field.id)}>
+                      <FormButton icon={Copy} disabled={!canAddField} onClick={() => duplicateFormField(field.id)}>
                         {copy.labels.duplicate}
                       </FormButton>
                       <FormButton
@@ -1730,6 +1757,7 @@ export default function FormsTab({
               <FormButton
                 className="add-question-wide"
                 icon={Plus}
+                disabled={!canAddField}
                 onClick={() => addQuestion(questionType, section.id)}
               >
                 {copy.labels.addQuestionHere}
@@ -1737,16 +1765,18 @@ export default function FormsTab({
               <FormButton
                 className="forms-insert-page-button"
                 icon={ListPlus}
+                disabled={!canAddPage}
                 onClick={() => addFormSection(section.id)}
               >
-                Add page after this page
+                {copy.labels.addPageAfter}
               </FormButton>
             </section>
           ))}
           <FormButton
             className="forms-add-page-button"
             icon={ListPlus}
-            onClick={addFormSection}
+            disabled={!canAddPage}
+            onClick={() => addFormSection()}
           >
             {copy.labels.addPage}
           </FormButton>
@@ -1756,18 +1786,18 @@ export default function FormsTab({
       </div>
 
       {quizOptionsOpen && (
-        <div className="quiz-drawer-backdrop" dir="ltr" onClick={() => setQuizOptionsOpen(false)}>
+        <div className="quiz-drawer-backdrop" dir={formDirection} onClick={() => setQuizOptionsOpen(false)}>
           <div
             className="quiz-options-drawer"
             role="dialog"
             aria-modal="true"
-            aria-label={copy.labels.quizOptions}
+            aria-label={copy.labels.formSettings}
             onClick={(event) => event.stopPropagation()}
           >
             <div className="quiz-drawer-header">
               <div>
                 <h3>{copy.labels.formSettings}</h3>
-                <p>Language, confirmation, quiz, and logic.</p>
+                {supports("quiz") && <p>Language, confirmation, quiz, and logic.</p>}
               </div>
               <button
                 type="button"
@@ -1781,8 +1811,8 @@ export default function FormsTab({
 
             <div className="quiz-settings-grid quiz-drawer-grid">
               <section className="quiz-settings-section">
-                <h4>General</h4>
-              <label>
+                <h4>{copy.labels.general}</h4>
+              {supports("localization") && (<><label>
                 <span className="quiz-setting-title">{copy.labels.primaryLanguage}</span>
                 <select
                   value={primaryLanguage}
@@ -1805,7 +1835,7 @@ export default function FormsTab({
                   />
                   {formatCopy(copy.messages.addTranslations, { language: getLanguageName(translationLanguage) })}
                 </label>
-              </section>
+              </section></>)}
 
               <label>
                 <span className="quiz-setting-title">{copy.labels.successMessage}</span>
@@ -1836,7 +1866,7 @@ export default function FormsTab({
               </label>
               </section>
 
-              <section className="quiz-settings-section">
+              {supports("quiz") && (<section className="quiz-settings-section">
                 <h4>Quiz</h4>
               <label className="checkbox-control">
                 <span className="quiz-setting-title">
@@ -1956,10 +1986,11 @@ export default function FormsTab({
                   }
                 />
               </label>
-              </section>
+              </section>)}
 
+              {settingsFields}
               <section className="logic-settings-card quiz-settings-section">
-                <h4>Logic</h4>
+                <h4>{copy.labels.logic}</h4>
                 <div className="logic-settings-header">
                   <div>
                     <span className="quiz-setting-title">{copy.labels.conditionalLogic}</span>
@@ -1976,7 +2007,7 @@ export default function FormsTab({
                     {(activeForm.logicRules || []).map((rule) => (
                       <div className="logic-rule-row" key={rule.id}>
                         <label className="logic-rule-field logic-rule-source">
-                          <span>When question</span>
+                          <span>{copy.labels.whenQuestion}</span>
                           <select
                             value={rule.sourceFieldId}
                             onChange={(event) => updateLogicRule(rule.id, { sourceFieldId: event.target.value })}
@@ -1989,7 +2020,7 @@ export default function FormsTab({
                           </select>
                         </label>
                         <label className="logic-rule-field logic-rule-answer">
-                          <span>Has answer</span>
+                          <span>{copy.labels.hasAnswer}</span>
                           <input
                             value={rule.value || ""}
                             placeholder={copy.labels.answer}
@@ -1997,17 +2028,17 @@ export default function FormsTab({
                           />
                         </label>
                         <label className="logic-rule-field logic-rule-action">
-                          <span>Then</span>
+                          <span>{copy.labels.then}</span>
                           <select
                             value={rule.action || "show"}
                             onChange={(event) => updateLogicRule(rule.id, { action: event.target.value })}
                           >
-                            <option value="show">Show</option>
-                            <option value="hide">Hide</option>
+                            <option value="show">{copy.labels.show}</option>
+                            <option value="hide">{copy.labels.hide}</option>
                           </select>
                         </label>
                         <label className="logic-rule-field logic-rule-target">
-                          <span>This question</span>
+                          <span>{copy.labels.thisQuestion}</span>
                           <select
                             value={rule.targetFieldId}
                             onChange={(event) => updateLogicRule(rule.id, { targetFieldId: event.target.value })}

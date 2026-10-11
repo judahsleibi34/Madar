@@ -593,6 +593,10 @@ def _raise_revision_conflict(project_id: str, tenant_id: int | str) -> None:
 
 
 def require_schema_asset_tenant(schema: dict[str, Any], tenant_id: int) -> None:
+    from services.academy_builder_service import has_academy_form
+    if has_academy_form(schema):
+        from services.elearning_forms_service import gate
+        gate(tenant_id)
     try:
         require_builder_asset_tenant_ownership(schema, tenant_id=tenant_id)
     except ValueError as error:
@@ -1680,7 +1684,8 @@ async def upload_builder_asset(
     ecommerce_product_media = request.scope.get("madar_asset_usage") == "ecommerce_product_media"
     elearning_logo = request.scope.get("madar_asset_usage") == "elearning_logo"
     elearning_course_cover = request.scope.get("madar_asset_usage") == "elearning_course_cover"
-    elearning_content = request.scope.get("madar_asset_usage") == "elearning_content"
+    elearning_assessment_media = request.scope.get("madar_asset_usage") == "elearning_assessment_media"
+    elearning_content = request.scope.get("madar_asset_usage") == "elearning_content" or elearning_assessment_media
     elearning_image = elearning_logo or elearning_course_cover
     if elearning_image or elearning_content:
         from services.elearning_access_service import authorize_elearning_context
@@ -1721,7 +1726,7 @@ async def upload_builder_asset(
     asset_kind = "audio" if is_declared_audio else "video" if is_declared_video else "document" if is_declared_document else "image"
     if is_declared_audio and not elearning_content:
         raise HTTPException(status_code=400, detail="Audio uploads require a lesson content context")
-    if elearning_content and asset_kind not in {"audio", "video"}:
+    if elearning_content and asset_kind not in ({"audio", "video", "image"} if elearning_assessment_media else {"audio", "video"}):
         raise HTTPException(status_code=400, detail="Lesson media must be MP3, WAV, MP4, or WebM")
 
     if elearning_image and asset_kind != "image":
@@ -1832,7 +1837,7 @@ async def upload_builder_asset(
             detail=f"{detected_kind.title()} filename does not match the file content",
         )
 
-    if elearning_content and not detected_content_type.startswith(("audio/", "video/")):
+    if elearning_content and not detected_content_type.startswith(("audio/", "video/", "image/") if elearning_assessment_media else ("audio/", "video/")):
         raise HTTPException(status_code=400, detail="Lesson media must contain audio or video")
     extension = BUILDER_ASSET_EXTENSIONS[detected_content_type]
     filename = f"{uuid4().hex}{extension}"

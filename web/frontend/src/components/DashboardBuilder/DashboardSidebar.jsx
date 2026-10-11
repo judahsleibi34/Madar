@@ -1,17 +1,13 @@
-﻿import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
   Home,
   GraduationCap,
-  BookOpen,
-  Users,
   Archive,
   LayoutDashboard,
   GalleryHorizontalEnd,
   PanelsTopLeft,
-  LayoutTemplate,
-  Globe,
   ClipboardList,
   CalendarDays,
   Database,
@@ -34,6 +30,8 @@ import {
   PanelLeftOpen,
 } from "lucide-react";
 
+import OwnerNavigation from "../ELearning/OwnerNavigation";
+import useAcademyCapabilities from "../../hooks/useAcademyCapabilities";
 import LanguageSwitcher from "../LanguageSwitcher";
 import ThemeToggle from "../ThemeChanger/ThemeToggle";
 import NotificationBell from "./NotificationBell";
@@ -144,6 +142,8 @@ export default function DashboardSidebar({
   showNotifications = false,
 }) {
   const { t, i18n } = useTranslation(["dashboard"]);
+  const academyAccess = useAcademyCapabilities(user);
+  const learningCapabilities = academyAccess?.can_manage ? academyAccess.capabilities || {} : {};
   const isPlatformAdmin = user?.account_kind === "platform" && user?.user_type === "admin";
   const navigate = useNavigate();
   const location = useLocation();
@@ -356,16 +356,6 @@ export default function DashboardSidebar({
       icon: ShoppingBag,
     },
   ];
-  const elearningItems = [
-    { label: t("sidebar.elearningCourses", { defaultValue: "Courses" }), path: DASHBOARD_ROUTES.elearningCourses, icon: BookOpen },
-    { label: t("sidebar.elearningGroups", { defaultValue: "Groups" }), path: DASHBOARD_ROUTES.elearningGroups, icon: Users },
-    { label: t("sidebar.elearningInstructors", { defaultValue: "Instructors" }), path: DASHBOARD_ROUTES.elearningInstructors, icon: GraduationCap },
-    { label: t("elearning.academy.learningPlans"), path: DASHBOARD_ROUTES.elearningPlans, icon: CreditCard },
-    { label: t("elearning.academy.landingPage"), path: "/e-learning/landing-page", icon: LayoutTemplate },
-    { label: t("elearning.academy.academyAccess"), path: "/e-learning/academy-access", icon: Globe },
-    { label: t("sidebar.settings"), path: DASHBOARD_ROUTES.elearningSettings, icon: Settings },
-  ];
-
   const workspaceLabel = t("sidebar.workspace", {
     defaultValue: "Workspace",
   });
@@ -715,21 +705,11 @@ export default function DashboardSidebar({
               }}
             />
             {elearningIsExpanded && <div className="admin-sidebar-subnav" id="dashboard-sidebar-elearning">
-              {elearningItems.map((item) => {
-                const Icon = item.icon;
-                const active = item.path === "/e-learning/academy-access"
-                  ? isActive(item.path) || isActive("/e-learning/settings/academy")
-                  : item.path === DASHBOARD_ROUTES.elearningSettings
-                    ? location.pathname === item.path
-                    : isActive(item.path);
-                return <Link key={item.path} to={item.path} className={active ? "active" : ""}
-                  aria-current={active ? "page" : undefined} title={item.label}
-                  onClick={() => { if (typeof onNavigate === "function") onNavigate(); }}>
-                  <Icon size={16} aria-hidden="true" /><span>{item.label}</span>
-                </Link>;
-              })}
+              <OwnerNavigation capabilities={learningCapabilities} programmeFlags={academyAccess?.programme_flags} supportName={academyAccess?.support_programme_name} exchangeName={academyAccess?.exchange_programme_name} onNavigate={onNavigate}/>
             </div>}
           </div>}
+
+
 
           {!isPlatformAdmin && primaryNavItems.slice(2).map((item) => {
             const active = isActive(item.path);

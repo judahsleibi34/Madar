@@ -63,6 +63,10 @@ class AcademyModelsTests(unittest.TestCase):
 
 
 class AcademyProjectionTests(unittest.TestCase):
+    def setUp(self):
+        gate = patch.object(service, "require_public_runtime_entitlement")
+        gate.start(); self.addCleanup(gate.stop)
+
     def test_authorized_private_course_is_only_in_personal_continue_feed(self):
         db=MagicMock()
         public={"courses":[{"id":"public"}],"plans":[],"authenticated":True}

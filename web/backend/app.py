@@ -517,6 +517,14 @@ from routes.elearning_credentials_routes import router as elearning_credentials_
 app.include_router(elearning_credentials_router)
 app.include_router(elearning_player_router)
 app.include_router(elearning_commerce_router)
+from routes.academy_programme_routes import router as academy_programme_router
+app.include_router(academy_programme_router)
+from routes.academy_owner_routes import router as academy_owner_router, public as academy_owner_public_router
+app.include_router(academy_owner_router)
+app.include_router(academy_owner_public_router)
+from routes.elearning_forms_routes import router as elearning_forms_router, public as elearning_forms_public_router
+app.include_router(elearning_forms_router)
+app.include_router(elearning_forms_public_router)
 app.include_router(elearning_academy_router)
 app.include_router(elearning_relationships_router)
 app.include_router(elearning_assessments_router)

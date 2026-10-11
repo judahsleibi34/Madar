@@ -1,0 +1,14 @@
+{
+  "manifest_version": 1,
+  "release_sha": "STAGING",
+  "migrations": [
+    {
+      "number": 143,
+      "from_schema": 141,
+      "to_schema": 143,
+      "path": "web/database/migrations/143_complete_learning_capabilities.sql",
+      "sha256": "35c79afc5c44c982aeb7fcfac854e2f744e5c65408a1c3e0084a265b025fe6dc",
+      "compatibility": "forward-compatible"
+    }
+  ]
+}

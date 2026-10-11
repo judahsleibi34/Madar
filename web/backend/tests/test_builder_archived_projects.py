@@ -128,6 +128,7 @@ class FakeQuery:
 class FakeSupabase:
     def __init__(self):
         self.tables = {
+            "tenants": [{"tenant_id": 1, "lifecycle_state": "active"}],
             "website_settings": [
                 {
                     "id": 1,

@@ -1,4 +1,5 @@
-"""Generic objective assessment authoring and learner-safe transactional runtime."""
+"""Canonical assessment authoring, objective grading and human-reviewed responses."""
+from __future__ import annotations
 from typing import Annotated, Literal
 from uuid import UUID
 from decimal import Decimal
@@ -17,6 +18,11 @@ class AssessmentDetails(Payload):
     max_attempts: int | None = Field(default=None, ge=1, le=10000, strict=True)
     required_for_completion: StrictBool = False
     status: Literal['draft','published','archived'] = 'draft'
+    activity_mode: Literal['graded','practice'] = 'graded'
+    pool_size: int | None = Field(default=None,ge=1,le=200,strict=True)
+    shuffle_questions: StrictBool = False
+    shuffle_options: StrictBool = False
+    practice_feedback: StrictBool = True
 
 
 class Option(Payload):
@@ -92,7 +98,58 @@ class ListeningQuestion(QuestionDetails):
     config: ListeningConfig
 
 
-Question = Annotated[ChoiceQuestion | BooleanQuestion | MatchingQuestion | ListeningQuestion,Field(discriminator='type')]
+class ImageOption(Payload):
+    id: UUID
+    media_id: UUID
+    alt: str = Field(min_length=1,max_length=2000)
+
+
+class PictureConfig(Payload):
+    media_id: UUID
+    options: list[ImageOption] = Field(min_length=2,max_length=20)
+    correct_option_id: UUID
+
+    @model_validator(mode='after')
+    def choices(self):
+        ids=[option.id for option in self.options]
+        if len(set(ids)) != len(ids) or self.correct_option_id not in ids:
+            raise ValueError('Choose one valid correct picture')
+        return self
+
+
+class PictureQuestion(QuestionDetails):
+    type: Literal['picture_listen']
+    config: PictureConfig
+
+
+class WrittenConfig(Payload):
+    rubric: str = Field(default='',max_length=10000)
+    max_characters: int = Field(default=5000,ge=1,le=20000,strict=True)
+
+
+class SpeakingConfig(Payload):
+    rubric: str = Field(default='',max_length=10000)
+    max_duration_seconds: int = Field(default=120,ge=1,le=300,strict=True)
+    max_size_bytes: int = Field(default=10485760,ge=1024,le=10485760,strict=True)
+    media_id: UUID | None = None
+
+
+class WrittenQuestion(QuestionDetails):
+    type: Literal['written']
+    config: WrittenConfig
+
+
+class SpeakingQuestion(QuestionDetails):
+    type: Literal['speaking']
+    config: SpeakingConfig
+
+
+class SpeakingPracticeQuestion(QuestionDetails):
+    type: Literal['speaking_practice']
+    config: SpeakingConfig
+
+
+Question = Annotated[ChoiceQuestion | BooleanQuestion | MatchingQuestion | ListeningQuestion | PictureQuestion | WrittenQuestion | SpeakingQuestion | SpeakingPracticeQuestion,Field(discriminator='type')]
 QUESTION_ADAPTER=TypeAdapter(Question)
 
 
@@ -134,7 +191,34 @@ class MatchingResponse(Payload):
 
 
 class Submission(Payload):
-    answers: dict[UUID,ChoiceResponse | BooleanResponse | MatchingResponse] = Field(min_length=1,max_length=200)
+    answers: dict[UUID,ChoiceResponse | BooleanResponse | MatchingResponse | WrittenResponse | SpeakingResponse | PracticeResponse] = Field(min_length=1,max_length=200)
+
+
+class WrittenResponse(Payload):
+    text: str = Field(min_length=1,max_length=20000)
+
+
+class SpeakingResponse(Payload):
+    recording_id: UUID
+
+
+class PracticeResponse(Payload):
+    finished: Literal[True]
+
+
+Submission.model_rebuild()
+
+
+def require_learning143():
+    if not settings_available(143):
+        raise HTTPException(503,detail={'code':'learning_upgrade_required','message':'This learning activity requires schema143.'})
+
+
+def require_learning_payload(payload):
+    if (payload.get('activity_mode','graded') != 'graded' or payload.get('pool_size') is not None
+            or payload.get('shuffle_questions') or payload.get('shuffle_options') or payload.get('practice_feedback') is False
+            or payload.get('type') in {'picture_listen','speaking','written','speaking_practice'}):
+        require_learning143()
 
 
 def call(name,tenant_id,**args):
@@ -146,8 +230,8 @@ def call(name,tenant_id,**args):
         if error.code=='P0001': raise HTTPException(409,detail={'code':code,'message':'This assessment changed. Reload before saving.'}) from error
         if error.code=='42501': raise HTTPException(403,detail={'code':code if code in {'assessment_attempt_limit','elearning_assessment_required','elearning_lesson_locked'} else 'assessment_forbidden','message':'Assessment access is unavailable or the attempt limit has been reached.'}) from error
         if error.code in {'22023','23514','23503','22P02','23502','23505'}:
-            safe=code if code in {'assessment_questions_required','assessment_invalid_audio','assessment_answers_required','assessment_invalid_response','assessment_correct_option_required','assessment_question_limit'} else 'assessment_invalid'
-            raise HTTPException(400,detail={'code':safe,'message':{'assessment_questions_required':'Add at least one active question before publishing.','assessment_invalid_audio':'Select valid authorized audio for every listening prompt.','assessment_answers_required':'Answer every question before submitting.','assessment_invalid_response':'Select valid answers and use each matching target once.'}.get(safe,'Check the assessment settings, questions and media references.')}) from error
+            safe=code if code in {'assessment_questions_required','assessment_invalid_audio','assessment_answers_required','assessment_invalid_response','assessment_correct_option_required','assessment_question_limit','assessment_practice_requires_lesson','assessment_invalid_mode'} else 'assessment_invalid'
+            raise HTTPException(400,detail={'code':safe,'message':{'assessment_questions_required':'Add at least one active question before publishing.','assessment_invalid_audio':'Select valid authorized audio for every listening prompt.','assessment_answers_required':'Answer every question before submitting.','assessment_invalid_response':'Select valid answers and use each matching target once.','assessment_practice_requires_lesson':'Place ungraded practice inside a lesson; section and course assessments are graded.','assessment_invalid_mode':'Use practice mode for speaking practice, and graded mode for written or speaking exam responses.'}.get(safe,'Check the assessment settings, questions and media references.')}) from error
         raise
 
 
@@ -160,10 +244,13 @@ def author(member,course,lesson,block,preview=False):
 
 
 def create(member,course,lesson,payload):
+    require_learning_payload(payload.assessment.model_dump())
+    for question in payload.questions: require_learning_payload(question.model_dump())
     return call('create_elearning_assessment',member.tenant_id,**args(course,lesson),p_actor_id=member.user_id,p_expected_revision=payload.expected_revision,p_details=payload.assessment.model_dump(mode='json'),p_questions=[q.model_dump(mode='json') for q in payload.questions])
 
 
 def manage(member,course,lesson,block,payload):
+    require_learning_payload(payload.payload)
     return call('manage_elearning_assessment',member.tenant_id,**args(course,lesson,block),p_actor_id=member.user_id,p_expected_revision=payload.expected_revision,p_action=payload.action,p_question_id=str(payload.question_id) if payload.question_id else None,p_payload=payload.payload)
 
 

@@ -1,7 +1,7 @@
 import { learningDescription } from "../../utils/elearningPresentation";
 import ELearningSkeleton from "./ELearningSkeleton";
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { BookOpen, Plus, Pencil, Copy, Archive, Settings2, Trash2 } from "lucide-react";
 import { DASHBOARD_ROUTES } from "../../config/routes";
@@ -20,7 +20,9 @@ export default function ELearningCoursesPage() {
   const [hasMore, setHasMore] = useState(false);
   const [error, setError] = useState("");
   const [feedback, setFeedback] = useState("");
-  const [form, setForm] = useState(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [form, setForm] = useState(() => searchParams.get("create") === "true" ? {} : null);
+  const closeForm = () => { setForm(null); if (searchParams.has("create")) { const next = new URLSearchParams(searchParams); next.delete("create"); setSearchParams(next, { replace: true }); } };
   const [archiving, setArchiving] = useState(null);
   const [deleting, setDeleting] = useState(null);
   const [confirmationName, setConfirmationName] = useState("");
@@ -70,7 +72,7 @@ export default function ELearningCoursesPage() {
       </article>)}
     </div>}
     {hasMore && <button className="ecommerce-secondary-button" disabled={busy} onClick={loadMore}>{t("elearning.courses.loadMore")}</button>}
-    {form && <ELearningCourseForm course={form.course} onClose={() => setForm(null)} onSaved={(course) => { apply(course); setForm(null); setFeedback("courses.saved"); }} />}
+    {form && <ELearningCourseForm course={form.course} onClose={closeForm} onSaved={(course) => { apply(course); closeForm(); setFeedback("courses.saved"); }} />}
     {deleting && <ELearningDialog title={t("elearning.courses.deleteTitle", { label: labels.course })} closeLabel={t("elearning.courses.close")} busy={busy} onClose={() => setDeleting(null)}><form onSubmit={(event) => { event.preventDefault(); if (!busy && confirmationName === deleting.name) action("delete", deleting); }}>{error && <p role="alert" className="elearning-feedback is-error">{t(`elearning.${error}`)}</p>}<p>{t("elearning.courses.deleteHelp", { name: deleting.name, sections: labels.plural.section, lessons: labels.plural.lesson })}</p><fieldset className="elearning-course-form" disabled={busy}><label>{t("elearning.courses.confirmName", { name: deleting.name })}<input autoFocus required maxLength={120} autoComplete="off" value={confirmationName} onChange={(event) => setConfirmationName(event.target.value)} /></label></fieldset><footer><button type="button" className="ecommerce-secondary-button" disabled={busy} onClick={() => setDeleting(null)}>{t("elearning.courses.cancel")}</button><button type="submit" className="ecommerce-primary-button" disabled={busy || confirmationName !== deleting.name}>{t("elearning.structure.delete")}</button></footer></form></ELearningDialog>}
     {archiving && <ELearningDialog title={t("elearning.courses.archiveTitle", { label: labels.course })} closeLabel={t("elearning.courses.close")} busy={busy} onClose={() => setArchiving(null)}>{error && <p role="alert" className="elearning-feedback is-error">{t(`elearning.${error}`)}</p>}<p>{t("elearning.courses.archiveHelp", { name: archiving.name })}</p><footer><button className="ecommerce-secondary-button" disabled={busy} onClick={() => setArchiving(null)}>{t("elearning.courses.cancel")}</button><button className="ecommerce-primary-button" disabled={busy} onClick={() => action("archive", archiving)}>{t("elearning.courses.archive")}</button></footer></ELearningDialog>}
   </main>;

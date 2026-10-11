@@ -11,6 +11,8 @@ DEFAULT_MAX_BUILDER_ASSET_REQUEST_BODY_BYTES = 252 * 1024 * 1024
 DEFAULT_MAX_JSON_BODY_BYTES = 3 * 1024 * 1024
 DEFAULT_MAX_SMALL_JSON_BODY_BYTES = 256 * 1024
 DEFAULT_MAX_DATA_JSON_BODY_BYTES = 1024 * 1024
+ASSESSMENT_RECORDING_BODY_BYTES = 10 * 1024 * 1024 + 64 * 1024
+ASSESSMENT_RECORDING_RE = re.compile(r"^/elearning/assessment-attempts/[0-9a-f-]{36}/recordings/[0-9a-f-]{36}/?$")
 
 PUBLIC_FORM_SUBMISSION_RE = re.compile(r"^/public/sites/[^/]+/forms/[^/]+/submissions$")
 USER_SMALL_JSON_RE = re.compile(
@@ -139,6 +141,9 @@ def select_request_body_limit(
 ) -> int | None:
     if method.upper() in SAFE_METHODS:
         return None
+
+    if ASSESSMENT_RECORDING_RE.fullmatch(path):
+        return min(config.max_request_body_bytes, ASSESSMENT_RECORDING_BODY_BYTES)
 
     if _is_builder_asset_upload_path(path) and _is_multipart_content_type(content_type):
         return config.max_builder_asset_request_body_bytes

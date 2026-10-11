@@ -268,6 +268,24 @@ def create_builder_block_event_notification(
 
 
 def _format_notification(row: dict[str, Any]) -> dict[str, Any]:
+    # Historical learning events keep their immutable payload; the inbox projects
+    # known recipient actions onto the focused account routes. Owner links stay put.
+    data = dict(row.get("data") or {})
+    action = data.get("action")
+    event = str(row.get("event_type") or "")
+    path = None
+    if event == "learning_affiliate_submitted":
+        path = "/my-learning/affiliate"
+    elif event == "learning_referral_attributed":
+        path = "/my-learning/referrals"
+    elif event in {"learning_reward_earned", "learning_reward_reversed"}:
+        path = "/my-learning/rewards"
+    elif event.startswith("learning_withdrawal_") and not event.endswith(("_owner", "_request")):
+        path = "/my-learning/withdrawals"
+    if (path and isinstance(action, dict) and action.get("kind") == "learning"
+            and action.get("path") in {"/my-learning", "/my-learning/account", "/my-learning/programmes"}
+            and str(action.get("tenant_id", row.get("tenant_id"))) == str(row.get("tenant_id"))):
+        data["action"] = {**action, "path": path}
     return {
         "id": row.get("id"),
         "event_id": row.get("event_id"),
@@ -275,7 +293,7 @@ def _format_notification(row: dict[str, Any]) -> dict[str, Any]:
         "event_type": row.get("event_type"),
         "title": row.get("title"),
         "body": row.get("body"),
-        "data": row.get("data") or {},
+        "data": data,
         "read_at": row.get("read_at"),
         "created_at": row.get("created_at"),
         "unread": not bool(row.get("read_at")),

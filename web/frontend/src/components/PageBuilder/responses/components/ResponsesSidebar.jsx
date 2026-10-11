@@ -17,6 +17,10 @@ export default function ResponsesSidebar({
   toggleSelectedStatus,
   clearFilters,
   hasFilters,
+  emptyOption,
+  getResponseCount,
+  getFieldCount,
+  showFieldFilters = true,
 }) {
   const hasSearchQuery = searchQuery.trim().length > 0;
 
@@ -33,6 +37,7 @@ export default function ResponsesSidebar({
           value={selectedForm?.id || ""}
           onChange={(event) => selectForm(event.target.value)}
         >
+          {emptyOption && <option value="">{emptyOption}</option>}
           {allForms.map((form) => (
             <option key={form.id} value={form.id}>
               {form.title}
@@ -44,8 +49,9 @@ export default function ResponsesSidebar({
       <div className="results-form-list-scroll">
         {allForms.map((form) => {
           const isActive = selectedForm?.id === form.id;
-          const count = getDisplayResponsesForForm(form).length;
+          const count = getResponseCount ? getResponseCount(form) : getDisplayResponsesForForm(form).length;
           const formFields = getFormFields(form);
+          const fieldCount = getFieldCount ? getFieldCount(form) : formFields.length;
 
           return (
             <button
@@ -57,7 +63,7 @@ export default function ResponsesSidebar({
               <strong>{form.title}</strong>
               <span>
                 {count} {count === 1 ? t.submission : t.submissionsLower} /{" "}
-                {formFields.length} {formFields.length === 1 ? t.field : t.fields}
+                {fieldCount} {fieldCount === 1 ? t.field : t.fields}
               </span>
             </button>
           );
@@ -93,7 +99,7 @@ export default function ResponsesSidebar({
             </div>
           </label>
 
-          <div className="responses-checkbox-filter">
+          {showFieldFilters && <div className="responses-checkbox-filter">
             <div className="responses-filter-heading">
               <span>{t.searchIn}</span>
             </div>
@@ -109,7 +115,7 @@ export default function ResponsesSidebar({
                 </label>
               ))}
             </div>
-          </div>
+          </div>}
 
           <div className="responses-checkbox-filter">
             <div className="responses-filter-heading">

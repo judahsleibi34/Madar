@@ -14,6 +14,19 @@ from services.notification_delivery_service import (
 
 
 class NotificationActionContractTests(unittest.TestCase):
+    def test_learning_destinations_retain_precise_allowlist(self):
+        identifier = "11111111-1111-4111-8111-111111111111"
+        for path in (
+            f"/my-learning/courses/{identifier}/lessons/{identifier}",
+            f"/my-learning/courses/{identifier}/assessments/{identifier}",
+            "/my-learning/referrals", "/my-learning/withdrawals",
+            "/my-learning/affiliate", "/my-learning/affiliate/application",
+            f"/my-learning/exchange/{identifier}", f"/e-learning/forms/responses/{identifier}",
+        ):
+            self.assertEqual(validate_notification_action_path(path), path)
+            self.assertIsNone(validate_notification_action_path(path + "?tenant=8"))
+            self.assertIsNone(validate_notification_action_path(path + "/../admin"))
+
     def test_accepts_only_the_current_allowlisted_relative_route(self):
         self.assertEqual(
             validate_notification_action_path("/notifications"), "/notifications"

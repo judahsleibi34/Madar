@@ -1,4 +1,6 @@
 /* eslint-disable react-refresh/only-export-components -- Builder composition context */
+import AcademyFormBlock from "./AcademyFormBlock";
+import AcademyContactBlock from "./AcademyContactBlock";
 import { createContext, useContext } from "react";
 import { Link } from "react-router-dom";
 import { getBrandedMadarSubdomain } from "../../../utils/hostedAddress";
@@ -19,7 +21,18 @@ export default function AcademyDataBlock({ element, editing = false }) {
   if (!runtime) return empty("unavailable");
   if (!runtime.data) return empty(runtime.loading ? "loading" : "error");
   const { data, renderCollection, renderPlans } = runtime;
+  const programmeTarget = (kind, opportunity) => { const target = kind === "affiliate" ? "/my-learning/affiliate" : kind === "exchange" ? `/my-learning/exchange${opportunity ? `/${encodeURIComponent(opportunity)}` : ""}` : `/my-learning/programmes?kind=${kind}${opportunity ? `&opportunity_id=${encodeURIComponent(opportunity)}` : ""}`; const base = getBrandedMadarSubdomain(window.location.hostname) ? "/academy" : `/academy/${encodeURIComponent(data.site.subdomain)}`; return data.authenticated ? target : `${base}/login?returnTo=${encodeURIComponent(target)}`; };
   const maximum = Math.max(1, Math.min(24, config.maxItems || 4));
+  if (element.type === "academyForm") return <AcademyFormBlock formId={config.formId} identifier={data.site?.subdomain} editing={editing} />;
+  if (element.type === "academyContact") return editing || data.contact_enabled ? <AcademyContactBlock site={data.site} editing={editing} heading={heading} /> : null;
+  if (element.type === "academyProgrammeInfo") {
+    const info = data.programme_info;
+    return info && Object.keys(info).length ? <section className="academy-section"><h2>{heading}</h2>{Object.entries(info).map(([key, value]) => <p key={key} style={{ whiteSpace: "pre-wrap" }}>{value}</p>)}{info.affiliate_terms != null && <Link to={programmeTarget("affiliate")}>{t("elearning.affiliate.apply")}</Link>}{info.support_programme_name != null && <Link to={programmeTarget("tuition")}>{info.support_programme_name}</Link>}{info.exchange_programme_name != null && <Link to={programmeTarget("exchange")}>{info.exchange_programme_name}</Link>}</section> : empty("unavailable");
+  }
+  if (element.type === "academyExchangeOpportunities") {
+    const items = (data.exchange_opportunities || []).slice(0, maximum);
+    return items.length ? <section className="academy-section"><h2>{heading}</h2>{items.map(row => <article className="academy-card academy-public-opportunity" key={row.id}><h3>{row.title}</h3><p>{row.short_description}</p><p>{row.host_institution} · {row.location}</p><details><summary>{t("elearning.exchange.view_opportunity")}</summary><p style={{ whiteSpace: "pre-wrap" }}>{row.description}</p><dl>{["requirements", "start_date", "end_date", "deadline", "capacity"].filter(key => row[key] != null && row[key] !== "").map(key => <div key={key}><dt>{t(`elearning.owner.${key}`)}</dt><dd dir="auto">{row[key]}</dd></div>)}</dl><p>{t("elearning.exchange.capacity_help")}</p><Link to={programmeTarget("exchange", row.id)}>{t("elearning.exchange.apply")}</Link></details></article>)}</section> : empty("unavailable");
+  }
   if (element.type === "academyContinueLearning") {
     if (!data.authenticated || !data.continue_courses?.length) return empty();
     return <div data-academy-component={element.type} className={`academy-data-variant-${config.variant || "grid"}`}>{renderCollection(heading, (data.continue_courses || []).slice(0, maximum))}</div>;

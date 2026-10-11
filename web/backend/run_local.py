@@ -9,7 +9,14 @@ from urllib.parse import urlsplit
 from dotenv import load_dotenv
 
 
-def configure_local_environment(*, local_database=False):
+LOCAL_SCHEMA_CONTRACTS = ("release.json", "schema-114-136-bridge.json", "schema-114-138-bridge.json", "schema-114-139-bridge.json", "schema-114-140-bridge.json", "schema-114-141-bridge.json", "schema-114-142-bridge.json", "schema-141-143-learning-bridge.json")
+
+
+def configure_local_environment(*, local_database=False, schema_contract="release.json"):
+    if schema_contract not in LOCAL_SCHEMA_CONTRACTS:
+        raise RuntimeError("Unsupported local schema contract")
+    if not local_database and schema_contract != "release.json":
+        raise RuntimeError("Local schema contract requires --local-db")
     if os.getenv("APP_ENV", "").strip().lower() in {"prod", "production"}:
         raise RuntimeError("run_local.py is for local development only")
 
@@ -24,12 +31,13 @@ def configure_local_environment(*, local_database=False):
         for key in ("SUPABASE_URL", "SUPABASE_DB_URL"):
             if urlsplit(os.getenv(key, "")).hostname not in {"127.0.0.1", "localhost", "::1"}:
                 raise RuntimeError(f"Local database mode requires a loopback {key}")
-        schema = json.loads((web_root / "deployment/releases/release.json").read_text())["schema"]
+        schema = json.loads((web_root / "deployment/releases" / schema_contract).read_text())["schema"]
         minimum, maximum, target = (int(schema[key]) for key in ("compatible_min", "compatible_max", "target"))
         if not 0 < minimum <= target <= maximum:
             raise RuntimeError("Invalid local release schema compatibility contract")
         os.environ["SCHEMA_COMPATIBLE_MIN"] = str(minimum)
         os.environ["SCHEMA_COMPATIBLE_MAX"] = str(maximum)
+        os.environ["SCHEMA_EXCLUDED_VERSIONS"] = ",".join(map(str,schema.get("excluded_versions",[])))
     elif os.getenv("MADAR_TEST_AUTO_LOGIN", "").lower() == "true":
         raise RuntimeError("Test auto-login requires --local-db")
 
@@ -42,7 +50,10 @@ def configure_local_environment(*, local_database=False):
 
 
 def create_local_app():
-    configure_local_environment(local_database=True)
+    configure_local_environment(
+        local_database=True,
+        schema_contract=os.getenv("MADAR_LOCAL_SCHEMA_CONTRACT", "release.json"),
+    )
     from app import app
     if os.getenv("MADAR_TEST_AUTO_LOGIN", "").lower() == "true":
         from local_dev_auth import LocalTestLoginMiddleware
@@ -53,11 +64,17 @@ def create_local_app():
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--local-db", action="store_true", help="Use the isolated Docker-backed Supabase database")
+    parser.add_argument("--local-schema-contract", choices=LOCAL_SCHEMA_CONTRACTS, default="release.json",
+                        help="Select an existing schema contract for isolated local development; does not run migrations")
     parser.add_argument("--local-commerce", action="store_true", help="Enable payment simulation only on the isolated local database")
     args = parser.parse_args()
     if args.local_commerce and not args.local_db:
         parser.error("--local-commerce requires --local-db")
-    configure_local_environment(local_database=args.local_db)
+    if args.local_schema_contract != "release.json" and not args.local_db:
+        parser.error("--local-schema-contract requires --local-db")
+    configure_local_environment(local_database=args.local_db, schema_contract=args.local_schema_contract)
+    if args.local_db:
+        os.environ["MADAR_LOCAL_SCHEMA_CONTRACT"] = args.local_schema_contract
     if args.local_commerce:
         os.environ["MADAR_LOCAL_COMMERCE_ADAPTER"] = "true"
     import uvicorn

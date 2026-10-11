@@ -1,6 +1,8 @@
+import { useTranslation } from "react-i18next";
 import BuilderProjectLoadError from "./BuilderProjectLoadError";
 import { AcademyBuilderPreviewProvider } from "../../ELearning/ELearningAcademy";
 import AcademyDataInspector from "../blocks/AcademyDataInspector";
+import useAcademyCapabilities from "../../../hooks/useAcademyCapabilities";
 import { ACADEMY_COMPONENT_TYPES, getAcademyNavigationDestinations } from "../core/PageBuilder.academyProfile";
 import SelectionBoundary from "../core/PageBuilder.selectionBoundary";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -741,11 +743,13 @@ export default function PageBuilder({
   const [builderProjectRecord, setBuilderProjectRecord] = useState(null);
   const [builderProjectLoadStatus, setBuilderProjectLoadStatus] = useState(null);
   const isAcademyProject = builderProjectRecord?.usage_profile === "academy";
+  const academyCapabilities = useAcademyCapabilities(user, isAcademyProject);
   useEffect(() => {
     if (!isAcademyProject || routeWorkspace !== "page-builder" || !routeProjectId) return;
     navigate(location.pathname.replace(/^\/page-builder/, "/e-learning/landing-page") + location.search, { replace: true });
   }, [isAcademyProject, routeWorkspace, routeProjectId, navigate, location.pathname, location.search]);
-  const elementTypes = useMemo(() => allElementTypes.filter(item => isAcademyProject ? ACADEMY_COMPONENT_TYPES.has(item.id) : item.group !== "Academy"), [isAcademyProject]);
+  const { t: ownerTranslation } = useTranslation("dashboard");
+  const elementTypes = useMemo(() => allElementTypes.filter(item => isAcademyProject ? ACADEMY_COMPONENT_TYPES.has(item.id) && (item.id !== "academyForm" || academyCapabilities?.capabilities?.forms) : item.group !== "Academy").map(item => item.id === "academyForm" ? {...item,label:ownerTranslation("elearning.ui.form_component")} : item), [isAcademyProject, academyCapabilities, ownerTranslation]);
   const builderTabs = useMemo(() => isAcademyProject ? allBuilderTabs.filter(tab => ["design", "theme", "chrome", "publish"].includes(tab.id)) : allBuilderTabs, [isAcademyProject]);
   const [builderProjectLoading, setBuilderProjectLoading] = useState(
     !demoMode && Boolean(routeProjectId)
