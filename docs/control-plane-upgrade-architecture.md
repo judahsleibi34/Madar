@@ -1,5 +1,10 @@
 # Privileged control-plane upgrade architecture
 
+A completed-NORMAL read-only candidate model may verify frozen Compose inputs
+from the accepted application commit and its three immutable Git tree objects.
+Object hashes and exact paths are checked without fetching production refs.
+Actual staging additionally checks the real fetched deployment Git objects.
+
 The actual installed library inventory includes the admitted forward-resumption
 module. Its isolated import is tested from exactly the installer-selected files;
 development imports alone cannot establish installed SQL-resumption readiness.

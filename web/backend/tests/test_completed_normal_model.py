@@ -5,6 +5,7 @@ import tempfile
 import subprocess
 from types import SimpleNamespace
 import unittest
+import base64
 from unittest.mock import patch
 
 from deployment.lib import completed_normal_model as m
@@ -37,6 +38,27 @@ class AcceptedApplicationPathsTests(unittest.TestCase):
         self.assertTrue(all(args[0]=='rev-parse' for args in self.commands))
     def test_actual_stage_uses_the_deployment_worktree_location(self):
         self.assertEqual(m.candidate_release_root(self.actor,read_only=False),self.actor.ops.state_root/'releases'/self.sha)
+    def source_objects(self):
+        rows=[]
+        for expression in (self.sha,self.sha+'^{tree}',self.sha+':web',self.sha+':web/precutover'):
+            oid=self.git('rev-parse',expression);kind=self.git('cat-file','-t',oid)
+            body=subprocess.run(['git','cat-file',kind,oid],cwd=self.repo,check=True,capture_output=True).stdout
+            rows.append({'oid':oid,'kind':kind,'body_base64':base64.b64encode(body).decode()})
+        return rows
+    def test_read_only_preflight_proves_real_git_objects_without_production_fetch(self):
+        objects=self.source_objects();self.actor.document={'application_source_objects':objects}
+        original=self.actor.ops.root_git;self.actor.ops.root_git=lambda *a,**kw:self.fail('production Git lookup attempted')
+        self.assertEqual(m.candidate_release_root(self.actor,read_only=True),self.actor.package/'source')
+        self.actor.ops.root_git=original
+        self.assertEqual(m.candidate_release_root(self.actor,read_only=False),self.actor.ops.state_root/'releases'/self.sha)
+    def test_source_object_corruption_wrong_commit_or_changed_staging_rejects(self):
+        objects=self.source_objects();self.actor.document={'application_source_objects':objects}
+        wrong=[dict(row) for row in objects];wrong[0]['body_base64']=base64.b64encode(b'fabricated commit').decode()
+        with self.assertRaisesRegex(RuntimeError,'objects_invalid'):m.accepted_compose_blobs(self.sha,wrong)
+        with self.assertRaisesRegex(RuntimeError,'objects_invalid'):m.accepted_compose_blobs('f'*40,objects)
+        with self.assertRaisesRegex(RuntimeError,'objects_invalid'):m.accepted_compose_blobs(self.sha,objects+[objects[0]])
+        self.actor.ops.root_git=lambda *a,**kw:SimpleNamespace(stdout='f'*40)
+        with self.assertRaisesRegex(RuntimeError,'staged_object_changed'):m.candidate_release_root(self.actor,read_only=False)
     def test_changed_application_input_or_missing_stage_fails(self):
         path=self.actor.package/'source'/self.relative[0];path.write_text('services: {unexpected: {}}\n')
         with self.assertRaisesRegex(RuntimeError,'input_changed'):m.candidate_release_root(self.actor,read_only=True)

@@ -11,15 +11,65 @@ import hashlib
 import os
 from pathlib import Path
 import subprocess
+import base64
+import re
 
 from deployment.lib.environment_file import load_environment_file
 from deployment.lib.provider_recovery_runtime import readonly_configuration
+
+
+def accepted_compose_blobs(sha,objects):
+    """Verify accepted commit/tree bytes without fetching into production.
+
+    These are immutable Git objects, not a caller-written source PASS. The
+    exact accepted application SHA anchors the commit and both file paths.
+    """
+    try:
+        if not isinstance(objects,list) or len(objects)!=4:raise ValueError()
+        measured={}
+        for row in objects:
+            if set(row)!={'oid','kind','body_base64'} or row['kind'] not in {'commit','tree'}:raise ValueError()
+            if not isinstance(row['body_base64'],str) or len(row['body_base64'])>87384:raise ValueError()
+            body=base64.b64decode(row['body_base64'],validate=True)
+            if len(body)>65536:raise ValueError()
+            oid=hashlib.sha1(row['kind'].encode()+b' '+str(len(body)).encode()+b'\0'+body).hexdigest()
+            if oid!=row['oid'] or oid in measured:raise ValueError()
+            measured[oid]=(row['kind'],body)
+        kind,commit=measured[sha]
+        if kind!='commit':raise ValueError()
+        first=commit.split(b'\n',1)[0]
+        if not re.fullmatch(b'tree [0-9a-f]{40}',first):raise ValueError()
+        def lookup(tree,name):
+            kind,body=measured[tree]
+            if kind!='tree':raise ValueError()
+            found=None;names=set();offset=0
+            while offset<len(body):
+                end=body.index(b'\0',offset);mode,entry=body[offset:end].split(b' ',1)
+                raw=body[end+1:end+21]
+                if len(raw)!=20 or entry in names or not entry or b'/' in entry or entry in (b'.',b'..'):raise ValueError()
+                names.add(entry);offset=end+21
+                if entry==name.encode():found=(mode,raw.hex())
+            if found is None:raise ValueError()
+            return found
+        root=first[5:].decode();mode,web=lookup(root,'web')
+        if mode!=b'40000':raise ValueError()
+        mode,main=lookup(web,'docker-compose.yml')
+        if mode!=b'100644':raise ValueError()
+        mode,precutover=lookup(web,'precutover')
+        if mode!=b'40000':raise ValueError()
+        mode,client=lookup(precutover,'docker-compose.supabase-client.yml')
+        if mode!=b'100644' or set(measured)!={sha,root,web,precutover}:raise ValueError()
+        return {'web/docker-compose.yml':main,'web/precutover/docker-compose.supabase-client.yml':client}
+    except (ValueError,KeyError,TypeError,UnicodeError):
+        raise RuntimeError('completed_model_application_objects_invalid') from None
 
 
 def candidate_release_root(actor, *, read_only):
     """Render accepted application files without creating a preflight worktree."""
     sha=actor.contract['candidate']['source_sha']
     root=actor.package/'source' if read_only else actor.ops.state_root/'releases'/sha
+    objects=getattr(actor,'document',{}).get('application_source_objects')
+    bindings=accepted_compose_blobs(sha,objects) if objects is not None else None
     # The frozen controller package may contain different deployment code, but
     # these application Compose inputs must be the accepted application's exact
     # Git blobs. No checkout, grant or Docker mutation is required to prove it.
@@ -29,8 +79,10 @@ def candidate_release_root(actor, *, read_only):
             raise RuntimeError('completed_model_application_input_missing')
         content=path.read_bytes()
         blob=hashlib.sha1(b'blob '+str(len(content)).encode()+b'\0'+content).hexdigest()
-        expected=actor.ops.root_git('completed_model_application_blob','rev-parse',
-            f'{sha}:{relative}',cwd=actor.ops.repo).stdout
+        expected=bindings[relative] if read_only and bindings is not None else actor.ops.root_git(
+            'completed_model_application_blob','rev-parse',f'{sha}:{relative}',cwd=actor.ops.repo).stdout
+        if bindings is not None and expected!=bindings[relative]:
+            raise RuntimeError('completed_model_application_staged_object_changed')
         if blob!=expected:
             raise RuntimeError('completed_model_application_input_changed')
     return root
