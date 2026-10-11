@@ -33,6 +33,10 @@ independently measured completed runtime, original history, current customer
 table/Auth/MFA/storage roots, native database identity and the separate
 application/controller revisions. Missing or changed bindings fail closed.
 Historical NORMAL completion is data, never fresh authorization.
+The historical provider record remains root-owned0600. Root remeasures its bytes
+for each fresh scoped credential; the deployment user validates its hash-bound
+file-identity witness through LoadCredential. Staging must not require private
+record read access, and a replaced/touched record or missing witness rejects it.
 
 The admitted path uses explicit prepare, fenced worker activation, READ_ONLY
 publication and post-root-grant adoption stages. Unattended deployment cannot

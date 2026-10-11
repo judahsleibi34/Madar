@@ -26,6 +26,7 @@ class PrivateComposeRuntimeTests(CompletedNormalComposeTests):
     test_modified_image_and_wrong_slot_fail_before_staging=None
     test_missing_or_modified_grant_rejected_before_staging=None
     test_real_compose_merge_keeps_security_and_root_mount_on_all_business_roles=None
+    test_bridge_uses_current_backup_state_mount_instead_of_legacy_provider_marker=None
     def command(self,*args):
         result=subprocess.run(['docker','--host',self.endpoint,*args],capture_output=True,text=True,timeout=180)
         if result.returncode:raise RuntimeError('private_compose_operation_failed_'+args[0])

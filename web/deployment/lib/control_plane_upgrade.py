@@ -2619,6 +2619,7 @@ class SystemOperations:
         if completed_normal_contract is not None:
             from deployment.lib.completed_normal_admission import (
                 ADMISSIONS, OPERATION, digest, validate_contract, verify_history, require_candidate_authority,
+                measure_provider_record,
             )
             from deployment.lib.provider_recovery_runtime import protected
             validate_contract(completed_normal_contract)
@@ -2635,8 +2636,11 @@ class SystemOperations:
                     raise UpgradeError('completed_normal_authorization_admission_changed')
                 witnesses['completed_normal_admission'] = admission
                 witnesses['candidate_authority'] = require_candidate_authority(completed_normal_contract)
+                witnesses['provider_record_witness'] = measure_provider_record(
+                    self.state_root, completed_normal_contract['provider_record_sha256'])
                 witness_hashes = {'admission_sha256':digest(admission),
-                    'candidate_authority_sha256':digest(witnesses['candidate_authority'])}
+                    'candidate_authority_sha256':digest(witnesses['candidate_authority']),
+                    'provider_record_witness_sha256':digest(witnesses['provider_record_witness'])}
                 runtime_record=admission_path.parent/'candidate-runtime.json'
                 if runtime_record.exists():
                     witnesses['candidate_runtime']=json.loads(protected(runtime_record,private=True).read_text())

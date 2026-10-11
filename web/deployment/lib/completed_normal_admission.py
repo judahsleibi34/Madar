@@ -172,6 +172,35 @@ def verify_history(contract: dict) -> None:
             raise RuntimeError("completed_normal_admission_historical_evidence_changed")
 
 
+def provider_record_metadata(state_root: Path) -> dict:
+    """Nonsecret identity of the historical root-private record.
+
+    The deployment user can stat this file but must not read its contents.
+    Nanosecond change times and inode/device prevent replacing a root-issued
+    measurement with a different file while its child credential is active.
+    """
+    from deployment.lib.provider_recovery_runtime import readonly_configuration
+    path = readonly_configuration(Path(state_root) / 'provider-recovery.json', private=True)
+    st = path.stat()
+    if st.st_uid != 0 or st.st_mode & 0o077:
+        raise RuntimeError('completed_normal_provider_record_identity_invalid')
+    return {'path': str(path), 'device': st.st_dev, 'inode': st.st_ino,
+            'size': st.st_size, 'mtime_ns': st.st_mtime_ns, 'ctime_ns': st.st_ctime_ns,
+            'uid': st.st_uid, 'gid': st.st_gid, 'mode': st.st_mode & 0o7777}
+
+
+def measure_provider_record(state_root: Path, expected_sha256: str) -> dict:
+    """Root remeasures before issuing every fresh child credential."""
+    from deployment.lib.provider_recovery_runtime import file_digest
+    if os.geteuid() != 0:
+        raise RuntimeError('completed_normal_provider_record_root_required')
+    before = provider_record_metadata(state_root)
+    actual = file_digest(Path(before['path']))
+    if actual != expected_sha256 or provider_record_metadata(state_root) != before:
+        raise RuntimeError('completed_normal_admission_provider_record_changed')
+    return dict(before, sha256=actual)
+
+
 def require_candidate_authority(contract: dict, *, mode: str | None = None, admissions: Path = ADMISSIONS) -> dict:
     """Read the root-issued v2 grant; no caller/environment can issue one."""
     from deployment.lib.provider_recovery_runtime import protected
@@ -290,8 +319,9 @@ def require_admission(state_root: Path, application_sha: str | None, *, admissio
             or application_sha not in {None, contract["candidate"]["source_sha"]}):
         raise RuntimeError("completed_normal_admission_binding_changed")
     require_fresh_authorization(contract)
+    provider = credential_witness('provider_record_witness', 'provider_record_witness_sha256')
     if (receipt["provider_record_sha256"] != contract["provider_record_sha256"]
-            or file_digest(readonly_configuration(Path(state_root) / "provider-recovery.json", private=True)) != contract["provider_record_sha256"]):
+            or provider != dict(provider_record_metadata(state_root), sha256=contract['provider_record_sha256'])):
         raise RuntimeError("completed_normal_admission_provider_record_changed")
     # The root coordinator remeasures private historical evidence at each
     # privileged boundary. The madar child sees only this immutable root-issued

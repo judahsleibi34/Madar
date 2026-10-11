@@ -48,6 +48,7 @@ class AdmissionTests(unittest.TestCase):
         self.contract = fixture_contract()
         self.state = self.root / "state"; self.state.mkdir()
         (self.state / "provider-recovery.json").write_bytes(b'{"phase":"local_rollback_active"}')
+        (self.state / "provider-recovery.json").chmod(0o600)
         known = {"sha": "a" * 40, "slot": "blue", "schema": 115, "images": self.contract["origin"]["images"]}
         (self.state / "state.json").write_text(json.dumps({"active_slot": "blue", "known_good_release": known}))
         self.admissions = self.root / "admissions"
@@ -88,13 +89,22 @@ class AdmissionTests(unittest.TestCase):
             interlock = self.interlock
             def fixture_stat(path, *args, **kwargs):
                 result = original_stat(path, *args, **kwargs)
-                if path == interlock:
-                    fields = list(result); fields[4] = 0
-                    return os.stat_result(fields)
+                if path in {interlock, self.state / 'provider-recovery.json'}:
+                    class RootOwnedStat:
+                        st_uid = 0
+                        def __getattr__(self, name): return getattr(result, name)
+                    return RootOwnedStat()
                 return result
             patches.append(patch.object(Path, "stat", fixture_stat))
         for p in patches:
             p.start(); self.addCleanup(p.stop)
+        self.refresh_provider_witness()
+
+    def refresh_provider_witness(self):
+        witness = dict(m.provider_record_metadata(self.state), sha256=self.contract['provider_record_sha256'])
+        self.authorization['provider_record_witness'] = witness
+        self.interlock_data['provider_record_witness_sha256'] = m.digest(witness)
+        self.save_auth()
 
     def save_auth(self):
         self.interlock.write_text(json.dumps(self.interlock_data)); self.interlock.chmod(0o644)
@@ -130,6 +140,7 @@ class AdmissionTests(unittest.TestCase):
         (self.state / "provider-recovery.json").write_text('{"phase":"normal"}')
         with self.assertRaisesRegex(RuntimeError, "provider_record_changed"): self.call()
         (self.state / "provider-recovery.json").write_bytes(b'{"phase":"local_rollback_active"}')
+        self.refresh_provider_witness()
         self.controller.write_text("e" * 40)
         with self.assertRaisesRegex(RuntimeError, "installed_controller_changed"): self.call()
 
@@ -169,6 +180,47 @@ class AdmissionTests(unittest.TestCase):
         value['observed_at']='invented'
         self.authorization['completed_normal_admission']=value;self.save_auth()
         with self.assertRaisesRegex(RuntimeError,'credential_witness_changed'):self.call()
+
+    def test_child_admission_never_reads_root_private_provider_contents(self):
+        provider = self.state / 'provider-recovery.json'
+        original = Path.open
+        def denied(path, *args, **kw):
+            if path == provider: raise PermissionError('root-private fixture')
+            return original(path, *args, **kw)
+        with patch.object(Path, 'open', denied):
+            self.assertEqual(self.call(), self.contract)
+
+    def test_missing_or_modified_root_provider_witness_rejects(self):
+        del self.authorization['provider_record_witness']; self.save_auth()
+        with self.assertRaisesRegex(RuntimeError, 'credential_witness_changed'): self.call()
+        self.refresh_provider_witness()
+        self.authorization['provider_record_witness']['inode'] += 1; self.save_auth()
+        with self.assertRaisesRegex(RuntimeError, 'credential_witness_changed'): self.call()
+
+    def test_replaced_or_touched_root_record_rejects_even_with_identical_bytes(self):
+        path = self.state / 'provider-recovery.json'
+        before = path.read_bytes()
+        replacement = self.state / 'replacement'
+        replacement.write_bytes(before); replacement.chmod(0o600); replacement.replace(path)
+        with self.assertRaisesRegex(RuntimeError, 'provider_record_changed'): self.call()
+        self.refresh_provider_witness()
+        os.utime(path, ns=(path.stat().st_atime_ns, path.stat().st_mtime_ns + 1))
+        with self.assertRaisesRegex(RuntimeError, 'provider_record_changed'): self.call()
+
+    def test_root_issuer_remeasures_contents_and_cannot_widen_permissions(self):
+        with patch.object(m.os, 'geteuid', return_value=0):
+            measured = m.measure_provider_record(self.state, self.contract['provider_record_sha256'])
+            self.assertEqual(measured, self.authorization['provider_record_witness'])
+            with self.assertRaisesRegex(RuntimeError, 'provider_record_changed'):
+                m.measure_provider_record(self.state, 'f' * 64)
+            (self.state / 'provider-recovery.json').chmod(0o644)
+            with self.assertRaisesRegex(RuntimeError, 'identity_invalid'):
+                m.measure_provider_record(self.state, self.contract['provider_record_sha256'])
+
+    def test_unprivileged_issuer_cannot_create_provider_witness(self):
+        with patch.object(m.os, 'geteuid', return_value=1000):
+            with self.assertRaisesRegex(RuntimeError, 'root_required'):
+                m.measure_provider_record(self.state, self.contract['provider_record_sha256'])
 
 
 if __name__ == "__main__": unittest.main()

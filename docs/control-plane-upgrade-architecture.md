@@ -52,6 +52,11 @@ recovery state. The root issuer independently hashes original private records
 and measures current runtime/customer identities. History directories stay0700:
 only hash-bound admission, live-grant and runtime witnesses reach the madar child
 through existing systemd LoadCredential. They carry no historical bearer tokens.
+The root-private provider record is rehashed before every child credential is
+issued. Its nonsecret inode/device, size, nanosecond change times, owner and mode
+are included in a separately hash-bound witness. The child verifies that exact
+file identity without reading the protected contents or widening permissions.
+Replacement or mutation between issuance and staging fails closed.
 Every privileged phase requires the new controller SHA; the runtime child uses
 the accepted application SHA. Neither revision is fabricated to match the other.
 
