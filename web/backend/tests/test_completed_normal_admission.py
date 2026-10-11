@@ -222,5 +222,49 @@ class AdmissionTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, 'root_required'):
                 m.measure_provider_record(self.state, self.contract['provider_record_sha256'])
 
+    def test_publisher_keeps_mounted_grant_readable_under_root_private_umask(self):
+        from types import SimpleNamespace
+        provider=self.state/'provider-recovery.json'
+        provider.write_text(json.dumps({'profile':'provider402-signin','phase':'local_rollback_active'}))
+        self.contract['provider_record_sha256']=hashlib.sha256(provider.read_bytes()).hexdigest()
+        state=json.loads((self.state/'state.json').read_text())
+        state['known_good_release']['worker_generation']=self.contract['origin']['worker_generation']
+        (self.state/'state.json').write_text(json.dumps(state))
+        old_grant=self.root/'origin-grant.json'
+        old_grant.write_text(json.dumps({'contract_digest':self.contract['origin']['write_contract_digest']}))
+        def command(label,args):
+            if label.endswith('database_identity'):
+                row={'Id':self.contract['database']['container_id'],'Image':self.contract['database']['image'],
+                     'State':{'Running':True,'Health':{'Status':'healthy'}}}
+                return SimpleNamespace(stdout=json.dumps([row]))
+            if label.endswith('database_schema'):return SimpleNamespace(stdout='731:115')
+            raise AssertionError('unexpected admission command')
+        original_lstat=Path.lstat
+        def ancestry(path,*args,**kw):
+            measured=original_lstat(path,*args,**kw)
+            class FixtureStat:
+                st_uid=0
+                st_mode=measured.st_mode&~0o022
+                def __getattr__(self,name):return getattr(measured,name)
+            return FixtureStat()
+        # Unit fixture measurements only. The publication and umask/file-mode
+        # behavior are real; this is not full historical-admission acceptance.
+        with patch.object(m.os,'geteuid',return_value=0),patch.object(m,'require_fresh_authorization'),\
+                patch.object(m,'verify_history'),\
+                patch('deployment.lib.completed_normal_baseline.attest_runtime',return_value=self.contract['source_roles']),\
+                patch('deployment.lib.completed_normal_database.customer_baseline',return_value={
+                    'table_roots_sha256':self.contract['customer_table_roots_sha256'],
+                    'identity_roots_sha256':self.contract['customer_identity_roots_sha256']}),\
+                patch('deployment.lib.provider_recovery_runtime.protected',side_effect=lambda p,**kw:
+                    old_grant if Path(p).name=='authority.json' else Path(p)),patch.object(Path,'lstat',ancestry):
+            previous=os.umask(0o077)
+            try:root=m.publish_admission(self.contract,SimpleNamespace(command=command),self.state,
+                admissions=self.root/'new-private-admissions')
+            finally:os.umask(previous)
+        self.assertEqual((root/'write-authority').stat().st_mode&0o777,0o755)
+        self.assertEqual((root/'write-authority/authority.json').stat().st_mode&0o777,0o644)
+        self.assertEqual((root/'events.jsonl').stat().st_mode&0o777,0o600)
+        self.assertEqual(json.loads((root/'write-authority/authority.json').read_text())['mode'],'READ_ONLY')
+
 
 if __name__ == "__main__": unittest.main()

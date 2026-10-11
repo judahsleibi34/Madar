@@ -1,5 +1,9 @@
 # Madar production release acceptance policy
 
+Root's private0077 umask must not make the new mounted nonsecret authority
+directory inaccessible. Verify explicit0755 directory/0644 grant publication and
+actual application readability while keeping all protected history private.
+
 New completed-NORMAL database/runtime seals bind complete mount objects by unique
 destination rather than transient Docker response ordering. Changed mount bytes
 or permissions still fail. Historical hashes remain unchanged; the six-service

@@ -292,6 +292,9 @@ def publish_admission(contract: dict, operations, state_root: Path, *, admission
     exclusive(root / "events.jsonl", (json.dumps({"operation": OPERATION, "phase": "admitted", "context_sha256": digest(contract)}, sort_keys=True) + "\n").encode())
     authority = root / "write-authority"
     authority.mkdir(mode=0o755)
+    # The root coordinator runs with UMask=0077. Set the nonsecret mounted
+    # directory explicitly; mkdir(mode=0755) alone produces unreadable0700.
+    authority.chmod(0o755)
     exclusive(authority / "authority.json", encoded({
         "version": 2, "schema": 115, "release_sha": contract["candidate"]["source_sha"],
         "contract_digest": digest(contract), "mode": "READ_ONLY", "compatible_min": 115, "compatible_max": 136,

@@ -84,7 +84,7 @@ def verify_allocation(contract,slot,runtime):
                 if any(n.version==other.version and n.overlaps(other) for n in intended):
                     raise RuntimeError('completed_normal_allocation_subnet_occupied')
     require_unreserved_ports(runtime,tuple(int(p) for p in result['ports'].values()),
-                             retired=result['retired_port_declarations'])
+                             retired=result['retired_port_declarations'],spec_matcher=measured_spec_matches)
     return result
 
 

@@ -56,6 +56,16 @@ class CompletedNormalResourceTests(unittest.TestCase):
         self.contract['resources']['green']['retired_port_declarations']={'madar-historical':
             {'container_id':row['Id'],'image_id':row['Image'],'spec_sha256':spec(row)}}
         with self.assertRaisesRegex(RuntimeError,'already_reserved'):m.verify_allocation(self.contract,'green',self.runtime)
+    def test_retained_resource_binding_uses_same_complete_mount_measurement(self):
+        row={'Id':'c'*64,'Name':'/madar-historical','Image':'sha256:'+'d'*64,'Config':{},
+            'Mounts':[{'Destination':'/a','Source':'/one','RW':False},{'Destination':'/b','Source':'/two','RW':True}],
+            'HostConfig':{'RestartPolicy':{'Name':'no'},'PortBindings':{'8000/tcp':[{'HostPort':'8201'}]}},'State':{'Running':False}}
+        self.runtime.rows=[row]
+        self.contract['resources']['green']['retired_port_declarations']={'madar-historical':
+            {'container_id':row['Id'],'image_id':row['Image'],'spec_sha256':m.measured_spec(row)}}
+        row['Mounts'].reverse();m.verify_allocation(self.contract,'green',self.runtime)
+        row['Mounts'][0]['RW']=False
+        with self.assertRaisesRegex(RuntimeError,'already_reserved'):m.verify_allocation(self.contract,'green',self.runtime)
 
 class CompletedNormalSpecificationTests(unittest.TestCase):
     def setUp(self):

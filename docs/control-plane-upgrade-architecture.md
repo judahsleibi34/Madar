@@ -1,5 +1,10 @@
 # Privileged control-plane upgrade architecture
 
+Admission explicitly sets the new nonsecret write-authority directory0755 and
+grant0644 after creation under root's private0077 umask. Historical receipts and
+audits remain private; the application receives only this root-controlled,
+read-only bind mount. An intended mkdir mode alone does not satisfy readability.
+
 Fresh completed-NORMAL native and candidate specification hashes sort Docker's
 unordered mount inventory by its unique destination, preserving every full mount
 object and all other configuration fields. The historical raw hashes stay intact.
