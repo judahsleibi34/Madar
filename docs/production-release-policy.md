@@ -1,5 +1,10 @@
 # Madar production release acceptance policy
 
+Completed-NORMAL preflight independently reads the exact remote main head both
+before and under the upgrade lock. A changed head rejects before quiescing timers
+or installing boot resources. The governed installer still performs and verifies
+the approved fetch; preparation does not refresh production candidate refs.
+
 A completed-NORMAL read-only candidate model may verify frozen Compose inputs
 from the accepted application commit and its three immutable Git tree objects.
 Object hashes and exact paths are checked without fetching production refs.

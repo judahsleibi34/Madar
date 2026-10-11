@@ -100,6 +100,15 @@ class ExecutionTests(unittest.TestCase):
         self.assertEqual(release,state/'releases'/contract['candidate']['source_sha'])
         self.effect('seal_sql_completion')
 
+    def test_moving_remote_main_rejects_without_fetch_or_production_effect(self):
+        git=Mock(return_value=SimpleNamespace(stdout=self.driver.controller+'\trefs/heads/main\n'))
+        self.ops.madar_git=git;self.driver.verify_candidate_remote()
+        git.assert_called_once_with('completed_upgrade_candidate_remote','ls-remote','--exit-code','origin','refs/heads/main')
+        for value in ('f'*40+'\trefs/heads/main\n',self.driver.controller+' refs/heads/other',self.driver.controller+' refs/heads/main extra',''):
+            git.return_value=SimpleNamespace(stdout=value)
+            with self.assertRaisesRegex(RuntimeError,'candidate_remote_changed'):self.driver.verify_candidate_remote()
+        self.assertEqual(self.calls,[]);self.assertFalse(self.root.exists())
+
     def test_complete_order_has_fence_owner_read_only_backup_and_durable_sql_before_target_grant(self):
         result=self.driver.execute()
         ordered=['preflight','preflight_locked','quiesce','admit','boot_install','controller_install','release_lock',

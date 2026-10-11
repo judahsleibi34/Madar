@@ -97,9 +97,17 @@ class CompletedNormalUpgrade:
             raise RuntimeError('completed_upgrade_preparation_source_changed')
         verify_live_configuration(self.document)
 
+    def verify_candidate_remote(self):
+        # Read-only: production refs are fetched only by the approved installer.
+        # A moving main must reject before timer, boot or controller effects.
+        remote=self.ops.madar_git('completed_upgrade_candidate_remote','ls-remote',
+            '--exit-code','origin','refs/heads/main').stdout.split()
+        if remote!=[self.controller,'refs/heads/main']:
+            raise RuntimeError('completed_upgrade_candidate_remote_changed')
+
     def preflight(self, *, locked=False):
         """No authorization consumption, service effects, or live SQL writes."""
-        self.preparation_source();self.artifact_guard();self.rehearsal_guard()
+        self.preparation_source();self.verify_candidate_remote();self.artifact_guard();self.rehearsal_guard()
         before=self.ops.current_preflight(lock_deployment=locked)
         if (before['schema']!=115 or before['slot']!=self.contract['origin']['slot']
                 or before['installed_sha']!=self.contract['source_roles']['controller_sha']
