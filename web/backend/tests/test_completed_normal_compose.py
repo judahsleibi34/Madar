@@ -50,6 +50,16 @@ class CompletedNormalComposeTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError,'admission_changed'):
                 self.ops._environment('c'*40,'green',self.images)
 
+    def test_bridge_uses_current_backup_state_mount_instead_of_legacy_provider_marker(self):
+        previous='/var/lib/madar-control-plane/provider402/preparation-backup-verification.json'
+        with patch.dict(os.environ,{'BACKUP_FRESHNESS_MARKER':previous,'BACKUP_FRESHNESS_REQUIRED':'true'}):
+            value=self.ops._environment('c'*40,'green',self.images,workers_active=True)
+            self.assertEqual(value['BACKUP_FRESHNESS_MARKER'],'/var/lib/madar/backup-state/latest.json')
+            self.assertEqual(os.environ['BACKUP_FRESHNESS_MARKER'],previous)
+            self.ops.completed_normal_admission=None
+            ordinary=self.ops._environment('c'*40,'green',self.images)
+            self.assertEqual(ordinary['BACKUP_FRESHNESS_MARKER'],previous)
+
     def test_modified_image_and_wrong_slot_fail_before_staging(self):
         changed = dict(self.images, backend='backend@sha256:'+'e'*64)
         with self.assertRaisesRegex(RuntimeError,'accepted_artifact_changed'):
@@ -111,6 +121,11 @@ class CompletedNormalComposeTests(unittest.TestCase):
                 self.assertIn('ALL',role['cap_drop'])
                 self.assertEqual(role['restart'],'no')
                 self.assertTrue(any(s.startswith('no-new-privileges') for s in role['security_opt']))
+        marker=services['backend']['environment']['BACKUP_FRESHNESS_MARKER']
+        self.assertEqual(marker,'/var/lib/madar/backup-state/latest.json')
+        mounts=services['backend']['volumes']
+        self.assertTrue(any(v['source']=='/var/lib/madar/backup-state'
+            and v['target']=='/var/lib/madar/backup-state' and v['read_only'] for v in mounts))
         self.assertFalse(any(v.get('target')=='/run/madar/business-write-authority' for v in services['parser-worker']['volumes']))
 
 

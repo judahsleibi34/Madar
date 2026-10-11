@@ -610,6 +610,11 @@ class DockerGitOperations:
                 "MADAR_BACKEND_IMAGE":images['backend'],
                 "MADAR_FRONTEND_IMAGE":images['frontend'],
                 "MADAR_REDIS_IMAGE":admission['candidate']['redis_image'],
+                # The completed continuation's running release uses the
+                # genuine ordinary marker. Its historical production.env
+                # retains the obsolete provider preparation path, which is
+                # neither mounted nor current in this Compose release.
+                "BACKUP_FRESHNESS_MARKER":"/var/lib/madar/backup-state/latest.json",
                 "MADAR_BUSINESS_WRITE_AUTHORITY": "/run/madar/business-write-authority/authority.json",
                 "MADAR_BUSINESS_WRITE_CONTRACT": context,
                 "MADAR_BUSINESS_WRITE_AUTHORITY_ROOT": str(ADMISSIONS / context / "write-authority"),

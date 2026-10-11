@@ -1,5 +1,11 @@
 # Privileged control-plane upgrade architecture
 
+The completed-NORMAL Compose environment binds backup freshness to the existing
+ordinary backup-state mount. The special origin's runtime uses that marker even
+though historical production.env retains a provider-preparation path. The new
+candidate cannot inherit the obsolete, unmounted path; ordinary deployment
+configuration is otherwise unchanged. Actual backup verification remains a gate.
+
 The completed-NORMAL read-only preflight renders the same Compose builder as
 staging. Its preparation context permits only `config --format json`; it cannot
 issue or require a nonexistent pre-approval grant, create containers or run a

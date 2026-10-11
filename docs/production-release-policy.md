@@ -1,5 +1,11 @@
 # Madar production release acceptance policy
 
+The admitted compatible candidate explicitly reads the current ordinary
+`/var/lib/madar/backup-state/latest.json` through its existing read-only Compose
+mount. It must not inherit the obsolete provider-preparation marker retained
+in the historical environment file. This changes no marker bytes, timestamps
+or receipts, and does not disable freshness or grant any write authority.
+
 Completed-NORMAL preparation must render the exact staging model without
 inventing an admission or grant. A read-only renderer is restricted to Compose
 configuration output and cannot mutate runtime resources. Before the136 write
