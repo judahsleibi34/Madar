@@ -28,7 +28,7 @@ def verify_migration_backup(actual,witness,sha,operations):
     scripts package. Never emit their private output or import mutable source.
     """
     actual=Path(actual)
-    helper=readonly_configuration(operations.recovery_helper_root()/'backup_support.py',private=False)
+    helper=protected(operations.recovery_helper_root()/'backup_support.py')
     try:
         result=subprocess.run([sys.executable,'-I','-B',str(helper),'verify',str(actual)],
             capture_output=True,timeout=180)

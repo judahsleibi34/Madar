@@ -21,6 +21,7 @@ class InstalledBackupTests(unittest.TestCase):
             [('backup_manifest_sha256','manifest.json'),('backup_checksums_sha256','SHA256SUMS')]}
         self.ops=SimpleNamespace(recovery_helper_root=lambda:self.helpers)
         p=patch.object(m,'readonly_configuration',lambda path,**kw:Path(path));p.start();self.addCleanup(p.stop)
+        p=patch.object(m,'protected',lambda path,**kw:Path(path));p.start();self.addCleanup(p.stop)
     def check(self):m.verify_migration_backup(self.backup,self.witness,self.sha,self.ops)
     def test_installed_scripts_layout_needs_no_importable_scripts_package(self):self.check()
     def test_verifier_uses_isolated_python_and_bounded_execution(self):
