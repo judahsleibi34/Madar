@@ -1307,3 +1307,9 @@ fresh credential and READ_ONLY grant under the deployment lock for at most 180
 seconds. Only `starting` is transient. Changed specifications and unhealthy or
 missing resources fail closed. This follows an actual isolated stop/start
 reproduction; production workers are unchanged during engineering preparation.
+
+The pre-migration boundary also awaits the existing kernel's sustained READ_ONLY
+verification after revocation. Atomic authority publication alone does not prove
+the workers have observed it. Three rounds over at least five seconds and a
+strict 180-second deadline precede backup capture and migration intent. Security
+failures remain immediate, and compensation preserves current data.

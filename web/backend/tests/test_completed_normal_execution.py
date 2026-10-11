@@ -46,7 +46,8 @@ class ExecutionTests(unittest.TestCase):
             # coordinator does not skip it because its audit failed.
             self.mode=self.origin='READ_ONLY';effect('compensate')
         kernel=SimpleNamespace(contract=self.contract,root=self.root,native_verifier=lambda:self.schema,
-            round=lambda **kw:effect('round_normal' if kw['normal'] else 'round_read_only'))
+            round=lambda **kw:effect('round_normal' if kw['normal'] else 'round_read_only'),
+            verify_mode=lambda **kw:effect('sustained_normal' if kw['normal'] else 'sustained_read_only'))
         actor=SimpleNamespace(contract=self.contract,document=self.document,ops=self.ops,root=self.root,package=self.base/'package',
             runtime=object(),guard=lambda:effect('source'),source=lambda:effect('source'),
             native=lambda:self.schema,measure=lambda:(self.document,self.base),
@@ -103,7 +104,7 @@ class ExecutionTests(unittest.TestCase):
         result=self.driver.execute()
         ordered=['preflight','preflight_locked','quiesce','admit','boot_install','controller_install','release_lock',
             'service_prepare','seal_stage','fence_origin','service_activate','seal_runtime','service_publish',
-            'acceptance_115_False','grant_115','service_adopt','acceptance_115_True','revoke',
+            'acceptance_115_False','grant_115','service_adopt','acceptance_115_True','revoke','sustained_read_only',
             'backup_pre-migration','backup_inputs','customer_snapshot_115','seal_sql_intent','service_migrate',
             'customer_snapshot_136','customer_preservation','seal_sql_completion',
             'service_refresh','acceptance_136_False','grant_136','acceptance_136_True','backup_post-migration',
@@ -150,6 +151,13 @@ class ExecutionTests(unittest.TestCase):
         self.assertEqual(self.schema,136);self.assertEqual(self.mode,'READ_ONLY')
         self.assertEqual(self.owners,1);self.assertNotIn('restore_timers',self.calls)
         self.assertTrue(json.loads((self.root/'failure.json').read_text())['customer_database_restored'] is False)
+
+    def test_unconverged_revocation_blocks_backup_and_sql_then_compensates(self):
+        self.failure='sustained_read_only'
+        with self.assertRaises(RuntimeError):self.driver.execute()
+        self.assertEqual(self.mode,'READ_ONLY');self.assertEqual(self.schema,115)
+        self.assertNotIn('backup_pre-migration',self.calls);self.assertNotIn('seal_sql_intent',self.calls)
+        self.assertNotIn('service_migrate',self.calls);self.assertIn('compensate',self.calls)
     def test_failed_timer_restoration_fences_target_and_quiesces_partial_schedules(self):
         self.failure='restore_timers'
         with self.assertRaises(RuntimeError):self.driver.execute()

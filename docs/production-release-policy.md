@@ -2297,3 +2297,9 @@ network before allowing Docker health `starting` to converge. One 180-second
 deadline spans repeated fresh authorization, READ_ONLY and model checks. Missing,
 unhealthy, stopped or identity-changed resources remain fatal; no routing or
 write grant is published from a pending health result.
+
+After the bridge's source-schema NORMAL grant is revoked, the coordinator waits
+for three complete READ_ONLY rounds spanning at least five seconds, within one
+180-second deadline. No backup or SQL intent may precede this observed worker
+fence. This wait does not start workers, issue a grant, or tolerate changed
+identities; it handles only transient availability during grant polling.

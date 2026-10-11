@@ -251,7 +251,7 @@ class CompletedNormalUpgrade:
                 # Stop consuming through the real grant, not by granting two
                 # owners or relying on a status flag. The same healthy bridge
                 # stays publicly available while the database is advanced.
-                handoff.revoke();kernel.round(normal=False)
+                handoff.revoke();kernel.verify_mode(normal=False)
                 self.event('pre_migration_backup_pending')
                 backup=CompletedNormalBackupContext(self.contract,self.document,self.package,kernel,
                     stage='pre-migration',source_guard=self.actor.guard,artifact_guard=self.artifact_guard)

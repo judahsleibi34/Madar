@@ -142,6 +142,16 @@ class CompatibleNormalBoot:
             except AvailabilityFailure:
                 time.sleep(self.runtime.budget(1))
 
+    def verify_mode(self, *, normal):
+        """Await observed worker fencing without starting or granting anything.
+
+        Grant publication is synchronous; worker health reflects its next poll.
+        Identity/integrity failures stay fatal. Require sustained convergence
+        before a backup or SQL boundary can rely on stopped consumption.
+        """
+        with verification_window(self.runtime,180):
+            self._converge(normal=normal)
+
     def _start(self, rows):
         for kind in ('redis','parser-worker','remote-ingestion-worker','backend','frontend',*WORKERS):
             self.source_guard()

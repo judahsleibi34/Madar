@@ -100,6 +100,27 @@ class CompatibleBootTests(unittest.TestCase):
         self.assertGreaterEqual(self.clock.value,12)
         self.assertEqual(self.compensations,[])
 
+    def test_revocation_verification_waits_without_starts_or_positive_publication(self):
+        self.runtime.mode='READ_ONLY';self.runtime.pending=2
+        for row in self.runtime.rows.values():
+            if row.get('Id','').startswith('candidate'):row['State']['Running']=True
+        self.kernel.verify_mode(normal=False)
+        self.assertGreaterEqual(self.clock.value,7)
+        self.assertEqual(self.runtime.starts,[]);self.assertEqual(self.publications,[])
+        self.assertEqual(self.compensations,[])
+
+    def test_revocation_verification_deadline_or_changed_identity_cannot_pass(self):
+        self.runtime.mode='READ_ONLY';self.runtime.pending=1000
+        for row in self.runtime.rows.values():
+            if row.get('Id','').startswith('candidate'):row['State']['Running']=True
+        with self.assertRaisesRegex(RuntimeError,'verification_deadline_expired'):
+            self.kernel.verify_mode(normal=False)
+        self.assertLessEqual(self.clock.value,180)
+        self.assertEqual(self.runtime.starts,[]);self.assertEqual(self.publications,[])
+        self.runtime.pending=0;self.runtime.rows['candidate-0']['Image']='changed'
+        with self.assertRaises(RuntimeError):self.kernel.verify_mode(normal=False)
+        self.assertEqual(self.runtime.starts,[]);self.assertEqual(self.publications,[])
+
     def test_schema_advancement_never_selects_old115_application(self):
         self.schema=120;self.kernel.execute()
         self.assertTrue(all(cid.startswith('candidate') for cid in self.runtime.starts))
