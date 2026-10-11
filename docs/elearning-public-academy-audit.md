@@ -162,4 +162,3 @@ architecture work; the file inventory below is limited to this pass.
     issued credential was created for native browser verification. Builder publishes whole
     snapshots: an individual unpublished page is absent from that snapshot, not a separate
     page lifecycle store. No unresolved regression or additional public CMS gap was found.
-

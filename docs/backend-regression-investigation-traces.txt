@@ -420,4 +420,3 @@ Traceback (most recent call last):
   File "web/backend/tests/test_readiness_service.py", line 336, in test_explicit_optional_redis_outage_is_ready
     self.assertIs(result["ready"], True)
 AssertionError: False is not True
-

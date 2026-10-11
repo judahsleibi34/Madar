@@ -259,4 +259,3 @@ Transient screenshots/evidence live in `/tmp/end-user-browser/`, with summaries 
 `/tmp/end-user-native.log`, `/tmp/end-user-journeys.log`, `/tmp/end-user-native-download.log`,
 `/tmp/end-user-form-fixture.log`, `/tmp/end-user-affiliate-browser.log`.
 No credentials/environment contents appear in this report or browser evidence.
-

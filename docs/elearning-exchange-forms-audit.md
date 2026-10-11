@@ -264,4 +264,3 @@ activation requires the governed release/backup/upgrade process. Existing legacy
 programme reports remain views of historical specialized records; new Exchange
 applications and decisions are authoritative in Forms and their review context.
 No payment/provider/EduHope/course configuration or opportunity content was seeded.
-
