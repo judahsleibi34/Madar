@@ -22,7 +22,7 @@ REQUIRED_FILES={'web/scripts/continue_completed_normal_upgrade.py',*(
         'completed_normal_runtime','completed_normal_migration','completed_normal_database',
         'completed_normal_resources','compatible_normal_boot','completed_normal_boot_installation',
         'completed_normal_write_handoff','completed_normal_backup','completed_normal_execution',
-        'completed_normal_model','completed_normal_evidence'))}
+        'completed_normal_model','completed_normal_evidence','completed_normal_forward'))}
 def secured(path, *, directory=False):
     for part in (path,*path.parents):
         st=part.lstat()
@@ -68,18 +68,36 @@ def main():
     if os.geteuid()!=0 or not sys.flags.isolated or not sys.flags.dont_write_bytecode:
         raise RuntimeError('completed_upgrade_boot_isolated_root_required')
     parser=argparse.ArgumentParser()
-    parser.add_argument('mode',choices=('preflight','execute','boot','proxy-gate'))
+    parser.add_argument('mode',choices=('preflight','execute','forward-preflight','forward-resume','boot','proxy-gate'))
     for name in ('source-package','approved-source','approved-plan'):parser.add_argument('--'+name,required=True)
+    parser.add_argument('--resumption-plan');parser.add_argument('--approved-resumption')
     args=parser.parse_args();package=Path(args.source_package)
     document,source=measure(package,args.approved_source,args.approved_plan)
     if Path(__file__)!=source/'web/scripts/continue_completed_normal_upgrade.py':
         raise RuntimeError('completed_upgrade_boot_entry_location_changed')
-    if args.mode in {'preflight','execute'} and (document.get('fixture_only') or document.get('production_authorization') is False):
+    if args.mode in {'preflight','execute','forward-preflight','forward-resume'} and (document.get('fixture_only') or document.get('production_authorization') is False):
         raise RuntimeError('completed_upgrade_fixture_cannot_authorize_production')
     sys.path.insert(0,str(source/'web'))
     from deployment.lib.completed_normal_boot_actor import CompletedNormalBootActor
     actor=CompletedNormalBootActor(document,package,lambda:measure(package,args.approved_source,args.approved_plan))
-    if args.mode in {'preflight','execute'}:
+    if args.mode in {'forward-preflight','forward-resume'}:
+        if not re.fullmatch('[0-9a-f]{64}',str(args.approved_resumption)):
+            raise RuntimeError('completed_forward_plan_hash_required')
+        path=Path(args.resumption_plan or '')
+        if path!=BASE/('forward-resumption-'+args.approved_resumption)/'plan.json':
+            raise RuntimeError('completed_forward_plan_location_invalid')
+        body=secured(path).read_bytes();resume=json.loads(body)
+        if (body!=(json.dumps(resume,sort_keys=True,indent=2)+'\n').encode()
+                or hashlib.sha256(body).hexdigest()!=args.approved_resumption
+                or resume.get('fixture_only') or resume.get('production_authorization') is not True):
+            raise RuntimeError('completed_forward_approved_plan_changed')
+        from deployment.lib.completed_normal_forward import CompletedNormalForwardResumption
+        from deployment.lib.completed_normal_evidence import verify_application_evidence,verify_complete_rehearsal
+        driver=CompletedNormalForwardResumption(actor,resume,artifact_guard=lambda:verify_application_evidence(actor),
+            rehearsal_guard=lambda:verify_complete_rehearsal(actor))
+        try:result=driver.preflight() if args.mode=='forward-preflight' else driver.execute()
+        finally:actor.ops.close_locks()
+    elif args.mode in {'preflight','execute'}:
         from deployment.lib.completed_normal_execution import CompletedNormalUpgrade,verify_serving
         from deployment.lib.completed_normal_evidence import verify_application_evidence,verify_complete_rehearsal
         from deployment.lib.completed_normal_model import render_candidate_model

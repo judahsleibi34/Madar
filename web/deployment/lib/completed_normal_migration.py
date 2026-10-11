@@ -168,11 +168,23 @@ def run_migration(contract,release_root,state_root,operations):
         if actual!=backup:raise RuntimeError('completed_migration_backup_changed')
         verify_migration_backup(actual,witness,sha,operations)
     root=state_root/'migrations'/sha
+    execution=root/'execution.json'
+    from deployment.lib.control_plane_upgrade_authorization import UPGRADE_INTERLOCK
+    if json.loads(protected(UPGRADE_INTERLOCK).read_text()).get('migration_resumption_sha256') is not None:
+        from deployment.lib.completed_normal_forward import authorized_executor
+        resumption,execution=authorized_executor(contract,state_root)
+        if operations.schema_version()!=resumption['observed_schema']:
+            raise RuntimeError('completed_forward_source_schema_changed')
     # Never overwrite a failed/completed executor record on automatic retry.
-    if (root/'execution.json').exists():raise RuntimeError('completed_migration_attempt_already_consumed')
+    if execution.exists():raise RuntimeError('completed_migration_attempt_already_consumed')
     executor=LockedMigrationExecutor(connection_factory=lambda:connection_factory(contract),manifest=manifest,
-        state_file=root/'execution.json',backup_dir=backup,backup_verifier=verify_backup)
-    result=executor.run()
+        state_file=execution,backup_dir=backup,backup_verifier=verify_backup,
+        failure_formatter=lambda error:'completed_migration_error_'+type(error).__name__)
+    try:result=executor.run()
+    except Exception as error:
+        # SQL error details may contain customer rows. Keep numeric migration
+        # phase/checksum in the durable executor; emit only the exception type.
+        raise RuntimeError('completed_migration_error_'+type(error).__name__) from None
     if operations.schema_version()!=136:raise RuntimeError('completed_migration_target_not_observed')
     operations.validate_candidate_core(sha,state['active_slot'])
     # Update only mutable ordinary observed state. Historical source115
@@ -187,7 +199,7 @@ def run_migration(contract,release_root,state_root,operations):
     atomic_json(state_root/'state.json',after)
     return result
 
-def seal_completion(contract,release_root,state_root, *, source_guard,runtime_guard,admissions=ADMISSIONS):
+def seal_completion(contract,release_root,state_root, *, source_guard,runtime_guard,admissions=ADMISSIONS,execution_path=None):
     """Copy genuine child evidence as historical DATA, never create a PASS claim."""
     if os.geteuid()!=0:raise RuntimeError('completed_migration_root_required')
     source_guard();require_fresh_authorization(contract)
@@ -196,7 +208,12 @@ def seal_completion(contract,release_root,state_root, *, source_guard,runtime_gu
     if json.loads(protected(root/'migration-intent.json',private=True).read_text())!=intent_document(contract):
         raise RuntimeError('completed_migration_intent_changed')
     if runtime_guard()!=136:raise RuntimeError('completed_migration_target_not_observed')
-    execution=readonly_configuration(Path(state_root)/'migrations'/contract['candidate']['source_sha']/'execution.json',private=True)
+    expected=Path(state_root)/'migrations'/contract['candidate']['source_sha']/'execution.json'
+    if execution_path is not None:
+        from deployment.lib.completed_normal_forward import authorized_executor
+        _,expected=authorized_executor(contract,state_root)
+        if Path(execution_path)!=expected:raise RuntimeError('completed_forward_execution_path_changed')
+    execution=readonly_configuration(expected,private=True)
     manifest=readonly_configuration(Path(release_root)/'web/deployment/releases/migrations-116-136.json',private=False)
     if file_digest(manifest)!=contract['migration_manifest_sha256']:raise RuntimeError('completed_migration_manifest_changed')
     result=json.loads(execution.read_text());rows=result.get('migrations',[])

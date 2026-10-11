@@ -1,5 +1,12 @@
 # Privileged control-plane upgrade architecture
 
+The completed-NORMAL dispatcher exposes separately hash-bound forward-preflight
+and forward-resume modes for an interrupted SQL stage. They neither reinstall
+the controller nor replay the completed-normal authorization. New root receipts
+bind one new child executor record to measured partial data and unchanged runtime
+ownership. Resumption ends on the accepted READ_ONLY bridge at136; subsequent
+NORMAL completion needs its own explicit operation. Historical records survive.
+
 Completed-NORMAL restart measurement accepts only null/empty-list encoding of
 the three default Docker DNS fields, as demonstrated by an actual isolated
 daemon restart. Configured options/search domains remain security-critical.

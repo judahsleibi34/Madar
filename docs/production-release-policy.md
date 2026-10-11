@@ -1,5 +1,11 @@
 # Madar production release acceptance policy
 
+Partial admitted SQL recovery requires a fresh exact forward-resumption plan,
+independent live/data/artifact/rehearsal gates and root-issued credential witness.
+The old attempt supplies historical evidence only. A new executor record retains
+committed progress and ends READ_ONLY at136; it issues no NORMAL grant. This path
+must pass actual isolated interruption/resumption before production approval.
+
 Actual Docker restart serializes default `Dns`, `DnsOptions` and `DnsSearch`
 between null and empty lists. New completed-NORMAL specification measurements
 canonicalize only those empty defaults. Historical origin hashes use a bounded

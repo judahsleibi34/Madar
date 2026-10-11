@@ -148,9 +148,10 @@ class CompletedNormalUpgrade:
         return {'operation':OPERATION,'schema':115,'candidate':allocation,'production_modified':False,'authorization_consumed':False}
 
     @contextmanager
-    def root_credential(self):
+    def root_credential(self, *, migration_resumption=None):
         """New root-issued credential, never reconstruction of expired tokens."""
-        self.ops.write_authorization(self.controller,completed_normal_contract=self.contract)
+        extra={} if migration_resumption is None else {'migration_resumption':migration_resumption}
+        self.ops.write_authorization(self.controller,completed_normal_contract=self.contract,**extra)
         # Use the existing systemd credential name without making the token
         # public or copying it into protected historical transaction records.
         directory=self.ops.runtime_root/('root-credentials-'+digest(self.contract)[:16])

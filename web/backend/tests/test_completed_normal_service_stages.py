@@ -42,5 +42,17 @@ class CompletedNormalServiceTests(unittest.TestCase):
             ops.run_deploy_service('prepare','d'*40,completed_normal_contract=contract,completed_normal_mode='prepare')
         ops.write_authorization.assert_called_once();ops.clear_authorization.assert_called_once()
         self.assertEqual(ops.command.call_count,2)
+    def test_forward_witness_is_exclusive_to_sql_and_fenced_refresh(self):
+        contract=fixture_contract();witness={'fixture':'fresh measured scope'}
+        for stage in ('migrate','refresh'):
+            ops=self.operations();ops.run_deploy_service(stage,'d'*40,completed_normal_contract=contract,
+                completed_normal_mode=stage,migration_resumption=witness)
+            ops.write_authorization.assert_called_once_with('d'*40,completed_normal_contract=contract,migration_resumption=witness)
+        for stage in ('prepare','activate','adopt','publish'):
+            ops=self.operations()
+            with self.assertRaisesRegex(m.UpgradeError,'forward_stage_invalid'):
+                ops.run_deploy_service(stage,'d'*40,completed_normal_contract=contract,
+                    completed_normal_mode=stage,migration_resumption=witness)
+            ops.command.assert_not_called();ops.write_authorization.assert_not_called()
 
 if __name__=='__main__':unittest.main()

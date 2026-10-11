@@ -1,5 +1,16 @@
 # Automated database migration architecture
 
+An interrupted admitted SQL chain has a separate SQL-only forward-resumption
+operation. A new immutable plan binds the parent failure as DATA, actual partial
+schema, unchanged customer projection, current grant/worker/runtime identities,
+and prior executor hash. A fresh root receipt and LoadCredential witness select
+a NEW executor record; the consumed record is never overwritten. Checksums and
+the live database govern skipped committed transitions. Completion ends READ_ONLY
+at136 with the accepted bridge, awaiting a separate normal-completion operation.
+There is no stale restore, schema115 application rollback or automatic retry.
+Admitted SQL error records use fixed exception types and numeric migration
+phases; raw PostgreSQL details never enter that child journal or executor record.
+
 Completed-NORMAL verifies the sealed source backup through the ordinary
 controller's installed helper directory, using isolated Python with a bounded
 timeout and sanitized failure. It does not assume a development-only top-level

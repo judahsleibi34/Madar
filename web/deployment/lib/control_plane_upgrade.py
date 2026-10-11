@@ -2609,6 +2609,7 @@ class SystemOperations:
         self, approved_sha: str, *, recovery: bool = False,
         schema: int | None = None, rehearsal_sha256: str | None = None,
         completed_normal_contract: dict | None = None,
+        migration_resumption: dict | None = None,
     ) -> None:
         require_root_directory(self.runtime_root, mode=0o711)
         document = self.interlock_document(approved_sha)
@@ -2658,6 +2659,13 @@ class SystemOperations:
                     witnesses['migration_database']=issue_database_lease(completed_normal_contract)
                     witness_hashes.update(migration_inputs_sha256=digest(witnesses['migration_inputs']),
                         migration_database_sha256=digest(witnesses['migration_database']))
+        if migration_resumption is not None:
+            if completed_normal_contract is None:
+                raise UpgradeError('completed_forward_parent_contract_required')
+            from deployment.lib.completed_normal_forward import authorize_witness
+            from deployment.lib.completed_normal_admission import digest
+            witnesses['migration_resumption']=authorize_witness(completed_normal_contract,migration_resumption)
+            witness_hashes['migration_resumption_sha256']=digest(migration_resumption)
         token = secrets.token_urlsafe(32)
         descriptor, temporary = tempfile.mkstemp(prefix=".authorized.", dir=self.runtime_root)
         try:
@@ -2714,6 +2722,7 @@ class SystemOperations:
         migration_repair: bool = False,
         completed_normal_contract: dict | None = None,
         completed_normal_mode: str | None = None,
+        migration_resumption: dict | None = None,
     ) -> None:
         if recovery and migration_repair:
             raise UpgradeError("deployment_operation_mode_invalid")
@@ -2726,9 +2735,12 @@ class SystemOperations:
             if (recovery or migration_repair or completed_normal_mode not in modes
                     or completed_normal_contract['candidate']['controller_sha']!=approved_sha):
                 raise UpgradeError('completed_normal_deploy_stage_invalid')
-            self.write_authorization(approved_sha,completed_normal_contract=completed_normal_contract)
+            extra={} if migration_resumption is None else {'migration_resumption':migration_resumption}
+            if migration_resumption is not None and completed_normal_mode not in {'migrate','refresh'}:
+                raise UpgradeError('completed_forward_stage_invalid')
+            self.write_authorization(approved_sha,completed_normal_contract=completed_normal_contract,**extra)
         else:
-            if completed_normal_mode is not None:
+            if completed_normal_mode is not None or migration_resumption is not None:
                 raise UpgradeError('completed_normal_deploy_contract_required')
             self.write_authorization(
                 approved_sha,
