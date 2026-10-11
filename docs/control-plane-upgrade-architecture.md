@@ -1,5 +1,10 @@
 # Privileged control-plane upgrade architecture
 
+Fresh forward-resumption credentials are issued only after root independently
+remeasures the new receipt and private parent records. The deployment child
+verifies protected current-interlock witnesses and its readable executor/owner
+files; it receives no read access to historical root-private directories.
+
 The completed-NORMAL dispatcher exposes separately hash-bound forward-preflight
 and forward-resume modes for an interrupted SQL stage. They neither reinstall
 the controller nor replay the completed-normal authorization. New root receipts

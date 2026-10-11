@@ -45,10 +45,28 @@ class ForwardScopeTests(unittest.TestCase):
     def test_parent_authorization_is_not_a_resumption_receipt(self):
         with tempfile.TemporaryDirectory() as raw:
             root=Path(raw);(root/'operator-authorization.json').write_text(json.dumps({'operation':'completed-normal-schema115-136-upgrade'}))
-            with patch.object(m,'scope_root',return_value=root),patch.object(m,'protected',lambda path,**kw:Path(path)):
+            with patch.object(m,'scope_root',return_value=root),patch.object(m,'protected',lambda path,**kw:Path(path)),patch.object(m.os,'geteuid',return_value=0),patch.object(m,'file_digest',return_value='c'*64):
                 with self.assertRaisesRegex(RuntimeError,'fresh_authorization_missing'):m.authorize_witness(self.contract,self.plan)
                 (root/'operator-authorization.json').write_bytes(encoded(m.authorization_record(self.plan)))
                 self.assertEqual(m.authorize_witness(self.contract,self.plan),self.plan)
+    def test_root_issuer_rejects_changed_private_parent_before_credential(self):
+        with tempfile.TemporaryDirectory() as raw:
+            root=Path(raw);(root/'operator-authorization.json').write_bytes(encoded(m.authorization_record(self.plan)))
+            with patch.object(m,'scope_root',return_value=root),patch.object(m,'protected',lambda path,**kw:Path(path)),patch.object(m.os,'geteuid',return_value=0),patch.object(m,'file_digest',return_value='d'*64):
+                with self.assertRaisesRegex(RuntimeError,'runtime_witness_changed'):m.authorize_witness(self.contract,self.plan)
+    def test_deployment_user_cannot_issue_a_private_history_witness(self):
+        with patch.object(m.os,'geteuid',return_value=1000):
+            with self.assertRaisesRegex(RuntimeError,'root_issuer_required'):m.authorize_witness(self.contract,self.plan)
+    def test_child_executor_never_reads_root_private_parent_history(self):
+        with tempfile.TemporaryDirectory() as raw:
+            state=Path(raw);prior=m.executor_path(state,self.plan['application_sha'],'execution.json');prior.parent.mkdir(parents=True)
+            prior.write_text('preserved failed executor');owner=state/'worker-ownership.json';owner.write_text('exclusive current owner')
+            runtime={'fixture':'root-issued sealed runtime'};grant={'fixture':'root-issued READ_ONLY grant'}
+            plan=dict(self.plan,previous_execution_sha256=hashlib.sha256(prior.read_bytes()).hexdigest(),worker_owner_sha256=hashlib.sha256(owner.read_bytes()).hexdigest(),runtime_sha256=digest(runtime),grant_sha256=digest(grant))
+            def witness(name,key):return {'migration_resumption':plan,'candidate_runtime':runtime}[name]
+            with patch.object(m.os,'geteuid',return_value=1000),patch.object(m,'credential_witness',side_effect=witness),patch.object(m,'protected',side_effect=AssertionError('private parent read attempted')),patch.object(m,'readonly_configuration',lambda path,**kw:Path(path)),patch.object(m,'require_candidate_authority',return_value=grant),patch('deployment.lib.completed_normal_admission.require_fresh_authorization') as authorization:
+                actual,path=m.authorized_executor(self.contract,state)
+                self.assertEqual(actual,plan);self.assertIn('/resumptions/',str(path));authorization.assert_called_once_with(self.contract)
     def test_stale_plan_fails_before_new_attempt_or_effect(self):
         actor=SimpleNamespace(contract=self.contract)
         driver=m.CompletedNormalForwardResumption(actor,self.plan,artifact_guard=Mock(),rehearsal_guard=Mock())

@@ -1,5 +1,10 @@
 # Madar production release acceptance policy
 
+Fresh forward-resumption credentials are issued only after root independently
+remeasures the new receipt and private parent records. The deployment child
+verifies protected current-interlock witnesses and its readable executor/owner
+files; it receives no read access to historical root-private directories.
+
 Partial admitted SQL recovery requires a fresh exact forward-resumption plan,
 independent live/data/artifact/rehearsal gates and root-issued credential witness.
 The old attempt supplies historical evidence only. A new executor record retains

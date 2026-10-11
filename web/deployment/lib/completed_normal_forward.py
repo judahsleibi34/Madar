@@ -52,23 +52,39 @@ def validate_scope(contract,plan):
     executor_path(Path('/var/lib/madar/releases'),plan['application_sha'],plan['previous_execution'])
 
 def authorize_witness(contract,plan):
+    if os.geteuid()!=0:
+        raise RuntimeError('completed_forward_root_issuer_required')
     validate_scope(contract,plan)
     receipt=json.loads(protected(scope_root(contract,plan)/'operator-authorization.json',private=True).read_text())
     if receipt!=authorization_record(plan):raise RuntimeError('completed_forward_fresh_authorization_missing')
+    # Root must remeasure private parent records before issuing every fresh
+    # LoadCredential. The deployment user must never gain history read access.
+    root=ADMISSIONS/digest(contract)
+    bindings=((root/'failure.json','parent_failure_sha256'),(root/'candidate-runtime.json','runtime_sha256'),
+        (root/'write-authority/authority.json','grant_sha256'))
+    if any(file_digest(protected(path))!=plan[key] for path,key in bindings):
+        raise RuntimeError('completed_forward_runtime_witness_changed')
     return plan
 
 def authorized_executor(contract,state_root):
     """A consumed parent execution can never authorize another executor."""
     plan=credential_witness('migration_resumption','migration_resumption_sha256')
-    authorize_witness(contract,plan)
+    validate_scope(contract,plan)
+    if os.geteuid()==0:
+        authorize_witness(contract,plan)
+    else:
+        from deployment.lib.completed_normal_admission import require_fresh_authorization
+        require_fresh_authorization(contract)
+        # These are freshly measured root-issued witnesses, hash-bound to the
+        # protected current interlock, rather than reads of root-private history.
+        runtime=credential_witness('candidate_runtime','candidate_runtime_sha256')
+        grant=require_candidate_authority(contract,mode='READ_ONLY')
+        if digest(runtime)!=plan['runtime_sha256'] or digest(grant)!=plan['grant_sha256']:
+            raise RuntimeError('completed_forward_runtime_witness_changed')
     prior=readonly_configuration(executor_path(state_root,plan['application_sha'],plan['previous_execution']),private=True)
     if file_digest(prior)!=plan['previous_execution_sha256']:
         raise RuntimeError('completed_forward_previous_execution_changed')
-    root=ADMISSIONS/digest(contract)
-    bindings=((root/'failure.json','parent_failure_sha256'),(root/'candidate-runtime.json','runtime_sha256'),
-        (root/'write-authority/authority.json','grant_sha256'))
-    if (any(file_digest(protected(path))!=plan[key] for path,key in bindings)
-            or file_digest(readonly_configuration(Path(state_root)/'worker-ownership.json',private=True))!=plan['worker_owner_sha256']):
+    if file_digest(readonly_configuration(Path(state_root)/'worker-ownership.json',private=True))!=plan['worker_owner_sha256']:
         raise RuntimeError('completed_forward_runtime_witness_changed')
     return plan,executor_path(state_root,plan['application_sha'],'resumptions/'+digest(plan)+'/execution.json')
 
