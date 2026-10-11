@@ -30,6 +30,7 @@ class ExecutionTests(unittest.TestCase):
             systemctl_state=lambda n:{'active':'active','enabled':'enabled'},
             current_preflight=lambda **kw:effect('origin_rechecked'),
             restore_backup_timers=lambda:effect('restore_timers'),
+            durable_quiesce_snapshot_exists=lambda sha:True,
             requiesce_backup_timers_for_failure=lambda:effect('requiesce_timers'))
         def service(label,sha,*,completed_normal_contract,completed_normal_mode):
             mode=completed_normal_mode;effect('service_'+mode)
@@ -121,6 +122,15 @@ class ExecutionTests(unittest.TestCase):
         with self.assertRaises(RuntimeError):self.driver.execute()
         self.assertEqual(self.calls[-2:],['origin_rechecked','restore_timers'])
         self.assertNotIn('compensate',self.calls)
+    def test_rejected_quiesce_without_durable_snapshot_preserves_original_error(self):
+        self.failure='quiesce'
+        self.ops.durable_quiesce_snapshot_exists=lambda sha:False
+        with self.assertRaisesRegex(RuntimeError,'PRIVATE VALUE MUST NOT APPEAR'):
+            self.driver.execute()
+        self.assertNotIn('restore_timers',self.calls)
+        self.assertNotIn('origin_rechecked',self.calls)
+        self.assertEqual(self.origin,'NORMAL')
+        self.assertFalse(self.root.exists())
     def test_post_install_failure_restricts_current_data_and_does_not_retry(self):
         self.failure='service_prepare'
         with self.assertRaises(RuntimeError):self.driver.execute()

@@ -1,5 +1,11 @@
 # Madar production release acceptance policy
 
+Fresh completed-NORMAL preflight requires the existing root upgrade lock and
+no unrelated volatile upgrade interlock. It executes the real restricted
+read-only backup-context gate before any write grant. A quiesce rejection
+before a durable timer snapshot must preserve its original error and cannot
+attempt timer restoration using nonexistent state.
+
 New completed-NORMAL proxy bindings use the same complete deterministic mount
 measurement as native and candidate resources. Docker inspection order alone
 cannot invalidate a fresh seal; changed identity, mount fields, configuration

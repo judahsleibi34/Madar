@@ -65,7 +65,14 @@ class CompletedNormalUpgrade:
         verify_history(self.contract)
         if controller_tree_digest()!=self.document['installed_controller_tree_sha256']:
             raise RuntimeError('completed_upgrade_installed_preimage_changed')
+        # A fresh operation must not inherit an unrelated volatile upgrade
+        # interlock, or discover a missing root lock after authorization.
+        protected(self.ops.upgrade_root/'upgrade.lock',private=True)
+        if self.ops.interlock_file.exists() or self.ops.interlock_file.is_symlink():
+            raise RuntimeError('completed_upgrade_existing_interlock_requires_reconciliation')
         observe_native(self.contract,self.actor.runtime)
+        from deployment.lib.active_recovery_backup import verify_backup_execution_context
+        verify_backup_execution_context(self.package)
         baseline=customer_baseline(self.contract,self.actor.runtime)
         if (baseline['table_roots_sha256']!=self.contract['customer_table_roots_sha256']
                 or baseline['identity_roots_sha256']!=self.contract['customer_identity_roots_sha256']):
@@ -174,8 +181,12 @@ class CompletedNormalUpgrade:
             elif self.quiesced:
                 # Only independently attested unchanged old NORMAL may regain
                 # its backup schedule. Never enable automatic deployment.
-                self.ops.current_preflight(lock_deployment=False)
-                self.ops.restore_backup_timers()
+                # quiesce can reject a busy service or a foreign interlock
+                # before capturing or mutating any timer. Do not mask that
+                # original error with backup_timer_states_missing.
+                if self.ops.durable_quiesce_snapshot_exists(self.controller):
+                    self.ops.current_preflight(lock_deployment=False)
+                    self.ops.restore_backup_timers()
         except Exception as compensation:
             evidence['compensation_exception_type']=type(compensation).__name__
             raise
