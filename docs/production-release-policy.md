@@ -1,5 +1,50 @@
 # Madar production release acceptance policy
 
+Completed-NORMAL preparation must render the exact staging model without
+inventing an admission or grant. A read-only renderer is restricted to Compose
+configuration output and cannot mutate runtime resources. Before the136 write
+grant, the actual SQL-boundary original-column comparison must preserve all96
+original public tables and five Auth/storage tables, except the approved schema
+state transition. Pre/post ordinary backup LATEST preimages are distinct and
+append-only; an explicitly schema-bound Node1 receiver rejects an incompatible
+backup. A private replica namespace is not production backup evidence.
+
+Staged completed-NORMAL business workers must be CREATED with exact final
+configuration and declared network objects. Root attestation precedes old-worker
+retirement. Governed startup uses exact IDs under exclusive ownership; running
+attachments and worker health/consumption are checked afterward. The standard
+recreate/cleanup path must not invalidate or delete the admitted boot target.
+
+The target136 write grant requires independently sealed completion of all21
+migrations and actual native136 observation. A115 publication alone is never
+permission to recover NORMAL during an interrupted migration. Backup, restored
+current-data deployment, forward-resumption and full application reboot gates
+must still pass before an immutable complete operation is approval-ready.
+
+Completed-NORMAL upgrade preparation retains `provider-recovery.json` and all
+historical receipts. Admission requires a NEW exact-context root credential,
+independently measured completed runtime, original history, current customer
+table/Auth/MFA/storage roots, native database identity and the separate
+application/controller revisions. Missing or changed bindings fail closed.
+Historical NORMAL completion is data, never fresh authorization.
+
+The admitted path uses explicit prepare, fenced worker activation, READ_ONLY
+publication and post-root-grant adoption stages. Unattended deployment cannot
+run this sequence implicitly. Only accepted immutable images may be selected;
+the candidate uses fresh container/network names and exact stopped port
+declarations. Allocation is rechecked under the runtime lock. The optional
+authority overlay mounts the root-issued directory read-only without creating
+host paths. All eight services use restart policy `no`; enabling a compatible
+boot actor requires a separate exact-resource installation within the complete
+approved operation. Unit or lifecycle-test PASS alone does not authorize it.
+
+The schema-aware boot kernel binds complete runtime specs, image identities,
+network objects/aliases and exclusive worker generation. CREATED/stopped
+declarations may lack live endpoint IDs; RUNNING endpoints must have exact IDs.
+It never selects the legacy115 application after schema advancement. The full
+private deployment, boot supersession, backup/restore/replica and interruption
+rehearsal remain mandatory before any production approval request.
+
 The existing root-owned write-authority reader now additionally accepts a fresh
 version2 grant for the exact local115..136 bridge. It requires the exact115/136
 range, an integer observed schema within that range, exact application release

@@ -1,0 +1,65 @@
+# Included only by the exact-context completed-NORMAL upgrade path. No default
+# host directory or empty contract is allowed. The root coordinator creates the
+# containing directory and issues READ_ONLY before any candidate is staged.
+x-write-authority: &write-authority
+  MADAR_BUSINESS_WRITE_AUTHORITY: /run/madar/business-write-authority/authority.json
+  MADAR_BUSINESS_WRITE_CONTRACT: ${MADAR_BUSINESS_WRITE_CONTRACT:?root-issued write contract required}
+  SCHEMA_COMPATIBLE_MIN: "115"
+  SCHEMA_COMPATIBLE_MAX: "136"
+
+x-authority-mount: &authority-mount
+  type: bind
+  source: ${MADAR_BUSINESS_WRITE_AUTHORITY_ROOT:?root-issued write authority required}
+  target: /run/madar/business-write-authority
+  read_only: true
+  bind:
+    create_host_path: false
+
+networks:
+  default:
+    name: ${MADAR_ALLOCATION_DEFAULT_NETWORK:?exact default network required}
+  parser_internal:
+    name: ${MADAR_ALLOCATION_PARSER_NETWORK:?exact parser network required}
+  remote_ingestion_internal:
+    name: ${MADAR_ALLOCATION_REMOTE_INTERNAL_NETWORK:?exact remote network required}
+  remote_ingestion_egress:
+    name: ${MADAR_ALLOCATION_REMOTE_EGRESS_NETWORK:?exact egress network required}
+
+services:
+  frontend:
+    container_name: ${MADAR_CONTAINER_PREFIX:?exact prefix required}-${MADAR_SLOT:?slot required}-frontend
+    restart: "no"
+  parser-worker:
+    container_name: ${MADAR_CONTAINER_PREFIX:?exact prefix required}-${MADAR_SLOT:?slot required}-parser-worker
+    restart: "no"
+  remote-ingestion-worker:
+    container_name: ${MADAR_CONTAINER_PREFIX:?exact prefix required}-${MADAR_SLOT:?slot required}-remote-ingestion-worker
+    restart: "no"
+  redis:
+    image: ${MADAR_REDIS_IMAGE:?exact accepted Redis image required}
+    container_name: ${MADAR_CONTAINER_PREFIX:?exact prefix required}-${MADAR_SLOT:?slot required}-redis
+    restart: "no"
+  backend:
+    container_name: ${MADAR_CONTAINER_PREFIX:?exact prefix required}-${MADAR_SLOT:?slot required}-backend
+    environment: *write-authority
+    volumes:
+      - *authority-mount
+    restart: "no"
+  notification-worker:
+    container_name: ${MADAR_CONTAINER_PREFIX:?exact prefix required}-${MADAR_SLOT:?slot required}-notification-worker
+    environment: *write-authority
+    volumes:
+      - *authority-mount
+    restart: "no"
+  calendar-sync-worker:
+    container_name: ${MADAR_CONTAINER_PREFIX:?exact prefix required}-${MADAR_SLOT:?slot required}-calendar-sync-worker
+    environment: *write-authority
+    volumes:
+      - *authority-mount
+    restart: "no"
+  data-deletion-worker:
+    container_name: ${MADAR_CONTAINER_PREFIX:?exact prefix required}-${MADAR_SLOT:?slot required}-data-deletion-worker
+    environment: *write-authority
+    volumes:
+      - *authority-mount
+    restart: "no"

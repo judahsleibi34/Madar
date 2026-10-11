@@ -2608,9 +2608,52 @@ class SystemOperations:
     def write_authorization(
         self, approved_sha: str, *, recovery: bool = False,
         schema: int | None = None, rehearsal_sha256: str | None = None,
+        completed_normal_contract: dict | None = None,
     ) -> None:
         require_root_directory(self.runtime_root, mode=0o711)
         document = self.interlock_document(approved_sha)
+        operation = "schema_recovery" if recovery else "release"
+        context = None
+        witnesses = {}
+        witness_hashes = {}
+        if completed_normal_contract is not None:
+            from deployment.lib.completed_normal_admission import (
+                ADMISSIONS, OPERATION, digest, validate_contract, verify_history, require_candidate_authority,
+            )
+            from deployment.lib.provider_recovery_runtime import protected
+            validate_contract(completed_normal_contract)
+            if recovery or completed_normal_contract['candidate']['controller_sha'] != approved_sha:
+                raise UpgradeError('completed_normal_authorization_scope_invalid')
+            verify_history(completed_normal_contract)
+            operation, schema = OPERATION, 115
+            rehearsal_sha256 = completed_normal_contract['rehearsal_sha256']
+            context = digest(completed_normal_contract)
+            admission_path = ADMISSIONS/context/'admission.json'
+            if admission_path.exists():
+                admission = json.loads(protected(admission_path).read_text())
+                if admission.get('contract') != completed_normal_contract or admission.get('operation') != OPERATION:
+                    raise UpgradeError('completed_normal_authorization_admission_changed')
+                witnesses['completed_normal_admission'] = admission
+                witnesses['candidate_authority'] = require_candidate_authority(completed_normal_contract)
+                witness_hashes = {'admission_sha256':digest(admission),
+                    'candidate_authority_sha256':digest(witnesses['candidate_authority'])}
+                runtime_record=admission_path.parent/'candidate-runtime.json'
+                if runtime_record.exists():
+                    witnesses['candidate_runtime']=json.loads(protected(runtime_record,private=True).read_text())
+                    witness_hashes['candidate_runtime_sha256']=digest(witnesses['candidate_runtime'])
+                stage_record=admission_path.parent/'candidate-staged-runtime.json'
+                if stage_record.exists():
+                    witnesses['candidate_stage']=json.loads(protected(stage_record,private=True).read_text())
+                    witness_hashes['candidate_stage_sha256']=digest(witnesses['candidate_stage'])
+                migration_record=admission_path.parent/'migration-inputs.json'
+                if migration_record.exists():
+                    from deployment.lib.completed_normal_migration import issue_database_lease, intent_document
+                    witnesses['migration_inputs']=json.loads(protected(migration_record,private=True).read_text())
+                    if witnesses['migration_inputs'].get('intent')!=intent_document(completed_normal_contract):
+                        raise UpgradeError('completed_normal_migration_inputs_changed')
+                    witnesses['migration_database']=issue_database_lease(completed_normal_contract)
+                    witness_hashes.update(migration_inputs_sha256=digest(witnesses['migration_inputs']),
+                        migration_database_sha256=digest(witnesses['migration_database']))
         token = secrets.token_urlsafe(32)
         descriptor, temporary = tempfile.mkstemp(prefix=".authorized.", dir=self.runtime_root)
         try:
@@ -2619,9 +2662,11 @@ class SystemOperations:
                     {
                         "approved_sha": approved_sha,
                         "token": token,
-                        "operation": "schema_recovery" if recovery else "release",
+                        "operation": operation,
                         "schema": schema,
                         "rehearsal_sha256": rehearsal_sha256,
+                        "context_sha256": context,
+                        **witnesses,
                     }, handle,
                     sort_keys=True,
                 )
@@ -2638,9 +2683,11 @@ class SystemOperations:
                         token.encode("utf-8")
                     ).hexdigest(),
                     status="authorized_cycle",
-                    operation="schema_recovery" if recovery else "release",
+                    operation=operation,
                     schema=schema,
                     rehearsal_sha256=rehearsal_sha256,
+                    context_sha256=context,
+                    **witness_hashes,
                 ),
             )
             os.chmod(self.interlock_file, 0o644)
@@ -2661,23 +2708,41 @@ class SystemOperations:
         *,
         recovery: bool = False,
         migration_repair: bool = False,
+        completed_normal_contract: dict | None = None,
+        completed_normal_mode: str | None = None,
     ) -> None:
         if recovery and migration_repair:
             raise UpgradeError("deployment_operation_mode_invalid")
-
-        self.write_authorization(
-            approved_sha,
-            recovery=recovery,
-            schema=getattr(self, "recovery_schema", None) if recovery else None,
-            rehearsal_sha256=(
-                getattr(self, "recovery_rehearsal_sha256", None)
-                if recovery else None
-            ),
-        )
+        modes={'prepare':'--prepare-only','activate':'--activate-prepared',
+               'publish':'--publish-prepared','adopt':'--adopt-prepared','migrate':'--automatic-migrate',
+               'refresh':'--refresh-active-workers'}
+        if completed_normal_contract is not None:
+            from deployment.lib.completed_normal_admission import validate_contract
+            validate_contract(completed_normal_contract)
+            if (recovery or migration_repair or completed_normal_mode not in modes
+                    or completed_normal_contract['candidate']['controller_sha']!=approved_sha):
+                raise UpgradeError('completed_normal_deploy_stage_invalid')
+            self.write_authorization(approved_sha,completed_normal_contract=completed_normal_contract)
+        else:
+            if completed_normal_mode is not None:
+                raise UpgradeError('completed_normal_deploy_contract_required')
+            self.write_authorization(
+                approved_sha,
+                recovery=recovery,
+                schema=getattr(self, "recovery_schema", None) if recovery else None,
+                rehearsal_sha256=(
+                    getattr(self, "recovery_rehearsal_sha256", None)
+                    if recovery else None
+                ),
+            )
         unit = f"madar-control-plane-upgrade-{os.getpid()}-{label}"
         started = time.time()
         try:
-            if recovery:
+            if completed_normal_contract is not None:
+                entrypoint=[str(self.control_root/'bin/madar-release-deploy'),
+                    completed_normal_contract['candidate']['source_sha'],modes[completed_normal_mode],
+                    '--slot',completed_normal_contract['candidate']['slot']]
+            elif recovery:
                 entrypoint = [
                     str(self.control_root / "bin/madar-release-deploy"),
                     approved_sha,

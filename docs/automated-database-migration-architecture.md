@@ -1,5 +1,40 @@
 # Automated database migration architecture
 
+The completed-NORMAL coordinator snapshots all original columns of the96 public
+tables and five Auth/storage tables in a read-only repeatable snapshot before
+SQL intent. It compares the same projection after migration before sealing
+completion or granting target writes. Added tables/columns are allowed; only
+the schema-state value may change in the original projection. Existing password
+verifiers, MFA factors, tenant records and object metadata must remain exact.
+Unexpected differences, including concurrent Auth changes, fail closed for
+independent reconciliation. The gate never restores or reverses customer data.
+
+The admitted completed-NORMAL migration child uses a fresh root-issued native
+database address/credential lease through systemd LoadCredential. It binds the
+database ID, image, configuration, network object and PostgreSQL system ID;
+credentials never appear in argv, public metadata or diagnostics. It requires
+the actual known-good compatible READ_ONLY bridge and a verified source115
+ordinary backup with independent restore and replica evidence. The root intent
+precedes SQL. The existing locked executor applies only116..136; automatic
+replay of a consumed execution is rejected. Fresh explicit forward resumption
+and the complete deployment/backup/reboot rehearsal remain mandatory gates.
+
+Root completion binds copies of the genuine executor output and unchanged
+manifest only after native136 observation. Boot refuses positive authority for
+an incomplete chain at any schema, including115 after intent. The target136
+grant preserves the115 publication and records a separate protected boundary.
+
+The completed-NORMAL preparation path keeps its historical provider record and
+requires fresh admission for explicit runtime stages. Native schema observation
+binds the actual PostgreSQL container/image and system identifier before a
+read-only query; it does not depend on Docker-only DNS resolving on the host.
+Admission measures current public-table and Auth/MFA/storage roots without
+exporting customer fields. The accepted115..136 application and new controller
+have separate source roles. No migration or authorization follows merely from
+admission, unit tests, or application acceptance. The complete private deployment,
+compatible fallback/boot supersession and backup pipeline must pass before the
+immutable full operation can be proposed.
+
 The active candidate descriptor now selects the existing schema115..136 bridge
 and checksum-pinned migrations116..136. The former exact115/no-SQL descriptor
 is retained as `schema-115-local.json`; historical SQL and manifests remain

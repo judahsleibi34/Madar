@@ -25,6 +25,14 @@ from deployment.lib.emergency_routing_repair import exclusive, encoded
 
 ENVIRONMENT={'PATH':'/usr/sbin:/usr/bin:/sbin:/bin','LANG':'C.UTF-8','LC_ALL':'C.UTF-8'}
 
+def latest_preimage_name(completed_context=None):
+    # A compatible upgrade publishes two distinct ordinary backups. Preserve
+    # each exact LATEST preimage without replaying or replacing the first one.
+    if completed_context is None:return 'ordinary-latest-preimage'
+    if completed_context.stage not in {'pre-migration','post-migration'}:
+        raise RuntimeError('normal_backup_preimage_stage_invalid')
+    return completed_context.stage+'-ordinary-latest-preimage'
+
 def checked(args, *, env=None, user=None, timeout=1800, stdin=None, pass_fds=()):
     if user is not None:args=['/usr/bin/setpriv','--no-new-privs',*args]
     result=subprocess.run(args,env=env or ENVIRONMENT,user=user,group=user,extra_groups=[] if user is not None else None,
@@ -97,7 +105,9 @@ print(json.dumps({'uid':os.getuid(),'gid':os.getgid(),'supplementary_groups':os.
     return result
 
 
-def remote_receiver(package,plan,backup,sums,filesystem_uuid):
+def remote_receiver(package,plan,backup,sums,filesystem_uuid,*,expected_schema=115,namespace='normal-local-production'):
+    if type(expected_schema) is not int or expected_schema not in {115,136} or namespace not in {'normal-local-production','private-schema136-rehearsal'}:
+        raise RuntimeError('normal_backup_replica_scope_invalid')
     # Freeze only reviewed non-secret code at a NEW append-only Node 1 path.
     # SSH uses the operator's existing alias/host-key/key policy; no private key
     # content is read, copied or recorded by this operation.
@@ -125,14 +135,18 @@ sys.path.insert(0,str(root));sys.argv=[str(root/'normal_backup_replica.py'),*sys
 runpy.run_path(sys.argv[0],run_name='__main__')
 """
     args=['/usr/bin/python3','-I','-B','-c',code,base64.b64encode(json.dumps(payload).encode()).decode(),
-        plan.digest,backup.name,sums,filesystem_uuid]
+        plan.digest,backup.name,sums,filesystem_uuid,str(expected_schema),namespace]
     return ['/usr/sbin/runuser','-u','madar','--','/usr/bin/ssh','-o','BatchMode=yes',
         '-o','StrictHostKeyChecking=yes','-o','UpdateHostKeys=no','-o','ControlMaster=no',
         '-o','ControlPath=none','-o','ConnectTimeout=10','madar-node1-lan',shlex.join(args)]
 
-def capture_and_replicate(plan,root,package,source_guard,kernel, *, recovery_context=None,authorizing_context=None):
+def capture_and_replicate(plan,root,package,source_guard,kernel, *, recovery_context=None,authorizing_context=None,completed_context=None):
     from scripts import backup_support
     source_guard()
+    if completed_context is not None:
+        if recovery_context is not None or authorizing_context is not None:
+            raise RuntimeError('normal_backup_operation_context_conflict')
+        completed_context.validate(plan,root,package)
     if authorizing_context is not None:
         import re
         if (recovery_context is not None or set(authorizing_context)!={'plan_sha256','source_bundle_sha256'}
@@ -145,9 +159,10 @@ def capture_and_replicate(plan,root,package,source_guard,kernel, *, recovery_con
         if (receipt!={'operation':'repair-completed-normal-boot',**authorizing_context}
                 or document.get('original_plan_sha256')!=plan.digest):
             raise RuntimeError('normal_backup_fresh_boot_authorization_required')
-    if recovery_context is None:kernel.normal()
+    if completed_context is not None:completed_context.guard()
+    elif recovery_context is None:kernel.normal()
     else:recovery_context.guard()
-    acceptance=verify_artifact_acceptance(plan)
+    acceptance=completed_context.artifacts() if completed_context is not None else verify_artifact_acceptance(plan)
     replica=acceptance['node1_replica']
     if file_digest(readonly_configuration(NODE1_CONFIGURATION,private=True))!=replica['configuration_sha256']:
         raise RuntimeError('normal_backup_node1_configuration_changed')
@@ -194,7 +209,8 @@ def capture_and_replicate(plan,root,package,source_guard,kernel, *, recovery_con
     from scripts import backup_support
     manifest=backup_support.verify(backup)
     expected_source=plan.source_sha if recovery_context is None else recovery_context.release_sha
-    if int(manifest['database']['schema_version'])!=115 or manifest['release']['git_sha']!=expected_source:
+    expected_schema=completed_context.schema if completed_context is not None else 115
+    if int(manifest['database']['schema_version'])!=expected_schema or manifest['release']['git_sha']!=expected_source:
         raise RuntimeError('normal_backup_release_changed')
     row=json.loads(checked(['/usr/bin/docker','--host','unix:///var/run/docker.sock','image','inspect',
         kernel.runtime.inspect(['supabase-db'])['supabase-db']['Image']]))[0]
@@ -204,17 +220,20 @@ def capture_and_replicate(plan,root,package,source_guard,kernel, *, recovery_con
     # The exact independently restored checkpoint supplies only role NAMES
     # required by native policy definitions. NOLOGIN prerequisites do not
     # restore historical credentials, owners, memberships or authorization.
-    from deployment.lib.active_recovery_execution import CHECKPOINT
-    checkpoint_manifest=json.loads(protected(CHECKPOINT/'manifest.json',private=True).read_text())
-    roles=protected(CHECKPOINT/'roles.sql',private=True)
-    entries=[row for row in checkpoint_manifest['files'] if row['path']=='roles.sql']
-    if len(entries)!=1 or file_digest(roles)!=entries[0]['sha256']:
-        raise RuntimeError('normal_backup_restore_role_inventory_changed')
-    role_names=tuple(sorted(set(re.findall(r'^CREATE ROLE ([a-zA-Z_][a-zA-Z0-9_]*);$',roles.read_text(),re.MULTILINE))))
+    if completed_context is not None:
+        role_names=completed_context.role_names()
+    else:
+        from deployment.lib.active_recovery_execution import CHECKPOINT
+        checkpoint_manifest=json.loads(protected(CHECKPOINT/'manifest.json',private=True).read_text())
+        roles=protected(CHECKPOINT/'roles.sql',private=True)
+        entries=[row for row in checkpoint_manifest['files'] if row['path']=='roles.sql']
+        if len(entries)!=1 or file_digest(roles)!=entries[0]['sha256']:
+            raise RuntimeError('normal_backup_restore_role_inventory_changed')
+        role_names=tuple(sorted(set(re.findall(r'^CREATE ROLE ([a-zA-Z_][a-zA-Z0-9_]*);$',roles.read_text(),re.MULTILINE))))
     if not {'anon','authenticated','service_role'}.issubset(role_names):
         raise RuntimeError('normal_backup_restore_role_inventory_missing')
     restore=rehearse(backup,digests[0],postgres_preload=('pg_cron','pg_net'),additional_roles=role_names)
-    if restore.get('status')!='logical_database_and_file_restore_passed' or restore.get('backup_schema')!=115:
+    if restore.get('status')!='logical_database_and_file_restore_passed' or restore.get('backup_schema')!=expected_schema:
         raise RuntimeError('normal_backup_actual_restore_incomplete')
     sums=backup_support.digest(backup/'SHA256SUMS')
     # Stream only this verified scoped backup. A failed receiver is retained;
@@ -227,16 +246,18 @@ def capture_and_replicate(plan,root,package,source_guard,kernel, *, recovery_con
         if authorizing_context is not None:
             from types import SimpleNamespace
             replica_plan=SimpleNamespace(digest=scope_digest)
-        output=checked(remote_receiver(package,replica_plan,backup,sums,replica['filesystem_uuid']),stdin=archive)
+        output=checked(remote_receiver(package,replica_plan,backup,sums,replica['filesystem_uuid'],expected_schema=expected_schema),stdin=archive)
     remote=json.loads(output)
     if (remote.get('operation')!='actual-append-only-normal-backup-replica' or remote.get('plan_sha256')!=replica_plan.digest
             or remote.get('backup_id')!=backup.name or remote.get('sha256sums_sha256')!=sums
+            or remote.get('schema')!=expected_schema or remote.get('namespace')!='normal-local-production'
             or type(remote.get('checksum_exit_code')) is not int or remote['checksum_exit_code']!=0
             or remote.get('historical_backups_modified') is not False):
         raise RuntimeError('normal_backup_replica_verification_failed')
     if backup_support.digest(backup/'SHA256SUMS')!=sums:raise RuntimeError('normal_backup_changed_during_replication')
     backup_support.verify(backup);source_guard()
-    if recovery_context is None:kernel.normal()
+    if completed_context is not None:completed_context.guard()
+    elif recovery_context is None:kernel.normal()
     else:recovery_context.close_and_guard()
     # Publish this same already-verified backup (no second dump/checkpoint) to
     # the configured ordinary root before restoring its backup timers. Existing
@@ -244,7 +265,7 @@ def capture_and_replicate(plan,root,package,source_guard,kernel, *, recovery_con
     if cfg.get('MADAR_BACKUP_DIR')!=str(canonical) or cfg.get('MADAR_BACKUP_FRESHNESS_MARKER')!=str(canonical/'LATEST'):
         raise RuntimeError('normal_backup_configured_root_changed')
     latest=canonical/'LATEST'
-    exclusive(root/'ordinary-latest-preimage',readonly_configuration(latest,private=False).read_bytes())
+    exclusive(root/latest_preimage_name(completed_context),readonly_configuration(latest,private=False).read_bytes())
     final=canonical/backup.name
     libc=ctypes.CDLL(None,use_errno=True)
     rename=libc.renameat2;rename.argtypes=(ctypes.c_int,ctypes.c_char_p,ctypes.c_int,ctypes.c_char_p,ctypes.c_uint)
@@ -255,14 +276,17 @@ def capture_and_replicate(plan,root,package,source_guard,kernel, *, recovery_con
     try:os.fsync(descriptor)
     finally:os.close(descriptor)
     backup_support.verify(backup)
-    receipt_name='post-boot-backup.json' if authorizing_context is not None else ('post-cutover-backup.json' if recovery_context is None else 'verified-recovery-backup.json')
+    receipt_name=completed_context.receipt_name if completed_context is not None else ('post-boot-backup.json' if authorizing_context is not None else ('post-cutover-backup.json' if recovery_context is None else 'verified-recovery-backup.json'))
     receipt={'operation':('actual-post-normal-backup-restore-replica' if recovery_context is None else 'actual-pre-normal-current-data-backup-restore-replica'),
         'plan_sha256':scope_digest,
-        'source_sha':plan.source_sha,'images':plan.candidate_images,'schema':115,
+        'source_sha':plan.source_sha,'images':plan.candidate_images,'schema':expected_schema,
         'captured_release_sha':expected_source,
         'started_at':started,'finished_at':datetime.now(timezone.utc).isoformat(),
         'local_path':str(backup),'sha256sums_sha256':sums,'restore':restore,'node1':remote,
         'customer_database_restored':False,'migration_executed':False,'historical_backups_modified':False}
+    if completed_context is not None:
+        receipt.update(operation='actual-completed-normal-backup-restore-replica',context_sha256=completed_context.context,
+            stage=completed_context.stage,authorizing_plan_sha256=completed_context.contract['plan_sha256'])
     if authorizing_context is not None:
         receipt.update(runtime_plan_sha256=plan.digest,authorizing_context=authorizing_context)
     exclusive(root/receipt_name,encoded(receipt))
@@ -271,3 +295,4 @@ def capture_and_replicate(plan,root,package,source_guard,kernel, *, recovery_con
     os.chown(canonical/'LATEST',identity.pw_uid,identity.pw_gid)
     os.chown(Path('/var/lib/madar/backup-state/latest.json'),identity.pw_uid,identity.pw_gid)
     if recovery_context is not None:recovery_context.record_publication(backup,sums)
+    return receipt

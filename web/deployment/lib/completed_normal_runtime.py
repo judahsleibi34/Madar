@@ -1,0 +1,238 @@
+"""Independent Compose-to-runtime validation before sealing the bridge.
+
+An observed Docker spec hash alone proves continuity, not that the initial
+container was authorized. This verifier compares immutable images, image
+defaults and the freshly rendered frozen deployment specification first.
+No configuration or environment values are written to its public results.
+"""
+import json
+import os
+from pathlib import Path
+import re
+import hashlib
+
+from deployment.lib.completed_normal_admission import ADMISSIONS,OPERATION,digest,encoded,require_fresh_authorization
+from deployment.lib.completed_normal_resources import ROLES,allocation,verify_runtime_binding
+from deployment.lib.emergency_routing_repair import exclusive,spec
+from deployment.lib.provider_recovery_runtime import protected
+from deployment.lib.runtime_authority import load_worker_authority,runtime_mutation_lock
+
+BUSINESS=('notification-worker','calendar-sync-worker','data-deletion-worker')
+
+def _environment(items):
+    result={}
+    for raw in items or []:
+        key,separator,value=raw.partition('=')
+        if not separator or key in result:raise RuntimeError('completed_runtime_environment_invalid')
+        result[key]=value
+    return result
+
+def _duration(value):
+    units={'ns':1,'us':1000,'ms':1_000_000,'s':1_000_000_000,'m':60_000_000_000,'h':3_600_000_000_000}
+    if type(value) is int:return value
+    parts=re.findall(r'([0-9]+(?:\.[0-9]+)?)(ns|us|ms|s|m|h)',str(value))
+    if not parts or ''.join(n+u for n,u in parts)!=str(value):
+        raise RuntimeError('completed_runtime_health_declaration_invalid')
+    return round(sum(float(n)*units[u] for n,u in parts))
+
+def validate_model(contract,model,runtime, *, phase='running'):
+    if phase not in {'staged','running'}:
+        raise RuntimeError('completed_runtime_lifecycle_invalid')
+    selected=allocation(contract,contract['candidate']['slot'])
+    services=model.get('services',{})
+    if set(services)!=set(ROLES):raise RuntimeError('completed_runtime_service_inventory_changed')
+    images={};rows=runtime.inspect(list(selected['containers'].values()))
+    if len(rows)!=8:raise RuntimeError('completed_runtime_container_inventory_changed')
+    for image in {*contract['candidate']['images'].values(),contract['candidate']['redis_image']}:
+        result=json.loads(runtime.command(['docker','image','inspect',image]))
+        if len(result)!=1 or result[0]['Id']!=image:raise RuntimeError('completed_runtime_image_changed')
+        images[image]=result[0]['Config']
+        if image in contract['candidate']['images'].values() and (
+                images[image].get('Labels',{}).get('org.opencontainers.image.revision')!=contract['candidate']['source_sha']):
+            raise RuntimeError('completed_runtime_image_source_changed')
+    network_ids={}
+    for declaration in model.get('networks',{}).values():
+        name=declaration.get('name')
+        if name not in {*selected['networks'].values(),'madar-supabase-client'}:
+            raise RuntimeError('completed_runtime_network_declaration_changed')
+        observed=json.loads(runtime.command(['docker','network','inspect',name]))
+        if len(observed)!=1 or observed[0]['Name']!=name or observed[0]['Driver']!='bridge':
+            raise RuntimeError('completed_runtime_network_object_changed')
+        net=observed[0]
+        if bool(net.get('Internal'))!=bool(declaration.get('internal',declaration.get('external',False))):
+            raise RuntimeError('completed_runtime_network_isolation_changed')
+        if not declaration.get('external') and (net.get('IPAM',{}).get('Config') or [])!=declaration.get('ipam',{}).get('config',[]):
+            # Docker adds the gateway to IPAM serialization. Compare subnets
+            # exactly; an additional range is never treated as a default.
+            expected=[n.get('subnet') for n in declaration.get('ipam',{}).get('config',[])]
+            actual=[n.get('Subnet') for n in net.get('IPAM',{}).get('Config',[])]
+            if actual!=expected:raise RuntimeError('completed_runtime_network_subnet_changed')
+        network_ids[name]=net['Id']
+    bindings={}
+    for role,service in services.items():
+        name=selected['containers'][role]
+        if service.get('container_name')!=name or service.get('restart')!='no':
+            raise RuntimeError('completed_runtime_role_declaration_changed')
+        row=rows.get(name)
+        image=contract['candidate']['redis_image'] if role=='redis' else contract['candidate']['images']['frontend' if role=='frontend' else 'backend']
+        if row is not None:
+            state=row['State']
+            if phase=='staged' and role in BUSINESS:
+                if state.get('Running') or state.get('Status')!='created':
+                    raise RuntimeError('completed_runtime_standby_started')
+            elif not state.get('Running'):
+                raise RuntimeError('completed_runtime_service_not_running')
+        if (row is None or row['Image']!=image
+                or (not (phase=='staged' and role in BUSINESS)
+                    and row['State'].get('Health',{}).get('Status')!='healthy')):
+            raise RuntimeError('completed_runtime_running_identity_changed')
+        base=images[image];config=row['Config'];host=row['HostConfig']
+        labels=config.get('Labels',{})
+        if labels.get('com.docker.compose.service')!=role or labels.get('com.docker.compose.project')!=selected['project']:
+            raise RuntimeError('completed_runtime_role_identity_changed')
+        expected_env=_environment(base.get('Env'))
+        expected_env.update({k:str(v) for k,v in service.get('environment',{}).items() if v is not None})
+        if (_environment(config.get('Env'))!=expected_env or config.get('User','')!=service.get('user',base.get('User',''))
+                or config.get('Cmd')!=service.get('command',base.get('Cmd'))
+                or config.get('Entrypoint')!=service.get('entrypoint',base.get('Entrypoint'))
+                or config.get('WorkingDir','')!=service.get('working_dir',base.get('WorkingDir',''))):
+            raise RuntimeError('completed_runtime_configuration_changed')
+        if (host.get('RestartPolicy',{}).get('Name')!='no' or host.get('Privileged') is not False
+                or host.get('ReadonlyRootfs') is not True or sorted(host.get('CapDrop') or [])!=['ALL']
+                or host.get('CapAdd') or host.get('Devices') or host.get('DeviceRequests')
+                or host.get('PidMode') or host.get('IpcMode') in {'host'} or host.get('UTSMode')
+                or sorted(host.get('SecurityOpt') or [])!=['no-new-privileges:true']
+                or host.get('Dns') not in (None,[]) or host.get('Init')!=service.get('init',False)
+                or host.get('Memory')!=int(service.get('mem_limit',0))
+                or host.get('NanoCpus')!=round(float(service.get('cpus',0))*1_000_000_000)
+                or ('pids_limit' in service and host.get('PidsLimit')!=service['pids_limit'])):
+            raise RuntimeError('completed_runtime_security_changed')
+        expected_tmpfs={}
+        for entry in service.get('tmpfs',[]):
+            target,separator,options=entry.partition(':')
+            if not separator or target in expected_tmpfs:raise RuntimeError('completed_runtime_tmpfs_declaration_invalid')
+            expected_tmpfs[target]=options
+        if (host.get('Tmpfs') or {})!=expected_tmpfs:
+            raise RuntimeError('completed_runtime_tmpfs_changed')
+        health=dict(base.get('Healthcheck') or {})
+        for key,value in service.get('healthcheck',{}).items():
+            if key in {'interval','timeout','start_period','start_interval'}:
+                health[{'interval':'Interval','timeout':'Timeout','start_period':'StartPeriod','start_interval':'StartInterval'}[key]]=_duration(value)
+            elif key=='test':health['Test']=value
+            elif key=='retries':health['Retries']=value
+            elif key=='disable':
+                if value:raise RuntimeError('completed_runtime_healthcheck_disabled')
+            else:raise RuntimeError('completed_runtime_health_declaration_invalid')
+        actual_health=config.get('Healthcheck') or {}
+        if any(actual_health.get(key,0)!=health.get(key,0) for key in set(health)|set(actual_health)):
+            raise RuntimeError('completed_runtime_healthcheck_changed')
+        expected_ports={}
+        for port in service.get('ports',[]):
+            if port.get('host_ip')!='127.0.0.1':raise RuntimeError('completed_runtime_port_declaration_changed')
+            expected_ports.setdefault(str(port['target'])+'/'+port.get('protocol','tcp'),[]).append(
+                {'HostIp':'127.0.0.1','HostPort':str(port['published'])})
+        if (host.get('PortBindings') or {})!=expected_ports:
+            raise RuntimeError('completed_runtime_listener_changed')
+        mounts={}
+        for mount in row.get('Mounts',[]):
+            if mount['Destination'] in mounts:raise RuntimeError('completed_runtime_mount_changed')
+            mounts[mount['Destination']]=mount
+        declared={volume['target']:volume for volume in service.get('volumes',[])}
+        if set(mounts)!=set(declared):raise RuntimeError('completed_runtime_mount_inventory_changed')
+        for target,expected in declared.items():
+            actual=mounts[target]
+            if (expected['type']!='bind' or actual['Type']!='bind' or actual['Source']!=expected['source']
+                    or actual['RW']!=(not bool(expected.get('read_only',False)))):
+                raise RuntimeError('completed_runtime_mount_changed')
+        if role in {'backend',*BUSINESS}:
+            authority=declared.get('/run/madar/business-write-authority')
+            if (authority is None or authority['source']!=str(ADMISSIONS/digest(contract)/'write-authority')
+                    or not authority.get('read_only') or authority.get('bind',{}).get('create_host_path') is not False
+                    or expected_env.get('MADAR_BUSINESS_WRITE_CONTRACT')!=digest(contract)
+                    or expected_env.get('MADAR_BUSINESS_WRITE_AUTHORITY')!='/run/madar/business-write-authority/authority.json'
+                    or expected_env.get('SCHEMA_COMPATIBLE_MIN')!='115' or expected_env.get('SCHEMA_COMPATIBLE_MAX')!='136'):
+                raise RuntimeError('completed_runtime_authority_mount_changed')
+        expected_networks={model['networks'][key]['name'] for key in service.get('networks',{})}
+        attached=row['NetworkSettings']['Networks']
+        if set(attached)!=expected_networks or host.get('NetworkMode') not in expected_networks:
+            raise RuntimeError('completed_runtime_network_attachment_changed')
+        for key,definition in service.get('networks',{}).items():
+            net=model['networks'][key]['name'];definition=definition or {}
+            aliases=sorted({name,role,*definition.get('aliases',[])})
+            endpoint=attached[net]
+            declared_only=phase=='staged' and role in BUSINESS
+            attachment_ok=(endpoint.get('NetworkID')==network_ids[net] and bool(endpoint.get('IPAddress')))
+            if declared_only:
+                attachment_ok=(endpoint.get('NetworkID') in {'',network_ids[net]}
+                    and not endpoint.get('IPAddress') and not endpoint.get('EndpointID'))
+            if (not attachment_ok or sorted(endpoint.get('Aliases') or [])!=aliases):
+                raise RuntimeError('completed_runtime_network_role_changed')
+        bindings[role]={'id':row['Id'],'image':image,'spec_sha256':spec(row),
+            'networks':{net:network_ids[net] for net in attached},
+            'network_aliases':{net:attached[net].get('Aliases') or [] for net in attached}}
+    return bindings,network_ids
+
+def seal_candidate_runtime(contract, *, source_guard,model_loader,runtime,state_root,admissions=ADMISSIONS):
+    """The model loader must render frozen source against measured private env.
+
+    The final frozen coordinator, not a child-written summary, supplies it.
+    All candidate workers must already be running READ_ONLY under one owner.
+    """
+    if os.geteuid()!=0:raise RuntimeError('completed_runtime_root_required')
+    if not callable(source_guard) or not callable(model_loader):raise RuntimeError('completed_runtime_independent_guards_required')
+    from deployment.lib.completed_normal_admission import require_candidate_authority
+    source_guard();require_fresh_authorization(contract)
+    require_candidate_authority(contract,mode='READ_ONLY',admissions=admissions)
+    root=Path(admissions)/digest(contract)
+    with runtime_mutation_lock(Path(state_root)):
+        source_guard();require_fresh_authorization(contract)
+        runtimes,networks=validate_model(contract,model_loader(),runtime)
+        owner=load_worker_authority(Path(state_root))
+        original=json.loads(protected(Path(contract['source_roles']['completion_root'])/'candidate-identities.json',private=True).read_text())
+        origin_workers=[original['runtimes'][role]['id'] for role in ('notification','calendar-sync','data-deletion')]
+        publication={'operation':OPERATION,'context_sha256':digest(contract),'source_sha':contract['candidate']['source_sha'],
+            'images':contract['candidate']['images'],'runtimes':runtimes,'networks':networks,
+            'worker_generation':owner['generation'] if owner else '', 'origin_workers':origin_workers}
+        verify_runtime_binding(contract,publication,runtime,Path(state_root))
+        require_candidate_authority(contract,mode='READ_ONLY',admissions=admissions)
+        source_guard()
+        exclusive(root/'candidate-runtime.json',encoded(publication))
+    return publication
+
+
+def seal_candidate_stage(contract, *, source_guard,model_loader,runtime,state_root,admissions=ADMISSIONS):
+    """Seal independently modeled resources BEFORE retiring the old workers.
+
+    All three accepted business workers must be CREATED. The exact record also
+    provides a durable recovery target if interruption follows owner transfer
+    but precedes worker startup. It does not grant writes or transfer ownership.
+    """
+    from deployment.lib.completed_normal_admission import require_candidate_authority
+    from deployment.lib.provider_recovery_runtime import readonly_configuration
+    if os.geteuid()!=0:raise RuntimeError('completed_runtime_root_required')
+    if not callable(source_guard) or not callable(model_loader):raise RuntimeError('completed_runtime_independent_guards_required')
+    root=Path(admissions)/digest(contract)
+    source_guard();require_fresh_authorization(contract)
+    require_candidate_authority(contract,mode='READ_ONLY',admissions=admissions)
+    with runtime_mutation_lock(Path(state_root)):
+        source_guard();require_fresh_authorization(contract)
+        runtimes,networks=validate_model(contract,model_loader(),runtime,phase='staged')
+        prepared=json.loads(readonly_configuration(Path(state_root)/'prepared-release.json',private=True).read_text())
+        if (prepared.get('release_sha')!=contract['candidate']['source_sha']
+                or prepared.get('candidate_slot')!=contract['candidate']['slot']
+                or prepared.get('status')!='candidate_validated_workers_inactive'
+                or not isinstance(prepared.get('prepared_at'),str) or not prepared['prepared_at']):
+            raise RuntimeError('completed_runtime_stage_record_changed')
+        owner=load_worker_authority(Path(state_root))
+        if (owner is None or owner['owner']!='CANDIDATE' or owner['generation']!=contract['origin']['worker_generation']
+                or owner['candidate']!={'sha':contract['source_roles']['application_sha'],'slot':contract['origin']['slot']}):
+            raise RuntimeError('completed_runtime_origin_owner_changed')
+        original=json.loads(protected(Path(contract['source_roles']['completion_root'])/'candidate-identities.json',private=True).read_text())
+        origin_workers=[original['runtimes'][role]['id'] for role in ('notification','calendar-sync','data-deletion')]
+        publication={'operation':OPERATION,'context_sha256':digest(contract),'source_sha':contract['candidate']['source_sha'],
+            'images':contract['candidate']['images'],'runtimes':runtimes,'networks':networks,
+            'worker_generation':hashlib.sha256(f"bootstrap:{prepared['release_sha']}:{prepared['candidate_slot']}:{prepared['prepared_at']}".encode()).hexdigest(),
+            'origin_workers':origin_workers}
+        source_guard()
+        exclusive(root/'candidate-staged-runtime.json',encoded(publication))
+    return publication

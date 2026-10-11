@@ -1,5 +1,68 @@
 # Privileged control-plane upgrade architecture
 
+The completed-NORMAL read-only preflight renders the same Compose builder as
+staging. Its preparation context permits only `config --format json`; it cannot
+issue or require a nonexistent pre-approval grant, create containers or run a
+different Compose operation. Rendering does not attest application execution.
+The source115 and target136 ordinary backup publications preserve separate,
+exclusive LATEST preimages. Node 1 reception validates the explicitly bound
+schema (115 or136) and namespace before accepting an archive; private rehearsal
+replicas use a distinct namespace and never become production freshness proof.
+
+The completed-NORMAL exact-resource boot supersession preserves original unit
+files and archives original proxy drop-in bytes in its new root-private audit
+namespace. Systemd dependency directives are additive: empty `Requires=`,
+`After=` or `PartOf=` assignments must not be relied on to remove dependencies.
+The installer removes only literal obsolete actor references from approved
+proxy drop-in preimages, retains unrelated settings and original permissions,
+and restores those exact preimages on installation failure. Old actors are
+disabled and guarded by `RefuseManualStart` and a receipt-bound negative
+condition. The actual loaded fragment/drop-in inventories are attested,
+including rejection of unexpected runtime or vendor overrides. Isolated real
+systemd testing covers initially active legacy actors with Docker `PartOf`
+edges; it does not establish complete application boot acceptance.
+
+Accepted business workers are created without starting during staging. Root
+independently validates their rendered final configuration, images, security,
+network declarations/aliases and intended network objects before sealing their
+identities. The deployment child verifies this sealed witness before retiring
+old workers, publishes exclusive ownership, and starts only those exact IDs.
+RUNNING attachments must acquire their actual network IDs. The existing narrow
+first-start OOM/default-DNS comparator applies only to these worker lifecycles;
+it does not permit arbitrary specification changes. Active compatible services
+are verified without forced recreation, preserving durable boot identities.
+
+Root seals migration intent before SQL. An interrupted chain, including intent
+at115 before the first COMMIT, permits only READ_ONLY bridge recovery. A136
+NORMAL grant additionally requires the actual native136 identity and sealed
+executor/manifest/completion evidence for all21 checksum-pinned migrations.
+The original115 publication/preimages remain unchanged. Revocation precedes
+compensation, and a failed bound-worker stop cannot skip the traffic fence;
+only the exact bound proxy may be stopped if verified maintenance fails.
+
+`completed_normal_admission` provides an explicit, fresh credential-bound
+admission from the completed NORMAL continuation without editing historical
+recovery state. The root issuer independently hashes original private records
+and measures current runtime/customer identities. History directories stay0700:
+only hash-bound admission, live-grant and runtime witnesses reach the madar child
+through existing systemd LoadCredential. They carry no historical bearer tokens.
+Every privileged phase requires the new controller SHA; the runtime child uses
+the accepted application SHA. Neither revision is fabricated to match the other.
+
+`run_deploy_service` has explicit completed-NORMAL stage modes. The existing
+root-controlled grant is revoked before the worker owner becomesNONE. Old
+consumers stop before the accepted candidate becomes the sole owner. Candidate
+workers and routing remain READ_ONLY until the separately guarded root write
+boundary verifies source, artifacts, boot controls, database and runtime. New
+preimages/publication records are exclusive and original evidence is retained.
+Post-grant failure revokes the new authority before current-data compensation;
+the boundary never restores customer data or automatically regrants the origin.
+
+These components are preparation primitives. They do not constitute an approved
+full upgrade driver or completed boot installation. The exact-resource installer,
+complete private current-data lifecycle and failure matrix, immutable final
+source/plan and explicit operator approval are still required before live use.
+
 The existing root-owned write-authority reader now additionally accepts a fresh
 version2 grant for the exact local115..136 bridge. It requires the exact115/136
 range, an integer observed schema within that range, exact application release

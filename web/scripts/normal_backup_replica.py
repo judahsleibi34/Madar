@@ -19,9 +19,11 @@ import backup_support as backup
 
 BASE=Path('/srv/data2/madar-backups')
 
-def receive(plan_sha,backup_id,sums_sha,filesystem_uuid):
+def receive(plan_sha,backup_id,sums_sha,filesystem_uuid,expected_schema=115,namespace='normal-local-production'):
     if (not re.fullmatch(r'[0-9a-f]{64}',plan_sha) or not backup.BACKUP_ID.fullmatch(backup_id)
-            or not re.fullmatch(r'[0-9a-f]{64}',sums_sha) or not re.fullmatch(r'[0-9a-f-]{36}',filesystem_uuid)):
+            or not re.fullmatch(r'[0-9a-f]{64}',sums_sha) or not re.fullmatch(r'[0-9a-f-]{36}',filesystem_uuid)
+            or type(expected_schema) is not int or expected_schema not in {115,136}
+            or namespace not in {'normal-local-production','private-schema136-rehearsal'}):
         raise RuntimeError('normal_replica_binding_invalid')
     for path in (BASE,*BASE.parents):
         st=path.lstat()
@@ -32,7 +34,7 @@ def receive(plan_sha,backup_id,sums_sha,filesystem_uuid):
     observed=subprocess.run(['findmnt','-T',str(BASE),'-n','-o','SOURCE,FSTYPE,TARGET,UUID'],capture_output=True,text=True,timeout=10)
     if observed.returncode or observed.stdout.split()!=['/dev/sdc1','ext4','/srv/data2',filesystem_uuid]:
         raise RuntimeError('normal_replica_filesystem_changed')
-    parent=BASE/'normal-local-production';parent.mkdir(mode=0o700,exist_ok=True)
+    parent=BASE/namespace;parent.mkdir(mode=0o700,exist_ok=True)
     if parent.is_symlink() or parent.stat().st_uid!=os.getuid() or parent.stat().st_mode&0o077:
         raise RuntimeError('normal_replica_namespace_untrusted')
     scope=parent/plan_sha
@@ -58,7 +60,7 @@ def receive(plan_sha,backup_id,sums_sha,filesystem_uuid):
                 stream.flush();os.fsync(stream.fileno())
     if backup.digest(staging/'SHA256SUMS')!=sums_sha:raise RuntimeError('normal_replica_checksum_manifest_changed')
     manifest=backup.verify(staging,dump=False)
-    if manifest.get('backup_id')!=backup_id or int(manifest.get('database',{}).get('schema_version',0))!=115:
+    if manifest.get('backup_id')!=backup_id or int(manifest.get('database',{}).get('schema_version',0))!=expected_schema:
         raise RuntimeError('normal_replica_backup_identity_changed')
     final=scope/backup_id;os.rename(staging,final)
     for path in final.rglob('*'):path.chmod(0o400 if path.is_file() else 0o500)
@@ -70,10 +72,13 @@ def receive(plan_sha,backup_id,sums_sha,filesystem_uuid):
     return {'operation':'actual-append-only-normal-backup-replica','plan_sha256':plan_sha,
         'backup_id':backup_id,'destination':str(final),'sha256sums_sha256':sums_sha,
         'archive_entries':count,'files':sum(path.is_file() for path in final.rglob('*')),'bytes':size,'checksum_exit_code':0,'historical_backups_modified':False,
-        'latest_modified':False,'retention_performed':False,'schema':115}
+        'latest_modified':False,'retention_performed':False,'schema':expected_schema,'namespace':namespace}
 
 if __name__=='__main__':
-    try:print(json.dumps(receive(*sys.argv[1:]),sort_keys=True))
+    try:
+        args=sys.argv[1:]
+        if len(args)>4:args[4]=int(args[4])
+        print(json.dumps(receive(*args),sort_keys=True))
     except Exception as error:
         print(json.dumps({'operation':'normal-backup-replica','status':'failed','exception_type':type(error).__name__}),flush=True)
         raise SystemExit(1)
