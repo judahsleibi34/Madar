@@ -1454,6 +1454,20 @@ class ControlPlaneUpgradeTests(unittest.TestCase):
         self.assertTrue(wrapper.startswith("#!/usr/bin/python3 -I"))
         self.assertIn("os.environ.clear()", wrapper)
 
+    def test_installed_launcher_disables_bytecode_before_implementation_imports(self):
+        import runpy
+        module=runpy.run_path(str(WRAPPER_PATH))
+        with mock.patch.dict(os.environ,{'PYTHONPATH':'untrusted','LD_PRELOAD':'untrusted'},clear=True), \
+                mock.patch.object(sys,'argv',[str(WRAPPER_PATH),'--dry-run','a'*40]), \
+                mock.patch.object(os,'execve') as execute:
+            module['main']()
+        executable,args,environment=execute.call_args.args
+        self.assertEqual(executable,'/usr/bin/python3')
+        self.assertEqual(args[:3],['/usr/bin/python3','-I','-B'])
+        self.assertEqual(args[3],module['IMPLEMENTATION'])
+        self.assertEqual(args[4:],['--dry-run','a'*40])
+        self.assertNotIn('PYTHONPATH',environment);self.assertNotIn('LD_PRELOAD',environment)
+
     def test_controlled_auto_deploy_maps_suppression_to_explicit_result(self):
         operations = object.__new__(upgrade.SystemOperations)
         operations.repo = Path("/srv/madar/production")

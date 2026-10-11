@@ -36,6 +36,7 @@ alert_hook_source="$web_root/scripts/madar_alert_hook.sh"
 declare -a tracked_files=(
   production-paths.conf
   docker-compose.release.yml
+  docker-compose.write-authority.yml
   bin/madar-auto-deploy
   bin/madar-control-plane-guard
   bin/madar-control-plane-upgrade
@@ -49,6 +50,20 @@ declare -a tracked_files=(
   lib/environment_file.py
   lib/control_plane_upgrade.py
   lib/completed_normal_baseline.py
+  lib/completed_normal_admission.py
+  lib/compatible_normal_boot.py
+  lib/completed_normal_write_handoff.py
+  lib/completed_normal_resources.py
+  lib/completed_normal_database.py
+  lib/completed_normal_boot_installation.py
+  lib/completed_normal_migration.py
+  lib/completed_normal_forward.py
+  lib/completed_normal_runtime.py
+  lib/completed_normal_boot_actor.py
+  lib/completed_normal_backup.py
+  lib/completed_normal_execution.py
+  lib/completed_normal_model.py
+  lib/completed_normal_evidence.py
   lib/normal_boot_repair.py
   lib/control_plane_upgrade_authorization.py
   lib/migration_executor.py

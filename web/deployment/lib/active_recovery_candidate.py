@@ -122,9 +122,11 @@ def inspect_previous_candidate(plan, runtime=None):
     return {'root':root,'candidate':value,'rows':rows,'binding':binding}
 
 
-def require_unreserved_ports(runtime, ports, retired=None, planned=None):
+def require_unreserved_ports(runtime, ports, retired=None, planned=None, *, spec_matcher=None):
     """Check host sockets AND stopped Docker reservations without displacing any."""
     planned=planned or {}
+    if spec_matcher is not None and not callable(spec_matcher):
+        raise RuntimeError('detached_resource_specification_verifier_invalid')
     planned_ports={str(b['HostPort']) for row in planned.values() if row['State']['Running'] for values in (row['HostConfig'].get('PortBindings') or {}).values() for b in values or []}
     for port in ports:
         if str(port) in planned_ports:continue
@@ -144,7 +146,8 @@ def require_unreserved_ports(runtime, ports, retired=None, planned=None):
             if any(str(b.get('HostPort')) in {str(p) for p in ports} for b in bindings or []):
                 binding=retired.get(row.get('Name','').lstrip('/'))
                 if (binding is None or row['Id']!=binding['container_id'] or row['Image']!=binding['image_id']
-                        or spec(row)!=binding['spec_sha256'] or (row['State']['Running'] and row['Id'] not in planned)
+                        or not (spec_matcher(row,binding['spec_sha256']) if spec_matcher is not None
+                            else spec(row)==binding['spec_sha256']) or (row['State']['Running'] and row['Id'] not in planned)
                         or row['HostConfig']['RestartPolicy']['Name']!='no'):
                     raise RuntimeError('detached_port_already_reserved')
 

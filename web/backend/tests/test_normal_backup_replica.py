@@ -80,6 +80,40 @@ class AppendOnlyNormalReplicaTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError,'binding_invalid'):receiver.receive('bad',self.identifier,self.sums,self.uuid)
         self.assertFalse((self.base/'normal-local-production').exists())
 
+    def target_archive(self,schema):
+        manifest=json.loads((self.data/'manifest.json').read_text())
+        manifest['database']['schema_version']=str(schema)
+        (self.data/'manifest.json').write_text(json.dumps(manifest));self.seal()
+        return self.archive()
+
+    def test_exact_schema136_replica_uses_explicit_target_and_preserves_history(self):
+        stream=self.target_archive(136)
+        with patch('normal_backup_replica.sys',SimpleNamespace(stdin=SimpleNamespace(buffer=stream))):
+            report=receiver.receive(self.plan,self.identifier,self.sums,self.uuid,136)
+        self.assertEqual(report['schema'],136);self.assertEqual(report['namespace'],'normal-local-production')
+        self.assertEqual((self.base/'LATEST').read_text(),'historical fixture')
+        self.assertEqual(int(backup_support.verify(Path(report['destination']),dump=False)['database']['schema_version']),136)
+
+    def test_schema136_archive_is_not_silently_accepted_by_legacy115_receiver(self):
+        stream=self.target_archive(136)
+        with patch('normal_backup_replica.sys',SimpleNamespace(stdin=SimpleNamespace(buffer=stream))):
+            with self.assertRaisesRegex(RuntimeError,'backup_identity_changed'):self.receive()
+        self.assertTrue((self.base/'normal-local-production'/self.plan/'incoming').is_dir())
+
+    def test_wrong_target_and_untrusted_namespace_fail_before_effects(self):
+        for schema,namespace in ((116,'normal-local-production'),(True,'normal-local-production'),
+                ('136','normal-local-production'),(136,'../production')):
+            with self.subTest(schema=schema,namespace=namespace):
+                with self.assertRaisesRegex(RuntimeError,'binding_invalid'):
+                    receiver.receive(self.plan,self.identifier,self.sums,self.uuid,schema,namespace)
+        self.assertFalse((self.base/'normal-local-production').exists())
+
+    def test_private_rehearsal_replica_is_separate_from_production_namespace(self):
+        report=receiver.receive(self.plan,self.identifier,self.sums,self.uuid,115,'private-schema136-rehearsal')
+        self.assertEqual(report['namespace'],'private-schema136-rehearsal')
+        self.assertTrue(Path(report['destination']).is_relative_to(self.base/'private-schema136-rehearsal'))
+        self.assertFalse((self.base/'normal-local-production').exists())
+
     def test_insufficient_space_fails_without_publishing_backup(self):
         with patch('normal_backup_replica.shutil.disk_usage',return_value=SimpleNamespace(free=1024)):
             with self.assertRaisesRegex(RuntimeError,'capacity_exceeded'):self.receive()

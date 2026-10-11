@@ -24,7 +24,7 @@ def main() -> None:
     os.environ.update(SAFE_ENVIRONMENT)
     os.execve(
         "/usr/bin/python3",
-        ["/usr/bin/python3", "-I", IMPLEMENTATION, *sys.argv[1:]],
+        ["/usr/bin/python3", "-I", "-B", IMPLEMENTATION, *sys.argv[1:]],
         dict(SAFE_ENVIRONMENT),
     )
 

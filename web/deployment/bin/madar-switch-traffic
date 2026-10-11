@@ -101,6 +101,8 @@ def main() -> int:
 
 def _switch_locked(slot: str) -> int:
     backend, frontend = PORTS[slot]
+    state_root=Path(os.environ['MADAR_DEPLOY_STATE_ROOT'])
+    completed_normal=(state_root/'provider-recovery.json').exists()
     readiness = _read_ready(f"http://127.0.0.1:{backend}/health/ready")
     components = readiness.get("components")
     if not isinstance(components, dict):
@@ -110,11 +112,9 @@ def _switch_locked(slot: str) -> int:
         if value not in {"ok", "disabled", "configured", "not_required", "development"}
     }
     worker_handoff = readiness.get("ready") is not True
-    if worker_handoff and (
-        not degraded or not degraded <= {
-            "notification_worker", "calendar_sync_worker", "data_deletion_worker",
-        }
-    ):
+    allowed={'notification_worker','calendar_sync_worker','data_deletion_worker'}
+    if completed_normal:allowed.add('calendar_sync_queue')
+    if worker_handoff and (not degraded or not degraded <= allowed):
         raise RuntimeError(f"candidate target is not ready: {slot}")
     with urllib.request.urlopen(f"http://127.0.0.1:{frontend}/", timeout=5) as response:
         if response.status != 200:
@@ -123,9 +123,29 @@ def _switch_locked(slot: str) -> int:
     expected_sha = str(expected_identity.get("release_sha") or "")
     if len(expected_sha) != 40 or any(character not in "0123456789abcdef" for character in expected_sha):
         raise RuntimeError("candidate release identity is invalid")
-    if worker_handoff:
+    if worker_handoff or completed_normal:
         authority = load_worker_authority(Path(os.environ["MADAR_DEPLOY_STATE_ROOT"]))
-        if (
+        if completed_normal:
+            from deployment.lib.completed_normal_admission import require_admission,require_candidate_authority,credential_witness
+            from deployment.lib.completed_normal_resources import verify_runtime_binding
+            from deployment.lib.emergency_routing_repair import Runtime
+            contract=require_admission(state_root,expected_sha)
+            if (slot!=contract['candidate']['slot'] or expected_identity.get('release_slot')!=slot
+                    or expected_identity.get('schema_compatible_min')!=115 or expected_identity.get('schema_compatible_max')!=136):
+                raise RuntimeError('completed_normal_traffic_identity_changed')
+            require_candidate_authority(contract,mode='READ_ONLY')
+            publication=credential_witness('candidate_runtime','candidate_runtime_sha256')
+            rows=verify_runtime_binding(contract,publication,Runtime(),state_root)
+            if any(not r['State']['Running'] for r in rows.values()):
+                raise RuntimeError('completed_normal_traffic_runtime_not_running')
+            if _read_json(f'http://127.0.0.1:{backend}/health/recovery')!={'restricted':True,'business_writes_enabled':False}:
+                raise RuntimeError('completed_normal_traffic_candidate_not_fenced')
+            origin_port=PORTS[contract['origin']['slot']][0]
+            origin_version=_read_json(f'http://127.0.0.1:{origin_port}/health/version')
+            if (origin_version.get('release_sha')!=contract['source_roles']['application_sha']
+                    or _read_json(f'http://127.0.0.1:{origin_port}/health/recovery')!={'restricted':True,'business_writes_enabled':False}):
+                raise RuntimeError('completed_normal_traffic_origin_not_fenced')
+        elif (
             authority is None
             or authority.get("owner") != "NONE"
             or authority.get("candidate") != {"sha": expected_sha, "slot": slot}

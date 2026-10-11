@@ -37,7 +37,19 @@ readonly DEPLOY_SCRIPT="${MADAR_PRODUCTION_DEPLOY_BIN:-$CONTROL_ROOT/bin/madar-p
 readonly RELEASE_DEPLOY="${MADAR_RELEASE_DEPLOY_BIN:-$CONTROL_ROOT/bin/madar-release-deploy}"
 readonly STATE_ROOT="${MADAR_DEPLOY_STATE_ROOT:-/var/lib/madar/releases}"
 if [[ -e "$STATE_ROOT/provider-recovery.json" || -L "$STATE_ROOT/provider-recovery.json" ]]; then
-    echo "[madar-auto-deploy] ERROR: provider_recovery_requires_separate_operator_exit" >&2
+    # Historical recovery remains immutable. Admission requires a fresh root
+    # context plus the systemd credential; a NORMAL flag is insufficient.
+    admitted_sha="$(python3 -I -B - "$TRACKED_CONTROL_ROOT" "$STATE_ROOT" <<'PY'
+import pathlib,sys
+sys.path.insert(0,str(pathlib.Path(sys.argv[1]).parent))
+from deployment.lib.completed_normal_admission import require_admission
+print(require_admission(pathlib.Path(sys.argv[2]),None)['candidate']['source_sha'])
+PY
+    )"
+    # Admission does not authorize the ordinary implicit write/worker path.
+    # The root coordinator invokes each fenced phase explicitly, using the
+    # accepted application SHA separately from the installed controller SHA.
+    echo "[madar-auto-deploy] completed_normal_explicit_handoff_required: $admitted_sha" >&2
     exit 1
 fi
 readonly -a RUNTIME_PATHS=(

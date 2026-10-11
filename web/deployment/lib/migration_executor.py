@@ -102,12 +102,14 @@ class LockedMigrationExecutor:
         state_file: Path,
         backup_dir: Path,
         backup_verifier: Callable[[Path], None],
+        failure_formatter: Callable[[Exception], str] | None = None,
     ):
         self.connection_factory = connection_factory
         self.manifest = manifest
         self.state_file = state_file
         self.backup_dir = backup_dir
         self.backup_verifier = backup_verifier
+        self.failure_formatter = failure_formatter or (lambda error: str(error)[:160])
 
     @staticmethod
     def _checksum(path: Path) -> str:
@@ -211,14 +213,12 @@ class LockedMigrationExecutor:
 
             state.update(
                 status="failed",
-                failure_code=str(error)[:160],
+                failure_code=self.failure_formatter(error),
                 failed_at=utc_now(),
             )
 
             if rollback_error is not None:
-                state["rollback_failure_code"] = str(
-                    rollback_error
-                )[:160]
+                state["rollback_failure_code"] = self.failure_formatter(rollback_error)
 
             atomic_json(self.state_file, state)
             raise

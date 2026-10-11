@@ -14,6 +14,135 @@ from deployment.lib.provider_recovery_runtime import protected,readonly_configur
 
 BASE=Path('/var/lib/madar-control-plane/normal-local-preparation')
 
+def compatible_package(package,source_hash,plan_hash):
+    """Measure frozen package DATA from either source or installed layout."""
+    from deployment.lib.completed_normal_admission import encoded
+    if (not re.fullmatch('[0-9a-f]{64}',str(source_hash))
+            or not re.fullmatch('[0-9a-f]{64}',str(plan_hash))
+            or package!=BASE/('normal-source-'+source_hash)):
+        raise RuntimeError('completed_compatible_package_invalid')
+    def frozen(path):
+        path=protected(path,private=True)
+        if path.stat().st_mode&0o277:raise RuntimeError('completed_compatible_package_not_frozen')
+        return path
+    manifest_body=frozen(package/'source-bundle.json').read_bytes()
+    plan_body=frozen(package/'plan.json').read_bytes()
+    manifest=json.loads(manifest_body);document=json.loads(plan_body)
+    if (hashlib.sha256(manifest_body).hexdigest()!=source_hash or hashlib.sha256(plan_body).hexdigest()!=plan_hash
+            or encoded(manifest)!=manifest_body or encoded(document)!=plan_body
+            or manifest.get('version')!=1 or document.get('source_bundle_sha256')!=source_hash
+            or manifest.get('source_sha')!=document.get('controller_source_sha')):
+        raise RuntimeError('completed_compatible_package_changed')
+    source=package/'source';files=manifest.get('files',{})
+    actual={p.relative_to(source).as_posix() for p in source.rglob('*') if p.is_file() or p.is_symlink()}
+    if not files or set(files)!=actual:raise RuntimeError('completed_compatible_inventory_changed')
+    for relative,expected in files.items():
+        path=Path(relative)
+        if (path.is_absolute() or '..' in path.parts or path.as_posix()!=relative
+                or path.suffix in {'.pyc','.pyo'} or file_digest(frozen(source/path))!=expected):
+            raise RuntimeError('completed_compatible_package_bytes_changed')
+    return document,source
+
+def seal_compatible_release(contract, root, state_root):
+    """Link current mutable release state to genuine immutable completion DATA."""
+    from deployment.lib.completed_normal_admission import digest
+    from deployment.lib.control_plane_upgrade import atomic_json
+    if __import__('os').geteuid()!=0:
+        raise RuntimeError('completed_compatible_root_required')
+    root=Path(root);state_path=Path(state_root)/'state.json'
+    completion=protected(root/'normal-completion.json',private=True)
+    value=json.loads(completion.read_text());candidate=contract['candidate']
+    if (root.name!=digest(contract) or value.get('context_sha256')!=root.name
+            or value.get('mode')!='NORMAL' or value.get('schema')!=136
+            or value.get('application_sha')!=candidate['source_sha']
+            or value.get('controller_sha')!=candidate['controller_sha']):
+        raise RuntimeError('completed_compatible_completion_invalid')
+    state=json.loads(readonly_configuration(state_path,private=True).read_text())
+    known=state.get('known_good_release') or {}
+    if (state.get('active_slot')!=candidate['slot'] or known.get('slot')!=candidate['slot']
+            or known.get('sha')!=candidate['source_sha'] or known.get('schema')!=136
+            or state.get('in_progress_release') or state.get('rollback_failure')
+            or 'completed_normal_upgrade' in known):
+        raise RuntimeError('completed_compatible_release_state_invalid')
+    known['completed_normal_upgrade']={'context_sha256':root.name,'completion_sha256':file_digest(completion)}
+    stat=state_path.stat()
+    atomic_json(state_path,state,owner=(stat.st_uid,stat.st_gid))
+
+def attest_compatible_runtime(operations,state,production_sha,installed_sha):
+    """Read-only attestation of the ordinary release after admitted completion.
+
+    A mutable state marker selects a protected record; it supplies no authority.
+    The original receipt, full frozen bytes, installed tree, genuine SQL record,
+    boot controls, current grant and exact runtime all remain mandatory.
+    """
+    from deployment.lib.completed_normal_admission import ADMISSIONS,OPERATION,digest,verify_history
+    from deployment.lib.completed_normal_boot_installation import CompletedNormalBootInstallation
+    from deployment.lib.completed_normal_boot_actor import verify_live_configuration
+    from deployment.lib.completed_normal_database import observe_native,require_normal_migration_boundary
+    from deployment.lib.compatible_normal_boot import CompatibleNormalBoot
+    from deployment.lib.emergency_routing_repair import Runtime
+    from deployment.lib.active_recovery_inputs import controller_tree_digest
+    known=state.get('known_good_release') or {};marker=known.get('completed_normal_upgrade')
+    if (not isinstance(marker,dict) or set(marker)!={'context_sha256','completion_sha256'}
+            or any(not re.fullmatch('[0-9a-f]{64}',str(v)) for v in marker.values())):
+        raise RuntimeError('completed_compatible_marker_invalid')
+    root=ADMISSIONS/marker['context_sha256']
+    authorization=json.loads(protected(root/'operator-authorization.json',private=True).read_text())
+    source_hash=authorization.get('source_bundle_sha256');plan_hash=authorization.get('plan_sha256')
+    package=BASE/('normal-source-'+str(source_hash))
+    document,source=compatible_package(package,source_hash,plan_hash)
+    contract=dict(document['admission_contract'],plan_sha256=digest(document));candidate=contract['candidate']
+    expected_authorization={'operation':OPERATION,'context_sha256':digest(contract),'plan_sha256':digest(document),
+        'source_bundle_sha256':document['source_bundle_sha256'],'controller_sha':candidate['controller_sha'],
+        'application_sha':candidate['source_sha']}
+    def guard():
+        if (digest(contract)!=root.name or authorization!=expected_authorization
+                or json.loads(protected(root/'operator-authorization.json',private=True).read_text())!=authorization
+                or compatible_package(package,source_hash,plan_hash)!=(document,source)
+                or production_sha!=installed_sha or installed_sha!=candidate['controller_sha']
+                or operations.repository_head()!=production_sha or operations.installed_sha()!=installed_sha
+                or controller_tree_digest()!=candidate['controller_tree_sha256']):
+            raise RuntimeError('completed_compatible_controller_changed')
+        verify_live_configuration(document);verify_history(contract)
+        admission=json.loads(protected(root/'admission.json').read_text())
+        if admission.get('operation')!=OPERATION or admission.get('contract')!=contract:
+            raise RuntimeError('completed_compatible_admission_changed')
+    guard()
+    body=protected(root/'normal-completion.json',private=True)
+    completion=json.loads(body.read_text())
+    if (file_digest(body)!=marker['completion_sha256'] or completion.get('operation')!=OPERATION
+            or completion.get('context_sha256')!=root.name or completion.get('schema')!=136
+            or completion.get('mode')!='NORMAL' or completion.get('controller_sha')!=installed_sha
+            or completion.get('application_sha')!=candidate['source_sha']
+            or completion.get('images')!=candidate['images'] or completion.get('customer_database_restored') is not False
+            or known.get('sha')!=candidate['source_sha'] or known.get('slot')!=candidate['slot']
+            or state.get('active_slot')!=candidate['slot'] or known.get('schema')!=136
+            or known.get('schema_compatible_min')!=115 or known.get('schema_compatible_max')!=136
+            or state.get('in_progress_release') or state.get('rollback_failure')):
+        raise RuntimeError('completed_compatible_release_changed')
+    for kind in ('backend','frontend','worker'):
+        if (known.get('images') or {}).get(kind)!=document['application_artifacts'][kind]:
+            raise RuntimeError('completed_compatible_images_changed')
+    backup=json.loads(protected(root/'post-migration-backup.json',private=True).read_text())
+    if (completion.get('backup')!=backup or backup.get('schema')!=136
+            or backup.get('restore',{}).get('status')!='logical_database_and_file_restore_passed'
+            or backup.get('restore',{}).get('backup_schema')!=136
+            or backup.get('node1',{}).get('checksum_exit_code')!=0):
+        raise RuntimeError('completed_compatible_backup_changed')
+    CompletedNormalBootInstallation(contract,document,package,guard,operations).installed()
+    runtime=Runtime();schema=observe_native(contract,runtime)
+    require_normal_migration_boundary(contract,schema,root,operations.state_root)
+    def forbidden(*args,**kwargs):raise RuntimeError('completed_compatible_readonly_effect_forbidden')
+    kernel=CompatibleNormalBoot(contract,source_guard=guard,native_verifier=lambda:observe_native(contract,runtime),
+        publish_authority=forbidden,compensate_current_data=forbidden,runtime=runtime,state_root=operations.state_root)
+    kernel.round(normal=True)
+    runtime_record=json.loads(protected(root/'candidate-runtime.json',private=True).read_text())
+    if known.get('worker_generation')!=runtime_record['worker_generation']:
+        raise RuntimeError('completed_compatible_worker_generation_changed')
+    guard()
+    return {'application_sha':candidate['source_sha'],'controller_sha':installed_sha,'completion_root':str(root),
+        'completion_sha256':marker['completion_sha256'],'completed_compatible_upgrade':True,'schema':schema}
+
 def historical_source(plan):
     """Measure old frozen bytes as DATA, without importing historical code."""
     package=BASE/('normal-source-'+plan.source_bundle_sha256)
@@ -114,7 +243,19 @@ def attest_runtime(operations,state):
     root=Path(binding['completion_root']);plan=load_saved_resumption_plan(root)
     source=SimpleNamespace(verify=lambda:historical_source(plan))
     actor=ActiveRecoveryBootActor(plan,root,BASE/('normal-source-'+plan.source_bundle_sha256),source=source)
-    actor.assemble();actor.completed_evidence();actor.kernel.normal()
+    actor.assemble();bind_origin_specification_verifiers(actor)
+    actor.completed_evidence();actor.kernel.normal()
     if discover_split(operations,state,operations.repository_head(),operations.installed_sha())!=binding:
         raise RuntimeError('completed_normal_runtime_source_changed')
     return binding
+
+def bind_origin_specification_verifiers(actor):
+    """Use the bounded unordered-mount comparator only for measured origin IDs.
+
+    Historical raw hashes remain unchanged. The ordinary old continuation keeps
+    its strict default; this new source-bound admission/boot path opts in after
+    assembling the protected completed origin, not an arbitrary new candidate.
+    """
+    from deployment.lib.completed_normal_resources import origin_spec_matches
+    actor.kernel.spec_matcher=origin_spec_matches
+    actor.workers.spec_matcher=origin_spec_matches

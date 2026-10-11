@@ -273,6 +273,16 @@ class DockerGitOperations:
             frontend_tag, sha,
             expected_labels={"com.madar.frontend.api_origin": frontend_api_url},
         )
+        admission = getattr(self, "completed_normal_admission", None)
+        if admission is not None:
+            candidate = admission["candidate"]
+            if (candidate["source_sha"] != sha or candidate["slot"] != slot
+                    or existing_backend is None or existing_frontend is None
+                    or existing_backend[0].split("@", 1)[-1] != candidate["images"]["backend"]
+                    or existing_frontend[0].split("@", 1)[-1] != candidate["images"]["frontend"]):
+                # Accepted artifacts are immutable inputs to this operation.
+                # Missing/changed tags cannot silently trigger another build.
+                raise RuntimeError("completed_normal_accepted_artifact_changed")
         if existing_backend and existing_frontend:
             if existing_backend[1] != existing_frontend[1]:
                 raise RuntimeError("release_artifact_timestamp_mismatch")
@@ -318,6 +328,11 @@ class DockerGitOperations:
         )
 
     def schema_version(self) -> int:
+        admission=getattr(self,"completed_normal_admission",None)
+        if admission is not None:
+            from deployment.lib.completed_normal_database import observe_native
+            from deployment.lib.emergency_routing_repair import Runtime
+            return observe_native(admission,Runtime())
         url = os.environ["SUPABASE_URL"].rstrip("/") + "/rest/v1/application_schema_state?select=schema_version&contract_key=eq.core&limit=1"
         key = os.environ["SUPABASE_SERVICE_KEY"]
         request = urllib.request.Request(url, headers=supabase_server_headers(key))
@@ -445,7 +460,7 @@ class DockerGitOperations:
             return str(known_good["worker_generation"])
         try:
             prepared = json.loads(
-                prepared_release_path(self.state_root).read_text(encoding="utf-8")
+                prepared_release_path(self.state_root,self).read_text(encoding="utf-8")
             )
         except (OSError, ValueError):
             prepared = {}
@@ -573,6 +588,47 @@ class DockerGitOperations:
             env["CALENDAR_FEATURE_ENABLED"] = "false"
             env["CALENDAR_SYNC_REQUIRED"] = "false"
         env["MADAR_STORAGE_ROOT"] = str(self._storage_root())
+        rendering = getattr(self, "read_only_model_contract", None)
+        admission = rendering if rendering is not None else getattr(self, "completed_normal_admission", None)
+        if admission is not None:
+            from deployment.lib.completed_normal_admission import ADMISSIONS, digest, require_admission, require_candidate_authority, validate_contract
+            if rendering is not None:validate_contract(rendering)
+            elif require_admission(self.state_root, sha) != admission:
+                raise RuntimeError("completed_normal_admission_changed")
+            if (slot != admission["candidate"]["slot"]
+                    or any(str(images.get(key, "")).split("@", 1)[-1] != admission["candidate"]["images"][key]
+                           for key in ("backend", "frontend"))
+                    or str(images.get("worker", "")).split("@", 1)[-1] != admission["candidate"]["images"]["backend"]):
+                raise RuntimeError("completed_normal_accepted_artifact_changed")
+            context = digest(admission)
+            if rendering is None:require_candidate_authority(admission)
+            from deployment.lib.completed_normal_resources import allocation
+            selected = allocation(admission,slot)
+            env.update({
+                # Accepted artifacts are immutable inputs, including Redis.
+                # Do not resolve mutable tags again at the create boundary.
+                "MADAR_BACKEND_IMAGE":images['backend'],
+                "MADAR_FRONTEND_IMAGE":images['frontend'],
+                "MADAR_REDIS_IMAGE":admission['candidate']['redis_image'],
+                # The completed continuation's running release uses the
+                # genuine ordinary marker. Its historical production.env
+                # retains the obsolete provider preparation path, which is
+                # neither mounted nor current in this Compose release.
+                "BACKUP_FRESHNESS_MARKER":"/var/lib/madar/backup-state/latest.json",
+                "MADAR_BUSINESS_WRITE_AUTHORITY": "/run/madar/business-write-authority/authority.json",
+                "MADAR_BUSINESS_WRITE_CONTRACT": context,
+                "MADAR_BUSINESS_WRITE_AUTHORITY_ROOT": str(ADMISSIONS / context / "write-authority"),
+                "MADAR_CONTAINER_PREFIX":selected['prefix'],
+                "MADAR_REDIS_BIND_PORT":selected['ports']['redis'],
+                "MADAR_DEFAULT_SUBNET":selected['subnets']['default'],
+                "MADAR_PARSER_SUBNET":selected['subnets']['parser'],
+                "MADAR_REMOTE_INTERNAL_SUBNET":selected['subnets']['remote_internal'],
+                "MADAR_REMOTE_EGRESS_SUBNET":selected['subnets']['remote_egress'],
+                "MADAR_ALLOCATION_DEFAULT_NETWORK":selected['networks']['default'],
+                "MADAR_ALLOCATION_PARSER_NETWORK":selected['networks']['parser'],
+                "MADAR_ALLOCATION_REMOTE_INTERNAL_NETWORK":selected['networks']['remote_internal'],
+                "MADAR_ALLOCATION_REMOTE_EGRESS_NETWORK":selected['networks']['remote_egress'],
+            })
         return env
 
     def _supabase_client_files(self) -> list[str]:
@@ -608,6 +664,11 @@ class DockerGitOperations:
     ) -> None:
         if self.release_root is None:
             raise RuntimeError("release_source_not_prepared")
+        rendering=getattr(self,'read_only_model_contract',None)
+        if rendering is not None and args!=('config','--format','json'):
+            # Pure preauthorization rendering cannot create/start/recreate,
+            # delete, exec, or otherwise mutate a Docker resource.
+            raise RuntimeError('completed_model_render_mutation_denied')
         web = self.release_root / "web"
         files = ["-f", str(self.compose_file or (web / "docker-compose.yml"))]
         override = os.getenv("MADAR_COMPOSE_OVERRIDE", "").strip()
@@ -616,11 +677,17 @@ class DockerGitOperations:
         elif self.compose_file is None:
             files.extend(["-f", str(WEB_ROOT / "deployment" / "docker-compose.release.yml")])
         files.extend(self._supabase_client_files())
+        if rendering is not None or getattr(self, "completed_normal_admission", None) is not None:
+            files.extend(["-f", str(WEB_ROOT / "deployment/docker-compose.write-authority.yml")])
         profiles = ["--profile", "workers"]
         if self.schema_version() >= 83:
             profiles.extend(["--profile", "deletion-worker"])
+        project=f"{self.project_prefix}-{slot}"
+        if rendering is not None or getattr(self,"completed_normal_admission",None) is not None:
+            from deployment.lib.completed_normal_resources import allocation
+            project=allocation(rendering or self.completed_normal_admission,slot)['project']
         self.run([
-            "docker", "compose", "--project-name", f"{self.project_prefix}-{slot}",
+            "docker", "compose", "--project-name", project,
             "--project-directory", str(web), "--env-file", str(self.env_file),
             *files, *profiles, *args,
         ], cwd=web, env=self._environment(sha, slot, images, workers_active=workers_active))
@@ -628,6 +695,18 @@ class DockerGitOperations:
     def preflight(self, sha: str, slot: str, images: dict[str, str], schema: int) -> None:
         if self.release_root is None:
             raise RuntimeError("release_source_not_prepared")
+
+        if getattr(self, "completed_normal_admission", None) is not None:
+            from deployment.lib.completed_normal_admission import require_candidate_authority
+            require_candidate_authority(self.completed_normal_admission)
+            state=_json_file(self.state_root/'state.json','release_state_invalid')
+            known=state.get('known_good_release') or {}
+            if known.get('sha')==sha and known.get('slot')==slot and state.get('active_slot')==slot:
+                require_candidate_authority(self.completed_normal_admission)
+                self.verify_completed_normal_runtime(slot)
+            else:
+                require_candidate_authority(self.completed_normal_admission, mode="READ_ONLY")
+                self.verify_completed_normal_allocation(slot)
 
         candidate_compatibility = Compatibility.load(
             self.release_root / "web/deployment/releases" / self.metadata_filename
@@ -666,6 +745,8 @@ class DockerGitOperations:
         with runtime_mutation_lock(self.state_root):
             if self._loaded_serving_slot() == slot:
                 raise RuntimeError("runtime_mutation_target_is_serving")
+            if getattr(self,"completed_normal_admission",None) is not None:
+                self.verify_completed_normal_allocation(slot)
             self._inhibit_worker_slot(slot)
             self._compose(
                 # Stage the backend with its final worker requirements. Core
@@ -677,9 +758,30 @@ class DockerGitOperations:
                 "remote-ingestion-worker", "backend", "frontend",
                 workers_active=True,
             )
+            if getattr(self,'completed_normal_admission',None) is not None:
+                # Final-spec standby identities exist before the root model
+                # attestation; they cannot consume before singleton handoff.
+                self._compose(sha,slot,images,'create','--no-build','--no-recreate',
+                    'notification-worker','calendar-sync-worker','data-deletion-worker',workers_active=True)
 
     def activate_workers(self, sha: str, slot: str, images: dict[str, str]) -> None:
         self._require_worker_authority(sha, slot)
+        if getattr(self,'completed_normal_admission',None) is not None:
+            from deployment.lib.completed_normal_admission import credential_witness,require_candidate_authority
+            from deployment.lib.completed_normal_resources import verify_runtime_binding
+            from deployment.lib.emergency_routing_repair import Runtime
+            runtime=Runtime();record=credential_witness('candidate_stage','candidate_stage_sha256')
+            with runtime_mutation_lock(self.state_root):
+                require_candidate_authority(self.completed_normal_admission,mode='READ_ONLY')
+                rows=verify_runtime_binding(self.completed_normal_admission,record,runtime,self.state_root)
+                if any(rows[k]['State'].get('Status')!='created' or rows[k]['State']['Running']
+                        for k in ('notification-worker','calendar-sync-worker','data-deletion-worker')):
+                    raise RuntimeError('completed_normal_standby_lifecycle_changed')
+                for kind in ('notification-worker','calendar-sync-worker','data-deletion-worker'):
+                    # Recheck under the same lock before each exact-ID start.
+                    verify_runtime_binding(self.completed_normal_admission,record,runtime,self.state_root)
+                    runtime.command(['docker','start',rows[kind]['Id']])
+            return
         services = ["notification-worker", "calendar-sync-worker"]
         if self.schema_version() >= 83:
             services.append("data-deletion-worker")
@@ -699,6 +801,11 @@ class DockerGitOperations:
         """Recreate only active services whose runtime environment is mutable."""
 
         self._require_worker_authority(sha, slot)
+        if getattr(self,'completed_normal_admission',None) is not None:
+            # The compatible standbys already have their final immutable
+            # configuration. Recreating them would invalidate boot identity.
+            self.verify_completed_normal_runtime(slot)
+            return
         services = ["parser-worker", "notification-worker", "calendar-sync-worker"]
         if self.schema_version() >= 83:
             services.append("data-deletion-worker")
@@ -713,13 +820,59 @@ class DockerGitOperations:
             self._require_worker_authority(sha, slot)
             self._require_other_worker_slot_inactive(slot)
 
+    def verify_completed_normal_allocation(self,slot):
+        from deployment.lib.completed_normal_resources import verify_allocation
+        from deployment.lib.emergency_routing_repair import Runtime
+        return verify_allocation(self.completed_normal_admission,slot,Runtime())
+
+    def verify_completed_normal_runtime(self,slot):
+        from deployment.lib.completed_normal_admission import credential_witness
+        from deployment.lib.completed_normal_resources import verify_runtime_binding
+        from deployment.lib.emergency_routing_repair import Runtime
+        if slot!=self.completed_normal_admission['candidate']['slot']:
+            raise RuntimeError('completed_normal_runtime_slot_changed')
+        record=credential_witness('candidate_runtime','candidate_runtime_sha256')
+        return verify_runtime_binding(self.completed_normal_admission,record,Runtime(),self.state_root)
+
+    def require_completed_normal_standbys(self,prepared):
+        from deployment.lib.completed_normal_admission import credential_witness,require_candidate_authority
+        from deployment.lib.completed_normal_resources import verify_runtime_resources
+        from deployment.lib.emergency_routing_repair import Runtime
+        contract=self.completed_normal_admission
+        require_candidate_authority(contract,mode='READ_ONLY')
+        record=credential_witness('candidate_stage','candidate_stage_sha256')
+        expected=hashlib.sha256(f"bootstrap:{prepared['release_sha']}:{prepared['candidate_slot']}:{prepared.get('prepared_at','')}".encode()).hexdigest()
+        if record.get('worker_generation')!=expected:
+            raise RuntimeError('completed_normal_standby_generation_changed')
+        rows=verify_runtime_resources(contract,record,Runtime())
+        if any(rows[k]['State'].get('Status')!='created' or rows[k]['State']['Running']
+                for k in ('notification-worker','calendar-sync-worker','data-deletion-worker')):
+            raise RuntimeError('completed_normal_standby_lifecycle_changed')
+
     def _worker_names(self, slot: str) -> list[str]:
         prefix = getattr(self, "container_prefix", "madar")
+        admission=getattr(self,"completed_normal_admission",None)
+        if admission is not None and slot==admission['candidate']['slot']:
+            from deployment.lib.completed_normal_resources import allocation
+            prefix=allocation(admission,slot)['prefix']
         return [
             f"{prefix}-{slot}-notification-worker",
             f"{prefix}-{slot}-calendar-sync-worker",
             f"{prefix}-{slot}-data-deletion-worker",
         ]
+
+    def require_completed_normal_origin_fenced(self) -> None:
+        admission = getattr(self, "completed_normal_admission", None)
+        if admission is None:
+            raise RuntimeError("completed_normal_admission_required")
+        roles, origin = admission["source_roles"], admission["origin"]
+        base = "http://127.0.0.1:" + SLOT_PORTS[origin["slot"]]["backend"]
+        version = self._json(base + "/health/version")
+        if (version.get("release_sha") != roles["application_sha"]
+                or version.get("release_slot") != origin["slot"]
+                or version.get("schema_compatible_min") != 115 or version.get("schema_compatible_max") != 115
+                or self._json(base + "/health/recovery") != {"restricted":True,"business_writes_enabled":False}):
+            raise RuntimeError("completed_normal_origin_write_fence_required")
 
     def deactivate_workers(self, release: dict) -> None:
         slot = str(release.get("slot") or "")
@@ -972,6 +1125,11 @@ class DockerGitOperations:
     ) -> None:
         """Validate serving identity while allowing only refreshable outages."""
 
+        if getattr(self,'completed_normal_admission',None) is not None:
+            self.verify_completed_normal_runtime(slot)
+            self.validate_candidate_core(sha,slot)
+            return
+
         backend_id = self._recorded_image_id(images, "backend")
         frontend_id = self._recorded_image_id(images, "frontend")
         worker_id = self._recorded_image_id(images, "worker")
@@ -1155,6 +1313,26 @@ class DockerGitOperations:
                 raise RuntimeError("candidate_core_frontend_unavailable")
             self._validate_frontend_api_origin(frontend_base, response.read())
 
+    def validate_completed_normal_read_only_serving(self,sha:str,slot:str)->None:
+        """Migration refresh precedes the root target-schema NORMAL grant."""
+        from deployment.lib.completed_normal_admission import require_candidate_authority
+        from deployment.lib.emergency_routing_repair import Runtime
+        contract=getattr(self,'completed_normal_admission',None)
+        if (contract is None or sha!=contract['candidate']['source_sha'] or slot!=contract['candidate']['slot']):
+            raise RuntimeError('completed_normal_read_only_refresh_binding_invalid')
+        require_candidate_authority(contract,mode='READ_ONLY')
+        self.verify_completed_normal_runtime(slot)
+        self.validate_candidate_core(sha,slot)
+        runtime=Runtime()
+        for base in ('http://127.0.0.1:8001','http://127.0.0.1:3000/api'):
+            version=runtime.json_http(base+'/health/version')
+            if (version.get('release_sha')!=sha or version.get('release_slot')!=slot
+                    or version.get('schema_compatible_min')!=115 or version.get('schema_compatible_max')!=136
+                    or runtime.json_http(base+'/health/recovery')!={'restricted':True,'business_writes_enabled':False}):
+                raise RuntimeError('completed_normal_read_only_refresh_serving_changed')
+            runtime.denied(base)
+        runtime.http_status('http://127.0.0.1:3000/')
+
     def validate_rollback_target(self, release: dict, schema: int) -> dict[str, int]:
         slot = str(release.get("slot") or "")
         expected_sha = str(release.get("sha") or "")
@@ -1218,6 +1396,10 @@ class DockerGitOperations:
             self._stop_candidate_locked(slot)
 
     def _stop_candidate_locked(self, slot: str) -> None:
+        if getattr(self,'completed_normal_admission',None) is not None:
+            # Root owns the source/model-bound compensation and durable boot
+            # target. Never destroy candidate/network/evidence via generic down.
+            raise RuntimeError('completed_normal_compensation_requires_root')
         # Only the isolated inactive Compose project is removed. Images and the
         # retained active target are deliberately untouched.
         files = ["-f", str(self.compose_file or (self.release_root / "web/docker-compose.yml"))]
@@ -1245,7 +1427,11 @@ class DockerGitOperations:
         ], env=environment)
 
 
-def prepared_release_path(state_root: Path) -> Path:
+def prepared_release_path(state_root: Path, operations=None) -> Path:
+    admission=getattr(operations,'completed_normal_admission',None)
+    if admission is not None:
+        from deployment.lib.completed_normal_admission import prepared_path
+        return prepared_path(admission,state_root)
     return state_root / "prepared-release.json"
 
 
@@ -1320,7 +1506,7 @@ def prepare_release(
             sha=sha, schema=schema, compatibility=compatibility,
             operations=operations,
         )
-        path = prepared_release_path(state_root)
+        path = prepared_release_path(state_root,operations)
         record: dict
         if path.exists():
             try:
@@ -1394,9 +1580,9 @@ def prepare_release(
         return record
 
 
-def load_prepared_release(state_root: Path, sha: str, slot: str) -> dict:
+def load_prepared_release(state_root: Path, sha: str, slot: str, operations=None) -> dict:
     try:
-        record = json.loads(prepared_release_path(state_root).read_text(encoding="utf-8"))
+        record = json.loads(prepared_release_path(state_root,operations).read_text(encoding="utf-8"))
     except (OSError, ValueError) as error:
         raise RuntimeError("prepared_release_missing_or_invalid") from error
     if record.get("release_sha") != sha or record.get("candidate_slot") != slot:
@@ -1411,32 +1597,67 @@ def load_prepared_release(state_root: Path, sha: str, slot: str) -> dict:
 def activate_prepared_release(
     *, sha: str, slot: str, state_root: Path, operations: DockerGitOperations,
 ) -> dict:
-    record = load_prepared_release(state_root, sha, slot)
+    record = load_prepared_release(state_root, sha, slot, operations)
     operations.verify_source(sha)
     validate_core = getattr(
         operations, "validate_candidate_core", operations.validate_candidate,
     )
     validate_core(sha, slot)
     other_slot = "green" if slot == "blue" else "blue"
+    admission = getattr(operations, "completed_normal_admission", None)
+    old_identity = {"sha": sha, "slot": other_slot}
+    if admission is not None:
+        from deployment.lib.completed_normal_admission import require_candidate_authority
+        require_candidate_authority(admission, mode="READ_ONLY")
+        existing = _json_file(state_root / "state.json", "release_state_invalid")
+        known = existing.get("known_good_release") or {}
+        if (existing.get("active_slot") != admission["origin"]["slot"]
+                or known.get("sha") != admission["source_roles"]["application_sha"]
+                or known.get("slot") != other_slot or known.get("schema") != 115
+                or existing.get("in_progress_release") or existing.get("rollback_failure")):
+            raise RuntimeError("completed_normal_origin_handoff_changed")
+        candidate = {"sha": sha, "slot": slot, "images": record["images"]}
+        if operations.worker_ownership(known, candidate) != "old":
+            raise RuntimeError("completed_normal_origin_worker_ownership_changed")
+        old_identity = {"sha": known["sha"], "slot": other_slot}
+        # Fence/authority publication by root must precede this boundary. The
+        # madar runtime mutator cannot grant either generation business writes.
+        require_origin_fenced = getattr(operations, "require_completed_normal_origin_fenced", None)
+        if not callable(require_origin_fenced):
+            raise RuntimeError("completed_normal_origin_write_fence_required")
+        require_origin_fenced()
+        operations.require_completed_normal_standbys(record)
+        write_worker_authority(state_root,generation=hashlib.sha256(
+            f"bootstrap:{sha}:{slot}:{record.get('prepared_at', '')}".encode()).hexdigest(), owner="NONE",
+            old=old_identity,candidate={"sha":sha,"slot":slot})
+        operations.deactivate_workers(known)
+        if operations.worker_ownership(known,candidate) != "none":
+            raise RuntimeError("completed_normal_origin_worker_shutdown_unverified")
     generation = hashlib.sha256(
         f"bootstrap:{sha}:{slot}:{record.get('prepared_at', '')}".encode()
     ).hexdigest()
     write_worker_authority(
         state_root, generation=generation, owner="CANDIDATE",
-        old={"sha": sha, "slot": other_slot},
+        old=old_identity,
         candidate={"sha": sha, "slot": slot},
     )
     record["worker_generation"] = generation
-    atomic_json(prepared_release_path(state_root), record)
+    atomic_json(prepared_release_path(state_root,operations), record)
     try:
         operations.activate_workers(sha, slot, record["images"])
-        operations.validate_candidate(sha, slot)
+        if admission is None:
+            operations.validate_candidate(sha, slot)
+        else:
+            require_candidate_authority(admission, mode="READ_ONLY")
+            operations.validate_candidate_core(sha, slot)
     except Exception:
         operations.deactivate_workers({"sha": sha, "slot": slot, "images": record["images"]})
         raise
     record["status"] = "candidate_workers_active"
+    if admission is not None:
+        record["business_writes"] = "READ_ONLY"
     record["workers_activated_at"] = utc_now().isoformat()
-    atomic_json(prepared_release_path(state_root), record)
+    atomic_json(prepared_release_path(state_root,operations), record)
     return record
 
 
@@ -1444,7 +1665,7 @@ def adopt_prepared_release(
     *, sha: str, slot: str, state_root: Path, compatibility: Compatibility,
     operations: DockerGitOperations,
 ) -> dict:
-    record = load_prepared_release(state_root, sha, slot)
+    record = load_prepared_release(state_root, sha, slot, operations)
     if record.get("status") != "candidate_workers_active":
         raise RuntimeError("prepared_release_workers_not_active")
     state_file = state_root / "state.json"
@@ -1454,7 +1675,18 @@ def adopt_prepared_release(
         existing = {}
     except ValueError as error:
         raise RuntimeError("release_state_invalid") from error
-    if existing.get("known_good_release") or existing.get("in_progress_release"):
+    admission = getattr(operations, "completed_normal_admission", None)
+    if admission is not None:
+        from deployment.lib.completed_normal_admission import require_candidate_authority, digest as admission_digest
+        require_candidate_authority(admission, mode="NORMAL")
+        origin = existing.get("known_good_release") or {}
+        if (origin.get("sha") != admission["source_roles"]["application_sha"]
+                or origin.get("slot") != admission["origin"]["slot"] or origin.get("schema") != 115
+                or existing.get("active_slot") != origin.get("slot")
+                or existing.get("in_progress_release") or existing.get("rollback_failure")
+                or operations.worker_ownership(origin, {"sha":sha,"slot":slot}) != "candidate"):
+            raise RuntimeError("completed_normal_promotion_origin_changed")
+    elif existing.get("known_good_release") or existing.get("in_progress_release"):
         raise RuntimeError("immutable_release_state_already_initialized")
     operations.verify_source(sha)
     operations.validate_candidate(sha, slot)
@@ -1487,15 +1719,55 @@ def adopt_prepared_release(
         "phase": "bootstrap_adopted",
         "completed_at": utc_now().isoformat(),
     }
+    if admission is not None:
+        adopted.update(phase="complete",previous_known_good_release=existing["known_good_release"],
+            previous_traffic_target=existing["active_slot"],worker_generation=record["worker_generation"],
+            context_sha256=admission_digest(admission))
     state = {
         "active_slot": slot,
         "known_good_release": known_good,
         "failed_releases": existing.get("failed_releases") or {},
-        "history": [adopted],
+        "history": [*(existing.get("history") or [])[-49:], adopted],
     }
     atomic_json(state_file, state)
-    prepared_release_path(state_root).unlink()
+    prepared_release_path(state_root,operations).unlink()
     return adopted
+
+
+def publish_prepared_release(*,sha:str,slot:str,state_root:Path,operations:DockerGitOperations)->dict:
+    """Publish an admitted, positively fenced bridge without issuing a grant."""
+    from deployment.lib.completed_normal_admission import require_candidate_authority,digest
+    admission=getattr(operations,'completed_normal_admission',None)
+    if admission is None:raise RuntimeError('completed_normal_publication_admission_required')
+    record=load_prepared_release(state_root,sha,slot,operations)
+    if (record.get('status')!='candidate_workers_active' or record.get('business_writes')!='READ_ONLY'
+            or sha!=admission['candidate']['source_sha'] or slot!=admission['candidate']['slot']):
+        raise RuntimeError('completed_normal_publication_stage_invalid')
+    state=_json_file(state_root/'state.json','release_state_invalid')
+    origin=state.get('known_good_release') or {}
+    if (origin.get('sha')!=admission['source_roles']['application_sha'] or origin.get('schema')!=115
+            or origin.get('slot')!=admission['origin']['slot'] or state.get('active_slot')!=origin['slot']
+            or state.get('in_progress_release') or state.get('rollback_failure')):
+        raise RuntimeError('completed_normal_publication_origin_changed')
+    require_candidate_authority(admission,mode='READ_ONLY')
+    operations.verify_source(sha)
+    operations.require_completed_normal_origin_fenced()
+    if operations.worker_ownership(origin,{'sha':sha,'slot':slot})!='candidate':
+        raise RuntimeError('completed_normal_publication_worker_owner_changed')
+    operations.validate_candidate_core(sha,slot)
+    operations.switch_traffic(slot)
+    operations.validate_candidate_core(sha,slot)
+    identity=operations._json('http://127.0.0.1:8001/health/version')
+    fence=operations._json('http://127.0.0.1:8001/health/recovery')
+    if (identity.get('release_sha')!=sha or identity.get('release_slot')!=slot
+            or identity.get('schema_compatible_min')!=115 or identity.get('schema_compatible_max')!=136
+            or fence!={'restricted':True,'business_writes_enabled':False}):
+        raise RuntimeError('completed_normal_publication_stable_identity_changed')
+    record['traffic_publication']={'operation':'completed-normal-schema115-136-upgrade',
+        'context_sha256':digest(admission),'source_sha':sha,'slot':slot,'business_writes':'READ_ONLY',
+        'observed_at':utc_now().isoformat()}
+    atomic_json(prepared_release_path(state_root,operations),record)
+    return record['traffic_publication']
 
 
 def _refresh_active_runtime(
@@ -1531,8 +1803,11 @@ def _refresh_active_runtime(
     operations.preflight(sha, slot, known_good["images"], schema)
     operations.validate_active_refresh_prerequisites(sha, slot, known_good["images"])
     operations.refresh_active_runtime_services(sha, slot, known_good["images"])
-    operations.validate_candidate(sha, slot)
-    operations.validate_stable_candidate(sha)
+    if getattr(operations,'completed_normal_admission',None) is not None:
+        operations.validate_completed_normal_read_only_serving(sha,slot)
+    else:
+        operations.validate_candidate(sha, slot)
+        operations.validate_stable_candidate(sha)
     known_good["schema"] = schema
     event = {
         "release_sha": sha, "candidate_slot": slot, "traffic_target": slot,
@@ -1730,6 +2005,17 @@ def automatic_migrate_known_good(
     validation. Migration errors are forward-repair events and never enter the
     release promotion rollback state machine.
     """
+    admission=getattr(operations,'completed_normal_admission',None)
+    if admission is not None:
+        from deployment.lib.completed_normal_migration import run_migration
+        operations.verify_source(sha)
+        if (admission['candidate']['source_sha']!=sha or operations.release_root is None
+                or compatibility.schema_min!=115 or compatibility.schema_max!=136 or compatibility.target_schema!=136):
+            raise RuntimeError('completed_migration_release_binding_invalid')
+        # An explicit root-issued current-data backup + native connection lease
+        # replaces neither historical receipts nor the ordinary release path.
+        # Never call the schema115-only fallback or the old backup subprocess.
+        return run_migration(admission,operations.release_root,state_root,operations)
     if len(sha) != 40 or any(char not in "0123456789abcdef" for char in sha):
         raise ValueError("automatic migration release must be a full lowercase Git SHA")
     state_file = state_root / "state.json"
@@ -2115,6 +2401,7 @@ def main() -> int:
     mode.add_argument("--prepare-only", action="store_true", help="Validate an initial inactive candidate without workers or traffic")
     mode.add_argument("--activate-prepared", action="store_true", help="Activate workers for a previously prepared candidate")
     mode.add_argument("--adopt-prepared", action="store_true", help="Adopt a promoted initial candidate as immutable known-good")
+    mode.add_argument("--publish-prepared", action="store_true", help="Publish an admitted READ_ONLY completed-NORMAL bridge")
     mode.add_argument("--refresh-active-workers", action="store_true", help="Refresh the active release after reaching schema 83")
     mode.add_argument(
         "--refresh-active-runtime", action="store_true",
@@ -2131,12 +2418,17 @@ def main() -> int:
     normalized_sha = args.sha.lower()
     if not re.fullmatch(r"[0-9a-f]{40}", normalized_sha):
         raise RuntimeError("candidate_sha_invalid")
-    require_upgrade_authorization(normalized_sha)
     load_production_path_contract()
     repo = Path(os.environ["MADAR_PRODUCTION_REPO"]).resolve()
     state_root = Path(os.environ["MADAR_DEPLOY_STATE_ROOT"]).resolve()
     from deployment.lib.provider_recovery import reject_ordinary_operation
-    reject_ordinary_operation(state_root)
+    admission = None
+    if (state_root / "provider-recovery.json").exists() or (state_root / "provider-recovery.json").is_symlink():
+        from deployment.lib.completed_normal_admission import require_admission
+        admission = require_admission(state_root, normalized_sha)
+    else:
+        require_upgrade_authorization(normalized_sha)
+    reject_ordinary_operation(state_root, normalized_sha)
     env_file = Path(os.environ["MADAR_ENV_FILE"]).resolve()
     if args.refresh_active_workers or args.refresh_active_runtime:
         load_active_runtime_environment(env_file)
@@ -2150,6 +2442,7 @@ def main() -> int:
         repo, state_root, env_file, compatibility,
         metadata_filename=metadata_path.name,
     )
+    operations.completed_normal_admission = admission
     if args.recover_current_schema:
         require_upgrade_authorization(
             normalized_sha,
@@ -2204,6 +2497,11 @@ def main() -> int:
             )
         print(json.dumps(result, indent=2, sort_keys=True))
         return 0
+    if args.publish_prepared:
+        with deployment_lock(state_root):
+            result=publish_prepared_release(sha=normalized_sha,slot=args.slot,state_root=state_root,operations=operations)
+        print(json.dumps(result,indent=2,sort_keys=True))
+        return 0
     if args.refresh_active_workers:
         with deployment_lock(state_root):
             result = refresh_active_workers(
@@ -2220,6 +2518,8 @@ def main() -> int:
             )
         print(json.dumps(result, indent=2, sort_keys=True))
         return 0
+    if admission is not None:
+        raise RuntimeError('completed_normal_explicit_handoff_required')
     deployer = ReleaseDeployer(state_root=state_root, compatibility=compatibility, operations=operations)
     result = deployer.deploy(normalized_sha, manual_retry=args.manual_retry)
     print(json.dumps(result, indent=2, sort_keys=True))

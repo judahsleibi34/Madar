@@ -349,6 +349,14 @@
       ]
     },
     {
+      "path": "web/backend/services/academy_referral_service.py",
+      "boundary": "At schema136+, account receives an authenticated active learning member tenant/user from the player route; attach receives the verified public academy tenant and newly created local membership user from registration. Guarded SQL RPCs enforce matching active tenant membership and referral eligibility. No payouts or payment-provider activation are granted. Reviewed against accepted application 81cebfeb024341cd8d784402ba1f92ed2e63fb3d.",
+      "reviewed_functions": [
+        "account",
+        "attach"
+      ]
+    },
+    {
       "path": "web/backend/services/account_lifecycle_service.py",
       "boundary": "internal_worker_or_authorized_command_with_durable_tenant_context",
       "reviewed_functions": [

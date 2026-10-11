@@ -1,5 +1,175 @@
 # Privileged control-plane upgrade architecture
 
+The compatible boot unit wants the existing proxy and orders itself before it;
+the proxy requires that unit and retains its measured root startup gate. This
+queues a disabled, previously stopped proxy on Docker/host startup without
+changing its original enablement or starting it during installation. A failed
+boot dependency prevents proxy activation. Real cold-boot verification remains
+mandatory; application-only recovery does not establish traffic availability.
+
+The installed upgrade launcher passes both `-I` and `-B` to its implementation,
+so a read-only invocation cannot create bytecode and invalidate the installed
+source fence. Existing historical installed-tree measurements remain unchanged.
+
+After the admitted coordinator completes backup/restore/replication and timer
+activation, it appends a completion selector to current ordinary release state.
+The selector is historical DATA, never new authorization. The read-only upgrade
+attestor resolves sealed candidate IDs rather than conventional container names,
+and validates the root SQL completion rather than inventing automation records.
+
+The compatible proxy drop-in resets only its owned preconditions and prefixes
+the measured root-private gate with systemd `+`. Its inherited madar service
+identity remains unchanged; widening frozen package permissions is forbidden.
+
+Completed-NORMAL preflight independently reads the exact remote main head both
+before and under the upgrade lock. A changed head rejects before quiescing timers
+or installing boot resources. The governed installer still performs and verifies
+the approved fetch; preparation does not refresh production candidate refs.
+
+A completed-NORMAL read-only candidate model may verify frozen Compose inputs
+from the accepted application commit and its three immutable Git tree objects.
+Object hashes and exact paths are checked without fetching production refs.
+Actual staging additionally checks the real fetched deployment Git objects.
+
+The actual installed library inventory includes the admitted forward-resumption
+module. Its isolated import is tested from exactly the installer-selected files;
+development imports alone cannot establish installed SQL-resumption readiness.
+
+Fresh forward-resumption credentials are issued only after root independently
+remeasures the new receipt and private parent records. The deployment child
+verifies protected current-interlock witnesses and its readable executor/owner
+files; it receives no read access to historical root-private directories.
+
+The completed-NORMAL dispatcher exposes separately hash-bound forward-preflight
+and forward-resume modes for an interrupted SQL stage. They neither reinstall
+the controller nor replay the completed-normal authorization. New root receipts
+bind one new child executor record to measured partial data and unchanged runtime
+ownership. Resumption ends on the accepted READ_ONLY bridge at136; subsequent
+NORMAL completion needs its own explicit operation. Historical records survive.
+
+Completed-NORMAL restart measurement accepts only null/empty-list encoding of
+the three default Docker DNS fields, as demonstrated by an actual isolated
+daemon restart. Configured options/search domains remain security-critical.
+Historical specification hashes are compared with bounded default permutations,
+never rewritten.
+
+Completed-NORMAL prepare/activate/publish/adopt stages use a mutable prepared
+record scoped to the complete fresh admission digest. The root staging seal
+reads that same path. A matching application SHA and slot cannot adopt another
+operation’s prepared resources; existing ordinary prepared records stay intact.
+
+The completed-NORMAL root coordinator explicitly uses umask0077 throughout
+execution, including Git staging and installer subprocesses, and restores the
+caller mask afterward. A permissive launcher cannot create0666 contracts or
+0777 staging parents. Existing root-protection checks remain unchanged.
+
+Fresh completed-NORMAL preflight requires the existing root upgrade lock and
+no unrelated volatile upgrade interlock. It executes the real restricted
+read-only backup-context gate before any write grant. A quiesce rejection
+before a durable timer snapshot must preserve its original error and cannot
+attempt timer restoration using nonexistent state.
+
+New completed-NORMAL proxy bindings use the same complete deterministic mount
+measurement as native and candidate resources. Docker inspection order alone
+cannot invalidate a fresh seal; changed identity, mount fields, configuration
+or privileges still fail. Historical proxy measurements remain unchanged.
+
+Completed-NORMAL preflight reads frozen application Compose inputs only after comparing their exact Git blobs with the accepted application revision; it creates no release worktree. Staged validation uses the actual `releases/<application SHA>` deployment worktree. Explicit Compose null command/entrypoint fields inherit exact immutable image defaults; changed or explicit overrides remain checked.
+
+Admission explicitly sets the new nonsecret write-authority directory0755 and
+grant0644 after creation under root's private0077 umask. Historical receipts and
+audits remain private; the application receives only this root-controlled,
+read-only bind mount. An intended mkdir mode alone does not satisfy readability.
+
+Fresh completed-NORMAL native and candidate specification hashes sort Docker's
+unordered mount inventory by its unique destination, preserving every full mount
+object and all other configuration fields. The historical raw hashes stay intact.
+The origin fence may compare at most six unchanged mount objects in their former
+ordering; it never accepts changed paths, permissions, duplicate destinations or
+other specification changes. New sealed records use deterministic measurement.
+Completed-origin admission and superseding boot select this same comparator in
+their original-runtime and worker-owner verifiers. This selection applies only
+to the assembled protected origin inventory; legacy continuation callers retain
+their default comparison. Historical records remain unchanged.
+
+The completed-NORMAL Compose environment binds backup freshness to the existing
+ordinary backup-state mount. The special origin's runtime uses that marker even
+though historical production.env retains a provider-preparation path. The new
+candidate cannot inherit the obsolete, unmounted path; ordinary deployment
+configuration is otherwise unchanged. Actual backup verification remains a gate.
+
+The completed-NORMAL read-only preflight renders the same Compose builder as
+staging. Its preparation context permits only `config --format json`; it cannot
+issue or require a nonexistent pre-approval grant, create containers or run a
+different Compose operation. Rendering does not attest application execution.
+The source115 and target136 ordinary backup publications preserve separate,
+exclusive LATEST preimages. Node 1 reception validates the explicitly bound
+schema (115 or136) and namespace before accepting an archive; private rehearsal
+replicas use a distinct namespace and never become production freshness proof.
+The ordinary backup pipeline retains its production namespace by default. Only
+the isolated rehearsal harness supplies a measured private guard and selects
+the private namespace; Docker-container isolation and the receiver's exact
+namespace are checked. The production coordinator supplies neither override.
+
+The completed-NORMAL exact-resource boot supersession preserves original unit
+files and archives original proxy drop-in bytes in its new root-private audit
+namespace. Systemd dependency directives are additive: empty `Requires=`,
+`After=` or `PartOf=` assignments must not be relied on to remove dependencies.
+The installer removes only literal obsolete actor references from approved
+proxy drop-in preimages, retains unrelated settings and original permissions,
+and restores those exact preimages on installation failure. Old actors are
+disabled and guarded by `RefuseManualStart` and a receipt-bound negative
+condition. The actual loaded fragment/drop-in inventories are attested,
+including rejection of unexpected runtime or vendor overrides. Isolated real
+systemd testing covers initially active legacy actors with Docker `PartOf`
+edges; it does not establish complete application boot acceptance.
+
+Accepted business workers are created without starting during staging. Root
+independently validates their rendered final configuration, images, security,
+network declarations/aliases and intended network objects before sealing their
+identities. The deployment child verifies this sealed witness before retiring
+old workers, publishes exclusive ownership, and starts only those exact IDs.
+RUNNING attachments must acquire their actual network IDs. The existing narrow
+first-start OOM/default-DNS comparator applies only to these worker lifecycles;
+it does not permit arbitrary specification changes. Active compatible services
+are verified without forced recreation, preserving durable boot identities.
+
+Root seals migration intent before SQL. An interrupted chain, including intent
+at115 before the first COMMIT, permits only READ_ONLY bridge recovery. A136
+NORMAL grant additionally requires the actual native136 identity and sealed
+executor/manifest/completion evidence for all21 checksum-pinned migrations.
+The original115 publication/preimages remain unchanged. Revocation precedes
+compensation, and a failed bound-worker stop cannot skip the traffic fence;
+only the exact bound proxy may be stopped if verified maintenance fails.
+
+`completed_normal_admission` provides an explicit, fresh credential-bound
+admission from the completed NORMAL continuation without editing historical
+recovery state. The root issuer independently hashes original private records
+and measures current runtime/customer identities. History directories stay0700:
+only hash-bound admission, live-grant and runtime witnesses reach the madar child
+through existing systemd LoadCredential. They carry no historical bearer tokens.
+The root-private provider record is rehashed before every child credential is
+issued. Its nonsecret inode/device, size, nanosecond change times, owner and mode
+are included in a separately hash-bound witness. The child verifies that exact
+file identity without reading the protected contents or widening permissions.
+Replacement or mutation between issuance and staging fails closed.
+Every privileged phase requires the new controller SHA; the runtime child uses
+the accepted application SHA. Neither revision is fabricated to match the other.
+
+`run_deploy_service` has explicit completed-NORMAL stage modes. The existing
+root-controlled grant is revoked before the worker owner becomesNONE. Old
+consumers stop before the accepted candidate becomes the sole owner. Candidate
+workers and routing remain READ_ONLY until the separately guarded root write
+boundary verifies source, artifacts, boot controls, database and runtime. New
+preimages/publication records are exclusive and original evidence is retained.
+Post-grant failure revokes the new authority before current-data compensation;
+the boundary never restores customer data or automatically regrants the origin.
+
+These components are preparation primitives. They do not constitute an approved
+full upgrade driver or completed boot installation. The exact-resource installer,
+complete private current-data lifecycle and failure matrix, immutable final
+source/plan and explicit operator approval are still required before live use.
+
 The existing root-owned write-authority reader now additionally accepts a fresh
 version2 grant for the exact local115..136 bridge. It requires the exact115/136
 range, an integer observed schema within that range, exact application release
@@ -1181,3 +1351,31 @@ write-authority release, ordinary backups and application acceptance continue to
 bind the unchanged application revision. Existing authorization bytes/digests are
 preserved by omitting an absent controller revision from canonical serialization.
 No acceptance is transferred to another application revision or image.
+
+## Completed-NORMAL worker health activation
+
+The completed-NORMAL runtime sealer distinguishes Docker's first healthcheck
+activation from an identity error. It revalidates the complete rendered model,
+fresh credential and READ_ONLY grant under the deployment lock for at most 180
+seconds. Only `starting` is transient. Changed specifications and unhealthy or
+missing resources fail closed. This follows an actual isolated stop/start
+reproduction; production workers are unchanged during engineering preparation.
+
+The pre-migration boundary also awaits the existing kernel's sustained READ_ONLY
+verification after revocation. Atomic authority publication alone does not prove
+the workers have observed it. Three rounds over at least five seconds and a
+strict 180-second deadline precede backup capture and migration intent. Security
+failures remain immediate, and compensation preserves current data.
+
+The completed-NORMAL backup adapter excludes initdb's reserved `pg_*` roles from
+CREATE ROLE prerequisites. An actual fresh-backup restore demonstrated the
+reserved-role prerequisite failure; filtering those server-owned names permits the
+same immutable backup to restore privately. Application roles remain included.
+This does not change live roles or widen the logical restore's evidence scope.
+
+The measured continuation entrypoint now exposes `preflight` and `execute` in
+addition to durable boot/proxy checks. Both require independent exact-image and
+complete private coordinator evidence; fixture packages are rejected before
+privileged imports. Execute still requires separate exact-package operator
+authorization. Stable-route verification uses three complete rounds spanning
+five seconds within 180 seconds and makes no unsupported live-login claim.
