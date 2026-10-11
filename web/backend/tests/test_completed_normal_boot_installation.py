@@ -39,6 +39,17 @@ class Operations:
         return SimpleNamespace(stdout='')
 
 class CompletedBootInstallationTests(unittest.TestCase):
+    def test_boot_queues_disabled_proxy_only_after_successful_verified_recovery(self):
+        body=m.unit_bytes('/measured/boot').decode()
+        self.assertIn('Wants=madar-release-proxy.service\n',body)
+        self.assertIn('Before=madar-release-proxy.service\n',body)
+        gate=m.proxy_bytes('madar-compatible-normal-boot-test.service','/measured/gate').decode()
+        self.assertIn('Requires=docker.service madar-compatible-normal-boot-test.service\n',gate)
+        self.assertIn('After=docker.service madar-compatible-normal-boot-test.service\n',gate)
+        # Installation queues nothing immediately and preserves the original
+        # disabled proxy activation. Its guarded boot dependency owns recovery.
+        self.assertNotIn('ExecStartPost=',body)
+
     def test_proxy_gate_runs_as_root_without_changing_proxy_service_identity(self):
         body=m.proxy_bytes('madar-compatible-normal-boot-test.service','/usr/bin/python3 /root-private/gate.py').decode()
         self.assertIn('ExecStartPre=+/usr/bin/python3 /root-private/gate.py\n',body)

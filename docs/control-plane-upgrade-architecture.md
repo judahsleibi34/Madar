@@ -1,5 +1,12 @@
 # Privileged control-plane upgrade architecture
 
+The compatible boot unit wants the existing proxy and orders itself before it;
+the proxy requires that unit and retains its measured root startup gate. This
+queues a disabled, previously stopped proxy on Docker/host startup without
+changing its original enablement or starting it during installation. A failed
+boot dependency prevents proxy activation. Real cold-boot verification remains
+mandatory; application-only recovery does not establish traffic availability.
+
 The installed upgrade launcher passes both `-I` and `-B` to its implementation,
 so a read-only invocation cannot create bytecode and invalidate the installed
 source fence. Existing historical installed-tree measurements remain unchanged.

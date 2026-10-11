@@ -22,7 +22,7 @@ DROPINS=UNITS/(PROXY+'.d')
 
 def unit_bytes(command):
     return ('[Unit]\nDescription=Madar accepted schema115..136 boot recovery\n'
-        'Requires=docker.service\nAfter=docker.service\nBefore=madar-release-proxy.service\nPartOf=docker.service\n'
+        'Requires=docker.service\nWants=madar-release-proxy.service\nAfter=docker.service\nBefore=madar-release-proxy.service\nPartOf=docker.service\n'
         '[Service]\nType=oneshot\nRemainAfterExit=yes\nUser=root\nGroup=root\nUMask=0077\n'
         'Environment=PATH=/usr/sbin:/usr/bin:/sbin:/bin\nEnvironment=LANG=C.UTF-8\n'
         'NoNewPrivileges=yes\nTimeoutStartSec=300\nExecStart='+command+'\n'

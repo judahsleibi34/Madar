@@ -1,5 +1,12 @@
 # Madar production release acceptance policy
 
+The compatible boot actor queues the existing proxy through `Wants`, with the
+proxy ordered after and requiring successful verified application recovery.
+It preserves the proxy's original disabled enablement state. A real private
+cold boot otherwise left a manually stopped `unless-stopped` proxy down even
+though the accepted NORMAL application recovered. No failed boot may activate
+traffic through this dependency; the existing root proxy gate still applies.
+
 The installed upgrade launcher runs its implementation with isolated Python
 and bytecode disabled before the first import. An actual private launcher
 execution otherwise changed the measured installed tree during a dry run.
