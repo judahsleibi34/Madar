@@ -39,6 +39,12 @@ class Operations:
         return SimpleNamespace(stdout='')
 
 class CompletedBootInstallationTests(unittest.TestCase):
+    def test_proxy_gate_runs_as_root_without_changing_proxy_service_identity(self):
+        body=m.proxy_bytes('madar-compatible-normal-boot-test.service','/usr/bin/python3 /root-private/gate.py').decode()
+        self.assertIn('ExecStartPre=+/usr/bin/python3 /root-private/gate.py\n',body)
+        self.assertNotIn('User=',body)
+        self.assertNotIn('Group=',body)
+
     def setUp(self):
         self.temp=tempfile.TemporaryDirectory();self.addCleanup(self.temp.cleanup);self.path=Path(self.temp.name)
         self.units=self.path/'units';self.units.mkdir(mode=0o755);self.proxy=self.units/(m.PROXY+'.d');self.proxy.mkdir(mode=0o755)

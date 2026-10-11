@@ -1,5 +1,9 @@
 # Privileged control-plane upgrade architecture
 
+The compatible proxy drop-in resets only its owned preconditions and prefixes
+the measured root-private gate with systemd `+`. Its inherited madar service
+identity remains unchanged; widening frozen package permissions is forbidden.
+
 Completed-NORMAL preflight independently reads the exact remote main head both
 before and under the upgrade lock. A changed head rejects before quiescing timers
 or installing boot resources. The governed installer still performs and verifies

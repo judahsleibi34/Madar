@@ -33,7 +33,7 @@ def proxy_bytes(name,command):
     # CANNOT reset them. Exact earlier preimages are narrowly superseded below.
     # ExecStartPre DOES support reset and replaces only the legacy actor calls.
     return ('[Unit]\nRequires=docker.service '+name+'\nAfter=docker.service '+name+
-        '\n[Service]\nTimeoutStartSec=300\nExecStartPre=\nExecStartPre='+command+'\n').encode()
+        '\n[Service]\nTimeoutStartSec=300\nExecStartPre=\nExecStartPre=+'+command+'\n').encode()
 
 def superseded_dependencies(body,old_units):
     """Remove only literal obsolete unit references, preserving all other bytes."""

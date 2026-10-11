@@ -1,5 +1,10 @@
 # Madar production release acceptance policy
 
+The compatible boot proxy precondition uses systemd's `+` command prefix to
+run the measured root-private gate as root. The proxy service itself retains
+its existing madar identity. A real isolated Docker restart exposed the
+unprivileged precondition failure; package protections must not be relaxed.
+
 Completed-NORMAL preflight independently reads the exact remote main head both
 before and under the upgrade lock. A changed head rejects before quiescing timers
 or installing boot resources. The governed installer still performs and verifies
