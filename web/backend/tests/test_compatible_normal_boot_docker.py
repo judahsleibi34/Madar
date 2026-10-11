@@ -21,7 +21,8 @@ WEB=Path(os.getenv('MADAR_TEST_REPOSITORY_ROOT') or Path(__file__).resolve().par
 sys.path.insert(0,str(WEB))
 from deployment.lib import compatible_normal_boot as m
 from deployment.lib import completed_normal_admission as admission
-from deployment.lib.emergency_routing_repair import Runtime,spec
+from deployment.lib.emergency_routing_repair import Runtime
+from deployment.lib.completed_normal_resources import measured_spec as spec
 from deployment.lib.runtime_authority import write_worker_authority
 from test_completed_normal_admission import fixture_contract
 
@@ -111,7 +112,9 @@ class RealDockerCompatibleBootTests(unittest.TestCase):
     def test_actual_extra_network_attachment_rejected(self):
         extra=self.prefix+'-unexpected';self.create_network(extra)
         cid=self.publication['runtimes']['backend']['id'];self.command('network','connect',extra,cid)
-        with self.assertRaisesRegex(RuntimeError,'network_changed'):self.kernel.bindings()
+        # The complete specification hash may reject the extra attachment
+        # before the narrower network inventory check.
+        with self.assertRaisesRegex(RuntimeError,'runtime_identity_changed|network_changed'):self.kernel.bindings()
     def test_actual_old_worker_start_and_restart_policy_rejected(self):
         cid=self.publication['origin_workers'][0];self.command('start',cid)
         with self.assertRaisesRegex(RuntimeError,'old_workers_not_inhibited'):self.kernel.bindings()
