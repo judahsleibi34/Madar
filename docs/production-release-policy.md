@@ -1,5 +1,11 @@
 # Madar production release acceptance policy
 
+New completed-NORMAL database/runtime seals bind complete mount objects by unique
+destination rather than transient Docker response ordering. Changed mount bytes
+or permissions still fail. Historical hashes remain unchanged; the six-service
+origin write fence allows only a bounded ordering comparison of those exact
+objects. This does not permit image, identity, configuration or security changes.
+
 The admitted compatible candidate explicitly reads the current ordinary
 `/var/lib/madar/backup-state/latest.json` through its existing read-only Compose
 mount. It must not inherit the obsolete provider-preparation marker retained

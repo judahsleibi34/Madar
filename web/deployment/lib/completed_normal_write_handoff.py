@@ -20,7 +20,7 @@ from deployment.lib.completed_normal_admission import (
 from deployment.lib.emergency_routing_repair import exclusive, verification_window, AvailabilityFailure
 from deployment.lib.provider_recovery_runtime import protected
 from deployment.lib.runtime_authority import runtime_mutation_lock
-from deployment.lib.active_recovery_candidate import worker_spec_matches
+from deployment.lib.completed_normal_resources import origin_spec_matches
 
 
 def atomic_public_authority(path: Path, value: dict) -> None:
@@ -103,7 +103,7 @@ class CompletedNormalWriteHandoff:
         for kind,identity in binding['runtimes'].items():
             row=next((r for r in rows.values() if r['Id']==identity['id']),None)
             if (row is None or row['Image']!=identity['image'] or not row['State']['Running']
-                    or not worker_spec_matches(row,identity['spec_sha256'],started_worker=kind in {'notification','calendar-sync','data-deletion'})):
+                    or not origin_spec_matches(row,identity['spec_sha256'],started_worker=kind in {'notification','calendar-sync','data-deletion'})):
                 raise RuntimeError('completed_normal_origin_runtime_changed')
         port=8101 if self.contract['origin']['slot']=='blue' else 8201
         base=f'http://127.0.0.1:{port}'

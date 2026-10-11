@@ -15,6 +15,47 @@ NETWORK_KEYS = ('default','parser','remote_internal','remote_egress')
 PORTS = {'blue': {'backend':'8101','frontend':'3100','redis':'6383'},
          'green': {'backend':'8201','frontend':'3200','redis':'6382'}}
 
+def measured_spec(row):
+    """New admission hashes bind mount objects independently of Docker order.
+
+    Docker's Mounts response is an unordered inventory. Every complete mount
+    object remains hashed, including source, destination and write permission;
+    historical raw specification hashes are neither edited nor reinterpreted.
+    """
+    from deployment.lib.emergency_routing_repair import spec
+    mounts=row.get('Mounts')
+    if (not isinstance(mounts,list) or any(not isinstance(m,dict)
+            or not isinstance(m.get('Destination'),str) or not m['Destination'] for m in mounts)
+            or len({m['Destination'] for m in mounts})!=len(mounts)):
+        raise RuntimeError('completed_normal_mount_inventory_invalid')
+    host=dict(row['HostConfig'])
+    if 'Dns' in host and host['Dns'] in (None,[]):host['Dns']=None
+    return spec(dict(row,Mounts=sorted(mounts,key=lambda m:m['Destination']),HostConfig=host))
+
+
+def measured_spec_matches(row, expected, *, started_worker=False):
+    if measured_spec(row)==expected:return True
+    if not started_worker or row['HostConfig'].get('OomKillDisable',False) is not None:return False
+    return measured_spec(dict(row,HostConfig=dict(row['HostConfig'],OomKillDisable=False)))==expected
+
+
+def origin_spec_matches(row, expected, *, started_worker=False):
+    """Preserve the old digest while comparing only mount inventory ordering.
+
+    The origin has five mounts. Bound the legacy search to six, reject duplicate
+    destinations, and continue hashing ALL fields. This is used only for the
+    independently attested six original services at their write-fence boundary.
+    New native/candidate records always use measured_spec instead.
+    """
+    from deployment.lib.active_recovery_candidate import worker_spec_matches
+    from itertools import permutations
+    if worker_spec_matches(row,expected,started_worker=started_worker):return True
+    measured_spec(row) # reject ambiguous mount inventories before comparison
+    mounts=row['Mounts']
+    if len(mounts)>6:return False
+    return any(worker_spec_matches(dict(row,Mounts=list(order)),expected,started_worker=started_worker)
+               for order in permutations(mounts))
+
 def allocation(contract,slot):
     if slot not in PORTS: raise RuntimeError('completed_normal_allocation_slot_invalid')
     prefix='madar-schema136-'+digest(contract)[:16]
@@ -75,7 +116,6 @@ def verify_runtime_resources(contract,publication,runtime):
     This cannot authorize starts or traffic. Those callers additionally require
     their phase-specific, positive singleton worker ownership.
     """
-    from deployment.lib.active_recovery_candidate import worker_spec_matches
     if (publication.get('context_sha256')!=digest(contract)
             or publication.get('source_sha')!=contract['candidate']['source_sha']
             or publication.get('images')!=contract['candidate']['images']
@@ -86,7 +126,7 @@ def verify_runtime_resources(contract,publication,runtime):
     selected={}
     for kind,expected in publication['runtimes'].items():
         row=next((r for r in rows.values() if r['Id']==expected['id']),None)
-        if (row is None or row['Image']!=expected['image'] or not worker_spec_matches(row,expected['spec_sha256'],
+        if (row is None or row['Image']!=expected['image'] or not measured_spec_matches(row,expected['spec_sha256'],
                 started_worker=kind in {'notification-worker','calendar-sync-worker','data-deletion-worker'}
                     and row['State'].get('Status') in {'running','exited'})
                 or row['HostConfig']['RestartPolicy']['Name']!='no'):

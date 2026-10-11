@@ -1,5 +1,12 @@
 # Privileged control-plane upgrade architecture
 
+Fresh completed-NORMAL native and candidate specification hashes sort Docker's
+unordered mount inventory by its unique destination, preserving every full mount
+object and all other configuration fields. The historical raw hashes stay intact.
+The origin fence may compare at most six unchanged mount objects in their former
+ordering; it never accepts changed paths, permissions, duplicate destinations or
+other specification changes. New sealed records use deterministic measurement.
+
 The completed-NORMAL Compose environment binds backup freshness to the existing
 ordinary backup-state mount. The special origin's runtime uses that marker even
 though historical production.env retains a provider-preparation path. The new

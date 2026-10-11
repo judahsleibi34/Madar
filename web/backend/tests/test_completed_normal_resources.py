@@ -57,4 +57,42 @@ class CompletedNormalResourceTests(unittest.TestCase):
             {'container_id':row['Id'],'image_id':row['Image'],'spec_sha256':spec(row)}}
         with self.assertRaisesRegex(RuntimeError,'already_reserved'):m.verify_allocation(self.contract,'green',self.runtime)
 
+class CompletedNormalSpecificationTests(unittest.TestCase):
+    def setUp(self):
+        self.row={'Id':'a'*64,'Image':'sha256:'+'b'*64,'Config':{'Env':['NONSECRET=fixture']},
+            'HostConfig':{'Dns':None,'OomKillDisable':False,'Privileged':False},
+            'Mounts':[{'Destination':'/'+str(i),'Source':'/fixture/'+str(i),'Type':'bind','RW':False,
+                'Propagation':'rprivate'} for i in range(9)]}
+    def test_new_native_and_candidate_hashes_are_order_independent_without_dropping_mount_fields(self):
+        before=copy.deepcopy(self.row);expected=m.measured_spec(self.row)
+        changed=copy.deepcopy(self.row);changed['Mounts'].reverse();changed['HostConfig']['Dns']=[]
+        self.assertEqual(m.measured_spec(changed),expected)
+        self.assertEqual(self.row,before)
+        for field,value in (('RW',True),('Source','/other'),('Destination','/other'),
+                ('Propagation','shared'),('Type','volume')):
+            altered=copy.deepcopy(changed);altered['Mounts'][0][field]=value
+            self.assertFalse(m.measured_spec_matches(altered,expected))
+        changed['Mounts'][0]['extra_security_field']='changed'
+        self.assertFalse(m.measured_spec_matches(changed,expected))
+    def test_default_dns_and_worker_first_start_remain_narrow(self):
+        expected=m.measured_spec(self.row)
+        changed=copy.deepcopy(self.row);changed['HostConfig']['OomKillDisable']=None
+        self.assertFalse(m.measured_spec_matches(changed,expected))
+        self.assertTrue(m.measured_spec_matches(changed,expected,started_worker=True))
+        for key,value in (('OomKillDisable',True),('Dns',['1.1.1.1']),('Privileged',True)):
+            altered=copy.deepcopy(changed);altered['HostConfig'][key]=value
+            self.assertFalse(m.measured_spec_matches(altered,expected,started_worker=True))
+    def test_legacy_origin_comparison_preserves_exact_historical_hash(self):
+        self.row['Mounts']=self.row['Mounts'][:5];before=copy.deepcopy(self.row);expected=spec(self.row)
+        changed=copy.deepcopy(self.row);changed['Mounts'].reverse()
+        self.assertTrue(m.origin_spec_matches(changed,expected))
+        self.assertEqual(spec(self.row),expected);self.assertEqual(self.row,before)
+        changed['Mounts'][0]['RW']=True
+        self.assertFalse(m.origin_spec_matches(changed,expected))
+    def test_ambiguous_inventory_and_unbounded_legacy_search_fail_closed(self):
+        changed=copy.deepcopy(self.row);changed['Mounts'][0]['Destination']=changed['Mounts'][1]['Destination']
+        with self.assertRaisesRegex(RuntimeError,'mount_inventory_invalid'):m.measured_spec(changed)
+        expected=spec(self.row);self.row['Mounts'].reverse()
+        self.assertFalse(m.origin_spec_matches(self.row,expected))
+
 if __name__=='__main__':unittest.main()

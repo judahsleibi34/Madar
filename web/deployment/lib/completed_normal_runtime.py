@@ -12,7 +12,7 @@ import re
 import hashlib
 
 from deployment.lib.completed_normal_admission import ADMISSIONS,OPERATION,digest,encoded,require_fresh_authorization
-from deployment.lib.completed_normal_resources import ROLES,allocation,verify_runtime_binding
+from deployment.lib.completed_normal_resources import ROLES,allocation,verify_runtime_binding,measured_spec
 from deployment.lib.emergency_routing_repair import exclusive,spec
 from deployment.lib.provider_recovery_runtime import protected
 from deployment.lib.runtime_authority import load_worker_authority,runtime_mutation_lock
@@ -167,7 +167,7 @@ def validate_model(contract,model,runtime, *, phase='running'):
                     and not endpoint.get('IPAddress') and not endpoint.get('EndpointID'))
             if (not attachment_ok or sorted(endpoint.get('Aliases') or [])!=aliases):
                 raise RuntimeError('completed_runtime_network_role_changed')
-        bindings[role]={'id':row['Id'],'image':image,'spec_sha256':spec(row),
+        bindings[role]={'id':row['Id'],'image':image,'spec_sha256':measured_spec(row),
             'networks':{net:network_ids[net] for net in attached},
             'network_aliases':{net:attached[net].get('Aliases') or [] for net in attached}}
     return bindings,network_ids

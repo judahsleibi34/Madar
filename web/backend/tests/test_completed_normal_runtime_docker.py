@@ -151,4 +151,16 @@ class PrivateComposeRuntimeTests(CompletedNormalComposeTests):
             time.sleep(0.2)
         runtime_module.validate_model(self.contract,self.model,self.runtime)
 
+    def test_real_mount_inventory_seals_survive_reordering_but_reject_permission_changes(self):
+        from deployment.lib.completed_normal_resources import measured_spec_matches
+        bindings,_=runtime_module.validate_model(self.contract,self.model,self.runtime)
+        rows=self.runtime.inspect([v['id'] for v in bindings.values()])
+        for role,binding in bindings.items():
+            row=next(r for r in rows.values() if r['Id']==binding['id'])
+            row['Mounts'].reverse()
+            self.assertTrue(measured_spec_matches(row,binding['spec_sha256']))
+            if row['Mounts']:
+                row['Mounts'][0]['RW']=not row['Mounts'][0]['RW']
+                self.assertFalse(measured_spec_matches(row,binding['spec_sha256']))
+
 if __name__=='__main__':unittest.main()

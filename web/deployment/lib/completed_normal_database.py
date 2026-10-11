@@ -11,8 +11,8 @@ def observe_native(contract,runtime, *, allow_pending=False):
     row=next(iter(rows.values())) if len(rows)==1 else None
     if (row is None or row.get('Name')!='/supabase-db' or row['Id']!=expected['container_id'] or row['Image']!=expected['image']):
         raise RuntimeError('completed_normal_native_database_identity_changed')
-    from deployment.lib.active_recovery_candidate import default_dns_spec_matches
-    if not default_dns_spec_matches(row,expected['spec_sha256']):
+    from deployment.lib.completed_normal_resources import measured_spec_matches
+    if not measured_spec_matches(row,expected['spec_sha256']):
         raise RuntimeError('completed_normal_native_database_configuration_changed')
     networks=row['NetworkSettings']['Networks']
     if set(networks)!={expected['network_name']}:
