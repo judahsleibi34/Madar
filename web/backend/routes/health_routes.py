@@ -25,6 +25,7 @@ def version():
         "build_timestamp": os.getenv("MADAR_BUILD_TIMESTAMP", "unknown"),
         "schema_compatible_min": int(os.getenv("SCHEMA_COMPATIBLE_MIN", "81")),
         "schema_compatible_max": int(os.getenv("SCHEMA_COMPATIBLE_MAX", "83")),
+        **({"schema_excluded_versions": [142]} if os.getenv("SCHEMA_EXCLUDED_VERSIONS", "").strip() == "142" else {}),
     }
 
 

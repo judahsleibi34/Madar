@@ -3,17 +3,24 @@ from fastapi import HTTPException
 from postgrest.exceptions import APIError
 from database import service_supabase
 from services.elearning_settings_service import settings_available
+from services.academy_capability_service import require_capability, capabilities, permitted_wallet
 
 
 def account(member):
     if not settings_available(136):
         return {"available": False, "enabled": False, "balances": [], "history": []}
-    return service_supabase.rpc("get_academy_referral_account", {
+    grants = capabilities(member.tenant_id)
+    if not grants["referrals"]:
+        return {"available": False, "enabled": False, "balances": [], "history": []}
+    result = service_supabase.rpc("get_academy_referral_account", {
         "p_tenant_id": member.tenant_id, "p_user_id": member.user_id,
     }).execute().data
+    if result.get('wallet'): result['wallet'] = permitted_wallet(result['wallet'], grants)
+    return result
 
 
 def attach(tenant_id, user_id, code):
+    require_capability(tenant_id, "referrals")
     if not settings_available(136):
         raise HTTPException(503, detail={"code": "academy_referrals_upgrade_required"})
     try:

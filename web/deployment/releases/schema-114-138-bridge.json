@@ -1,0 +1,14 @@
+{
+  "release_metadata_version": 1,
+  "schema": {
+    "compatible_min": 114,
+    "compatible_max": 138,
+    "target": 138,
+    "migration_class": "forward-compatible",
+    "rollback_compatible_min": 114,
+    "rollback_compatible_max": 114
+  },
+  "migration_policy": "automatic-after-known-good-backup-first-forward-repair",
+  "notes": "Unselected EduHope development candidate. Active production release remains schema115 with no SQL selected. Migrations 137\u2013138 add opt-in learning notifications and private programme workflows, referral purchase eligibility, reserved withdrawals, CEFR section credentials and owner progress reporting. Requires separately reviewed production bridge, backup and approved upgrade; local validation does not authorize production migration.",
+  "migration_manifest": "migrations-115-138.json"
+}

@@ -1,7 +1,7 @@
 import { BUILDER_CLIENT_CONTRACT } from "../components/PageBuilder/services/PageBuilder.api";
 import { apiFetch, getApiUrl, readApiResponse, createApiError } from "../utils/apiClient";
-export async function fetchAcademy(identifier, courseId) {
-  const path = `/public/academies/${encodeURIComponent(identifier)}${courseId ? `/courses/${encodeURIComponent(courseId)}` : ""}`;
+export async function fetchAcademy(identifier, courseId, preview = false) {
+  const path = `/public/academies/${encodeURIComponent(identifier)}${preview ? "/preview" : courseId ? `/courses/${encodeURIComponent(courseId)}` : ""}`;
   const response = await apiFetch(getApiUrl(path), { cache: "no-store" });
   const data = await readApiResponse(response);
   if (!response.ok) throw createApiError(response, data);
@@ -9,11 +9,11 @@ export async function fetchAcademy(identifier, courseId) {
 }
 
 export function academyReturnPath(requested, base, origin, allowLearning = false) {
-  if (typeof requested !== "string" || !requested.startsWith("/") || requested.startsWith("//") || /[\\\r\n]/.test(requested)) return base;
+  if (typeof requested !== "string" || !requested.startsWith("/") || requested.startsWith("//") || /[\\\r\n]/.test(requested) || requested.includes(String.fromCharCode(0))) return base;
   try {
     let decoded = requested;
     for (let i = 0; i < 4; i += 1) decoded = decodeURIComponent(decoded);
-    if (/[\\\r\n]/.test(decoded) || decoded.startsWith("//") || new URL(decoded, origin).pathname.split("/").some(segment => segment === "." || segment === "..") || /(?:^|\/)\.\.?(?:\/|$)/.test(decoded.split(/[?#]/)[0])) return base;
+    if (/[\\\r\n]/.test(decoded) || decoded.includes(String.fromCharCode(0)) || decoded.startsWith("//") || new URL(decoded, origin).pathname.split("/").some(segment => segment === "." || segment === "..") || /(?:^|\/)\.\.?(?:\/|$)/.test(decoded.split(/[?#]/)[0])) return base;
     const url = new URL(requested, origin);
     if (url.origin === origin && (url.pathname === base || url.pathname.startsWith(`${base}/`) || (allowLearning && (url.pathname === "/my-learning" || url.pathname.startsWith("/my-learning/"))))) {
       return `${url.pathname}${url.search}${url.hash}`;
@@ -37,3 +37,7 @@ async function academyAuth(identifier, action, payload) {
 }
 export const loginAcademy = (identifier, payload) => academyAuth(identifier, "login", payload);
 export const registerAcademy = (identifier, payload) => academyAuth(identifier, "register", payload);
+
+export function recordReferralClick(identifier, code) {
+  return apiFetch(getApiUrl(`/public/academies/${encodeURIComponent(identifier)}/referrals/${encodeURIComponent(code)}/click`), { method: "POST" });
+}

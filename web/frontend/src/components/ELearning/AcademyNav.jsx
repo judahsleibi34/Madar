@@ -1,6 +1,6 @@
 /* eslint-disable react-refresh/only-export-components -- shared route helper */
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, NavLink } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Menu, X } from "lucide-react";
 import { getBrandedMadarSubdomain } from "../../utils/hostedAddress";
@@ -17,8 +17,8 @@ export default function AcademyNav({ site, authenticated = false, hasPlans = fal
     <button className="academy-menu" aria-label={t("elearning.academy.menu")} aria-expanded={open} onClick={() => setOpen(!open)}>{open ? <X /> : <Menu />}</button>
     <nav aria-label={t("elearning.academy.navigation")} className={open ? "is-open" : ""} onClick={() => setOpen(false)}>
       <div className="academy-page-links">
-      <Link to={base}>{t("elearning.academy.home")}</Link><Link to={`${base}/courses`}>{t("elearning.academy.courses")}</Link>
-      {hasPlans && <Link to={`${base}/plans`}>{t("elearning.academy.plans")}</Link>}
+      <NavLink end to={base}>{t("elearning.academy.home")}</NavLink><NavLink to={`${base}/courses`}>{t("elearning.academy.courses")}</NavLink>
+      {hasPlans && <NavLink to={`${base}/plans`}>{t("elearning.academy.plans")}</NavLink>}
       </div>
       <div className="academy-account-links">
       {authenticated ? <Link to={`${base}/dashboard`}>{t("elearning.player.myLearning")}</Link> : <><Link to={`${base}/login`}>{t("elearning.learner.logIn")}</Link>{["open", "email_domain"].includes(site.academy_registration) && <Link className="academy-nav-signup" to={`${base}/login?register=1`}>{t("elearning.learner.signUp")}</Link>}</>}

@@ -2,6 +2,7 @@ const NOTIFICATION_CENTER_PATH = "/notifications";
 const CALENDAR_PATH = "/calendar";
 const ACTION_KINDS = new Set([
   "notification_center",
+  "learning",
   "reservation",
   "calendar_event",
   "calendar_task",
@@ -11,7 +12,8 @@ const ACTION_KINDS = new Set([
 export function resolveNotificationAction(value, { tenantId } = {}) {
   const action = value && typeof value === "object" ? value : {};
   const kind = ACTION_KINDS.has(action.kind) ? action.kind : "notification_center";
-  const expectedPath = kind === "calendar_event" || kind === "calendar_task"
+  const learningPath = /^\/(?:my-learning(?:\/(?:dashboard|assessment-reviews(?:\/[0-9a-f-]{36})?|affiliate(?:\/application)?|exchange(?:\/[0-9a-f-]{36})?|referrals|rewards|wallet|withdrawals|account|plans|notifications|programmes|certificates(?:\/[0-9a-f-]{36})?|courses\/[0-9a-f-]{36}(?:\/(?:lessons|assessments)\/[0-9a-f-]{36})?))?|e-learning(?:\/(?:programmes|reports|forms\/responses(?:\/[0-9a-f-]{36})?))?)$/;
+  const expectedPath = kind === "learning" ? (learningPath.test(action.path || "") ? action.path : "/my-learning") : kind === "calendar_event" || kind === "calendar_task"
     ? CALENDAR_PATH
     : NOTIFICATION_CENTER_PATH;
   const rawPath = typeof action.path === "string" ? action.path : "";

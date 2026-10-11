@@ -1,3 +1,5 @@
+import { Link } from "react-router-dom";
+import { getSafeNotificationActionPath } from "../../notifications/notificationActions";
 import PageHeaderSkeleton from "../common/PageHeaderSkeleton";
 import { useEffect, useMemo, useState } from "react";
 import { Bell, CheckCircle2, Circle } from "lucide-react";
@@ -26,6 +28,7 @@ const formatNotificationTime = (value) => {
 
 const normalizeNotification = (item, t) => ({
   id: item.id,
+  action: item.data?.action,
   title: item.title || t("notifications.fallbackTitle"),
   detail: item.body || item.detail || "",
   time: item.time || formatNotificationTime(item.createdAt || item.created_at),
@@ -37,6 +40,8 @@ const normalizeNotification = (item, t) => ({
 export default function NotificationsPage({ user }) {
   const { direction, t } = useLanguage();
   const {
+    identity,
+    tenantId,
     loading,
     markAllRead,
     markRead,
@@ -45,7 +50,7 @@ export default function NotificationsPage({ user }) {
   } = useNotifications();
   const [pushState, setPushState] = useState("checking");
   const [pushConfig, setPushConfig] = useState(null);
-  const notificationIdentity = `${user?.tenant_id || ""}:${user?.id || user?.auth_id || ""}`;
+  const notificationIdentity = identity || `${user?.tenant_id || ""}:${user?.id || user?.auth_id || ""}`;
   const visibleNotifications = notifications.map((item) => normalizeNotification(item, t));
 
   useEffect(() => {
@@ -93,7 +98,7 @@ export default function NotificationsPage({ user }) {
 
     try {
       const result = await enableBrowserPushNotifications({
-        tenantId: user?.tenant_id,
+        tenantId: user?.tenant_id || tenantId,
         pushConfig,
       });
       setPushState(
@@ -207,6 +212,7 @@ export default function NotificationsPage({ user }) {
                     </div>
                     <p>{item.detail}</p>
                     <time>{item.time}</time>
+                    {item.action?.kind === "learning" && <Link to={getSafeNotificationActionPath(item.action, { tenantId: user?.tenant_id || tenantId })}>{t("notifications.openAction", { defaultValue: "Open" })}</Link>}
                   </div>
 
                   <span className="notifications-state">

@@ -31,5 +31,6 @@ export default function MediaBlockEditor({ type, value, onChange, upload, onBusy
     {error && <p role="alert" className="elearning-feedback is-error">{t(`elearning.content.${error}`)}</p>}
     {value.media_id && <MediaBlockRenderer key={value.media_id} block={value} kind={type} />}
     <label><span id={captionLabelId}>{t("elearning.content.caption")}</span><textarea aria-labelledby={captionLabelId} rows={3} maxLength={4000} value={value.content.caption} onChange={(event) => onChange({ ...value, content: { ...value.content, caption: event.target.value } })} /></label>
+    {type === "audio" && <label>{t("elearning.content.transcript")}<textarea rows={5} maxLength={20000} value={value.content.transcript || ""} onChange={event => onChange({ ...value, content: { ...value.content, transcript: event.target.value } })} /></label>}
   </div>;
 }

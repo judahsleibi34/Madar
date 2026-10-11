@@ -1,0 +1,14 @@
+{
+  "release_metadata_version": 1,
+  "schema": {
+    "compatible_min": 114,
+    "compatible_max": 142,
+    "target": 142,
+    "migration_class": "forward-compatible",
+    "rollback_compatible_min": 114,
+    "rollback_compatible_max": 114
+  },
+  "migration_policy": "automatic-after-known-good-backup-first-forward-repair",
+  "notes": "Unselected Exchange Forms candidate. Immutable115\u2013141 history retained; production115 remains non-migrating. No production authority.",
+  "migration_manifest": "migrations-115-142.json"
+}

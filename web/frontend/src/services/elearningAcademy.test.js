@@ -1,16 +1,8 @@
-import { expect, it } from "vitest";
-import { academyReturnPath } from "./elearningAcademy";
-const base = "/academy/tenant", origin = "https://app.example.com";
-it.each([
-  [`${base}/courses/course?plan=plan#access`, `${base}/courses/course?plan=plan#access`],
-  ["/academy/other/courses/course", base],
-  ["https://other.example.com/academy/tenant/courses", base],
-  [`${base}/../../admin`, base],
-  [`${base}/%2e%2e/other`, base],
-  ["//other.example.com/academy/tenant", base],
-  [`${base}/%252e%252e/other`, base],
-  [`${base}/%255c%255cevil.test`, base],
-  [`${base}\\..\\other`, base],
-])("safely resumes Academy authentication from %s", (requested, expected) => {
-  expect(academyReturnPath(requested, base, origin)).toBe(expected);
+import { expect, it } from 'vitest';
+import { academyReturnPath } from './elearningAcademy';
+it.each(['https://foreign.example','//foreign.example','/academy/other/form','/academy/testing/../other','/academy/testing/%00form','/academy/testing/%2500form','/academy/testing/%5cform'])('rejects unsafe Academy return %s', target => {
+ expect(academyReturnPath(target,'/academy/testing','https://madar.example',true)).toBe('/academy/testing');
+});
+it.each(['/academy/testing/about/our-story?campaign=1#form','/my-learning/affiliate','/my-learning/exchange/own'])('retains contextual authorized returns %s', target=>{
+ expect(academyReturnPath(target,'/academy/testing','https://madar.example',true)).toBe(target);
 });

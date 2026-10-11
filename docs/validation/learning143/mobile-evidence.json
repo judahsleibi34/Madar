@@ -1,0 +1,37 @@
+[
+  {
+    "retake": "failed0 then passed100",
+    "questions": 10,
+    "varied": true,
+    "language": "ar",
+    "width": 390
+  },
+  {
+    "role": "student",
+    "language": "en",
+    "width": 1440,
+    "scroll": 1440,
+    "direction": "ltr"
+  },
+  {
+    "role": "student",
+    "language": "ar",
+    "width": 390,
+    "scroll": 390,
+    "direction": "rtl"
+  },
+  {
+    "role": "instructor",
+    "language": "ar",
+    "width": 390,
+    "scroll": 390,
+    "direction": "rtl"
+  },
+  {
+    "role": "owner",
+    "language": "ar",
+    "width": 390,
+    "scroll": 390,
+    "direction": "rtl"
+  }
+]

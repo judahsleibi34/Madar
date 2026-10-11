@@ -86,7 +86,7 @@ const TAB_STYLES = `
 
   .sheet-close {
     min-height: 36px;
-    margin-left: auto;
+    margin-inline-start: auto;
     padding: 8px 16px;
     border: 1px solid #495666;
     border-radius: 10px;
@@ -151,7 +151,7 @@ const TAB_STYLES = `
     border-bottom: 1px solid #34404d;
     background: #10151b;
     color: #f4f7fb;
-    text-align: left;
+    text-align: start;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -171,7 +171,7 @@ const TAB_STYLES = `
   .sheet-grid tbody th,
   .sheet-grid .sheet-corner {
     position: sticky;
-    left: 0;
+    inset-inline-start: 0;
     z-index: 3;
     width: 48px;
     min-width: 48px;
@@ -214,13 +214,16 @@ export function openResponsesSpreadsheetTab({
   formatSavedValue,
   isQuiz,
   labels,
+  language = "en",
+  direction = "ltr",
 }) {
   const previewWindow = window.open("about:blank", "_blank");
   if (!previewWindow) return false;
 
   const documentRef = previewWindow.document;
   documentRef.title = String(form?.title || labels.form) + " ? Spreadsheet";
-  documentRef.documentElement.lang = "en";
+  documentRef.documentElement.lang = language;
+  documentRef.documentElement.dir = direction;
   documentRef.head.replaceChildren();
   documentRef.body.replaceChildren();
 

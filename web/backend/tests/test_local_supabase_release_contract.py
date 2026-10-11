@@ -134,14 +134,14 @@ class LocalSupabaseReleaseContractTests(unittest.TestCase):
                     namespace.check_production_lineage(errors)
                 return errors
             self.assertEqual(namespace_errors(), [])
-            for number in [116, 117, 135, 136]:
+            for number in [116, 117, 135, 136, 137, 138, 139, 140, 141, 142]:
                 path = next(trees['database'].glob(str(number) + '_*.sql'))
                 original = path.read_bytes()
                 path.write_bytes(original + b'\n-- unreviewed alteration\n')
                 self.assertTrue(validator.validate(root))
                 self.assertTrue(namespace_errors())
                 path.write_bytes(original)
-            unexpected = trees['database'] / '137_unreviewed.sql'
+            unexpected = trees['database'] / '143_unreviewed.sql'
             unexpected.write_text('begin; commit;')
             self.assertTrue(validator.validate(root)); self.assertTrue(namespace_errors())
             unexpected.unlink()

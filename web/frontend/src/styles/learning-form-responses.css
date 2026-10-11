@@ -1,0 +1,24 @@
+/* Keep Builder's submissions proportions inside the normal academy owner shell. */
+.page-builder.elearning-forms-workspace {display:block;width:100%;height:auto;min-height:0;background:var(--theme-bg);padding:0;overflow:visible;}
+.elearning-forms-workspace .workspace-page {padding:0;min-width:0;}
+.elearning-forms-workspace .results-layout > *, .elearning-forms-workspace .responses-results-page {min-width:0;}
+.elearning-forms-workspace .learning-response-lifecycle {color:var(--madar-muted);font-size:12px;line-height:1.5;margin:12px 0;}
+.elearning-forms-workspace .learning-response-controls {display:flex;flex-wrap:wrap;align-items:end;gap:12px;margin-block:16px;}
+.elearning-forms-workspace .learning-response-controls label {display:grid;gap:6px;min-width:0;font-size:12px;color:var(--madar-muted);}
+.elearning-forms-workspace input,.elearning-forms-workspace select,.elearning-forms-workspace textarea {max-width:100%;min-width:0;color:var(--madar-text);background:var(--madar-surface);border:1px solid var(--color-border-control);border-radius:8px;padding:10px;font:inherit;}
+.elearning-forms-workspace button,.elearning-forms-workspace a.ecommerce-secondary-button {font:inherit;min-height:40px;border:1px solid var(--color-border-control);border-radius:8px;background:var(--madar-surface);color:var(--madar-text);padding:8px 12px;cursor:pointer;}
+.elearning-forms-workspace button:disabled {opacity:.55;cursor:default;}
+.elearning-forms-workspace button:focus-visible,.elearning-forms-workspace a:focus-visible,.elearning-forms-workspace input:focus-visible,.elearning-forms-workspace select:focus-visible,.elearning-forms-workspace textarea:focus-visible {outline:2px solid var(--theme-primary);outline-offset:3px;}
+.elearning-forms-workspace .results-data-table caption {text-align:start;padding:8px;color:var(--madar-muted);font-size:12px;}
+.elearning-forms-workspace .results-data-table td:last-child {white-space:nowrap;}
+.elearning-forms-workspace .results-data-table td:last-child button {margin-inline-end:8px;}
+.elearning-forms-workspace .learning-response-detail-only .responses-list-panel {display:none;}
+.elearning-forms-workspace .learning-response-review {padding:16px;border-block-start:1px solid var(--madar-border);}
+.elearning-forms-workspace .learning-response-review form,.elearning-forms-workspace .learning-response-review label {display:grid;gap:12px;}
+.elearning-forms-workspace .learning-response-review textarea {width:100%;min-height:100px;}
+.elearning-forms-workspace .responses-answer-grid article {overflow-wrap:anywhere;}
+@media (max-width:780px) {
+ .elearning-forms-workspace .learning-response-controls > label {width:100%;}
+ .elearning-forms-workspace .results-form-list {position:static;max-height:none;}
+ .elearning-forms-workspace .responses-browser-actions {flex-wrap:wrap;}
+}

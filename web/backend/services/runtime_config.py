@@ -157,6 +157,16 @@ def env_bool(name: str, default: bool = False) -> bool:
     return normalized in {"1", "true", "yes", "on"}
 
 
+def schema_excluded_versions(minimum: int, maximum: int) -> tuple[int, ...]:
+    raw = os.getenv("SCHEMA_EXCLUDED_VERSIONS", "").strip()
+    excluded = tuple(int(value) for value in raw.split(",") if value) if raw else ()
+    if excluded and (excluded != (142,) or minimum != 141 or maximum != 143):
+        raise ValueError("unsupported schema branch exclusions")
+    if minimum <= 142 <= maximum and maximum == 143 and excluded != (142,):
+        raise ValueError("learning branch must exclude schema142")
+    return excluded
+
+
 @dataclass(frozen=True)
 class RuntimeConfiguration:
     environment: str
@@ -164,6 +174,7 @@ class RuntimeConfiguration:
     schema_min: int
     schema_max: int
     email_channel_enabled: bool
+    excluded_schemas: tuple[int, ...] = ()
 
 
 def validate_runtime_configuration() -> RuntimeConfiguration:
@@ -180,6 +191,10 @@ def validate_runtime_configuration() -> RuntimeConfiguration:
         raise RuntimeError("schema compatibility configuration is invalid") from error
     if schema_min <= 0 or schema_max < schema_min:
         raise RuntimeError("schema compatibility configuration is invalid")
+    try:
+        excluded_schemas = schema_excluded_versions(schema_min, schema_max)
+    except ValueError as error:
+        raise RuntimeError("schema branch compatibility configuration is invalid") from error
     email_enabled = env_bool("EMAIL_CHANNEL_ENABLED", False)
     if production_like:
         required = ("SUPABASE_URL", "SUPABASE_ANON_KEY", "SUPABASE_SERVICE_KEY", "CSRF_SECRET", "FRONTEND_URLS", "REDIS_URL")
@@ -241,7 +256,7 @@ def validate_runtime_configuration() -> RuntimeConfiguration:
                 raise RuntimeError("enabled calendar integration is missing credential encryption")
             if not env_bool("CALENDAR_SYNC_WORKER_ENABLED", False):
                 raise RuntimeError("enabled calendar integration is missing its worker")
-    return RuntimeConfiguration(environment, release_sha, schema_min, schema_max, email_enabled)
+    return RuntimeConfiguration(environment, release_sha, schema_min, schema_max, email_enabled, excluded_schemas)
 
 
 def redacted_configuration_inventory(observed_keys: set[str] | None = None) -> list[dict[str, str | bool]]:

@@ -37,6 +37,21 @@ def course(identifier: str, course_id: UUID, request: Request, response: Respons
     return academy(identifier, request, response, course_id)
 
 
+@router.get("/{identifier}/preview")
+def preview(identifier: str, request: Request, response: Response):
+    from services.elearning_access_service import require_elearning_access
+    from services.entitlement_service import require_entitlement
+    actor = require_elearning_access(request, response, "elearning.manage")
+    require_entitlement(actor.tenant_id, "page_builder")
+    website = resolve_website_settings(identifier, request=request)
+    if resolve_tenant_id(website) != actor.tenant_id:
+        raise HTTPException(403, "Academy preview tenant does not match session")
+    response.headers["Cache-Control"] = "private, no-store"
+    response.headers["Vary"] = "Cookie"
+    # Builder supplies the authorized draft; this endpoint supplies live data only.
+    return operation(lambda: service.storefront(actor.tenant_id, website, actor, preview=True))
+
+
 @router.post("/management/landing")
 def initialize_landing(request: Request, response: Response):
     from services.elearning_access_service import require_elearning_access
@@ -121,3 +136,17 @@ def register(identifier: str, payload: AcademyRegisterRequest, request: Request)
         verification_target = "/academy" + target[len(main_base):]
     result = register_tenant_account(identifier, payload, request, academy_context={"return_to": f"/academy/login?returnTo={quote(verification_target, safe='')}", "referral_code": str(payload.referral_code) if payload.referral_code else None})
     return {**result, "return_to": target}
+
+
+@router.post('/{identifier}/referrals/{code}/click')
+def referral_click(identifier: str, code: UUID, request: Request):
+    from services.elearning_settings_service import settings_available
+    from database import service_supabase
+    enforce_public_rate_limit(request, 'academy_referral_click', identifier)
+    website = resolve_website_settings(identifier, request=request)
+    tenant_id = resolve_tenant_id(website)
+    from services.academy_capability_service import capabilities
+    if settings_available(139) and capabilities(tenant_id)["referrals"]:
+        service_supabase.rpc('academy_record_referral_click', {'p_tenant': tenant_id, 'p_code': str(code)}).execute()
+    # No disclosure of code ownership or private membership to an anonymous visitor.
+    return {'success': True}

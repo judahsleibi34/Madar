@@ -16,3 +16,14 @@ export const submitAssessment = (c, l, b, attempt, answers) => request(c, l, b, 
 export const fetchPlacements = (course, section) => request(course, null, null, section ? `?section_id=${encodeURIComponent(section)}` : "");
 export const attachAssessment = (course, body) => request(course, null, null, "/attach", body);
 export const placementCommand = (course, placement, body) => request(course, null, placement, "/placement", body);
+
+export async function learningReviewRequest(path, options = {}) {
+  const response = await apiFetch(getApiUrl(`/elearning/${path}`), { cache: "no-store", ...options });
+  const data = await readApiResponse(response);
+  if (!response.ok) throw createApiError(response, data);
+  return data;
+}
+export async function uploadAssessmentRecording(attempt, question, recording) {
+  const body = new FormData(); body.append("file", recording, "recording.wav"); body.append("recording_id", crypto.randomUUID());
+  return learningReviewRequest(`assessment-attempts/${encodeURIComponent(attempt)}/recordings/${encodeURIComponent(question)}`, { method: "POST", body });
+}

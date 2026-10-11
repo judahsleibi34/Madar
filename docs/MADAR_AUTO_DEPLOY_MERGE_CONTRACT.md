@@ -1,5 +1,97 @@
 # Madar Auto-Deploy Merge Contract
 
+## Unselected learning-only141→143 candidate
+
+The approved learning-only route is now finalized as an exact source-pinned
+candidate: `learning-141-143-path.json`, `migrations-141-143-learning.json`,
+`schema-141-143-learning-bridge.json`, and mirrored
+`143_complete_learning_capabilities.sql`. It contains exactly one transition
+from141 to143 and explicitly excludes142. Migration142, all001–141 SQL, all
+retained manifests, and active `release.json` remain unchanged. The incoming main release retains its reviewed115→136 bridge and selects
+only migrations116–136. The learning137–143 candidates remain unselected;
+the existing local application database is141.
+Finalization is source authority for this candidate, not production deployment,
+installation, traffic switching, or upgrading the application database.
+
+The descriptor pins SQL, manifest and bridge digests. Every ordinary transition
+remains consecutive. Source gates accept namespace001–143 only after validating
+the exact learning descriptor, SQL mirrors, manifest and bridge. The executor
+retains checksums, verified backup, advisory locks and forward repair; it rejects
+live142 before SQL and resumes143 without executing142. Automatic orchestration
+requires explicit bridge selection and its usual known-good acceptance gates.
+
+Compatibility is141..143 with excluded version142; rollback compatibility is
+exactly141. Backend readiness, runtime configuration, candidate identity and
+release promotion/rollback attestations carry/enforce the exclusion. Missing or
+arbitrary exclusions fail closed. `settings_available(142)` is false on the
+learning143 branch, so143 never implies Exchange142 features. CLI reconciliation
+accepts only the pinned143 transition, requires the141 predecessor and rejects
+any142 ledger row; it never invents or repairs142. Repository identity, clean
+source, stable health, execution/acceptance evidence and operator confirmation
+remain mandatory for any ledger mutation.
+
+143 extends the existing assessment engine with picture/audio choices, local
+unscored speaking practice, bounded private PCM WAV exam responses, bounded
+written answers, authorized human review, immutable decisions and snapshots,
+pending-review finalization, optional question pools/shuffling and feedback.
+Objective grading remains deterministic; no AI or subjective automated scores
+are introduced. Selected recordings remain immutable assessment evidence;
+retryable cleanup fences unused objects before deleting bytes and releasing
+quota. CEFR configuration reuses required published graded exams with the
+owner's configured passing threshold instead of a global70% requirement.
+
+A populated disposable141 rehearsal verifies old attempts/answers/completion
+preservation, complete transactional rollback, an actual schema141 dump,
+locked143-only execution, excluded142 rejection and143 re-entry. Native browser
+validation uses separate disposable auth/REST/storage services and original
+synthetic content. None of this seeds the original academy course. See
+[the implementation report](elearning-final-learning-implementation.md) for
+validation evidence and any remaining acceptance limits.
+
+## Unselected Exchange Forms candidate (schema142)
+
+The exact checksum-pinned `migrations-115-142.json` /
+`schema-114-142-bridge.json` pair retains immutable115–141 and adds mirrored142.
+Both source validators accept this explicit transition and namespace001–142 only.
+The retained exact115 profile selects no SQL. The active main bridge selects
+only116–136; this candidate remains unselected. No production
+installation, migration or deployment authority is granted; orchestration is unchanged.
+
+142 links tenant-owned opportunities to independent E-Learning Forms and records
+immutable opportunity context on Forms responses. Exchange stores only decisions
+and immutable decision history, never copied answers. Approved legacy and Forms
+applications both consume capacity under the opportunity lock. Historical legacy
+Exchange answers/reviews remain intact; new specialized Exchange submissions reject.
+Affiliate and Support workflows remain independent and unchanged. Local142 requires
+explicit contract selection after a preservation-checked upgrade; production still
+requires its accepted bridge, verified backup and governed upgrade.
+
+## Unselected independent E-Learning Forms candidate (schema141)
+
+The exact checksum-pinned `migrations-115-141.json` /
+`schema-114-141-bridge.json` pair retains immutable115–140 and adds mirrored141.
+Both source validators accept only this additional transition and namespace001–141.
+The active main115→136 bridge selects only116–136; Forms141 remains unselected. No production
+installation, migration or deployment authority is granted.
+
+141 adds tenant-owned learning form definitions, immutable versions/responses,
+private response attachment ownership, guarded lifecycle/submission/read functions,
+and a tenant-checked Academy Builder form reference. Builder definitions, drafts,
+submissions and specialized programme workflows remain independent. Existing Forms
+capabilities, storage quotas and learning notifications are reused. Browser and
+server enforce conditional visibility; historical answers reference immutable
+schemas and survive lifecycle changes. Local development may explicitly select141
+after a preservation-checked local upgrade. Production requires its own accepted
+bridge/backup/governed upgrade; orchestration is unchanged.
+
+The current unselected Academy owner candidate is the exact checksum-pinned
+`migrations-115-140.json` / `schema-114-140-bridge.json` pair. Both validators
+verify namespace001–140 and immutable history. The retained exact115 profile selects no SQL. Main’s active115→136 bridge
+selects only116–136; the owner candidate remains unselected. See the schema140 candidate sections
+in `production-release-policy.md` and
+`automated-database-migration-architecture.md` for the owner-tool expansion.
+This candidate grants no production deployment or mutation authority.
+
 The active candidate descriptor now selects the existing schema115..136 bridge
 and checksum-pinned migrations116..136. The former exact115/no-SQL descriptor
 is retained as `schema-115-local.json`; historical SQL and manifests remain

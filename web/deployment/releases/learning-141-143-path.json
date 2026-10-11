@@ -1,0 +1,17 @@
+{
+  "contract_version": 1,
+  "route": "learning-only-141-143",
+  "status": "finalized",
+  "source_schema": 141,
+  "target_schema": 143,
+  "excluded_schemas": [
+    142
+  ],
+  "manifest_path": "web/deployment/releases/migrations-141-143-learning.json",
+  "sql_path": "web/database/migrations/143_complete_learning_capabilities.sql",
+  "manifest_sha256": "ea5107eddb14e9a4220d549aac95efc50de37457f588dcf9c12e4553887f2376",
+  "sql_sha256": "35c79afc5c44c982aeb7fcfac854e2f744e5c65408a1c3e0084a265b025fe6dc",
+  "execution_authority": true,
+  "bridge_path": "web/deployment/releases/schema-141-143-learning-bridge.json",
+  "bridge_sha256": "ebcdd0a91af9a812538c63d5d81884f8841611889a54270729526f98109483cb"
+}

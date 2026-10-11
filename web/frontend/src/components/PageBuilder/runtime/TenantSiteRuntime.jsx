@@ -1,3 +1,4 @@
+import { isFormFieldVisible } from "./formVisibility";
 import { getBuilderWorkspaceFromPath, getBuilderProjectBasePath } from "../core/PageBuilder.workspaceRouting";
 import { getAcademyNavigationDestinations } from "../core/PageBuilder.academyProfile";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -1310,21 +1311,7 @@ export default function TenantSiteRuntime({ draftPreview = false, siteIdentifier
 
   const getVisibleFieldsForInstance = (form, fields, instanceKey) => {
     const answers = formAnswers[instanceKey] || {};
-    const rules = Array.isArray(form?.logicRules) ? form.logicRules : [];
-    if (!rules.length) return fields;
-
-    return fields.filter((field) => {
-      const relatedRules = rules.filter((rule) => rule.targetFieldId === field.id);
-      if (!relatedRules.length) return true;
-
-      return relatedRules.reduce((visible, rule) => {
-        const rawAnswer = normalizeRuntimeAnswerValue(answers[rule.sourceFieldId]);
-        const matched = String(rawAnswer ?? "").trim() === String(rule.value ?? "").trim();
-        if (rule.action === "show") return matched;
-        if (rule.action === "hide") return matched ? false : visible;
-        return visible;
-      }, true);
-    });
+    return fields.filter(field => isFormFieldVisible(form, field, answers, normalizeRuntimeAnswerValue));
   };
 
   const buildSubmissionAnswers = (form, instanceKey) => {

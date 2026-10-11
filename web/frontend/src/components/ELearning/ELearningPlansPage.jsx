@@ -27,7 +27,7 @@ export default function ELearningPlansPage() {
     return () => { active = false; };
   }, []);
   useEffect(() => { if (form) dialog.current?.showModal(); }, [form]);
-  const createPlan = () => { setError(null); setForm({ ...empty }); };
+  const createPlan = () => { setError(null); setForm({ ...empty, amount: empty.amount }); };
   const update = (key, value) => setForm(old => ({ ...old, [key]: value }));
   async function save(event) {
     event.preventDefault(); setBusy(true); setError(null);

@@ -34,6 +34,9 @@ def listing(member,course,section=None):
 def create(member,course,payload):
     available()
     attach=isinstance(payload,AttachAssessment)
+    if not attach:
+        engine.require_learning_payload(payload.assessment.model_dump())
+        for question in payload.questions: engine.require_learning_payload(question.model_dump())
     return engine.call('create_elearning_placed_assessment',member.tenant_id,p_course_id=str(course),p_section_id=str(payload.section_id) if payload.section_id else None,p_actor_id=member.user_id,p_expected_revision=payload.expected_revision,p_details={'required_for_completion':payload.required_for_completion} if attach else payload.assessment.model_dump(mode='json'),p_questions=[] if attach else [q.model_dump(mode='json') for q in payload.questions],p_assessment_id=str(payload.assessment_id) if attach else None)
 
 

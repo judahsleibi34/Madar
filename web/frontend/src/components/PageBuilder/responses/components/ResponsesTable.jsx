@@ -14,21 +14,30 @@ export default function ResponsesTable({
   formatSavedValue,
   isQuiz,
   incompleteView = false,
+  caption,
+  renderAnswer,
+  extraHeaders = [],
+  renderExtraCells,
+  trailingHeaders = [],
+  renderTrailingCells,
 }) {
-  const columnCount = fields.length + 3 + (isQuiz ? 1 : 0);
+  const columnCount = fields.length + extraHeaders.length + trailingHeaders.length + 3 + (isQuiz ? 1 : 0);
 
   return (
     <div className="results-table-wrap">
       <table className="results-data-table">
+        {caption && <caption>{caption}</caption>}
         <thead>
           <tr>
             <th>{t.reviewStatus}</th>
             <th>{t.created}</th>
             <th>{t.submittedBy}</th>
             {isQuiz && <th>{t.score}</th>}
+            {extraHeaders.map(label => <th key={label}>{label}</th>)}
             {fields.map((field) => (
               <th key={field.id}>{field.label}</th>
             ))}
+            {trailingHeaders.map(label => <th key={label}>{label}</th>)}
           </tr>
         </thead>
 
@@ -93,9 +102,11 @@ export default function ResponsesTable({
                   </td>
                 )}
 
+                {renderExtraCells?.(response)}
                 {fields.map((field) => (
-                  <td key={field.id}>{formatSavedValue(response.answers?.[field.id])}</td>
+                  <td key={field.id}>{renderAnswer ? renderAnswer(field, response.answers?.[field.id], response) : formatSavedValue(response.answers?.[field.id])}</td>
                 ))}
+                {renderTrailingCells?.(response)}
               </tr>
             ))
           ) : (

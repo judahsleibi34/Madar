@@ -1,8 +1,6 @@
-import madarLearningLanding from "../content/pageBuilder/madarLearningLanding.json";
-
 export function getAcademyAppearance(site, landing) {
   if (!site) return site;
-  const presentation = import.meta.env.DEV && import.meta.env.VITE_MADAR_LOCAL_LANDING_PREVIEW === "true" && site?.subdomain === "testing" ? madarLearningLanding : landing;
+  const presentation = landing;
   return {
     ...site,
     brand: presentation?.siteChrome?.brand || site?.brand,

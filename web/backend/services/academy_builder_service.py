@@ -2,9 +2,9 @@
 from uuid import UUID, uuid4
 from fastapi import HTTPException
 
-ALLOWED_TYPES = frozenset({"heading", "text", "button", "image", "imageButton", "imageCardButton", "card", "carousel", "logoSlider", "list", "divider", "thinDivider", "metric", "academyFeaturedCourses", "academyCourseCollection", "academyPlans", "academyContinueLearning", "academyInstructors"})
+ALLOWED_TYPES = frozenset({"heading", "text", "button", "image", "imageButton", "imageCardButton", "card", "carousel", "logoSlider", "list", "divider", "thinDivider", "metric", "academyFeaturedCourses", "academyCourseCollection", "academyPlans", "academyContinueLearning", "academyInstructors", "academyContact", "academyExchangeOpportunities", "academyProgrammeInfo", "academyForm"})
 DATA_TYPES = frozenset(t for t in ALLOWED_TYPES if t.startswith("academy"))
-DATA_FIELDS = {"heading", "description", "maxItems", "courseIds", "planIds", "variant", "featuredOnly", "instructorIds"}
+DATA_FIELDS = {"heading", "description", "maxItems", "courseIds", "planIds", "variant", "featuredOnly", "instructorIds", "formId"}
 
 
 def management_profile(tenant_id):
@@ -22,6 +22,12 @@ def management_profile(tenant_id):
     return {"editor_project_id": editor, "full_builder_available": settings_available(133), "subdomain": websites[0].get("subdomain") if websites else None, "published_project_id": websites[0].get("academy_project_id") if websites else None, "landing_project": projects[0] if projects else None}
 
 
+def has_academy_form(value):
+    if isinstance(value, dict):
+        return value.get("type") == "academyForm" or any(has_academy_form(child) for child in value.values())
+    return isinstance(value, list) and any(has_academy_form(child) for child in value)
+
+
 def validate_academy_schema(schema):
     def reject():
         raise HTTPException(400, detail={"code": "academy_component_not_allowed", "message": "This component or data is not allowed in an Academy landing page."})
@@ -34,6 +40,14 @@ def validate_academy_schema(schema):
         return isinstance(value, list) and any(has_instructors(child) for child in value)
     if (len(schema["pages"]) > 1 or has_instructors(schema)) and not settings_available(133):
         raise HTTPException(503, detail={"code": "academy_builder_upgrade_required"})
+    def has_owner_component(value):
+        if isinstance(value, dict):
+            return value.get("type") in ("academyContact", "academyExchangeOpportunities", "academyProgrammeInfo") or any(has_owner_component(child) for child in value.values())
+        return isinstance(value, list) and any(has_owner_component(child) for child in value)
+    if has_owner_component(schema) and not settings_available(140):
+        raise HTTPException(503, "Academy components require the database upgrade")
+    if has_academy_form(schema) and not settings_available(141):
+        raise HTTPException(503, "E-Learning form components require the database upgrade")
     reserved = {"courses", "plans", "login", "signup", "auth", "my-learning", "account", "checkout", "assessments", "api", "admin", "dashboard", "settings", "builder", "page-builder"}
     import re
     slugs, ids = set(), set()
@@ -72,6 +86,9 @@ def validate_academy_schema(schema):
                             maximum = config.get("maxItems", 4)
                             if isinstance(maximum, bool) or not isinstance(maximum, int) or not 1 <= maximum <= 24:
                                 reject()
+                            if config.get("formId"):
+                                try: UUID(config["formId"])
+                                except (ValueError, TypeError): reject()
                             for ids_key in ("courseIds", "planIds", "instructorIds"):
                                 ids = config.get(ids_key, [])
                                 if not isinstance(ids, list) or len(ids) > 24:

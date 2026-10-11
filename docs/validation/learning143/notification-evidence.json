@@ -1,0 +1,11 @@
+{
+  "resolved": 1512,
+  "processed": 756,
+  "events": [
+    "learning_certificate_issued",
+    "learning_exam_pending_review",
+    "learning_exam_result",
+    "learning_review_requested"
+  ],
+  "external_email_enabled": false
+}

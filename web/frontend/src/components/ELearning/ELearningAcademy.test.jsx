@@ -1,15 +1,18 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import i18n from "../../i18n";
-import ELearningAcademy, { AcademyBuilderPreviewProvider } from "./ELearningAcademy";
+import ELearningAcademy, { AcademyBuilderPreviewProvider, HostedAcademyLearning } from "./ELearningAcademy";
 import { useContext } from "react";
 import { AcademyCompositionContext } from "../PageBuilder/blocks/AcademyDataBlock";
 import { fetchAcademy, loginAcademy, registerAcademy } from "../../services/elearningAcademy";
+import { fetchLearningAccountContext } from "../../services/elearningPlayer";
 import * as commerce from "../../services/elearningCommerce";
 import { getBrandedMadarSubdomain } from "../../utils/hostedAddress";
 vi.mock("../../utils/hostedAddress", async (original) => ({ ...(await original()), getBrandedMadarSubdomain: vi.fn(() => null) }));
 vi.mock("../../services/elearningAcademy", async (original) => ({ ...(await original()), fetchAcademy: vi.fn(), loginAcademy: vi.fn(), registerAcademy: vi.fn() }));
+vi.mock("../../services/elearningPlayer", () => ({fetchLearningAccountContext:vi.fn()}));
+vi.mock("./ELearningPlayer", () => ({default:()=> <h1>Fixed learning runtime</h1>}));
 vi.mock("../../services/elearningCommerce", () => ({ enrollCatalogCourse: vi.fn(), fetchMyPlans: vi.fn(), createCheckout: vi.fn(), localPaymentEvent: vi.fn() }));
 const plan = { id:"plan", name:"Lifetime Access", amount:49, currency:"USD", billing_type:"one_time", access_scope:"all_courses", description:"Real plan" };
 const course = { id:"free", name:"English Basics", description:"Speak with confidence", access_type:"free", cta:{action:"enroll_free"}, featured:true, outline:[{name:"First level",lesson_count:2}], instructors:[{name:"Teacher"}], plans:[], progress:null, credential:null };
@@ -25,17 +28,15 @@ it("renders Builder hero and actual featured courses while hiding empty/account 
 });
 it("uses centralized learner state, stored resume target and certificate state",async()=>{
  fetchAcademy.mockResolvedValue({...data,authenticated:true,continue_courses:[{...course,cta:{action:"continue"},progress:{progress_percent:50,completion:{completed:false}},resume:"/my-learning/courses/free/lessons/second"}],courses:[{...course,cta:{action:"continue"},progress:{progress_percent:50,completion:{completed:false}},resume:"/my-learning/courses/free/lessons/second"}]});mount('/academy/tenant/dashboard');
- expect(await screen.findByRole("heading",{name:"Continue Learning"})).toBeTruthy();expect(screen.getAllByRole("link",{name:"Continue Learning"})[0].getAttribute("href")).toBe('/my-learning/courses/free/lessons/second');
- expect(screen.getByRole("link",{name:"My Certificates"})).toBeTruthy();
- expect(screen.queryByText("Learn With Confidence")).toBeNull();
- expect(document.querySelector('.academy-builder-landing')).toBeNull();
- expect(screen.getByRole('link', { name: 'Home' }).getAttribute('href')).toBe('/academy/tenant/dashboard');
+ expect(await screen.findByRole("heading",{name:"Learning runtime"})).toBeTruthy();
+ expect(document.querySelector(".academy-builder-landing")).toBeNull();
 });
 it('keeps the published landing page outside the learner shell even with an active session', async () => {
  fetchAcademy.mockResolvedValue({ ...data, authenticated: true }); mount();
  expect(await screen.findByText('Learn With Confidence')).toBeTruthy();
  expect(document.querySelector('.learning-shell-sidebar')).toBeNull();
- expect(screen.getAllByRole('link', { name: 'Log in' })[0].getAttribute('href')).toBe('/academy/tenant/login');
+ expect(screen.queryByRole('link', { name: 'Log in' })).toBeNull();
+ expect(screen.getAllByRole('link', { name: 'My Learning' })[0].getAttribute('href')).toBe('/academy/tenant/dashboard');
  expect(document.querySelectorAll('header.built-site-header, header.academy-header')).toHaveLength(1);
 });
 it('requires authentication before entering the fixed learner home', async () => {
@@ -46,18 +47,14 @@ it('requires authentication before entering the fixed learner home', async () =>
 });
 it('opens the fixed learner home when an authenticated learner follows Sign In', async () => {
  fetchAcademy.mockResolvedValue({ ...data, authenticated: true, site: { ...data.site, management_path: '/e-learning/settings/academy' } }); mount('/academy/tenant/login');
- expect(await screen.findByRole('heading', { name: 'Home' })).toBeTruthy();
- expect(document.querySelector('.learning-shell-sidebar')).toBeTruthy();
+ expect(await screen.findByRole('heading', { name: 'Learning runtime' })).toBeTruthy();
  expect(document.querySelector('.academy-builder-landing')).toBeNull();
- expect(screen.queryByRole('link', { name: 'Back to Admin' })).toBeNull();
- expect(screen.getByRole('button', { name: 'Sign out' }).querySelector('svg')).toBeTruthy();
 });
 it('uses the same fixed learner home on a hosted academy', async () => {
  getBrandedMadarSubdomain.mockReturnValue('tenant');
  fetchAcademy.mockResolvedValue({ ...data, authenticated: true });
- render(<MemoryRouter initialEntries={['/academy/login']}><Routes><Route path='/academy/*' element={<ELearningAcademy subdomain='tenant' />} /></Routes></MemoryRouter>);
- expect(await screen.findByRole('heading', { name: 'Home' })).toBeTruthy();
- expect(screen.getByRole('link', { name: 'Home' }).getAttribute('href')).toBe('/academy/dashboard');
+ render(<MemoryRouter initialEntries={['/academy/login']}><Routes><Route path='/academy/*' element={<ELearningAcademy subdomain='tenant' />} /><Route path='/my-learning/*' element={<h1>Learning runtime</h1>} /></Routes></MemoryRouter>);
+ expect(await screen.findByRole('heading', { name: 'Learning runtime' })).toBeTruthy();
  expect(document.querySelector('.academy-builder-landing')).toBeNull();
 });
 it.each([
@@ -79,7 +76,7 @@ it("enrollment uses existing commerce API then opens the learning runtime",async
  fetchAcademy.mockResolvedValue({...data,authenticated:true});commerce.enrollCatalogCourse.mockResolvedValue({});mount('/academy/tenant/courses/free');fireEvent.click(await screen.findByRole('button',{name:'Enroll Free'}));expect(await screen.findByRole('heading',{name:'Learning runtime'})).toBeTruthy();expect(commerce.enrollCatalogCourse).toHaveBeenCalledWith('free');
 });
 it("shows real plan prices and keeps unconfigured live payments disabled",async()=>{
- fetchAcademy.mockResolvedValue({...data,authenticated:true,plans:[plan]});commerce.fetchMyPlans.mockResolvedValue({local_adapter:false});mount('/academy/tenant/plans');fireEvent.click(await screen.findByRole('button',{name:'Buy'}));await screen.findByRole('alert');expect(commerce.createCheckout).not.toHaveBeenCalled();expect(screen.getByText(/49.00 USD/)).toBeTruthy();
+ fetchAcademy.mockResolvedValue({...data,authenticated:true,plans:[plan]});commerce.fetchMyPlans.mockResolvedValue({local_adapter:false});mount('/academy/tenant/plans');expect((await screen.findByRole('button',{name:'Buy'})).disabled).toBe(true);await screen.findByText('Purchases are unavailable. Live payments are disabled.');expect(commerce.createCheckout).not.toHaveBeenCalled();expect(screen.getByText(/49.00 USD/)).toBeTruthy();
 });
 it("catalog searches existing metadata and renders Arabic RTL",async()=>{
  await i18n.changeLanguage('ar');mount('/academy/tenant/courses');const search=await screen.findByRole('searchbox');expect(document.querySelector('.academy').dir).toBe('rtl');fireEvent.change(search,{target:{value:'missing'}});expect(screen.queryByText('English Basics')).toBeNull();fireEvent.change(search,{target:{value:'Teacher'}});expect(screen.getByText('English Basics')).toBeTruthy();fireEvent.click(screen.getByRole('button',{name:'القائمة'}));await waitFor(()=>expect(document.querySelector('.academy-header nav').className).toBe('is-open'));
@@ -170,3 +167,43 @@ it('keeps the referral code through academy navigation and attaches it only to r
  expect(loginAcademy).not.toHaveBeenCalled();
  expect(sessionStorage.getItem('academy-referral:tenant')).toBeNull();
 });
+
+it('uses published nested page names and canonical paths without draft pages', async () => {
+ const landing=structuredClone(data.landing);
+ landing.pages.push({id:'about',name:'Our story',slug:'/about/our-story',sections:[]});
+ fetchAcademy.mockResolvedValue({...data,landing});mount('/academy/tenant/about/our-story/');
+ await waitFor(()=>expect(document.title).toBe('Our story | Academy'));
+ expect(document.querySelector('link[rel="canonical"]').href).toMatch(/\/academy\/tenant\/about\/our-story$/);
+ expect(document.querySelector('meta[name="robots"]').content).toBe('index,follow');
+});
+it.each(['/academy/tenant/missing','/academy/tenant/courses/missing','/academy/tenant/login/'])('does not index unavailable or authentication pages: %s',async path=>{
+ mount(path);await waitFor(()=>expect(document.querySelector('meta[name="robots"]')?.content).toBe('noindex,nofollow,noarchive'));
+ expect(document.querySelector('link[rel="canonical"]')).toBeNull();
+});
+it('honors Builder footer suppression without injecting another footer',async()=>{
+ fetchAcademy.mockResolvedValue({...data,landing:{...data.landing,siteChrome:{showHeader:true,showFooter:false}}});mount();
+ await screen.findByText('Learn With Confidence');expect(document.querySelector('footer')).toBeNull();
+});
+it('marks fixed public navigation active on course detail routes',async()=>{
+ mount('/academy/tenant/courses/free');await screen.findByRole('heading',{name:'English Basics'});
+ expect(screen.getAllByRole('link',{name:'Courses'}).find(link=>link.getAttribute('aria-current')==='page')).toBeTruthy();
+});
+
+it('uses owner-authorized live data for unpublished Builder previews',async()=>{
+ function Probe(){const runtime=useContext(AcademyCompositionContext);return <p>{runtime?.data?.site.brand || 'Loading'}</p>;}
+ render(<MemoryRouter><AcademyBuilderPreviewProvider identifier="tenant"><Probe/></AcademyBuilderPreviewProvider></MemoryRouter>);
+ await screen.findByText('Academy');expect(fetchAcademy).toHaveBeenCalledWith('tenant',null,true);
+});
+it('keeps hosted fixed learning independent of public publication and Website entitlement',async()=>{
+ fetchAcademy.mockRejectedValue({status:404});fetchLearningAccountContext.mockResolvedValue({academy:data.site});
+ mountHosted();expect(await screen.findByRole('heading',{name:'Fixed learning runtime'})).toBeTruthy();expect(fetchAcademy).not.toHaveBeenCalled();
+});
+it('keeps a hosted learner login return when membership authentication expires',async()=>{
+ fetchLearningAccountContext.mockRejectedValue({status:401});mountHosted();expect(await screen.findByRole('heading',{name:'Hosted login'})).toBeTruthy();
+ expect(screen.getByText('/academy/login?returnTo=%2Fmy-learning%2Fcourses%2Fown')).toBeTruthy();
+});
+function mountHosted(){
+ render(<MemoryRouter initialEntries={['/my-learning/courses/own']}><Routes><Route path="/my-learning/*" element={<HostedAcademyLearning subdomain="tenant"/>}/><Route path="/academy/login" element={<LoginLocation/>}/></Routes></MemoryRouter>);
+}
+
+function LoginLocation(){const location=useLocation();return <><h1>Hosted login</h1><p>{location.pathname+location.search}</p></>;}

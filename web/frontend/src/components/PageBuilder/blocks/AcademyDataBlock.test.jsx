@@ -56,3 +56,27 @@ it("renders selected existing instructors and only projected public course conte
   expect(screen.getByRole("link", { name: "Public course" }).getAttribute("href")).toBe("/academy/testing/courses/public");
   expect(screen.queryByText("Other")).toBeNull(); expect(screen.queryByText("private")).toBeNull();
 });
+
+it("hides the public contact form when Website access is unavailable", () => {
+  renderBlock("academyContact", { site: { subdomain: "academy" }, contact_enabled: false });
+  expect(screen.queryByRole("button")).toBeNull();
+});
+it("renders the published academy contact form when Website access is enabled", () => {
+  renderBlock("academyContact", { site: { subdomain: "academy" }, contact_enabled: true });
+  expect(screen.getByRole("button", { name: /Send/ })).toBeTruthy();
+});
+it("preserves the guest affiliate destination through Academy login without pointing to support", () => {
+ renderBlock('academyProgrammeInfo',{authenticated:false,site:{subdomain:'testing'},programme_info:{affiliate_terms:'Academy terms'}});
+ const link=screen.getByRole('link',{name:'Become an affiliate'});
+ expect(new URL(link.href).searchParams.get('returnTo')).toBe('/my-learning/affiliate');
+});
+
+it('shows configured Support actions and preserves the specialized return flow',()=>{
+ renderBlock('academyProgrammeInfo',{authenticated:false,site:{subdomain:'testing'},programme_info:{support_programme_name:'Learning Assistance',tuition_terms:'Terms'}});
+ const link=screen.getByRole('link',{name:'Learning Assistance'});expect(new URL(link.href).searchParams.get('returnTo')).toBe('/my-learning/programmes?kind=tuition');
+});
+it('lets guests read public opportunity detail before the contextual Forms login',()=>{
+ renderBlock('academyExchangeOpportunities',{authenticated:false,site:{subdomain:'testing'},exchange_opportunities:[{id:'own',title:'Exchange',short_description:'Summary',description:'Full public detail',requirements:'Active learner',capacity:2}]});
+ expect(screen.getByText('Full public detail').closest('details')).toBeTruthy();
+ expect(new URL(screen.getByRole('link',{name:'Apply'}).href).searchParams.get('returnTo')).toBe('/my-learning/exchange/own');
+});

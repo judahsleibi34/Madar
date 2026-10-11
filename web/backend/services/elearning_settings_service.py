@@ -29,6 +29,32 @@ def normalize_academy_email_domain(value):
 class ELearningSettings(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
+    learning_notifications_enabled: StrictBool = False
+    institution_enabled: StrictBool = False
+    institution_name: str = Field(default='', max_length=160)
+    institution_email_domains: list[str] = Field(default_factory=list, max_length=20)
+    institution_student_label: str = Field(default='Institution Student', min_length=1, max_length=120)
+    regular_student_label: str = Field(default='Regular Student', min_length=1, max_length=120)
+    affiliate_applications_enabled: StrictBool = True
+    tuition_applications_enabled: StrictBool = True
+    exchange_applications_enabled: StrictBool = True
+    exchange_opportunities_enabled: StrictBool = False
+    programmes_enabled: StrictBool = False
+    withdrawals_enabled: StrictBool = False
+    support_programme_name: str = Field(default="Support Programme", min_length=1, max_length=120)
+    exchange_programme_name: str = Field(default="Exchange Programme", min_length=1, max_length=120)
+    support_eligibility: Literal["verified_referral_sales", "active_learner"] = "verified_referral_sales"
+    referral_eligibility: Literal["registration", "purchase_or_affiliate"] = "registration"
+    tuition_sales_threshold: int | None = Field(default=None, ge=1, le=10000, strict=True)
+    minimum_withdrawal_amount: Decimal | None = Field(default=None, gt=0, max_digits=14, decimal_places=2)
+    withdrawal_methods: list[str] = Field(default_factory=list, max_length=20)
+    tuition_support_enabled: StrictBool = False
+    exchange_programme_enabled: StrictBool = False
+    affiliates_enabled: StrictBool = False
+    affiliate_terms: str = Field(default="", max_length=12000)
+    tuition_terms: str = Field(default="", max_length=12000)
+    exchange_terms: str = Field(default="", max_length=12000)
+    tuition_support_information_required: StrictBool = False
     referral_rewards_enabled: StrictBool = False
     referral_reward_amount: Decimal = Field(default=Decimal("0.00"), ge=0, max_digits=14, decimal_places=2)
     referral_reward_currency: str = Field(default="USD", pattern=r"^[A-Z]{3}$")
@@ -66,7 +92,15 @@ class ELearningSettings(BaseModel):
     logo_url: str = Field(default="", max_length=2048)
     primary_display_name: str = Field(default="", max_length=120)
 
-    @field_validator("academy_email_domains")
+    @field_validator("withdrawal_methods")
+    @classmethod
+    def valid_withdrawal_methods(cls, values):
+        values = [value.strip() for value in values]
+        if any(not 1 <= len(value) <= 120 for value in values) or len(set(values)) != len(values):
+            raise ValueError("Use unique payment method names of 1–120 characters")
+        return values
+
+    @field_validator("academy_email_domains", "institution_email_domains")
     @classmethod
     def validate_domains(cls, values):
         return list(dict.fromkeys(normalize_academy_email_domain(value) for value in values))
@@ -75,6 +109,8 @@ class ELearningSettings(BaseModel):
     def require_email_domains(self):
         if self.academy_registration == "email_domain" and not self.academy_email_domains:
             raise ValueError("Email domain registration requires at least one domain")
+        if self.institution_enabled and (not self.institution_name or not self.institution_email_domains):
+            raise ValueError("Institution verification requires a name and domains")
         return self
 
     @field_validator("logo_url", "academy_hero_image")
@@ -93,7 +129,11 @@ def settings_available(minimum_schema=117):
             .select("schema_version").eq("contract_key", "core").limit(1).execute()).data or []
     if not rows:
         raise HTTPException(status_code=503, detail="Schema state unavailable")
-    return int(rows[0]["schema_version"]) >= minimum_schema
+    version = int(rows[0]["schema_version"])
+    # Learning143 branches directly from141; it contains no Exchange142 SQL.
+    if minimum_schema == 142 and version >= 143:
+        return False
+    return version >= minimum_schema
 
 
 def get_settings(tenant_id):
@@ -118,8 +158,23 @@ def require_owned_image(tenant_id, image_url):
 
 
 def save_settings(tenant_id, settings):
+    from services.academy_capability_service import validate_settings_access
+    stored = get_settings(tenant_id)
+    settings = ELearningSettings(**{**stored, **settings.model_dump(mode="json", include=settings.model_fields_set)})
+    validate_settings_access(tenant_id, settings.model_dump(mode="json"), stored)
+    owner_fields = {'institution_enabled', 'institution_name', 'institution_email_domains', 'institution_student_label', 'regular_student_label', 'affiliate_applications_enabled', 'tuition_applications_enabled', 'exchange_applications_enabled', 'exchange_opportunities_enabled'}
+    if any(getattr(settings, key) != stored[key] for key in owner_fields) and not settings_available(140):
+        raise HTTPException(503, 'Academy owner settings require the database upgrade')
+    if settings.programmes_enabled and settings.tuition_support_enabled and settings.support_eligibility == 'verified_referral_sales' and settings.tuition_sales_threshold is None:
+        raise HTTPException(422, 'Configure the support sales threshold')
+    if settings.withdrawals_enabled and (settings.minimum_withdrawal_amount is None or not settings.withdrawal_methods):
+        raise HTTPException(422, 'Configure the withdrawal minimum and methods')
     if settings.referral_rewards_enabled and not settings_available(136):
         raise HTTPException(503, detail={"code": "academy_referrals_upgrade_required"})
+    if settings.learning_notifications_enabled and not settings_available(137):
+        raise HTTPException(503, detail={"code": "learning_notifications_upgrade_required"})
+    if settings.programmes_enabled and not settings_available(139):
+        raise HTTPException(503, detail={"code": "academy_programmes_upgrade_required"})
     require_owned_image(tenant_id, settings.logo_url)
     require_owned_image(tenant_id, settings.academy_hero_image)
     if settings.academy_enabled and not settings_available(131):

@@ -1,0 +1,29 @@
+[
+  {
+    "stage": "Student plays audio and toggles transcript"
+  },
+  {
+    "stage": "Wrong picture receives deterministic practice feedback"
+  },
+  {
+    "stage": "Picture retake receives correct feedback without an official score"
+  },
+  {
+    "stage": "Native microphone speaking practice plays back and finishes unscored"
+  },
+  {
+    "stage": "Student explicitly completes lesson after required practice"
+  },
+  {
+    "stage": "Mixed objective, real WAV recording and written answer submit as Pending Review"
+  },
+  {
+    "stage": "Assigned instructor listens, reads immutable rubric and finalizes both human grades"
+  },
+  {
+    "stage": "Canonical final result is visible to student"
+  },
+  {
+    "stage": "Existing completion hook issues the configured certificate"
+  }
+]

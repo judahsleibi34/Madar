@@ -6,13 +6,33 @@ import {
   within,
 } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 
+import useAcademyCapabilities from "../../hooks/useAcademyCapabilities";
 import DashboardSidebar from "./DashboardSidebar";
 
+vi.mock("../../hooks/useAcademyCapabilities", () => ({ default: vi.fn() }));
+beforeEach(() => useAcademyCapabilities.mockReturnValue({ can_manage: true, programme_flags:{affiliate:true,tuition:true,exchange:true}, support_programme_name: "Tuition Support", exchange_programme_name: "Exchange Programme", capabilities: { contact:true, affiliate: true, referrals: true, rewards: true, wallet: true, tuition: true, exchange: true, reports: true, transactions: true, withdrawal: true } }));
 afterEach(cleanup);
 
 const labels = {
+  "elearning.ui.edit_website": "Edit Website",
+  "sidebar.elearningCourses":"Courses",
+  "sidebar.elearningGroups":"Groups",
+  "sidebar.elearningInstructors":"Instructors",
+  "elearning.programmes.exchange": "Exchange Programme",
+  "elearning.programmes.tuition": "Tuition Support",
+  "elearning.programmes.rewards": "Rewards",
+  "elearning.programmes.referrals": "Referrals",
+  "elearning.programmes.affiliate": "Affiliates",
+  "elearning.programmes.students": "Students",
+  "elearning.owner.overview": "Academy overview",
+  "elearning.owner.opportunities": "Exchange Opportunities",
+  "elearning.owner.contacts": "Contact submissions",
+  "elearning.programmes.reports": "Reports",
+  "elearning.programmes.finance": "Finance",
+  "elearning.programmes.transactions": "Transactions",
+  "elearning.programmes.withdrawal": "Withdrawals",
   "sidebar.aria": "Dashboard sidebar",
   "sidebar.navigation": "Dashboard navigation",
   "sidebar.brand": "Madar",
@@ -33,7 +53,8 @@ const labels = {
   "elearning.commerce.plansPricing": "Plans / Pricing",
   "elearning.academy.learningPlans": "Learning Plans",
   "elearning.academy.academyAccess": "Academy & Access",
-  "elearning.academy.landingPage": "Landing Page",
+  "elearning.academy.landingPage": "Home Page",
+  "elearning.theme.title": "Theme",
   "elearning.certificates.myCertificates": "My Certificates",
   "sidebar.cvRerank": "CV Rerank",
   "sidebar.store": "Store",
@@ -352,6 +373,7 @@ it("expands E-Learning without navigating and opens its Settings child", () => {
   fireEvent.click(parent);
   expect(parent.getAttribute("aria-expanded")).toBe("true");
   expect(props.onNavigate).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: "elearning.ui.configuration_group" }));
   const settings = within(document.getElementById("dashboard-sidebar-elearning")).getByRole("link", { name: "Settings" });
   fireEvent.click(settings);
   expect(props.onNavigate).toHaveBeenCalledTimes(1);
@@ -367,11 +389,48 @@ it("closes E-Learning when another sidebar section opens", () => {
   expect(screen.getByRole("button", { name: "E-Learning" }).getAttribute("aria-expanded")).toBe("false");
 });
 
-it.each(["/e-learning/courses", "/e-learning/courses/course-a/structure", "/e-learning/groups", "/e-learning/instructors", "/e-learning/plans"])("keeps normalized E-Learning navigation and highlights one child at %s", (path) => {
+it.each(["/e-learning/courses", "/e-learning/courses/course-a/structure", "/e-learning/groups", "/e-learning/instructors", "/e-learning/plans", "/e-learning/theme", "/e-learning/landing-page", "/e-learning/students", "/e-learning/programmes/affiliate", "/e-learning/finance/referrals", "/e-learning/finance/rewards", "/e-learning/programmes/tuition", "/e-learning/programmes/exchange", "/e-learning/exchange-opportunities"])("keeps normalized E-Learning navigation and highlights one child at %s", (path) => {
   renderSidebar(path);
   const group = document.getElementById("dashboard-sidebar-elearning");
   const links = within(group).getAllByRole("link");
-  expect(links.map((link) => link.textContent.trim())).toEqual(["Courses", "Groups", "Instructors", "Learning Plans", "Landing Page", "Academy & Access", "Settings"]);
+  const allLabels = [];
+  for (const button of within(group).getAllByRole("button")) {
+    if (button.getAttribute("aria-expanded") !== "true") fireEvent.click(button);
+    allLabels.push(...within(group).getAllByRole("link").map(link => link.textContent.trim()));
+  }
+  expect(allLabels).toEqual(["Academy overview", "Courses", "Students", "Groups", "Instructors", "Learning Plans", "Affiliates", "Referrals", "Rewards", "Tuition Support", "Exchange Programme", "Transactions", "Withdrawals", "Reports", "Edit Website", "Theme", "Contact submissions", "Academy & Access", "Settings"]);
   expect(links.filter((link) => link.getAttribute("aria-current") === "page")).toHaveLength(1);
   expect(screen.getByRole("button", { name: "E-Learning" }).classList.contains("active")).toBe(false);
+});
+
+
+it.each(["/e-learning/finance/transactions", "/e-learning/finance/withdrawals"])("nests active Finance routes inside E-Learning at %s", (path) => {
+  renderSidebar(path);
+  const group = document.getElementById("dashboard-sidebar-elearning");
+  const finance = within(group).getByRole("button", { name: "Finance" });
+  expect(finance.getAttribute("aria-expanded")).toBe("true");
+  expect(within(group).getAllByRole("link").filter(link => link.getAttribute("aria-current") === "page")).toHaveLength(1);
+  fireEvent.click(screen.getByRole("button", { name: "E-Learning" }));
+  expect(screen.queryByRole("button", { name: "Finance" })).toBeNull();
+  expect(screen.queryByRole("link", { name: "Students" })).toBeNull();
+});
+
+
+it("hides modules that the academy plan does not include", () => {
+  useAcademyCapabilities.mockReturnValue({ can_manage: true, programme_flags:{tuition:true}, capabilities: { tuition: true }, support_programme_name: "Student Scholarship" });
+  renderSidebar("/e-learning/courses");
+  const group = document.getElementById("dashboard-sidebar-elearning");
+  for (const label of ["Affiliates", "Referrals", "Rewards", "Reports", "Exchange Programme"])
+    expect(within(group).queryByRole("link", { name: label })).toBeNull();
+  expect(within(group).queryByRole("button", { name: "Finance" })).toBeNull();
+  expect(within(group).getByRole("link", { name: "Courses" })).toBeTruthy();
+  fireEvent.click(within(group).getByRole("button", { name: "elearning.ui.applications_group" }));
+  expect(within(group).getByRole("link", { name: "Student Scholarship" })).toBeTruthy();
+});
+
+it("does not show academy programme management for a student", () => {
+  useAcademyCapabilities.mockReturnValue({ can_manage: false, capabilities: { affiliate: true, reports: true } });
+  renderSidebar("/e-learning/courses");
+  expect(screen.queryByRole("link", { name: "Affiliates" })).toBeNull();
+  expect(screen.queryByRole("link", { name: "Reports" })).toBeNull();
 });

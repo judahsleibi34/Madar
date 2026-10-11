@@ -1,4 +1,5 @@
 import { useState } from "react";
+import {hasAnswerValue} from "../utils/responsesUtils";
 export default function ResponsesDataBrowser({
   t,
   fields,
@@ -18,6 +19,10 @@ export default function ResponsesDataBrowser({
   onUpdateRecord,
   onDeleteRecord,
   showToast,
+  readOnly = false,
+  detailFields = fields,
+  renderAnswer,
+  detailFooter,
 }) {
   const [isEditing, setIsEditing] = useState(false);
   const [draftAnswers, setDraftAnswers] = useState({});
@@ -73,13 +78,13 @@ export default function ResponsesDataBrowser({
             <p>{t.submissionListText}</p>
           </div>
           <div className="responses-browser-actions">
-            <button
+            {onOpenSpreadsheet && <button
               type="button"
               className="responses-spreadsheet-button"
               onClick={onOpenSpreadsheet}
             >
               {t.reviewInExcel}
-            </button>
+            </button>}
             <span className="responses-browser-count">{displayedResponses.length}</span>
           </div>
         </div>
@@ -97,7 +102,7 @@ export default function ResponsesDataBrowser({
             </div>
           ) : displayedResponses.length > 0 ? (
             displayedResponses.map((response, index) => {
-              const primaryField = fields.find((field) => response.answers?.[field.id]);
+              const primaryField = fields.find((field) => hasAnswerValue(response.answers?.[field.id]));
               const primaryValue = primaryField
                 ? formatSavedValue(response.answers?.[primaryField.id])
                 : t.noAnswerPreview;
@@ -142,7 +147,7 @@ export default function ResponsesDataBrowser({
               <span className="responses-record-status">
                 {selectedResponse.status || t.newStatus}
               </span>
-              {!isEditing && (
+              {!readOnly && !isEditing && (
                 <>
                   <button type="button" onClick={() => {
                     setDraftAnswers(selectedResponse.answers || {});
@@ -198,7 +203,7 @@ export default function ResponsesDataBrowser({
             </div>
 
             <div className={`responses-answer-grid${isEditing ? " editing" : ""}`}>
-              {fields.map((field) => {
+              {detailFields.map((field) => {
                 const value = formatSavedValue(selectedResponse.answers?.[field.id]);
                 const originalValue = selectedResponse.answers?.[field.id];
                 const editorValue = draftAnswers[field.id];
@@ -226,12 +231,13 @@ export default function ResponsesDataBrowser({
                         />
                       )
                     ) : (
-                      <strong>{value || "-"}</strong>
+                      <strong>{renderAnswer ? renderAnswer(field, originalValue, selectedResponse) : value || "-"}</strong>
                     )}
                   </article>
                 );
               })}
             </div>
+            {detailFooter}
             {isEditing && (
               <div className="responses-record-editor-footer">
                 <button type="button" onClick={() => {
