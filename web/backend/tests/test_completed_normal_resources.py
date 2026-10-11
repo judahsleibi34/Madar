@@ -99,6 +99,20 @@ class CompletedNormalSpecificationTests(unittest.TestCase):
         self.assertEqual(spec(self.row),expected);self.assertEqual(self.row,before)
         changed['Mounts'][0]['RW']=True
         self.assertFalse(m.origin_spec_matches(changed,expected))
+    def test_docker_restart_default_dns_options_and_search_serialization(self):
+        from itertools import product
+        row=copy.deepcopy(self.row);row['Mounts']=row['Mounts'][:5]
+        row['HostConfig'].update(Dns=None,DnsOptions=None,DnsSearch=None)
+        expected=m.measured_spec(row);historical=spec(row)
+        for values in product((None,[]),repeat=3):
+            changed=copy.deepcopy(row);changed['HostConfig'].update(dict(zip(('Dns','DnsOptions','DnsSearch'),values)))
+            self.assertTrue(m.measured_spec_matches(changed,expected))
+            self.assertTrue(m.origin_spec_matches(changed,historical))
+        for field,value in (('Dns',['1.1.1.1']),('DnsOptions',['use-vc']),('DnsSearch',['other.invalid'])):
+            changed=copy.deepcopy(row);changed['HostConfig'][field]=value
+            self.assertFalse(m.measured_spec_matches(changed,expected))
+            self.assertFalse(m.origin_spec_matches(changed,historical))
+        self.assertEqual(spec(row),historical)
     def test_ambiguous_inventory_and_unbounded_legacy_search_fail_closed(self):
         changed=copy.deepcopy(self.row);changed['Mounts'][0]['Destination']=changed['Mounts'][1]['Destination']
         with self.assertRaisesRegex(RuntimeError,'mount_inventory_invalid'):m.measured_spec(changed)

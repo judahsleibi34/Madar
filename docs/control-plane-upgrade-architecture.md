@@ -1,5 +1,11 @@
 # Privileged control-plane upgrade architecture
 
+Completed-NORMAL restart measurement accepts only null/empty-list encoding of
+the three default Docker DNS fields, as demonstrated by an actual isolated
+daemon restart. Configured options/search domains remain security-critical.
+Historical specification hashes are compared with bounded default permutations,
+never rewritten.
+
 Completed-NORMAL prepare/activate/publish/adopt stages use a mutable prepared
 record scoped to the complete fresh admission digest. The root staging seal
 reads that same path. A matching application SHA and slot cannot adopt another

@@ -1,5 +1,11 @@
 # Madar production release acceptance policy
 
+Actual Docker restart serializes default `Dns`, `DnsOptions` and `DnsSearch`
+between null and empty lists. New completed-NORMAL specification measurements
+canonicalize only those empty defaults. Historical origin hashes use a bounded
+comparison without editing receipts. Configured DNS values and all other
+security, mount, network and identity fields remain binding.
+
 Completed-NORMAL migration verification uses the measured installed backup CLI
 with isolated Python and a bounded timeout. Installed helper layout must be
 tested; a development-only import cannot replace this execution. Verifier

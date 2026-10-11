@@ -29,7 +29,8 @@ def measured_spec(row):
             or len({m['Destination'] for m in mounts})!=len(mounts)):
         raise RuntimeError('completed_normal_mount_inventory_invalid')
     host=dict(row['HostConfig'])
-    if 'Dns' in host and host['Dns'] in (None,[]):host['Dns']=None
+    for field in ('Dns','DnsOptions','DnsSearch'):
+        if field in host and host[field] in (None,[]):host[field]=None
     return spec(dict(row,Mounts=sorted(mounts,key=lambda m:m['Destination']),HostConfig=host))
 
 
@@ -53,8 +54,16 @@ def origin_spec_matches(row, expected, *, started_worker=False):
     measured_spec(row) # reject ambiguous mount inventories before comparison
     mounts=row['Mounts']
     if len(mounts)>6:return False
-    return any(worker_spec_matches(dict(row,Mounts=list(order)),expected,started_worker=started_worker)
-               for order in permutations(mounts))
+    from itertools import product
+    # Preserve historical hashes; configured DNS values are never widened.
+    fields=[k for k in ('Dns','DnsOptions','DnsSearch')
+        if k in row['HostConfig'] and row['HostConfig'][k] in (None,[])]
+    for values in product((None,[]),repeat=len(fields)):
+        host=dict(row['HostConfig'],**dict(zip(fields,values)))
+        if any(worker_spec_matches(dict(row,HostConfig=host,Mounts=list(order)),expected,
+                started_worker=started_worker) for order in permutations(mounts)):
+            return True
+    return False
 
 def allocation(contract,slot):
     if slot not in PORTS: raise RuntimeError('completed_normal_allocation_slot_invalid')
