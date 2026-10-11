@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Stdlib-first boot/proxy gate for the freshly approved compatible handoff.
+"""Stdlib-first exact-source entrypoint for the compatible handoff.
 
-This entrypoint cannot start a cutover or issue operator approval. Its durable
-receipt must already exist from the separately approved complete operation.
+Preflight consumes no authorization. Execute requires a separately approved
+complete operation and independently verified full private rehearsal. Boot and
+proxy-gate require the durable receipt from that operation.
 Every privileged import is measured before loading it. No historical code is
 imported to manufacture a matching application/controller revision.
 """
@@ -67,16 +68,29 @@ def main():
     if os.geteuid()!=0 or not sys.flags.isolated or not sys.flags.dont_write_bytecode:
         raise RuntimeError('completed_upgrade_boot_isolated_root_required')
     parser=argparse.ArgumentParser()
-    parser.add_argument('mode',choices=('boot','proxy-gate'))
+    parser.add_argument('mode',choices=('preflight','execute','boot','proxy-gate'))
     for name in ('source-package','approved-source','approved-plan'):parser.add_argument('--'+name,required=True)
     args=parser.parse_args();package=Path(args.source_package)
     document,source=measure(package,args.approved_source,args.approved_plan)
     if Path(__file__)!=source/'web/scripts/continue_completed_normal_upgrade.py':
         raise RuntimeError('completed_upgrade_boot_entry_location_changed')
+    if args.mode in {'preflight','execute'} and (document.get('fixture_only') or document.get('production_authorization') is False):
+        raise RuntimeError('completed_upgrade_fixture_cannot_authorize_production')
     sys.path.insert(0,str(source/'web'))
     from deployment.lib.completed_normal_boot_actor import CompletedNormalBootActor
     actor=CompletedNormalBootActor(document,package,lambda:measure(package,args.approved_source,args.approved_plan))
-    result=actor.resume() if args.mode=='boot' else actor.proxy_gate()
+    if args.mode in {'preflight','execute'}:
+        from deployment.lib.completed_normal_execution import CompletedNormalUpgrade,verify_serving
+        from deployment.lib.completed_normal_evidence import verify_application_evidence,verify_complete_rehearsal
+        from deployment.lib.completed_normal_model import render_candidate_model
+        driver=CompletedNormalUpgrade(actor,
+            artifact_guard=lambda:verify_application_evidence(actor),
+            model_loader=lambda:render_candidate_model(actor),
+            acceptance_guard=lambda **kw:verify_serving(actor,**kw),
+            rehearsal_guard=lambda:verify_complete_rehearsal(actor))
+        try:result=driver.preflight() if args.mode=='preflight' else driver.execute()
+        finally:actor.ops.close_locks()
+    else:result=actor.resume() if args.mode=='boot' else actor.proxy_gate()
     print(json.dumps({'operation':args.mode,'result':result},sort_keys=True))
 
 if __name__=='__main__':

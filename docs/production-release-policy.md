@@ -2303,3 +2303,19 @@ for three complete READ_ONLY rounds spanning at least five seconds, within one
 180-second deadline. No backup or SQL intent may precede this observed worker
 fence. This wait does not start workers, issue a grant, or tolerate changed
 identities; it handles only transient availability during grant polling.
+
+Completed-NORMAL ordinary-backup restore prerequisites retain all current
+application role names and exclude only PostgreSQL's reserved `pg_*` roles,
+which the identical-major-version isolated cluster already creates during
+initdb. This modifies no source role, grants, credentials or historical dump.
+The logical restore's existing limitations on role attributes and ACL recovery
+remain explicit; it is not relabeled as complete platform authorization recovery.
+
+`continue_completed_normal_upgrade.py preflight` and `execute` construct the
+existing coordinator with measured application, model, complete-rehearsal and
+stable-runtime guards. Fixture documents cannot authorize production. Execution
+is permitted only after one fresh approval of the immutable full operation;
+preparation, CI, historical receipts and private tests provide no authorization.
+Stable runtime verification records whether a live customer mutation was
+actually performed; private authentication acceptance is never reported as a
+live customer login.

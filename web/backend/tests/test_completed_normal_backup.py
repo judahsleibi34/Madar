@@ -72,6 +72,12 @@ class CompletedBackupTests(unittest.TestCase):
         self.assertEqual(self.context.role_names(),('anon','authenticated','service_role'))
         self.kernel.runtime.command=lambda args:json.dumps(['anon','quoted-role'])
         with self.assertRaisesRegex(RuntimeError,'role_inventory_invalid'):self.context.role_names()
+
+    def test_initdb_reserved_roles_are_not_recreated_but_application_roles_remain(self):
+        self.kernel.runtime.command=lambda args:json.dumps(['anon','authenticated','pg_checkpoint','pg_monitor','postgres','service_role','supabase_auth_admin'])
+        self.assertEqual(self.context.role_names(),('anon','authenticated','postgres','service_role','supabase_auth_admin'))
+        self.kernel.runtime.command=lambda args:json.dumps(['anon','anon','pg_monitor'])
+        with self.assertRaisesRegex(RuntimeError,'role_inventory_invalid'):self.context.role_names()
     def test_actual_pipeline_receives_only_fresh_context_and_no_old_plan(self):
         with patch('deployment.lib.active_recovery_backup.capture_and_replicate',return_value={'verified':True}) as call:
             self.assertEqual(self.context.capture(),{'verified':True})

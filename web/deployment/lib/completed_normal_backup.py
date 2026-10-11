@@ -73,7 +73,10 @@ class CompletedNormalBackupContext:
         if (not isinstance(names,list) or not names or len(names)!=len(set(names))
                 or any(not re.fullmatch('[a-zA-Z_][a-zA-Z0-9_]*',str(n)) for n in names)):
             raise RuntimeError('completed_backup_role_inventory_invalid')
-        return tuple(names)
+        # initdb already creates PostgreSQL's reserved pg_* roles. They cannot
+        # be CREATE ROLE prerequisites in the independently restored cluster.
+        # Preserve every current application role; no source role is altered.
+        return tuple(name for name in names if not name.startswith('pg_'))
 
     def capture(self):
         from deployment.lib.active_recovery_backup import capture_and_replicate

@@ -28,6 +28,44 @@ from deployment.lib.emergency_routing_repair import exclusive
 from deployment.lib.provider_recovery_runtime import protected,readonly_configuration,file_digest
 
 
+def verify_serving(actor, *, schema,normal):
+    """Observe the exact candidate and stable routes; no customer mutation.
+
+    Authenticated application cases are independently pinned by the artifact
+    and complete-private-rehearsal gates. This runtime check does not claim a
+    live customer login or mutation when no approved credential is available.
+    """
+    import time
+    from deployment.lib.emergency_routing_repair import verification_window,AvailabilityFailure
+    if schema not in {115,136} or type(normal) is not bool:
+        raise RuntimeError('completed_upgrade_serving_mode_invalid')
+    first=None;successes=0
+    with verification_window(actor.runtime,180):
+        while True:
+            actor.runtime.budget(1);actor.guard();actor.proxy_identity()
+            try:
+                actor.candidate().round(normal=normal)
+                if actor.native()!=schema:raise RuntimeError('completed_upgrade_serving_schema_changed')
+                for base in ('http://127.0.0.1:8001','http://127.0.0.1:3000/api'):
+                    version=actor.runtime.json_http(base+'/health/version')
+                    if (version.get('release_sha')!=actor.contract['candidate']['source_sha']
+                            or version.get('release_slot')!=actor.contract['candidate']['slot']
+                            or version.get('schema_compatible_min')!=115 or version.get('schema_compatible_max')!=136
+                            or actor.runtime.json_http(base+'/health/recovery')!={'restricted':not normal,'business_writes_enabled':normal}):
+                        raise RuntimeError('completed_upgrade_stable_serving_identity_changed')
+                    if not normal:actor.runtime.denied(base)
+                actor.runtime.http_status('http://127.0.0.1:3000/')
+                actor.guard();actor.proxy_identity()
+            except AvailabilityFailure:first=None;successes=0
+            else:
+                successes+=1
+                if first is None:first=time.monotonic()
+                if successes>=3 and time.monotonic()-first>=5:break
+            time.sleep(actor.runtime.budget(1))
+    return {'schema':schema,'mode':'NORMAL' if normal else 'READ_ONLY','stable_frontend_http':200,
+        'stable_api_verified':True,'complete_rounds':successes,'authenticated_customer_mutation_executed':False}
+
+
 @contextmanager
 def protected_creation_mode():
     """Root staging must not inherit a permissive launcher umask."""

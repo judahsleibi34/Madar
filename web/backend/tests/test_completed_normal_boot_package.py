@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 import tempfile
 import unittest
+from types import SimpleNamespace
 from unittest.mock import patch
 
 WEB=Path(os.getenv('MADAR_TEST_REPOSITORY_ROOT') or Path(__file__).resolve().parents[2])
@@ -45,5 +46,16 @@ class PackageTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError,'source_bytes_changed'):self.measure()
         target.write_bytes(b'# fixture only\n');(self.package/'source/unreviewed.py').write_bytes(b'new')
         with self.assertRaisesRegex(RuntimeError,'inventory_changed'):self.measure()
+
+    def test_fixture_package_cannot_be_used_by_production_preflight_or_execute(self):
+        self.document['fixture_only']=True
+        (self.package/'plan.json').write_bytes(self.encode(self.document))
+        flags=SimpleNamespace(**{name:getattr(module.sys.flags,name) for name in dir(module.sys.flags) if not name.startswith('_')})
+        flags.isolated=1;flags.dont_write_bytecode=1
+        for mode in ('preflight','execute'):
+            argv=['continue_completed_normal_upgrade.py',mode,'--source-package',str(self.package),
+                '--approved-source',self.source_hash,'--approved-plan',self.sha(self.encode(self.document))]
+            with patch.object(module.sys,'argv',argv),patch.object(module.sys,'flags',flags),patch.object(module.os,'geteuid',return_value=0),patch.object(module,'__file__',str(self.package/'source/web/scripts/continue_completed_normal_upgrade.py')):
+                with self.assertRaisesRegex(RuntimeError,'fixture_cannot_authorize_production'):module.main()
 
 if __name__=='__main__':unittest.main()

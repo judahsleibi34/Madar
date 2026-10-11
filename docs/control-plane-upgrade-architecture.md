@@ -1313,3 +1313,16 @@ verification after revocation. Atomic authority publication alone does not prove
 the workers have observed it. Three rounds over at least five seconds and a
 strict 180-second deadline precede backup capture and migration intent. Security
 failures remain immediate, and compensation preserves current data.
+
+The completed-NORMAL backup adapter excludes initdb's reserved `pg_*` roles from
+CREATE ROLE prerequisites. An actual fresh-backup restore demonstrated the
+reserved-role prerequisite failure; filtering those server-owned names permits the
+same immutable backup to restore privately. Application roles remain included.
+This does not change live roles or widen the logical restore's evidence scope.
+
+The measured continuation entrypoint now exposes `preflight` and `execute` in
+addition to durable boot/proxy checks. Both require independent exact-image and
+complete private coordinator evidence; fixture packages are rejected before
+privileged imports. Execute still requires separate exact-package operator
+authorization. Stable-route verification uses three complete rounds spanning
+five seconds within 180 seconds and makes no unsupported live-login claim.
