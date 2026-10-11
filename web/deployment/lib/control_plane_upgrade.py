@@ -282,11 +282,13 @@ def validate_backup_timer_states(value: Any) -> dict[str, dict[str, str]]:
     return {name: dict(value[name]) for name in BACKUP_TIMERS}
 
 
-def atomic_json(path: Path, value: dict[str, Any]) -> None:
+def atomic_json(path: Path, value: dict[str, Any], *, owner: tuple[int,int] | None = None) -> None:
     path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     descriptor, temporary = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
     try:
         with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            if owner is not None:
+                os.fchown(handle.fileno(),*owner)
             json.dump(value, handle, indent=2, sort_keys=True)
             handle.write("\n")
             handle.flush()

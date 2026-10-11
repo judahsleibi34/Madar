@@ -177,10 +177,12 @@ class CompletedCompatibleReleaseTests(unittest.TestCase):
                 patch('os.geteuid',return_value=0)):
             p.start();self.addCleanup(p.stop)
     def test_link_measures_real_completion_and_preserves_history(self):
-        before=self.body.read_bytes();m.seal_compatible_release(self.contract,self.root,self.state_root)
+        before=self.body.read_bytes();stat=self.state_path.stat()
+        m.seal_compatible_release(self.contract,self.root,self.state_root)
         value=json.loads(self.state_path.read_text());marker=value['known_good_release']['completed_normal_upgrade']
         self.assertEqual(marker,{'context_sha256':self.root.name,'completion_sha256':hashlib.sha256(before).hexdigest()})
         self.assertEqual(value['history'],self.state['history']);self.assertEqual(self.body.read_bytes(),before)
+        self.assertEqual((self.state_path.stat().st_uid,self.state_path.stat().st_gid),(stat.st_uid,stat.st_gid))
         with self.assertRaisesRegex(RuntimeError,'release_state_invalid'):
             m.seal_compatible_release(self.contract,self.root,self.state_root)
     def test_partial_read_only_wrong_source_or_wrong_slot_cannot_claim_completion(self):

@@ -14,6 +14,35 @@ from deployment.lib.provider_recovery_runtime import protected,readonly_configur
 
 BASE=Path('/var/lib/madar-control-plane/normal-local-preparation')
 
+def compatible_package(package,source_hash,plan_hash):
+    """Measure frozen package DATA from either source or installed layout."""
+    from deployment.lib.completed_normal_admission import encoded
+    if (not re.fullmatch('[0-9a-f]{64}',str(source_hash))
+            or not re.fullmatch('[0-9a-f]{64}',str(plan_hash))
+            or package!=BASE/('normal-source-'+source_hash)):
+        raise RuntimeError('completed_compatible_package_invalid')
+    def frozen(path):
+        path=protected(path,private=True)
+        if path.stat().st_mode&0o277:raise RuntimeError('completed_compatible_package_not_frozen')
+        return path
+    manifest_body=frozen(package/'source-bundle.json').read_bytes()
+    plan_body=frozen(package/'plan.json').read_bytes()
+    manifest=json.loads(manifest_body);document=json.loads(plan_body)
+    if (hashlib.sha256(manifest_body).hexdigest()!=source_hash or hashlib.sha256(plan_body).hexdigest()!=plan_hash
+            or encoded(manifest)!=manifest_body or encoded(document)!=plan_body
+            or manifest.get('version')!=1 or document.get('source_bundle_sha256')!=source_hash
+            or manifest.get('source_sha')!=document.get('controller_source_sha')):
+        raise RuntimeError('completed_compatible_package_changed')
+    source=package/'source';files=manifest.get('files',{})
+    actual={p.relative_to(source).as_posix() for p in source.rglob('*') if p.is_file() or p.is_symlink()}
+    if not files or set(files)!=actual:raise RuntimeError('completed_compatible_inventory_changed')
+    for relative,expected in files.items():
+        path=Path(relative)
+        if (path.is_absolute() or '..' in path.parts or path.as_posix()!=relative
+                or path.suffix in {'.pyc','.pyo'} or file_digest(frozen(source/path))!=expected):
+            raise RuntimeError('completed_compatible_package_bytes_changed')
+    return document,source
+
 def seal_compatible_release(contract, root, state_root):
     """Link current mutable release state to genuine immutable completion DATA."""
     from deployment.lib.completed_normal_admission import digest
@@ -36,7 +65,8 @@ def seal_compatible_release(contract, root, state_root):
             or 'completed_normal_upgrade' in known):
         raise RuntimeError('completed_compatible_release_state_invalid')
     known['completed_normal_upgrade']={'context_sha256':root.name,'completion_sha256':file_digest(completion)}
-    atomic_json(state_path,state)
+    stat=state_path.stat()
+    atomic_json(state_path,state,owner=(stat.st_uid,stat.st_gid))
 
 def attest_compatible_runtime(operations,state,production_sha,installed_sha):
     """Read-only attestation of the ordinary release after admitted completion.
@@ -52,7 +82,6 @@ def attest_compatible_runtime(operations,state,production_sha,installed_sha):
     from deployment.lib.compatible_normal_boot import CompatibleNormalBoot
     from deployment.lib.emergency_routing_repair import Runtime
     from deployment.lib.active_recovery_inputs import controller_tree_digest
-    from scripts.continue_completed_normal_upgrade import measure
     known=state.get('known_good_release') or {};marker=known.get('completed_normal_upgrade')
     if (not isinstance(marker,dict) or set(marker)!={'context_sha256','completion_sha256'}
             or any(not re.fullmatch('[0-9a-f]{64}',str(v)) for v in marker.values())):
@@ -61,7 +90,7 @@ def attest_compatible_runtime(operations,state,production_sha,installed_sha):
     authorization=json.loads(protected(root/'operator-authorization.json',private=True).read_text())
     source_hash=authorization.get('source_bundle_sha256');plan_hash=authorization.get('plan_sha256')
     package=BASE/('normal-source-'+str(source_hash))
-    document,source=measure(package,source_hash,plan_hash)
+    document,source=compatible_package(package,source_hash,plan_hash)
     contract=dict(document['admission_contract'],plan_sha256=digest(document));candidate=contract['candidate']
     expected_authorization={'operation':OPERATION,'context_sha256':digest(contract),'plan_sha256':digest(document),
         'source_bundle_sha256':document['source_bundle_sha256'],'controller_sha':candidate['controller_sha'],
@@ -69,7 +98,7 @@ def attest_compatible_runtime(operations,state,production_sha,installed_sha):
     def guard():
         if (digest(contract)!=root.name or authorization!=expected_authorization
                 or json.loads(protected(root/'operator-authorization.json',private=True).read_text())!=authorization
-                or measure(package,source_hash,plan_hash)!=(document,source)
+                or compatible_package(package,source_hash,plan_hash)!=(document,source)
                 or production_sha!=installed_sha or installed_sha!=candidate['controller_sha']
                 or operations.repository_head()!=production_sha or operations.installed_sha()!=installed_sha
                 or controller_tree_digest()!=candidate['controller_tree_sha256']):
