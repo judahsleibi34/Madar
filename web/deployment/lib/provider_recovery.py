@@ -152,10 +152,11 @@ def require_provider_recovery_authorization(contract: RecoveryContract) -> None:
                                  required_context_digest=digest)
 
 
-def reject_ordinary_operation(state_root: Path) -> None:
+def reject_ordinary_operation(state_root: Path, application_sha: str | None = None) -> None:
     """Prevent ordinary automation or migration from taking over recovery."""
     if (state_root / "provider-recovery.json").exists() or (state_root / "provider-recovery.json").is_symlink():
-        raise RuntimeError("provider_recovery_requires_separate_operator_exit")
+        from deployment.lib.completed_normal_admission import require_admission
+        require_admission(state_root, application_sha)
 
 
 class ProviderRecoveryTransaction:

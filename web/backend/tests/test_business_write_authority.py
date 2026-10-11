@@ -51,6 +51,35 @@ class BusinessWriteAuthorityTests(unittest.TestCase):
         self.assertFalse(authority.restricted())
         self.assertFalse(recovery.restricted())
 
+    def test_fresh_bridge_grant_preserves_fencing_at_every_supported_schema(self):
+        self.data.update(version=2, compatible_min=115, compatible_max=136)
+        with patch.dict(os.environ, {"SCHEMA_COMPATIBLE_MIN":"115",
+                "SCHEMA_COMPATIBLE_MAX":"136", "SUPABASE_URL":"http://madar-supabase:8000",
+                "MADAR_SUPABASE_CLIENT_NETWORK":"madar-supabase-client"}):
+            for schema in range(115,137):
+                self.data.update(schema=schema,mode="READ_ONLY");self.write()
+                recovery.validate_configuration()
+                self.assertFalse(recovery.worker_consumption_allowed())
+                self.assertEqual(self.client.post("/auth/signup",json={}).status_code,503)
+                self.data["mode"]="NORMAL";self.write()
+                self.assertTrue(recovery.worker_consumption_allowed())
+                self.assertFalse(authority.restricted())
+
+    def test_bridge_grant_cannot_widen_legacy_or_altered_runtime_bindings(self):
+        self.data.update(version=2,compatible_min=115,compatible_max=136)
+        with patch.dict(os.environ,{"SCHEMA_COMPATIBLE_MIN":"115","SCHEMA_COMPATIBLE_MAX":"136"}):
+            for field,value in [("schema",114),("schema",137),("schema",True),
+                    ("compatible_min",114),("compatible_max",137),("compatible_max",True),
+                    ("release_sha","c"*40),("contract_digest","d"*64)]:
+                original=dict(self.data);self.data[field]=value;self.write()
+                with self.assertRaises(RuntimeError):authority.read_authority()
+                self.data=original
+            self.write()
+            with patch.dict(os.environ,{"SCHEMA_COMPATIBLE_MAX":"115"}):
+                with self.assertRaises(RuntimeError):authority.read_authority()
+            self.data.update(version=1);self.write()
+            with self.assertRaises(RuntimeError):authority.read_authority()
+
     def test_modified_binding_denies_every_request(self):
         for field, value in [("mode", "ALLOW"), ("schema", 116), ("release_sha", "c" * 40),
                              ("contract_digest", "d" * 64), ("version", 2)]:

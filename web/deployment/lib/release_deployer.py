@@ -118,8 +118,8 @@ class ReleaseDeployer:
         self.lock_file = state_root / "deploy.lock"
 
     def _state(self) -> dict[str, Any]:
-        if (self.state_root / "provider-recovery.json").exists():
-            raise RuntimeError("provider_recovery_requires_separate_operator_exit")
+        from deployment.lib.provider_recovery import reject_ordinary_operation
+        reject_ordinary_operation(self.state_root, getattr(self, "_requested_sha", None))
         try:
             state = json.loads(self.state_file.read_text(encoding="utf-8"))
             return state if isinstance(state, dict) else {}
@@ -370,6 +370,7 @@ class ReleaseDeployer:
     def deploy(self, sha: str, *, manual_retry: bool = False) -> dict[str, Any]:
         if len(sha) != 40 or any(char not in "0123456789abcdef" for char in sha.lower()):
             raise ValueError("candidate must be a full lowercase Git SHA")
+        self._requested_sha = sha
         self.state_root.mkdir(parents=True, exist_ok=True, mode=0o700)
         with self.lock_file.open("a+", encoding="utf-8") as lock:
             try:

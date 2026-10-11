@@ -46,6 +46,21 @@ class ActiveRuntimeTests(unittest.TestCase):
     def test_modified_image_or_spec_fails(self):
         self.rows['backend']['Image']='sha256:'+'0'*64
         with self.assertRaisesRegex(RuntimeError,'identity_changed'):self.verifier.identities(workers_started=True)
+
+    def test_completed_origin_mount_comparator_is_explicit_and_preserves_security(self):
+        from deployment.lib.completed_normal_resources import origin_spec_matches
+        row=self.rows['backend']
+        row['Mounts']=[{'Destination':'/a','Source':'/first','RW':False},
+                       {'Destination':'/b','Source':'/second','RW':False}]
+        self.record['runtimes']['backend']['spec_sha256']=spec(row);self.save()
+        row['Mounts'].reverse()
+        with self.assertRaisesRegex(RuntimeError,'identity_changed'):
+            self.verifier.identities(workers_started=True)
+        self.verifier.spec_matcher=origin_spec_matches
+        self.verifier.identities(workers_started=True)
+        row['Mounts'][0]['RW']=True
+        with self.assertRaisesRegex(RuntimeError,'identity_changed'):
+            self.verifier.identities(workers_started=True)
     def test_changed_network_id_or_role_fails(self):
         self.rows['backend']['NetworkSettings']['Networks']['normal']['NetworkID']='0'*64
         with self.assertRaisesRegex(RuntimeError,'attachment_changed'):self.verifier.identities(workers_started=True)
@@ -74,3 +89,16 @@ class ActiveRuntimeTests(unittest.TestCase):
         for row in self.rows.values():row['State']['Running']=False
         self.verifier.identities(workers_started=True,require_running=False)
         self.assertTrue(all(not row['State']['Running'] for row in self.rows.values()))
+
+    def test_boot_accepts_only_default_dns_serialization_on_same_stopped_ids(self):
+        for kind,row in self.rows.items():
+            row['HostConfig']['Dns']=None
+            self.record['runtimes'][kind]['spec_sha256']=spec(row)
+            row['HostConfig']['Dns']=[]
+            row['State']['Running']=False
+        self.save()
+        self.verifier.identities(workers_started=True,require_running=False)
+        self.assertTrue(all(not row['State']['Running'] for row in self.rows.values()))
+        self.rows['backend']['HostConfig']['Dns']=['1.1.1.1']
+        with self.assertRaisesRegex(RuntimeError,'identity_changed'):
+            self.verifier.identities(workers_started=True,require_running=False)

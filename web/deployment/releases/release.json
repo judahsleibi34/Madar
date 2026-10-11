@@ -1,14 +1,15 @@
 {
   "release_metadata_version": 1,
-  "deployment_profile": "local-supabase-schema115",
+  "deployment_profile": "local-supabase-schema115-136",
   "schema": {
     "compatible_min": 115,
-    "compatible_max": 115,
-    "target": 115,
-    "migration_class": "none",
+    "compatible_max": 136,
+    "target": 136,
+    "migration_class": "forward-compatible",
     "rollback_compatible_min": 115,
     "rollback_compatible_max": 115
   },
-  "migration_policy": "none",
-  "notes": "Non-migrating local Supabase cutover candidate, tested only on core schema115. Preserve all applied schema history and existing manifest files. No automatic migration selected; schema116 catalog writes remain gated. Rollback requires the validated compatible local runtime and local data, never hosted HTTP APIs."
+  "migration_policy": "automatic-after-known-good-backup-first-forward-repair",
+  "migration_manifest": "migrations-116-136.json",
+  "notes": "Schema115-to-136 bridge candidate. Exact-image acceptance at both endpoints and complete current-data rehearsal are required before separately approved production deployment. Promote the compatible bridge at schema115, independently verify the current-data backup, then apply only checksum-pinned migrations116..136. Prior schema115-only releases are fallback-compatible only before schema advancement; retain this bridge for forward repair afterward. Referral payouts, redemptions and real payment activation remain out of scope."
 }

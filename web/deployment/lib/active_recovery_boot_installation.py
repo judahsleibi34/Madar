@@ -87,10 +87,11 @@ class ActiveRecoveryBootInstallation:
         exclusive(self.root/'proxy-unit-preimage.txt',old.encode())
         body=('[Unit]\nDescription=Madar exact-plan boot reconciliation\n'
             f'Requires=docker.service {listener}\nAfter=docker.service {listener}\n'
+            'PartOf=docker.service\n'
             '[Service]\nType=oneshot\nRemainAfterExit=yes\nUser=root\nGroup=root\nUMask=0077\n'
             'Environment=PATH=/usr/sbin:/usr/bin:/sbin:/bin\nEnvironment=HOME=/root\nEnvironment=LANG=C.UTF-8\n'
             f'ExecStart={self.command("resume-boot")}\nTimeoutStartSec=300\nNoNewPrivileges=yes\n'
-            '[Install]\nWantedBy=multi-user.target\n').encode()
+            '[Install]\nWantedBy=multi-user.target docker.service\n').encode()
         dropin=('[Unit]\n'+f'Requires={self.name}\nAfter={self.name}\n'
             '[Service]\nExecStartPre=\n'+f'ExecStartPre={self.command("check-proxy-gate")}\n').encode()
         exclusive(self.root/self.name,body)

@@ -169,11 +169,12 @@ class RecoveryTransport(httpx.BaseTransport):
 def validate_configuration() -> None:
     from services.business_write_authority import read_authority
     authority = read_authority()
+    maximum = "136" if authority is not None and authority["version"] == 2 else "115"
     if authority is not None and (
             os.getenv("SUPABASE_URL") != "http://madar-supabase:8000" or
             os.getenv("MADAR_SUPABASE_CLIENT_NETWORK") != "madar-supabase-client" or
             os.getenv("SCHEMA_COMPATIBLE_MIN") != "115" or
-            os.getenv("SCHEMA_COMPATIBLE_MAX") != "115"):
+            os.getenv("SCHEMA_COMPATIBLE_MAX") != maximum):
         raise RuntimeError("business_write_authority_runtime_contract_invalid")
     if not enabled():
         return

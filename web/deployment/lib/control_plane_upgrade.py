@@ -30,6 +30,11 @@ from typing import Any
 LIB_ROOT = Path(__file__).resolve().parent
 if str(LIB_ROOT) not in sys.path:
     sys.path.insert(0, str(LIB_ROOT))
+# Both the source and installed layouts contain deployment/ below this trusted
+# parent. Isolated launcher execution must find its measured sibling package.
+PACKAGE_ROOT = LIB_ROOT.parent.parent
+if str(PACKAGE_ROOT) not in sys.path:
+    sys.path.insert(0, str(PACKAGE_ROOT))
 
 from control_plane_filesystem import (
     FilesystemPreflightError,
@@ -277,11 +282,13 @@ def validate_backup_timer_states(value: Any) -> dict[str, dict[str, str]]:
     return {name: dict(value[name]) for name in BACKUP_TIMERS}
 
 
-def atomic_json(path: Path, value: dict[str, Any]) -> None:
+def atomic_json(path: Path, value: dict[str, Any], *, owner: tuple[int,int] | None = None) -> None:
     path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     descriptor, temporary = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
     try:
         with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            if owner is not None:
+                os.fchown(handle.fileno(),*owner)
             json.dump(value, handle, indent=2, sort_keys=True)
             handle.write("\n")
             handle.flush()
@@ -652,9 +659,22 @@ class SystemOperations:
                 return slot
         raise UpgradeError("active_proxy_target_unknown")
 
+    def completed_compatible_binding(self,state):
+        from deployment.lib.completed_normal_baseline import attest_compatible_runtime
+        try:
+            return attest_compatible_runtime(self,state,self.repository_head(),self.installed_sha())
+        except (RuntimeError,ValueError,KeyError,IndexError,OSError) as error:
+            raise UpgradeError('completed_compatible_runtime_invalid') from error
+
     def live_schema(self, slot: str) -> int:
         if slot not in SLOT_PORTS:
             raise UpgradeError("active_slot_invalid")
+        state=json_file(self.state_root/'state.json','release_state_invalid')
+        if 'completed_normal_upgrade' in (state.get('known_good_release') or {}):
+            binding=self.completed_compatible_binding(state)
+            if state.get('active_slot')!=slot:
+                raise UpgradeError('completed_compatible_slot_changed')
+            return binding['schema']
         code = (
             "from database import service_supabase;"
             "r=service_supabase.table('application_schema_state')"
@@ -680,6 +700,29 @@ class SystemOperations:
             self.state_root / "state.json", "release_state_invalid"
         )
         known_good = release_state.get("known_good_release") or {}
+        if 'completed_normal_upgrade' in known_good:
+            binding=self.completed_compatible_binding(release_state)
+            if binding['application_sha']!=sha or binding['schema']!=schema:
+                raise UpgradeError('completed_compatible_migration_changed')
+            return 'completed'
+        if known_good.get("sha") == sha and known_good.get("runtime_only_rollback") is True:
+            # A completed NORMAL continuation has a protected execution contract,
+            # not an ordinary immutable release checkout. Re-attest that exact
+            # contract and positive authority; a missing file alone proves nothing.
+            from deployment.lib.completed_normal_baseline import discover_split
+            try:
+                binding = discover_split(
+                    self, release_state, self.repository_head(), self.installed_sha()
+                )
+            except (RuntimeError, ValueError, KeyError, IndexError) as error:
+                raise UpgradeError("completed_normal_migration_contract_invalid") from error
+            if (binding["application_sha"] != sha or schema != 115
+                    or known_good.get("migration_policy") != "none"):
+                raise UpgradeError("completed_normal_migration_contract_invalid")
+            migration_dir = self.state_root / "migrations" / sha
+            if migration_dir.exists() or migration_dir.is_symlink():
+                raise UpgradeError("completed_normal_migration_state_conflict")
+            return "not_requested"
         if known_good.get("sha") == sha and known_good.get("schema_recovery") is True:
             active_slot = str(release_state.get("active_slot") or "")
             fallback_value = release_state.get("compatible_fallback_release")
@@ -1209,6 +1252,27 @@ class SystemOperations:
         *,
         allow_refreshable_workers: bool = False,
     ) -> None:
+        if 'completed_normal_upgrade' in known_good:
+            state=json_file(self.state_root/'state.json','release_state_invalid')
+            binding=self.completed_compatible_binding(state)
+            if (allow_refreshable_workers or state.get('active_slot')!=slot
+                    or state.get('known_good_release')!=known_good
+                    or binding['application_sha']!=known_good.get('sha')):
+                raise UpgradeError('completed_compatible_runtime_changed')
+            return
+        if known_good.get("runtime_only_rollback") is True:
+            from deployment.lib.completed_normal_baseline import attest_runtime
+            state = json_file(self.state_root / "state.json", "release_state_invalid")
+            if allow_refreshable_workers or state.get("known_good_release") != known_good:
+                raise UpgradeError("completed_normal_runtime_contract_invalid")
+            try:
+                binding = attest_runtime(self, state)
+            except (RuntimeError, ValueError, KeyError, IndexError) as error:
+                raise UpgradeError("completed_normal_runtime_contract_invalid") from error
+            if (state.get("active_slot") != slot
+                    or binding["application_sha"] != known_good.get("sha")):
+                raise UpgradeError("completed_normal_runtime_contract_invalid")
+            return
         images = known_good.get("images") or {}
         if not isinstance(images, dict):
             raise UpgradeError("known_good_image_state_invalid")
@@ -1533,8 +1597,20 @@ class SystemOperations:
         self.require_clean_repository()
         production_sha = self.repository_head()
         installed_sha = self.installed_sha()
+        state=json_file(self.state_root/'state.json','release_state_invalid')
+        serving_sha=production_sha
+        source_roles=None
+        if (state.get('known_good_release') or {}).get('sha')!=production_sha:
+            if 'completed_normal_upgrade' in (state.get('known_good_release') or {}):
+                source_roles=self.completed_compatible_binding(state)
+            else:
+                from deployment.lib.completed_normal_baseline import discover_split
+                try:source_roles=discover_split(self,state,production_sha,installed_sha)
+                except (RuntimeError,ValueError,KeyError,IndexError) as error:
+                    raise UpgradeError('completed_normal_source_roles_invalid') from error
+            serving_sha=source_roles['application_sha']
         serving = self.attest_serving(
-            production_sha,
+            serving_sha,
             current_origin=True,
         )
         timer = self.systemctl_state("madar-auto-deploy.timer")
@@ -1554,6 +1630,7 @@ class SystemOperations:
             "schema": serving["schema"],
             "migration": serving["migration"],
             "timer": timer,
+            "source_roles":source_roles,
         }
 
     def current_recovery_preflight(
@@ -2562,9 +2639,64 @@ class SystemOperations:
     def write_authorization(
         self, approved_sha: str, *, recovery: bool = False,
         schema: int | None = None, rehearsal_sha256: str | None = None,
+        completed_normal_contract: dict | None = None,
+        migration_resumption: dict | None = None,
     ) -> None:
         require_root_directory(self.runtime_root, mode=0o711)
         document = self.interlock_document(approved_sha)
+        operation = "schema_recovery" if recovery else "release"
+        context = None
+        witnesses = {}
+        witness_hashes = {}
+        if completed_normal_contract is not None:
+            from deployment.lib.completed_normal_admission import (
+                ADMISSIONS, OPERATION, digest, validate_contract, verify_history, require_candidate_authority,
+                measure_provider_record,
+            )
+            from deployment.lib.provider_recovery_runtime import protected
+            validate_contract(completed_normal_contract)
+            if recovery or completed_normal_contract['candidate']['controller_sha'] != approved_sha:
+                raise UpgradeError('completed_normal_authorization_scope_invalid')
+            verify_history(completed_normal_contract)
+            operation, schema = OPERATION, 115
+            rehearsal_sha256 = completed_normal_contract['rehearsal_sha256']
+            context = digest(completed_normal_contract)
+            admission_path = ADMISSIONS/context/'admission.json'
+            if admission_path.exists():
+                admission = json.loads(protected(admission_path).read_text())
+                if admission.get('contract') != completed_normal_contract or admission.get('operation') != OPERATION:
+                    raise UpgradeError('completed_normal_authorization_admission_changed')
+                witnesses['completed_normal_admission'] = admission
+                witnesses['candidate_authority'] = require_candidate_authority(completed_normal_contract)
+                witnesses['provider_record_witness'] = measure_provider_record(
+                    self.state_root, completed_normal_contract['provider_record_sha256'])
+                witness_hashes = {'admission_sha256':digest(admission),
+                    'candidate_authority_sha256':digest(witnesses['candidate_authority']),
+                    'provider_record_witness_sha256':digest(witnesses['provider_record_witness'])}
+                runtime_record=admission_path.parent/'candidate-runtime.json'
+                if runtime_record.exists():
+                    witnesses['candidate_runtime']=json.loads(protected(runtime_record,private=True).read_text())
+                    witness_hashes['candidate_runtime_sha256']=digest(witnesses['candidate_runtime'])
+                stage_record=admission_path.parent/'candidate-staged-runtime.json'
+                if stage_record.exists():
+                    witnesses['candidate_stage']=json.loads(protected(stage_record,private=True).read_text())
+                    witness_hashes['candidate_stage_sha256']=digest(witnesses['candidate_stage'])
+                migration_record=admission_path.parent/'migration-inputs.json'
+                if migration_record.exists():
+                    from deployment.lib.completed_normal_migration import issue_database_lease, intent_document
+                    witnesses['migration_inputs']=json.loads(protected(migration_record,private=True).read_text())
+                    if witnesses['migration_inputs'].get('intent')!=intent_document(completed_normal_contract):
+                        raise UpgradeError('completed_normal_migration_inputs_changed')
+                    witnesses['migration_database']=issue_database_lease(completed_normal_contract)
+                    witness_hashes.update(migration_inputs_sha256=digest(witnesses['migration_inputs']),
+                        migration_database_sha256=digest(witnesses['migration_database']))
+        if migration_resumption is not None:
+            if completed_normal_contract is None:
+                raise UpgradeError('completed_forward_parent_contract_required')
+            from deployment.lib.completed_normal_forward import authorize_witness
+            from deployment.lib.completed_normal_admission import digest
+            witnesses['migration_resumption']=authorize_witness(completed_normal_contract,migration_resumption)
+            witness_hashes['migration_resumption_sha256']=digest(migration_resumption)
         token = secrets.token_urlsafe(32)
         descriptor, temporary = tempfile.mkstemp(prefix=".authorized.", dir=self.runtime_root)
         try:
@@ -2573,9 +2705,11 @@ class SystemOperations:
                     {
                         "approved_sha": approved_sha,
                         "token": token,
-                        "operation": "schema_recovery" if recovery else "release",
+                        "operation": operation,
                         "schema": schema,
                         "rehearsal_sha256": rehearsal_sha256,
+                        "context_sha256": context,
+                        **witnesses,
                     }, handle,
                     sort_keys=True,
                 )
@@ -2592,9 +2726,11 @@ class SystemOperations:
                         token.encode("utf-8")
                     ).hexdigest(),
                     status="authorized_cycle",
-                    operation="schema_recovery" if recovery else "release",
+                    operation=operation,
                     schema=schema,
                     rehearsal_sha256=rehearsal_sha256,
+                    context_sha256=context,
+                    **witness_hashes,
                 ),
             )
             os.chmod(self.interlock_file, 0o644)
@@ -2615,23 +2751,45 @@ class SystemOperations:
         *,
         recovery: bool = False,
         migration_repair: bool = False,
+        completed_normal_contract: dict | None = None,
+        completed_normal_mode: str | None = None,
+        migration_resumption: dict | None = None,
     ) -> None:
         if recovery and migration_repair:
             raise UpgradeError("deployment_operation_mode_invalid")
-
-        self.write_authorization(
-            approved_sha,
-            recovery=recovery,
-            schema=getattr(self, "recovery_schema", None) if recovery else None,
-            rehearsal_sha256=(
-                getattr(self, "recovery_rehearsal_sha256", None)
-                if recovery else None
-            ),
-        )
+        modes={'prepare':'--prepare-only','activate':'--activate-prepared',
+               'publish':'--publish-prepared','adopt':'--adopt-prepared','migrate':'--automatic-migrate',
+               'refresh':'--refresh-active-workers'}
+        if completed_normal_contract is not None:
+            from deployment.lib.completed_normal_admission import validate_contract
+            validate_contract(completed_normal_contract)
+            if (recovery or migration_repair or completed_normal_mode not in modes
+                    or completed_normal_contract['candidate']['controller_sha']!=approved_sha):
+                raise UpgradeError('completed_normal_deploy_stage_invalid')
+            extra={} if migration_resumption is None else {'migration_resumption':migration_resumption}
+            if migration_resumption is not None and completed_normal_mode not in {'migrate','refresh'}:
+                raise UpgradeError('completed_forward_stage_invalid')
+            self.write_authorization(approved_sha,completed_normal_contract=completed_normal_contract,**extra)
+        else:
+            if completed_normal_mode is not None or migration_resumption is not None:
+                raise UpgradeError('completed_normal_deploy_contract_required')
+            self.write_authorization(
+                approved_sha,
+                recovery=recovery,
+                schema=getattr(self, "recovery_schema", None) if recovery else None,
+                rehearsal_sha256=(
+                    getattr(self, "recovery_rehearsal_sha256", None)
+                    if recovery else None
+                ),
+            )
         unit = f"madar-control-plane-upgrade-{os.getpid()}-{label}"
         started = time.time()
         try:
-            if recovery:
+            if completed_normal_contract is not None:
+                entrypoint=[str(self.control_root/'bin/madar-release-deploy'),
+                    completed_normal_contract['candidate']['source_sha'],modes[completed_normal_mode],
+                    '--slot',completed_normal_contract['candidate']['slot']]
+            elif recovery:
                 entrypoint = [
                     str(self.control_root / "bin/madar-release-deploy"),
                     approved_sha,

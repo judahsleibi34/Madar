@@ -7,8 +7,9 @@ candidate: `learning-141-143-path.json`, `migrations-141-143-learning.json`,
 `schema-141-143-learning-bridge.json`, and mirrored
 `143_complete_learning_capabilities.sql`. It contains exactly one transition
 from141 to143 and explicitly excludes142. Migration142, all001–141 SQL, all
-retained manifests, and active `release.json` remain unchanged. The active
-production115 profile still selects no SQL; the existing application DB is141.
+retained manifests, and active `release.json` remain unchanged. The incoming main release retains its reviewed115→136 bridge and selects
+only migrations116–136. The learning137–143 candidates remain unselected;
+the existing local application database is141.
 Finalization is source authority for this candidate, not production deployment,
 installation, traffic switching, or upgrading the application database.
 
@@ -52,7 +53,8 @@ validation evidence and any remaining acceptance limits.
 The exact checksum-pinned `migrations-115-142.json` /
 `schema-114-142-bridge.json` pair retains immutable115–141 and adds mirrored142.
 Both source validators accept this explicit transition and namespace001–142 only.
-Active production115 remains non-migrating and selects no SQL. No production
+The retained exact115 profile selects no SQL. The active main bridge selects
+only116–136; this candidate remains unselected. No production
 installation, migration or deployment authority is granted; orchestration is unchanged.
 
 142 links tenant-owned opportunities to independent E-Learning Forms and records
@@ -69,7 +71,7 @@ requires its accepted bridge, verified backup and governed upgrade.
 The exact checksum-pinned `migrations-115-141.json` /
 `schema-114-141-bridge.json` pair retains immutable115–140 and adds mirrored141.
 Both source validators accept only this additional transition and namespace001–141.
-Active production115 remains non-migrating with no selected SQL. No production
+The active main115→136 bridge selects only116–136; Forms141 remains unselected. No production
 installation, migration or deployment authority is granted.
 
 141 adds tenant-owned learning form definitions, immutable versions/responses,
@@ -87,8 +89,8 @@ bridge/backup/governed upgrade; orchestration is unchanged.
 The exact `migrations-115-140.json` / `schema-114-140-bridge.json` pair extends
 immutable115–139 history with mirrored140 only. `academy_owner_candidate.py`
 pins the new descriptors/SQL and both validators accept only this additional
-transition in namespace001–140. The active production115 contract remains
-non-migrating with no selected SQL. No production authority is granted here.
+transition in namespace001–140. Main’s reviewed115→136 bridge selects
+only116–136; the owner140 candidate remains unselected. No production authority is granted here.
 
 140 adds tenant/application-owned private document metadata, tenant-owned
 exchange opportunities and a composite opportunity link on existing applications.
@@ -116,8 +118,8 @@ The retained `migrations-115-139.json` / `schema-114-139-bridge.json` pair exten
 exactly the immutable115–138 prefix. `academy_candidate.py` pins the new artifacts
 and mirrored139 SQL; both release validators accept only this additional transition
 and the exact001–139 namespace. Existing137/138 SQL and their pinned descriptors
-remain unchanged. The active schema115 release still selects no SQL and has
-migration class/policy `none`. This candidate grants no production authority.
+remain unchanged. Main’s reviewed115→136 bridge selects only116–136;
+the academy139 candidate remains unselected. This candidate grants no production authority.
 
 139 translates the historical `eduhope_enabled` settings key into the generic
 `programmes_enabled` key, preserving historical enabled tenant behavior and
@@ -169,13 +171,81 @@ for production. Development uses an explicit loopback-only local contract and
 consumer launcher; production recovery and worker-consumption fences remain.
 
 
+An interrupted admitted SQL chain has a separate SQL-only forward-resumption
+operation. A new immutable plan binds the parent failure as DATA, actual partial
+schema, unchanged customer projection, current grant/worker/runtime identities,
+and prior executor hash. A fresh root receipt and LoadCredential witness select
+a NEW executor record; the consumed record is never overwritten. Checksums and
+the live database govern skipped committed transitions. Completion ends READ_ONLY
+at136 with the accepted bridge, awaiting a separate normal-completion operation.
+There is no stale restore, schema115 application rollback or automatic retry.
+Admitted SQL error records use fixed exception types and numeric migration
+phases; raw PostgreSQL details never enter that child journal or executor record.
+
+Completed-NORMAL verifies the sealed source backup through the ordinary
+controller's installed helper directory, using isolated Python with a bounded
+timeout and sanitized failure. It does not assume a development-only top-level
+`scripts` package exists. Checksum/release/schema bindings precede connections.
+
+The completed-NORMAL coordinator snapshots all original columns of the96 public
+tables and five Auth/storage tables in a read-only repeatable snapshot before
+SQL intent. It compares the same projection after migration before sealing
+completion or granting target writes. Added tables/columns are allowed; only
+the schema-state value may change in the original projection. Existing password
+verifiers, MFA factors, tenant records and object metadata must remain exact.
+Unexpected differences, including concurrent Auth changes, fail closed for
+independent reconciliation. The gate never restores or reverses customer data.
+
+The admitted completed-NORMAL migration child uses a fresh root-issued native
+database address/credential lease through systemd LoadCredential. It binds the
+database ID, image, configuration, network object and PostgreSQL system ID;
+credentials never appear in argv, public metadata or diagnostics. It requires
+the actual known-good compatible READ_ONLY bridge and a verified source115
+ordinary backup with independent restore and replica evidence. The root intent
+precedes SQL. The existing locked executor applies only116..136; automatic
+replay of a consumed execution is rejected. Fresh explicit forward resumption
+and the complete deployment/backup/reboot rehearsal remain mandatory gates.
+
+Root completion binds copies of the genuine executor output and unchanged
+manifest only after native136 observation. Boot refuses positive authority for
+an incomplete chain at any schema, including115 after intent. The target136
+grant preserves the115 publication and records a separate protected boundary.
+
+The completed-NORMAL preparation path keeps its historical provider record and
+requires fresh admission for explicit runtime stages. Native schema observation
+binds the actual PostgreSQL container/image and system identifier before a
+read-only query; it does not depend on Docker-only DNS resolving on the host.
+Admission measures current public-table and Auth/MFA/storage roots without
+exporting customer fields. The accepted115..136 application and new controller
+have separate source roles. No migration or authorization follows merely from
+admission, unit tests, or application acceptance. The complete private deployment,
+compatible fallback/boot supersession and backup pipeline must pass before the
+immutable full operation can be proposed.
+
+The active candidate descriptor now selects the existing schema115..136 bridge
+and checksum-pinned migrations116..136. The former exact115/no-SQL descriptor
+is retained as `schema-115-local.json`; historical SQL and manifests remain
+unchanged. This is upgrade preparation, not production authorization. Production
+continues serving its accepted schema115 application until exact-image acceptance,
+current-data application/migration rehearsal, forward-repair validation and one
+complete governed operation have passed and received explicit approval.
+
+The new unselected local source115 bridge uses `schema-115-136-bridge.json` and
+`migrations-116-136.json`. The manifest is exactly the historical 115..136
+manifest's suffix, excluding already-applied commercial migration115. Historical
+SQL/checksums/descriptors stay unchanged; the exact115/no-SQL profile is retained.
+The existing executor supplies checksum, backup, advisory-lock, transaction and
+resume guards. This candidate descriptor supplies no production permission or
+proof of runtime compatibility. Exact-source/images must pass acceptance at115
+and136 and a current-data migration/forward-repair rehearsal before selection.
+
 The referral candidate retains an additional checksum-pinned, unselected
 `migrations-115-136.json` / `schema-114-136-bridge.json` pair. The 115..135
 manifest and its pinned history remain unchanged. `check_migrations.py` accepts
 only the exact additional 136 artifact and verifies the old entries are
 identical; `check_forward_release.py` also validates this additional pinned
-candidate and exact namespace 001..139. Unknown future migrations outside the explicitly pinned137–139 candidates still fail. Main's active schema115 profile
-still selects no SQL. Migration136 requires schema135 and adds tenant-private
+candidate and exact namespace001–143 after validating the explicitly pinned learning candidate. Unknown future migrations still fail. The historical schema115 profile
+still selects no SQL; the new upgrade candidate selects only116..136. Migration136 requires schema135 and adds tenant-private
 referrals plus monetary reward/reversal records tied atomically to a verified
 first learning purchase. Runtime endpoints and enabling referrals fail closed
 before schema136. Historical rewards keep their amount/currency; local payment
@@ -184,8 +254,8 @@ activation and production migration are outside this candidate. A separately
 accepted bridge, backup and approved upgrade are required before production use.
 
 
-Active local-Supabase integration profile: **schema115 only**, migration class
-`none`, migration policy `none`, no selected migration manifest. Retained bridge
+Previous local-Supabase integration profile: **schema115 only**, migration class
+`none`, migration policy `none`, now retained as `schema-115-local.json`. Retained bridge
 examples below describe reviewed migration history/future work and authorize no
 SQL for this profile. Main's 116..135 artifacts remain checksum-verified; features
 requiring those schemas retain their existing unavailable/upgrade-required gates.

@@ -1,0 +1,14 @@
+{
+  "release_metadata_version": 1,
+  "deployment_profile": "local-supabase-schema115",
+  "schema": {
+    "compatible_min": 115,
+    "compatible_max": 115,
+    "target": 115,
+    "migration_class": "none",
+    "rollback_compatible_min": 115,
+    "rollback_compatible_max": 115
+  },
+  "migration_policy": "none",
+  "notes": "Non-migrating local Supabase cutover candidate, tested only on core schema115. Preserve all applied schema history and existing manifest files. No automatic migration selected; schema116 catalog writes remain gated. Rollback requires the validated compatible local runtime and local data, never hosted HTTP APIs."
+}

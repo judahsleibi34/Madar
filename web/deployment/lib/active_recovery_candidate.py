@@ -49,6 +49,20 @@ def verify_lifecycle_networks(row, networks, primary, alias=None, *, created_wor
             raise RuntimeError('network_secondary_alias_changed')
 
 
+def default_dns_spec_matches(row, expected):
+    """Compare Docker's two encodings of an unset DNS list against the old hash.
+
+    A daemon reload can persist null as []. Never change the recorded digest or
+    normalize other fields: an explicit resolver, missing field or any unrelated
+    change must still match its exact recorded specification.
+    """
+    if spec(row)==expected:return True
+    host=row['HostConfig']
+    if 'Dns' not in host or host['Dns'] not in (None,[]):return False
+    previous=dict(row,HostConfig=dict(host,Dns=[] if host['Dns'] is None else None))
+    return spec(previous)==expected
+
+
 def worker_spec_matches(row, expected, *, started_worker=False):
     """Docker first start changes only OomKillDisable false to null.
 
@@ -56,10 +70,10 @@ def worker_spec_matches(row, expected, *, started_worker=False):
     only a governed business-worker lifecycle may compare the observed null to
     the originally recorded false; true and every other alteration still fail.
     """
-    if spec(row)==expected:return True
+    if default_dns_spec_matches(row,expected):return True
     if not started_worker or row['HostConfig'].get('OomKillDisable',False) is not None:return False
     previous=dict(row,HostConfig=dict(row['HostConfig'],OomKillDisable=False))
-    return spec(previous)==expected
+    return default_dns_spec_matches(previous,expected)
 
 
 def inspect_previous_candidate(plan, runtime=None):
@@ -108,9 +122,11 @@ def inspect_previous_candidate(plan, runtime=None):
     return {'root':root,'candidate':value,'rows':rows,'binding':binding}
 
 
-def require_unreserved_ports(runtime, ports, retired=None, planned=None):
+def require_unreserved_ports(runtime, ports, retired=None, planned=None, *, spec_matcher=None):
     """Check host sockets AND stopped Docker reservations without displacing any."""
     planned=planned or {}
+    if spec_matcher is not None and not callable(spec_matcher):
+        raise RuntimeError('detached_resource_specification_verifier_invalid')
     planned_ports={str(b['HostPort']) for row in planned.values() if row['State']['Running'] for values in (row['HostConfig'].get('PortBindings') or {}).values() for b in values or []}
     for port in ports:
         if str(port) in planned_ports:continue
@@ -130,7 +146,8 @@ def require_unreserved_ports(runtime, ports, retired=None, planned=None):
             if any(str(b.get('HostPort')) in {str(p) for p in ports} for b in bindings or []):
                 binding=retired.get(row.get('Name','').lstrip('/'))
                 if (binding is None or row['Id']!=binding['container_id'] or row['Image']!=binding['image_id']
-                        or spec(row)!=binding['spec_sha256'] or (row['State']['Running'] and row['Id'] not in planned)
+                        or not (spec_matcher(row,binding['spec_sha256']) if spec_matcher is not None
+                            else spec(row)==binding['spec_sha256']) or (row['State']['Running'] and row['Id'] not in planned)
                         or row['HostConfig']['RestartPolicy']['Name']!='no'):
                     raise RuntimeError('detached_port_already_reserved')
 

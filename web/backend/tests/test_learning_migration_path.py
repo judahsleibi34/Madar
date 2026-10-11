@@ -69,8 +69,13 @@ class LearningMigrationPathTests(unittest.TestCase):
             self.assertEqual([item.number for item in manifest.migrations],[143])
             self.assertEqual(manifest.excluded_schemas,(142,))
         active=json.loads((WEB_ROOT/'deployment/releases/release.json').read_text())
-        self.assertEqual(active['schema']['target'],115)
-        self.assertNotIn('migration_manifest',active)
+        # Main's independently reviewed bridge must remain selected; learning
+        # finalization cannot extend it or implicitly select any learning SQL.
+        self.assertEqual(active['deployment_profile'],'local-supabase-schema115-136')
+        self.assertEqual(active['schema']['target'],136)
+        self.assertEqual(active['migration_manifest'],'migrations-116-136.json')
+        selected=json.loads((WEB_ROOT/'deployment/releases'/active['migration_manifest']).read_text())
+        self.assertEqual([entry['number'] for entry in selected['migrations']],list(range(116,137)))
 
     def test_reserved_descriptor_still_rejects_execution(self):
         with tempfile.TemporaryDirectory() as directory:

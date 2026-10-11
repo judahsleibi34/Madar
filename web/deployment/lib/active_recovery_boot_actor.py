@@ -21,9 +21,13 @@ EARLY_PHASES=frozenset({'authorized','detached_candidate_pending','detached_cand
     'detached_candidate_ready','compensation_preparation_failed'})
 
 class ActiveRecoveryBootActor:
-    def __init__(self,plan,root,package):
+    def __init__(self,plan,root,package,*,source=None,audit=None):
         self.plan,self.root,self.package=plan,Path(root),Path(package)
-        self.source=FrozenContinuationSource(plan,self.package)
+        if source is not None and not callable(getattr(source,'verify',None)):
+            raise RuntimeError('boot_actor_source_fence_required')
+        if audit is not None and not callable(audit):raise RuntimeError('boot_actor_audit_required')
+        self.source=source or FrozenContinuationSource(plan,self.package)
+        self.audit=audit
         self.runtime=Runtime();self.runtime.expected_nginx_sha256=plan.retained_inputs['proxy_configuration']
         self.fallback=CurrentDataFallback(plan,self.root,runtime=self.runtime)
         self.compensation=CompensationPublication(self.fallback,self.root,runtime=self.runtime)
@@ -126,7 +130,8 @@ class ActiveRecoveryBootActor:
         # Journal failure cannot prevent revocation. No stale controller,
         # configuration, ownership, checkpoint or customer data is restored.
         transaction=ActiveRecoveryResumption(self.plan,None)
-        try:transaction.event('compensation_pending',exception_type='InterruptedContinuation')
+        emit=getattr(self,'audit',None) or transaction.event
+        try:emit('compensation_pending',exception_type='InterruptedContinuation')
         except OSError:pass
         try:
             self.candidate._publish_write_authority(self.candidate.contract,'READ_ONLY')
@@ -136,7 +141,7 @@ class ActiveRecoveryBootActor:
                 from deployment.lib.active_recovery_controller import ActiveRecoveryBackupTimers
                 ActiveRecoveryBackupTimers(self.plan,self.root,self.source.verify).quiesce_compensation()
             self.compensation.publish(self.fallback_public_round)
-            transaction.event('restricted_fallback')
+            emit('restricted_fallback')
         except Exception:
             # If an authority cannot be revoked, stop the exact bound application
             # as well as the proxy. Never start an unverified fallback or worker.
@@ -144,7 +149,7 @@ class ActiveRecoveryBootActor:
                 self.stop_bound_runtimes_for_failed_compensation()
             finally:
                 self.compensation.maintenance_or_stop_proxy()
-                try:transaction.event('compensation_failed',exception_type='CompensationFailure')
+                try:emit('compensation_failed',exception_type='CompensationFailure')
                 except OSError:pass
             raise
     def early_recovery(self):
@@ -178,7 +183,7 @@ class ActiveRecoveryBootActor:
                 self.compensate()
                 return {'phase':'restricted_fallback','mode':'READ_ONLY'}
             return ActiveRecoveryNormalBoot(self.plan,self.root,self.candidate,self.kernel,self.source.verify,
-                self.completed_evidence,self.native,self.compensate,runtime=self.runtime).execute()
+                self.completed_evidence,self.native,self.compensate,runtime=self.runtime,audit=getattr(self,'audit',None)).execute()
         if phase=='restricted_fallback':
             self.fallback.verify()
             if UPSTREAM.read_bytes()!=FALLBACK_ROUTE:raise RuntimeError('boot_actor_restricted_route_changed')
