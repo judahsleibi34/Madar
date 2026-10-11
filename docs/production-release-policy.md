@@ -1,5 +1,10 @@
 # Madar production release acceptance policy
 
+Completed-NORMAL migration verification uses the measured installed backup CLI
+with isolated Python and a bounded timeout. Installed helper layout must be
+tested; a development-only import cannot replace this execution. Verifier
+failure is fatal before SQL and private child output remains suppressed.
+
 Completed-NORMAL prepare/activate/publish/adopt stages use a mutable prepared
 record scoped to the complete fresh admission digest. The root staging seal
 reads that same path. A matching application SHA and slot cannot adopt another

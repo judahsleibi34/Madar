@@ -1,5 +1,10 @@
 # Automated database migration architecture
 
+Completed-NORMAL verifies the sealed source backup through the ordinary
+controller's installed helper directory, using isolated Python with a bounded
+timeout and sanitized failure. It does not assume a development-only top-level
+`scripts` package exists. Checksum/release/schema bindings precede connections.
+
 The completed-NORMAL coordinator snapshots all original columns of the96 public
 tables and five Auth/storage tables in a read-only repeatable snapshot before
 SQL intent. It compares the same projection after migration before sealing

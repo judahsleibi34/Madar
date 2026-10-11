@@ -10,6 +10,8 @@ import ipaddress
 import json
 import os
 from pathlib import Path
+import subprocess
+import sys
 import time
 
 from deployment.lib.completed_normal_admission import (
@@ -18,6 +20,28 @@ from deployment.lib.completed_normal_admission import (
 from deployment.lib.emergency_routing_repair import exclusive
 from deployment.lib.provider_recovery_runtime import protected,readonly_configuration,file_digest
 from deployment.lib.migration_executor import MigrationManifest,LockedMigrationExecutor
+
+def verify_migration_backup(actual,witness,sha,operations):
+    """Verify through the ordinary controller's measured installed CLI.
+
+    Installed helpers live in deployment/scripts rather than a top-level
+    scripts package. Never emit their private output or import mutable source.
+    """
+    actual=Path(actual)
+    helper=readonly_configuration(operations.recovery_helper_root()/'backup_support.py',private=False)
+    try:
+        result=subprocess.run([sys.executable,'-I','-B',str(helper),'verify',str(actual)],
+            capture_output=True,timeout=180)
+    except (OSError,subprocess.TimeoutExpired):
+        raise RuntimeError('completed_migration_backup_verification_failed') from None
+    if result.returncode:
+        raise RuntimeError('completed_migration_backup_verification_failed')
+    manifest=readonly_configuration(actual/'manifest.json',private=False)
+    observed=json.loads(manifest.read_text())
+    if (file_digest(manifest)!=witness['backup_manifest_sha256']
+            or file_digest(readonly_configuration(actual/'SHA256SUMS',private=False))!=witness['backup_checksums_sha256']
+            or int(observed['database']['schema_version'])!=115 or observed['release']['git_sha']!=sha):
+        raise RuntimeError('completed_migration_backup_binding_changed')
 
 def intent_document(contract):
     return {'operation':OPERATION,'context_sha256':digest(contract),'source_sha':contract['candidate']['source_sha'],
@@ -142,12 +166,7 @@ def run_migration(contract,release_root,state_root,operations):
         raise RuntimeError('completed_migration_backup_path_invalid')
     def verify_backup(actual):
         if actual!=backup:raise RuntimeError('completed_migration_backup_changed')
-        from scripts.backup_support import verify
-        observed=verify(actual)
-        if (file_digest(readonly_configuration(actual/'manifest.json',private=False))!=witness['backup_manifest_sha256']
-                or file_digest(readonly_configuration(actual/'SHA256SUMS',private=False))!=witness['backup_checksums_sha256']
-                or int(observed['database']['schema_version'])!=115 or observed['release']['git_sha']!=sha):
-            raise RuntimeError('completed_migration_backup_binding_changed')
+        verify_migration_backup(actual,witness,sha,operations)
     root=state_root/'migrations'/sha
     # Never overwrite a failed/completed executor record on automatic retry.
     if (root/'execution.json').exists():raise RuntimeError('completed_migration_attempt_already_consumed')
