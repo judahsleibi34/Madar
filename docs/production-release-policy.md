@@ -1,5 +1,7 @@
 # Madar production release acceptance policy
 
+Completed-NORMAL preflight reads frozen application Compose inputs only after comparing their exact Git blobs with the accepted application revision; it creates no release worktree. Staged validation uses the actual `releases/<application SHA>` deployment worktree. Explicit Compose null command/entrypoint fields inherit exact immutable image defaults; changed or explicit overrides remain checked.
+
 Root's private0077 umask must not make the new mounted nonsecret authority
 directory inaccessible. Verify explicit0755 directory/0644 grant publication and
 actual application readability while keeping all protected history private.

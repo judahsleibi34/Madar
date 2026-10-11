@@ -7,12 +7,33 @@ from contextlib import contextmanager
 import importlib.machinery
 import importlib.util
 import json
+import hashlib
 import os
 from pathlib import Path
 import subprocess
 
 from deployment.lib.environment_file import load_environment_file
 from deployment.lib.provider_recovery_runtime import readonly_configuration
+
+
+def candidate_release_root(actor, *, read_only):
+    """Render accepted application files without creating a preflight worktree."""
+    sha=actor.contract['candidate']['source_sha']
+    root=actor.package/'source' if read_only else actor.ops.state_root/'releases'/sha
+    # The frozen controller package may contain different deployment code, but
+    # these application Compose inputs must be the accepted application's exact
+    # Git blobs. No checkout, grant or Docker mutation is required to prove it.
+    for relative in ('web/docker-compose.yml','web/precutover/docker-compose.supabase-client.yml'):
+        path=root/relative
+        if not path.is_file() or path.is_symlink():
+            raise RuntimeError('completed_model_application_input_missing')
+        content=path.read_bytes()
+        blob=hashlib.sha1(b'blob '+str(len(content)).encode()+b'\0'+content).hexdigest()
+        expected=actor.ops.root_git('completed_model_application_blob','rev-parse',
+            f'{sha}:{relative}',cwd=actor.ops.repo).stdout
+        if blob!=expected:
+            raise RuntimeError('completed_model_application_input_changed')
+    return root
 
 
 @contextmanager
@@ -57,7 +78,7 @@ def render_candidate_model(actor, *, read_only=False):
     cfg=actor.document['application_artifacts']
     images={key:cfg[key] for key in ('backend','frontend','worker','build_timestamp')}
     operations=module.DockerGitOperations(actor.ops.repo,actor.ops.state_root,Path('/etc/madar/production.env'),compatibility)
-    operations.release_root=actor.ops.state_root/sha
+    operations.release_root=candidate_release_root(actor,read_only=read_only)
     operations.completed_normal_admission=contract
     if read_only:operations.read_only_model_contract=contract
     operations.schema_version=actor.native

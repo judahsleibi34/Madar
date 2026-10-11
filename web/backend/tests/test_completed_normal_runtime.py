@@ -61,6 +61,21 @@ class RuntimeModelTests(unittest.TestCase):
         bindings,networks=self.validate()
         self.assertEqual(set(bindings),set(ROLES));self.assertEqual(len(networks),1)
         self.assertTrue(all(len(value['spec_sha256'])==64 for value in bindings.values()))
+    def test_compose_null_command_and_entrypoint_inherit_exact_image_defaults(self):
+        for service in self.model['services'].values():
+            service.update(command=None,entrypoint=None,user=None,working_dir=None)
+        self.validate()
+        self.rows[self.selected['containers']['backend']]['Config']['Cmd']=['unexpected']
+        with self.assertRaisesRegex(RuntimeError,'configuration_changed'):self.validate()
+    def test_explicit_command_and_entrypoint_do_not_inherit(self):
+        for key,image_key in (('command','Cmd'),('entrypoint','Entrypoint')):
+            with self.subTest(key=key):
+                self.model['services']['backend'][key]=[]
+                with self.assertRaisesRegex(RuntimeError,'configuration_changed'):self.validate()
+                self.rows[self.selected['containers']['backend']]['Config'][image_key]=[]
+                self.validate()
+                self.model['services']['backend'].pop(key)
+                self.rows[self.selected['containers']['backend']]['Config'][image_key]=self.images[self.contract['candidate']['images']['backend']]['Config'][image_key]
     def test_created_standbys_require_declarations_and_objects_without_live_endpoints(self):
         for role in m.BUSINESS:
             row=self.rows[self.selected['containers'][role]]

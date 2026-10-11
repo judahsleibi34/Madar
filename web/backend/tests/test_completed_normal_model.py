@@ -2,10 +2,46 @@
 import os
 from pathlib import Path
 import tempfile
+import subprocess
+from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
 from deployment.lib import completed_normal_model as m
+
+
+class AcceptedApplicationPathsTests(unittest.TestCase):
+    def setUp(self):
+        self.temp=tempfile.TemporaryDirectory();self.addCleanup(self.temp.cleanup)
+        self.root=Path(self.temp.name);self.repo=self.root/'repository';self.repo.mkdir()
+        self.relative=('web/docker-compose.yml','web/precutover/docker-compose.supabase-client.yml')
+        for relative in self.relative:
+            path=self.repo/relative;path.parent.mkdir(parents=True,exist_ok=True);path.write_text('services: {}\n')
+        self.git('init','-q');self.git('add','.');self.git('-c','user.name=Fixture','-c','user.email=fixture@example.invalid','commit','-qm','accepted fixture')
+        self.sha=self.git('rev-parse','HEAD');self.commands=[]
+        def root_git(label,*args,cwd=None):
+            self.commands.append(args)
+            return SimpleNamespace(stdout=self.git(*args))
+        self.actor=SimpleNamespace(package=self.root/'package',contract={'candidate':{'source_sha':self.sha}},
+            ops=SimpleNamespace(state_root=self.root/'state',repo=self.repo,root_git=root_git))
+        for root in (self.actor.package/'source',self.actor.ops.state_root/'releases'/self.sha):
+            for relative in self.relative:
+                path=root/relative;path.parent.mkdir(parents=True,exist_ok=True);path.write_bytes((self.repo/relative).read_bytes())
+    def git(self,*args):
+        return subprocess.run(['git',*args],cwd=self.repo,check=True,capture_output=True,text=True).stdout.strip()
+    def test_preflight_uses_frozen_matching_inputs_without_creating_release(self):
+        import shutil
+        shutil.rmtree(self.actor.ops.state_root)
+        self.assertEqual(m.candidate_release_root(self.actor,read_only=True),self.actor.package/'source')
+        self.assertFalse(self.actor.ops.state_root.exists())
+        self.assertTrue(all(args[0]=='rev-parse' for args in self.commands))
+    def test_actual_stage_uses_the_deployment_worktree_location(self):
+        self.assertEqual(m.candidate_release_root(self.actor,read_only=False),self.actor.ops.state_root/'releases'/self.sha)
+    def test_changed_application_input_or_missing_stage_fails(self):
+        path=self.actor.package/'source'/self.relative[0];path.write_text('services: {unexpected: {}}\n')
+        with self.assertRaisesRegex(RuntimeError,'input_changed'):m.candidate_release_root(self.actor,read_only=True)
+        (self.actor.ops.state_root/'releases'/self.sha/self.relative[1]).unlink()
+        with self.assertRaisesRegex(RuntimeError,'input_missing'):m.candidate_release_root(self.actor,read_only=False)
 
 
 class ModelEnvironmentTests(unittest.TestCase):

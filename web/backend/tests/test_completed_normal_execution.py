@@ -91,8 +91,12 @@ class ExecutionTests(unittest.TestCase):
                   patch.object(m,'seal_candidate_stage',lambda *a,**kw:effect('seal_stage')),
                   patch.object(m,'seal_candidate_runtime',lambda *a,**kw:effect('seal_runtime')),
                   patch.object(m,'seal_intent',lambda *a,**kw:effect('seal_sql_intent')),
-                  patch.object(m,'seal_completion',lambda *a,**kw:effect('seal_sql_completion'))):
+                  patch.object(m,'seal_completion',lambda contract,release,state,**kw:self.seal_completion(contract,release,state))):
             p.start();self.addCleanup(p.stop)
+
+    def seal_completion(self,contract,release,state):
+        self.assertEqual(release,state/'releases'/contract['candidate']['source_sha'])
+        self.effect('seal_sql_completion')
 
     def test_complete_order_has_fence_owner_read_only_backup_and_durable_sql_before_target_grant(self):
         result=self.driver.execute()

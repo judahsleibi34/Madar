@@ -1,5 +1,7 @@
 # Privileged control-plane upgrade architecture
 
+Completed-NORMAL preflight reads frozen application Compose inputs only after comparing their exact Git blobs with the accepted application revision; it creates no release worktree. Staged validation uses the actual `releases/<application SHA>` deployment worktree. Explicit Compose null command/entrypoint fields inherit exact immutable image defaults; changed or explicit overrides remain checked.
+
 Admission explicitly sets the new nonsecret write-authority directory0755 and
 grant0644 after creation under root's private0077 umask. Historical receipts and
 audits remain private; the application receives only this root-controlled,

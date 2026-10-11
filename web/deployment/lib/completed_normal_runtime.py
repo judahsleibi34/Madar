@@ -27,6 +27,13 @@ def _environment(items):
         result[key]=value
     return result
 
+
+def _image_default(service, key, base, image_key):
+    # Compose's explicit null means inherit the image configuration, exactly
+    # like an omitted field. An explicit empty value still overrides it.
+    value = service.get(key)
+    return base.get(image_key) if value is None else value
+
 def _duration(value):
     units={'ns':1,'us':1000,'ms':1_000_000,'s':1_000_000_000,'m':60_000_000_000,'h':3_600_000_000_000}
     if type(value) is int:return value
@@ -92,10 +99,10 @@ def validate_model(contract,model,runtime, *, phase='running'):
             raise RuntimeError('completed_runtime_role_identity_changed')
         expected_env=_environment(base.get('Env'))
         expected_env.update({k:str(v) for k,v in service.get('environment',{}).items() if v is not None})
-        if (_environment(config.get('Env'))!=expected_env or config.get('User','')!=service.get('user',base.get('User',''))
-                or config.get('Cmd')!=service.get('command',base.get('Cmd'))
-                or config.get('Entrypoint')!=service.get('entrypoint',base.get('Entrypoint'))
-                or config.get('WorkingDir','')!=service.get('working_dir',base.get('WorkingDir',''))):
+        if (_environment(config.get('Env'))!=expected_env or config.get('User','')!=_image_default(service,'user',base,'User')
+                or config.get('Cmd')!=_image_default(service,'command',base,'Cmd')
+                or config.get('Entrypoint')!=_image_default(service,'entrypoint',base,'Entrypoint')
+                or config.get('WorkingDir','')!=_image_default(service,'working_dir',base,'WorkingDir')):
             raise RuntimeError('completed_runtime_configuration_changed')
         if (host.get('RestartPolicy',{}).get('Name')!='no' or host.get('Privileged') is not False
                 or host.get('ReadonlyRootfs') is not True or sorted(host.get('CapDrop') or [])!=['ALL']

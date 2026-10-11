@@ -247,7 +247,7 @@ class CompletedNormalUpgrade:
                 preservation=verify_migration_customer_preservation(original,after)
                 exclusive(self.root/'migration-customer-preservation.json',encoded(preservation))
                 self.event('migration_completion_pending')
-                seal_completion(self.contract,self.ops.state_root/self.contract['candidate']['source_sha'],self.ops.state_root,
+                seal_completion(self.contract,self.ops.state_root/'releases'/self.contract['candidate']['source_sha'],self.ops.state_root,
                     source_guard=self.actor.guard,runtime_guard=self.actor.native)
             self.service('refresh')
             with self.root_credential():
