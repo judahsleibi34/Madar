@@ -10,10 +10,11 @@ import os
 from pathlib import Path
 import re
 import hashlib
+import time
 
 from deployment.lib.completed_normal_admission import ADMISSIONS,OPERATION,digest,encoded,require_fresh_authorization
 from deployment.lib.completed_normal_resources import ROLES,allocation,verify_runtime_binding,measured_spec
-from deployment.lib.emergency_routing_repair import exclusive,spec
+from deployment.lib.emergency_routing_repair import exclusive,spec,AvailabilityFailure,verification_window
 from deployment.lib.provider_recovery_runtime import protected
 from deployment.lib.runtime_authority import load_worker_authority,runtime_mutation_lock
 
@@ -75,7 +76,7 @@ def validate_model(contract,model,runtime, *, phase='running'):
             actual=[n.get('Subnet') for n in net.get('IPAM',{}).get('Config',[])]
             if actual!=expected:raise RuntimeError('completed_runtime_network_subnet_changed')
         network_ids[name]=net['Id']
-    bindings={}
+    bindings={};health_pending=False
     for role,service in services.items():
         name=selected['containers'][role]
         if service.get('container_name')!=name or service.get('restart')!='no':
@@ -89,10 +90,13 @@ def validate_model(contract,model,runtime, *, phase='running'):
                     raise RuntimeError('completed_runtime_standby_started')
             elif not state.get('Running'):
                 raise RuntimeError('completed_runtime_service_not_running')
-        if (row is None or row['Image']!=image
-                or (not (phase=='staged' and role in BUSINESS)
-                    and row['State'].get('Health',{}).get('Status')!='healthy')):
+        if row is None or row['Image']!=image:
             raise RuntimeError('completed_runtime_running_identity_changed')
+        if not (phase=='staged' and role in BUSINESS):
+            health=row['State'].get('Health',{}).get('Status')
+            if health not in {'healthy','starting'}:
+                raise RuntimeError('completed_runtime_running_identity_changed')
+            health_pending=health_pending or health=='starting'
         base=images[image];config=row['Config'];host=row['HostConfig']
         labels=config.get('Labels',{})
         if labels.get('com.docker.compose.service')!=role or labels.get('com.docker.compose.project')!=selected['project']:
@@ -177,7 +181,23 @@ def validate_model(contract,model,runtime, *, phase='running'):
         bindings[role]={'id':row['Id'],'image':image,'spec_sha256':measured_spec(row),
             'networks':{net:network_ids[net] for net in attached},
             'network_aliases':{net:attached[net].get('Aliases') or [] for net in attached}}
+    # Complete every specification/security check before treating startup as
+    # transient. Docker HTTP health may succeed before its first healthcheck
+    # records healthy; that state cannot hide a changed image or attachment.
+    if health_pending:raise AvailabilityFailure('completed_runtime_health_activation_pending')
     return bindings,network_ids
+
+
+def converge_running_model(contract,model_loader,runtime,source_guard,*,admissions=ADMISSIONS):
+    """One bounded deadline; unchanged starting health alone may converge."""
+    with verification_window(runtime,180):
+        while True:
+            runtime.budget(1)
+            source_guard();require_fresh_authorization(contract)
+            from deployment.lib.completed_normal_admission import require_candidate_authority
+            require_candidate_authority(contract,mode='READ_ONLY',admissions=admissions)
+            try:return validate_model(contract,model_loader(),runtime)
+            except AvailabilityFailure:time.sleep(runtime.budget(1))
 
 def seal_candidate_runtime(contract, *, source_guard,model_loader,runtime,state_root,admissions=ADMISSIONS):
     """The model loader must render frozen source against measured private env.
@@ -193,7 +213,7 @@ def seal_candidate_runtime(contract, *, source_guard,model_loader,runtime,state_
     root=Path(admissions)/digest(contract)
     with runtime_mutation_lock(Path(state_root)):
         source_guard();require_fresh_authorization(contract)
-        runtimes,networks=validate_model(contract,model_loader(),runtime)
+        runtimes,networks=converge_running_model(contract,model_loader,runtime,source_guard,admissions=admissions)
         owner=load_worker_authority(Path(state_root))
         original=json.loads(protected(Path(contract['source_roles']['completion_root'])/'candidate-identities.json',private=True).read_text())
         origin_workers=[original['runtimes'][role]['id'] for role in ('notification','calendar-sync','data-deletion')]

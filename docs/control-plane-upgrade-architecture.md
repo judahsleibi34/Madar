@@ -1298,3 +1298,12 @@ write-authority release, ordinary backups and application acceptance continue to
 bind the unchanged application revision. Existing authorization bytes/digests are
 preserved by omitting an absent controller revision from canonical serialization.
 No acceptance is transferred to another application revision or image.
+
+## Completed-NORMAL worker health activation
+
+The completed-NORMAL runtime sealer distinguishes Docker's first healthcheck
+activation from an identity error. It revalidates the complete rendered model,
+fresh credential and READ_ONLY grant under the deployment lock for at most 180
+seconds. Only `starting` is transient. Changed specifications and unhealthy or
+missing resources fail closed. This follows an actual isolated stop/start
+reproduction; production workers are unchanged during engineering preparation.

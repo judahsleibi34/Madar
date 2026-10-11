@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 import sys
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock,patch
 
 WEB=Path(os.getenv('MADAR_TEST_REPOSITORY_ROOT') or Path(__file__).resolve().parents[2])
 sys.path.insert(0,str(WEB))
@@ -135,5 +135,47 @@ class RuntimeModelTests(unittest.TestCase):
         self.images[image]['Config']['Labels']={'org.opencontainers.image.revision':'c'*40}
         self.rows.pop(self.selected['containers']['parser-worker'])
         with self.assertRaisesRegex(RuntimeError,'inventory_changed'):self.validate()
+
+    def test_starting_health_is_transient_only_after_full_security_validation(self):
+        row=self.rows[self.selected['containers'][m.BUSINESS[0]]]
+        row['State']['Health']['Status']='starting'
+        with self.assertRaisesRegex(m.AvailabilityFailure,'health_activation_pending'):self.validate()
+        row['HostConfig']['Privileged']=True
+        with self.assertRaisesRegex(RuntimeError,'security_changed'):self.validate()
+        row['HostConfig']['Privileged']=False;row['Image']='unexpected'
+        with self.assertRaisesRegex(RuntimeError,'running_identity_changed'):self.validate()
+        row['Image']=self.contract['candidate']['images']['backend']
+        row['State']['Health']['Status']='unhealthy'
+        with self.assertRaisesRegex(RuntimeError,'running_identity_changed'):self.validate()
+        row['State']['Health']['Status']='healthy';self.validate()
+
+    def test_bounded_running_seal_rechecks_authority_after_delayed_health(self):
+        row=self.rows[self.selected['containers'][m.BUSINESS[0]]]
+        row['State']['Health']['Status']='starting'
+        runtime=m.Runtime() if hasattr(m,'Runtime') else __import__('deployment.lib.emergency_routing_repair',fromlist=['Runtime']).Runtime()
+        source=Mock();loader=Mock(return_value=self.model)
+        with patch.object(m,'require_fresh_authorization') as authorization,patch('deployment.lib.completed_normal_admission.require_candidate_authority') as authority,patch.object(m.time,'sleep',side_effect=lambda _:row['State']['Health'].update(Status='healthy')):
+            # Retain the genuine model validator and its Docker inspection.
+            runtime.inspect=self.runtime.inspect;runtime.command=self.runtime.command
+            bindings,_=m.converge_running_model(self.contract,loader,runtime,source)
+        self.assertEqual(len(bindings),8)
+        self.assertEqual(source.call_count,2);self.assertEqual(loader.call_count,2)
+        self.assertEqual(authorization.call_count,2);self.assertEqual(authority.call_count,2)
+        self.assertIsNone(runtime.deadline)
+
+    def test_pending_health_deadline_and_integrity_failures_never_seal(self):
+        from deployment.lib.emergency_routing_repair import Runtime,VerificationDeadline
+        row=self.rows[self.selected['containers'][m.BUSINESS[0]]];row['State']['Health']['Status']='starting'
+        runtime=Runtime();runtime.inspect=self.runtime.inspect;runtime.command=self.runtime.command
+        runtime.budget=Mock(side_effect=[1,1,VerificationDeadline('verification_deadline_expired')])
+        with patch.object(m,'require_fresh_authorization'),patch('deployment.lib.completed_normal_admission.require_candidate_authority'),patch.object(m.time,'sleep'):
+            with self.assertRaisesRegex(VerificationDeadline,'verification_deadline_expired'):
+                m.converge_running_model(self.contract,lambda:self.model,runtime,lambda:None)
+        self.assertIsNone(runtime.deadline)
+        runtime.budget=Mock(return_value=1);row['HostConfig']['Privileged']=True
+        with patch.object(m,'require_fresh_authorization'),patch('deployment.lib.completed_normal_admission.require_candidate_authority'),patch.object(m.time,'sleep') as pause:
+            with self.assertRaisesRegex(RuntimeError,'security_changed'):
+                m.converge_running_model(self.contract,lambda:self.model,runtime,lambda:None)
+            pause.assert_not_called()
 
 if __name__=='__main__':unittest.main()

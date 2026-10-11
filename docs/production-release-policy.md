@@ -2289,3 +2289,11 @@ write-authority release, ordinary backups and application acceptance continue to
 bind the unchanged application revision. Existing authorization bytes/digests are
 preserved by omitting an absent controller revision from canonical serialization.
 No acceptance is transferred to another application revision or image.
+
+## Completed-NORMAL worker health activation
+
+Running candidate sealing validates every image, security setting, mount and
+network before allowing Docker health `starting` to converge. One 180-second
+deadline spans repeated fresh authorization, READ_ONLY and model checks. Missing,
+unhealthy, stopped or identity-changed resources remain fatal; no routing or
+write grant is published from a pending health result.
