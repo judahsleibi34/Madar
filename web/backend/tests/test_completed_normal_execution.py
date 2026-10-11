@@ -85,6 +85,7 @@ class ExecutionTests(unittest.TestCase):
             if before['schema']!=115 or after['schema']!=136:raise AssertionError('invalid_customer_comparison')
             effect('customer_preservation');return {'verified':True}
         for p in (patch.object(m.os,'geteuid',lambda:0),patch.object(m,'acquire_lock',lambda *a,**kw:os.open('/dev/null',os.O_RDONLY)),
+                  patch('deployment.lib.completed_normal_baseline.seal_compatible_release',lambda *a:effect('seal_compatible_release')),
                   patch.object(m,'protected',lambda p,**kw:Path(p)),
                   patch.object(m,'publish_admission',admit),patch.object(m,'CompletedNormalWriteHandoff',Handoff),
                   patch.object(m,'CompletedNormalBackupContext',Backup),

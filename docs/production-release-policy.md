@@ -1,5 +1,11 @@
 # Madar production release acceptance policy
 
+Final admitted schema136 completion links ordinary known-good state to its
+immutable root completion digest. Later dry runs verify the genuine complete
+SQL chain, original admission/authorization, frozen source, installed tree,
+boot resources, backup/restore/replica receipt, current NORMAL authority and
+exact sealed runtime IDs. Mutable state alone cannot attest this split.
+
 The compatible boot proxy precondition uses systemd's `+` command prefix to
 run the measured root-private gate as root. The proxy service itself retains
 its existing madar identity. A real isolated Docker restart exposed the

@@ -1,5 +1,11 @@
 # Privileged control-plane upgrade architecture
 
+After the admitted coordinator completes backup/restore/replication and timer
+activation, it appends a completion selector to current ordinary release state.
+The selector is historical DATA, never new authorization. The read-only upgrade
+attestor resolves sealed candidate IDs rather than conventional container names,
+and validates the root SQL completion rather than inventing automation records.
+
 The compatible proxy drop-in resets only its owned preconditions and prefixes
 the measured root-private gate with systemd `+`. Its inherited madar service
 identity remains unchanged; widening frozen package permissions is forbidden.

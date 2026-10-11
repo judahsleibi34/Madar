@@ -657,9 +657,22 @@ class SystemOperations:
                 return slot
         raise UpgradeError("active_proxy_target_unknown")
 
+    def completed_compatible_binding(self,state):
+        from deployment.lib.completed_normal_baseline import attest_compatible_runtime
+        try:
+            return attest_compatible_runtime(self,state,self.repository_head(),self.installed_sha())
+        except (RuntimeError,ValueError,KeyError,IndexError,OSError) as error:
+            raise UpgradeError('completed_compatible_runtime_invalid') from error
+
     def live_schema(self, slot: str) -> int:
         if slot not in SLOT_PORTS:
             raise UpgradeError("active_slot_invalid")
+        state=json_file(self.state_root/'state.json','release_state_invalid')
+        if 'completed_normal_upgrade' in (state.get('known_good_release') or {}):
+            binding=self.completed_compatible_binding(state)
+            if state.get('active_slot')!=slot:
+                raise UpgradeError('completed_compatible_slot_changed')
+            return binding['schema']
         code = (
             "from database import service_supabase;"
             "r=service_supabase.table('application_schema_state')"
@@ -685,6 +698,11 @@ class SystemOperations:
             self.state_root / "state.json", "release_state_invalid"
         )
         known_good = release_state.get("known_good_release") or {}
+        if 'completed_normal_upgrade' in known_good:
+            binding=self.completed_compatible_binding(release_state)
+            if binding['application_sha']!=sha or binding['schema']!=schema:
+                raise UpgradeError('completed_compatible_migration_changed')
+            return 'completed'
         if known_good.get("sha") == sha and known_good.get("runtime_only_rollback") is True:
             # A completed NORMAL continuation has a protected execution contract,
             # not an ordinary immutable release checkout. Re-attest that exact
@@ -1232,6 +1250,14 @@ class SystemOperations:
         *,
         allow_refreshable_workers: bool = False,
     ) -> None:
+        if 'completed_normal_upgrade' in known_good:
+            state=json_file(self.state_root/'state.json','release_state_invalid')
+            binding=self.completed_compatible_binding(state)
+            if (allow_refreshable_workers or state.get('active_slot')!=slot
+                    or state.get('known_good_release')!=known_good
+                    or binding['application_sha']!=known_good.get('sha')):
+                raise UpgradeError('completed_compatible_runtime_changed')
+            return
         if known_good.get("runtime_only_rollback") is True:
             from deployment.lib.completed_normal_baseline import attest_runtime
             state = json_file(self.state_root / "state.json", "release_state_invalid")
@@ -1573,10 +1599,13 @@ class SystemOperations:
         serving_sha=production_sha
         source_roles=None
         if (state.get('known_good_release') or {}).get('sha')!=production_sha:
-            from deployment.lib.completed_normal_baseline import discover_split
-            try:source_roles=discover_split(self,state,production_sha,installed_sha)
-            except (RuntimeError,ValueError,KeyError,IndexError) as error:
-                raise UpgradeError('completed_normal_source_roles_invalid') from error
+            if 'completed_normal_upgrade' in (state.get('known_good_release') or {}):
+                source_roles=self.completed_compatible_binding(state)
+            else:
+                from deployment.lib.completed_normal_baseline import discover_split
+                try:source_roles=discover_split(self,state,production_sha,installed_sha)
+                except (RuntimeError,ValueError,KeyError,IndexError) as error:
+                    raise UpgradeError('completed_normal_source_roles_invalid') from error
             serving_sha=source_roles['application_sha']
         serving = self.attest_serving(
             serving_sha,

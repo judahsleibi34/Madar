@@ -159,4 +159,42 @@ class CompletedNormalBaselineTests(unittest.TestCase):
             with self.assertRaisesRegex(UpgradeError,'completed_normal_runtime_contract_invalid'):
                 operations.attest_active_images('blue',self.state['known_good_release'])
 
+class CompletedCompatibleReleaseTests(unittest.TestCase):
+    def setUp(self):
+        from test_completed_normal_admission import fixture_contract
+        from deployment.lib.completed_normal_admission import digest
+        self.temp=tempfile.TemporaryDirectory();self.addCleanup(self.temp.cleanup)
+        self.base=Path(self.temp.name);self.contract=fixture_contract();self.root=self.base/digest(self.contract)
+        self.root.mkdir();candidate=self.contract['candidate']
+        self.completion={'context_sha256':self.root.name,'schema':136,'mode':'NORMAL',
+            'application_sha':candidate['source_sha'],'controller_sha':candidate['controller_sha']}
+        self.body=self.root/'normal-completion.json';self.body.write_text(json.dumps(self.completion))
+        self.state_root=self.base/'state';self.state_root.mkdir();self.state_path=self.state_root/'state.json'
+        self.state={'active_slot':candidate['slot'],'known_good_release':{'slot':candidate['slot'],
+            'sha':candidate['source_sha'],'schema':136},'history':[{'immutable_historical_attempt':True}]}
+        self.state_path.write_text(json.dumps(self.state))
+        for p in (patch.object(m,'protected',lambda p,**kw:p),patch.object(m,'readonly_configuration',lambda p,**kw:p),
+                patch('os.geteuid',return_value=0)):
+            p.start();self.addCleanup(p.stop)
+    def test_link_measures_real_completion_and_preserves_history(self):
+        before=self.body.read_bytes();m.seal_compatible_release(self.contract,self.root,self.state_root)
+        value=json.loads(self.state_path.read_text());marker=value['known_good_release']['completed_normal_upgrade']
+        self.assertEqual(marker,{'context_sha256':self.root.name,'completion_sha256':hashlib.sha256(before).hexdigest()})
+        self.assertEqual(value['history'],self.state['history']);self.assertEqual(self.body.read_bytes(),before)
+        with self.assertRaisesRegex(RuntimeError,'release_state_invalid'):
+            m.seal_compatible_release(self.contract,self.root,self.state_root)
+    def test_partial_read_only_wrong_source_or_wrong_slot_cannot_claim_completion(self):
+        for key,value in [('mode','READ_ONLY'),('schema',119),('controller_sha','f'*40)]:
+            self.body.write_text(json.dumps(dict(self.completion,**{key:value})))
+            with self.assertRaisesRegex(RuntimeError,'completion_invalid'):
+                m.seal_compatible_release(self.contract,self.root,self.state_root)
+        self.body.write_text(json.dumps(self.completion));self.state['active_slot']='invalid'
+        self.state_path.write_text(json.dumps(self.state))
+        with self.assertRaisesRegex(RuntimeError,'release_state_invalid'):
+            m.seal_compatible_release(self.contract,self.root,self.state_root)
+    def test_untrusted_or_missing_marker_rejects_before_root_history_lookup(self):
+        for marker in (None,{}, {'context_sha256':'f'*64}, {'context_sha256':'../x','completion_sha256':'a'*64}):
+            with self.assertRaisesRegex(RuntimeError,'marker_invalid'):
+                m.attest_compatible_runtime(None,{'known_good_release':{'completed_normal_upgrade':marker}},'c'*40,'c'*40)
+
 if __name__=='__main__':unittest.main()

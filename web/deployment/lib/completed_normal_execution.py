@@ -336,6 +336,8 @@ class CompletedNormalUpgrade:
                     'images':self.contract['candidate']['images'],'backup':receipt,
                     'backup_timers':{n:self.ops.systemctl_state(n) for n in BACKUP_TIMERS},'customer_database_restored':False}
                 exclusive(self.root/'normal-completion.json',encoded(result))
+                from deployment.lib.completed_normal_baseline import seal_compatible_release
+                seal_compatible_release(self.contract,self.root,self.ops.state_root)
             self.ops.clear_interlock()
             return result
         except Exception as error:
