@@ -140,9 +140,27 @@ runpy.run_path(sys.argv[0],run_name='__main__')
         '-o','StrictHostKeyChecking=yes','-o','UpdateHostKeys=no','-o','ControlMaster=no',
         '-o','ControlPath=none','-o','ConnectTimeout=10','madar-node1-lan',shlex.join(args)]
 
-def capture_and_replicate(plan,root,package,source_guard,kernel, *, recovery_context=None,authorizing_context=None,completed_context=None):
+def replica_namespace_scope(namespace,private_guard):
+    """An isolated rehearsal replica must never become production evidence.
+
+    Production callers always use the default and expose no namespace option.
+    A private fixture's measured entrypoint must additionally attest isolation;
+    the native host cannot select the private path even with a caller flag.
+    """
+    if namespace=='normal-local-production' and private_guard is None:return namespace
+    if (namespace!='private-schema136-rehearsal' or not callable(private_guard)
+            or private_guard()!={'fixture_only':True,'production_modified':False}):
+        raise RuntimeError('normal_backup_private_replica_guard_required')
+    result=subprocess.run(['/usr/bin/systemd-detect-virt','--container'],capture_output=True,text=True,timeout=5)
+    if result.returncode or result.stdout.strip()!='docker':
+        raise RuntimeError('normal_backup_private_replica_isolation_required')
+    return namespace
+
+def capture_and_replicate(plan,root,package,source_guard,kernel, *, recovery_context=None,authorizing_context=None,completed_context=None,
+                          replica_namespace='normal-local-production',private_replica_guard=None):
     from scripts import backup_support
     source_guard()
+    replica_namespace=replica_namespace_scope(replica_namespace,private_replica_guard)
     if completed_context is not None:
         if recovery_context is not None or authorizing_context is not None:
             raise RuntimeError('normal_backup_operation_context_conflict')
@@ -246,11 +264,12 @@ def capture_and_replicate(plan,root,package,source_guard,kernel, *, recovery_con
         if authorizing_context is not None:
             from types import SimpleNamespace
             replica_plan=SimpleNamespace(digest=scope_digest)
-        output=checked(remote_receiver(package,replica_plan,backup,sums,replica['filesystem_uuid'],expected_schema=expected_schema),stdin=archive)
+        output=checked(remote_receiver(package,replica_plan,backup,sums,replica['filesystem_uuid'],expected_schema=expected_schema,
+            namespace=replica_namespace),stdin=archive)
     remote=json.loads(output)
     if (remote.get('operation')!='actual-append-only-normal-backup-replica' or remote.get('plan_sha256')!=replica_plan.digest
             or remote.get('backup_id')!=backup.name or remote.get('sha256sums_sha256')!=sums
-            or remote.get('schema')!=expected_schema or remote.get('namespace')!='normal-local-production'
+            or remote.get('schema')!=expected_schema or remote.get('namespace')!=replica_namespace
             or type(remote.get('checksum_exit_code')) is not int or remote['checksum_exit_code']!=0
             or remote.get('historical_backups_modified') is not False):
         raise RuntimeError('normal_backup_replica_verification_failed')

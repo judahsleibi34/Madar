@@ -1,5 +1,10 @@
 # Madar production release acceptance policy
 
+New completed-NORMAL proxy bindings use the same complete deterministic mount
+measurement as native and candidate resources. Docker inspection order alone
+cannot invalidate a fresh seal; changed identity, mount fields, configuration
+or privileges still fail. Historical proxy measurements remain unchanged.
+
 Completed-NORMAL preflight reads frozen application Compose inputs only after comparing their exact Git blobs with the accepted application revision; it creates no release worktree. Staged validation uses the actual `releases/<application SHA>` deployment worktree. Explicit Compose null command/entrypoint fields inherit exact immutable image defaults; changed or explicit overrides remain checked.
 
 Root's private0077 umask must not make the new mounted nonsecret authority
@@ -31,6 +36,10 @@ original public tables and five Auth/storage tables, except the approved schema
 state transition. Pre/post ordinary backup LATEST preimages are distinct and
 append-only; an explicitly schema-bound Node1 receiver rejects an incompatible
 backup. A private replica namespace is not production backup evidence.
+The complete ordinary pipeline can use that private namespace only through an
+explicit isolation attestor inside the disposable Docker fixture. Production
+entrypoints expose no namespace override and retain the ordinary production
+default. Replica verification must bind the same selected namespace.
 
 Staged completed-NORMAL business workers must be CREATED with exact final
 configuration and declared network objects. Root attestation precedes old-worker

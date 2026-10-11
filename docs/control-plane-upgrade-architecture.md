@@ -1,5 +1,10 @@
 # Privileged control-plane upgrade architecture
 
+New completed-NORMAL proxy bindings use the same complete deterministic mount
+measurement as native and candidate resources. Docker inspection order alone
+cannot invalidate a fresh seal; changed identity, mount fields, configuration
+or privileges still fail. Historical proxy measurements remain unchanged.
+
 Completed-NORMAL preflight reads frozen application Compose inputs only after comparing their exact Git blobs with the accepted application revision; it creates no release worktree. Staged validation uses the actual `releases/<application SHA>` deployment worktree. Explicit Compose null command/entrypoint fields inherit exact immutable image defaults; changed or explicit overrides remain checked.
 
 Admission explicitly sets the new nonsecret write-authority directory0755 and
@@ -32,6 +37,10 @@ The source115 and target136 ordinary backup publications preserve separate,
 exclusive LATEST preimages. Node 1 reception validates the explicitly bound
 schema (115 or136) and namespace before accepting an archive; private rehearsal
 replicas use a distinct namespace and never become production freshness proof.
+The ordinary backup pipeline retains its production namespace by default. Only
+the isolated rehearsal harness supplies a measured private guard and selects
+the private namespace; Docker-container isolation and the receiver's exact
+namespace are checked. The production coordinator supplies neither override.
 
 The completed-NORMAL exact-resource boot supersession preserves original unit
 files and archives original proxy drop-in bytes in its new root-private audit

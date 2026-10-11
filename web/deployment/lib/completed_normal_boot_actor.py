@@ -173,12 +173,12 @@ class CompletedNormalBootActor:
             except Exception as error:failures.append(type(error).__name__)
         self.maintenance()
     def proxy_identity(self):
-        from deployment.lib.active_recovery_candidate import default_dns_spec_matches
+        from deployment.lib.completed_normal_resources import measured_spec_matches
         expected=self.document['proxy_runtime']
         rows=self.runtime.inspect([expected['id']])
         row=next(iter(rows.values())) if len(rows)==1 else None
         if (row is None or row['Id']!=expected['id'] or row['Image']!=expected['image']
-                or not default_dns_spec_matches(row,expected['spec_sha256'])):
+                or not measured_spec_matches(row,expected['spec_sha256'])):
             raise RuntimeError('completed_upgrade_boot_proxy_identity_changed')
         return row
     def publish_restricted_bridge(self):
