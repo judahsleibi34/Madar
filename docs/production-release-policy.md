@@ -1,5 +1,9 @@
 # Madar production release acceptance policy
 
+The actual installed library inventory includes the admitted forward-resumption
+module. Its isolated import is tested from exactly the installer-selected files;
+development imports alone cannot establish installed SQL-resumption readiness.
+
 Fresh forward-resumption credentials are issued only after root independently
 remeasures the new receipt and private parent records. The deployment child
 verifies protected current-interlock witnesses and its readable executor/owner

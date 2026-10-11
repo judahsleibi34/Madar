@@ -57,6 +57,7 @@ declare -a tracked_files=(
   lib/completed_normal_database.py
   lib/completed_normal_boot_installation.py
   lib/completed_normal_migration.py
+  lib/completed_normal_forward.py
   lib/completed_normal_runtime.py
   lib/completed_normal_boot_actor.py
   lib/completed_normal_backup.py

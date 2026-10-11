@@ -6,6 +6,10 @@ import os
 from pathlib import Path
 import tempfile
 import unittest
+import re
+import shutil
+import subprocess
+import sys
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -14,6 +18,18 @@ spec=importlib.util.spec_from_file_location('completed_normal_boot_package_fixtu
 module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
 
 class PackageTests(unittest.TestCase):
+    def test_real_installed_library_inventory_imports_forward_resumption(self):
+        installer=(WEB/'deployment/bin/madar-install-control-plane').read_text()
+        names=re.search(r'declare -a tracked_files=\((.*?)\n\)',installer,re.S).group(1).split()
+        self.assertIn('lib/completed_normal_forward.py',names)
+        with tempfile.TemporaryDirectory() as raw:
+            for name in names:
+                if not name.startswith('lib/'):continue
+                target=Path(raw)/'deployment'/name;target.parent.mkdir(parents=True,exist_ok=True)
+                shutil.copyfile(WEB/'deployment'/name,target)
+            program='import sys; sys.path.insert(0,sys.argv[1]); from deployment.lib.completed_normal_forward import CompletedNormalForwardResumption, authorized_executor'
+            result=subprocess.run([sys.executable,'-I','-B','-c',program,raw],capture_output=True,text=True,timeout=15)
+            self.assertEqual(result.returncode,0,result.stderr)
     def setUp(self):
         self.temp=tempfile.TemporaryDirectory();self.addCleanup(self.temp.cleanup)
         self.base=Path(self.temp.name)
