@@ -31,6 +31,7 @@ sys.path.insert(0, str(WEB_ROOT))
 
 from deployment.lib.release_deployer import Compatibility, ReleaseDeployer, atomic_json, utc_now  # noqa: E402
 from deployment.lib.environment_file import load_environment_file  # noqa: E402
+from deployment.lib.completed_normal_profile import profile  # noqa: E402
 from deployment.lib.control_plane_upgrade_authorization import (  # noqa: E402
     require_production_mutation_identity,
     require_upgrade_authorization,
@@ -268,12 +269,18 @@ class DockerGitOperations:
         if frontend_api_url != expected_api_url:
             raise RuntimeError("frontend_api_origin_missing_or_invalid")
         frontend_tag = f"madar-frontend:{sha}-{frontend_target}"
+        admission = getattr(self, "completed_normal_admission", None)
+        if admission is not None:
+            from deployment.lib.completed_normal_profile import MANUAL
+            if profile(admission) is MANUAL:
+                # The accepted manual build has this immutable local tag.
+                # Never retag/rebuild it to fit the historical build suffix.
+                frontend_tag=f'madar-frontend:{sha}'
         existing_backend = self._existing_artifact(backend_tag, sha)
         existing_frontend = self._existing_artifact(
             frontend_tag, sha,
             expected_labels={"com.madar.frontend.api_origin": frontend_api_url},
         )
-        admission = getattr(self, "completed_normal_admission", None)
         if admission is not None:
             candidate = admission["candidate"]
             if (candidate["source_sha"] != sha or candidate["slot"] != slot
@@ -598,7 +605,7 @@ class DockerGitOperations:
                 raise RuntimeError("completed_normal_admission_changed")
             if (self.compatibility.schema_min != admission['candidate']['compatible_min']
                     or self.compatibility.schema_max != admission['candidate']['compatible_max']
-                    or self.compatibility.excluded_schemas):
+                    or self.compatibility.excluded_schemas != profile(admission).excluded):
                 # A historical115..136 admission cannot supply an authority
                 # mount or grant for a differently selected release contract.
                 raise RuntimeError('completed_normal_compatibility_changed')
@@ -859,6 +866,21 @@ class DockerGitOperations:
     def _worker_names(self, slot: str) -> list[str]:
         prefix = getattr(self, "container_prefix", "madar")
         admission=getattr(self,"completed_normal_admission",None)
+        if admission is not None and slot==admission['origin']['slot']:
+            from deployment.lib.completed_normal_profile import MANUAL
+            if profile(admission) is MANUAL:
+                from deployment.lib.completed_normal_admission import credential_witness
+                witness=credential_witness('origin_runtime','origin_runtime_sha256')
+                if (witness.get('source_sha')!=admission['source_roles']['application_sha']
+                        or witness.get('worker_generation')!=admission['origin']['worker_generation']
+                        or witness.get('context_sha256')!=Path(admission['source_roles']['completion_root']).name
+                        or witness.get('images')!=admission['origin']['images']):
+                    raise RuntimeError('completed_normal_origin_worker_runtime_changed')
+                identities=[witness.get('runtimes',{}).get(role,{}).get('id') for role in
+                    ('notification-worker','calendar-sync-worker','data-deletion-worker')]
+                if any(not isinstance(v,str) or not re.fullmatch('[0-9a-f]{64}',v) for v in identities) or len(set(identities))!=3:
+                    raise RuntimeError('completed_normal_origin_worker_runtime_changed')
+                return identities
         if admission is not None and slot==admission['candidate']['slot']:
             from deployment.lib.completed_normal_resources import allocation
             prefix=allocation(admission,slot)['prefix']
@@ -873,11 +895,13 @@ class DockerGitOperations:
         if admission is None:
             raise RuntimeError("completed_normal_admission_required")
         roles, origin = admission["source_roles"], admission["origin"]
+        from deployment.lib.completed_normal_profile import profile, LEGACY
+        legacy = profile(admission) is LEGACY
         base = "http://127.0.0.1:" + SLOT_PORTS[origin["slot"]]["backend"]
         version = self._json(base + "/health/version")
         if (version.get("release_sha") != roles["application_sha"]
                 or version.get("release_slot") != origin["slot"]
-                or version.get("schema_compatible_min") != 115 or version.get("schema_compatible_max") != 115
+                or version.get("schema_compatible_min") != 115 or version.get("schema_compatible_max") != (115 if legacy else 136)
                 or self._json(base + "/health/recovery") != {"restricted":True,"business_writes_enabled":False}):
             raise RuntimeError("completed_normal_origin_write_fence_required")
 
@@ -1337,7 +1361,9 @@ class DockerGitOperations:
         for base in ('http://127.0.0.1:8001','http://127.0.0.1:3000/api'):
             version=runtime.json_http(base+'/health/version')
             if (version.get('release_sha')!=sha or version.get('release_slot')!=slot
-                    or version.get('schema_compatible_min')!=115 or version.get('schema_compatible_max')!=136
+                    or version.get('schema_compatible_min')!=contract['candidate']['compatible_min']
+                    or version.get('schema_compatible_max')!=contract['candidate']['compatible_max']
+                    or tuple(version.get('schema_excluded_versions',[]))!=profile(contract).excluded
                     or runtime.json_http(base+'/health/recovery')!={'restricted':True,'business_writes_enabled':False}):
                 raise RuntimeError('completed_normal_read_only_refresh_serving_changed')
             runtime.denied(base)
@@ -1623,7 +1649,7 @@ def activate_prepared_release(
         known = existing.get("known_good_release") or {}
         if (existing.get("active_slot") != admission["origin"]["slot"]
                 or known.get("sha") != admission["source_roles"]["application_sha"]
-                or known.get("slot") != other_slot or known.get("schema") != 115
+                or known.get("slot") != other_slot or known.get("schema") != admission['database']['schema']
                 or existing.get("in_progress_release") or existing.get("rollback_failure")):
             raise RuntimeError("completed_normal_origin_handoff_changed")
         candidate = {"sha": sha, "slot": slot, "images": record["images"]}
@@ -1688,10 +1714,12 @@ def adopt_prepared_release(
     admission = getattr(operations, "completed_normal_admission", None)
     if admission is not None:
         from deployment.lib.completed_normal_admission import require_candidate_authority, digest as admission_digest
-        require_candidate_authority(admission, mode="NORMAL")
+        from deployment.lib.completed_normal_profile import profile, MANUAL
+        manual = profile(admission) is MANUAL
+        require_candidate_authority(admission, mode='READ_ONLY' if manual else 'NORMAL')
         origin = existing.get("known_good_release") or {}
         if (origin.get("sha") != admission["source_roles"]["application_sha"]
-                or origin.get("slot") != admission["origin"]["slot"] or origin.get("schema") != 115
+                or origin.get("slot") != admission["origin"]["slot"] or origin.get("schema") != admission['database']['schema']
                 or existing.get("active_slot") != origin.get("slot")
                 or existing.get("in_progress_release") or existing.get("rollback_failure")
                 or operations.worker_ownership(origin, {"sha":sha,"slot":slot}) != "candidate"):
@@ -1699,13 +1727,17 @@ def adopt_prepared_release(
     elif existing.get("known_good_release") or existing.get("in_progress_release"):
         raise RuntimeError("immutable_release_state_already_initialized")
     operations.verify_source(sha)
-    operations.validate_candidate(sha, slot)
+    if admission is not None and manual:
+        operations.validate_candidate_core(sha,slot)
+        operations.validate_completed_normal_read_only_serving(sha,slot)
+    else:
+        operations.validate_candidate(sha, slot)
     schema = operations.schema_version()
     if not compatibility.accepts_schema(schema):
         raise RuntimeError("candidate_schema_incompatible")
     stable_identity = operations._json("http://127.0.0.1:8001/health/version")
-    stable_readiness = operations._json("http://127.0.0.1:8001/health/ready")
-    if stable_identity.get("release_sha") != sha or not stable_readiness.get("ready"):
+    stable_readiness = {} if admission is not None and manual else operations._json("http://127.0.0.1:8001/health/ready")
+    if stable_identity.get("release_sha") != sha or not (admission is not None and manual or stable_readiness.get("ready")):
         raise RuntimeError("stable_proxy_release_validation_failed")
     with urllib.request.urlopen("http://127.0.0.1:3000/", timeout=5) as response:
         if response.status != 200:
@@ -1755,7 +1787,7 @@ def publish_prepared_release(*,sha:str,slot:str,state_root:Path,operations:Docke
         raise RuntimeError('completed_normal_publication_stage_invalid')
     state=_json_file(state_root/'state.json','release_state_invalid')
     origin=state.get('known_good_release') or {}
-    if (origin.get('sha')!=admission['source_roles']['application_sha'] or origin.get('schema')!=115
+    if (origin.get('sha')!=admission['source_roles']['application_sha'] or origin.get('schema')!=admission['database']['schema']
             or origin.get('slot')!=admission['origin']['slot'] or state.get('active_slot')!=origin['slot']
             or state.get('in_progress_release') or state.get('rollback_failure')):
         raise RuntimeError('completed_normal_publication_origin_changed')
@@ -1770,10 +1802,12 @@ def publish_prepared_release(*,sha:str,slot:str,state_root:Path,operations:Docke
     identity=operations._json('http://127.0.0.1:8001/health/version')
     fence=operations._json('http://127.0.0.1:8001/health/recovery')
     if (identity.get('release_sha')!=sha or identity.get('release_slot')!=slot
-            or identity.get('schema_compatible_min')!=115 or identity.get('schema_compatible_max')!=136
+            or identity.get('schema_compatible_min')!=admission['candidate']['compatible_min']
+            or identity.get('schema_compatible_max')!=admission['candidate']['compatible_max']
+            or tuple(identity.get('schema_excluded_versions',[]))!=profile(admission).excluded
             or fence!={'restricted':True,'business_writes_enabled':False}):
         raise RuntimeError('completed_normal_publication_stable_identity_changed')
-    record['traffic_publication']={'operation':'completed-normal-schema115-136-upgrade',
+    record['traffic_publication']={'operation':admission['operation'],
         'context_sha256':digest(admission),'source_sha':sha,'slot':slot,'business_writes':'READ_ONLY',
         'observed_at':utc_now().isoformat()}
     atomic_json(prepared_release_path(state_root,operations),record)
@@ -2447,6 +2481,9 @@ def main() -> int:
     else:
         load_environment_file(env_file)
     metadata_path = WEB_ROOT / "deployment/releases/release.json"
+    if admission is not None:
+        from deployment.lib.completed_normal_profile import profile
+        metadata_path = metadata_path.with_name(profile(admission).metadata)
     if args.recover_current_schema:
         metadata_path = WEB_ROOT / "deployment/releases/schema-96-recovery.json"
     compatibility = Compatibility.load(metadata_path)

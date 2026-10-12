@@ -37,7 +37,7 @@ class CustomerPreservationTests(unittest.TestCase):
     def test_changed_snapshot_native_schema_is_rejected_before_sql(self):
         with patch.object(m,'observe_native',return_value=136):
             with self.assertRaisesRegex(RuntimeError,'source_schema_changed'):
-                m.migration_customer_snapshot({},object())
+                m.migration_customer_snapshot({'version':1,'operation':'completed-normal-schema115-136-upgrade'},object())
 
 
 if __name__=='__main__':unittest.main()

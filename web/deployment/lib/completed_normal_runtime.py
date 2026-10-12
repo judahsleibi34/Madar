@@ -17,6 +17,7 @@ from deployment.lib.completed_normal_resources import ROLES,allocation,verify_ru
 from deployment.lib.emergency_routing_repair import exclusive,spec,AvailabilityFailure,verification_window
 from deployment.lib.provider_recovery_runtime import protected
 from deployment.lib.runtime_authority import load_worker_authority,runtime_mutation_lock
+from deployment.lib.completed_normal_profile import profile, LEGACY
 
 BUSINESS=('notification-worker','calendar-sync-worker','data-deletion-worker')
 
@@ -215,9 +216,12 @@ def seal_candidate_runtime(contract, *, source_guard,model_loader,runtime,state_
         source_guard();require_fresh_authorization(contract)
         runtimes,networks=converge_running_model(contract,model_loader,runtime,source_guard,admissions=admissions)
         owner=load_worker_authority(Path(state_root))
-        original=json.loads(protected(Path(contract['source_roles']['completion_root'])/'candidate-identities.json',private=True).read_text())
-        origin_workers=[original['runtimes'][role]['id'] for role in ('notification','calendar-sync','data-deletion')]
-        publication={'operation':OPERATION,'context_sha256':digest(contract),'source_sha':contract['candidate']['source_sha'],
+        legacy=profile(contract) is LEGACY
+        original=json.loads(protected(Path(contract['source_roles']['completion_root'])/
+            ('candidate-identities.json' if legacy else 'candidate-runtime.json'),private=True).read_text())
+        origin_workers=[original['runtimes'][role]['id'] for role in
+            (('notification','calendar-sync','data-deletion') if legacy else BUSINESS)]
+        publication={'operation':profile(contract).operation,'context_sha256':digest(contract),'source_sha':contract['candidate']['source_sha'],
             'images':contract['candidate']['images'],'runtimes':runtimes,'networks':networks,
             'worker_generation':owner['generation'] if owner else '', 'origin_workers':origin_workers}
         verify_runtime_binding(contract,publication,runtime,Path(state_root))
@@ -255,9 +259,12 @@ def seal_candidate_stage(contract, *, source_guard,model_loader,runtime,state_ro
         if (owner is None or owner['owner']!='CANDIDATE' or owner['generation']!=contract['origin']['worker_generation']
                 or owner['candidate']!={'sha':contract['source_roles']['application_sha'],'slot':contract['origin']['slot']}):
             raise RuntimeError('completed_runtime_origin_owner_changed')
-        original=json.loads(protected(Path(contract['source_roles']['completion_root'])/'candidate-identities.json',private=True).read_text())
-        origin_workers=[original['runtimes'][role]['id'] for role in ('notification','calendar-sync','data-deletion')]
-        publication={'operation':OPERATION,'context_sha256':digest(contract),'source_sha':contract['candidate']['source_sha'],
+        legacy=profile(contract) is LEGACY
+        original=json.loads(protected(Path(contract['source_roles']['completion_root'])/
+            ('candidate-identities.json' if legacy else 'candidate-runtime.json'),private=True).read_text())
+        origin_workers=[original['runtimes'][role]['id'] for role in
+            (('notification','calendar-sync','data-deletion') if legacy else BUSINESS)]
+        publication={'operation':profile(contract).operation,'context_sha256':digest(contract),'source_sha':contract['candidate']['source_sha'],
             'images':contract['candidate']['images'],'runtimes':runtimes,'networks':networks,
             'worker_generation':hashlib.sha256(f"bootstrap:{prepared['release_sha']}:{prepared['candidate_slot']}:{prepared['prepared_at']}".encode()).hexdigest(),
             'origin_workers':origin_workers}

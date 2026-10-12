@@ -2,6 +2,7 @@
 import json
 from pathlib import Path
 from deployment.lib.completed_normal_admission import digest
+from deployment.lib.completed_normal_profile import profile, LEGACY
 
 IDENTITY_SQL="BEGIN READ ONLY; SELECT json_build_object('system_identifier',system_identifier::text,'schema',schema_version)::text FROM pg_control_system(),public.application_schema_state WHERE contract_key='core'; COMMIT;"
 
@@ -35,7 +36,7 @@ def observe_native(contract,runtime, *, allow_pending=False):
     observed=json.loads(runtime.command(['docker','exec',expected['container_id'],'psql','-XqAt',
         '-v','ON_ERROR_STOP=1','-U','postgres','-d','postgres','-c',IDENTITY_SQL]))
     if (observed.get('system_identifier')!=expected['system_identifier']
-            or type(observed.get('schema')) is not int or not 115<=observed['schema']<=136):
+            or not profile(contract).supports(observed.get('schema'))):
         raise RuntimeError('completed_normal_native_database_schema_changed')
     return observed['schema']
 
@@ -48,15 +49,16 @@ def require_normal_migration_boundary(contract, schema, root, state_root):
     recovery after advancement. Historical schema115 publication is insufficient.
     """
     from deployment.lib.provider_recovery_runtime import protected, file_digest
+    selected = profile(contract)
     intent=Path(root)/'migration-intent.json'
     if not intent.exists():
-        if schema!=115:
+        if schema!=selected.source:
             raise RuntimeError('compatible_boot_unattested_schema_advancement')
         return
     expected={'operation':contract['operation'],'context_sha256':digest(contract),
               'source_sha':contract['candidate']['source_sha'],
               'manifest_sha256':contract['migration_manifest_sha256'],
-              'source_schema':115,'target_schema':136,'database_restored':False}
+              'source_schema':selected.source,'target_schema':selected.target,'database_restored':False}
     if json.loads(protected(intent,private=True).read_text())!=expected:
         raise RuntimeError('compatible_boot_migration_intent_changed')
     completion=Path(root)/'migration-completion.json'
@@ -68,8 +70,8 @@ def require_normal_migration_boundary(contract, schema, root, state_root):
     # state is never an authorization source for reboot recovery.
     execution=Path(root)/'migration-execution.json'
     if (set(record)!=set(expected)|{'execution_sha256','observed_schema'}
-            or any(record[k]!=v for k,v in expected.items()) or record['observed_schema']!=136
-            or schema!=136 or file_digest(protected(execution,private=True))!=record['execution_sha256']):
+            or any(record[k]!=v for k,v in expected.items()) or record['observed_schema']!=selected.target
+            or schema!=selected.target or file_digest(protected(execution,private=True))!=record['execution_sha256']):
         raise RuntimeError('compatible_boot_migration_completion_changed')
     result=json.loads(execution.read_text())
     manifest_path=Path(root)/'migration-manifest.json'
@@ -80,14 +82,42 @@ def require_normal_migration_boundary(contract, schema, root, state_root):
     actual=[(r.get('number'),r.get('checksum')) for r in result.get('migrations',[])
             if r.get('status') in {'applied','already_applied'}]
     if (result.get('release_sha')!=contract['candidate']['source_sha'] or result.get('status')!='completed'
-            or result.get('phase')!='complete' or result.get('observed_schema')!=136
+            or result.get('phase')!='complete' or result.get('observed_schema')!=selected.target
             or (result.get('backup') or {}).get('verified') is not True
-            or [n for n,_ in expected_records]!=list(range(116,137)) or actual!=expected_records):
+            or [n for n,_ in expected_records]!=list(selected.migrations) or actual!=expected_records):
         raise RuntimeError('compatible_boot_migration_execution_invalid')
+
+def require_manual_normal_completion(contract, root):
+    """An interrupted manual operation must recover READ_ONLY after reboot."""
+    selected=profile(contract)
+    if selected is LEGACY:return
+    from deployment.lib.provider_recovery_runtime import protected
+    path=Path(root)/'normal-completion.json'
+    if not path.exists():raise RuntimeError('compatible_boot_normal_completion_pending')
+    record=json.loads(protected(path,private=True).read_text())
+    backup=json.loads(protected(Path(root)/'post-migration-backup.json',private=True).read_text())
+    if (record.get('operation')!=selected.operation or record.get('context_sha256')!=digest(contract)
+            or record.get('schema')!=selected.target or record.get('mode')!='NORMAL'
+            or record.get('application_sha')!=contract['candidate']['source_sha']
+            or record.get('controller_sha')!=contract['candidate']['controller_sha']
+            or record.get('images')!=contract['candidate']['images'] or record.get('backup')!=backup
+            or record.get('customer_database_restored') is not False or backup.get('schema')!=selected.target
+            or backup.get('source_sha')!=contract['candidate']['source_sha']
+            or backup.get('images')!=contract['candidate']['images']
+            or backup.get('restore',{}).get('status')!='logical_database_and_file_restore_passed'
+            or backup.get('restore',{}).get('backup_schema')!=selected.target
+            or backup.get('node1',{}).get('checksum_exit_code')!=0):
+        raise RuntimeError('compatible_boot_normal_completion_changed')
+
 
 def customer_baseline(contract,runtime):
     """No customer field leaves PostgreSQL; return only table/Auth/storage roots."""
     from deployment.lib.active_recovery_reconciliation import CurrentLocalReconciliation
+    if profile(contract) is not LEGACY:
+        current = migration_customer_snapshot(contract, runtime)
+        identities = [row for name,row in sorted(current['roots'].items()) if not name.startswith('public.')]
+        return {'tables':current, 'table_roots_sha256':digest(current),
+            'identity_roots':identities, 'identity_roots_sha256':digest({'roots':identities})}
     from deployment.lib.active_recovery_resumption import load_saved_resumption_plan
     root=Path(contract['source_roles']['completion_root'])
     def guard():
@@ -131,7 +161,7 @@ def migration_customer_snapshot(contract,runtime,*,columns=None):
             '-v','ON_ERROR_STOP=1','-U','postgres','-d','postgres','-c',sql])
         return [json.loads(line) for line in raw.splitlines() if line.strip()]
     if columns is None:
-        if schema!=115:raise RuntimeError('completed_migration_customer_source_schema_changed')
+        if schema!=profile(contract).source:raise RuntimeError('completed_migration_customer_source_schema_changed')
         rows=query("SELECT json_build_object('schema',n.nspname,'table',c.relname,'columns',"
             "json_agg(a.attname ORDER BY a.attnum))::text FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace "
             "JOIN pg_attribute a ON a.attrelid=c.oid AND a.attnum>0 AND NOT a.attisdropped "
@@ -140,8 +170,9 @@ def migration_customer_snapshot(contract,runtime,*,columns=None):
             "(n.nspname='storage' AND c.relname IN ('objects','buckets'))) "
             "GROUP BY n.nspname,c.relname ORDER BY n.nspname,c.relname;")
         columns={row['schema']+'.'+row['table']:row['columns'] for row in rows}
-    if (not isinstance(columns,dict) or len(columns)!=101
-            or len([name for name in columns if name.startswith('public.')])!=96
+    if (not isinstance(columns,dict) or (len(columns)!=101 if profile(contract) is LEGACY else len(columns)<101)
+            or (len([name for name in columns if name.startswith('public.')])!=96 if profile(contract) is LEGACY
+                else len([name for name in columns if name.startswith('public.')])!=len(columns)-5)
             or not {'auth.users','auth.identities','auth.mfa_factors','storage.objects','storage.buckets'}.issubset(columns)
             or any(not isinstance(names,list) or not names or len(names)!=len(set(names))
                 or any(not isinstance(n,str) or not n for n in names) for names in columns.values())):
@@ -159,7 +190,7 @@ def migration_customer_snapshot(contract,runtime,*,columns=None):
             "FROM (SELECT encode(sha256(convert_to(to_jsonb(ROW("+projection+"))::text,'UTF8')),'hex') h FROM "+table+" t) rows;")
     statements.append("SELECT json_build_object('schema',schema_version)::text FROM public.application_schema_state WHERE contract_key='core';")
     rows=query('\n'.join(statements))
-    if (len(rows)!=102 or rows[-1]!={'schema':schema}
+    if (len(rows)!=len(columns)+1 or rows[-1]!={'schema':schema}
             or [row.get('table') for row in rows[:-1]]!=sorted(columns)):
         raise RuntimeError('completed_migration_customer_snapshot_invalid')
     if observe_native(contract,runtime)!=schema:
@@ -167,16 +198,18 @@ def migration_customer_snapshot(contract,runtime,*,columns=None):
     return {'schema':schema,'columns':columns,'roots':{row['table']:row for row in rows[:-1]}}
 
 
-def verify_migration_customer_preservation(before,after):
+def verify_migration_customer_preservation(before,after, *, contract=None):
     """Only the approved schema-state row may differ across the SQL chain."""
-    if (before.get('schema')!=115 or after.get('schema')!=136
+    selected = LEGACY if contract is None else profile(contract)
+    if (before.get('schema')!=selected.source or after.get('schema')!=selected.target
             or before.get('columns')!=after.get('columns')
-            or set(before.get('roots',{}))!=set(after.get('roots',{})) or len(before['roots'])!=101):
+            or set(before.get('roots',{}))!=set(after.get('roots',{}))
+            or (len(before['roots'])!=101 if selected is LEGACY else len(before['roots'])<101)):
         raise RuntimeError('completed_migration_customer_preservation_inventory_changed')
     changed=[name for name in before['roots'] if before['roots'][name]!=after['roots'][name]]
     if (changed!=['public.application_schema_state']
             or before['roots']['public.application_schema_state']['count']!=after['roots']['public.application_schema_state']['count']):
         raise RuntimeError('completed_migration_existing_customer_values_changed')
-    return {'operation':'current-data-original-column-migration-comparison','starting_schema':115,'final_schema':136,
-        'original_public_tables':96,'original_identity_storage_tables':5,'only_schema_state_changed':True,
+    return {'operation':'current-data-original-column-migration-comparison','starting_schema':selected.source,'final_schema':selected.target,
+        'original_public_tables':len(before['roots'])-5,'original_identity_storage_tables':5,'only_schema_state_changed':True,
         'source_snapshot_sha256':digest(before),'target_snapshot_sha256':digest(after),'database_restored':False}

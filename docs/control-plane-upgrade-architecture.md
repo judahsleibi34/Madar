@@ -1,5 +1,35 @@
 # Privileged control-plane upgrade architecture
 
+## Explicit schema136→144 maintenance operation
+
+The existing completed-NORMAL coordinator has a separate version-2 operation,
+`completed-normal-schema136-144-maintenance-release`. It independently attests
+the completed136 origin before admission. Its fresh credential binds controller,
+accepted application/images, native database, exact historical receipts and the
+new plan. Historical115→136 receipts and grants remain unchanged as evidence;
+only the independently verified live origin grant is revoked by the new operation.
+
+This profile selects `schema-136-144-learning-bridge.json` and exactly migrations
+137,138,139,140,141,143,144.142 is rejected by admission, leases, migration and boot.
+Candidate workers start fenced; source136 adoption is READ_ONLY. NORMAL is granted
+only at144 after sealed SQL completion and original-column preservation checks.
+Exact retained BLUE identities may be stopped under the approved transaction;
+ports are rechecked without prospective allowances before Compose staging.
+No container or customer volume is removed by that retirement adapter.
+
+The existing exact-resource boot installer also supersedes the prior compatible
+136 actor, preserving all original files/receipts. Interrupted manual handoff
+selects verified READ_ONLY forward recovery or maintenance; it cannot invoke the
+old origin actor. SQL resumption uses a new separately authorized executor record.
+
+Manual maintenance validation is explicitly `component-verified-maintenance`:
+actual144 image execution, unchanged current-data SQL execution, exact-source
+controller tests/CI and live read-only resource preflight. GitHub CI is queried
+independently. This mode does not claim a complete Docker/systemd rehearsal or
+real restart acceptance. Those limitations must be disclosed in its new exact
+operator approval. Legacy full-rehearsal gates are unchanged. Implementation
+alone grants no production execution or auto-deployment authority.
+
 ## Pending manual136→144 release
 
 The unselected136→144 descriptor is migration/source authority only. The installed

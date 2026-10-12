@@ -17,6 +17,7 @@ from deployment.lib.completed_normal_admission import OPERATION, ADMISSIONS, dig
 from deployment.lib.emergency_routing_repair import Runtime, AvailabilityFailure, verification_window
 from deployment.lib.provider_recovery_runtime import protected
 from deployment.lib.runtime_authority import runtime_mutation_lock
+from deployment.lib.completed_normal_profile import profile
 
 WORKERS = ("notification-worker", "calendar-sync-worker", "data-deletion-worker")
 ROLES = ("backend", "frontend", "parser-worker", "remote-ingestion-worker", "redis", *WORKERS)
@@ -30,6 +31,7 @@ class CompatibleNormalBoot:
             raise RuntimeError('compatible_boot_independent_guards_required')
         validate_contract(contract)
         self.contract = contract
+        self.profile = profile(contract)
         self.root = Path(admissions) / digest(contract)
         self.admissions, self.state_root = Path(admissions), Path(state_root)
         self.source_guard, self.native_verifier = source_guard, native_verifier
@@ -39,9 +41,10 @@ class CompatibleNormalBoot:
             raise RuntimeError('compatible_boot_publication_path_invalid')
         self.publication_name = publication_name
         if normal_resume_guard is None:
-            from deployment.lib.completed_normal_database import require_normal_migration_boundary
-            normal_resume_guard=lambda schema:require_normal_migration_boundary(
-                self.contract,schema,self.root,self.state_root)
+            from deployment.lib.completed_normal_database import require_normal_migration_boundary,require_manual_normal_completion
+            def normal_resume_guard(schema):
+                require_normal_migration_boundary(self.contract,schema,self.root,self.state_root)
+                require_manual_normal_completion(self.contract,self.root)
         if not callable(normal_resume_guard):
             raise RuntimeError('compatible_boot_normal_resume_guard_required')
         self.normal_resume_guard=normal_resume_guard
@@ -51,11 +54,11 @@ class CompatibleNormalBoot:
         if os.geteuid() != 0:
             raise RuntimeError('compatible_boot_root_required')
         receipt = json.loads(protected(self.root/'admission.json').read_text())
-        if receipt.get('operation') != OPERATION or receipt.get('contract') != self.contract:
+        if receipt.get('operation') != self.profile.operation or receipt.get('contract') != self.contract:
             raise RuntimeError('compatible_boot_fresh_contract_changed')
         publication = json.loads(protected(self.root/self.publication_name, private=True).read_text())
         if (set(publication) != {'operation','context_sha256','source_sha','images','runtimes','networks','worker_generation','origin_workers'}
-                or publication['operation'] != OPERATION or publication['context_sha256'] != digest(self.contract)
+                or publication['operation'] != self.profile.operation or publication['context_sha256'] != digest(self.contract)
                 or publication['source_sha'] != self.contract['candidate']['source_sha']
                 or publication['images'] != self.contract['candidate']['images']
                 or set(publication['runtimes']) != set(ROLES) or len(publication['origin_workers']) != 3):
@@ -63,7 +66,7 @@ class CompatibleNormalBoot:
         from deployment.lib.completed_normal_resources import verify_runtime_binding
         selected=verify_runtime_binding(self.contract,publication,self.runtime,self.state_root)
         schema = self.native_verifier()
-        if type(schema) is not int or not 115 <= schema <= 136:
+        if not self.profile.supports(schema):
             raise RuntimeError('compatible_boot_native_schema_invalid')
         self.source_guard()
         return selected
@@ -79,8 +82,9 @@ class CompatibleNormalBoot:
             version = self.runtime.json_http(url+'/health/version')
             fence = self.runtime.json_http(url+'/health/recovery')
             if (version.get('release_sha') != self.contract['candidate']['source_sha']
-                    or version.get('release_slot') != slot or version.get('schema_compatible_min') != 115
-                    or version.get('schema_compatible_max') != 136
+                    or version.get('release_slot') != slot or version.get('schema_compatible_min') != self.profile.source
+                    or version.get('schema_compatible_max') != self.profile.target
+                    or tuple(version.get('schema_excluded_versions', [])) != self.profile.excluded
                     or fence != {'restricted':not normal,'business_writes_enabled':normal}):
                 raise RuntimeError('compatible_boot_serving_binding_changed')
             if not normal:
@@ -178,7 +182,7 @@ class CompatibleNormalBoot:
             if effect_started:
                 self.compensate_current_data()
             raise
-        return {'operation':OPERATION,'schema':self.native_verifier(),'mode':'READ_ONLY','database_restored':False}
+        return {'operation':self.profile.operation,'schema':self.native_verifier(),'mode':'READ_ONLY','database_restored':False}
 
     def execute(self):
         if self.publication_name != 'normal-publication.json':
@@ -210,4 +214,4 @@ class CompatibleNormalBoot:
             if effect_started:
                 self.compensate_current_data()
             raise
-        return {'operation':OPERATION,'schema':self.native_verifier(),'mode':'NORMAL','database_restored':False}
+        return {'operation':self.profile.operation,'schema':self.native_verifier(),'mode':'NORMAL','database_restored':False}

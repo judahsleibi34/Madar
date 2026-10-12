@@ -6,6 +6,7 @@ from pathlib import Path
 import socket
 import sys
 import unittest
+from unittest.mock import patch
 
 WEB=Path(os.getenv('MADAR_TEST_REPOSITORY_ROOT') or Path(__file__).resolve().parents[2])
 sys.path.insert(0,str(WEB))
@@ -23,11 +24,21 @@ class Inventory:
         raise AssertionError('allocator attempted a mutation')
 
 class CompletedNormalResourceTests(unittest.TestCase):
-    def setUp(self):self.contract=fixture_contract();self.runtime=Inventory()
+    def setUp(self):
+        self.contract=fixture_contract();self.runtime=Inventory()
+        # Exercise real bind/listen without probing serving production ports.
+        sockets=[socket.socket() for _ in range(3)]
+        try:
+            for listener in sockets:listener.bind(('127.0.0.1',0))
+            self.ports=dict(zip(('backend','frontend','redis'),(str(s.getsockname()[1]) for s in sockets)))
+        finally:
+            for listener in sockets:listener.close()
+        original=dict(m.PORTS)
+        changed=patch.dict(m.PORTS,dict(original,green=self.ports),clear=True);changed.start();self.addCleanup(changed.stop)
     def test_preflight_and_locked_recheck_have_exact_same_immutable_resolution(self):
         before=m.verify_allocation(self.contract,'green',self.runtime)
         self.assertEqual(before,m.verify_allocation(self.contract,'green',self.runtime))
-        self.assertEqual(before['ports'],{'backend':'8201','frontend':'3200','redis':'6382'})
+        self.assertEqual(before['ports'],self.ports)
         self.assertTrue(all(n.startswith('madar-schema136-') for n in before['containers'].values()))
         self.assertFalse(any(n.startswith('madar-green-') for n in before['containers'].values()))
     def test_name_or_network_acquired_between_preflight_and_staging_rejects(self):
@@ -41,7 +52,7 @@ class CompletedNormalResourceTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError,'subnet_occupied'):m.verify_allocation(self.contract,'green',self.runtime)
     def test_stopped_port_reservation_requires_exact_fresh_binding_and_inhibition(self):
         row={'Id':'c'*64,'Name':'/madar-historical','Image':'sha256:'+'d'*64,'Config':{},'Mounts':[],
-            'HostConfig':{'RestartPolicy':{'Name':'no'},'PortBindings':{'8000/tcp':[{'HostPort':'8201'}]}},'State':{'Running':False}}
+            'HostConfig':{'RestartPolicy':{'Name':'no'},'PortBindings':{'8000/tcp':[{'HostPort':self.ports['backend']}]}},'State':{'Running':False}}
         self.runtime.rows=[row]
         with self.assertRaisesRegex(RuntimeError,'already_reserved'):m.verify_allocation(self.contract,'green',self.runtime)
         self.contract['resources']['green']['retired_port_declarations']={'madar-historical':
@@ -51,7 +62,7 @@ class CompletedNormalResourceTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError,'already_reserved'):m.verify_allocation(self.contract,'green',self.runtime)
     def test_running_retained_container_never_displaced(self):
         row={'Id':'c'*64,'Name':'/madar-historical','Image':'sha256:'+'d'*64,'Config':{},'Mounts':[],
-            'HostConfig':{'RestartPolicy':{'Name':'no'},'PortBindings':{'8000/tcp':[{'HostPort':'8201'}]}},'State':{'Running':True}}
+            'HostConfig':{'RestartPolicy':{'Name':'no'},'PortBindings':{'8000/tcp':[{'HostPort':self.ports['backend']}]}},'State':{'Running':True}}
         self.runtime.rows=[row]
         self.contract['resources']['green']['retired_port_declarations']={'madar-historical':
             {'container_id':row['Id'],'image_id':row['Image'],'spec_sha256':spec(row)}}
@@ -59,7 +70,7 @@ class CompletedNormalResourceTests(unittest.TestCase):
     def test_retained_resource_binding_uses_same_complete_mount_measurement(self):
         row={'Id':'c'*64,'Name':'/madar-historical','Image':'sha256:'+'d'*64,'Config':{},
             'Mounts':[{'Destination':'/a','Source':'/one','RW':False},{'Destination':'/b','Source':'/two','RW':True}],
-            'HostConfig':{'RestartPolicy':{'Name':'no'},'PortBindings':{'8000/tcp':[{'HostPort':'8201'}]}},'State':{'Running':False}}
+            'HostConfig':{'RestartPolicy':{'Name':'no'},'PortBindings':{'8000/tcp':[{'HostPort':self.ports['backend']}]}},'State':{'Running':False}}
         self.runtime.rows=[row]
         self.contract['resources']['green']['retired_port_declarations']={'madar-historical':
             {'container_id':row['Id'],'image_id':row['Image'],'spec_sha256':m.measured_spec(row)}}

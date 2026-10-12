@@ -26,6 +26,61 @@ from deployment.lib.completed_normal_write_handoff import CompletedNormalWriteHa
 from deployment.lib.control_plane_upgrade import acquire_lock,BACKUP_TIMERS
 from deployment.lib.emergency_routing_repair import exclusive
 from deployment.lib.provider_recovery_runtime import protected,readonly_configuration,file_digest
+from deployment.lib.completed_normal_profile import profile, MANUAL
+
+
+def manual_maintenance_route(contract):
+    """Existing maintenance listener, with only read-only version probes.
+
+    Ordinary backup verifies the actual release through the stable proxy. Keep
+    that nonmutating endpoint available while customer/Auth traffic is fenced.
+    """
+    if profile(contract) is not MANUAL:
+        raise RuntimeError('completed_manual_maintenance_contract_required')
+    port=8101 if contract['candidate']['slot']=='blue' else 8201
+    return (f'upstream madar_backend_active {{ server 127.0.0.1:29402; }}\n'
+        f'upstream madar_frontend_active {{ server 127.0.0.1:29402; }}\n'
+        f'server {{ listen 127.0.0.1:29402; access_log off; '
+        f'location = /health/version {{ proxy_pass http://127.0.0.1:{port}/health/version; }} '
+        f'location = /api/health/version {{ proxy_pass http://127.0.0.1:{port}/health/version; }} '
+        f'location / {{ return 503; }} }}\n').encode()
+
+
+def enter_manual_maintenance(actor):
+    from deployment.lib.emergency_routing_repair import verification_window, UPSTREAM
+    from deployment.lib.runtime_authority import runtime_mutation_lock
+    from deployment.lib.completed_normal_admission import require_fresh_authorization
+    from deployment.lib.completed_normal_resources import ROLES, measured_spec_matches
+    from deployment.lib.completed_normal_profile import expected_origin_grant
+    contract=actor.contract;actor.guard();require_fresh_authorization(contract)
+    origin=Path(contract['source_roles']['completion_root'])
+    if json.loads(protected(origin/'write-authority/authority.json').read_text())!=expected_origin_grant(contract,'READ_ONLY'):
+        raise RuntimeError('completed_manual_origin_not_fenced')
+    record=json.loads(protected(origin/'candidate-runtime.json',private=True).read_text())
+    if (record.get('source_sha')!=contract['source_roles']['application_sha']
+            or record.get('context_sha256')!=origin.name or set(record.get('runtimes',{}))!=set(ROLES)):
+        raise RuntimeError('completed_manual_origin_runtime_changed')
+    body=manual_maintenance_route(contract)
+    with verification_window(actor.runtime,180):
+        with runtime_mutation_lock(actor.ops.state_root):
+            actor.guard();actor.proxy_identity()
+            exclusive(actor.root/'migration-maintenance-route-preimage.conf',readonly_configuration(UPSTREAM,private=False).read_bytes())
+            actor.runtime.nginx_preflight(body,actor.root)
+            actor.runtime.publish(body);actor.runtime.reload();actor.runtime.verify_maintenance()
+            # No old schema136 application may query advanced schema, including
+            # through draining proxy workers. Preserve its containers/data and
+            # Redis; stop only exact independently measured application IDs.
+            for kind in ('backend','frontend','parser-worker','remote-ingestion-worker'):
+                identity=record['runtimes'][kind]
+                rows=actor.runtime.inspect([identity['id']]);row=next(iter(rows.values())) if len(rows)==1 else None
+                if (row is None or row['Id']!=identity['id'] or row['Image']!=identity['image']
+                        or not measured_spec_matches(row,identity['spec_sha256'])
+                        or row['HostConfig']['RestartPolicy']['Name']!='no'):
+                    raise RuntimeError('completed_manual_origin_application_changed')
+                if row['State']['Running']:actor.runtime.command(['docker','stop',identity['id']])
+            actor.guard();actor.proxy_identity()
+            if UPSTREAM.read_bytes()!=body:raise RuntimeError('completed_manual_maintenance_route_changed')
+            return {'frontend_http':503,'api_http':503,'version_probe_preserved':True,'customer_database_restored':False}
 
 
 def verify_serving(actor, *, schema,normal):
@@ -37,7 +92,8 @@ def verify_serving(actor, *, schema,normal):
     """
     import time
     from deployment.lib.emergency_routing_repair import verification_window,AvailabilityFailure
-    if schema not in {115,136} or type(normal) is not bool:
+    selected=profile(actor.contract)
+    if schema not in {selected.source,selected.target} or type(normal) is not bool:
         raise RuntimeError('completed_upgrade_serving_mode_invalid')
     first=None;successes=0
     with verification_window(actor.runtime,180):
@@ -50,7 +106,8 @@ def verify_serving(actor, *, schema,normal):
                     version=actor.runtime.json_http(base+'/health/version')
                     if (version.get('release_sha')!=actor.contract['candidate']['source_sha']
                             or version.get('release_slot')!=actor.contract['candidate']['slot']
-                            or version.get('schema_compatible_min')!=115 or version.get('schema_compatible_max')!=136
+                            or version.get('schema_compatible_min')!=selected.source or version.get('schema_compatible_max')!=selected.target
+                            or tuple(version.get('schema_excluded_versions',[]))!=selected.excluded
                             or actor.runtime.json_http(base+'/health/recovery')!={'restricted':not normal,'business_writes_enabled':normal}):
                         raise RuntimeError('completed_upgrade_stable_serving_identity_changed')
                     if not normal:actor.runtime.denied(base)
@@ -84,6 +141,7 @@ class CompletedNormalUpgrade:
         if not all(callable(f) for f in (artifact_guard,model_loader,acceptance_guard,rehearsal_guard)):
             raise RuntimeError('completed_upgrade_independent_execution_guards_required')
         self.actor=actor;self.contract=actor.contract;self.document=actor.document
+        self.profile=profile(self.contract)
         self.ops=actor.ops;self.root=actor.root;self.package=actor.package
         self.artifact_guard=artifact_guard;self.model_loader=model_loader
         self.acceptance_guard=acceptance_guard;self.rehearsal_guard=rehearsal_guard
@@ -112,7 +170,7 @@ class CompletedNormalUpgrade:
         """No authorization consumption, service effects, or live SQL writes."""
         self.preparation_source();self.verify_candidate_remote();self.artifact_guard();self.rehearsal_guard()
         before=self.ops.current_preflight(lock_deployment=locked)
-        if (before['schema']!=115 or before['slot']!=self.contract['origin']['slot']
+        if (before['schema']!=self.profile.source or before['slot']!=self.contract['origin']['slot']
                 or before['installed_sha']!=self.contract['source_roles']['controller_sha']
                 or before['production_sha']!=self.contract['source_roles']['controller_sha']
                 or before.get('source_roles')!=self.contract['source_roles']):
@@ -129,12 +187,15 @@ class CompletedNormalUpgrade:
             raise RuntimeError('completed_upgrade_existing_interlock_requires_reconciliation')
         observe_native(self.contract,self.actor.runtime)
         from deployment.lib.active_recovery_backup import verify_backup_execution_context
-        verify_backup_execution_context(self.package)
+        if self.profile is MANUAL:
+            verify_backup_execution_context(self.package,expected_schema=self.profile.source)
+        else:verify_backup_execution_context(self.package)
         baseline=customer_baseline(self.contract,self.actor.runtime)
         if (baseline['table_roots_sha256']!=self.contract['customer_table_roots_sha256']
                 or baseline['identity_roots_sha256']!=self.contract['customer_identity_roots_sha256']):
             raise RuntimeError('completed_upgrade_current_customer_data_changed')
-        allocation=verify_allocation(self.contract,self.contract['candidate']['slot'],self.actor.runtime)
+        allocation=verify_allocation(self.contract,self.contract['candidate']['slot'],self.actor.runtime,
+            prospective_retirement=self.profile is MANUAL)
         # Render the exact staging builder before authorization. Its dedicated
         # read-only mode rejects every command except Compose config and does
         # not invent an admission, grant, worker owner or historical credential.
@@ -156,7 +217,7 @@ class CompletedNormalUpgrade:
         if any(self.ops.systemctl_state(n.replace('.timer','.service'))['active'] not in {'inactive','failed'} for n in BACKUP_TIMERS):
             raise RuntimeError('completed_upgrade_backup_service_running')
         self.preparation_source()
-        return {'operation':OPERATION,'schema':115,'candidate':allocation,'production_modified':False,'authorization_consumed':False}
+        return {'operation':self.profile.operation,'schema':self.profile.source,'candidate':allocation,'production_modified':False,'authorization_consumed':False}
 
     @contextmanager
     def root_credential(self, *, migration_resumption=None):
@@ -209,7 +270,7 @@ class CompletedNormalUpgrade:
             raise RuntimeError('completed_upgrade_proxy_base_unit_incompatible')
         backup=self.root/'controller-backup';backup.mkdir(mode=0o700)
         self.ops.installer_dry_run(staged,backup)
-        intent={'operation':OPERATION,'context_sha256':digest(self.contract),
+        intent={'operation':self.profile.operation,'context_sha256':digest(self.contract),
             'from_controller':self.contract['source_roles']['controller_sha'],'to_controller':self.controller,
             'old_tree_sha256':self.document['installed_controller_tree_sha256'],
             'new_tree_sha256':self.contract['candidate']['controller_tree_sha256']}
@@ -229,7 +290,7 @@ class CompletedNormalUpgrade:
     def failure(self,error):
         # Fixed stage/type and frame coordinates only. Never serialize exception
         # text, command output, configurations, SQL or customer values.
-        evidence={'operation':OPERATION,'context_sha256':digest(self.contract),'phase':self.phase,
+        evidence={'operation':self.profile.operation,'context_sha256':digest(self.contract),'phase':self.phase,
             'exception_type':type(error).__name__,'frames':[{'source':Path(f.filename).name,'line':f.lineno,'function':f.name}
                 for f in traceback.extract_tb(error.__traceback__)[-24:]],'customer_database_restored':False}
         # Failure diagnostics must never prevent write revocation/compensation.
@@ -269,7 +330,7 @@ class CompletedNormalUpgrade:
             with self.root_credential():
                 publish_admission(self.contract,self.ops,self.ops.state_root)
             self.admitted=True
-            authorization={'operation':OPERATION,'context_sha256':digest(self.contract),'plan_sha256':digest(self.document),
+            authorization={'operation':self.profile.operation,'context_sha256':digest(self.contract),'plan_sha256':digest(self.document),
                 'source_bundle_sha256':self.document['source_bundle_sha256'],'controller_sha':self.controller,
                 'application_sha':self.contract['candidate']['source_sha']}
             exclusive(self.root/'operator-authorization.json',encoded(authorization))
@@ -280,6 +341,12 @@ class CompletedNormalUpgrade:
             # Existing deploy.lock must be released before the User=madar
             # service obtains it. The protected upgrade interlock stays armed.
             self.ops.release_deployment_lock()
+            if self.profile is MANUAL:
+                with self.root_credential():
+                    self.event('retained_blue_retirement_pending')
+                    from deployment.lib.completed_normal_resources import retire_bound_resources
+                    retirement=retire_bound_resources(self.contract,self.actor.runtime,source_guard=self.actor.guard)
+                    exclusive(self.root/'retained-resource-retirement.json',encoded(retirement))
             self.service('prepare')
             with self.root_credential():
                 seal_candidate_stage(self.contract,source_guard=self.actor.guard,model_loader=self.model_loader,
@@ -295,11 +362,16 @@ class CompletedNormalUpgrade:
                 kernel.round(normal=False)
             self.service('publish')
             with self.root_credential():
-                self.acceptance_guard(schema=115,normal=False)
-                self.event('bridge_normal_grant_pending');handoff.grant(schema=115)
+                self.acceptance_guard(schema=self.profile.source,normal=False)
+                if self.profile is not MANUAL:
+                    self.event('bridge_normal_grant_pending');handoff.grant(schema=self.profile.source)
             self.service('adopt')
             with self.root_credential():
-                self.acceptance_guard(schema=115,normal=True)
+                self.acceptance_guard(schema=self.profile.source,normal=self.profile is not MANUAL)
+                if self.profile is MANUAL:
+                    self.event('migration_maintenance_pending')
+                    receipt=enter_manual_maintenance(self.actor)
+                    exclusive(self.root/'migration-maintenance.json',encoded(receipt))
                 # Stop consuming through the real grant, not by granting two
                 # owners or relying on a status flag. The same healthy bridge
                 # stays publicly available while the database is advanced.
@@ -319,24 +391,28 @@ class CompletedNormalUpgrade:
                 original=json.loads(protected(self.root/'pre-migration-customer-snapshot.json',private=True).read_text())
                 after=migration_customer_snapshot(self.contract,self.actor.runtime,columns=original['columns'])
                 exclusive(self.root/'post-migration-customer-snapshot.json',encoded(after))
-                preservation=verify_migration_customer_preservation(original,after)
+                preservation=(verify_migration_customer_preservation(original,after,contract=self.contract)
+                    if self.profile is MANUAL else verify_migration_customer_preservation(original,after))
                 exclusive(self.root/'migration-customer-preservation.json',encoded(preservation))
                 self.event('migration_completion_pending')
                 seal_completion(self.contract,self.ops.state_root/'releases'/self.contract['candidate']['source_sha'],self.ops.state_root,
                     source_guard=self.actor.guard,runtime_guard=self.actor.native)
+                if self.profile is MANUAL:
+                    self.event('verified_target_read_only_routing_pending')
+                    self.actor.publish_restricted_bridge()
             self.service('refresh')
             with self.root_credential():
-                self.acceptance_guard(schema=136,normal=False)
-                self.event('target_normal_grant_pending');handoff.grant(schema=136)
-                self.acceptance_guard(schema=136,normal=True)
+                self.acceptance_guard(schema=self.profile.target,normal=False)
+                self.event('target_normal_grant_pending');handoff.grant(schema=self.profile.target)
+                self.acceptance_guard(schema=self.profile.target,normal=True)
                 self.event('post_migration_backup_pending')
                 backup=CompletedNormalBackupContext(self.contract,self.document,self.package,kernel,
                     stage='post-migration',source_guard=self.actor.guard,artifact_guard=self.artifact_guard)
                 receipt=backup.capture()
                 self.event('backup_timer_restore_pending');self.ops.restore_backup_timers()
-                kernel.round(normal=True);self.acceptance_guard(schema=136,normal=True)
-                self.event('normal_completed',schema=136,mode='NORMAL')
-                result={'operation':OPERATION,'context_sha256':digest(self.contract),'schema':136,'mode':'NORMAL',
+                kernel.round(normal=True);self.acceptance_guard(schema=self.profile.target,normal=True)
+                self.event('normal_completed',schema=self.profile.target,mode='NORMAL')
+                result={'operation':self.profile.operation,'context_sha256':digest(self.contract),'schema':self.profile.target,'mode':'NORMAL',
                     'application_sha':self.contract['candidate']['source_sha'],'controller_sha':self.controller,
                     'images':self.contract['candidate']['images'],'backup':receipt,
                     'backup_timers':{n:self.ops.systemctl_state(n) for n in BACKUP_TIMERS},'customer_database_restored':False}

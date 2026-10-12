@@ -33,6 +33,7 @@ class BootCompensationTests(unittest.TestCase):
         self.temp=tempfile.TemporaryDirectory();self.addCleanup(self.temp.cleanup)
         self.root=Path(self.temp.name)
         actor=object.__new__(m.CompletedNormalBootActor)
+        actor.profile=__import__('deployment.lib.completed_normal_profile',fromlist=['LEGACY']).LEGACY
         actor.root=self.root;actor.contract=fixture_contract()
         actor.contract['source_roles']['completion_root']=str(self.root/'original')
         actor.document={'proxy_runtime':{'id':'proxy','image':'proxy-image','spec_sha256':'unused'}}
