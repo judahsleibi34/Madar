@@ -5,6 +5,7 @@ synthetic environment file. These tests do not claim a deployment rehearsal.
 """
 import importlib.machinery
 import importlib.util
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -129,35 +130,77 @@ class CompletedNormalComposeTests(unittest.TestCase):
         self.assertFalse(any(v.get('target')=='/run/madar/business-write-authority' for v in services['parser-worker']['volumes']))
 
 
-    def test_real_compose_preserves_explicit_136_144_bounds_without_widening_mounts(self):
+    def selected_144_environment(self):
+        from deployment.lib import learning_migration_path as route
+        descriptor=WEB/route.NORMAL_CONTRACT_PATH.removeprefix('web/')
+        self.assertEqual(hashlib.sha256(descriptor.read_bytes()).hexdigest(),route.NORMAL_CONTRACT_SHA256)
+        contract=json.loads(descriptor.read_text())
+        path=WEB/route.NORMAL_BRIDGE_PATH.removeprefix('web/')
+        self.assertEqual(hashlib.sha256(path.read_bytes()).hexdigest(),contract['bridge_sha256'])
+        manifest=WEB/route.NORMAL_MANIFEST_PATH.removeprefix('web/')
+        self.assertEqual(hashlib.sha256(manifest.read_bytes()).hexdigest(),contract['manifest_sha256'])
+        self.assertEqual([item['number'] for item in json.loads(manifest.read_text())['migrations']],
+                         [137,138,139,140,141,143,144])
+        self.ops.compatibility=cli.Compatibility.load(path)
+        self.ops.completed_normal_admission=None
+        stale={'SCHEMA_COMPATIBLE_MIN':'115','SCHEMA_COMPATIBLE_MAX':'136',
+               'SCHEMA_EXCLUDED_VERSIONS':''}
+        with patch.dict(os.environ,stale):
+            return self.ops._environment('c'*40,'blue',self.images)
+
+    def test_actual_environment_uses_selected_144_contract_not_stale_values(self):
+        environment=self.selected_144_environment()
+        self.assertEqual(environment['SCHEMA_COMPATIBLE_MIN'],'136')
+        self.assertEqual(environment['SCHEMA_COMPATIBLE_MAX'],'144')
+        self.assertEqual(environment['SCHEMA_EXCLUDED_VERSIONS'],'142')
+
+    def test_historical_admission_cannot_authorize_selected_144_contract(self):
+        self.ops.compatibility=cli.Compatibility.load(WEB/'deployment/releases/schema-136-144-learning-bridge.json')
+        self.ops.run=lambda *args,**kwargs:self.fail('Docker reached with incompatible historical admission')
+        with self.assertRaisesRegex(RuntimeError,'completed_normal_compatibility_changed'):
+            self.ops._compose('c'*40,'green',self.images,'config','--format','json')
+
+    def test_real_compose_preserves_selected_144_contract_despite_stale_env_file(self):
         if not shutil.which('docker'):
             self.skipTest('Docker Compose unavailable; source render exercised on deployment host')
         version = subprocess.run(['docker','compose','version'],capture_output=True,text=True)
         if version.returncode:
             self.skipTest('Docker Compose unavailable; actual render runs separately on deployment host')
-        captured=[]
-        original=self.ops._environment
-        def environment(*args,**kwargs):
-            value=original(*args,**kwargs)
-            # Render-only fixture inputs, not a144 admission/authorization claim.
-            value.update(SCHEMA_COMPATIBLE_MIN='136',SCHEMA_COMPATIBLE_MAX='144',SCHEMA_EXCLUDED_VERSIONS='142')
-            return value
-        def run(command,*,cwd=None,env=None,**kwargs):
-            result=subprocess.run(command,cwd=cwd,env=env,capture_output=True,text=True,timeout=30)
-            self.assertEqual(result.returncode,0,'Private Compose configuration failed')
-            captured.append(json.loads(result.stdout));return result.stdout
-        self.ops._environment=environment;self.ops.run=run
-        self.ops._compose('c'*40,'green',self.images,'config','--format','json',workers_active=True)
+        environment=self.selected_144_environment()
+        # Render-only allocation and authority identifiers. This does not issue
+        # a grant, change admission, or make the missing144 handoff executable.
+        environment.update({
+            'MADAR_BUSINESS_WRITE_CONTRACT':'a'*64,
+            'MADAR_BUSINESS_WRITE_AUTHORITY_ROOT':str(Path(self.temp.name)/'authority'),
+            'MADAR_CONTAINER_PREFIX':'fixture-schema144',
+            'MADAR_REDIS_IMAGE':'redis@sha256:'+'7'*64,
+            'MADAR_ALLOCATION_DEFAULT_NETWORK':'fixture-schema144-default',
+            'MADAR_ALLOCATION_PARSER_NETWORK':'fixture-schema144-parser',
+            'MADAR_ALLOCATION_REMOTE_INTERNAL_NETWORK':'fixture-schema144-remote-internal',
+            'MADAR_ALLOCATION_REMOTE_EGRESS_NETWORK':'fixture-schema144-remote-egress',
+        })
+        with self.envfile.open('a') as stream:
+            stream.write('SCHEMA_COMPATIBLE_MIN=115\nSCHEMA_COMPATIBLE_MAX=136\nSCHEMA_EXCLUDED_VERSIONS=\n')
+        command=['docker','compose','--project-name','fixture-schema144','--env-file',str(self.envfile),
+                 '-f',str(WEB/'docker-compose.yml'),
+                 '-f',str(WEB/'deployment/docker-compose.release.yml'),
+                 '-f',str(WEB/'deployment/docker-compose.write-authority.yml'),
+                 '--profile','workers','--profile','deletion-worker','config','--format','json']
+        result=subprocess.run(command,cwd=WEB,env=environment,capture_output=True,text=True,timeout=30)
+        self.assertEqual(result.returncode,0,'Private Compose configuration failed')
+        services=json.loads(result.stdout)['services']
         for name in ('backend','notification-worker','calendar-sync-worker','data-deletion-worker'):
-            role=captured[0]['services'][name]
+            role=services[name]
             self.assertEqual(str(role['environment']['SCHEMA_COMPATIBLE_MIN']),'136')
             self.assertEqual(str(role['environment']['SCHEMA_COMPATIBLE_MAX']),'144')
             self.assertEqual(str(role['environment']['SCHEMA_EXCLUDED_VERSIONS']),'142')
+            self.assertEqual(role['environment']['MADAR_BUSINESS_WRITE_CONTRACT'],'a'*64)
             mounts=[v for v in role['volumes'] if v['target']=='/run/madar/business-write-authority']
             self.assertEqual(len(mounts),1)
             self.assertTrue(mounts[0]['read_only'])
             self.assertFalse(mounts[0]['bind']['create_host_path'])
             self.assertTrue(role['read_only']);self.assertIn('ALL',role['cap_drop'])
+            self.assertEqual(role['restart'],'no')
 
     def test_real_compose_rejects_missing_explicit_authority_bounds(self):
         if not shutil.which('docker'):

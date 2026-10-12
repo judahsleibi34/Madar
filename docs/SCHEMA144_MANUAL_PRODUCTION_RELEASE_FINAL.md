@@ -66,14 +66,22 @@ Existing authority mounts remain read-only, with `create_host_path: false`.
 Changed files:
 
 - `web/deployment/docker-compose.write-authority.yml`
+- `web/deployment/bin/madar-release-deploy`
 - `web/backend/tests/test_completed_normal_compose.py`
 - `docs/production-release-policy.md`
+- `docs/control-plane-upgrade-architecture.md`
 - This checkpoint document.
 
-**10 focused tests pass** on the deployment host, including actual Docker
-Compose rendering for the historical range and136..144 with142 excluded, and
-rejection of missing minimum or maximum. The144 render uses explicit synthetic
-inputs; it does not claim144 admission, credential issuance or deployment.
+**12 focused tests pass** on the deployment host. The144 test validates the
+pinned descriptor, manifest and bridge hashes, loads that actual compatibility
+contract through the actual deployment environment builder, and renders the
+base/release/authority Compose stack. Stale115..136 values in both shell and env
+file cannot replace136..144 with142 excluded. All four business roles retain the
+read-only authority mount and container security settings. Missing minimum or
+maximum rejects rendering. Historical admission with a144 selected range rejects
+before Docker. Missing/modified grants and image/slot mismatches remain rejected.
+Allocation, image and contract identifiers used only for rendering are synthetic;
+this does not claim144 admission, credential issuance or image acceptance.
 Dependency locks, migration mirrors, schema transitions, forward-release,
 exact learning route and secret hygiene checks pass. Two unchanged historical
 013/014 duplicate-content warnings remain; migration validation reports zero errors.
@@ -133,11 +141,35 @@ isolation acceptance. It has no verified private root filesystem, delegated
 cgroups, private Docker daemon, genuine systemd credential lifecycle or restart
 rehearsal. No VM or replacement deployment framework was created.
 
-The smallest remaining environmental prerequisite is a bounded, independently
-verified isolated Docker/systemd test target. A subordinate-ID setup is a
-possible route only after its storage, cgroups, device and network isolation are
-actually established. It must not expose a host-root Docker socket or host disks.
-No complete release rehearsal can be claimed from Compose rendering or SQL tests.
+Further RootlessKit, namespace, VM and rehearsal-environment work is stopped
+under the operator's P0 update. No complete release rehearsal can be claimed
+from Compose rendering or SQL tests.
+
+## Smallest alternative validation strategy and risks
+
+Keep the working136 deployment unchanged. Reuse the existing installed136
+completion attestor, known-good backup/replica proof and unchanged seven-SQL
+rehearsal. Validate the remaining manual transition in bounded stages: exact
+controller inventory/preimages and authorization negatives; actual Compose
+render and port/name/network feasibility; worker/authority/boot state-machine
+failure injection using existing fixtures; then exact-image application checks
+against private data only where an already safe fixture exists. No new privileged
+environment or controller framework is required for those source/read-only checks.
+
+This alternative yields component evidence, **not** complete operational
+acceptance. It does not prove real new-controller installation, systemd credential
+delivery, occupied-BLUE retirement, Docker/systemd restart or the combined
+forward-recovery sequence. Those risks remain unverified. A runtime safety guard
+must still reject absent or mismatched fresh authority. Existing136 acceptance
+cannot attest new144 images or changed privileged executables. Do not suppress
+those guards or turn this alternative into a PASS receipt.
+
+The next correction is confined to the existing manual installer/admission and
+boot path, with a new candidate-specific136→144 contract and explicit resource
+preimages. It must not broaden the historical115→136 contract. Retained BLUE
+requires exact-ID retirement under deployment locks, with managed mounts and
+volumes preserved and GREEN still serving until the compatible candidate is
+verified. Neither remaining operation is implemented or accepted in this change.
 
 ## Remaining release engineering and approval boundary
 

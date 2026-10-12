@@ -18,6 +18,13 @@ configuration rendering. It still requires an existing read-only authority
 mount with `create_host_path: false`. Real Compose rendering verifies both
 the historical bounds and the 136..144 range with 142 excluded, without
 granting new runtime or production authority.
+The actual environment builder loads the selected136..144 bridge compatibility
+and overrides stale inherited115..136 values. A full three-file Compose render
+also rejects stale env-file values in favor of that generated environment.
+Historical completed-NORMAL admission is additionally required to match the
+selected compatibility range before any Compose command; it cannot furnish a
+legacy authority mount to a144 candidate. The real144 admission/boot handoff
+remains a separate, uncompleted execution requirement.
 
 Manual activation still requires accepted exact images at136/144, preservation
 on a private current-data restore, independently authorized controller/source-role

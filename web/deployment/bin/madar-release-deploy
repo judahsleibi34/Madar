@@ -596,6 +596,12 @@ class DockerGitOperations:
             if rendering is not None:validate_contract(rendering)
             elif require_admission(self.state_root, sha) != admission:
                 raise RuntimeError("completed_normal_admission_changed")
+            if (self.compatibility.schema_min != admission['candidate']['compatible_min']
+                    or self.compatibility.schema_max != admission['candidate']['compatible_max']
+                    or self.compatibility.excluded_schemas):
+                # A historical115..136 admission cannot supply an authority
+                # mount or grant for a differently selected release contract.
+                raise RuntimeError('completed_normal_compatibility_changed')
             if (slot != admission["candidate"]["slot"]
                     or any(str(images.get(key, "")).split("@", 1)[-1] != admission["candidate"]["images"][key]
                            for key in ("backend", "frontend"))
