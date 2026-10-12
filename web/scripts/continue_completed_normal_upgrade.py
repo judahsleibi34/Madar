@@ -22,7 +22,7 @@ REQUIRED_FILES={'web/scripts/continue_completed_normal_upgrade.py',*(
         'completed_normal_runtime','completed_normal_migration','completed_normal_database',
         'completed_normal_resources','compatible_normal_boot','completed_normal_boot_installation',
         'completed_normal_write_handoff','completed_normal_backup','completed_normal_execution',
-        'completed_normal_model','completed_normal_evidence','completed_normal_forward'))}
+        'completed_normal_model','completed_normal_evidence','completed_normal_forward','completed_normal_profile'))}
 def secured(path, *, directory=False):
     for part in (path,*path.parents):
         st=part.lstat()

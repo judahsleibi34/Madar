@@ -16,6 +16,7 @@ import re
 
 from deployment.lib.environment_file import load_environment_file
 from deployment.lib.provider_recovery_runtime import readonly_configuration
+from deployment.lib.completed_normal_profile import profile
 
 
 def accepted_compose_blobs(sha,objects):
@@ -124,12 +125,14 @@ def render_candidate_model(actor, *, read_only=False):
     loader.exec_module(module)
     guard()
     contract=actor.contract;sha=contract['candidate']['source_sha'];slot=contract['candidate']['slot']
-    compatibility=module.Compatibility.load(source/'web/deployment/releases/release.json')
-    if (compatibility.schema_min,compatibility.schema_max,compatibility.target_schema)!=(115,136,136):
+    selected=profile(actor.contract)
+    compatibility=module.Compatibility.load(source/'web/deployment/releases'/selected.metadata)
+    if ((compatibility.schema_min,compatibility.schema_max,compatibility.target_schema)!=(selected.source,selected.target,selected.target)
+            or compatibility.excluded_schemas!=selected.excluded):
         raise RuntimeError('completed_model_loader_schema_contract_changed')
     cfg=actor.document['application_artifacts']
     images={key:cfg[key] for key in ('backend','frontend','worker','build_timestamp')}
-    operations=module.DockerGitOperations(actor.ops.repo,actor.ops.state_root,Path('/etc/madar/production.env'),compatibility)
+    operations=module.DockerGitOperations(actor.ops.repo,actor.ops.state_root,Path('/etc/madar/production.env'),compatibility,metadata_filename=selected.metadata)
     operations.release_root=candidate_release_root(actor,read_only=read_only)
     operations.completed_normal_admission=contract
     if read_only:operations.read_only_model_contract=contract

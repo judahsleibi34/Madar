@@ -1,5 +1,17 @@
 # Automated database migration architecture
 
+## Manual136→144 execution binding
+
+The separately authorized version-2 completed-NORMAL profile selects the existing
+checksum-pinned learning136→144 route. The coordinator and sealed database lease
+recognize only136..144 excluding142, and the locked executor must observe the exact
+seven reviewed SQL transitions. Source guards, advisory locks, backup verification,
+durable execution history and fatal SQL errors retain their existing behavior.
+NORMAL cannot be granted until144 and independently sealed execution completion.
+Failed attempts are never replayed; forward resumption gets fresh authorization
+and a new executor path. Prior committed SQL/customer data is retained. Historical
+115→136 contracts and all SQL checksums remain unchanged.
+
 ## Unselected manual completed-NORMAL136→144 route
 
 The new source-pinned `learning-136-144-path.json` composes existing137..141,

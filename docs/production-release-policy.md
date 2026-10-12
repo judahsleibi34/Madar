@@ -1,5 +1,29 @@
 # Madar production release acceptance policy
 
+## Separately authorized schema144 maintenance release
+
+The version-2 completed-NORMAL maintenance profile reuses accepted application8d0c298
+images and genuine144 application/136→144 SQL evidence. Controller-only revisions
+remain distinct from that accepted application revision. It never relabels image
+acceptance, replays the historical136 credential or treats main as authorization.
+The selected bridge and exclusion142 are mandatory through real Compose rendering,
+the version-2 grant, schema probes, migration execution and restart recovery.
+
+This manually approved profile stages source136 READ_ONLY and grants NORMAL only
+after144 completion. Fresh pre/post-migration ordinary backups, independent restores,
+append-only Node1 replicas and restoration of the recorded native timers are part
+of the complete operation. Current data is never restored from an older backup.
+
+Its operator-reviewed validation mode is `component-verified-maintenance`, not a
+claimed full isolated deployment PASS. Exact-source focused controller validation,
+authenticated mandatory GitHub CI, actual144 image checks and unchanged SQL proofs
+must be bound to the plan. The final proposal must explicitly disclose untested
+combined installation/restart behavior. All root/source/runtime/worker/authority
+guards remain mandatory; changed or missing bindings fail closed. No production
+installation, routing, worker or SQL mutation is permitted before fresh exact
+source-package/plan approval. The historical115→136 full rehearsal requirement is
+unchanged, and automatic deployment remains disabled.
+
 ## Unselected completed-NORMAL136→144 manual release candidate
 
 `learning-136-144-path.json` pins the new `migrations-137-144-learning.json` and

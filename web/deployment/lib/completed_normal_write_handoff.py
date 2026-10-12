@@ -21,6 +21,7 @@ from deployment.lib.emergency_routing_repair import exclusive, verification_wind
 from deployment.lib.provider_recovery_runtime import protected
 from deployment.lib.runtime_authority import runtime_mutation_lock
 from deployment.lib.completed_normal_resources import origin_spec_matches
+from deployment.lib.completed_normal_profile import profile, LEGACY, expected_origin_grant
 
 
 def atomic_public_authority(path: Path, value: dict) -> None:
@@ -45,36 +46,38 @@ class CompletedNormalWriteHandoff:
         if not all(callable(f) for f in (source_guard,boot_guard,artifact_guard)):
             raise RuntimeError('completed_normal_write_independent_guards_required')
         self.contract,self.kernel=contract,kernel
+        self.profile=profile(contract)
         self.admissions,self.state_root=Path(admissions),Path(state_root)
         self.root=self.admissions/digest(contract)
         self.source_guard,self.boot_guard,self.artifact_guard=source_guard,boot_guard,artifact_guard
         if kernel.publication_name!='candidate-runtime.json' or kernel.root!=self.root or kernel.contract!=contract:
             raise RuntimeError('completed_normal_write_candidate_binding_invalid')
 
-    def authorization(self, *, schema=115):
-        if schema not in {115,136}:
+    def authorization(self, *, schema=None):
+        if schema is None:schema=self.profile.source
+        if schema not in {self.profile.source,self.profile.target}:
             raise RuntimeError('completed_normal_write_target_schema_invalid')
         if os.geteuid()!=0:raise RuntimeError('completed_normal_write_root_required')
         self.source_guard()
         require_fresh_authorization(self.contract)
         receipt=json.loads(protected(self.root/'admission.json').read_text())
-        if receipt.get('operation')!=OPERATION or receipt.get('contract')!=self.contract:
+        if receipt.get('operation')!=self.profile.operation or receipt.get('contract')!=self.contract:
             raise RuntimeError('completed_normal_write_fresh_admission_changed')
         verify_history(self.contract)
         self.boot_guard()
         self.artifact_guard()
         if self.kernel.native_verifier()!=schema:
             raise RuntimeError('completed_normal_write_source_schema_changed')
-        if schema==136:
+        if schema==self.profile.target:
             from deployment.lib.completed_normal_database import require_normal_migration_boundary
             require_normal_migration_boundary(self.contract,schema,self.root,self.state_root)
 
-    def guard(self, *, schema=115):
+    def guard(self, *, schema=None):
+        if schema is None:schema=self.profile.source
         self.authorization(schema=schema)
         roles=self.contract['source_roles']
         origin=json.loads(protected(Path(roles['completion_root'])/'write-authority/authority.json').read_text())
-        if origin!={'version':1,'schema':115,'release_sha':roles['application_sha'],
-                'contract_digest':self.contract['origin']['write_contract_digest'],'mode':'READ_ONLY'}:
+        if origin!=expected_origin_grant(self.contract,'READ_ONLY'):
             raise RuntimeError('completed_normal_write_origin_not_fenced')
         self.kernel.round(normal=False)
         self.source_guard()
@@ -89,27 +92,29 @@ class CompletedNormalWriteHandoff:
         self.authorization()
         roles=self.contract['source_roles'];old_root=Path(roles['completion_root'])
         path=old_root/'write-authority/authority.json'
-        expected={'version':1,'schema':115,'release_sha':roles['application_sha'],
-                  'contract_digest':self.contract['origin']['write_contract_digest'],'mode':'NORMAL'}
+        expected=expected_origin_grant(self.contract,'NORMAL')
         if json.loads(protected(path).read_text())!=expected:
             raise RuntimeError('completed_normal_origin_positive_grant_changed')
-        binding=json.loads(protected(old_root/'candidate-identities.json',private=True).read_text())
-        if (binding.get('plan_sha256')!=roles['original_plan_sha256']
+        legacy=self.profile is LEGACY
+        binding=json.loads(protected(old_root/('candidate-identities.json' if legacy else 'candidate-runtime.json'),private=True).read_text())
+        from deployment.lib.completed_normal_resources import ROLES, measured_spec_matches
+        if ((binding.get('plan_sha256')!=roles['original_plan_sha256'] if legacy else binding.get('context_sha256')!=old_root.name)
                 or binding.get('source_sha')!=roles['application_sha']
-                or set(binding.get('runtimes',{}))!={'backend','frontend','parser','notification','calendar-sync','data-deletion'}):
+                or set(binding.get('runtimes',{}))!=({'backend','frontend','parser','notification','calendar-sync','data-deletion'} if legacy else set(ROLES))):
             raise RuntimeError('completed_normal_origin_runtime_binding_changed')
         runtime=self.kernel.runtime
         rows=runtime.inspect([value['id'] for value in binding['runtimes'].values()])
         for kind,identity in binding['runtimes'].items():
             row=next((r for r in rows.values() if r['Id']==identity['id']),None)
             if (row is None or row['Image']!=identity['image'] or not row['State']['Running']
-                    or not origin_spec_matches(row,identity['spec_sha256'],started_worker=kind in {'notification','calendar-sync','data-deletion'})):
+                    or not (origin_spec_matches if legacy else measured_spec_matches)(row,identity['spec_sha256'],
+                        started_worker=kind in {'notification','calendar-sync','data-deletion','notification-worker','calendar-sync-worker','data-deletion-worker'})):
                 raise RuntimeError('completed_normal_origin_runtime_changed')
         port=8101 if self.contract['origin']['slot']=='blue' else 8201
         base=f'http://127.0.0.1:{port}'
         version=runtime.json_http(base+'/health/version')
         if (version.get('release_sha')!=roles['application_sha'] or version.get('release_slot')!=self.contract['origin']['slot']
-                or version.get('schema_compatible_min')!=115 or version.get('schema_compatible_max')!=115
+                or version.get('schema_compatible_min')!=115 or version.get('schema_compatible_max')!=(115 if legacy else 136)
                 or runtime.json_http(base+'/health/recovery')!={'restricted':False,'business_writes_enabled':True}):
             raise RuntimeError('completed_normal_origin_serving_identity_changed')
         with runtime_mutation_lock(self.state_root):
@@ -127,7 +132,10 @@ class CompletedNormalWriteHandoff:
         atomic_public_authority(self.root/'write-authority/authority.json',dict(value,mode='READ_ONLY'))
         require_candidate_authority(self.contract,mode='READ_ONLY',admissions=self.admissions)
 
-    def grant(self, *, schema=115):
+    def grant(self, *, schema=None):
+        if schema is None:schema=self.profile.source
+        if self.profile is not LEGACY and schema!=self.profile.target:
+            raise RuntimeError('completed_normal_manual_grant_requires_target_schema')
         self.guard(schema=schema)
         effect_started=False
         try:
@@ -135,9 +143,9 @@ class CompletedNormalWriteHandoff:
                 self.guard(schema=schema)
                 path=self.root/'write-authority/authority.json'
                 value=require_candidate_authority(self.contract,mode='READ_ONLY',admissions=self.admissions)
-                suffix='' if schema==115 else '-136'
+                suffix='' if schema==self.profile.source else '-'+str(self.profile.target)
                 exclusive(self.root/('pre-grant-authority'+suffix+'.json'),protected(path).read_bytes())
-                exclusive(self.root/('write-boundary'+suffix+'.json'),encoded({'operation':OPERATION,'context_sha256':digest(self.contract),
+                exclusive(self.root/('write-boundary'+suffix+'.json'),encoded({'operation':self.profile.operation,'context_sha256':digest(self.contract),
                     'normal_writes_may_have_occurred':True,'restore_customer_database':False}))
                 effect_started=True
                 # The original115 grant remains historical data. The target
@@ -159,18 +167,18 @@ class CompletedNormalWriteHandoff:
                 # and sustained checks. A READ_ONLY stage is not NORMAL evidence.
                 self.authorization(schema=schema)
                 actual=protected(self.root/'candidate-runtime.json',private=True).read_bytes()
-                if schema==115:
+                if schema==self.profile.source or self.profile is not LEGACY:
                     exclusive(self.root/'normal-publication.json',actual)
-                else:
+                if schema==self.profile.target:
                     if protected(self.root/'normal-publication.json',private=True).read_bytes()!=actual:
                         raise RuntimeError('completed_normal_write_publication_changed')
                     exclusive(self.root/'target-normal-publication.json',encoded({
-                        'operation':OPERATION,'context_sha256':digest(self.contract),'schema':136,
+                        'operation':self.profile.operation,'context_sha256':digest(self.contract),'schema':self.profile.target,
                         'mode':'NORMAL','database_restored':False}))
         except Exception:
             if effect_started:
                 try:self.revoke()
                 finally:self.kernel.compensate_current_data()
             raise
-        return {'operation':OPERATION,'context_sha256':digest(self.contract),'mode':'NORMAL',
+        return {'operation':self.profile.operation,'context_sha256':digest(self.contract),'mode':'NORMAL',
                 'schema':schema,'customer_database_restored':False}

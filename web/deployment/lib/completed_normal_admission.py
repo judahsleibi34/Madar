@@ -16,6 +16,7 @@ from pathlib import Path
 import re
 
 from deployment.lib.control_plane_upgrade_authorization import require_upgrade_authorization
+from deployment.lib.completed_normal_profile import profile, LEGACY, MANUAL
 
 OPERATION = "completed-normal-schema115-136-upgrade"
 ADMISSIONS = Path("/var/lib/madar-control-plane/upgrades/completed-normal-admissions")
@@ -27,6 +28,15 @@ HISTORICAL_NAMES = (
     "fenced-local-reconciliation.json", "retained-writer-fence.json", "write-boundary.json",
     "boot-installation.json", "fallback-listener-installation.json",
     "worker-start-notification.json", "worker-start-calendar-sync.json", "worker-start-data-deletion.json",
+)
+COMPATIBLE_HISTORICAL_NAMES = (
+    'operator-authorization.json', 'admission.json', 'normal-completion.json',
+    'normal-publication.json', 'target-normal-publication.json',
+    'post-migration-backup.json', 'controller-installation-intent.json',
+    'controller-installation.json', 'boot-installation.json', 'boot-preimages.json',
+    'candidate-runtime.json', 'migration-intent.json', 'migration-completion.json',
+    'migration-execution.json', 'migration-manifest.json',
+    'migration-customer-preservation.json',
 )
 
 
@@ -52,15 +62,19 @@ def validate_contract(value: dict) -> None:
         "customer_table_roots_sha256", "customer_identity_roots_sha256",
     }:
         raise RuntimeError("completed_normal_admission_contract_invalid")
-    if type(value["version"]) is not int or value["version"] != 1 or value["operation"] != OPERATION:
-        raise RuntimeError("completed_normal_admission_contract_invalid")
+    selected = profile(value)
     roles = value["source_roles"]
-    if not isinstance(roles, dict) or set(roles) != {
-        "application_sha", "controller_sha", "completion_root", "original_plan_sha256", "completion_sha256",
-    }:
+    role_keys = ({'application_sha', 'controller_sha', 'completion_root', 'original_plan_sha256', 'completion_sha256'}
+        if selected is LEGACY else {'application_sha', 'controller_sha', 'completion_root', 'completion_sha256', 'completed_compatible_upgrade', 'schema'})
+    if not isinstance(roles, dict) or set(roles) != role_keys:
         raise RuntimeError("completed_normal_admission_origin_invalid")
     from deployment.lib.active_recovery_resumption import ROOT
-    if roles["completion_root"] != str(ROOT / roles["original_plan_sha256"]):
+    origin_root = Path(roles['completion_root'])
+    valid_root = (roles['completion_root'] == str(ROOT / roles['original_plan_sha256'])
+        if selected is LEGACY else origin_root.parent == ADMISSIONS
+        and re.fullmatch('[0-9a-f]{64}', origin_root.name)
+        and roles['completed_compatible_upgrade'] is True and type(roles['schema']) is int and roles['schema'] == 136)
+    if not valid_root:
         raise RuntimeError("completed_normal_admission_origin_invalid")
     origin, candidate, database = value["origin"], value["candidate"], value["database"]
     if (not isinstance(origin, dict) or set(origin) != {"slot", "images", "worker_generation", "write_contract_digest"}
@@ -68,11 +82,11 @@ def validate_contract(value: dict) -> None:
             or not isinstance(candidate, dict) or set(candidate) != {
                 "source_sha", "controller_sha", "controller_tree_sha256", "images", "redis_image", "slot", "compatible_min", "compatible_max"}
             or candidate["slot"] not in {"blue", "green"} or candidate["slot"] == origin["slot"]
-            or type(candidate["compatible_min"]) is not int or candidate["compatible_min"] != 115
-            or type(candidate["compatible_max"]) is not int or candidate["compatible_max"] != 136
+            or type(candidate["compatible_min"]) is not int or candidate["compatible_min"] != selected.source
+            or type(candidate["compatible_max"]) is not int or candidate["compatible_max"] != selected.target
             or not isinstance(database, dict) or set(database) != {
                 "container_id", "image", "system_identifier", "schema", "spec_sha256", "network_name", "network_id", "backup_configuration_sha256"}
-            or type(database["schema"]) is not int or database["schema"] != 115
+            or type(database["schema"]) is not int or database["schema"] != selected.source
             or not re.fullmatch(r"[0-9]+", str(database["system_identifier"]))):
         raise RuntimeError("completed_normal_admission_runtime_invalid")
     for images in (origin["images"], candidate["images"]):
@@ -84,7 +98,7 @@ def validate_contract(value: dict) -> None:
     for sha in (roles["application_sha"], roles["controller_sha"], candidate["source_sha"], candidate["controller_sha"]):
         if not re.fullmatch(r"[0-9a-f]{40}", str(sha)):
             raise RuntimeError("completed_normal_admission_source_invalid")
-    hashes = [roles["original_plan_sha256"], roles["completion_sha256"], origin["worker_generation"], origin["write_contract_digest"],
+    hashes = [origin_root.name, roles["completion_sha256"], origin["worker_generation"], origin["write_contract_digest"],
               database["container_id"], value["migration_manifest_sha256"], value["rehearsal_sha256"], value["plan_sha256"],
               database['spec_sha256'], database['network_id'], database['backup_configuration_sha256'],
               value["provider_record_sha256"], candidate["controller_tree_sha256"],
@@ -96,7 +110,8 @@ def validate_contract(value: dict) -> None:
     files = value["historical_files"]
     if not isinstance(files, dict) or not files:
         raise RuntimeError("completed_normal_admission_history_missing")
-    required = {str(Path(roles["completion_root"]) / name) for name in HISTORICAL_NAMES}
+    names = HISTORICAL_NAMES if selected is LEGACY else COMPATIBLE_HISTORICAL_NAMES
+    required = {str(origin_root / name) for name in names}
     # These are historical protected records only, never arbitrary executable or
     # operator-selected paths. The retained provider record is checked separately.
     if set(files) != required:
@@ -134,9 +149,10 @@ def validate_contract(value: dict) -> None:
 
 def require_fresh_authorization(contract: dict) -> None:
     validate_contract(contract)
+    selected = profile(contract)
     require_upgrade_authorization(
-        contract["candidate"]["controller_sha"], required_operation=OPERATION,
-        required_schema=115, required_context_digest=digest(contract), require_rehearsal=True,
+        contract["candidate"]["controller_sha"], required_operation=selected.operation,
+        required_schema=selected.source, required_context_digest=digest(contract), require_rehearsal=True,
     )
     # The shared credential validator compares interlock and credential. Also
     # bind the rehearsal to this contract, not just to each other.
@@ -211,6 +227,7 @@ def require_candidate_authority(contract: dict, *, mode: str | None = None, admi
     """Read the root-issued v2 grant; no caller/environment can issue one."""
     from deployment.lib.provider_recovery_runtime import protected
     validate_contract(contract)
+    selected = profile(contract)
     if os.geteuid()==0:
         value = json.loads(protected(admissions / digest(contract) / "write-authority/authority.json").read_text())
     else:
@@ -219,11 +236,12 @@ def require_candidate_authority(contract: dict, *, mode: str | None = None, admi
     if (not isinstance(value, dict) or set(value) != {
             "version", "schema", "release_sha", "contract_digest", "mode", "compatible_min", "compatible_max"}
             or type(value["version"]) is not int or value["version"] != 2
-            or type(value["schema"]) is not int or not 115 <= value["schema"] <= 136
-            or type(value["compatible_min"]) is not int or value["compatible_min"] != 115
-            or type(value["compatible_max"]) is not int or value["compatible_max"] != 136
+            or not selected.supports(value["schema"])
+            or type(value["compatible_min"]) is not int or value["compatible_min"] != selected.source
+            or type(value["compatible_max"]) is not int or value["compatible_max"] != selected.target
             or value["release_sha"] != contract["candidate"]["source_sha"]
             or value["contract_digest"] != digest(contract)
+            or selected is MANUAL and value.get('mode')=='NORMAL' and value['schema']!=selected.target
             or value["mode"] not in {"READ_ONLY", "NORMAL"} or mode is not None and value["mode"] != mode):
         raise RuntimeError("completed_normal_candidate_authority_changed")
     return value
@@ -242,11 +260,18 @@ def publish_admission(contract: dict, operations, state_root: Path, *, admission
     if os.geteuid() != 0:
         raise RuntimeError("completed_normal_admission_root_required")
     require_fresh_authorization(contract)
+    selected = profile(contract)
     state = json.loads(readonly_configuration(Path(state_root) / "state.json", private=True).read_text())
-    roles = attest_runtime(operations, state)
+    if selected is LEGACY:
+        roles = attest_runtime(operations, state)
+    else:
+        from deployment.lib.completed_normal_baseline import attest_compatible_runtime
+        roles = attest_compatible_runtime(operations, state, operations.repository_head(), operations.installed_sha())
     known = state["known_good_release"]
     grant=json.loads(protected(Path(roles['completion_root'])/'write-authority/authority.json').read_text())
-    actual_origin = {"slot": state["active_slot"], "images": known["images"], "worker_generation": known["worker_generation"],
+    origin_images = known['images'] if selected is LEGACY else {
+        key: 'sha256:' + str(known['images'][key]).split('sha256:')[-1] for key in ('backend', 'frontend')}
+    actual_origin = {"slot": state["active_slot"], "images": origin_images, "worker_generation": known["worker_generation"],
                      "write_contract_digest":grant.get('contract_digest')}
     if roles != contract["source_roles"] or actual_origin != contract["origin"]:
         raise RuntimeError("completed_normal_admission_live_origin_changed")
@@ -270,7 +295,7 @@ def publish_admission(contract: dict, operations, state_root: Path, *, admission
     ])
     # -q suppresses transaction tags on some client versions; accept neither
     # ambiguous rows nor another schema. No credentials or customer rows emitted.
-    if [line for line in result.stdout.splitlines() if line not in {"BEGIN", "COMMIT"}] != [db["system_identifier"] + ":115"]:
+    if [line for line in result.stdout.splitlines() if line not in {"BEGIN", "COMMIT"}] != [db["system_identifier"] + ':' + str(selected.source)]:
         raise RuntimeError("completed_normal_admission_database_changed")
     provider = Path(state_root) / "provider-recovery.json"
     from deployment.lib.provider_recovery_runtime import readonly_configuration as read_config
@@ -288,22 +313,22 @@ def publish_admission(contract: dict, operations, state_root: Path, *, admission
     root = admissions / digest(contract)
     root.mkdir(mode=0o755, parents=True, exist_ok=False)
     from deployment.lib.emergency_routing_repair import exclusive
-    receipt = {"version": 1, "operation": OPERATION, "contract": contract,
+    receipt = {"version": 1, "operation": selected.operation, "contract": contract,
                "provider_record_sha256": hashlib.sha256(provider_bytes).hexdigest(),
                "observed_at": datetime.now(timezone.utc).isoformat(),
                "database_restored": False, "historical_authorization_reused": False}
     exclusive(root / "admission.json", encoded(receipt))
     exclusive(root / 'admitted-customer-baseline.json',encoded(baseline))
     os.chmod(root / "admission.json", 0o444)
-    exclusive(root / "events.jsonl", (json.dumps({"operation": OPERATION, "phase": "admitted", "context_sha256": digest(contract)}, sort_keys=True) + "\n").encode())
+    exclusive(root / "events.jsonl", (json.dumps({"operation": selected.operation, "phase": "admitted", "context_sha256": digest(contract)}, sort_keys=True) + "\n").encode())
     authority = root / "write-authority"
     authority.mkdir(mode=0o755)
     # The root coordinator runs with UMask=0077. Set the nonsecret mounted
     # directory explicitly; mkdir(mode=0755) alone produces unreadable0700.
     authority.chmod(0o755)
     exclusive(authority / "authority.json", encoded({
-        "version": 2, "schema": 115, "release_sha": contract["candidate"]["source_sha"],
-        "contract_digest": digest(contract), "mode": "READ_ONLY", "compatible_min": 115, "compatible_max": 136,
+        "version": 2, "schema": selected.source, "release_sha": contract["candidate"]["source_sha"],
+        "contract_digest": digest(contract), "mode": "READ_ONLY", "compatible_min": selected.source, "compatible_max": selected.target,
     }))
     os.chmod(authority / "authority.json", 0o644)
     return root
@@ -317,13 +342,14 @@ def require_admission(state_root: Path, application_sha: str | None, *, admissio
         raise RuntimeError("provider_recovery_requires_separate_operator_exit")
     interlock = json.loads(protected(UPGRADE_INTERLOCK).read_text())
     context = str(interlock.get("context_sha256", ""))
-    if interlock.get("operation") != OPERATION or not re.fullmatch(r"[0-9a-f]{64}", context):
+    if interlock.get("operation") not in {LEGACY.operation, MANUAL.operation} or not re.fullmatch(r"[0-9a-f]{64}", context):
         raise RuntimeError("provider_recovery_requires_separate_operator_exit")
     receipt = credential_witness('completed_normal_admission','admission_sha256')
     contract = receipt.get("contract")
     validate_contract(contract)
+    selected = profile(contract)
     if (set(receipt) != {"version", "operation", "contract", "provider_record_sha256", "observed_at", "database_restored", "historical_authorization_reused"}
-            or receipt["version"] != 1 or receipt["operation"] != OPERATION or digest(contract) != context
+            or receipt["version"] != 1 or receipt["operation"] != selected.operation or interlock['operation'] != selected.operation or digest(contract) != context
             or receipt["database_restored"] is not False or receipt["historical_authorization_reused"] is not False
             or application_sha not in {None, contract["candidate"]["source_sha"]}):
         raise RuntimeError("completed_normal_admission_binding_changed")
@@ -350,7 +376,8 @@ def require_admission(state_root: Path, application_sha: str | None, *, admissio
     images = {k: ("sha256:" + str(v).split("sha256:")[-1]) for k, v in known.get("images", {}).items() if k in {"backend", "frontend"}}
     if (known.get("sha") not in {old, candidate["source_sha"]} or known.get("slot") != expected_slot
             or state.get("active_slot") != expected_slot or images != expected_images
-            or type(known.get("schema")) is not int or not 115 <= known["schema"] <= (115 if known.get("sha") == old else 136)):
+            or not selected.supports(known.get('schema'))
+            or known.get('sha') == old and known['schema'] != selected.source):
         raise RuntimeError("completed_normal_admission_release_changed")
     pending = state.get("in_progress_release")
     if pending and (pending.get("release_sha") != candidate["source_sha"] or pending.get("candidate_slot") != candidate["slot"]):

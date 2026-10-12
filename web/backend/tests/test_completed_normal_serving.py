@@ -15,7 +15,8 @@ class ServingTests(unittest.TestCase):
         self.runtime.json_http=json_http;self.runtime.denied=Mock();self.runtime.http_status=Mock()
         self.kernel=SimpleNamespace(round=Mock())
         self.actor=SimpleNamespace(runtime=self.runtime,guard=Mock(),proxy_identity=Mock(),native=lambda:115,
-            contract={'candidate':{'source_sha':'c'*40,'slot':'green'}},candidate=lambda:self.kernel)
+            contract={'version':1,'operation':'completed-normal-schema115-136-upgrade',
+                'candidate':{'source_sha':'c'*40,'slot':'green'}},candidate=lambda:self.kernel)
         for p in (patch('time.monotonic',self.clock.monotonic),patch('time.sleep',self.clock.sleep)):
             p.start();self.addCleanup(p.stop)
     def test_delayed_complete_rounds_verify_both_routes_and_do_not_claim_customer_login(self):

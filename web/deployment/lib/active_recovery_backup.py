@@ -47,7 +47,7 @@ def checked(args, *, env=None, user=None, timeout=1800, stdin=None, pass_fds=())
         raise RuntimeError('normal_backup_command_failed:' + code)
     return result.stdout
 
-def verify_backup_execution_context(package):
+def verify_backup_execution_context(package, *, expected_schema=115):
     """Read-only gate with the exact uid/gid, empty groups and sealed DB lease.
 
     Recovery's version endpoint deliberately differs from known-good normal
@@ -56,6 +56,8 @@ def verify_backup_execution_context(package):
     No dump, freshness publication, retention, service or customer write occurs.
     """
     from scripts import backup_support
+    if type(expected_schema) is not int or expected_schema not in {115,136,144}:
+        raise RuntimeError('normal_backup_execution_schema_invalid')
     identity = pwd.getpwnam('madar')
     cfg = {}
     load_environment_file(readonly_configuration(INPUTS['backup_configuration'], private=True), environ=cfg)
@@ -96,6 +98,7 @@ if result.returncode or '115' not in result.stdout.splitlines():raise RuntimeErr
 print(json.dumps({'uid':os.getuid(),'gid':os.getgid(),'supplementary_groups':os.getgroups(),
  'schema':115,'database_read_only':True,'managed_sources_readable':True,'credential_readable':True}))
 """
+        code=code.replace("'115'",repr(str(expected_schema))).replace("'schema':115","'schema':"+str(expected_schema))
         result = json.loads(checked(['/usr/bin/python3','-I','-B','-c',code], env=env,
                                     user=identity.pw_uid, timeout=120))
     finally:
@@ -106,7 +109,7 @@ print(json.dumps({'uid':os.getuid(),'gid':os.getgid(),'supplementary_groups':os.
 
 
 def remote_receiver(package,plan,backup,sums,filesystem_uuid,*,expected_schema=115,namespace='normal-local-production'):
-    if type(expected_schema) is not int or expected_schema not in {115,136} or namespace not in {'normal-local-production','private-schema136-rehearsal'}:
+    if type(expected_schema) is not int or expected_schema not in {115,136,144} or namespace not in {'normal-local-production','private-schema136-rehearsal'}:
         raise RuntimeError('normal_backup_replica_scope_invalid')
     # Freeze only reviewed non-secret code at a NEW append-only Node 1 path.
     # SSH uses the operator's existing alias/host-key/key policy; no private key
