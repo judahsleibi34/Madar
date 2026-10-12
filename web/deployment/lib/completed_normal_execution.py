@@ -11,6 +11,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import traceback
 
 from deployment.lib.completed_normal_admission import ADMISSIONS,OPERATION,digest,encoded,publish_admission
@@ -23,10 +24,117 @@ from deployment.lib.completed_normal_migration import seal_intent,seal_completio
 from deployment.lib.completed_normal_resources import verify_allocation
 from deployment.lib.completed_normal_runtime import seal_candidate_stage,seal_candidate_runtime
 from deployment.lib.completed_normal_write_handoff import CompletedNormalWriteHandoff,atomic_public_authority
-from deployment.lib.control_plane_upgrade import acquire_lock,BACKUP_TIMERS
+from deployment.lib.control_plane_upgrade import acquire_lock,BACKUP_TIMERS,require_root_directory
 from deployment.lib.emergency_routing_repair import exclusive
 from deployment.lib.provider_recovery_runtime import protected,readonly_configuration,file_digest
 from deployment.lib.completed_normal_profile import profile, MANUAL
+
+FAILED_BOOT_RECORDS=frozenset({'operator-authorization.json','admission.json','failure.json',
+    'boot-preimages.json','boot-installation.json','boot-installation-failed.json',
+    'events.jsonl','boot-events.jsonl','backup-timer-preimages.json'})
+SOURCE_PACKAGES=Path('/var/lib/madar-control-plane/normal-local-preparation')
+BOOT_UNITS=Path('/etc/systemd/system')
+PROC_ROOT=Path('/proc')
+
+
+def verify_failed_boot_interlock(document,contract,ops):
+    """Read-only admission for an exact compensated, consumed boot failure.
+
+    Current NORMAL source/database/worker/customer and boot preimages are also
+    verified by the surrounding full preflight. Old receipts are historical
+    data only, never credentials or permission to execute a successor.
+    """
+    binding=document.get('failed_boot_interlock')
+    present=ops.interlock_file.exists() or ops.interlock_file.is_symlink()
+    if binding is None:
+        if present:raise RuntimeError('completed_upgrade_existing_interlock_requires_reconciliation')
+        return None
+    keys={'interlock_sha256','context_sha256','controller_sha','plan_sha256',
+        'source_bundle_sha256','invocation_wrapper_sha256','records'}
+    if (profile(contract) is not MANUAL or not isinstance(binding,dict) or set(binding)!=keys
+            or any(not re.fullmatch('[0-9a-f]{64}',str(binding[k])) for k in keys-{'records','controller_sha'})
+            or not re.fullmatch('[0-9a-f]{40}',str(binding['controller_sha']))
+            or not isinstance(binding['records'],dict) or set(binding['records'])!=FAILED_BOOT_RECORDS or not present):
+        raise RuntimeError('completed_upgrade_failed_interlock_binding_invalid')
+    body=protected(ops.interlock_file).read_bytes()
+    if hashlib.sha256(body).hexdigest()!=binding['interlock_sha256']:
+        raise RuntimeError('completed_upgrade_failed_interlock_changed')
+    interlock=json.loads(body);old_root=ADMISSIONS/binding['context_sha256']
+    records={}
+    for name,expected in binding['records'].items():
+        path=protected(old_root/name,private=name!='admission.json')
+        if not re.fullmatch('[0-9a-f]{64}',str(expected)) or file_digest(path)!=expected:
+            raise RuntimeError('completed_upgrade_failed_attempt_evidence_changed')
+        if name.endswith('.json'):records[name]=json.loads(path.read_text())
+    old=records['admission.json']['contract']
+    from deployment.lib.completed_normal_admission import validate_contract
+    validate_contract(old)
+    expected_auth={'operation':MANUAL.operation,'context_sha256':binding['context_sha256'],
+        'plan_sha256':binding['plan_sha256'],'source_bundle_sha256':binding['source_bundle_sha256'],
+        'controller_sha':binding['controller_sha'],'application_sha':old['candidate']['source_sha']}
+    failure=records['failure.json'];failed_boot=records['boot-installation-failed.json']
+    if (digest(old)!=binding['context_sha256'] or old['plan_sha256']!=binding['plan_sha256']
+            or old['candidate']['controller_sha']!=binding['controller_sha']
+            or old['source_roles']!=contract['source_roles'] or old['origin']!=contract['origin']
+            or old['database']!=contract['database']
+            or records['operator-authorization.json']!=expected_auth
+            or interlock.get('version')!=2 or interlock.get('status')!='authorized_cycle'
+            or interlock.get('approved_sha')!=binding['controller_sha']
+            or interlock.get('operation')!=MANUAL.operation or interlock.get('schema')!=136
+            or interlock.get('context_sha256')!=binding['context_sha256']
+            or interlock.get('admission_sha256')!=digest(records['admission.json'])
+            or failure.get('operation')!=MANUAL.operation or failure.get('context_sha256')!=binding['context_sha256']
+            or failure.get('phase')!='boot_supersession_pending' or failure.get('exception_type')!='RuntimeError'
+            or failure.get('customer_database_restored') is not False or 'compensation_exception_type' in failure
+            or not any(f.get('source')=='completed_normal_boot_installation.py' and f.get('function')=='installed'
+                for f in failure.get('frames',[]))
+            or failed_boot.get('phase')!='boot_resource_installation'
+            or failed_boot.get('context_sha256')!=binding['context_sha256']
+            or failed_boot.get('operation')!=MANUAL.operation or failed_boot.get('database_restored') is not False
+            or records['boot-installation.json'].get('historical_units_deleted') is not False
+            or records['backup-timer-preimages.json']!=document['backup_timer_states']
+            or interlock.get('backup_timer_states')!=document['backup_timer_states']):
+        raise RuntimeError('completed_upgrade_failed_attempt_not_reconciliable')
+    if any((old_root/name).exists() for name in ('controller-installation-intent.json',
+            'candidate-stage.json','candidate-runtime.json','migration-intent.json','normal-completion.json')):
+        raise RuntimeError('completed_upgrade_failed_attempt_advanced')
+    # Prove compensation from real current resources, not an agent PASS marker.
+    baseline=records['boot-preimages.json']
+    if baseline!=document['boot_resources']:
+        raise RuntimeError('completed_upgrade_failed_boot_compensation_incomplete')
+    for raw,expected in baseline['files'].items():
+        path=protected(Path(raw));st=path.stat()
+        if {'sha256':file_digest(path),'uid':st.st_uid,'mode':st.st_mode&0o7777}!=expected:
+            raise RuntimeError('completed_upgrade_failed_boot_compensation_incomplete')
+    for name,state in baseline['unit_states'].items():
+        if ops.systemctl_state(name)!=state:
+            raise RuntimeError('completed_upgrade_failed_boot_compensation_incomplete')
+    generated=failed_boot.get('retained_generated_resources',{})
+    if not generated or generated!=records['boot-installation.json']['resources']:
+        raise RuntimeError('completed_upgrade_failed_boot_compensation_incomplete')
+    for raw,expected in generated.items():
+        path=Path(raw)
+        if not path.is_relative_to(BOOT_UNITS) or path.exists() or path.is_symlink():
+            raise RuntimeError('completed_upgrade_failed_boot_compensation_incomplete')
+        retained=old_root/('retained-'+path.relative_to(BOOT_UNITS).as_posix().replace('/','_'))
+        if file_digest(protected(retained,private=True))!=expected:
+            raise RuntimeError('completed_upgrade_failed_boot_compensation_incomplete')
+    if ops.authorization_file.exists() or ops.authorization_file.is_symlink():
+        raise RuntimeError('completed_upgrade_failed_attempt_authorization_active')
+    wrapper=SOURCE_PACKAGES/('normal-invocation-'+binding['invocation_wrapper_sha256']+'.py')
+    if file_digest(protected(wrapper,private=True))!=binding['invocation_wrapper_sha256']:
+        raise RuntimeError('completed_upgrade_failed_attempt_wrapper_changed')
+    entry=SOURCE_PACKAGES/('normal-source-'+binding['source_bundle_sha256'])/'source/web/scripts/continue_completed_normal_upgrade.py'
+    for process in PROC_ROOT.glob('[0-9]*'):
+        try:args=process.joinpath('cmdline').read_bytes().split(b'\0')
+        except (FileNotFoundError,ProcessLookupError):continue
+        if b'execute' in args and any(str(p).encode() in args for p in (entry,wrapper)):
+            raise RuntimeError('completed_upgrade_failed_attempt_still_running')
+    active=ops.command('completed_failed_attempt_units',['systemctl','list-units','--all','--type=service',
+        '--state=active,activating,deactivating','--plain','--no-legend',
+        'madar-control-plane-upgrade-*.service','madar-compatible-normal-boot-'+binding['context_sha256'][:12]+'.service']).stdout
+    if active.strip():raise RuntimeError('completed_upgrade_failed_attempt_still_running')
+    return body
 
 
 def manual_maintenance_route(contract):
@@ -183,8 +291,9 @@ class CompletedNormalUpgrade:
         # A fresh operation must not inherit an unrelated volatile upgrade
         # interlock, or discover a missing root lock after authorization.
         protected(self.ops.upgrade_root/'upgrade.lock',private=True)
-        if self.ops.interlock_file.exists() or self.ops.interlock_file.is_symlink():
-            raise RuntimeError('completed_upgrade_existing_interlock_requires_reconciliation')
+        verify_failed_boot_interlock(self.document,self.contract,self.ops)
+        if self.document.get('failed_boot_interlock') is not None and self.reconciliation_root().exists():
+            raise RuntimeError('completed_upgrade_interlock_reconciliation_already_consumed')
         observe_native(self.contract,self.actor.runtime)
         from deployment.lib.active_recovery_backup import verify_backup_execution_context
         if self.profile is MANUAL:
@@ -218,6 +327,36 @@ class CompletedNormalUpgrade:
             raise RuntimeError('completed_upgrade_backup_service_running')
         self.preparation_source()
         return {'operation':self.profile.operation,'schema':self.profile.source,'candidate':allocation,'production_modified':False,'authorization_consumed':False}
+
+    def reconciliation_root(self):
+        return self.ops.upgrade_root/'failed-boot-interlock-reconciliations'/digest(self.document)
+
+    def reconcile_failed_interlock(self):
+        """One plan-bound retirement under both existing deployment locks."""
+        if self.document.get('failed_boot_interlock') is None:return
+        if self.lock is None or self.ops.deploy_lock_descriptor is None:
+            raise RuntimeError('completed_upgrade_interlock_reconciliation_locks_required')
+        self.preparation_source()
+        body=verify_failed_boot_interlock(self.document,self.contract,self.ops)
+        archive=self.reconciliation_root()
+        require_root_directory(archive.parent,create=True)
+        if archive.exists() or archive.is_symlink():
+            raise RuntimeError('completed_upgrade_interlock_reconciliation_already_consumed')
+        archive.mkdir(mode=0o700);require_root_directory(archive)
+        exclusive(archive/'previous-interlock.json',body)
+        exclusive(archive/'intent.json',encoded({'operation':'exact-failed-boot-interlock-reconciliation',
+            'replacement_plan_sha256':digest(self.document),'replacement_context_sha256':digest(self.contract),
+            'controller_sha':self.controller,'source_bundle_sha256':self.document['source_bundle_sha256'],
+            'binding':self.document['failed_boot_interlock'],'origin':self.contract['source_roles'],
+            'customer_database_restored':False}))
+        self.preparation_source()
+        if verify_failed_boot_interlock(self.document,self.contract,self.ops)!=body:
+            raise RuntimeError('completed_upgrade_failed_interlock_changed')
+        self.ops.clear_interlock()
+        if self.ops.interlock_file.exists() or self.ops.interlock_file.is_symlink():
+            raise RuntimeError('completed_upgrade_failed_interlock_retirement_failed')
+        exclusive(archive/'completion.json',encoded({'replacement_plan_sha256':digest(self.document),
+            'retired_interlock_sha256':hashlib.sha256(body).hexdigest(),'historical_attempt_preserved':True}))
 
     @contextmanager
     def root_credential(self, *, migration_resumption=None):
@@ -314,6 +453,8 @@ class CompletedNormalUpgrade:
         finally:
             if self.admitted:
                 exclusive(self.root/'failure.json',encoded(evidence))
+            elif self.document.get('failed_boot_interlock') is not None and self.reconciliation_root().exists():
+                exclusive(self.reconciliation_root()/'failure.json',encoded(evidence))
         return evidence
 
     def execute(self):
@@ -326,6 +467,8 @@ class CompletedNormalUpgrade:
         self.lock=acquire_lock(self.ops.upgrade_root/'upgrade.lock',create=False)
         try:
             self.preflight(locked=True)
+            if self.document.get('failed_boot_interlock') is not None:self.phase='failed_interlock_reconciliation'
+            self.reconcile_failed_interlock()
             self.quiesced=True;self.ops.quiesce(self.controller)
             with self.root_credential():
                 publish_admission(self.contract,self.ops,self.ops.state_root)

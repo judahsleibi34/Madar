@@ -2,6 +2,18 @@
 
 ## Explicit schema136→144 maintenance operation
 
+The manual successor may bind one exact consumed boot-installation failure and
+its volatile upgrade interlock. Read-only preflight verifies the old protected
+receipts, original NORMAL136 roles/native identity, actual restored boot bytes
+and unit states, retained generated artifacts, no active old process/service or
+credential, and no subsequent controller/candidate/migration progress. Unknown,
+altered or unfinished interlocks remain rejected. Under both existing locks the
+fresh exact-approved operation archives the interlock and its bound intent in a
+new single-use reconciliation scope, rechecks it, then calls the existing
+controller retirement primitive before fresh quiescence/admission. An interrupted
+reconciliation cannot replay the same plan. Historical attempts are never edited
+and old authorization grants no successor authority.
+
 The successor proxy gate uses `99z-compatible-normal-<context>.conf` so it sorts
 after the already completed136 `99-compatible-normal-<origin>.conf`. The latter's
 retained `ExecStartPre=` reset otherwise restores its historical gate when the
