@@ -1,5 +1,23 @@
 # Madar production release acceptance policy
 
+## Retained schema144 READ_ONLY outage repair
+
+The independent runtime validator derives bounds and excluded schemas from the
+validated operation contract/profile: legacy115..136 remains unchanged;
+manual136..144 excludes142. Environment values cannot widen this authority.
+Mount, identity, lifecycle and runtime security checks remain mandatory.
+
+A separately exact-hash-approved routing-only repair may use the retained
+accepted136-compatible candidate with all business consumers stopped and both
+grants READ_ONLY. It verifies core readiness, accepts only the explicitly absent
+business-worker readiness components, and never labels this state NORMAL. It
+uses the existing locks and Nginx validation/atomic publication/reload, requires
+sustained public identity/write-denial verification, and compensates to the exact
+maintenance preimage or stops the bound proxy. It does not renew consumed upgrade
+credentials, seal successor ownership, install code/boot resources or execute SQL.
+The current boot actor may return to maintenance after restart until a separately
+authorized completion resolves the missing candidate runtime receipt.
+
 ## Separately authorized schema144 maintenance release
 
 An exact compensated boot-failure interlock can be reconciled only when explicitly

@@ -1,5 +1,21 @@
 # Privileged control-plane upgrade architecture
 
+## Retained candidate availability repair
+
+`recover_completed_normal_read_only.py` is a separately source/plan-approved
+routing-only operation using the previously installed, fully measured controller
+and boot guards. Its measured corrected validator selects compatibility from the
+validated operation profile, rather than the legacy115..136 constants. The
+historical package and consumed attempt remain immutable. A read-only render
+resolves relative mounts to the clean accepted application worktree and checks
+the actual CREATED worker/container/network specification before route selection.
+All authority mounts and both READ_ONLY grants remain required. No credential is
+reconstructed, interlock retired, worker started or NORMAL ownership inferred.
+The fresh append-only routing attempt changes only the upstream include and reloads
+the existing independently bound proxy. Maintenance is its compensation preimage.
+This temporary availability repair does not complete the failed deployment or
+attest restart durability; completing the migration/handoff requires fresh scope.
+
 ## Explicit schema136→144 maintenance operation
 
 The manual successor may bind one exact consumed boot-installation failure and

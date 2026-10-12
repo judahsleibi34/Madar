@@ -12,7 +12,7 @@ import re
 import hashlib
 import time
 
-from deployment.lib.completed_normal_admission import ADMISSIONS,OPERATION,digest,encoded,require_fresh_authorization
+from deployment.lib.completed_normal_admission import ADMISSIONS,OPERATION,digest,encoded,require_fresh_authorization,validate_contract
 from deployment.lib.completed_normal_resources import ROLES,allocation,verify_runtime_binding,measured_spec
 from deployment.lib.emergency_routing_repair import exclusive,spec,AvailabilityFailure,verification_window
 from deployment.lib.provider_recovery_runtime import protected
@@ -47,6 +47,8 @@ def _duration(value):
 def validate_model(contract,model,runtime, *, phase='running'):
     if phase not in {'staged','running'}:
         raise RuntimeError('completed_runtime_lifecycle_invalid')
+    validate_contract(contract)
+    release=profile(contract)
     selected=allocation(contract,contract['candidate']['slot'])
     services=model.get('services',{})
     if set(services)!=set(ROLES):raise RuntimeError('completed_runtime_service_inventory_changed')
@@ -162,7 +164,9 @@ def validate_model(contract,model,runtime, *, phase='running'):
                     or not authority.get('read_only') or authority.get('bind',{}).get('create_host_path') is not False
                     or expected_env.get('MADAR_BUSINESS_WRITE_CONTRACT')!=digest(contract)
                     or expected_env.get('MADAR_BUSINESS_WRITE_AUTHORITY')!='/run/madar/business-write-authority/authority.json'
-                    or expected_env.get('SCHEMA_COMPATIBLE_MIN')!='115' or expected_env.get('SCHEMA_COMPATIBLE_MAX')!='136'):
+                    or expected_env.get('SCHEMA_COMPATIBLE_MIN')!=str(release.source)
+                    or expected_env.get('SCHEMA_COMPATIBLE_MAX')!=str(release.target)
+                    or expected_env.get('SCHEMA_EXCLUDED_VERSIONS','')!=','.join(map(str,release.excluded))):
                 raise RuntimeError('completed_runtime_authority_mount_changed')
         expected_networks={model['networks'][key]['name'] for key in service.get('networks',{})}
         attached=row['NetworkSettings']['Networks']
