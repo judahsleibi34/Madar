@@ -1,5 +1,38 @@
 # Madar production release acceptance policy
 
+## Unselected completed-NORMAL136→144 manual release candidate
+
+`learning-136-144-path.json` pins the new `migrations-137-144-learning.json` and
+`schema-136-144-learning-bridge.json`. They compose only the existing immutable
+137..141,143,144 entries; Exchange142 remains excluded. The old descriptors,
+SQL/checksums and active136 release remain unchanged. The executor accepts this
+second exact source-pinned route, not arbitrary gaps. Backend configuration and
+version-2 authority accept only the additional reviewed136..144 range with142
+excluded, an exact source/context binding and a fresh root-issued grant. Existing
+115..136 grants cannot authorize it. Root file protection and recovery fencing
+remain mandatory. These source changes grant no installation or SQL authority.
+
+The root-authority Compose overlay carries explicit reviewed compatibility
+bounds and exclusions from the deployment environment. Missing bounds reject
+configuration rendering. It still requires an existing read-only authority
+mount with `create_host_path: false`. Real Compose rendering verifies both
+the historical bounds and the 136..144 range with 142 excluded, without
+granting new runtime or production authority.
+The actual environment builder loads the selected136..144 bridge compatibility
+and overrides stale inherited115..136 values. A full three-file Compose render
+also rejects stale env-file values in favor of that generated environment.
+Historical completed-NORMAL admission is additionally required to match the
+selected compatibility range before any Compose command; it cannot furnish a
+legacy authority mount to a144 candidate. The real144 admission/boot handoff
+remains a separate, uncompleted execution requirement.
+
+Manual activation still requires accepted exact images at136/144, preservation
+on a private current-data restore, independently authorized controller/source-role
+reconciliation, singleton workers, boot supersession and a complete exact-hash
+operation. Existing completed-NORMAL115→136 execution/boot contracts remain
+historical and cannot be replayed or silently widened to144. Auto-deploy, Phase3B
+and VM construction are not prerequisites for this manually governed release.
+
 Completed-NORMAL preparation can explicitly select a reviewed immutable controller
 ancestor of a separately pinned canonical main. Its approved plan contains
 hash-verified Git commit bodies proving the bounded parent chain and selected

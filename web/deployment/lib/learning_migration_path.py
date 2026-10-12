@@ -15,6 +15,50 @@ CONTRACT_SHA256 = "0941d244bd1e6102bed6c5c28a7384afa2a145206ca29ef8ec0ae1eb426e6
 MANIFEST_PATH = "web/deployment/releases/migrations-141-143-learning.json"
 SQL_PATH = "web/database/migrations/143_complete_learning_capabilities.sql"
 BRIDGE_PATH = "web/deployment/releases/schema-141-143-learning-bridge.json"
+NORMAL_CONTRACT_PATH = "web/deployment/releases/learning-136-144-path.json"
+NORMAL_CONTRACT_SHA256 = "ea2654bedb35f38cf7bfb59d5d7f18c82099344de8133f0d0e74efcdb92d9571"
+NORMAL_MANIFEST_PATH = "web/deployment/releases/migrations-137-144-learning.json"
+NORMAL_BRIDGE_PATH = "web/deployment/releases/schema-136-144-learning-bridge.json"
+
+
+def authorize_normal_manifest(repository_root: Path, manifest_path: Path, raw: dict) -> None:
+    """Authorize only the pinned136→144 composition; historical SQL is unchanged."""
+    descriptor = repository_root / NORMAL_CONTRACT_PATH
+    if hashlib.sha256(descriptor.read_bytes()).hexdigest() != NORMAL_CONTRACT_SHA256:
+        raise ValueError("normal learning migration descriptor checksum mismatch")
+    contract = json.loads(descriptor.read_text())
+    identity = {"contract_version": 1, "route": "learning-only-136-144",
+                "source_schema": 136, "target_schema": 144, "excluded_schemas": [142],
+                "manifest_path": NORMAL_MANIFEST_PATH, "bridge_path": NORMAL_BRIDGE_PATH}
+    if any(contract.get(key) != value for key, value in identity.items()):
+        raise ValueError("normal learning migration identity invalid")
+    if (manifest_path.resolve() != (repository_root / NORMAL_MANIFEST_PATH).resolve()
+            or hashlib.sha256(manifest_path.read_bytes()).hexdigest() != contract["manifest_sha256"]):
+        raise ValueError("normal learning migration manifest checksum/path mismatch")
+    entries = raw.get("migrations")
+    if entries != contract["migrations"]:
+        raise ValueError("normal learning migration transitions changed")
+    if ([entry["number"] for entry in entries] != [137, 138, 139, 140, 141, 143, 144]
+            or [entry["from_schema"] for entry in entries] != [136, 137, 138, 139, 140, 141, 143]):
+        raise ValueError("normal learning migration ordering invalid")
+    for entry in entries:
+        relative = Path(entry["path"])
+        sql = repository_root / relative
+        mirror = repository_root / entry["path"].replace("/database/", "/supabase/")
+        if (relative.is_absolute() or ".." in relative.parts or not sql.is_file()
+                or not mirror.is_file() or sql.read_bytes() != mirror.read_bytes()
+                or hashlib.sha256(sql.read_bytes()).hexdigest() != entry["sha256"]):
+            raise ValueError("normal learning SQL checksum/mirror mismatch")
+    bridge = repository_root / NORMAL_BRIDGE_PATH
+    if hashlib.sha256(bridge.read_bytes()).hexdigest() != contract["bridge_sha256"]:
+        raise ValueError("normal learning bridge checksum mismatch")
+    metadata = json.loads(bridge.read_text())
+    if (metadata.get("schema") != {"compatible_min":136,"compatible_max":144,"target":144,
+            "migration_class":"forward-compatible","rollback_compatible_min":136,
+            "rollback_compatible_max":136,"excluded_versions":[142]}
+            or metadata.get("migration_manifest") != Path(NORMAL_MANIFEST_PATH).name
+            or metadata.get("migration_policy") != "automatic-after-known-good-backup-first-forward-repair"):
+        raise ValueError("normal learning bridge compatibility invalid")
 
 
 def load_contract(repository_root: Path) -> dict:
@@ -48,7 +92,10 @@ def load_contract(repository_root: Path) -> dict:
 
 
 def authorize_manifest(repository_root: Path, manifest_path: Path, raw: dict) -> None:
-    """Accept only the exact finalized, single-transition candidate, never142."""
+    """Accept only the two source-pinned learning routes, never142."""
+    if manifest_path.resolve() == (repository_root / NORMAL_MANIFEST_PATH).resolve():
+        authorize_normal_manifest(repository_root, manifest_path, raw)
+        return
     contract = load_contract(repository_root)
     if contract["status"] != "finalized":
         raise ValueError("learning migration path is reserved, not executable")

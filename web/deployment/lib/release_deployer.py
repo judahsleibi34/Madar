@@ -72,10 +72,13 @@ class Compatibility:
             rollback_schema_max=int(raw["rollback_compatible_max"]),
             excluded_schemas=tuple(raw.get("excluded_versions", [])),
         )
-        if result.excluded_schemas and (result.excluded_schemas != (142,) or result.schema_min != 141 or result.schema_max != 143 or result.target_schema != 143):
+        if result.excluded_schemas and (result.excluded_schemas != (142,) or
+                (result.schema_min, result.schema_max, result.target_schema) not in {(141,143,143),(136,144,144)}):
             raise ValueError("unsupported schema branch exclusions")
         if result.schema_min <= 142 <= result.schema_max and result.target_schema == 143 and result.excluded_schemas != (142,):
             raise ValueError("learning branch must exclude schema142")
+        if (result.schema_min, result.schema_max, result.target_schema) == (136,144,144) and result.excluded_schemas != (142,):
+            raise ValueError("normal learning branch must exclude schema142")
         if result.migration_class not in {"none", "expand-only", "forward-compatible", "coordinated", "breaking"}:
             raise ValueError("unsupported migration compatibility class")
         if not result.schema_min <= result.target_schema <= result.schema_max:

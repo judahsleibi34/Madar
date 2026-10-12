@@ -1,5 +1,23 @@
 # Privileged control-plane upgrade architecture
 
+## Pending manual136→144 release
+
+The unselected136→144 descriptor is migration/source authority only. The installed
+completed-NORMAL completion binds controllerdbc26321 and application81cebfeb at136.
+Ordinary or privileged successors still need fresh independently authorized source,
+runtime, worker/write and boot reconciliation. Historical115→136 contracts and
+grants are not widened or reused as authorization. Preparing this manual release
+does not install the Phase3A controller, enable auto-deploy or require its Phase3B
+VM rehearsal. No completed execution or restart acceptance for144 is claimed.
+
+Completed-NORMAL Compose preparation also checks that the selected compatibility
+bounds match its fresh admission contract before reaching Docker. The historical
+115..136 contract cannot supply an authority mount to a136..144 candidate.
+Offline configuration verification uses the checksum-bound136..144 bridge and
+actual environment builder with the base, release and authority overlays; stale
+shell/env-file values cannot replace the generated bounds. This render issues no
+credential or grant and does not establish a144 runtime or boot transition.
+
 Completed-NORMAL preparation can explicitly select a reviewed immutable controller
 ancestor of a separately pinned canonical main. Its approved plan contains
 hash-verified Git commit bodies proving the bounded parent chain and selected

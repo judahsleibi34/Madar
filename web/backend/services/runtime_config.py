@@ -160,10 +160,12 @@ def env_bool(name: str, default: bool = False) -> bool:
 def schema_excluded_versions(minimum: int, maximum: int) -> tuple[int, ...]:
     raw = os.getenv("SCHEMA_EXCLUDED_VERSIONS", "").strip()
     excluded = tuple(int(value) for value in raw.split(",") if value) if raw else ()
-    if excluded and (excluded != (142,) or minimum != 141 or maximum != 143):
+    if excluded and (excluded != (142,) or (minimum, maximum) not in {(141,143),(136,144)}):
         raise ValueError("unsupported schema branch exclusions")
     if minimum <= 142 <= maximum and maximum == 143 and excluded != (142,):
         raise ValueError("learning branch must exclude schema142")
+    if (minimum, maximum) == (136,144) and excluded != (142,):
+        raise ValueError("normal learning branch must exclude schema142")
     return excluded
 
 

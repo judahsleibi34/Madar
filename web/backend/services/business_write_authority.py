@@ -30,21 +30,26 @@ def read_authority() -> dict | None:
         raise RuntimeError("business_write_authority_binding_invalid")
     fields = {"version", "schema", "release_sha", "contract_digest", "mode"}
     version = value.get("version")
+    minimum, maximum = 115, 115
     if type(version) is not int or version not in {1, 2}:
         raise RuntimeError("business_write_authority_binding_invalid")
     if version == 2:
         fields |= {"compatible_min", "compatible_max"}
-        # This is the reviewed local115->136 bridge, not arbitrary permission
-        # to widen an older grant. Root must issue a fresh release-bound grant.
+        # Only reviewed bridge ranges are admitted. A new range needs a fresh
+        # root-issued source/context-bound grant; no legacy grant is widened.
         if (type(value.get("compatible_min")) is not int
                 or type(value.get("compatible_max")) is not int
-                or value["compatible_min"] != 115 or value["compatible_max"] != 136
-                or os.getenv("SCHEMA_COMPATIBLE_MIN") != "115"
-                or os.getenv("SCHEMA_COMPATIBLE_MAX") != "136"):
+                or (value["compatible_min"],value["compatible_max"]) not in {(115,136),(136,144)}
+                or os.getenv("SCHEMA_COMPATIBLE_MIN") != str(value["compatible_min"])
+                or os.getenv("SCHEMA_COMPATIBLE_MAX") != str(value["compatible_max"])):
+            raise RuntimeError("business_write_authority_binding_invalid")
+        minimum, maximum = value["compatible_min"],value["compatible_max"]
+        if (minimum,maximum) == (136,144) and (
+                os.getenv("SCHEMA_EXCLUDED_VERSIONS") != "142" or value.get("schema") == 142):
             raise RuntimeError("business_write_authority_binding_invalid")
     if (set(value) != fields
             or type(value.get("schema")) is not int
-            or not 115 <= value["schema"] <= (136 if version == 2 else 115)
+            or not minimum <= value["schema"] <= maximum
             or value["release_sha"] != os.getenv("MADAR_RELEASE_SHA")
             or not re.fullmatch(r"[0-9a-f]{40}", str(value["release_sha"]))
             or value["contract_digest"] != contract

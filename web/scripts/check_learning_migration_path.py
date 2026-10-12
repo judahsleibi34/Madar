@@ -22,6 +22,11 @@ def validate(root=ROOT):
     else:
         import json
         module.authorize_manifest(root, root / MANIFEST_PATH, json.loads((root / MANIFEST_PATH).read_text()))
+    normal = root / module.NORMAL_CONTRACT_PATH
+    if normal.exists():
+        import json
+        manifest = root / module.NORMAL_MANIFEST_PATH
+        module.authorize_normal_manifest(root,manifest,json.loads(manifest.read_text()))
     return contract
 
 
