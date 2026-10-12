@@ -2,6 +2,11 @@
 
 ## Separately authorized schema144 maintenance release
 
+Successor boot validation preserves the completed136 origin and uses an explicitly
+ordered proxy gate; an unrelated later drop-in fails preflight. Offline systemd
+parser acceptance proves configuration merge ordering, not a real restart. Fresh
+exact-source evidence and operation authorization remain mandatory after a change.
+
 The version-2 completed-NORMAL maintenance profile reuses accepted application8d0c298
 images and genuine144 application/136→144 SQL evidence. Controller-only revisions
 remain distinct from that accepted application revision. It never relabels image

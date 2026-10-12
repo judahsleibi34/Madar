@@ -80,7 +80,11 @@ class CompletedNormalBootInstallation:
         self.profile=profile(contract)
         self.source_guard,self.ops=source_guard,operations;self.units=Path(units)
         self.root=Path(admissions)/digest(contract);self.name='madar-compatible-normal-boot-'+digest(contract)[:12]+'.service'
-        self.proxy=self.units/(PROXY+'.d')/('99-compatible-normal-'+digest(contract)[:12]+'.conf')
+        # A completed136 origin already has a99-compatible-normal drop-in.
+        # Its ExecStartPre reset must precede the successor's gate regardless
+        # of the two context hashes; lexical hash order is not ownership.
+        prefix='99z-compatible-normal-' if self.profile is MANUAL else '99-compatible-normal-'
+        self.proxy=self.units/(PROXY+'.d')/(prefix+digest(contract)[:12]+'.conf')
         baseline=document['boot_resources']
         compatible_origin='madar-compatible-normal-boot-'+Path(contract['source_roles']['completion_root']).name[:12]+'.service'
         if (set(baseline)!={'files','proxy_dropins','old_units','old_unit_dropins','unit_states'} or not baseline['old_units']
@@ -96,6 +100,8 @@ class CompletedNormalBootInstallation:
             *(p for paths in baseline['old_unit_dropins'].values() for p in paths)}
         if set(baseline['files'])!=required or any(Path(p).parent!=DROPINS or not Path(p).name.endswith('.conf') for p in baseline['proxy_dropins']):
             raise RuntimeError('completed_boot_resource_inventory_invalid')
+        if self.profile is MANUAL and any(Path(p).name>=self.proxy.name for p in baseline['proxy_dropins']):
+            raise RuntimeError('completed_boot_proxy_gate_order_unreviewed')
         self.baseline=baseline
     def command(self,mode):
         script=self.package/'source/web/scripts/continue_completed_normal_upgrade.py'

@@ -1,5 +1,18 @@
 # Schema-144 manual production release: verified checkpoint
 
+**Latest checkpoint:** the operation under plan4b96d106 consumed authorization
+and failed in boot installation with `completed_boot_effective_proxy_controls_changed`.
+Compensation restored the original proxy controls; GREEN remains NORMAL at136.
+The archived original and generated drop-ins reproduce the failure in the real
+offline systemd parser: the original99-compatible-normal-c3 file sorts after the
+new99-compatible-normal-402 file and resets its gate. The minimal source correction
+orders only the manual successor gate with99z and rejects any later measured
+drop-in before installation. Fourteen focused installer tests pass; real restart
+acceptance remains unexecuted. No CI, SQL or image acceptance was repeated.
+The old proposal and every protected receipt remain preserved and consumed;
+changed controller bytes require fresh exact-source CI, a new frozen plan and new
+approval. The older assessment below is a historical preparation checkpoint.
+
 Recorded 2026-10-12. **Production approval ready: NO.** This document records
 completed work and unresolved execution gates. It is not a production plan,
 authorization receipt, or claim that the complete manual deployment passed.
