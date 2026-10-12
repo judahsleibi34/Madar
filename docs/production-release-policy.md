@@ -1,5 +1,17 @@
 # Madar production release acceptance policy
 
+Completed-NORMAL preparation can explicitly select a reviewed immutable controller
+ancestor of a separately pinned canonical main. Its approved plan contains
+hash-verified Git commit bodies proving the bounded parent chain and selected
+tree. Remote main still must equal that separate pinned head before effects and
+under locks; fetched objects, canonical ancestry and selected tree are rechecked.
+The exact selected ref alone is bundled/staged and production advances only to
+that controller, never newer application or SQL. Ordinary upgrades retain the
+current-main-only admission rule. Accepted application/image and116..136 manifest
+bindings stay separate; newer137..143 artifacts are not selected implicitly.
+A changed selection/source needs fresh evidence applicability and exact approval.
+Historical rehearsal/authorization records remain unchanged.
+
 ## Approved unselected generic Forms review candidate143→144
 
 The separately approved mirrored144 candidate follows learning143 consecutively.

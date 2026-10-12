@@ -102,7 +102,10 @@ class CompletedNormalUpgrade:
         # A moving main must reject before timer, boot or controller effects.
         remote=self.ops.madar_git('completed_upgrade_candidate_remote','ls-remote',
             '--exit-code','origin','refs/heads/main').stdout.split()
-        if remote!=[self.controller,'refs/heads/main']:
+        selection=self.document.get('immutable_release_selection')
+        from deployment.lib.control_plane_upgrade import validate_immutable_release_selection
+        expected=self.controller if selection is None else validate_immutable_release_selection(selection,self.controller)
+        if remote!=[expected,'refs/heads/main']:
             raise RuntimeError('completed_upgrade_candidate_remote_changed')
 
     def preflight(self, *, locked=False):
@@ -188,8 +191,10 @@ class CompletedNormalUpgrade:
 
     def install_controller(self):
         self.actor.source();self.actor.installation.installed()
-        self.ops.resolve_candidate(self.controller,dry_run=False)
-        transaction,staged=self.ops.stage_candidate(self.controller)
+        selection=self.document.get('immutable_release_selection')
+        options={} if selection is None else {'immutable_selection':selection}
+        self.ops.resolve_candidate(self.controller,dry_run=False,**options)
+        transaction,staged=self.ops.stage_candidate(self.controller,**options)
         tree=self.ops.static_preflight(staged)
         manifest=json.loads(protected(self.package/'source-bundle.json',private=True).read_text())
         for relative,expected in manifest['files'].items():
