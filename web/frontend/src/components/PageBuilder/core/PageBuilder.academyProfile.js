@@ -1,4 +1,5 @@
 export const ACADEMY_COMPONENT_TYPES = new Set([
+  "educationHero",
   "heading", "text", "button", "image", "imageButton", "imageCardButton", "card",
   "carousel", "logoSlider", "list", "divider", "thinDivider", "metric",
   "academyFeaturedCourses", "academyCourseCollection", "academyPlans", "academyContinueLearning", "academyInstructors", "academyContact", "academyExchangeOpportunities", "academyProgrammeInfo", "academyForm",

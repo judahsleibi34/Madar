@@ -54,22 +54,30 @@ class ResponseEdit(Payload):
 
 
 def validate_schema(s):
-    allowed={'title','description','sections','logicRules','submitLabel','successMessage','access','notifyOwner','confirmSubmitter','pageMode'}
+    allowed={'title','description','sections','logicRules','submitLabel','successMessage','access','notifyOwner','confirmSubmitter','pageMode','languageMode','defaultLanguage','localized','workflow','metadata'}
     if set(s)-allowed or len(json.dumps(s))>150000:raise ValueError('Invalid form schema')
     for key,maximum in [('title',160),('description',4000),('submitLabel',120),('successMessage',1200)]:
         if not isinstance(s.get(key,''),str) or len(s.get(key,''))>maximum:raise ValueError('Invalid form text')
     if not s.get('title','').strip():raise ValueError('Form title is required')
+    if s.get('languageMode','en') not in {'en','ar','bilingual'} or s.get('defaultLanguage','en') not in {'en','ar'}:
+        raise ValueError('Unsupported form language')
+    validate_localized(s, {'title':160,'description':4000,'submitLabel':120,'successMessage':1200})
+    metadata=s.get('metadata',{})
+    if not isinstance(metadata,dict) or len(metadata)>20 or any(not isinstance(key,str) or not re.fullmatch(r'[A-Za-z0-9_-]{1,80}',key) or not isinstance(value,str) or len(value)>500 for key,value in metadata.items()):
+        raise ValueError('Invalid form metadata')
     if s.get('access','public') not in {'public','authenticated','enrolled'} or s.get('pageMode','paged') not in {'paged','single'}:raise ValueError('Invalid form access/page mode')
     if any(type(s.get(key,False)) is not bool for key in ('notifyOwner','confirmSubmitter')):raise ValueError('Invalid notification setting')
     sections=s.get('sections');ids=[]
     if not isinstance(sections,list) or not 1<=len(sections)<=10:raise ValueError('Use 1–10 form pages')
     section_ids=set()
     for section in sections:
-        if not isinstance(section,dict) or set(section)-{'id','title','fields'} or not isinstance(section.get('id'),str) or section['id'] in section_ids:raise ValueError('Invalid page')
+        if not isinstance(section,dict) or set(section)-{'id','title','fields','localized'} or not isinstance(section.get('id'),str) or section['id'] in section_ids:raise ValueError('Invalid page')
+        validate_localized(section, {'title':160})
         section_ids.add(section['id'])
         if not isinstance(section.get('title',''),str) or len(section.get('title',''))>160 or not isinstance(section.get('fields'),list):raise ValueError('Invalid page fields')
         for f in section['fields']:
-            if not isinstance(f,dict) or set(f)-{'id','type','label','helpText','placeholder','required','options','defaultValue','validation','maxFileSizeMb'}:raise ValueError('Invalid field schema')
+            if not isinstance(f,dict) or set(f)-{'id','type','label','helpText','placeholder','required','options','defaultValue','validation','maxFileSizeMb','localized'}:raise ValueError('Invalid field schema')
+            validate_localized(f, {'label':200,'helpText':1200,'placeholder':300,'options':200})
             if not isinstance(f.get('id'),str) or not re.fullmatch(r'[A-Za-z0-9_-]{1,100}',f['id']) or f['id'] in ids or f.get('type') not in TYPES:raise ValueError('Invalid field ID/type')
             ids.append(f['id'])
             if type(f.get('required',False)) is not bool:raise ValueError('Invalid required setting')
@@ -89,12 +97,36 @@ def validate_schema(s):
                 if f['type']=='file':raise ValueError('File fields cannot have uploaded defaults')
                 validate_value(f,f['defaultValue'])
     if not 1<=len(ids)<=100:raise ValueError('Use 1–100 fields')
+    workflow=s.get('workflow',{})
+    if not isinstance(workflow,dict) or set(workflow)-{'kind','termsFieldId'} or workflow.get('kind','none') not in {'none','affiliate','tuition','exchange'}:
+        raise ValueError('Invalid form workflow')
+    if workflow.get('kind','none')!='none':
+        terms=next((field for field in fields(s) if field['id']==workflow.get('termsFieldId')),None)
+        if not terms or terms['type']!='checkboxes' or not terms.get('required') or len(terms['options'])!=1:
+            raise ValueError('Choose a required single-option terms acceptance field')
+        if s.get('access','public')=='public':raise ValueError('Programme applications require authentication')
     rules=s.get('logicRules',[])
     if not isinstance(rules,list) or len(rules)>200:raise ValueError('Invalid conditional logic')
     for r in rules:
         if not isinstance(r,dict) or set(r)-{'id','sourceFieldId','targetFieldId','operator','value','action'} or r.get('operator','equals')!='equals' or r.get('action') not in {'show','hide'}:raise ValueError('Invalid conditional rule')
         if r.get('sourceFieldId') not in ids or r.get('targetFieldId') not in ids or ids.index(r['sourceFieldId'])>=ids.index(r['targetFieldId']):raise ValueError('Conditional source must precede target')
         if not isinstance(r.get('value',''),str) or len(r.get('value',''))>200 or next(f for f in fields(s) if f['id']==r['sourceFieldId'])['type']=='file':raise ValueError('Invalid conditional value')
+
+
+def validate_localized(source, limits):
+    translations=source.get('localized',{})
+    if not isinstance(translations,dict) or set(translations)-set(limits):
+        raise ValueError('Invalid localized presentation')
+    for key, languages in translations.items():
+        if not isinstance(languages,dict) or set(languages)-{'en','ar'}:
+            raise ValueError('Unsupported translation language')
+        for value in languages.values():
+            if key=='options':
+                if (not isinstance(value,list) or len(value)!=len(source.get('options',[]))
+                        or any(not isinstance(item,str) or not item.strip() or len(item)>limits[key] for item in value)):
+                    raise ValueError('Choice translations must match canonical options')
+            elif not isinstance(value,str) or len(value)>limits[key]:
+                raise ValueError('Invalid translated text')
 
 
 def visible(schema, field, answers):
@@ -165,6 +197,11 @@ def definition(tenant,identifier,version=None):
 
 def save(actor,payload,identifier=None):
     gate(actor.tenant_id)
+    kind=payload.form_schema.get('workflow',{}).get('kind','none')
+    if kind!='none':
+        require_reviews()
+        from services.academy_programme_service import available
+        available(actor,kind)
     return rpc('manage_elearning_form',{'p_tenant':actor.tenant_id,'p_user':actor.user_id,'p_id':str(identifier) if identifier else None,'p_revision':payload.expected_version,'p_name':payload.name,'p_status':payload.status,'p_schema':payload.form_schema})
 
 
@@ -179,7 +216,7 @@ def forms(actor):
         offset+=500
     counts=rpc('elearning_form_counts',{'p_tenant':actor.tenant_id,'p_user':actor.user_id})
     for row in rows:row.update(counts.get(str(row['id']),{'responses':0,'unread':0}))
-    return {'items':rows,'visible':any(f['status'] in {'active','archived'} or f['responses'] for f in rows)}
+    return {'review_available':settings_available(144),'items':rows,'visible':any(f['status'] in {'active','archived'} or f['responses'] for f in rows)}
 
 
 def public_access(tenant,form,actor):
@@ -192,6 +229,15 @@ def public_access(tenant,form,actor):
         if access=='enrolled':
             result=rpc('elearning_form_enrolled',{'p_tenant':tenant,'p_user':actor.user_id})
             if not result:raise HTTPException(403,'Active course enrollment required')
+    kind=form['schema'].get('workflow',{}).get('kind','none')
+    if kind!='none':
+        require_reviews()
+        if actor is None:raise HTTPException(401,'Sign in to apply')
+        from services.academy_programme_service import available, programme_rpc
+        available(actor,kind)
+        if kind in {'tuition','exchange'}:
+            eligibility=programme_rpc('academy_wallet',actor)
+            if not eligibility.get(kind+'_eligible'):raise HTTPException(403,'Programme eligibility requirements are not met')
 
 
 def responses(actor,form_id=None,search='',unread=False,date_from=None,date_to=None,identity=None,limit=50,offset=0,opportunity_id=None):
@@ -218,6 +264,16 @@ def response_detail(actor,identifier):
     if not rows:raise HTTPException(404,'Response not found')
     r=rows[0];r['definition']=definition(actor.tenant_id,r['form_id'],r['version'])
     r['files']=service_supabase.table('elearning_form_files').select('id,field_id,filename,size_bytes,mime_type').eq('tenant_id',actor.tenant_id).eq('response_id',str(identifier)).execute().data or []
+    if settings_available(144):
+        reviews=service_supabase.table('elearning_form_reviews').select('*').eq('tenant_id',actor.tenant_id).eq('response_id',str(identifier)).limit(1).execute().data or []
+        r['review']=reviews[0] if reviews else None
+        r['decision_history']=service_supabase.table('elearning_form_decision_history').select('revision,actor_id,old_status,new_status,note,created_at').eq('tenant_id',actor.tenant_id).eq('response_id',str(identifier)).order('revision').execute().data or []
+        identifiers=list({entry['actor_id'] for entry in r['decision_history']})
+        names={}
+        if identifiers:
+            people=service_supabase.table('users').select('id,first_name,last_name').eq('tenant_id',actor.tenant_id).in_('id',identifiers).execute().data or []
+            names={person['id']:' '.join(filter(None,[person.get('first_name'),person.get('last_name')])) for person in people}
+        for entry in r['decision_history']:entry['reviewer_name']=names.get(entry['actor_id'],'')
     if r.get('opportunity_id'):
         from services.academy_exchange_service import review_context
         try:r['exchange'] = review_context(actor,r)
@@ -227,6 +283,55 @@ def response_detail(actor,identifier):
             if error.status_code not in {402,403}:raise
             r['exchange'] = None
     return r
+
+
+def require_reviews():
+    if not settings_available(144):raise HTTPException(503,'General Forms review requires the schema144 candidate')
+
+
+class Decision(Payload):
+    status: str
+    revision: int = Field(ge=1,strict=True)
+    note: str = Field(min_length=1,max_length=4000)
+
+    @model_validator(mode='after')
+    def valid(self):
+        if self.status not in {'under_review','approved','not_approved','suspended'}:raise ValueError('Invalid review status')
+        return self
+
+
+def review_response(actor,identifier,payload):
+    require_reviews();gate(actor.tenant_id,'response_management')
+    if actor.role not in {'owner','admin'}:raise HTTPException(403,'Owner or admin review required')
+    response=response_detail(actor,identifier)
+    kind=response['definition']['schema'].get('workflow',{}).get('kind','none')
+    if kind!='none':
+        from services.academy_programme_service import available
+        available(actor,kind)
+    return rpc('review_elearning_form_response',{'p_tenant':actor.tenant_id,'p_admin':actor.user_id,'p_response':str(identifier),'p_status':payload.status,'p_revision':payload.revision,'p_note':payload.note})
+
+
+def applicant_responses(actor,limit=25,offset=0):
+    require_reviews();gate(actor.tenant_id)
+    rows=(service_supabase.table('elearning_form_responses')
+          .select('id,form_id,version,submitted_at')
+          .eq('tenant_id',actor.tenant_id).eq('user_id',actor.user_id)
+          .order('submitted_at',desc=True).range(offset,offset+limit).execute()).data or []
+    items=[]
+    for row in rows[:limit]:
+        # Reuse the canonical applicant projection so revoked membership,
+        # immutable versions and private reviewer fields retain one authority.
+        value=applicant_response(actor,row['id'])
+        items.append({key:value[key] for key in ('id','status','submitted_at')} | {
+            'title':value['schema'].get('title',''),
+            'localized':{'title':value['schema'].get('localized',{}).get('title',{})},
+        })
+    return {'items':items,'has_more':len(rows)>limit}
+
+
+def applicant_response(actor,identifier):
+    require_reviews();gate(actor.tenant_id)
+    return rpc('get_elearning_form_applicant_response',{'p_tenant':actor.tenant_id,'p_user':actor.user_id,'p_response':str(identifier)})
 
 
 def export_csv(actor,filters):

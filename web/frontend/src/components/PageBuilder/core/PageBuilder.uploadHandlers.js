@@ -167,7 +167,8 @@ export const createUploadHandlers = ({  selectedElement,
   const handleSelectedElementImageUpload = async (event) => {
     const file = event.target.files?.[0];
     event.target.value = "";
-    if (!file || !selectedElement || !["image", "imageButton"].includes(selectedElement.type)) return;
+    const hero=selectedElement?.type==='card' && selectedElement.variant==='educationHero';
+    if (!file || !selectedElement || (!hero && !["image", "imageButton"].includes(selectedElement.type))) return;
 
     const [assetUrl, aspectRatio] = await Promise.all([
       uploadBuilderImageFile(file),
@@ -176,11 +177,12 @@ export const createUploadHandlers = ({  selectedElement,
     if (!assetUrl) return;
 
     updateSelectedElement({
-      content: assetUrl,
+      ...(hero ? {imageUrl:assetUrl} : {content:assetUrl}),
       assetFileName: file.name || getBuilderAssetFileName(assetUrl),
       name: selectedElement.name || file.name || "Image",
       mediaAspectRatio: aspectRatio || selectedElement.mediaAspectRatio || undefined,
       ...(selectedElement.mode === "direct" &&
+        !hero &&
         aspectRatio &&
         selectedElement.imageButtonVariant !== "editorialCard"
         ? { position: fitMediaPositionsToAspectRatio(selectedElement.position, aspectRatio) }

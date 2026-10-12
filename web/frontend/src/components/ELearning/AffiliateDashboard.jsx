@@ -28,7 +28,7 @@ export default function AffiliateDashboard({ site }) {
   return <section className="learner-account affiliate-dashboard" dir={i18n.dir()}>
     <header className="ecommerce-page-header"><h1>{t("elearning.affiliate.dashboard")}</h1><p>{t("elearning.affiliate.intro")}</p></header>
     <section className="learner-account-panel"><h2>{t("elearning.affiliate.status")}</h2><p className="elearning-course-status">{status ? t(`elearning.programmes.${status}`) : t("elearning.affiliate.notApplied")}</p><p>{t(`elearning.affiliate.${status === "approved" ? "approvedHelp" : status === "suspended" ? "suspendedHelp" : "applicationHelp"}`)}</p>
-      {account.settings.affiliates_enabled && <Link className="ecommerce-secondary-button" to="/my-learning/affiliate/application">{t(!status || status === "not_approved" ? "elearning.affiliate.apply" : "elearning.affiliate.application")}</Link>}
+      {account.settings.affiliates_enabled && <Link className="ecommerce-secondary-button" to={account.application_paths?.affiliate || "/my-learning/affiliate/application"}>{t(!status || status === "not_approved" ? "elearning.affiliate.apply" : "elearning.affiliate.application")}</Link>}
     </section>
     <ReferralInvitation referrals={referrals} academy={site} />
     {referrals === null && <p role="alert">{t("elearning.referrals.loadError")}</p>}

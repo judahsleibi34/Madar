@@ -82,6 +82,6 @@ class ExchangeFormsServiceTests(TestCase):
         db=MagicMock();response_query=MagicMock();response_query.eq.return_value=response_query;response_query.limit.return_value=response_query;response_query.execute.return_value.data=[record]
         file_query=MagicMock();file_query.eq.return_value=file_query;file_query.execute.return_value.data=[]
         db.table.side_effect=lambda name:SimpleNamespace(select=lambda *_:response_query if name=='elearning_form_responses' else file_query)
-        with patch.object(forms,'gate'),patch.object(forms,'service_supabase',db),patch.object(forms,'definition',return_value={'schema':schema()}),patch.object(exchange,'review_context',side_effect=HTTPException(402,'Exchange unavailable')):
+        with patch.object(forms,'gate'),patch.object(forms,'settings_available',side_effect=lambda minimum=141:minimum<=142),patch.object(forms,'service_supabase',db),patch.object(forms,'definition',return_value={'schema':schema()}),patch.object(exchange,'review_context',side_effect=HTTPException(402,'Exchange unavailable')):
             result=forms.response_detail(self.actor,record['id'])
             self.assertEqual(result['answers'],{'student':'No'});self.assertIsNone(result['exchange'])

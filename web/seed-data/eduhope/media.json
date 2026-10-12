@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "assets": [
+    {
+      "key": "hero.library",
+      "source_url": "https://www.pexels.com/photo/students-studying-inside-the-library-8199659/",
+      "download_url": "https://images.pexels.com/photos/8199659/pexels-photo-8199659.jpeg?auto=compress&cs=tinysrgb&w=1920",
+      "author": "Yan Krukau",
+      "license_url": "https://www.pexels.com/license/",
+      "usage": "Integrated educational hero; illustrative stock models, no endorsement or nationality claim",
+      "sha256": "a232332f4b98ae32023888b0a0a097fd774f789d739f851d3440668511cd789f",
+      "bytes": 254946,
+      "portable": "Fetch verified bytes into tenant-owned storage; no remote runtime dependency",
+      "file": "hero.jpg"
+    },
+    {
+      "key": "brand.original-logo",
+      "file": "eduhope-original-logo.jpeg",
+      "package_file": "assets/eduhope-original-logo.jpeg",
+      "source": "Owner supplied original file, verified visually against the uploaded EduHope logo",
+      "sha256": "1f6147d18f80daa3aefed419dfd260194d1760a1883ec9ed6cf83fc9665f96b5",
+      "bytes": 69686,
+      "usage": "Academy logo; exact owner asset, no recreation or raster edits",
+      "portable": "Original public brand asset included in the seed package"
+    }
+  ]
+}

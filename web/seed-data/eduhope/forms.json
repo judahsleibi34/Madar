@@ -1,0 +1,870 @@
+{
+  "version": 1,
+  "definitions": [
+    {
+      "key": "forms.contact",
+      "name": "Contact EduHope",
+      "status": "active",
+      "schema": {
+        "title": "Contact EduHope",
+        "description": "Your information is private and reviewed by authorized academy staff. This is a local demonstration.",
+        "languageMode": "bilingual",
+        "defaultLanguage": "ar",
+        "localized": {
+          "title": {
+            "en": "Contact EduHope",
+            "ar": "تواصل مع إديوهوب"
+          },
+          "description": {
+            "ar": "معلوماتك خاصة ويراجعها موظّفو الأكاديمية المخوّلون. هذه معاينة محلية تجريبية."
+          },
+          "submitLabel": {
+            "en": "Submit",
+            "ar": "إرسال"
+          },
+          "successMessage": {
+            "en": "Thank you. Your response was received.",
+            "ar": "شكراً لك. تم استلام ردّك."
+          }
+        },
+        "submitLabel": "Submit",
+        "successMessage": "Thank you. Your response was received.",
+        "pageMode": "single",
+        "access": "public",
+        "notifyOwner": true,
+        "confirmSubmitter": false,
+        "sections": [
+          {
+            "id": "contact-page",
+            "title": "",
+            "fields": [
+              {
+                "id": "name",
+                "type": "shortText",
+                "label": "Full name",
+                "localized": {
+                  "label": {
+                    "en": "Full name",
+                    "ar": "الاسم الكامل"
+                  },
+                  "placeholder": {
+                    "en": "Enter full name",
+                    "ar": "أدخل الاسم الكامل"
+                  }
+                },
+                "required": true,
+                "placeholder": "Enter full name",
+                "helpText": "",
+                "validation": {
+                  "maxLength": 120
+                }
+              },
+              {
+                "id": "email",
+                "type": "email",
+                "label": "Email address",
+                "localized": {
+                  "label": {
+                    "en": "Email address",
+                    "ar": "البريد الإلكتروني"
+                  },
+                  "placeholder": {
+                    "en": "Enter email address",
+                    "ar": "أدخل البريد الإلكتروني"
+                  }
+                },
+                "required": true,
+                "placeholder": "Enter email address",
+                "helpText": "",
+                "validation": {}
+              },
+              {
+                "id": "subject",
+                "type": "shortText",
+                "label": "Subject",
+                "localized": {
+                  "label": {
+                    "en": "Subject",
+                    "ar": "الموضوع"
+                  },
+                  "placeholder": {
+                    "en": "Enter subject",
+                    "ar": "أدخل الموضوع"
+                  }
+                },
+                "required": true,
+                "placeholder": "Enter subject",
+                "helpText": "",
+                "validation": {
+                  "maxLength": 200
+                }
+              },
+              {
+                "id": "message",
+                "type": "paragraph",
+                "label": "Message",
+                "localized": {
+                  "label": {
+                    "en": "Message",
+                    "ar": "الرسالة"
+                  },
+                  "placeholder": {
+                    "en": "Write your response",
+                    "ar": "اكتب إجابتك"
+                  }
+                },
+                "required": true,
+                "placeholder": "Write your response",
+                "helpText": "",
+                "validation": {
+                  "maxLength": 4000
+                }
+              }
+            ]
+          }
+        ],
+        "logicRules": []
+      },
+      "demo_only": true
+    },
+    {
+      "key": "forms.affiliate",
+      "name": "Affiliate application",
+      "status": "active",
+      "schema": {
+        "title": "Affiliate application",
+        "description": "Your information is private and reviewed by authorized academy staff. This is a local demonstration.",
+        "languageMode": "bilingual",
+        "defaultLanguage": "ar",
+        "localized": {
+          "title": {
+            "en": "Affiliate application",
+            "ar": "طلب الانضمام لبرنامج الإحالة"
+          },
+          "description": {
+            "ar": "معلوماتك خاصة ويراجعها موظّفو الأكاديمية المخوّلون. هذه معاينة محلية تجريبية."
+          },
+          "submitLabel": {
+            "en": "Submit",
+            "ar": "إرسال"
+          },
+          "successMessage": {
+            "en": "Thank you. Your response was received.",
+            "ar": "شكراً لك. تم استلام ردّك."
+          }
+        },
+        "submitLabel": "Submit",
+        "successMessage": "Thank you. Your response was received.",
+        "pageMode": "single",
+        "access": "authenticated",
+        "notifyOwner": true,
+        "confirmSubmitter": true,
+        "sections": [
+          {
+            "id": "affiliate-page",
+            "title": "",
+            "fields": [
+              {
+                "id": "name",
+                "type": "shortText",
+                "label": "Full name",
+                "localized": {
+                  "label": {
+                    "en": "Full name",
+                    "ar": "الاسم الكامل"
+                  },
+                  "placeholder": {
+                    "en": "Enter full name",
+                    "ar": "أدخل الاسم الكامل"
+                  }
+                },
+                "required": true,
+                "placeholder": "Enter full name",
+                "helpText": "",
+                "validation": {
+                  "maxLength": 120
+                }
+              },
+              {
+                "id": "email",
+                "type": "email",
+                "label": "Email",
+                "localized": {
+                  "label": {
+                    "en": "Email",
+                    "ar": "البريد الإلكتروني"
+                  },
+                  "placeholder": {
+                    "en": "Enter email",
+                    "ar": "أدخل البريد الإلكتروني"
+                  }
+                },
+                "required": true,
+                "placeholder": "Enter email",
+                "helpText": "",
+                "validation": {}
+              },
+              {
+                "id": "country",
+                "type": "shortText",
+                "label": "Country",
+                "localized": {
+                  "label": {
+                    "en": "Country",
+                    "ar": "الدولة"
+                  },
+                  "placeholder": {
+                    "en": "Enter country",
+                    "ar": "أدخل الدولة"
+                  }
+                },
+                "required": true,
+                "placeholder": "Enter country",
+                "helpText": "",
+                "validation": {
+                  "maxLength": 120
+                }
+              },
+              {
+                "id": "experience",
+                "type": "paragraph",
+                "label": "Promotion experience",
+                "localized": {
+                  "label": {
+                    "en": "Promotion experience",
+                    "ar": "الخبرة في الترويج"
+                  },
+                  "placeholder": {
+                    "en": "Write your response",
+                    "ar": "اكتب إجابتك"
+                  }
+                },
+                "required": true,
+                "placeholder": "Write your response",
+                "helpText": "",
+                "validation": {
+                  "maxLength": 2000
+                }
+              },
+              {
+                "id": "plan",
+                "type": "paragraph",
+                "label": "How will you promote EduHope?",
+                "localized": {
+                  "label": {
+                    "en": "How will you promote EduHope?",
+                    "ar": "كيف تخطّط للتعريف بإديوهوب؟"
+                  },
+                  "placeholder": {
+                    "en": "Write your response",
+                    "ar": "اكتب إجابتك"
+                  }
+                },
+                "required": true,
+                "placeholder": "Write your response",
+                "helpText": "",
+                "validation": {
+                  "maxLength": 2000
+                }
+              },
+              {
+                "id": "additional",
+                "type": "paragraph",
+                "label": "Additional information",
+                "localized": {
+                  "label": {
+                    "en": "Additional information",
+                    "ar": "معلومات إضافية"
+                  },
+                  "placeholder": {
+                    "en": "Write your response",
+                    "ar": "اكتب إجابتك"
+                  }
+                },
+                "required": false,
+                "placeholder": "Write your response",
+                "helpText": "",
+                "validation": {
+                  "maxLength": 2000
+                }
+              },
+              {
+                "id": "terms",
+                "type": "checkboxes",
+                "label": "I accept the demo Affiliate terms; owner/legal approval is required before live use.",
+                "localized": {
+                  "label": {
+                    "en": "I accept the demo Affiliate terms; owner/legal approval is required before live use.",
+                    "ar": "أوافق على الشروط التجريبية لبرنامج الإحالة؛ يلزم اعتماد المالك والمراجعة القانونية قبل الاستخدام الفعلي."
+                  },
+                  "options": {
+                    "en": [
+                      "I accept"
+                    ],
+                    "ar": [
+                      "أوافق"
+                    ]
+                  },
+                  "placeholder": {
+                    "en": "Enter i accept the demo affiliate terms; owner/legal approval is required before live use.",
+                    "ar": "أدخل أوافق على الشروط التجريبية لبرنامج الإحالة؛ يلزم اعتماد المالك والمراجعة القانونية قبل الاستخدام الفعلي."
+                  }
+                },
+                "required": true,
+                "placeholder": "Enter i accept the demo affiliate terms; owner/legal approval is required before live use.",
+                "helpText": "",
+                "validation": {},
+                "options": [
+                  "I accept"
+                ]
+              }
+            ]
+          }
+        ],
+        "logicRules": [],
+        "workflow": {
+          "kind": "affiliate",
+          "termsFieldId": "terms"
+        }
+      },
+      "demo_only": true
+    },
+    {
+      "key": "forms.tuition",
+      "name": "Tuition Support application",
+      "status": "active",
+      "schema": {
+        "title": "Tuition Support application",
+        "description": "Your information is private and reviewed by authorized academy staff. This is a local demonstration.",
+        "languageMode": "bilingual",
+        "defaultLanguage": "ar",
+        "localized": {
+          "title": {
+            "en": "Tuition Support application",
+            "ar": "طلب دعم الرسوم الجامعية"
+          },
+          "description": {
+            "ar": "معلوماتك خاصة ويراجعها موظّفو الأكاديمية المخوّلون. هذه معاينة محلية تجريبية."
+          },
+          "submitLabel": {
+            "en": "Submit",
+            "ar": "إرسال"
+          },
+          "successMessage": {
+            "en": "Thank you. Your response was received.",
+            "ar": "شكراً لك. تم استلام ردّك."
+          }
+        },
+        "submitLabel": "Submit",
+        "successMessage": "Thank you. Your response was received.",
+        "pageMode": "single",
+        "access": "authenticated",
+        "notifyOwner": true,
+        "confirmSubmitter": true,
+        "sections": [
+          {
+            "id": "tuition-page",
+            "title": "",
+            "fields": [
+              {
+                "id": "name",
+                "type": "shortText",
+                "label": "Full name",
+                "localized": {
+                  "label": {
+                    "en": "Full name",
+                    "ar": "الاسم الكامل"
+                  },
+                  "placeholder": {
+                    "en": "Enter full name",
+                    "ar": "أدخل الاسم الكامل"
+                  }
+                },
+                "required": true,
+                "placeholder": "Enter full name",
+                "helpText": "",
+                "validation": {
+                  "maxLength": 120
+                }
+              },
+              {
+                "id": "university",
+                "type": "shortText",
+                "label": "University",
+                "localized": {
+                  "label": {
+                    "en": "University",
+                    "ar": "الجامعة"
+                  },
+                  "placeholder": {
+                    "en": "Enter university",
+                    "ar": "أدخل الجامعة"
+                  }
+                },
+                "required": true,
+                "placeholder": "Enter university",
+                "helpText": "",
+                "validation": {
+                  "maxLength": 120
+                }
+              },
+              {
+                "id": "student_number",
+                "type": "shortText",
+                "label": "University student number",
+                "localized": {
+                  "label": {
+                    "en": "University student number",
+                    "ar": "الرقم الجامعي"
+                  },
+                  "placeholder": {
+                    "en": "Enter university student number",
+                    "ar": "أدخل الرقم الجامعي"
+                  }
+                },
+                "required": true,
+                "placeholder": "Enter university student number",
+                "helpText": "",
+                "validation": {
+                  "maxLength": 120
+                }
+              },
+              {
+                "id": "contact",
+                "type": "shortText",
+                "label": "Contact information",
+                "localized": {
+                  "label": {
+                    "en": "Contact information",
+                    "ar": "معلومات التواصل"
+                  },
+                  "placeholder": {
+                    "en": "Enter contact information",
+                    "ar": "أدخل معلومات التواصل"
+                  }
+                },
+                "required": true,
+                "placeholder": "Enter contact information",
+                "helpText": "",
+                "validation": {
+                  "maxLength": 120
+                }
+              },
+              {
+                "id": "tuition_fee",
+                "type": "number",
+                "label": "Tuition fee information",
+                "localized": {
+                  "label": {
+                    "en": "Tuition fee information",
+                    "ar": "معلومات الرسوم الجامعية"
+                  },
+                  "placeholder": {
+                    "en": "Enter tuition fee information",
+                    "ar": "أدخل معلومات الرسوم الجامعية"
+                  }
+                },
+                "required": true,
+                "placeholder": "Enter tuition fee information",
+                "helpText": "",
+                "validation": {
+                  "min": 1,
+                  "max": 1000000
+                }
+              },
+              {
+                "id": "difficulty",
+                "type": "paragraph",
+                "label": "Financial difficulty information",
+                "localized": {
+                  "label": {
+                    "en": "Financial difficulty information",
+                    "ar": "توضيح الصعوبات المالية"
+                  },
+                  "placeholder": {
+                    "en": "Write your response",
+                    "ar": "اكتب إجابتك"
+                  }
+                },
+                "required": true,
+                "placeholder": "Write your response",
+                "helpText": "",
+                "validation": {
+                  "maxLength": 3000
+                }
+              },
+              {
+                "id": "amount",
+                "type": "number",
+                "label": "Requested assistance amount",
+                "localized": {
+                  "label": {
+                    "en": "Requested assistance amount",
+                    "ar": "مبلغ المساعدة المطلوب"
+                  },
+                  "placeholder": {
+                    "en": "Enter requested assistance amount",
+                    "ar": "أدخل مبلغ المساعدة المطلوب"
+                  }
+                },
+                "required": true,
+                "placeholder": "Enter requested assistance amount",
+                "helpText": "",
+                "validation": {
+                  "min": 1,
+                  "max": 1000000
+                }
+              },
+              {
+                "id": "information",
+                "type": "paragraph",
+                "label": "Supporting information",
+                "localized": {
+                  "label": {
+                    "en": "Supporting information",
+                    "ar": "معلومات داعمة"
+                  },
+                  "placeholder": {
+                    "en": "Write your response",
+                    "ar": "اكتب إجابتك"
+                  }
+                },
+                "required": false,
+                "placeholder": "Write your response",
+                "helpText": "",
+                "validation": {
+                  "maxLength": 3000
+                }
+              },
+              {
+                "id": "documents",
+                "type": "file",
+                "label": "Supporting documents",
+                "localized": {
+                  "label": {
+                    "en": "Supporting documents",
+                    "ar": "المستندات الداعمة"
+                  },
+                  "placeholder": {
+                    "en": "Enter supporting documents",
+                    "ar": "أدخل المستندات الداعمة"
+                  },
+                  "helpText": {
+                    "en": "PDF, PNG or JPEG; up to 5 MB",
+                    "ar": "PDF أو PNG أو JPEG؛ بحد أقصى 5 ميغابايت"
+                  }
+                },
+                "required": false,
+                "placeholder": "Enter supporting documents",
+                "helpText": "PDF, PNG or JPEG; up to 5 MB",
+                "validation": {},
+                "maxFileSizeMb": 5
+              },
+              {
+                "id": "terms",
+                "type": "checkboxes",
+                "label": "I accept the demo Tuition Support terms. Assistance is not guaranteed.",
+                "localized": {
+                  "label": {
+                    "en": "I accept the demo Tuition Support terms. Assistance is not guaranteed.",
+                    "ar": "أوافق على الشروط التجريبية لدعم الرسوم. المساعدة المالية غير مضمونة."
+                  },
+                  "options": {
+                    "en": [
+                      "I accept"
+                    ],
+                    "ar": [
+                      "أوافق"
+                    ]
+                  },
+                  "placeholder": {
+                    "en": "Enter i accept the demo tuition support terms. assistance is not guaranteed.",
+                    "ar": "أدخل أوافق على الشروط التجريبية لدعم الرسوم. المساعدة المالية غير مضمونة."
+                  }
+                },
+                "required": true,
+                "placeholder": "Enter i accept the demo tuition support terms. assistance is not guaranteed.",
+                "helpText": "",
+                "validation": {},
+                "options": [
+                  "I accept"
+                ]
+              }
+            ]
+          }
+        ],
+        "logicRules": [],
+        "workflow": {
+          "kind": "tuition",
+          "termsFieldId": "terms"
+        }
+      },
+      "demo_only": true
+    },
+    {
+      "key": "forms.exchange",
+      "name": "Exchange application",
+      "status": "active",
+      "schema": {
+        "title": "Exchange application",
+        "description": "Your information is private and reviewed by authorized academy staff. This is a local demonstration.",
+        "languageMode": "bilingual",
+        "defaultLanguage": "ar",
+        "localized": {
+          "title": {
+            "en": "Exchange application",
+            "ar": "طلب المشاركة في برنامج التبادل"
+          },
+          "description": {
+            "ar": "معلوماتك خاصة ويراجعها موظّفو الأكاديمية المخوّلون. هذه معاينة محلية تجريبية."
+          },
+          "submitLabel": {
+            "en": "Submit",
+            "ar": "إرسال"
+          },
+          "successMessage": {
+            "en": "Thank you. Your response was received.",
+            "ar": "شكراً لك. تم استلام ردّك."
+          }
+        },
+        "submitLabel": "Submit",
+        "successMessage": "Thank you. Your response was received.",
+        "pageMode": "single",
+        "access": "authenticated",
+        "notifyOwner": true,
+        "confirmSubmitter": true,
+        "sections": [
+          {
+            "id": "exchange-page",
+            "title": "",
+            "fields": [
+              {
+                "id": "name",
+                "type": "shortText",
+                "label": "Full name",
+                "localized": {
+                  "label": {
+                    "en": "Full name",
+                    "ar": "الاسم الكامل"
+                  },
+                  "placeholder": {
+                    "en": "Enter full name",
+                    "ar": "أدخل الاسم الكامل"
+                  }
+                },
+                "required": true,
+                "placeholder": "Enter full name",
+                "helpText": "",
+                "validation": {
+                  "maxLength": 120
+                }
+              },
+              {
+                "id": "email",
+                "type": "email",
+                "label": "Email",
+                "localized": {
+                  "label": {
+                    "en": "Email",
+                    "ar": "البريد الإلكتروني"
+                  },
+                  "placeholder": {
+                    "en": "Enter email",
+                    "ar": "أدخل البريد الإلكتروني"
+                  }
+                },
+                "required": true,
+                "placeholder": "Enter email",
+                "helpText": "",
+                "validation": {}
+              },
+              {
+                "id": "university",
+                "type": "shortText",
+                "label": "University",
+                "localized": {
+                  "label": {
+                    "en": "University",
+                    "ar": "الجامعة"
+                  },
+                  "placeholder": {
+                    "en": "Enter university",
+                    "ar": "أدخل الجامعة"
+                  }
+                },
+                "required": true,
+                "placeholder": "Enter university",
+                "helpText": "",
+                "validation": {
+                  "maxLength": 120
+                }
+              },
+              {
+                "id": "country",
+                "type": "shortText",
+                "label": "Country",
+                "localized": {
+                  "label": {
+                    "en": "Country",
+                    "ar": "الدولة"
+                  },
+                  "placeholder": {
+                    "en": "Enter country",
+                    "ar": "أدخل الدولة"
+                  }
+                },
+                "required": true,
+                "placeholder": "Enter country",
+                "helpText": "",
+                "validation": {
+                  "maxLength": 120
+                }
+              },
+              {
+                "id": "education",
+                "type": "paragraph",
+                "label": "Educational background",
+                "localized": {
+                  "label": {
+                    "en": "Educational background",
+                    "ar": "الخلفية التعليمية"
+                  },
+                  "placeholder": {
+                    "en": "Write your response",
+                    "ar": "اكتب إجابتك"
+                  }
+                },
+                "required": true,
+                "placeholder": "Write your response",
+                "helpText": "",
+                "validation": {
+                  "maxLength": 2000
+                }
+              },
+              {
+                "id": "english",
+                "type": "paragraph",
+                "label": "English-learning background",
+                "localized": {
+                  "label": {
+                    "en": "English-learning background",
+                    "ar": "خبرتك في تعلّم الإنجليزية"
+                  },
+                  "placeholder": {
+                    "en": "Write your response",
+                    "ar": "اكتب إجابتك"
+                  }
+                },
+                "required": true,
+                "placeholder": "Write your response",
+                "helpText": "",
+                "validation": {
+                  "maxLength": 2000
+                }
+              },
+              {
+                "id": "motivation",
+                "type": "paragraph",
+                "label": "Motivation for applying",
+                "localized": {
+                  "label": {
+                    "en": "Motivation for applying",
+                    "ar": "دوافع التقديم"
+                  },
+                  "placeholder": {
+                    "en": "Write your response",
+                    "ar": "اكتب إجابتك"
+                  }
+                },
+                "required": true,
+                "placeholder": "Write your response",
+                "helpText": "",
+                "validation": {
+                  "maxLength": 2000
+                }
+              },
+              {
+                "id": "experience",
+                "type": "paragraph",
+                "label": "Relevant experience",
+                "localized": {
+                  "label": {
+                    "en": "Relevant experience",
+                    "ar": "الخبرات ذات الصلة"
+                  },
+                  "placeholder": {
+                    "en": "Write your response",
+                    "ar": "اكتب إجابتك"
+                  }
+                },
+                "required": true,
+                "placeholder": "Write your response",
+                "helpText": "",
+                "validation": {
+                  "maxLength": 2000
+                }
+              },
+              {
+                "id": "additional",
+                "type": "paragraph",
+                "label": "Additional information",
+                "localized": {
+                  "label": {
+                    "en": "Additional information",
+                    "ar": "معلومات إضافية"
+                  },
+                  "placeholder": {
+                    "en": "Write your response",
+                    "ar": "اكتب إجابتك"
+                  }
+                },
+                "required": false,
+                "placeholder": "Write your response",
+                "helpText": "",
+                "validation": {
+                  "maxLength": 2000
+                }
+              },
+              {
+                "id": "terms",
+                "type": "checkboxes",
+                "label": "I accept the demo Exchange terms. No opportunity or place is promised.",
+                "localized": {
+                  "label": {
+                    "en": "I accept the demo Exchange terms. No opportunity or place is promised.",
+                    "ar": "أوافق على الشروط التجريبية لبرنامج التبادل. لا يضمن الطلب فرصة أو مقعداً."
+                  },
+                  "options": {
+                    "en": [
+                      "I accept"
+                    ],
+                    "ar": [
+                      "أوافق"
+                    ]
+                  },
+                  "placeholder": {
+                    "en": "Enter i accept the demo exchange terms. no opportunity or place is promised.",
+                    "ar": "أدخل أوافق على الشروط التجريبية لبرنامج التبادل. لا يضمن الطلب فرصة أو مقعداً."
+                  }
+                },
+                "required": true,
+                "placeholder": "Enter i accept the demo exchange terms. no opportunity or place is promised.",
+                "helpText": "",
+                "validation": {},
+                "options": [
+                  "I accept"
+                ]
+              }
+            ]
+          }
+        ],
+        "logicRules": [],
+        "workflow": {
+          "kind": "exchange",
+          "termsFieldId": "terms"
+        }
+      },
+      "demo_only": true
+    }
+  ]
+}

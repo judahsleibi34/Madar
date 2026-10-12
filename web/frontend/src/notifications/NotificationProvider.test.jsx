@@ -1,3 +1,4 @@
+import { StrictMode } from "react";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -89,6 +90,17 @@ describe("NotificationProvider", () => {
     fetchNotifications.mockReset();
     markNotificationRead.mockReset().mockResolvedValue({ success: true });
     markAllNotificationsRead.mockReset().mockResolvedValue({ success: true });
+  });
+
+  it("replaces an aborted initial request during StrictMode replay without waiting for polling", async () => {
+    fetchNotifications.mockImplementationOnce(({signal}) => new Promise((resolve,reject) => {
+      signal.addEventListener("abort",()=>reject(new DOMException("Aborted","AbortError")),{once:true});
+    })).mockResolvedValue(response([item("replayed","2026-10-12T10:00:00Z")]));
+    render(<StrictMode><NotificationProvider user={userA} pollIntervalMs={0} claimToast={vi.fn().mockResolvedValue(true)}><Harness /></NotificationProvider></StrictMode>);
+    await waitFor(()=>expect(screen.getByTestId("ids").textContent).toBe("replayed"));
+    expect(fetchNotifications).toHaveBeenCalledTimes(2);
+    expect(screen.getByTestId("loading").textContent).toBe("false");
+    expect(screen.getByTestId("toasts").textContent).toBe("");
   });
 
   it("uses the first successful fetch as a no-toast baseline, including unread backlog", async () => {

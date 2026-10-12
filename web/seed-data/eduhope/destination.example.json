@@ -1,0 +1,22 @@
+{
+  "logical_academy": "eduhope",
+  "production": {
+    "tenant_id": null,
+    "ownership_verified": false,
+    "schema_version": null,
+    "writes_authorized": false,
+    "owner_email": null
+  },
+  "local": {
+    "tenant_id": null,
+    "subdomain": null
+  },
+  "excluded": [
+    "auth_users",
+    "password_hashes",
+    "sessions",
+    "private_responses",
+    "payments",
+    "wallet_history"
+  ]
+}

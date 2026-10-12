@@ -1709,6 +1709,22 @@
       "filtered_applications": "Showing applications for the selected Exchange opportunity.",
       "clear_filter": "Show all form responses",
       "legacy_help": "Historical specialized applications. New applications are reviewed through the opportunity’s Forms responses."
+    },
+    "forms_review": {
+      "open_submission": "Open form submission",
+      "title": "Submission decision",
+      "domain_help": "This form is connected to an academy programme. A successful decision also updates its authorized workflow. It does not make a payment.",
+      "changed": "The decision could not be saved. Refresh to check eligibility, permission and the latest revision.",
+      "record": "Record decision",
+      "reviewer": "Reviewer",
+      "your_answers": "Your submitted answers",
+      "question": "Question",
+      "answer": "Answer",
+      "binding": "Application workflow",
+      "ordinary": "General form",
+      "terms_field": "Terms acceptance field",
+      "binding_help": "Choose an existing required, single-choice checkbox field. Applications require sign-in; eligibility is enforced by the server.",
+      "my_submissions": "My submissions"
     }
   }
 }

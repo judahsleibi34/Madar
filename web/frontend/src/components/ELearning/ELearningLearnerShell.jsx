@@ -46,19 +46,21 @@ export default function ELearningLearnerShell({ site: suppliedSite, children }) 
   const closeDrawer = useCallback(() => setDrawerPath(null), []);
   useLearningDrawer(open, panelRef, closeDrawer);
   const base = site ? academyPath(site) : "/my-learning";
-  const home = "/my-learning/dashboard";
+  const home = site ? base : "/my-learning";
   const links = [
-    [home, t("elearning.academy.home"), Home],
+    ...(site ? [[home, t("elearning.academy.home"), Home]] : []),
+    ["/my-learning/dashboard", t("sidebar.dashboard"), Library],
     ["/my-learning", t("elearning.player.myLearning"), BookOpen],
     [site ? `${base}/courses` : "/my-learning/catalog", t("elearning.commerce.catalog"), Library],
     ["/my-learning/plans", t("elearning.commerce.myPlans"), CreditCard],
-    ["/my-learning/certificates", t("elearning.certificates.myCertificates"), Award],
+    ...(site?.certificates_enabled !== false ? [["/my-learning/certificates", t("elearning.certificates.myCertificates"), Award]] : []),
     ...(academyAccess?.capabilities?.affiliate && academyAccess?.programme_flags?.affiliate ? [["/my-learning/affiliate", t("elearning.affiliate.dashboard"), CreditCard]] : []),
-    ...(academyAccess?.capabilities?.exchange && academyAccess?.programme_flags?.exchange ? [["/my-learning/exchange", t("elearning.exchange.opportunities"), CreditCard]] : []),
+    ...(academyAccess?.capabilities?.exchange && academyAccess?.programme_flags?.exchange && academyAccess?.exchange_intake_available ? [[site?.application_paths?.exchange || "/my-learning/exchange", t("elearning.programmes.exchange"), CreditCard]] : []),
     ...(["tuition"].some(key => academyAccess?.capabilities?.[key] && academyAccess?.programme_flags?.[key]) ? [["/my-learning/programmes", t("elearning.owner.applications"), CreditCard]] : []),
     ...(finance?.available && (finance.enabled || finance.history?.length) ? [["/my-learning/referrals", t("elearning.programmes.referrals"), CreditCard], ["/my-learning/rewards", t("elearning.referrals.rewards"), Award]] : []),
     ...(finance?.wallet ? [["/my-learning/wallet", t("elearning.programmes.wallet"), CreditCard]] : []),
     ...(reviewCapabilities?.identity === user?.id && reviewCapabilities?.can_review ? [["/my-learning/assessment-reviews", t("elearning.assessment.reviews"), BookOpen]] : []),
+    ...(academyAccess?.form_reviews_available && academyAccess?.capabilities?.forms ? [["/my-learning/form-responses", t("elearning.forms_review.my_submissions"), BookOpen]] : []),
     ["/my-learning/notifications", t("sidebar.notifications"), Bell],
     ["/my-learning/account", t("elearning.learner.account"), UserRound],
   ];

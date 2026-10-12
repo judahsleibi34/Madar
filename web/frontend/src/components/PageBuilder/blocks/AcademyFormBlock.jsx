@@ -16,6 +16,7 @@ export default function AcademyFormBlock({ formId, identifier, editing }) {
   if (!formId) return editing ? <p>{t("elearning.forms.select")}</p> : null;
   if (state.identity !== identity) return <p role="status">{t("elearning.forms.loading")}</p>;
   if (state.error && state.status === 401) return <p><Link to={loginPath}>{t("elearning.learner.logIn")}</Link></p>;
+  if (state.error && state.status === 403) return <p role="status">{t("elearning.programmes.locked")}</p>;
   if (state.error) return <p role="alert">{t("elearning.forms.unavailable")}</p>;
   return <LearningFormRenderer key={`${formId}:${state.form.version}:${editing}`} form={state.form} identifier={identifier} preview={editing} loginPath={loginPath} />;
 }

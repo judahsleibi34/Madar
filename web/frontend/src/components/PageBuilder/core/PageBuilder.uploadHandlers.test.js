@@ -10,6 +10,14 @@ import {
 import { builderAssetMaxBytes } from "./PageBuilder.config";
 
 describe("Page Builder image uploads", () => {
+  it('replaces a photographic hero image without overwriting its headline or resizing its canvas',async()=>{
+    const updateSelectedElement=vi.fn();
+    const handlers=createUploadHandlers({selectedElement:{id:'hero',type:'card',variant:'educationHero',content:'Keep this headline',mode:'direct',position:{desktop:{width:1000,height:740}}},carouselElementTypes:new Set(['card']),builderAssetMimeTypes:new Set(['image/png']),builderAssetMaxBytes,uploadBuilderAsset:vi.fn().mockResolvedValue({url:'/uploads/new-photo.png'}),setAssetUploadBusy:vi.fn(),updateSelectedElement,showToast:vi.fn(),user:{id:'owner'}});
+    await handlers.handleSelectedElementImageUpload({target:{files:[{name:'photo.png',type:'image/png',size:100}],value:'selected'}});
+    expect(updateSelectedElement).toHaveBeenCalledWith(expect.objectContaining({imageUrl:'/uploads/new-photo.png'}));
+    expect(updateSelectedElement.mock.calls[0][0]).not.toHaveProperty('content');
+    expect(updateSelectedElement.mock.calls[0][0]).not.toHaveProperty('position');
+  });
   it("allows builder images up to 25 MiB", async () => {
     const uploadBuilderAsset = vi.fn().mockResolvedValue({ url: "/uploads/hash.png" });
     const showToast = vi.fn();

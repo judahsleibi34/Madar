@@ -22,8 +22,8 @@ it('saves inline text and choices to independent schema without Builder metadata
  fireEvent.change(screen.getByPlaceholderText('Option 1'),{target:{value:'Maybe'}});fireEvent.click(screen.getByRole('button',{name:'Save form'}));
  await waitFor(()=>expect(learningFormsApi).toHaveBeenCalledWith('/existing',expect.objectContaining({method:'PUT'})));
  const body=learningFormsApi.mock.calls.find(([,options])=>options?.method==='PUT')[1].body;
- expect(body.expected_version).toBe(7);expect(body.schema.access).toBe('enrolled');expect(body.schema.pageMode).toBe('single');expect(body.schema.sections[0].fields[0]).toEqual({...schema.sections[0].fields[0],label:'Full name',helpText:'Help updated'});expect(body.schema.sections[0].fields[1].options).toEqual(['Maybe','No']);
- expect(JSON.stringify(body)).not.toMatch(/localized|showDetailsEditor|connectedCollectionId|responses|theme|languageMode/);
+ expect(body.expected_version).toBe(7);expect(body.schema.access).toBe('enrolled');expect(body.schema.pageMode).toBe('single');expect(body.schema.sections[0].fields[0]).toMatchObject({...schema.sections[0].fields[0],label:'Full name',helpText:'Help updated',localized:{label:{en:'Full name'},helpText:{en:'Help updated'}}});expect(body.schema.sections[0].fields[1].options).toEqual(['Maybe','No']);
+ expect(JSON.stringify(body)).not.toMatch(/showDetailsEditor|connectedCollectionId|responses|theme/);
 });
 it('retains drafts in preview without saving or enabling public submission',async()=>{
  await load();fireEvent.change(screen.getByLabelText('Question 1'),{target:{value:'Unsaved label'}});fireEvent.click(screen.getByRole('button',{name:'Preview form'}));expect(await screen.findByRole('textbox',{name:/Unsaved label/})).toBeTruthy();expect(screen.getByRole('button',{name:'Send'}).disabled).toBe(true);
@@ -33,12 +33,12 @@ it('edits logic in the shared drawer and preserves source/target references',asy
  await load();fireEvent.click(screen.getByRole('button',{name:'Form settings'}));fireEvent.click(screen.getByRole('button',{name:'Add rule'}));fireEvent.change(screen.getByRole('textbox',{name:'Has answer'}),{target:{value:'Alice'}});fireEvent.click(screen.getByRole('button',{name:'Close',exact:true}));fireEvent.click(screen.getByRole('button',{name:'Save form'}));
  await waitFor(()=>expect(learningFormsApi.mock.calls.some(([,options])=>options?.method==='PUT')).toBe(true));const body=learningFormsApi.mock.calls.find(([,options])=>options?.method==='PUT')[1].body;expect(body.schema.logicRules[0]).toMatchObject({sourceFieldId:'name',targetFieldId:'choice',operator:'equals',value:'Alice',action:'show'});
 });
-it('saves Arabic inline edits as plain schema text and uses RTL drawer direction',async()=>{
+it('preserves canonical English alongside Arabic inline edits and RTL',async()=>{
  await i18n.changeLanguage('ar');mount();const question=await screen.findByLabelText('السؤال 1');fireEvent.change(question,{target:{value:'الاسم الكامل'}});
  const settings=i18n.t('elearning.forms.title',{ns:'dashboard'});expect(settings).toBeTruthy();expect(document.querySelector('.forms-simple-workbench').getAttribute('dir')).toBe('rtl');
  // Shared Builder content supplies the localized action labels.
  const actions=document.querySelector('.forms-form-actions-group');fireEvent.click(within(actions).getAllByRole('button')[1]);expect(document.querySelector('.quiz-drawer-backdrop').getAttribute('dir')).toBe('rtl');
- fireEvent.click(screen.getByRole('button',{name:'إغلاق',exact:true}));fireEvent.click(screen.getByRole('button',{name:'حفظ النموذج'}));await waitFor(()=>expect(learningFormsApi.mock.calls.some(([,options])=>options?.method==='PUT')).toBe(true));expect(learningFormsApi.mock.calls.find(([,options])=>options?.method==='PUT')[1].body.schema.sections[0].fields[0].label).toBe('الاسم الكامل');
+ fireEvent.click(screen.getByRole('button',{name:'إغلاق',exact:true}));fireEvent.click(screen.getByRole('button',{name:'حفظ النموذج'}));await waitFor(()=>expect(learningFormsApi.mock.calls.some(([,options])=>options?.method==='PUT')).toBe(true));expect(learningFormsApi.mock.calls.find(([,options])=>options?.method==='PUT')[1].body.schema.sections[0].fields[0]).toMatchObject({label:'Your name',localized:{label:{ar:'الاسم الكامل'}}});
 });
 it('keeps Builder-only features available for existing Builder consumers by default',()=>{
  const activeForm={...schema,id:'builder-form',name:'Builder form',mode:'form',responses:[]};

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { createSiteChromeRenderers } from "../PageBuilder/core/PageBuilder.siteChrome";
@@ -13,14 +13,17 @@ import { getElementPlacementMargins, getElementLayoutWidth, normalizeElementAlig
 import { getLiveArtboardProfile } from "../PageBuilder/core/PageBuilder.artboard";
 import { runPublicElementAction } from "../PageBuilder/core/PageBuilder.actions";
 import { getStoredUrlError } from "../PageBuilder/core/PageBuilder.url";
+import { localizePresentation } from "../PageBuilder/core/PageBuilder.presentationLocalization";
 import "../../styles/admin/PageBuilder/index.css";
 
-export default function AcademyBuilderLanding({ schema, basePath = "", authenticated = false, registration }) {
+export default function AcademyBuilderLanding({ schema: sourceSchema, basePath = "", authenticated = false, registration }) {
+  const { t, i18n } = useTranslation("dashboard");
+  const language=i18n.language.startsWith("ar") ? "ar" : "en";
+  const schema = useMemo(()=>localizePresentation(sourceSchema,language),[sourceSchema,language]);
   const navigate = useNavigate();
   const params = useParams();
   const activePage = resolveStrictPublishedPageByPath(schema?.pages, `/${params["*"] || ""}`, schema?.defaultPageId);
   const selectPage = id => { const page = schema?.pages.find(page => page.id === id); if (page) navigate(getPublicPagePath(basePath, page)); };
-  const { t, i18n } = useTranslation("dashboard");
   const [width, setWidth] = useState(window.innerWidth);
   const containerRef = useRef(null);
   useEffect(() => {
@@ -48,7 +51,10 @@ export default function AcademyBuilderLanding({ schema, basePath = "", authentic
     </>}
     <button type="button" onClick={() => i18n.changeLanguage(i18n.language.startsWith("ar") ? "en" : "ar")}>{i18n.language.startsWith("ar") ? "English" : "العربية"}</button>
   </>;
-  const { renderSiteHeader, renderSiteFooter } = createSiteChromeRenderers({ project: schema || { pages: [] }, activePage, selected: { type: "", id: "" }, preview: true, publicRuntime: true, selectPage, setSelected: () => {}, navigateUrl: url => navigate(url), navigationDestinations: getAcademyNavigationDestinations(basePath), authenticated, renderHeaderActions });
+  const { renderSiteHeader, renderSiteFooter } = createSiteChromeRenderers({ project: schema || { pages: [] }, activePage, selected: { type: "", id: "" }, preview: true, publicRuntime: true, selectPage, setSelected: () => {}, navigateUrl: url => navigate(url), navigationDestinations: getAcademyNavigationDestinations(basePath), authenticated, renderHeaderActions,
+    renderFooterActions:()=> <button type="button" onClick={()=>i18n.changeLanguage(language === "ar" ? "en" : "ar")}>English | العربية</button>,
+    direction:i18n.dir(),chromeLabels:{menu:language === "ar" ? "فتح قائمة التنقّل" : "Open navigation menu",attribution:language === "ar" ? "مدعوم بمنصة مدار" : "Powered by Madar"},
+  });
   if (!schema) return null;
   if (!activePage) return <p role="alert">{t("elearning.academy.pageNotFound")}</p>;
   return <div ref={containerRef} dir="ltr" className={`academy-landing-region tenant-runtime-page${schema.name === "Madar Learning" ? " madar-learning-landing" : ""}`} style={getPageBuilderThemeVars(schema.theme)}><SiteRenderer project={schema} activePage={activePage} {...profile} canvasStyle={{ direction: i18n.dir() }} availablePresentationWidth={width} renderElement={renderElement} carouselElementTypes={carouselElementTypes} filterElement={element => ACADEMY_COMPONENT_TYPES.has(element.type)} renderSiteHeader={renderSiteHeader} renderSiteFooter={renderSiteFooter} className="academy-builder-landing" getSectionProps={section => ({ "data-landing-section": section.id })} /></div>;

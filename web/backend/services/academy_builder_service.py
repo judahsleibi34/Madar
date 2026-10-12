@@ -100,6 +100,14 @@ def validate_academy_schema(schema):
                                     reject()
                         if element.get("connectedFormId"):
                             reject()
+                        if element.get('variant') == 'educationHero':
+                            if element['type'] != 'card': reject()
+                            for key,maximum in [('content',500),('description',2000),('eyebrow',200),('primaryLabel',120),('secondaryLabel',120),('alt',500),('caption',500)]:
+                                if not isinstance(element.get(key,''),str) or len(element.get(key,''))>maximum: reject()
+                            for key in ['focalX','focalY']:
+                                if type(element.get(key,50)) not in {int,float} or not 0<=element.get(key,50)<=100: reject()
+                            secondary=element.get('secondaryAction') or {}
+                            if not isinstance(secondary,dict) or secondary.get('type','none') not in {'none','goToPage','openUrl','scrollToSection'}: reject()
                         action = element.get("action") or {}
                         if not isinstance(action, dict):
                             reject()

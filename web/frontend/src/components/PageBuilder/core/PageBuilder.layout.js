@@ -59,6 +59,7 @@ export const removeDuplicateFormHeadings = (section) => ({
 export const getMetricMinimumHeight = () => 170;
 
 export const getDirectElementMinimumSize = (element) => {
+  if (element?.type === "card" && element.variant === "educationHero") return {width:280,height:460};
   if (element?.type === "reservationBlock") {
     const hasCustomComposition = Array.isArray(element?.reservation?.formItems)
       && element.reservation.formItems.length > 0;
@@ -115,6 +116,7 @@ export const reconcileMeasuredFormBlockPosition = ({
   );
 
 export const directElementHeight = (element) => {
+  if (element?.type === "card" && element.variant === "educationHero") return 740;
   if (element?.type === "metric") return getMetricMinimumHeight(element);
   if (element?.type === "imageButton" && element.imageButtonVariant === "editorialCard") return 240;
 
@@ -239,7 +241,15 @@ export const compactDirectSectionAfterElementRemoval = (
     const removedBottom = removedPosition
       ? (Number(removedPosition.y) || 0) + (Number(removedPosition.height) || 0)
       : 0;
-    const reclaimedHeight = removedPosition
+    const occupiedRemovalArea=removedPosition && remainingElements.some(element=>{
+      const position=element.position?.[viewportName];
+      return position && horizontalRangesOverlap(position,removedPosition)
+        && Number(position.y)<removedBottom
+        && Number(position.y)+Number(position.height)>Number(removedPosition.y);
+    });
+    // Removing an overlay does not create a gap in the underlying layout.
+    // Reclaiming its height would pull later content into the retained block.
+    const reclaimedHeight = removedPosition && !occupiedRemovalArea
       ? (Number(removedPosition.height) || 0) + verticalGap
       : 0;
 

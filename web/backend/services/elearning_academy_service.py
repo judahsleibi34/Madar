@@ -8,19 +8,44 @@ from services.entitlement_service import require_public_runtime_entitlement, get
 
 PUBLIC_SETTINGS = (
     "academy_registration", "academy_hero_title", "academy_hero_description", "academy_hero_image", "academy_cta_text",
-    "academy_benefits", "course_label", "section_label", "lesson_label", "instructor_label",
+    "certificates_enabled", "academy_benefits", "course_label", "section_label", "lesson_label", "instructor_label",
 )
 
 
-def profile(tenant_id, website):
+def form_application_paths(tenant_id,website,schema):
+    """Navigation from published placements and current tenant Form bindings."""
+    if not settings_available(144) or not isinstance(schema,dict):return {}
+    references={}
+    def walk(value,path):
+        if isinstance(value,dict):
+            if value.get('type')=='academyForm' and value.get('academy',{}).get('formId'):references.setdefault(value['academy']['formId'],path)
+            for child in value.values():walk(child,path)
+        elif isinstance(value,list):
+            for child in value:walk(child,path)
+    for page in schema.get('pages',[]):
+        walk(page,f"/academy/{website['subdomain']}"+(page['slug'] if page['slug']!='/' else ''))
+    if not references:return {}
+    forms=service_supabase.table('elearning_forms').select('id,version').eq('tenant_id',tenant_id).eq('status','active').in_('id',list(references)).limit(100).execute().data or []
+    if not forms:return {}
+    filters=','.join(f"and(form_id.eq.{row['id']},version.eq.{row['version']})" for row in forms)
+    versions=service_supabase.table('elearning_form_versions').select('form_id,schema').eq('tenant_id',tenant_id).or_(filters).limit(100).execute().data or []
+    paths={}
+    for row in versions:
+        kind=row['schema'].get('workflow',{}).get('kind')
+        if kind in {'affiliate','tuition','exchange'}:paths.setdefault(kind,references[row['form_id']])
+    return paths
+
+
+def profile(tenant_id, website, academy_theme=None, application_paths=None):
     cfg = get_settings(tenant_id)
     return {
         "subdomain": website["subdomain"],
         "brand": cfg["primary_display_name"] or website.get("brand") or cfg["platform_name"],
         "logo_url": cfg["logo_url"] or website.get("logo_url") or "",
         "description": cfg["description"] or website.get("description") or "",
-        "theme": {key: value for key, value in (website.get("ecommerce_theme") or {}).items()
-                  if key in {"accent", "text", "muted", "surface", "background"}},
+        "application_paths":application_paths or {},
+        "theme": {key: value for key, value in (academy_theme if isinstance(academy_theme,dict) else website.get("ecommerce_theme") or {}).items()
+                  if key in {"primary", "accent", "accentDark", "buttonText", "text", "muted", "surface", "softSurface", "background", "border", "fontFamily"}},
         **{key: cfg[key] for key in PUBLIC_SETTINGS},
     }
 
@@ -78,7 +103,7 @@ def storefront(tenant_id, website, actor=None, course_id=None, *, preview=False)
     instructors = []
     if settings_available(133):
         instructors = service_supabase.rpc("get_academy_public_instructors", {"p_tenant_id": tenant_id, "p_course_ids": [card["id"] for card in result["courses"]]}).execute().data or []
-    site = profile(tenant_id, website)
+    site = profile(tenant_id, website, landing.get('theme'),form_application_paths(tenant_id,website,landing))
     if actor and actor.role in {"owner", "admin"}:
         site["management_path"] = "/e-learning/settings/academy"
     contact_enabled = False
@@ -110,6 +135,12 @@ def member_profile(tenant_id):
     cfg = get_settings(tenant_id)
     if not cfg["enabled"] or not cfg["academy_enabled"] or not settings_available(131):
         return None
-    rows = (service_supabase.table("website_settings").select("subdomain,brand,logo_url,description,ecommerce_theme")
+    rows = (service_supabase.table("website_settings").select("subdomain,brand,logo_url,description,ecommerce_theme" + (",academy_project_id" if settings_available(132) else ""))
             .eq("tenant_id", tenant_id).limit(1).execute()).data or []
-    return profile(tenant_id, rows[0]) if rows and rows[0].get("subdomain") else None
+    if not rows or not rows[0].get('subdomain'):return None
+    theme=None;schema=None
+    if rows[0].get('academy_project_id') and settings_available(132):
+        projects=service_supabase.table('builder_projects').select('published_schema,status').eq('tenant_id',tenant_id).eq('id',rows[0]['academy_project_id']).eq('usage_profile','academy').limit(1).execute().data or []
+        if projects and projects[0]['status']=='published':
+            schema=projects[0].get('published_schema') or {};theme=schema.get('theme')
+    return profile(tenant_id, rows[0], theme,form_application_paths(tenant_id,rows[0],schema))

@@ -84,3 +84,21 @@ class AcademyProjectionTests(unittest.TestCase):
         with patch.object(service,"settings_available",return_value=True),patch.object(service,"service_supabase",db),patch.object(service,"profile",return_value={}),patch.object(service,"get_settings",return_value=ELearningSettings().model_dump(mode="json")):
             result=service.storefront(17,{"subdomain":"testing"})
         self.assertEqual(result["continue_courses"],[]);self.assertEqual([call.args[0] for call in db.rpc.call_args_list],["get_elearning_academy", "get_academy_public_instructors"])
+
+class PublishedIntakeNavigationTests(unittest.TestCase):
+    def test_navigation_uses_published_tenant_form_current_version_binding(self):
+        db=MagicMock();forms=db.table.return_value.select.return_value.eq.return_value.eq.return_value.in_.return_value.limit.return_value
+        forms.execute.return_value.data=[{'id':'form','version':3}]
+        versions=db.table.return_value.select.return_value.eq.return_value.or_.return_value.limit.return_value
+        versions.execute.return_value.data=[{'form_id':'form','schema':{'workflow':{'kind':'exchange'}}}]
+        schema={'pages':[{'slug':'/owner-configured-intake','sections':[{'freeElements':[{'type':'academyForm','academy':{'formId':'form'}}]}]}]}
+        with patch.object(service,'settings_available',return_value=True),patch.object(service,'service_supabase',db):
+            result=service.form_application_paths(17,{'subdomain':'tenant'},schema)
+        self.assertEqual(result,{'exchange':'/academy/tenant/owner-configured-intake'})
+        self.assertIn(unittest.mock.call('tenant_id',17),db.table.return_value.select.return_value.eq.call_args_list)
+        db.table.return_value.select.return_value.eq.return_value.or_.assert_called_once_with('and(form_id.eq.form,version.eq.3)')
+
+    def test_schema141_does_not_query_review_bindings(self):
+        with patch.object(service,'settings_available',return_value=False),patch.object(service,'service_supabase') as db:
+            self.assertEqual(service.form_application_paths(17,{'subdomain':'tenant'},{'pages':[]}),{})
+        db.table.assert_not_called()

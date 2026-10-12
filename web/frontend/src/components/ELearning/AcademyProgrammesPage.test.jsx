@@ -9,6 +9,19 @@ const data = () => ({ wallet: { available: "40.00", pending: "0", debt: "0", tot
 beforeEach(() => { apiFetch.mockReset();apiFetch.mockResolvedValue({ ok: true, json: async () => data() }); });
 afterEach(cleanup);
 const mount = props => render(<MemoryRouter><AcademyProgrammesPage {...props} /></MemoryRouter>);
+it('routes linked owner applications to the sole Forms Responses inbox',async()=>{
+ const row={id:'application',kind:'affiliate',user_id:8,status:'submitted',created_at:'2026-10-12',learning_form_response_id:'original-response',details:{form_response_id:'original-response'}};
+ apiFetch.mockResolvedValue({ok:true,json:async()=>({items:[row]})});
+ mount({admin:true});
+ const link=await screen.findByRole('link',{name:'elearning.programmes.review'});
+ expect(link.getAttribute('href')).toBe('/e-learning/forms/responses/original-response');
+});
+it('shows the applicant a link to their original Form instead of copied response fields',async()=>{
+ apiFetch.mockResolvedValue({ok:true,json:async()=>({...data(),applications:[{id:'application',kind:'affiliate',user_id:8,status:'submitted',created_at:'2026-10-12',learning_form_response_id:'original-response',details:{form_response_id:'original-response'}}]})});
+ mount();const link=await screen.findByRole('link',{name:'elearning.forms_review.open_submission'});
+ expect(link.getAttribute('href')).toBe('/my-learning/form-responses/original-response');
+ expect(screen.queryByText('elearning.programmes.form_response_id')).toBeNull();
+});
 it("hides unconfigured learner actions and never renders private review notes", async () => {
  apiFetch.mockResolvedValue({ok:true,json:async()=>({...data(),settings:{},applications:[{id:"a",kind:"affiliate",status:"submitted",created_at:"2026-10-10",details:{full_name:"Learner"},review_note:"Private owner review"}]})});
  mount();await screen.findByRole("heading",{name:"Learner"});

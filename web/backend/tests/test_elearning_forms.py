@@ -13,6 +13,19 @@ def schema():
     return {'title':'Student feedback','sections':[{'id':'page','title':'Page','fields':[{'id':'student','type':'radio','label':'Student?','options':['Yes','No'],'required':True},{'id':'university','type':'shortText','label':'University','required':True}]}],'logicRules':[{'sourceFieldId':'student','targetFieldId':'university','operator':'equals','action':'show','value':'Yes'}],'access':'public'}
 
 class LearningFormValidationTests(unittest.TestCase):
+    def test_bilingual_labels_do_not_change_canonical_answers_or_logic(self):
+        value=schema();value.update(languageMode='bilingual',defaultLanguage='ar',localized={'title':{'ar':'ملاحظات الطالب'}})
+        value['sections'][0]['fields'][0]['localized']={'label':{'ar':'هل أنت طالب؟'},'options':{'ar':['نعم','لا']}}
+        service.Definition(name='Bilingual feedback',schema=value)
+        self.assertEqual(service.clean_answers(value,{'student':'No'}),{'student':'No'})
+        with self.assertRaises(HTTPException):service.clean_answers(value,{'student':'لا'})
+        value['sections'][0]['fields'][0]['localized']['options']['ar']=['نعم']
+        with self.assertRaises(ValidationError):service.Definition(name='Invalid choices',schema=value)
+
+    def test_translation_metadata_cannot_alter_authorization_or_accept_unknown_languages(self):
+        for localized in [{'access':{'ar':'public'}},{'title':{'fr':'Untrusted'}},{'title':{'ar':{'html':'unsafe'}}}]:
+            with self.assertRaises(ValidationError):service.Definition(name='Invalid',schema={**schema(),'localized':localized})
+
     def test_hidden_required_answers_are_removed_and_cannot_influence_nested_logic(self):
         self.assertEqual(service.clean_answers(schema(),{'student':'No','university':'Injected'}),{'student':'No'})
         with self.assertRaises(HTTPException):service.clean_answers(schema(),{'student':'Yes'})
@@ -134,3 +147,17 @@ class LearningFormApiTests(unittest.TestCase):
         with patch.object(self.routes,'context',return_value=(1,f,None)),patch.object(self.routes,'enforce_public_form_submission_rate_limit'),patch.object(service,'public_access'),patch.object(service,'rpc',return_value={'id':'r','duplicate':False}) as rpc:
             response=self.client.post(f'/public/academies/own/forms/{identifier}/responses',json={'answers':{'student':'No','university':'Hidden'},'version':1,'idempotency_key':str(uuid4())})
             self.assertEqual(response.status_code,200);self.assertEqual(rpc.call_args.args[0],'submit_elearning_form');self.assertEqual(rpc.call_args.args[1]['p_answers'],{'student':'No'})
+
+class ApplicantResponseFeedTests(unittest.TestCase):
+    def test_feed_scopes_tenant_and_user_and_reuses_private_projection(self):
+        actor=SimpleNamespace(tenant_id=17,user_id=9)
+        query=MagicMock();query.select.return_value=query;query.eq.return_value=query;query.order.return_value=query;query.range.return_value=query
+        query.execute.return_value.data=[{'id':'own-response'},{'id':'next-page'}]
+        projection={'id':'own-response','status':'approved','submitted_at':'2026-10-12','schema':{'title':'Application','localized':{'title':{'ar':'طلب'}}},'answers':{'private':'answer'},'note':'must not leak'}
+        with patch.object(service,'gate'),patch.object(service,'require_reviews'),patch.object(service,'service_supabase') as db,patch.object(service,'applicant_response',return_value=projection) as own:
+            db.table.return_value=query
+            result=service.applicant_responses(actor,limit=1,offset=2)
+        query.eq.assert_any_call('tenant_id',17);query.eq.assert_any_call('user_id',9);query.range.assert_called_once_with(2,3)
+        own.assert_called_once_with(actor,'own-response')
+        self.assertTrue(result['has_more']);self.assertEqual(set(result['items'][0]),{'id','status','submitted_at','title','localized'})
+        self.assertNotIn('private',str(result));self.assertNotIn('must not leak',str(result))
