@@ -1,5 +1,24 @@
 # Madar production release acceptance policy
 
+## Unselected completed-NORMAL136→144 manual release candidate
+
+`learning-136-144-path.json` pins the new `migrations-137-144-learning.json` and
+`schema-136-144-learning-bridge.json`. They compose only the existing immutable
+137..141,143,144 entries; Exchange142 remains excluded. The old descriptors,
+SQL/checksums and active136 release remain unchanged. The executor accepts this
+second exact source-pinned route, not arbitrary gaps. Backend configuration and
+version-2 authority accept only the additional reviewed136..144 range with142
+excluded, an exact source/context binding and a fresh root-issued grant. Existing
+115..136 grants cannot authorize it. Root file protection and recovery fencing
+remain mandatory. These source changes grant no installation or SQL authority.
+
+Manual activation still requires accepted exact images at136/144, preservation
+on a private current-data restore, independently authorized controller/source-role
+reconciliation, singleton workers, boot supersession and a complete exact-hash
+operation. Existing completed-NORMAL115→136 execution/boot contracts remain
+historical and cannot be replayed or silently widened to144. Auto-deploy, Phase3B
+and VM construction are not prerequisites for this manually governed release.
+
 Completed-NORMAL preparation can explicitly select a reviewed immutable controller
 ancestor of a separately pinned canonical main. Its approved plan contains
 hash-verified Git commit bodies proving the bounded parent chain and selected
