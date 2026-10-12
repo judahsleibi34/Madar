@@ -8,6 +8,7 @@ invocation; no candidate module is imported into this process.
 from __future__ import annotations
 
 import argparse
+import base64
 import fcntl
 import hashlib
 import json
@@ -167,9 +168,50 @@ def normalize_sha(value: str) -> str:
     return value.lower()
 
 
-def attest_candidate_bundle_heads(output: str, approved_sha: str) -> None:
+SELECTED_RELEASE_REF = "refs/madar-control-plane/selected"
+
+
+def validate_immutable_release_selection(selection: dict, approved_sha: str) -> str:
+    """Attest a pinned canonical ancestor; never treat newer main as approval.
+
+    Commit bodies are immutable Git DATA. A bounded parent chain proves that
+    the exact selected controller/tree belongs to the exact measured main.
+    Actual fetch/staging independently rechecks objects, trees and ancestry.
+    Ordinary upgrade admission still requires current origin/main.
+    """
+    try:
+        if (not isinstance(selection,dict) or set(selection)!={
+                'canonical_main_sha','selected_tree_oid','ancestry_commit_objects'}
+                or not LOWER_SHA_RE.fullmatch(approved_sha)
+                or not LOWER_SHA_RE.fullmatch(selection['canonical_main_sha'])
+                or not LOWER_SHA_RE.fullmatch(selection['selected_tree_oid'])):
+            raise ValueError()
+        rows=selection['ancestry_commit_objects']
+        if not isinstance(rows,list) or not 1<=len(rows)<=32:raise ValueError()
+        expected=selection['canonical_main_sha'];seen=set()
+        for index,row in enumerate(rows):
+            if (not isinstance(row,dict) or set(row)!={'oid','body_base64'}
+                    or not LOWER_SHA_RE.fullmatch(str(row['oid']))
+                    or not isinstance(row['body_base64'],str) or len(row['body_base64'])>87384):raise ValueError()
+            body=base64.b64decode(row['body_base64'],validate=True)
+            if len(body)>65536:raise ValueError()
+            oid=hashlib.sha1(b'commit '+str(len(body)).encode()+b'\0'+body).hexdigest()
+            if oid!=expected or row['oid']!=oid or oid in seen:raise ValueError()
+            seen.add(oid);headers=body.split(b'\n\n',1)[0].splitlines()
+            if not headers or not re.fullmatch(b'tree [0-9a-f]{40}',headers[0]):raise ValueError()
+            if index==len(rows)-1:
+                if oid!=approved_sha or headers[0][5:].decode()!=selection['selected_tree_oid']:raise ValueError()
+            else:
+                expected=rows[index+1]['oid']
+                if b'parent '+expected.encode() not in headers:raise ValueError()
+        return selection['canonical_main_sha']
+    except (ValueError,KeyError,TypeError,UnicodeError):
+        raise UpgradeError('immutable_release_selection_invalid') from None
+
+
+def attest_candidate_bundle_heads(output: str, approved_sha: str, *, reference="refs/remotes/origin/main") -> None:
     entries = [line.split() for line in output.splitlines() if line.strip()]
-    if entries != [[approved_sha, "refs/remotes/origin/main"]]:
+    if reference not in {"refs/remotes/origin/main",SELECTED_RELEASE_REF} or entries != [[approved_sha, reference]]:
         raise UpgradeError("candidate_bundle_identity_mismatch")
 
 
@@ -1826,14 +1868,16 @@ class SystemOperations:
             raise UpgradeError("recovery_checkout_advance_failed")
         self.require_clean_repository()
 
-    def resolve_candidate(self, approved_sha: str, *, dry_run: bool) -> None:
+    def resolve_candidate(self, approved_sha: str, *, dry_run: bool, immutable_selection=None) -> None:
         if self.repository_origin() != EXPECTED_CONTRACT["MADAR_CANONICAL_GIT_REMOTE"]:
             raise UpgradeError("canonical_git_remote_mismatch")
+        selected = immutable_selection is not None
+        canonical = validate_immutable_release_selection(immutable_selection,approved_sha) if selected else approved_sha
         if dry_run:
             remote = self.madar_git(
                 "git_ls_remote", "ls-remote", "--exit-code", "origin", "refs/heads/main"
             ).stdout.split()
-            if not remote or remote[0] != approved_sha:
+            if remote != [canonical,"refs/heads/main"]:
                 raise UpgradeError("approved_sha_not_current_origin_main")
         else:
             self.madar_git("git_fetch_main", "fetch", "--quiet", "origin", "main")
@@ -1841,15 +1885,21 @@ class SystemOperations:
                 "git_verify_remote_main", "ls-remote", "--exit-code", "origin",
                 "refs/heads/main",
             ).stdout.split()
-            if not remote or remote[0] != approved_sha:
+            if remote != [canonical,"refs/heads/main"]:
                 raise UpgradeError("origin_main_advanced_during_authorization")
         resolved = self.madar_git(
             "git_resolve_main", "rev-parse", "refs/remotes/origin/main^{commit}"
         ).stdout
-        if resolved != approved_sha:
+        if resolved != canonical:
             raise UpgradeError("approved_sha_not_current_origin_main")
         if self.madar_git("git_commit_type", "cat-file", "-t", approved_sha).stdout != "commit":
             raise UpgradeError("approved_object_not_commit")
+        if selected:
+            tree = self.madar_git('git_selected_tree','rev-parse',approved_sha+'^{tree}').stdout
+            if tree != immutable_selection['selected_tree_oid']:
+                raise UpgradeError('immutable_release_tree_changed')
+            inclusion = self.madar_git('git_selected_canonical_ancestry','merge-base','--is-ancestor',approved_sha,canonical,check=False)
+            if inclusion.returncode != 0:raise UpgradeError('immutable_release_not_canonical_ancestor')
         current = self.repository_head()
         ancestor = self.madar_git(
             "git_ancestry", "merge-base", "--is-ancestor", current, approved_sha,
@@ -2326,20 +2376,31 @@ class SystemOperations:
         ):
             raise UpgradeError("failed_upgrade_automation_not_quiesced")
 
-    def stage_candidate(self, approved_sha: str) -> tuple[Path, Path]:
+    def stage_candidate(self, approved_sha: str, *, immutable_selection=None) -> tuple[Path, Path]:
         self.prepare_upgrade_roots()
         transaction = Path(tempfile.mkdtemp(prefix=f"{approved_sha[:12]}-", dir=self.staging_root))
         os.chmod(transaction, 0o700)
         bundle = transaction / "candidate.bundle"
         candidate = transaction / "repository"
-        self.root_git(
-            "git_bundle_create", "-C", str(self.repo), "bundle", "create",
-            str(bundle), "refs/remotes/origin/main",
-        )
+        reference = "refs/remotes/origin/main"
+        if immutable_selection is not None:
+            self.resolve_candidate(approved_sha,dry_run=True,immutable_selection=immutable_selection)
+            reference = SELECTED_RELEASE_REF
+            # Exclusive temporary ref: never rewrite origin/main or silently
+            # replace another operation's selection. Locks protect this phase.
+            self.madar_git('git_select_release','update-ref',reference,approved_sha,'')
+        try:
+            self.root_git(
+                "git_bundle_create", "-C", str(self.repo), "bundle", "create",
+                str(bundle), reference,
+            )
+        finally:
+            if immutable_selection is not None:
+                self.madar_git('git_unselect_release','update-ref','-d',reference,approved_sha)
         bundle_heads = self.staging_git(
             "git_bundle_heads", "bundle", "list-heads", str(bundle)
         ).stdout
-        attest_candidate_bundle_heads(bundle_heads, approved_sha)
+        attest_candidate_bundle_heads(bundle_heads, approved_sha, reference=reference)
         # A bundle whose only advertised name is refs/remotes/origin/main is
         # intentionally not a cloneable branch topology: ordinary clone sees
         # no refs/heads/* and creates an empty repository.  Initialize a
@@ -2359,7 +2420,7 @@ class SystemOperations:
             "git_fetch_bundle",
             "-C", str(candidate), "fetch", "--no-tags",
             "--no-recurse-submodules", "--no-write-fetch-head",
-            str(bundle), f"refs/remotes/origin/main:{staged_ref}",
+            str(bundle), f"{reference}:{staged_ref}",
             timeout=300,
         )
         fetched = self.staging_git(
