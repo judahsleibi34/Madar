@@ -2,6 +2,13 @@
 
 ## Separately authorized schema144 maintenance release
 
+An exact compensated boot-failure interlock can be reconciled only when explicitly
+bound into the fresh manual operation. Preflight is read-only; retirement requires
+the approved execution under upgrade/deployment locks, archival and a final
+identity recheck. Current NORMAL136 ownership and actual completed compensation
+must verify independently. Consumed authorization is preserved and never replayed;
+unknown/active/advanced attempts continue to fail closed.
+
 Successor boot validation preserves the completed136 origin and uses an explicitly
 ordered proxy gate; an unrelated later drop-in fails preflight. Offline systemd
 parser acceptance proves configuration merge ordering, not a real restart. Fresh
