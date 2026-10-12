@@ -13,6 +13,8 @@ import os
 from pathlib import Path
 import pwd
 import sys
+import re
+import traceback
 
 CONTROL = Path('/opt/madar/control-plane/deployment')
 
@@ -104,12 +106,19 @@ def main():
         if sys.argv[1]=='activate':result=activate_stopped_origin(module,operations,witness,contract)
         else:
             operations.verify_source(contract['candidate']['source_sha'])
-            from deployment.lib.completed_normal_migration import run_migration
-            result=run_migration(contract,operations.release_root,operations.state_root,operations)
+            path=Path(os.environ['CREDENTIALS_DIRECTORY'])/'completed-continuation-migration'
+            if hashlib.sha256(path.read_bytes()).hexdigest()!=witness['migration_sha256']:
+                raise RuntimeError('continuation_migration_source_changed')
+            loader=importlib.machinery.SourceFileLoader('continuation_measured_migration',str(path))
+            migration=importlib.util.module_from_spec(importlib.util.spec_from_loader(loader.name,loader));loader.exec_module(migration)
+            result=migration.run_migration(contract,operations.release_root,operations.state_root,operations)
     print(json.dumps({'stage':sys.argv[1],'completed':True}))
 
 
 if __name__=='__main__':
     try:main()
     except Exception as error:
-        print(json.dumps({'status':'failed','exception_type':type(error).__name__}));raise SystemExit(1)
+        code=str(error)
+        print(json.dumps({'status':'failed','exception_type':type(error).__name__,
+            'failure_code':code if isinstance(error,RuntimeError) and re.fullmatch('[a-z][a-z0-9_]{1,120}',code) else 'sanitized_exception',
+            'frames':[{'file':Path(f.filename).name,'function':f.name,'line':f.lineno} for f in traceback.extract_tb(error.__traceback__)[-12:]]}));raise SystemExit(1)

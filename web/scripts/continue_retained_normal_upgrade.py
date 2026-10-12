@@ -21,6 +21,8 @@ ROUTING_SOURCE='8b0ab68f77a81bc6480b49d0fed9ef8b2ca8b5257887add7a50d75b5008a9bfd
 ROUTING_PLAN='bde5730d072d21d322423b645f49ad93e7b3f6e9e188a5c7f94da55844eb9fa2'
 ROUTING_RESULT='19350f64c7b30a80a50a02cc6a0864a76e087763a8fdc4bbdb39e3b72a2aa91f'
 OPERATION='retained-normal-schema136-144-continuation'
+PREVIOUS_PLAN='6c489dcddea6bf7a6e72689833e3883f63fa11cb6bf69f4d667748b2e2fde86b'
+PREVIOUS_SOURCE='ad4d9ce099863e002db2a895a197a3b8098d74e0fd54492b33bba2132b03db32'
 
 
 def encoded(value):return (json.dumps(value,sort_keys=True,indent=2)+'\n').encode()
@@ -41,7 +43,7 @@ class Continuation:
         self.package=BASE/('retained-continuation-source-'+source_hash);self.source_hash=source_hash
         raw=secure(self.package/'source-bundle.json').read_bytes();self.manifest=json.loads(raw)
         if (hashlib.sha256(raw).hexdigest()!=source_hash or raw!=encoded(self.manifest)
-                or set(self.manifest['files'])!={'driver.py','child.py','write-probe.py'}
+                or set(self.manifest['files'])!={'driver.py','child.py','write-probe.py','migration.py'}
                 or not re.fullmatch('[0-9a-f]{40}',str(self.manifest.get('source_git')))
                 or Path(__file__)!=self.package/'driver.py'):
             raise RuntimeError('continuation_source_package_changed')
@@ -78,6 +80,7 @@ class Continuation:
         return accepted
 
     def measurement(self):
+        if (self.actor.root/'migration-intent.json').exists():return self.resume_measurement()
         actor=self.actor
         result=Path('/var/lib/madar-control-plane/emergency-retained-bridge-routing')/ROUTING_PLAN/'result.json'
         if sha(secure(result))!=ROUTING_RESULT:raise RuntimeError('continuation_routing_completion_changed')
@@ -123,6 +126,76 @@ class Continuation:
                 'timer_restore':actor.document['backup_timer_states'],
                 'worker_generation':hashlib.sha256(f"bootstrap:{record['release_sha']}:blue:{record['prepared_at']}".encode()).hexdigest()}
 
+    def resume_measurement(self):
+        """Exact consumed attempt, sealed READ_ONLY runtime, no executor/SQL."""
+        from deployment.lib.provider_recovery_runtime import protected,readonly_configuration
+        from deployment.lib.runtime_authority import load_worker_authority
+        from deployment.lib.completed_normal_migration import intent_document
+        from deployment.lib.completed_normal_database import migration_customer_snapshot
+        from deployment.lib.completed_normal_resources import measured_spec
+        from deployment.lib.control_plane_upgrade import BACKUP_TIMERS
+        actor=self.actor;actor.guard();kernel=actor.candidate();kernel.verify_mode(normal=False)
+        if actor.native()!=136:raise RuntimeError('continuation_resume_source_schema_changed')
+        previous=actor.root/'continuations'/PREVIOUS_PLAN
+        failure=json.loads(protected(previous/'failure.json',private=True).read_text())
+        previous_plan=json.loads(protected(previous/'plan.json',private=True).read_text())
+        previous_authorization=json.loads(protected(previous/'operator-authorization.json',private=True).read_text())
+        if (digest(previous_plan)!=PREVIOUS_PLAN or failure.get('operation')!=OPERATION
+                or failure.get('phase')!='service_migrate_pending' or failure.get('database_restored') is not False
+                or 'compensation_exception_type' in failure or (previous/'completion.json').exists()
+                or json.loads(protected(actor.root/'migration-intent.json',private=True).read_text())!=intent_document(self.contract)):
+            raise RuntimeError('continuation_resume_previous_attempt_changed')
+        if previous_authorization!={'operation':OPERATION,'plan_sha256':PREVIOUS_PLAN,'source_sha256':PREVIOUS_SOURCE,
+                'parent_context_sha256':actor.root.name,'historical_authorization_reused':False}:
+            raise RuntimeError('continuation_resume_previous_authorization_changed')
+        if any((actor.root/n).exists() for n in ('migration-completion.json','normal-completion.json','post-migration-backup.json','normal-publication.json')):
+            raise RuntimeError('continuation_resume_progress_changed')
+        candidate=self.contract['candidate'];state_path=readonly_configuration(actor.ops.state_root/'state.json',private=True)
+        state=json.loads(state_path.read_text());known=state.get('known_good_release') or {}
+        owner=load_worker_authority(actor.ops.state_root)
+        if (state.get('active_slot')!='blue' or known.get('sha')!=candidate['source_sha'] or known.get('slot')!='blue'
+                or known.get('schema')!=136 or state.get('in_progress_release') or state.get('rollback_failure')
+                or owner is None or owner['owner']!='CANDIDATE' or owner['candidate']!={'sha':candidate['source_sha'],'slot':'blue'}
+                or owner['generation']!=previous_plan['initial']['worker_generation']
+                or (actor.ops.state_root/'migrations'/candidate['source_sha']/'execution.json').exists()):
+            raise RuntimeError('continuation_resume_no_sql_state_changed')
+        before=json.loads(protected(actor.root/'pre-migration-customer-snapshot.json',private=True).read_text())
+        current=migration_customer_snapshot(self.contract,actor.runtime,columns=before['columns'])
+        if before!=current:raise RuntimeError('continuation_resume_customer_snapshot_changed')
+        from deployment.lib.completed_normal_migration import verify_migration_backup
+        from deployment.lib.active_recovery_backup import verify_backup_execution_context
+        inputs=json.loads(protected(actor.root/'migration-inputs.json',private=True).read_text())
+        receipt=json.loads(protected(actor.root/'pre-migration-backup.json',private=True).read_text())
+        if (receipt['schema']!=136 or receipt['source_sha']!=candidate['source_sha'] or receipt['images']!=candidate['images']
+                or receipt['restore']['status']!='logical_database_and_file_restore_passed'
+                or receipt['node1']['checksum_exit_code']!=0 or receipt['local_path']!=inputs['backup']):
+            raise RuntimeError('continuation_resume_backup_evidence_changed')
+        from types import SimpleNamespace
+        verify_migration_backup(Path(inputs['backup']),inputs,candidate['source_sha'],
+            SimpleNamespace(recovery_helper_root=lambda:actor.package/'source/web/scripts'),expected_schema=136)
+        verify_backup_execution_context(actor.package,expected_schema=136);self.evidence()
+        timers={n:actor.ops.systemctl_state(n) for n in BACKUP_TIMERS}
+        if any(v['active']!='inactive' for v in timers.values()) or actor.ops.interlock_backup_states(self.controller)!=actor.document['backup_timer_states']:
+            raise RuntimeError('continuation_resume_backup_timer_changed')
+        if any(actor.ops.systemctl_state(n.replace('.timer','.service'))['active'] not in {'inactive','failed'} for n in BACKUP_TIMERS):
+            raise RuntimeError('continuation_resume_backup_service_running')
+        gateway=actor.runtime.inspect(['supabase-envoy'])['supabase-envoy'];actor.proxy_identity()
+        from deployment.lib.emergency_routing_repair import UPSTREAM
+        if UPSTREAM.read_bytes()!=self.recovery.ROUTE:raise RuntimeError('continuation_resume_public_route_changed')
+        fixed=[actor.root/n for n in ('admission.json','operator-authorization.json','failure.json','controller-installation.json',
+            'controller-installation-intent.json','boot-installation.json','candidate-staged-runtime.json','candidate-runtime.json',
+            'migration-intent.json','migration-inputs.json','pre-migration-backup.json','pre-migration-customer-snapshot.json')]
+        fixed += [previous/n for n in ('plan.json','operator-authorization.json','failure.json')]
+        fixed += [actor.root/'write-authority/authority.json',Path(self.contract['source_roles']['completion_root'])/'write-authority/authority.json',
+            actor.ops.interlock_file]
+        records={str(p):sha(protected(p)) for p in fixed}
+        owner_path=readonly_configuration(actor.ops.state_root/'worker-ownership.json',private=True);records[str(owner_path)]=sha(owner_path)
+        if os.statvfs('/').f_bavail*os.statvfs('/').f_frsize<4*1024**3:raise RuntimeError('continuation_storage_insufficient')
+        return {'entry':'sealed-pre-sql','previous_plan_sha256':PREVIOUS_PLAN,'bindings':{'records':records},
+            'state_sha256':sha(state_path),'customer_snapshot_sha256':digest(current),'execution_ci':self.execution_ci(),
+            'timers':timers,'timer_restore':actor.document['backup_timer_states'],'worker_generation':owner['generation'],
+            'auth_gateway':{'id':gateway['Id'],'image':gateway['Image'],'spec_sha256':measured_spec(gateway)}}
+
     def preflight(self):
         if self.plan['initial']!=self.measurement():raise RuntimeError('continuation_live_bindings_changed')
         if self.scope.exists() or self.scope.is_symlink():raise RuntimeError('continuation_authorization_consumed')
@@ -155,6 +228,7 @@ class Continuation:
         return {'operation':OPERATION,'plan_sha256':digest(self.plan),'source_sha256':self.source_hash,
                 'parent_context_sha256':self.actor.root.name,'application_sha':self.contract['candidate']['source_sha'],
                 'child_sha256':self.manifest['files']['child.py'],'worker_generation':self.plan['initial']['worker_generation'],
+                'migration_sha256':self.manifest['files']['migration.py'],
                 'worker_owner_sha256':self.plan['initial']['bindings']['records'][str(self.actor.ops.state_root/'worker-ownership.json')],
                 'origin_grant':expected_origin_grant(self.contract,'READ_ONLY')}
 
@@ -184,6 +258,7 @@ class Continuation:
                 '--property=Environment=MADAR_PROXY_CONTAINER=madar-release-proxy',
                 '--property=LoadCredential=madar-control-plane-upgrade:'+str(self.ops.authorization_file),
                 '--property=LoadCredential=completed-continuation-executor:'+str(self.package/'child.py'),
+                '--property=LoadCredential=completed-continuation-migration:'+str(self.package/'migration.py'),
                 '/usr/bin/python3','-I','-B','/run/credentials/'+unit+'.service/completed-continuation-executor',mode],
                 timeout=3000,check=False)
             if result.returncode:raise RuntimeError('continuation_child_'+mode+'_failed')
@@ -218,26 +293,38 @@ class Continuation:
                     'source_sha256':self.source_hash,'parent_context_sha256':self.actor.root.name,'historical_authorization_reused':False}))
                 exclusive(self.scope/'previous-interlock.json',secure(self.ops.interlock_file).read_bytes())
                 self.active=True;self.guard()
-                with self.credential():
-                    self.event('candidate_stage_seal_pending')
-                    self.validator.seal_candidate_stage(self.contract,source_guard=self.guard,
-                        model_loader=lambda:self.recovery.staged_model(self.actor),runtime=self.actor.runtime,state_root=self.ops.state_root)
-                self.child('activate')
-                with self.credential():
-                    self.event('candidate_runtime_seal_pending')
-                    self.validator.seal_candidate_runtime(self.contract,source_guard=self.guard,
-                        model_loader=lambda:self.recovery.staged_model(self.actor),runtime=self.actor.runtime,state_root=self.ops.state_root)
-                    kernel=self.actor.candidate();kernel.verify_mode(normal=False)
-                self.event('ordinary_read_only_adoption_pending')
-                self.ops.run_deploy_service('continuation_adopt',self.controller,completed_normal_contract=self.contract,completed_normal_mode='adopt')
-                with self.credential():
-                    self.event('migration_maintenance_pending');enter_manual_maintenance(self.actor)
-                    backup=CompletedNormalBackupContext(self.contract,self.actor.document,self.actor.package,kernel,
-                        stage='pre-migration',source_guard=self.guard,artifact_guard=lambda:self.evidence()[0])
-                    self.event('pre_migration_backup_pending');receipt=backup.capture();backup.seal_migration_inputs(receipt)
-                    before=migration_customer_snapshot(self.contract,self.actor.runtime)
-                    exclusive(self.actor.root/'pre-migration-customer-snapshot.json',encoded(before))
-                    seal_intent(self.contract,source_guard=self.guard,runtime_guard=self.actor.native,backup_guard=backup.guard)
+                if self.plan['initial'].get('entry')=='sealed-pre-sql':
+                    with self.credential():
+                        self.event('sealed_pre_sql_resume_verified')
+                        kernel=self.actor.candidate();kernel.verify_mode(normal=False)
+                        before=json.loads(secure(self.actor.root/'pre-migration-customer-snapshot.json').read_text())
+                        from deployment.lib.emergency_routing_repair import UPSTREAM,MAINTENANCE,verification_window
+                        self.event('migration_maintenance_pending')
+                        exclusive(self.scope/'migration-maintenance-preimage.conf',UPSTREAM.read_bytes())
+                        with verification_window(self.actor.runtime,180):
+                            self.actor.proxy_identity();self.actor.runtime.nginx_preflight(MAINTENANCE,self.scope)
+                            self.actor.runtime.publish(MAINTENANCE);self.actor.runtime.reload()
+                else:
+                    with self.credential():
+                        self.event('candidate_stage_seal_pending')
+                        self.validator.seal_candidate_stage(self.contract,source_guard=self.guard,
+                            model_loader=lambda:self.recovery.staged_model(self.actor),runtime=self.actor.runtime,state_root=self.ops.state_root)
+                    self.child('activate')
+                    with self.credential():
+                        self.event('candidate_runtime_seal_pending')
+                        self.validator.seal_candidate_runtime(self.contract,source_guard=self.guard,
+                            model_loader=lambda:self.recovery.staged_model(self.actor),runtime=self.actor.runtime,state_root=self.ops.state_root)
+                        kernel=self.actor.candidate();kernel.verify_mode(normal=False)
+                    self.event('ordinary_read_only_adoption_pending')
+                    self.ops.run_deploy_service('continuation_adopt',self.controller,completed_normal_contract=self.contract,completed_normal_mode='adopt')
+                    with self.credential():
+                        self.event('migration_maintenance_pending');enter_manual_maintenance(self.actor)
+                        backup=CompletedNormalBackupContext(self.contract,self.actor.document,self.actor.package,kernel,
+                            stage='pre-migration',source_guard=self.guard,artifact_guard=lambda:self.evidence()[0])
+                        self.event('pre_migration_backup_pending');receipt=backup.capture();backup.seal_migration_inputs(receipt)
+                        before=migration_customer_snapshot(self.contract,self.actor.runtime)
+                        exclusive(self.actor.root/'pre-migration-customer-snapshot.json',encoded(before))
+                        seal_intent(self.contract,source_guard=self.guard,runtime_guard=self.actor.native,backup_guard=backup.guard)
                 self.child('migrate')
                 with self.credential():
                     self.event('migration_preservation_pending')
