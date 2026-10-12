@@ -131,6 +131,15 @@ def connection_factory(contract):
         if isinstance(error,RuntimeError):raise
         raise RuntimeError('completed_migration_database_connection_failed_'+type(error).__name__) from None
 
+def bind_manifest(manifest,contract):
+    """A reviewed placeholder never substitutes for fresh release authority."""
+    selected=profile(contract);sha=contract['candidate']['source_sha']
+    allowed_releases={'CURRENT',sha}
+    if selected is MANUAL:allowed_releases.add('STAGING')
+    if manifest.release_sha not in allowed_releases or [m.number for m in manifest.migrations]!=list(selected.migrations):
+        raise RuntimeError('completed_migration_chain_invalid')
+    return replace(manifest,release_sha=sha)
+
 def run_migration(contract,release_root,state_root,operations):
     """Actual madar deployment child; called only by explicit migrate stage."""
     require_fresh_authorization(contract)
@@ -162,9 +171,10 @@ def run_migration(contract,release_root,state_root,operations):
     if file_digest(readonly_configuration(path,private=False))!=contract['migration_manifest_sha256']:
         raise RuntimeError('completed_migration_manifest_changed')
     manifest=MigrationManifest.load(path,release_root)
-    if manifest.release_sha not in {'CURRENT',sha} or [m.number for m in manifest.migrations]!=list(selected.migrations):
-        raise RuntimeError('completed_migration_chain_invalid')
-    manifest=replace(manifest,release_sha=sha)
+    # The reviewed learning manifest retains its immutable STAGING marker.
+    # It is usable only inside the checksum-bound manual profile; the fresh
+    # candidate authority supplies the actual release identity below.
+    manifest=bind_manifest(manifest,contract)
     backup=Path(witness['backup'])
     if not backup.is_absolute() or not backup.name.startswith('madar-'):
         raise RuntimeError('completed_migration_backup_path_invalid')
