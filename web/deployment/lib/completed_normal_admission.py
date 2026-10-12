@@ -190,7 +190,8 @@ def credential_witness(name: str, hash_key: str) -> dict:
 def verify_history(contract: dict) -> None:
     from deployment.lib.provider_recovery_runtime import protected, file_digest
     for name, expected in contract["historical_files"].items():
-        if file_digest(protected(Path(name), private=True)) != expected:
+        nonsecret_admission=(profile(contract) is MANUAL and Path(name)==Path(contract['source_roles']['completion_root'])/'admission.json')
+        if file_digest(protected(Path(name), private=not nonsecret_admission)) != expected:
             raise RuntimeError("completed_normal_admission_historical_evidence_changed")
 
 
