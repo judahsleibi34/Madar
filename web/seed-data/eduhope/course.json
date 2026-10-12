@@ -1,0 +1,1158 @@
+{
+  "version": 1,
+  "logical_key": "eduhope.course",
+  "title": "EduHope English Conversation Course",
+  "price": {
+    "amount": "30.00",
+    "currency": "USD",
+    "billing_type": "one_time"
+  },
+  "access_type": "paid",
+  "status": "draft",
+  "provisional": true,
+  "owner_original_topic_map_missing": true,
+  "levels": [
+    {
+      "key": "course.level-1",
+      "number": 1,
+      "name": "Level 1 — Beginner Foundations",
+      "cefr": "A1",
+      "status": "draft",
+      "topics": [
+        {
+          "key": "course.level-1.topic-1",
+          "title": "Meeting a new classmate",
+          "cefr": "A1",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": "teaching.json",
+          "editorial_status": "authored_demonstration",
+          "original_owner_material_required": true
+        },
+        {
+          "key": "course.level-1.topic-2",
+          "title": "Introducing yourself",
+          "cefr": "A1",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": null,
+          "editorial_status": "outline_requires_authoring",
+          "original_owner_material_required": true
+        },
+        {
+          "key": "course.level-1.topic-3",
+          "title": "Names and spelling",
+          "cefr": "A1",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": null,
+          "editorial_status": "outline_requires_authoring",
+          "original_owner_material_required": true
+        },
+        {
+          "key": "course.level-1.topic-4",
+          "title": "Countries and languages",
+          "cefr": "A1",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": null,
+          "editorial_status": "outline_requires_authoring",
+          "original_owner_material_required": true
+        },
+        {
+          "key": "course.level-1.topic-5",
+          "title": "Numbers and contact details",
+          "cefr": "A1",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": null,
+          "editorial_status": "outline_requires_authoring",
+          "original_owner_material_required": true
+        },
+        {
+          "key": "course.level-1.topic-6",
+          "title": "People in your family",
+          "cefr": "A1",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": null,
+          "editorial_status": "outline_requires_authoring",
+          "original_owner_material_required": true
+        },
+        {
+          "key": "course.level-1.topic-7",
+          "title": "Everyday study objects",
+          "cefr": "A1",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": null,
+          "editorial_status": "outline_requires_authoring",
+          "original_owner_material_required": true
+        },
+        {
+          "key": "course.level-1.topic-8",
+          "title": "Classroom questions",
+          "cefr": "A1",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": null,
+          "editorial_status": "outline_requires_authoring",
+          "original_owner_material_required": true
+        },
+        {
+          "key": "course.level-1.topic-9",
+          "title": "Places on campus",
+          "cefr": "A1",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": null,
+          "editorial_status": "outline_requires_authoring",
+          "original_owner_material_required": true
+        }
+      ],
+      "review": {
+        "title": "Level 1 review",
+        "passing_score": 70,
+        "max_attempts": 3,
+        "status": "draft",
+        "provisional": true
+      }
+    },
+    {
+      "key": "course.level-2",
+      "number": 2,
+      "name": "Level 2 — Beginner Communication",
+      "cefr": "A1",
+      "status": "draft",
+      "topics": [
+        {
+          "key": "course.level-2.topic-1",
+          "title": "Daily routines",
+          "cefr": "A1",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": "teaching.json",
+          "editorial_status": "authored_demonstration",
+          "original_owner_material_required": true
+        },
+        {
+          "key": "course.level-2.topic-2",
+          "title": "Telling the time",
+          "cefr": "A1",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": null,
+          "editorial_status": "outline_requires_authoring",
+          "original_owner_material_required": true
+        },
+        {
+          "key": "course.level-2.topic-3",
+          "title": "Ordering a simple meal",
+          "cefr": "A1",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": null,
+          "editorial_status": "outline_requires_authoring",
+          "original_owner_material_required": true
+        },
+        {
+          "key": "course.level-2.topic-4",
+          "title": "Buying everyday items",
+          "cefr": "A1",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": null,
+          "editorial_status": "outline_requires_authoring",
+          "original_owner_material_required": true
+        },
+        {
+          "key": "course.level-2.topic-5",
+          "title": "Getting around town",
+          "cefr": "A1",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": null,
+          "editorial_status": "outline_requires_authoring",
+          "original_owner_material_required": true
+        },
+        {
+          "key": "course.level-2.topic-6",
+          "title": "Asking for directions",
+          "cefr": "A1",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": null,
+          "editorial_status": "outline_requires_authoring",
+          "original_owner_material_required": true
+        },
+        {
+          "key": "course.level-2.topic-7",
+          "title": "Likes and preferences",
+          "cefr": "A1",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": null,
+          "editorial_status": "outline_requires_authoring",
+          "original_owner_material_required": true
+        },
+        {
+          "key": "course.level-2.topic-8",
+          "title": "Making a simple invitation",
+          "cefr": "A1",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": null,
+          "editorial_status": "outline_requires_authoring",
+          "original_owner_material_required": true
+        },
+        {
+          "key": "course.level-2.topic-9",
+          "title": "Describing your room",
+          "cefr": "A1",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": null,
+          "editorial_status": "outline_requires_authoring",
+          "original_owner_material_required": true
+        }
+      ],
+      "review": {
+        "title": "Level 2 review",
+        "passing_score": 70,
+        "max_attempts": 3,
+        "status": "draft",
+        "provisional": true
+      }
+    },
+    {
+      "key": "course.level-3",
+      "number": 3,
+      "name": "Level 3 — Elementary Communication",
+      "cefr": "A2",
+      "status": "draft",
+      "topics": [
+        {
+          "key": "course.level-3.topic-1",
+          "title": "Talking about last weekend",
+          "cefr": "A2",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": "teaching.json",
+          "editorial_status": "authored_demonstration",
+          "original_owner_material_required": true
+        },
+        {
+          "key": "course.level-3.topic-2",
+          "title": "Planning a study session",
+          "cefr": "A2",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": null,
+          "editorial_status": "outline_requires_authoring",
+          "original_owner_material_required": true
+        },
+        {
+          "key": "course.level-3.topic-3",
+          "title": "Making an appointment",
+          "cefr": "A2",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": null,
+          "editorial_status": "outline_requires_authoring",
+          "original_owner_material_required": true
+        },
+        {
+          "key": "course.level-3.topic-4",
+          "title": "Finding information online",
+          "cefr": "A2",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": null,
+          "editorial_status": "outline_requires_authoring",
+          "original_owner_material_required": true
+        },
+        {
+          "key": "course.level-3.topic-5",
+          "title": "Asking about a timetable",
+          "cefr": "A2",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": null,
+          "editorial_status": "outline_requires_authoring",
+          "original_owner_material_required": true
+        },
+        {
+          "key": "course.level-3.topic-6",
+          "title": "Describing a person",
+          "cefr": "A2",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": null,
+          "editorial_status": "outline_requires_authoring",
+          "original_owner_material_required": true
+        },
+        {
+          "key": "course.level-3.topic-7",
+          "title": "Shopping for clothing",
+          "cefr": "A2",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": null,
+          "editorial_status": "outline_requires_authoring",
+          "original_owner_material_required": true
+        },
+        {
+          "key": "course.level-3.topic-8",
+          "title": "Comparing everyday choices",
+          "cefr": "A2",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": null,
+          "editorial_status": "outline_requires_authoring",
+          "original_owner_material_required": true
+        },
+        {
+          "key": "course.level-3.topic-9",
+          "title": "Talking about health",
+          "cefr": "A2",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": null,
+          "editorial_status": "outline_requires_authoring",
+          "original_owner_material_required": true
+        }
+      ],
+      "review": {
+        "title": "Level 3 review",
+        "passing_score": 70,
+        "max_attempts": 3,
+        "status": "draft",
+        "provisional": true
+      }
+    },
+    {
+      "key": "course.level-4",
+      "number": 4,
+      "name": "Level 4 — Elementary Real-Life English",
+      "cefr": "A2",
+      "status": "draft",
+      "topics": [
+        {
+          "key": "course.level-4.topic-1",
+          "title": "Booking a journey",
+          "cefr": "A2",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": "teaching.json",
+          "editorial_status": "authored_demonstration",
+          "original_owner_material_required": true
+        },
+        {
+          "key": "course.level-4.topic-2",
+          "title": "At a service desk",
+          "cefr": "A2",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": null,
+          "editorial_status": "outline_requires_authoring",
+          "original_owner_material_required": true
+        },
+        {
+          "key": "course.level-4.topic-3",
+          "title": "Explaining a simple problem",
+          "cefr": "A2",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": null,
+          "editorial_status": "outline_requires_authoring",
+          "original_owner_material_required": true
+        },
+        {
+          "key": "course.level-4.topic-4",
+          "title": "University clubs and activities",
+          "cefr": "A2",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": null,
+          "editorial_status": "outline_requires_authoring",
+          "original_owner_material_required": true
+        },
+        {
+          "key": "course.level-4.topic-5",
+          "title": "Talking about experiences",
+          "cefr": "A2",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": null,
+          "editorial_status": "outline_requires_authoring",
+          "original_owner_material_required": true
+        },
+        {
+          "key": "course.level-4.topic-6",
+          "title": "Finding a place to live",
+          "cefr": "A2",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": null,
+          "editorial_status": "outline_requires_authoring",
+          "original_owner_material_required": true
+        },
+        {
+          "key": "course.level-4.topic-7",
+          "title": "Requesting help politely",
+          "cefr": "A2",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": null,
+          "editorial_status": "outline_requires_authoring",
+          "original_owner_material_required": true
+        },
+        {
+          "key": "course.level-4.topic-8",
+          "title": "Making and changing plans",
+          "cefr": "A2",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": null,
+          "editorial_status": "outline_requires_authoring",
+          "original_owner_material_required": true
+        },
+        {
+          "key": "course.level-4.topic-9",
+          "title": "Giving practical instructions",
+          "cefr": "A2",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": null,
+          "editorial_status": "outline_requires_authoring",
+          "original_owner_material_required": true
+        }
+      ],
+      "review": {
+        "title": "Level 4 review",
+        "passing_score": 70,
+        "max_attempts": 3,
+        "status": "draft",
+        "provisional": true
+      }
+    },
+    {
+      "key": "course.level-5",
+      "number": 5,
+      "name": "Level 5 — Intermediate Communication",
+      "cefr": "B1",
+      "status": "draft",
+      "topics": [
+        {
+          "key": "course.level-5.topic-1",
+          "title": "Giving an opinion respectfully",
+          "cefr": "B1",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": "teaching.json",
+          "editorial_status": "authored_demonstration",
+          "original_owner_material_required": true
+        },
+        {
+          "key": "course.level-5.topic-2",
+          "title": "Explaining a missed deadline",
+          "cefr": "B1",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": null,
+          "editorial_status": "outline_requires_authoring",
+          "original_owner_material_required": true
+        },
+        {
+          "key": "course.level-5.topic-3",
+          "title": "Discussing study habits",
+          "cefr": "B1",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": null,
+          "editorial_status": "outline_requires_authoring",
+          "original_owner_material_required": true
+        },
+        {
+          "key": "course.level-5.topic-4",
+          "title": "Describing an important experience",
+          "cefr": "B1",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": null,
+          "editorial_status": "outline_requires_authoring",
+          "original_owner_material_required": true
+        },
+        {
+          "key": "course.level-5.topic-5",
+          "title": "Making a group decision",
+          "cefr": "B1",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": null,
+          "editorial_status": "outline_requires_authoring",
+          "original_owner_material_required": true
+        },
+        {
+          "key": "course.level-5.topic-6",
+          "title": "Responding to unexpected changes",
+          "cefr": "B1",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": null,
+          "editorial_status": "outline_requires_authoring",
+          "original_owner_material_required": true
+        },
+        {
+          "key": "course.level-5.topic-7",
+          "title": "Talking about future goals",
+          "cefr": "B1",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": null,
+          "editorial_status": "outline_requires_authoring",
+          "original_owner_material_required": true
+        },
+        {
+          "key": "course.level-5.topic-8",
+          "title": "Making a recommendation",
+          "cefr": "B1",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": null,
+          "editorial_status": "outline_requires_authoring",
+          "original_owner_material_required": true
+        },
+        {
+          "key": "course.level-5.topic-9",
+          "title": "Explaining a process",
+          "cefr": "B1",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": null,
+          "editorial_status": "outline_requires_authoring",
+          "original_owner_material_required": true
+        }
+      ],
+      "review": {
+        "title": "Level 5 review",
+        "passing_score": 70,
+        "max_attempts": 3,
+        "status": "draft",
+        "provisional": true
+      }
+    },
+    {
+      "key": "course.level-6",
+      "number": 6,
+      "name": "Level 6 — Intermediate Real-Life English",
+      "cefr": "B1",
+      "status": "draft",
+      "topics": [
+        {
+          "key": "course.level-6.topic-1",
+          "title": "Preparing for a job interview",
+          "cefr": "B1",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": "teaching.json",
+          "editorial_status": "authored_demonstration",
+          "original_owner_material_required": true
+        },
+        {
+          "key": "course.level-6.topic-2",
+          "title": "Resolving a misunderstanding",
+          "cefr": "B1",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": null,
+          "editorial_status": "outline_requires_authoring",
+          "original_owner_material_required": true
+        },
+        {
+          "key": "course.level-6.topic-3",
+          "title": "Communicating in an online meeting",
+          "cefr": "B1",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": null,
+          "editorial_status": "outline_requires_authoring",
+          "original_owner_material_required": true
+        },
+        {
+          "key": "course.level-6.topic-4",
+          "title": "Planning a community activity",
+          "cefr": "B1",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": null,
+          "editorial_status": "outline_requires_authoring",
+          "original_owner_material_required": true
+        },
+        {
+          "key": "course.level-6.topic-5",
+          "title": "Asking about study opportunities",
+          "cefr": "B1",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": null,
+          "editorial_status": "outline_requires_authoring",
+          "original_owner_material_required": true
+        },
+        {
+          "key": "course.level-6.topic-6",
+          "title": "Evaluating information sources",
+          "cefr": "B1",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": null,
+          "editorial_status": "outline_requires_authoring",
+          "original_owner_material_required": true
+        },
+        {
+          "key": "course.level-6.topic-7",
+          "title": "Giving constructive feedback",
+          "cefr": "B1",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": null,
+          "editorial_status": "outline_requires_authoring",
+          "original_owner_material_required": true
+        },
+        {
+          "key": "course.level-6.topic-8",
+          "title": "Negotiating a practical arrangement",
+          "cefr": "B1",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": null,
+          "editorial_status": "outline_requires_authoring",
+          "original_owner_material_required": true
+        },
+        {
+          "key": "course.level-6.topic-9",
+          "title": "Presenting a short proposal",
+          "cefr": "B1",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": null,
+          "editorial_status": "outline_requires_authoring",
+          "original_owner_material_required": true
+        }
+      ],
+      "review": {
+        "title": "Level 6 review",
+        "passing_score": 70,
+        "max_attempts": 3,
+        "status": "draft",
+        "provisional": true
+      }
+    },
+    {
+      "key": "course.level-7",
+      "number": 7,
+      "name": "Level 7 — Upper-Intermediate Communication",
+      "cefr": "B2",
+      "status": "draft",
+      "topics": [
+        {
+          "key": "course.level-7.topic-1",
+          "title": "Balancing different viewpoints",
+          "cefr": "B2",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": "teaching.json",
+          "editorial_status": "authored_demonstration",
+          "original_owner_material_required": true
+        },
+        {
+          "key": "course.level-7.topic-2",
+          "title": "Discussing professional priorities",
+          "cefr": "B2",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": null,
+          "editorial_status": "outline_requires_authoring",
+          "original_owner_material_required": true
+        },
+        {
+          "key": "course.level-7.topic-3",
+          "title": "Handling a difficult conversation",
+          "cefr": "B2",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": null,
+          "editorial_status": "outline_requires_authoring",
+          "original_owner_material_required": true
+        },
+        {
+          "key": "course.level-7.topic-4",
+          "title": "Interpreting a detailed explanation",
+          "cefr": "B2",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": null,
+          "editorial_status": "outline_requires_authoring",
+          "original_owner_material_required": true
+        },
+        {
+          "key": "course.level-7.topic-5",
+          "title": "Clarifying assumptions",
+          "cefr": "B2",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": null,
+          "editorial_status": "outline_requires_authoring",
+          "original_owner_material_required": true
+        },
+        {
+          "key": "course.level-7.topic-6",
+          "title": "Supporting an argument with examples",
+          "cefr": "B2",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": null,
+          "editorial_status": "outline_requires_authoring",
+          "original_owner_material_required": true
+        },
+        {
+          "key": "course.level-7.topic-7",
+          "title": "Managing an international meeting",
+          "cefr": "B2",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": null,
+          "editorial_status": "outline_requires_authoring",
+          "original_owner_material_required": true
+        },
+        {
+          "key": "course.level-7.topic-8",
+          "title": "Giving a persuasive presentation",
+          "cefr": "B2",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": null,
+          "editorial_status": "outline_requires_authoring",
+          "original_owner_material_required": true
+        },
+        {
+          "key": "course.level-7.topic-9",
+          "title": "Summarizing competing proposals",
+          "cefr": "B2",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": null,
+          "editorial_status": "outline_requires_authoring",
+          "original_owner_material_required": true
+        }
+      ],
+      "review": {
+        "title": "Level 7 review",
+        "passing_score": 70,
+        "max_attempts": 3,
+        "status": "draft",
+        "provisional": true
+      }
+    },
+    {
+      "key": "course.level-8",
+      "number": 8,
+      "name": "Level 8 — Advanced Everyday Communication",
+      "cefr": "B2",
+      "status": "draft",
+      "topics": [
+        {
+          "key": "course.level-8.topic-1",
+          "title": "Negotiating a shared outcome",
+          "cefr": "B2",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": "teaching.json",
+          "editorial_status": "authored_demonstration",
+          "original_owner_material_required": true
+        },
+        {
+          "key": "course.level-8.topic-2",
+          "title": "Responding to a service complaint",
+          "cefr": "B2",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": null,
+          "editorial_status": "outline_requires_authoring",
+          "original_owner_material_required": true
+        },
+        {
+          "key": "course.level-8.topic-3",
+          "title": "Discussing technology responsibly",
+          "cefr": "B2",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": null,
+          "editorial_status": "outline_requires_authoring",
+          "original_owner_material_required": true
+        },
+        {
+          "key": "course.level-8.topic-4",
+          "title": "Explaining uncertainty",
+          "cefr": "B2",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": null,
+          "editorial_status": "outline_requires_authoring",
+          "original_owner_material_required": true
+        },
+        {
+          "key": "course.level-8.topic-5",
+          "title": "Communicating across cultures",
+          "cefr": "B2",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": null,
+          "editorial_status": "outline_requires_authoring",
+          "original_owner_material_required": true
+        },
+        {
+          "key": "course.level-8.topic-6",
+          "title": "Proposing improvements at work",
+          "cefr": "B2",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": null,
+          "editorial_status": "outline_requires_authoring",
+          "original_owner_material_required": true
+        },
+        {
+          "key": "course.level-8.topic-7",
+          "title": "Handling detailed travel problems",
+          "cefr": "B2",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": null,
+          "editorial_status": "outline_requires_authoring",
+          "original_owner_material_required": true
+        },
+        {
+          "key": "course.level-8.topic-8",
+          "title": "Discussing ethical choices",
+          "cefr": "B2",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": null,
+          "editorial_status": "outline_requires_authoring",
+          "original_owner_material_required": true
+        },
+        {
+          "key": "course.level-8.topic-9",
+          "title": "Adapting tone to an audience",
+          "cefr": "B2",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": null,
+          "editorial_status": "outline_requires_authoring",
+          "original_owner_material_required": true
+        }
+      ],
+      "review": {
+        "title": "Level 8 review",
+        "passing_score": 70,
+        "max_attempts": 3,
+        "status": "draft",
+        "provisional": true
+      }
+    },
+    {
+      "key": "course.level-9",
+      "number": 9,
+      "name": "Level 9 — Advanced Communication",
+      "cefr": "C1",
+      "status": "draft",
+      "topics": [
+        {
+          "key": "course.level-9.topic-1",
+          "title": "Developing a nuanced argument",
+          "cefr": "C1",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": "teaching.json",
+          "editorial_status": "authored_demonstration",
+          "original_owner_material_required": true
+        },
+        {
+          "key": "course.level-9.topic-2",
+          "title": "Evaluating academic claims",
+          "cefr": "C1",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": null,
+          "editorial_status": "outline_requires_authoring",
+          "original_owner_material_required": true
+        },
+        {
+          "key": "course.level-9.topic-3",
+          "title": "Synthesizing information",
+          "cefr": "C1",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": null,
+          "editorial_status": "outline_requires_authoring",
+          "original_owner_material_required": true
+        },
+        {
+          "key": "course.level-9.topic-4",
+          "title": "Challenging a conclusion diplomatically",
+          "cefr": "C1",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": null,
+          "editorial_status": "outline_requires_authoring",
+          "original_owner_material_required": true
+        },
+        {
+          "key": "course.level-9.topic-5",
+          "title": "Explaining implications",
+          "cefr": "C1",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": null,
+          "editorial_status": "outline_requires_authoring",
+          "original_owner_material_required": true
+        },
+        {
+          "key": "course.level-9.topic-6",
+          "title": "Leading a complex discussion",
+          "cefr": "C1",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": null,
+          "editorial_status": "outline_requires_authoring",
+          "original_owner_material_required": true
+        },
+        {
+          "key": "course.level-9.topic-7",
+          "title": "Presenting an evidence-based position",
+          "cefr": "C1",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": null,
+          "editorial_status": "outline_requires_authoring",
+          "original_owner_material_required": true
+        },
+        {
+          "key": "course.level-9.topic-8",
+          "title": "Managing disagreement constructively",
+          "cefr": "C1",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": null,
+          "editorial_status": "outline_requires_authoring",
+          "original_owner_material_required": true
+        },
+        {
+          "key": "course.level-9.topic-9",
+          "title": "Interpreting implied meaning",
+          "cefr": "C1",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": null,
+          "editorial_status": "outline_requires_authoring",
+          "original_owner_material_required": true
+        }
+      ],
+      "review": {
+        "title": "Level 9 review",
+        "passing_score": 70,
+        "max_attempts": 3,
+        "status": "draft",
+        "provisional": true
+      }
+    },
+    {
+      "key": "course.level-10",
+      "number": 10,
+      "name": "Level 10 — Advanced Fluency and Professional Communication",
+      "cefr": "C1",
+      "status": "draft",
+      "topics": [
+        {
+          "key": "course.level-10.topic-1",
+          "title": "Negotiating with multiple constraints",
+          "cefr": "C1",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": "teaching.json",
+          "editorial_status": "authored_demonstration",
+          "original_owner_material_required": true
+        },
+        {
+          "key": "course.level-10.topic-2",
+          "title": "Communicating a strategic recommendation",
+          "cefr": "C1",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": null,
+          "editorial_status": "outline_requires_authoring",
+          "original_owner_material_required": true
+        },
+        {
+          "key": "course.level-10.topic-3",
+          "title": "Presenting research to a broad audience",
+          "cefr": "C1",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": null,
+          "editorial_status": "outline_requires_authoring",
+          "original_owner_material_required": true
+        },
+        {
+          "key": "course.level-10.topic-4",
+          "title": "Responding to challenging questions",
+          "cefr": "C1",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": null,
+          "editorial_status": "outline_requires_authoring",
+          "original_owner_material_required": true
+        },
+        {
+          "key": "course.level-10.topic-5",
+          "title": "Discussing policy trade-offs",
+          "cefr": "C1",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": null,
+          "editorial_status": "outline_requires_authoring",
+          "original_owner_material_required": true
+        },
+        {
+          "key": "course.level-10.topic-6",
+          "title": "Building consensus professionally",
+          "cefr": "C1",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": null,
+          "editorial_status": "outline_requires_authoring",
+          "original_owner_material_required": true
+        },
+        {
+          "key": "course.level-10.topic-7",
+          "title": "Reflecting on communication choices",
+          "cefr": "C1",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": null,
+          "editorial_status": "outline_requires_authoring",
+          "original_owner_material_required": true
+        },
+        {
+          "key": "course.level-10.topic-8",
+          "title": "Planning continued independent learning",
+          "cefr": "C1",
+          "status": "draft",
+          "provisional": true,
+          "owner_original_topic": false,
+          "teaching_ref": null,
+          "editorial_status": "outline_requires_authoring",
+          "original_owner_material_required": true
+        }
+      ],
+      "review": {
+        "title": "Level 10 review",
+        "passing_score": 70,
+        "max_attempts": 3,
+        "status": "draft",
+        "provisional": true
+      }
+    }
+  ],
+  "assessments_ref": "assessments.json",
+  "teaching_ref": "teaching.json",
+  "publish_policy": "Official material remains Draft pending owner topic-map and educator review. Explicit local demonstration publication is separate."
+}

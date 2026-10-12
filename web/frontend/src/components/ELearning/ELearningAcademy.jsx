@@ -1,3 +1,4 @@
+import { localizePresentation } from "../PageBuilder/core/PageBuilder.presentationLocalization";
 import { learningDescription } from "../../utils/elearningPresentation";
 import AcademyBuilderLanding from "./AcademyBuilderLanding";
 import { resolveStrictPublishedPageByPath, getPublicPagePath } from "../PageBuilder/core/PageBuilder.routing";
@@ -63,12 +64,13 @@ function AcademyContent({ data, refresh }) {
   const publishedPage = presentation ? resolveStrictPublishedPageByPath(data.landing?.pages, relativePath, data.landing?.defaultPageId) : null;
   const missing = presentation ? !publishedPage : !selected && !["/courses", "/plans", "/login", "/dashboard"].includes(relativePath);
   const view = missing ? "missing" : authPage || relativePath === "/dashboard" ? "checkout" : "landing";
-  const title = selected ? `${selected.name} | ${site.brand}` : relativePath === "/courses" ? `${t("elearning.academy.courses")} | ${site.brand}` : publishedPage?.name && relativePath !== "/" ? `${publishedPage.name} | ${site.brand}` : site.brand;
+  const localizedPage = publishedPage ? localizePresentation(publishedPage,i18n.language.startsWith("ar") ? "ar" : "en") : null;
+  const title = localizedPage?.seo?.title || (selected ? `${selected.name} | ${site.brand}` : relativePath === "/courses" ? `${t("elearning.academy.courses")} | ${site.brand}` : publishedPage?.name && relativePath !== "/" ? `${publishedPage.name} | ${site.brand}` : site.brand);
   const builderTheme = getPageBuilderThemeVars(data.landing?.theme || site.theme);
   const theme = { ...builderTheme, "--academy-accent": builderTheme["--theme-primary"], "--academy-background": builderTheme["--theme-bg"], "--academy-surface": builderTheme["--theme-surface"], "--academy-text": builderTheme["--theme-text"], "--academy-muted": builderTheme["--theme-text-soft"] };
   const Surface = learnerSurface ? ELearningLearnerShell : GuestSurface;
   return <AcademyContext.Provider value={{ data, refresh }}><Surface site={site}><div className={`academy${presentation ? " academy-presentation" : ""}${learnerSurface ? " academy-learner" : ""}${authPage ? " academy-auth" : ""}`} dir={i18n.dir()} lang={i18n.language} style={theme}>
-    <StorefrontSeo origin={window.location.origin} storePath={base} locale={i18n.language} site={site} view={view} publicPage={{ title, description: learningDescription(selected?.description) || site.description, path: publishedPage ? getPublicPagePath(base, publishedPage) : `${base}${relativePath === "/" ? "" : relativePath}` }} />
+    <StorefrontSeo origin={window.location.origin} storePath={base} locale={i18n.language} site={site} view={view} publicPage={{ title, description: learningDescription(selected?.description) || localizedPage?.seo?.description || site.description, path: publishedPage ? getPublicPagePath(base, publishedPage) : `${base}${relativePath === "/" ? "" : relativePath}` }} />
     {!learnerSurface && !presentation && <AcademyNav site={site} authenticated={data.authenticated} hasPlans={data.plans.length > 0} />}
     <main className="academy-main"><Routes>
       <Route index element={<AcademyPresentation data={data} />} />

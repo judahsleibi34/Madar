@@ -1,0 +1,14 @@
+{
+  "manifest_version": 1,
+  "release_sha": "STAGING",
+  "migrations": [
+    {
+      "number": 144,
+      "from_schema": 143,
+      "to_schema": 144,
+      "path": "web/database/migrations/144_add_generic_learning_form_reviews.sql",
+      "sha256": "ac3f67a144f515e341414732fc23f202f015625b07fb377d9fb416c40cf289f2",
+      "compatibility": "forward-compatible"
+    }
+  ]
+}

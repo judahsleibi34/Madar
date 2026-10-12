@@ -1,0 +1,15 @@
+# Independent Forms review and domain binding — proposed source-only transition
+
+Date: 2026-10-12. Status: approved for preparation and isolated rehearsal; source candidate remains unselected. See [the completed isolated rehearsal](forms-review-rehearsal-report.md).
+
+Schema141 supplies immutable learning form versions/responses/files, read state and internal notes. Learning143 preserves141 and explicitly excludes142. General review decisions do not exist on that branch; Exchange142's opportunity-specific decision tables/functions are not available and will not be executed or expanded.
+
+The smallest durable completion is a separately reviewed consecutive143→144 candidate. It would add tenant-scoped generic learning Form response decisions and append-only decision history with composite response/actor ownership, expected revision and immutable answers. Submitted → Under Review → Approved / Not Approved is the presentation contract. Owner/admin permissions, active membership and Forms response-management entitlement remain required. Student access is limited to their authenticated responses. Files retain existing private ownership and storage quotas.
+
+Immutable Form version metadata would declare an optional contact/affiliate/tuition/exchange purpose. Server and SQL submission guards would require authenticated identity for applications, current canonical four-sale eligibility for Tuition Support, and independently active learning access for Exchange. Terms must be accepted; canonical answer values and hidden-field validation remain unchanged. Tenant-owned, same-purpose duplicate submissions would reject consistently under a lock; contact messages remain repeatable.
+
+Affiliate/Tuition domain applications would reference the original Forms response through a nullable tenant-scoped foreign key rather than copy its answers. Existing historical application answers remain intact. Affiliate approval would call the existing canonical privileged academy review/activation function in the same transaction; a generic label cannot independently grant eligibility. Support approval records a decision and never triggers a payout. Generic Exchange decisions require no specialized Exchange engine, opportunity or142 schema.
+
+The candidate would preserve every001–143 SQL file and checksum, all existing manifests, the exact141→143 path and the active main115→136 release descriptor. It would remain unselected. Source validators/policy would require an exact new mirrored144 artifact and143 predecessor. Rehearsal would verify transactional rollback, historical data preservation, duplicate/concurrent approvals, foreign-tenant/self/learner rejection, revocation, four-sale refund reversal, private files and notification deduplication.
+
+Neither creation of this proposal nor approval to prepare its source authorizes production installation, SQL, traffic switching or customer imports. The user subsequently authorized its preparation and application only to a separate marked local preview. That rehearsal is complete; the existing application141 database stays unchanged. Application/production activation remains outside that authorization.

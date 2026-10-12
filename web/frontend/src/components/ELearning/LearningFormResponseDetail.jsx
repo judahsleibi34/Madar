@@ -1,3 +1,4 @@
+import LearningFormDecision from "./LearningFormDecision";
 import ExchangeResponseDecision from "./ExchangeResponseDecision";
 import { useEffect, useState } from "react";
 import { useLocation, useParams } from "react-router-dom";
@@ -67,6 +68,7 @@ export default function LearningFormResponseDetail() {
   return <OwnerPage><OwnerHeader title={t('elearning.ui.response')} description={data?.definition.schema.title} back={{to: `/e-learning/forms/responses${location.search}`, label: label('all_responses')}} actions={data && <button className="ecommerce-secondary-button" disabled={busy} onClick={() => save(!data.read_at)}>{label(data.read_at ? 'mark_unread' : 'mark_read')}</button>}/>
     <OwnerState error={error} retry={() => setAttempt(value => value + 1)} loading={!data && !error}/>{saved && <p role="status">{t('elearning.saved')}</p>}
     {data && <div className="elearning-owner-detail elearning-submission-detail">
+      {data.review && <LearningFormDecision key={`${data.id}:${data.review.revision}`} response={data} onChanged={() => setAttempt(value => value + 1)} />}
       {data.exchange && <ExchangeResponseDecision key={`${data.id}:${data.exchange.decision?.revision}`} context={data.exchange} responseId={data.id} onChanged={() => setAttempt(value => value + 1)} />}
       <section className="elearning-submission-table-section"><h2>{t('elearning.ui.submitter')}</h2>
         <OwnerTable caption={t('elearning.ui.submitter')} columns={[label('identity'), t('elearning.ui.submitted'), label('version'), label('status')]}><tr><td>{data.user_id ? t('elearning.ui.member') : label('guest')}</td><td>{new Date(data.submitted_at).toLocaleString(i18n.language)}</td><td>{label('version')} {data.version}</td><td><OwnerStatus value={data.read_at ? 'read' : 'unread'}>{label(data.read_at ? 'read' : 'unread')}</OwnerStatus></td></tr></OwnerTable>

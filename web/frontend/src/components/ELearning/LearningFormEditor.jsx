@@ -14,9 +14,9 @@ import "../../styles/admin/PageBuilder/button-colors.css";
 import "../../styles/learning-form-editor.css";
 
 const types = ['shortText', 'paragraph', 'email', 'phone', 'number', 'dropdown', 'radio', 'checkboxes', 'date', 'file'];
-const features = {fieldTypes: types, import: false, templates: false, localization: false, theme: false, richText: false, quiz: false, placement: false, pageDescription: false};
-const fieldKeys = ['id', 'type', 'label', 'required', 'helpText', 'placeholder', 'options', 'defaultValue', 'validation', 'maxFileSizeMb'];
-const schemaKeys = ['title', 'description', 'submitLabel', 'successMessage', 'access', 'notifyOwner', 'confirmSubmitter', 'pageMode', 'logicRules'];
+const features = {fieldTypes: types, import: false, templates: false, localization: true, theme: false, richText: false, quiz: false, placement: false, pageDescription: false};
+const fieldKeys = ['id', 'type', 'label', 'required', 'helpText', 'placeholder', 'options', 'defaultValue', 'validation', 'maxFileSizeMb', 'localized'];
+const schemaKeys = ['title', 'description', 'submitLabel', 'successMessage', 'access', 'notifyOwner', 'confirmSubmitter', 'pageMode', 'logicRules', 'languageMode', 'defaultLanguage', 'localized', 'workflow', 'metadata'];
 const pick = (value, keys) => Object.fromEntries(keys.filter(key => value[key] !== undefined).map(key => [key, value[key]]));
 const fieldFor = type => pick(createField('Question', type), fieldKeys);
 const fresh = () => ({name: '', status: 'inactive', schema: {title: '', description: '', submitLabel: '', successMessage: '', access: 'public', notifyOwner: true, confirmSubmitter: false, pageMode: 'paged', sections: [{id: crypto.randomUUID(), title: '', fields: [fieldFor('shortText')]}], logicRules: []}});
@@ -38,6 +38,7 @@ export default function LearningFormEditor() {
     return value;
   });
   const [library, setLibrary] = useState([]);
+  const [reviewsAvailable,setReviewsAvailable] = useState(false);
   const [themeMode, setThemeMode] = useState(() => document.documentElement.dataset.theme || 'light');
   useEffect(() => {
     const changed = () => setThemeMode(document.documentElement.dataset.theme || 'light');
@@ -62,7 +63,7 @@ export default function LearningFormEditor() {
 
   useEffect(() => {
     let active = true;
-    learningFormsApi('').then(value => {if (active) setLibrary(value.items || []);}).catch(() => {});
+    learningFormsApi('').then(value => {if (active) {setLibrary(value.items || []);setReviewsAvailable(Boolean(value.review_available));}}).catch(() => {});
     return () => {active = false;};
   }, [id, saved]);
   useEffect(() => {
@@ -80,7 +81,7 @@ export default function LearningFormEditor() {
   const updateSchema = patch => update({schema: {...schema, ...patch}});
   const editorId = draft.id || 'new';
   const activeForm = {
-    ...schema, id: editorId, name: draft.name, mode: 'form', responses: [], languageMode: lang,
+    ...schema, id: editorId, name: draft.name, mode: 'form', responses: [], languageMode: schema.languageMode || lang,
     sections: schema.sections.map((section, index) => ({...section,
       title: index === 0 ? schema.title : section.title,
       description: index === 0 ? schema.description : '',
@@ -91,7 +92,7 @@ export default function LearningFormEditor() {
   const updateActiveForm = updater => {
     const next = updater(activeForm);
     update({name: next.name, schema: {...schema, ...pick(next, schemaKeys),
-      ...Object.fromEntries(['title','description','successMessage'].map(key => [key, plain(next, key, lang) || '']))
+      ...Object.fromEntries(['title','description','successMessage'].map(key => [key, plain(next, key, 'en') || '']))
     }});
   };
   const updateFormField = (fieldId, patch) => {
@@ -100,7 +101,7 @@ export default function LearningFormEditor() {
       if (field.id !== fieldId) return field;
       const next = {...field, ...pick(patch, fieldKeys)};
       for (const key of ['label','helpText','placeholder','options']) {
-        if (patch.localized?.[key]?.[lang] !== undefined) next[key] = patch.localized[key][lang];
+        if (patch.localized?.[key]?.en !== undefined) next[key] = patch.localized[key].en;
       }
       if (patch.type && patch.type !== field.type) {
         next.defaultValue = ''; next.validation = {};
@@ -111,8 +112,8 @@ export default function LearningFormEditor() {
   };
   const updateFormSection = (sectionId, patch) => {
     const index = schema.sections.findIndex(section => section.id === sectionId);
-    if (index === 0) {updateSchema({...(patch.title !== undefined ? {title: patch.title} : {}), ...(patch.description !== undefined ? {description: patch.description} : {})}); return;}
-    updateSchema({sections: schema.sections.map(section => section.id === sectionId ? {...section, ...pick(patch, ['title'])} : section)});
+    if (index === 0) {updateSchema({...(patch.localized ? {localized:{...schema.localized,...patch.localized}} : {}),...(patch.title !== undefined ? {title: patch.title} : {}), ...(patch.description !== undefined ? {description: patch.description} : {})}); return;}
+    updateSchema({sections: schema.sections.map(section => section.id === sectionId ? {...section, ...pick(patch, ['title','localized'])} : section)});
   };
   const addField = (sectionId, type) => {
     if (fields.length >= 100) return;
@@ -171,6 +172,12 @@ export default function LearningFormEditor() {
     } catch {setError(true); return false;} finally {setBusy(false);}
   }
   const settingsFields = <>
+    {reviewsAvailable && <section className="quiz-settings-section"><h4>{t('elearning.forms_review.binding')}</h4>
+      <label>{t('elearning.forms_review.binding')}<select value={schema.workflow?.kind || 'none'} onChange={event=>updateSchema({workflow:{kind:event.target.value,termsFieldId:schema.workflow?.termsFieldId || ''},...(event.target.value!=='none' && schema.access==='public'?{access:'authenticated'}:{})})}>
+        <option value="none">{t('elearning.forms_review.ordinary')}</option>{['affiliate','tuition','exchange'].map(kind=><option key={kind} value={kind}>{t(`elearning.programmes.${kind}`)}</option>)}
+      </select></label>
+      {schema.workflow?.kind && schema.workflow.kind!=='none' && <><p>{t('elearning.forms_review.binding_help')}</p><label>{t('elearning.forms_review.terms_field')}<select required value={schema.workflow.termsFieldId || ''} onChange={event=>updateSchema({workflow:{...schema.workflow,termsFieldId:event.target.value}})}><option value="">{label('select')}</option>{fields.filter(field=>field.type==='checkboxes' && field.required && field.options?.length===1).map(field=><option key={field.id} value={field.id}>{field.label}</option>)}</select></label></>}
+    </section>}
     <section className="quiz-settings-section"><h4>{label('access')}</h4><label>{label('access')}<select value={schema.access} onChange={event => updateSchema({access: event.target.value})}>{['public','authenticated','enrolled'].map(value => <option key={value} value={value}>{label(value)}</option>)}</select></label><label>{ui('page_mode')}<select value={schema.pageMode} onChange={event => updateSchema({pageMode: event.target.value})}><option value="paged">{ui('paged')}</option><option value="single">{ui('single')}</option></select></label><label>{label('submitLabel')}<input maxLength={120} value={schema.submitLabel || ''} onChange={event => updateSchema({submitLabel: event.target.value})}/></label></section>
     <section className="quiz-settings-section"><h4>{ui('notifications')}</h4>{['notifyOwner','confirmSubmitter'].map(key => <label className="checkbox-control" key={key}><input type="checkbox" checked={Boolean(schema[key])} onChange={event => updateSchema({[key]: event.target.checked})}/>{label(key)}</label>)}</section>
   </>;

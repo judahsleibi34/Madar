@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "documents": [
+    {
+      "file": "The book project. 30.docx",
+      "sha256": "689ac8cf0701da3a39e18bcbd0c4158fe8ba6eab21153a510beb990841eb0e7c",
+      "read_completely": true,
+      "copyright": "Customer-provided requirements; not redistributed as documents"
+    },
+    {
+      "file": "website prompt .docx",
+      "sha256": "2b55327baa77c2f1f946d5ec55fc297c8fc3cf577025758e303162b404dc2434",
+      "read_completely": true,
+      "copyright": "Customer-provided requirements; not redistributed as documents"
+    }
+  ],
+  "logo": {
+    "source": "Owner image attached 2026-10-12",
+    "approved": true,
+    "local_binary": "assets/eduhope-original-logo.jpeg",
+    "note": "Exact owner-specified original file verified visually and by digest, imported through managed media; navy/emerald theme persisted."
+  },
+  "references": [
+    {
+      "url": "https://dribbble.com/shots/26994297-Funlet-Education-Website-UI-Design",
+      "use": "Layout inspiration only; no artwork copied"
+    },
+    {
+      "url": "https://www.figma.com/community/file/1334813732758519314/future-engineers-comsci-technologies-figma-public",
+      "status": "Not accessible through browser tool"
+    },
+    {
+      "url": "https://www.coe.int/en/web/common-european-framework-reference-languages/cefr-descriptors",
+      "use": "Level alignment only; original exercises"
+    }
+  ],
+  "original_logo": {
+    "verified": true,
+    "package_file": "web/seed-data/eduhope/assets/eduhope-original-logo.jpeg",
+    "sha256": "1f6147d18f80daa3aefed419dfd260194d1760a1883ec9ed6cf83fc9665f96b5",
+    "original_unchanged": true,
+    "palette": [
+      "#002A60",
+      "#005088",
+      "#088848",
+      "#FFFFFF",
+      "#F6F7F4"
+    ]
+  }
+}

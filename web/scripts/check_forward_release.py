@@ -32,6 +32,11 @@ validated_exchange_entries = _exchange_candidate.validated_entries
 _learning_spec = importlib.util.spec_from_file_location("madar_learning_path_validator", Path(__file__).with_name("check_learning_migration_path.py"))
 _learning_candidate = importlib.util.module_from_spec(_learning_spec)
 _learning_spec.loader.exec_module(_learning_candidate)
+
+_forms_review_spec = importlib.util.spec_from_file_location("madar_forms_review_candidate", Path(__file__).with_name("forms_review_candidate.py"))
+_forms_review_candidate = importlib.util.module_from_spec(_forms_review_spec)
+_forms_review_spec.loader.exec_module(_forms_review_candidate)
+validated_forms_review_entries = _forms_review_candidate.validated_entries
 import re
 
 
@@ -229,6 +234,7 @@ def validate(root: Path = ROOT) -> list[str]:
         validated_forms_entries(root)
         validated_exchange_entries(root)
         learning_contract = _learning_candidate.validate(root)
+        validated_forms_review_entries(root)
 
         for tree in ("database", "supabase"):
             catalog = root / f"web/{tree}/migrations/116_reconcile_ecommerce_product_saves.sql"
@@ -388,10 +394,10 @@ def validate(root: Path = ROOT) -> list[str]:
                 ).glob("*.sql")
             )
 
-            if versions != list(range(1, 144 if learning_contract['status']=='finalized' else 143)):
+            if versions != list(range(1, 145 if learning_contract['status']=='finalized' else 143)):
                 errors.append(
                     "migration namespace must contain exactly "
-                    f"001 through {143 if learning_contract['status']=='finalized' else 142}: {tree}"
+                    f"001 through {144 if learning_contract['status']=='finalized' else 142}: {tree}"
                 )
 
     except (OSError, KeyError, ValueError, TypeError) as error:

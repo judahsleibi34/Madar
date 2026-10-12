@@ -1,4 +1,5 @@
 import AcademyDataBlock from "../blocks/AcademyDataBlock";
+import EducationHero from "../blocks/EducationHero";
 import PageBuilderCarousel from "../ui/PageBuilderCarousel";
 import AutoFitDirectText from "./PageBuilder.autoFitText";
 import LazyBuilderVideo from "./LazyBuilderVideo";
@@ -246,6 +247,7 @@ export const createElementRenderer = ({
       renderMode,
     });
     if (overridden !== undefined) return overridden;
+    if (element.type === "card" && element.variant === "educationHero") return <div key={element.id} {...commonProps}><EducationHero element={element} onAction={runElementAction} editing={!preview} /></div>;
     if (element.type.startsWith("academy")) return <div key={element.id} {...commonProps}><AcademyDataBlock element={element} editing={!preview} /></div>;
 
     if (element.type === "heading") {

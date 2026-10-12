@@ -1,0 +1,902 @@
+{
+  "version": 1,
+  "original_content": true,
+  "provisional": true,
+  "authored_demonstration_lessons": [
+    {
+      "key": "course.level-1.topic-1",
+      "level": 1,
+      "cefr": "A1",
+      "title": "Meeting a new classmate",
+      "dialogue": "Lina: Hello. Is this seat free?\nOmar: Yes, it is. Please sit here.\nLina: Thank you. My name is Lina. What is your name?\nOmar: I am Omar. I study engineering.\nLina: I study business. Are you from Bethlehem?\nOmar: No, I am from Ramallah. And you?\nLina: I am from Bethlehem. Nice to meet you.\nOmar: Nice to meet you too. Is this your first English class?",
+      "understanding": [
+        {
+          "prompt": "Where can Lina sit?",
+          "choices": [
+            "In the free seat.",
+            "In a different classroom.",
+            "Outside the library."
+          ],
+          "correct": 0
+        },
+        {
+          "prompt": "What does Omar study?",
+          "choices": [
+            "Engineering.",
+            "Business.",
+            "English literature."
+          ],
+          "correct": 0
+        },
+        {
+          "prompt": "Where is Lina from?",
+          "choices": [
+            "Bethlehem.",
+            "Ramallah.",
+            "Nablus."
+          ],
+          "correct": 0
+        }
+      ],
+      "vocabulary": [
+        {
+          "word": "seat",
+          "meaning": "A place for one person to sit.",
+          "arabic": "مقعد",
+          "example": "Hello. Is this seat free?"
+        },
+        {
+          "word": "free",
+          "meaning": "Not occupied in this conversation.",
+          "arabic": "غير مشغول",
+          "example": "Hello. Is this seat free?"
+        },
+        {
+          "word": "study",
+          "meaning": "Learn about a subject.",
+          "arabic": "يدرس",
+          "example": "I am Omar. I study engineering."
+        },
+        {
+          "word": "first",
+          "meaning": "Before the second.",
+          "arabic": "الأول",
+          "example": "Nice to meet you too. Is this your first English class?"
+        }
+      ],
+      "expressions": [
+        "Is this seat free?",
+        "My name is…",
+        "Nice to meet you."
+      ],
+      "picture": "book",
+      "audio_rate": 140,
+      "editorial_status": "authored_provisional_demonstration",
+      "official_publication_approved": false,
+      "goal": "Introduce yourself and ask a short, clear question.",
+      "arabic_support": "استمع أولاً، ثم اقرأ النص. حدّد الهدف من الحوار، وجرّب التعبيرات بمعلوماتك الخاصة. لا توجد درجات آلية على التحدّث.",
+      "communication_situations": [
+        "Use the conversation’s language to introduce the situation to a new classmate.",
+        "Use the conversation’s language to ask for one missing detail.",
+        "Use the conversation’s language to respond politely to a different preference."
+      ],
+      "response_questions": [
+        "What would you say if you needed the speaker to repeat one detail?",
+        "What would you say if your classmate preferred a different option?",
+        "What would you say if you wanted to check that you had understood?"
+      ],
+      "speaking_challenges": [
+        "Introduce yourself and ask a short, clear question. Use your own information. Speak for 20–40 seconds."
+      ]
+    },
+    {
+      "key": "course.level-2.topic-1",
+      "level": 2,
+      "cefr": "A1",
+      "title": "Daily routines",
+      "dialogue": "Omar: What time do you get up on class days?\nLina: I get up at seven. I have breakfast at half past seven.\nOmar: Do you walk to campus?\nLina: No. I take the bus at eight.\nOmar: When does your first class start?\nLina: At nine. I study in the library after class.\nOmar: Do you study there every day?\nLina: Usually. On Fridays I study at home.",
+      "understanding": [
+        {
+          "prompt": "When does Lina get up?",
+          "choices": [
+            "At seven.",
+            "At half past seven.",
+            "At eight."
+          ],
+          "correct": 0
+        },
+        {
+          "prompt": "How does Lina travel to campus?",
+          "choices": [
+            "By bus.",
+            "On foot.",
+            "By bicycle."
+          ],
+          "correct": 0
+        },
+        {
+          "prompt": "Where does she study on Fridays?",
+          "choices": [
+            "At home.",
+            "On campus.",
+            "On the bus."
+          ],
+          "correct": 0
+        }
+      ],
+      "vocabulary": [
+        {
+          "word": "breakfast",
+          "meaning": "The meal you eat in the morning.",
+          "arabic": "فطور",
+          "example": "I get up at seven. I have breakfast at half past seven."
+        },
+        {
+          "word": "campus",
+          "meaning": "The buildings and grounds of a university.",
+          "arabic": "حرم جامعي",
+          "example": "Do you walk to campus?"
+        },
+        {
+          "word": "usually",
+          "meaning": "On most occasions.",
+          "arabic": "عادةً",
+          "example": "Usually. On Fridays I study at home."
+        },
+        {
+          "word": "start",
+          "meaning": "Begin.",
+          "arabic": "يبدأ",
+          "example": "When does your first class start?"
+        }
+      ],
+      "expressions": [
+        "What time do you…?",
+        "I usually…",
+        "At half past…"
+      ],
+      "picture": "bus",
+      "audio_rate": 140,
+      "editorial_status": "authored_provisional_demonstration",
+      "official_publication_approved": false,
+      "goal": "Introduce yourself and ask a short, clear question.",
+      "arabic_support": "استمع أولاً، ثم اقرأ النص. حدّد الهدف من الحوار، وجرّب التعبيرات بمعلوماتك الخاصة. لا توجد درجات آلية على التحدّث.",
+      "communication_situations": [
+        "Use the conversation’s language to introduce the situation to a new classmate.",
+        "Use the conversation’s language to ask for one missing detail.",
+        "Use the conversation’s language to respond politely to a different preference."
+      ],
+      "response_questions": [
+        "What would you say if you needed the speaker to repeat one detail?",
+        "What would you say if your classmate preferred a different option?",
+        "What would you say if you wanted to check that you had understood?"
+      ],
+      "speaking_challenges": [
+        "Introduce yourself and ask a short, clear question. Use your own information. Speak for 20–40 seconds."
+      ]
+    },
+    {
+      "key": "course.level-3.topic-1",
+      "level": 3,
+      "cefr": "A2",
+      "title": "Talking about last weekend",
+      "dialogue": "Lina: Did you enjoy the student book fair on Saturday?\nOmar: Yes. I went with my cousin and bought two used books.\nLina: Were the books expensive?\nOmar: No. They cost less than the new editions. One was about photography.\nLina: That sounds interesting. Did you stay all afternoon?\nOmar: We left at three because my cousin had a family visit.\nLina: I missed the fair. I was helping my sister move.\nOmar: There is another one next month. We can go together.",
+      "understanding": [
+        {
+          "prompt": "Who went with Omar?",
+          "choices": [
+            "His cousin.",
+            "His sister.",
+            "Lina."
+          ],
+          "correct": 0
+        },
+        {
+          "prompt": "Why did they leave at three?",
+          "choices": [
+            "His cousin had a family visit.",
+            "The fair closed at three.",
+            "They could not find any books."
+          ],
+          "correct": 0
+        },
+        {
+          "prompt": "Why did Lina miss the fair?",
+          "choices": [
+            "She was helping her sister move.",
+            "She was studying photography.",
+            "She had already bought the books."
+          ],
+          "correct": 0
+        }
+      ],
+      "vocabulary": [
+        {
+          "word": "fair",
+          "meaning": "An event where people show or sell things.",
+          "arabic": "معرض",
+          "example": "Did you enjoy the student book fair on Saturday?"
+        },
+        {
+          "word": "used",
+          "meaning": "Owned or used before.",
+          "arabic": "مستعمل",
+          "example": "Yes. I went with my cousin and bought two used books."
+        },
+        {
+          "word": "edition",
+          "meaning": "A particular version of a published book.",
+          "arabic": "طبعة",
+          "example": "No. They cost less than the new editions. One was about photography."
+        },
+        {
+          "word": "miss",
+          "meaning": "Fail to attend something.",
+          "arabic": "يفوّت",
+          "example": "I missed the fair. I was helping my sister move."
+        }
+      ],
+      "expressions": [
+        "Did you enjoy…?",
+        "That sounds interesting.",
+        "We can go together."
+      ],
+      "picture": "calendar",
+      "audio_rate": 155,
+      "editorial_status": "authored_provisional_demonstration",
+      "official_publication_approved": false,
+      "goal": "Ask for details and describe an event or arrangement.",
+      "arabic_support": "استمع أولاً، ثم اقرأ النص. حدّد الهدف من الحوار، وجرّب التعبيرات بمعلوماتك الخاصة. لا توجد درجات آلية على التحدّث.",
+      "communication_situations": [
+        "Use the conversation’s language to introduce the situation to a new classmate.",
+        "Use the conversation’s language to ask for one missing detail.",
+        "Use the conversation’s language to respond politely to a different preference.",
+        "Use the conversation’s language to explain a change to the original arrangement."
+      ],
+      "response_questions": [
+        "What would you say if you needed the speaker to repeat one detail?",
+        "What would you say if your classmate preferred a different option?",
+        "What would you say if you wanted to check that you had understood?",
+        "What would you say if the proposed time did not suit you?"
+      ],
+      "speaking_challenges": [
+        "Ask for details and describe an event or arrangement. Use your own information. Speak for 20–40 seconds."
+      ]
+    },
+    {
+      "key": "course.level-4.topic-1",
+      "level": 4,
+      "cefr": "A2",
+      "title": "Booking a journey",
+      "dialogue": "Omar: I would like two seats on the morning bus to Nablus, please.\nClerk: We have departures at eight and ten. Which one would you prefer?\nOmar: The eight o’clock bus. Does it stop near the university?\nClerk: Yes, but you need to tell the driver before you leave.\nOmar: How long does the journey usually take?\nClerk: About an hour and a half, depending on traffic.\nOmar: Can I change the booking if our class time changes?\nClerk: You can change it before six this evening. Keep your confirmation number.",
+      "understanding": [
+        {
+          "prompt": "Which departure does Omar choose?",
+          "choices": [
+            "Eight o’clock.",
+            "Ten o’clock.",
+            "Six in the evening."
+          ],
+          "correct": 0
+        },
+        {
+          "prompt": "What must he do for the university stop?",
+          "choices": [
+            "Tell the driver before leaving.",
+            "Buy a different ticket.",
+            "Change buses at the station."
+          ],
+          "correct": 0
+        },
+        {
+          "prompt": "What can affect the journey time?",
+          "choices": [
+            "Traffic.",
+            "The confirmation number.",
+            "The number of classes."
+          ],
+          "correct": 0
+        }
+      ],
+      "vocabulary": [
+        {
+          "word": "departure",
+          "meaning": "The time a journey begins.",
+          "arabic": "مغادرة",
+          "example": "We have departures at eight and ten. Which one would you prefer?"
+        },
+        {
+          "word": "prefer",
+          "meaning": "Like one choice more than another.",
+          "arabic": "يفضّل",
+          "example": "We have departures at eight and ten. Which one would you prefer?"
+        },
+        {
+          "word": "depending on",
+          "meaning": "Affected or decided by something else.",
+          "arabic": "اعتماداً على",
+          "example": "About an hour and a half, depending on traffic."
+        },
+        {
+          "word": "confirmation",
+          "meaning": "A message showing that an arrangement is accepted.",
+          "arabic": "تأكيد",
+          "example": "You can change it before six this evening. Keep your confirmation number."
+        }
+      ],
+      "expressions": [
+        "I would like…",
+        "Which one would you prefer?",
+        "Can I change the booking?"
+      ],
+      "picture": "bus",
+      "audio_rate": 155,
+      "editorial_status": "authored_provisional_demonstration",
+      "official_publication_approved": false,
+      "goal": "Ask for details and describe an event or arrangement.",
+      "arabic_support": "استمع أولاً، ثم اقرأ النص. حدّد الهدف من الحوار، وجرّب التعبيرات بمعلوماتك الخاصة. لا توجد درجات آلية على التحدّث.",
+      "communication_situations": [
+        "Use the conversation’s language to introduce the situation to a new classmate.",
+        "Use the conversation’s language to ask for one missing detail.",
+        "Use the conversation’s language to respond politely to a different preference.",
+        "Use the conversation’s language to explain a change to the original arrangement."
+      ],
+      "response_questions": [
+        "What would you say if you needed the speaker to repeat one detail?",
+        "What would you say if your classmate preferred a different option?",
+        "What would you say if you wanted to check that you had understood?",
+        "What would you say if the proposed time did not suit you?"
+      ],
+      "speaking_challenges": [
+        "Ask for details and describe an event or arrangement. Use your own information. Speak for 20–40 seconds."
+      ]
+    },
+    {
+      "key": "course.level-5.topic-1",
+      "level": 5,
+      "cefr": "B1",
+      "title": "Giving an opinion respectfully",
+      "dialogue": "Lina: I think our study group should meet twice a week before the exam.\nOmar: I see your point, but two long meetings may be difficult for students who work.\nLina: What if one meeting were online and only lasted thirty minutes?\nOmar: That would help. We could use it to ask questions rather than repeat the lecture.\nLina: Agreed. The campus meeting could focus on solving practice problems.\nOmar: We should ask everyone which evening works best before fixing a time.\nLina: I will send a short poll today. Could you prepare three practice problems?\nOmar: Yes. Then we can review the plan after the first week.",
+      "understanding": [
+        {
+          "prompt": "What concern does Omar raise?",
+          "choices": [
+            "Working students may find two long meetings difficult.",
+            "The exam has been cancelled.",
+            "Nobody understands online meetings."
+          ],
+          "correct": 0
+        },
+        {
+          "prompt": "What is the purpose of the online meeting?",
+          "choices": [
+            "To ask questions.",
+            "To repeat the whole lecture.",
+            "To choose a different course."
+          ],
+          "correct": 0
+        },
+        {
+          "prompt": "What will Lina do next?",
+          "choices": [
+            "Send a poll.",
+            "Prepare three problems.",
+            "Cancel the campus meeting."
+          ],
+          "correct": 0
+        }
+      ],
+      "vocabulary": [
+        {
+          "word": "concern",
+          "meaning": "Something that worries a person.",
+          "arabic": "مصدر قلق",
+          "example": "Use “concern” to describe an example from your own experience."
+        },
+        {
+          "word": "focus on",
+          "meaning": "Give particular attention to.",
+          "arabic": "يركّز على",
+          "example": "Agreed. The campus meeting could focus on solving practice problems."
+        },
+        {
+          "word": "poll",
+          "meaning": "A short question used to collect people’s choices.",
+          "arabic": "استطلاع",
+          "example": "I will send a short poll today. Could you prepare three practice problems?"
+        },
+        {
+          "word": "review",
+          "meaning": "Look at something again to see whether it works.",
+          "arabic": "يراجع",
+          "example": "Yes. Then we can review the plan after the first week."
+        }
+      ],
+      "expressions": [
+        "I see your point, but…",
+        "What if we…?",
+        "We could…rather than…"
+      ],
+      "picture": "meeting",
+      "audio_rate": 165,
+      "editorial_status": "authored_provisional_demonstration",
+      "official_publication_approved": false,
+      "goal": "Explain an opinion or experience with a reason.",
+      "arabic_support": "استمع أولاً، ثم اقرأ النص. حدّد الهدف من الحوار، وجرّب التعبيرات بمعلوماتك الخاصة. لا توجد درجات آلية على التحدّث.",
+      "communication_situations": [
+        "Use the conversation’s language to introduce the situation to a new classmate.",
+        "Use the conversation’s language to ask for one missing detail.",
+        "Use the conversation’s language to respond politely to a different preference.",
+        "Use the conversation’s language to explain a change to the original arrangement.",
+        "Use the conversation’s language to agree a useful next step."
+      ],
+      "response_questions": [
+        "What would you say if you needed the speaker to repeat one detail?",
+        "What would you say if your classmate preferred a different option?",
+        "What would you say if you wanted to check that you had understood?",
+        "What would you say if the proposed time did not suit you?",
+        "What would you say if you needed to explain a reason without sounding rude?"
+      ],
+      "speaking_challenges": [
+        "Explain an opinion or experience with a reason. Use your own information. Speak for 45–90 seconds.",
+        "Summarize both speakers’ priorities, then explain what you would do and why. Make your level of certainty clear."
+      ]
+    },
+    {
+      "key": "course.level-6.topic-1",
+      "level": 6,
+      "cefr": "B1",
+      "title": "Preparing for a job interview",
+      "dialogue": "Interviewer: Tell me about a time you worked with a team.\nOmar: In a university project, our group had to present a simple energy-saving plan.\nInterviewer: What was your responsibility?\nOmar: I compared three options and summarized their costs. At first, I included too many technical details.\nInterviewer: How did you deal with that?\nOmar: I asked a classmate to listen to my explanation. Her questions helped me make the summary clearer.\nInterviewer: What did you learn from the experience?\nOmar: A good explanation depends on the audience. I now check that my main point is clear before adding detail.",
+      "understanding": [
+        {
+          "prompt": "What did the group present?",
+          "choices": [
+            "An energy-saving plan.",
+            "A new job application.",
+            "A campus transport timetable."
+          ],
+          "correct": 0
+        },
+        {
+          "prompt": "What was Omar’s initial difficulty?",
+          "choices": [
+            "He included too many technical details.",
+            "He could not compare the costs.",
+            "He did not work with a team."
+          ],
+          "correct": 0
+        },
+        {
+          "prompt": "What helped him improve?",
+          "choices": [
+            "A classmate’s questions.",
+            "Removing every cost from the presentation.",
+            "Using more specialist terminology."
+          ],
+          "correct": 0
+        }
+      ],
+      "vocabulary": [
+        {
+          "word": "responsibility",
+          "meaning": "A task you are expected to do.",
+          "arabic": "مسؤولية",
+          "example": "What was your responsibility?"
+        },
+        {
+          "word": "summarize",
+          "meaning": "Give the main points briefly.",
+          "arabic": "يلخّص",
+          "example": "I compared three options and summarized their costs. At first, I included too many technical details."
+        },
+        {
+          "word": "audience",
+          "meaning": "The people who listen or read.",
+          "arabic": "جمهور",
+          "example": "A good explanation depends on the audience. I now check that my main point is clear before adding detail."
+        },
+        {
+          "word": "technical",
+          "meaning": "Related to specialist knowledge.",
+          "arabic": "تقني",
+          "example": "I compared three options and summarized their costs. At first, I included too many technical details."
+        }
+      ],
+      "expressions": [
+        "My responsibility was…",
+        "At first…",
+        "What I learned was…"
+      ],
+      "picture": "interview",
+      "audio_rate": 165,
+      "editorial_status": "authored_provisional_demonstration",
+      "official_publication_approved": false,
+      "goal": "Explain an opinion or experience with a reason.",
+      "arabic_support": "استمع أولاً، ثم اقرأ النص. حدّد الهدف من الحوار، وجرّب التعبيرات بمعلوماتك الخاصة. لا توجد درجات آلية على التحدّث.",
+      "communication_situations": [
+        "Use the conversation’s language to introduce the situation to a new classmate.",
+        "Use the conversation’s language to ask for one missing detail.",
+        "Use the conversation’s language to respond politely to a different preference.",
+        "Use the conversation’s language to explain a change to the original arrangement.",
+        "Use the conversation’s language to agree a useful next step."
+      ],
+      "response_questions": [
+        "What would you say if you needed the speaker to repeat one detail?",
+        "What would you say if your classmate preferred a different option?",
+        "What would you say if you wanted to check that you had understood?",
+        "What would you say if the proposed time did not suit you?",
+        "What would you say if you needed to explain a reason without sounding rude?"
+      ],
+      "speaking_challenges": [
+        "Explain an opinion or experience with a reason. Use your own information. Speak for 45–90 seconds.",
+        "Summarize both speakers’ priorities, then explain what you would do and why. Make your level of certainty clear."
+      ]
+    },
+    {
+      "key": "course.level-7.topic-1",
+      "level": 7,
+      "cefr": "B2",
+      "title": "Balancing different viewpoints",
+      "dialogue": "Lina: Extending library hours could benefit students who have daytime jobs.\nOmar: I support the idea, although staffing costs would have to be considered.\nLina: Perhaps we could trial longer hours during the exam period rather than throughout the year.\nOmar: A trial would give us evidence, but attendance alone would not show whether the service was useful.\nLina: We could collect anonymous feedback as well as counting visits.\nOmar: Provided the questions are neutral, that would strengthen the evaluation.\nLina: Let us propose a four-week pilot with a clear budget and a review date.\nOmar: Agreed. We should also explain what would justify continuing or ending it.",
+      "understanding": [
+        {
+          "prompt": "Why might longer hours help?",
+          "choices": [
+            "Some students work during the day.",
+            "All students prefer studying at night.",
+            "The library has no staffing costs."
+          ],
+          "correct": 0
+        },
+        {
+          "prompt": "Why is attendance alone insufficient?",
+          "choices": [
+            "It does not establish how useful the service was.",
+            "It cannot be counted.",
+            "It proves that all visitors dislike the service."
+          ],
+          "correct": 0
+        },
+        {
+          "prompt": "What condition does Omar attach to feedback?",
+          "choices": [
+            "The questions should be neutral.",
+            "Students should identify themselves.",
+            "The budget should be ignored."
+          ],
+          "correct": 0
+        }
+      ],
+      "vocabulary": [
+        {
+          "word": "trial",
+          "meaning": "A limited test before a wider decision.",
+          "arabic": "تجربة",
+          "example": "Perhaps we could trial longer hours during the exam period rather than throughout the year."
+        },
+        {
+          "word": "neutral",
+          "meaning": "Not favoring a particular answer or viewpoint.",
+          "arabic": "محايد",
+          "example": "Provided the questions are neutral, that would strengthen the evaluation."
+        },
+        {
+          "word": "evaluation",
+          "meaning": "A systematic judgment of value or effectiveness.",
+          "arabic": "تقييم",
+          "example": "Provided the questions are neutral, that would strengthen the evaluation."
+        },
+        {
+          "word": "justify",
+          "meaning": "Give a convincing reason for.",
+          "arabic": "يبرّر",
+          "example": "Agreed. We should also explain what would justify continuing or ending it."
+        }
+      ],
+      "expressions": [
+        "I support the idea, although…",
+        "Provided that…",
+        "This would give us evidence…"
+      ],
+      "picture": "balance",
+      "audio_rate": 165,
+      "editorial_status": "authored_provisional_demonstration",
+      "official_publication_approved": false,
+      "goal": "Balance viewpoints and negotiate an appropriate response.",
+      "arabic_support": "استمع أولاً، ثم اقرأ النص. حدّد الهدف من الحوار، وجرّب التعبيرات بمعلوماتك الخاصة. لا توجد درجات آلية على التحدّث.",
+      "communication_situations": [
+        "Use the conversation’s language to introduce the situation to a new classmate.",
+        "Use the conversation’s language to ask for one missing detail.",
+        "Use the conversation’s language to respond politely to a different preference.",
+        "Use the conversation’s language to explain a change to the original arrangement.",
+        "Use the conversation’s language to agree a useful next step."
+      ],
+      "response_questions": [
+        "What would you say if you needed the speaker to repeat one detail?",
+        "What would you say if your classmate preferred a different option?",
+        "What would you say if you wanted to check that you had understood?",
+        "What would you say if the proposed time did not suit you?",
+        "What would you say if you needed to explain a reason without sounding rude?"
+      ],
+      "speaking_challenges": [
+        "Balance viewpoints and negotiate an appropriate response. Use your own information. Speak for 45–90 seconds.",
+        "Summarize both speakers’ priorities, then explain what you would do and why. Make your level of certainty clear."
+      ]
+    },
+    {
+      "key": "course.level-8.topic-1",
+      "level": 8,
+      "cefr": "B2",
+      "title": "Negotiating a shared outcome",
+      "dialogue": "Omar: The team needs the rehearsal room on Thursday, but the music society has already booked it.\nLina: Could we negotiate a shorter session rather than asking them to cancel?\nOmar: We need forty minutes to test the presentation equipment. They need an uninterrupted hour.\nLina: If we move our test to the start of the afternoon, they could keep their full session afterward.\nOmar: That depends on whether the technician is available earlier.\nLina: I can check with her. We should make our proposal conditional on that confirmation.\nOmar: Good. Let us also offer to reset the room so their rehearsal can start on time.\nLina: That makes the arrangement fairer. Both groups keep the time they actually need.",
+      "understanding": [
+        {
+          "prompt": "What does the music society need?",
+          "choices": [
+            "An uninterrupted hour.",
+            "Forty minutes for equipment testing.",
+            "The technician’s entire afternoon."
+          ],
+          "correct": 0
+        },
+        {
+          "prompt": "What must be confirmed first?",
+          "choices": [
+            "The technician’s earlier availability.",
+            "Whether the music society exists.",
+            "Whether the room needs any equipment."
+          ],
+          "correct": 0
+        },
+        {
+          "prompt": "Why offer to reset the room?",
+          "choices": [
+            "To help the other rehearsal start on time.",
+            "To shorten the other group’s session.",
+            "To avoid confirming the arrangement."
+          ],
+          "correct": 0
+        }
+      ],
+      "vocabulary": [
+        {
+          "word": "negotiate",
+          "meaning": "Discuss terms to reach agreement.",
+          "arabic": "يتفاوض",
+          "example": "Could we negotiate a shorter session rather than asking them to cancel?"
+        },
+        {
+          "word": "uninterrupted",
+          "meaning": "Without a break or disruption.",
+          "arabic": "دون انقطاع",
+          "example": "We need forty minutes to test the presentation equipment. They need an uninterrupted hour."
+        },
+        {
+          "word": "conditional on",
+          "meaning": "Only valid if another requirement is met.",
+          "arabic": "مشروط بـ",
+          "example": "I can check with her. We should make our proposal conditional on that confirmation."
+        },
+        {
+          "word": "arrangement",
+          "meaning": "An agreed plan.",
+          "arabic": "ترتيب",
+          "example": "That makes the arrangement fairer. Both groups keep the time they actually need."
+        }
+      ],
+      "expressions": [
+        "Could we…rather than…?",
+        "That depends on whether…",
+        "We could make this conditional on…"
+      ],
+      "picture": "meeting",
+      "audio_rate": 165,
+      "editorial_status": "authored_provisional_demonstration",
+      "official_publication_approved": false,
+      "goal": "Balance viewpoints and negotiate an appropriate response.",
+      "arabic_support": "استمع أولاً، ثم اقرأ النص. حدّد الهدف من الحوار، وجرّب التعبيرات بمعلوماتك الخاصة. لا توجد درجات آلية على التحدّث.",
+      "communication_situations": [
+        "Use the conversation’s language to introduce the situation to a new classmate.",
+        "Use the conversation’s language to ask for one missing detail.",
+        "Use the conversation’s language to respond politely to a different preference.",
+        "Use the conversation’s language to explain a change to the original arrangement.",
+        "Use the conversation’s language to agree a useful next step."
+      ],
+      "response_questions": [
+        "What would you say if you needed the speaker to repeat one detail?",
+        "What would you say if your classmate preferred a different option?",
+        "What would you say if you wanted to check that you had understood?",
+        "What would you say if the proposed time did not suit you?",
+        "What would you say if you needed to explain a reason without sounding rude?"
+      ],
+      "speaking_challenges": [
+        "Balance viewpoints and negotiate an appropriate response. Use your own information. Speak for 45–90 seconds.",
+        "Summarize both speakers’ priorities, then explain what you would do and why. Make your level of certainty clear."
+      ]
+    },
+    {
+      "key": "course.level-9.topic-1",
+      "level": 9,
+      "cefr": "C1",
+      "title": "Developing a nuanced argument",
+      "dialogue": "Lina: The survey suggests that students who attend language workshops report greater confidence.\nOmar: That is encouraging, but it does not establish that the workshops caused the improvement.\nLina: Students who were already motivated may have been more likely to attend.\nOmar: Exactly. We should distinguish an association from a causal claim.\nLina: Would comparing participants’ confidence before and after the workshop address that limitation?\nOmar: It would help, although a comparable non-participant group would make the interpretation stronger.\nLina: Then our recommendation should be a carefully evaluated pilot, rather than immediate expansion.\nOmar: Yes. Acknowledge the promising findings while making the uncertainty explicit.",
+      "understanding": [
+        {
+          "prompt": "What does the survey establish?",
+          "choices": [
+            "An association between attendance and reported confidence.",
+            "That workshops definitely caused improvement.",
+            "That every student attended a workshop."
+          ],
+          "correct": 0
+        },
+        {
+          "prompt": "What alternative explanation is raised?",
+          "choices": [
+            "Already motivated students may be more likely to attend.",
+            "The survey measured staffing costs.",
+            "Participants were forbidden to report confidence."
+          ],
+          "correct": 0
+        },
+        {
+          "prompt": "What do the speakers recommend?",
+          "choices": [
+            "A carefully evaluated pilot.",
+            "Immediate expansion without evaluation.",
+            "Ending all language workshops."
+          ],
+          "correct": 0
+        }
+      ],
+      "vocabulary": [
+        {
+          "word": "association",
+          "meaning": "A relationship that does not by itself prove cause.",
+          "arabic": "ارتباط",
+          "example": "Exactly. We should distinguish an association from a causal claim."
+        },
+        {
+          "word": "causal",
+          "meaning": "Showing that one thing produces another.",
+          "arabic": "سببي",
+          "example": "Exactly. We should distinguish an association from a causal claim."
+        },
+        {
+          "word": "comparable",
+          "meaning": "Similar enough to support a fair comparison.",
+          "arabic": "قابل للمقارنة",
+          "example": "It would help, although a comparable non-participant group would make the interpretation stronger."
+        },
+        {
+          "word": "explicit",
+          "meaning": "Stated clearly rather than implied.",
+          "arabic": "صريح",
+          "example": "Yes. Acknowledge the promising findings while making the uncertainty explicit."
+        }
+      ],
+      "expressions": [
+        "This suggests…rather than establishes…",
+        "An alternative explanation is…",
+        "While the findings are promising…"
+      ],
+      "picture": "evidence",
+      "audio_rate": 165,
+      "editorial_status": "authored_provisional_demonstration",
+      "official_publication_approved": false,
+      "goal": "Qualify claims, explain limitations and support a nuanced recommendation.",
+      "arabic_support": "استمع أولاً، ثم اقرأ النص. حدّد الهدف من الحوار، وجرّب التعبيرات بمعلوماتك الخاصة. لا توجد درجات آلية على التحدّث.",
+      "communication_situations": [
+        "Use the conversation’s language to introduce the situation to a new classmate.",
+        "Use the conversation’s language to ask for one missing detail.",
+        "Use the conversation’s language to respond politely to a different preference.",
+        "Use the conversation’s language to explain a change to the original arrangement.",
+        "Use the conversation’s language to agree a useful next step."
+      ],
+      "response_questions": [
+        "What would you say if you needed the speaker to repeat one detail?",
+        "What would you say if your classmate preferred a different option?",
+        "What would you say if you wanted to check that you had understood?",
+        "What would you say if the proposed time did not suit you?",
+        "What would you say if you needed to explain a reason without sounding rude?"
+      ],
+      "speaking_challenges": [
+        "Qualify claims, explain limitations and support a nuanced recommendation. Use your own information. Speak for 45–90 seconds.",
+        "Summarize both speakers’ priorities, then explain what you would do and why. Make your level of certainty clear."
+      ]
+    },
+    {
+      "key": "course.level-10.topic-1",
+      "level": 10,
+      "cefr": "C1",
+      "title": "Communicating a strategic recommendation",
+      "dialogue": "Omar: I recommend a phased introduction of the peer-mentoring scheme rather than a campus-wide launch.\nLina: Which constraint has most influenced that recommendation?\nOmar: We can recruit mentors quickly, but consistent training and supervision would be harder to scale.\nLina: How would you judge whether the initial phase had succeeded?\nOmar: I would combine participation data with confidential feedback and evidence that support needs were being addressed.\nLina: We also need safeguards so that enthusiasm does not substitute for qualified guidance.\nOmar: Agreed. Mentors should know when to refer a student to an authorized professional.\nLina: Then present the proposal with clear boundaries, review criteria and conditions for expansion.",
+      "understanding": [
+        {
+          "prompt": "Why recommend a phased introduction?",
+          "choices": [
+            "Training and supervision are harder to scale than recruitment.",
+            "No mentors can be recruited.",
+            "A campus-wide launch is already compulsory."
+          ],
+          "correct": 0
+        },
+        {
+          "prompt": "What safeguard is proposed?",
+          "choices": [
+            "Mentors should refer issues requiring professional support.",
+            "Mentors should give every type of advice themselves.",
+            "Feedback should never be confidential."
+          ],
+          "correct": 0
+        },
+        {
+          "prompt": "What should accompany the proposal?",
+          "choices": [
+            "Boundaries, review criteria and conditions for expansion.",
+            "Only a list of participation totals.",
+            "A promise of unlimited support."
+          ],
+          "correct": 0
+        }
+      ],
+      "vocabulary": [
+        {
+          "word": "phased",
+          "meaning": "Introduced in planned stages.",
+          "arabic": "على مراحل",
+          "example": "I recommend a phased introduction of the peer-mentoring scheme rather than a campus-wide launch."
+        },
+        {
+          "word": "constraint",
+          "meaning": "A limit affecting a decision.",
+          "arabic": "قيد",
+          "example": "Which constraint has most influenced that recommendation?"
+        },
+        {
+          "word": "safeguard",
+          "meaning": "A measure that protects against a problem.",
+          "arabic": "إجراء وقائي",
+          "example": "We also need safeguards so that enthusiasm does not substitute for qualified guidance."
+        },
+        {
+          "word": "criteria",
+          "meaning": "Standards used to judge something.",
+          "arabic": "معايير",
+          "example": "Then present the proposal with clear boundaries, review criteria and conditions for expansion."
+        }
+      ],
+      "expressions": [
+        "I recommend…rather than…",
+        "The key constraint is…",
+        "Expansion should depend on…"
+      ],
+      "picture": "evidence",
+      "audio_rate": 165,
+      "editorial_status": "authored_provisional_demonstration",
+      "official_publication_approved": false,
+      "goal": "Qualify claims, explain limitations and support a nuanced recommendation.",
+      "arabic_support": "استمع أولاً، ثم اقرأ النص. حدّد الهدف من الحوار، وجرّب التعبيرات بمعلوماتك الخاصة. لا توجد درجات آلية على التحدّث.",
+      "communication_situations": [
+        "Use the conversation’s language to introduce the situation to a new classmate.",
+        "Use the conversation’s language to ask for one missing detail.",
+        "Use the conversation’s language to respond politely to a different preference.",
+        "Use the conversation’s language to explain a change to the original arrangement.",
+        "Use the conversation’s language to agree a useful next step."
+      ],
+      "response_questions": [
+        "What would you say if you needed the speaker to repeat one detail?",
+        "What would you say if your classmate preferred a different option?",
+        "What would you say if you wanted to check that you had understood?",
+        "What would you say if the proposed time did not suit you?",
+        "What would you say if you needed to explain a reason without sounding rude?"
+      ],
+      "speaking_challenges": [
+        "Qualify claims, explain limitations and support a nuanced recommendation. Use your own information. Speak for 45–90 seconds.",
+        "Summarize both speakers’ priorities, then explain what you would do and why. Make your level of certainty clear."
+      ]
+    }
+  ],
+  "remaining_topics": "Editable draft outlines; original owner topic map and further editorial authoring required."
+}

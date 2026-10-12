@@ -26,6 +26,18 @@ def create(payload:service.Definition,request:Request,response:Response):
     actor=owner(request,response)
     result=operation(lambda:service.save(actor,payload));audit(request,actor,'create',result['id']);return result
 
+@router.get('/my-responses')
+def applicant_responses(request:Request,response:Response,limit:int=Query(25,ge=1,le=50),offset:int=Query(0,ge=0)):
+    actor=require_active_tenant_member(request,response,allow_admin_account_access=False,allow_learner=True)
+    response.headers['Cache-Control']='private, no-store'
+    return operation(lambda:service.applicant_responses(actor,limit,offset))
+
+@router.get('/my-responses/{identifier}')
+def applicant_response(identifier:UUID,request:Request,response:Response):
+    actor=require_active_tenant_member(request,response,allow_admin_account_access=False,allow_learner=True)
+    response.headers['Cache-Control']='private, no-store'
+    return operation(lambda:service.applicant_response(actor,identifier))
+
 @router.get('/responses')
 def responses(request:Request,response:Response,form_id:UUID|None=None,search:str=Query('',max_length=120),unread:bool=False,date_from:datetime|None=None,date_to:datetime|None=None,identity:Literal['guest','authenticated']|None=None,limit:int=Query(50,ge=1,le=100),offset:int=Query(0,ge=0),opportunity_id:UUID|None=None):
     actor=owner(request,response)
@@ -45,6 +57,11 @@ def response_detail(identifier:UUID,request:Request,response:Response):
 def mark(identifier:UUID,payload:service.ResponseEdit,request:Request,response:Response):
     actor=owner(request,response);service.gate(actor.tenant_id,'response_management')
     result=service.rpc('manage_elearning_form_response',{'p_tenant':actor.tenant_id,'p_user':actor.user_id,'p_id':str(identifier),'p_read':payload.read,'p_notes':payload.owner_notes});audit(request,actor,'review',identifier);return result
+
+@router.post('/responses/{identifier}/decision')
+def decision(identifier:UUID,payload:service.Decision,request:Request,response:Response):
+    actor=owner(request,response)
+    result=operation(lambda:service.review_response(actor,identifier,payload));audit(request,actor,'decision',identifier);return result
 
 @router.get('/responses/{response_id}/files/{file_id}')
 def download(response_id:UUID,file_id:UUID,request:Request,response:Response):

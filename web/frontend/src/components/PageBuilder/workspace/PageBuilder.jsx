@@ -2,6 +2,7 @@ import { useTranslation } from "react-i18next";
 import BuilderProjectLoadError from "./BuilderProjectLoadError";
 import { AcademyBuilderPreviewProvider } from "../../ELearning/ELearningAcademy";
 import AcademyDataInspector from "../blocks/AcademyDataInspector";
+import PresentationTranslationInspector from "../blocks/PresentationTranslationInspector";
 import useAcademyCapabilities from "../../../hooks/useAcademyCapabilities";
 import { ACADEMY_COMPONENT_TYPES, getAcademyNavigationDestinations } from "../core/PageBuilder.academyProfile";
 import SelectionBoundary from "../core/PageBuilder.selectionBoundary";
@@ -6679,6 +6680,16 @@ export default function PageBuilder({
             <label>Name<input value={getBuilderElementName(selectedElement)} onChange={(event) => updateSelectedElement({ name: event.target.value })} /></label>
           )}
           {selectedElement.type.startsWith("academy") && <AcademyDataInspector key={selectedElement.id} element={selectedElement} onChange={updateSelectedElement} />}
+          {isAcademyProject && <PresentationTranslationInspector element={selectedElement} onChange={updateSelectedElement} />}
+          {selectedElement.type === "card" && selectedElement.variant === "educationHero" && <>
+            <label>Content<textarea value={selectedElement.content || ""} onChange={event=>updateSelectedElement({content:event.target.value})} /></label>
+            <label className="upload-image-button">{assetUploadBusy ? "Uploading..." : "Upload hero image"}<input type="file" accept="image/png,image/jpeg,image/webp" hidden disabled={assetUploadBusy} onChange={handleSelectedElementImageUpload} /></label>
+            <label>Image URL<input value={selectedElement.imageUrl || ""} onChange={event => updateSelectedElement({imageUrl:event.target.value})} /></label>
+            <label>Image description<input value={selectedElement.alt || ""} onChange={event => updateSelectedElement({alt:event.target.value})} /></label>
+            {["eyebrow","description","primaryLabel","secondaryLabel","caption"].map(key => <label key={key}>{key}<textarea value={selectedElement[key] || ""} onChange={event => updateSelectedElement({[key]:event.target.value})} /></label>)}
+            <label>Secondary destination<select value={selectedElement.secondaryAction?.pageId || ""} onChange={event => updateSelectedElement({secondaryAction:{type:"goToPage",pageId:event.target.value}})}><option value="">Select page</option>{project.pages.map(page => <option key={page.id} value={page.id}>{page.name}</option>)}</select></label>
+            {["focalX","focalY"].map(key => <label key={key}>{key}<input type="range" min="0" max="100" value={selectedElement[key] ?? 50} onChange={event => updateSelectedElement({[key]:Number(event.target.value)})} /></label>)}
+          </>}
           {selectedElement.type === "logoSlider" && (
             <div className="logo-slider-settings">
               <strong>Trusted logo slider</strong>
@@ -6715,7 +6726,7 @@ export default function PageBuilder({
               <p className="builder-note">The destination page can stay hidden from the header.</p>
             </div>
           )}
-          {carouselElementTypes.has(selectedElement.type) && (
+          {carouselElementTypes.has(selectedElement.type) && selectedElement.variant !== 'educationHero' && (
             <div className="carousel-timing-controls">
               <strong>Slide timing</strong>
               <label>
@@ -6746,7 +6757,7 @@ export default function PageBuilder({
               </label>
             </div>
           )}
-          {carouselElementTypes.has(selectedElement.type) && (
+          {carouselElementTypes.has(selectedElement.type) && selectedElement.variant !== 'educationHero' && (
             <details open className="carousel-slide-editor">
               <summary>{selectedElement.type === "logoSlider" ? "Partner logos" : "Carousel cards"}</summary>
               <p className="builder-note">{selectedElement.type === "logoSlider" ? "Add each partner name and upload its logo." : "Edit each card and choose or replace its image."}</p>

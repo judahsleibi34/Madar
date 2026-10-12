@@ -93,7 +93,7 @@ export function NotificationProvider({
   const refreshNotifications = useCallback(async () => {
     const requestIdentity = identity;
     if (!requestIdentity) return null;
-    if (inFlightRef.current?.identity === requestIdentity) {
+    if (inFlightRef.current?.identity === requestIdentity && !inFlightRef.current.controller.signal.aborted) {
       return inFlightRef.current.promise;
     }
 

@@ -1,0 +1,15 @@
+{
+  "release_metadata_version": 1,
+  "deployment_profile": "learning-forms-reviews143-144",
+  "schema": {
+    "compatible_min": 143,
+    "compatible_max": 144,
+    "target": 144,
+    "migration_class": "forward-compatible",
+    "rollback_compatible_min": 143,
+    "rollback_compatible_max": 143
+  },
+  "migration_policy": "automatic-after-known-good-backup-first-forward-repair",
+  "migration_manifest": "migrations-143-144-forms.json",
+  "notes": "Unselected candidate following the exact learning143 branch; Exchange142 remains excluded from its history. Independent Forms decisions and transactional existing Affiliate/Tuition authority. No production or application database activation granted."
+}

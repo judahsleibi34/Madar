@@ -22,6 +22,10 @@ def snapshot(tenant, modules, suspended=None):
 class AcademyCapabilityTests(unittest.TestCase):
     def setUp(self):
         self.stack=[]
+        # Published intake navigation is a separate projection; isolate it from
+        # the finance entitlement tests rather than contacting a real provider.
+        navigation=patch('services.elearning_academy_service.member_profile',return_value={'application_paths':{}})
+        navigation.start();self.addCleanup(navigation.stop)
         def start(patcher):
             value=patcher.start();self.addCleanup(patcher.stop);return value
         start(patch.dict(os.environ,{'COMMERCIAL_ENTITLEMENTS_ENFORCED':'true'}))

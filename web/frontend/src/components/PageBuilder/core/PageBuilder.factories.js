@@ -151,6 +151,13 @@ export const createElement = (type = "text", overrides = {}) => {
   };
 
   const presets = {
+    educationHero: {
+      type: "card", variant: "educationHero",
+      name: "Photographic hero", content: "Learn with confidence", description: "Build practical skills and discover new opportunities.",
+      imageUrl: "", alt: "", eyebrow: "", primaryLabel: "Explore", secondaryLabel: "How it works",
+      secondaryAction: createAction(), focalX: 50, focalY: 50,
+      styles: {...base.styles,width:"100%",alignSelf:"stretch",borderRadius:"24px"},
+    },
     heading: {
       name: factoryCopy.elements.heading.name,
       content: factoryCopy.elements.heading.content,

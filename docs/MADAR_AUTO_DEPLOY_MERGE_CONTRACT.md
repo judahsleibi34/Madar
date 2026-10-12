@@ -1,5 +1,39 @@
 # Madar Auto-Deploy Merge Contract
 
+## Approved unselected generic Forms review candidate143→144
+
+The separately approved mirrored144 candidate follows learning143 consecutively.
+It does not execute or select Exchange142, change001–143 SQL, or change the active
+main115→136 descriptor. Exact144 SQL/manifest/bridge hashes are validated by
+`web/scripts/forms_review_candidate.py`; source namespace acceptance extends to144
+only for those verified artifacts. Ordinary executor backup, locks and resume
+rules remain unchanged. Candidate compatibility is143..144; rollback is143 only.
+The normal local application remains141.
+
+Independent E-Learning Forms keeps the only definitions, immutable versions,
+answers, files and response inbox.144 adds generic decisions/history and a nullable
+reference on existing domain applications; it stores no copied answers. Explicit
+versioned owner binding and a configured terms field drive generic Affiliate,
+Tuition or Exchange intake without hardcoded Form fields or a specialized Exchange
+engine. Submission cannot grant privileges. Backend/SQL recheck authentication,
+active membership, programme flags and canonical eligibility. Four verified sales
+apply to Tuition only; generic Exchange requires independent active learning access.
+
+Forms decisions call the retained privileged domain review in the same transaction
+for Affiliate/Tuition. Existing domain UI dispatches linked decisions back through
+Forms, preserving revision, history and atomicity. Self-approval, conflicting
+revisions, revoked access and duplicate applications reject. Idempotent exact
+retries do not duplicate decisions/notifications. Legacy applications and all
+withdrawal accounting retain their existing authority. Applicant status endpoints
+exclude internal notes and reviewer information; private file rules remain.
+
+A new marked disposable rehearsal retains141→143 preservation/backup checks and
+adds143 backup verification,144 transactional rollback, exact locked144 execution,
+re-entry, generic/domain permissions and history tests. Source preparation and
+isolated validation authorize no application141 upgrade, production installation,
+production SQL, customer import or traffic switch.
+
+
 ## Unselected learning-only141→143 candidate
 
 The approved learning-only route is now finalized as an exact source-pinned

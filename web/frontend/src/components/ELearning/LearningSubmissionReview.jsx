@@ -1,4 +1,5 @@
 import {useEffect, useState} from 'react';
+import LearningFormDecision from './LearningFormDecision';
 import {useTranslation} from 'react-i18next';
 import {learningFormsApi} from './learningFormsApi';
 import {OwnerState} from './OwnerUI';
@@ -20,5 +21,5 @@ export default function LearningSubmissionReview({responseId, onSaved}) {
       onSaved();
     } catch {setError(true);} finally {setBusy(false);}
   }
-  return <section className="learning-response-review"><OwnerState loading={!data && !error} error={error} retry={() => setAttempt(value => value+1)}/>{data && <form onSubmit={event => {event.preventDefault();void save(Boolean(data.read_at));}}><label>{label('notes')}<textarea dir="auto" maxLength={4000} value={notes} onChange={event => setNotes(event.target.value)} /></label><div className="responses-browser-actions"><button type="submit" disabled={busy}>{t('elearning.save')}</button><button type="button" disabled={busy} onClick={() => save(!data.read_at)}>{label(data.read_at ? 'mark_unread' : 'mark_read')}</button></div></form>}</section>;
+  return <section className="learning-response-review"><OwnerState loading={!data && !error} error={error} retry={() => setAttempt(value => value+1)}/>{data?.review && <LearningFormDecision key={`${responseId}:${data.review.revision}`} response={data} onChanged={()=>{setAttempt(value=>value+1);onSaved();}} />}{data && <form onSubmit={event => {event.preventDefault();void save(Boolean(data.read_at));}}><label>{label('notes')}<textarea dir="auto" maxLength={4000} value={notes} onChange={event => setNotes(event.target.value)} /></label><div className="responses-browser-actions"><button type="submit" disabled={busy}>{t('elearning.save')}</button><button type="button" disabled={busy} onClick={() => save(!data.read_at)}>{label(data.read_at ? 'mark_unread' : 'mark_read')}</button></div></form>}</section>;
 }

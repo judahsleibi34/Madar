@@ -1,0 +1,2338 @@
+{
+  "version": 1,
+  "note": "Local acceptance is verified where explicitly recorded. Official course source material, production destination/governed activation and live payments remain separate dependencies; no implicit acceptance.",
+  "requirements": [
+    {
+      "key": "mission.0",
+      "requirement": "NON-NEGOTIABLE MISSION",
+      "status": "PARTIALLY COMPLETE",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": "Working local website/Forms/10 authored demonstrations verified. Complete official89-topic teaching/distribution/credentials and production/financial journey require the explicit dependencies in report items24–25."
+    },
+    {
+      "key": "mission.1",
+      "requirement": "Required owner source material",
+      "status": "REQUIRES OWNER MATERIAL",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": "Original89 topic/book map, final educator-approved content/audio/assessments, legal approval or confirmed institutional domains, as applicable. Ten original demo lessons exist;79 outlines and official finals remain draft."
+    },
+    {
+      "key": "mission.2",
+      "requirement": "Existing implementation and migration state",
+      "status": "IMPLEMENTED AND VERIFIED",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": null,
+      "scope": "Local demonstration/reusable architecture; official course and production approval excluded"
+    },
+    {
+      "key": "mission.3",
+      "requirement": "Audit-and-reuse requirement",
+      "status": "IMPLEMENTED AND VERIFIED",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": null,
+      "scope": "Local demonstration/reusable architecture; official course and production approval excluded"
+    },
+    {
+      "key": "mission.4",
+      "requirement": "Customer ownership",
+      "status": "BLOCKED — production ownership and schema verification unavailable",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": "No authorized production administration endpoint or governed compatible release/import approval. Supplied account mapping is private; no tenant ID guessed."
+    },
+    {
+      "key": "mission.5",
+      "requirement": "Local EduHope mirror and editor",
+      "status": "IMPLEMENTED AND VERIFIED",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": null,
+      "scope": "Local demonstration/reusable architecture; official course and production approval excluded"
+    },
+    {
+      "key": "mission.6",
+      "requirement": "LOGO IS THE THEME SOURCE OF TRUTH",
+      "status": "IMPLEMENTED AND VERIFIED",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": null,
+      "scope": "Local demonstration/reusable architecture; official course and production approval excluded"
+    },
+    {
+      "key": "mission.7",
+      "requirement": "Design inspiration",
+      "status": "PARTIALLY COMPLETE",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": "Working local website/Forms/10 authored demonstrations verified. Complete official89-topic teaching/distribution/credentials and production/financial journey require the explicit dependencies in report items24–25."
+    },
+    {
+      "key": "mission.8",
+      "requirement": "Palestinian audience and demographic",
+      "status": "IMPLEMENTED AND VERIFIED",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": null,
+      "scope": "Local demonstration/reusable architecture; official course and production approval excluded"
+    },
+    {
+      "key": "mission.9",
+      "requirement": "Website architecture",
+      "status": "IMPLEMENTED AND VERIFIED",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": null,
+      "scope": "Local demonstration/reusable architecture; official course and production approval excluded"
+    },
+    {
+      "key": "mission.10",
+      "requirement": "Unlimited reasonable Builder-component authorization",
+      "status": "IMPLEMENTED AND VERIFIED",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": null,
+      "scope": "Local demonstration/reusable architecture; official course and production approval excluded"
+    },
+    {
+      "key": "mission.11",
+      "requirement": "Homepage — visual priority",
+      "status": "IMPLEMENTED AND VERIFIED",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": null,
+      "scope": "Local demonstration/reusable architecture; official course and production approval excluded"
+    },
+    {
+      "key": "mission.12",
+      "requirement": "Every required public page",
+      "status": "IMPLEMENTED AND VERIFIED",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": null,
+      "scope": "Local demonstration/reusable architecture; official course and production approval excluded"
+    },
+    {
+      "key": "mission.13",
+      "requirement": "Header and footer",
+      "status": "IMPLEMENTED AND VERIFIED",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": null,
+      "scope": "Local demonstration/reusable architecture; official course and production approval excluded"
+    },
+    {
+      "key": "mission.14",
+      "requirement": "SEO and site presentation",
+      "status": "PARTIALLY COMPLETE",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": "Working local website/Forms/10 authored demonstrations verified. Complete official89-topic teaching/distribution/credentials and production/financial journey require the explicit dependencies in report items24–25."
+    },
+    {
+      "key": "mission.15",
+      "requirement": "Forms architecture — mandatory",
+      "status": "IMPLEMENTED AND VERIFIED",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": null,
+      "scope": "Local demonstration/reusable architecture; official course and production approval excluded"
+    },
+    {
+      "key": "mission.16",
+      "requirement": "Required Form definitions",
+      "status": "IMPLEMENTED AND VERIFIED",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": null,
+      "scope": "Local demonstration/reusable architecture; official course and production approval excluded"
+    },
+    {
+      "key": "mission.17",
+      "requirement": "Real response lifecycle",
+      "status": "IMPLEMENTED AND VERIFIED",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": null,
+      "scope": "Local demonstration/reusable architecture; official course and production approval excluded"
+    },
+    {
+      "key": "mission.18",
+      "requirement": "Review statuses",
+      "status": "IMPLEMENTED AND VERIFIED",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": null,
+      "scope": "Local demonstration/reusable architecture; official course and production approval excluded"
+    },
+    {
+      "key": "mission.19",
+      "requirement": "Connect approval to domain authority",
+      "status": "IMPLEMENTED AND VERIFIED",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": null,
+      "scope": "Local demonstration/reusable architecture; official course and production approval excluded"
+    },
+    {
+      "key": "mission.20",
+      "requirement": "Create the EduHope course",
+      "status": "IMPLEMENTED AND VERIFIED",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": null,
+      "scope": "Local demonstration/reusable architecture; official course and production approval excluded"
+    },
+    {
+      "key": "mission.21",
+      "requirement": "Every topic's content structure",
+      "status": "REQUIRES OWNER MATERIAL",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": "Original89 topic/book map, final educator-approved content/audio/assessments, legal approval or confirmed institutional domains, as applicable. Ten original demo lessons exist;79 outlines and official finals remain draft."
+    },
+    {
+      "key": "mission.22",
+      "requirement": "Listening and temporary audio",
+      "status": "IMPLEMENTED AND VERIFIED",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": null,
+      "scope": "Local demonstration/reusable architecture; official course and production approval excluded"
+    },
+    {
+      "key": "mission.23",
+      "requirement": "Listen & Match with Pictures",
+      "status": "IMPLEMENTED AND VERIFIED",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": null,
+      "scope": "Local demonstration/reusable architecture; official course and production approval excluded"
+    },
+    {
+      "key": "mission.24",
+      "requirement": "Speaking practice and speaking exams",
+      "status": "IMPLEMENTED AND VERIFIED",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": null,
+      "scope": "Local demonstration/reusable architecture; official course and production approval excluded"
+    },
+    {
+      "key": "mission.25",
+      "requirement": "Course practice distribution",
+      "status": "REQUIRES OWNER MATERIAL",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": "Original89 topic/book map, final educator-approved content/audio/assessments, legal approval or confirmed institutional domains, as applicable. Ten original demo lessons exist;79 outlines and official finals remain draft."
+    },
+    {
+      "key": "mission.26",
+      "requirement": "Assessments and exams",
+      "status": "REQUIRES OWNER MATERIAL",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": "Original89 topic/book map, final educator-approved content/audio/assessments, legal approval or confirmed institutional domains, as applicable. Ten original demo lessons exist;79 outlines and official finals remain draft."
+    },
+    {
+      "key": "mission.27",
+      "requirement": "Certificates",
+      "status": "REQUIRES OWNER MATERIAL",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": "Original89 topic/book map, final educator-approved content/audio/assessments, legal approval or confirmed institutional domains, as applicable. Ten original demo lessons exist;79 outlines and official finals remain draft."
+    },
+    {
+      "key": "mission.28",
+      "requirement": "Course player and learner experience",
+      "status": "IMPLEMENTED AND VERIFIED",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": null,
+      "scope": "Local demonstration/reusable architecture; official course and production approval excluded"
+    },
+    {
+      "key": "mission.29",
+      "requirement": "Registration and authentication",
+      "status": "IMPLEMENTED AND VERIFIED",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": null,
+      "scope": "Local demonstration/reusable architecture; official course and production approval excluded"
+    },
+    {
+      "key": "mission.30",
+      "requirement": "Palestine Ahliya University classification",
+      "status": "REQUIRES OWNER MATERIAL",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": "Original89 topic/book map, final educator-approved content/audio/assessments, legal approval or confirmed institutional domains, as applicable. Ten original demo lessons exist;79 outlines and official finals remain draft."
+    },
+    {
+      "key": "mission.31",
+      "requirement": "Student dashboard",
+      "status": "PARTIALLY COMPLETE",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": "Working local website/Forms/10 authored demonstrations verified. Complete official89-topic teaching/distribution/credentials and production/financial journey require the explicit dependencies in report items24–25."
+    },
+    {
+      "key": "mission.32",
+      "requirement": "Referral system",
+      "status": "IMPLEMENTED AND VERIFIED",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": null,
+      "scope": "Local demonstration/reusable architecture; official course and production approval excluded"
+    },
+    {
+      "key": "mission.33",
+      "requirement": "Tuition Support",
+      "status": "IMPLEMENTED AND VERIFIED",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": null,
+      "scope": "Local demonstration/reusable architecture; official course and production approval excluded"
+    },
+    {
+      "key": "mission.34",
+      "requirement": "Exchange",
+      "status": "IMPLEMENTED AND VERIFIED",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": null,
+      "scope": "Local demonstration/reusable architecture; official course and production approval excluded"
+    },
+    {
+      "key": "mission.35",
+      "requirement": "Affiliate experience",
+      "status": "IMPLEMENTED AND VERIFIED",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": null,
+      "scope": "Local demonstration/reusable architecture; official course and production approval excluded"
+    },
+    {
+      "key": "mission.36",
+      "requirement": "Wallets and withdrawals",
+      "status": "PARTIALLY COMPLETE",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": "Working local website/Forms/10 authored demonstrations verified. Complete official89-topic teaching/distribution/credentials and production/financial journey require the explicit dependencies in report items24–25."
+    },
+    {
+      "key": "mission.37",
+      "requirement": "Owner/admin dashboard",
+      "status": "IMPLEMENTED BUT NOT VERIFIED",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": "Existing reusable service/UI and automated coverage retained; complete EduHope native owner walkthrough of this individual module was not repeated. No extra financial/opportunity engine introduced."
+    },
+    {
+      "key": "mission.38",
+      "requirement": "Notifications",
+      "status": "IMPLEMENTED AND VERIFIED",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": null,
+      "scope": "Local demonstration/reusable architecture; official course and production approval excluded"
+    },
+    {
+      "key": "mission.39",
+      "requirement": "Everything tenant-specific comes from the database",
+      "status": "IMPLEMENTED AND VERIFIED",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": null,
+      "scope": "Local demonstration/reusable architecture; official course and production approval excluded"
+    },
+    {
+      "key": "mission.40",
+      "requirement": "Research and licensed assets",
+      "status": "IMPLEMENTED AND VERIFIED",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": null,
+      "scope": "Local demonstration/reusable architecture; official course and production approval excluded"
+    },
+    {
+      "key": "mission.41",
+      "requirement": "Local dummy data",
+      "status": "IMPLEMENTED AND VERIFIED",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": null,
+      "scope": "Local demonstration/reusable architecture; official course and production approval excluded"
+    },
+    {
+      "key": "mission.42",
+      "requirement": "Portable GitHub seed package",
+      "status": "PARTIALLY COMPLETE",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": "Working local website/Forms/10 authored demonstrations verified. Complete official89-topic teaching/distribution/credentials and production/financial journey require the explicit dependencies in report items24–25."
+    },
+    {
+      "key": "mission.43",
+      "requirement": "Existing customer production target",
+      "status": "BLOCKED — production ownership and schema verification unavailable",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": "No authorized production administration endpoint or governed compatible release/import approval. Supplied account mapping is private; no tenant ID guessed."
+    },
+    {
+      "key": "mission.44",
+      "requirement": "Real localhost website validation",
+      "status": "IMPLEMENTED AND VERIFIED",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": null,
+      "scope": "Local demonstration/reusable architecture; official course and production approval excluded"
+    },
+    {
+      "key": "mission.45",
+      "requirement": "Builder editing acceptance",
+      "status": "IMPLEMENTED AND VERIFIED",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": null,
+      "scope": "Local demonstration/reusable architecture; official course and production approval excluded"
+    },
+    {
+      "key": "mission.46",
+      "requirement": "Forms acceptance",
+      "status": "IMPLEMENTED AND VERIFIED",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": null,
+      "scope": "Local demonstration/reusable architecture; official course and production approval excluded"
+    },
+    {
+      "key": "mission.47",
+      "requirement": "Learning acceptance",
+      "status": "IMPLEMENTED AND VERIFIED",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": null,
+      "scope": "Local demonstration/reusable architecture; official course and production approval excluded"
+    },
+    {
+      "key": "mission.48",
+      "requirement": "Student/affiliate/business acceptance",
+      "status": "PARTIALLY COMPLETE",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": "Working local website/Forms/10 authored demonstrations verified. Complete official89-topic teaching/distribution/credentials and production/financial journey require the explicit dependencies in report items24–25."
+    },
+    {
+      "key": "mission.49",
+      "requirement": "Security and release acceptance",
+      "status": "PARTIALLY COMPLETE",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": "Working local website/Forms/10 authored demonstrations verified. Complete official89-topic teaching/distribution/credentials and production/financial journey require the explicit dependencies in report items24–25."
+    },
+    {
+      "key": "mission.50",
+      "requirement": "Do not silently drop requirements",
+      "status": "PARTIALLY COMPLETE",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": "Working local website/Forms/10 authored demonstrations verified. Complete official89-topic teaching/distribution/credentials and production/financial journey require the explicit dependencies in report items24–25."
+    },
+    {
+      "key": "mission.51",
+      "requirement": "Required final handoff",
+      "status": "PARTIALLY COMPLETE",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": "Working local website/Forms/10 authored demonstrations verified. Complete official89-topic teaching/distribution/credentials and production/financial journey require the explicit dependencies in report items24–25."
+    },
+    {
+      "key": "mission.52",
+      "requirement": "Completion criteria",
+      "status": "PARTIALLY COMPLETE",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": "Working local website/Forms/10 authored demonstrations verified. Complete official89-topic teaching/distribution/credentials and production/financial journey require the explicit dependencies in report items24–25."
+    },
+    {
+      "key": "website.1",
+      "requirement": "PLATFORM IDENTITY",
+      "status": "IMPLEMENTED AND VERIFIED",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": null,
+      "scope": "Local demonstration/reusable architecture; official course and production approval excluded"
+    },
+    {
+      "key": "website.2",
+      "requirement": "LANGUAGE AND DESIGN",
+      "status": "IMPLEMENTED AND VERIFIED",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": null,
+      "scope": "Local demonstration/reusable architecture; official course and production approval excluded"
+    },
+    {
+      "key": "website.3",
+      "requirement": "MAIN NAVIGATION",
+      "status": "IMPLEMENTED AND VERIFIED",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": null,
+      "scope": "Local demonstration/reusable architecture; official course and production approval excluded"
+    },
+    {
+      "key": "website.4",
+      "requirement": "HOMEPAGE",
+      "status": "IMPLEMENTED AND VERIFIED",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": null,
+      "scope": "Local demonstration/reusable architecture; official course and production approval excluded"
+    },
+    {
+      "key": "website.5",
+      "requirement": "ENGLISH CONVERSATION COURSE",
+      "status": "IMPLEMENTED AND VERIFIED",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": null,
+      "scope": "Local demonstration/reusable architecture; official course and production approval excluded"
+    },
+    {
+      "key": "website.6",
+      "requirement": "COURSE LEVELS AND PROGRESS",
+      "status": "IMPLEMENTED AND VERIFIED",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": null,
+      "scope": "Local demonstration/reusable architecture; official course and production approval excluded"
+    },
+    {
+      "key": "website.7",
+      "requirement": "REGISTRATION AND LOGIN",
+      "status": "IMPLEMENTED AND VERIFIED",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": null,
+      "scope": "Local demonstration/reusable architecture; official course and production approval excluded"
+    },
+    {
+      "key": "website.8",
+      "requirement": "PALESTINE AHLIA UNIVERSITY STUDENTS",
+      "status": "REQUIRES OWNER MATERIAL",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": "Original89 topic/book map, final educator-approved content/audio/assessments, legal approval or confirmed institutional domains, as applicable. Ten original demo lessons exist;79 outlines and official finals remain draft."
+    },
+    {
+      "key": "website.9",
+      "requirement": "REFERRAL SYSTEM",
+      "status": "IMPLEMENTED AND VERIFIED",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": null,
+      "scope": "Local demonstration/reusable architecture; official course and production approval excluded"
+    },
+    {
+      "key": "website.10",
+      "requirement": "BECOME AN AFFILIATE",
+      "status": "IMPLEMENTED AND VERIFIED",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": null,
+      "scope": "Local demonstration/reusable architecture; official course and production approval excluded"
+    },
+    {
+      "key": "website.11",
+      "requirement": "TUITION SUPPORT",
+      "status": "IMPLEMENTED AND VERIFIED",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": null,
+      "scope": "Local demonstration/reusable architecture; official course and production approval excluded"
+    },
+    {
+      "key": "website.12",
+      "requirement": "TUITION SUPPORT APPLICATION",
+      "status": "IMPLEMENTED AND VERIFIED",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": null,
+      "scope": "Local demonstration/reusable architecture; official course and production approval excluded"
+    },
+    {
+      "key": "website.13",
+      "requirement": "EXCHANGE PROGRAMME",
+      "status": "IMPLEMENTED AND VERIFIED",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": null,
+      "scope": "Local demonstration/reusable architecture; official course and production approval excluded"
+    },
+    {
+      "key": "website.14",
+      "requirement": "STUDENT DASHBOARD",
+      "status": "IMPLEMENTED AND VERIFIED",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": null,
+      "scope": "Local demonstration/reusable architecture; official course and production approval excluded"
+    },
+    {
+      "key": "website.15",
+      "requirement": "MY COURSE",
+      "status": "IMPLEMENTED AND VERIFIED",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": null,
+      "scope": "Local demonstration/reusable architecture; official course and production approval excluded"
+    },
+    {
+      "key": "website.16",
+      "requirement": "MY REFERRAL",
+      "status": "IMPLEMENTED AND VERIFIED",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": null,
+      "scope": "Local demonstration/reusable architecture; official course and production approval excluded"
+    },
+    {
+      "key": "website.17",
+      "requirement": "STUDENT APPLICATIONS",
+      "status": "IMPLEMENTED AND VERIFIED",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": null,
+      "scope": "Local demonstration/reusable architecture; official course and production approval excluded"
+    },
+    {
+      "key": "website.18",
+      "requirement": "STUDENT WALLET",
+      "status": "PARTIALLY COMPLETE",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": "Working local website/Forms/10 authored demonstrations verified. Complete official89-topic teaching/distribution/credentials and production/financial journey require the explicit dependencies in report items24–25."
+    },
+    {
+      "key": "website.19",
+      "requirement": "STUDENT WITHDRAWAL",
+      "status": "PARTIALLY COMPLETE",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": "Working local website/Forms/10 authored demonstrations verified. Complete official89-topic teaching/distribution/credentials and production/financial journey require the explicit dependencies in report items24–25."
+    },
+    {
+      "key": "website.20",
+      "requirement": "AFFILIATE DASHBOARD",
+      "status": "IMPLEMENTED AND VERIFIED",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": null,
+      "scope": "Local demonstration/reusable architecture; official course and production approval excluded"
+    },
+    {
+      "key": "website.21",
+      "requirement": "ADMIN DASHBOARD",
+      "status": "IMPLEMENTED BUT NOT VERIFIED",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": "Existing reusable service/UI and automated coverage retained; complete EduHope native owner walkthrough of this individual module was not repeated. No extra financial/opportunity engine introduced."
+    },
+    {
+      "key": "website.22",
+      "requirement": "ADMIN DASHBOARD OVERVIEW",
+      "status": "IMPLEMENTED BUT NOT VERIFIED",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": "Existing reusable service/UI and automated coverage retained; complete EduHope native owner walkthrough of this individual module was not repeated. No extra financial/opportunity engine introduced."
+    },
+    {
+      "key": "website.23",
+      "requirement": "ADMIN STUDENT MANAGEMENT",
+      "status": "IMPLEMENTED BUT NOT VERIFIED",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": "Existing reusable service/UI and automated coverage retained; complete EduHope native owner walkthrough of this individual module was not repeated. No extra financial/opportunity engine introduced."
+    },
+    {
+      "key": "website.24",
+      "requirement": "ADMIN COURSE MANAGEMENT",
+      "status": "PARTIALLY COMPLETE",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": "Working local website/Forms/10 authored demonstrations verified. Complete official89-topic teaching/distribution/credentials and production/financial journey require the explicit dependencies in report items24–25."
+    },
+    {
+      "key": "website.25",
+      "requirement": "ADMIN REFERRAL MANAGEMENT",
+      "status": "IMPLEMENTED BUT NOT VERIFIED",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": "Existing reusable service/UI and automated coverage retained; complete EduHope native owner walkthrough of this individual module was not repeated. No extra financial/opportunity engine introduced."
+    },
+    {
+      "key": "website.26",
+      "requirement": "ADMIN REWARD MANAGEMENT",
+      "status": "IMPLEMENTED BUT NOT VERIFIED",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": "Existing reusable service/UI and automated coverage retained; complete EduHope native owner walkthrough of this individual module was not repeated. No extra financial/opportunity engine introduced."
+    },
+    {
+      "key": "website.27",
+      "requirement": "ADMIN TUITION SUPPORT MANAGEMENT",
+      "status": "IMPLEMENTED BUT NOT VERIFIED",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": "Existing reusable service/UI and automated coverage retained; complete EduHope native owner walkthrough of this individual module was not repeated. No extra financial/opportunity engine introduced."
+    },
+    {
+      "key": "website.28",
+      "requirement": "ADMIN EXCHANGE PROGRAMME MANAGEMENT",
+      "status": "IMPLEMENTED BUT NOT VERIFIED",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": "Existing reusable service/UI and automated coverage retained; complete EduHope native owner walkthrough of this individual module was not repeated. No extra financial/opportunity engine introduced."
+    },
+    {
+      "key": "website.29",
+      "requirement": "ADMIN WITHDRAWAL MANAGEMENT",
+      "status": "IMPLEMENTED BUT NOT VERIFIED",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": "Existing reusable service/UI and automated coverage retained; complete EduHope native owner walkthrough of this individual module was not repeated. No extra financial/opportunity engine introduced."
+    },
+    {
+      "key": "website.30",
+      "requirement": "ADMIN SETTINGS",
+      "status": "IMPLEMENTED BUT NOT VERIFIED",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": "Existing reusable service/UI and automated coverage retained; complete EduHope native owner walkthrough of this individual module was not repeated. No extra financial/opportunity engine introduced."
+    },
+    {
+      "key": "website.31",
+      "requirement": "NOTIFICATION SYSTEM",
+      "status": "IMPLEMENTED AND VERIFIED",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": null,
+      "scope": "Local demonstration/reusable architecture; official course and production approval excluded"
+    },
+    {
+      "key": "website.32",
+      "requirement": "HOW IT WORKS PAGE",
+      "status": "IMPLEMENTED AND VERIFIED",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": null,
+      "scope": "Local demonstration/reusable architecture; official course and production approval excluded"
+    },
+    {
+      "key": "website.33",
+      "requirement": "ABOUT EDUHOPE PAGE",
+      "status": "IMPLEMENTED AND VERIFIED",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": null,
+      "scope": "Local demonstration/reusable architecture; official course and production approval excluded"
+    },
+    {
+      "key": "website.34",
+      "requirement": "FAQ PAGE",
+      "status": "IMPLEMENTED AND VERIFIED",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": null,
+      "scope": "Local demonstration/reusable architecture; official course and production approval excluded"
+    },
+    {
+      "key": "website.35",
+      "requirement": "CONTACT PAGE",
+      "status": "IMPLEMENTED AND VERIFIED",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": null,
+      "scope": "Local demonstration/reusable architecture; official course and production approval excluded"
+    },
+    {
+      "key": "website.36",
+      "requirement": "FOOTER",
+      "status": "IMPLEMENTED AND VERIFIED",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": null,
+      "scope": "Local demonstration/reusable architecture; official course and production approval excluded"
+    },
+    {
+      "key": "website.37",
+      "requirement": "DATABASE STRUCTURE",
+      "status": "IMPLEMENTED AND VERIFIED",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": null,
+      "scope": "Local demonstration/reusable architecture; official course and production approval excluded"
+    },
+    {
+      "key": "website.38",
+      "requirement": "PAYMENT INTEGRATION",
+      "status": "DEFERRED — LIVE PAYMENT PROVIDER ONLY",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": "Owner has not configured a live provider; course offering draft; no real purchases or payouts."
+    },
+    {
+      "key": "website.39",
+      "requirement": "CORE BUSINESS LOGIC",
+      "status": "PARTIALLY COMPLETE",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": "Working local website/Forms/10 authored demonstrations verified. Complete official89-topic teaching/distribution/credentials and production/financial journey require the explicit dependencies in report items24–25."
+    },
+    {
+      "key": "website.40",
+      "requirement": "SECURITY AND ACCESS CONTROL",
+      "status": "IMPLEMENTED AND VERIFIED",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": null,
+      "scope": "Local demonstration/reusable architecture; official course and production approval excluded"
+    },
+    {
+      "key": "website.41",
+      "requirement": "TERMS AND CONDITIONS",
+      "status": "REQUIRES OWNER MATERIAL",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": "Original89 topic/book map, final educator-approved content/audio/assessments, legal approval or confirmed institutional domains, as applicable. Ten original demo lessons exist;79 outlines and official finals remain draft."
+    },
+    {
+      "key": "website.42",
+      "requirement": "FINAL USER JOURNEYS",
+      "status": "PARTIALLY COMPLETE",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": "Working local website/Forms/10 authored demonstrations verified. Complete official89-topic teaching/distribution/credentials and production/financial journey require the explicit dependencies in report items24–25."
+    },
+    {
+      "key": "website.43",
+      "requirement": "FINAL DEVELOPMENT REQUIREMENTS",
+      "status": "PARTIALLY COMPLETE",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": "Working local website/Forms/10 authored demonstrations verified. Complete official89-topic teaching/distribution/credentials and production/financial journey require the explicit dependencies in report items24–25."
+    },
+    {
+      "key": "course.1",
+      "requirement": "PROJECT OBJECTIVE",
+      "status": "PARTIALLY COMPLETE",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": "Working local website/Forms/10 authored demonstrations verified. Complete official89-topic teaching/distribution/credentials and production/financial journey require the explicit dependencies in report items24–25."
+    },
+    {
+      "key": "course.2",
+      "requirement": "CORE COURSE PHILOSOPHY",
+      "status": "PARTIALLY COMPLETE",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": "Working local website/Forms/10 authored demonstrations verified. Complete official89-topic teaching/distribution/credentials and production/financial journey require the explicit dependencies in report items24–25."
+    },
+    {
+      "key": "course.3",
+      "requirement": "ORIGINAL 89 TOPICS",
+      "status": "REQUIRES OWNER MATERIAL",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": "Original89 topic/book map, final educator-approved content/audio/assessments, legal approval or confirmed institutional domains, as applicable. Ten original demo lessons exist;79 outlines and official finals remain draft."
+    },
+    {
+      "key": "course.4",
+      "requirement": "CEFR STRUCTURE",
+      "status": "IMPLEMENTED AND VERIFIED",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": null,
+      "scope": "Local demonstration/reusable architecture; official course and production approval excluded"
+    },
+    {
+      "key": "course.5",
+      "requirement": "LANGUAGE SYSTEM",
+      "status": "PARTIALLY COMPLETE",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": "Working local website/Forms/10 authored demonstrations verified. Complete official89-topic teaching/distribution/credentials and production/financial journey require the explicit dependencies in report items24–25."
+    },
+    {
+      "key": "course.6",
+      "requirement": "ARABIC LEARNER SUPPORT",
+      "status": "PARTIALLY COMPLETE",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": "Working local website/Forms/10 authored demonstrations verified. Complete official89-topic teaching/distribution/credentials and production/financial journey require the explicit dependencies in report items24–25."
+    },
+    {
+      "key": "course.7",
+      "requirement": "SIMPLE STUDENT EXPERIENCE",
+      "status": "IMPLEMENTED AND VERIFIED",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": null,
+      "scope": "Local demonstration/reusable architecture; official course and production approval excluded"
+    },
+    {
+      "key": "course.8",
+      "requirement": "AUDIO IS THE HEART OF THE COURSE",
+      "status": "PARTIALLY COMPLETE",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": "Working local website/Forms/10 authored demonstrations verified. Complete official89-topic teaching/distribution/credentials and production/financial journey require the explicit dependencies in report items24–25."
+    },
+    {
+      "key": "course.9",
+      "requirement": "MODERNIZE THE 89 TOPICS",
+      "status": "REQUIRES OWNER MATERIAL",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": "Original89 topic/book map, final educator-approved content/audio/assessments, legal approval or confirmed institutional domains, as applicable. Ten original demo lessons exist;79 outlines and official finals remain draft."
+    },
+    {
+      "key": "course.10",
+      "requirement": "STANDARD TOPIC STRUCTURE",
+      "status": "REQUIRES OWNER MATERIAL",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": "Original89 topic/book map, final educator-approved content/audio/assessments, legal approval or confirmed institutional domains, as applicable. Ten original demo lessons exist;79 outlines and official finals remain draft."
+    },
+    {
+      "key": "course.11",
+      "requirement": "USEFUL EXPRESSIONS",
+      "status": "PARTIALLY COMPLETE",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": "Working local website/Forms/10 authored demonstrations verified. Complete official89-topic teaching/distribution/credentials and production/financial journey require the explicit dependencies in report items24–25."
+    },
+    {
+      "key": "course.12",
+      "requirement": "VOCABULARY",
+      "status": "PARTIALLY COMPLETE",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": "Working local website/Forms/10 authored demonstrations verified. Complete official89-topic teaching/distribution/credentials and production/financial journey require the explicit dependencies in report items24–25."
+    },
+    {
+      "key": "course.13",
+      "requirement": "PRONUNCIATION SUPPORT",
+      "status": "PARTIALLY COMPLETE",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": "Working local website/Forms/10 authored demonstrations verified. Complete official89-topic teaching/distribution/credentials and production/financial journey require the explicit dependencies in report items24–25."
+    },
+    {
+      "key": "course.14",
+      "requirement": "LISTEN & MATCH WITH PICTURES — NEW CORE EXERCISE",
+      "status": "PARTIALLY COMPLETE",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": "Working local website/Forms/10 authored demonstrations verified. Complete official89-topic teaching/distribution/credentials and production/financial journey require the explicit dependencies in report items24–25."
+    },
+    {
+      "key": "course.15",
+      "requirement": "LISTEN & MATCH INTERACTION DESIGN",
+      "status": "IMPLEMENTED AND VERIFIED",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": null,
+      "scope": "Local demonstration/reusable architecture; official course and production approval excluded"
+    },
+    {
+      "key": "course.16",
+      "requirement": "PICTURE REQUIREMENTS",
+      "status": "REQUIRES OWNER MATERIAL",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": "Original89 topic/book map, final educator-approved content/audio/assessments, legal approval or confirmed institutional domains, as applicable. Ten original demo lessons exist;79 outlines and official finals remain draft."
+    },
+    {
+      "key": "course.17",
+      "requirement": "LISTEN & MATCH QUESTION VOLUME",
+      "status": "REQUIRES OWNER MATERIAL",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": "Original89 topic/book map, final educator-approved content/audio/assessments, legal approval or confirmed institutional domains, as applicable. Ten original demo lessons exist;79 outlines and official finals remain draft."
+    },
+    {
+      "key": "course.18",
+      "requirement": "DO NOT MAKE THE COURSE A WORKBOOK",
+      "status": "PARTIALLY COMPLETE",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": "Working local website/Forms/10 authored demonstrations verified. Complete official89-topic teaching/distribution/credentials and production/financial journey require the explicit dependencies in report items24–25."
+    },
+    {
+      "key": "course.19",
+      "requirement": "EXPANDED COMMUNICATION PRACTICE",
+      "status": "PARTIALLY COMPLETE",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": "Working local website/Forms/10 authored demonstrations verified. Complete official89-topic teaching/distribution/credentials and production/financial journey require the explicit dependencies in report items24–25."
+    },
+    {
+      "key": "course.20",
+      "requirement": "PRACTICE VOLUME BY LEVEL",
+      "status": "REQUIRES OWNER MATERIAL",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": "Original89 topic/book map, final educator-approved content/audio/assessments, legal approval or confirmed institutional domains, as applicable. Ten original demo lessons exist;79 outlines and official finals remain draft."
+    },
+    {
+      "key": "course.21",
+      "requirement": "NO ROLE-PLAY",
+      "status": "IMPLEMENTED AND VERIFIED",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": null,
+      "scope": "Local demonstration/reusable architecture; official course and production approval excluded"
+    },
+    {
+      "key": "course.22",
+      "requirement": "CONTEXT PROGRESSION",
+      "status": "PARTIALLY COMPLETE",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": "Working local website/Forms/10 authored demonstrations verified. Complete official89-topic teaching/distribution/credentials and production/financial journey require the explicit dependencies in report items24–25."
+    },
+    {
+      "key": "course.23",
+      "requirement": "SPEAKING PRACTICE",
+      "status": "PARTIALLY COMPLETE",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": "Working local website/Forms/10 authored demonstrations verified. Complete official89-topic teaching/distribution/credentials and production/financial journey require the explicit dependencies in report items24–25."
+    },
+    {
+      "key": "course.24",
+      "requirement": "PART REVIEWS",
+      "status": "REQUIRES OWNER MATERIAL",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": "Original89 topic/book map, final educator-approved content/audio/assessments, legal approval or confirmed institutional domains, as applicable. Ten original demo lessons exist;79 outlines and official finals remain draft."
+    },
+    {
+      "key": "course.25",
+      "requirement": "FINAL CEFR EXAMS",
+      "status": "REQUIRES OWNER MATERIAL",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": "Original89 topic/book map, final educator-approved content/audio/assessments, legal approval or confirmed institutional domains, as applicable. Ten original demo lessons exist;79 outlines and official finals remain draft."
+    },
+    {
+      "key": "course.26",
+      "requirement": "EXAM DIFFICULTY",
+      "status": "REQUIRES OWNER MATERIAL",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": "Original89 topic/book map, final educator-approved content/audio/assessments, legal approval or confirmed institutional domains, as applicable. Ten original demo lessons exist;79 outlines and official finals remain draft."
+    },
+    {
+      "key": "course.27",
+      "requirement": "PASSING SCORE",
+      "status": "PARTIALLY COMPLETE",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": "Working local website/Forms/10 authored demonstrations verified. Complete official89-topic teaching/distribution/credentials and production/financial journey require the explicit dependencies in report items24–25."
+    },
+    {
+      "key": "course.28",
+      "requirement": "RETAKES",
+      "status": "PARTIALLY COMPLETE",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": "Working local website/Forms/10 authored demonstrations verified. Complete official89-topic teaching/distribution/credentials and production/financial journey require the explicit dependencies in report items24–25."
+    },
+    {
+      "key": "course.29",
+      "requirement": "CERTIFICATE SYSTEM",
+      "status": "REQUIRES OWNER MATERIAL",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": "Original89 topic/book map, final educator-approved content/audio/assessments, legal approval or confirmed institutional domains, as applicable. Ten original demo lessons exist;79 outlines and official finals remain draft."
+    },
+    {
+      "key": "course.30",
+      "requirement": "CERTIFICATE CONTENT",
+      "status": "REQUIRES OWNER MATERIAL",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": "Original89 topic/book map, final educator-approved content/audio/assessments, legal approval or confirmed institutional domains, as applicable. Ten original demo lessons exist;79 outlines and official finals remain draft."
+    },
+    {
+      "key": "course.31",
+      "requirement": "COMPLETE COURSE CERTIFICATE",
+      "status": "REQUIRES OWNER MATERIAL",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": "Original89 topic/book map, final educator-approved content/audio/assessments, legal approval or confirmed institutional domains, as applicable. Ten original demo lessons exist;79 outlines and official finals remain draft."
+    },
+    {
+      "key": "course.32",
+      "requirement": "STUDENT DASHBOARD",
+      "status": "PARTIALLY COMPLETE",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": "Working local website/Forms/10 authored demonstrations verified. Complete official89-topic teaching/distribution/credentials and production/financial journey require the explicit dependencies in report items24–25."
+    },
+    {
+      "key": "course.33",
+      "requirement": "TOPIC COMPLETION",
+      "status": "IMPLEMENTED AND VERIFIED",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": null,
+      "scope": "Local demonstration/reusable architecture; official course and production approval excluded"
+    },
+    {
+      "key": "course.34",
+      "requirement": "PART COMPLETION",
+      "status": "REQUIRES OWNER MATERIAL",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": "Original89 topic/book map, final educator-approved content/audio/assessments, legal approval or confirmed institutional domains, as applicable. Ten original demo lessons exist;79 outlines and official finals remain draft."
+    },
+    {
+      "key": "course.35",
+      "requirement": "CEFR LEVEL COMPLETION",
+      "status": "REQUIRES OWNER MATERIAL",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": "Original89 topic/book map, final educator-approved content/audio/assessments, legal approval or confirmed institutional domains, as applicable. Ten original demo lessons exist;79 outlines and official finals remain draft."
+    },
+    {
+      "key": "course.36",
+      "requirement": "STUDENT MOTIVATION",
+      "status": "PARTIALLY COMPLETE",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": "Working local website/Forms/10 authored demonstrations verified. Complete official89-topic teaching/distribution/credentials and production/financial journey require the explicit dependencies in report items24–25."
+    },
+    {
+      "key": "course.37",
+      "requirement": "ARABIC → ENGLISH COMMUNICATION SUPPORT",
+      "status": "PARTIALLY COMPLETE",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": "Working local website/Forms/10 authored demonstrations verified. Complete official89-topic teaching/distribution/credentials and production/financial journey require the explicit dependencies in report items24–25."
+    },
+    {
+      "key": "course.38",
+      "requirement": "INTERNATIONAL COMMUNICATION FOR ARAB LEARNERS",
+      "status": "PARTIALLY COMPLETE",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": "Working local website/Forms/10 authored demonstrations verified. Complete official89-topic teaching/distribution/credentials and production/financial journey require the explicit dependencies in report items24–25."
+    },
+    {
+      "key": "course.39",
+      "requirement": "EDUHOPE BRAND",
+      "status": "IMPLEMENTED AND VERIFIED",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": null,
+      "scope": "Local demonstration/reusable architecture; official course and production approval excluded"
+    },
+    {
+      "key": "course.40",
+      "requirement": "USER INTERFACE",
+      "status": "IMPLEMENTED AND VERIFIED",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": null,
+      "scope": "Local demonstration/reusable architecture; official course and production approval excluded"
+    },
+    {
+      "key": "course.41",
+      "requirement": "LISTEN & MATCH UI",
+      "status": "IMPLEMENTED AND VERIFIED",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": null,
+      "scope": "Local demonstration/reusable architecture; official course and production approval excluded"
+    },
+    {
+      "key": "course.42",
+      "requirement": "MOBILE-FIRST EXPERIENCE",
+      "status": "PARTIALLY COMPLETE",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": "Working local website/Forms/10 authored demonstrations verified. Complete official89-topic teaching/distribution/credentials and production/financial journey require the explicit dependencies in report items24–25."
+    },
+    {
+      "key": "course.43",
+      "requirement": "ACCESSIBILITY",
+      "status": "PARTIALLY COMPLETE",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": "Working local website/Forms/10 authored demonstrations verified. Complete official89-topic teaching/distribution/credentials and production/financial journey require the explicit dependencies in report items24–25."
+    },
+    {
+      "key": "course.44",
+      "requirement": "STUDENT JOURNEY",
+      "status": "PARTIALLY COMPLETE",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": "Working local website/Forms/10 authored demonstrations verified. Complete official89-topic teaching/distribution/credentials and production/financial journey require the explicit dependencies in report items24–25."
+    },
+    {
+      "key": "course.45",
+      "requirement": "ORIGINALITY AND COPYRIGHT",
+      "status": "PARTIALLY COMPLETE",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": "Working local website/Forms/10 authored demonstrations verified. Complete official89-topic teaching/distribution/credentials and production/financial journey require the explicit dependencies in report items24–25."
+    },
+    {
+      "key": "course.46",
+      "requirement": "QUALITY CONTROL",
+      "status": "REQUIRES OWNER MATERIAL",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": "Original89 topic/book map, final educator-approved content/audio/assessments, legal approval or confirmed institutional domains, as applicable. Ten original demo lessons exist;79 outlines and official finals remain draft."
+    },
+    {
+      "key": "course.47",
+      "requirement": "10-PART VISUAL DESIGN",
+      "status": "PARTIALLY COMPLETE",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": "Working local website/Forms/10 authored demonstrations verified. Complete official89-topic teaching/distribution/credentials and production/financial journey require the explicit dependencies in report items24–25."
+    },
+    {
+      "key": "course.48",
+      "requirement": "MASTER TOPIC MAP",
+      "status": "REQUIRES OWNER MATERIAL",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": "Original89 topic/book map, final educator-approved content/audio/assessments, legal approval or confirmed institutional domains, as applicable. Ten original demo lessons exist;79 outlines and official finals remain draft."
+    },
+    {
+      "key": "course.49",
+      "requirement": "EXERCISE DISTRIBUTION ACROSS THE COURSE",
+      "status": "REQUIRES OWNER MATERIAL",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": "Original89 topic/book map, final educator-approved content/audio/assessments, legal approval or confirmed institutional domains, as applicable. Ten original demo lessons exist;79 outlines and official finals remain draft."
+    },
+    {
+      "key": "course.50",
+      "requirement": "FINAL COURSE EXPERIENCE",
+      "status": "PARTIALLY COMPLETE",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": "Working local website/Forms/10 authored demonstrations verified. Complete official89-topic teaching/distribution/credentials and production/financial journey require the explicit dependencies in report items24–25."
+    },
+    {
+      "key": "course.51",
+      "requirement": "DEVELOPMENT INSTRUCTIONS FOR THE AI",
+      "status": "PARTIALLY COMPLETE",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": "Working local website/Forms/10 authored demonstrations verified. Complete official89-topic teaching/distribution/credentials and production/financial journey require the explicit dependencies in report items24–25."
+    },
+    {
+      "key": "course.52",
+      "requirement": "IMPORTANT DEVELOPMENT RULES",
+      "status": "PARTIALLY COMPLETE",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": "Working local website/Forms/10 authored demonstrations verified. Complete official89-topic teaching/distribution/credentials and production/financial journey require the explicit dependencies in report items24–25."
+    },
+    {
+      "key": "course.53",
+      "requirement": "CORE EDUHOPE PRINCIPLE",
+      "status": "PARTIALLY COMPLETE",
+      "implementation": "Existing Madar APIs and public seed; see docs/eduhope/local-delivery-report.md",
+      "database": "Isolated marked144 preview; normal application141 unchanged",
+      "owner_ui": "Existing Academy Builder / E-Learning authoring / Forms Responses",
+      "public_or_learner_ui": "Published Builder site / fixed CoursePlayer and canonical learner routes",
+      "endpoint": "Canonical /public/academies, /builder/projects, /elearning APIs",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "blocker": "Working local website/Forms/10 authored demonstrations verified. Complete official89-topic teaching/distribution/credentials and production/financial journey require the explicit dependencies in report items24–25."
+    },
+    {
+      "key": "correction.1",
+      "requirement": "Reuse completed implementation",
+      "status": "IMPLEMENTED AND VERIFIED",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "evidence": "Retained canonical systems and immutable001–143.",
+      "blocker": null
+    },
+    {
+      "key": "correction.2",
+      "requirement": "Actual local academy",
+      "status": "IMPLEMENTED AND VERIFIED",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "evidence": "Persistent144 tenant1; restart/edit/preview/publish proof.",
+      "blocker": null
+    },
+    {
+      "key": "correction.3",
+      "requirement": "Complete public website",
+      "status": "IMPLEMENTED AND VERIFIED",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "evidence": "All11 published editable pages;44 EN/AR viewport combinations.",
+      "blocker": null
+    },
+    {
+      "key": "correction.4",
+      "requirement": "Original logo and theme",
+      "status": "IMPLEMENTED AND VERIFIED",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "evidence": "Exact owner JPEG/hash; managed media/settings/Builder.",
+      "blocker": null
+    },
+    {
+      "key": "correction.5",
+      "requirement": "Professional homepage",
+      "status": "IMPLEMENTED AND VERIFIED",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "evidence": "Adult licensed photo hero, editable original messaging and working CTAs.",
+      "blocker": null
+    },
+    {
+      "key": "correction.6",
+      "requirement": "Reusable Builder components",
+      "status": "IMPLEMENTED AND VERIFIED",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "evidence": "Hero existing-card variant, native inspector/upload/theme/localization/tests.",
+      "blocker": null
+    },
+    {
+      "key": "correction.7",
+      "requirement": "Actual generic Forms",
+      "status": "IMPLEMENTED AND VERIFIED",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "evidence": "Four definitions and published placements; native Forms editors.",
+      "blocker": null
+    },
+    {
+      "key": "correction.8",
+      "requirement": "Forms end-to-end",
+      "status": "IMPLEMENTED AND VERIFIED",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "evidence": "Contact rejected; Exchange approved; Affiliate atomic approval/notifs; Tuition eligibility rehearsal.",
+      "blocker": null
+    },
+    {
+      "key": "correction.9",
+      "requirement": "Business configuration",
+      "status": "PARTIALLY COMPLETE",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "evidence": "Known values persisted; PAU domains unavailable; live payments/payouts unconfigured.",
+      "blocker": "Known values persisted; PAU domains unavailable; live payments/payouts unconfigured."
+    },
+    {
+      "key": "correction.10",
+      "requirement": "Course structure and content",
+      "status": "PARTIALLY COMPLETE",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "evidence": "10 Levels/89 topics;10 original authored demos,79 draft outlines pending original map.",
+      "blocker": "10 Levels/89 topics;10 original authored demos,79 draft outlines pending original map."
+    },
+    {
+      "key": "correction.11",
+      "requirement": "Exams and credentials",
+      "status": "REQUIRES OWNER MATERIAL",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "evidence": "10 draft reviews/5 draft65-question banks/5 disabled CEFR configs; educator approval required.",
+      "blocker": "10 draft reviews/5 draft65-question banks/5 disabled CEFR configs; educator approval required."
+    },
+    {
+      "key": "correction.12",
+      "requirement": "Learner navigation",
+      "status": "IMPLEMENTED AND VERIFIED",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "evidence": "Home distinct Dashboard, canonical1/10 progress, placement-derived intake, own submission table.",
+      "blocker": null
+    },
+    {
+      "key": "correction.13",
+      "requirement": "Database-backed runtime",
+      "status": "IMPLEMENTED AND VERIFIED",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "evidence": "Canonical persistence/APIs; no static EduHope React imports.",
+      "blocker": null
+    },
+    {
+      "key": "correction.14",
+      "requirement": "Portable seed",
+      "status": "PARTIALLY COMPLETE",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "evidence": "Logical/idempotent/localguard/media/owner-conflict/actualrestore proof; production mode awaits governed destination approval.",
+      "blocker": "Logical/idempotent/localguard/media/owner-conflict/actualrestore proof; production mode awaits governed destination approval."
+    },
+    {
+      "key": "correction.15",
+      "requirement": "Editable retained preview",
+      "status": "IMPLEMENTED AND VERIFIED",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "evidence": "Persistent DB/storage/private localcfg; allpages/Form/lesson editors and restart proof.",
+      "blocker": null
+    },
+    {
+      "key": "correction.16",
+      "requirement": "Native acceptance",
+      "status": "IMPLEMENTED AND VERIFIED",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "evidence": "Real Builder/Forms/learning/human grading/notifs/mobile/RTL/eligibility/recipient denial.",
+      "blocker": null
+    },
+    {
+      "key": "correction.17",
+      "requirement": "Finish actual deliverable",
+      "status": "PARTIALLY COMPLETE",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "evidence": "Actual local website and seeded course delivered; official owner materials/production approval pending.",
+      "blocker": "Actual local website and seeded course delivered; official owner materials/production approval pending."
+    },
+    {
+      "key": "correction.18",
+      "requirement": "Final report and matrix",
+      "status": "IMPLEMENTED AND VERIFIED",
+      "proof": [
+        "docs/eduhope/local-delivery-report.md"
+      ],
+      "evidence": "25-point report and individual149 source plus18 correction rows.",
+      "blocker": null
+    }
+  ]
+}

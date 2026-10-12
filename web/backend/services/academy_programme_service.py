@@ -93,6 +93,9 @@ def account(actor):
         values = service_supabase.rpc('academy_wallet', {'p_tenant': actor.tenant_id, 'p_user': actor.user_id}).execute().data
         visible = permitted_wallet(values, grants)
         result['eligibility'] = {key: visible[key] for key in ('tuition_eligible', 'exchange_eligible', 'verified_sales', 'threshold', 'remaining_sales') if key in visible and (key != 'verified_sales' or grants['tuition'])}
+    if settings_available(144) and any(grants[kind] for kind in ('affiliate', 'tuition', 'exchange')):
+        from services.elearning_academy_service import member_profile
+        result['application_paths'] = (member_profile(actor.tenant_id) or {}).get('application_paths', {})
     return result
 
 
@@ -115,9 +118,13 @@ def review(actor, entity_type, entity_id, payload):
     available(actor)
     if actor.role not in {'owner', 'admin'}: raise HTTPException(403, 'Owner or admin access required')
     table = 'academy_withdrawals' if entity_type == 'withdrawal' else 'academy_applications'
-    rows = service_supabase.table(table).select('kind' if entity_type == 'application' else 'id').eq('tenant_id', actor.tenant_id).eq('id', str(entity_id)).limit(1).execute().data or []
+    selected='kind'+(',learning_form_response_id' if settings_available(144) else '') if entity_type=='application' else 'id'
+    rows = service_supabase.table(table).select(selected).eq('tenant_id', actor.tenant_id).eq('id', str(entity_id)).limit(1).execute().data or []
     if not rows: raise HTTPException(404, 'Request not found')
     require_capability(actor.tenant_id, rows[0]['kind'] if entity_type == 'application' else 'withdrawal')
+    if rows[0].get('learning_form_response_id'):
+        from services.elearning_forms_service import gate
+        gate(actor.tenant_id,'response_management')
     try:
         service_supabase.rpc('academy_review', {'p_tenant': actor.tenant_id, 'p_admin': actor.user_id,
                             'p_type': entity_type, 'p_id': str(entity_id), 'p_status': payload.status,

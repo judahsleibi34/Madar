@@ -13,7 +13,14 @@ import {
   moveElementBehindText,
   moveElementToFront,
   reconcileMeasuredFormBlockPosition,
+  directElementHeight,
 } from "./PageBuilder.layout";
+
+it('retains a usable photographic hero frame when an academy row is converted to the direct editor',()=>{
+  const hero={id:'hero',type:'card',variant:'educationHero',styles:{width:'100%'}};
+  expect(directElementHeight(hero)).toBe(740);
+  expect(getDirectElementMinimumSize(hero)).toEqual({width:280,height:460});
+});
 
 describe("editorial image card sizing", () => {
   it("applies one frame and image width to every editorial card in the viewport", () => {
@@ -214,6 +221,17 @@ describe("page builder canvas compaction", () => {
 
     const result = compactDirectSectionAfterElementRemoval(section, "removed");
     expect(result.freeElements[0].position.desktop.y).toBe(240);
+  });
+  it('does not collapse retained content when deleting an overlapping overlay',()=>{
+    const section={mode:'direct',layout:{minHeight:1100},freeElements:[
+      {id:'hero',position:{desktop:{x:24,y:24,width:1152,height:740}}},
+      {id:'overlay',position:{desktop:{x:238,y:417,width:380,height:104}}},
+      {id:'heading',position:{desktop:{x:24,y:836,width:1152,height:112}}},
+    ]};
+    const result=compactDirectSectionAfterElementRemoval(section,'overlay');
+    expect(result.freeElements.map(element=>element.id)).toEqual(['hero','heading']);
+    expect(result.freeElements[1].position.desktop.y).toBe(836);
+    expect(section.freeElements).toHaveLength(3);
   });
 });
 

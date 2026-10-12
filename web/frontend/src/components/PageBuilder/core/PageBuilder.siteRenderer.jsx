@@ -352,7 +352,7 @@ const SiteRenderer = forwardRef(function SiteRenderer({
                     const layoutElement = isUnderTextImage && element.layer !== "behindText"
                       ? { ...element, layer: "behindText" }
                       : element;
-                    const usesIntrinsicHeight = intrinsicHeightElementTypes.has(element.type);
+                    const usesIntrinsicHeight = intrinsicHeightElementTypes.has(element.type) || (element.type === 'card' && element.variant === 'educationHero');
                     const frameStyle = {
                       ...getDirectElementFrameStyle({
                         element: interactionPositionsBySection?.[section.id]?.[element.id]

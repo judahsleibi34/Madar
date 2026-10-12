@@ -19,7 +19,7 @@ def capabilities(request: Request, response: Response):
     programme_flags={key:bool(config.get('programmes_enabled') and config.get(flag)) for key,flag in [('tuition','tuition_support_enabled'),('exchange','exchange_programme_enabled'),('affiliate','affiliates_enabled')]}
     from services.elearning_academy_service import member_profile
     academy = member_profile(actor.tenant_id) if config.get('enabled') and config.get('academy_enabled') else None
-    return {'academy': academy, 'programme_flags':programme_flags, 'capabilities': allowed, 'can_manage': actor.role in {'owner', 'admin'},
+    return {'academy': academy, 'form_reviews_available':service.settings_available(144), 'exchange_intake_available':bool((academy or {}).get('application_paths',{}).get('exchange') or (service.settings_available(142) and config.get('exchange_opportunities_enabled'))), 'programme_flags':programme_flags, 'capabilities': allowed, 'can_manage': actor.role in {'owner', 'admin'},
             'support_programme_name': config.get('support_programme_name', 'Support Programme') if allowed['tuition'] else None,
             'exchange_programme_name': config.get('exchange_programme_name', 'Exchange Programme') if allowed['exchange'] else None}
 

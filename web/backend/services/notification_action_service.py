@@ -45,7 +45,7 @@ def validate_notification_action_path(path: Any) -> str | None:
         return None
     # Both routes resolve their tenant from the authenticated session. Object
     # identifiers remain display hints and are never trusted for authorization.
-    learning_path = re.fullmatch(r"/(?:my-learning(?:/(?:dashboard|assessment-reviews(?:/[0-9a-f-]{36})?|affiliate(?:/application)?|exchange(?:/[0-9a-f-]{36})?|referrals|rewards|wallet|withdrawals|account|plans|notifications|programmes|certificates(?:/[0-9a-f-]{36})?|courses/[0-9a-f-]{36}(?:/(?:lessons|assessments)/[0-9a-f-]{36})?))?|e-learning(?:/(?:programmes|reports|forms/responses(?:/[0-9a-f-]{36})?))?)", decoded_path)
+    learning_path = re.fullmatch(r"/(?:my-learning(?:/(?:dashboard|assessment-reviews(?:/[0-9a-f-]{36})?|affiliate(?:/application)?|exchange(?:/[0-9a-f-]{36})?|form-responses(?:/[0-9a-f-]{36})?|referrals|rewards|wallet|withdrawals|account|plans|notifications|programmes|certificates(?:/[0-9a-f-]{36})?|courses/[0-9a-f-]{36}(?:/(?:lessons|assessments)/[0-9a-f-]{36})?))?|e-learning(?:/(?:programmes|reports|forms/responses(?:/[0-9a-f-]{36})?))?)", decoded_path)
     return decoded_path if decoded_path in {NOTIFICATION_CENTER_PATH, CALENDAR_PATH} or learning_path else None
 
 

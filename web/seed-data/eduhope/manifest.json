@@ -1,0 +1,32 @@
+{
+  "package": "eduhope",
+  "version": 1,
+  "languages": [
+    "en",
+    "ar"
+  ],
+  "website": "website.json",
+  "forms": "forms.json",
+  "course": "course.json",
+  "media": "media.json",
+  "provisional": true,
+  "production_writes_authorized": false,
+  "required_schema": {
+    "website_forms": 141,
+    "advanced_learning": 143,
+    "general_decisions": 144
+  },
+  "exclude_from_import": [
+    "auth_users",
+    "sessions",
+    "private_responses",
+    "application_history",
+    "payments",
+    "wallet_records",
+    "demo_enrolments"
+  ],
+  "settings": "settings.json",
+  "teaching": "teaching.json",
+  "assessments": "assessments.json",
+  "illustrations": "illustrations/"
+}

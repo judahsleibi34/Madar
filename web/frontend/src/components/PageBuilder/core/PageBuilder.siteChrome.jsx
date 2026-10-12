@@ -41,6 +41,9 @@ export const createSiteChromeRenderers = ({
   navigationDestinations = [],
   authenticated = false,
   renderHeaderActions,
+  renderFooterActions,
+  chromeLabels = {},
+  direction,
 }) => {
   const renderSiteHeader = () => {
     const site = project.siteChrome || defaultSiteChrome;
@@ -83,6 +86,7 @@ export const createSiteChromeRenderers = ({
 
     return (
       <header
+        dir={direction}
         className={`built-site-header header-align-${site.headerAlign || "center"} ${selected.type === "siteHeader" ? "is-selected" : ""}`}
         style={{
           ...(headerBackgroundColor ? { backgroundColor: headerBackgroundColor } : {}),
@@ -103,7 +107,7 @@ export const createSiteChromeRenderers = ({
               if (homePage) selectPage(homePage.id);
             }}
           >
-            {logoSrc ? <img {...logoProps} alt={`${brandLabel || "Website"} logo`} /> : brandLabel ? <span className="logo-fallback">{brandLabel.slice(0, 1).toUpperCase()}</span> : null}
+            {logoSrc ? <img {...logoProps} alt={`${brandLabel || "Website"} logo`} /> : brandLabel ? <span className="logo-fallback" style={{width:42,height:42}}>{brandLabel.slice(0, 1).toUpperCase()}</span> : null}
             {brandLabel && <span>{brandLabel}</span>}
           </button>
 
@@ -133,7 +137,7 @@ export const createSiteChromeRenderers = ({
 
           {publicRuntime && (
             <details className="built-site-mobile-menu">
-              <summary aria-label="Open navigation menu">
+              <summary aria-label={chromeLabels.menu || "Open navigation menu"}>
                 <span aria-hidden="true" />
                 <span aria-hidden="true" />
                 <span aria-hidden="true" />
@@ -241,6 +245,7 @@ export const createSiteChromeRenderers = ({
 
     return (
       <footer
+        dir={direction}
         className={`built-site-footer ecommerce-style-footer ${selected.type === "siteFooter" ? "is-selected" : ""}`}
         onClick={(event) => {
           event.stopPropagation();
@@ -342,7 +347,8 @@ export const createSiteChromeRenderers = ({
 
         <div className="ecommerce-footer-bottom">
           <p>© 2026{footerBrand ? ` ${footerBrand}.` : ""}{footerRights ? ` ${footerRights}` : ""}</p>
-          <a href={MADAR_ATTRIBUTION_URL} className="powered-by-madar" onClick={(event) => event.stopPropagation()}>Powered by Madar</a>
+          {renderFooterActions?.()}
+          <a href={MADAR_ATTRIBUTION_URL} className="powered-by-madar" onClick={(event) => event.stopPropagation()}>{chromeLabels.attribution || "Powered by Madar"}</a>
         </div>
       </footer>
     );
