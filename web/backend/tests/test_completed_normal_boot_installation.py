@@ -1,5 +1,6 @@
 """Exact-file installer tests in a private fixture, with no host systemd effects."""
 import hashlib
+import copy
 import json
 import os
 from pathlib import Path
@@ -39,6 +40,25 @@ class Operations:
         return SimpleNamespace(stdout='')
 
 class CompletedBootInstallationTests(unittest.TestCase):
+    def test_manual_supersession_accepts_only_the_verified_compatible_origin_actor(self):
+        from test_completed_normal_manual_profile import manual_contract
+        contract=manual_contract();document=copy.deepcopy(self.installer.document)
+        name='madar-compatible-normal-boot-'+Path(contract['source_roles']['completion_root']).name[:12]+'.service'
+        path=self.units/name;path.write_text('[Unit]\nDescription=exact completed origin\n');path.chmod(0o644)
+        baseline=document['boot_resources'];baseline['old_units'].append(name)
+        baseline['old_unit_dropins'][name]=[]
+        baseline['unit_states'][name]={'enabled':'disabled','active':'inactive'}
+        baseline['files'][str(m.UNITS/name)]={'sha256':hashlib.sha256(path.read_bytes()).hexdigest(),'uid':0,'mode':0o644}
+        contract['plan_sha256']=admission.digest(document)
+        installer=m.CompletedNormalBootInstallation(contract,document,self.installer.package,lambda:None,self.ops,
+            units=self.units,admissions=self.path/'admissions')
+        installer.preflight(read_only=True)
+        self.assertEqual(self.ops.calls,[])
+        document['boot_resources']['old_units'][-1]='madar-compatible-normal-boot-'+('f'*12)+'.service'
+        contract['plan_sha256']=admission.digest(document)
+        with self.assertRaisesRegex(RuntimeError,'resource_contract_invalid'):
+            m.CompletedNormalBootInstallation(contract,document,self.installer.package,lambda:None,self.ops,
+                units=self.units,admissions=self.path/'admissions')
     def test_boot_queues_disabled_proxy_only_after_successful_verified_recovery(self):
         body=m.unit_bytes('/measured/boot').decode()
         self.assertIn('Wants=madar-release-proxy.service\n',body)

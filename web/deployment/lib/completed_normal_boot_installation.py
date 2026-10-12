@@ -82,8 +82,10 @@ class CompletedNormalBootInstallation:
         self.root=Path(admissions)/digest(contract);self.name='madar-compatible-normal-boot-'+digest(contract)[:12]+'.service'
         self.proxy=self.units/(PROXY+'.d')/('99-compatible-normal-'+digest(contract)[:12]+'.conf')
         baseline=document['boot_resources']
+        compatible_origin='madar-compatible-normal-boot-'+Path(contract['source_roles']['completion_root']).name[:12]+'.service'
         if (set(baseline)!={'files','proxy_dropins','old_units','old_unit_dropins','unit_states'} or not baseline['old_units']
-                or any(not (name=='madar-emergency-routing.service' or re.fullmatch('madar-normal-local-(boot|fallback)-[0-9a-f]{12}\\.service',name)) for name in baseline['old_units'])
+                or any(not (name=='madar-emergency-routing.service' or re.fullmatch('madar-normal-local-(boot|fallback)-[0-9a-f]{12}\\.service',name)
+                    or self.profile is MANUAL and name==compatible_origin) for name in baseline['old_units'])
                 or set(baseline['unit_states'])!={PROXY,*baseline['old_units']}):
             raise RuntimeError('completed_boot_resource_contract_invalid')
         if set(baseline['old_unit_dropins'])!=set(baseline['old_units']):raise RuntimeError('completed_boot_resource_contract_invalid')
