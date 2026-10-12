@@ -55,6 +55,16 @@ class ManualProfileTests(unittest.TestCase):
         contract=manual_contract();contract['historical_files'].pop(next(iter(contract['historical_files'])))
         with self.assertRaises(RuntimeError):admission.validate_contract(contract)
 
+    def test_only_exact_nonsecret_origin_admission_uses_public_permissions(self):
+        contract=manual_contract();observed=[]
+        def protected(path,**kw):observed.append((str(path),kw['private']));return path
+        with patch('deployment.lib.provider_recovery_runtime.protected',protected),patch('deployment.lib.provider_recovery_runtime.file_digest',return_value='7'*64):
+            admission.verify_history(contract)
+        public=[name for name,private in observed if not private]
+        self.assertEqual(public,[str(Path(contract['source_roles']['completion_root'])/'admission.json')])
+        for name,private in observed:
+            if name!=public[0]:self.assertTrue(private)
+
     def test_fresh_authorization_binds_new_operation_and_source_schema(self):
         contract=manual_contract()
         with tempfile.TemporaryDirectory() as temporary:
