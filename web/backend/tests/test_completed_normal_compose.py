@@ -129,4 +129,56 @@ class CompletedNormalComposeTests(unittest.TestCase):
         self.assertFalse(any(v.get('target')=='/run/madar/business-write-authority' for v in services['parser-worker']['volumes']))
 
 
+    def test_real_compose_preserves_explicit_136_144_bounds_without_widening_mounts(self):
+        if not shutil.which('docker'):
+            self.skipTest('Docker Compose unavailable; source render exercised on deployment host')
+        version = subprocess.run(['docker','compose','version'],capture_output=True,text=True)
+        if version.returncode:
+            self.skipTest('Docker Compose unavailable; actual render runs separately on deployment host')
+        captured=[]
+        original=self.ops._environment
+        def environment(*args,**kwargs):
+            value=original(*args,**kwargs)
+            # Render-only fixture inputs, not a144 admission/authorization claim.
+            value.update(SCHEMA_COMPATIBLE_MIN='136',SCHEMA_COMPATIBLE_MAX='144',SCHEMA_EXCLUDED_VERSIONS='142')
+            return value
+        def run(command,*,cwd=None,env=None,**kwargs):
+            result=subprocess.run(command,cwd=cwd,env=env,capture_output=True,text=True,timeout=30)
+            self.assertEqual(result.returncode,0,'Private Compose configuration failed')
+            captured.append(json.loads(result.stdout));return result.stdout
+        self.ops._environment=environment;self.ops.run=run
+        self.ops._compose('c'*40,'green',self.images,'config','--format','json',workers_active=True)
+        for name in ('backend','notification-worker','calendar-sync-worker','data-deletion-worker'):
+            role=captured[0]['services'][name]
+            self.assertEqual(str(role['environment']['SCHEMA_COMPATIBLE_MIN']),'136')
+            self.assertEqual(str(role['environment']['SCHEMA_COMPATIBLE_MAX']),'144')
+            self.assertEqual(str(role['environment']['SCHEMA_EXCLUDED_VERSIONS']),'142')
+            mounts=[v for v in role['volumes'] if v['target']=='/run/madar/business-write-authority']
+            self.assertEqual(len(mounts),1)
+            self.assertTrue(mounts[0]['read_only'])
+            self.assertFalse(mounts[0]['bind']['create_host_path'])
+            self.assertTrue(role['read_only']);self.assertIn('ALL',role['cap_drop'])
+
+    def test_real_compose_rejects_missing_explicit_authority_bounds(self):
+        if not shutil.which('docker'):
+            self.skipTest('Docker Compose unavailable; actual render runs separately on deployment host')
+        version = subprocess.run(['docker','compose','version'],capture_output=True,text=True)
+        if version.returncode:
+            self.skipTest('Docker Compose unavailable; actual render runs separately on deployment host')
+        original=self.ops._environment
+        for missing in ('SCHEMA_COMPATIBLE_MIN','SCHEMA_COMPATIBLE_MAX'):
+            with self.subTest(missing=missing):
+                def environment(*args,**kwargs):
+                    value=original(*args,**kwargs)
+                    value.pop(missing)
+                    return value
+                def run(command,*,cwd=None,env=None,**kwargs):
+                    result=subprocess.run(command,cwd=cwd,env=env,capture_output=True,text=True,timeout=30)
+                    self.assertNotEqual(result.returncode,0)
+                    self.assertIn(missing,result.stderr)
+                    return result.stdout
+                self.ops._environment=environment;self.ops.run=run
+                self.ops._compose('c'*40,'green',self.images,'config','--format','json',workers_active=True)
+
+
 if __name__=='__main__':unittest.main()

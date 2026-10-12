@@ -12,6 +12,13 @@ excluded, an exact source/context binding and a fresh root-issued grant. Existin
 115..136 grants cannot authorize it. Root file protection and recovery fencing
 remain mandatory. These source changes grant no installation or SQL authority.
 
+The root-authority Compose overlay carries explicit reviewed compatibility
+bounds and exclusions from the deployment environment. Missing bounds reject
+configuration rendering. It still requires an existing read-only authority
+mount with `create_host_path: false`. Real Compose rendering verifies both
+the historical bounds and the 136..144 range with 142 excluded, without
+granting new runtime or production authority.
+
 Manual activation still requires accepted exact images at136/144, preservation
 on a private current-data restore, independently authorized controller/source-role
 reconciliation, singleton workers, boot supersession and a complete exact-hash
