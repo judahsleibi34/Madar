@@ -3,8 +3,10 @@ import hashlib
 import copy
 import json
 import os
+import shutil
 from pathlib import Path
 import sys
+import subprocess
 import tempfile
 import unittest
 from types import SimpleNamespace
@@ -40,6 +42,53 @@ class Operations:
         return SimpleNamespace(stdout='')
 
 class CompletedBootInstallationTests(unittest.TestCase):
+    def test_manual_successor_gate_sorts_after_existing_completed_origin(self):
+        from test_completed_normal_manual_profile import manual_contract
+        contract=manual_contract();document=copy.deepcopy(self.installer.document)
+        origin='99-compatible-normal-'+Path(contract['source_roles']['completion_root']).name[:12]+'.conf'
+        canonical=str(m.DROPINS/origin)
+        document['boot_resources']['proxy_dropins'].append(canonical)
+        document['boot_resources']['files'][canonical]={'sha256':'b'*64,'uid':0,'mode':0o644}
+        contract['plan_sha256']=admission.digest(document)
+        installer=m.CompletedNormalBootInstallation(contract,document,self.installer.package,lambda:None,self.ops,
+            units=self.units,admissions=self.path/'admissions')
+        self.assertTrue(all(Path(p).name<installer.proxy.name for p in installer.baseline['proxy_dropins']))
+        self.assertTrue(installer.proxy.name.startswith('99z-compatible-normal-'))
+        self.assertTrue(self.installer.proxy.name.startswith('99-compatible-normal-'))
+        late=str(m.DROPINS/'zz-unreviewed.conf')
+        document['boot_resources']['proxy_dropins'].append(late)
+        document['boot_resources']['files'][late]={'sha256':'c'*64,'uid':0,'mode':0o644}
+        contract['plan_sha256']=admission.digest(document)
+        with self.assertRaisesRegex(RuntimeError,'completed_boot_proxy_gate_order_unreviewed'):
+            m.CompletedNormalBootInstallation(contract,document,self.installer.package,lambda:None,self.ops,
+                units=self.units,admissions=self.path/'admissions')
+        self.assertEqual(self.ops.calls,[])
+
+    @unittest.skipUnless(shutil.which('systemd-analyze'),'offline systemd parser unavailable')
+    def test_real_systemd_parser_reproduces_old_reset_and_accepts_ordered_successor(self):
+        # Offline parser only: no manager reload, unit start, Docker or DB access.
+        units=self.path/'offline-parser';units.mkdir()
+        fragment=units/'order-test.service'
+        fragment.write_text('[Unit]\nDefaultDependencies=no\n[Service]\nType=oneshot\n'
+            'StandardOutput=null\nStandardError=null\nExecStart=/usr/bin/true\n')
+        dropins=units/(fragment.name+'.d');dropins.mkdir()
+        old=dropins/'99-compatible-normal-c3c5ec68f56f.conf'
+        old.write_text('[Service]\nExecStartPre=\nExecStartPre=/usr/bin/true old-gate\n')
+        candidate=dropins/'99-compatible-normal-402aea67e904.conf'
+        candidate.write_text('[Service]\nExecStartPre=\nExecStartPre=/usr/bin/true successor-gate\n')
+        original=old.read_bytes()
+        def effective_gate():
+            result=subprocess.run(['systemd-analyze','verify','--man=no','--generators=no',str(fragment)],
+                env={**os.environ,'SYSTEMD_UNIT_PATH':str(units),'SYSTEMD_LOG_LEVEL':'debug','SYSTEMD_COLORS':'0'},
+                capture_output=True,text=True,timeout=15)
+            self.assertEqual(result.returncode,0,result.stderr[-1500:])
+            return [line.strip() for line in (result.stdout+result.stderr).splitlines()
+                if 'Command Line: /usr/bin/true ' in line]
+        self.assertEqual(effective_gate(),['Command Line: /usr/bin/true old-gate'])
+        candidate.rename(dropins/'99z-compatible-normal-402aea67e904.conf')
+        self.assertEqual(effective_gate(),['Command Line: /usr/bin/true successor-gate'])
+        self.assertEqual(old.read_bytes(),original)
+
     def test_manual_supersession_accepts_only_the_verified_compatible_origin_actor(self):
         from test_completed_normal_manual_profile import manual_contract
         contract=manual_contract();document=copy.deepcopy(self.installer.document)

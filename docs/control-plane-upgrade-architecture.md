@@ -2,6 +2,15 @@
 
 ## Explicit schema136→144 maintenance operation
 
+The successor proxy gate uses `99z-compatible-normal-<context>.conf` so it sorts
+after the already completed136 `99-compatible-normal-<origin>.conf`. The latter's
+retained `ExecStartPre=` reset otherwise restores its historical gate when the
+new context hash sorts earlier. Exact-resource preflight rejects any measured
+drop-in sorting after the successor gate. The installed effective-controls guard
+is unchanged; historical resources are preserved and superseded only inside the
+fresh authorized transaction. This is ordering correction, not another boot actor
+or recognition of the136 actor as schema144-compatible.
+
 The existing completed-NORMAL coordinator has a separate version-2 operation,
 `completed-normal-schema136-144-maintenance-release`. It independently attests
 the completed136 origin before admission. Its fresh credential binds controller,
