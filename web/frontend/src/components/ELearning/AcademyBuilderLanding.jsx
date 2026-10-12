@@ -42,8 +42,10 @@ export default function AcademyBuilderLanding({ schema, basePath = "", authentic
     }),
   });
   const renderHeaderActions = () => <>
-    <Link className="academy-login-link" to={`${basePath}/login`}>{t("elearning.learner.logIn")}</Link>
-    {["open", "email_domain"].includes(registration) && <Link className="academy-signup-link" to={`${basePath}/login?register=1`}>{t("elearning.learner.signUp")}</Link>}
+    {authenticated ? <Link className="academy-login-link" to={`${basePath}/dashboard`}>{t("elearning.player.myLearning")}</Link> : <>
+      <Link className="academy-login-link" to={`${basePath}/login`}>{t("elearning.learner.logIn")}</Link>
+      {["open", "email_domain"].includes(registration) && <Link className="academy-signup-link" to={`${basePath}/login?register=1`}>{t("elearning.learner.signUp")}</Link>}
+    </>}
     <button type="button" onClick={() => i18n.changeLanguage(i18n.language.startsWith("ar") ? "en" : "ar")}>{i18n.language.startsWith("ar") ? "English" : "العربية"}</button>
   </>;
   const { renderSiteHeader, renderSiteFooter } = createSiteChromeRenderers({ project: schema || { pages: [] }, activePage, selected: { type: "", id: "" }, preview: true, publicRuntime: true, selectPage, setSelected: () => {}, navigateUrl: url => navigate(url), navigationDestinations: getAcademyNavigationDestinations(basePath), authenticated, renderHeaderActions });

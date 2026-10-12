@@ -1,0 +1,14 @@
+{
+  "release_metadata_version": 1,
+  "schema": {
+    "compatible_min": 114,
+    "compatible_max": 140,
+    "target": 140,
+    "migration_class": "forward-compatible",
+    "rollback_compatible_min": 114,
+    "rollback_compatible_max": 114
+  },
+  "migration_policy": "automatic-after-known-good-backup-first-forward-repair",
+  "notes": "Unselected Academy owner tools candidate: exact immutable115-139 prefix plus140. Active production schema115 non-migrating contract unchanged. Separate production bridge and verified backup required.",
+  "migration_manifest": "migrations-115-140.json"
+}

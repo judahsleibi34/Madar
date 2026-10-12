@@ -143,6 +143,11 @@ This ignored file contains local credentials only; `web/.env` is preserved.
 The `--local-db` launcher refuses missing configuration and hosted database URLs.
 It loads the schema compatibility range from `deployment/releases/release.json`
 so health readiness checks use the current release contract after local migrations.
+For an existing isolated database at schema 136, explicitly select the retained
+development candidate contract with
+`python run_local.py --local-db --local-schema-contract schema-114-136-bridge.json`.
+This option requires loopback database URLs, preserves schema compatibility
+checks, and runs no migrations. It does not change the production release contract.
 Restart any existing API process before using this launcher. The frontend's
 normal development proxy already targets `127.0.0.1:8000`.
 
@@ -400,32 +405,42 @@ deployment sequence.
 
 ## Testing Commands
 
-Use Docker-based validation from the repository root. For backend unit tests, include the test override and `--no-deps` so the test container does not try to create the fixed-name Redis containers used by the running production/dev stacks:
+Run the complete backend suite in the isolated environment defined by
+[`Backend Check`](../.github/workflows/backend-check.yml). From the repository
+root, build its locked, non-root test image:
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.test.yml run --rm --no-deps backend python -m unittest tests.test_security_foundation -v
+docker build --target test -t madar-backend-test web/backend
 ```
 
-For the broader backend stabilization suite:
+Then execute the workflow's complete **Run backend tests** command, including all
+environment variables and read-only mounts. The copyable command and the regression
+investigation results are in
+[`docs/backend-regression-investigation.md`](../docs/backend-regression-investigation.md).
+Finish the backend CI checks with:
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.test.yml run --rm --no-deps backend python -m unittest \
-  tests.test_security_foundation \
-  tests.test_website_routes \
-  tests.test_builder_backend_hardening \
-  tests.test_builder_form_submissions \
-  tests.test_builder_archived_projects \
-  tests.test_builder_asset_upload \
-  -v
+docker run --rm madar-backend-test python -m pip check
 ```
 
-The test override uses a separate Compose project name, removes fixed `container_name` values for test services, avoids publishing backend/frontend ports, and keeps the read-only migration mounts available at `/app/database` and `/app/supabase`.
+Running the backend test runner directly in the development virtual environment
+can load `web/.env`, including production cookie, entitlement and worker settings.
+Setting `APP_ENV=test` alone does not isolate that dotenv file. The CI image excludes
+environment files and uses synthetic credentials, writable temporary storage and
+the source paths required by the tests. The suite also blocks external network
+attempts. Use this environment for the full backend gate; preserve the local app's
+configuration separately.
+
+Database integration tests require a separate marked disposable database. The
+existing `web/scripts/rehearse_migration_141.py` verifies the immutable 001–141
+chain and runs the E-Learning database tests against that disposable database.
+It requires the loopback local database configuration and does not upgrade the
+application database.
 
 For full image validation, still run:
 
 ```bash
-docker compose build backend frontend
-docker compose build frontend
+docker compose -f web/docker-compose.yml build backend frontend
 git diff --check
 ```
 
@@ -491,3 +506,100 @@ Phase 5: production hardening
 
 Phase 6: future SaaS expansion
 - custom domains, collaboration, analytics, and integration depth
+
+## Reusable E-Learning programmes and owner tools (unselected schema140 candidate)
+
+The implementation inventory and verification record are in
+[`docs/eduhope-implementation.md`](../docs/eduhope-implementation.md).
+Production `release.json` remains the exact schema115/non-migrating profile.
+The retained schema140 manifest does not authorize production migration or deploy.
+
+For a local Supabase database already migrated to schema140:
+
+```bash
+cd web/backend
+./madar_env/bin/python run_local.py --local-db --local-schema-contract schema-114-140-bridge.json
+```
+
+In a separate terminal, start Madar's existing notification consumer:
+
+```bash
+cd web/backend
+./madar_env/bin/python run_local_notifications.py --local-schema-contract schema-114-140-bridge.json
+```
+
+The worker launcher refuses non-loopback configuration, enables internal delivery,
+and disables external SMTP/push for this development process. Its health endpoint
+is `http://127.0.0.1:8090/health`. These launchers do not apply migrations. The local
+schema contract choice does not modify the active production release contract.
+The API's optional production worker-readiness gate remains disabled locally;
+check the separate worker health endpoint for actual development worker status.
+
+Owner **E-Learning → Settings** controls tenant programme configuration according
+to existing commercial module access: Commerce for referral/affiliate/finance,
+Website for support/exchange, Forms exports for advanced reports. Backend checks
+remain authoritative. Names, terms, reward values, support eligibility/threshold
+and withdrawal minimum/methods are tenant data. New thresholds/minima/methods are
+unset until explicitly configured; no EduHope prices or reward presets are applied.
+Prices remain in existing Learning Plans/commerce offerings. Migration139 preserves
+historical opt-in settings while replacing the brand gate with `programmes_enabled`.
+
+Live payments intentionally return `payment_provider_unavailable` until a concrete
+provider adapter is implemented, registered and configured. `MADAR_PAYMENT_PROVIDER`
+alone cannot activate payments. No provider credentials have been supplied. The
+existing explicit local commerce simulator creates no payable academy rewards or
+qualifying Tuition Support sales.
+
+A destructive-data-free SQL rehearsal creates and removes a marked disposable
+localhost database, validates fresh history and transactional rollback, and runs
+learning-commerce/referral/CEFR/programme regressions:
+
+```bash
+cd web
+./backend/madar_env/bin/python scripts/rehearse_migration_140.py
+```
+
+Actual curriculum, five CEFR section mappings and existing offering prices remain
+unconfigured at the user's request. Configure CEFR on a course's existing
+Certificates screen after its required final exams have been published with 70%
+passing scores and retakes enabled. Credentials use the existing PDF, verification
+and revocation endpoints.
+
+Owner tools extend the existing Academy hub with metrics, the shared Settings
+with institution verification and application switches, existing tuition
+applications with private attachments, and exchange opportunity management.
+Contact administration extends platform contacts; the Academy Builder profile
+adds contact, programme information and open exchange components while retaining
+shared pages, chrome and publishing. The architecture audit and acceptance
+report are linked in the implementation document. Live provider credentials,
+real course content and institution domains remain unconfigured.
+
+
+## Independent E-Learning Forms (local schema141)
+
+[The Forms report](../docs/elearning-forms-implementation.md) documents the
+Builder methodology reuse, independent tenant definitions/responses, private
+files, notifications, endpoint/security contracts and verification. Start from
+**E-Learning → Settings → Forms** with an entitled tenant academy owner. A nested
+Forms menu appears when an active/archived form or historical responses exist.
+The existing platform test account retains its platform permissions.
+
+For a local database already upgraded to141, use these explicit contracts in
+separate terminals from `web/backend`:
+
+```bash
+./madar_env/bin/python run_local.py --local-db --local-schema-contract schema-114-141-bridge.json
+./madar_env/bin/python run_local_notifications.py --local-schema-contract schema-114-141-bridge.json
+```
+
+These commands select runtime compatibility; they do not apply migrations.
+To validate fresh history, populated upgrades, rollback and domain tests on a
+marked disposable local database, run from the repository root:
+
+```bash
+./web/backend/madar_env/bin/python web/scripts/rehearse_migration_141.py
+```
+
+Migration141 and its descriptors are an unselected candidate. Production
+`release.json` remains the unchanged schema115 non-migrating contract. Local
+validation or a runtime schema choice does not authorize production deployment.

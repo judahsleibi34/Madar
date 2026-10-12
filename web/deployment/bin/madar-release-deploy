@@ -568,6 +568,7 @@ class DockerGitOperations:
             "MADAR_REMOTE_EGRESS_SUBNET": subnets["remote_egress"],
             "SCHEMA_COMPATIBLE_MIN": str(self.compatibility.schema_min),
             "SCHEMA_COMPATIBLE_MAX": str(self.compatibility.schema_max),
+            "SCHEMA_EXCLUDED_VERSIONS": ",".join(map(str,self.compatibility.excluded_schemas)),
             "MADAR_RELEASE_WORKERS_ACTIVE": "true" if workers_active else "false",
             "MADAR_CONTAINER_PREFIX": getattr(self, "container_prefix", "madar"),
             "NOTIFICATION_WORKER_REQUIRED": "true" if workers_active else "false",
@@ -1103,6 +1104,7 @@ class DockerGitOperations:
             != str(self.compatibility.schema_min)
             or str(identity.get("schema_compatible_max"))
             != str(self.compatibility.schema_max)
+            or tuple(identity.get("schema_excluded_versions", [])) != self.compatibility.excluded_schemas
         ):
             raise RuntimeError("active_refresh_schema_contract_mismatch")
         components = readiness.get("components")
@@ -1241,6 +1243,7 @@ class DockerGitOperations:
                     != str(self.compatibility.schema_min)
                     or str(identity.get("schema_compatible_max"))
                     != str(self.compatibility.schema_max)
+                    or tuple(identity.get("schema_excluded_versions", [])) != self.compatibility.excluded_schemas
                 ):
                     last_failure = "release_schema_contract_mismatch"
                 else:
@@ -1283,6 +1286,7 @@ class DockerGitOperations:
         if (
             str(identity.get("schema_compatible_min")) != str(self.compatibility.schema_min)
             or str(identity.get("schema_compatible_max")) != str(self.compatibility.schema_max)
+            or tuple(identity.get("schema_excluded_versions", [])) != self.compatibility.excluded_schemas
         ):
             raise RuntimeError("candidate_core_schema_contract_mismatch")
         components = readiness.get("components")
@@ -1350,7 +1354,7 @@ class DockerGitOperations:
             ) from error
         if identity.get("release_sha") != expected_sha:
             raise RollbackTargetAttestationError("known_good_release_identity_mismatch")
-        if not minimum <= schema <= maximum:
+        if not minimum <= schema <= maximum or schema in identity.get("schema_excluded_versions", []):
             raise RollbackTargetAttestationError(
                 "known_good_rollback_schema_incompatible"
             )
@@ -1500,7 +1504,7 @@ def prepare_release(
     with deployment_lock(state_root):
         operations.verify_source(sha)
         schema = operations.schema_version()
-        if not compatibility.schema_min <= schema <= compatibility.schema_max:
+        if not compatibility.accepts_schema(schema):
             raise RuntimeError("candidate_schema_incompatible")
         migration_plan = plan_release_migrations(
             sha=sha, schema=schema, compatibility=compatibility,
@@ -1691,7 +1695,7 @@ def adopt_prepared_release(
     operations.verify_source(sha)
     operations.validate_candidate(sha, slot)
     schema = operations.schema_version()
-    if not compatibility.schema_min <= schema <= compatibility.schema_max:
+    if not compatibility.accepts_schema(schema):
         raise RuntimeError("candidate_schema_incompatible")
     stable_identity = operations._json("http://127.0.0.1:8001/health/version")
     stable_readiness = operations._json("http://127.0.0.1:8001/health/ready")
@@ -1797,7 +1801,7 @@ def _refresh_active_runtime(
             raise RuntimeError("active_release_schema_mismatch")
     elif schema != recorded_schema:
         raise RuntimeError("active_release_schema_mismatch")
-    if not operations.compatibility.schema_min <= schema <= operations.compatibility.schema_max:
+    if not operations.compatibility.accepts_schema(schema):
         raise RuntimeError("active_release_schema_incompatible")
     operations.verify_source(sha)
     operations.preflight(sha, slot, known_good["images"], schema)
@@ -2114,8 +2118,10 @@ def automatic_migrate_known_good(
     ])
     _validate_stable_known_good(sha=sha, slot=slot, operations=operations)
     current_schema = operations.schema_version()
-    if not compatibility.schema_min <= current_schema <= compatibility.schema_max:
+    if not compatibility.accepts_schema(current_schema):
         raise RuntimeError("automatic_migration_live_schema_incompatible")
+    if not manifest.accepts_schema(current_schema):
+        raise RuntimeError(f"automatic_migration_unexpected_schema:{current_schema}")
     if current_schema < source_schema or current_schema > target_schema:
         raise RuntimeError(f"automatic_migration_unexpected_schema:{current_schema}")
 

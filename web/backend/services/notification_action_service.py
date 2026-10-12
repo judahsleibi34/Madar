@@ -12,6 +12,7 @@ NOTIFICATION_CENTER_PATH = "/notifications"
 CALENDAR_PATH = "/calendar"
 ACTION_KINDS = {
     "notification_center",
+    "learning",
     "reservation",
     "calendar_event",
     "calendar_task",
@@ -44,10 +45,13 @@ def validate_notification_action_path(path: Any) -> str | None:
         return None
     # Both routes resolve their tenant from the authenticated session. Object
     # identifiers remain display hints and are never trusted for authorization.
-    return decoded_path if decoded_path in {NOTIFICATION_CENTER_PATH, CALENDAR_PATH} else None
+    learning_path = re.fullmatch(r"/(?:my-learning(?:/(?:dashboard|assessment-reviews(?:/[0-9a-f-]{36})?|affiliate(?:/application)?|exchange(?:/[0-9a-f-]{36})?|referrals|rewards|wallet|withdrawals|account|plans|notifications|programmes|certificates(?:/[0-9a-f-]{36})?|courses/[0-9a-f-]{36}(?:/(?:lessons|assessments)/[0-9a-f-]{36})?))?|e-learning(?:/(?:programmes|reports|forms/responses(?:/[0-9a-f-]{36})?))?)", decoded_path)
+    return decoded_path if decoded_path in {NOTIFICATION_CENTER_PATH, CALENDAR_PATH} or learning_path else None
 
 
 def default_action_path(kind: str) -> str:
+    if kind == "learning":
+        return "/my-learning"
     return CALENDAR_PATH if kind in {"calendar_event", "calendar_task"} else NOTIFICATION_CENTER_PATH
 
 
@@ -63,7 +67,7 @@ def build_notification_action(
     safe_path = validate_notification_action_path(path or expected_path) or expected_path
     if safe_kind in {"calendar_event", "calendar_task"} and safe_path != CALENDAR_PATH:
         safe_path = CALENDAR_PATH
-    elif safe_kind not in {"calendar_event", "calendar_task"} and safe_path != NOTIFICATION_CENTER_PATH:
+    elif safe_kind not in {"calendar_event", "calendar_task", "learning"} and safe_path != NOTIFICATION_CENTER_PATH:
         safe_path = NOTIFICATION_CENTER_PATH
     action = {"kind": safe_kind, "path": safe_path}
     candidate_id = str(object_id or "").strip()
@@ -113,6 +117,8 @@ def normalize_notification_data(
 def action_kind_for_source(*, event_type: Any, source_type: Any) -> str:
     event_value = str(event_type or "").lower()
     source_value = str(source_type or "").lower()
+    if event_value.startswith("learning_"):
+        return "learning"
     if "form" in event_value or source_value == "form":
         return "form_submission"
     if "reservation" in event_value or "reservation" in source_value:

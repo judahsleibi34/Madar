@@ -2,6 +2,7 @@ const MADAR_NOTIFICATION_FALLBACK_PATH = "/notifications";
 const MADAR_CALENDAR_PATH = "/calendar";
 const MADAR_ACTION_KINDS = new Set([
   "notification_center",
+  "learning",
   "reservation",
   "calendar_event",
   "calendar_task",
@@ -16,7 +17,8 @@ function normalizeNotificationAction(value) {
   const kind = MADAR_ACTION_KINDS.has(candidate.kind)
     ? candidate.kind
     : "notification_center";
-  const expectedPath = kind === "calendar_event" || kind === "calendar_task"
+  const learningPath = /^\/(?:my-learning(?:\/(?:assessment-reviews(?:\/[0-9a-f-]{36})?|account|plans|notifications|programmes|certificates(?:\/[0-9a-f-]{36})?|courses\/[0-9a-f-]{36}))?|e-learning(?:\/(?:programmes|reports))?)$/;
+  const expectedPath = kind === "learning" ? (learningPath.test(candidate.path || "") ? candidate.path : "/my-learning") : kind === "calendar_event" || kind === "calendar_task"
     ? MADAR_CALENDAR_PATH
     : MADAR_NOTIFICATION_FALLBACK_PATH;
   const rawPath = typeof candidate.path === "string"

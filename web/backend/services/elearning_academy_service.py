@@ -3,6 +3,7 @@ from fastapi import HTTPException
 from postgrest.exceptions import APIError
 from database import service_supabase
 from services.elearning_settings_service import get_settings, settings_available
+from services.entitlement_service import require_public_runtime_entitlement, get_tenant_entitlements
 
 
 PUBLIC_SETTINGS = (
@@ -24,9 +25,11 @@ def profile(tenant_id, website):
     }
 
 
-def storefront(tenant_id, website, actor=None, course_id=None):
+def storefront(tenant_id, website, actor=None, course_id=None, *, preview=False):
     if not settings_available(131):
         raise HTTPException(503, detail={"code": "academy_upgrade_required"})
+    if not preview:
+        require_public_runtime_entitlement({**website, 'tenant_id': tenant_id}, 'website_publish')
     try:
         result = service_supabase.rpc("get_elearning_academy", {
             "p_tenant_id": tenant_id, "p_user_id": actor.user_id if actor else None,
@@ -67,7 +70,10 @@ def storefront(tenant_id, website, actor=None, course_id=None):
     landing = default_landing(get_settings(tenant_id), website["subdomain"])
     if settings_available(132) and website.get("academy_project_id"):
         projects = service_supabase.table("builder_projects").select("published_schema,status").eq("id", website["academy_project_id"]).eq("tenant_id", tenant_id).eq("usage_profile", "academy").limit(1).execute().data or []
-        if projects and projects[0].get("status") == "published" and projects[0].get("published_schema"):
+        if not projects or projects[0].get("status") != "published" or not projects[0].get("published_schema"):
+            if not preview:
+                raise HTTPException(404, "Academy website not published")
+        else:
             landing = validate_academy_schema(projects[0]["published_schema"])
     instructors = []
     if settings_available(133):
@@ -75,7 +81,28 @@ def storefront(tenant_id, website, actor=None, course_id=None):
     site = profile(tenant_id, website)
     if actor and actor.role in {"owner", "admin"}:
         site["management_path"] = "/e-learning/settings/academy"
-    return {**result, "continue_courses": continuing, "instructors": instructors, "site": site, "landing": landing}
+    contact_enabled = False
+    from routes.builder_routes import schema_contains_element_type
+    if settings_available(140) and schema_contains_element_type(landing, "academyContact"):
+        from services.academy_capability_service import capabilities
+        contact_enabled = capabilities(tenant_id)["contact"]
+    programme_info = None
+    opportunities = []
+    if settings_available(140):
+        from services.academy_capability_service import capabilities
+        cfg = get_settings(tenant_id)
+        if cfg.get('programmes_enabled'):
+            grants = capabilities(tenant_id)
+            programme_info = {key: cfg[key] for capability, key in [('affiliate', 'affiliate_terms'), ('tuition', 'support_programme_name'), ('tuition', 'tuition_terms'), ('exchange', 'exchange_programme_name'), ('exchange', 'exchange_terms')] if grants[capability] and cfg.get({'affiliate':'affiliates_enabled','tuition':'tuition_support_enabled','exchange':'exchange_programme_enabled'}[capability])}
+            exchange_available = grants['exchange'] and grants['forms'] and settings_available(142) and cfg['exchange_programme_enabled']
+            if exchange_available:
+                entitlements = get_tenant_entitlements(tenant_id)
+                exchange_available = 'public_form_links' in entitlements.get('operational_capabilities', entitlements.get('capabilities', []))
+            if not exchange_available:
+                programme_info = {key: value for key, value in programme_info.items() if key not in {'exchange_programme_name', 'exchange_terms'}}
+            if exchange_available:
+                opportunities = service_supabase.rpc('get_academy_open_opportunities', {'p_tenant': tenant_id, 'p_user': None, 'p_limit': 24}).execute().data or []
+    return {**result, 'contact_enabled': contact_enabled, 'programme_info': programme_info, 'exchange_opportunities': opportunities, "continue_courses": continuing, "instructors": instructors, "site": site, "landing": landing}
 
 
 def member_profile(tenant_id):

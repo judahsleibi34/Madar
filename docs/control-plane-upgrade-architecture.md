@@ -12,6 +12,18 @@ bindings stay separate; newer137..143 artifacts are not selected implicitly.
 A changed selection/source needs fresh evidence applicability and exact approval.
 Historical rehearsal/authorization records remain unchanged.
 
+## Exact learning migration route dependency
+
+The installer includes `lib/learning_migration_path.py` alongside the migration
+executor that imports it. This source-pinned helper authorizes only the exact
+finalized, unselected141→143 learning candidate, its bridge and SQL mirrors;
+Exchange142 is excluded. Runtime/health identity and orchestration enforce the
+explicit exclusion. Installing this protected controller dependency still needs
+the governed exact-SHA workflow before production use. No installer, timer,
+traffic or application database operation was performed. See the production
+policy's learning-only candidate section for execution and compatibility rules.
+
+
 The compatible boot unit wants the existing proxy and orders itself before it;
 the proxy requires that unit and retains its measured root startup gate. This
 queues a disabled, previously stopped proxy on Docker/host startup without

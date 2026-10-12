@@ -1,0 +1,14 @@
+{
+  "release_metadata_version": 1,
+  "schema": {
+    "compatible_min": 114,
+    "compatible_max": 141,
+    "target": 141,
+    "migration_class": "forward-compatible",
+    "rollback_compatible_min": 114,
+    "rollback_compatible_max": 114
+  },
+  "migration_policy": "automatic-after-known-good-backup-first-forward-repair",
+  "notes": "Unselected independent E-Learning Forms candidate. Immutable115\u2013140 history retained; production115 remains non-migrating. No production authority.",
+  "migration_manifest": "migrations-115-141.json"
+}

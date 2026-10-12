@@ -644,6 +644,50 @@ class SupabaseLedgerReconciliationTests(unittest.TestCase):
             0,
         )
 
+    def learning_fixture(self, directory):
+        repository,state,unused=self.fixture(directory)
+        relatives=['web/deployment/releases/learning-141-143-path.json','web/deployment/releases/migrations-141-143-learning.json','web/deployment/releases/schema-141-143-learning-bridge.json','web/database/migrations/143_complete_learning_capabilities.sql','web/supabase/migrations/143_complete_learning_capabilities.sql']
+        for relative in relatives:
+            source=ROOT/relative.removeprefix('web/')
+            if not source.exists():source=Path('/app')/relative.removeprefix('web/')
+            target=repository/relative;target.parent.mkdir(parents=True,exist_ok=True);target.write_bytes(source.read_bytes())
+        bridge=repository/'web/deployment/releases/schema-141-143-learning-bridge.json'
+        (bridge.parent/'release.json').write_bytes(bridge.read_bytes())
+        descriptor=json.loads((bridge.parent/'learning-141-143-path.json').read_text());checksum=descriptor['sql_sha256']
+        path=state/'state.json';raw=json.loads(path.read_text());raw['known_good_release']['schema']=143;raw['history'][0]['schema']['observed']=143;path.write_text(json.dumps(raw))
+        path=state/'migrations'/self.sha/'automation.json';raw=json.loads(path.read_text());raw['observed_schema']=143;path.write_text(json.dumps(raw))
+        path=state/'migrations'/self.sha/'execution.json';raw=json.loads(path.read_text());raw.update(observed_schema=143,migrations=[{'number':143,'status':'applied','checksum':checksum}]);path.write_text(json.dumps(raw))
+        return repository,state,checksum
+
+    def learning_run(self, directory, remote):
+        repository,state,checksum=self.learning_fixture(directory)
+        base=FakeRunner(repository,self.sha);repairs=[]
+        def runner(arguments,**kwargs):
+            if arguments[0]=='git':return base(arguments,**kwargs)
+            if 'list' in arguments:output='Local | Remote | Time\n'+'\n'.join(f' {v:03d} | {v:03d} | {v:03d}' for v in sorted(remote))
+            else:
+                self.assertEqual(arguments[-1],'143');remote.add(143);repairs.append(143);output='repaired'
+            return subprocess.CompletedProcess(arguments,0,output,'')
+        self.live_schema=143
+        def reader(url,headers):
+            if url.endswith('/health/version'):return {'release_sha':self.sha,'schema_compatible_min':141,'schema_compatible_max':143,'schema_excluded_versions':[142]}
+            return self.reader(url,headers)
+        args=self.arguments(repository,state,runner,checksum,confirmation='143:'+checksum,json_reader=reader)
+        return args,repairs
+
+    def test_exact_learning_reconciliation_repairs143_only_after141(self):
+        with tempfile.TemporaryDirectory() as directory:
+            remote={141};args,repairs=self.learning_run(Path(directory),remote)
+            self.module._run(**args);self.assertEqual(repairs,[143]);self.assertEqual(remote,{141,143})
+            self.module._run(**args);self.assertEqual(repairs,[143])
+
+    def test_learning_reconciliation_rejects142_ledger_and_missing141(self):
+        for remote,reason in [({141,142},'excluded142_present'),(set(),'remote_predecessor_missing')]:
+            with self.subTest(remote=remote),tempfile.TemporaryDirectory() as directory:
+                args,repairs=self.learning_run(Path(directory),remote)
+                with self.assertRaisesRegex(RuntimeError,reason):self.module._run(**args)
+                self.assertEqual(repairs,[])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -309,7 +309,10 @@ def _deliver_email(row: dict[str, Any]) -> None:
     host, port, username, password, sender, use_tls = _smtp_settings()
     template = str(row.get("template") or "")
     payload = row.get("payload") or {}
-    if template == "reservation_confirmation":
+    if template == "tenant_event" and str(payload.get("event_type", "")).startswith("learning_"):
+        subject = str(payload.get("title") or "Learning update")[:200].replace("\r", " ").replace("\n", " ")
+        body = str(payload.get("body") or "Open your learning account for details.")[:2000]
+    elif template == "reservation_confirmation":
         subject = "Madar reservation confirmation"
         body = "Your reservation was received."
     elif template == "reservation_status_changed":

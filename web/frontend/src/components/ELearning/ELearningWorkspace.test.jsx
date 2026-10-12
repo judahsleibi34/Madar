@@ -2,6 +2,8 @@ import { act, cleanup, fireEvent, render, screen, within, waitFor } from "@testi
 import { Link, MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import i18n from "../../i18n";
+import useAcademyCapabilities from "../../hooks/useAcademyCapabilities";
+import { academyOwnerApi } from "./academyOwnerApi";
 import ELearningWorkspace from "./ELearningWorkspace";
 import { ELearningRouteSkeleton } from "./ELearningSkeleton";
 import * as api from "../../services/elearningCourses";
@@ -17,6 +19,8 @@ vi.mock("../../services/elearningDirectory", () => ({ fetchDirectory: vi.fn(), c
 vi.mock("../../services/elearningStructure", () => ({ fetchStructure: vi.fn(), fetchLesson: vi.fn(), executeStructureCommand: vi.fn() }));
 vi.mock("../../services/elearningContent", () => ({ fetchContent: vi.fn(), executeContentCommand: vi.fn(), uploadContentMedia: vi.fn() }));
 vi.mock("../../services/elearningParticipation", () => ({ fetchCourseProgress: vi.fn(), fetchCourseEnrollments: vi.fn(), fetchEnrollmentCandidates: vi.fn(), enrollCourseUsers: vi.fn(), changeEnrollmentStatus: vi.fn() }));
+vi.mock("../../hooks/useAcademyCapabilities", () => ({ default: vi.fn() }));
+vi.mock("./academyOwnerApi", () => ({ academyOwnerApi: vi.fn() }));
 const settings = { course_label: "Program", section_label: "Module", lesson_label: "Topic", group_label: "Cohort", instructor_label: "Trainer" };
 const course = { id: "course-a", name: "English", description: "Communication skills", status: "published", access_type: "paid", revision: 1, structure_revision: 1, deletion_available: true, section_count: 0, lesson_count: 0, learner_count: 0, created_at: "2026-10-04T10:00:00Z", updated_at: "2026-10-04T10:00:00Z" };
 function workspace(path = "/e-learning/courses", user = { id: 1, tenant_id: "tenant-a" }) {
@@ -24,6 +28,8 @@ function workspace(path = "/e-learning/courses", user = { id: 1, tenant_id: "ten
 }
 beforeEach(async () => {
   await i18n.changeLanguage("en");
+  useAcademyCapabilities.mockReturnValue(null);
+  academyOwnerApi.mockReset();academyOwnerApi.mockResolvedValue({ items: [] });
   fetchELearningSettings.mockResolvedValue({ settings, available: true });
   api.fetchCourses.mockResolvedValue({ courses: [course], available: true, has_more: false });
   api.fetchCourse.mockResolvedValue({ course });
@@ -596,3 +602,28 @@ it("enrolls more than 100 selected users in API batches and retries only unfinis
   await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   expect(enrollCourseUsers.mock.calls[2]).toEqual(["course-a", [110], "manual"]);
 });
+
+it.each([
+  ["/e-learning/contacts", { can_manage: true, capabilities: { contact: false } }],
+  ["/e-learning/reports", { can_manage: true, capabilities: { reports: false } }],
+  ["/e-learning/exchange-opportunities", { can_manage: false, capabilities: { exchange: true } }],
+])("blocks direct owner-tool navigation without role and plan access: %s", async (path, access) => {
+  useAcademyCapabilities.mockReturnValue(access);render(workspace(path));
+  expect(await screen.findByText("Academy access unavailable.")).toBeTruthy();
+  expect(academyOwnerApi).not.toHaveBeenCalled();
+});
+it("permits the contact inbox only for an entitled academy manager", async () => {
+  useAcademyCapabilities.mockReturnValue({ can_manage: true, capabilities: { contact: true } });
+  render(workspace("/e-learning/contacts"));
+  expect(await screen.findByRole("heading", {name:"Contact submissions"})).toBeTruthy();
+  await waitFor(() => expect(academyOwnerApi).toHaveBeenCalled());
+});
+
+
+it.each(['/e-learning/forms','/e-learning/forms/new','/e-learning/forms/form-a/edit','/e-learning/forms/responses','/e-learning/forms/responses/response-a'])('blocks every Forms owner route when capability is denied: %s',async(path)=>{
+ useAcademyCapabilities.mockReturnValue({can_manage:true,capabilities:{forms:false}});render(workspace(path));expect(await screen.findByText('Academy access unavailable.')).toBeTruthy();expect(screen.queryByLabelText('Form name')).toBeNull();
+});
+it.each(['/e-learning/exchange-opportunities/new','/e-learning/exchange-opportunities/opportunity/edit','/e-learning/finance/withdrawals','/e-learning/finance/withdrawals/request','/e-learning/programmes/tuition/application','/e-learning/affiliates','/e-learning/affiliates/members/member'])('blocks new owner detail routes for non-managers: %s',async(path)=>{
+ useAcademyCapabilities.mockReturnValue({can_manage:false,capabilities:{exchange:true,withdrawal:true,tuition:true,affiliate:true}});render(workspace(path));expect(await screen.findByText('Academy access unavailable.')).toBeTruthy();expect(academyOwnerApi).not.toHaveBeenCalled();
+});
+it('opens the existing course dialog from the overview create action',async()=>{render(workspace('/e-learning/courses?create=true'));expect(await screen.findByRole('dialog')).toBeTruthy();});

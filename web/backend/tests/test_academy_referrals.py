@@ -16,7 +16,7 @@ class AcademyReferralServiceTests(unittest.TestCase):
             db.rpc.assert_not_called()
 
     def test_session_identity_is_the_only_balance_authority(self):
-        with patch.object(service,'settings_available',return_value=True),patch.object(service,'service_supabase') as db:
+        with patch.object(service,'settings_available',return_value=True),patch.object(service,'capabilities',return_value={'referrals':True}),patch.object(service,'service_supabase') as db:
             db.rpc.return_value.execute.return_value.data={'available':True}
             self.assertTrue(service.account(SimpleNamespace(tenant_id=3,user_id=7))['available'])
             db.rpc.assert_called_once_with('get_academy_referral_account',{'p_tenant_id':3,'p_user_id':7})

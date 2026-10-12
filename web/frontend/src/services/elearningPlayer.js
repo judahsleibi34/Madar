@@ -11,3 +11,10 @@ export const fetchLearningLesson = (course, lesson) => request(`/courses/${encod
 export const completeLearningLesson = (course, lesson) => request(`/courses/${encodeURIComponent(course)}/lessons/${encodeURIComponent(lesson)}/completion`, "POST");
 
 export const fetchReferralAccount = () => request("/referrals");
+
+export async function fetchLearningAccountContext() {
+  const response = await apiFetch(getApiUrl("/elearning/programmes/capabilities"), { cache: "no-store" });
+  const data = await readApiResponse(response);
+  if (!response.ok) throw createApiError(response, data);
+  return { academy: data.academy, settings: {} };
+}

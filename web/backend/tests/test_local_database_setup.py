@@ -14,6 +14,24 @@ spec.loader.exec_module(setup)
 
 
 class LocalDatabaseSetupTests(unittest.TestCase):
+    def test_explicit_local_candidate_contract_survives_app_factory(self):
+        from run_local import create_local_app
+        import types
+        environment = {"APP_ENV": "development", "SUPABASE_URL": "http://127.0.0.1:54321", "SUPABASE_DB_URL": "postgresql://127.0.0.1/postgres", "MADAR_LOCAL_SCHEMA_CONTRACT": "schema-114-136-bridge.json"}
+        contract = json.dumps({"schema": {"compatible_min": 114, "compatible_max": 136, "target": 136}})
+        app = object()
+        with patch.dict(os.environ, environment, clear=True), patch("run_local.Path.is_file", return_value=True), patch("run_local.load_dotenv"), patch("run_local.Path.read_text", return_value=contract) as read, patch.dict("sys.modules", {"app": types.SimpleNamespace(app=app)}):
+            self.assertIs(create_local_app(), app)
+            self.assertEqual(os.environ["SCHEMA_COMPATIBLE_MIN"], "114")
+            self.assertEqual(os.environ["SCHEMA_COMPATIBLE_MAX"], "136")
+            self.assertEqual(read.call_count, 1)
+
+    def test_candidate_contract_requires_local_mode_and_known_contract(self):
+        with self.assertRaisesRegex(RuntimeError, "requires --local-db"):
+            configure_local_environment(schema_contract="schema-114-136-bridge.json")
+        with self.assertRaisesRegex(RuntimeError, "Unsupported local schema contract"):
+            configure_local_environment(local_database=True, schema_contract="arbitrary.json")
+
     def test_local_launcher_uses_release_contract_instead_of_stale_health_defaults(self):
         environment = {"APP_ENV": "development", "SUPABASE_URL": "http://127.0.0.1:54321", "SUPABASE_DB_URL": "postgresql://127.0.0.1/postgres", "SCHEMA_COMPATIBLE_MIN": "81", "SCHEMA_COMPATIBLE_MAX": "83"}
         contract = json.dumps({"schema": {"compatible_min": 114, "compatible_max": 118, "target": 118}})

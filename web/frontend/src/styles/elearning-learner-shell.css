@@ -118,3 +118,27 @@
 .learner-account-reward-balances strong { font-size:26px; }
 .learner-account-referral-history { list-style:none; padding:0; margin:20px 0 0; }
 .learner-account-referral-history li { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; padding:16px 0; border-top:1px solid var(--theme-border); }
+
+.learning-unread-count { margin-inline-start:auto; display:inline-flex; align-items:center; justify-content:center; min-width:24px; padding:2px 6px; border-radius:20px; background:var(--theme-primary); color:var(--theme-on-primary,var(--theme-text-inverse)); font-size:12px; }
+.learner-dashboard { display:grid; gap:24px; }
+.learner-dashboard-courses { list-style:none; padding:0; margin:0 0 20px; }
+.learner-dashboard-courses li { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:16px 0; border-block-end:1px solid var(--theme-border); }
+.learner-dashboard-courses h3 { margin:0 0 8px; }
+.learner-dashboard-courses p { margin:0; color:var(--theme-text-soft); }
+.learner-dashboard-actions { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; }
+.learner-dashboard-actions a { color:var(--theme-text); text-decoration:none; display:flex; gap:12px; align-items:center; }
+.learning-shell-content :is(.learner-account,.learner-dashboard,.elearning-management) h1 { background:none; -webkit-text-fill-color:var(--theme-text); color:var(--theme-text); overflow-wrap:anywhere; }
+.learning-shell-content .settings-card { background:var(--theme-surface); border:1px solid var(--theme-border); padding:24px; border-radius:14px; display:grid; gap:16px; }
+.learning-shell-content .settings-card label { display:grid; gap:8px; min-width:0; }
+.learning-shell-content .settings-card :is(input:not([type="checkbox"]),textarea,select) { width:100%; min-width:0; padding:10px 12px; border:1px solid var(--theme-border); border-radius:10px; background:var(--theme-bg); color:var(--theme-text); }
+.learning-shell-content .settings-card input[type="checkbox"] { width:18px; height:18px; accent-color:var(--theme-primary); }
+.learner-data-table { width:100%; border-collapse:collapse; table-layout:fixed; }
+.learner-data-table :is(th,td) { text-align:start; vertical-align:top; padding:12px; border-block-end:1px solid var(--theme-border); overflow-wrap:anywhere; white-space:pre-wrap; }
+.learning-shell-content :is(dd,p,summary,h2,h3) { overflow-wrap:anywhere; }
+@media(max-width:600px) { .learner-dashboard-actions { grid-template-columns:1fr; } .learner-dashboard-courses li { align-items:stretch; flex-direction:column; } }
+.affiliate-dashboard .learner-account-panel { min-inline-size: 0; }
+.affiliate-table-scroll { max-inline-size: 100%; overflow-x: auto; }
+.affiliate-table-scroll table { inline-size: 100%; border-collapse: collapse; text-align: start; }
+.affiliate-table-scroll th, .affiliate-table-scroll td { padding: .8rem; border-block-end: 1px solid var(--builder-border, #34404c); }
+.affiliate-table-scroll caption { text-align: start; padding-block: .8rem; font-weight: 600; }
+.learner-account-referral strong { overflow-wrap: anywhere; }

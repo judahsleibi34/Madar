@@ -1,0 +1,14 @@
+{
+  "release_metadata_version": 1,
+  "schema": {
+    "compatible_min": 114,
+    "compatible_max": 139,
+    "target": 139,
+    "migration_class": "forward-compatible",
+    "rollback_compatible_min": 114,
+    "rollback_compatible_max": 114
+  },
+  "migration_policy": "automatic-after-known-good-backup-first-forward-repair",
+  "notes": "Unselected reusable academy capability correction. Keeps active schema115/non-migrating production contract unchanged. Exact immutable115-138 prefix plus139 generalize tenant programme configuration and strengthen history ownership. Separate approved production bridge and verified backup are required.",
+  "migration_manifest": "migrations-115-139.json"
+}

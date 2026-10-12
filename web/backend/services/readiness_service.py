@@ -134,7 +134,12 @@ def check_schema() -> str:
         maximum = int(os.getenv("SCHEMA_COMPATIBLE_MAX", str(DEFAULT_SCHEMA_COMPATIBLE_MAX)))
         if minimum <= 0 or maximum < minimum:
             return "misconfigured"
-        return "ok" if minimum <= version <= maximum else "incompatible"
+        from services.runtime_config import schema_excluded_versions
+        try:
+            excluded = schema_excluded_versions(minimum, maximum)
+        except ValueError:
+            return "misconfigured"
+        return "ok" if minimum <= version <= maximum and version not in excluded else "incompatible"
     except (requests.RequestException, TypeError, ValueError):
         return "unavailable"
 

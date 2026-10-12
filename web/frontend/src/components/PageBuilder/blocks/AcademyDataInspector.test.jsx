@@ -1,4 +1,5 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
+import { cleanup, fireEvent, render as renderUI, screen } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import "../../../i18n";
 import AcademyDataInspector from "./AcademyDataInspector";
@@ -6,6 +7,7 @@ import { fetchELearningSettings } from "../../../services/elearningSettings";
 import { fetchAcademy } from "../../../services/elearningAcademy";
 vi.mock("../../../services/elearningSettings", () => ({ fetchELearningSettings: vi.fn() }));
 vi.mock("../../../services/elearningAcademy", () => ({ fetchAcademy: vi.fn() }));
+const render = element => renderUI(<MemoryRouter>{element}</MemoryRouter>);
 afterEach(cleanup);
 beforeEach(() => {
   vi.resetAllMocks();

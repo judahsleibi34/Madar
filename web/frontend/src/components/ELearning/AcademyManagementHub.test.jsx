@@ -6,6 +6,7 @@ import AcademyManagementHub from './AcademyManagementHub';
 import { fetchELearningSettings, saveELearningSettings } from '../../services/elearningSettings';
 import { initializeAcademyLanding } from '../../services/elearningAcademy';
 vi.mock('../../services/elearningSettings', () => ({ fetchELearningSettings: vi.fn(), saveELearningSettings: vi.fn() }));
+vi.mock('./AcademyOwnerOverview', () => ({ default: () => null }));
 vi.mock('../../services/elearningAcademy', () => ({ initializeAcademyLanding: vi.fn() }));
 const settings = { enabled: true, academy_enabled: true, academy_registration: 'invitation_only', academy_email_domains: [], academy_hero_title: 'Preserved hero', academy_cta_label: 'Preserved CTA', academy_featured_courses: ['course-id'] };
 const data = { available: true, settings, academy_management: { subdomain: 'testing', landing_project: null } };

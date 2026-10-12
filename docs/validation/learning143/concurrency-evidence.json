@@ -1,0 +1,15 @@
+{
+  "concurrent_learners": 2,
+  "distinct_attempts": true,
+  "competing_review_statuses": [
+    409,
+    200
+  ],
+  "self_grading": 403,
+  "foreign_playback": 403,
+  "revoked_reviewer_grade_and_playback": 403,
+  "forged_score": 422,
+  "quota": 413,
+  "invalid_audio": 415,
+  "duplicate_submissions": "original pending evidence retained"
+}

@@ -61,6 +61,15 @@ for number in range(84, 1000):
         fail(f"{number:03d}: migration must end with COMMIT")
 
     previous = number - 1
+    if number == 143:
+        from check_learning_migration_path import validate
+        try:
+            contract=validate(WEB_ROOT.parent)
+            if contract['status']!='finalized':raise ValueError('learning path is reserved')
+            previous=141
+        except (OSError,ValueError,TypeError,KeyError) as error:
+            fail(f"143: unauthorized learning branch: {error}")
+            continue
 
     if re.search(r"\bcurrent_schema\b", text):
         fail(

@@ -1,3 +1,5 @@
+import AcademyProgrammeSettings from "../ELearning/AcademyProgrammeSettings";
+import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Save, Settings2, BookOpen, ListOrdered, Award, Palette, Info, Upload, Gift } from "lucide-react";
@@ -51,6 +53,7 @@ function TerminologySettings({ settings, update, t }) {
 export default function ELearningSettingsPage({ user }) {
   const { t, i18n } = useTranslation("dashboard");
   const { updateSettings } = useELearningTerminology();
+  const [capabilities, setCapabilities] = useState({});
   const [settings, setSettings] = useState(null);
   const [referralsAvailable, setReferralsAvailable] = useState(false);
   const [available, setAvailable] = useState(false);
@@ -65,7 +68,7 @@ export default function ELearningSettingsPage({ user }) {
   useEffect(() => {
     let cancelled = false;
     fetchELearningSettings().then((data) => {
-      if (!cancelled) { setSettings(data.settings); setAvailable(data.available); setReferralsAvailable(Boolean(data.referrals_available)); }
+      if (!cancelled) { setCapabilities(data.capabilities || {}); setSettings(data.settings); setAvailable(data.available); setReferralsAvailable(Boolean(data.referrals_available)); }
     }).catch((failure) => {
       if (!cancelled) setError(failure.status === 403 ? "forbidden" : "loadError");
     }).finally(() => { if (!cancelled) setLoading(false); });
@@ -157,7 +160,7 @@ export default function ELearningSettingsPage({ user }) {
             </label>)}
           </div>
         </section>; })}
-        <section className="settings-card" aria-labelledby="elearning-referrals">
+        {capabilities.referrals && <section className="settings-card" aria-labelledby="elearning-referrals">
           <header className="elearning-card-heading"><span className="elearning-card-icon"><Gift size={20} aria-hidden="true" /></span><div><h3 id="elearning-referrals">{t("elearning.referrals.settings")}</h3><p>{t("elearning.referrals.settingsHelp")}</p></div></header>
           {!referralsAvailable && <p role="status">{t("elearning.referrals.upgradeRequired")}</p>}
           <fieldset disabled={!referralsAvailable} className="settings-form-grid">
@@ -169,9 +172,12 @@ export default function ELearningSettingsPage({ user }) {
                 {settings.referral_reward_currency && !["USD", "ILS", "EUR"].includes(settings.referral_reward_currency) && <option value={settings.referral_reward_currency}>{settings.referral_reward_currency}</option>}
               </select>
             </label>
-            <p>{t("elearning.referrals.termsHelp")}</p>
+            <label className="elearning-field">{t("elearning.programmes.referral_eligibility")}<select value={settings.referral_eligibility || "registration"} onChange={e=>update("referral_eligibility",e.target.value)}>{["registration","purchase_or_affiliate"].map(value=><option key={value} value={value}>{t(`elearning.programmes.${value}`)}</option>)}</select></label><p>{t("elearning.referrals.termsHelp")}</p>
           </fieldset>
-        </section>
+        </section>}
+        <AcademyProgrammeSettings settings={settings} capabilities={capabilities} update={update}/>
+        {capabilities.forms && <section className="settings-card"><h3>{t("elearning.forms.title")}</h3><Link className="ecommerce-secondary-button" to="/e-learning/forms">{t("elearning.forms.manage")}</Link></section>}
+        <section className="settings-card"><h3>{t("elearning.owner.institution")}</h3><label><input type="checkbox" checked={Boolean(settings.institution_enabled)} onChange={event => update("institution_enabled", event.target.checked)} />{t("elearning.owner.institution_enabled")}</label>{["institution_name", "institution_student_label", "regular_student_label"].map(key => <label className="elearning-field" key={key}>{t(`elearning.owner.${key}`)}<input maxLength={key === "institution_name" ? 160 : 120} required={settings.institution_enabled} value={settings[key] ?? ""} onChange={event => update(key, event.target.value)} /></label>)}<label>{t("elearning.owner.institution_domains")}<textarea value={(settings.institution_email_domains || []).join("\n")} onChange={event => update("institution_email_domains", event.target.value.split(/[\n,]/).map(value => value.trim()).filter(Boolean))} /></label></section>
         <div className="elearning-actions"><button className="settings-save-button" type="submit" disabled={saving || uploading || !available}><Save size={16} aria-hidden="true" />{t(saving ? "elearning.saving" : "elearning.save")}</button></div>
       </fieldset>
       {saved && <p role="status" className="elearning-feedback">{t("elearning.saved")}</p>}

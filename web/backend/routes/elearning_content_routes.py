@@ -37,6 +37,10 @@ async def upload_media(course_id: UUID, lesson_id: UUID, request: Request, respo
     # Reuse shared quota, reservation, validation, durable storage and registration.
     from routes.builder_routes import upload_builder_asset
     request.scope['madar_asset_usage'] = 'elearning_content'
+    if (file.content_type or '').startswith('image/'):
+        from services.elearning_assessments_service import require_learning143
+        require_learning143()
+        request.scope['madar_asset_usage']='elearning_assessment_media'
     return await upload_builder_asset(request=request, response=response, file=file)
 
 

@@ -1,0 +1,64 @@
+/* Owner layouts adapt Madar's existing typography, controls, surfaces and tokens. */
+.elearning-owner { min-width:0; font-family:var(--font-family-base); color:var(--theme-text); }
+.elearning-owner :is(button,input,select,textarea) {font:inherit;}
+.elearning-owner-page, .elearning-owner > :is(main,section).ecommerce-page {width:100%;max-width:var(--layout-max-width);box-sizing:border-box;display:grid;gap:var(--space-6);margin-inline:auto;padding:var(--space-6);}
+.elearning-owner .app-page-intro {display:flex;align-items:flex-start;justify-content:space-between;gap:var(--space-4);flex-wrap:wrap;}
+.elearning-owner .app-page-intro h1 {font-family:inherit;font-size:var(--type-h1-size);line-height:var(--type-h1-line);font-weight:var(--font-weight-bold);margin:0;}
+.elearning-owner .app-page-intro p {font-size:var(--font-size-base);color:var(--theme-text-muted);margin-block:var(--space-2) 0;}
+.elearning-owner h2:not(.learning-builder-editor *) {font-family:inherit;font-size:var(--type-h2-size);line-height:var(--type-h2-line);}
+.elearning-owner h3:not(.learning-builder-editor *) {font-family:inherit;font-size:var(--type-h3-size);line-height:var(--type-h3-line);}
+.elearning-owner-breadcrumb {font-size:var(--font-size-sm);display:flex;flex-wrap:wrap;gap:var(--space-2);}
+.elearning-owner :is(.elearning-field,.elearning-owner-filters > label) {display:grid;gap:var(--space-2);min-width:0;}
+.elearning-owner :is(input:not([type=checkbox]):not([type=radio]):not([type=file]),select,textarea):not(.learning-builder-editor *) {box-sizing:border-box;width:100%;min-width:0;padding:var(--space-3);border:1px solid var(--color-border-control);border-radius:var(--ui-radius-small);background:var(--theme-surface);color:var(--theme-text);}
+.elearning-owner textarea:not(.learning-builder-editor *) {min-height:var(--space-16);resize:vertical;}
+.elearning-owner :is(.settings-card,.ecommerce-list-card) {padding:var(--space-5);min-width:0;}
+.elearning-owner-section {display:grid;gap:var(--space-4);padding-block:var(--space-4);border-block-start:1px solid var(--theme-border);min-width:0;}
+.elearning-owner-section > h2,.elearning-owner-section > h3 {margin:0;}
+.elearning-owner-filters {display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr));gap:var(--space-4);align-items:end;}
+.elearning-owner-table-wrap {max-width:100%;overflow:auto;border:1px solid var(--theme-border);border-radius:var(--ui-radius-card);background:var(--theme-surface);}
+.elearning-owner-table {width:100%;border-collapse:collapse;text-align:start;font-size:var(--font-size-sm);}
+.elearning-owner-table :is(th,td) {padding:var(--space-4);border-block-end:1px solid var(--theme-border);text-align:start;vertical-align:middle;}
+.elearning-owner-table th {background:var(--theme-surface-2);font-weight:var(--font-weight-semibold);white-space:nowrap;}
+.elearning-owner-table tr:hover td {background:var(--theme-surface-2);}
+.elearning-owner-table td:first-child {overflow-wrap:anywhere;}
+.elearning-owner-table .elearning-course-actions {min-width:max-content;}
+.elearning-owner-metrics {display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr));gap:var(--space-4);}
+.elearning-owner-metrics h3 {font-size:var(--font-size-sm);line-height:var(--line-height-normal);margin:0;color:var(--theme-text-muted);}
+.elearning-owner-metrics strong {font-size:var(--type-h2-size);}
+.elearning-owner-detail {display:grid;gap:var(--space-5);}
+.elearning-owner-detail dl {margin:0;display:grid;gap:var(--space-4);}
+.elearning-owner-detail dl > div {display:grid;gap:var(--space-2);padding-block-end:var(--space-3);border-block-end:1px solid var(--theme-border);}
+.elearning-owner-detail dt {font-weight:var(--font-weight-semibold);color:var(--theme-text-muted);}
+.elearning-owner-detail dd {margin:0;white-space:pre-wrap;overflow-wrap:anywhere;}
+.elearning-form-preview {width:100%;max-width:100%;margin-inline:auto;background:var(--theme-surface);padding:var(--space-5);box-sizing:border-box;}
+.elearning-form-preview.is-mobile {max-width:390px;}
+.elearning-owner details > summary {cursor:pointer;font-weight:var(--font-weight-semibold);padding-block:var(--space-3);}
+.elearning-owner details[open] > :not(summary) {margin-block:var(--space-3);}
+.elearning-owner-group-label {display:block;font-size:var(--font-size-sm);color:var(--theme-text-muted);}
+@media(max-width:600px) {.elearning-owner-page,.elearning-owner > :is(main,section).ecommerce-page{padding:var(--space-4);gap:var(--space-4)}.elearning-owner .app-page-intro .elearning-course-actions{width:100%}.elearning-owner-table :is(th,td){padding:var(--space-3)}}
+.elearning-owner-preserve {white-space:pre-wrap;overflow-wrap:anywhere;}
+.elearning-owner-activity {list-style:none;padding:0;margin:0;display:grid;gap:var(--space-3);}
+.elearning-owner-activity li {display:flex;justify-content:space-between;gap:var(--space-3);flex-wrap:wrap;padding-block:var(--space-3);border-block-end:1px solid var(--theme-border);}
+.elearning-owner-activity time {color:var(--theme-text-muted);font-size:var(--font-size-sm);}
+.elearning-owner progress {width:100%;accent-color:var(--theme-primary);}
+.elearning-owner details :is(button,input,textarea,select) {font:inherit;}
+.elearning-owner [dir=rtl] :is(.elearning-course-actions,.elearning-owner-filters) {text-align:start;}
+
+.elearning-owner-table .sr-only {position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;border:0;}
+.elearning-owner .elearning-course-form > fieldset {border:0;padding:0;margin:0;min-width:0;}
+
+.elearning-owner .elearning-course-status {justify-self:start;width:fit-content;}
+
+.elearning-owner .academy-theme-field {font-size:var(--font-size-base);font-weight:var(--font-weight-semibold);gap:var(--space-2);}
+.elearning-owner .academy-theme-field :is(input,select) {font:inherit;border-radius:var(--ui-radius-small);}
+
+.elearning-submission-tables, .elearning-submission-table-section {display:grid;gap:var(--space-3);min-width:0;}
+.elearning-submission-tables {gap:var(--space-6);}
+.elearning-submission-table-section > h2 {margin:0;font-size:var(--type-h3-size);overflow-wrap:anywhere;}
+.elearning-submission-tables .elearning-owner-table :is(th,td) {padding:var(--space-3);}
+.elearning-submission-tables .elearning-owner-table th {max-width:24rem;white-space:normal;min-width:9rem;}
+.elearning-submission-answer {display:block;white-space:pre-wrap;overflow-wrap:anywhere;min-width:8rem;max-width:32rem;}
+.elearning-submission-detail .elearning-owner-table tbody th {width:30%;white-space:normal;background:var(--theme-surface-2);}
+.elearning-submission-download {text-align:start;white-space:normal;overflow-wrap:anywhere;}
+.elearning-submission-filters > .elearning-submission-unread-filter {display:flex;align-items:center;gap:var(--space-2);min-height:44px;}
+.elearning-submission-filters .elearning-submission-unread-filter input {width:18px;height:18px;min-height:0;padding:0;margin:0;}

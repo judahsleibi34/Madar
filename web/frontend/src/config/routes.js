@@ -28,6 +28,7 @@ export const DASHBOARD_ROUTES = {
   elearningInstructors: "/e-learning/instructors",
   elearningSettings: "/e-learning/settings",
   elearningPlans: "/e-learning/plans",
+  elearningTheme: "/e-learning/theme",
   ecommerce: "/ecommerce",
   ecommerceTags: "/ecommerce/tags",
   ecommerceCategories: "/ecommerce/categories",

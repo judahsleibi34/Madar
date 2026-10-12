@@ -28,6 +28,8 @@ CSRF_EXEMPT_PATHS = {
     ("POST", "/auth/refresh"),
     ("POST", "/auth/log_out"),
     ("POST", "/billing/webhook"),
+    # Machine-to-machine payment signature verification replaces browser CSRF.
+    ("POST", "/elearning/payments/webhook"),
     ("POST", "/public/contact"),
 }
 CSRF_EXEMPT_PATTERNS = (

@@ -6,6 +6,32 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
+import importlib.util
+
+_candidate_spec = importlib.util.spec_from_file_location("madar_eduhope_candidate", Path(__file__).with_name("eduhope_candidate.py"))
+_candidate = importlib.util.module_from_spec(_candidate_spec)
+_candidate_spec.loader.exec_module(_candidate)
+validated_entries = _candidate.validated_entries
+
+_academy_spec = importlib.util.spec_from_file_location("madar_academy_candidate", Path(__file__).with_name("academy_candidate.py"))
+_academy_candidate = importlib.util.module_from_spec(_academy_spec)
+_academy_spec.loader.exec_module(_academy_candidate)
+validated_academy_entries = _academy_candidate.validated_entries
+_owner_spec = importlib.util.spec_from_file_location("madar_academy_owner_candidate", Path(__file__).with_name("academy_owner_candidate.py"))
+_owner_candidate = importlib.util.module_from_spec(_owner_spec)
+_owner_spec.loader.exec_module(_owner_candidate)
+validated_owner_entries = _owner_candidate.validated_entries
+_forms_spec = importlib.util.spec_from_file_location("madar_forms_candidate", Path(__file__).with_name("elearning_forms_candidate.py"))
+_forms_candidate = importlib.util.module_from_spec(_forms_spec)
+_forms_spec.loader.exec_module(_forms_candidate)
+validated_forms_entries = _forms_candidate.validated_entries
+_exchange_spec = importlib.util.spec_from_file_location("madar_exchange_forms_candidate", Path(__file__).with_name("exchange_forms_candidate.py"))
+_exchange_candidate = importlib.util.module_from_spec(_exchange_spec)
+_exchange_spec.loader.exec_module(_exchange_candidate)
+validated_exchange_entries = _exchange_candidate.validated_entries
+_learning_spec = importlib.util.spec_from_file_location("madar_learning_path_validator", Path(__file__).with_name("check_learning_migration_path.py"))
+_learning_candidate = importlib.util.module_from_spec(_learning_spec)
+_learning_spec.loader.exec_module(_learning_candidate)
 import re
 
 
@@ -197,6 +223,13 @@ def validate(root: Path = ROOT) -> list[str]:
                 )
 
         # Main's catalog transition already owns 116; PR rebasing may not rewrite it.
+        validated_entries(root)
+        validated_academy_entries(root)
+        validated_owner_entries(root)
+        validated_forms_entries(root)
+        validated_exchange_entries(root)
+        learning_contract = _learning_candidate.validate(root)
+
         for tree in ("database", "supabase"):
             catalog = root / f"web/{tree}/migrations/116_reconcile_ecommerce_product_saves.sql"
             if not catalog.is_file() or digest(catalog) != "6227c1f50f19282f6cd58aa5ada1b2795f5cc63ca674f9447bbdbd44011b2208":
@@ -355,10 +388,10 @@ def validate(root: Path = ROOT) -> list[str]:
                 ).glob("*.sql")
             )
 
-            if versions != list(range(1, 137)):
+            if versions != list(range(1, 144 if learning_contract['status']=='finalized' else 143)):
                 errors.append(
                     "migration namespace must contain exactly "
-                    f"001 through 136: {tree}"
+                    f"001 through {143 if learning_contract['status']=='finalized' else 142}: {tree}"
                 )
 
     except (OSError, KeyError, ValueError, TypeError) as error:
@@ -367,6 +400,10 @@ def validate(root: Path = ROOT) -> list[str]:
             + type(error).__name__
         )
 
+    try:
+        _learning_candidate.validate(root)
+    except (OSError, ValueError, TypeError, KeyError) as error:
+        errors.append(f"learning migration reservation invalid: {error}")
     return errors
 
 

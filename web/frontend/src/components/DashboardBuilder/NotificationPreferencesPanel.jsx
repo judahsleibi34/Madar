@@ -5,7 +5,7 @@ import {
   saveNotificationPreference,
 } from "../../services/notificationsApi";
 
-const CATEGORY_ORDER = ["calendar", "reservations", "forms", "general"];
+const CATEGORY_ORDER = ["calendar", "reservations", "forms", "learning", "general"];
 const CHANNEL_ORDER = ["in_app", "push", "email"];
 
 export default function NotificationPreferencesPanel({ copy, showNotification }) {

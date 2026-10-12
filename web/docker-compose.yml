@@ -50,6 +50,7 @@ services:
       MADAR_BUILD_TIMESTAMP: ${MADAR_BUILD_TIMESTAMP:-unknown}
       SCHEMA_COMPATIBLE_MIN: ${SCHEMA_COMPATIBLE_MIN:-81}
       SCHEMA_COMPATIBLE_MAX: ${SCHEMA_COMPATIBLE_MAX:-105}
+      SCHEMA_EXCLUDED_VERSIONS: ${SCHEMA_EXCLUDED_VERSIONS:-}
       # Direct PostgreSQL credentials are operator-only. An explicit empty
       # override makes the key unusable even when the shared env_file contains
       # it for backup or catalog-verification tooling.

@@ -181,6 +181,21 @@ def _run(
             "ledger_reconciliation_release_contract_invalid"
         )
 
+    learning_branch = target == 143 and numbers == [143]
+    predecessor = 141 if learning_branch else version - 1
+    if learning_branch:
+        # No generic gap repair. Bind the exact source-pinned single-step route.
+        if __package__:
+            from .learning_migration_path import authorize_manifest
+        else:
+            import importlib.util
+            spec=importlib.util.spec_from_file_location('madar_learning_ledger_contract',Path(__file__).with_name('learning_migration_path.py'))
+            module=importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            authorize_manifest=module.authorize_manifest
+        authorize_manifest(repository_root,web_root / 'deployment/releases' / manifest_name,manifest)
+        if release.get('schema',{}).get('excluded_versions') != [142]:
+            raise RuntimeError('ledger_reconciliation_learning_branch_exclusion_missing')
     for item in entries:
         try:
             number = int(item["number"])
@@ -192,7 +207,7 @@ def _run(
             ) from error
 
         if (
-            from_schema != number - 1
+            from_schema != (141 if learning_branch else number - 1)
             or to_schema != number
         ):
             raise RuntimeError(
@@ -204,7 +219,7 @@ def _run(
         for item in entries
         if int(item["number"]) == version
     ]
-    if len(matching) != 1 or int(matching[0].get("from_schema", -1)) != version - 1 or int(matching[0].get("to_schema", -1)) != version:
+    if len(matching) != 1 or int(matching[0].get("from_schema", -1)) != predecessor or int(matching[0].get("to_schema", -1)) != version:
         raise RuntimeError("ledger_reconciliation_manifest_transition_invalid")
     migration = (repository_root / str(matching[0].get("path", ""))).resolve()
     try:
@@ -293,11 +308,15 @@ def _run(
     if not isinstance(identity, dict) or identity.get("release_sha") != release_sha or not isinstance(readiness, dict) or readiness.get("ready") is not True:
         raise RuntimeError("ledger_reconciliation_stable_health_invalid")
 
+    if learning_branch and (identity.get('schema_excluded_versions') != [142] or identity.get('schema_compatible_min') != 141 or identity.get('schema_compatible_max') != 143):
+        raise RuntimeError('ledger_reconciliation_learning_runtime_identity_invalid')
     list_command = [supabase_bin, "--workdir", str(web_root), "migration", "list", "--linked"]
     before = migration_ledger(command(list_command).stdout)
     if any(version > target for version in before):
         raise RuntimeError("ledger_reconciliation_remote_ledger_ahead")
-    if version - 1 not in before or any(number < version and number not in before for number in numbers):
+    if learning_branch and 142 in before:
+        raise RuntimeError("ledger_reconciliation_excluded142_present")
+    if predecessor not in before or any(number < version and number not in before for number in numbers):
         raise RuntimeError("ledger_reconciliation_remote_predecessor_missing")
     if version not in before and any(number > version for number in before):
         raise RuntimeError("ledger_reconciliation_remote_order_invalid")

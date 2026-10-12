@@ -48,3 +48,29 @@ it("shows the issued credential CTA from the server snapshot", async () => {
  expect((await screen.findByRole("link", { name: "View Certificate" })).getAttribute("href")).toBe("/my-learning/certificates/issued-credential");
  expect(api.completeLearningLesson).not.toHaveBeenCalled();
 });
+it("keeps resume outside the mobile curriculum drawer and preserves course navigation context", async () => {
+ const { container } = page("/my-learning/courses/c");
+ const resume = await screen.findByRole("link", { name: "Continue Learning" });
+ expect(resume.closest(".elearning-player-outline")).toBeNull();
+ expect(resume.closest(".elearning-course-resume")).toBeTruthy();
+ const navigation = container.querySelector("#learning-navigation nav");
+ expect(navigation.querySelectorAll('a[href="/my-learning"]')).toHaveLength(1);
+ expect(navigation.querySelector('a[href="/my-learning"]').classList.contains("active")).toBe(true);
+ fireEvent.click(resume);
+ await screen.findByText("Learn together");
+ expect(container.querySelector('.elearning-player-outline .is-current a').getAttribute("aria-current")).toBe("page");
+ expect(screen.getByText("Next topic").closest("li").textContent).toContain("Locked");
+});
+it("marks the current assessment and offers the refreshed next step only after passing", async () => {
+ const current = { ...snapshot(true), lesson: null, continue_lesson_id: null, continue_assessment_id: "final", assessments: [{ placement_id: "final", title: "Final Check", required_for_completion: true, locked: true, passed: false }] };
+ api.fetchLearningCourse.mockResolvedValue(current);
+ page("/my-learning/courses/c/assessments/final");
+ await screen.findByRole("heading", { name: "Final Check" });
+ expect(screen.queryByRole("link", { name: "Continue Learning" })).toBeNull();
+ expect(document.querySelector(".elearning-assessment-outline .is-current")).toBeTruthy();
+ cleanup();
+ api.fetchLearningCourse.mockResolvedValue({ ...current, continue_assessment_id: null, continue_lesson_id: "next", assessments: [{ ...current.assessments[0], passed: true }] });
+ page("/my-learning/courses/c/assessments/final");
+ expect((await screen.findByRole("link", { name: "Continue Learning" })).getAttribute("href")).toBe("/my-learning/courses/c/lessons/next");
+ expect(api.completeLearningLesson).not.toHaveBeenCalled();
+});

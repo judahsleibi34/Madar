@@ -1,5 +1,176 @@
 # Automated database migration architecture
 
+## Unselected learning-only141→143 candidate
+
+The approved learning-only route is now finalized as an exact source-pinned
+candidate: `learning-141-143-path.json`, `migrations-141-143-learning.json`,
+`schema-141-143-learning-bridge.json`, and mirrored
+`143_complete_learning_capabilities.sql`. It contains exactly one transition
+from141 to143 and explicitly excludes142. Migration142, all001–141 SQL, all
+retained manifests, and active `release.json` remain unchanged. The incoming main release retains its reviewed115→136 bridge and selects
+only migrations116–136. The learning137–143 candidates remain unselected;
+the existing local application database is141.
+Finalization is source authority for this candidate, not production deployment,
+installation, traffic switching, or upgrading the application database.
+
+The descriptor pins SQL, manifest and bridge digests. Every ordinary transition
+remains consecutive. Source gates accept namespace001–143 only after validating
+the exact learning descriptor, SQL mirrors, manifest and bridge. The executor
+retains checksums, verified backup, advisory locks and forward repair; it rejects
+live142 before SQL and resumes143 without executing142. Automatic orchestration
+requires explicit bridge selection and its usual known-good acceptance gates.
+
+Compatibility is141..143 with excluded version142; rollback compatibility is
+exactly141. Backend readiness, runtime configuration, candidate identity and
+release promotion/rollback attestations carry/enforce the exclusion. Missing or
+arbitrary exclusions fail closed. `settings_available(142)` is false on the
+learning143 branch, so143 never implies Exchange142 features. CLI reconciliation
+accepts only the pinned143 transition, requires the141 predecessor and rejects
+any142 ledger row; it never invents or repairs142. Repository identity, clean
+source, stable health, execution/acceptance evidence and operator confirmation
+remain mandatory for any ledger mutation.
+
+143 extends the existing assessment engine with picture/audio choices, local
+unscored speaking practice, bounded private PCM WAV exam responses, bounded
+written answers, authorized human review, immutable decisions and snapshots,
+pending-review finalization, optional question pools/shuffling and feedback.
+Objective grading remains deterministic; no AI or subjective automated scores
+are introduced. Selected recordings remain immutable assessment evidence;
+retryable cleanup fences unused objects before deleting bytes and releasing
+quota. CEFR configuration reuses required published graded exams with the
+owner's configured passing threshold instead of a global70% requirement.
+
+A populated disposable141 rehearsal verifies old attempts/answers/completion
+preservation, complete transactional rollback, an actual schema141 dump,
+locked143-only execution, excluded142 rejection and143 re-entry. Native browser
+validation uses separate disposable auth/REST/storage services and original
+synthetic content. None of this seeds the original academy course. See
+[the implementation report](elearning-final-learning-implementation.md) for
+validation evidence and any remaining acceptance limits.
+
+## Unselected Exchange Forms candidate (schema142)
+
+The exact checksum-pinned `migrations-115-142.json` /
+`schema-114-142-bridge.json` pair retains immutable115–141 and adds mirrored142.
+Both source validators accept this explicit transition and namespace001–142 only.
+The retained exact115 profile selects no SQL. The active main bridge selects
+only116–136; this candidate remains unselected. No production
+installation, migration or deployment authority is granted; orchestration is unchanged.
+
+142 links tenant-owned opportunities to independent E-Learning Forms and records
+immutable opportunity context on Forms responses. Exchange stores only decisions
+and immutable decision history, never copied answers. Approved legacy and Forms
+applications both consume capacity under the opportunity lock. Historical legacy
+Exchange answers/reviews remain intact; new specialized Exchange submissions reject.
+Affiliate and Support workflows remain independent and unchanged. Local142 requires
+explicit contract selection after a preservation-checked upgrade; production still
+requires its accepted bridge, verified backup and governed upgrade.
+
+## Unselected independent E-Learning Forms candidate (schema141)
+
+The exact checksum-pinned `migrations-115-141.json` /
+`schema-114-141-bridge.json` pair retains immutable115–140 and adds mirrored141.
+Both source validators accept only this additional transition and namespace001–141.
+The active main115→136 bridge selects only116–136; Forms141 remains unselected. No production
+installation, migration or deployment authority is granted.
+
+141 adds tenant-owned learning form definitions, immutable versions/responses,
+private response attachment ownership, guarded lifecycle/submission/read functions,
+and a tenant-checked Academy Builder form reference. Builder definitions, drafts,
+submissions and specialized programme workflows remain independent. Existing Forms
+capabilities, storage quotas and learning notifications are reused. Browser and
+server enforce conditional visibility; historical answers reference immutable
+schemas and survive lifecycle changes. Local development may explicitly select141
+after a preservation-checked local upgrade. Production requires its own accepted
+bridge/backup/governed upgrade; orchestration is unchanged.
+
+## Unselected Academy owner tools candidate (schema140)
+
+The exact `migrations-115-140.json` / `schema-114-140-bridge.json` pair extends
+immutable115–139 history with mirrored140 only. `academy_owner_candidate.py`
+pins the new descriptors/SQL and both validators accept only this additional
+transition in namespace001–140. Main’s reviewed115→136 bridge selects
+only116–136; the owner140 candidate remains unselected. No production authority is granted here.
+
+140 adds tenant/application-owned private document metadata, tenant-owned
+exchange opportunities and a composite opportunity link on existing applications.
+It extends existing `contacts` with nullable academy/project scope, preserving
+historical platform contacts. Institution classification derives verified linked
+identity and tenant configuration through a guarded read function. Dashboard
+metrics reuse existing records and report/progress logic; API projections enforce
+commercial module visibility. Supporting bytes reuse private Supabase storage,
+existing quota reservations/accounting and authenticated access, never public
+Builder URLs. Opportunity application/review guards preserve idempotency and
+serialize capacity checks; existing general applications remain compatible.
+
+Builder profiles/validators gain only programme information, exchange listings
+and the shared contact component. General Forms/reservations remain excluded;
+projects, header/footer, renderer, publishing and tenant bindings are reused.
+Production orchestration and existing migrations/descriptors are unchanged.
+The local140 launcher is explicit and loopback-only. The disposable rehearsal
+covers the retained115 upgrade chain, rollback, existing Builder lifecycle and
+owner-tool isolation. Production still requires a separate accepted bridge,
+verified backup and governed upgrade.
+
+## Unselected reusable academy correction (schema 139)
+
+The retained `migrations-115-139.json` / `schema-114-139-bridge.json` pair extends
+exactly the immutable115–138 prefix. `academy_candidate.py` pins the new artifacts
+and mirrored139 SQL; both release validators accept only this additional transition
+and the exact001–139 namespace. Existing137/138 SQL and their pinned descriptors
+remain unchanged. Main’s reviewed115→136 bridge selects only116–136;
+the academy139 candidate remains unselected. This candidate grants no production authority.
+
+139 translates the historical `eduhope_enabled` settings key into the generic
+`programmes_enabled` key, preserving historical enabled tenant behavior and
+configured values. Legacy defaults are materialized only for existing legacy
+opt-in configuration; newly configured academies have no implicit sales threshold,
+withdrawal minimum or payment methods. It strengthens application/withdrawal
+membership and immutable history parent/actor ownership with composite foreign
+keys and removes direct service-role writes to canonical referral facts. Optional
+CEFR configuration no longer requires programme opt-in. No course prices, syllabus,
+CEFR mappings, plan assignments or academy opt-ins are seeded.
+
+Runtime gates reuse the canonical dated commercial ledger and existing module
+capabilities: `ecommerce` for referral/affiliate/finance, `website_publish` for
+support/exchange, `data_exports` for advanced reports. Existing operator override
+and suspension rules remain authoritative. Owner/member permissions, tenant
+context, academy flags and server-side gates remain required; historical verified
+payment/refund processing is retained even after subscription expiration.
+
+The disposable139 rehearsal verifies the schema115 upgrade path, populated138
+configuration/financial/history preservation and rollback, then runs tenant and
+financial regressions. Local development may explicitly select the loopback139
+contract; production still requires the separate accepted bridge, verified backup
+and governed upgrade. Deployment and migration orchestration are unchanged.
+
+## Unselected EduHope candidate (schema 138)
+
+The exact checksum-pinned `migrations-115-138.json` / `schema-114-138-bridge.json`
+artifacts extend the retained 115..136 history without editing any earlier SQL
+or manifest. `eduhope_candidate.py`, `check_migrations.py` and
+`check_forward_release.py` verify only these exact two additional mirrored
+transitions and reject unknown future migrations. Main remains schema115,
+migration class/policy none, with no selected manifest. This work grants no
+production installation, migration, traffic or worker authority.
+
+137 connects prospective E-Learning business evidence to existing Madar events,
+outbox, delivery worker and preferences, with recipient-bound private events.
+138 adds opt-in academy applications, withdrawal reservations/review history,
+verified direct-sales eligibility, purchase/approved-affiliate code eligibility,
+section CEFR configurations using the existing credential engine, and owner
+reports using the existing progress calculator. Runtime mutations fail closed
+before their required schema. Existing academies retain legacy referral behavior
+unless explicitly opting into the historical academy programme configuration (generalized by139). Local test purchase credits are excluded
+from withdrawable balances and Tuition Support eligibility. Refunds and
+withdrawals serialize on the same user lock; paid requests are terminal and
+review history is immutable. Refund shortfalls prevent further payment.
+
+A separate approved bridge, verified backup and governed upgrade remain required
+for production. Development uses an explicit loopback-only local contract and
+consumer launcher; production recovery and worker-consumption fences remain.
+
+
 An interrupted admitted SQL chain has a separate SQL-only forward-resumption
 operation. A new immutable plan binds the parent failure as DATA, actual partial
 schema, unchanged customer projection, current grant/worker/runtime identities,
@@ -73,7 +244,7 @@ The referral candidate retains an additional checksum-pinned, unselected
 manifest and its pinned history remain unchanged. `check_migrations.py` accepts
 only the exact additional 136 artifact and verifies the old entries are
 identical; `check_forward_release.py` also validates this additional pinned
-candidate and exact namespace 001..136. Unknown future migrations still fail. The historical schema115 profile
+candidate and exact namespace001–143 after validating the explicitly pinned learning candidate. Unknown future migrations still fail. The historical schema115 profile
 still selects no SQL; the new upgrade candidate selects only116..136. Migration136 requires schema135 and adds tenant-private
 referrals plus monetary reward/reversal records tied atomically to a verified
 first learning purchase. Runtime endpoints and enabling referrals fail closed
