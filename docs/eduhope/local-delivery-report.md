@@ -118,8 +118,12 @@ activation or a claim that the unavailable original89-topic book is complete.
     attempts. Frontend1562 passed/one skipped; database144 rehearsal80 passed.
     Full frontend lint/build/public-tenant-bundle audit and dependency audit passed
     (zero vulnerabilities). Release locks/mirrors/transitions/forward/secret checks
-    passed; two historical013/014 duplicate-content warnings remain. Final merged
-    source validation is recorded below when integration completes.
+    passed; two historical013/014 duplicate-content warnings remain. Integrated current-main validation:3350 backend executions,2688 passed/662
+    skipped; frontend1562 passed/one skipped. Incoming immutable-controller tests
+    passed. The policy conflict retained both reviewed boundaries. Actual
+    production image/installation/backup/traffic gates were not run locally and
+    remain mandatory for governed activation. The development build API-origin
+    check intentionally skips; this is not production-image acceptance.
 24. **Exact remaining dependencies:** original89-topic owner map and complete
     official teaching/audio/assessment educator approval; final legal terms/privacy
     approval; institutional domains/PAU verification; real production destination
