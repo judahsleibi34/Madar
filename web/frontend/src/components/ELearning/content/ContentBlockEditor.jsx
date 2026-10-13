@@ -1,3 +1,4 @@
+import LearningErrorNotice from "../LearningErrorNotice";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import ELearningDialog from "../ELearningDialog";
@@ -19,7 +20,7 @@ export default function ContentBlockEditor({ block, type, busy, error, upload, o
   }
   return <ELearningDialog title={t(block ? "elearning.content.editType" : "elearning.content.addType", { type: t(`elearning.content.types.${type}`) })} busy={disabled} onClose={onClose} closeLabel={t("elearning.courses.close")}>
     <form onSubmit={save}>
-      {error && <p role="alert" className="elearning-feedback is-error">{t(`elearning.content.${error}`)}</p>}
+      {error && <LearningErrorNotice as="p" className="elearning-feedback is-error">{t(`elearning.content.${error}`)}</LearningErrorNotice>}
       <fieldset className="elearning-course-form" disabled={disabled}>
         <label>{t("elearning.content.title")}<input maxLength={120} value={value.title} onChange={(event) => setValue({ ...value, title: event.target.value })} /></label>
         {type === "text" ? <Editor value={value.content} onChange={(content) => setValue({ ...value, content })} /> : <Editor type={type} value={value} onChange={setValue} upload={upload} onBusy={setUploading} />}

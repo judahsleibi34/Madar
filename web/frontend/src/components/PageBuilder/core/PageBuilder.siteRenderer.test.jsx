@@ -34,6 +34,23 @@ const activePage = {
 };
 
 describe("SiteRenderer artboard camera", () => {
+  it("expands public desktop geometry horizontally without scaling text or saved positions", () => {
+    const props = { project, activePage, viewportMode: "desktop", availablePresentationWidth: 1800,
+      renderElement: element => <span>{element.content}</span> };
+    const view = render(<SiteRenderer {...props} expandToAvailableWidth />);
+    const frame = () => view.container.querySelector('[data-builder-element-id="element_1"]');
+    expect(view.container.querySelector('.site-renderer-artboard').style.width).toBe('1800px');
+    expect(frame().style.width).toBe('480px');
+    expect(frame().style.transform).toBe('translate3d(150px, 80px, 0)');
+    expect(view.container.querySelector('.site-renderer-artboard').style.transform).toBe('scale(1)');
+    expect(activePage.sections[0].freeElements[0].position.desktop.width).toBe(320);
+    view.rerender(<SiteRenderer {...props} />);
+    expect(frame().style.width).toBe('320px');
+    view.rerender(<SiteRenderer {...props} viewportMode="mobile" availablePresentationWidth={390} expandToAvailableWidth />);
+    const expandedMobileGeometry = { width: frame().style.width, transform: frame().style.transform };
+    view.rerender(<SiteRenderer {...props} viewportMode="mobile" availablePresentationWidth={390} />);
+    expect({ width: frame().style.width, transform: frame().style.transform }).toEqual(expandedMobileGeometry);
+  });
   beforeEach(() => {
     globalThis.ResizeObserver = class ResizeObserver {
       observe() {}

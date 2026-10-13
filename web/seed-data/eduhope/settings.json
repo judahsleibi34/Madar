@@ -4,6 +4,7 @@
     "enabled": true,
     "academy_enabled": true,
     "academy_registration": "open",
+    "academy_email_verification_required": false,
     "platform_name": "EduHope",
     "primary_display_name": "EduHope",
     "description": "Learn English. Speak Confidently. Achieve Your Dreams. Your Gateway to Success. Learn. Grow. Give Back.",

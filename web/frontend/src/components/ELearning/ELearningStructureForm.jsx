@@ -1,3 +1,4 @@
+import LearningErrorNotice from "./LearningErrorNotice";
 import ELearningDescriptionTextarea from "./ELearningDescriptionTextarea";
 import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -10,7 +11,7 @@ export default function ELearningStructureForm({ label, kind, item, position, bu
   const change = (key, value) => setForm((current) => ({ ...current, [key]: value }));
   return <ELearningDialog title={t(item ? "elearning.courses.edit" : "elearning.courses.add", { label })} onClose={onClose} busy={busy} closeLabel={t("elearning.courses.close")}>
     <form onSubmit={(event) => { event.preventDefault(); if (!busy) onSave(form); }}>
-      {error && <p role="alert" className="elearning-feedback is-error">{t(`elearning.${error}`)}</p>}
+      {error && <LearningErrorNotice as="p" className="elearning-feedback is-error">{t(`elearning.${error}`)}</LearningErrorNotice>}
       <fieldset className="elearning-course-form" disabled={busy}>
         <label>{t("elearning.courses.name", { label })}<input autoFocus required maxLength={120} value={form.name} onChange={(event) => change("name", event.target.value)} /></label>
         <label><span id={descriptionLabelId}>{t(kind === "lesson" ? "elearning.structure.shortDescription" : "elearning.courses.description", { label })}</span><ELearningDescriptionTextarea label={t(kind === "lesson" ? "elearning.structure.shortDescription" : "elearning.courses.description", { label })} maxLength={4000} value={form.description} onChange={(event) => change("description", event.target.value)} /></label>

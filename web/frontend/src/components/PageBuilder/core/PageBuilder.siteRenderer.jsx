@@ -108,6 +108,7 @@ const SiteRenderer = forwardRef(function SiteRenderer({
   viewportMode = "desktop",
   presentationZoom = 1,
   availablePresentationWidth,
+  expandToAvailableWidth = false,
   renderElement,
   renderSiteHeader,
   renderSiteFooter,
@@ -129,7 +130,10 @@ const SiteRenderer = forwardRef(function SiteRenderer({
 }, forwardedRef) {
   const mode = normalizeArtboardViewportMode(viewportMode);
   const referenceLogicalWidth = getArtboardLogicalWidth(mode);
-  const logicalWidth = referenceLogicalWidth;
+  const logicalWidth = expandToAvailableWidth && mode === "desktop"
+    ? Math.max(referenceLogicalWidth, Number(availablePresentationWidth) || 0)
+    : referenceLogicalWidth;
+  const horizontalExpansion = logicalWidth / referenceLogicalWidth;
   const zoom = Math.min(2, Math.max(0.0001, Number(presentationZoom) || 1));
   const [measuredElementHeights, setMeasuredElementHeights] = useState({});
   const physicalAvailableWidth = Math.max(
@@ -192,8 +196,15 @@ const SiteRenderer = forwardRef(function SiteRenderer({
       const underTextRelationship = underTextImageRelationshipsBySection[section.id]?.get(element.id);
       const isUnderTextImage = Boolean(underTextRelationship);
       const authoredDesktopPosition = getArtboardElementPosition(element, "desktop");
-      const requestedPosition = getDirectElementPosition?.(element, section, mode)
+      const authoredPosition = getDirectElementPosition?.(element, section, mode)
         || getArtboardElementPosition(element, mode);
+      // Public wide-screen presentation expands horizontal geometry only.
+      // Saved coordinates, typography and vertical reading order stay intact.
+      const requestedPosition = horizontalExpansion === 1 ? authoredPosition : {
+        ...authoredPosition,
+        x: Number(authoredPosition.x || 0) * horizontalExpansion,
+        width: Number(authoredPosition.width || 0) * horizontalExpansion,
+      };
       const projectedDesktopPosition = projectUnderTextImagePosition(
         authoredDesktopPosition,
         logicalWidth

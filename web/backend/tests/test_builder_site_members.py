@@ -105,6 +105,7 @@ class FakeAuthAdmin:
     def __init__(self):
         self.created = []
         self.deleted = []
+        self.updated = []
 
     def create_user(self, payload):
         self.created.append(dict(payload))
@@ -112,6 +113,9 @@ class FakeAuthAdmin:
 
     def delete_user(self, auth_id):
         self.deleted.append(auth_id)
+
+    def update_user_by_id(self, auth_id, payload):
+        self.updated.append((auth_id, dict(payload)))
 
 
 class FakeAuth:

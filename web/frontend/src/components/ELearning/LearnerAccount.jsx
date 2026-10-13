@@ -1,3 +1,4 @@
+import LearningErrorNotice from "./LearningErrorNotice";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
@@ -36,7 +37,7 @@ export default function LearnerAccount({ view = "profile", site }) {
     return () => { active = false; };
   }, [attempt, view, site]);
   if (state.loading) return <ELearningSkeleton label={t("elearning.player.loading")} direction={i18n.dir()} />;
-  if (state.error) return <section className="learner-account-panel" role="alert"><p>{t("elearning.player.loadError")}</p><button className="ecommerce-secondary-button" onClick={() => { setState({ loading: true }); setAttempt(value => value + 1); }}>{t("elearning.retry")}</button></section>;
+  if (state.error) return <LearningErrorNotice className="learner-account-panel" as="section"><p>{t("elearning.player.loadError")}</p><button className="ecommerce-secondary-button" onClick={() => { setState({ loading: true }); setAttempt(value => value + 1); }}>{t("elearning.retry")}</button></LearningErrorNotice>;
   const { courses, user, academy, referrals, programme } = state.data;
   const name = [user?.first_name, user?.last_name].filter(Boolean).join(" ");
   const completed = courses.reduce((sum, item) => sum + item.progress.completed_lessons, 0);
@@ -63,7 +64,7 @@ export default function LearnerAccount({ view = "profile", site }) {
     {view === "referrals" && <ReferralInvitation referrals={referrals} academy={academy} />}
     {["referrals", "rewards", "wallet"].includes(view) && <section className="learner-account-panel learner-account-rewards">
       <header><h2>{t(view === "referrals" ? "elearning.programmes.history" : view === "wallet" ? "elearning.programmes.wallet" : "elearning.referrals.rewards")}</h2>{view === "rewards" && <p>{t("elearning.referrals.balanceHelp")}</p>}</header>
-      {referrals.error ? <p role="alert">{t("elearning.referrals.loadError")}</p> : !referrals.available ? <p>{t("elearning.referrals.unavailable")}</p> : <>
+      {referrals.error ? <LearningErrorNotice as="p">{t("elearning.referrals.loadError")}</LearningErrorNotice> : !referrals.available ? <p>{t("elearning.referrals.unavailable")}</p> : <>
         {view !== "referrals" && <div className="learner-account-reward-balances">{view === "wallet" && referrals.wallet ? <><div><span>{t("elearning.programmes.available")}</span><strong>{money(referrals.wallet.available, referrals.wallet.currency)}</strong>{programme?.capabilities?.withdrawal && programme.settings?.withdrawals_enabled && <Link to="/my-learning/withdrawals">{t("elearning.programmes.withdrawal")}</Link>}</div>{["pending", "total_earned", "total_withdrawn", "debt"].map(key => <div key={key}><span>{t(key === "pending" ? "elearning.affiliate.reserved" : `elearning.programmes.${key}`)}</span><strong>{money(referrals.wallet[key], referrals.wallet.currency)}</strong></div>)}</> : referrals.balances.length ? referrals.balances.map(balance => <div key={`${balance.currency}:${balance.simulated}`}><span>{t(balance.simulated ? "elearning.referrals.demoBalance" : "elearning.referrals.balance")}</span><strong>{money(balance.amount, balance.currency)}</strong></div>) : <p>{t("elearning.referrals.noRewards")}</p>}</div>}
         {view !== "wallet" && <p>{t("elearning.referrals.counts", { referred: referrals.referred_count, earned: referrals.earned_count })}</p>}
         {view !== "wallet" && <div className="affiliate-table-scroll"><table><caption>{t(view === "rewards" ? "elearning.referrals.rewards" : "elearning.programmes.referrals")}</caption><thead><tr>{["date", "amount", "statusColumn"].map(key => <th scope="col" key={key}>{t(`elearning.affiliate.${key}`)}</th>)}</tr></thead><tbody>{(referrals.history || []).filter(item => view !== "rewards" || ["earned", "reversed"].includes(item.status)).map(item => <tr key={item.id}><td>{new Date(view === "rewards" ? item.reversed_at || item.earned_at || item.created_at : item.created_at).toLocaleDateString(i18n.language)}</td><td>{money(item.amount, item.currency)}{item.simulated && ` · ${t("elearning.referrals.demo")}`}</td><td>{t(`elearning.referrals.${item.status}`)}</td></tr>)}</tbody></table></div>}

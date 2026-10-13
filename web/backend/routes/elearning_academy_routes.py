@@ -105,9 +105,16 @@ def auth_return(payload, website, request):
 def login(identifier: str, payload: AcademyLoginRequest, request: Request, response: Response):
     from services.academy_auth_service import academy_auth_settings
     from routes.public_site_routes import login_tenant_account, get_tenant_staff_membership
-    website, tenant_id, _ = academy_auth_settings(identifier, request)
+    website, tenant_id, settings = academy_auth_settings(identifier, request)
     target = auth_return(payload, website, request)
-    result = login_tenant_account(identifier, payload, request, response, allow_learning_membership=True)
+    result = login_tenant_account(
+        identifier,
+        payload,
+        request,
+        response,
+        allow_learning_membership=True,
+        email_verification_required=settings.get("academy_email_verification_required", True),
+    )
     user = result.get("user") or {}
     # The shared learning runtime uses the existing current tenant membership.
     if user.get("tenant_id") != tenant_id or not get_tenant_staff_membership(tenant_id, user.get("id")):
@@ -117,7 +124,7 @@ def login(identifier: str, payload: AcademyLoginRequest, request: Request, respo
 
 @router.post("/{identifier}/auth/register")
 def register(identifier: str, payload: AcademyRegisterRequest, request: Request):
-    from services.academy_auth_service import academy_auth_settings
+    from services.academy_auth_service import academy_auth_settings, verification_redirect
     from routes.public_site_routes import register_tenant_account
     website, _, settings = academy_auth_settings(identifier, request)
     if settings["academy_registration"] not in {"open", "email_domain"}:
@@ -134,7 +141,7 @@ def register(identifier: str, payload: AcademyRegisterRequest, request: Request)
     verification_target = target
     if target == main_base or target.startswith(main_base + "/"):
         verification_target = "/academy" + target[len(main_base):]
-    result = register_tenant_account(identifier, payload, request, academy_context={"return_to": f"/academy/login?returnTo={quote(verification_target, safe='')}", "referral_code": str(payload.referral_code) if payload.referral_code else None})
+    result = register_tenant_account(identifier, payload, request, academy_context={"return_to": f"/academy/login?returnTo={quote(verification_target, safe='')}", "email_redirect_to": verification_redirect(website['subdomain'], request, target), "email_verification_required": settings.get("academy_email_verification_required", True), "referral_code": str(payload.referral_code) if payload.referral_code else None})
     return {**result, "return_to": target}
 
 

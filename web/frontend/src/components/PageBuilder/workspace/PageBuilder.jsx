@@ -920,8 +920,8 @@ export default function PageBuilder({
     try {
       const members = await fetchBuilderSiteMembers(routeProjectId);
       setSiteMembers(Array.isArray(members) ? members : []);
-    } catch (error) {
-      setSiteMembersError(error?.message || "Could not load subdomain users.");
+    } catch {
+      setSiteMembersError("Could not load subdomain users.");
     } finally {
       setSiteMembersLoading(false);
     }
@@ -2833,8 +2833,8 @@ export default function PageBuilder({
       }
       setUserPendingDelete(null);
       showToast("Website access removed.");
-    } catch (error) {
-      setSiteMembersError(error?.message || "Could not remove website access.");
+    } catch {
+      setSiteMembersError("Could not remove website access.");
       showToast("Could not remove website access.");
     } finally {
       setSiteMemberMutationId("");
@@ -2888,8 +2888,8 @@ export default function PageBuilder({
         )
       );
       showToast("User access updated.");
-    } catch (error) {
-      setSiteMembersError(error?.message || "Could not update this user.");
+    } catch {
+      setSiteMembersError("Could not update this user.");
       showToast("Could not update this user.");
       await loadSiteMembers();
     } finally {
@@ -3709,8 +3709,8 @@ export default function PageBuilder({
         serverUpdatedAt: fullRecord.updated_at || null,
       }));
       return fullRecord;
-    } catch (error) {
-      if (import.meta.env.DEV) console.warn("Could not inspect latest server project.", error);
+    } catch {
+      if (import.meta.env.DEV) console.warn("Could not load the latest project.");
       showToast("The latest server metadata could not be loaded. Your local copy remains protected.");
       return null;
     }
@@ -3778,8 +3778,8 @@ export default function PageBuilder({
       );
       if (successMessage) showToast(successMessage);
       return true;
-    } catch (error) {
-      if (import.meta.env.DEV) console.warn("Could not adopt backend builder project.", error);
+    } catch {
+      if (import.meta.env.DEV) console.warn("Could not restore the project.");
       conflictRef.current = true;
       hydrationCompleteRef.current = true;
       setSaveState(BUILDER_SAVE_STATES.conflict);
@@ -4081,7 +4081,7 @@ export default function PageBuilder({
       );
       return true;
     } catch (error) {
-      console.error("Could not publish builder project:", error);
+      console.error("Could not publish the project.");
 
       if (isLikelySessionFailure(error)) {
         showToast("Please sign in again, then choose Go Live.");
@@ -4121,7 +4121,7 @@ export default function PageBuilder({
           setDesignPanel("Pages");
           showToast(getFormConnectionIssueMessage(issue));
         } else {
-          showToast(error.message || "This draft is not ready to publish. Review the highlighted content.");
+          showToast("This draft is not ready to publish. Review the highlighted content.");
         }
         return false;
       }
@@ -4185,8 +4185,8 @@ export default function PageBuilder({
         published_project_id: result?.binding?.project_id || projectId,
       }));
       showToast("This project is now live on your public website.");
-    } catch (error) {
-      showToast(error?.message || "The live project could not be changed.");
+    } catch {
+      showToast("The live project could not be changed.");
     } finally {
       setIsBindingPublicProject(false);
     }

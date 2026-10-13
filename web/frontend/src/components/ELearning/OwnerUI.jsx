@@ -1,3 +1,4 @@
+import LearningErrorNotice from "./LearningErrorNotice";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import LoadingBar from "../common/LoadingBar";
@@ -5,12 +6,13 @@ export function OwnerHeader({
   title,
   description,
   actions,
+  showBreadcrumb = true,
   back
 }) {
   const {
     t
   } = useTranslation('dashboard');
-  return <><nav className="elearning-owner-breadcrumb" aria-label={t('elearning.ui.breadcrumbs')}><Link to="/e-learning/dashboard">{t('sidebar.elearning')}</Link>{back && <><span aria-hidden="true"> / </span><Link to={back.to}>{back.label}</Link></>}</nav><header className="ecommerce-page-header app-page-intro"><div><h1>{title}</h1>{description && <p>{description}</p>}</div>{actions && <div className="elearning-course-actions">{actions}</div>}</header></>;
+  return <>{showBreadcrumb && <nav className="elearning-owner-breadcrumb" aria-label={t('elearning.ui.breadcrumbs')}><Link to="/e-learning/dashboard">{t('sidebar.elearning')}</Link>{back && <><span aria-hidden="true"> / </span><Link to={back.to}>{back.label}</Link></>}</nav>}<header className="ecommerce-page-header app-page-intro"><div><h1>{title}</h1>{description && <p>{description}</p>}</div>{actions && <div className="elearning-course-actions">{actions}</div>}</header></>;
 }
 export function OwnerPage({
   children
@@ -31,7 +33,7 @@ export function OwnerState({
   const {
     t
   } = useTranslation('dashboard');
-  if (error) return <div className="ecommerce-list-card" role="alert"><p>{message || t('elearning.ui.load_error')}</p>{retry && <button className="ecommerce-secondary-button" onClick={retry}>{t('elearning.retry')}</button>}</div>;
+  if (error) return <LearningErrorNotice className="ecommerce-list-card" as="div"><p>{message || t('elearning.ui.load_error')}</p>{retry && <button className="ecommerce-secondary-button" onClick={retry}>{t('elearning.retry')}</button>}</LearningErrorNotice>;
   if (loading) return <LoadingBar label={t('elearning.loading')} mode="inline" />;
   if (empty) return <section className="ecommerce-list-card ecommerce-empty-state"><h2>{empty}</h2>{action}</section>;
   return null;

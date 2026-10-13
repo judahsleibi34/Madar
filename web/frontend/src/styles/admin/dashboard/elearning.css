@@ -252,7 +252,7 @@
 .elearning-terminology {
   grid-column: 1 / -1;
   display: grid;
-  gap: var(--space-8);
+  gap: var(--space-4);
   min-width: 0;
 }
 
@@ -264,13 +264,13 @@
 }
 
 .elearning-settings .elearning-terminology-group + .elearning-terminology-group {
-  padding-block-start: var(--space-6);
+  padding-block-start: var(--space-2);
   border-block-start: 1px solid var(--theme-border);
 }
 
 .elearning-settings .elearning-terminology-group legend {
   padding: 0;
-  margin-block-end: var(--space-4);
+  margin-block-end: var(--space-2);
   color: var(--theme-text);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-bold);
@@ -363,4 +363,100 @@
   }
   .elearning-logo-field { grid-template-columns: minmax(0, 1fr); }
   .elearning-logo-field .elearning-logo-upload { justify-self: end; }
+}
+
+/* Compact academy settings: one category, one expanded group at a time. */
+.elearning-settings .settings-header {display:flex;justify-content:space-between;align-items:flex-start;gap:var(--space-4);flex-wrap:wrap;}
+.elearning-settings-header-actions {display:flex;align-items:center;flex-wrap:wrap;gap:var(--space-3);}
+.elearning-settings-tabs {display:flex;flex-wrap:wrap;gap:var(--space-2);padding-block-end:var(--space-4);border-block-end:1px solid var(--theme-border);}
+.elearning-settings-tabs [role="tab"] {min-height:42px;padding:var(--space-3) var(--space-4);border:1px solid var(--theme-border);border-radius:var(--ui-radius-small);background:var(--theme-surface);color:var(--theme-text);font:inherit;font-size:var(--font-size-sm);font-weight:var(--font-weight-semibold);cursor:pointer;}
+.elearning-settings-tabs [aria-selected="true"] {background:var(--theme-primary);border-color:var(--theme-primary);color:var(--theme-text-inverse);}
+.elearning-settings-tabs [role="tab"]:focus-visible,.elearning-settings-accordion summary:focus-visible {outline:2px solid var(--theme-primary);outline-offset:3px;}
+.elearning-settings-tab-panel {display:grid;gap:var(--space-4);min-width:0;}
+.elearning-settings-tab-panel[hidden] {display:none!important;}
+.admin-dashboard-page .settings-page.elearning-settings .settings-card.elearning-settings-accordion {display:block;padding:0;min-width:0;}
+.elearning-settings-accordion > summary {display:flex;align-items:center;gap:var(--space-3);width:100%;box-sizing:border-box;padding:var(--space-5) var(--space-6);cursor:pointer;list-style:none;}
+.elearning-settings-accordion summary::-webkit-details-marker {display:none;}
+.elearning-settings-accordion-copy {flex:1;min-width:0;}
+.elearning-settings-accordion-copy h3 {margin:0;font-size:var(--font-size-base);}
+.elearning-settings-accordion-copy > span {display:block;margin-block-start:var(--space-1);font-size:var(--font-size-sm);line-height:var(--type-small-line);color:var(--theme-text-muted);}
+.elearning-settings-chevron {flex-shrink:0;margin-inline-start:auto;transition:transform 160ms ease;}
+.elearning-settings-accordion[open] > summary .elearning-settings-chevron {transform:rotate(180deg);}
+.elearning-settings-accordion-body {padding:var(--space-5) var(--space-6);border-block-start:1px solid var(--theme-border);min-width:0;}
+@media(max-width:640px) {
+  .elearning-settings-accordion > summary,.elearning-settings-accordion-body {padding:var(--space-4);}
+  .elearning-settings-tabs {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));}
+  .elearning-settings-header-actions {width:100%;}
+  .elearning-settings-header-actions > :is(a,button) {flex:1;justify-content:center;}
+}
+
+/* Settings use the authenticated shell's responsive type and theme tokens. */
+.admin-dashboard-page .settings-page.elearning-settings {
+  font-family: var(--font-main);
+  font-size: var(--auth-text-body);
+  color: var(--theme-text);
+}
+.admin-dashboard-page .settings-page.elearning-settings :is(.elearning-card-heading h3, .elearning-settings-accordion-copy h3, .settings-card > h3) {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-size: var(--ui-text-heading);
+  line-height: var(--line-height-tight);
+  font-weight: var(--font-weight-bold);
+  color: var(--theme-text);
+}
+.admin-dashboard-page .settings-page.elearning-settings :is(.elearning-card-heading p, .elearning-settings-accordion-copy > span, .settings-card > p, .settings-card label, .elearning-terminology-group legend, .elearning-settings-tabs [role="tab"], small) {
+  font-family: var(--font-main);
+  font-size: var(--ui-text-small);
+  line-height: var(--line-height-base);
+}
+.admin-dashboard-page .settings-page.elearning-settings :is(.elearning-card-heading p, .elearning-settings-accordion-copy > span, .settings-card > p, small) {
+  font-weight: var(--font-weight-regular);
+  color: var(--theme-text-muted);
+}
+.admin-dashboard-page .settings-page.elearning-settings .settings-card select {
+  font-family: var(--font-main);
+  font-size: var(--auth-text-body);
+  font-weight: var(--font-weight-regular);
+}
+.admin-dashboard-page .settings-page.elearning-settings .elearning-settings-tabs [aria-selected="true"] {
+  color: var(--theme-text-inverse);
+}
+
+.admin-dashboard-page .settings-page.elearning-settings .elearning-settings-tabs [role="tab"]:hover {
+  background: var(--theme-primary);
+  border-color: var(--theme-primary);
+  color: var(--theme-text-inverse);
+}
+
+.admin-dashboard-page .settings-page.elearning-settings .settings-card.elearning-institution-card {
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-4);
+  padding: var(--space-5) var(--space-6);
+}
+.elearning-institution-group {
+  margin: 0;
+  padding: var(--space-3) 0 0;
+  border: 0;
+  min-width: 0;
+}
+.elearning-institution-group legend {
+  padding: 0;
+  font-family: var(--font-main);
+  font-size: var(--ui-text-small);
+  font-weight: var(--font-weight-bold);
+  color: var(--theme-text);
+}
+.elearning-institution-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: var(--space-4);
+}
+.elearning-institution-group + .elearning-institution-group {
+  padding-block-start: var(--space-4);
+  border-block-start: 1px solid var(--theme-border);
+}
+@media (max-width: 640px) {
+  .admin-dashboard-page .settings-page.elearning-settings .settings-card.elearning-institution-card {padding: var(--space-4);}
+  .elearning-institution-fields {grid-template-columns: minmax(0, 1fr);}
 }

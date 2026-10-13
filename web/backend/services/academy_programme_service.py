@@ -43,10 +43,15 @@ class Review(Payload):
     note: str = Field(min_length=1, max_length=4000)
 
 
-def available(actor, capability=None):
+def read_access(actor, capability=None):
+    """Historical owner reads retain schema and entitlement checks, even when new programme activity is disabled."""
     if not settings_available(139):
         raise HTTPException(503, detail={'code': 'academy_programmes_upgrade_required'})
     if capability: require_capability(actor.tenant_id, capability)
+
+
+def available(actor, capability=None):
+    read_access(actor, capability)
     if not get_settings(actor.tenant_id)['programmes_enabled']:
         raise HTTPException(403, detail={'code': 'academy_programmes_disabled'})
 
@@ -63,9 +68,10 @@ def programme_rpc(name, actor, **args):
 
 
 def records(actor, table, admin=False, kind=None, status=None, limit=100, offset=0, opportunity_id=None):
+    guard = read_access if admin else available
     if table == 'academy_applications' and kind is None:
-        for module in ('affiliate', 'tuition', 'exchange'): available(actor, module)
-    else: available(actor, kind or 'withdrawal')
+        for module in ('affiliate', 'tuition', 'exchange'): guard(actor, module)
+    else: guard(actor, kind or 'withdrawal')
     if admin and actor.role not in {'owner', 'admin'}:
         raise HTTPException(403, 'Owner or admin access required')
     query = service_supabase.table(table).select('*').eq('tenant_id', actor.tenant_id)

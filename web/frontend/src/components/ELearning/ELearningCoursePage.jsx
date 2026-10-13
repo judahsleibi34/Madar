@@ -1,3 +1,4 @@
+import LearningErrorNotice from "./LearningErrorNotice";
 import { learningDescription } from "../../utils/elearningPresentation";
 import ELearningSkeleton from "./ELearningSkeleton";
 import { useCallback, useEffect, useState } from "react";
@@ -42,11 +43,11 @@ export default function ELearningCoursePage() {
   return <main className="ecommerce-page elearning-management" dir={i18n.dir()}>
     <header className="ecommerce-page-header app-page-intro"><div><h1>{t("elearning.navigation.courses")}</h1><p>{course?.name || t("elearning.courses.subtitle")}</p></div></header>
     <Link className="ecommerce-secondary-button elearning-back-link" to={DASHBOARD_ROUTES.elearningCourses}><ArrowLeft size={16} aria-hidden="true" />{t("elearning.courses.back")}</Link>
-    {error && <p role="alert" className="elearning-feedback is-error">{t(`elearning.${error}`)} <button className="ecommerce-secondary-button" onClick={() => { setError(""); setLoading(true); setReload((value) => value + 1); }}>{t("elearning.retry")}</button></p>}
+    {error && <LearningErrorNotice as="p" className="elearning-feedback is-error">{t(`elearning.${error}`)} <button className="ecommerce-secondary-button" onClick={() => { setError(""); setLoading(true); setReload((value) => value + 1); }}>{t("elearning.retry")}</button></LearningErrorNotice>}
     {!loading && course && !error && <>
       <nav className="elearning-course-tabs" aria-label={t("elearning.courses.tabsLabel")}>{tabs.map((value) => <NavLink key={value} className={({ isActive }) => isActive ? "ecommerce-secondary-button active" : "ecommerce-secondary-button"} to={`${DASHBOARD_ROUTES.elearningCourses}/${course.id}${value === "overview" ? "" : `/${value}`}`} end>{t(`elearning.courses.tabs.${value}`)}</NavLink>)}</nav>
       {saved && <p role="status" className="elearning-feedback">{t("elearning.courses.saved", { label: labels.course })}</p>}
-      {!validTab ? <p role="alert">{t("elearning.courses.notFound")}</p> : tab === "overview" ? <section className="ecommerce-list-card elearning-course-overview">
+      {!validTab ? <LearningErrorNotice as="p">{t("elearning.courses.notFound")}</LearningErrorNotice> : tab === "overview" ? <section className="ecommerce-list-card elearning-course-overview">
         <header><h2>{course.name}</h2><button className="ecommerce-primary-button" disabled={labelsError?.status === 403} onClick={() => setEditing(true)}>{t("elearning.courses.edit", { label: labels.course })}</button></header>
         <div className="elearning-course-cover elearning-overview-cover">{course.cover_asset ? <img src={resolveMediaUrl(course.cover_asset)} alt={t("elearning.courses.coverAlt", { name: course.name })} /> : <Image size={36} aria-hidden="true" />}</div>
         <p>{learningDescription(course.description) || t("elearning.courses.noDescription")}</p>

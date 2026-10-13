@@ -1096,6 +1096,7 @@
       "card_certificate": "عرض الدورة",
       "card_suspended": "الوصول معلّق",
       "card_unavailable": "غير متاح",
+      "startCourse": "ابدأ الدورة",
       "viewPlans": "عرض الخطط",
       "subscribe": "اشترك",
       "noPlans": "لا توجد خطط متاحة بعد.",
@@ -1174,13 +1175,15 @@
       "verifyEmail": "أكد بريدك الإلكتروني ثم سجل الدخول لمتابعة التسجيل أو الشراء.",
       "name": "الاسم الكامل",
       "registrationPolicy": "تسجيل المتعلمين",
+      "requireEmailVerification": "طلب التحقق من البريد الإلكتروني",
+      "requireEmailVerificationHelp": "عند تعطيله، يمكن لحسابات المتعلمين الجديدة تسجيل الدخول مباشرة.",
       "invitationOnly": "بالدعوة فقط",
       "openRegistration": "مفتوح",
       "backAdmin": "العودة إلى الإدارة",
       "changePassword": "تغيير كلمة المرور",
       "emailDomainRegistration": "نطاق البريد الإلكتروني",
       "allowedEmailDomains": "نطاقات البريد المسموح بها",
-      "emailDomainHelp": "أدخل نطاقات أو أمثلة بريد إلكتروني مفصولة بفواصل. يتحول jack@university.edu إلى university.edu. يُحفظ النطاق فقط. أضف النطاقات الفرعية بشكل مستقل؛ يلزم التحقق من البريد الإلكتروني.",
+      "emailDomainHelp": "أدخل نطاقات أو أمثلة بريد إلكتروني مفصولة بفواصل. يتحول jack@university.edu إلى university.edu. يُحفظ النطاق فقط. أضف النطاقات الفرعية بشكل مستقل.",
       "domainsRequired": "أضف نطاق بريد مسموحاً به واحداً على الأقل.",
       "domainsInvalid": "أدخل نطاقات أو أمثلة بريد صحيحة، مثل university.edu أو jack@university.edu، حتى 20 إدخالاً.",
       "emailDomainDenied": "استخدم عنوان بريد إلكتروني من نطاق تسمح به هذه الأكاديمية.",
@@ -1393,7 +1396,14 @@
       "affiliate_applications_enabled": "تفعيل طلبات التسويق",
       "tuition_applications_enabled": "تفعيل طلبات الدعم",
       "exchange_applications_enabled": "تفعيل طلبات التبادل",
-      "exchange_opportunities_enabled": "اشتراط فرصة تبادل منشورة"
+      "exchange_opportunities_enabled": "اشتراط فرصة تبادل منشورة",
+      "section_help": {
+        "commerce_settings": "اختر برامج الأكاديمية المتاحة للمتعلمين.",
+        "affiliate_settings": "إدارة وصول الشركاء والطلبات وشروط البرنامج.",
+        "support_settings": "تحديد أهلية الدعم الدراسي والطلبات وشروط البرنامج.",
+        "exchange_settings": "إدارة الوصول لبرنامج التبادل والطلبات والفرص والشروط.",
+        "withdrawal_settings": "تحديد إتاحة السحب والحد الأدنى والطرق المدعومة."
+      }
     },
     "owner": {
       "overview": "نظرة عامة على الأكاديمية",
@@ -1462,7 +1472,16 @@
       "institution_student_label": "تسمية طالب المؤسسة الموثّق",
       "regular_student_label": "التسمية الافتراضية للطالب",
       "institution_domains": "نطاقات البريد الموثّقة (نطاق في كل سطر)",
-      "access_unavailable": "الوصول إلى الأكاديمية غير متاح."
+      "access_unavailable": "الوصول إلى الأكاديمية غير متاح.",
+      "metric_notes": {
+        "total_learners": "جميع متعلّمي الأكاديمية",
+        "active_learners": "حسابات المتعلّمين النشطة",
+        "enrollments": "التسجيلات المسجّلة في الدورات",
+        "certificates": "شهادات التعلّم الصادرة",
+        "affiliates": "طلبات التسويق المعتمدة",
+        "support_eligible": "يستوفي شروط دعم الرسوم",
+        "purchases": "عمليات شراء التعلّم المؤكّدة"
+      }
     },
     "forms": {
       "title": "النماذج",
@@ -1522,6 +1541,11 @@
       "previous": "السابق",
       "sending": "جارٍ الإرسال",
       "received": "تم استلام ردك.",
+      "sign_in_required": "سجّل الدخول لإكمال هذا الطلب. يمكنك مراجعة جميع الأسئلة أولاً.",
+      "sign_in_to_apply": "سجّل الدخول للتقديم",
+      "locked_eligibility": "يمكنك مراجعة جميع الأسئلة، لكن هذا البرنامج متاح للمتعلمين النشطين فقط. سجّل في دورة للتقديم.",
+      "locked_unavailable": "يمكنك مراجعة جميع الأسئلة، لكن هذا الطلب غير متاح لحسابك.",
+      "explore_courses": "استكشف الدورات",
       "error": "تعذر إكمال الطلب. تحقق من الحقول وأعد التحميل.",
       "invalid": "القيمة خارج الحدود المسموحة.",
       "unavailable": "النموذج غير متاح. سجل الدخول إذا لزم.",
@@ -1666,10 +1690,14 @@
         "learning_exam_submitted": "تم تقديم اختبار",
         "learning_exam_result": "تم تسجيل نتيجة اختبار",
         "learning_certificate_issued": "تم إصدار شهادة",
-        "learning_certificate_revoked": "تم إلغاء شهادة"
+        "learning_certificate_revoked": "تم إلغاء شهادة",
+        "learning_exam_pending_review": "تقييم بانتظار المراجعة"
       },
       "builder_forms_help": "أنشئ النماذج وعدّل الأسئلة باستخدام محرّر نماذج مدار.",
-      "discard_form_changes": "هل تريد مغادرة هذا النموذج والتخلّي عن التغييرات غير المحفوظة؟"
+      "discard_form_changes": "هل تريد مغادرة هذا النموذج والتخلّي عن التغييرات غير المحفوظة؟",
+      "view_academy_website": "عرض موقع الأكاديمية",
+      "error_toast_title": "حدث خطأ",
+      "error_toast_help": "يرجى المحاولة مرة أخرى. إذا استمرت المشكلة، تواصل مع الدعم."
     },
     "affiliate": {
       "dashboard": "لوحة الشريك",
@@ -1725,6 +1753,56 @@
       "terms_field": "حقل الموافقة على الشروط",
       "binding_help": "اختر حقل موافقة إلزامياً بخيار واحد. تتطلّب الطلبات تسجيل الدخول ويتحقّق الخادم من الأهلية.",
       "my_submissions": "طلباتي وردودي"
+    },
+    "admin_overview": {
+      "learning_title": "أداء التعلّم في الأكاديمية",
+      "learning_help": "إجماليات التعلّم من تقرير الأكاديمية.",
+      "view_reports": "عرض تقارير المتعلّمين",
+      "completed_enrollments": "تسجيلات مكتملة",
+      "completed_enrollments_help": "متعلّمون أكملوا الدورة المسجّلين فيها",
+      "topic_completions": "الموضوعات المكتملة",
+      "topic_completions_help": "موضوعات مكتملة عبر تسجيلات المتعلّمين",
+      "level_completions": "المستويات المكتملة",
+      "level_completions_help": "مستويات مكتملة عبر تسجيلات المتعلّمين",
+      "submitted_attempts": "التقييمات المقدّمة",
+      "submitted_attempts_help": "محاولات تقييم مسجّلة عبر الأكاديمية",
+      "average_score": "متوسط الدرجة المسجّلة",
+      "average_score_help": "متوسط الدرجات المتاحة للمحاولات المقدّمة",
+      "pass_rate": "نسبة نجاح التقييمات",
+      "pass_rate_help": "المحاولات المقدّمة المسجّلة كناجحة",
+      "no_attempts": "لا توجد تقييمات مقدّمة بعد",
+      "finance_title": "الشؤون المالية للبرامج",
+      "finance_help": "إجماليات أعضاء الأكاديمية ومعاملات البرامج، مصنّفة حسب العملة.",
+      "wallets": "أرصدة مكافآت المتعلّمين",
+      "revenue": "إيرادات المشتريات المؤكّدة",
+      "rewards": "إجماليات مكافآت الإحالة",
+      "withdrawals": "طلبات السحب",
+      "currency": "العملة",
+      "available": "الرصيد المتاح",
+      "reserved": "الرصيد المحجوز",
+      "amount": "المبلغ",
+      "sales": "المبيعات",
+      "requests": "الطلبات",
+      "view_details": "عرض التفاصيل",
+      "activity_title": "أحداث التعلّم الحديثة في الأكاديمية",
+      "activity_help": "أحدث أحداث التعلّم المسجّلة. تتضمّن التقارير تفاصيل المتعلّمين والدورات.",
+      "event": "الحدث",
+      "recorded_at": "وقت التسجيل"
+    },
+    "settings_nav": {
+      "help": "إدارة تفضيلات الأكاديمية وقواعد التعلّم والبرامج.",
+      "sections": "فئات الإعدادات",
+      "general": "عام",
+      "learning": "التعلّم",
+      "branding": "الهوية",
+      "programmes": "البرامج",
+      "institution": "المؤسسة",
+      "notifications_help": "تظهر أحداث التعلم في إشعارات مدار وتُرسل عبر الويب للمتصفحات المشتركة. يلزم إذن المتصفح وإعداد إرسال الإشعارات على الخادم.",
+      "web_notifications": "إدارة إشعارات الويب",
+      "institution_help": "تصنيف الطلاب حسب عنوان البريد الإلكتروني المؤكد للمؤسسة.",
+      "institution_details": "بيانات المؤسسة",
+      "student_labels": "تسميات الطلاب",
+      "institution_domain_help": "أدخل نطاق بريد إلكتروني في كل سطر، مثل university.edu. يلزم التحقق من البريد الإلكتروني."
     }
   }
 }

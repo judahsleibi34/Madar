@@ -1,3 +1,4 @@
+import LearningErrorNotice from "../LearningErrorNotice";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ArrowLeft, Pencil, Copy, ArrowUp, ArrowDown, Archive, ArchiveRestore, Trash2 } from "lucide-react";
@@ -60,7 +61,7 @@ export default function AssessmentBuilder({ courseId, lessonId, sectionId, block
       }
       if (editKey) setQuestionDrafts(previous => { const next = { ...previous }; delete next[editKey]; return next; });
       setEdit(null); setConfirm(null);
-    } catch (failure) { setError(failure.detail?.message || t("elearning.assessment.saveError")); } finally { setBusy(false); }
+    } catch { setError(t("elearning.assessment.saveError")); } finally { setBusy(false); }
   }
   async function save(event) {
     event.preventDefault(); setBusy(true); setError("");
@@ -68,13 +69,13 @@ export default function AssessmentBuilder({ courseId, lessonId, sectionId, block
       if (state.block_id) await commandAssessment(courseId, lessonId, state.block_id, { action: "settings", expected_revision: state.assessment.revision, payload: details(settings) });
       else await createAssessment(courseId, lessonId, { expected_revision: revision, ...(!lessonId ? { section_id: sectionId || null } : {}), assessment: details(settings), questions: state.questions.filter(q => !q.archived_at).map(questionPayload) });
       onSaved();
-    } catch (failure) { setError(failure.detail?.message || t("elearning.assessment.saveError")); } finally { setBusy(false); }
+    } catch { setError(t("elearning.assessment.saveError")); } finally { setBusy(false); }
   }
   const field = (key, value) => setSettings(previous => ({ ...previous, [key]: value }));
   const active = state?.questions.filter(q => !q.archived_at) || [];
   return <ELearningDialog className="assessment-builder-dialog" title={t("elearning.assessment.builder")} busy={busy} onClose={onClose} closeLabel={t("elearning.courses.close")}>
     <div className="assessment-builder-body">
-    {error && <p role="alert">{error}</p>}
+    {error && <LearningErrorNotice as="p">{error}</LearningErrorNotice>}
     {!state || !settings ? <ELearningSkeleton label={t("elearning.assessment.loading")} /> : <>
       {edit ? <QuestionEditor key={editKey} question={questionDrafts[editKey] || edit.question || fresh(edit.type)} media={media} upload={async file => { const result = await uploadContentMedia(courseId, lessonId, file); const value = result.asset || { id: result.asset_id, url: result.asset_url, filename: file.name, mime_type: file.type }; setMedia(previous => [value, ...previous]); return value; }} busy={busy} onBack={q => { setQuestionDrafts(previous => ({ ...previous, [editKey]: q })); setEdit(null); }} onCancel={() => { setQuestionDrafts(previous => { const next = { ...previous }; delete next[editKey]; return next; }); setEdit(null); }} onSave={q => command(edit.question ? "update_question" : "create_question", edit.question, q)} /> : <>
         <form id="assessment-settings" onSubmit={save} className="assessment-settings">
@@ -112,7 +113,7 @@ function QuestionEditor({ question, media, upload, busy, onBack, onCancel, onSav
   const updateRow = (key, index, property, value) => config({ [key]: q.config[key].map((row, i) => i === index ? { ...row, [property]: value } : row) });
   async function uploadRow(index, file) {
     if (!file) return; setUploading(true); setError("");
-    try { const value = await upload(file); updateRow("prompts", index, "media_id", value.id); } catch (failure) { setError(failure.detail?.message || t("elearning.content.mediaError")); } finally { setUploading(false); }
+    try { const value = await upload(file); updateRow("prompts", index, "media_id", value.id); } catch { setError(t("elearning.content.mediaError")); } finally { setUploading(false); }
   }
   function addPair() {
     const left = q.type === "listen_match" ? { id: uuid(), media_id: "", admin_label: "" } : option(), right = option();
@@ -125,7 +126,7 @@ function QuestionEditor({ question, media, upload, busy, onBack, onCancel, onSav
   }
   return <form className="assessment-question-editor" onSubmit={e => { e.preventDefault(); onSave(questionPayload(q)); }}>
     <nav className="assessment-question-navigation" aria-label={t("elearning.assessment.builder")}><button className="ecommerce-secondary-button" type="button" disabled={busy || uploading} onClick={() => onBack(q)}><ArrowLeft size={18} aria-hidden="true" />{t("elearning.assessment.back")}</button><span>{t(`elearning.assessment.types.${q.type}`)}</span></nav>
-    <div className="assessment-question-heading"><h3>{t(`elearning.assessment.types.${q.type}`)}</h3><p>{t("elearning.assessment.questionHelp")}</p></div>{error && <p role="alert">{error}</p>}
+    <div className="assessment-question-heading"><h3>{t(`elearning.assessment.types.${q.type}`)}</h3><p>{t("elearning.assessment.questionHelp")}</p></div>{error && <LearningErrorNotice as="p">{error}</LearningErrorNotice>}
     <label>{t("elearning.assessment.prompt")}<textarea aria-label={t("elearning.assessment.prompt")} required maxLength={10000} value={q.prompt} onChange={e => setQ(previous => ({ ...previous, prompt: e.target.value }))} /></label>
     <label>{t("elearning.assessment.points")}<input type="number" required min="0.01" max="10000" step="0.01" value={q.points} onChange={e => setQ(previous => ({ ...previous, points: e.target.value }))} /></label>
     {q.type === "multiple_choice" && <>{q.config.options.map((row, i) => <div className="assessment-pair assessment-option-row" key={row.id}><label>{t("elearning.assessment.option", { number: i + 1 })}<input required maxLength={2000} value={row.label} onChange={e => updateRow("options", i, "label", e.target.value)} /></label><label><input type="radio" name="correct-option" checked={q.config.correct_option_id === row.id} onChange={() => config({ correct_option_id: row.id })} />{t("elearning.assessment.correct")}</label><button className="ecommerce-secondary-button" type="button" disabled={q.config.options.length <= 2} onClick={() => { const options = q.config.options.filter(v => v.id !== row.id); config({ options, correct_option_id: q.config.correct_option_id === row.id ? options[0].id : q.config.correct_option_id }); }}>{t("elearning.assessment.removeOption")}</button></div>)}<button className="ecommerce-secondary-button" type="button" disabled={q.config.options.length >= 20} onClick={() => config({ options: [...q.config.options, option()] })}>{t("elearning.assessment.addOption")}</button></>}

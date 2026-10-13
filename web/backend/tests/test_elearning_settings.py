@@ -108,6 +108,18 @@ class ELearningSettingsTests(unittest.TestCase):
             expected = service.ELearningSettings(course_label="Workshop").model_dump(mode="json")
             client.rpc.assert_called_once_with("save_elearning_settings", {"p_tenant_id": 17, "p_settings": expected})
 
+    def test_learning_notifications_default_on_and_preserve_explicit_opt_out(self):
+        self.assertTrue(service.ELearningSettings().learning_notifications_enabled)
+        client = MagicMock()
+        read = client.table.return_value.select.return_value.eq.return_value.limit.return_value.execute
+        with patch.object(service, "service_supabase", client):
+            for stored, expected in [({}, True), ({"learning_notifications_enabled": False}, False), ({"learning_notifications_enabled": True}, True)]:
+                read.return_value.data = [{"settings": stored}]
+                self.assertEqual(service.get_settings(17)["learning_notifications_enabled"], expected)
+            read.return_value.data = [{"settings": {}}]
+            with patch.object(service, "settings_available", return_value=False):
+                self.assertFalse(service.get_settings(17)["learning_notifications_enabled"])
+
     def test_database_failure_returns_safe_error(self):
         with patch.object(service, "get_settings", side_effect=RuntimeError("internal SQL secret")):
             response = self.client.get("/elearning/settings")

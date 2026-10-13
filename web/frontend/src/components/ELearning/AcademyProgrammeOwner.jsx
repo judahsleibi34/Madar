@@ -110,7 +110,7 @@ export default function AcademyProgrammeOwner({
       label: title
     } : null} actions={!identifier && !memberId && kind === 'exchange' && <Link className="ecommerce-secondary-button" to="/e-learning/exchange-opportunities">{t('elearning.owner.opportunities')}</Link>} />
  {kind === 'affiliate' && !identifier && !memberId && <nav className="elearning-course-tabs"><Link to="/e-learning/programmes/affiliate" className={`ecommerce-secondary-button ${!directory ? 'active' : ''}`}>{t('elearning.owner.applications')}</Link><Link to="/e-learning/affiliates" className={`ecommerce-secondary-button ${directory ? 'active' : ''}`}>{label('affiliate')}</Link></nav>}
- <OwnerState message={error==='academy_programmes_disabled'?t('elearning.ui.programme_disabled'):undefined} error={error} retry={() => setRevision(v => v + 1)} loading={!data && !error} />{error && <Link className="ecommerce-secondary-button" to="/e-learning/settings">{label("settings")}</Link>}{saved && <p role="status">{label('saved')}</p>}
+ <OwnerState message={error==='academy_programmes_disabled'?t('elearning.ui.programme_disabled'):undefined} error={error} retry={() => { setError(false); setRevision(v => v + 1); }} loading={!data && !error} />{error && <Link className="ecommerce-secondary-button" to="/e-learning/settings">{label("settings")}</Link>}{saved && <p role="status">{label('saved')}</p>}
  {!identifier && !memberId && <><div className="elearning-owner-filters"><label>{label('search')}<input value={query} onChange={e => setQuery(e.target.value)} /></label>{<label>{label('status')}<select value={status} onChange={e => {
             setStatus(e.target.value);
             setPage(0);

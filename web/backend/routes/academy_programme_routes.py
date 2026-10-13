@@ -113,7 +113,7 @@ def finance(kind: Literal['referrals', 'rewards', 'transactions'], request: Requ
             limit: int = Query(50, ge=1, le=100), offset: int = Query(0, ge=0)):
     actor = owner(request, response)
     def execute():
-        service.available(actor, kind)
+        service.read_access(actor, kind)
         return service.service_supabase.rpc('academy_owner_finance', {'p_tenant': actor.tenant_id, 'p_admin': actor.user_id,
                                             'p_kind': kind, 'p_limit': limit, 'p_offset': offset}).execute().data
     return operation(execute)

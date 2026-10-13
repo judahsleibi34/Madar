@@ -457,25 +457,25 @@
 }
 
 .builder-element > h1[data-builder-text-block] {
-  font-size: calc(46px * var(--builder-text-fit-scale, 1));
+  font-size: var(--builder-authored-font-size, calc(46px * var(--builder-text-fit-scale, 1)));
   line-height: 1.08;
   color: var(--theme-text);
 }
 
 .builder-element > h2[data-builder-text-block] {
-  font-size: calc(36px * var(--builder-text-fit-scale, 1));
+  font-size: var(--builder-authored-font-size, calc(36px * var(--builder-text-fit-scale, 1)));
   line-height: 1.15;
   color: var(--theme-text);
 }
 
 .builder-element > h3[data-builder-text-block] {
-  font-size: calc(28px * var(--builder-text-fit-scale, 1));
+  font-size: var(--builder-authored-font-size, calc(28px * var(--builder-text-fit-scale, 1)));
   line-height: 1.2;
   color: var(--theme-text);
 }
 
 .builder-element > p[data-builder-text-block] {
-  font-size: calc(17px * var(--builder-text-fit-scale, 1));
+  font-size: var(--builder-authored-font-size, calc(17px * var(--builder-text-fit-scale, 1)));
   line-height: 1.5;
 }
 
@@ -2183,7 +2183,7 @@
 
 .site-renderer-artboard .direct-element-frame-list.is-intrinsic-height .builder-element-list ul {
   gap: clamp(7px, 2.8cqw, 24px);
-  font-size: clamp(14px, 5cqw, 34px);
+  font-size: var(--builder-authored-font-size, clamp(14px, 5cqw, 34px));
 }
 
 .direct-element-frame-button .direct-element-content {

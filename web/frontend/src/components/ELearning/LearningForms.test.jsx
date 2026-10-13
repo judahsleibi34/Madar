@@ -21,6 +21,27 @@ beforeEach(async () => {await i18n.changeLanguage("en");learningFormsApi.mockRes
 afterEach(cleanup);
 const schema = {title:"Scholarship feedback",access:"public",pageMode:"single",sections:[{id:"p",title:"Questions",fields:[{id:"student",type:"radio",label:"Student?",options:["Yes","No"],required:true},{id:"university",type:"shortText",label:"University",required:true}]}],logicRules:[{sourceFieldId:"student",targetFieldId:"university",operator:"equals",action:"show",value:"Yes"}]};
 const mount = element => render(<MemoryRouter>{element}</MemoryRouter>);
+it("shows guests every question of a sign-in form and sends them to Academy login to apply", async () => {
+ apiFetch.mockResolvedValue({ok:true,status:200,json:async()=>({id:"own",version:1,requires_sign_in:true,schema:{...schema,access:"authenticated"}})});
+ render(<MemoryRouter initialEntries={["/academy/tenant/exchange"]}><AcademyFormBlock formId="own" identifier="tenant" /></MemoryRouter>);
+ expect(await screen.findByText("Student? *")).toBeTruthy();
+ expect(screen.getByLabelText("Yes")).toBeTruthy();
+ expect(screen.queryByRole("button",{name:"Submit"})).toBeNull();
+ const apply = screen.getByRole("link",{name:"Log in to apply"});
+ expect(new URL(apply.href).searchParams.get("returnTo")).toBe("/academy/tenant/exchange");
+ expect(document.querySelector("fieldset").disabled).toBe(true);
+});
+it("shows ineligible learners the form with an accurate reason and English base text", async () => {
+ const description = {description:"Your information is private.",localized:{description:{ar:"معلوماتك خاصة."}}};
+ apiFetch.mockResolvedValue({ok:true,status:200,json:async()=>({id:"own",version:1,requires_sign_in:false,locked_reason:"eligibility",schema:{...schema,...description,access:"authenticated"}})});
+ render(<MemoryRouter initialEntries={["/academy/tenant/exchange"]}><AcademyFormBlock formId="own" identifier="tenant" /></MemoryRouter>);
+ expect(await screen.findByText("Your information is private.")).toBeTruthy();
+ expect(screen.queryByText("معلوماتك خاصة.")).toBeNull();
+ expect(screen.getByText(/open to active learners only/)).toBeTruthy();
+ expect(screen.getByRole("link",{name:"Explore courses"}).getAttribute("href")).toBe("/academy/tenant/courses");
+ expect(screen.queryByRole("button",{name:"Submit"})).toBeNull();
+ expect(screen.queryByText("Tuition Support locked")).toBeNull();
+});
 it("recovers a signed-in form through Academy login while preserving its contextual page", async () => {
  apiFetch.mockResolvedValue({ok:false,status:401});
  render(<MemoryRouter initialEntries={["/academy/tenant/survey?campaign=learning"]}><AcademyFormBlock formId="own" identifier="tenant" /></MemoryRouter>);

@@ -1,3 +1,5 @@
+import LearningErrorNotice from "../../ELearning/LearningErrorNotice";
+import { LearningErrorToast } from "../../ELearning/LearningErrorNotice";
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { fetchELearningSettings } from "../../../services/elearningSettings";
@@ -37,6 +39,7 @@ export default function BuilderProjectLoadError({ status, lang = "en" }) {
   }
 
   return <main className="builder-project-loading" dir={ar ? "rtl" : "ltr"}>
+    <LearningErrorToast />
     <div className="builder-project-loading-card">
       <h2>{status === 404 ? (ar ? "رابط المشروع غير متاح" : "This project link is unavailable") : (ar ? "تعذر تحميل المشروع" : "Project could not be loaded")}</h2>
       <p>{status === 404
@@ -47,7 +50,7 @@ export default function BuilderProjectLoadError({ status, lang = "en" }) {
       {academyAvailable && <button type="button" className="page-primary-action" disabled={busy} onClick={openAcademy}>
         {busy ? (ar ? "جارٍ فتح الأكاديمية…" : "Opening Academy…") : (ar ? "فتح منشئ الأكاديمية" : "Open Academy Builder")}
       </button>}
-      {recoveryError && <p role="alert">{ar ? "تعذر فتح الأكاديمية. تحقق من صلاحيات المنشئ من إعدادات الأكاديمية ثم أعد المحاولة." : "Academy could not be opened. Check your Builder access in Academy settings and try again."}</p>}
+      {recoveryError && <LearningErrorNotice as="p">{ar ? "تعذر فتح الأكاديمية. تحقق من صلاحيات المنشئ من إعدادات الأكاديمية ثم أعد المحاولة." : "Academy could not be opened. Check your Builder access in Academy settings and try again."}</LearningErrorNotice>}
       <Link className="page-secondary-action" to="/page-builder">{ar ? "العودة إلى المشاريع" : "Back to Projects"}</Link>
       <button type="button" className="page-secondary-action" disabled={busy} onClick={() => window.location.reload()}>{ar ? "إعادة المحاولة" : "Retry"}</button>
     </div>

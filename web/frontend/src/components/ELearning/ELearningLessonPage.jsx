@@ -1,3 +1,4 @@
+import LearningErrorNotice from "./LearningErrorNotice";
 import { learningDescription } from "../../utils/elearningPresentation";
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
@@ -62,7 +63,7 @@ function LessonBuilder({ courseId, lessonId }) {
     <header className="ecommerce-page-header app-page-intro"><div><h1>{t("elearning.structure.lessonBuilder")}</h1><p>{data?.lesson.name || t("elearning.navigation.courses")}</p></div></header>
     <nav className="elearning-content-breadcrumb" aria-label={t("elearning.content.breadcrumb")}><Link to={`${DASHBOARD_ROUTES.elearningCourses}/${courseId}`}>{labels.course || t("elearning.content.course")}</Link><span aria-hidden="true">/</span><Link to={`${DASHBOARD_ROUTES.elearningCourses}/${courseId}/structure`}>{t("elearning.courses.tabs.structure")}</Link><span aria-hidden="true">/</span><span aria-current="page">{data?.lesson.name || labels.lesson}</span></nav>
     <Link className="ecommerce-secondary-button elearning-back-link" to={`${DASHBOARD_ROUTES.elearningCourses}/${courseId}/structure`}><ArrowLeft size={16} aria-hidden="true" />{t("elearning.structure.back")}</Link>
-    {error && <p role="alert" className="elearning-feedback is-error">{t(`elearning.content.${error}`)} <button className="ecommerce-secondary-button" disabled={busy} onClick={refresh}>{t("elearning.retry")}</button></p>}
+    {error && <LearningErrorNotice as="p" className="elearning-feedback is-error">{t(`elearning.content.${error}`)} <button className="ecommerce-secondary-button" disabled={busy} onClick={refresh}>{t("elearning.retry")}</button></LearningErrorNotice>}
     {notice && <p role="status" className="elearning-feedback">{t(`elearning.content.${notice}`)}</p>}
     {data && <>
       <section className="ecommerce-list-card elearning-course-overview"><header><h2>{data.lesson.name}</h2><span className={`elearning-course-status is-${data.lesson.status}`}>{t(`elearning.courses.statuses.${data.lesson.status}`)}</span></header><p>{learningDescription(data.lesson.description) || t("elearning.courses.noDescription")}</p><p>{t("elearning.structure.lessonContext", { section: labels.section, name: data.section.name })}</p></section>
@@ -87,7 +88,7 @@ function LessonBuilder({ courseId, lessonId }) {
     {editor?.type === "assessment" && <AssessmentBuilder courseId={courseId} lessonId={lessonId} block={editor.block} revision={data.revision} onClose={() => setEditor(null)} onSaved={refresh} />}
     {editor && editor.type !== "assessment" && <ContentBlockEditor block={editor.block} type={editor.type} busy={busy} error={error} upload={(file) => uploadContentMedia(courseId, lessonId, file)} onClose={() => setEditor(null)} onSave={(payload) => run(editor.block ? "update" : "create", editor.block, payload)} />}
     {dialog && ["archive", "delete"].includes(dialog.action) && <ELearningDialog title={t(`elearning.content.${dialog.action}Title`)} busy={busy} onClose={() => setDialog(null)} closeLabel={t("elearning.courses.close")}>
-      <p>{t(`elearning.content.${dialog.action}Help`, { name: dialog.block.title || t(`elearning.content.types.${dialog.block.type}`) })}</p>{error && <p role="alert">{t(`elearning.content.${error}`)}</p>}
+      <p>{t(`elearning.content.${dialog.action}Help`, { name: dialog.block.title || t(`elearning.content.types.${dialog.block.type}`) })}</p>{error && <LearningErrorNotice as="p">{t(`elearning.content.${error}`)}</LearningErrorNotice>}
       <footer><button className="ecommerce-secondary-button" disabled={busy} onClick={() => setDialog(null)}>{t("elearning.courses.cancel")}</button><button className="ecommerce-primary-button" disabled={disabled} onClick={() => run(dialog.action, dialog.block, { confirmed: true })}>{t(dialog.action === "delete" ? "elearning.content.delete" : "elearning.courses.archive")}</button></footer>
     </ELearningDialog>}
     {preview && <ELearningDialog title={t("elearning.content.previewLesson", { label: labels.lesson })} onClose={() => setPreview(false)} closeLabel={t("elearning.courses.close")}><div className="elearning-lesson-preview">{active.map((block) => <ContentBlockRenderer key={block.id} block={block} context="preview" courseId={courseId} lessonId={lessonId} />)}</div></ELearningDialog>}

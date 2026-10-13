@@ -1355,14 +1355,14 @@ body.theme-dark .admin-dashboard-page .settings-page .settings-save-button {
   color: var(--theme-text) !important;
 }
 
-.admin-dashboard-page .user-dashboard-page .user-dashboard-quick-actions {
+.admin-dashboard-page :is(.user-dashboard-page, .elearning-owner-page) .user-dashboard-quick-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 14px;
   margin-bottom: 10px;
 }
 
-.admin-dashboard-page .user-dashboard-page .user-dashboard-quick-actions :is(a, button) {
+.admin-dashboard-page :is(.user-dashboard-page, .elearning-owner-page) .user-dashboard-quick-actions :is(a, button) {
   min-height: 42px;
   padding: 0 15px;
   display: inline-flex;
@@ -1382,12 +1382,12 @@ body.theme-dark .admin-dashboard-page .settings-page .settings-save-button {
   transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
 }
 
-.admin-dashboard-page .user-dashboard-page .user-dashboard-quick-actions :is(a, button):hover {
+.admin-dashboard-page :is(.user-dashboard-page, .elearning-owner-page) .user-dashboard-quick-actions :is(a, button):hover {
   transform: translateY(-1px);
   border-color: rgba(var(--theme-primary-rgb), 0.5);
 }
 
-.admin-dashboard-page .user-dashboard-page .user-dashboard-quick-actions a.is-primary {
+.admin-dashboard-page :is(.user-dashboard-page, .elearning-owner-page) .user-dashboard-quick-actions a.is-primary {
   color: var(--theme-text-inverse);
   background: var(--theme-primary);
   border-color: var(--color-accent-text);
@@ -1437,7 +1437,7 @@ body.theme-dark .admin-dashboard-page .settings-page .settings-save-button {
   color: var(--theme-primary) !important;
 }
 
-.admin-dashboard-page .user-dashboard-page .user-dashboard-metrics-grid {
+.admin-dashboard-page :is(.user-dashboard-page, .elearning-owner-page) .user-dashboard-metrics-grid {
   display: grid;
   grid-template-columns: repeat(12, minmax(0, 1fr));
   gap: var(--space-3);
@@ -1550,7 +1550,7 @@ body.theme-dark .admin-dashboard-page .settings-page .settings-save-button {
   box-shadow: inset 0 0 0 1px var(--color-border-control);
 }
 
-.admin-dashboard-page .user-dashboard-page .user-dashboard-metrics-empty {
+.admin-dashboard-page :is(.user-dashboard-page, .elearning-owner-page) .user-dashboard-metrics-empty {
   grid-column: 1 / -1;
   padding: var(--space-6);
   color: var(--color-text-muted);
@@ -1561,7 +1561,7 @@ body.theme-dark .admin-dashboard-page .settings-page .settings-save-button {
   font-size: var(--font-size-sm);
 }
 
-.admin-dashboard-page .user-dashboard-page .user-dashboard-metric-card {
+.admin-dashboard-page :is(.user-dashboard-page, .elearning-owner-page) .user-dashboard-metric-card {
   grid-column: span 3;
   min-width: 0;
   min-height: 126px;
@@ -1583,27 +1583,27 @@ body.theme-dark .admin-dashboard-page .settings-page .settings-save-button {
     background-color 180ms ease;
 }
 
-.admin-dashboard-page .user-dashboard-page .user-dashboard-metric-card--plan {
+.admin-dashboard-page :is(.user-dashboard-page, .elearning-owner-page) .user-dashboard-metric-card--plan {
   grid-column: 1 / -1;
   min-height: 110px;
 }
 
-.admin-dashboard-page .user-dashboard-page .user-dashboard-metric-card:hover {
+.admin-dashboard-page :is(.user-dashboard-page, .elearning-owner-page) .user-dashboard-metric-card:hover {
   border-color: rgba(var(--theme-primary-rgb), 0.3);
   box-shadow: 0 10px 24px rgba(var(--theme-shadow-rgb), 0.08);
 }
 
-.admin-dashboard-page .user-dashboard-page .user-dashboard-metric-card--accent {
+.admin-dashboard-page :is(.user-dashboard-page, .elearning-owner-page) .user-dashboard-metric-card--accent {
   border-color: rgba(var(--theme-primary-rgb), 0.42);
 }
 
-.admin-dashboard-page .user-dashboard-page .user-dashboard-metric-heading {
+.admin-dashboard-page :is(.user-dashboard-page, .elearning-owner-page) .user-dashboard-metric-heading {
   display: flex;
   align-items: center;
   gap: var(--space-3);
 }
 
-.admin-dashboard-page .user-dashboard-page .user-dashboard-metric-icon {
+.admin-dashboard-page :is(.user-dashboard-page, .elearning-owner-page) .user-dashboard-metric-icon {
   width: 32px;
   height: 32px;
   flex: 0 0 32px;
@@ -1616,12 +1616,12 @@ body.theme-dark .admin-dashboard-page .settings-page .settings-save-button {
   border-radius: var(--radius-default);
 }
 
-.admin-dashboard-page .user-dashboard-page .user-dashboard-metric-icon svg {
+.admin-dashboard-page :is(.user-dashboard-page, .elearning-owner-page) .user-dashboard-metric-icon svg {
   width: 17px;
   height: 17px;
 }
 
-.admin-dashboard-page .user-dashboard-page .user-dashboard-metric-label {
+.admin-dashboard-page :is(.user-dashboard-page, .elearning-owner-page) .user-dashboard-metric-label {
   color: var(--color-text-muted);
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-bold);
@@ -1629,7 +1629,7 @@ body.theme-dark .admin-dashboard-page .settings-page .settings-save-button {
   line-height: var(--type-small-line);
 }
 
-.admin-dashboard-page .user-dashboard-page .user-dashboard-metric-value {
+.admin-dashboard-page :is(.user-dashboard-page, .elearning-owner-page) .user-dashboard-metric-value {
   display: block;
   overflow-wrap: anywhere;
   color: var(--color-text);
@@ -1640,7 +1640,7 @@ body.theme-dark .admin-dashboard-page .settings-page .settings-save-button {
   line-height: var(--type-heading-line);
 }
 
-.admin-dashboard-page .user-dashboard-page .user-dashboard-metric-note {
+.admin-dashboard-page :is(.user-dashboard-page, .elearning-owner-page) .user-dashboard-metric-note {
   min-height: 1.3em;
   margin: var(--space-1) 0 0;
   overflow: hidden;
@@ -1651,7 +1651,7 @@ body.theme-dark .admin-dashboard-page .settings-page .settings-save-button {
   text-overflow: ellipsis;
 }
 
-.admin-dashboard-page .user-dashboard-page .user-dashboard-storage-track {
+.admin-dashboard-page :is(.user-dashboard-page, .elearning-owner-page) .user-dashboard-storage-track {
   height: 5px;
   margin-top: var(--space-2);
   overflow: hidden;
@@ -1659,7 +1659,7 @@ body.theme-dark .admin-dashboard-page .settings-page .settings-save-button {
   border-radius: 999px;
 }
 
-.admin-dashboard-page .user-dashboard-page .user-dashboard-storage-track > span {
+.admin-dashboard-page :is(.user-dashboard-page, .elearning-owner-page) .user-dashboard-storage-track > span {
   display: block;
   height: 100%;
   min-width: 2px;
@@ -1669,27 +1669,27 @@ body.theme-dark .admin-dashboard-page .settings-page .settings-save-button {
 }
 
 @media (max-width: 1100px) {
-  .admin-dashboard-page .user-dashboard-page .user-dashboard-metrics-grid {
+  .admin-dashboard-page :is(.user-dashboard-page, .elearning-owner-page) .user-dashboard-metrics-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .admin-dashboard-page .user-dashboard-page .user-dashboard-metric-card,
-  .admin-dashboard-page .user-dashboard-page .user-dashboard-metric-card:nth-child(n + 5) {
+  .admin-dashboard-page :is(.user-dashboard-page, .elearning-owner-page) .user-dashboard-metric-card,
+  .admin-dashboard-page :is(.user-dashboard-page, .elearning-owner-page) .user-dashboard-metric-card:nth-child(n + 5) {
     grid-column: span 1;
   }
 
-  .admin-dashboard-page .user-dashboard-page .user-dashboard-metric-card:last-child {
+  .admin-dashboard-page :is(.user-dashboard-page, .elearning-owner-page) .user-dashboard-metric-card:last-child {
     grid-column: 1 / -1;
   }
 }
 
 @media (max-width: 640px) {
-  .admin-dashboard-page .user-dashboard-page .user-dashboard-quick-actions {
+  .admin-dashboard-page :is(.user-dashboard-page, .elearning-owner-page) .user-dashboard-quick-actions {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .admin-dashboard-page .user-dashboard-page .user-dashboard-quick-actions :is(a, button) {
+  .admin-dashboard-page :is(.user-dashboard-page, .elearning-owner-page) .user-dashboard-quick-actions :is(a, button) {
     justify-content: flex-start;
   }
 
@@ -1702,17 +1702,17 @@ body.theme-dark .admin-dashboard-page .settings-page .settings-save-button {
     margin-inline-start: 0;
   }
 
-  .admin-dashboard-page .user-dashboard-page .user-dashboard-metrics-grid {
+  .admin-dashboard-page :is(.user-dashboard-page, .elearning-owner-page) .user-dashboard-metrics-grid {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .admin-dashboard-page .user-dashboard-page .user-dashboard-metric-card,
-  .admin-dashboard-page .user-dashboard-page .user-dashboard-metric-card:nth-child(n + 5),
-  .admin-dashboard-page .user-dashboard-page .user-dashboard-metric-card:last-child {
+  .admin-dashboard-page :is(.user-dashboard-page, .elearning-owner-page) .user-dashboard-metric-card,
+  .admin-dashboard-page :is(.user-dashboard-page, .elearning-owner-page) .user-dashboard-metric-card:nth-child(n + 5),
+  .admin-dashboard-page :is(.user-dashboard-page, .elearning-owner-page) .user-dashboard-metric-card:last-child {
     grid-column: 1;
   }
 
-  .admin-dashboard-page .user-dashboard-page .user-dashboard-metric-card {
+  .admin-dashboard-page :is(.user-dashboard-page, .elearning-owner-page) .user-dashboard-metric-card {
     min-height: 118px;
     padding: var(--space-4);
   }

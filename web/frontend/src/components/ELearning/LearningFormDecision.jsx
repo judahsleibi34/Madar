@@ -1,3 +1,4 @@
+import LearningErrorNotice from "./LearningErrorNotice";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { learningFormsApi } from "./learningFormsApi";
@@ -20,7 +21,7 @@ export default function LearningFormDecision({ response, onChanged }) {
   return <section className="elearning-owner-section"><h2>{copy("title")}</h2>
     <OwnerStatus value={decision.status}>{t(`elearning.programmes.${decision.status}`)}</OwnerStatus>
     {kind!=="none" && <p>{copy("domain_help")}</p>}
-    {error && <p role="alert">{copy("changed")}</p>}
+    {error && <LearningErrorNotice as="p">{copy("changed")}</LearningErrorNotice>}
     {options.length>0 && <form className="elearning-course-form" onSubmit={save}>
       <label>{t("elearning.owner.status")}<select value={status} onChange={event=>setStatus(event.target.value)}>{options.map(value=><option key={value} value={value}>{t(`elearning.programmes.${value}`)}</option>)}</select></label>
       <label>{t("elearning.programmes.note")}<textarea required maxLength={4000} dir="auto" value={note} onChange={event=>setNote(event.target.value)} /></label>

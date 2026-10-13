@@ -1,3 +1,4 @@
+import LearningErrorNotice from "../ELearning/LearningErrorNotice";
 import { Link } from "react-router-dom";
 import { getSafeNotificationActionPath } from "../../notifications/notificationActions";
 import PageHeaderSkeleton from "../common/PageHeaderSkeleton";
@@ -40,6 +41,8 @@ const normalizeNotification = (item, t) => ({
 export default function NotificationsPage({ user }) {
   const { direction, t } = useLanguage();
   const {
+    error,
+    refreshNotifications,
     identity,
     tenantId,
     loading,
@@ -48,6 +51,7 @@ export default function NotificationsPage({ user }) {
     notifications,
     unreadCount,
   } = useNotifications();
+  const [actionError, setActionError] = useState(false);
   const [pushState, setPushState] = useState("checking");
   const [pushConfig, setPushConfig] = useState(null);
   const notificationIdentity = identity || `${user?.tenant_id || ""}:${user?.id || user?.auth_id || ""}`;
@@ -111,8 +115,14 @@ export default function NotificationsPage({ user }) {
     }
   };
 
-  const markOneRead = (item) => {
-    if (item.unread) markRead(item.id);
+  const markOneRead = async (item) => {
+    if (!item.unread) return;
+    setActionError(false);
+    if (!await markRead(item.id)) setActionError(true);
+  };
+  const markAll = async () => {
+    setActionError(false);
+    if (!await markAllRead()) setActionError(true);
   };
 
   return (
@@ -137,6 +147,7 @@ export default function NotificationsPage({ user }) {
         </div>
       </header>)}
 
+      {(error || actionError) && <LearningErrorNotice><p>{t("notifications.requestError")}</p><button type="button" onClick={() => {setActionError(false);void refreshNotifications();}}>{t("notifications.retry")}</button></LearningErrorNotice>}
       <div className="notifications-actions">
         <button
           type="button"
@@ -147,11 +158,11 @@ export default function NotificationsPage({ user }) {
             ? t("notifications.pushEnabledButton")
             : t("notifications.enablePush")}
         </button>
-        <button type="button" onClick={markAllRead} disabled={unreadCount === 0}>
+        <button type="button" onClick={markAll} disabled={unreadCount === 0}>
           {t("notifications.markAllRead")}
         </button>
         {pushState && (
-          <span role="status">{t(`notifications.pushState.${pushState}`)}</span>
+          <LearningErrorNotice as="span" role={pushState === "failed" ? "alert" : "status"}>{t(`notifications.pushState.${pushState}`)}</LearningErrorNotice>
         )}
       </div>
 

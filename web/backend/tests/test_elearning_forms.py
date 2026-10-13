@@ -63,6 +63,21 @@ class LearningFormValidationTests(unittest.TestCase):
             with self.assertRaises(HTTPException):service.public_access(1,f,SimpleNamespace(tenant_id=2,user_id=9))
             f['schema']['access']='enrolled'
             with self.assertRaises(HTTPException):service.public_access(1,f,SimpleNamespace(tenant_id=1,user_id=9))
+    def test_guests_may_view_but_not_submit_sign_in_forms(self):
+        f={'status':'active','schema':{**schema(),'access':'authenticated','workflow':{'kind':'exchange'}}}
+        with patch.object(service,'gate'),patch.object(service,'require_entitlement') as entitlement,patch.object(service,'require_reviews') as reviews:
+            self.assertEqual(service.public_access(1,f,None,viewing=True),{'requires_sign_in':True,'locked_reason':None})
+            entitlement.assert_called_once_with(1,'public_form_links');reviews.assert_called()
+            learner=SimpleNamespace(tenant_id=1,user_id=9)
+            import services.academy_programme_service as programmes
+            with patch.object(programmes,'available'),patch.object(programmes,'programme_rpc',return_value={'exchange_eligible':False}):
+                self.assertEqual(service.public_access(1,f,learner,viewing=True),{'requires_sign_in':False,'locked_reason':'eligibility'})
+                with self.assertRaises(HTTPException) as ineligible:service.public_access(1,f,learner)
+                self.assertEqual(ineligible.exception.status_code,403)
+            with self.assertRaises(HTTPException) as denied:service.public_access(1,f,None)
+            self.assertEqual(denied.exception.status_code,401)
+            f['status']='archived'
+            with self.assertRaises(HTTPException):service.public_access(1,f,None,viewing=True)
     def test_disabled_forms_fail_before_write(self):
         with patch.object(service,'settings_available',return_value=True),patch.object(service,'require_entitlement',side_effect=HTTPException(402,'Disabled')),patch.object(service,'rpc') as rpc:
             with self.assertRaises(HTTPException):service.save(SimpleNamespace(tenant_id=1,user_id=9),service.Definition(name='Form',schema=schema()))

@@ -26,3 +26,18 @@ it("attaches existing assessments with scope-specific requirements and confirms 
 it("shows optional indicators and RTL while preserving errors", async () => {
  await i18n.changeLanguage("ar"); api.fetchPlacements.mockResolvedValue({ ...data, placements: [{ ...data.placements[0], required_for_completion: false }] }); render(<div dir="rtl"><ELearningAssessmentsPage course={{ id: "c" }} /></div>); await screen.findByText(/اختياري/);
 });
+it("never displays backend messages when loading or updating assessments fails", async () => {
+ const secret="SQL trace /srv/backend INTERNAL_SECRET";
+ api.fetchPlacements.mockRejectedValueOnce({status:500,detail:{message:secret}});
+ render(<ELearningAssessmentsPage course={{id:'c'}}/>);
+ await screen.findByRole('alert');
+ expect(document.body.textContent).not.toContain(secret);
+ await waitFor(()=>expect(document.querySelector('.ecommerce-toast')).toBeTruthy());
+ fireEvent.click(screen.getByRole('button',{name:'Try again'}));
+ await screen.findByText('Final Check');
+ api.placementCommand.mockRejectedValueOnce({status:500,detail:{message:secret}});
+ fireEvent.click(screen.getByRole('button',{name:'Duplicate'}));
+ await screen.findByRole('alert');
+ expect(document.body.textContent).not.toContain(secret);
+ await waitFor(()=>expect(document.querySelector('.ecommerce-toast')).toBeTruthy());
+});

@@ -1,3 +1,4 @@
+import LearningErrorNotice from "./LearningErrorNotice";
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
@@ -24,7 +25,7 @@ export default function AcademyManagementHub({ user }) {
     return () => { active = false; };
   }, [user?.id, user?.tenant_id, attempt]);
   if (state.loading) return <ELearningSkeleton variant="settings" label={t("elearning.loading")} direction={i18n.dir()} lang={i18n.language} />;
-  if (state.error) return <main className="ecommerce-page" dir={i18n.dir()}><p role="alert">{t("elearning.loadError")}</p><button className="ecommerce-secondary-button" onClick={() => { setState({ loading: true }); setAttempt(value => value + 1); }}>{t("elearning.retry")}</button></main>;
+  if (state.error) return <main className="ecommerce-page" dir={i18n.dir()}><LearningErrorNotice as="p">{t("elearning.loadError")}</LearningErrorNotice><button className="ecommerce-secondary-button" onClick={() => { setState({ loading: true }); setAttempt(value => value + 1); }}>{t("elearning.retry")}</button></main>;
   const { settings, academy_management: management, available } = state.data;
   const project = management?.landing_project;
   const publication = getBuilderPublicationState(project);
@@ -56,7 +57,7 @@ export default function AcademyManagementHub({ user }) {
   }
   return <main className="ecommerce-page academy-management-hub" dir={i18n.dir()} lang={i18n.language}>
     <header className="ecommerce-page-header app-page-intro"><div><h1>{t("elearning.academy.academyAccess")}</h1><p>{t("elearning.academy.hubIntro")}</p></div><span className={`elearning-course-status is-${status}`}><GraduationCap size={16} />{t(`elearning.academy.hubStatus.${status}`)}</span></header>
-    {notice && <p role={notice.error ? "alert" : "status"}>{t(notice.error ? notice.key || "elearning.saveError" : "elearning.saved")}</p>}
+    {notice && <LearningErrorNotice as="p" role={notice.error ? "alert" : "status"}>{t(notice.error ? notice.key || "elearning.saveError" : "elearning.saved")}</LearningErrorNotice>}
     {notice?.key === "elearning.academy.editorPlanError" && <Link className="ecommerce-secondary-button" to="/my-plan">{t("elearning.academy.reviewPlan")}</Link>}
     <div className="academy-management-grid">
       <section className="ecommerce-list-card academy-management-card"><h2 className="academy-management-card-heading"><LayoutTemplate size={24} aria-hidden="true" /><span>{t("elearning.academy.landingPage")}</span></h2><p>{t("elearning.academy.landingHelp")}</p><small>{t(`elearning.academy.landingStatus.${publication.status}`)}</small><div className="elearning-course-actions"><button className="ecommerce-primary-button" disabled={busy || !available} onClick={() => edit()}>{t("elearning.academy.editAcademy")}</button><Link className="ecommerce-secondary-button" to="/my-learning" target="_blank" rel="noopener noreferrer">{t("elearning.academy.previewLanding")}</Link></div></section>
@@ -86,6 +87,13 @@ export default function AcademyManagementHub({ user }) {
           </select>
           <p id="academy-registration-help">{t(`elearning.learner.registrationHelp.${settings.academy_registration || "invitation_only"}`)}</p>
         </div>
+        <label className="academy-access-toggle">
+          <span className="academy-access-setting-copy"><strong>{t("elearning.learner.requireEmailVerification")}</strong><small>{t("elearning.learner.requireEmailVerificationHelp")}</small></span>
+          <span className="academy-access-switch">
+            <input type="checkbox" role="switch" aria-label={t("elearning.learner.requireEmailVerification")} checked={settings.academy_email_verification_required !== false} onChange={event => setState(current => ({ ...current, data: { ...current.data, settings: { ...settings, academy_email_verification_required: event.target.checked } } }))} />
+            <span className="academy-access-switch-track" aria-hidden="true" />
+          </span>
+        </label>
         {settings.academy_registration === "email_domain" && <label className="elearning-field academy-email-domains"><span>{t("elearning.learner.allowedEmailDomains")}</span><input aria-label={t("elearning.learner.allowedEmailDomains")} aria-describedby="academy-domain-help" required maxLength={5200} value={state.domainsText || ""} placeholder="jack@university.edu, college.edu" onChange={event => setState(current => ({ ...current, domainsText: event.target.value }))} /><small id="academy-domain-help">{t("elearning.learner.emailDomainHelp")}</small></label>}
         <footer className="academy-access-footer"><button className="ecommerce-primary-button" type="submit">{t(busy ? "elearning.saving" : "elearning.save")}</button></footer>
       </fieldset>

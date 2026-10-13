@@ -9,6 +9,7 @@ export default function AuthToast({
   className = "",
   onDismiss,
   duration = 4200,
+  announce = true,
 }) {
   const [paused, setPaused] = useState(false);
   useEffect(() => {
@@ -24,7 +25,7 @@ export default function AuthToast({
   if (!title && !message) return null;
 
   return (
-    <div className={`auth-toast auth-toast-${type} ${className}`.trim()} role={type === "error" ? "alert" : "status"} aria-live={type === "error" ? "assertive" : "polite"} dir={dir} onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)} onFocus={() => setPaused(true)} onBlur={() => setPaused(false)}>
+    <div className={`auth-toast auth-toast-${type} ${className}`.trim()} role={announce ? (type === "error" ? "alert" : "status") : undefined} aria-live={announce ? (type === "error" ? "assertive" : "polite") : "off"} dir={dir} onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)} onFocus={() => setPaused(true)} onBlur={() => setPaused(false)}>
       <span className="auth-toast-icon" aria-hidden="true">
         {type === "error" ? <AlertCircle size={18} /> : <CheckCircle2 size={18} />}
       </span>

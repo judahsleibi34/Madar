@@ -1,3 +1,4 @@
+import LearningErrorNotice from "../LearningErrorNotice";
 import { useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -70,7 +71,7 @@ export default function SpeakingRecorder({ maxDuration = 120, maxBytes = 1048576
     }
   }
   return <div className="speaking-recorder" aria-busy={["requesting", "processing"].includes(state)}>
-    {error && <p role="alert">{t(`elearning.assessment.${error}`)}</p>}
+    {error && <LearningErrorNotice as="p">{t(`elearning.assessment.${error}`)}</LearningErrorNotice>}
     <p role="status">{t(`elearning.assessment.recorder.${state}`)}</p>
     {state === "recording" ? <button type="button" onClick={stop}>{t("elearning.assessment.stopRecording")}</button> : <button type="button" disabled={disabled || ["requesting", "processing"].includes(state)} onClick={start}>{t(`elearning.assessment.${url ? "recordAgain" : "startRecording"}`)}</button>}
     {url && <audio id={audioId} controls preload="metadata" src={url} aria-label={t("elearning.assessment.yourRecording")} />}
