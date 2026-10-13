@@ -1,5 +1,74 @@
 # Privileged control-plane upgrade architecture
 
+## Explicit schema136→144 maintenance operation
+
+The manual successor may bind one exact consumed boot-installation failure and
+its volatile upgrade interlock. Read-only preflight verifies the old protected
+receipts, original NORMAL136 roles/native identity, actual restored boot bytes
+and unit states, retained generated artifacts, no active old process/service or
+credential, and no subsequent controller/candidate/migration progress. Unknown,
+altered or unfinished interlocks remain rejected. Under both existing locks the
+fresh exact-approved operation archives the interlock and its bound intent in a
+new single-use reconciliation scope, rechecks it, then calls the existing
+controller retirement primitive before fresh quiescence/admission. An interrupted
+reconciliation cannot replay the same plan. Historical attempts are never edited
+and old authorization grants no successor authority.
+
+The successor proxy gate uses `99z-compatible-normal-<context>.conf` so it sorts
+after the already completed136 `99-compatible-normal-<origin>.conf`. The latter's
+retained `ExecStartPre=` reset otherwise restores its historical gate when the
+new context hash sorts earlier. Exact-resource preflight rejects any measured
+drop-in sorting after the successor gate. The installed effective-controls guard
+is unchanged; historical resources are preserved and superseded only inside the
+fresh authorized transaction. This is ordering correction, not another boot actor
+or recognition of the136 actor as schema144-compatible.
+
+The existing completed-NORMAL coordinator has a separate version-2 operation,
+`completed-normal-schema136-144-maintenance-release`. It independently attests
+the completed136 origin before admission. Its fresh credential binds controller,
+accepted application/images, native database, exact historical receipts and the
+new plan. Historical115→136 receipts and grants remain unchanged as evidence;
+only the independently verified live origin grant is revoked by the new operation.
+
+This profile selects `schema-136-144-learning-bridge.json` and exactly migrations
+137,138,139,140,141,143,144.142 is rejected by admission, leases, migration and boot.
+Candidate workers start fenced; source136 adoption is READ_ONLY. NORMAL is granted
+only at144 after sealed SQL completion and original-column preservation checks.
+Exact retained BLUE identities may be stopped under the approved transaction;
+ports are rechecked without prospective allowances before Compose staging.
+No container or customer volume is removed by that retirement adapter.
+
+The existing exact-resource boot installer also supersedes the prior compatible
+136 actor, preserving all original files/receipts. Interrupted manual handoff
+selects verified READ_ONLY forward recovery or maintenance; it cannot invoke the
+old origin actor. SQL resumption uses a new separately authorized executor record.
+
+Manual maintenance validation is explicitly `component-verified-maintenance`:
+actual144 image execution, unchanged current-data SQL execution, exact-source
+controller tests/CI and live read-only resource preflight. GitHub CI is queried
+independently. This mode does not claim a complete Docker/systemd rehearsal or
+real restart acceptance. Those limitations must be disclosed in its new exact
+operator approval. Legacy full-rehearsal gates are unchanged. Implementation
+alone grants no production execution or auto-deployment authority.
+
+## Pending manual136→144 release
+
+The unselected136→144 descriptor is migration/source authority only. The installed
+completed-NORMAL completion binds controllerdbc26321 and application81cebfeb at136.
+Ordinary or privileged successors still need fresh independently authorized source,
+runtime, worker/write and boot reconciliation. Historical115→136 contracts and
+grants are not widened or reused as authorization. Preparing this manual release
+does not install the Phase3A controller, enable auto-deploy or require its Phase3B
+VM rehearsal. No completed execution or restart acceptance for144 is claimed.
+
+Completed-NORMAL Compose preparation also checks that the selected compatibility
+bounds match its fresh admission contract before reaching Docker. The historical
+115..136 contract cannot supply an authority mount to a136..144 candidate.
+Offline configuration verification uses the checksum-bound136..144 bridge and
+actual environment builder with the base, release and authority overlays; stale
+shell/env-file values cannot replace the generated bounds. This render issues no
+credential or grant and does not establish a144 runtime or boot transition.
+
 Completed-NORMAL preparation can explicitly select a reviewed immutable controller
 ancestor of a separately pinned canonical main. Its approved plan contains
 hash-verified Git commit bodies proving the bounded parent chain and selected

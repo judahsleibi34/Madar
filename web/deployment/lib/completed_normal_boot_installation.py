@@ -15,13 +15,14 @@ import tempfile
 from deployment.lib.completed_normal_admission import ADMISSIONS,OPERATION,digest,encoded,require_fresh_authorization
 from deployment.lib.emergency_routing_repair import exclusive
 from deployment.lib.provider_recovery_runtime import protected,file_digest
+from deployment.lib.completed_normal_profile import profile, MANUAL
 
 UNITS=Path('/etc/systemd/system')
 PROXY='madar-release-proxy.service'
 DROPINS=UNITS/(PROXY+'.d')
 
-def unit_bytes(command):
-    return ('[Unit]\nDescription=Madar accepted schema115..136 boot recovery\n'
+def unit_bytes(command, *, source=115, target=136):
+    return (f'[Unit]\nDescription=Madar accepted schema{source}..{target} boot recovery\n'
         'Requires=docker.service\nWants=madar-release-proxy.service\nAfter=docker.service\nBefore=madar-release-proxy.service\nPartOf=docker.service\n'
         '[Service]\nType=oneshot\nRemainAfterExit=yes\nUser=root\nGroup=root\nUMask=0077\n'
         'Environment=PATH=/usr/sbin:/usr/bin:/sbin:/bin\nEnvironment=LANG=C.UTF-8\n'
@@ -76,12 +77,19 @@ class CompletedNormalBootInstallation:
                 or Path(package)!=Path('/var/lib/madar-control-plane/normal-local-preparation')/('normal-source-'+source_hash)):
             raise RuntimeError('completed_boot_package_binding_invalid')
         self.contract,self.document,self.package=contract,document,Path(package)
+        self.profile=profile(contract)
         self.source_guard,self.ops=source_guard,operations;self.units=Path(units)
         self.root=Path(admissions)/digest(contract);self.name='madar-compatible-normal-boot-'+digest(contract)[:12]+'.service'
-        self.proxy=self.units/(PROXY+'.d')/('99-compatible-normal-'+digest(contract)[:12]+'.conf')
+        # A completed136 origin already has a99-compatible-normal drop-in.
+        # Its ExecStartPre reset must precede the successor's gate regardless
+        # of the two context hashes; lexical hash order is not ownership.
+        prefix='99z-compatible-normal-' if self.profile is MANUAL else '99-compatible-normal-'
+        self.proxy=self.units/(PROXY+'.d')/(prefix+digest(contract)[:12]+'.conf')
         baseline=document['boot_resources']
+        compatible_origin='madar-compatible-normal-boot-'+Path(contract['source_roles']['completion_root']).name[:12]+'.service'
         if (set(baseline)!={'files','proxy_dropins','old_units','old_unit_dropins','unit_states'} or not baseline['old_units']
-                or any(not (name=='madar-emergency-routing.service' or re.fullmatch('madar-normal-local-(boot|fallback)-[0-9a-f]{12}\\.service',name)) for name in baseline['old_units'])
+                or any(not (name=='madar-emergency-routing.service' or re.fullmatch('madar-normal-local-(boot|fallback)-[0-9a-f]{12}\\.service',name)
+                    or self.profile is MANUAL and name==compatible_origin) for name in baseline['old_units'])
                 or set(baseline['unit_states'])!={PROXY,*baseline['old_units']}):
             raise RuntimeError('completed_boot_resource_contract_invalid')
         if set(baseline['old_unit_dropins'])!=set(baseline['old_units']):raise RuntimeError('completed_boot_resource_contract_invalid')
@@ -92,13 +100,15 @@ class CompletedNormalBootInstallation:
             *(p for paths in baseline['old_unit_dropins'].values() for p in paths)}
         if set(baseline['files'])!=required or any(Path(p).parent!=DROPINS or not Path(p).name.endswith('.conf') for p in baseline['proxy_dropins']):
             raise RuntimeError('completed_boot_resource_inventory_invalid')
+        if self.profile is MANUAL and any(Path(p).name>=self.proxy.name for p in baseline['proxy_dropins']):
+            raise RuntimeError('completed_boot_proxy_gate_order_unreviewed')
         self.baseline=baseline
     def command(self,mode):
         script=self.package/'source/web/scripts/continue_completed_normal_upgrade.py'
         return ('/usr/bin/python3 -I -B '+str(script)+' '+mode+' --source-package '+str(self.package)+
             ' --approved-source '+self.document['source_bundle_sha256']+' --approved-plan '+self.contract['plan_sha256'])
     def paths(self):
-        result={self.units/self.name:unit_bytes(self.command('boot')),
+        result={self.units/self.name:unit_bytes(self.command('boot'),source=self.profile.source,target=self.profile.target),
                 self.proxy:proxy_bytes(self.name,self.command('proxy-gate'))}
         for name in self.baseline['old_units']:
             result[self.units/(name+'.d')/('99-superseded-'+digest(self.contract)[:12]+'.conf')]=(
@@ -122,6 +132,8 @@ class CompletedNormalBootInstallation:
         if any((self.root/name).exists() for name in ('boot-installation.json','boot-preimages.json','boot-installation-failed.json')):
             raise RuntimeError('completed_boot_installation_already_consumed')
         legacy={p.name for kind in ('boot','fallback') for p in self.units.glob('madar-normal-local-'+kind+'-*.service')}
+        if self.profile is MANUAL:
+            legacy.update(p.name for p in self.units.glob('madar-compatible-normal-boot-*.service') if p.name!=self.name)
         if (self.units/'madar-emergency-routing.service').exists():legacy.add('madar-emergency-routing.service')
         if legacy!=set(self.baseline['old_units']):raise RuntimeError('completed_boot_legacy_unit_inventory_changed')
         for raw,expected in self.baseline['files'].items():
@@ -146,7 +158,7 @@ class CompletedNormalBootInstallation:
         expected={str(p):hashlib.sha256(body).hexdigest() for p,body in self.paths().items()}
         replaced=self.replacements()
         superseded={str(p):hashlib.sha256(new).hexdigest() for p,(_,new,_) in replaced.items()}
-        if (record!={'operation':OPERATION,'context_sha256':digest(self.contract),'resources':expected,
+        if (record!={'operation':self.profile.operation,'context_sha256':digest(self.contract),'resources':expected,
             'superseded_proxy_dropins':superseded,'superseded_units':self.baseline['old_units'],'historical_units_deleted':False}):
             raise RuntimeError('completed_boot_installation_attestation_changed')
         if any(file_digest(protected(Path(p)))!=value for p,value in expected.items()):
@@ -206,7 +218,7 @@ class CompletedNormalBootInstallation:
                 # Mark compensation responsibility before the atomic rename.
                 replaced_paths.append(path);atomic_resource(path,new,mode)
             # Receipt closes every old ConditionPathExists before daemon-reload.
-            exclusive(self.root/'boot-installation.json',encoded({'operation':OPERATION,'context_sha256':digest(self.contract),
+            exclusive(self.root/'boot-installation.json',encoded({'operation':self.profile.operation,'context_sha256':digest(self.contract),
                 'resources':{str(p):hashlib.sha256(b).hexdigest() for p,b in paths.items()},
                 'superseded_proxy_dropins':{str(p):hashlib.sha256(new).hexdigest() for p,(_,new,_) in replaced.items()},
                 'superseded_units':self.baseline['old_units'],'historical_units_deleted':False}))
@@ -217,7 +229,7 @@ class CompletedNormalBootInstallation:
         except Exception as error:
             # Restore the exact approved earlier drop-in preimages and retain
             # generated additions as audit data. Original units stay unchanged.
-            exclusive(self.root/'boot-installation-failed.json',encoded({'operation':OPERATION,'context_sha256':digest(self.contract),
+            exclusive(self.root/'boot-installation-failed.json',encoded({'operation':self.profile.operation,'context_sha256':digest(self.contract),
                 'exception_type':type(error).__name__,'phase':'boot_resource_installation',
                 'retained_generated_resources':{str(p):hashlib.sha256(paths[p]).hexdigest() for p in created},'database_restored':False}))
             for path in reversed(replaced_paths):

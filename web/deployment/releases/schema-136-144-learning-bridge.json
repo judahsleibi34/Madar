@@ -1,0 +1,18 @@
+{
+  "release_metadata_version": 1,
+  "deployment_profile": "local-supabase-schema136-144-learning",
+  "schema": {
+    "compatible_min": 136,
+    "compatible_max": 144,
+    "target": 144,
+    "migration_class": "forward-compatible",
+    "rollback_compatible_min": 136,
+    "rollback_compatible_max": 136,
+    "excluded_versions": [
+      142
+    ]
+  },
+  "migration_policy": "automatic-after-known-good-backup-first-forward-repair",
+  "migration_manifest": "migrations-137-144-learning.json",
+  "notes": "Unselected manual-release candidate for completed NORMAL schema136. Only137..141,143,144; Exchange142 is excluded. Requires exact-image acceptance at136/144, current-data preservation, governed controller/write/worker/boot handoff and fresh complete operator authorization. No production authority is granted by this descriptor."
+}

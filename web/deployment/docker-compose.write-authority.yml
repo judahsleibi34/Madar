@@ -4,8 +4,9 @@
 x-write-authority: &write-authority
   MADAR_BUSINESS_WRITE_AUTHORITY: /run/madar/business-write-authority/authority.json
   MADAR_BUSINESS_WRITE_CONTRACT: ${MADAR_BUSINESS_WRITE_CONTRACT:?root-issued write contract required}
-  SCHEMA_COMPATIBLE_MIN: "115"
-  SCHEMA_COMPATIBLE_MAX: "136"
+  SCHEMA_COMPATIBLE_MIN: ${SCHEMA_COMPATIBLE_MIN:?reviewed schema minimum required}
+  SCHEMA_COMPATIBLE_MAX: ${SCHEMA_COMPATIBLE_MAX:?reviewed schema maximum required}
+  SCHEMA_EXCLUDED_VERSIONS: ${SCHEMA_EXCLUDED_VERSIONS:-}
 
 x-authority-mount: &authority-mount
   type: bind

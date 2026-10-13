@@ -1,0 +1,62 @@
+{
+  "manifest_version": 1,
+  "release_sha": "STAGING",
+  "migrations": [
+    {
+      "number": 137,
+      "path": "web/database/migrations/137_connect_learning_notifications.sql",
+      "sha256": "36b8a9db4467a4aa4e9e23ac65ff65313ece2fee21346124252a7c493f3c4391",
+      "from_schema": 136,
+      "to_schema": 137,
+      "compatibility": "forward-compatible"
+    },
+    {
+      "number": 138,
+      "path": "web/database/migrations/138_add_academy_programme_workflows.sql",
+      "sha256": "1fd08b2590ae5e3daf522946745a70c5f7aaad50489336d1695f7568d535f910",
+      "from_schema": 137,
+      "to_schema": 138,
+      "compatibility": "forward-compatible"
+    },
+    {
+      "number": 139,
+      "from_schema": 138,
+      "to_schema": 139,
+      "compatibility": "forward-compatible",
+      "path": "web/database/migrations/139_generalize_academy_programme_configuration.sql",
+      "sha256": "326645287f2192d73f98feb2ed076325e0b43372a5d289254856e9709f0df96e"
+    },
+    {
+      "number": 140,
+      "from_schema": 139,
+      "to_schema": 140,
+      "compatibility": "forward-compatible",
+      "path": "web/database/migrations/140_complete_academy_owner_tools.sql",
+      "sha256": "c028c6189fedb91c986292aaf53668ffa94f1fd9cb9538ff59dc84b75a9d4276"
+    },
+    {
+      "number": 141,
+      "from_schema": 140,
+      "to_schema": 141,
+      "compatibility": "forward-compatible",
+      "path": "web/database/migrations/141_add_elearning_forms.sql",
+      "sha256": "9d48eb363c761bfece597417841a2ca48205eb12fd0d5e35a4e9ce71f967cdc9"
+    },
+    {
+      "number": 143,
+      "from_schema": 141,
+      "to_schema": 143,
+      "path": "web/database/migrations/143_complete_learning_capabilities.sql",
+      "sha256": "35c79afc5c44c982aeb7fcfac854e2f744e5c65408a1c3e0084a265b025fe6dc",
+      "compatibility": "forward-compatible"
+    },
+    {
+      "number": 144,
+      "from_schema": 143,
+      "to_schema": 144,
+      "path": "web/database/migrations/144_add_generic_learning_form_reviews.sql",
+      "sha256": "ac3f67a144f515e341414732fc23f202f015625b07fb377d9fb416c40cf289f2",
+      "compatibility": "forward-compatible"
+    }
+  ]
+}

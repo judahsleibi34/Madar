@@ -67,7 +67,8 @@ def origin_spec_matches(row, expected, *, started_worker=False):
 
 def allocation(contract,slot):
     if slot not in PORTS: raise RuntimeError('completed_normal_allocation_slot_invalid')
-    prefix='madar-schema136-'+digest(contract)[:16]
+    from deployment.lib.completed_normal_profile import profile
+    prefix='madar-schema'+str(profile(contract).target)+'-'+digest(contract)[:16]
     resource=contract['resources'][slot]
     return {'prefix':prefix,'project':prefix+'-'+slot,
             'containers':{r:prefix+'-'+slot+'-'+r for r in ROLES},
@@ -75,7 +76,48 @@ def allocation(contract,slot):
             'ports':dict(PORTS[slot]),'subnets':dict(resource['subnets']),
             'retired_port_declarations':resource['retired_port_declarations']}
 
-def verify_allocation(contract,slot,runtime):
+def planned_retirements(contract,slot,runtime):
+    """Read-only proof for resources explicitly included in a manual stop.
+
+    This does not authorize stopping anything. Staging always rechecks ports
+    without this prospective allowance after the root transaction stops them.
+    """
+    from deployment.lib.completed_normal_profile import profile, MANUAL
+    if profile(contract) is not MANUAL:
+        raise RuntimeError('completed_normal_manual_retirement_contract_required')
+    if slot!=contract['candidate']['slot'] or slot==contract['origin']['slot']:
+        raise RuntimeError('completed_normal_manual_retirement_slot_invalid')
+    declarations=contract['resources'][slot]['retired_port_declarations']
+    result={}
+    for name,binding in declarations.items():
+        rows=runtime.inspect([binding['container_id']])
+        row=next(iter(rows.values())) if len(rows)==1 else None
+        ports={str(b['HostPort']) for values in (row['HostConfig'].get('PortBindings') or {}).values() for b in values or []} if row else set()
+        if (row is None or row['Id']!=binding['container_id'] or row['Name'].lstrip('/')!=name
+                or row['Image']!=binding['image_id'] or not measured_spec_matches(row,binding['spec_sha256'])
+                or row['HostConfig']['RestartPolicy']['Name']!='no'
+                or not ports or not ports.issubset(set(PORTS[slot].values()))):
+            raise RuntimeError('completed_normal_manual_retirement_identity_changed')
+        result[row['Id']]=row
+    return result
+
+
+def retire_bound_resources(contract,runtime, *, source_guard):
+    """Stop exact approved applications only; never remove mounts or volumes."""
+    from deployment.lib.completed_normal_admission import require_fresh_authorization
+    source_guard();require_fresh_authorization(contract)
+    planned=planned_retirements(contract,contract['candidate']['slot'],runtime)
+    for identifier in planned:
+        source_guard();require_fresh_authorization(contract)
+        current=planned_retirements(contract,contract['candidate']['slot'],runtime)
+        if current[identifier]['State']['Running']:runtime.command(['docker','stop',identifier])
+    if any(row['State']['Running'] for row in planned_retirements(contract,contract['candidate']['slot'],runtime).values()):
+        raise RuntimeError('completed_normal_manual_retirement_stop_failed')
+    return {'stopped_ids':sorted(planned),'volumes_deleted':False,'customer_database_restored':False}
+
+
+def verify_allocation(contract,slot,runtime, *, prospective_retirement=False):
+    planned=planned_retirements(contract,slot,runtime) if prospective_retirement else None
     result=allocation(contract,slot)
     ids=runtime.command(['docker','ps','-aq']).splitlines()
     rows=json.loads(runtime.command(['docker','inspect',*ids])) if ids else []
@@ -93,16 +135,16 @@ def verify_allocation(contract,slot,runtime):
                 if any(n.version==other.version and n.overlaps(other) for n in intended):
                     raise RuntimeError('completed_normal_allocation_subnet_occupied')
     require_unreserved_ports(runtime,tuple(int(p) for p in result['ports'].values()),
-                             retired=result['retired_port_declarations'],spec_matcher=measured_spec_matches)
+                             retired=result['retired_port_declarations'],planned=planned,spec_matcher=measured_spec_matches)
     return result
 
 
 def verify_runtime_binding(contract,publication,runtime,state_root):
     """Shared exact-runtime check for root boot and credential-bound routing."""
-    from deployment.lib.completed_normal_admission import OPERATION
+    from deployment.lib.completed_normal_profile import profile
     from deployment.lib.runtime_authority import load_worker_authority
     if (set(publication)!={'operation','context_sha256','source_sha','images','runtimes','networks','worker_generation','origin_workers'}
-            or publication['operation']!=OPERATION or publication['context_sha256']!=digest(contract)
+            or publication['operation']!=profile(contract).operation or publication['context_sha256']!=digest(contract)
             or publication['source_sha']!=contract['candidate']['source_sha']
             or publication['images']!=contract['candidate']['images']
             or set(publication['runtimes'])!=set(ROLES) or len(publication['origin_workers'])!=3):

@@ -6,12 +6,14 @@ import unittest
 from unittest.mock import Mock,patch
 
 from deployment.lib import completed_normal_boot_actor as m
+from deployment.lib.completed_normal_profile import LEGACY
 
 
 class BootDispatchTests(unittest.TestCase):
     def setUp(self):
         self.tmp=tempfile.TemporaryDirectory();self.addCleanup(self.tmp.cleanup)
         actor=object.__new__(m.CompletedNormalBootActor);self.actor=actor
+        actor.profile=LEGACY
         actor.root=Path(self.tmp.name);(actor.root/'candidate-runtime.json').write_text('{}')
         actor.contract={};actor.guard=Mock();actor.proxy_identity=Mock();actor.event=Mock()
         actor.native=Mock(side_effect=AssertionError('native check outside bounded kernel'))

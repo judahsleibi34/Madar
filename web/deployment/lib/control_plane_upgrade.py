@@ -2719,21 +2719,35 @@ class SystemOperations:
             if recovery or completed_normal_contract['candidate']['controller_sha'] != approved_sha:
                 raise UpgradeError('completed_normal_authorization_scope_invalid')
             verify_history(completed_normal_contract)
-            operation, schema = OPERATION, 115
+            from deployment.lib.completed_normal_profile import profile
+            selected_profile = profile(completed_normal_contract)
+            operation, schema = selected_profile.operation, selected_profile.source
             rehearsal_sha256 = completed_normal_contract['rehearsal_sha256']
             context = digest(completed_normal_contract)
             admission_path = ADMISSIONS/context/'admission.json'
             if admission_path.exists():
                 admission = json.loads(protected(admission_path).read_text())
-                if admission.get('contract') != completed_normal_contract or admission.get('operation') != OPERATION:
+                if admission.get('contract') != completed_normal_contract or admission.get('operation') != operation:
                     raise UpgradeError('completed_normal_authorization_admission_changed')
                 witnesses['completed_normal_admission'] = admission
                 witnesses['candidate_authority'] = require_candidate_authority(completed_normal_contract)
                 witnesses['provider_record_witness'] = measure_provider_record(
                     self.state_root, completed_normal_contract['provider_record_sha256'])
+                from deployment.lib.completed_normal_profile import MANUAL
+                if selected_profile is MANUAL:
+                    origin_runtime_path=Path(completed_normal_contract['source_roles']['completion_root'])/'candidate-runtime.json'
+                    origin_runtime=json.loads(protected(origin_runtime_path,private=True).read_text())
+                    if (origin_runtime.get('context_sha256')!=origin_runtime_path.parent.name
+                            or origin_runtime.get('source_sha')!=completed_normal_contract['source_roles']['application_sha']
+                            or origin_runtime.get('images')!=completed_normal_contract['origin']['images']
+                            or origin_runtime.get('worker_generation')!=completed_normal_contract['origin']['worker_generation']):
+                        raise UpgradeError('completed_normal_authorization_origin_runtime_changed')
+                    witnesses['origin_runtime']=origin_runtime
                 witness_hashes = {'admission_sha256':digest(admission),
                     'candidate_authority_sha256':digest(witnesses['candidate_authority']),
                     'provider_record_witness_sha256':digest(witnesses['provider_record_witness'])}
+                if 'origin_runtime' in witnesses:
+                    witness_hashes['origin_runtime_sha256']=digest(witnesses['origin_runtime'])
                 runtime_record=admission_path.parent/'candidate-runtime.json'
                 if runtime_record.exists():
                     witnesses['candidate_runtime']=json.loads(protected(runtime_record,private=True).read_text())

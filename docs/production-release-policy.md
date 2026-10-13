@@ -1,5 +1,74 @@
 # Madar production release acceptance policy
 
+## Separately authorized schema144 maintenance release
+
+An exact compensated boot-failure interlock can be reconciled only when explicitly
+bound into the fresh manual operation. Preflight is read-only; retirement requires
+the approved execution under upgrade/deployment locks, archival and a final
+identity recheck. Current NORMAL136 ownership and actual completed compensation
+must verify independently. Consumed authorization is preserved and never replayed;
+unknown/active/advanced attempts continue to fail closed.
+
+Successor boot validation preserves the completed136 origin and uses an explicitly
+ordered proxy gate; an unrelated later drop-in fails preflight. Offline systemd
+parser acceptance proves configuration merge ordering, not a real restart. Fresh
+exact-source evidence and operation authorization remain mandatory after a change.
+
+The version-2 completed-NORMAL maintenance profile reuses accepted application8d0c298
+images and genuine144 application/136→144 SQL evidence. Controller-only revisions
+remain distinct from that accepted application revision. It never relabels image
+acceptance, replays the historical136 credential or treats main as authorization.
+The selected bridge and exclusion142 are mandatory through real Compose rendering,
+the version-2 grant, schema probes, migration execution and restart recovery.
+
+This manually approved profile stages source136 READ_ONLY and grants NORMAL only
+after144 completion. Fresh pre/post-migration ordinary backups, independent restores,
+append-only Node1 replicas and restoration of the recorded native timers are part
+of the complete operation. Current data is never restored from an older backup.
+
+Its operator-reviewed validation mode is `component-verified-maintenance`, not a
+claimed full isolated deployment PASS. Exact-source focused controller validation,
+authenticated mandatory GitHub CI, actual144 image checks and unchanged SQL proofs
+must be bound to the plan. The final proposal must explicitly disclose untested
+combined installation/restart behavior. All root/source/runtime/worker/authority
+guards remain mandatory; changed or missing bindings fail closed. No production
+installation, routing, worker or SQL mutation is permitted before fresh exact
+source-package/plan approval. The historical115→136 full rehearsal requirement is
+unchanged, and automatic deployment remains disabled.
+
+## Unselected completed-NORMAL136→144 manual release candidate
+
+`learning-136-144-path.json` pins the new `migrations-137-144-learning.json` and
+`schema-136-144-learning-bridge.json`. They compose only the existing immutable
+137..141,143,144 entries; Exchange142 remains excluded. The old descriptors,
+SQL/checksums and active136 release remain unchanged. The executor accepts this
+second exact source-pinned route, not arbitrary gaps. Backend configuration and
+version-2 authority accept only the additional reviewed136..144 range with142
+excluded, an exact source/context binding and a fresh root-issued grant. Existing
+115..136 grants cannot authorize it. Root file protection and recovery fencing
+remain mandatory. These source changes grant no installation or SQL authority.
+
+The root-authority Compose overlay carries explicit reviewed compatibility
+bounds and exclusions from the deployment environment. Missing bounds reject
+configuration rendering. It still requires an existing read-only authority
+mount with `create_host_path: false`. Real Compose rendering verifies both
+the historical bounds and the 136..144 range with 142 excluded, without
+granting new runtime or production authority.
+The actual environment builder loads the selected136..144 bridge compatibility
+and overrides stale inherited115..136 values. A full three-file Compose render
+also rejects stale env-file values in favor of that generated environment.
+Historical completed-NORMAL admission is additionally required to match the
+selected compatibility range before any Compose command; it cannot furnish a
+legacy authority mount to a144 candidate. The real144 admission/boot handoff
+remains a separate, uncompleted execution requirement.
+
+Manual activation still requires accepted exact images at136/144, preservation
+on a private current-data restore, independently authorized controller/source-role
+reconciliation, singleton workers, boot supersession and a complete exact-hash
+operation. Existing completed-NORMAL115→136 execution/boot contracts remain
+historical and cannot be replayed or silently widened to144. Auto-deploy, Phase3B
+and VM construction are not prerequisites for this manually governed release.
+
 Completed-NORMAL preparation can explicitly select a reviewed immutable controller
 ancestor of a separately pinned canonical main. Its approved plan contains
 hash-verified Git commit bodies proving the bounded parent chain and selected

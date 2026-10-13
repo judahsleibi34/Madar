@@ -15,8 +15,12 @@ import traceback
 from deployment.lib.completed_normal_admission import ADMISSIONS,digest,encoded,require_candidate_authority,credential_witness
 from deployment.lib.provider_recovery_runtime import protected,readonly_configuration,file_digest
 from deployment.lib.emergency_routing_repair import exclusive
+from deployment.lib.completed_normal_profile import profile, LEGACY
 
 OPERATION='completed-normal-schema115-136-forward-resumption'
+
+def forward_operation(contract):
+    return OPERATION if profile(contract) is LEGACY else 'completed-normal-schema136-144-forward-resumption'
 
 def executor_path(state_root,sha,relative):
     if not isinstance(relative,str) or not re.fullmatch(r'execution\.json|resumptions/[0-9a-f]{64}/execution\.json',relative):
@@ -24,7 +28,7 @@ def executor_path(state_root,sha,relative):
     return Path(state_root)/'migrations'/sha/relative
 
 def authorization_record(plan):
-    return {'operation':OPERATION,'plan_sha256':digest(plan),
+    return {'operation':plan['operation'],'plan_sha256':digest(plan),
         'parent_context_sha256':plan['parent_context_sha256'],'source_bundle_sha256':plan['source_bundle_sha256'],
         'controller_sha':plan['controller_sha'],'application_sha':plan['application_sha']}
 
@@ -32,16 +36,17 @@ def scope_root(contract,plan):
     return ADMISSIONS/digest(contract)/'forward-resumptions'/digest(plan)
 
 def validate_scope(contract,plan):
+    selected=profile(contract)
     keys={'version','operation','nonce','controller_sha','application_sha','source_bundle_sha256','parent_plan_sha256',
         'parent_context_sha256','observed_schema','database','previous_execution','previous_execution_sha256',
         'parent_failure_sha256','customer_snapshot_sha256','grant_sha256','runtime_sha256','worker_owner_sha256',
         'fixture_only','production_authorization'}
-    if (not isinstance(plan,dict) or set(plan)!=keys or type(plan['version']) is not int or plan['version']!=1
-            or plan['operation']!=OPERATION or not re.fullmatch('[0-9a-f]{32}',str(plan['nonce']))
+    if (not isinstance(plan,dict) or set(plan)!=keys or type(plan['version']) is not int or plan['version']!=selected.version
+            or plan['operation']!=forward_operation(contract) or not re.fullmatch('[0-9a-f]{32}',str(plan['nonce']))
             or plan['controller_sha']!=contract['candidate']['controller_sha']
             or plan['application_sha']!=contract['candidate']['source_sha']
             or plan['parent_plan_sha256']!=contract['plan_sha256'] or plan['parent_context_sha256']!=digest(contract)
-            or type(plan['observed_schema']) is not int or not 115<=plan['observed_schema']<=136
+            or not selected.supports(plan['observed_schema'])
             or plan['database']!=contract['database'] or type(plan['fixture_only']) is not bool
             or type(plan['production_authorization']) is not bool
             or plan['fixture_only']==plan['production_authorization']):
@@ -91,6 +96,7 @@ def authorized_executor(contract,state_root):
 def measure_plan(actor,*,nonce=None,previous_execution='execution.json'):
     """Read-only candidate/data measurement; no authorization or effects."""
     actor.guard();contract=actor.contract;root=actor.root
+    selected=profile(contract)
     if (root/'migration-completion.json').exists() or not (root/'migration-intent.json').exists():
         raise RuntimeError('completed_forward_incomplete_migration_required')
     failure=protected(root/'failure.json',private=True)
@@ -100,7 +106,7 @@ def measure_plan(actor,*,nonce=None,previous_execution='execution.json'):
     from deployment.lib.completed_normal_database import migration_customer_snapshot
     original=json.loads(protected(root/'pre-migration-customer-snapshot.json',private=True).read_text())
     current=migration_customer_snapshot(contract,actor.runtime,columns=original['columns'])
-    if (original.get('schema')!=115 or current['schema'] not in range(115,137)
+    if (original.get('schema')!=selected.source or not selected.supports(current['schema'])
             or set(current['roots'])!=set(original['roots'])
             or any(v!=current['roots'][k] for k,v in original['roots'].items() if k!='public.application_schema_state')):
         raise RuntimeError('completed_forward_current_customer_data_changed')
@@ -114,14 +120,14 @@ def measure_plan(actor,*,nonce=None,previous_execution='execution.json'):
     from deployment.lib.completed_normal_migration import intent_document
     if json.loads(protected(root/'migration-intent.json',private=True).read_text())!=intent_document(contract):
         raise RuntimeError('completed_forward_migration_intent_changed')
-    manifest=json.loads(protected(actor.package/'source/web/deployment/releases/migrations-116-136.json').read_text())
+    manifest=json.loads(protected(actor.package/'source/web/deployment/releases'/selected.manifest).read_text())
     rows=record.get('migrations',[])
-    if not isinstance(rows,list) or len(rows)>21:raise RuntimeError('completed_forward_previous_execution_invalid')
+    if not isinstance(rows,list) or len(rows)>len(selected.migrations):raise RuntimeError('completed_forward_previous_execution_invalid')
     for row,sql in zip(rows,manifest['migrations']):
         if (row.get('number')!=sql['number'] or row.get('checksum')!=sql['sha256']
                 or row.get('status') not in {'applied','applying','already_applied'}):
             raise RuntimeError('completed_forward_previous_execution_invalid')
-    result={'version':1,'operation':OPERATION,'nonce':nonce or secrets.token_hex(16),
+    result={'version':selected.version,'operation':forward_operation(contract),'nonce':nonce or secrets.token_hex(16),
         'controller_sha':contract['candidate']['controller_sha'],'application_sha':contract['candidate']['source_sha'],
         'source_bundle_sha256':actor.document['source_bundle_sha256'],'parent_plan_sha256':contract['plan_sha256'],
         'parent_context_sha256':digest(contract),'observed_schema':current['schema'],'database':contract['database'],
@@ -184,8 +190,9 @@ class CompletedNormalForwardResumption:
                 self.phase='read_only_refresh_pending'
                 self.actor.ops.run_deploy_service('completed_forward_refresh',self.plan['controller_sha'],
                     completed_normal_contract=self.actor.contract,completed_normal_mode='refresh',migration_resumption=self.plan)
-                with self.credential():observed=verify_serving(self.actor,schema=136,normal=False)
-                result={'operation':OPERATION,'plan_sha256':digest(self.plan),'schema':136,'mode':'READ_ONLY',
+                target=profile(self.actor.contract).target
+                with self.credential():observed=verify_serving(self.actor,schema=target,normal=False)
+                result={'operation':forward_operation(self.actor.contract),'plan_sha256':digest(self.plan),'schema':target,'mode':'READ_ONLY',
                     'database_restored':False,'normal_grant_issued':False,'separate_normal_completion_required':True,'serving':observed}
                 exclusive(self.root/'completion.json',encoded(result));self.actor.ops.clear_interlock();return result
         except Exception as error:

@@ -51,6 +51,7 @@ declare -a tracked_files=(
   lib/control_plane_upgrade.py
   lib/completed_normal_baseline.py
   lib/completed_normal_admission.py
+  lib/completed_normal_profile.py
   lib/compatible_normal_boot.py
   lib/completed_normal_write_handoff.py
   lib/completed_normal_resources.py
@@ -116,6 +117,8 @@ declare -a tracked_files=(
   bin/madar-provider402-prepare
   releases/release.json
   releases/schema-96-recovery.json
+  releases/schema-136-144-learning-bridge.json
+  releases/learning-136-144-path.json
   proxy/docker-compose.yml
   proxy/nginx.conf
 )

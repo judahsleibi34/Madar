@@ -12,6 +12,7 @@ from types import SimpleNamespace
 
 from deployment.lib.completed_normal_admission import ADMISSIONS,OPERATION,digest,encoded,require_fresh_authorization
 from deployment.lib.provider_recovery_runtime import protected,readonly_configuration,file_digest
+from deployment.lib.completed_normal_profile import profile
 
 
 class CompletedNormalBackupContext:
@@ -19,11 +20,12 @@ class CompletedNormalBackupContext:
         if stage not in {'pre-migration','post-migration'} or not all(callable(f) for f in (source_guard,artifact_guard)):
             raise RuntimeError('completed_backup_independent_guards_required')
         self.contract,self.document,self.package,self.kernel=contract,document,Path(package),kernel
+        self.profile=profile(contract)
         self.context=digest(contract);self.root=ADMISSIONS/self.context
-        self.stage=stage;self.schema=115 if stage=='pre-migration' else 136
+        self.stage=stage;self.schema=self.profile.source if stage=='pre-migration' else self.profile.target
         self.source_guard,self.artifact_guard=source_guard,artifact_guard
         self.receipt_name=stage+'-backup.json'
-        self.scope=digest({'operation':OPERATION,'context_sha256':self.context,'backup_stage':stage})
+        self.scope=digest({'operation':self.profile.operation,'context_sha256':self.context,'backup_stage':stage})
         self.plan=SimpleNamespace(digest=self.scope,source_sha=contract['candidate']['source_sha'],
             candidate_images=contract['candidate']['images'])
         if (kernel.contract!=contract or kernel.root!=self.root or document.get('source_bundle_sha256') is None
@@ -38,12 +40,12 @@ class CompletedNormalBackupContext:
                 or file_digest(protected(self.package/'source-bundle.json',private=True))!=self.document['source_bundle_sha256']):
             raise RuntimeError('completed_backup_fresh_binding_invalid')
         receipt=json.loads(protected(self.root/'operator-authorization.json',private=True).read_text())
-        if receipt!={'operation':OPERATION,'context_sha256':self.context,'plan_sha256':self.contract['plan_sha256'],
+        if receipt!={'operation':self.profile.operation,'context_sha256':self.context,'plan_sha256':self.contract['plan_sha256'],
                 'source_bundle_sha256':self.document['source_bundle_sha256'],
                 'controller_sha':self.contract['candidate']['controller_sha'],'application_sha':self.plan.source_sha}:
             raise RuntimeError('completed_backup_operator_binding_changed')
         admission=json.loads(protected(self.root/'admission.json').read_text())
-        if admission.get('operation')!=OPERATION or admission.get('contract')!=self.contract:
+        if admission.get('operation')!=self.profile.operation or admission.get('contract')!=self.contract:
             raise RuntimeError('completed_backup_admission_changed')
         if (self.root/self.receipt_name).exists():raise RuntimeError('completed_backup_stage_already_consumed')
 
@@ -88,16 +90,16 @@ class CompletedNormalBackupContext:
         from deployment.lib.emergency_routing_repair import exclusive
         self.guard()
         actual=json.loads(protected(self.root/self.receipt_name,private=True).read_text())
-        if (self.stage!='pre-migration' or receipt!=actual or actual.get('schema')!=115
+        if (self.stage!='pre-migration' or receipt!=actual or actual.get('schema')!=self.profile.source
                 or actual.get('context_sha256')!=self.context or actual.get('plan_sha256')!=self.scope
                 or actual.get('source_sha')!=self.plan.source_sha or actual.get('images')!=self.plan.candidate_images
                 or actual.get('restore',{}).get('status')!='logical_database_and_file_restore_passed'
-                or actual.get('restore',{}).get('backup_schema')!=115
+                or actual.get('restore',{}).get('backup_schema')!=self.profile.source
                 or actual.get('node1',{}).get('checksum_exit_code')!=0):
             raise RuntimeError('completed_backup_migration_evidence_invalid')
         from scripts import backup_support
         backup=Path(actual['local_path']);manifest=backup_support.verify(backup)
-        if manifest['release']['git_sha']!=self.plan.source_sha or int(manifest['database']['schema_version'])!=115:
+        if manifest['release']['git_sha']!=self.plan.source_sha or int(manifest['database']['schema_version'])!=self.profile.source:
             raise RuntimeError('completed_backup_migration_release_changed')
         inputs={'intent':intent_document(self.contract),'backup':str(backup),
             'backup_manifest_sha256':file_digest(readonly_configuration(backup/'manifest.json',private=False)),

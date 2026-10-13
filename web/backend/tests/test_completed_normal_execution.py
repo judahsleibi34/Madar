@@ -16,9 +16,10 @@ class ExecutionTests(unittest.TestCase):
     def setUp(self):
         self.temp=tempfile.TemporaryDirectory();self.addCleanup(self.temp.cleanup)
         self.base=Path(self.temp.name);self.root=self.base/'attempt';self.calls=[]
-        self.failure=None;self.mode='READ_ONLY';self.origin='NORMAL';self.schema=115
+        self.source_schema=getattr(self,'source_schema',115);self.target_schema=getattr(self,'target_schema',136)
+        self.failure=None;self.mode='READ_ONLY';self.origin='NORMAL';self.schema=self.source_schema
         self.owners=1;self.backup_count=0
-        self.contract=fixture_contract()
+        self.contract=self.make_contract() if hasattr(self,'make_contract') else fixture_contract()
         self.document={'source_bundle_sha256':'f'*64,'backup_timer_states':{'native':{'active':'active','enabled':'enabled'}}}
         def effect(name):
             self.calls.append(name)
@@ -39,7 +40,7 @@ class ExecutionTests(unittest.TestCase):
                 self.owners=1
             if mode=='migrate':
                 if self.mode!='READ_ONLY':raise AssertionError('sql_under_positive_grant')
-                self.schema=136
+                self.schema=self.target_schema
         self.ops.run_deploy_service=service
         def compensate():
             # Real leaf behavior is covered separately; this verifies the
@@ -72,8 +73,8 @@ class ExecutionTests(unittest.TestCase):
             def __init__(self,*a,stage,**kw):self.stage=stage
             def capture(self):
                 test.backup_count+=1;effect('backup_'+self.stage)
-                if self.stage=='pre-migration' and (test.mode!='READ_ONLY' or test.schema!=115):raise AssertionError('unsafe_source_backup')
-                if self.stage=='post-migration' and (test.mode!='NORMAL' or test.schema!=136):raise AssertionError('wrong_target_backup')
+                if self.stage=='pre-migration' and (test.mode!='READ_ONLY' or test.schema!=test.source_schema):raise AssertionError('unsafe_source_backup')
+                if self.stage=='post-migration' and (test.mode!='NORMAL' or test.schema!=test.target_schema):raise AssertionError('wrong_target_backup')
                 return {'stage':self.stage,'schema':test.schema}
             def seal_migration_inputs(self,r):effect('backup_inputs')
             def guard(self):effect('backup_guard')
@@ -81,8 +82,8 @@ class ExecutionTests(unittest.TestCase):
             if test.mode!='READ_ONLY':raise AssertionError('customer_snapshot_under_positive_grant')
             effect('customer_snapshot_'+str(test.schema))
             return {'schema':test.schema,'columns':{'fixture':['original_column']}}
-        def preservation(before,after):
-            if before['schema']!=115 or after['schema']!=136:raise AssertionError('invalid_customer_comparison')
+        def preservation(before,after,**kw):
+            if before['schema']!=test.source_schema or after['schema']!=test.target_schema:raise AssertionError('invalid_customer_comparison')
             effect('customer_preservation');return {'verified':True}
         for p in (patch.object(m.os,'geteuid',lambda:0),patch.object(m,'acquire_lock',lambda *a,**kw:os.open('/dev/null',os.O_RDONLY)),
                   patch('deployment.lib.completed_normal_baseline.seal_compatible_release',lambda *a:effect('seal_compatible_release')),

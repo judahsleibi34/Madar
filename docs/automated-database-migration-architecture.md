@@ -1,5 +1,31 @@
 # Automated database migration architecture
 
+## Manual136→144 execution binding
+
+The separately authorized version-2 completed-NORMAL profile selects the existing
+checksum-pinned learning136→144 route. The coordinator and sealed database lease
+recognize only136..144 excluding142, and the locked executor must observe the exact
+seven reviewed SQL transitions. Source guards, advisory locks, backup verification,
+durable execution history and fatal SQL errors retain their existing behavior.
+NORMAL cannot be granted until144 and independently sealed execution completion.
+Failed attempts are never replayed; forward resumption gets fresh authorization
+and a new executor path. Prior committed SQL/customer data is retained. Historical
+115→136 contracts and all SQL checksums remain unchanged.
+
+## Unselected manual completed-NORMAL136→144 route
+
+The new source-pinned `learning-136-144-path.json` composes existing137..141,
+the exact141→143 learning branch, and143→144 Forms review into one unselected
+`migrations-137-144-learning.json`. Its bridge accepts136..144 except142 and
+declares rollback compatibility only at136. Every SQL/mirror/hash is preserved.
+The existing locked executor validates the exact descriptor/manifest/bridge and
+SQL before admitting this specific nonconsecutive route. It still rejects all
+other gaps and live142. Checksums, strict source guards, backup prerequisites,
+session/advisory locks and durable committed-progress evidence remain intact.
+No production SQL, ledger mutation or active release selection is performed by
+adding the candidate. The existing136-only application is not a rollback target
+after advancement; the accepted compatible candidate must provide forward repair.
+
 ## Approved unselected generic Forms review candidate143→144
 
 The separately approved mirrored144 candidate follows learning143 consecutively.

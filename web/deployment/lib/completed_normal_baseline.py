@@ -47,20 +47,22 @@ def seal_compatible_release(contract, root, state_root):
     """Link current mutable release state to genuine immutable completion DATA."""
     from deployment.lib.completed_normal_admission import digest
     from deployment.lib.control_plane_upgrade import atomic_json
+    from deployment.lib.completed_normal_profile import profile
+    selected=profile(contract)
     if __import__('os').geteuid()!=0:
         raise RuntimeError('completed_compatible_root_required')
     root=Path(root);state_path=Path(state_root)/'state.json'
     completion=protected(root/'normal-completion.json',private=True)
     value=json.loads(completion.read_text());candidate=contract['candidate']
     if (root.name!=digest(contract) or value.get('context_sha256')!=root.name
-            or value.get('mode')!='NORMAL' or value.get('schema')!=136
+            or value.get('mode')!='NORMAL' or value.get('schema')!=selected.target
             or value.get('application_sha')!=candidate['source_sha']
             or value.get('controller_sha')!=candidate['controller_sha']):
         raise RuntimeError('completed_compatible_completion_invalid')
     state=json.loads(readonly_configuration(state_path,private=True).read_text())
     known=state.get('known_good_release') or {}
     if (state.get('active_slot')!=candidate['slot'] or known.get('slot')!=candidate['slot']
-            or known.get('sha')!=candidate['source_sha'] or known.get('schema')!=136
+            or known.get('sha')!=candidate['source_sha'] or known.get('schema')!=selected.target
             or state.get('in_progress_release') or state.get('rollback_failure')
             or 'completed_normal_upgrade' in known):
         raise RuntimeError('completed_compatible_release_state_invalid')
@@ -92,7 +94,9 @@ def attest_compatible_runtime(operations,state,production_sha,installed_sha):
     package=BASE/('normal-source-'+str(source_hash))
     document,source=compatible_package(package,source_hash,plan_hash)
     contract=dict(document['admission_contract'],plan_sha256=digest(document));candidate=contract['candidate']
-    expected_authorization={'operation':OPERATION,'context_sha256':digest(contract),'plan_sha256':digest(document),
+    from deployment.lib.completed_normal_profile import profile
+    selected=profile(contract)
+    expected_authorization={'operation':selected.operation,'context_sha256':digest(contract),'plan_sha256':digest(document),
         'source_bundle_sha256':document['source_bundle_sha256'],'controller_sha':candidate['controller_sha'],
         'application_sha':candidate['source_sha']}
     def guard():
@@ -105,28 +109,28 @@ def attest_compatible_runtime(operations,state,production_sha,installed_sha):
             raise RuntimeError('completed_compatible_controller_changed')
         verify_live_configuration(document);verify_history(contract)
         admission=json.loads(protected(root/'admission.json').read_text())
-        if admission.get('operation')!=OPERATION or admission.get('contract')!=contract:
+        if admission.get('operation')!=selected.operation or admission.get('contract')!=contract:
             raise RuntimeError('completed_compatible_admission_changed')
     guard()
     body=protected(root/'normal-completion.json',private=True)
     completion=json.loads(body.read_text())
-    if (file_digest(body)!=marker['completion_sha256'] or completion.get('operation')!=OPERATION
-            or completion.get('context_sha256')!=root.name or completion.get('schema')!=136
+    if (file_digest(body)!=marker['completion_sha256'] or completion.get('operation')!=selected.operation
+            or completion.get('context_sha256')!=root.name or completion.get('schema')!=selected.target
             or completion.get('mode')!='NORMAL' or completion.get('controller_sha')!=installed_sha
             or completion.get('application_sha')!=candidate['source_sha']
             or completion.get('images')!=candidate['images'] or completion.get('customer_database_restored') is not False
             or known.get('sha')!=candidate['source_sha'] or known.get('slot')!=candidate['slot']
-            or state.get('active_slot')!=candidate['slot'] or known.get('schema')!=136
-            or known.get('schema_compatible_min')!=115 or known.get('schema_compatible_max')!=136
+            or state.get('active_slot')!=candidate['slot'] or known.get('schema')!=selected.target
+            or known.get('schema_compatible_min')!=selected.source or known.get('schema_compatible_max')!=selected.target
             or state.get('in_progress_release') or state.get('rollback_failure')):
         raise RuntimeError('completed_compatible_release_changed')
     for kind in ('backend','frontend','worker'):
         if (known.get('images') or {}).get(kind)!=document['application_artifacts'][kind]:
             raise RuntimeError('completed_compatible_images_changed')
     backup=json.loads(protected(root/'post-migration-backup.json',private=True).read_text())
-    if (completion.get('backup')!=backup or backup.get('schema')!=136
+    if (completion.get('backup')!=backup or backup.get('schema')!=selected.target
             or backup.get('restore',{}).get('status')!='logical_database_and_file_restore_passed'
-            or backup.get('restore',{}).get('backup_schema')!=136
+            or backup.get('restore',{}).get('backup_schema')!=selected.target
             or backup.get('node1',{}).get('checksum_exit_code')!=0):
         raise RuntimeError('completed_compatible_backup_changed')
     CompletedNormalBootInstallation(contract,document,package,guard,operations).installed()

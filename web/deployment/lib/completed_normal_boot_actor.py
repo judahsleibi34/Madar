@@ -21,6 +21,7 @@ from deployment.lib.active_recovery_inputs import INPUTS,controller_tree_digest
 from deployment.lib.emergency_routing_repair import Runtime,MAINTENANCE,verification_window,AvailabilityFailure
 from deployment.lib.provider_recovery_runtime import protected,readonly_configuration
 from deployment.lib.runtime_authority import runtime_mutation_lock,load_worker_authority
+from deployment.lib.completed_normal_profile import profile, MANUAL, expected_origin_grant
 
 CONFIGURATIONS={key:(INPUTS[key],key in {'production_configuration','backup_configuration','native_configuration'})
     for key in ('production_configuration','backup_configuration','native_configuration','native_compose','native_override',
@@ -45,6 +46,7 @@ class CompletedNormalBootActor:
             raise RuntimeError('completed_upgrade_boot_circular_contract_invalid')
         self.document,self.package,self.measure=document,Path(package),measure
         self.contract=dict(document['admission_contract'],plan_sha256=digest(document));validate_contract(self.contract)
+        self.profile=profile(self.contract)
         if self.contract['candidate']['controller_sha']!=document['controller_source_sha']:
             raise RuntimeError('completed_upgrade_boot_controller_role_changed')
         self.root=ADMISSIONS/digest(self.contract)
@@ -64,7 +66,7 @@ class CompletedNormalBootActor:
                 if location is not None and str(Path(location).absolute()) not in locations:
                     raise RuntimeError('completed_upgrade_boot_foreign_import')
         authorization=json.loads(protected(self.root/'operator-authorization.json',private=True).read_text())
-        expected={'operation':OPERATION,'context_sha256':digest(self.contract),'plan_sha256':digest(self.document),
+        expected={'operation':self.profile.operation,'context_sha256':digest(self.contract),'plan_sha256':digest(self.document),
             'source_bundle_sha256':self.document['source_bundle_sha256'],
             'controller_sha':self.contract['candidate']['controller_sha'],'application_sha':self.contract['candidate']['source_sha']}
         if authorization!=expected:raise RuntimeError('completed_upgrade_boot_durable_authorization_changed')
@@ -74,7 +76,7 @@ class CompletedNormalBootActor:
             if tree!=candidate['controller_tree_sha256']:
                 raise RuntimeError('completed_upgrade_boot_installed_tree_changed')
             intent=json.loads(protected(self.root/'controller-installation-intent.json',private=True).read_text())
-            if intent!={'operation':OPERATION,'context_sha256':digest(self.contract),
+            if intent!={'operation':self.profile.operation,'context_sha256':digest(self.contract),
                 'from_controller':origin['controller_sha'],'to_controller':candidate['controller_sha'],
                 'old_tree_sha256':self.document['installed_controller_tree_sha256'],
                 'new_tree_sha256':candidate['controller_tree_sha256']}:
@@ -87,7 +89,7 @@ class CompletedNormalBootActor:
     def guard(self):
         self.source();verify_history(self.contract)
         admission=json.loads(protected(self.root/'admission.json').read_text())
-        if admission.get('operation')!=OPERATION or admission.get('contract')!=self.contract:
+        if admission.get('operation')!=self.profile.operation or admission.get('contract')!=self.contract:
             raise RuntimeError('completed_upgrade_boot_admission_changed')
         self.installation.installed()
     def event(self,phase,**fields):
@@ -99,7 +101,7 @@ class CompletedNormalBootActor:
         if path.exists():protected(path,private=True)
         descriptor=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_APPEND|os.O_NOFOLLOW,0o600)
         with os.fdopen(descriptor,'wb') as stream:
-            stream.write(encoded({'operation':OPERATION,'context_sha256':digest(self.contract),'phase':phase,**fields}).replace(b'\n',b'')+b'\n')
+            stream.write(encoded({'operation':self.profile.operation,'context_sha256':digest(self.contract),'phase':phase,**fields}).replace(b'\n',b'')+b'\n')
             stream.flush();os.fsync(stream.fileno())
     def native(self):return observe_native(self.contract,self.runtime,allow_pending=True)
     def candidate(self, *, compensation_leaf=False):
@@ -112,6 +114,10 @@ class CompletedNormalBootActor:
         atomic_public_authority(self.root/'write-authority/authority.json',dict(value,mode=mode))
         require_candidate_authority(self.contract,mode=mode)
     def origin(self):
+        if self.profile is MANUAL:
+            # A separately authorized maintenance transition never delegates
+            # to the historical136 actor after installing its replacement.
+            raise RuntimeError('completed_upgrade_manual_origin_restart_forbidden')
         # New measured code executes; the old frozen package is historical DATA.
         from deployment.lib.active_recovery_resumption import load_saved_resumption_plan
         from deployment.lib.completed_normal_baseline import historical_source,bind_origin_specification_verifiers
@@ -153,8 +159,7 @@ class CompletedNormalBootActor:
         try:
             root=Path(self.contract['source_roles']['completion_root'])
             value=json.loads(protected(root/'write-authority/authority.json').read_text())
-            expected={'version':1,'schema':115,'release_sha':self.contract['source_roles']['application_sha'],
-                'contract_digest':self.contract['origin']['write_contract_digest']}
+            expected=expected_origin_grant(self.contract,'READ_ONLY');expected.pop('mode')
             if {k:v for k,v in value.items() if k!='mode'}!=expected or value.get('mode') not in {'READ_ONLY','NORMAL'}:
                 raise RuntimeError('completed_upgrade_boot_origin_authority_changed')
             atomic_public_authority(root/'write-authority/authority.json',dict(value,mode='READ_ONLY'))
@@ -226,13 +231,14 @@ class CompletedNormalBootActor:
         failures=[]
         with verification_window(self.runtime,60):
             with runtime_mutation_lock(Path('/var/lib/madar/releases')):
-                for path in (self.root/'candidate-runtime.json',Path(self.contract['source_roles']['completion_root'])/'candidate-identities.json'):
+                for path in (self.root/'candidate-runtime.json',Path(self.contract['source_roles']['completion_root'])/
+                        ('candidate-runtime.json' if self.profile is MANUAL else 'candidate-identities.json')):
                     if not path.exists():continue
                     try:record=json.loads(protected(path,private=True).read_text())
                     except Exception as error:
                         failures.append(type(error).__name__)
                         continue
-                    kinds=(*WORKERS,'backend') if path.name=='candidate-runtime.json' else ('notification','calendar-sync','data-deletion','backend')
+                    kinds=(*WORKERS,'backend') if path.parent==self.root or self.profile is MANUAL else ('notification','calendar-sync','data-deletion','backend')
                     for kind in kinds:
                         try:
                             expected=record['runtimes'][kind]
@@ -263,6 +269,9 @@ class CompletedNormalBootActor:
         if failures:raise RuntimeError('completed_upgrade_boot_compensation_worker_stop_failed') from None
     def resume(self):
         self.guard();self.proxy_identity();self.event('begin')
+        if self.profile is MANUAL and not (self.root/'candidate-runtime.json').exists():
+            self.compensate()
+            raise RuntimeError('completed_upgrade_manual_handoff_not_published')
         if not (self.root/'candidate-runtime.json').exists() and (self.root/'candidate-staged-runtime.json').exists():
             # The root independently sealed exact CREATED identities before
             # owner transfer. An interruption may follow that transfer but
@@ -295,12 +304,14 @@ class CompletedNormalBootActor:
             # and checks migration intent before any positive write effect.
             try:return kernel.execute()
             except RuntimeError as error:
-                if str(error)!='compatible_boot_migration_forward_repair_required':raise
+                if str(error) not in {'compatible_boot_migration_forward_repair_required','compatible_boot_normal_completion_pending'}:raise
                 self.publish('READ_ONLY')
                 return kernel.execute_read_only()
         return kernel.execute_read_only()
     def proxy_gate(self):
         self.guard();self.proxy_identity()
+        if self.profile is MANUAL and not (self.root/'candidate-runtime.json').exists():
+            raise RuntimeError('completed_upgrade_manual_handoff_not_published')
         if not (self.root/'candidate-runtime.json').exists():
             actor,_=self.origin();actor.completed_evidence();actor.native();actor.kernel.normal(require_public=False)
             slot=self.contract['origin']['slot']
@@ -310,6 +321,11 @@ class CompletedNormalBootActor:
             kernel.round(normal=grant['mode']=='NORMAL');slot=self.contract['candidate']['slot']
         route=(f'upstream madar_backend_active {{ server 127.0.0.1:{8101 if slot=="blue" else 8201}; }}\n'
             f'upstream madar_frontend_active {{ server 127.0.0.1:{3100 if slot=="blue" else 3200}; }}\n').encode()
-        if readonly_configuration(Path('/var/lib/madar/proxy/active-upstreams.conf'),private=False).read_bytes()!=route:
+        actual=readonly_configuration(Path('/var/lib/madar/proxy/active-upstreams.conf'),private=False).read_bytes()
+        if self.profile is MANUAL and grant['mode']=='READ_ONLY':
+            from deployment.lib.completed_normal_execution import manual_maintenance_route
+            if actual==manual_maintenance_route(self.contract):
+                return {'schema':self.native(),'mode':'READ_ONLY','maintenance':True}
+        if actual!=route:
             raise RuntimeError('completed_upgrade_boot_proxy_route_changed')
         return {'schema':self.native(),'mode':'NORMAL' if not (self.root/'candidate-runtime.json').exists() else grant['mode']}
