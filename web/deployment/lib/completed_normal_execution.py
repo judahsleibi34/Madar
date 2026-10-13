@@ -263,14 +263,17 @@ class CompletedNormalUpgrade:
             raise RuntimeError('completed_upgrade_preparation_source_changed')
         verify_live_configuration(self.document)
 
+    def canonical_main(self):
+        from deployment.lib.control_plane_upgrade import validate_immutable_release_selection
+        selection=self.document.get('immutable_release_selection')
+        return self.controller if selection is None else validate_immutable_release_selection(selection,self.controller)
+
     def verify_candidate_remote(self):
         # Read-only: production refs are fetched only by the approved installer.
         # A moving main must reject before timer, boot or controller effects.
         remote=self.ops.madar_git('completed_upgrade_candidate_remote','ls-remote',
             '--exit-code','origin','refs/heads/main').stdout.split()
-        selection=self.document.get('immutable_release_selection')
-        from deployment.lib.control_plane_upgrade import validate_immutable_release_selection
-        expected=self.controller if selection is None else validate_immutable_release_selection(selection,self.controller)
+        expected=self.canonical_main()
         if remote!=[expected,'refs/heads/main']:
             raise RuntimeError('completed_upgrade_candidate_remote_changed')
 
@@ -281,7 +284,7 @@ class CompletedNormalUpgrade:
         if self.profile is APPLICATION:
             from deployment.lib.control_plane_upgrade import validate_immutable_release_selection
             selection=self.document.get('rollback_source_selection')
-            if validate_immutable_release_selection(selection,self.contract['source_roles']['controller_sha'])!=self.controller:
+            if validate_immutable_release_selection(selection,self.contract['source_roles']['controller_sha'])!=self.canonical_main():
                 raise RuntimeError('application_rollback_source_binding_invalid')
         if (before['schema']!=self.profile.source or before['slot']!=self.contract['origin']['slot']
                 or before['installed_sha']!=self.contract['source_roles']['controller_sha']
@@ -507,7 +510,8 @@ class CompletedNormalUpgrade:
                 # Resolve/freeze rollback objects before replacing boot or
                 # controller resources. Compensation must not need GitHub or
                 # a still-moving main after the handoff has started.
-                self.ops.resolve_candidate(self.controller,dry_run=False)
+                selection=self.document.get('immutable_release_selection')
+                self.ops.resolve_candidate(self.controller,dry_run=False,**({} if selection is None else {'immutable_selection':selection}))
                 _,rollback_source=self.ops.stage_candidate(self.contract['source_roles']['controller_sha'],
                     immutable_selection=self.document['rollback_source_selection'])
                 exclusive(self.root/'application-rollback-source.json',encoded({
@@ -681,7 +685,7 @@ class CompletedNormalUpgrade:
             os.chmod(path,worker_owner['mode'])
         roles=self.contract['source_roles'];old_root=Path(roles['completion_root'])
         old_sha=roles['controller_sha'];selection=self.document['rollback_source_selection']
-        if (validate_immutable_release_selection(selection,old_sha)!=self.controller
+        if (validate_immutable_release_selection(selection,old_sha)!=self.canonical_main()
                 or original.get('active_slot')!=self.contract['origin']['slot']
                 or (original.get('known_good_release') or {}).get('sha')!=roles['application_sha']
                 or workers.get('generation')!=self.contract['origin']['worker_generation']
