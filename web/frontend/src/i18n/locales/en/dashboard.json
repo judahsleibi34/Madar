@@ -2071,7 +2071,8 @@
       "withdrawalHistory": "Withdrawal History",
       "withdrawalLine": "Withdrawal #{{reference}} — {{amount}}",
       "noWithdrawals": "No withdrawals yet.",
-      "referralClicks": "Referral clicks"
+      "referralClicks": "Referral clicks",
+      "reward_rejected": "Not approved"
     },
     "affiliateArea": {
       "title": "Affiliate Dashboard",
@@ -2103,7 +2104,8 @@
       "sale_signup": "Signed up — no purchase yet",
       "sale_purchased": "Purchased",
       "sale_refunded": "Refunded",
-      "clicksIntro": "How many times your referral link was opened."
+      "clicksIntro": "How many times your referral link was opened.",
+      "sale_rejected": "Purchased — reward not approved"
     },
     "enrollment": {
       "testMode": "TEST MODE — no real payment is taken",
@@ -2155,6 +2157,35 @@
       "institutionDomains": "PAU email domains",
       "languages": "Languages",
       "languagesValue": "English and Arabic (Arabic right to left)"
+    },
+    "adminControls": {
+      "approveReward": "Approve",
+      "rejectReward": "Reject",
+      "confirmReject": "Reject reward",
+      "reason": "Reason",
+      "reasonRequired": "Reason (required, saved in the audit log)",
+      "note": "Note (optional)",
+      "error": "This change could not be saved.",
+      "saved": "Saved.",
+      "manage": "Manage",
+      "verifiedLabel": "Verified {{label}}",
+      "verifiedTitle": "Verified {{label}}",
+      "markVerified": "Mark as Verified {{label}}",
+      "removeVerification": "Remove verification",
+      "overrideTitle": "Tuition Support eligibility",
+      "overrideMode": "Eligibility",
+      "override_automatic": "Automatic (4 verified sales)",
+      "override_eligible": "Eligible (override)",
+      "override_not_eligible": "Not eligible (override)",
+      "saveOverride": "Save eligibility",
+      "auditTitle": "Audit log",
+      "auditHelp": "Every admin change in your academy, newest first. Read-only.",
+      "auditEmpty": "No admin changes recorded yet.",
+      "when": "When",
+      "who": "Who",
+      "action": "Action",
+      "details": "Details",
+      "reviewRequired": "Review each referral reward before it becomes available"
     }
   }
 }

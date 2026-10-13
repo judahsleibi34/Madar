@@ -179,6 +179,7 @@ export default function ELearningSettingsPage({ user }) {
                 {settings.referral_reward_currency && !["USD", "ILS", "EUR"].includes(settings.referral_reward_currency) && <option value={settings.referral_reward_currency}>{settings.referral_reward_currency}</option>}
               </select>
             </label>
+            <label className="elearning-toggle"><span>{t("elearning.adminControls.reviewRequired")}</span><input type="checkbox" role="switch" checked={Boolean(settings.referral_reward_review_required)} onChange={event => update("referral_reward_review_required", event.target.checked)} /></label>
             <label className="elearning-field">{t("elearning.programmes.referral_eligibility")}<select value={settings.referral_eligibility || "registration"} onChange={e=>update("referral_eligibility",e.target.value)}>{["registration","purchase_or_affiliate"].map(value=><option key={value} value={value}>{t(`elearning.programmes.${value}`)}</option>)}</select></label><p>{t("elearning.referrals.termsHelp")}</p>
           </fieldset>
         </LearningSettingsAccordion>}

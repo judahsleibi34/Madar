@@ -1,0 +1,14 @@
+{
+  "manifest_version": 1,
+  "release_sha": "STAGING",
+  "migrations": [
+    {
+      "number": 145,
+      "from_schema": 144,
+      "to_schema": 145,
+      "path": "web/database/migrations/145_add_academy_admin_review_controls.sql",
+      "sha256": "cfdba14c0175293aa5f7a1c562039d9223cbf7a6e4cf99e4ab742a1d8ec5bfa2",
+      "compatibility": "forward-compatible"
+    }
+  ]
+}

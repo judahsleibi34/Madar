@@ -1,0 +1,11 @@
+/* Academy admin review controls (schema 145). */
+.admin-control { display:grid; gap:8px; margin-top:8px; }
+.admin-control-actions { display:flex; flex-wrap:wrap; gap:8px; }
+.admin-control-actions button { display:inline-flex; align-items:center; gap:6px; min-height:40px; }
+.admin-control-form { display:grid; gap:8px; padding:12px; border:1px solid var(--theme-border,#D9E3DF); border-radius:12px; }
+.admin-control-form h4 { display:flex; align-items:center; gap:6px; margin:0; font-size:15px; }
+.admin-control-form label { display:grid; gap:4px; font-weight:600; }
+.admin-control-form textarea, .admin-control-form input, .admin-control-form select { min-height:40px; padding:8px 10px; border:1px solid var(--theme-border,#D9E3DF); border-radius:10px; font:inherit; }
+.admin-member-details { margin-top:8px; }
+.admin-member-details summary { cursor:pointer; font-weight:650; min-height:32px; }
+.admin-member-controls [role="status"]:empty { display:none; }

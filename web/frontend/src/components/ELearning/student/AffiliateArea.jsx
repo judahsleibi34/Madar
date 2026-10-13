@@ -52,12 +52,12 @@ function ReferralRows({ data, rewards }) {
     <thead><tr><th scope="col">{t("elearning.student.column_date")}</th><th scope="col">{t(rewards ? "elearning.student.column_amount" : "elearning.affiliateArea.column_sale")}</th><th scope="col">{t("elearning.student.column_status")}</th></tr></thead>
     <tbody>{rows.map(row => {
       const { signup, reward } = referralState(row);
-      const sale = signup ? "signup" : reward === "reversed" ? "refunded" : "purchased";
+      const sale = signup ? "signup" : reward === "reversed" ? "refunded" : reward === "rejected" ? "rejected" : "purchased";
       return <tr key={row.id}>
         <td>{new Date(rewards ? row.reversed_at || row.earned_at || row.created_at : row.created_at).toLocaleDateString(i18n.language)}</td>
         <td dir={rewards ? "ltr" : undefined}>{rewards ? `+${formatMoney(row.amount, row.currency, i18n.language)}` : t(row.simulated ? "elearning.student.rewardTestDescription" : "elearning.student.rewardDescription")}</td>
         <td>{rewards ? <StatusPill status={reward === "available" ? "earned" : reward}>{t(`elearning.student.reward_${reward}`)}</StatusPill>
-          : <StatusPill status={{ signup: "pending", purchased: "earned", refunded: "reversed" }[sale]}>{t(`elearning.affiliateArea.sale_${sale}`)}</StatusPill>}</td>
+          : <StatusPill status={{ signup: "pending", purchased: "earned", refunded: "reversed", rejected: "rejected" }[sale]}>{t(`elearning.affiliateArea.sale_${sale}`)}</StatusPill>}</td>
       </tr>;
     })}</tbody>
   </table></div>;

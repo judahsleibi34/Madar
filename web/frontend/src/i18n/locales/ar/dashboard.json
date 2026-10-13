@@ -2075,7 +2075,8 @@
       "topicCount_few": "{{count}} موضوعات",
       "topicCount_many": "{{count}} موضوعًا",
       "topicCount_other": "{{count}} موضوع",
-      "referralClicks": "نقرات الإحالة"
+      "referralClicks": "نقرات الإحالة",
+      "reward_rejected": "غير مقبولة"
     },
     "affiliateArea": {
       "title": "لوحة المسوّق بالعمولة",
@@ -2107,7 +2108,8 @@
       "sale_signup": "سجّل — لم يشترِ بعد",
       "sale_purchased": "تم الشراء",
       "sale_refunded": "مسترد",
-      "clicksIntro": "عدد المرات التي فُتح فيها رابط الإحالة الخاص بك."
+      "clicksIntro": "عدد المرات التي فُتح فيها رابط الإحالة الخاص بك.",
+      "sale_rejected": "تم الشراء — المكافأة غير مقبولة"
     },
     "enrollment": {
       "testMode": "وضع الاختبار — لا يتم تحصيل أي دفعة حقيقية",
@@ -2159,6 +2161,35 @@
       "institutionDomains": "نطاقات البريد الإلكتروني لجامعة فلسطين الأهلية",
       "languages": "اللغات",
       "languagesValue": "الإنجليزية والعربية (العربية من اليمين إلى اليسار)"
+    },
+    "adminControls": {
+      "approveReward": "موافقة",
+      "rejectReward": "رفض",
+      "confirmReject": "رفض المكافأة",
+      "reason": "السبب",
+      "reasonRequired": "السبب (مطلوب، يُحفظ في سجل التدقيق)",
+      "note": "ملاحظة (اختيارية)",
+      "error": "تعذّر حفظ هذا التغيير.",
+      "saved": "تم الحفظ.",
+      "manage": "إدارة",
+      "verifiedLabel": "{{label}} موثّق",
+      "verifiedTitle": "{{label}} موثّق",
+      "markVerified": "تعيين كـ {{label}} موثّق",
+      "removeVerification": "إزالة التوثيق",
+      "overrideTitle": "الأهلية لدعم الرسوم الجامعية",
+      "overrideMode": "الأهلية",
+      "override_automatic": "تلقائي (4 مبيعات موثّقة)",
+      "override_eligible": "مؤهل (تجاوز)",
+      "override_not_eligible": "غير مؤهل (تجاوز)",
+      "saveOverride": "حفظ الأهلية",
+      "auditTitle": "سجل التدقيق",
+      "auditHelp": "كل تغيير إداري في أكاديميتك، الأحدث أولًا. للقراءة فقط.",
+      "auditEmpty": "لا توجد تغييرات إدارية مسجلة بعد.",
+      "when": "متى",
+      "who": "من",
+      "action": "الإجراء",
+      "details": "التفاصيل",
+      "reviewRequired": "مراجعة كل مكافأة إحالة قبل أن تصبح متاحة"
     }
   }
 }

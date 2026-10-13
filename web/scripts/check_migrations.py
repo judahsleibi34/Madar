@@ -42,6 +42,11 @@ _forms_review_candidate = importlib.util.module_from_spec(_forms_review_spec)
 _forms_review_spec.loader.exec_module(_forms_review_candidate)
 validated_forms_review_entries = _forms_review_candidate.validated_entries
 
+_academy_admin_spec = importlib.util.spec_from_file_location("madar_academy_admin_candidate", Path(__file__).with_name("academy_admin_candidate.py"))
+_academy_admin_candidate = importlib.util.module_from_spec(_academy_admin_spec)
+_academy_admin_spec.loader.exec_module(_academy_admin_candidate)
+validated_academy_admin_entries = _academy_admin_candidate.validated_entries
+
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 TREE_PATHS = {
@@ -331,6 +336,7 @@ def check_production_lineage(errors: list[str]) -> None:
             retained_future.update({entry["number"]: entry for entry in validated_forms_entries(REPO_ROOT.parent)})
             retained_future.update({entry["number"]: entry for entry in validated_exchange_entries(REPO_ROOT.parent)})
             retained_future.update({entry["number"]: entry for entry in validated_forms_review_entries(REPO_ROOT.parent)})
+            retained_future.update({entry["number"]: entry for entry in validated_academy_admin_entries(REPO_ROOT.parent)})
             learning=validate_learning_path(REPO_ROOT.parent)
             if learning['status']=='finalized':
                 learning_manifest=json.loads((REPO_ROOT.parent / learning['manifest_path']).read_text())

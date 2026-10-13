@@ -170,3 +170,27 @@ def exchange_review(identifier:UUID,payload:ExchangeDecision,request:Request,res
     result=operation(lambda:exchange.review(actor,identifier,payload))
     audit(request,actor,'exchange.decision',identifier)
     return result
+
+
+@router.post('/rewards/{referral_id}/review')
+def review_reward(referral_id:UUID,payload:service.RewardReview,request:Request,response:Response):
+    actor=owner(request,response)
+    return operation(lambda:service.review_reward(actor,referral_id,payload))
+
+
+@router.put('/members/{user_id}/tuition-override')
+def tuition_override(user_id:int,payload:service.TuitionOverride,request:Request,response:Response):
+    actor=owner(request,response)
+    return operation(lambda:service.set_tuition_override(actor,user_id,payload))
+
+
+@router.put('/members/{user_id}/institution-verification')
+def institution_verification(user_id:int,payload:service.InstitutionVerification,request:Request,response:Response):
+    actor=owner(request,response)
+    return operation(lambda:service.set_institution_verification(actor,user_id,payload))
+
+
+@router.get('/audit-log')
+def audit_log(request:Request,response:Response,limit:int=Query(50,ge=1,le=100),offset:int=Query(0,ge=0)):
+    actor=owner(request,response)
+    return operation(lambda:service.audit_log(actor,limit,offset))

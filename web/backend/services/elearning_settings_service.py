@@ -58,6 +58,8 @@ class ELearningSettings(BaseModel):
     referral_rewards_enabled: StrictBool = False
     referral_reward_amount: Decimal = Field(default=Decimal("0.00"), ge=0, max_digits=14, decimal_places=2)
     referral_reward_currency: str = Field(default="USD", pattern=r"^[A-Z]{3}$")
+    # Schema 145: confirmed referred purchases wait for an owner's approval before counting.
+    referral_reward_review_required: StrictBool = False
 
     @model_validator(mode="after")
     def require_referral_amount(self):

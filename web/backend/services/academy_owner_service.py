@@ -6,7 +6,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from hashlib import sha256
 from fastapi import HTTPException
-from pydantic import Field, StrictBool, EmailStr, model_validator
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, EmailStr, model_validator
 from database import service_supabase
 from services.academy_programme_service import Payload, available, report
 from services.academy_capability_service import capabilities
@@ -181,3 +181,49 @@ def classified_students(actor, classification=None, limit=50, offset=0):
     result=service_supabase.rpc('academy_classified_students',{'p_tenant':actor.tenant_id,'p_admin':actor.user_id,'p_classification':classification,'p_limit':limit,'p_offset':offset}).execute().data
     result['learners']=result['learners'][:limit]
     return result
+
+
+# Schema 145 admin review controls (opt-in reward review, audited overrides).
+class RewardReview(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    decision: Literal['earned', 'rejected']
+    note: str = Field(default='', max_length=1000)
+
+
+class TuitionOverride(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    eligible: bool | None
+    reason: str = Field(min_length=1, max_length=1000)
+
+
+class InstitutionVerification(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    verified: bool
+    note: str = Field(default='', max_length=1000)
+
+
+def require_admin_controls():
+    if not settings_available(145): raise HTTPException(503, detail={'code': 'academy_upgrade_required'})
+
+
+def review_reward(actor, referral_id, payload):
+    require_admin_controls()
+    if payload.decision == 'rejected' and not payload.note.strip():
+        raise HTTPException(422, detail={'code': 'academy_reward_reason_required'})
+    return service_supabase.rpc('academy_review_reward', {'p_tenant': actor.tenant_id, 'p_admin': actor.user_id, 'p_referral': str(referral_id), 'p_decision': payload.decision, 'p_note': payload.note}).execute().data
+
+
+def set_tuition_override(actor, user_id, payload):
+    require_admin_controls()
+    if not payload.reason.strip(): raise HTTPException(422, detail={'code': 'academy_override_reason_required'})
+    return service_supabase.rpc('academy_set_tuition_override', {'p_tenant': actor.tenant_id, 'p_admin': actor.user_id, 'p_user': user_id, 'p_eligible': payload.eligible, 'p_reason': payload.reason}).execute().data
+
+
+def set_institution_verification(actor, user_id, payload):
+    require_admin_controls()
+    return service_supabase.rpc('academy_set_institution_verification', {'p_tenant': actor.tenant_id, 'p_admin': actor.user_id, 'p_user': user_id, 'p_verified': payload.verified, 'p_note': payload.note}).execute().data
+
+
+def audit_log(actor, limit=50, offset=0):
+    require_admin_controls()
+    return service_supabase.rpc('academy_audit_log', {'p_tenant': actor.tenant_id, 'p_admin': actor.user_id, 'p_limit': limit, 'p_offset': offset}).execute().data

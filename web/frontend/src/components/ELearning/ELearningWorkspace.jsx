@@ -2,6 +2,7 @@ import LoadingBar from "../common/LoadingBar";
 import { useTranslation } from "react-i18next";
 import { Navigate, Route, Routes, useParams } from "react-router-dom";
 import ELearningTerminologyProvider from "./ELearningTerminologyProvider";
+import { AcademyAuditLogPage } from "./AcademyAdminControls";
 import AcademyLandingPageEntry from "./AcademyLandingPageEntry";
 import AcademyManagementHub from "./AcademyManagementHub";
 import AcademyOwnerOverview from "./AcademyOwnerOverview";
@@ -84,6 +85,7 @@ export default function ELearningWorkspace({ user }) {
       <Route path="contacts/:contactId" element={<CapabilityRoute user={user} capability="contact"><ContactDetailRoute /></CapabilityRoute>}/>
       <Route path="contacts" element={<CapabilityRoute user={user} capability="contact"><AcademyContactInbox /></CapabilityRoute>} />
       <Route path="students" element={<AcademyStudentsPage />} />
+      <Route path="audit-log" element={<AcademyAuditLogPage />} />
       <Route path="finance/:kind" element={<FinanceRoute user={user} />} />
       <Route path="programmes/:kind" element={<ProgrammeRoute user={user} />} />
       <Route path="reports" element={ownerElement("reports",<AcademyReportsPage />)} />

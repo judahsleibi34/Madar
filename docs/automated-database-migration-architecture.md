@@ -26,6 +26,35 @@ No production SQL, ledger mutation or active release selection is performed by
 adding the candidate. The existing136-only application is not a rollback target
 after advancement; the accepted compatible candidate must provide forward repair.
 
+## Unselected academy admin review candidate144→145 (review only, not for merge)
+
+Branch `eduhope/admin-migrations` carries a mirrored145 candidate that follows
+forms144 consecutively. It does not execute or select Exchange142, change
+001–144 SQL, or change the active main descriptor. Exact145 SQL/manifest/bridge
+hashes are validated by `web/scripts/academy_admin_candidate.py`; source namespace
+acceptance extends to145 only for those verified artifacts. Ordinary executor
+backup, locks and resume rules remain unchanged. Candidate compatibility is
+144..145; rollback is144 only. The candidate adds release metadata under the
+protected `web/deployment/releases` tree, so publishing it would require the
+governed control-plane upgrade; it is prepared for review and is not merged.
+
+Behaviour changes are opt-in or explicit owner actions. With the tenant setting
+`referral_reward_review_required`, a confirmed referred purchase creates a
+pending reward that counts towards no wallet, verified sale or Tuition Support
+eligibility until an owner approves it; rejection needs a reason; refunds reverse
+pending and earned rewards. Owners may override Tuition Support eligibility only
+with a reason, and may manually mark an institution (e.g. PAU) student verified;
+both write `audit_logs`, which owners/admins can read through
+`academy_audit_log`. Without the setting or an owner action, schema144 behaviour
+is unchanged.
+
+`web/scripts/rehearse_migration_145.py` builds a marked disposable database
+through 001–141, learning143 and forms144, preserves real schema144 rewards and
+wallet values through145 transactional rollback, verifies a schema144 backup,
+runs the locked145 manifest and re-entry, and runs the admin-control, referral,
+programme and commerce database suites. Source preparation and isolated
+validation authorize no production installation, production SQL or traffic switch.
+
 ## Approved unselected generic Forms review candidate143→144
 
 The separately approved mirrored144 candidate follows learning143 consecutively.

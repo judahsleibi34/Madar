@@ -31,6 +31,7 @@ describe("wallet", () => {
   it("never treats a sign-up without a purchase as money", () => {
     expect(referralState({ status: "pending" })).toEqual({ signup: true, reward: null });
     expect(referralState({ status: "earned" })).toEqual({ signup: false, reward: "available" });
+    expect(referralState({ status: "rejected", reward_status: "rejected" })).toEqual({ signup: false, reward: "rejected" });
     expect(pendingRewards(referrals)).toBe(10);
     expect(pendingRewards({ history: [{ status: "pending", amount: 10 }] })).toBe(0);
   });

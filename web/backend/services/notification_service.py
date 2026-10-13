@@ -278,7 +278,7 @@ def _format_notification(row: dict[str, Any]) -> dict[str, Any]:
         path = "/my-learning/affiliate"
     elif event == "learning_referral_attributed":
         path = "/my-learning/referrals"
-    elif event in {"learning_reward_earned", "learning_reward_reversed"}:
+    elif event in {"learning_reward_earned", "learning_reward_reversed", "learning_reward_pending", "learning_reward_rejected"}:
         path = "/my-learning/rewards"
     elif event.startswith("learning_withdrawal_") and not event.endswith(("_owner", "_request")):
         path = "/my-learning/withdrawals"
