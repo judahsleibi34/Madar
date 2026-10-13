@@ -21,7 +21,7 @@ from deployment.lib.emergency_routing_repair import exclusive, verification_wind
 from deployment.lib.provider_recovery_runtime import protected
 from deployment.lib.runtime_authority import runtime_mutation_lock
 from deployment.lib.completed_normal_resources import origin_spec_matches
-from deployment.lib.completed_normal_profile import profile, LEGACY, expected_origin_grant
+from deployment.lib.completed_normal_profile import profile, LEGACY, APPLICATION, expected_origin_grant
 
 
 def atomic_public_authority(path: Path, value: dict) -> None:
@@ -114,7 +114,7 @@ class CompletedNormalWriteHandoff:
         base=f'http://127.0.0.1:{port}'
         version=runtime.json_http(base+'/health/version')
         if (version.get('release_sha')!=roles['application_sha'] or version.get('release_slot')!=self.contract['origin']['slot']
-                or version.get('schema_compatible_min')!=115 or version.get('schema_compatible_max')!=(115 if legacy else 136)
+                or version.get('schema_compatible_min')!=expected.get('compatible_min',115) or version.get('schema_compatible_max')!=expected.get('compatible_max',115)
                 or runtime.json_http(base+'/health/recovery')!={'restricted':False,'business_writes_enabled':True}):
             raise RuntimeError('completed_normal_origin_serving_identity_changed')
         with runtime_mutation_lock(self.state_root):

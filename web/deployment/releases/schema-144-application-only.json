@@ -1,0 +1,14 @@
+{
+  "release_metadata_version": 1,
+  "deployment_profile": "local-supabase-schema144-application-only",
+  "schema": {
+    "compatible_min": 136,
+    "compatible_max": 144,
+    "target": 144,
+    "migration_class": "none",
+    "rollback_compatible_min": 136,
+    "rollback_compatible_max": 144,
+    "excluded_versions": [142]
+  },
+  "migration_policy": "none"
+}

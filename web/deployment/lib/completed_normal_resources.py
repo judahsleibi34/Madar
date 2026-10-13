@@ -82,8 +82,8 @@ def planned_retirements(contract,slot,runtime):
     This does not authorize stopping anything. Staging always rechecks ports
     without this prospective allowance after the root transaction stops them.
     """
-    from deployment.lib.completed_normal_profile import profile, MANUAL
-    if profile(contract) is not MANUAL:
+    from deployment.lib.completed_normal_profile import profile, LEGACY, MANUAL
+    if profile(contract) is LEGACY:
         raise RuntimeError('completed_normal_manual_retirement_contract_required')
     if slot!=contract['candidate']['slot'] or slot==contract['origin']['slot']:
         raise RuntimeError('completed_normal_manual_retirement_slot_invalid')

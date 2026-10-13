@@ -183,6 +183,22 @@ class DockerGitOperations:
         self.container_prefix = container_prefix
         self.release_root: Path | None = None
 
+    def release_metadata_path(self) -> Path:
+        admission=getattr(self,'completed_normal_admission',None)
+        if admission is not None:
+            from deployment.lib.completed_normal_profile import APPLICATION,profile
+            if profile(admission) is APPLICATION:
+                # This no-SQL contract belongs to the exact installed controller,
+                # not the previously accepted, immutable application worktree.
+                from deployment.lib.completed_normal_admission import require_candidate_authority
+                from deployment.lib.provider_recovery_runtime import readonly_configuration
+                require_candidate_authority(admission)
+                if self.metadata_filename!=APPLICATION.metadata:
+                    raise RuntimeError('application_only_release_contract_changed')
+                return readonly_configuration(Path(__file__).resolve().parents[1]/'releases'/APPLICATION.metadata,private=False)
+        if self.release_root is None:raise RuntimeError('release_source_not_prepared')
+        return self.release_root/'web/deployment/releases'/self.metadata_filename
+
     @staticmethod
     def _storage_root() -> Path:
         raw = os.getenv("MADAR_STORAGE_ROOT", "").strip()
@@ -271,8 +287,8 @@ class DockerGitOperations:
         frontend_tag = f"madar-frontend:{sha}-{frontend_target}"
         admission = getattr(self, "completed_normal_admission", None)
         if admission is not None:
-            from deployment.lib.completed_normal_profile import MANUAL
-            if profile(admission) is MANUAL:
+            from deployment.lib.completed_normal_profile import LEGACY
+            if profile(admission) is not LEGACY:
                 # The accepted manual build has this immutable local tag.
                 # Never retag/rebuild it to fit the historical build suffix.
                 frontend_tag=f'madar-frontend:{sha}'
@@ -722,9 +738,7 @@ class DockerGitOperations:
                 require_candidate_authority(self.completed_normal_admission, mode="READ_ONLY")
                 self.verify_completed_normal_allocation(slot)
 
-        candidate_compatibility = Compatibility.load(
-            self.release_root / "web/deployment/releases" / self.metadata_filename
-        )
+        candidate_compatibility = Compatibility.load(self.release_metadata_path())
         if candidate_compatibility != self.compatibility:
             raise RuntimeError("control_plane_release_contract_mismatch")
 
@@ -867,8 +881,8 @@ class DockerGitOperations:
         prefix = getattr(self, "container_prefix", "madar")
         admission=getattr(self,"completed_normal_admission",None)
         if admission is not None and slot==admission['origin']['slot']:
-            from deployment.lib.completed_normal_profile import MANUAL
-            if profile(admission) is MANUAL:
+            from deployment.lib.completed_normal_profile import LEGACY
+            if profile(admission) is not LEGACY:
                 from deployment.lib.completed_normal_admission import credential_witness
                 witness=credential_witness('origin_runtime','origin_runtime_sha256')
                 if (witness.get('source_sha')!=admission['source_roles']['application_sha']
@@ -895,13 +909,13 @@ class DockerGitOperations:
         if admission is None:
             raise RuntimeError("completed_normal_admission_required")
         roles, origin = admission["source_roles"], admission["origin"]
-        from deployment.lib.completed_normal_profile import profile, LEGACY
+        from deployment.lib.completed_normal_profile import profile, LEGACY, expected_origin_grant
         legacy = profile(admission) is LEGACY
         base = "http://127.0.0.1:" + SLOT_PORTS[origin["slot"]]["backend"]
         version = self._json(base + "/health/version")
         if (version.get("release_sha") != roles["application_sha"]
                 or version.get("release_slot") != origin["slot"]
-                or version.get("schema_compatible_min") != 115 or version.get("schema_compatible_max") != (115 if legacy else 136)
+                or version.get("schema_compatible_min") != expected_origin_grant(admission,"READ_ONLY").get("compatible_min",115) or version.get("schema_compatible_max") != expected_origin_grant(admission,"READ_ONLY").get("compatible_max",115)
                 or self._json(base + "/health/recovery") != {"restricted":True,"business_writes_enabled":False}):
             raise RuntimeError("completed_normal_origin_write_fence_required")
 
@@ -1482,7 +1496,7 @@ def plan_release_migrations(
         # DockerGitOperations always sets it in verify_source().
         return []
     release_root = operations.release_root
-    metadata_path = release_root / "web/deployment/releases" / operations.metadata_filename
+    metadata_path = operations.release_metadata_path()
     metadata = _json_file(metadata_path, "candidate_release_contract_invalid")
     if Compatibility.load(metadata_path) != compatibility:
         raise RuntimeError("candidate_release_contract_mismatch")
@@ -1714,8 +1728,8 @@ def adopt_prepared_release(
     admission = getattr(operations, "completed_normal_admission", None)
     if admission is not None:
         from deployment.lib.completed_normal_admission import require_candidate_authority, digest as admission_digest
-        from deployment.lib.completed_normal_profile import profile, MANUAL
-        manual = profile(admission) is MANUAL
+        from deployment.lib.completed_normal_profile import profile, LEGACY
+        manual = profile(admission) is not LEGACY
         require_candidate_authority(admission, mode='READ_ONLY' if manual else 'NORMAL')
         origin = existing.get("known_good_release") or {}
         if (origin.get("sha") != admission["source_roles"]["application_sha"]

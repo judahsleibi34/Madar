@@ -121,7 +121,7 @@ def attest_compatible_runtime(operations,state,production_sha,installed_sha):
             or completion.get('images')!=candidate['images'] or completion.get('customer_database_restored') is not False
             or known.get('sha')!=candidate['source_sha'] or known.get('slot')!=candidate['slot']
             or state.get('active_slot')!=candidate['slot'] or known.get('schema')!=selected.target
-            or known.get('schema_compatible_min')!=selected.source or known.get('schema_compatible_max')!=selected.target
+            or known.get('schema_compatible_min')!=selected.minimum or known.get('schema_compatible_max')!=selected.target
             or state.get('in_progress_release') or state.get('rollback_failure')):
         raise RuntimeError('completed_compatible_release_changed')
     for kind in ('backend','frontend','worker'):

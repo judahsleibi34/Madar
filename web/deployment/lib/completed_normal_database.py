@@ -2,7 +2,7 @@
 import json
 from pathlib import Path
 from deployment.lib.completed_normal_admission import digest
-from deployment.lib.completed_normal_profile import profile, LEGACY
+from deployment.lib.completed_normal_profile import profile, LEGACY, APPLICATION
 
 IDENTITY_SQL="BEGIN READ ONLY; SELECT json_build_object('system_identifier',system_identifier::text,'schema',schema_version)::text FROM pg_control_system(),public.application_schema_state WHERE contract_key='core'; COMMIT;"
 
@@ -51,6 +51,11 @@ def require_normal_migration_boundary(contract, schema, root, state_root):
     from deployment.lib.provider_recovery_runtime import protected, file_digest
     selected = profile(contract)
     intent=Path(root)/'migration-intent.json'
+    if selected is APPLICATION:
+        if schema != 144 or any((Path(root)/name).exists() for name in (
+                'migration-intent.json', 'migration-completion.json', 'migration-execution.json')):
+            raise RuntimeError('compatible_boot_application_only_schema_changed')
+        return
     if not intent.exists():
         if schema!=selected.source:
             raise RuntimeError('compatible_boot_unattested_schema_advancement')

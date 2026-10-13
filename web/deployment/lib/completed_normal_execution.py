@@ -14,7 +14,7 @@ from pathlib import Path
 import re
 import traceback
 
-from deployment.lib.completed_normal_admission import ADMISSIONS,OPERATION,digest,encoded,publish_admission
+from deployment.lib.completed_normal_admission import ADMISSIONS,OPERATION,digest,encoded,publish_admission,require_candidate_authority
 from deployment.lib.completed_normal_backup import CompletedNormalBackupContext
 from deployment.lib.completed_normal_boot_installation import CompletedNormalBootInstallation
 from deployment.lib.completed_normal_boot_actor import verify_live_configuration
@@ -27,7 +27,7 @@ from deployment.lib.completed_normal_write_handoff import CompletedNormalWriteHa
 from deployment.lib.control_plane_upgrade import acquire_lock,BACKUP_TIMERS,require_root_directory
 from deployment.lib.emergency_routing_repair import exclusive
 from deployment.lib.provider_recovery_runtime import protected,readonly_configuration,file_digest
-from deployment.lib.completed_normal_profile import profile, MANUAL
+from deployment.lib.completed_normal_profile import profile, LEGACY, MANUAL, APPLICATION
 
 FAILED_BOOT_RECORDS=frozenset({'operator-authorization.json','admission.json','failure.json',
     'boot-preimages.json','boot-installation.json','boot-installation-failed.json',
@@ -214,7 +214,7 @@ def verify_serving(actor, *, schema,normal):
                     version=actor.runtime.json_http(base+'/health/version')
                     if (version.get('release_sha')!=actor.contract['candidate']['source_sha']
                             or version.get('release_slot')!=actor.contract['candidate']['slot']
-                            or version.get('schema_compatible_min')!=selected.source or version.get('schema_compatible_max')!=selected.target
+                            or version.get('schema_compatible_min')!=selected.minimum or version.get('schema_compatible_max')!=selected.target
                             or tuple(version.get('schema_excluded_versions',[]))!=selected.excluded
                             or actor.runtime.json_http(base+'/health/recovery')!={'restricted':not normal,'business_writes_enabled':normal}):
                         raise RuntimeError('completed_upgrade_stable_serving_identity_changed')
@@ -278,6 +278,11 @@ class CompletedNormalUpgrade:
         """No authorization consumption, service effects, or live SQL writes."""
         self.preparation_source();self.verify_candidate_remote();self.artifact_guard();self.rehearsal_guard()
         before=self.ops.current_preflight(lock_deployment=locked)
+        if self.profile is APPLICATION:
+            from deployment.lib.control_plane_upgrade import validate_immutable_release_selection
+            selection=self.document.get('rollback_source_selection')
+            if validate_immutable_release_selection(selection,self.contract['source_roles']['controller_sha'])!=self.controller:
+                raise RuntimeError('application_rollback_source_binding_invalid')
         if (before['schema']!=self.profile.source or before['slot']!=self.contract['origin']['slot']
                 or before['installed_sha']!=self.contract['source_roles']['controller_sha']
                 or before['production_sha']!=self.contract['source_roles']['controller_sha']
@@ -296,7 +301,7 @@ class CompletedNormalUpgrade:
             raise RuntimeError('completed_upgrade_interlock_reconciliation_already_consumed')
         observe_native(self.contract,self.actor.runtime)
         from deployment.lib.active_recovery_backup import verify_backup_execution_context
-        if self.profile is MANUAL:
+        if self.profile is not LEGACY:
             verify_backup_execution_context(self.package,expected_schema=self.profile.source)
         else:verify_backup_execution_context(self.package)
         baseline=customer_baseline(self.contract,self.actor.runtime)
@@ -304,7 +309,7 @@ class CompletedNormalUpgrade:
                 or baseline['identity_roots_sha256']!=self.contract['customer_identity_roots_sha256']):
             raise RuntimeError('completed_upgrade_current_customer_data_changed')
         allocation=verify_allocation(self.contract,self.contract['candidate']['slot'],self.actor.runtime,
-            prospective_retirement=self.profile is MANUAL)
+            prospective_retirement=self.profile is not LEGACY)
         # Render the exact staging builder before authorization. Its dedicated
         # read-only mode rejects every command except Compose config and does
         # not invent an admission, grant, worker owner or historical credential.
@@ -436,6 +441,17 @@ class CompletedNormalUpgrade:
         # Preserve both exception types when compensation itself fails.
         try:
             if self.fenced or self.controller_installed or (self.root/'controller-installation-intent.json').exists():
+                if self.profile is APPLICATION:
+                    try:self.rollback_application_origin()
+                    except Exception:
+                        # A rejected rollback must not leave either grant or
+                        # consumer generation active. Use the existing fenced
+                        # compensation path; never retry the consumed attempt.
+                        try:self.actor.compensate()
+                        finally:self.ops.requiesce_backup_timers_for_failure()
+                        raise
+                    evidence['compensation']='original_schema144_normal_restored'
+                    return evidence
                 try:self.actor.compensate()
                 finally:self.ops.requiesce_backup_timers_for_failure()
             elif self.quiesced:
@@ -477,6 +493,25 @@ class CompletedNormalUpgrade:
                 'source_bundle_sha256':self.document['source_bundle_sha256'],'controller_sha':self.controller,
                 'application_sha':self.contract['candidate']['source_sha']}
             exclusive(self.root/'operator-authorization.json',encoded(authorization))
+            if self.profile is APPLICATION:
+                from deployment.lib.runtime_authority import load_worker_authority
+                exclusive(self.root/'application-origin-state.json',readonly_configuration(self.ops.state_root/'state.json',private=True).read_bytes())
+                exclusive(self.root/'application-origin-workers.json',encoded(load_worker_authority(self.ops.state_root)))
+                worker_stat=readonly_configuration(self.ops.state_root/'worker-ownership.json',private=True).stat()
+                exclusive(self.root/'application-origin-worker-owner.json',encoded({
+                    'uid':worker_stat.st_uid,'gid':worker_stat.st_gid,'mode':worker_stat.st_mode & 0o777}))
+                route=readonly_configuration(Path('/var/lib/madar/proxy/active-upstreams.conf'),private=False).read_bytes()
+                if hashlib.sha256(route).hexdigest()!=self.document['origin_routing_sha256']:
+                    raise RuntimeError('application_rollback_origin_route_changed')
+                exclusive(self.root/'application-origin-route.conf',route)
+                # Resolve/freeze rollback objects before replacing boot or
+                # controller resources. Compensation must not need GitHub or
+                # a still-moving main after the handoff has started.
+                self.ops.resolve_candidate(self.controller,dry_run=False)
+                _,rollback_source=self.ops.stage_candidate(self.contract['source_roles']['controller_sha'],
+                    immutable_selection=self.document['rollback_source_selection'])
+                exclusive(self.root/'application-rollback-source.json',encoded({
+                    'path':str(rollback_source),'tree_sha256':self.ops.protected_tree_digest(rollback_source)}))
             exclusive(self.root/'backup-timer-preimages.json',encoded(self.document['backup_timer_states']))
             with self.root_credential():
                 self.event('boot_supersession_pending');self.actor.installation.install();self.actor.guard()
@@ -484,7 +519,7 @@ class CompletedNormalUpgrade:
             # Existing deploy.lock must be released before the User=madar
             # service obtains it. The protected upgrade interlock stays armed.
             self.ops.release_deployment_lock()
-            if self.profile is MANUAL:
+            if self.profile is not LEGACY:
                 with self.root_credential():
                     self.event('retained_blue_retirement_pending')
                     from deployment.lib.completed_normal_resources import retire_bound_resources
@@ -504,6 +539,8 @@ class CompletedNormalUpgrade:
                     runtime=self.actor.runtime,state_root=self.ops.state_root)
                 kernel.round(normal=False)
             self.service('publish')
+            if self.profile is APPLICATION:
+                return self.complete_application(handoff, kernel)
             with self.root_credential():
                 self.acceptance_guard(schema=self.profile.source,normal=False)
                 if self.profile is not MANUAL:
@@ -570,3 +607,153 @@ class CompletedNormalUpgrade:
         finally:
             self.ops.clear_authorization();self.ops.close_locks()
             if self.lock is not None:os.close(self.lock);self.lock=None
+
+    def complete_application(self, handoff, kernel):
+        """The existing handoff at144, with no migration intent or SQL child.
+
+        The candidate is published and adopted READ_ONLY. An ordinary backup
+        and independent restore/replica complete before the single NORMAL
+        grant. Interrupted execution uses the existing fenced compensation.
+        """
+        with self.root_credential():
+            self.acceptance_guard(schema=144,normal=False)
+        self.service('adopt')
+        with self.root_credential():
+            self.acceptance_guard(schema=144,normal=False)
+            self.event('pre_activation_backup_pending')
+            backup=CompletedNormalBackupContext(self.contract,self.document,self.package,kernel,
+                stage='pre-migration',source_guard=self.actor.guard,artifact_guard=self.artifact_guard)
+            backup.capture()
+            self.event('application_normal_grant_pending');handoff.grant(schema=144)
+            self.acceptance_guard(schema=144,normal=True)
+            self.event('post_activation_backup_pending')
+            backup=CompletedNormalBackupContext(self.contract,self.document,self.package,kernel,
+                stage='post-migration',source_guard=self.actor.guard,artifact_guard=self.artifact_guard)
+            receipt=backup.capture()
+            self.ops.restore_backup_timers()
+            kernel.round(normal=True);self.acceptance_guard(schema=144,normal=True)
+            result={'operation':self.profile.operation,'context_sha256':digest(self.contract),
+                'schema':144,'mode':'NORMAL','application_sha':self.contract['candidate']['source_sha'],
+                'controller_sha':self.controller,'images':self.contract['candidate']['images'],
+                'backup':receipt,'backup_timers':{n:self.ops.systemctl_state(n) for n in BACKUP_TIMERS},
+                'customer_database_restored':False,'sql_executed':False}
+            exclusive(self.root/'normal-completion.json',encoded(result))
+            from deployment.lib.completed_normal_baseline import seal_compatible_release
+            seal_compatible_release(self.contract,self.root,self.ops.state_root)
+            self.event('normal_completed',schema=144,mode='NORMAL')
+        self.ops.clear_interlock()
+        return result
+
+    def rollback_application_origin(self):
+        """Back out an authorized app-only attempt; never restore database data.
+
+        Existing installer, boot preimages and boot kernel are used. The old
+        controller is an explicitly pinned canonical ancestor in this plan.
+        Old receipts are integrity DATA; this active fresh transaction supplies
+        permission for the compensation, including restoring the old grant.
+        """
+        from deployment.lib.completed_normal_admission import verify_history
+        from deployment.lib.active_recovery_inputs import controller_tree_digest
+        from deployment.lib.runtime_authority import runtime_mutation_lock,write_worker_authority
+        from deployment.lib.compatible_normal_boot import CompatibleNormalBoot,WORKERS
+        from deployment.lib.completed_normal_resources import measured_spec_matches
+        from deployment.lib.completed_normal_baseline import compatible_package
+        from deployment.lib.control_plane_upgrade import atomic_json,validate_immutable_release_selection
+        from deployment.lib.completed_normal_profile import expected_origin_grant
+        if self.profile is not APPLICATION or self.lock is None or not self.admitted:
+            raise RuntimeError('application_rollback_active_transaction_required')
+        def guard():
+            self.preparation_source();verify_history(self.contract)
+            if self.actor.native()!=144 or any((self.root/name).exists() for name in ('migration-intent.json','migration-completion.json')):
+                raise RuntimeError('application_rollback_schema_changed')
+        guard()
+        original=json.loads(protected(self.root/'application-origin-state.json',private=True).read_text())
+        workers=json.loads(protected(self.root/'application-origin-workers.json',private=True).read_text())
+        worker_owner=json.loads(protected(self.root/'application-origin-worker-owner.json',private=True).read_text())
+        if (set(worker_owner)!={'uid','gid','mode'} or worker_owner['mode']!=0o600
+                or any(type(worker_owner[k]) is not int or worker_owner[k]<0 for k in ('uid','gid'))):
+            raise RuntimeError('application_rollback_worker_file_owner_changed')
+        def restore_workers(owner):
+            write_worker_authority(self.ops.state_root,generation=workers['generation'],owner=owner,
+                old=workers['old'],candidate=workers['candidate'])
+            path=self.ops.state_root/'worker-ownership.json'
+            os.chown(path,worker_owner['uid'],worker_owner['gid'])
+            os.chmod(path,worker_owner['mode'])
+        roles=self.contract['source_roles'];old_root=Path(roles['completion_root'])
+        old_sha=roles['controller_sha'];selection=self.document['rollback_source_selection']
+        if (validate_immutable_release_selection(selection,old_sha)!=self.controller
+                or original.get('active_slot')!=self.contract['origin']['slot']
+                or (original.get('known_good_release') or {}).get('sha')!=roles['application_sha']
+                or workers.get('generation')!=self.contract['origin']['worker_generation']
+                or workers.get('owner')!='CANDIDATE' or workers.get('candidate')!={'sha':roles['application_sha'],'slot':self.contract['origin']['slot']}):
+            raise RuntimeError('application_rollback_origin_changed')
+        exclusive(self.root/'application-rollback-intent.json',encoded({'context_sha256':digest(self.contract),
+            'controller_sha':old_sha,'application_sha':roles['application_sha'],'schema':144,'database_restored':False}))
+        with self.root_credential():
+            new=require_candidate_authority(self.contract)
+            atomic_public_authority(self.root/'write-authority/authority.json',dict(new,mode='READ_ONLY'))
+            old_grant=protected(old_root/'write-authority/authority.json')
+            current=json.loads(old_grant.read_text())
+            if current not in (expected_origin_grant(self.contract,'NORMAL'),expected_origin_grant(self.contract,'READ_ONLY')):
+                raise RuntimeError('application_rollback_origin_grant_changed')
+            atomic_public_authority(old_grant,expected_origin_grant(self.contract,'READ_ONLY'))
+            with runtime_mutation_lock(self.ops.state_root):
+                for path in (old_root/'candidate-runtime.json',self.root/'candidate-runtime.json',self.root/'candidate-staged-runtime.json'):
+                    if not path.exists():continue
+                    record=json.loads(protected(path,private=True).read_text())
+                    for kind in WORKERS:
+                        identity=record['runtimes'][kind];rows=self.actor.runtime.inspect([identity['id']])
+                        row=next(iter(rows.values())) if len(rows)==1 else None
+                        if row is None or row['Image']!=identity['image'] or not measured_spec_matches(row,identity['spec_sha256'],started_worker=True):
+                            raise RuntimeError('application_rollback_worker_identity_changed')
+                        if row['State']['Running']:self.actor.runtime.command(['docker','stop',identity['id']])
+                restore_workers('NONE')
+            # Source objects and full tree are independently revalidated by the
+            # existing immutable-selection staging and root installer.
+            saved=json.loads(protected(self.root/'application-rollback-source.json',private=True).read_text())
+            staged=Path(saved['path'])
+            if (not staged.is_relative_to(self.ops.staging_root)
+                    or self.ops.staging_git('application_rollback_source_head','rev-parse','HEAD',cwd=staged).stdout!=old_sha
+                    or self.ops.protected_tree_digest(staged)!=saved['tree_sha256']):
+                raise RuntimeError('application_rollback_frozen_source_changed')
+            backup=self.root/'rollback-controller-backup';backup.mkdir(mode=0o700)
+            self.ops.installer_dry_run(staged,backup)
+            self.ops.installer_apply(staged,backup,old_sha)
+            self.ops.madar_git('application_rollback_checkout','checkout','--detach',old_sha)
+            self.ops.verify_install(old_sha,backup)
+            if controller_tree_digest()!=self.document['installed_controller_tree_sha256']:
+                raise RuntimeError('application_rollback_controller_tree_changed')
+            previous=self.actor.installation.source_guard
+            self.actor.installation.source_guard=guard
+            try:self.actor.installation.restore_application_preimages()
+            finally:self.actor.installation.source_guard=previous
+            # Preserve every appended release event; restore only the exact
+            # origin identity/owner, never replace customer or database state.
+            state_path=self.ops.state_root/'state.json';state=json.loads(readonly_configuration(state_path,private=True).read_text())
+            state['known_good_release']=original['known_good_release'];state['active_slot']=original['active_slot']
+            state.pop('in_progress_release',None);state.pop('rollback_failure',None)
+            state.setdefault('history',[]).append({'operation':self.profile.operation,'phase':'application_rollback',
+                'context_sha256':digest(self.contract),'schema':144,'database_restored':False})
+            stat=state_path.stat();atomic_json(state_path,state,owner=(stat.st_uid,stat.st_gid))
+            restore_workers('CANDIDATE')
+            receipt=json.loads(protected(old_root/'operator-authorization.json',private=True).read_text())
+            package=SOURCE_PACKAGES/('normal-source-'+receipt['source_bundle_sha256'])
+            doc,_=compatible_package(package,receipt['source_bundle_sha256'],receipt['plan_sha256'])
+            old_contract=dict(doc['admission_contract'],plan_sha256=digest(doc))
+            def publish(mode):
+                guard();atomic_public_authority(old_grant,expected_origin_grant(self.contract,mode))
+            kernel=CompatibleNormalBoot(old_contract,source_guard=guard,native_verifier=lambda:self.actor.native(),
+                publish_authority=publish,compensate_current_data=lambda:publish('READ_ONLY'),
+                runtime=self.actor.runtime,state_root=self.ops.state_root)
+            kernel.execute_read_only()
+            route=protected(self.root/'application-origin-route.conf').read_bytes()
+            if hashlib.sha256(route).hexdigest()!=self.document['origin_routing_sha256']:
+                raise RuntimeError('application_rollback_origin_route_changed')
+            self.actor.proxy_identity()
+            self.actor.runtime.nginx_preflight(route,self.root)
+            self.actor.runtime.publish(route);self.actor.runtime.reload()
+            publish('NORMAL');kernel.verify_mode(normal=True)
+            self.ops.current_preflight(lock_deployment=False);self.ops.restore_backup_timers()
+            exclusive(self.root/'application-rollback-completion.json',encoded({'schema':144,'mode':'NORMAL',
+                'application_sha':roles['application_sha'],'controller_sha':old_sha,'customer_database_restored':False}))
+        self.ops.clear_interlock()

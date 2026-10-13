@@ -118,6 +118,7 @@ declare -a tracked_files=(
   releases/release.json
   releases/schema-96-recovery.json
   releases/schema-136-144-learning-bridge.json
+  releases/schema-144-application-only.json
   releases/learning-136-144-path.json
   proxy/docker-compose.yml
   proxy/nginx.conf

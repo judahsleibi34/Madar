@@ -41,6 +41,10 @@ def main() -> int:
     require_upgrade_authorization(None)
     from deployment.lib.provider_recovery import reject_ordinary_operation
     reject_ordinary_operation(Path(os.getenv("MADAR_DEPLOY_STATE_ROOT", "/var/lib/madar/releases")))
+    from deployment.lib.control_plane_upgrade_authorization import UPGRADE_INTERLOCK
+    from deployment.lib.completed_normal_profile import APPLICATION
+    if UPGRADE_INTERLOCK.exists() and json.loads(UPGRADE_INTERLOCK.read_text()).get('operation') == APPLICATION.operation:
+        raise RuntimeError('application_only_migration_operation_denied')
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
