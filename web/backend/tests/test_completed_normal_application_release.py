@@ -51,6 +51,22 @@ class ApplicationContractTests(unittest.TestCase):
         grant=expected_origin_grant(application_contract(),'NORMAL')
         self.assertEqual((grant['schema'],grant['compatible_min'],grant['compatible_max']),(144,136,144))
 
+    def test_only_nonsecret_origin_admission_uses_public_protected_file_check(self):
+        from deployment.lib import provider_recovery_runtime as protection
+        c=application_contract();origin=Path(c['source_roles']['completion_root'])
+        c['historical_files']={str(origin/'admission.json'):'a'*64,
+            str(origin/'operator-authorization.json'):'a'*64}
+        calls=[]
+        def checked(path,*,private=False):
+            calls.append((path.name,private));return path
+        with patch.object(protection,'protected',side_effect=checked), \
+                patch.object(protection,'file_digest',return_value='a'*64):
+            admission.verify_history(c)
+        self.assertEqual(calls,[('admission.json',False),('operator-authorization.json',True)])
+        with patch.object(protection,'protected',side_effect=checked), \
+                patch.object(protection,'file_digest',return_value='b'*64):
+            with self.assertRaisesRegex(RuntimeError,'historical_evidence_changed'):admission.verify_history(c)
+
     def test_app_only_boot_rejects_schema_changes_and_any_sql_intent(self):
         with tempfile.TemporaryDirectory() as d:
             root=Path(d);c=application_contract()
