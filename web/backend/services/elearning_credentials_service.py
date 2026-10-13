@@ -126,8 +126,51 @@ def save_template(actor, payload, identifier=None):
 
 
 def mine(actor, identifier=None):
-    return call('get_elearning_my_certificates', p_tenant_id=actor.tenant_id, p_user_id=actor.user_id,
+    data = call('get_elearning_my_certificates', p_tenant_id=actor.tenant_id, p_user_id=actor.user_id,
                 p_id=str(identifier) if identifier else None)
+    return with_final_scores(data, actor.tenant_id)
+
+
+def final_exam_score(credential_number, tenant_id=None):
+    """Best passed graded attempt in the certified section (CEFR certificates).
+
+    The book requires the final exam score on each certificate; it is derived
+    from existing records (credential -> completion event -> the section's
+    placed exams -> the enrolment's passed attempts). None when unavailable."""
+    from database import service_supabase
+    try:
+        query = service_supabase.table('elearning_credentials').select('tenant_id,completion_id,credential_type').eq('credential_number', credential_number)
+        if tenant_id is not None:
+            query = query.eq('tenant_id', tenant_id)
+        credential = (query.limit(1).execute().data or [None])[0]
+        if not credential or not str(credential.get('credential_type', '')).startswith('cefr_'):
+            return None
+        tenant = credential['tenant_id']
+        from services.elearning_academy_service import experience_for_tenant
+        if experience_for_tenant(tenant).get('lessonComponents') is not True:
+            return None  # Opt-in: other academies' certificates are unchanged.
+        event = (service_supabase.table('elearning_completion_events').select('section_id,enrollment_id').eq('tenant_id', tenant)
+                 .eq('id', credential['completion_id']).limit(1).execute().data or [None])[0]
+        if not event or not event.get('section_id'):
+            return None
+        placements = [row['id'] for row in service_supabase.table('elearning_assessment_placements').select('id').eq('tenant_id', tenant)
+                      .eq('section_id', event['section_id']).eq('placement_type', 'section').execute().data or []]
+        if not placements:
+            return None
+        scores = [row['score_percentage'] for row in service_supabase.table('elearning_assessment_attempts').select('score_percentage').eq('tenant_id', tenant)
+                  .eq('enrollment_id', event['enrollment_id']).in_('placement_id', placements).eq('status', 'submitted').eq('passed', True).execute().data or []
+                  if row.get('score_percentage') is not None]
+        return float(max(scores)) if scores else None
+    except Exception:
+        return None
+
+
+def with_final_scores(data, tenant_id=None):
+    rows = data if isinstance(data, list) else data.get('items') if isinstance(data, dict) and isinstance(data.get('items'), list) else [data] if isinstance(data, dict) else []
+    for row in rows:
+        if isinstance(row, dict) and row.get('credential_number'):
+            row['final_score'] = final_exam_score(row['credential_number'], tenant_id)
+    return data
 
 
 def verification(token):
@@ -140,6 +183,7 @@ def verification(token):
                      'completion_date': data['completed_at'][:10], 'issue_date': data['issued_at'][:10],
                      'issuer_name': data['issuer_name'], 'credential_id': data['credential_number']}
         data['issuer_name'] = PLACEHOLDER.sub(lambda match: variables[match[1].strip()], data['issuer_name'])
+        data['final_score'] = final_exam_score(data['credential_number'])
     return data
 
 
@@ -153,4 +197,6 @@ def presentation(row, origin=None):
         design[key] = PLACEHOLDER.sub(lambda match: variables[match[1].strip()], design.get(key, ''))
     return {**variables, 'credential_number': row['credential_number'], 'status': row['status'],
             'completed_at': row['completed_at'], 'issued_at': row['issued_at'], 'design': design,
-            'verification_url': resolve_frontend_url_for_request(origin) + '/verify/credential/' + row['verification_token']}
+            'verification_url': resolve_frontend_url_for_request(origin) + '/verify/credential/' + row['verification_token'],
+            **({'cefr_level': snapshot['cefr_level']} if snapshot.get('cefr_level') else {}),
+            **({'final_score': row['final_score']} if row.get('final_score') is not None else {})}

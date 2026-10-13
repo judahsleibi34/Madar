@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { checkPracticeAnswer, loadAssessment, learnerAssessment, startAssessment, submitAssessment } from "../../../services/elearningAssessments";
 import ListenMatchActivity, { ListenMatchResults } from "./ListenMatchActivity";
 import { ChooseBestResponse, SpeakNow } from "./PracticeActivities";
+import ExamRunner from "./ExamRunner";
 import { useLearningExperience } from "../LearningExperienceContext";
 import ELearningSkeleton from "../ELearningSkeleton";
 import AssessmentQuestions from "./AssessmentQuestions";
@@ -49,6 +50,7 @@ export default function AssessmentBlockRenderer({ block, context = "author", cou
       {listenMatch ? <ListenMatchActivity questions={attempt.questions} disabled={busy} check={check} onFinish={finish} />
       : bestResponse ? <ChooseBestResponse title={assessment?.title} questions={attempt.questions} disabled={busy} check={check} onFinish={finish} />
       : speakNow ? <SpeakNow questions={attempt.questions} disabled={busy} onFinish={finish} />
+      : enhanced && !practice && attempt?.status === "in_progress" ? <ExamRunner attempt={attempt} answers={answers} busy={busy} onChange={(id, value) => setAnswers(previous => ({ ...previous, [id]: value }))} onSubmit={() => run(true)} />
       : attempt?.status === "in_progress" ? <form onSubmit={event => { event.preventDefault(); run(true); }}><AssessmentQuestions recordings={attempt.recordings} attemptId={attempt.id} questions={attempt.questions} answers={answers} onChange={(id, value) => setAnswers(previous => ({ ...previous, [id]: value }))} disabled={busy} /><button className="ecommerce-primary-button" disabled={busy || attempt.questions.some(q => !answers[q.id] || (["matching", "listen_match"].includes(q.type) && Object.values(answers[q.id].matches || {}).filter(Boolean).length !== q.config.prompts.length))}>{t("elearning.assessment.submit")}</button></form> : attempt?.status === "pending_review" ? <button className="ecommerce-secondary-button" disabled={busy} onClick={() => setReload(n => n + 1)}>{t("elearning.retry")}</button> : data.summary.remaining_attempts === 0 ? <p role="status">{t("elearning.assessment.limit")}</p> : <button className="ecommerce-primary-button" disabled={busy} onClick={() => run()}>{t(`elearning.assessment.${attempt ? "retry" : "start"}`)}</button>}
       {attempt?.status === "submitted" && attempt.feedback?.length > 0 && <ul aria-label={t("elearning.assessment.answerFeedback")}>{attempt.feedback.map(value => <li key={value.question_id}><strong>{attempt.questions?.find(q => q.id === value.question_id)?.prompt}</strong><p>{value.correct != null ? t(`elearning.assessment.${value.correct ? "correct" : "tryAgain"}`) : value.points != null ? `${value.points} / ${value.maximum}` : t("elearning.assessment.practiceComplete")}</p>{value.feedback && <p>{value.feedback}</p>}</li>)}</ul>}
       <p>{t("elearning.assessment.attempts")}: {data.summary.attempts} {data.summary.remaining_attempts != null && `· ${t("elearning.assessment.remaining")}: ${data.summary.remaining_attempts}`}</p>

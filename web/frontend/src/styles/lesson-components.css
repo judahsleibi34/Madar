@@ -123,3 +123,29 @@
 .speak-now button:not(.listen-match-continue):disabled { opacity:.5; cursor:default; }
 .speak-now audio { width:100%; }
 .practice-option [dir="ltr"] { text-align:left; }
+
+/* EH / Exam Card and exam screen */
+.exam-card-list { display:grid; gap:12px; }
+.exam-card { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:12px; padding:16px; border:1px solid var(--theme-border); border-inline-start:5px solid var(--theme-border); border-radius:16px; background:var(--theme-surface); }
+.exam-card-main { display:grid; gap:6px; min-width:0; }
+.exam-card h3 { margin:0; font-size:17px; }
+.exam-card p { margin:0; color:var(--theme-text-soft); font-size:14px; }
+.exam-card-status { display:inline-flex; align-items:center; gap:6px; font-weight:700; }
+.exam-card.is-locked { border-inline-start-color:#9CA3AF; } .exam-card.is-locked .exam-card-status { color:#6B7280; }
+.exam-card.is-available { border-inline-start-color:var(--theme-primary); } .exam-card.is-available .exam-card-status { color:var(--theme-primary); }
+.exam-card.is-passed { border-inline-start-color:#16A34A; } .exam-card.is-passed .exam-card-status { color:#15803D; }
+.exam-card.is-failed { border-inline-start-color:#DC2626; } .exam-card.is-failed .exam-card-status { color:#B91C1C; }
+.exam-card.is-current { box-shadow:0 0 0 2px color-mix(in srgb,var(--theme-primary) 25%,transparent); }
+.exam-card a.ecommerce-primary-button { display:inline-flex; align-items:center; gap:6px; min-height:44px; }
+.exam-runner { display:grid; gap:14px; }
+.exam-runner-header { display:flex; flex-wrap:wrap; align-items:center; gap:10px 18px; }
+.exam-runner-header span { display:inline-flex; align-items:center; gap:6px; color:var(--theme-text-soft); }
+.exam-question-map { display:flex; flex-wrap:wrap; gap:6px; }
+.exam-question-map button { min-width:40px; min-height:40px; border:1px solid var(--theme-border); border-radius:10px; background:var(--theme-surface); color:inherit; font-weight:650; cursor:pointer; }
+.exam-question-map button.is-answered { background:color-mix(in srgb,#0D9488 14%,var(--theme-surface)); border-color:#0D9488; }
+.exam-question-map button[aria-current="step"] { outline:3px solid var(--theme-primary); outline-offset:1px; }
+.exam-review ul { display:grid; gap:6px; padding:0; list-style:none; }
+.exam-review button { display:inline-flex; align-items:center; gap:6px; border:0; background:none; color:inherit; font:inherit; cursor:pointer; text-decoration:underline; }
+.exam-runner-actions { display:flex; flex-wrap:wrap; gap:10px; justify-content:space-between; }
+.exam-runner-actions button { display:inline-flex; align-items:center; gap:6px; min-height:48px; }
+[dir="rtl"] .exam-runner-actions svg { transform:scaleX(-1); }

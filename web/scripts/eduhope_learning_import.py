@@ -76,7 +76,8 @@ def seed_learning(importer):
     for level,section_number in [('A1',2),('A2',4),('B1',6),('B2',8),('C1',10)]:
         key='credential.'+level
         if key not in I.journal:
-            desired={'name':'EduHope '+level+' completion — provisional','title':level+' English communication','subtitle':'Independent CEFR-band course completion','body':'Awarded to {{learner_name}} for completing the configured '+level+' learning requirements in {{course_name}}.','issuer_name':'EduHope'}
+            from update_eduhope_certificates import cefr_design
+            desired=cefr_design(level)
             result=I.call('POST','/elearning/certificate-templates',json={'design':desired,'status':'active'});I.record(key,result['saved_id'],desired,desired)
             I.call('PUT','/elearning/programmes/courses/'+cid+'/cefr',json={'section_id':I.journal['course.level-'+str(section_number)]['id'],'level':level,'template_id':result['saved_id'],'enabled':False})
     # A separate small mixed exam demonstrates143 human review without

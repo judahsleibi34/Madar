@@ -499,7 +499,12 @@
         "issued_at": "Issue date",
         "credential_number": "Credential ID",
         "status": "Credential status"
-      }
+      },
+      "finalScore": "Final exam score",
+      "cefrLevel": "CEFR level",
+      "share": "Share",
+      "linkCopied": "Link copied",
+      "shareHelp": "Copy the verification link to share it."
     },
     "appearance": "Platform Branding",
     "loading": "Loading E-Learning settings…",
@@ -1935,6 +1940,27 @@
       "current": "Current",
       "locked": "Locked",
       "available": "Available"
+    },
+    "exams": {
+      "locked": "Locked",
+      "available": "Available",
+      "passed": "Passed — {{score}}",
+      "failed": "Not passed — {{score}}",
+      "lockedHelp": "Complete both Levels and their reviews to unlock this exam.",
+      "passMark": "Pass mark: {{score}}%",
+      "start": "Start exam",
+      "retake": "Retake",
+      "screen": "Exam",
+      "review": "Review your answers",
+      "answeredCount": "{{done}} of {{total}} answered",
+      "timeSpent": "Time spent",
+      "questionMap": "Questions",
+      "answered": "Answered",
+      "unanswered": "Not answered",
+      "reviewHelp": "You have answered {{done}} of {{total}} questions. Answer every question, then submit. Answers are checked only after you submit.",
+      "previous": "Previous",
+      "next": "Next",
+      "reviewAnswers": "Review answers"
     }
   }
 }

@@ -10,6 +10,7 @@ import { useELearningTerminology } from "../../hooks/useELearningTerminology";
 import { fetchLearningAccountContext, fetchMyLearning, fetchLearningCourse, fetchLearningLesson, completeLearningLesson } from "../../services/elearningPlayer";
 import { LearningExperienceContext, useLearningExperience } from "./LearningExperienceContext";
 import LessonStepTracker from "./content/LessonStepTracker";
+import ExamCard from "./content/ExamCard";
 import { assembleLessonSteps, stepAnchor } from "../../utils/lessonSteps";
 import { CircleDot, Circle } from "lucide-react";
 import { getApiUrl } from "../../utils/apiClient";
@@ -188,5 +189,7 @@ function TopicLesson({ data, courseId, lessonId, onAssessmentChange }) {
 
 function AssessmentOutline({ assessments, courseId, placementId }) {
   const { t } = useTranslation("dashboard");
+  const enhanced = useLearningExperience().lessonComponents === true;
+  if (enhanced) return assessments.length > 0 && <div className="exam-card-list">{assessments.map(value => <ExamCard key={value.placement_id} exam={value} current={value.placement_id === placementId} href={assessmentPath(courseId, value.placement_id)} />)}</div>;
   return assessments.length > 0 && <ul className="elearning-assessment-outline">{assessments.map(value => <li key={value.placement_id} className={value.placement_id === placementId ? "is-current" : undefined}>{value.locked ? <Lock size={16} /> : value.passed ? <CheckCircle2 size={16} /> : <span aria-hidden="true">○</span>}{value.locked ? <span>{value.title} — {t("elearning.player.locked")}</span> : <Link aria-current={value.placement_id === placementId ? "page" : undefined} to={assessmentPath(courseId, value.placement_id)}>{value.title}</Link>}<small>{t(`elearning.placements.${value.required_for_completion ? "required" : "optional"}`)} · {value.passed ? `${t("elearning.assessment.passed")} — ${value.best_score}%` : value.attempts ? `${t("elearning.assessment.notPassed")} — ${value.best_score}%` : t("elearning.placements.notAttempted")}</small></li>)}</ul>;
 }

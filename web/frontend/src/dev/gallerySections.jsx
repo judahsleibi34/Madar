@@ -3,6 +3,10 @@ import { ChooseBestResponse, SpeakNow } from "../components/ELearning/content/Pr
 import LessonStepTracker from "../components/ELearning/content/LessonStepTracker";
 import { LESSON_STEPS, stepAnchor } from "../utils/lessonSteps";
 import TopicRowsSample from "./TopicRowsSample";
+import ExamCard from "../components/ELearning/content/ExamCard";
+import ExamRunner from "../components/ELearning/content/ExamRunner";
+import CertificateShare from "../components/ELearning/CertificateShare";
+import { MemoryRouter } from "react-router-dom";
 // Sample data and extra sections for the dev-only EH component gallery.
 // Existing EduHope (tenant 18) uploads, read through the dev proxy.
 export const SAMPLE = {
@@ -47,4 +51,12 @@ export const GALLERY_SECTIONS = [
     <section id={stepAnchor("situation")} data-step="situation"><SituationCard text="You are meeting a new classmate at university." /></section>
   </> },
   { id: "topic-rows", title: "EH / Topic Row statuses", render: () => <TopicRowsSample /> },
+  { id: "exams", title: "EH / Exam Cards · Exam screen · Certificate share", render: () => <MemoryRouter>
+    {[{ title: "A1 Final Exam", locked: true, passing_score: 70 }, { title: "A2 Final Exam", attempts: 0, passing_score: 70 }, { title: "B1 Final Exam", passed: true, attempts: 1, best_score: 88, passing_score: 70 }, { title: "B2 Final Exam", attempts: 2, best_score: 55, passing_score: 70 }].map(exam => <ExamCard key={exam.title} exam={exam} href="#exam" />)}
+    <ExamRunner attempt={{ id: "t", status: "in_progress", started_at: new Date(Date.now() - 754000).toISOString(), questions: [
+      { id: "e1", type: "multiple_choice", prompt: "Choose the natural sentence.", points: 1, config: { options: [{ id: "a", label: "I am 20 years old." }, { id: "b", label: "I have 20 years." }] } },
+      { id: "e2", type: "true_false", prompt: "Omar studies engineering.", points: 1, config: {} },
+      { id: "e3", type: "speaking", prompt: "Introduce yourself and ask one question.", points: 5, config: { max_duration_seconds: 60, max_size_bytes: 1048576 } }] }} answers={{ e1: { option_id: "a" } }} onChange={() => {}} onSubmit={() => {}} busy={false} />
+    <div><CertificateShare title="A1 English Speaking Certificate" url="https://madarportal.com/verify/credential/sample" /></div>
+  </MemoryRouter> },
 ];
