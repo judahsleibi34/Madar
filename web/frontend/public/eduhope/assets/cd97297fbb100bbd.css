@@ -1,0 +1,335 @@
+/* Central application UI consistency layer.
+   Customer-authored builder canvases, previews, and tenant runtimes are excluded. */
+
+html,
+body,
+#root {
+  width: 100%;
+  min-height: 100%;
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-family-base);
+}
+
+#root,
+.public-app-shell,
+.admin-dashboard-layout,
+.authenticated-shell {
+  min-height: 100vh;
+}
+
+.public-app-shell {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  overflow-x: clip;
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+.public-app-shell > main,
+.public-app-shell > section,
+.public-app-shell > .about-section,
+.public-app-shell > .team-page {
+  flex: 0 0 auto;
+}
+
+.public-app-shell > .site-footer {
+  margin-top: auto;
+}
+
+body,
+button,
+input,
+select,
+textarea {
+  font-family: var(--font-family-base);
+}
+
+:where(button, a, input, select, textarea):focus-visible {
+  outline: none;
+  box-shadow: var(--app-focus-ring);
+}
+
+/* Public header */
+.site-header {
+  height: var(--app-header-height);
+  min-height: var(--app-header-height);
+  padding-block: 0;
+  padding-inline: var(--page-gutter);
+  column-gap: var(--space-8);
+  background: var(--app-chrome-translucent);
+  border-color: var(--color-border);
+  box-shadow: var(--app-header-shadow);
+}
+
+.site-header .logo {
+  width: 64px;
+  height: 64px;
+}
+
+.site-header .brand { gap: var(--space-3); }
+.site-header .brand-name {
+  font-family: var(--font-family-base);
+  font-size: var(--type-h4-size);
+  line-height: var(--type-h4-line);
+  font-weight: var(--weight-bold);
+  letter-spacing: 0;
+}
+.site-header .nav-menu { gap: clamp(var(--space-5), 3vw, var(--space-10)); }
+.site-header .nav-menu a {
+  min-height: var(--control-height);
+  border-radius: var(--radius-pill);
+  font-family: var(--font-family-base);
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-line);
+  font-weight: var(--weight-semibold);
+}
+.site-header :is(.btn-login, .btn-signup, .lang-toggle),
+.site-header > .header-right :is(.language-toggle-button, .header-theme-toggle) {
+  min-height: var(--control-height);
+  padding-inline: var(--space-5);
+  border-radius: var(--radius-default);
+  font-size: var(--type-small-size);
+  line-height: var(--type-small-line);
+  font-weight: var(--weight-semibold);
+}
+.site-header > .header-right :is(.language-toggle-button, .header-theme-toggle) {
+  height: var(--control-height);
+}
+.site-header > .header-right .header-theme-toggle {
+  width: var(--control-height);
+  min-width: var(--control-height);
+  padding: 0;
+}
+.site-header .hamburger {
+  width: var(--control-height);
+  height: var(--control-height);
+  border-radius: var(--radius-default);
+}
+
+/* Public page foundations */
+:is(.hero-section, .contact-page, .pricing-page, .privacy-policy-page, .team-page, .login-page, .register-page) {
+  width: 100%;
+  min-height: calc(100vh - var(--app-header-height));
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+:is(.contact-page, .pricing-page, .privacy-policy-page, .team-page, .login-page, .register-page) {
+  padding-block: var(--page-top-space) var(--section-space);
+}
+
+:is(.contact-page, .team-page, .login-page, .register-page) {
+  padding-inline: var(--page-gutter);
+}
+
+:is(.pricing-page, .privacy-policy-page) {
+  padding-inline: 0;
+}
+
+.hero-section {
+  padding-block: var(--page-top-space) 0;
+  padding-inline: var(--page-gutter);
+}
+
+.about-section {
+  padding-block: var(--section-space);
+  padding-inline: var(--page-gutter);
+}
+
+:is(.contact-page, .team-page, .about-section) {
+  width: min(100%, var(--layout-max-width));
+  max-width: var(--layout-max-width);
+  margin-inline: auto;
+}
+
+:is(.pricing-hero, .pricing-inner-header, .pricing-base-section, .pricing-custom-section, .privacy-policy-hero, .privacy-policy-content, .footer-shell) {
+  width: min(100%, var(--layout-max-width));
+  max-width: var(--layout-max-width);
+  margin-inline: auto;
+  padding-inline: var(--page-gutter);
+  box-sizing: border-box;
+}
+
+:is(.contact-hero, .pricing-hero-copy, .pricing-section-heading, .privacy-policy-hero, .team-hero, .about-hero-copy) > p,
+.hero-description {
+  max-width: var(--intro-max-width);
+  font-size: var(--type-body-lg-size);
+  line-height: var(--type-body-lg-line);
+  font-weight: var(--weight-regular);
+}
+
+.public-app-shell h1:not(.brand-name):not(.hero-title),
+.login-heading h1,
+.forgot-card h1 {
+  margin-block-start: 0;
+  font-size: var(--type-h1-size);
+  line-height: var(--type-h1-line);
+  font-weight: var(--weight-bold);
+  letter-spacing: 0;
+}
+.public-app-shell :where(h2) {
+  font-size: var(--type-h2-size);
+  line-height: var(--type-h2-line);
+  font-weight: var(--weight-bold);
+  letter-spacing: 0;
+}
+.public-app-shell :where(h3) {
+  font-size: var(--type-h3-size);
+  line-height: var(--type-h3-line);
+  font-weight: var(--weight-semibold);
+}
+.public-app-shell :where(h4) {
+  font-size: var(--type-h4-size);
+  line-height: var(--type-h4-line);
+  font-weight: var(--weight-semibold);
+}
+.public-app-shell :where(p, li) {
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-line);
+  font-weight: var(--weight-regular);
+}
+.public-app-shell .hero-title {
+  font-size: var(--type-display-size);
+  line-height: var(--type-display-line);
+  font-weight: var(--weight-bold);
+  letter-spacing: 0;
+}
+
+/* Shared application buttons */
+:is(.btn-login, .btn-signup, .login-submit, .register-submit, .auth-secondary-button, .verification-secondary,
+    .contact-form button, .pricing-plan-button, .pricing-back-button, .subscription-modal-primary,
+    .primary-action, .secondary-action, .small-action) {
+  min-height: var(--control-height);
+  padding-block: 0;
+  padding-inline: var(--space-5);
+  border-radius: var(--radius-default);
+  font-size: var(--type-small-size);
+  line-height: var(--type-small-line);
+  font-weight: var(--weight-semibold);
+}
+:is(.btn-signup, .login-submit, .register-submit, .contact-form button, .pricing-plan-button.primary,
+    .subscription-modal-primary, .primary-action) {
+  color: var(--color-text-inverse);
+  background: var(--color-primary);
+}
+:is(.btn-signup, .login-submit, .register-submit, .contact-form button, .pricing-plan-button.primary,
+    .subscription-modal-primary, .primary-action):hover {
+  color: var(--color-text-inverse);
+  background: var(--color-primary-hover);
+}
+:is(button, [role="button"]):disabled,
+:is(button, [role="button"])[aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.5;
+  transform: none;
+  box-shadow: none;
+}
+
+/* Shared public/auth forms */
+:is(.contact-form, .login-card, .register-card, .forgot-card) label {
+  color: var(--color-text);
+  font-size: var(--type-small-size);
+  line-height: var(--type-small-line);
+  font-weight: var(--weight-semibold);
+}
+:is(.contact-form, .login-card, .register-card, .forgot-card) :where(input, select, textarea),
+.mfa-factor-select {
+  width: 100%;
+  min-height: var(--control-height);
+  padding: 9px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-default);
+  background: var(--color-surface-soft);
+  color: var(--color-text);
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-line);
+  font-weight: var(--weight-regular);
+}
+:is(.contact-form, .login-card, .register-card, .forgot-card) textarea { min-height: 120px; resize: vertical; }
+:is(.contact-form, .login-card, .register-card, .forgot-card) :where(input, select, textarea):focus,
+.mfa-factor-select:focus {
+  border-color: var(--color-accent-text);
+  box-shadow: var(--app-focus-ring);
+}
+:is(.auth-field-error, .contact-form-status, .form-status-message, .subdomain-preview) {
+  font-size: var(--type-caption-size);
+  line-height: var(--type-caption-line);
+}
+
+/* Shared cards and dialogs */
+:is(.contact-form, .contact-info-card, .login-card, .register-card, .forgot-card, .verification-card,
+    .pricing-choice-card, .pricing-mini-plan, .pricing-addon-card, .pricing-custom-summary,
+    .privacy-policy-section, .team-profile-card, .about-card, .about-metric, .about-hero-panel,
+    .subscription-modal) {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  color: var(--color-text);
+  box-shadow: var(--app-card-shadow);
+}
+:is(.contact-form, .contact-info-card, .login-card, .register-card, .forgot-card, .verification-card,
+    .pricing-choice-card, .pricing-mini-plan, .pricing-addon-card, .pricing-custom-summary,
+    .privacy-policy-section, .team-profile-card, .about-card, .about-hero-panel,
+    .subscription-modal) { padding: var(--space-6); }
+
+/* Dashboard shell and reusable dashboard surfaces */
+.admin-dashboard-layout,
+.authenticated-shell,
+.admin-dashboard-page,
+.authenticated-main {
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+.admin-dashboard-page,
+.authenticated-main { min-height: 100vh; }
+:is(.dashboard-page, .user-dashboard-page, .settings-page, .my-plan-page, .notifications-page,
+    .user-management-page, .admin-account-access-page, .reservation-calendar-page, .ecommerce-page) {
+  width: min(100%, var(--layout-max-width));
+  margin-inline: auto;
+}
+:is(.dashboard-panel, .user-dashboard-metric-card, .settings-card, .my-plan-card,
+    .notification-card, .ecommerce-panel, .calendar-panel, .restricted-access-card) {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  color: var(--color-text);
+  box-shadow: var(--app-card-shadow);
+}
+:is(.dashboard-panel, .settings-card, .my-plan-card, .ecommerce-panel, .calendar-panel, .restricted-access-card) {
+  padding: var(--space-6);
+}
+.authenticated-shell :where(input, select, textarea):not(.builder-canvas *) {
+  min-height: var(--control-height);
+  border-radius: var(--radius-default);
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-line);
+}
+
+/* Footer */
+.site-footer {
+  width: 100%;
+  padding-block: var(--section-space) var(--space-6);
+  padding-inline: 0;
+  background: var(--theme-footer-bg);
+  color: var(--theme-footer-text);
+}
+.site-footer .footer-shell { max-width: var(--layout-max-width); }
+
+@media (max-width: 1024px) {
+  .site-header .logo { width: 56px; height: 56px; }
+  .site-header { column-gap: var(--space-4); }
+}
+
+@media (max-width: 620px) {
+  .site-header { height: var(--app-header-height); min-height: var(--app-header-height); padding-inline: var(--page-gutter); }
+  .site-header .logo { width: 52px; height: 52px; }
+  .site-header .brand-name { font-size: var(--type-h4-size); line-height: var(--type-h4-line); }
+  :is(.contact-form, .contact-info-card, .login-card, .register-card, .forgot-card, .verification-card,
+      .pricing-choice-card, .pricing-mini-plan, .pricing-addon-card, .pricing-custom-summary,
+      .privacy-policy-section, .team-profile-card, .about-card, .about-hero-panel,
+      .subscription-modal, .dashboard-panel, .settings-card, .my-plan-card, .ecommerce-panel,
+      .calendar-panel, .restricted-access-card) { padding: var(--space-5); }
+}

@@ -1,0 +1,8 @@
+/* eb-garamond-latin-600-normal */
+@font-face {
+  font-family: 'EB Garamond';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 600;
+  src: url(/eduhope/assets/6a195b7e4f518d53.woff2) format('woff2'), url(/eduhope/assets/f13dee5df7bc1212.woff) format('woff');
+}

@@ -1,0 +1,8 @@
+/* oswald-latin-400-normal */
+@font-face {
+  font-family: 'Oswald';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url(/eduhope/assets/e902b779e43944c3.woff2) format('woff2'), url(/eduhope/assets/5f3966ed3a8e59e0.woff) format('woff');
+}

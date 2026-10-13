@@ -1,0 +1,8 @@
+/* lora-latin-700-normal */
+@font-face {
+  font-family: 'Lora';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 700;
+  src: url(/eduhope/assets/c05fd5289492ed31.woff2) format('woff2'), url(/eduhope/assets/543af1e069e40ba4.woff) format('woff');
+}

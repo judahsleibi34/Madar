@@ -1,0 +1,8 @@
+/* bebas-neue-latin-400-normal */
+@font-face {
+  font-family: 'Bebas Neue';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url(/eduhope/assets/a7c90c89240c134f.woff2) format('woff2'), url(/eduhope/assets/144f4a2feb4f333e.woff) format('woff');
+}

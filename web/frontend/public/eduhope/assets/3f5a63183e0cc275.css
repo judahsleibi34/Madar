@@ -1,0 +1,8 @@
+/* poppins-latin-400-italic */
+@font-face {
+  font-family: 'Poppins';
+  font-style: italic;
+  font-display: swap;
+  font-weight: 400;
+  src: url(/eduhope/assets/50d0c1742d80ac71.woff2) format('woff2'), url(/eduhope/assets/062874b44470ecca.woff) format('woff');
+}

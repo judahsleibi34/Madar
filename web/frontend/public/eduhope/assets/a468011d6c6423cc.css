@@ -1,0 +1,8 @@
+/* playfair-display-latin-700-normal */
+@font-face {
+  font-family: 'Playfair Display';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 700;
+  src: url(/eduhope/assets/28453852ea165c47.woff2) format('woff2'), url(/eduhope/assets/648a046ddf99139a.woff) format('woff');
+}

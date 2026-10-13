@@ -1,0 +1,8 @@
+/* eb-garamond-latin-400-italic */
+@font-face {
+  font-family: 'EB Garamond';
+  font-style: italic;
+  font-display: swap;
+  font-weight: 400;
+  src: url(/eduhope/assets/fc5851c4466e73be.woff2) format('woff2'), url(/eduhope/assets/ee21466cc9fc9b46.woff) format('woff');
+}
