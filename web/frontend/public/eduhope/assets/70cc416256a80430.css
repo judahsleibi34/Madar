@@ -1,0 +1,8 @@
+/* ibm-plex-sans-arabic-arabic-700-normal */
+@font-face {
+  font-family: 'IBM Plex Sans Arabic';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 700;
+  src: url(/eduhope/assets/04c730b4292731cc.woff2) format('woff2'), url(/eduhope/assets/db496b08765417c5.woff) format('woff');
+}

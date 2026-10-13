@@ -1,0 +1,8 @@
+/* poppins-latin-700-normal */
+@font-face {
+  font-family: 'Poppins';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 700;
+  src: url(/eduhope/assets/9338e65fc077355c.woff2) format('woff2'), url(/eduhope/assets/927ba66258ea405f.woff) format('woff');
+}

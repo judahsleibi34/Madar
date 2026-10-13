@@ -1,0 +1,8 @@
+/* cormorant-garamond-latin-400-italic */
+@font-face {
+  font-family: 'Cormorant Garamond';
+  font-style: italic;
+  font-display: swap;
+  font-weight: 400;
+  src: url(/eduhope/assets/e48e58027030df56.woff2) format('woff2'), url(/eduhope/assets/337d07118277acbf.woff) format('woff');
+}

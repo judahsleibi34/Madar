@@ -1,0 +1,139 @@
+/* Settings layouts must fit their available width in either language. */
+.admin-dashboard-page .settings-page,
+.admin-dashboard-page .settings-page :is(fieldset, .settings-tab-panel, .settings-card, .settings-profile-summary > div, .device-settings-copy, .security-mfa-panel-heading > div) {
+  min-width: 0;
+  max-width: 100%;
+}
+.admin-dashboard-page .settings-page :is(input, textarea, select) {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+.admin-dashboard-page .settings-page :is(h2, h3, p, small, .settings-field-error, .settings-profile-cover strong) {
+  overflow-wrap: anywhere;
+}
+.admin-dashboard-page .settings-page .settings-store-language-card textarea {
+  min-height: 112px !important;
+  max-height: 240px;
+  overflow-y: auto;
+  resize: vertical;
+}
+@media (max-width: 1100px) {
+  .admin-dashboard-layout.authenticated-shell > .admin-dashboard-page:has(.settings-page) {
+    padding: 72px clamp(16px, 3vw, 32px) 32px !important;
+  }
+}
+@media (max-width: 900px) {
+  .admin-dashboard-page .settings-page .settings-tabs {
+    display: grid;
+    grid-auto-flow: row;
+    grid-auto-columns: auto;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    overflow: visible;
+  }
+  .admin-dashboard-page .settings-page .settings-tab {
+    min-width: 0;
+    min-height: 44px;
+    padding: 10px 8px;
+    gap: 6px;
+    white-space: normal;
+    line-height: 1.3;
+  }
+  .admin-dashboard-page .settings-page .settings-tab svg { flex-shrink: 0; }
+  .admin-dashboard-page .settings-page .settings-profile-summary {
+    grid-template-columns: 72px minmax(0, 1fr);
+    align-items: center;
+  }
+  .admin-dashboard-page .settings-page .settings-profile-upload {
+    grid-column: 1 / -1;
+    width: 100%;
+    min-width: 0;
+    justify-self: stretch;
+    margin: 0;
+  }
+  .admin-dashboard-page .settings-page .settings-profile-avatar {
+    width: 72px;
+    height: 72px;
+    margin-top: 0;
+    flex-basis: 72px;
+  }
+  .admin-dashboard-page .settings-page :is(.settings-profile-actions, .settings-website-profile-actions) {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: auto;
+  }
+  .admin-dashboard-page .settings-page .settings-profile-actions > :is(button, a) {
+    width: 100%;
+    min-width: 0;
+    white-space: normal;
+    height: auto;
+    min-height: 44px;
+  }
+}
+@media (max-width: 640px) {
+  .admin-dashboard-page .settings-page { gap: 16px; }
+  .admin-dashboard-page .settings-page .settings-header {
+    margin: 0;
+    padding: 0;
+  }
+  .admin-dashboard-page .settings-page .settings-header::after { margin-block-start: 16px; }
+  .admin-dashboard-page .settings-page .settings-header h1 { font-size: 28px; line-height: 1.2; }
+  .admin-dashboard-page .settings-page .settings-header span { font-size: 14px; margin-top: 8px; }
+  .admin-dashboard-page .settings-page .settings-tabs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-auto-columns: auto;
+    gap: 6px;
+  }
+  .admin-dashboard-page .settings-page .settings-card { padding: 0; border-radius: 16px; }
+  .admin-dashboard-page .settings-page .settings-profile-cover {
+    min-height: 88px;
+    padding: 16px;
+  }
+  .admin-dashboard-page .settings-page .settings-profile-cover strong { font-size: 22px; line-height: 1.2; }
+  .admin-dashboard-page .settings-page .settings-profile-summary {
+    margin: 0 16px;
+    padding-top: 16px;
+    column-gap: 12px;
+    row-gap: 16px;
+    justify-items: stretch;
+  }
+  .admin-dashboard-page .settings-page .settings-profile-summary h2 { font-size: 22px; line-height: 1.2; }
+  .admin-dashboard-page .settings-page .settings-profile-summary p { font-size: 13px; }
+  .admin-dashboard-page .settings-page .settings-profile-body { padding: 16px; }
+  .admin-dashboard-page .settings-page .settings-form-grid { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  .admin-dashboard-page .settings-page .settings-store-translations { padding: 10px; }
+  .admin-dashboard-page .settings-page .settings-store-language-card { padding: 12px; }
+  .admin-dashboard-page .settings-page :is(.settings-profile-actions, .settings-website-profile-actions) {
+    grid-template-columns: minmax(0, 1fr);
+    margin: 0 16px 16px;
+    padding-top: 16px;
+    gap: 12px;
+  }
+  .admin-dashboard-page .settings-page .settings-profile-actions > :is(button, a) {
+    grid-column: 1 !important;
+    justify-self: stretch;
+  }
+  .admin-dashboard-page .settings-page :is(.device-settings-card, .notification-preferences-card, .security-mfa-panel) { padding: 16px; }
+  .admin-dashboard-page .settings-page :is(.device-settings-card > header, .device-install-card, .security-mfa-factor) { display: flex; flex-wrap: wrap; }
+  .admin-dashboard-page .settings-page .device-settings-item { grid-template-columns: auto minmax(0, 1fr); gap: 12px; padding: 12px; }
+  .admin-dashboard-page .settings-page .device-settings-actions { grid-column: 1 / -1; width: 100%; }
+  .admin-dashboard-page .settings-page .device-settings-actions > button { width: 100%; min-width: 0; white-space: normal; }
+  .admin-dashboard-page .settings-page :is(.notification-preferences-grid, .security-mfa-grid, .security-mfa-status-grid, .security-mfa-enroll-form, .security-mfa-enrollment) { grid-template-columns: minmax(0, 1fr); }
+  .admin-dashboard-page .settings-page .security-mfa-panel-heading svg { flex-shrink: 0; }
+  .admin-dashboard-page .settings-page .security-mfa-enroll-form > button { width: 100%; min-width: 0; white-space: normal; }
+}
+
+/* Include button padding in its width so stacked actions share the same edges. */
+.admin-dashboard-page .settings-page .settings-profile-actions > :is(button, a) {
+  box-sizing: border-box;
+  max-width: 100%;
+  margin-inline: 0;
+}
+@media (max-width: 640px) {
+  .admin-dashboard-page .settings-page .settings-profile-actions > :is(button, a) {
+    width: 100% !important;
+    margin: 0 !important;
+    justify-self: stretch !important;
+  }
+}

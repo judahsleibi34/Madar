@@ -1,0 +1,8 @@
+/* montserrat-latin-400-normal */
+@font-face {
+  font-family: 'Montserrat';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url(/eduhope/assets/e66bcd2761ab6924.woff2) format('woff2'), url(/eduhope/assets/6a7d6a30d2b8cdc9.woff) format('woff');
+}

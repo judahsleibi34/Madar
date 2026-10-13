@@ -1,0 +1,8 @@
+/* raleway-latin-700-normal */
+@font-face {
+  font-family: 'Raleway';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 700;
+  src: url(/eduhope/assets/05844cd75b25917a.woff2) format('woff2'), url(/eduhope/assets/98824b8cc9217c88.woff) format('woff');
+}

@@ -1,0 +1,8 @@
+/* montserrat-latin-400-italic */
+@font-face {
+  font-family: 'Montserrat';
+  font-style: italic;
+  font-display: swap;
+  font-weight: 400;
+  src: url(/eduhope/assets/a18fca2f8a465eaa.woff2) format('woff2'), url(/eduhope/assets/5bd79dc5fe8bbcf4.woff) format('woff');
+}

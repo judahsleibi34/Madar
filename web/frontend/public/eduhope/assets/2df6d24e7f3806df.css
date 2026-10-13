@@ -1,0 +1,8 @@
+/* cormorant-garamond-latin-700-normal */
+@font-face {
+  font-family: 'Cormorant Garamond';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 700;
+  src: url(/eduhope/assets/21a0fc1c5c22708c.woff2) format('woff2'), url(/eduhope/assets/19812cffd2e85fbf.woff) format('woff');
+}

@@ -1,0 +1,8 @@
+/* raleway-latin-400-italic */
+@font-face {
+  font-family: 'Raleway';
+  font-style: italic;
+  font-display: swap;
+  font-weight: 400;
+  src: url(/eduhope/assets/8ff3768f98c46cf7.woff2) format('woff2'), url(/eduhope/assets/4ac6ae2f25f62e39.woff) format('woff');
+}

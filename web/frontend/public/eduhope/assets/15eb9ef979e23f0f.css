@@ -1,0 +1,8 @@
+/* lobster-two-latin-700-italic */
+@font-face {
+  font-family: 'Lobster Two';
+  font-style: italic;
+  font-display: swap;
+  font-weight: 700;
+  src: url(/eduhope/assets/e55a402b7caa9098.woff2) format('woff2'), url(/eduhope/assets/839e23d381950ebc.woff) format('woff');
+}

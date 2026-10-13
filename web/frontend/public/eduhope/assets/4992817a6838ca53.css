@@ -1,0 +1,8 @@
+/* playfair-display-latin-500-italic */
+@font-face {
+  font-family: 'Playfair Display';
+  font-style: italic;
+  font-display: swap;
+  font-weight: 500;
+  src: url(/eduhope/assets/8f074624e50ab805.woff2) format('woff2'), url(/eduhope/assets/57773cbaa6af391a.woff) format('woff');
+}

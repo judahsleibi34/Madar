@@ -1,0 +1,104 @@
+.elearning-content-page { min-width: 0; }
+.elearning-content-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
+.elearning-content-list { display: grid; gap: 1rem; list-style: none; padding: 0; }
+.elearning-block-card { padding: 1.25rem; min-width: 0; }
+.elearning-block-card > header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: .75rem; margin-block-end: 1rem; }
+.elearning-block-card h3 { margin: 0; }
+.elearning-content-renderer { min-width: 0; overflow-wrap: anywhere; }
+.elearning-content-renderer + .elearning-content-renderer { margin-block-start: 1.5rem; }
+.elearning-text-content { white-space: pre-wrap; line-height: 1.7; }
+.elearning-text-content ul, .elearning-text-content ol { padding-inline-start: 1.5rem; }
+.elearning-media-content { display: grid; gap: .5rem; min-width: 0; }
+.elearning-media-content audio, .elearning-media-content video { width: 100%; max-width: 100%; }
+.elearning-media-content video { max-height: 65vh; background: var(--color-surface-muted); }
+.elearning-media-content small { overflow-wrap: anywhere; }
+.elearning-archived-blocks { padding: 1rem; }
+.elearning-archived-blocks > div { margin-block-start: .75rem; }
+.elearning-block-choices { display: grid; grid-template-columns: repeat(3, 1fr); gap: .75rem; padding-block: 1rem; }
+.elearning-text-editor, .elearning-media-editor { display: grid; gap: .75rem; }
+.elearning-text-editor > label, .elearning-media-editor > label { display: grid; gap: .5rem; }
+.elearning-text-editor textarea { resize: vertical; }
+.elearning-text-editor details, .elearning-lesson-preview { padding: 1rem; }
+@media (max-width: 600px) {
+  .elearning-block-card { padding: .75rem; }
+  .elearning-block-choices { grid-template-columns: 1fr; }
+  .elearning-content-page .elearning-structure-header { flex-direction: column; align-items: stretch; }
+  .elearning-content-toolbar button { min-height: 2.75rem; }
+}
+
+.elearning-content-breadcrumb { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; margin-block-end: 1rem; overflow-wrap: anywhere; }
+.assessment-settings, .assessment-question-editor { display: grid; gap: 1rem; }
+.assessment-settings label, .assessment-question-editor label, .assessment-question label { display: grid; gap: .4rem; }
+.assessment-question { margin-block: 1rem; min-inline-size: 0; }
+.assessment-question label:has(input[type="radio"]), .assessment-settings label:has(input[type="checkbox"]) { display: flex; align-items: center; gap: .6rem; padding-block: .5rem; }
+.assessment-pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr)); gap: 1rem; align-items: center; margin-block: 1rem; }
+.assessment-runtime select, .assessment-settings input:not([type="checkbox"]), .assessment-settings textarea, .assessment-settings select, .assessment-question-editor input:not([type="radio"]), .assessment-question-editor textarea, .assessment-question-editor select { inline-size: 100%; max-inline-size: 100%; padding: .6rem; border: 1px solid var(--border-color, #d1d5db); border-radius: .5rem; background: var(--surface-color, white); color: inherit; }
+.assessment-runtime audio { max-inline-size: 100%; }
+.assessment-question input[type="radio"], .assessment-question-editor input[type="radio"], .assessment-settings input[type="checkbox"] { inline-size: 1.15rem; block-size: 1.15rem; flex: 0 0 auto; margin: 0; }
+.assessment-placement-card { margin-block: 1rem; }
+.elearning-assessment-outline { padding-inline-start: 0; list-style: none; }
+.elearning-assessment-outline li { display: flex; align-items: start; flex-wrap: wrap; gap: .5rem; margin-block: .8rem; }
+.elearning-assessment-outline small { flex-basis: 100%; padding-inline-start: 1.5rem; }
+
+/* The assessment workspace keeps its header and actions outside the scroll area. */
+dialog.ecommerce-modal.elearning-dialog.assessment-builder-dialog { width: min(1040px, calc(100vw - 32px)); overflow: hidden; }
+dialog.assessment-builder-dialog[open] { display: flex; flex-direction: column; }
+dialog.assessment-builder-dialog > header { flex-shrink: 0; position: static; }
+dialog.assessment-builder-dialog .assessment-builder-body { min-height: 0; min-width: 0; overflow-y: auto; padding: var(--space-6); display: grid; gap: var(--space-5); }
+dialog.assessment-builder-dialog .assessment-settings { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-5); padding: 0; }
+dialog.assessment-builder-dialog .assessment-field-wide { grid-column: 1 / -1; }
+dialog.assessment-builder-dialog label { min-width: 0; }
+dialog.assessment-builder-dialog .assessment-settings .assessment-choice,
+dialog.assessment-builder-dialog .assessment-question-editor label:has(input[type="radio"]) { display: flex; flex-direction: row; align-items: center; justify-content: flex-start; gap: var(--space-3); }
+dialog.assessment-builder-dialog :is(input[type="checkbox"], input[type="radio"]) { width: 18px; height: 18px; min-height: 0; padding: 0; margin: 0; flex: 0 0 18px; accent-color: var(--theme-primary); }
+dialog.assessment-builder-dialog :is(input, textarea, select) { box-sizing: border-box; min-width: 0; }
+dialog.assessment-builder-dialog textarea { min-height: 88px; resize: vertical; }
+dialog.assessment-builder-dialog .assessment-builder-body > :is(h3, p, ol) { margin: 0; }
+dialog.assessment-builder-dialog .elearning-content-list > li { padding: var(--space-4); }
+dialog.assessment-builder-dialog > .assessment-builder-footer { flex-shrink: 0; margin: 0; padding: var(--space-4) var(--space-6); border-block-start: 1px solid var(--theme-border); }
+dialog.assessment-builder-dialog footer > button { width: auto; }
+dialog.assessment-builder-dialog .assessment-question-editor { padding: 0; margin: 0; }
+dialog.assessment-builder-dialog .assessment-question-editor > footer { position: static; margin: 0; padding: var(--space-4) 0 0; }
+@media (max-width: 600px) {
+  dialog.assessment-builder-dialog .assessment-builder-body { padding: var(--space-4); }
+  dialog.assessment-builder-dialog .assessment-settings { grid-template-columns: minmax(0, 1fr); }
+  dialog.assessment-builder-dialog > .assessment-builder-footer { padding: var(--space-4); }
+}
+
+/* Attachment choices use compact controls beside their labels. */
+dialog.elearning-dialog .assessment-attach-form { gap: var(--space-5); }
+dialog.elearning-dialog .assessment-attach-form .assessment-attach-choice { display: flex; flex-direction: row; align-items: center; justify-content: flex-start; gap: var(--space-3); }
+dialog.elearning-dialog .assessment-attach-choice input[type="checkbox"] { width: 18px; height: 18px; min-height: 0; padding: 0; margin: 0; flex: 0 0 18px; accent-color: var(--theme-primary); }
+dialog.elearning-dialog .assessment-attach-form > p { margin: 0; color: var(--theme-text-muted); line-height: var(--line-height-base); }
+dialog.elearning-dialog .assessment-attach-form select { box-sizing: border-box; min-width: 0; }
+dialog.elearning-dialog .assessment-attach-form > footer { position: static; margin: 0; padding: var(--space-4) 0 0; flex-wrap: wrap; }
+dialog.elearning-dialog .assessment-attach-form > footer > button { width: auto; max-width: 100%; }
+@media (max-width: 600px) {
+  dialog.elearning-dialog .assessment-attach-form > footer > button { flex: 1 1 auto; }
+}
+
+dialog.assessment-builder-dialog .assessment-question-navigation { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); padding-block-end: var(--space-4); border-block-end: 1px solid var(--theme-border); }
+dialog.assessment-builder-dialog .assessment-question-navigation > button { width: auto; }
+dialog.assessment-builder-dialog .assessment-question-navigation > span { color: var(--theme-text-muted); font-size: var(--font-size-sm); }
+[dir="rtl"] .assessment-question-navigation svg { transform: rotate(180deg); }
+dialog.assessment-builder-dialog .assessment-question-heading h3 { margin: 0; }
+dialog.assessment-builder-dialog .assessment-question-heading p { margin: var(--space-2) 0 0; color: var(--theme-text-muted); line-height: var(--line-height-base); }
+dialog.assessment-builder-dialog .assessment-option-row { grid-template-columns: minmax(0, 1fr) auto auto; gap: var(--space-4); margin: 0; padding: var(--space-4); border: 1px solid var(--theme-border); border-radius: var(--ui-radius-small); align-items: end; }
+dialog.assessment-builder-dialog .assessment-option-row > label:has(input[type="radio"]) { min-height: 44px; }
+dialog.assessment-builder-dialog .assessment-option-row > button { width: auto; }
+@media (max-width: 600px) {
+  dialog.assessment-builder-dialog .assessment-option-row { grid-template-columns: minmax(0, 1fr) auto; }
+  dialog.assessment-builder-dialog .assessment-option-row > label:first-child { grid-column: 1 / -1; }
+}
+dialog.assessment-builder-dialog .assessment-question-navigation { position: sticky; top: 0; z-index: 2; background: var(--theme-surface); }
+dialog.assessment-builder-dialog .assessment-question-editor > footer { position: sticky; bottom: calc(-1 * var(--space-6)); z-index: 2; margin: 0 calc(-1 * var(--space-6)) calc(-1 * var(--space-6)); padding: var(--space-4) var(--space-6); background: var(--theme-surface); }
+@media (max-width: 600px) {
+  dialog.assessment-builder-dialog .assessment-question-editor > footer { bottom: calc(-1 * var(--space-4)); margin: 0 calc(-1 * var(--space-4)) calc(-1 * var(--space-4)); padding: var(--space-4); }
+}
+
+dialog.assessment-builder-dialog .assessment-question-action { width: 44px; height: 44px; min-width: 44px; min-height: 44px; padding: 0; flex: 0 0 44px; }
+dialog.assessment-builder-dialog .assessment-question-action.is-danger { color: var(--theme-danger); }
+dialog.assessment-builder-dialog .assessment-question-action:disabled { opacity: .45; cursor: default; }
+dialog.assessment-builder-dialog .assessment-question-action:focus-visible { outline: 2px solid var(--theme-primary); outline-offset: 2px; }
+dialog.assessment-builder-dialog .assessment-archived-question { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); }
+dialog.assessment-builder-dialog .assessment-archived-question p { margin: 0; overflow-wrap: anywhere; }

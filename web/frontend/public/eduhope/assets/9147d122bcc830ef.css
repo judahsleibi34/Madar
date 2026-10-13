@@ -1,0 +1,8 @@
+/* inter-latin-900-normal */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 900;
+  src: url(/eduhope/assets/d5c0ed7b8b5dde97.woff2) format('woff2'), url(/eduhope/assets/59c48a0598e411bf.woff) format('woff');
+}

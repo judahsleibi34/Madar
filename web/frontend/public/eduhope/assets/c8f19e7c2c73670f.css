@@ -1,0 +1,8 @@
+/* lora-latin-400-italic */
+@font-face {
+  font-family: 'Lora';
+  font-style: italic;
+  font-display: swap;
+  font-weight: 400;
+  src: url(/eduhope/assets/723cc14fe86bc9fa.woff2) format('woff2'), url(/eduhope/assets/76be671f89ee79e3.woff) format('woff');
+}

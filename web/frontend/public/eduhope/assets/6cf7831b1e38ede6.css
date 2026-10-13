@@ -1,0 +1,93 @@
+/* Application-wide contrast contract.
+   These selectors intentionally carry enough specificity to survive
+   route-level lazy CSS without using !important. Authored tenant output is
+   excluded because its palette is controlled by the site/form author. */
+
+body :is(
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),
+  select,
+  textarea
+):not(.builder-canvas *):not(.builder-form-preview-page *):not(.tenant-site-runtime *) {
+  border-color: var(--color-border-control);
+}
+
+body :is(
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),
+  select,
+  textarea
+):not(.builder-canvas *):not(.builder-form-preview-page *):not(.tenant-site-runtime *)::placeholder {
+  color: var(--color-text-muted);
+  opacity: 1;
+}
+
+body :is(a, button, input, select, textarea, summary, [tabindex]):not(.builder-canvas *):not(.builder-form-preview-page *):not(.tenant-site-runtime *):focus-visible {
+  outline: 2px solid var(--color-focus-indicator);
+  outline-offset: 2px;
+}
+
+body :is(button, input, select, textarea, [role="button"])[disabled][disabled]:not(.builder-canvas *):not(.builder-form-preview-page *):not(.tenant-site-runtime *),
+body :is(button, input, select, textarea, [role="button"])[aria-disabled="true"][aria-disabled="true"]:not(.builder-canvas *):not(.builder-form-preview-page *):not(.tenant-site-runtime *) {
+  background-color: var(--color-disabled-bg);
+  background-image: none;
+  border-color: var(--color-disabled-border);
+  color: var(--color-disabled-text);
+  opacity: 1;
+  box-shadow: none;
+}
+
+/* Filled commerce actions use the on-fill token; accent text is for links. */
+body .admin-dashboard-layout .admin-dashboard-page :is(.ecommerce-page, .ecommerce-store-admin, .ecommerce-product-editor, .ecommerce-theme-page) .ecommerce-primary-button {
+  background: var(--theme-primary) !important;
+  border: 1px solid var(--theme-primary) !important;
+  opacity: 1 !important;
+  color: var(--theme-text-inverse) !important;
+  -webkit-text-fill-color: var(--theme-text-inverse) !important;
+}
+body .admin-dashboard-layout .admin-dashboard-page :is(.ecommerce-page, .ecommerce-store-admin, .ecommerce-product-editor, .ecommerce-theme-page) .ecommerce-primary-button :is(svg, span) {
+  color: inherit !important;
+  -webkit-text-fill-color: inherit !important;
+}
+body .admin-dashboard-layout .admin-dashboard-page :is(.ecommerce-page, .ecommerce-store-admin, .ecommerce-product-editor, .ecommerce-theme-page) .ecommerce-primary-button:disabled {
+  background: var(--color-disabled-bg) !important;
+  color: var(--color-disabled-text) !important;
+  -webkit-text-fill-color: var(--color-disabled-text) !important;
+  border: 1px solid var(--color-disabled-border) !important;
+  opacity: 1 !important;
+  box-shadow: none !important;
+}
+
+body .admin-dashboard-layout .admin-dashboard-page :is(.ecommerce-page, .ecommerce-store-admin, .ecommerce-product-editor, .ecommerce-theme-page) .ecommerce-primary-button:hover:not(:disabled) {
+  background: var(--theme-primary-hover) !important;
+  border-color: var(--theme-primary-hover) !important;
+}
+
+body .admin-dashboard-page .user-dashboard-customizer-toggle {
+  border: 1px solid var(--color-border-control) !important;
+}
+body .admin-dashboard-page .ecommerce-product-editor button[role="option"][aria-selected="true"] {
+  border: 1px solid var(--color-border-control) !important;
+}
+
+body .admin-dashboard-page .ecommerce-product-editor a {
+  color: var(--theme-text) !important;
+  -webkit-text-fill-color: var(--theme-text) !important;
+}
+
+body .admin-dashboard-page .cash-chart .cash-bar > span {
+  color: var(--theme-text-inverse) !important;
+  -webkit-text-fill-color: var(--theme-text-inverse) !important;
+}
+
+body .page-builder .builder-subbar-actions :is(.builder-history-controls, .artboard-camera-controls) > button {
+  border: 1px solid var(--color-border-control) !important;
+}
+body .page-builder .builder-subbar-actions :is(.builder-history-controls, .artboard-camera-controls) > button:disabled {
+  background: var(--color-disabled-bg) !important;
+  color: var(--color-disabled-text) !important;
+  -webkit-text-fill-color: var(--color-disabled-text) !important;
+  opacity: 1 !important;
+}
+body .page-builder .builder-subbar-actions :is(.builder-history-controls, .artboard-camera-controls) > button:disabled svg {
+  color: inherit !important;
+  opacity: 1 !important;
+}
