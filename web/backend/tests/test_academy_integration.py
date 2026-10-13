@@ -299,3 +299,23 @@ class AcademyExperienceFlagTests(unittest.TestCase):
         self.assertEqual(learning_experience(None), {})
         self.assertEqual(learning_experience({'academyExperience': {'lessonComponents': True, 'unknown': True}}), {'lessonComponents': True})
         self.assertEqual(learning_experience({'academyExperience': {'lessonComponents': 'yes'}}), {'lessonComponents': False})
+        self.assertEqual(learning_experience({'academyExperience': {'studentDashboard': True}}), {'studentDashboard': True})
+
+
+class InstitutionForMemberTests(unittest.TestCase):
+    def run_with(self, settings, email):
+        from unittest.mock import MagicMock, patch
+        from services import elearning_academy_service as service
+        db = MagicMock()
+        db.table.return_value.select.return_value.eq.return_value.limit.return_value.execute.return_value.data = [{'email': email}]
+        with patch.object(service, 'get_settings', return_value=settings), patch.object(service, 'service_supabase', db):
+            return service.institution_for_member(18, 7)
+
+    def test_matching_domain_gets_label_but_never_verification(self):
+        settings = {'institution_enabled': True, 'institution_email_domains': ['paluniv.edu.ps'], 'institution_name': 'Palestine Ahliya University', 'institution_student_label': 'PAU Student'}
+        self.assertEqual(self.run_with(settings, 'learner@paluniv.edu.ps'), {'member': True, 'name': 'Palestine Ahliya University', 'label': 'PAU Student'})
+        self.assertIsNone(self.run_with(settings, 'learner@gmail.com'))
+
+    def test_academies_without_institution_settings_are_unchanged(self):
+        self.assertIsNone(self.run_with({}, 'learner@paluniv.edu.ps'))
+        self.assertIsNone(self.run_with({'institution_enabled': True, 'institution_email_domains': []}, 'learner@paluniv.edu.ps'))

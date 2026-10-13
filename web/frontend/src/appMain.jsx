@@ -82,7 +82,7 @@ const root = createRoot(document.getElementById("root"));
 // for visual checks. import.meta.env.DEV is false in production builds, so this
 // branch and its module are removed from the production bundle.
 if (import.meta.env.DEV && window.location.pathname.startsWith("/__eh-components")) {
-  import("./dev/LessonComponentGallery.jsx").then(({ default: Gallery }) => root.render(<StrictMode><LanguageProvider><Gallery /></LanguageProvider></StrictMode>));
+  (window.location.pathname.startsWith("/__eh-components/student") ? import("./dev/StudentGallery.jsx") : import("./dev/LessonComponentGallery.jsx")).then(({ default: Gallery }) => root.render(<StrictMode><LanguageProvider><Gallery /></LanguageProvider></StrictMode>));
 } else {
   root.render(
     <StrictMode>

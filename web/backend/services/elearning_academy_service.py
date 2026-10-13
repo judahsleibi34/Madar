@@ -171,7 +171,7 @@ def member_profile(tenant_id):
 
 
 # Opt-in learner-app improvements, switched on per academy in its own website.
-EXPERIENCE_FLAGS = frozenset({"lessonComponents"})
+EXPERIENCE_FLAGS = frozenset({"lessonComponents", "studentDashboard"})
 
 
 def learning_experience(schema):
@@ -192,3 +192,21 @@ def experience_for_tenant(tenant_id):
         return learning_experience(projects[0].get("published_schema")) if projects and projects[0].get("status") == "published" else {}
     except Exception:
         return {}
+
+
+def institution_for_member(tenant_id, user_id):
+    """Institution (e.g. PAU) membership for the signed-in learner: the email
+    domain matches the owner's Settings → Institution domains. Selects the
+    welcome and "PAU Student" label only; it never marks anyone verified."""
+    try:
+        cfg = get_settings(tenant_id)
+        if not cfg.get("institution_enabled") or not cfg.get("institution_email_domains"):
+            return None
+        rows = service_supabase.table("users").select("email").eq("id", user_id).limit(1).execute().data or []
+        email = (rows[0].get("email") if rows else "") or ""
+        from routes.elearning_academy_routes import institution_member
+        if not institution_member(cfg, email):
+            return None
+        return {"member": True, "name": cfg.get("institution_name") or "", "label": cfg.get("institution_student_label") or ""}
+    except Exception:
+        return None

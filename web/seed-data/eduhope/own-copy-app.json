@@ -1,0 +1,126 @@
+{
+  "elearning.student.accessNone": {
+    "en": "Not purchased",
+    "ar": "لم يتم الشراء"
+  },
+  "elearning.student.allLevels": {
+    "en": "All Levels",
+    "ar": "كل المستويات"
+  },
+  "elearning.student.applyExchange": {
+    "en": "Apply",
+    "ar": "قدّم طلبًا"
+  },
+  "elearning.student.certificateEarned": {
+    "en": "Earned",
+    "ar": "تم الحصول عليها"
+  },
+  "elearning.student.copiedForInstagram": {
+    "en": "Copied — paste it on Instagram",
+    "ar": "تم النسخ — الصقه في إنستغرام"
+  },
+  "elearning.student.enrollNow": {
+    "en": "View the course",
+    "ar": "عرض الدورة"
+  },
+  "elearning.student.examsIntro": {
+    "en": "Pass each final exam with 70% or higher to earn its certificate.",
+    "ar": "اجتز كل امتحان نهائي بنسبة 70% أو أكثر للحصول على شهادته."
+  },
+  "elearning.student.heldForWithdrawal": {
+    "en": "{{amount}} held for withdrawal requests",
+    "ar": "{{amount}} محجوزة لطلبات السحب"
+  },
+  "elearning.student.levelProgress": {
+    "en": "Level progress",
+    "ar": "تقدم المستوى"
+  },
+  "elearning.student.maximumAmount": {
+    "en": "Up to {{amount}}",
+    "ar": "حتى {{amount}}"
+  },
+  "elearning.student.noExams": {
+    "en": "No exams are available yet.",
+    "ar": "لا توجد امتحانات متاحة بعد."
+  },
+  "elearning.student.noTransactions": {
+    "en": "No transactions yet.",
+    "ar": "لا توجد معاملات بعد."
+  },
+  "elearning.student.noWithdrawals": {
+    "en": "No withdrawals yet.",
+    "ar": "لا توجد سحوبات بعد."
+  },
+  "elearning.student.referralActive": {
+    "en": "Referral link active",
+    "ar": "رابط الإحالة مفعّل"
+  },
+  "elearning.student.referralAfterPurchase": {
+    "en": "Referral link after purchase",
+    "ar": "رابط الإحالة بعد الشراء"
+  },
+  "elearning.student.requestWithdrawal": {
+    "en": "Request Withdrawal",
+    "ar": "طلب سحب"
+  },
+  "elearning.student.rewardDescription": {
+    "en": "Eligible direct course sale",
+    "ar": "عملية بيع مباشرة مؤهلة للدورة"
+  },
+  "elearning.student.rewardRules": {
+    "en": "Rewards start as Pending and become Available after verification. Only direct sales count. Failed, cancelled, refunded, duplicate and self-referral purchases do not count. Rewards are not guaranteed.",
+    "ar": "تبدأ المكافآت بحالة «معلّقة» وتصبح «متاحة» بعد التحقق. تُحتسب المبيعات المباشرة فقط. لا تُحتسب عمليات الشراء الفاشلة أو الملغاة أو المستردة أو المكررة أو الإحالة الذاتية. المكافآت غير مضمونة."
+  },
+  "elearning.student.rewardTestDescription": {
+    "en": "Test-mode sale (not counted)",
+    "ar": "عملية بيع تجريبية (لا تُحتسب)"
+  },
+  "elearning.student.reward_reversed": {
+    "en": "Reversed",
+    "ar": "ملغاة"
+  },
+  "elearning.student.shareMessage": {
+    "en": "Learn English with EduHope:",
+    "ar": "تعلّم الإنجليزية مع EduHope:"
+  },
+  "elearning.student.topicCount_one": {
+    "en": "{{count}} topic",
+    "ar": "موضوع واحد"
+  },
+  "elearning.student.topicCount_other": {
+    "en": "{{count}} topics",
+    "ar": "{{count}} موضوعات"
+  },
+  "elearning.student.viewNotifications": {
+    "en": "View notifications",
+    "ar": "عرض الإشعارات"
+  },
+  "elearning.student.walletIntro": {
+    "en": "Your wallet changes only through verified transactions.",
+    "ar": "لا تتغير محفظتك إلا من خلال معاملات تم التحقق منها."
+  },
+  "elearning.student.welcome": {
+    "en": "Welcome to EduHope",
+    "ar": "مرحبًا بك في EduHope"
+  },
+  "elearning.student.welcomeName": {
+    "en": "Welcome, {{name}}",
+    "ar": "مرحبًا، {{name}}"
+  },
+  "elearning.student.withdrawBlocked": {
+    "en": "Withdrawals are paused while your wallet has a negative balance.",
+    "ar": "السحب متوقف مؤقتًا ما دام رصيد محفظتك سالبًا."
+  },
+  "elearning.student.withdrawEligible": {
+    "en": "Your available balance can be withdrawn.",
+    "ar": "يمكن سحب رصيدك المتاح."
+  },
+  "elearning.student.withdrawUnavailable": {
+    "en": "Withdrawals are not open yet.",
+    "ar": "السحب غير متاح بعد."
+  },
+  "elearning.student.withdrawalSubmitted": {
+    "en": "Withdrawal request submitted.",
+    "ar": "تم إرسال طلب السحب."
+  }
+}

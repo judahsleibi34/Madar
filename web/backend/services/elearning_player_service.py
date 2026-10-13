@@ -21,6 +21,11 @@ def my_learning(member, limit, offset):
     from services.elearning_academy_service import member_profile
     settings = get_settings(member.tenant_id)
     academy = member_profile(member.tenant_id) if settings.get("enabled") and settings.get("academy_enabled") else None
+    if academy:
+        from services.elearning_academy_service import institution_for_member
+        institution = institution_for_member(member.tenant_id, member.user_id)
+        if institution:
+            academy = {**academy, "institution": institution}
     if academy and member.role in {"owner", "admin"}:
         academy = {**academy, "management_path": "/e-learning/settings/academy"}
     return {**({"academy": academy} if academy else {}), "courses": courses[:limit], "has_more": len(courses) > limit, "settings": settings}

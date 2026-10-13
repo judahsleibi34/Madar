@@ -1,0 +1,101 @@
+/* EduHope student dashboard: mobile-first, builder theme tokens, status = icon + text. */
+.student-page { display:grid; grid-template-columns:minmax(0,1fr); gap:20px; min-width:0; max-width:1120px; }
+.student-page-header h1 { margin:0; font-size:clamp(24px,5vw,32px); }
+.student-page-header p { margin:6px 0 0; color:var(--theme-text-soft); }
+.student-page h2 { margin:0; font-size:20px; }
+.student-panel { display:grid; grid-template-columns:minmax(0,1fr); gap:12px; min-width:0; padding:18px; border:1px solid var(--theme-border); border-radius:16px; background:var(--theme-surface); }
+.student-panel > * { margin:0; }
+.student-empty { color:var(--theme-text-soft); }
+.student-note, .student-panel small { color:var(--theme-text-soft); line-height:1.6; }
+.student-page .ecommerce-primary-button { justify-self:start; min-height:48px; }
+
+.stat-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(min(100%,220px),1fr)); gap:12px; }
+.stat-card { display:grid; align-content:start; gap:6px; min-width:0; padding:16px; border:1px solid var(--theme-border); border-radius:16px; background:var(--theme-surface); color:inherit; text-decoration:none; }
+.stat-card.is-link:hover, .stat-card.is-link:focus-visible { border-color:var(--theme-primary); }
+.stat-card-label { display:inline-flex; align-items:center; gap:8px; color:var(--theme-text-soft); font-weight:650; }
+.stat-card-label svg { flex:none; color:var(--theme-primary); }
+.stat-card-value { font-size:22px; overflow-wrap:anywhere; }
+.stat-card-detail { color:var(--theme-text-soft); font-size:14px; overflow-wrap:anywhere; }
+
+.eh-progress { height:10px; border-radius:999px; background:var(--theme-border); overflow:hidden; }
+.eh-progress span { display:block; height:100%; border-radius:inherit; background:var(--theme-primary); }
+
+.status-pill { display:inline-flex; align-items:center; gap:6px; justify-self:start; width:fit-content; max-width:100%; padding:4px 12px; border-radius:999px; font-size:14px; font-weight:700; line-height:1.4; }
+.status-pill svg { flex:none; }
+.status-pill.is-teal { background:#CCFBF1; color:#115E59; }
+.status-pill.is-green { background:#DCFCE7; color:#166534; }
+.status-pill.is-indigo { background:#E0E7FF; color:#3730A3; }
+.status-pill.is-blue { background:#DBEAFE; color:#1E40AF; }
+.status-pill.is-amber { background:#FEF3C7; color:#92400E; }
+.status-pill.is-red { background:#FEE2E2; color:#991B1B; }
+.status-pill.is-gray { background:#F3F4F6; color:#374151; }
+
+.institution-welcome { display:grid; gap:8px; padding:18px; border-radius:16px; border:1px solid color-mix(in srgb,var(--theme-primary) 35%,transparent); background:color-mix(in srgb,var(--theme-primary) 8%,var(--theme-surface)); }
+.institution-welcome p { margin:0; }
+.student-continue { justify-self:start; }
+
+.course-summary { display:grid; gap:10px; padding:18px; border:1px solid var(--theme-border); border-radius:16px; background:var(--theme-surface); }
+.level-path { display:grid; grid-template-columns:repeat(auto-fill,minmax(min(100%,240px),1fr)); gap:12px; }
+.level-card { display:grid; align-content:start; gap:10px; min-width:0; padding:16px; border:1px solid var(--theme-border); border-inline-start:5px solid var(--theme-primary); border-radius:16px; background:var(--theme-surface); color:inherit; text-decoration:none; }
+.level-card header { display:flex; justify-content:space-between; align-items:center; gap:8px; }
+.level-card h3 { margin:0; font-size:18px; }
+.level-card.is-completed { border-inline-start-color:#0F766E; }
+.level-card.is-inProgress { border-inline-start-color:#D97706; }
+.level-card.is-locked { border-inline-start-color:#9CA3AF; opacity:.75; }
+a.level-card:hover, a.level-card:focus-visible { border-color:var(--theme-primary); }
+.level-card-number { font-weight:750; }
+.level-card-topics { color:var(--theme-text-soft); font-size:14px; }
+.cefr-badge { padding:2px 10px; border-radius:999px; background:var(--theme-primary); color:var(--theme-on-primary,#fff); font-size:13px; font-weight:750; }
+
+.topic-row-list { display:grid; gap:8px; margin:0; padding:0; list-style:none; }
+.topic-row { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:8px; min-width:0; padding:12px 14px; border:1px solid var(--theme-border); border-radius:12px; background:var(--theme-surface); }
+.topic-row-link { display:inline-flex; align-items:center; gap:10px; min-width:0; min-height:32px; color:inherit; font-weight:650; text-decoration:none; }
+a.topic-row-link:hover { color:var(--theme-primary); }
+.topic-row-number { display:grid; place-items:center; flex:none; width:28px; height:28px; border-radius:50%; background:color-mix(in srgb,var(--theme-primary) 12%,transparent); font-size:13px; }
+.topic-row.is-locked { color:var(--theme-text-soft); }
+
+.certificate-card-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(min(100%,240px),1fr)); gap:12px; }
+.certificate-card { display:grid; align-content:start; gap:10px; padding:18px; border:1px solid var(--theme-border); border-radius:16px; background:var(--theme-surface); }
+.certificate-card h3 { margin:0; font-size:17px; }
+.certificate-card.is-earned { border-color:color-mix(in srgb,#16A34A 45%,transparent); }
+.certificate-card.is-earned > svg { color:#16A34A; }
+.certificate-card.is-locked > svg { color:#6B7280; }
+
+.referral-link-row { display:flex; flex-wrap:wrap; gap:10px; }
+.referral-link-row input { flex:1 1 240px; min-width:0; min-height:48px; padding:0 14px; border:1px solid var(--theme-border); border-radius:12px; background:transparent; color:inherit; font-size:15px; }
+.referral-share { display:flex; flex-wrap:wrap; gap:8px; }
+.referral-share-button { display:inline-flex; align-items:center; gap:8px; min-height:44px; padding:0 16px; border:1px solid var(--theme-border); border-radius:999px; background:transparent; color:inherit; font:inherit; font-weight:650; text-decoration:none; cursor:pointer; }
+.referral-share-button:hover, .referral-share-button:focus-visible { border-color:var(--theme-primary); color:var(--theme-primary); }
+.referral-copy-status:empty { display:none; }
+.student-invite { justify-items:start; }
+.student-invite > svg { color:var(--theme-primary); }
+.student-invite p { max-width:60ch; line-height:1.7; }
+
+.student-panel .affiliate-table-scroll { max-width:100%; overflow-x:auto; }
+.student-table { width:100%; border-collapse:collapse; font-size:15px; }
+.student-table th, .student-table td { padding:10px 12px; border-bottom:1px solid var(--theme-border); text-align:start; vertical-align:middle; white-space:nowrap; }
+.student-table th { color:var(--theme-text-soft); font-size:13px; font-weight:700; }
+.student-table td.is-positive { color:#166534; font-weight:700; }
+.student-table td.is-negative { color:#991B1B; font-weight:700; }
+.student-table td.is-pending { color:var(--theme-text-soft); font-weight:700; }
+.student-table td.is-void { color:var(--theme-text-soft); text-decoration:line-through; }
+[dir="rtl"] .student-table td[dir="ltr"] { text-align:end; }
+.student-list { display:grid; gap:8px; margin:0; padding:0; list-style:none; }
+.student-list li { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:8px; padding:10px 0; border-bottom:1px solid var(--theme-border); }
+
+.student-form label { display:grid; gap:6px; font-weight:650; }
+.student-form input, .student-form select, .student-form textarea { min-height:48px; padding:10px 12px; border:1px solid var(--theme-border); border-radius:12px; background:transparent; color:inherit; font:inherit; }
+.student-form textarea { min-height:96px; }
+.student-form .student-check { display:flex; align-items:flex-start; gap:10px; font-weight:500; line-height:1.6; }
+.student-form .student-check input { min-height:auto; width:20px; height:20px; margin-top:3px; flex:none; }
+.student-form [role="status"]:empty { display:none; }
+
+.application-block { display:grid; gap:12px; }
+.application-status { display:flex; flex-wrap:wrap; align-items:center; gap:10px; }
+
+
+@media (max-width:520px) {
+  .student-panel, .course-summary { padding:14px; }
+  .student-page .ecommerce-primary-button, .referral-link-row .ecommerce-primary-button { justify-self:stretch; width:100%; justify-content:center; }
+  .referral-share-button { flex:1 1 calc(50% - 8px); justify-content:center; }
+}

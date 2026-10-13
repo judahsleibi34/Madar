@@ -144,3 +144,7 @@
 .affiliate-table-scroll th, .affiliate-table-scroll td { padding: .8rem; border-block-end: 1px solid var(--builder-border, #34404c); }
 .affiliate-table-scroll caption { text-align: start; padding-block: .8rem; font-weight: 600; }
 .learner-account-referral strong { overflow-wrap: anywhere; }
+
+/* Institution label (e.g. "PAU Student"), shown only when the academy enables it. */
+.learning-shell-institution { display:inline-flex; align-items:center; gap:6px; padding:4px 10px; border-radius:999px; background:color-mix(in srgb,var(--theme-primary) 12%,transparent); color:var(--theme-primary); font-size:13px; font-weight:750; white-space:nowrap; }
+@media (max-width:520px) { .learning-shell-institution { display:none; } }
