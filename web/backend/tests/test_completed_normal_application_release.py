@@ -190,4 +190,27 @@ class ApplicationRuntimeTests(unittest.TestCase):
         with self.assertRaises(RuntimeError):f.validate()
 
 
+class ApplicationDeploymentContractTests(unittest.TestCase):
+    def test_no_sql_metadata_is_owned_by_controller_not_changed_application(self):
+        import test_completed_normal_compose as f
+        from deployment.lib import provider_recovery_runtime as protection
+        c=application_contract()
+        ops=f.cli.DockerGitOperations(f.WEB.parent,Path('/unused-state'),Path('/unused-env'),
+            f.cli.Compatibility.load(f.WEB/'deployment/releases'/APPLICATION.metadata),
+            metadata_filename=APPLICATION.metadata)
+        ops.completed_normal_admission=c
+        ops.release_root=Path('/immutable-accepted-application')
+        with patch.object(admission,'require_candidate_authority') as authority, \
+                patch.object(protection,'readonly_configuration',side_effect=lambda p,**kw:p):
+            self.assertEqual(ops.release_metadata_path(),f.WEB/'deployment/releases'/APPLICATION.metadata)
+            self.assertEqual(f.cli.plan_release_migrations(sha=c['candidate']['source_sha'],schema=144,
+                compatibility=ops.compatibility,operations=ops),[])
+            self.assertTrue(authority.called)
+            ops.metadata_filename='schema-136-144-learning-bridge.json'
+            with self.assertRaisesRegex(RuntimeError,'application_only_release_contract_changed'):
+                ops.release_metadata_path()
+        with patch.object(admission,'require_candidate_authority',side_effect=RuntimeError('grant_invalid')):
+            with self.assertRaisesRegex(RuntimeError,'grant_invalid'):ops.release_metadata_path()
+
+
 if __name__=='__main__':unittest.main()

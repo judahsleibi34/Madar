@@ -183,6 +183,22 @@ class DockerGitOperations:
         self.container_prefix = container_prefix
         self.release_root: Path | None = None
 
+    def release_metadata_path(self) -> Path:
+        admission=getattr(self,'completed_normal_admission',None)
+        if admission is not None:
+            from deployment.lib.completed_normal_profile import APPLICATION,profile
+            if profile(admission) is APPLICATION:
+                # This no-SQL contract belongs to the exact installed controller,
+                # not the previously accepted, immutable application worktree.
+                from deployment.lib.completed_normal_admission import require_candidate_authority
+                from deployment.lib.provider_recovery_runtime import readonly_configuration
+                require_candidate_authority(admission)
+                if self.metadata_filename!=APPLICATION.metadata:
+                    raise RuntimeError('application_only_release_contract_changed')
+                return readonly_configuration(Path(__file__).resolve().parents[1]/'releases'/APPLICATION.metadata,private=False)
+        if self.release_root is None:raise RuntimeError('release_source_not_prepared')
+        return self.release_root/'web/deployment/releases'/self.metadata_filename
+
     @staticmethod
     def _storage_root() -> Path:
         raw = os.getenv("MADAR_STORAGE_ROOT", "").strip()
@@ -722,9 +738,7 @@ class DockerGitOperations:
                 require_candidate_authority(self.completed_normal_admission, mode="READ_ONLY")
                 self.verify_completed_normal_allocation(slot)
 
-        candidate_compatibility = Compatibility.load(
-            self.release_root / "web/deployment/releases" / self.metadata_filename
-        )
+        candidate_compatibility = Compatibility.load(self.release_metadata_path())
         if candidate_compatibility != self.compatibility:
             raise RuntimeError("control_plane_release_contract_mismatch")
 
@@ -1482,7 +1496,7 @@ def plan_release_migrations(
         # DockerGitOperations always sets it in verify_source().
         return []
     release_root = operations.release_root
-    metadata_path = release_root / "web/deployment/releases" / operations.metadata_filename
+    metadata_path = operations.release_metadata_path()
     metadata = _json_file(metadata_path, "candidate_release_contract_invalid")
     if Compatibility.load(metadata_path) != compatibility:
         raise RuntimeError("candidate_release_contract_mismatch")
