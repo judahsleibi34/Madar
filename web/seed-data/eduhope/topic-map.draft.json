@@ -1,0 +1,527 @@
+{
+  "status": "Approved as draft by owner — pending final owner approval",
+  "counts_source": "Owner instruction (book document gives no per-level counts)",
+  "sources": [
+    "The book project. 30 — level titles, CEFR stages, §9 and §22 contexts, §14 Listen & Match examples, §38 international contexts",
+    "Council of Europe CEFR illustrative descriptor scales (named scales; not quoted)",
+    "British Council / EAQUALS Core Inventory for General English (function and topic categories; not quoted)"
+  ],
+  "levels": [
+    {
+      "level": 1,
+      "cefr": "A1",
+      "title": "Beginner Foundations",
+      "topics": [
+        {
+          "number": 1,
+          "title": "Introducing Yourself",
+          "basis": "Book §22 A1 \"Introducing yourself\"; CEFR A1 Spoken interaction; Core Inventory: personal information"
+        },
+        {
+          "number": 2,
+          "title": "Greetings and Saying Goodbye",
+          "basis": "CEFR A1 Socio-linguistic appropriateness; Core Inventory: greeting, leave-taking"
+        },
+        {
+          "number": 3,
+          "title": "Talking About Your Family",
+          "basis": "Book §22 A1 \"Family\"; Core Inventory: family"
+        },
+        {
+          "number": 4,
+          "title": "Numbers, Phone Numbers and Email Addresses",
+          "basis": "CEFR A1 Information exchange; Core Inventory: numbers"
+        },
+        {
+          "number": 5,
+          "title": "Telling the Time",
+          "basis": "CEFR A1 Information exchange; Core Inventory: time"
+        },
+        {
+          "number": 6,
+          "title": "Days, Dates and Birthdays",
+          "basis": "CEFR A1 Information exchange; Core Inventory: dates"
+        },
+        {
+          "number": 7,
+          "title": "Things in the Classroom",
+          "basis": "Book §22 A1 \"School\"; Core Inventory: classroom language"
+        },
+        {
+          "number": 8,
+          "title": "Describing Your Home",
+          "basis": "CEFR A1 Sustained monologue: describing; Core Inventory: house and home"
+        }
+      ]
+    },
+    {
+      "level": 2,
+      "cefr": "A1",
+      "title": "Beginner Communication",
+      "topics": [
+        {
+          "number": 1,
+          "title": "Your Daily Routine",
+          "basis": "Book §22 A1 \"Daily routines\"; Core Inventory: daily routines"
+        },
+        {
+          "number": 2,
+          "title": "Ordering Food and Drinks",
+          "basis": "Book §22 A1 \"Food\"; CEFR A1 Transactions to obtain goods and services"
+        },
+        {
+          "number": 3,
+          "title": "Shopping for Everyday Items",
+          "basis": "Book §22 A1 \"Shopping\"; CEFR A1 Transactions to obtain goods and services"
+        },
+        {
+          "number": 4,
+          "title": "Asking for and Giving Directions",
+          "basis": "Book §22 A1 \"Basic travel\"; Core Inventory: directions"
+        },
+        {
+          "number": 5,
+          "title": "Using Public Transport",
+          "basis": "Book §9 \"Transportation\"; CEFR A1 Information exchange"
+        },
+        {
+          "number": 6,
+          "title": "Talking About Likes and Dislikes",
+          "basis": "CEFR A1 Conversation; Core Inventory: likes and dislikes"
+        },
+        {
+          "number": 7,
+          "title": "Talking About the Weather",
+          "basis": "CEFR A1 Conversation; Core Inventory: weather"
+        },
+        {
+          "number": 8,
+          "title": "Meeting Classmates at University",
+          "basis": "Book §22 A1 \"University\"; CEFR A1 Conversation"
+        }
+      ]
+    },
+    {
+      "level": 3,
+      "cefr": "A2",
+      "title": "Elementary Communication",
+      "topics": [
+        {
+          "number": 1,
+          "title": "Talking About Last Weekend",
+          "basis": "Book §22 A2 \"Talking about experiences\"; Core Inventory: past events"
+        },
+        {
+          "number": 2,
+          "title": "Making an Appointment",
+          "basis": "Book §22 A2 \"Making appointments\"; CEFR A2 Goal-oriented co-operation"
+        },
+        {
+          "number": 3,
+          "title": "Making Plans with Friends",
+          "basis": "Book §22 A2 \"Social activities\"; Core Inventory: making arrangements"
+        },
+        {
+          "number": 4,
+          "title": "Asking for Information",
+          "basis": "Book §22 A2 \"Asking for information\"; CEFR A2 Information exchange"
+        },
+        {
+          "number": 5,
+          "title": "Describing People",
+          "basis": "CEFR A2 Sustained monologue: describing; Core Inventory: describing people"
+        },
+        {
+          "number": 6,
+          "title": "Talking About Free Time",
+          "basis": "Book §22 A2 \"Social activities\"; Core Inventory: free time"
+        },
+        {
+          "number": 7,
+          "title": "At the Doctor's",
+          "basis": "Book §22 A2 \"Everyday services\"; Core Inventory: health"
+        },
+        {
+          "number": 8,
+          "title": "Inviting, Accepting and Declining",
+          "basis": "CEFR A2 Conversation; Core Inventory: invitations"
+        },
+        {
+          "number": 9,
+          "title": "Talking About Your Studies",
+          "basis": "Book §9 \"University\"; CEFR A2 Conversation"
+        }
+      ]
+    },
+    {
+      "level": 4,
+      "cefr": "A2",
+      "title": "Elementary Real-Life English",
+      "topics": [
+        {
+          "number": 1,
+          "title": "Booking a Hotel Room",
+          "basis": "Book §22 A2 \"Everyday services\"; CEFR A2 Transactions to obtain goods and services"
+        },
+        {
+          "number": 2,
+          "title": "At the Airport",
+          "basis": "Book §22 A2 \"Travel problems\"; Book §38 \"International travel\""
+        },
+        {
+          "number": 3,
+          "title": "Buying a Bus or Train Ticket",
+          "basis": "Book §9 \"Transportation\"; CEFR A2 Transactions"
+        },
+        {
+          "number": 4,
+          "title": "Returning Something to a Shop",
+          "basis": "Book §9 \"Shopping\"; CEFR A2 Transactions"
+        },
+        {
+          "number": 5,
+          "title": "At the Bank",
+          "basis": "Book §22 A2 \"Everyday services\"; CEFR A2 Transactions"
+        },
+        {
+          "number": 6,
+          "title": "Looking for an Apartment",
+          "basis": "Book §14 B1 example \"looking for a new apartment\"; CEFR A2 Information exchange"
+        },
+        {
+          "number": 7,
+          "title": "Calling Customer Service",
+          "basis": "Book §9 \"Customer service\"; CEFR A2 Transactions"
+        },
+        {
+          "number": 8,
+          "title": "Solving a Travel Problem",
+          "basis": "Book §22 A2 \"Travel problems\"; CEFR A2 Goal-oriented co-operation"
+        },
+        {
+          "number": 9,
+          "title": "Talking About a Past Trip",
+          "basis": "Book §22 A2 \"Talking about experiences\"; CEFR A2 Sustained monologue"
+        }
+      ]
+    },
+    {
+      "level": 5,
+      "cefr": "B1",
+      "title": "Intermediate Communication",
+      "topics": [
+        {
+          "number": 1,
+          "title": "Giving Your Opinion",
+          "basis": "Book §22 B1 \"Giving opinions\"; Core Inventory: expressing opinions"
+        },
+        {
+          "number": 2,
+          "title": "Agreeing and Disagreeing Politely",
+          "basis": "CEFR B1 Informal discussion; Core Inventory: agreeing and disagreeing"
+        },
+        {
+          "number": 3,
+          "title": "Explaining a Problem",
+          "basis": "Book §22 B1 \"Explaining problems\"; CEFR B1 Goal-oriented co-operation"
+        },
+        {
+          "number": 4,
+          "title": "Describing an Experience",
+          "basis": "Book §22 B1 \"Discussing experiences\"; CEFR B1 Sustained monologue: describing experience"
+        },
+        {
+          "number": 5,
+          "title": "Making Suggestions",
+          "basis": "Book §22 B1 \"Making plans\"; Core Inventory: making suggestions"
+        },
+        {
+          "number": 6,
+          "title": "Talking About Future Plans and Goals",
+          "basis": "Book §22 B1 \"Making plans\"; Core Inventory: future plans"
+        },
+        {
+          "number": 7,
+          "title": "Telling a Story",
+          "basis": "CEFR B1 Sustained monologue: narrating; Core Inventory: narrating"
+        },
+        {
+          "number": 8,
+          "title": "Discussing Films, Books and Music",
+          "basis": "CEFR B1 Conversation; Core Inventory: entertainment"
+        },
+        {
+          "number": 9,
+          "title": "Talking About Technology and Social Media",
+          "basis": "Book §9 \"Technology\", \"Social media\"; CEFR B1 Conversation"
+        }
+      ]
+    },
+    {
+      "level": 6,
+      "cefr": "B1",
+      "title": "Intermediate Real-Life English",
+      "topics": [
+        {
+          "number": 1,
+          "title": "Preparing for a Job Interview",
+          "basis": "Book §9 \"Job interviews\"; CEFR B1 Interviewing and being interviewed"
+        },
+        {
+          "number": 2,
+          "title": "Describing Your Responsibilities at Work",
+          "basis": "Book §22 B1 \"Workplace situations\"; CEFR B1 Sustained monologue"
+        },
+        {
+          "number": 3,
+          "title": "Making a Complaint",
+          "basis": "Book §9 \"Customer service\"; CEFR B1 Transactions"
+        },
+        {
+          "number": 4,
+          "title": "Taking Part in an Online Meeting",
+          "basis": "Book §38 \"Online meetings\"; CEFR B1 Formal discussion and meetings"
+        },
+        {
+          "number": 5,
+          "title": "Asking for Help at Work",
+          "basis": "Book §22 B1 \"Workplace situations\"; Core Inventory: requests"
+        },
+        {
+          "number": 6,
+          "title": "Making Arrangements by Phone",
+          "basis": "Book §9 \"Online communication\"; CEFR B1 Goal-oriented co-operation"
+        },
+        {
+          "number": 7,
+          "title": "Talking About Health and Lifestyle",
+          "basis": "CEFR B1 Conversation; Core Inventory: health"
+        },
+        {
+          "number": 8,
+          "title": "Volunteering in Your Community",
+          "basis": "Book §22 B1 \"Social issues\"; CEFR B1 Informal discussion"
+        },
+        {
+          "number": 9,
+          "title": "Discussing a Social Issue",
+          "basis": "Book §22 B1 \"Social issues\"; CEFR B1 Informal discussion"
+        }
+      ]
+    },
+    {
+      "level": 7,
+      "cefr": "B2",
+      "title": "Upper-Intermediate Communication",
+      "topics": [
+        {
+          "number": 1,
+          "title": "Taking Part in a Discussion",
+          "basis": "Book §22 B2 \"Discussions\"; CEFR B2 Informal discussion"
+        },
+        {
+          "number": 2,
+          "title": "Balancing Different Viewpoints",
+          "basis": "CEFR B2 Formal discussion; Core Inventory: balancing arguments"
+        },
+        {
+          "number": 3,
+          "title": "Explaining Advantages and Disadvantages",
+          "basis": "CEFR B2 Sustained monologue: putting a case; Core Inventory: pros and cons"
+        },
+        {
+          "number": 4,
+          "title": "Giving a Short Presentation",
+          "basis": "Book §22 B2 \"Presentations\"; CEFR B2 Addressing audiences"
+        },
+        {
+          "number": 5,
+          "title": "Describing Trends and Changes",
+          "basis": "Book §14 C1 \"Trends\"; CEFR B2 Sustained monologue"
+        },
+        {
+          "number": 6,
+          "title": "Talking About the Environment",
+          "basis": "CEFR B2 Formal discussion; Core Inventory: environment"
+        },
+        {
+          "number": 7,
+          "title": "Discussing News and Current Events",
+          "basis": "CEFR B2 Conversation; Core Inventory: news"
+        },
+        {
+          "number": 8,
+          "title": "Speculating About the Future",
+          "basis": "CEFR B2 Spoken production; Core Inventory: speculating"
+        },
+        {
+          "number": 9,
+          "title": "Giving Constructive Feedback",
+          "basis": "Book §22 B2 \"Workplace communication\"; CEFR B2 Goal-oriented co-operation"
+        }
+      ]
+    },
+    {
+      "level": 8,
+      "cefr": "B2",
+      "title": "Advanced Everyday Communication",
+      "topics": [
+        {
+          "number": 1,
+          "title": "Negotiating a Shared Outcome",
+          "basis": "Book §22 B2 \"Negotiation\"; CEFR B2 Goal-oriented co-operation"
+        },
+        {
+          "number": 2,
+          "title": "Solving Problems as a Team",
+          "basis": "Book §22 B2 \"Problem-solving\"; CEFR B2 Goal-oriented co-operation"
+        },
+        {
+          "number": 3,
+          "title": "Handling a Difficult Conversation",
+          "basis": "Book §22 B2 \"Complex conversations\"; CEFR B2 Conversation"
+        },
+        {
+          "number": 4,
+          "title": "Giving a Project Update",
+          "basis": "Owner revision; Book §22 B2 \"Workplace communication\"; CEFR B2 Sustained monologue"
+        },
+        {
+          "number": 5,
+          "title": "Explaining a Decision",
+          "basis": "CEFR B2 Sustained monologue: putting a case; Core Inventory: justifying"
+        },
+        {
+          "number": 6,
+          "title": "Discussing Education Systems",
+          "basis": "Book §9 \"University\", \"School\"; CEFR B2 Formal discussion"
+        },
+        {
+          "number": 7,
+          "title": "Persuading Someone",
+          "basis": "CEFR B2 Addressing audiences; Core Inventory: persuading"
+        },
+        {
+          "number": 8,
+          "title": "Dealing with Misunderstandings",
+          "basis": "CEFR B2 Mediating communication; Core Inventory: clarifying"
+        },
+        {
+          "number": 9,
+          "title": "Networking at an Event",
+          "basis": "Book §38 \"Conferences\", \"International friendships\"; CEFR B2 Conversation"
+        }
+      ]
+    },
+    {
+      "level": 9,
+      "cefr": "C1",
+      "title": "Advanced Communication",
+      "topics": [
+        {
+          "number": 1,
+          "title": "Developing a Nuanced Argument",
+          "basis": "Book §22 C1 \"Nuanced arguments\"; CEFR C1 Sustained monologue: putting a case"
+        },
+        {
+          "number": 2,
+          "title": "Taking Part in Academic Discussions",
+          "basis": "Book §22 C1 \"Academic discussions\"; CEFR C1 Formal discussion"
+        },
+        {
+          "number": 3,
+          "title": "Presenting Research Findings",
+          "basis": "Book §22 C1 \"Presentations\"; CEFR C1 Addressing audiences"
+        },
+        {
+          "number": 4,
+          "title": "Debating an Ethical Question",
+          "basis": "Book §22 C1 \"Complex opinions\"; CEFR C1 Formal discussion"
+        },
+        {
+          "number": 5,
+          "title": "Expressing Degrees of Certainty",
+          "basis": "CEFR C1 Propositional precision; Core Inventory: hedging"
+        },
+        {
+          "number": 6,
+          "title": "Interpreting Data and Evidence",
+          "basis": "Book §14 C1 \"Processes\", \"Trends\"; CEFR C1 Explaining data"
+        },
+        {
+          "number": 7,
+          "title": "Leading a Group Discussion",
+          "basis": "Book §22 C1 \"Leadership communication\"; CEFR C1 Facilitating collaborative interaction"
+        },
+        {
+          "number": 8,
+          "title": "Communicating Across Cultures",
+          "basis": "Book §38 \"International communication\"; CEFR C1 Facilitating pluricultural space"
+        },
+        {
+          "number": 9,
+          "title": "Responding to Challenging Questions",
+          "basis": "CEFR C1 Addressing audiences: handling questions; Book §22 C1 \"Professional communication\""
+        }
+      ]
+    },
+    {
+      "level": 10,
+      "cefr": "C1",
+      "title": "Advanced Fluency and Professional Communication",
+      "topics": [
+        {
+          "number": 1,
+          "title": "Negotiating with Multiple Constraints",
+          "basis": "Book §22 C1 \"Negotiation\"; CEFR C1 Goal-oriented co-operation"
+        },
+        {
+          "number": 2,
+          "title": "Chairing a Meeting",
+          "basis": "Book §22 C1 \"Professional communication\"; CEFR C1 Formal discussion and meetings"
+        },
+        {
+          "number": 3,
+          "title": "Giving a Formal Presentation",
+          "basis": "Book §22 C1 \"Presentations\"; CEFR C1 Addressing audiences"
+        },
+        {
+          "number": 4,
+          "title": "Handling Objections and Pushback",
+          "basis": "Owner revision; Book §22 C1 \"Persuasion\", \"Negotiation\"; CEFR C1 Formal discussion"
+        },
+        {
+          "number": 5,
+          "title": "Answering Questions in a Panel Interview",
+          "basis": "Book §9 \"Job interviews\"; CEFR C1 Interviewing and being interviewed"
+        },
+        {
+          "number": 6,
+          "title": "Mentoring a Colleague",
+          "basis": "Owner revision; Book §22 C1 \"Leadership communication\"; CEFR C1 Facilitating collaborative interaction"
+        },
+        {
+          "number": 7,
+          "title": "Managing Conflict at Work",
+          "basis": "Book §22 C1 \"Professional communication\"; CEFR C1 Mediating communication"
+        },
+        {
+          "number": 8,
+          "title": "Pitching an Idea",
+          "basis": "Book §22 C1 \"Persuasion\"; CEFR C1 Addressing audiences"
+        },
+        {
+          "number": 9,
+          "title": "Representing Your Organisation",
+          "basis": "Book §38 \"International workplaces\", \"Conferences\"; CEFR C1 Formal discussion"
+        },
+        {
+          "number": 10,
+          "title": "Summarising a Complex Discussion",
+          "basis": "CEFR C1 Mediating a text / processing text; Core Inventory: summarising"
+        }
+      ]
+    }
+  ],
+  "approved_on": "2026-10-13"
+}

@@ -1,0 +1,24 @@
+/* EduHope lesson components: large, touch-friendly, status = icon + text. */
+.lesson-audio { display:grid; gap:12px; padding:20px; border:1px solid var(--theme-border); border-radius:16px; background:var(--theme-surface); }
+.lesson-audio-title { font-size:18px; }
+.lesson-audio-controls { display:flex; flex-wrap:wrap; align-items:center; gap:12px; }
+.lesson-audio-listen, .lesson-audio-again { display:inline-flex; align-items:center; gap:10px; min-height:52px; padding:0 22px; border-radius:999px; font-size:17px; font-weight:750; letter-spacing:.02em; cursor:pointer; }
+.lesson-audio-listen { border:0; background:var(--theme-primary); color:var(--theme-on-primary,#fff); }
+.lesson-audio-again { border:2px solid var(--theme-primary); background:transparent; color:var(--theme-primary); }
+.lesson-audio-listen:disabled, .lesson-audio-again:disabled { opacity:.5; cursor:default; }
+.lesson-audio-speed { display:inline-flex; align-items:center; gap:6px; margin-inline-start:auto; color:var(--theme-text-soft); }
+.lesson-audio-speed button { min-width:52px; min-height:44px; border:1px solid var(--theme-border); border-radius:999px; background:transparent; color:inherit; font-weight:650; cursor:pointer; }
+.lesson-audio-speed button[aria-pressed="true"] { border-color:var(--theme-primary); background:color-mix(in srgb,var(--theme-primary) 12%,transparent); color:var(--theme-primary); }
+.lesson-audio-progress { height:8px; border-radius:999px; background:var(--theme-border); overflow:hidden; }
+.lesson-audio-progress span { display:block; height:100%; background:var(--theme-primary); }
+[dir="rtl"] .lesson-audio-progress { transform:scaleX(-1); }
+.lesson-audio-time { color:var(--theme-text-soft); }
+.lesson-audio-transcript-toggle { justify-self:start; min-height:44px; padding:0 16px; border:1px solid var(--theme-border); border-radius:999px; background:transparent; color:inherit; font-weight:700; letter-spacing:.02em; text-transform:uppercase; cursor:pointer; }
+.lesson-audio.is-pending { grid-template-columns:auto 1fr; align-items:center; border-style:dashed; color:var(--theme-text-soft); }
+.lesson-audio.is-pending p { margin:4px 0 0; }
+.lesson-transcript { display:grid; gap:10px; }
+.lesson-transcript-turn { display:grid; gap:2px; max-width:min(85%,560px); margin:0; padding:10px 14px; border-radius:16px; background:color-mix(in srgb,var(--theme-primary) 8%,var(--theme-surface)); }
+.lesson-transcript-turn.is-end { justify-self:end; background:color-mix(in srgb,var(--theme-accent,#088848) 10%,var(--theme-surface)); }
+.lesson-transcript-turn strong { font-size:13px; }
+.lesson-transcript-prose { white-space:pre-wrap; margin:0; }
+@media (max-width:520px) { .lesson-audio-speed { margin-inline-start:0; } .lesson-audio-listen, .lesson-audio-again { flex:1 1 auto; justify-content:center; } }

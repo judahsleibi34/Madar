@@ -9,7 +9,7 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 describe("learning media controls", () => {
   it("keeps an optional transcript hidden until the learner opens it", () => {
     render(<MediaBlockRenderer kind="audio" block={{ title: "Listen", media: { url: "/uploads/tenant_1/builder_assets/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.wav" }, content: { transcript: "Original testing transcript" } }} />);
-    const transcript = screen.getByText("Original testing transcript");
+    const transcript = screen.getByText("Original testing transcript").closest(".lesson-transcript");
     expect(transcript.hidden).toBe(true);
     const button = screen.getByRole("button", { name: "elearning.content.showTranscript" });
     fireEvent.click(button); expect(transcript.hidden).toBe(false);

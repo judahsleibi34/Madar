@@ -92,6 +92,30 @@ class AcademyLoginRequest(TenantLoginRequest):
 class AcademyRegisterRequest(TenantRegisterRequest):
     return_to: str = Field(default="", max_length=2048)
     referral_code: UUID | None = None
+    # Optional per-academy profile fields, required only when the academy's
+    # published website asks for them (see registration_profile).
+    country: str | None = Field(default=None, max_length=120)
+    university: str | None = Field(default=None, max_length=200)
+    terms_accepted: bool = False
+
+
+def registration_profile(tenant_id, website):
+    """The tenant-owned registration options stored in its published website."""
+    from database import service_supabase
+    from services.elearning_settings_service import settings_available
+    if not website.get("academy_project_id") or not settings_available(132):
+        return {}
+    rows = service_supabase.table("builder_projects").select("published_schema").eq("id", website["academy_project_id"]).eq("tenant_id", tenant_id).eq("usage_profile", "academy").limit(1).execute().data or []
+    value = ((rows[0].get("published_schema") or {}) if rows else {}).get("academyRegistration")
+    return value if isinstance(value, dict) else {}
+
+
+def requires_verified_email(profile_options, email):
+    """Listed institutional domains (and their subdomains) must confirm email,
+    even when the academy otherwise allows unconfirmed sign-up."""
+    domain = str(email).rsplit("@", 1)[-1].strip().lower()
+    listed = [str(item).strip().lower() for item in profile_options.get("verifiedEmailDomains", []) if str(item).strip()]
+    return any(domain == item or domain.endswith("." + item) for item in listed)
 
 
 def auth_return(payload, website, request):
@@ -107,13 +131,14 @@ def login(identifier: str, payload: AcademyLoginRequest, request: Request, respo
     from routes.public_site_routes import login_tenant_account, get_tenant_staff_membership
     website, tenant_id, settings = academy_auth_settings(identifier, request)
     target = auth_return(payload, website, request)
+    verification_required = settings.get("academy_email_verification_required", True) or requires_verified_email(registration_profile(tenant_id, website), payload.email)
     result = login_tenant_account(
         identifier,
         payload,
         request,
         response,
         allow_learning_membership=True,
-        email_verification_required=settings.get("academy_email_verification_required", True),
+        email_verification_required=verification_required,
     )
     user = result.get("user") or {}
     # The shared learning runtime uses the existing current tenant membership.
@@ -126,7 +151,7 @@ def login(identifier: str, payload: AcademyLoginRequest, request: Request, respo
 def register(identifier: str, payload: AcademyRegisterRequest, request: Request):
     from services.academy_auth_service import academy_auth_settings, verification_redirect
     from routes.public_site_routes import register_tenant_account
-    website, _, settings = academy_auth_settings(identifier, request)
+    website, tenant_id, settings = academy_auth_settings(identifier, request)
     if settings["academy_registration"] not in {"open", "email_domain"}:
         raise HTTPException(403, detail={"code": "academy_invitation_required"})
     if settings["academy_registration"] == "email_domain":
@@ -134,6 +159,16 @@ def register(identifier: str, payload: AcademyRegisterRequest, request: Request)
         domain = normalize_academy_email_domain(str(payload.email).rsplit("@", 1)[1])
         if domain not in settings.get("academy_email_domains", []):
             raise HTTPException(403, detail={"code": "academy_email_domain_not_allowed"})
+    profile_options = registration_profile(tenant_id, website)
+    requested = {key for key in profile_options.get("fields", []) if key in {"country", "university"}}
+    if "country" in requested and not (payload.country or "").strip():
+        raise HTTPException(422, detail={"code": "academy_country_required"})
+    if profile_options.get("requireTerms") and not payload.terms_accepted:
+        raise HTTPException(422, detail={"code": "academy_terms_required"})
+    profile = {key: getattr(payload, key).strip() for key in requested if (getattr(payload, key) or "").strip()}
+    if profile_options.get("requireTerms"):
+        from datetime import datetime, timezone
+        profile["terms_accepted_at"] = datetime.now(timezone.utc).isoformat()
     target = auth_return(payload, website, request)
     # Shared registration sends a canonical tenant-hosted verification link.
     # Convert a compatible main-app URL to the equivalent path on that host.
@@ -141,7 +176,7 @@ def register(identifier: str, payload: AcademyRegisterRequest, request: Request)
     verification_target = target
     if target == main_base or target.startswith(main_base + "/"):
         verification_target = "/academy" + target[len(main_base):]
-    result = register_tenant_account(identifier, payload, request, academy_context={"return_to": f"/academy/login?returnTo={quote(verification_target, safe='')}", "email_redirect_to": verification_redirect(website['subdomain'], request, target), "email_verification_required": settings.get("academy_email_verification_required", True), "referral_code": str(payload.referral_code) if payload.referral_code else None})
+    result = register_tenant_account(identifier, payload, request, academy_context={"return_to": f"/academy/login?returnTo={quote(verification_target, safe='')}", "email_redirect_to": verification_redirect(website['subdomain'], request, target), "email_verification_required": settings.get("academy_email_verification_required", True) or requires_verified_email(profile_options, payload.email), "referral_code": str(payload.referral_code) if payload.referral_code else None, "profile": profile})
     return {**result, "return_to": target}
 
 

@@ -2,13 +2,14 @@
 import { useState } from "react";
 import { Link, NavLink } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { Menu, X } from "lucide-react";
+import { GraduationCap, Languages, Menu, X } from "lucide-react";
 import { getBrandedMadarSubdomain } from "../../utils/hostedAddress";
 import { resolveMediaUrl } from "../../utils/media";
+import LanguageText from "./AcademyLanguageText";
 import "../../styles/elearning-academy.css";
 
 export const academyPath = (site) => getBrandedMadarSubdomain(window.location.hostname) ? "/academy" : `/academy/${encodeURIComponent(site.subdomain)}`;
-export default function AcademyNav({ site, authenticated = false, hasPlans = false, utility = false }) {
+export default function AcademyNav({ site, authenticated = false, hasPlans = false, utility = false, chrome = {} }) {
   const { t, i18n } = useTranslation("dashboard");
   const [open, setOpen] = useState(false);
   const base = academyPath(site);
@@ -21,8 +22,8 @@ export default function AcademyNav({ site, authenticated = false, hasPlans = fal
       {hasPlans && <NavLink to={`${base}/plans`}>{t("elearning.academy.plans")}</NavLink>}
       </div>
       <div className="academy-account-links">
-      {authenticated ? <Link to={`${base}/dashboard`}>{t("elearning.player.myLearning")}</Link> : <><Link to={`${base}/login`}>{t("elearning.learner.logIn")}</Link>{["open", "email_domain"].includes(site.academy_registration) && <Link className="academy-nav-signup" to={`${base}/login?register=1`}>{t("elearning.learner.signUp")}</Link>}</>}
-      <button onClick={() => i18n.changeLanguage(i18n.language.startsWith("ar") ? "en" : "ar")}>{i18n.language.startsWith("ar") ? "English" : "العربية"}</button>
+      {authenticated ? <Link className="academy-icon-action" to={`${base}/dashboard`} aria-label={t("elearning.player.myLearning")} title={t("elearning.player.myLearning")}><GraduationCap aria-hidden="true" /></Link> : <><Link to={`${base}/login`}>{t("elearning.learner.logIn")}</Link>{["open", "email_domain"].includes(site.academy_registration) && <Link className="academy-nav-signup" to={`${base}/login?register=1`}>{chrome.signUpLabel?.[i18n.language.startsWith("ar") ? "ar" : "en"] || t("elearning.learner.signUp")}</Link>}</>}
+      {chrome.languageSwitcher === "text" ? <LanguageText language={i18n.language.startsWith("ar") ? "ar" : "en"} onChange={next => i18n.changeLanguage(next)} /> : <button type="button" className="academy-icon-action" lang={i18n.language.startsWith("ar") ? "en" : "ar"} aria-label={i18n.language.startsWith("ar") ? "English" : "العربية"} title={i18n.language.startsWith("ar") ? "English" : "العربية"} onClick={() => i18n.changeLanguage(i18n.language.startsWith("ar") ? "en" : "ar")}><Languages aria-hidden="true" /></button>}
       </div>
     </nav>
   </header>;

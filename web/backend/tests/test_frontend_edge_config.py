@@ -44,6 +44,16 @@ class FrontendEdgeConfigTests(unittest.TestCase):
         self.assertIn("proxy_set_header X-Request-ID $madar_request_id", nginx)
         self.assertNotIn("location ^~ /api/ {\n        try_files", nginx)
 
+    def test_same_origin_api_proxy_accepts_backend_upload_limit(self):
+        from services.request_body_limits import DEFAULT_MAX_BUILDER_ASSET_REQUEST_BODY_BYTES
+        nginx = (ROOT / "frontend" / "nginx.conf.template").read_text(encoding="utf-8")
+        proxy = (ROOT / "deployment" / "proxy" / "nginx.conf").read_text(encoding="utf-8")
+        api = nginx[nginx.index("location ^~ /api/ {"):]
+        api = api[:api.index("}")]
+        directive = f"client_max_body_size {DEFAULT_MAX_BUILDER_ASSET_REQUEST_BODY_BYTES};"
+        self.assertIn(directive, api)
+        self.assertIn(directive, proxy)
+
     def test_api_assets_cannot_be_intercepted_by_static_file_regex(self):
         nginx = (ROOT / "frontend" / "nginx.conf.template").read_text(encoding="utf-8")
         self.assertIn("location ^~ /api/", nginx)

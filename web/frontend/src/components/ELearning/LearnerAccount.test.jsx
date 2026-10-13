@@ -50,3 +50,18 @@ it("renders personalized referrals and keeps currencies and simulated balances s
  expect(screen.getByText('Awaiting first purchase')).toBeTruthy();expect(screen.getByText(/3 referred learners/)).toBeTruthy();
  expect(screen.queryByText(/Referral rewards and tracking are not enabled/)).toBeNull();
 });
+it("never shows a referral link to a learner the server has not qualified (no purchase)", async () => {
+ // Server truth: get_academy_referral_account returns no code before a verified purchase or affiliate approval.
+ fetchReferralAccount.mockResolvedValue({ available: true, enabled: true, code: null, currency: "USD", reward_amount: "10", balances: [], history: [] });
+ fetchMyLearning.mockResolvedValue({ courses: [], has_more: false });
+ mount("referrals"); await screen.findByRole("heading", { name: "Referrals" });
+ expect(screen.queryByLabelText("Invitation link")).toBeNull();
+ expect(screen.queryByText(/\?ref=/)).toBeNull();
+ expect(screen.queryByRole("button", { name: "Copy invitation link" })).toBeNull();
+});
+it("shows the referral link to an approved affiliate the server has qualified", async () => {
+ fetchReferralAccount.mockResolvedValue({ available: true, enabled: true, code: "affiliate-code", currency: "USD", reward_amount: "10", balances: [], history: [] });
+ fetchMyLearning.mockResolvedValue({ courses: [], has_more: false });
+ mount("referrals"); const field = await screen.findByLabelText("Invitation link");
+ expect(new URL(field.value).searchParams.get("ref")).toBe("affiliate-code");
+});

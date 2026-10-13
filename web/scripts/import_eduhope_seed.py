@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Import public EduHope content through canonical owner APIs; dry-run by default.
 
-Apply currently requires the retained, marked local144 preview. Production
-destination preparation is separate and grants no remote mutation authority.
+Local apply requires the retained, marked local144 preview. The production
+destination writes only through madarportal.com owner APIs as an explicitly named,
+verified tenant owner/admin session; it never connects to the production database.
 """
 import argparse
 import copy
@@ -22,6 +23,10 @@ from dotenv import dotenv_values
 ROOT=Path(__file__).resolve().parents[2]
 PACKAGE=ROOT/'web/seed-data/eduhope'
 MARKER='madar-eduhope-local-preview-v1'
+LOCAL_FOLDER=Path('/tmp/madar-eduhope-preview')
+PRODUCTION_FOLDER=Path.home()/'.madar-eduhope-production'
+# The API host, not madarportal.com/api: the frontend proxy keeps nginx's 1 MB body limit.
+PRODUCTION_API='https://api.madarportal.com';PRODUCTION_ORIGIN='https://madarportal.com'
 
 
 def fingerprint(value):
@@ -51,20 +56,35 @@ def private_json(path,value):
 
 class Importer:
     def __init__(self,args):
-        self.args=args;self.env=dotenv_values(args.local_env)
-        url=urlsplit(self.env['SUPABASE_DB_URL']);api=urlsplit(args.api)
-        if self.env.get('APP_ENV')!='development' or url.hostname!='127.0.0.1' or url.port!=54322 or url.path!='/madar_eduhope_preview_144' or api.hostname!='127.0.0.1' or api.port!=8010:
-            raise RuntimeError('Apply/read plan requires the retained isolated local144 context; remote destinations are not authorized')
-        with psycopg.connect(self.env['SUPABASE_DB_URL']) as db:
-            db.execute('set transaction read only')
-            if db.execute("select shobj_description(oid,'pg_database') from pg_database where datname=current_database()").fetchone()[0]!=MARKER:raise RuntimeError('Preview marker mismatch')
-            if db.execute("select schema_version from public.application_schema_state where contract_key='core'").fetchone()[0]!=144:raise RuntimeError('This content package requires compatible144; application141 is not a target')
+        self.args=args;self.production=args.destination=='production'
+        if self.production:
+            if args.api.rstrip('/')!=PRODUCTION_API or args.origin.rstrip('/')!=PRODUCTION_ORIGIN or not args.owner_email:
+                raise RuntimeError('Production destination requires the canonical madarportal.com API/origin and an explicit --owner-email')
+        else:
+            self.env=dotenv_values(args.local_env)
+            url=urlsplit(self.env['SUPABASE_DB_URL']);api=urlsplit(args.api)
+            if self.env.get('APP_ENV')!='development' or url.hostname!='127.0.0.1' or url.port!=54322 or url.path!='/madar_eduhope_preview_144' or api.hostname!='127.0.0.1' or api.port!=8010:
+                raise RuntimeError('Apply/read plan requires the retained isolated local144 context; use --destination production for madarportal.com')
+            with psycopg.connect(self.env['SUPABASE_DB_URL']) as db:
+                db.execute('set transaction read only')
+                if db.execute("select shobj_description(oid,'pg_database') from pg_database where datname=current_database()").fetchone()[0]!=MARKER:raise RuntimeError('Preview marker mismatch')
+                if db.execute("select schema_version from public.application_schema_state where contract_key='core'").fetchone()[0]!=144:raise RuntimeError('This content package requires compatible144; application141 is not a target')
         self.session=requests.Session()
-        for key,value in json.loads(args.cookies.read_text()).items():self.session.cookies.set(key,value,domain='127.0.0.1',path='/')
+        for key,value in json.loads(args.cookies.read_text()).items():self.session.cookies.set(key,value,domain=urlsplit(args.api).hostname,path='/')
         self.session.headers.update({'Origin':args.origin,'X-Madar-Builder-Contract':'cloud-draft-v1'})
+        if self.production:
+            # The session, not the database, proves identity: exact owner email and tenant.
+            status=self.call('GET','/auth/user_status');user=status.get('user') or {}
+            if not status.get('logged_in') or (user.get('email') or '').lower()!=args.owner_email.lower() or user.get('tenant_id')!=args.target_tenant:
+                raise RuntimeError('Session does not belong to --owner-email in --target-tenant; refresh the owner cookies')
+            self.owner={key:user.get(key) for key in ('email','tenant_id','role')}
         self.settings=self.call('GET','/elearning/settings')
+        if not self.settings.get('available') or not self.settings.get('academy_management'):raise RuntimeError('E-Learning settings are unavailable at the destination schema')
+        # Forms review is exposed only at schema144, the package's required schema.
+        if self.production and not self.call('GET','/elearning/forms').get('review_available'):raise RuntimeError('Destination is not at schema144; wait for the compatible release')
         profile=self.settings['academy_management'];self.subdomain=profile['subdomain'];self.project=profile['landing_project']
-        if not self.project or self.project['tenant_id']!=args.target_tenant or self.project['usage_profile']!='academy':raise RuntimeError('Explicit target tenant/project ownership does not match authorized session')
+        if not self.project:raise RuntimeError('No Academy website exists for this tenant; the owner must open the Academy builder once before import')
+        if self.project['tenant_id']!=args.target_tenant or self.project['usage_profile']!='academy':raise RuntimeError('Explicit target tenant/project ownership does not match authorized session')
         self.pid=self.project['id'];self.state=copy.deepcopy(self.project['draft_schema']);self.journal=copy.deepcopy(self.state.get('seed_metadata',{}).get('resources',{}))
         self.audit=[];self.mapping={'routes.register':f'/academy/{self.subdomain}/login?register=1'}
         self.forms=json.loads((PACKAGE/'forms.json').read_text())['definitions'];self.course=json.loads((PACKAGE/'course.json').read_text())
@@ -89,6 +109,11 @@ class Importer:
 
     def backup(self):
         folder=self.args.evidence/'backup-before-import';folder.mkdir(mode=0o700,parents=True,exist_ok=True)
+        if self.production:
+            # No database access: retain the owner-visible state the import can change.
+            snapshot=folder/'production-owner-state.json'
+            if not snapshot.exists():private_json(snapshot,{'owner':self.owner,'settings':self.settings,'project':self.project,'forms':self.call('GET','/elearning/forms'),'courses':self.call('GET','/elearning/courses')})
+            return
         dump=folder/'preview144.dump'
         if dump.exists():return
         data=subprocess.check_output(['docker','exec','supabase_db_web','pg_dump','-U','postgres','-Fc','madar_eduhope_preview_144'])
@@ -101,6 +126,7 @@ class Importer:
     def form_value(self,form):return {key:form[key] for key in ('name','status','schema')}
 
     def content_fingerprint(self):
+        if self.production:raise RuntimeError('Learning content fingerprints read the local database only')
         cid=self.journal['course']['id'];tenant=self.args.target_tenant
         roots={}
         with psycopg.connect(self.env['SUPABASE_DB_URL']) as db:
@@ -138,7 +164,7 @@ class Importer:
         if 'settings' in self.journal:
             keys=self.journal['settings'].get('managed_keys',list(json.loads((PACKAGE/'settings.json').read_text())['settings']))
             if fingerprint({key:self.settings['settings'].get(key) for key in keys})!=self.journal['settings']['live_hash']:raise RuntimeError('Owner settings edit conflict; no mutations performed')
-        print(json.dumps({'mode':'apply' if self.args.apply else 'dry-run','tenant':self.args.target_tenant,'project':self.pid,'schema':144,'pages':len(self.website['pages']),'forms':len(self.forms),'levels':len(self.course['levels']),'topics':sum(len(level['topics']) for level in self.course['levels']),'existing_logical_resources':len(self.journal)},indent=2))
+        print(json.dumps({'mode':'apply' if self.args.apply else 'dry-run','destination':self.args.destination,'owner':getattr(self,'owner',None),'subdomain':self.subdomain,'capabilities':self.settings.get('capabilities'),'tenant':self.args.target_tenant,'project':self.pid,'schema':144,'pages':len(self.website['pages']),'forms':len(self.forms),'levels':len(self.course['levels']),'topics':sum(len(level['topics']) for level in self.course['levels']),'existing_logical_resources':len(self.journal)},indent=2))
 
     @staticmethod
     def course_value(row):return {key:row.get(key) for key in ('name','description','cover_asset','status','access_type','catalog_visible')}
@@ -194,13 +220,8 @@ class Importer:
                 self.record(key,result['asset_id'],asset,{'url':result['asset_url'],'sha256':asset['sha256']})
                 self.journal[key]['url']=result['asset_url'];self.checkpoint()
             self.mapping[key]=self.journal[key]['url']
-        for desired in self.forms:
-            key=desired['key']
-            if key not in self.journal:
-                schema=copy.deepcopy(desired['schema']);schema['metadata']={'logical_key':key,'content_package':'eduhope-v1'}
-                actual=self.call('POST','/elearning/forms',json={'name':desired['name'],'status':desired['status'],'schema':schema})
-                self.record(key,actual['id'],desired,self.form_value(actual))
-            self.mapping[key]=self.journal[key]['id']
+        # Settings precede Forms: workflow Forms require programmes_enabled, and
+        # settings reference only uploaded media.
         settings=resolve(json.loads((PACKAGE/'settings.json').read_text())['settings'],self.mapping)
         current=self.call('GET','/elearning/settings')['settings']
         managed={key:current.get(key) for key in settings}
@@ -209,6 +230,13 @@ class Importer:
         if not entry or fingerprint(settings)!=entry['input_hash']:
             result=self.call('PUT','/elearning/settings',json={**current,**settings})['settings']
             self.journal['settings']={'id':str(self.args.target_tenant),'input_hash':fingerprint(settings),'managed_keys':list(settings),'live_hash':fingerprint({key:result.get(key) for key in settings})};self.checkpoint()
+        for desired in self.forms:
+            key=desired['key']
+            if key not in self.journal:
+                schema=copy.deepcopy(desired['schema']);schema['metadata']={'logical_key':key,'content_package':'eduhope-v1'}
+                actual=self.call('POST','/elearning/forms',json={'name':desired['name'],'status':desired['status'],'schema':schema})
+                self.record(key,actual['id'],desired,self.form_value(actual))
+            self.mapping[key]=self.journal[key]['id']
         if 'course' not in self.journal:
             desired={'name':self.course['title'],'description':'Original provisional EduHope demonstration syllabus. The owner’s original 89-topic book map is pending. Draft lessons require editorial approval.','cover_asset':self.mapping['assets.hero.library'],'status':'draft','access_type':'paid','catalog_visible':True}
             actual=self.call('POST','/elearning/courses',json=desired)['course'];self.record('course',actual['id'],desired,self.course_value(actual))
@@ -249,24 +277,29 @@ class Importer:
             if not self.args.reconcile_package:raise RuntimeError('Website package changed; use explicit reconciliation after reviewing the dry-run')
             schema['seed_metadata']['resources']=self.journal;self.state=schema
             self.journal['website'].update(input_hash=fingerprint(self.website),live_hash=website_fingerprint(schema));self.checkpoint()
-        if self.args.learning:
+        if self.args.learning and not self.production:
             self.state.setdefault('seed_metadata',{})['learning_content_hash']=self.content_fingerprint();self.checkpoint()
         if self.args.publish and self.project.get('published_revision')!=self.project['draft_revision']:
-            self.call('POST','/builder/projects/'+self.pid+'/publish',json={'expected_revision':self.project['draft_revision'],'message':'EduHope local public website seed v1'})
-        private_json(self.args.evidence/'import-report.json',{'package':'eduhope','version':1,'tenant':self.args.target_tenant,'project':self.pid,'schema':144,'resources':self.journal,'actions':self.audit,'public_url':self.args.origin+'/academy/'+self.subdomain,'editor_url':self.args.origin+'/e-learning/landing-page/projects/'+self.pid+'/pages','production_touched':False})
+            self.call('POST','/builder/projects/'+self.pid+'/publish',json={'expected_revision':self.project['draft_revision'],'message':'EduHope public website seed v1'})
+        private_json(self.args.evidence/'import-report.json',{'package':'eduhope','version':1,'tenant':self.args.target_tenant,'project':self.pid,'schema':144,'resources':self.journal,'actions':self.audit,'public_url':self.args.origin+'/academy/'+self.subdomain,'editor_url':self.args.origin+'/e-learning/landing-page/projects/'+self.pid+'/pages','production_touched':self.production})
         print('Import complete. Created resources:',len(self.audit),'Public:',self.args.origin+'/academy/'+self.subdomain)
 
 
 def main():
     p=argparse.ArgumentParser(description=__doc__)
-    p.add_argument('--target-tenant',type=int,required=True);p.add_argument('--api',default='http://127.0.0.1:8010');p.add_argument('--origin',default='http://127.0.0.1:5180')
-    p.add_argument('--local-env',type=Path,default=Path('/tmp/madar-eduhope-preview/backend.env'));p.add_argument('--cookies',type=Path,default=Path('/tmp/madar-eduhope-preview/owner-cookies.json'))
-    p.add_argument('--media-root',type=Path,default=Path('/tmp/madar-eduhope-preview/assets'));p.add_argument('--evidence',type=Path,default=Path('/tmp/madar-eduhope-preview/seed'))
+    p.add_argument('--target-tenant',type=int,required=True);p.add_argument('--destination',choices=('local','production'),default='local')
+    p.add_argument('--owner-email',help='Production only: the exact tenant owner/admin whose session performs the import')
+    p.add_argument('--api');p.add_argument('--origin')
+    p.add_argument('--local-env',type=Path,default=LOCAL_FOLDER/'backend.env');p.add_argument('--cookies',type=Path)
+    p.add_argument('--media-root',type=Path);p.add_argument('--evidence',type=Path)
     p.add_argument('--apply',action='store_true');p.add_argument('--publish',action='store_true');p.add_argument('--initialize-existing',action='store_true');p.add_argument('--reconcile-package',action='store_true')
     p.add_argument('--capture-content-baseline',action='store_true',help='Explicitly adopt reviewed existing course authoring for owner-edit detection')
     p.add_argument('--export-owner-website',action='store_true',help='Explicitly adopt reviewed, published owner presentation into the public package')
     p.add_argument('--learning',action='store_true');p.add_argument('--publish-demo',action='store_true')
-    Importer(p.parse_args()).run()
+    args=p.parse_args();production=args.destination=='production';folder=PRODUCTION_FOLDER if production else LOCAL_FOLDER
+    args.api=args.api or (PRODUCTION_API if production else 'http://127.0.0.1:8010');args.origin=args.origin or (PRODUCTION_ORIGIN if production else 'http://127.0.0.1:5180')
+    args.cookies=args.cookies or folder/'owner-cookies.json';args.media_root=args.media_root or folder/'assets';args.evidence=args.evidence or folder/'seed'
+    Importer(args).run()
 
 
 if __name__=='__main__':main()

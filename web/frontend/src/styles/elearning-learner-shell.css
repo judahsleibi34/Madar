@@ -16,6 +16,8 @@
 .learning-shell-mark { display:grid; place-items:center; width:40px; height:40px; border-radius:10px; background:var(--theme-primary); color:var(--theme-on-primary,var(--theme-text-inverse)); font-weight:750; flex-shrink:0; }
 .learning-shell-logo { width:40px; height:40px; object-fit:contain; }
 .learning-shell-actions { margin-inline-start:auto; display:flex; align-items:center; gap:12px; }
+.learning-shell-header :is(.learning-shell-language,.learning-shell-signout) { border-color:transparent; }
+.learning-shell-header .learning-shell-language { padding:10px; }
 .learning-shell-user { display:flex; align-items:center; gap:8px; color:inherit; text-decoration:none; font-weight:500; padding:10px 12px; }
 .learning-shell-layout { display:grid; grid-template-columns:240px minmax(0,1fr); }
 .learning-shell-sidebar { padding:24px 16px; background:var(--theme-surface); min-height:calc(100dvh - 80px); border-inline-end:1px solid var(--theme-border); }

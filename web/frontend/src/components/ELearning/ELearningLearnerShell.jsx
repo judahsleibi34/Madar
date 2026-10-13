@@ -1,7 +1,7 @@
 import { useCallback, useContext, useEffect, useRef, useState } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { Bell, Award, BookOpen, CreditCard, Globe2, Home, Library, LogOut, Menu, UserRound, X } from "lucide-react";
+import { Bell, Award, BookOpen, CreditCard, Globe2, Home, Library, Menu, UserRound, X } from "lucide-react";
 import { getAcademyAppearance } from "../../services/academyAppearance";
 import { getPageBuilderThemeVars } from "../PageBuilder/core/PageBuilder.theme";
 import { apiFetch, getApiUrl } from "../../utils/apiClient";
@@ -74,8 +74,8 @@ export default function ELearningLearnerShell({ site: suppliedSite, children }) 
       <Link className="learning-shell-brand" to={home}>{site?.logo_url ? <img className="learning-shell-logo" src={resolveMediaUrl(site.logo_url)} alt="" /> : <span className="learning-shell-mark" aria-hidden="true">{(site?.brand || "M").slice(0,1).toUpperCase()}</span>}{site?.brand || t("elearning.player.myLearning")}</Link>
       <div className="learning-shell-actions">
       <Link className="learning-shell-user" to="/my-learning/account"><UserRound size={18} aria-hidden="true" />{[user?.first_name, user?.last_name].filter(Boolean).join(" ") || t("elearning.learner.account")}</Link>
-      <button onClick={() => i18n.changeLanguage(i18n.language.startsWith("ar") ? "en" : "ar")}><Globe2 size={18} aria-hidden="true" />{i18n.language.startsWith("ar") ? "English" : "العربية"}</button>
-      <button onClick={signOut}><LogOut size={18} aria-hidden="true" />{t("elearning.learner.signOut")}</button>
+      <button type="button" className="learning-shell-language" lang={i18n.language.startsWith("ar") ? "en" : "ar"} aria-label={i18n.language.startsWith("ar") ? "English" : "العربية"} title={i18n.language.startsWith("ar") ? "English" : "العربية"} onClick={() => i18n.changeLanguage(i18n.language.startsWith("ar") ? "en" : "ar")}><Globe2 size={20} aria-hidden="true" /></button>
+      <button type="button" className="learning-shell-signout" onClick={signOut}>{t("elearning.learner.signOut")}</button>
       </div>
     </header>
     {open && <button className="learning-drawer-backdrop" aria-label={t("elearning.learner.closeMenu")} onClick={() => setOpen(false)} />}

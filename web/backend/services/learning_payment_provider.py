@@ -34,6 +34,10 @@ class InvalidPaymentSignature(Exception):
     pass
 
 
+class IgnoredPaymentEvent(Exception):
+    """A verified provider notification that carries no payment state change."""
+
+
 class PaymentProvider(ABC):
     def reconcile(self, checkout: dict) -> VerifiedPaymentEvent:
         """Retrieve provider truth for this server-owned checkout.
@@ -91,13 +95,22 @@ def apply_verified_event(provider_name, event):
     }).execute().data
 
 
-def checkout(actor, payload):
+def checkout(actor, payload, origin):
     from services.elearning_commerce_service import call
     name, provider = configured_provider()
     result = call('create_commerce_learning_checkout', actor, p_offering_id=str(payload.offering_id),
                   p_course_id=str(payload.course_id) if payload.course_id else None,
                   p_idempotency_key=str(payload.idempotency_key), p_provider=name)
-    return {**result, 'provider_session': provider.start_checkout(result['checkout'])}
+    # Return URLs: a CSRF-verified origin plus a validated relative path only.
+    back = origin + payload.return_path
+    joiner = '&' if '?' in back else '?'
+    session = provider.start_checkout({**result['checkout'], 'success_url': f"{back}{joiner}payment=success&checkout={result['checkout']['id']}", 'cancel_url': f'{back}{joiner}payment=cancelled'})
+    return {**result, 'provider_session': session}
+
+
+def test_mode():
+    try: return bool(getattr(configured_provider()[1], 'test_mode', lambda: False)())
+    except HTTPException: return False
 
 
 def reconcile_checkout(actor, checkout_id):
@@ -114,3 +127,7 @@ def reconcile_checkout(actor, checkout_id):
     if event.tenant_id != actor.tenant_id or str(event.checkout_id) != str(record['id']):
         raise HTTPException(409, 'Provider reconciliation ownership mismatch')
     return apply_verified_event(provider_name, event)
+
+
+# Concrete adapters register into PROVIDERS; MADAR_PAYMENT_PROVIDER selects one.
+import services.stripe_payment_provider  # noqa: E402,F401

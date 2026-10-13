@@ -49,6 +49,9 @@ server {
     }
 
     location ^~ /api/ {
+        # Match the release proxy and the backend's largest route limit (252 MiB
+        # builder/media uploads); FastAPI enforces the exact per-route limits.
+        client_max_body_size 264241152;
         proxy_pass http://madar_backend_runtime/;
         proxy_http_version 1.1;
         proxy_request_buffering off;

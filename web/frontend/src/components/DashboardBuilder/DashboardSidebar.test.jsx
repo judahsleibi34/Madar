@@ -398,7 +398,7 @@ it.each(["/e-learning/courses", "/e-learning/courses/course-a/structure", "/e-le
     if (button.getAttribute("aria-expanded") !== "true") fireEvent.click(button);
     for (const link of within(group).getAllByRole("link")) allLabels.add(link.textContent.trim());
   }
-  expect([...allLabels]).toEqual(["Academy overview", "Courses", "Students", "Groups", "Instructors", "Learning Plans", "Affiliates", "Referrals", "Rewards", "Tuition Support", "Exchange Programme", "Transactions", "Withdrawals", "Reports", "Edit Website", "Theme", "Contact submissions", "Academy & Access", "Settings"]);
+  expect([...allLabels]).toEqual(["Academy overview", "Learning Plans", "Courses", "Students", "Groups", "Instructors", "Affiliates", "Referrals", "Rewards", "Tuition Support", "Exchange Programme", "Transactions", "Withdrawals", "Reports", "Edit Website", "Theme", "Contact submissions", "Academy & Access", "Settings"]);
   expect(links.filter((link) => link.getAttribute("aria-current") === "page")).toHaveLength(1);
   expect(screen.getByRole("button", { name: "E-Learning" }).classList.contains("active")).toBe(false);
 });

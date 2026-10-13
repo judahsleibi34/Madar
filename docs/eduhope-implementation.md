@@ -562,10 +562,11 @@ integrity constraints additionally prevent ambiguous tenant-parent ownership.
     now explicitly includes an active tenant rather than relying on lifecycle
     enforcement being disabled. Final measured results are recorded below.
 
-17. **External configuration remaining.** Choose and implement/register a concrete
-    provider adapter, then supply its API credentials/webhook secret and validate
-    real checkout/signatures/refunds/reconciliation. `MADAR_PAYMENT_PROVIDER`
-    selects a registered adapter; the variable alone cannot enable payments.
+17. **External configuration remaining.** The Stripe Checkout adapter is registered
+    for one-time plans (test keys only unless `MADAR_STRIPE_LIVE_MODE=true`); supply
+    `STRIPE_SECRET_KEY`/`STRIPE_WEBHOOK_SECRET`, set `MADAR_PAYMENT_PROVIDER=stripe`
+    and validate checkout/signatures/reconciliation (see `web/README.md`). Refunds
+    and subscription billing are not yet automated.
     Configure tenant programmes/terms/eligibility, real curriculum/offering prices,
     optional CEFR mappings, institution domains and actual opportunities when ready.
     Storage must have a private existing asset bucket and healthy quota services.

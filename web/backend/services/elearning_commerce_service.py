@@ -35,6 +35,8 @@ class Checkout(Payload):
     offering_id: UUID
     course_id: UUID | None = None
     idempotency_key: UUID
+    # Where the hosted provider returns the learner; a same-origin relative path.
+    return_path: str = Field(default="/my-learning/plans", max_length=500, pattern=r"^/(?:[^/\\\s][^\s]*)?$")
 
 
 class LocalEvent(Payload):
@@ -74,18 +76,28 @@ def save(actor, payload, plan_id=None):
     return call("manage_elearning_offering", actor, p_id=str(plan_id) if plan_id else None, p_revision=payload.revision, p_details=details)
 
 
+def payment_state():
+    from services import learning_payment_provider as payments
+    local = local_adapter_enabled()
+    return {"local_adapter": local, "payments_available": local or payments.available(), "payments_test_mode": not local and payments.test_mode()}
+
+
 def catalog(actor):
-    return {**call("get_elearning_catalog", actor), **plans(actor), "settings": get_settings(actor.tenant_id), "local_adapter": local_adapter_enabled()}
+    return {**call("get_elearning_catalog", actor), **plans(actor), "settings": get_settings(actor.tenant_id), **payment_state()}
 
 
 def account(actor):
-    return {**call("get_commerce_learning_account", actor), "settings": get_settings(actor.tenant_id), "local_adapter": local_adapter_enabled()}
+    return {**call("get_commerce_learning_account", actor), "settings": get_settings(actor.tenant_id), **payment_state()}
 
 
 def checkout(actor, payload, request):
     if not local_adapter_enabled():
         from services.learning_payment_provider import checkout as provider_checkout
-        return provider_checkout(actor, payload)
+        from services.request_security import normalize_origin
+        origin = normalize_origin(request.headers.get("origin"))
+        if not origin:
+            raise HTTPException(400, detail={"code": "checkout_origin_required"})
+        return provider_checkout(actor, payload, origin)
     adapter(request)
     return call("create_commerce_learning_checkout", actor, p_offering_id=str(payload.offering_id), p_course_id=str(payload.course_id) if payload.course_id else None, p_idempotency_key=str(payload.idempotency_key), p_provider="local_test")
 

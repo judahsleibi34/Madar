@@ -14,6 +14,15 @@ const publicIconModules = new Set([
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, import.meta.dirname, "");
   const devApiTarget = env.VITE_DEV_PROXY_TARGET || "http://127.0.0.1:8000";
+  // A remote dev target treats a localhost Referer as a cross-site hotlink (403).
+  const remoteTarget = !/^https?:\/\/(?:127\.0\.0\.1|localhost)(?::|\/|$)/.test(devApiTarget);
+  const dropReferer = remoteTarget ? { configure: (proxy) => proxy.on("proxyReq", (request) => request.removeHeader("referer")) } : {};
+  // Remote cookie writes accept only the deployed site origin; CSRF tokens still apply.
+  const remoteOrigin = env.VITE_DEV_PROXY_ORIGIN || "https://madarportal.com";
+  const presentRemoteOrigin = remoteTarget ? { configure: (proxy) => proxy.on("proxyReq", (request) => {
+    request.removeHeader("referer");
+    if (request.getHeader("origin")) request.setHeader("origin", remoteOrigin);
+  }) } : {};
 
   return {
     plugins: [react()],
@@ -39,16 +48,19 @@ export default defineConfig(({ mode }) => {
         "/uploads": {
           target: devApiTarget,
           changeOrigin: true,
+          ...dropReferer,
         },
         "/api": {
           target: devApiTarget,
           changeOrigin: true,
+          ...presentRemoteOrigin,
           rewrite: (path) => path.replace(/^\/api/, ""),
         },
 
         "/avatar_uploads": {
           target: devApiTarget,
           changeOrigin: true,
+          ...dropReferer,
         },
       },
     },
