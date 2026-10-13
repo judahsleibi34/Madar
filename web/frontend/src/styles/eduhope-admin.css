@@ -1,0 +1,16 @@
+/* EduHope admin overview: CSS bar charts (number shown as text) and settings summary. */
+.eh-chart-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr)); gap:14px; }
+.eh-chart { display:grid; align-content:start; gap:10px; min-width:0; padding:16px; border:1px solid var(--theme-border,#D9E3DF); border-radius:16px; background:var(--theme-surface,#fff); }
+.eh-chart h3 { margin:0; font-size:16px; }
+.eh-chart ul { display:grid; gap:8px; margin:0; padding:0; list-style:none; }
+.eh-chart li { display:grid; grid-template-columns:minmax(0,11rem) minmax(0,1fr) auto; align-items:center; gap:10px; }
+.eh-chart-label { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:14px; }
+.eh-chart-track { height:12px; border-radius:999px; background:color-mix(in srgb,var(--theme-border,#D9E3DF) 60%,transparent); overflow:hidden; }
+.eh-chart-bar { display:block; height:100%; min-width:2px; border-radius:inherit; background:var(--theme-primary,#002A60); }
+.eh-chart-bar.is-green { background:#16A34A; } .eh-chart-bar.is-red { background:#DC2626; } .eh-chart-bar.is-blue { background:#2563EB; }
+.eh-chart-value { min-width:2ch; text-align:end; font-variant-numeric:tabular-nums; }
+.eh-settings-summary dl { display:grid; margin:0; }
+.eh-settings-summary dl > div { display:grid; grid-template-columns:minmax(0,14rem) minmax(0,1fr); gap:12px; padding:12px 0; border-bottom:1px solid var(--theme-border,#D9E3DF); }
+.eh-settings-summary dt { font-weight:650; color:var(--theme-text-soft,#43576B); }
+.eh-settings-summary dd { display:flex; flex-wrap:wrap; justify-content:space-between; gap:8px; margin:0; overflow-wrap:anywhere; }
+@media (max-width:560px) { .eh-settings-summary dl > div { grid-template-columns:minmax(0,1fr); gap:4px; } .eh-chart li { grid-template-columns:minmax(0,7rem) minmax(0,1fr) auto; } }

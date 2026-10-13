@@ -13,6 +13,8 @@ import StudentApplications from "../components/ELearning/student/StudentApplicat
 import { StudentWallet, StudentWithdraw } from "../components/ELearning/student/StudentWallet";
 import AffiliateArea from "../components/ELearning/student/AffiliateArea";
 import EnrollmentCheckout from "../components/ELearning/EnrollmentCheckout";
+import { EduHopeAdminCharts, EduHopeSettingsSummary } from "../components/ELearning/EduHopeAdminPanels";
+import "../styles/admin/dashboard/elearning-content.css";
 import { EnrollmentClosedSample } from "./CheckoutSamples";
 import "../styles/admin/dashboard/elearning-player.css";
 
@@ -69,6 +71,16 @@ SCREENS.push(
   ["checkout-confirmed", "EH / Checkout — Confirmed", "/academy/aooloo/plans", <EnrollmentCheckout checkout={order("paid")} testMode courseId="c" />, base],
   ["checkout-failed", "EH / Checkout — Failed", "/academy/aooloo/plans", <EnrollmentCheckout checkout={order("failed")} testMode courseId="c" />, base],
   ["checkout-refunded", "EH / Checkout — Refunded", "/academy/aooloo/plans", <EnrollmentCheckout checkout={order("refunded")} testMode courseId="c" onClose={() => {}} />, base],
+);
+const adminDashboard = { total_learners: 128, active_learners: 97, purchases: 64, affiliates: 7, support_eligible: 5, certificates: 22,
+  applications: [{ kind: "tuition", status: "submitted", count: 4 }, { kind: "tuition", status: "under_review", count: 2 }, { kind: "tuition", status: "approved", count: 1 }, { kind: "exchange", status: "submitted", count: 6 }, { kind: "exchange", status: "not_approved", count: 1 }],
+  rewards: [{ currency: "USD", status: "earned", sales: 31, amount: "310" }, { currency: "USD", status: "reversed", sales: 2, amount: "20" }],
+  withdrawals: [{ currency: "USD", status: "paid", count: 3, amount: "150" }, { currency: "USD", status: "pending", count: 1, amount: "50" }] };
+const adminSettings = { settings: { referral_rewards_enabled: true, referral_reward_amount: "10", referral_reward_currency: "USD", minimum_withdrawal_amount: "50", tuition_sales_threshold: 4, withdrawal_methods: ["Palestinian Bank Transfer", "PayPal"], institution_enabled: true, institution_email_domains: ["paluniv.edu.ps"], institution_student_label: "PAU Student" },
+  plans: [{ id: "p", name: "EduHope English Conversation Course", status: "active", billing_type: "one_time", amount: "30.00", currency: "USD" }] };
+SCREENS.push(
+  ["admin-charts", "EH / Admin — overview charts", "/e-learning/dashboard", <EduHopeAdminCharts data={adminDashboard} />, base],
+  ["admin-settings", "EH / Admin — settings summary", "/e-learning/dashboard", <EduHopeSettingsSummary sample={adminSettings} />, base],
 );
 
 export default function StudentGallery() {

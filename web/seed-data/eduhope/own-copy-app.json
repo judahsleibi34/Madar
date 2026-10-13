@@ -55,6 +55,42 @@
     "en": "Not applied",
     "ar": "لم يتم التقديم"
   },
+  "elearning.ehAdmin.chartsHelp": {
+    "en": "Live counts from your academy. Each bar shows its number.",
+    "ar": "أعداد مباشرة من أكاديميتك. يظهر الرقم بجانب كل شريط."
+  },
+  "elearning.ehAdmin.chartsTitle": {
+    "en": "At a glance",
+    "ar": "نظرة سريعة"
+  },
+  "elearning.ehAdmin.languagesValue": {
+    "en": "English and Arabic (Arabic right to left)",
+    "ar": "الإنجليزية والعربية (العربية من اليمين إلى اليسار)"
+  },
+  "elearning.ehAdmin.noActivePlan": {
+    "en": "No active one-time plan",
+    "ar": "لا توجد خطة دفع واحدة مفعّلة"
+  },
+  "elearning.ehAdmin.notSet": {
+    "en": "Not set",
+    "ar": "غير محدد"
+  },
+  "elearning.ehAdmin.off": {
+    "en": "Off",
+    "ar": "متوقف"
+  },
+  "elearning.ehAdmin.people": {
+    "en": "Students and affiliates",
+    "ar": "الطلاب والمسوّقون بالعمولة"
+  },
+  "elearning.ehAdmin.settingsHelp": {
+    "en": "The current values. Use Edit to change each one in its settings page.",
+    "ar": "القيم الحالية. استخدم «تعديل» لتغيير كل قيمة في صفحة إعداداتها."
+  },
+  "elearning.ehAdmin.settingsUnavailable": {
+    "en": "Settings could not be loaded.",
+    "ar": "تعذّر تحميل الإعدادات."
+  },
   "elearning.enrollment.help_cancelled": {
     "en": "This payment was cancelled. Nothing was charged.",
     "ar": "تم إلغاء عملية الدفع هذه. لم يُخصم أي مبلغ."

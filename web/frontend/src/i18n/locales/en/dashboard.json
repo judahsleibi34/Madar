@@ -2132,6 +2132,27 @@
       "testFail": "Simulate a failed payment",
       "testRefund": "Simulate a refund",
       "close": "Close"
+    },
+    "ehAdmin": {
+      "chartsTitle": "At a glance",
+      "chartsHelp": "Live counts from your academy. Each bar shows its number.",
+      "people": "Students and affiliates",
+      "rewardSales": "Referral rewards",
+      "settingsTitle": "Settings",
+      "settingsHelp": "The current values. Use Edit to change each one in its settings page.",
+      "settingsUnavailable": "Settings could not be loaded.",
+      "notSet": "Not set",
+      "off": "Off",
+      "noActivePlan": "No active one-time plan",
+      "edit": "Edit",
+      "coursePrice": "Course price",
+      "rewardAmount": "Referral reward",
+      "minimumWithdrawal": "Minimum withdrawal",
+      "requiredSales": "Sales required for Tuition Support",
+      "paymentMethods": "Withdrawal payment methods",
+      "institutionDomains": "PAU email domains",
+      "languages": "Languages",
+      "languagesValue": "English and Arabic (Arabic right to left)"
     }
   }
 }
