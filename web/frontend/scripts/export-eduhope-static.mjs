@@ -8,6 +8,7 @@ import { mkdir, rm, writeFile } from "node:fs/promises";
 import { dirname, extname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
+import { replaceStaticNavigation } from "./eduhope-static-navigation.mjs";
 
 const ORIGIN = process.argv[2] || "http://127.0.0.1:5180";
 const ACADEMY = "/academy/eduhope-local";
@@ -44,6 +45,7 @@ for (const lang of LANGS) {
   for (const slug of slugs) {
     await page.goto(`${ORIGIN}${ACADEMY}${slug === "/" ? "" : slug}`, { waitUntil: "networkidle" });
     await page.waitForTimeout(800);
+    await page.evaluate(replaceStaticNavigation, { site: SITE, lang });
     const snapshot = await page.evaluate(({ ACADEMY, SITE, lang, slug }) => {
       const contact = `${SITE}${lang === "ar" ? "/ar" : ""}/contact/`;
       const note = lang === "ar" ? "يفتح التسجيل والتقديم عبر الإنترنت عند إطلاق بوابة التعلم. تواصل معنا للبدء." : "Online sign-up and applications open when the EduHope learning portal launches. Contact us to get started.";
