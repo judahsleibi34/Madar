@@ -110,11 +110,15 @@ def registration_profile(tenant_id, website):
     return value if isinstance(value, dict) else {}
 
 
-def requires_verified_email(profile_options, email):
-    """Listed institutional domains (and their subdomains) must confirm email,
-    even when the academy otherwise allows unconfirmed sign-up."""
+def institution_member(settings, email):
+    """True when the email's domain (or a subdomain) is one of the owner's
+    institution domains (Settings → Institution, e.g. PAU). This only selects
+    the institution welcome and label; it never requires email confirmation,
+    and it never marks a student verified (an admin does that manually)."""
+    if not (settings or {}).get("institution_enabled"):
+        return False
     domain = str(email).rsplit("@", 1)[-1].strip().lower()
-    listed = [str(item).strip().lower() for item in profile_options.get("verifiedEmailDomains", []) if str(item).strip()]
+    listed = [str(item).strip().lower() for item in settings.get("institution_email_domains", []) if str(item).strip()]
     return any(domain == item or domain.endswith("." + item) for item in listed)
 
 
@@ -131,20 +135,19 @@ def login(identifier: str, payload: AcademyLoginRequest, request: Request, respo
     from routes.public_site_routes import login_tenant_account, get_tenant_staff_membership
     website, tenant_id, settings = academy_auth_settings(identifier, request)
     target = auth_return(payload, website, request)
-    verification_required = settings.get("academy_email_verification_required", True) or requires_verified_email(registration_profile(tenant_id, website), payload.email)
     result = login_tenant_account(
         identifier,
         payload,
         request,
         response,
         allow_learning_membership=True,
-        email_verification_required=verification_required,
+        email_verification_required=settings.get("academy_email_verification_required", True),
     )
     user = result.get("user") or {}
     # The shared learning runtime uses the existing current tenant membership.
     if user.get("tenant_id") != tenant_id or not get_tenant_staff_membership(tenant_id, user.get("id")):
         raise HTTPException(403, "An active Academy tenant membership is required")
-    return {**result, "return_to": target}
+    return {**result, "return_to": target, "institution_member": institution_member(settings, payload.email)}
 
 
 @router.post("/{identifier}/auth/register")
@@ -176,8 +179,8 @@ def register(identifier: str, payload: AcademyRegisterRequest, request: Request)
     verification_target = target
     if target == main_base or target.startswith(main_base + "/"):
         verification_target = "/academy" + target[len(main_base):]
-    result = register_tenant_account(identifier, payload, request, academy_context={"return_to": f"/academy/login?returnTo={quote(verification_target, safe='')}", "email_redirect_to": verification_redirect(website['subdomain'], request, target), "email_verification_required": settings.get("academy_email_verification_required", True) or requires_verified_email(profile_options, payload.email), "referral_code": str(payload.referral_code) if payload.referral_code else None, "profile": profile})
-    return {**result, "return_to": target}
+    result = register_tenant_account(identifier, payload, request, academy_context={"return_to": f"/academy/login?returnTo={quote(verification_target, safe='')}", "email_redirect_to": verification_redirect(website['subdomain'], request, target), "email_verification_required": settings.get("academy_email_verification_required", True), "referral_code": str(payload.referral_code) if payload.referral_code else None, "profile": profile})
+    return {**result, "return_to": target, "institution_member": institution_member(settings, payload.email)}
 
 
 @router.post('/{identifier}/referrals/{code}/click')

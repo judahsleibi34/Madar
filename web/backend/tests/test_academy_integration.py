@@ -121,26 +121,29 @@ class AcademyAuthenticationTests(unittest.TestCase):
             register('testing', AcademyRegisterRequest(full_name='Jack Tester', email='jack@example.org', password='Safe-password-123', country='Elsewhere'), request)
             self.assertEqual(shared.call_args.kwargs['academy_context']['profile'], {})
 
-    def test_listed_institution_domains_must_confirm_email_even_when_academy_does_not(self):
+    def test_institution_addresses_register_and_log_in_without_email_confirmation(self):
         from unittest.mock import patch
         from fastapi import Request, Response
-        from routes.elearning_academy_routes import register, login, requires_verified_email, AcademyRegisterRequest, AcademyLoginRequest
-        options = {'verifiedEmailDomains': ['paluniv.edu.ps']}
-        self.assertTrue(requires_verified_email(options, 'Student@PALUNIV.edu.ps'))
-        self.assertTrue(requires_verified_email(options, 'student@students.paluniv.edu.ps'))
+        from routes.elearning_academy_routes import register, login, institution_member, AcademyRegisterRequest, AcademyLoginRequest
+        pau = {'institution_enabled': True, 'institution_email_domains': ['paluniv.edu.ps', 'second.example.edu']}
+        self.assertTrue(institution_member(pau, 'Student@PALUNIV.edu.ps'))
+        self.assertTrue(institution_member(pau, 'student@students.paluniv.edu.ps'))
+        self.assertTrue(institution_member(pau, 'student@second.example.edu'))
         for email in ['student@paluniv.edu.ps.evil.com', 'student@fakepaluniv.edu.ps', 'student@gmail.com']:
-            self.assertFalse(requires_verified_email(options, email), email)
-        self.assertFalse(requires_verified_email({}, 'student@paluniv.edu.ps'))
+            self.assertFalse(institution_member(pau, email), email)
+        self.assertFalse(institution_member({**pau, 'institution_enabled': False}, 'student@paluniv.edu.ps'))
         request = Request({'type':'http','method':'POST','path':'/public/academies/testing/auth/register','headers':[(b'host',b'localhost')]})
-        auth = ({'subdomain':'testing'},7,{'academy_registration':'open','academy_email_verification_required':False})
-        for email, expected in [('learner@paluniv.edu.ps', True), ('learner@gmail.com', False)]:
-            with self.subTest(email=email), patch('services.academy_auth_service.academy_auth_settings', return_value=auth), patch('routes.elearning_academy_routes.registration_profile', return_value=options), patch('routes.public_site_routes.register_tenant_account', return_value={'requires_email_verification':expected}) as shared:
-                register('testing', AcademyRegisterRequest(full_name='Jack Tester', email=email, password='Safe-password-123'), request)
-                self.assertIs(shared.call_args.kwargs['academy_context']['email_verification_required'], expected)
-            with self.subTest(login=email), patch('services.academy_auth_service.academy_auth_settings', return_value=auth), patch('routes.elearning_academy_routes.registration_profile', return_value=options), patch('routes.public_site_routes.login_tenant_account', side_effect=HTTPException(403, 'stop')) as shared:
-                with self.assertRaises(HTTPException):
-                    login('testing', AcademyLoginRequest(email=email, password='Safe-password-123'), request, Response())
-                self.assertIs(shared.call_args.kwargs['email_verification_required'], expected)
+        auth = ({'subdomain':'testing'},7,{'academy_registration':'open','academy_email_verification_required':False,**pau})
+        for email, member in [('learner@paluniv.edu.ps', True), ('learner@gmail.com', False)]:
+            with self.subTest(register=email), patch('services.academy_auth_service.academy_auth_settings', return_value=auth), patch('routes.elearning_academy_routes.registration_profile', return_value={'verifiedEmailDomains': ['paluniv.edu.ps']}), patch('routes.public_site_routes.register_tenant_account', return_value={'requires_email_verification': False}) as shared:
+                result = register('testing', AcademyRegisterRequest(full_name='Jack Tester', email=email, password='Safe-password-123'), request)
+                # No confirmation is ever required, even for institution domains.
+                self.assertIs(shared.call_args.kwargs['academy_context']['email_verification_required'], False)
+                self.assertIs(result['institution_member'], member)
+            with self.subTest(login=email), patch('services.academy_auth_service.academy_auth_settings', return_value=auth), patch('routes.elearning_academy_routes.registration_profile', return_value={}), patch('routes.public_site_routes.login_tenant_account', return_value={'user': {'tenant_id': 7, 'id': 3}}) as shared, patch('routes.public_site_routes.get_tenant_staff_membership', return_value={'role': 'learner'}):
+                result = login('testing', AcademyLoginRequest(email=email, password='Safe-password-123'), request, Response())
+                self.assertIs(shared.call_args.kwargs['email_verification_required'], False)
+                self.assertIs(result['institution_member'], member)
 
     def test_invitation_policy_is_enforced_before_registration(self):
         from unittest.mock import patch

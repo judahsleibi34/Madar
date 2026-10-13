@@ -15,6 +15,23 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from import_eduhope_seed import Importer, PACKAGE, PRODUCTION_API, PRODUCTION_ORIGIN, PRODUCTION_FOLDER  # noqa: E402
 
 DRAFT = 'Draft — pending owner approval.'
+# The imported course has 9 topics per Level and 8 in Level 10; the approved map
+# has 8, 8, 9 x 7, 10. The last (draft, unpublished) topic of Levels 1 and 2
+# moves to Level 10 as topics 9 and 10; everything else keeps its place.
+MOVED = {'course.level-1.topic-9': (10, 9), 'course.level-2.topic-9': (10, 10)}
+
+
+def topic_places(topic_map):
+    """Journal topic key -> (level, number) in the approved map, plus titles."""
+    places = {}
+    for level in range(1, 11):
+        for number in range(1, 10 if level < 10 else 9):
+            key = f'course.level-{level}.topic-{number}'
+            places[key] = MOVED.get(key, (level, number))
+    titles = {(level['level'], topic['number']): topic['title'] for level in topic_map['levels'] for topic in level['topics']}
+    if sorted(places.values()) != sorted(titles):
+        raise RuntimeError('Topic positions do not match the approved map')
+    return places, titles
 
 
 def main():
@@ -28,18 +45,7 @@ def main():
                                        local_env=None, media_root=PRODUCTION_FOLDER / 'assets', evidence=PRODUCTION_FOLDER / 'seed')
     importer = Importer(importer_args)
     topic_map = json.loads((PACKAGE / 'topic-map.draft.json').read_text())
-    # The imported course has 9 topics per Level and 8 in Level 10; the approved map
-    # has 8, 8, 9 x 7, 10. The last (draft, unpublished) topic of Levels 1 and 2
-    # moves to Level 10 as topics 9 and 10; everything else keeps its place.
-    moved = {'course.level-1.topic-9': (10, 9), 'course.level-2.topic-9': (10, 10)}
-    places = {}
-    for level in range(1, 11):
-        for number in range(1, 10 if level < 10 else 9):
-            key = f'course.level-{level}.topic-{number}'
-            places[key] = moved.get(key, (level, number))
-    titles = {(level['level'], topic['number']): topic['title'] for level in topic_map['levels'] for topic in level['topics']}
-    if sorted(places.values()) != sorted(titles):
-        raise RuntimeError('Topic positions do not match the approved map')
+    places, titles = topic_places(topic_map)
     course = importer.journal['course']['id']
     base = f'/elearning/courses/{course}/structure'
     structure = importer.call('GET', base)
@@ -50,17 +56,17 @@ def main():
         lesson = lessons.get((importer.journal.get(key) or {}).get('id'))
         if not lesson:
             raise RuntimeError('Topic missing from the live course: ' + key)
-        if key in moved and lesson['status'] != 'draft':
+        if key in MOVED and lesson['status'] != 'draft':
             raise RuntimeError('Only unpublished draft topics are moved: ' + key)
         title, section = titles[(level, number)], level_sections[level]
         if lesson['name'] != title or (lesson.get('description') or '') != DRAFT or lesson['section_id'] != section:
             changes.append((key, lesson, title, section))
     print(json.dumps({'mode': 'apply' if args.apply else 'dry-run', 'topics': len(places), 'to_update': len(changes),
-                      'moves': [{'topic': key, 'to': f'Level {places[key][0]} topic {places[key][1]}'} for key in moved],
+                      'moves': [{'topic': key, 'to': f'Level {places[key][0]} topic {places[key][1]}'} for key in MOVED],
                       'sample': [{'from': lesson['name'], 'to': title} for _, lesson, title, _ in changes[:5]]}, ensure_ascii=False, indent=2))
     if not args.apply:
         return
-    for key in moved:
+    for key in MOVED:
         lesson = lessons[importer.journal[key]['id']]
         if lesson['section_id'] != level_sections[10]:
             structure = importer.call('POST', base + '/commands', json={'action': 'move_lesson', 'entity_id': lesson['id'],

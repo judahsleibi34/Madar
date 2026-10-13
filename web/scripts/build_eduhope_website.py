@@ -17,8 +17,6 @@ NAVY, GREEN, GREEN_DARK, SOFT = '#002A60', '#088848', '#006C39', '#F6F7F4'
 # Terms & Privacy stay out of the published site until the owner approves their text;
 # their drafts are written to legal-drafts.json instead.
 PUBLISH_LEGAL = False
-# Domains whose sign-ups must confirm their email (PAU; confirm with the owner).
-VERIFIED_EMAIL_DOMAINS = ['paluniv.edu.ps']
 # Sentences not supplied by either document (reported for approval).
 OWN_COPY = []
 
@@ -442,8 +440,7 @@ def main():
     # Tenant-owned registration profile read by the academy sign-up form.
     # Terms acceptance is required once the approved Terms & Privacy pages are published.
     project['academyRegistration'] = {'fields': ['country', 'university'], 'requireTerms': PUBLISH_LEGAL,
-                                      'termsPageId': 'eduhope-page-terms', 'privacyPageId': 'eduhope-page-privacy',
-                                      'verifiedEmailDomains': VERIFIED_EMAIL_DOMAINS}
+                                      'termsPageId': 'eduhope-page-terms', 'privacyPageId': 'eduhope-page-privacy'}
     project['academyExperience'] = {'lessonComponents': True}
     project['academyChrome'] = {'signUpLabel': {'en': 'Register', 'ar': 'التسجيل'}, 'languageSwitcher': 'text'}
     (ROOT / 'website.json').write_text(json.dumps(project, ensure_ascii=False, indent=2) + '\n')
