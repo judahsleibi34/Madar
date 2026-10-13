@@ -10,16 +10,16 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 1: Introducing Yourself
 
-**Dialogue recording** (script approved for the demo lesson; record line by line):
+**Dialogue recording** — `L01-T01-dialogue.wav`: one file, the whole conversation in this order (script approved for the demo lesson):
 
-- `L01-T01-dialogue-01-lina.wav` — **Lina**: "Hello. Is this seat free?"
-- `L01-T01-dialogue-02-omar.wav` — **Omar**: "Yes, it is. Please sit here."
-- `L01-T01-dialogue-03-lina.wav` — **Lina**: "Thank you. My name is Lina. What is your name?"
-- `L01-T01-dialogue-04-omar.wav` — **Omar**: "I am Omar. I study engineering."
-- `L01-T01-dialogue-05-lina.wav` — **Lina**: "I study business. Are you from Bethlehem?"
-- `L01-T01-dialogue-06-omar.wav` — **Omar**: "No, I am from Ramallah. And you?"
-- `L01-T01-dialogue-07-lina.wav` — **Lina**: "I am from Bethlehem. Nice to meet you."
-- `L01-T01-dialogue-08-omar.wav` — **Omar**: "Nice to meet you too. Is this your first English class?"
+1. **Lina**: "Hello. Is this seat free?"
+2. **Omar**: "Yes, it is. Please sit here."
+3. **Lina**: "Thank you. My name is Lina. What is your name?"
+4. **Omar**: "I am Omar. I study engineering."
+5. **Lina**: "I study business. Are you from Bethlehem?"
+6. **Omar**: "No, I am from Ramallah. And you?"
+7. **Lina**: "I am from Bethlehem. Nice to meet you."
+8. **Omar**: "Nice to meet you too. Is this your first English class?"
 
 **Vocabulary audio** (word, then the example sentence, one file each):
 
@@ -43,7 +43,7 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 2: Greetings and Saying Goodbye
 
-**Dialogue recording** — `L01-T02-dialogue-NN-speaker.wav`: *script to be written and approved before recording.*
+**Dialogue recording** — `L01-T02-dialogue.wav`: *script to be written and approved before recording.*
 
 **Listen & Match** (4 photos, landscape 4:3, no text):
 
@@ -56,7 +56,7 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 3: Talking About Your Family
 
-**Dialogue recording** — `L01-T03-dialogue-NN-speaker.wav`: *script to be written and approved before recording.*
+**Dialogue recording** — `L01-T03-dialogue.wav`: *script to be written and approved before recording.*
 
 **Listen & Match** (4 photos, landscape 4:3, no text):
 
@@ -69,7 +69,7 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 4: Numbers, Phone Numbers and Email Addresses
 
-**Dialogue recording** — `L01-T04-dialogue-NN-speaker.wav`: *script to be written and approved before recording.*
+**Dialogue recording** — `L01-T04-dialogue.wav`: *script to be written and approved before recording.*
 
 **Listen & Match** (4 photos, landscape 4:3, no text):
 
@@ -82,7 +82,7 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 5: Telling the Time
 
-**Dialogue recording** — `L01-T05-dialogue-NN-speaker.wav`: *script to be written and approved before recording.*
+**Dialogue recording** — `L01-T05-dialogue.wav`: *script to be written and approved before recording.*
 
 **Listen & Match** (4 photos, landscape 4:3, no text):
 
@@ -95,7 +95,7 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 6: Days, Dates and Birthdays
 
-**Dialogue recording** — `L01-T06-dialogue-NN-speaker.wav`: *script to be written and approved before recording.*
+**Dialogue recording** — `L01-T06-dialogue.wav`: *script to be written and approved before recording.*
 
 **Listen & Match** (4 photos, landscape 4:3, no text):
 
@@ -108,7 +108,7 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 7: Things in the Classroom
 
-**Dialogue recording** — `L01-T07-dialogue-NN-speaker.wav`: *script to be written and approved before recording.*
+**Dialogue recording** — `L01-T07-dialogue.wav`: *script to be written and approved before recording.*
 
 **Listen & Match** (4 photos, landscape 4:3, no text):
 
@@ -121,7 +121,7 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 8: Describing Your Home
 
-**Dialogue recording** — `L01-T08-dialogue-NN-speaker.wav`: *script to be written and approved before recording.*
+**Dialogue recording** — `L01-T08-dialogue.wav`: *script to be written and approved before recording.*
 
 **Listen & Match** (4 photos, landscape 4:3, no text):
 
@@ -138,16 +138,16 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 1: Your Daily Routine
 
-**Dialogue recording** (script approved for the demo lesson; record line by line):
+**Dialogue recording** — `L02-T01-dialogue.wav`: one file, the whole conversation in this order (script approved for the demo lesson):
 
-- `L02-T01-dialogue-01-omar.wav` — **Omar**: "What time do you get up on class days?"
-- `L02-T01-dialogue-02-lina.wav` — **Lina**: "I get up at seven. I have breakfast at half past seven."
-- `L02-T01-dialogue-03-omar.wav` — **Omar**: "Do you walk to campus?"
-- `L02-T01-dialogue-04-lina.wav` — **Lina**: "No. I take the bus at eight."
-- `L02-T01-dialogue-05-omar.wav` — **Omar**: "When does your first class start?"
-- `L02-T01-dialogue-06-lina.wav` — **Lina**: "At nine. I study in the library after class."
-- `L02-T01-dialogue-07-omar.wav` — **Omar**: "Do you study there every day?"
-- `L02-T01-dialogue-08-lina.wav` — **Lina**: "Usually. On Fridays I study at home."
+1. **Omar**: "What time do you get up on class days?"
+2. **Lina**: "I get up at seven. I have breakfast at half past seven."
+3. **Omar**: "Do you walk to campus?"
+4. **Lina**: "No. I take the bus at eight."
+5. **Omar**: "When does your first class start?"
+6. **Lina**: "At nine. I study in the library after class."
+7. **Omar**: "Do you study there every day?"
+8. **Lina**: "Usually. On Fridays I study at home."
 
 **Vocabulary audio** (word, then the example sentence, one file each):
 
@@ -171,7 +171,7 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 2: Ordering Food and Drinks
 
-**Dialogue recording** — `L02-T02-dialogue-NN-speaker.wav`: *script to be written and approved before recording.*
+**Dialogue recording** — `L02-T02-dialogue.wav`: *script to be written and approved before recording.*
 
 **Listen & Match** (4 photos, landscape 4:3, no text):
 
@@ -184,7 +184,7 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 3: Shopping for Everyday Items
 
-**Dialogue recording** — `L02-T03-dialogue-NN-speaker.wav`: *script to be written and approved before recording.*
+**Dialogue recording** — `L02-T03-dialogue.wav`: *script to be written and approved before recording.*
 
 **Listen & Match** (4 photos, landscape 4:3, no text):
 
@@ -197,7 +197,7 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 4: Asking for and Giving Directions
 
-**Dialogue recording** — `L02-T04-dialogue-NN-speaker.wav`: *script to be written and approved before recording.*
+**Dialogue recording** — `L02-T04-dialogue.wav`: *script to be written and approved before recording.*
 
 **Listen & Match** (4 photos, landscape 4:3, no text):
 
@@ -210,7 +210,7 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 5: Using Public Transport
 
-**Dialogue recording** — `L02-T05-dialogue-NN-speaker.wav`: *script to be written and approved before recording.*
+**Dialogue recording** — `L02-T05-dialogue.wav`: *script to be written and approved before recording.*
 
 **Listen & Match** (4 photos, landscape 4:3, no text):
 
@@ -223,7 +223,7 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 6: Talking About Likes and Dislikes
 
-**Dialogue recording** — `L02-T06-dialogue-NN-speaker.wav`: *script to be written and approved before recording.*
+**Dialogue recording** — `L02-T06-dialogue.wav`: *script to be written and approved before recording.*
 
 **Listen & Match** (4 photos, landscape 4:3, no text):
 
@@ -236,7 +236,7 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 7: Talking About the Weather
 
-**Dialogue recording** — `L02-T07-dialogue-NN-speaker.wav`: *script to be written and approved before recording.*
+**Dialogue recording** — `L02-T07-dialogue.wav`: *script to be written and approved before recording.*
 
 **Listen & Match** (4 photos, landscape 4:3, no text):
 
@@ -249,7 +249,7 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 8: Meeting Classmates at University
 
-**Dialogue recording** — `L02-T08-dialogue-NN-speaker.wav`: *script to be written and approved before recording.*
+**Dialogue recording** — `L02-T08-dialogue.wav`: *script to be written and approved before recording.*
 
 **Listen & Match** (4 photos, landscape 4:3, no text):
 
@@ -266,16 +266,16 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 1: Talking About Last Weekend
 
-**Dialogue recording** (script approved for the demo lesson; record line by line):
+**Dialogue recording** — `L03-T01-dialogue.wav`: one file, the whole conversation in this order (script approved for the demo lesson):
 
-- `L03-T01-dialogue-01-lina.wav` — **Lina**: "Did you enjoy the student book fair on Saturday?"
-- `L03-T01-dialogue-02-omar.wav` — **Omar**: "Yes. I went with my cousin and bought two used books."
-- `L03-T01-dialogue-03-lina.wav` — **Lina**: "Were the books expensive?"
-- `L03-T01-dialogue-04-omar.wav` — **Omar**: "No. They cost less than the new editions. One was about photography."
-- `L03-T01-dialogue-05-lina.wav` — **Lina**: "That sounds interesting. Did you stay all afternoon?"
-- `L03-T01-dialogue-06-omar.wav` — **Omar**: "We left at three because my cousin had a family visit."
-- `L03-T01-dialogue-07-lina.wav` — **Lina**: "I missed the fair. I was helping my sister move."
-- `L03-T01-dialogue-08-omar.wav` — **Omar**: "There is another one next month. We can go together."
+1. **Lina**: "Did you enjoy the student book fair on Saturday?"
+2. **Omar**: "Yes. I went with my cousin and bought two used books."
+3. **Lina**: "Were the books expensive?"
+4. **Omar**: "No. They cost less than the new editions. One was about photography."
+5. **Lina**: "That sounds interesting. Did you stay all afternoon?"
+6. **Omar**: "We left at three because my cousin had a family visit."
+7. **Lina**: "I missed the fair. I was helping my sister move."
+8. **Omar**: "There is another one next month. We can go together."
 
 **Vocabulary audio** (word, then the example sentence, one file each):
 
@@ -299,7 +299,7 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 2: Making an Appointment
 
-**Dialogue recording** — `L03-T02-dialogue-NN-speaker.wav`: *script to be written and approved before recording.*
+**Dialogue recording** — `L03-T02-dialogue.wav`: *script to be written and approved before recording.*
 
 **Listen & Match** (4 photos, landscape 4:3, no text):
 
@@ -312,7 +312,7 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 3: Making Plans with Friends
 
-**Dialogue recording** — `L03-T03-dialogue-NN-speaker.wav`: *script to be written and approved before recording.*
+**Dialogue recording** — `L03-T03-dialogue.wav`: *script to be written and approved before recording.*
 
 **Listen & Match** (4 photos, landscape 4:3, no text):
 
@@ -325,7 +325,7 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 4: Asking for Information
 
-**Dialogue recording** — `L03-T04-dialogue-NN-speaker.wav`: *script to be written and approved before recording.*
+**Dialogue recording** — `L03-T04-dialogue.wav`: *script to be written and approved before recording.*
 
 **Listen & Match** (4 photos, landscape 4:3, no text):
 
@@ -338,7 +338,7 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 5: Describing People
 
-**Dialogue recording** — `L03-T05-dialogue-NN-speaker.wav`: *script to be written and approved before recording.*
+**Dialogue recording** — `L03-T05-dialogue.wav`: *script to be written and approved before recording.*
 
 **Listen & Match** (4 photos, landscape 4:3, no text):
 
@@ -351,7 +351,7 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 6: Talking About Free Time
 
-**Dialogue recording** — `L03-T06-dialogue-NN-speaker.wav`: *script to be written and approved before recording.*
+**Dialogue recording** — `L03-T06-dialogue.wav`: *script to be written and approved before recording.*
 
 **Listen & Match** (4 photos, landscape 4:3, no text):
 
@@ -364,7 +364,7 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 7: At the Doctor's
 
-**Dialogue recording** — `L03-T07-dialogue-NN-speaker.wav`: *script to be written and approved before recording.*
+**Dialogue recording** — `L03-T07-dialogue.wav`: *script to be written and approved before recording.*
 
 **Listen & Match** (4 photos, landscape 4:3, no text):
 
@@ -377,7 +377,7 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 8: Inviting, Accepting and Declining
 
-**Dialogue recording** — `L03-T08-dialogue-NN-speaker.wav`: *script to be written and approved before recording.*
+**Dialogue recording** — `L03-T08-dialogue.wav`: *script to be written and approved before recording.*
 
 **Listen & Match** (4 photos, landscape 4:3, no text):
 
@@ -390,7 +390,7 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 9: Talking About Your Studies
 
-**Dialogue recording** — `L03-T09-dialogue-NN-speaker.wav`: *script to be written and approved before recording.*
+**Dialogue recording** — `L03-T09-dialogue.wav`: *script to be written and approved before recording.*
 
 **Listen & Match** (4 photos, landscape 4:3, no text):
 
@@ -407,16 +407,16 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 1: Booking a Hotel Room
 
-**Dialogue recording** (script approved for the demo lesson; record line by line):
+**Dialogue recording** — `L04-T01-dialogue.wav`: one file, the whole conversation in this order (script approved for the demo lesson):
 
-- `L04-T01-dialogue-01-omar.wav` — **Omar**: "I would like two seats on the morning bus to Nablus, please."
-- `L04-T01-dialogue-02-clerk.wav` — **Clerk**: "We have departures at eight and ten. Which one would you prefer?"
-- `L04-T01-dialogue-03-omar.wav` — **Omar**: "The eight o’clock bus. Does it stop near the university?"
-- `L04-T01-dialogue-04-clerk.wav` — **Clerk**: "Yes, but you need to tell the driver before you leave."
-- `L04-T01-dialogue-05-omar.wav` — **Omar**: "How long does the journey usually take?"
-- `L04-T01-dialogue-06-clerk.wav` — **Clerk**: "About an hour and a half, depending on traffic."
-- `L04-T01-dialogue-07-omar.wav` — **Omar**: "Can I change the booking if our class time changes?"
-- `L04-T01-dialogue-08-clerk.wav` — **Clerk**: "You can change it before six this evening. Keep your confirmation number."
+1. **Omar**: "I would like two seats on the morning bus to Nablus, please."
+2. **Clerk**: "We have departures at eight and ten. Which one would you prefer?"
+3. **Omar**: "The eight o’clock bus. Does it stop near the university?"
+4. **Clerk**: "Yes, but you need to tell the driver before you leave."
+5. **Omar**: "How long does the journey usually take?"
+6. **Clerk**: "About an hour and a half, depending on traffic."
+7. **Omar**: "Can I change the booking if our class time changes?"
+8. **Clerk**: "You can change it before six this evening. Keep your confirmation number."
 
 **Vocabulary audio** (word, then the example sentence, one file each):
 
@@ -440,7 +440,7 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 2: At the Airport
 
-**Dialogue recording** — `L04-T02-dialogue-NN-speaker.wav`: *script to be written and approved before recording.*
+**Dialogue recording** — `L04-T02-dialogue.wav`: *script to be written and approved before recording.*
 
 **Listen & Match** (4 photos, landscape 4:3, no text):
 
@@ -453,7 +453,7 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 3: Buying a Bus or Train Ticket
 
-**Dialogue recording** — `L04-T03-dialogue-NN-speaker.wav`: *script to be written and approved before recording.*
+**Dialogue recording** — `L04-T03-dialogue.wav`: *script to be written and approved before recording.*
 
 **Listen & Match** (4 photos, landscape 4:3, no text):
 
@@ -466,7 +466,7 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 4: Returning Something to a Shop
 
-**Dialogue recording** — `L04-T04-dialogue-NN-speaker.wav`: *script to be written and approved before recording.*
+**Dialogue recording** — `L04-T04-dialogue.wav`: *script to be written and approved before recording.*
 
 **Listen & Match** (4 photos, landscape 4:3, no text):
 
@@ -479,7 +479,7 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 5: At the Bank
 
-**Dialogue recording** — `L04-T05-dialogue-NN-speaker.wav`: *script to be written and approved before recording.*
+**Dialogue recording** — `L04-T05-dialogue.wav`: *script to be written and approved before recording.*
 
 **Listen & Match** (4 photos, landscape 4:3, no text):
 
@@ -492,7 +492,7 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 6: Looking for an Apartment
 
-**Dialogue recording** — `L04-T06-dialogue-NN-speaker.wav`: *script to be written and approved before recording.*
+**Dialogue recording** — `L04-T06-dialogue.wav`: *script to be written and approved before recording.*
 
 **Listen & Match** (4 photos, landscape 4:3, no text):
 
@@ -505,7 +505,7 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 7: Calling Customer Service
 
-**Dialogue recording** — `L04-T07-dialogue-NN-speaker.wav`: *script to be written and approved before recording.*
+**Dialogue recording** — `L04-T07-dialogue.wav`: *script to be written and approved before recording.*
 
 **Listen & Match** (4 photos, landscape 4:3, no text):
 
@@ -518,7 +518,7 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 8: Solving a Travel Problem
 
-**Dialogue recording** — `L04-T08-dialogue-NN-speaker.wav`: *script to be written and approved before recording.*
+**Dialogue recording** — `L04-T08-dialogue.wav`: *script to be written and approved before recording.*
 
 **Listen & Match** (4 photos, landscape 4:3, no text):
 
@@ -531,7 +531,7 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 9: Talking About a Past Trip
 
-**Dialogue recording** — `L04-T09-dialogue-NN-speaker.wav`: *script to be written and approved before recording.*
+**Dialogue recording** — `L04-T09-dialogue.wav`: *script to be written and approved before recording.*
 
 **Listen & Match** (4 photos, landscape 4:3, no text):
 
@@ -548,16 +548,16 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 1: Giving Your Opinion
 
-**Dialogue recording** (script approved for the demo lesson; record line by line):
+**Dialogue recording** — `L05-T01-dialogue.wav`: one file, the whole conversation in this order (script approved for the demo lesson):
 
-- `L05-T01-dialogue-01-lina.wav` — **Lina**: "I think our study group should meet twice a week before the exam."
-- `L05-T01-dialogue-02-omar.wav` — **Omar**: "I see your point, but two long meetings may be difficult for students who work."
-- `L05-T01-dialogue-03-lina.wav` — **Lina**: "What if one meeting were online and only lasted thirty minutes?"
-- `L05-T01-dialogue-04-omar.wav` — **Omar**: "That would help. We could use it to ask questions rather than repeat the lecture."
-- `L05-T01-dialogue-05-lina.wav` — **Lina**: "Agreed. The campus meeting could focus on solving practice problems."
-- `L05-T01-dialogue-06-omar.wav` — **Omar**: "We should ask everyone which evening works best before fixing a time."
-- `L05-T01-dialogue-07-lina.wav` — **Lina**: "I will send a short poll today. Could you prepare three practice problems?"
-- `L05-T01-dialogue-08-omar.wav` — **Omar**: "Yes. Then we can review the plan after the first week."
+1. **Lina**: "I think our study group should meet twice a week before the exam."
+2. **Omar**: "I see your point, but two long meetings may be difficult for students who work."
+3. **Lina**: "What if one meeting were online and only lasted thirty minutes?"
+4. **Omar**: "That would help. We could use it to ask questions rather than repeat the lecture."
+5. **Lina**: "Agreed. The campus meeting could focus on solving practice problems."
+6. **Omar**: "We should ask everyone which evening works best before fixing a time."
+7. **Lina**: "I will send a short poll today. Could you prepare three practice problems?"
+8. **Omar**: "Yes. Then we can review the plan after the first week."
 
 **Vocabulary audio** (word, then the example sentence, one file each):
 
@@ -581,7 +581,7 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 2: Agreeing and Disagreeing Politely
 
-**Dialogue recording** — `L05-T02-dialogue-NN-speaker.wav`: *script to be written and approved before recording.*
+**Dialogue recording** — `L05-T02-dialogue.wav`: *script to be written and approved before recording.*
 
 **Listen & Match** (4 photos, landscape 4:3, no text):
 
@@ -594,7 +594,7 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 3: Explaining a Problem
 
-**Dialogue recording** — `L05-T03-dialogue-NN-speaker.wav`: *script to be written and approved before recording.*
+**Dialogue recording** — `L05-T03-dialogue.wav`: *script to be written and approved before recording.*
 
 **Listen & Match** (4 photos, landscape 4:3, no text):
 
@@ -607,7 +607,7 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 4: Describing an Experience
 
-**Dialogue recording** — `L05-T04-dialogue-NN-speaker.wav`: *script to be written and approved before recording.*
+**Dialogue recording** — `L05-T04-dialogue.wav`: *script to be written and approved before recording.*
 
 **Listen & Match** (4 photos, landscape 4:3, no text):
 
@@ -620,7 +620,7 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 5: Making Suggestions
 
-**Dialogue recording** — `L05-T05-dialogue-NN-speaker.wav`: *script to be written and approved before recording.*
+**Dialogue recording** — `L05-T05-dialogue.wav`: *script to be written and approved before recording.*
 
 **Listen & Match** (4 photos, landscape 4:3, no text):
 
@@ -633,7 +633,7 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 6: Talking About Future Plans and Goals
 
-**Dialogue recording** — `L05-T06-dialogue-NN-speaker.wav`: *script to be written and approved before recording.*
+**Dialogue recording** — `L05-T06-dialogue.wav`: *script to be written and approved before recording.*
 
 **Listen & Match** (4 photos, landscape 4:3, no text):
 
@@ -646,7 +646,7 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 7: Telling a Story
 
-**Dialogue recording** — `L05-T07-dialogue-NN-speaker.wav`: *script to be written and approved before recording.*
+**Dialogue recording** — `L05-T07-dialogue.wav`: *script to be written and approved before recording.*
 
 **Listen & Match** (4 photos, landscape 4:3, no text):
 
@@ -659,7 +659,7 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 8: Discussing Films, Books and Music
 
-**Dialogue recording** — `L05-T08-dialogue-NN-speaker.wav`: *script to be written and approved before recording.*
+**Dialogue recording** — `L05-T08-dialogue.wav`: *script to be written and approved before recording.*
 
 **Listen & Match** (4 photos, landscape 4:3, no text):
 
@@ -672,7 +672,7 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 9: Talking About Technology and Social Media
 
-**Dialogue recording** — `L05-T09-dialogue-NN-speaker.wav`: *script to be written and approved before recording.*
+**Dialogue recording** — `L05-T09-dialogue.wav`: *script to be written and approved before recording.*
 
 **Listen & Match** (4 photos, landscape 4:3, no text):
 
@@ -689,16 +689,16 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 1: Preparing for a Job Interview
 
-**Dialogue recording** (script approved for the demo lesson; record line by line):
+**Dialogue recording** — `L06-T01-dialogue.wav`: one file, the whole conversation in this order (script approved for the demo lesson):
 
-- `L06-T01-dialogue-01-interviewer.wav` — **Interviewer**: "Tell me about a time you worked with a team."
-- `L06-T01-dialogue-02-omar.wav` — **Omar**: "In a university project, our group had to present a simple energy-saving plan."
-- `L06-T01-dialogue-03-interviewer.wav` — **Interviewer**: "What was your responsibility?"
-- `L06-T01-dialogue-04-omar.wav` — **Omar**: "I compared three options and summarized their costs. At first, I included too many technical details."
-- `L06-T01-dialogue-05-interviewer.wav` — **Interviewer**: "How did you deal with that?"
-- `L06-T01-dialogue-06-omar.wav` — **Omar**: "I asked a classmate to listen to my explanation. Her questions helped me make the summary clearer."
-- `L06-T01-dialogue-07-interviewer.wav` — **Interviewer**: "What did you learn from the experience?"
-- `L06-T01-dialogue-08-omar.wav` — **Omar**: "A good explanation depends on the audience. I now check that my main point is clear before adding detail."
+1. **Interviewer**: "Tell me about a time you worked with a team."
+2. **Omar**: "In a university project, our group had to present a simple energy-saving plan."
+3. **Interviewer**: "What was your responsibility?"
+4. **Omar**: "I compared three options and summarized their costs. At first, I included too many technical details."
+5. **Interviewer**: "How did you deal with that?"
+6. **Omar**: "I asked a classmate to listen to my explanation. Her questions helped me make the summary clearer."
+7. **Interviewer**: "What did you learn from the experience?"
+8. **Omar**: "A good explanation depends on the audience. I now check that my main point is clear before adding detail."
 
 **Vocabulary audio** (word, then the example sentence, one file each):
 
@@ -722,7 +722,7 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 2: Describing Your Responsibilities at Work
 
-**Dialogue recording** — `L06-T02-dialogue-NN-speaker.wav`: *script to be written and approved before recording.*
+**Dialogue recording** — `L06-T02-dialogue.wav`: *script to be written and approved before recording.*
 
 **Listen & Match** (4 photos, landscape 4:3, no text):
 
@@ -735,7 +735,7 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 3: Making a Complaint
 
-**Dialogue recording** — `L06-T03-dialogue-NN-speaker.wav`: *script to be written and approved before recording.*
+**Dialogue recording** — `L06-T03-dialogue.wav`: *script to be written and approved before recording.*
 
 **Listen & Match** (4 photos, landscape 4:3, no text):
 
@@ -748,7 +748,7 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 4: Taking Part in an Online Meeting
 
-**Dialogue recording** — `L06-T04-dialogue-NN-speaker.wav`: *script to be written and approved before recording.*
+**Dialogue recording** — `L06-T04-dialogue.wav`: *script to be written and approved before recording.*
 
 **Listen & Match** (4 photos, landscape 4:3, no text):
 
@@ -761,7 +761,7 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 5: Asking for Help at Work
 
-**Dialogue recording** — `L06-T05-dialogue-NN-speaker.wav`: *script to be written and approved before recording.*
+**Dialogue recording** — `L06-T05-dialogue.wav`: *script to be written and approved before recording.*
 
 **Listen & Match** (4 photos, landscape 4:3, no text):
 
@@ -774,7 +774,7 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 6: Making Arrangements by Phone
 
-**Dialogue recording** — `L06-T06-dialogue-NN-speaker.wav`: *script to be written and approved before recording.*
+**Dialogue recording** — `L06-T06-dialogue.wav`: *script to be written and approved before recording.*
 
 **Listen & Match** (4 photos, landscape 4:3, no text):
 
@@ -787,7 +787,7 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 7: Talking About Health and Lifestyle
 
-**Dialogue recording** — `L06-T07-dialogue-NN-speaker.wav`: *script to be written and approved before recording.*
+**Dialogue recording** — `L06-T07-dialogue.wav`: *script to be written and approved before recording.*
 
 **Listen & Match** (4 photos, landscape 4:3, no text):
 
@@ -800,7 +800,7 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 8: Volunteering in Your Community
 
-**Dialogue recording** — `L06-T08-dialogue-NN-speaker.wav`: *script to be written and approved before recording.*
+**Dialogue recording** — `L06-T08-dialogue.wav`: *script to be written and approved before recording.*
 
 **Listen & Match** (4 photos, landscape 4:3, no text):
 
@@ -813,7 +813,7 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 9: Discussing a Social Issue
 
-**Dialogue recording** — `L06-T09-dialogue-NN-speaker.wav`: *script to be written and approved before recording.*
+**Dialogue recording** — `L06-T09-dialogue.wav`: *script to be written and approved before recording.*
 
 **Listen & Match** (4 photos, landscape 4:3, no text):
 
@@ -830,16 +830,16 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 1: Taking Part in a Discussion
 
-**Dialogue recording** (script approved for the demo lesson; record line by line):
+**Dialogue recording** — `L07-T01-dialogue.wav`: one file, the whole conversation in this order (script approved for the demo lesson):
 
-- `L07-T01-dialogue-01-lina.wav` — **Lina**: "Extending library hours could benefit students who have daytime jobs."
-- `L07-T01-dialogue-02-omar.wav` — **Omar**: "I support the idea, although staffing costs would have to be considered."
-- `L07-T01-dialogue-03-lina.wav` — **Lina**: "Perhaps we could trial longer hours during the exam period rather than throughout the year."
-- `L07-T01-dialogue-04-omar.wav` — **Omar**: "A trial would give us evidence, but attendance alone would not show whether the service was useful."
-- `L07-T01-dialogue-05-lina.wav` — **Lina**: "We could collect anonymous feedback as well as counting visits."
-- `L07-T01-dialogue-06-omar.wav` — **Omar**: "Provided the questions are neutral, that would strengthen the evaluation."
-- `L07-T01-dialogue-07-lina.wav` — **Lina**: "Let us propose a four-week pilot with a clear budget and a review date."
-- `L07-T01-dialogue-08-omar.wav` — **Omar**: "Agreed. We should also explain what would justify continuing or ending it."
+1. **Lina**: "Extending library hours could benefit students who have daytime jobs."
+2. **Omar**: "I support the idea, although staffing costs would have to be considered."
+3. **Lina**: "Perhaps we could trial longer hours during the exam period rather than throughout the year."
+4. **Omar**: "A trial would give us evidence, but attendance alone would not show whether the service was useful."
+5. **Lina**: "We could collect anonymous feedback as well as counting visits."
+6. **Omar**: "Provided the questions are neutral, that would strengthen the evaluation."
+7. **Lina**: "Let us propose a four-week pilot with a clear budget and a review date."
+8. **Omar**: "Agreed. We should also explain what would justify continuing or ending it."
 
 **Vocabulary audio** (word, then the example sentence, one file each):
 
@@ -863,7 +863,7 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 2: Balancing Different Viewpoints
 
-**Dialogue recording** — `L07-T02-dialogue-NN-speaker.wav`: *script to be written and approved before recording.*
+**Dialogue recording** — `L07-T02-dialogue.wav`: *script to be written and approved before recording.*
 
 **Listen & Match** (4 photos, landscape 4:3, no text):
 
@@ -876,7 +876,7 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 3: Explaining Advantages and Disadvantages
 
-**Dialogue recording** — `L07-T03-dialogue-NN-speaker.wav`: *script to be written and approved before recording.*
+**Dialogue recording** — `L07-T03-dialogue.wav`: *script to be written and approved before recording.*
 
 **Listen & Match** (4 photos, landscape 4:3, no text):
 
@@ -889,7 +889,7 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 4: Giving a Short Presentation
 
-**Dialogue recording** — `L07-T04-dialogue-NN-speaker.wav`: *script to be written and approved before recording.*
+**Dialogue recording** — `L07-T04-dialogue.wav`: *script to be written and approved before recording.*
 
 **Listen & Match** (4 photos, landscape 4:3, no text):
 
@@ -902,7 +902,7 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 5: Describing Trends and Changes
 
-**Dialogue recording** — `L07-T05-dialogue-NN-speaker.wav`: *script to be written and approved before recording.*
+**Dialogue recording** — `L07-T05-dialogue.wav`: *script to be written and approved before recording.*
 
 **Listen & Match** (4 photos, landscape 4:3, no text):
 
@@ -915,7 +915,7 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 6: Talking About the Environment
 
-**Dialogue recording** — `L07-T06-dialogue-NN-speaker.wav`: *script to be written and approved before recording.*
+**Dialogue recording** — `L07-T06-dialogue.wav`: *script to be written and approved before recording.*
 
 **Listen & Match** (4 photos, landscape 4:3, no text):
 
@@ -928,7 +928,7 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 7: Discussing News and Current Events
 
-**Dialogue recording** — `L07-T07-dialogue-NN-speaker.wav`: *script to be written and approved before recording.*
+**Dialogue recording** — `L07-T07-dialogue.wav`: *script to be written and approved before recording.*
 
 **Listen & Match** (4 photos, landscape 4:3, no text):
 
@@ -941,7 +941,7 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 8: Speculating About the Future
 
-**Dialogue recording** — `L07-T08-dialogue-NN-speaker.wav`: *script to be written and approved before recording.*
+**Dialogue recording** — `L07-T08-dialogue.wav`: *script to be written and approved before recording.*
 
 **Listen & Match** (4 photos, landscape 4:3, no text):
 
@@ -954,7 +954,7 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 9: Giving Constructive Feedback
 
-**Dialogue recording** — `L07-T09-dialogue-NN-speaker.wav`: *script to be written and approved before recording.*
+**Dialogue recording** — `L07-T09-dialogue.wav`: *script to be written and approved before recording.*
 
 **Listen & Match** (4 photos, landscape 4:3, no text):
 
@@ -971,16 +971,16 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 1: Negotiating a Shared Outcome
 
-**Dialogue recording** (script approved for the demo lesson; record line by line):
+**Dialogue recording** — `L08-T01-dialogue.wav`: one file, the whole conversation in this order (script approved for the demo lesson):
 
-- `L08-T01-dialogue-01-omar.wav` — **Omar**: "The team needs the rehearsal room on Thursday, but the music society has already booked it."
-- `L08-T01-dialogue-02-lina.wav` — **Lina**: "Could we negotiate a shorter session rather than asking them to cancel?"
-- `L08-T01-dialogue-03-omar.wav` — **Omar**: "We need forty minutes to test the presentation equipment. They need an uninterrupted hour."
-- `L08-T01-dialogue-04-lina.wav` — **Lina**: "If we move our test to the start of the afternoon, they could keep their full session afterward."
-- `L08-T01-dialogue-05-omar.wav` — **Omar**: "That depends on whether the technician is available earlier."
-- `L08-T01-dialogue-06-lina.wav` — **Lina**: "I can check with her. We should make our proposal conditional on that confirmation."
-- `L08-T01-dialogue-07-omar.wav` — **Omar**: "Good. Let us also offer to reset the room so their rehearsal can start on time."
-- `L08-T01-dialogue-08-lina.wav` — **Lina**: "That makes the arrangement fairer. Both groups keep the time they actually need."
+1. **Omar**: "The team needs the rehearsal room on Thursday, but the music society has already booked it."
+2. **Lina**: "Could we negotiate a shorter session rather than asking them to cancel?"
+3. **Omar**: "We need forty minutes to test the presentation equipment. They need an uninterrupted hour."
+4. **Lina**: "If we move our test to the start of the afternoon, they could keep their full session afterward."
+5. **Omar**: "That depends on whether the technician is available earlier."
+6. **Lina**: "I can check with her. We should make our proposal conditional on that confirmation."
+7. **Omar**: "Good. Let us also offer to reset the room so their rehearsal can start on time."
+8. **Lina**: "That makes the arrangement fairer. Both groups keep the time they actually need."
 
 **Vocabulary audio** (word, then the example sentence, one file each):
 
@@ -1004,7 +1004,7 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 2: Solving Problems as a Team
 
-**Dialogue recording** — `L08-T02-dialogue-NN-speaker.wav`: *script to be written and approved before recording.*
+**Dialogue recording** — `L08-T02-dialogue.wav`: *script to be written and approved before recording.*
 
 **Listen & Match** (4 photos, landscape 4:3, no text):
 
@@ -1017,7 +1017,7 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 3: Handling a Difficult Conversation
 
-**Dialogue recording** — `L08-T03-dialogue-NN-speaker.wav`: *script to be written and approved before recording.*
+**Dialogue recording** — `L08-T03-dialogue.wav`: *script to be written and approved before recording.*
 
 **Listen & Match** (4 photos, landscape 4:3, no text):
 
@@ -1030,7 +1030,7 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 4: Giving a Project Update
 
-**Dialogue recording** — `L08-T04-dialogue-NN-speaker.wav`: *script to be written and approved before recording.*
+**Dialogue recording** — `L08-T04-dialogue.wav`: *script to be written and approved before recording.*
 
 **Listen & Match** (4 photos, landscape 4:3, no text):
 
@@ -1043,7 +1043,7 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 5: Explaining a Decision
 
-**Dialogue recording** — `L08-T05-dialogue-NN-speaker.wav`: *script to be written and approved before recording.*
+**Dialogue recording** — `L08-T05-dialogue.wav`: *script to be written and approved before recording.*
 
 **Listen & Match** (4 photos, landscape 4:3, no text):
 
@@ -1056,7 +1056,7 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 6: Discussing Education Systems
 
-**Dialogue recording** — `L08-T06-dialogue-NN-speaker.wav`: *script to be written and approved before recording.*
+**Dialogue recording** — `L08-T06-dialogue.wav`: *script to be written and approved before recording.*
 
 **Listen & Match** (4 photos, landscape 4:3, no text):
 
@@ -1069,7 +1069,7 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 7: Persuading Someone
 
-**Dialogue recording** — `L08-T07-dialogue-NN-speaker.wav`: *script to be written and approved before recording.*
+**Dialogue recording** — `L08-T07-dialogue.wav`: *script to be written and approved before recording.*
 
 **Listen & Match** (4 photos, landscape 4:3, no text):
 
@@ -1082,7 +1082,7 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 8: Dealing with Misunderstandings
 
-**Dialogue recording** — `L08-T08-dialogue-NN-speaker.wav`: *script to be written and approved before recording.*
+**Dialogue recording** — `L08-T08-dialogue.wav`: *script to be written and approved before recording.*
 
 **Listen & Match** (4 photos, landscape 4:3, no text):
 
@@ -1095,7 +1095,7 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 9: Networking at an Event
 
-**Dialogue recording** — `L08-T09-dialogue-NN-speaker.wav`: *script to be written and approved before recording.*
+**Dialogue recording** — `L08-T09-dialogue.wav`: *script to be written and approved before recording.*
 
 **Listen & Match** (4 photos, landscape 4:3, no text):
 
@@ -1112,16 +1112,16 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 1: Developing a Nuanced Argument
 
-**Dialogue recording** (script approved for the demo lesson; record line by line):
+**Dialogue recording** — `L09-T01-dialogue.wav`: one file, the whole conversation in this order (script approved for the demo lesson):
 
-- `L09-T01-dialogue-01-lina.wav` — **Lina**: "The survey suggests that students who attend language workshops report greater confidence."
-- `L09-T01-dialogue-02-omar.wav` — **Omar**: "That is encouraging, but it does not establish that the workshops caused the improvement."
-- `L09-T01-dialogue-03-lina.wav` — **Lina**: "Students who were already motivated may have been more likely to attend."
-- `L09-T01-dialogue-04-omar.wav` — **Omar**: "Exactly. We should distinguish an association from a causal claim."
-- `L09-T01-dialogue-05-lina.wav` — **Lina**: "Would comparing participants’ confidence before and after the workshop address that limitation?"
-- `L09-T01-dialogue-06-omar.wav` — **Omar**: "It would help, although a comparable non-participant group would make the interpretation stronger."
-- `L09-T01-dialogue-07-lina.wav` — **Lina**: "Then our recommendation should be a carefully evaluated pilot, rather than immediate expansion."
-- `L09-T01-dialogue-08-omar.wav` — **Omar**: "Yes. Acknowledge the promising findings while making the uncertainty explicit."
+1. **Lina**: "The survey suggests that students who attend language workshops report greater confidence."
+2. **Omar**: "That is encouraging, but it does not establish that the workshops caused the improvement."
+3. **Lina**: "Students who were already motivated may have been more likely to attend."
+4. **Omar**: "Exactly. We should distinguish an association from a causal claim."
+5. **Lina**: "Would comparing participants’ confidence before and after the workshop address that limitation?"
+6. **Omar**: "It would help, although a comparable non-participant group would make the interpretation stronger."
+7. **Lina**: "Then our recommendation should be a carefully evaluated pilot, rather than immediate expansion."
+8. **Omar**: "Yes. Acknowledge the promising findings while making the uncertainty explicit."
 
 **Vocabulary audio** (word, then the example sentence, one file each):
 
@@ -1145,7 +1145,7 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 2: Taking Part in Academic Discussions
 
-**Dialogue recording** — `L09-T02-dialogue-NN-speaker.wav`: *script to be written and approved before recording.*
+**Dialogue recording** — `L09-T02-dialogue.wav`: *script to be written and approved before recording.*
 
 **Listen & Match** (4 photos, landscape 4:3, no text):
 
@@ -1158,7 +1158,7 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 3: Presenting Research Findings
 
-**Dialogue recording** — `L09-T03-dialogue-NN-speaker.wav`: *script to be written and approved before recording.*
+**Dialogue recording** — `L09-T03-dialogue.wav`: *script to be written and approved before recording.*
 
 **Listen & Match** (4 photos, landscape 4:3, no text):
 
@@ -1171,7 +1171,7 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 4: Debating an Ethical Question
 
-**Dialogue recording** — `L09-T04-dialogue-NN-speaker.wav`: *script to be written and approved before recording.*
+**Dialogue recording** — `L09-T04-dialogue.wav`: *script to be written and approved before recording.*
 
 **Listen & Match** (4 photos, landscape 4:3, no text):
 
@@ -1184,7 +1184,7 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 5: Expressing Degrees of Certainty
 
-**Dialogue recording** — `L09-T05-dialogue-NN-speaker.wav`: *script to be written and approved before recording.*
+**Dialogue recording** — `L09-T05-dialogue.wav`: *script to be written and approved before recording.*
 
 **Listen & Match** (4 photos, landscape 4:3, no text):
 
@@ -1197,7 +1197,7 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 6: Interpreting Data and Evidence
 
-**Dialogue recording** — `L09-T06-dialogue-NN-speaker.wav`: *script to be written and approved before recording.*
+**Dialogue recording** — `L09-T06-dialogue.wav`: *script to be written and approved before recording.*
 
 **Listen & Match** (4 photos, landscape 4:3, no text):
 
@@ -1210,7 +1210,7 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 7: Leading a Group Discussion
 
-**Dialogue recording** — `L09-T07-dialogue-NN-speaker.wav`: *script to be written and approved before recording.*
+**Dialogue recording** — `L09-T07-dialogue.wav`: *script to be written and approved before recording.*
 
 **Listen & Match** (4 photos, landscape 4:3, no text):
 
@@ -1223,7 +1223,7 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 8: Communicating Across Cultures
 
-**Dialogue recording** — `L09-T08-dialogue-NN-speaker.wav`: *script to be written and approved before recording.*
+**Dialogue recording** — `L09-T08-dialogue.wav`: *script to be written and approved before recording.*
 
 **Listen & Match** (4 photos, landscape 4:3, no text):
 
@@ -1236,7 +1236,7 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 9: Responding to Challenging Questions
 
-**Dialogue recording** — `L09-T09-dialogue-NN-speaker.wav`: *script to be written and approved before recording.*
+**Dialogue recording** — `L09-T09-dialogue.wav`: *script to be written and approved before recording.*
 
 **Listen & Match** (4 photos, landscape 4:3, no text):
 
@@ -1253,16 +1253,16 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 1: Negotiating with Multiple Constraints
 
-**Dialogue recording** (script approved for the demo lesson; record line by line):
+**Dialogue recording** — `L10-T01-dialogue.wav`: one file, the whole conversation in this order (script approved for the demo lesson):
 
-- `L10-T01-dialogue-01-omar.wav` — **Omar**: "I recommend a phased introduction of the peer-mentoring scheme rather than a campus-wide launch."
-- `L10-T01-dialogue-02-lina.wav` — **Lina**: "Which constraint has most influenced that recommendation?"
-- `L10-T01-dialogue-03-omar.wav` — **Omar**: "We can recruit mentors quickly, but consistent training and supervision would be harder to scale."
-- `L10-T01-dialogue-04-lina.wav` — **Lina**: "How would you judge whether the initial phase had succeeded?"
-- `L10-T01-dialogue-05-omar.wav` — **Omar**: "I would combine participation data with confidential feedback and evidence that support needs were being addressed."
-- `L10-T01-dialogue-06-lina.wav` — **Lina**: "We also need safeguards so that enthusiasm does not substitute for qualified guidance."
-- `L10-T01-dialogue-07-omar.wav` — **Omar**: "Agreed. Mentors should know when to refer a student to an authorized professional."
-- `L10-T01-dialogue-08-lina.wav` — **Lina**: "Then present the proposal with clear boundaries, review criteria and conditions for expansion."
+1. **Omar**: "I recommend a phased introduction of the peer-mentoring scheme rather than a campus-wide launch."
+2. **Lina**: "Which constraint has most influenced that recommendation?"
+3. **Omar**: "We can recruit mentors quickly, but consistent training and supervision would be harder to scale."
+4. **Lina**: "How would you judge whether the initial phase had succeeded?"
+5. **Omar**: "I would combine participation data with confidential feedback and evidence that support needs were being addressed."
+6. **Lina**: "We also need safeguards so that enthusiasm does not substitute for qualified guidance."
+7. **Omar**: "Agreed. Mentors should know when to refer a student to an authorized professional."
+8. **Lina**: "Then present the proposal with clear boundaries, review criteria and conditions for expansion."
 
 **Vocabulary audio** (word, then the example sentence, one file each):
 
@@ -1286,7 +1286,7 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 2: Chairing a Meeting
 
-**Dialogue recording** — `L10-T02-dialogue-NN-speaker.wav`: *script to be written and approved before recording.*
+**Dialogue recording** — `L10-T02-dialogue.wav`: *script to be written and approved before recording.*
 
 **Listen & Match** (4 photos, landscape 4:3, no text):
 
@@ -1299,7 +1299,7 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 3: Giving a Formal Presentation
 
-**Dialogue recording** — `L10-T03-dialogue-NN-speaker.wav`: *script to be written and approved before recording.*
+**Dialogue recording** — `L10-T03-dialogue.wav`: *script to be written and approved before recording.*
 
 **Listen & Match** (4 photos, landscape 4:3, no text):
 
@@ -1312,7 +1312,7 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 4: Handling Objections and Pushback
 
-**Dialogue recording** — `L10-T04-dialogue-NN-speaker.wav`: *script to be written and approved before recording.*
+**Dialogue recording** — `L10-T04-dialogue.wav`: *script to be written and approved before recording.*
 
 **Listen & Match** (4 photos, landscape 4:3, no text):
 
@@ -1325,7 +1325,7 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 5: Answering Questions in a Panel Interview
 
-**Dialogue recording** — `L10-T05-dialogue-NN-speaker.wav`: *script to be written and approved before recording.*
+**Dialogue recording** — `L10-T05-dialogue.wav`: *script to be written and approved before recording.*
 
 **Listen & Match** (4 photos, landscape 4:3, no text):
 
@@ -1338,7 +1338,7 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 6: Mentoring a Colleague
 
-**Dialogue recording** — `L10-T06-dialogue-NN-speaker.wav`: *script to be written and approved before recording.*
+**Dialogue recording** — `L10-T06-dialogue.wav`: *script to be written and approved before recording.*
 
 **Listen & Match** (4 photos, landscape 4:3, no text):
 
@@ -1351,7 +1351,7 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 7: Managing Conflict at Work
 
-**Dialogue recording** — `L10-T07-dialogue-NN-speaker.wav`: *script to be written and approved before recording.*
+**Dialogue recording** — `L10-T07-dialogue.wav`: *script to be written and approved before recording.*
 
 **Listen & Match** (4 photos, landscape 4:3, no text):
 
@@ -1364,7 +1364,7 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 8: Pitching an Idea
 
-**Dialogue recording** — `L10-T08-dialogue-NN-speaker.wav`: *script to be written and approved before recording.*
+**Dialogue recording** — `L10-T08-dialogue.wav`: *script to be written and approved before recording.*
 
 **Listen & Match** (4 photos, landscape 4:3, no text):
 
@@ -1377,7 +1377,7 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 9: Representing Your Organisation
 
-**Dialogue recording** — `L10-T09-dialogue-NN-speaker.wav`: *script to be written and approved before recording.*
+**Dialogue recording** — `L10-T09-dialogue.wav`: *script to be written and approved before recording.*
 
 **Listen & Match** (4 photos, landscape 4:3, no text):
 
@@ -1390,7 +1390,7 @@ Topic titles are the owner-approved draft map. Suggested file names never reveal
 
 ### Topic 10: Summarising a Complex Discussion
 
-**Dialogue recording** — `L10-T10-dialogue-NN-speaker.wav`: *script to be written and approved before recording.*
+**Dialogue recording** — `L10-T10-dialogue.wav`: *script to be written and approved before recording.*
 
 **Listen & Match** (4 photos, landscape 4:3, no text):
 

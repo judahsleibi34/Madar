@@ -9,6 +9,10 @@ import { useELearningTerminology } from "../../../hooks/useELearningTerminology"
 import ELearningDialog from "../ELearningDialog";
 import ELearningSkeleton from "../ELearningSkeleton";
 import MediaBlockRenderer from "./MediaBlockRenderer";
+import MediaSlot from "./MediaSlot";
+import { useLearningExperience } from "../LearningExperienceContext";
+import { useLessonMediaPrefix } from "./LessonMediaNaming";
+import { uploadWithProgress } from "../../../utils/uploadWithProgress";
 const types = ["multiple_choice", "true_false", "matching", "listen_match", "picture_listen", "speaking_practice", "speaking", "written"];
 const uuid = () => crypto.randomUUID();
 const option = () => ({ id: uuid(), label: "" });
@@ -77,7 +81,7 @@ export default function AssessmentBuilder({ courseId, lessonId, sectionId, block
     <div className="assessment-builder-body">
     {error && <LearningErrorNotice as="p">{error}</LearningErrorNotice>}
     {!state || !settings ? <ELearningSkeleton label={t("elearning.assessment.loading")} /> : <>
-      {edit ? <QuestionEditor key={editKey} question={questionDrafts[editKey] || edit.question || fresh(edit.type)} media={media} upload={async file => { const result = await uploadContentMedia(courseId, lessonId, file); const value = result.asset || { id: result.asset_id, url: result.asset_url, filename: file.name, mime_type: file.type }; setMedia(previous => [value, ...previous]); return value; }} busy={busy} onBack={q => { setQuestionDrafts(previous => ({ ...previous, [editKey]: q })); setEdit(null); }} onCancel={() => { setQuestionDrafts(previous => { const next = { ...previous }; delete next[editKey]; return next; }); setEdit(null); }} onSave={q => command(edit.question ? "update_question" : "create_question", edit.question, q)} /> : <>
+      {edit ? <QuestionEditor key={editKey} question={questionDrafts[editKey] || edit.question || fresh(edit.type)} media={media} upload={async (file, onProgress) => { const path = `/elearning/courses/${encodeURIComponent(courseId)}${lessonId ? `/lessons/${encodeURIComponent(lessonId)}/content` : "/assessments"}/media/upload`; const result = onProgress ? await uploadWithProgress(path, file, { onProgress, fallback: source => uploadContentMedia(courseId, lessonId, source) }) : await uploadContentMedia(courseId, lessonId, file); const value = result.asset || { id: result.asset_id, url: result.asset_url, filename: file.name, mime_type: file.type }; setMedia(previous => [value, ...previous]); return value; }} busy={busy} onBack={q => { setQuestionDrafts(previous => ({ ...previous, [editKey]: q })); setEdit(null); }} onCancel={() => { setQuestionDrafts(previous => { const next = { ...previous }; delete next[editKey]; return next; }); setEdit(null); }} onSave={q => command(edit.question ? "update_question" : "create_question", edit.question, q)} /> : <>
         <form id="assessment-settings" onSubmit={save} className="assessment-settings">
           <label className="assessment-field-wide">{t("elearning.assessment.title")}<input required maxLength={120} value={settings.title} onChange={e => field("title", e.target.value)} /></label>
           <label className="assessment-field-wide">{t("elearning.assessment.instructions")}<textarea aria-label={t("elearning.assessment.instructions")} maxLength={10000} value={settings.instructions} onChange={e => field("instructions", e.target.value)} /></label>
@@ -109,6 +113,12 @@ export default function AssessmentBuilder({ courseId, lessonId, sectionId, block
 function QuestionEditor({ question, media, upload, busy, onBack, onCancel, onSave }) {
   const { t } = useTranslation("dashboard");
   const [q, setQ] = useState(() => structuredClone(question)), [uploading, setUploading] = useState(false), [error, setError] = useState("");
+  const enhanced = useLearningExperience().lessonComponents === true, prefix = useLessonMediaPrefix();
+  // Uploaded files shown in slots; options still store only media_id.
+  const [previews, setPreviews] = useState({});
+  const slotValue = (mediaId, known) => !mediaId ? null : previews[mediaId] || (known?.url ? known : null) || (() => { const row = media.find(v => v.id === mediaId); return row ? { id: row.id, url: row.url, filename: row.filename } : { id: mediaId, url: null }; })();
+  const slotUpload = async (file, onProgress) => { const value = await upload(file, onProgress); setPreviews(previous => ({ ...previous, [value.id]: value })); return { asset_id: value.id, asset_url: value.url }; };
+  const slotName = suffix => prefix ? `${prefix}-${suffix}` : "";
   const config = changes => setQ(previous => ({ ...previous, config: { ...previous.config, ...changes } }));
   const updateRow = (key, index, property, value) => config({ [key]: q.config[key].map((row, i) => i === index ? { ...row, [property]: value } : row) });
   async function uploadRow(index, file) {
@@ -139,7 +149,15 @@ function QuestionEditor({ question, media, upload, busy, onBack, onCancel, onSav
         <label>{t("elearning.assessment.promptAudio")}<select value={q.config.media_id || ""} onChange={e => config({ media_id: e.target.value || null })}><option value="">{t("elearning.assessment.selectMedia")}</option>{media.filter(v => !v.mime_type || v.mime_type.startsWith("audio/")).map(v => <option key={v.id} value={v.id}>{v.filename}</option>)}</select></label>
       </>}
     </>}
-    {q.type === "picture_listen" && <>
+    {q.type === "picture_listen" && enhanced && <div className="media-slot-group">
+      <MediaSlot kind="audio" label={t("elearning.mediaSlot.promptAudio")} expectedName={slotName("LM1-prompt.wav")} value={slotValue(q.config.media_id, q.config.media)} upload={slotUpload} onBusy={setUploading} onChange={value => config({ media_id: value?.id || "" })} />
+      {q.config.options.map((option, index) => <div className="assessment-pair" key={option.id}>
+        <MediaSlot kind="image" label={t("elearning.mediaSlot.photo", { number: index + 1 })} expectedName={slotName(`LM1-photo-${index + 1}.jpg`)} value={slotValue(option.media_id, option.media)} upload={slotUpload} onBusy={setUploading} onChange={value => updateRow("options", index, "media_id", value?.id || "")} />
+        <label>{t("elearning.mediaSlot.photoDescription")}<input required maxLength={2000} value={option.alt} onChange={e => updateRow("options", index, "alt", e.target.value)} /></label>
+        <label><input type="radio" name="correct-picture" checked={q.config.correct_option_id === option.id} onChange={() => config({ correct_option_id: option.id })} />{t("elearning.assessment.correct")}</label>
+      </div>)}
+    </div>}
+    {q.type === "picture_listen" && !enhanced && <>
       <label>{t("elearning.assessment.promptAudio")}<select required value={q.config.media_id} onChange={e => config({ media_id: e.target.value })}><option value="">{t("elearning.assessment.selectMedia")}</option>{media.filter(v => !v.mime_type || v.mime_type.startsWith("audio/")).map(v => <option key={v.id} value={v.id}>{v.filename}</option>)}</select></label>
       <label>{t("elearning.assessment.upload")}<input type="file" accept="audio/mpeg,audio/wav" disabled={uploading} onChange={async e => { const file=e.target.files[0]; if (!file) return; setUploading(true); setError(""); try { const value=await upload(file); config({media_id:value.id}); } catch { setError(t("elearning.content.mediaError")); } finally { setUploading(false); } }} /></label>
       {q.config.options.map((option, index) => <div className="assessment-pair" key={option.id}>

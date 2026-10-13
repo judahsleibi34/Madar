@@ -31,73 +31,46 @@
       "level": 1,
       "topic": 1,
       "kind": "audio",
-      "use": "dialogue line",
-      "speaker": "Lina",
-      "script": "Hello. Is this seat free?",
-      "file": "L01-T01-dialogue-01-lina.wav"
-    },
-    {
-      "level": 1,
-      "topic": 1,
-      "kind": "audio",
-      "use": "dialogue line",
-      "speaker": "Omar",
-      "script": "Yes, it is. Please sit here.",
-      "file": "L01-T01-dialogue-02-omar.wav"
-    },
-    {
-      "level": 1,
-      "topic": 1,
-      "kind": "audio",
-      "use": "dialogue line",
-      "speaker": "Lina",
-      "script": "Thank you. My name is Lina. What is your name?",
-      "file": "L01-T01-dialogue-03-lina.wav"
-    },
-    {
-      "level": 1,
-      "topic": 1,
-      "kind": "audio",
-      "use": "dialogue line",
-      "speaker": "Omar",
-      "script": "I am Omar. I study engineering.",
-      "file": "L01-T01-dialogue-04-omar.wav"
-    },
-    {
-      "level": 1,
-      "topic": 1,
-      "kind": "audio",
-      "use": "dialogue line",
-      "speaker": "Lina",
-      "script": "I study business. Are you from Bethlehem?",
-      "file": "L01-T01-dialogue-05-lina.wav"
-    },
-    {
-      "level": 1,
-      "topic": 1,
-      "kind": "audio",
-      "use": "dialogue line",
-      "speaker": "Omar",
-      "script": "No, I am from Ramallah. And you?",
-      "file": "L01-T01-dialogue-06-omar.wav"
-    },
-    {
-      "level": 1,
-      "topic": 1,
-      "kind": "audio",
-      "use": "dialogue line",
-      "speaker": "Lina",
-      "script": "I am from Bethlehem. Nice to meet you.",
-      "file": "L01-T01-dialogue-07-lina.wav"
-    },
-    {
-      "level": 1,
-      "topic": 1,
-      "kind": "audio",
-      "use": "dialogue line",
-      "speaker": "Omar",
-      "script": "Nice to meet you too. Is this your first English class?",
-      "file": "L01-T01-dialogue-08-omar.wav"
+      "use": "dialogue",
+      "speakers": [
+        "Lina",
+        "Omar"
+      ],
+      "script": [
+        {
+          "speaker": "Lina",
+          "line": "Hello. Is this seat free?"
+        },
+        {
+          "speaker": "Omar",
+          "line": "Yes, it is. Please sit here."
+        },
+        {
+          "speaker": "Lina",
+          "line": "Thank you. My name is Lina. What is your name?"
+        },
+        {
+          "speaker": "Omar",
+          "line": "I am Omar. I study engineering."
+        },
+        {
+          "speaker": "Lina",
+          "line": "I study business. Are you from Bethlehem?"
+        },
+        {
+          "speaker": "Omar",
+          "line": "No, I am from Ramallah. And you?"
+        },
+        {
+          "speaker": "Lina",
+          "line": "I am from Bethlehem. Nice to meet you."
+        },
+        {
+          "speaker": "Omar",
+          "line": "Nice to meet you too. Is this your first English class?"
+        }
+      ],
+      "file": "L01-T01-dialogue.wav"
     },
     {
       "level": 1,
@@ -214,7 +187,7 @@
       "use": "dialogue",
       "script": null,
       "status": "script pending",
-      "file": "L01-T02-dialogue-NN-speaker.wav"
+      "file": "L01-T02-dialogue.wav"
     },
     {
       "level": 1,
@@ -267,7 +240,7 @@
       "use": "dialogue",
       "script": null,
       "status": "script pending",
-      "file": "L01-T03-dialogue-NN-speaker.wav"
+      "file": "L01-T03-dialogue.wav"
     },
     {
       "level": 1,
@@ -320,7 +293,7 @@
       "use": "dialogue",
       "script": null,
       "status": "script pending",
-      "file": "L01-T04-dialogue-NN-speaker.wav"
+      "file": "L01-T04-dialogue.wav"
     },
     {
       "level": 1,
@@ -373,7 +346,7 @@
       "use": "dialogue",
       "script": null,
       "status": "script pending",
-      "file": "L01-T05-dialogue-NN-speaker.wav"
+      "file": "L01-T05-dialogue.wav"
     },
     {
       "level": 1,
@@ -426,7 +399,7 @@
       "use": "dialogue",
       "script": null,
       "status": "script pending",
-      "file": "L01-T06-dialogue-NN-speaker.wav"
+      "file": "L01-T06-dialogue.wav"
     },
     {
       "level": 1,
@@ -479,7 +452,7 @@
       "use": "dialogue",
       "script": null,
       "status": "script pending",
-      "file": "L01-T07-dialogue-NN-speaker.wav"
+      "file": "L01-T07-dialogue.wav"
     },
     {
       "level": 1,
@@ -532,7 +505,7 @@
       "use": "dialogue",
       "script": null,
       "status": "script pending",
-      "file": "L01-T08-dialogue-NN-speaker.wav"
+      "file": "L01-T08-dialogue.wav"
     },
     {
       "level": 1,
@@ -588,73 +561,46 @@
       "level": 2,
       "topic": 1,
       "kind": "audio",
-      "use": "dialogue line",
-      "speaker": "Omar",
-      "script": "What time do you get up on class days?",
-      "file": "L02-T01-dialogue-01-omar.wav"
-    },
-    {
-      "level": 2,
-      "topic": 1,
-      "kind": "audio",
-      "use": "dialogue line",
-      "speaker": "Lina",
-      "script": "I get up at seven. I have breakfast at half past seven.",
-      "file": "L02-T01-dialogue-02-lina.wav"
-    },
-    {
-      "level": 2,
-      "topic": 1,
-      "kind": "audio",
-      "use": "dialogue line",
-      "speaker": "Omar",
-      "script": "Do you walk to campus?",
-      "file": "L02-T01-dialogue-03-omar.wav"
-    },
-    {
-      "level": 2,
-      "topic": 1,
-      "kind": "audio",
-      "use": "dialogue line",
-      "speaker": "Lina",
-      "script": "No. I take the bus at eight.",
-      "file": "L02-T01-dialogue-04-lina.wav"
-    },
-    {
-      "level": 2,
-      "topic": 1,
-      "kind": "audio",
-      "use": "dialogue line",
-      "speaker": "Omar",
-      "script": "When does your first class start?",
-      "file": "L02-T01-dialogue-05-omar.wav"
-    },
-    {
-      "level": 2,
-      "topic": 1,
-      "kind": "audio",
-      "use": "dialogue line",
-      "speaker": "Lina",
-      "script": "At nine. I study in the library after class.",
-      "file": "L02-T01-dialogue-06-lina.wav"
-    },
-    {
-      "level": 2,
-      "topic": 1,
-      "kind": "audio",
-      "use": "dialogue line",
-      "speaker": "Omar",
-      "script": "Do you study there every day?",
-      "file": "L02-T01-dialogue-07-omar.wav"
-    },
-    {
-      "level": 2,
-      "topic": 1,
-      "kind": "audio",
-      "use": "dialogue line",
-      "speaker": "Lina",
-      "script": "Usually. On Fridays I study at home.",
-      "file": "L02-T01-dialogue-08-lina.wav"
+      "use": "dialogue",
+      "speakers": [
+        "Lina",
+        "Omar"
+      ],
+      "script": [
+        {
+          "speaker": "Omar",
+          "line": "What time do you get up on class days?"
+        },
+        {
+          "speaker": "Lina",
+          "line": "I get up at seven. I have breakfast at half past seven."
+        },
+        {
+          "speaker": "Omar",
+          "line": "Do you walk to campus?"
+        },
+        {
+          "speaker": "Lina",
+          "line": "No. I take the bus at eight."
+        },
+        {
+          "speaker": "Omar",
+          "line": "When does your first class start?"
+        },
+        {
+          "speaker": "Lina",
+          "line": "At nine. I study in the library after class."
+        },
+        {
+          "speaker": "Omar",
+          "line": "Do you study there every day?"
+        },
+        {
+          "speaker": "Lina",
+          "line": "Usually. On Fridays I study at home."
+        }
+      ],
+      "file": "L02-T01-dialogue.wav"
     },
     {
       "level": 2,
@@ -771,7 +717,7 @@
       "use": "dialogue",
       "script": null,
       "status": "script pending",
-      "file": "L02-T02-dialogue-NN-speaker.wav"
+      "file": "L02-T02-dialogue.wav"
     },
     {
       "level": 2,
@@ -824,7 +770,7 @@
       "use": "dialogue",
       "script": null,
       "status": "script pending",
-      "file": "L02-T03-dialogue-NN-speaker.wav"
+      "file": "L02-T03-dialogue.wav"
     },
     {
       "level": 2,
@@ -877,7 +823,7 @@
       "use": "dialogue",
       "script": null,
       "status": "script pending",
-      "file": "L02-T04-dialogue-NN-speaker.wav"
+      "file": "L02-T04-dialogue.wav"
     },
     {
       "level": 2,
@@ -930,7 +876,7 @@
       "use": "dialogue",
       "script": null,
       "status": "script pending",
-      "file": "L02-T05-dialogue-NN-speaker.wav"
+      "file": "L02-T05-dialogue.wav"
     },
     {
       "level": 2,
@@ -983,7 +929,7 @@
       "use": "dialogue",
       "script": null,
       "status": "script pending",
-      "file": "L02-T06-dialogue-NN-speaker.wav"
+      "file": "L02-T06-dialogue.wav"
     },
     {
       "level": 2,
@@ -1036,7 +982,7 @@
       "use": "dialogue",
       "script": null,
       "status": "script pending",
-      "file": "L02-T07-dialogue-NN-speaker.wav"
+      "file": "L02-T07-dialogue.wav"
     },
     {
       "level": 2,
@@ -1089,7 +1035,7 @@
       "use": "dialogue",
       "script": null,
       "status": "script pending",
-      "file": "L02-T08-dialogue-NN-speaker.wav"
+      "file": "L02-T08-dialogue.wav"
     },
     {
       "level": 2,
@@ -1145,73 +1091,46 @@
       "level": 3,
       "topic": 1,
       "kind": "audio",
-      "use": "dialogue line",
-      "speaker": "Lina",
-      "script": "Did you enjoy the student book fair on Saturday?",
-      "file": "L03-T01-dialogue-01-lina.wav"
-    },
-    {
-      "level": 3,
-      "topic": 1,
-      "kind": "audio",
-      "use": "dialogue line",
-      "speaker": "Omar",
-      "script": "Yes. I went with my cousin and bought two used books.",
-      "file": "L03-T01-dialogue-02-omar.wav"
-    },
-    {
-      "level": 3,
-      "topic": 1,
-      "kind": "audio",
-      "use": "dialogue line",
-      "speaker": "Lina",
-      "script": "Were the books expensive?",
-      "file": "L03-T01-dialogue-03-lina.wav"
-    },
-    {
-      "level": 3,
-      "topic": 1,
-      "kind": "audio",
-      "use": "dialogue line",
-      "speaker": "Omar",
-      "script": "No. They cost less than the new editions. One was about photography.",
-      "file": "L03-T01-dialogue-04-omar.wav"
-    },
-    {
-      "level": 3,
-      "topic": 1,
-      "kind": "audio",
-      "use": "dialogue line",
-      "speaker": "Lina",
-      "script": "That sounds interesting. Did you stay all afternoon?",
-      "file": "L03-T01-dialogue-05-lina.wav"
-    },
-    {
-      "level": 3,
-      "topic": 1,
-      "kind": "audio",
-      "use": "dialogue line",
-      "speaker": "Omar",
-      "script": "We left at three because my cousin had a family visit.",
-      "file": "L03-T01-dialogue-06-omar.wav"
-    },
-    {
-      "level": 3,
-      "topic": 1,
-      "kind": "audio",
-      "use": "dialogue line",
-      "speaker": "Lina",
-      "script": "I missed the fair. I was helping my sister move.",
-      "file": "L03-T01-dialogue-07-lina.wav"
-    },
-    {
-      "level": 3,
-      "topic": 1,
-      "kind": "audio",
-      "use": "dialogue line",
-      "speaker": "Omar",
-      "script": "There is another one next month. We can go together.",
-      "file": "L03-T01-dialogue-08-omar.wav"
+      "use": "dialogue",
+      "speakers": [
+        "Lina",
+        "Omar"
+      ],
+      "script": [
+        {
+          "speaker": "Lina",
+          "line": "Did you enjoy the student book fair on Saturday?"
+        },
+        {
+          "speaker": "Omar",
+          "line": "Yes. I went with my cousin and bought two used books."
+        },
+        {
+          "speaker": "Lina",
+          "line": "Were the books expensive?"
+        },
+        {
+          "speaker": "Omar",
+          "line": "No. They cost less than the new editions. One was about photography."
+        },
+        {
+          "speaker": "Lina",
+          "line": "That sounds interesting. Did you stay all afternoon?"
+        },
+        {
+          "speaker": "Omar",
+          "line": "We left at three because my cousin had a family visit."
+        },
+        {
+          "speaker": "Lina",
+          "line": "I missed the fair. I was helping my sister move."
+        },
+        {
+          "speaker": "Omar",
+          "line": "There is another one next month. We can go together."
+        }
+      ],
+      "file": "L03-T01-dialogue.wav"
     },
     {
       "level": 3,
@@ -1328,7 +1247,7 @@
       "use": "dialogue",
       "script": null,
       "status": "script pending",
-      "file": "L03-T02-dialogue-NN-speaker.wav"
+      "file": "L03-T02-dialogue.wav"
     },
     {
       "level": 3,
@@ -1381,7 +1300,7 @@
       "use": "dialogue",
       "script": null,
       "status": "script pending",
-      "file": "L03-T03-dialogue-NN-speaker.wav"
+      "file": "L03-T03-dialogue.wav"
     },
     {
       "level": 3,
@@ -1434,7 +1353,7 @@
       "use": "dialogue",
       "script": null,
       "status": "script pending",
-      "file": "L03-T04-dialogue-NN-speaker.wav"
+      "file": "L03-T04-dialogue.wav"
     },
     {
       "level": 3,
@@ -1487,7 +1406,7 @@
       "use": "dialogue",
       "script": null,
       "status": "script pending",
-      "file": "L03-T05-dialogue-NN-speaker.wav"
+      "file": "L03-T05-dialogue.wav"
     },
     {
       "level": 3,
@@ -1540,7 +1459,7 @@
       "use": "dialogue",
       "script": null,
       "status": "script pending",
-      "file": "L03-T06-dialogue-NN-speaker.wav"
+      "file": "L03-T06-dialogue.wav"
     },
     {
       "level": 3,
@@ -1593,7 +1512,7 @@
       "use": "dialogue",
       "script": null,
       "status": "script pending",
-      "file": "L03-T07-dialogue-NN-speaker.wav"
+      "file": "L03-T07-dialogue.wav"
     },
     {
       "level": 3,
@@ -1646,7 +1565,7 @@
       "use": "dialogue",
       "script": null,
       "status": "script pending",
-      "file": "L03-T08-dialogue-NN-speaker.wav"
+      "file": "L03-T08-dialogue.wav"
     },
     {
       "level": 3,
@@ -1699,7 +1618,7 @@
       "use": "dialogue",
       "script": null,
       "status": "script pending",
-      "file": "L03-T09-dialogue-NN-speaker.wav"
+      "file": "L03-T09-dialogue.wav"
     },
     {
       "level": 3,
@@ -1755,73 +1674,46 @@
       "level": 4,
       "topic": 1,
       "kind": "audio",
-      "use": "dialogue line",
-      "speaker": "Omar",
-      "script": "I would like two seats on the morning bus to Nablus, please.",
-      "file": "L04-T01-dialogue-01-omar.wav"
-    },
-    {
-      "level": 4,
-      "topic": 1,
-      "kind": "audio",
-      "use": "dialogue line",
-      "speaker": "Clerk",
-      "script": "We have departures at eight and ten. Which one would you prefer?",
-      "file": "L04-T01-dialogue-02-clerk.wav"
-    },
-    {
-      "level": 4,
-      "topic": 1,
-      "kind": "audio",
-      "use": "dialogue line",
-      "speaker": "Omar",
-      "script": "The eight o’clock bus. Does it stop near the university?",
-      "file": "L04-T01-dialogue-03-omar.wav"
-    },
-    {
-      "level": 4,
-      "topic": 1,
-      "kind": "audio",
-      "use": "dialogue line",
-      "speaker": "Clerk",
-      "script": "Yes, but you need to tell the driver before you leave.",
-      "file": "L04-T01-dialogue-04-clerk.wav"
-    },
-    {
-      "level": 4,
-      "topic": 1,
-      "kind": "audio",
-      "use": "dialogue line",
-      "speaker": "Omar",
-      "script": "How long does the journey usually take?",
-      "file": "L04-T01-dialogue-05-omar.wav"
-    },
-    {
-      "level": 4,
-      "topic": 1,
-      "kind": "audio",
-      "use": "dialogue line",
-      "speaker": "Clerk",
-      "script": "About an hour and a half, depending on traffic.",
-      "file": "L04-T01-dialogue-06-clerk.wav"
-    },
-    {
-      "level": 4,
-      "topic": 1,
-      "kind": "audio",
-      "use": "dialogue line",
-      "speaker": "Omar",
-      "script": "Can I change the booking if our class time changes?",
-      "file": "L04-T01-dialogue-07-omar.wav"
-    },
-    {
-      "level": 4,
-      "topic": 1,
-      "kind": "audio",
-      "use": "dialogue line",
-      "speaker": "Clerk",
-      "script": "You can change it before six this evening. Keep your confirmation number.",
-      "file": "L04-T01-dialogue-08-clerk.wav"
+      "use": "dialogue",
+      "speakers": [
+        "Clerk",
+        "Omar"
+      ],
+      "script": [
+        {
+          "speaker": "Omar",
+          "line": "I would like two seats on the morning bus to Nablus, please."
+        },
+        {
+          "speaker": "Clerk",
+          "line": "We have departures at eight and ten. Which one would you prefer?"
+        },
+        {
+          "speaker": "Omar",
+          "line": "The eight o’clock bus. Does it stop near the university?"
+        },
+        {
+          "speaker": "Clerk",
+          "line": "Yes, but you need to tell the driver before you leave."
+        },
+        {
+          "speaker": "Omar",
+          "line": "How long does the journey usually take?"
+        },
+        {
+          "speaker": "Clerk",
+          "line": "About an hour and a half, depending on traffic."
+        },
+        {
+          "speaker": "Omar",
+          "line": "Can I change the booking if our class time changes?"
+        },
+        {
+          "speaker": "Clerk",
+          "line": "You can change it before six this evening. Keep your confirmation number."
+        }
+      ],
+      "file": "L04-T01-dialogue.wav"
     },
     {
       "level": 4,
@@ -1938,7 +1830,7 @@
       "use": "dialogue",
       "script": null,
       "status": "script pending",
-      "file": "L04-T02-dialogue-NN-speaker.wav"
+      "file": "L04-T02-dialogue.wav"
     },
     {
       "level": 4,
@@ -1991,7 +1883,7 @@
       "use": "dialogue",
       "script": null,
       "status": "script pending",
-      "file": "L04-T03-dialogue-NN-speaker.wav"
+      "file": "L04-T03-dialogue.wav"
     },
     {
       "level": 4,
@@ -2044,7 +1936,7 @@
       "use": "dialogue",
       "script": null,
       "status": "script pending",
-      "file": "L04-T04-dialogue-NN-speaker.wav"
+      "file": "L04-T04-dialogue.wav"
     },
     {
       "level": 4,
@@ -2097,7 +1989,7 @@
       "use": "dialogue",
       "script": null,
       "status": "script pending",
-      "file": "L04-T05-dialogue-NN-speaker.wav"
+      "file": "L04-T05-dialogue.wav"
     },
     {
       "level": 4,
@@ -2150,7 +2042,7 @@
       "use": "dialogue",
       "script": null,
       "status": "script pending",
-      "file": "L04-T06-dialogue-NN-speaker.wav"
+      "file": "L04-T06-dialogue.wav"
     },
     {
       "level": 4,
@@ -2203,7 +2095,7 @@
       "use": "dialogue",
       "script": null,
       "status": "script pending",
-      "file": "L04-T07-dialogue-NN-speaker.wav"
+      "file": "L04-T07-dialogue.wav"
     },
     {
       "level": 4,
@@ -2256,7 +2148,7 @@
       "use": "dialogue",
       "script": null,
       "status": "script pending",
-      "file": "L04-T08-dialogue-NN-speaker.wav"
+      "file": "L04-T08-dialogue.wav"
     },
     {
       "level": 4,
@@ -2309,7 +2201,7 @@
       "use": "dialogue",
       "script": null,
       "status": "script pending",
-      "file": "L04-T09-dialogue-NN-speaker.wav"
+      "file": "L04-T09-dialogue.wav"
     },
     {
       "level": 4,
@@ -2365,73 +2257,46 @@
       "level": 5,
       "topic": 1,
       "kind": "audio",
-      "use": "dialogue line",
-      "speaker": "Lina",
-      "script": "I think our study group should meet twice a week before the exam.",
-      "file": "L05-T01-dialogue-01-lina.wav"
-    },
-    {
-      "level": 5,
-      "topic": 1,
-      "kind": "audio",
-      "use": "dialogue line",
-      "speaker": "Omar",
-      "script": "I see your point, but two long meetings may be difficult for students who work.",
-      "file": "L05-T01-dialogue-02-omar.wav"
-    },
-    {
-      "level": 5,
-      "topic": 1,
-      "kind": "audio",
-      "use": "dialogue line",
-      "speaker": "Lina",
-      "script": "What if one meeting were online and only lasted thirty minutes?",
-      "file": "L05-T01-dialogue-03-lina.wav"
-    },
-    {
-      "level": 5,
-      "topic": 1,
-      "kind": "audio",
-      "use": "dialogue line",
-      "speaker": "Omar",
-      "script": "That would help. We could use it to ask questions rather than repeat the lecture.",
-      "file": "L05-T01-dialogue-04-omar.wav"
-    },
-    {
-      "level": 5,
-      "topic": 1,
-      "kind": "audio",
-      "use": "dialogue line",
-      "speaker": "Lina",
-      "script": "Agreed. The campus meeting could focus on solving practice problems.",
-      "file": "L05-T01-dialogue-05-lina.wav"
-    },
-    {
-      "level": 5,
-      "topic": 1,
-      "kind": "audio",
-      "use": "dialogue line",
-      "speaker": "Omar",
-      "script": "We should ask everyone which evening works best before fixing a time.",
-      "file": "L05-T01-dialogue-06-omar.wav"
-    },
-    {
-      "level": 5,
-      "topic": 1,
-      "kind": "audio",
-      "use": "dialogue line",
-      "speaker": "Lina",
-      "script": "I will send a short poll today. Could you prepare three practice problems?",
-      "file": "L05-T01-dialogue-07-lina.wav"
-    },
-    {
-      "level": 5,
-      "topic": 1,
-      "kind": "audio",
-      "use": "dialogue line",
-      "speaker": "Omar",
-      "script": "Yes. Then we can review the plan after the first week.",
-      "file": "L05-T01-dialogue-08-omar.wav"
+      "use": "dialogue",
+      "speakers": [
+        "Lina",
+        "Omar"
+      ],
+      "script": [
+        {
+          "speaker": "Lina",
+          "line": "I think our study group should meet twice a week before the exam."
+        },
+        {
+          "speaker": "Omar",
+          "line": "I see your point, but two long meetings may be difficult for students who work."
+        },
+        {
+          "speaker": "Lina",
+          "line": "What if one meeting were online and only lasted thirty minutes?"
+        },
+        {
+          "speaker": "Omar",
+          "line": "That would help. We could use it to ask questions rather than repeat the lecture."
+        },
+        {
+          "speaker": "Lina",
+          "line": "Agreed. The campus meeting could focus on solving practice problems."
+        },
+        {
+          "speaker": "Omar",
+          "line": "We should ask everyone which evening works best before fixing a time."
+        },
+        {
+          "speaker": "Lina",
+          "line": "I will send a short poll today. Could you prepare three practice problems?"
+        },
+        {
+          "speaker": "Omar",
+          "line": "Yes. Then we can review the plan after the first week."
+        }
+      ],
+      "file": "L05-T01-dialogue.wav"
     },
     {
       "level": 5,
@@ -2548,7 +2413,7 @@
       "use": "dialogue",
       "script": null,
       "status": "script pending",
-      "file": "L05-T02-dialogue-NN-speaker.wav"
+      "file": "L05-T02-dialogue.wav"
     },
     {
       "level": 5,
@@ -2601,7 +2466,7 @@
       "use": "dialogue",
       "script": null,
       "status": "script pending",
-      "file": "L05-T03-dialogue-NN-speaker.wav"
+      "file": "L05-T03-dialogue.wav"
     },
     {
       "level": 5,
@@ -2654,7 +2519,7 @@
       "use": "dialogue",
       "script": null,
       "status": "script pending",
-      "file": "L05-T04-dialogue-NN-speaker.wav"
+      "file": "L05-T04-dialogue.wav"
     },
     {
       "level": 5,
@@ -2707,7 +2572,7 @@
       "use": "dialogue",
       "script": null,
       "status": "script pending",
-      "file": "L05-T05-dialogue-NN-speaker.wav"
+      "file": "L05-T05-dialogue.wav"
     },
     {
       "level": 5,
@@ -2760,7 +2625,7 @@
       "use": "dialogue",
       "script": null,
       "status": "script pending",
-      "file": "L05-T06-dialogue-NN-speaker.wav"
+      "file": "L05-T06-dialogue.wav"
     },
     {
       "level": 5,
@@ -2813,7 +2678,7 @@
       "use": "dialogue",
       "script": null,
       "status": "script pending",
-      "file": "L05-T07-dialogue-NN-speaker.wav"
+      "file": "L05-T07-dialogue.wav"
     },
     {
       "level": 5,
@@ -2866,7 +2731,7 @@
       "use": "dialogue",
       "script": null,
       "status": "script pending",
-      "file": "L05-T08-dialogue-NN-speaker.wav"
+      "file": "L05-T08-dialogue.wav"
     },
     {
       "level": 5,
@@ -2919,7 +2784,7 @@
       "use": "dialogue",
       "script": null,
       "status": "script pending",
-      "file": "L05-T09-dialogue-NN-speaker.wav"
+      "file": "L05-T09-dialogue.wav"
     },
     {
       "level": 5,
@@ -2975,73 +2840,46 @@
       "level": 6,
       "topic": 1,
       "kind": "audio",
-      "use": "dialogue line",
-      "speaker": "Interviewer",
-      "script": "Tell me about a time you worked with a team.",
-      "file": "L06-T01-dialogue-01-interviewer.wav"
-    },
-    {
-      "level": 6,
-      "topic": 1,
-      "kind": "audio",
-      "use": "dialogue line",
-      "speaker": "Omar",
-      "script": "In a university project, our group had to present a simple energy-saving plan.",
-      "file": "L06-T01-dialogue-02-omar.wav"
-    },
-    {
-      "level": 6,
-      "topic": 1,
-      "kind": "audio",
-      "use": "dialogue line",
-      "speaker": "Interviewer",
-      "script": "What was your responsibility?",
-      "file": "L06-T01-dialogue-03-interviewer.wav"
-    },
-    {
-      "level": 6,
-      "topic": 1,
-      "kind": "audio",
-      "use": "dialogue line",
-      "speaker": "Omar",
-      "script": "I compared three options and summarized their costs. At first, I included too many technical details.",
-      "file": "L06-T01-dialogue-04-omar.wav"
-    },
-    {
-      "level": 6,
-      "topic": 1,
-      "kind": "audio",
-      "use": "dialogue line",
-      "speaker": "Interviewer",
-      "script": "How did you deal with that?",
-      "file": "L06-T01-dialogue-05-interviewer.wav"
-    },
-    {
-      "level": 6,
-      "topic": 1,
-      "kind": "audio",
-      "use": "dialogue line",
-      "speaker": "Omar",
-      "script": "I asked a classmate to listen to my explanation. Her questions helped me make the summary clearer.",
-      "file": "L06-T01-dialogue-06-omar.wav"
-    },
-    {
-      "level": 6,
-      "topic": 1,
-      "kind": "audio",
-      "use": "dialogue line",
-      "speaker": "Interviewer",
-      "script": "What did you learn from the experience?",
-      "file": "L06-T01-dialogue-07-interviewer.wav"
-    },
-    {
-      "level": 6,
-      "topic": 1,
-      "kind": "audio",
-      "use": "dialogue line",
-      "speaker": "Omar",
-      "script": "A good explanation depends on the audience. I now check that my main point is clear before adding detail.",
-      "file": "L06-T01-dialogue-08-omar.wav"
+      "use": "dialogue",
+      "speakers": [
+        "Interviewer",
+        "Omar"
+      ],
+      "script": [
+        {
+          "speaker": "Interviewer",
+          "line": "Tell me about a time you worked with a team."
+        },
+        {
+          "speaker": "Omar",
+          "line": "In a university project, our group had to present a simple energy-saving plan."
+        },
+        {
+          "speaker": "Interviewer",
+          "line": "What was your responsibility?"
+        },
+        {
+          "speaker": "Omar",
+          "line": "I compared three options and summarized their costs. At first, I included too many technical details."
+        },
+        {
+          "speaker": "Interviewer",
+          "line": "How did you deal with that?"
+        },
+        {
+          "speaker": "Omar",
+          "line": "I asked a classmate to listen to my explanation. Her questions helped me make the summary clearer."
+        },
+        {
+          "speaker": "Interviewer",
+          "line": "What did you learn from the experience?"
+        },
+        {
+          "speaker": "Omar",
+          "line": "A good explanation depends on the audience. I now check that my main point is clear before adding detail."
+        }
+      ],
+      "file": "L06-T01-dialogue.wav"
     },
     {
       "level": 6,
@@ -3158,7 +2996,7 @@
       "use": "dialogue",
       "script": null,
       "status": "script pending",
-      "file": "L06-T02-dialogue-NN-speaker.wav"
+      "file": "L06-T02-dialogue.wav"
     },
     {
       "level": 6,
@@ -3211,7 +3049,7 @@
       "use": "dialogue",
       "script": null,
       "status": "script pending",
-      "file": "L06-T03-dialogue-NN-speaker.wav"
+      "file": "L06-T03-dialogue.wav"
     },
     {
       "level": 6,
@@ -3264,7 +3102,7 @@
       "use": "dialogue",
       "script": null,
       "status": "script pending",
-      "file": "L06-T04-dialogue-NN-speaker.wav"
+      "file": "L06-T04-dialogue.wav"
     },
     {
       "level": 6,
@@ -3317,7 +3155,7 @@
       "use": "dialogue",
       "script": null,
       "status": "script pending",
-      "file": "L06-T05-dialogue-NN-speaker.wav"
+      "file": "L06-T05-dialogue.wav"
     },
     {
       "level": 6,
@@ -3370,7 +3208,7 @@
       "use": "dialogue",
       "script": null,
       "status": "script pending",
-      "file": "L06-T06-dialogue-NN-speaker.wav"
+      "file": "L06-T06-dialogue.wav"
     },
     {
       "level": 6,
@@ -3423,7 +3261,7 @@
       "use": "dialogue",
       "script": null,
       "status": "script pending",
-      "file": "L06-T07-dialogue-NN-speaker.wav"
+      "file": "L06-T07-dialogue.wav"
     },
     {
       "level": 6,
@@ -3476,7 +3314,7 @@
       "use": "dialogue",
       "script": null,
       "status": "script pending",
-      "file": "L06-T08-dialogue-NN-speaker.wav"
+      "file": "L06-T08-dialogue.wav"
     },
     {
       "level": 6,
@@ -3529,7 +3367,7 @@
       "use": "dialogue",
       "script": null,
       "status": "script pending",
-      "file": "L06-T09-dialogue-NN-speaker.wav"
+      "file": "L06-T09-dialogue.wav"
     },
     {
       "level": 6,
@@ -3585,73 +3423,46 @@
       "level": 7,
       "topic": 1,
       "kind": "audio",
-      "use": "dialogue line",
-      "speaker": "Lina",
-      "script": "Extending library hours could benefit students who have daytime jobs.",
-      "file": "L07-T01-dialogue-01-lina.wav"
-    },
-    {
-      "level": 7,
-      "topic": 1,
-      "kind": "audio",
-      "use": "dialogue line",
-      "speaker": "Omar",
-      "script": "I support the idea, although staffing costs would have to be considered.",
-      "file": "L07-T01-dialogue-02-omar.wav"
-    },
-    {
-      "level": 7,
-      "topic": 1,
-      "kind": "audio",
-      "use": "dialogue line",
-      "speaker": "Lina",
-      "script": "Perhaps we could trial longer hours during the exam period rather than throughout the year.",
-      "file": "L07-T01-dialogue-03-lina.wav"
-    },
-    {
-      "level": 7,
-      "topic": 1,
-      "kind": "audio",
-      "use": "dialogue line",
-      "speaker": "Omar",
-      "script": "A trial would give us evidence, but attendance alone would not show whether the service was useful.",
-      "file": "L07-T01-dialogue-04-omar.wav"
-    },
-    {
-      "level": 7,
-      "topic": 1,
-      "kind": "audio",
-      "use": "dialogue line",
-      "speaker": "Lina",
-      "script": "We could collect anonymous feedback as well as counting visits.",
-      "file": "L07-T01-dialogue-05-lina.wav"
-    },
-    {
-      "level": 7,
-      "topic": 1,
-      "kind": "audio",
-      "use": "dialogue line",
-      "speaker": "Omar",
-      "script": "Provided the questions are neutral, that would strengthen the evaluation.",
-      "file": "L07-T01-dialogue-06-omar.wav"
-    },
-    {
-      "level": 7,
-      "topic": 1,
-      "kind": "audio",
-      "use": "dialogue line",
-      "speaker": "Lina",
-      "script": "Let us propose a four-week pilot with a clear budget and a review date.",
-      "file": "L07-T01-dialogue-07-lina.wav"
-    },
-    {
-      "level": 7,
-      "topic": 1,
-      "kind": "audio",
-      "use": "dialogue line",
-      "speaker": "Omar",
-      "script": "Agreed. We should also explain what would justify continuing or ending it.",
-      "file": "L07-T01-dialogue-08-omar.wav"
+      "use": "dialogue",
+      "speakers": [
+        "Lina",
+        "Omar"
+      ],
+      "script": [
+        {
+          "speaker": "Lina",
+          "line": "Extending library hours could benefit students who have daytime jobs."
+        },
+        {
+          "speaker": "Omar",
+          "line": "I support the idea, although staffing costs would have to be considered."
+        },
+        {
+          "speaker": "Lina",
+          "line": "Perhaps we could trial longer hours during the exam period rather than throughout the year."
+        },
+        {
+          "speaker": "Omar",
+          "line": "A trial would give us evidence, but attendance alone would not show whether the service was useful."
+        },
+        {
+          "speaker": "Lina",
+          "line": "We could collect anonymous feedback as well as counting visits."
+        },
+        {
+          "speaker": "Omar",
+          "line": "Provided the questions are neutral, that would strengthen the evaluation."
+        },
+        {
+          "speaker": "Lina",
+          "line": "Let us propose a four-week pilot with a clear budget and a review date."
+        },
+        {
+          "speaker": "Omar",
+          "line": "Agreed. We should also explain what would justify continuing or ending it."
+        }
+      ],
+      "file": "L07-T01-dialogue.wav"
     },
     {
       "level": 7,
@@ -3768,7 +3579,7 @@
       "use": "dialogue",
       "script": null,
       "status": "script pending",
-      "file": "L07-T02-dialogue-NN-speaker.wav"
+      "file": "L07-T02-dialogue.wav"
     },
     {
       "level": 7,
@@ -3821,7 +3632,7 @@
       "use": "dialogue",
       "script": null,
       "status": "script pending",
-      "file": "L07-T03-dialogue-NN-speaker.wav"
+      "file": "L07-T03-dialogue.wav"
     },
     {
       "level": 7,
@@ -3874,7 +3685,7 @@
       "use": "dialogue",
       "script": null,
       "status": "script pending",
-      "file": "L07-T04-dialogue-NN-speaker.wav"
+      "file": "L07-T04-dialogue.wav"
     },
     {
       "level": 7,
@@ -3927,7 +3738,7 @@
       "use": "dialogue",
       "script": null,
       "status": "script pending",
-      "file": "L07-T05-dialogue-NN-speaker.wav"
+      "file": "L07-T05-dialogue.wav"
     },
     {
       "level": 7,
@@ -3980,7 +3791,7 @@
       "use": "dialogue",
       "script": null,
       "status": "script pending",
-      "file": "L07-T06-dialogue-NN-speaker.wav"
+      "file": "L07-T06-dialogue.wav"
     },
     {
       "level": 7,
@@ -4033,7 +3844,7 @@
       "use": "dialogue",
       "script": null,
       "status": "script pending",
-      "file": "L07-T07-dialogue-NN-speaker.wav"
+      "file": "L07-T07-dialogue.wav"
     },
     {
       "level": 7,
@@ -4086,7 +3897,7 @@
       "use": "dialogue",
       "script": null,
       "status": "script pending",
-      "file": "L07-T08-dialogue-NN-speaker.wav"
+      "file": "L07-T08-dialogue.wav"
     },
     {
       "level": 7,
@@ -4139,7 +3950,7 @@
       "use": "dialogue",
       "script": null,
       "status": "script pending",
-      "file": "L07-T09-dialogue-NN-speaker.wav"
+      "file": "L07-T09-dialogue.wav"
     },
     {
       "level": 7,
@@ -4195,73 +4006,46 @@
       "level": 8,
       "topic": 1,
       "kind": "audio",
-      "use": "dialogue line",
-      "speaker": "Omar",
-      "script": "The team needs the rehearsal room on Thursday, but the music society has already booked it.",
-      "file": "L08-T01-dialogue-01-omar.wav"
-    },
-    {
-      "level": 8,
-      "topic": 1,
-      "kind": "audio",
-      "use": "dialogue line",
-      "speaker": "Lina",
-      "script": "Could we negotiate a shorter session rather than asking them to cancel?",
-      "file": "L08-T01-dialogue-02-lina.wav"
-    },
-    {
-      "level": 8,
-      "topic": 1,
-      "kind": "audio",
-      "use": "dialogue line",
-      "speaker": "Omar",
-      "script": "We need forty minutes to test the presentation equipment. They need an uninterrupted hour.",
-      "file": "L08-T01-dialogue-03-omar.wav"
-    },
-    {
-      "level": 8,
-      "topic": 1,
-      "kind": "audio",
-      "use": "dialogue line",
-      "speaker": "Lina",
-      "script": "If we move our test to the start of the afternoon, they could keep their full session afterward.",
-      "file": "L08-T01-dialogue-04-lina.wav"
-    },
-    {
-      "level": 8,
-      "topic": 1,
-      "kind": "audio",
-      "use": "dialogue line",
-      "speaker": "Omar",
-      "script": "That depends on whether the technician is available earlier.",
-      "file": "L08-T01-dialogue-05-omar.wav"
-    },
-    {
-      "level": 8,
-      "topic": 1,
-      "kind": "audio",
-      "use": "dialogue line",
-      "speaker": "Lina",
-      "script": "I can check with her. We should make our proposal conditional on that confirmation.",
-      "file": "L08-T01-dialogue-06-lina.wav"
-    },
-    {
-      "level": 8,
-      "topic": 1,
-      "kind": "audio",
-      "use": "dialogue line",
-      "speaker": "Omar",
-      "script": "Good. Let us also offer to reset the room so their rehearsal can start on time.",
-      "file": "L08-T01-dialogue-07-omar.wav"
-    },
-    {
-      "level": 8,
-      "topic": 1,
-      "kind": "audio",
-      "use": "dialogue line",
-      "speaker": "Lina",
-      "script": "That makes the arrangement fairer. Both groups keep the time they actually need.",
-      "file": "L08-T01-dialogue-08-lina.wav"
+      "use": "dialogue",
+      "speakers": [
+        "Lina",
+        "Omar"
+      ],
+      "script": [
+        {
+          "speaker": "Omar",
+          "line": "The team needs the rehearsal room on Thursday, but the music society has already booked it."
+        },
+        {
+          "speaker": "Lina",
+          "line": "Could we negotiate a shorter session rather than asking them to cancel?"
+        },
+        {
+          "speaker": "Omar",
+          "line": "We need forty minutes to test the presentation equipment. They need an uninterrupted hour."
+        },
+        {
+          "speaker": "Lina",
+          "line": "If we move our test to the start of the afternoon, they could keep their full session afterward."
+        },
+        {
+          "speaker": "Omar",
+          "line": "That depends on whether the technician is available earlier."
+        },
+        {
+          "speaker": "Lina",
+          "line": "I can check with her. We should make our proposal conditional on that confirmation."
+        },
+        {
+          "speaker": "Omar",
+          "line": "Good. Let us also offer to reset the room so their rehearsal can start on time."
+        },
+        {
+          "speaker": "Lina",
+          "line": "That makes the arrangement fairer. Both groups keep the time they actually need."
+        }
+      ],
+      "file": "L08-T01-dialogue.wav"
     },
     {
       "level": 8,
@@ -4378,7 +4162,7 @@
       "use": "dialogue",
       "script": null,
       "status": "script pending",
-      "file": "L08-T02-dialogue-NN-speaker.wav"
+      "file": "L08-T02-dialogue.wav"
     },
     {
       "level": 8,
@@ -4431,7 +4215,7 @@
       "use": "dialogue",
       "script": null,
       "status": "script pending",
-      "file": "L08-T03-dialogue-NN-speaker.wav"
+      "file": "L08-T03-dialogue.wav"
     },
     {
       "level": 8,
@@ -4484,7 +4268,7 @@
       "use": "dialogue",
       "script": null,
       "status": "script pending",
-      "file": "L08-T04-dialogue-NN-speaker.wav"
+      "file": "L08-T04-dialogue.wav"
     },
     {
       "level": 8,
@@ -4537,7 +4321,7 @@
       "use": "dialogue",
       "script": null,
       "status": "script pending",
-      "file": "L08-T05-dialogue-NN-speaker.wav"
+      "file": "L08-T05-dialogue.wav"
     },
     {
       "level": 8,
@@ -4590,7 +4374,7 @@
       "use": "dialogue",
       "script": null,
       "status": "script pending",
-      "file": "L08-T06-dialogue-NN-speaker.wav"
+      "file": "L08-T06-dialogue.wav"
     },
     {
       "level": 8,
@@ -4643,7 +4427,7 @@
       "use": "dialogue",
       "script": null,
       "status": "script pending",
-      "file": "L08-T07-dialogue-NN-speaker.wav"
+      "file": "L08-T07-dialogue.wav"
     },
     {
       "level": 8,
@@ -4696,7 +4480,7 @@
       "use": "dialogue",
       "script": null,
       "status": "script pending",
-      "file": "L08-T08-dialogue-NN-speaker.wav"
+      "file": "L08-T08-dialogue.wav"
     },
     {
       "level": 8,
@@ -4749,7 +4533,7 @@
       "use": "dialogue",
       "script": null,
       "status": "script pending",
-      "file": "L08-T09-dialogue-NN-speaker.wav"
+      "file": "L08-T09-dialogue.wav"
     },
     {
       "level": 8,
@@ -4805,73 +4589,46 @@
       "level": 9,
       "topic": 1,
       "kind": "audio",
-      "use": "dialogue line",
-      "speaker": "Lina",
-      "script": "The survey suggests that students who attend language workshops report greater confidence.",
-      "file": "L09-T01-dialogue-01-lina.wav"
-    },
-    {
-      "level": 9,
-      "topic": 1,
-      "kind": "audio",
-      "use": "dialogue line",
-      "speaker": "Omar",
-      "script": "That is encouraging, but it does not establish that the workshops caused the improvement.",
-      "file": "L09-T01-dialogue-02-omar.wav"
-    },
-    {
-      "level": 9,
-      "topic": 1,
-      "kind": "audio",
-      "use": "dialogue line",
-      "speaker": "Lina",
-      "script": "Students who were already motivated may have been more likely to attend.",
-      "file": "L09-T01-dialogue-03-lina.wav"
-    },
-    {
-      "level": 9,
-      "topic": 1,
-      "kind": "audio",
-      "use": "dialogue line",
-      "speaker": "Omar",
-      "script": "Exactly. We should distinguish an association from a causal claim.",
-      "file": "L09-T01-dialogue-04-omar.wav"
-    },
-    {
-      "level": 9,
-      "topic": 1,
-      "kind": "audio",
-      "use": "dialogue line",
-      "speaker": "Lina",
-      "script": "Would comparing participants’ confidence before and after the workshop address that limitation?",
-      "file": "L09-T01-dialogue-05-lina.wav"
-    },
-    {
-      "level": 9,
-      "topic": 1,
-      "kind": "audio",
-      "use": "dialogue line",
-      "speaker": "Omar",
-      "script": "It would help, although a comparable non-participant group would make the interpretation stronger.",
-      "file": "L09-T01-dialogue-06-omar.wav"
-    },
-    {
-      "level": 9,
-      "topic": 1,
-      "kind": "audio",
-      "use": "dialogue line",
-      "speaker": "Lina",
-      "script": "Then our recommendation should be a carefully evaluated pilot, rather than immediate expansion.",
-      "file": "L09-T01-dialogue-07-lina.wav"
-    },
-    {
-      "level": 9,
-      "topic": 1,
-      "kind": "audio",
-      "use": "dialogue line",
-      "speaker": "Omar",
-      "script": "Yes. Acknowledge the promising findings while making the uncertainty explicit.",
-      "file": "L09-T01-dialogue-08-omar.wav"
+      "use": "dialogue",
+      "speakers": [
+        "Lina",
+        "Omar"
+      ],
+      "script": [
+        {
+          "speaker": "Lina",
+          "line": "The survey suggests that students who attend language workshops report greater confidence."
+        },
+        {
+          "speaker": "Omar",
+          "line": "That is encouraging, but it does not establish that the workshops caused the improvement."
+        },
+        {
+          "speaker": "Lina",
+          "line": "Students who were already motivated may have been more likely to attend."
+        },
+        {
+          "speaker": "Omar",
+          "line": "Exactly. We should distinguish an association from a causal claim."
+        },
+        {
+          "speaker": "Lina",
+          "line": "Would comparing participants’ confidence before and after the workshop address that limitation?"
+        },
+        {
+          "speaker": "Omar",
+          "line": "It would help, although a comparable non-participant group would make the interpretation stronger."
+        },
+        {
+          "speaker": "Lina",
+          "line": "Then our recommendation should be a carefully evaluated pilot, rather than immediate expansion."
+        },
+        {
+          "speaker": "Omar",
+          "line": "Yes. Acknowledge the promising findings while making the uncertainty explicit."
+        }
+      ],
+      "file": "L09-T01-dialogue.wav"
     },
     {
       "level": 9,
@@ -4988,7 +4745,7 @@
       "use": "dialogue",
       "script": null,
       "status": "script pending",
-      "file": "L09-T02-dialogue-NN-speaker.wav"
+      "file": "L09-T02-dialogue.wav"
     },
     {
       "level": 9,
@@ -5041,7 +4798,7 @@
       "use": "dialogue",
       "script": null,
       "status": "script pending",
-      "file": "L09-T03-dialogue-NN-speaker.wav"
+      "file": "L09-T03-dialogue.wav"
     },
     {
       "level": 9,
@@ -5094,7 +4851,7 @@
       "use": "dialogue",
       "script": null,
       "status": "script pending",
-      "file": "L09-T04-dialogue-NN-speaker.wav"
+      "file": "L09-T04-dialogue.wav"
     },
     {
       "level": 9,
@@ -5147,7 +4904,7 @@
       "use": "dialogue",
       "script": null,
       "status": "script pending",
-      "file": "L09-T05-dialogue-NN-speaker.wav"
+      "file": "L09-T05-dialogue.wav"
     },
     {
       "level": 9,
@@ -5200,7 +4957,7 @@
       "use": "dialogue",
       "script": null,
       "status": "script pending",
-      "file": "L09-T06-dialogue-NN-speaker.wav"
+      "file": "L09-T06-dialogue.wav"
     },
     {
       "level": 9,
@@ -5253,7 +5010,7 @@
       "use": "dialogue",
       "script": null,
       "status": "script pending",
-      "file": "L09-T07-dialogue-NN-speaker.wav"
+      "file": "L09-T07-dialogue.wav"
     },
     {
       "level": 9,
@@ -5306,7 +5063,7 @@
       "use": "dialogue",
       "script": null,
       "status": "script pending",
-      "file": "L09-T08-dialogue-NN-speaker.wav"
+      "file": "L09-T08-dialogue.wav"
     },
     {
       "level": 9,
@@ -5359,7 +5116,7 @@
       "use": "dialogue",
       "script": null,
       "status": "script pending",
-      "file": "L09-T09-dialogue-NN-speaker.wav"
+      "file": "L09-T09-dialogue.wav"
     },
     {
       "level": 9,
@@ -5415,73 +5172,46 @@
       "level": 10,
       "topic": 1,
       "kind": "audio",
-      "use": "dialogue line",
-      "speaker": "Omar",
-      "script": "I recommend a phased introduction of the peer-mentoring scheme rather than a campus-wide launch.",
-      "file": "L10-T01-dialogue-01-omar.wav"
-    },
-    {
-      "level": 10,
-      "topic": 1,
-      "kind": "audio",
-      "use": "dialogue line",
-      "speaker": "Lina",
-      "script": "Which constraint has most influenced that recommendation?",
-      "file": "L10-T01-dialogue-02-lina.wav"
-    },
-    {
-      "level": 10,
-      "topic": 1,
-      "kind": "audio",
-      "use": "dialogue line",
-      "speaker": "Omar",
-      "script": "We can recruit mentors quickly, but consistent training and supervision would be harder to scale.",
-      "file": "L10-T01-dialogue-03-omar.wav"
-    },
-    {
-      "level": 10,
-      "topic": 1,
-      "kind": "audio",
-      "use": "dialogue line",
-      "speaker": "Lina",
-      "script": "How would you judge whether the initial phase had succeeded?",
-      "file": "L10-T01-dialogue-04-lina.wav"
-    },
-    {
-      "level": 10,
-      "topic": 1,
-      "kind": "audio",
-      "use": "dialogue line",
-      "speaker": "Omar",
-      "script": "I would combine participation data with confidential feedback and evidence that support needs were being addressed.",
-      "file": "L10-T01-dialogue-05-omar.wav"
-    },
-    {
-      "level": 10,
-      "topic": 1,
-      "kind": "audio",
-      "use": "dialogue line",
-      "speaker": "Lina",
-      "script": "We also need safeguards so that enthusiasm does not substitute for qualified guidance.",
-      "file": "L10-T01-dialogue-06-lina.wav"
-    },
-    {
-      "level": 10,
-      "topic": 1,
-      "kind": "audio",
-      "use": "dialogue line",
-      "speaker": "Omar",
-      "script": "Agreed. Mentors should know when to refer a student to an authorized professional.",
-      "file": "L10-T01-dialogue-07-omar.wav"
-    },
-    {
-      "level": 10,
-      "topic": 1,
-      "kind": "audio",
-      "use": "dialogue line",
-      "speaker": "Lina",
-      "script": "Then present the proposal with clear boundaries, review criteria and conditions for expansion.",
-      "file": "L10-T01-dialogue-08-lina.wav"
+      "use": "dialogue",
+      "speakers": [
+        "Lina",
+        "Omar"
+      ],
+      "script": [
+        {
+          "speaker": "Omar",
+          "line": "I recommend a phased introduction of the peer-mentoring scheme rather than a campus-wide launch."
+        },
+        {
+          "speaker": "Lina",
+          "line": "Which constraint has most influenced that recommendation?"
+        },
+        {
+          "speaker": "Omar",
+          "line": "We can recruit mentors quickly, but consistent training and supervision would be harder to scale."
+        },
+        {
+          "speaker": "Lina",
+          "line": "How would you judge whether the initial phase had succeeded?"
+        },
+        {
+          "speaker": "Omar",
+          "line": "I would combine participation data with confidential feedback and evidence that support needs were being addressed."
+        },
+        {
+          "speaker": "Lina",
+          "line": "We also need safeguards so that enthusiasm does not substitute for qualified guidance."
+        },
+        {
+          "speaker": "Omar",
+          "line": "Agreed. Mentors should know when to refer a student to an authorized professional."
+        },
+        {
+          "speaker": "Lina",
+          "line": "Then present the proposal with clear boundaries, review criteria and conditions for expansion."
+        }
+      ],
+      "file": "L10-T01-dialogue.wav"
     },
     {
       "level": 10,
@@ -5598,7 +5328,7 @@
       "use": "dialogue",
       "script": null,
       "status": "script pending",
-      "file": "L10-T02-dialogue-NN-speaker.wav"
+      "file": "L10-T02-dialogue.wav"
     },
     {
       "level": 10,
@@ -5651,7 +5381,7 @@
       "use": "dialogue",
       "script": null,
       "status": "script pending",
-      "file": "L10-T03-dialogue-NN-speaker.wav"
+      "file": "L10-T03-dialogue.wav"
     },
     {
       "level": 10,
@@ -5704,7 +5434,7 @@
       "use": "dialogue",
       "script": null,
       "status": "script pending",
-      "file": "L10-T04-dialogue-NN-speaker.wav"
+      "file": "L10-T04-dialogue.wav"
     },
     {
       "level": 10,
@@ -5757,7 +5487,7 @@
       "use": "dialogue",
       "script": null,
       "status": "script pending",
-      "file": "L10-T05-dialogue-NN-speaker.wav"
+      "file": "L10-T05-dialogue.wav"
     },
     {
       "level": 10,
@@ -5810,7 +5540,7 @@
       "use": "dialogue",
       "script": null,
       "status": "script pending",
-      "file": "L10-T06-dialogue-NN-speaker.wav"
+      "file": "L10-T06-dialogue.wav"
     },
     {
       "level": 10,
@@ -5863,7 +5593,7 @@
       "use": "dialogue",
       "script": null,
       "status": "script pending",
-      "file": "L10-T07-dialogue-NN-speaker.wav"
+      "file": "L10-T07-dialogue.wav"
     },
     {
       "level": 10,
@@ -5916,7 +5646,7 @@
       "use": "dialogue",
       "script": null,
       "status": "script pending",
-      "file": "L10-T08-dialogue-NN-speaker.wav"
+      "file": "L10-T08-dialogue.wav"
     },
     {
       "level": 10,
@@ -5969,7 +5699,7 @@
       "use": "dialogue",
       "script": null,
       "status": "script pending",
-      "file": "L10-T09-dialogue-NN-speaker.wav"
+      "file": "L10-T09-dialogue.wav"
     },
     {
       "level": 10,
@@ -6022,7 +5752,7 @@
       "use": "dialogue",
       "script": null,
       "status": "script pending",
-      "file": "L10-T10-dialogue-NN-speaker.wav"
+      "file": "L10-T10-dialogue.wav"
     },
     {
       "level": 10,

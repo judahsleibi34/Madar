@@ -151,11 +151,13 @@ def main():
             lines += [f"### Topic {n}: {topic['title']}", '']
             lesson = demo.get(number_level) if n == 1 else None
             if lesson:
-                lines += ['**Dialogue recording** (script approved for the demo lesson; record line by line):', '']
-                for index, (speaker, text) in enumerate(speaker_lines(lesson['dialogue']), 1):
-                    name = f'{prefix}-dialogue-{index:02d}-{speaker.lower()}.wav'
-                    lines.append(f'- `{name}` — **{speaker}**: "{text}"')
-                    items.append({'level': number_level, 'topic': n, 'kind': 'audio', 'use': 'dialogue line', 'speaker': speaker, 'script': text, 'file': name})
+                # One recording per dialogue: the lesson's audio block plays it as a whole.
+                name = f'{prefix}-dialogue.wav'
+                turns = speaker_lines(lesson['dialogue'])
+                lines += [f'**Dialogue recording** — `{name}`: one file, the whole conversation in this order (script approved for the demo lesson):', '']
+                lines += [f'{index}. **{speaker}**: "{text}"' for index, (speaker, text) in enumerate(turns, 1)]
+                items.append({'level': number_level, 'topic': n, 'kind': 'audio', 'use': 'dialogue', 'speakers': sorted({s for s, _ in turns}),
+                              'script': [{'speaker': s, 'line': t} for s, t in turns], 'file': name})
                 lines += ['', '**Vocabulary audio** (word, then the example sentence, one file each):', '']
                 for index, word in enumerate(lesson['vocabulary'], 1):
                     for part, script in (('word', word['word']), ('example', word['example'])):
@@ -164,8 +166,8 @@ def main():
                         items.append({'level': number_level, 'topic': n, 'kind': 'audio', 'use': f'vocabulary {part}', 'script': script, 'file': name})
                 lines.append('')
             else:
-                lines += [f'**Dialogue recording** — `{prefix}-dialogue-NN-speaker.wav`: *script to be written and approved before recording.*', '']
-                items.append({'level': number_level, 'topic': n, 'kind': 'audio', 'use': 'dialogue', 'script': None, 'status': 'script pending', 'file': f'{prefix}-dialogue-NN-speaker.wav'})
+                lines += [f'**Dialogue recording** — `{prefix}-dialogue.wav`: *script to be written and approved before recording.*', '']
+                items.append({'level': number_level, 'topic': n, 'kind': 'audio', 'use': 'dialogue', 'script': None, 'status': 'script pending', 'file': f'{prefix}-dialogue.wav'})
             prompt, correct, others = LISTEN_MATCH[(number_level, n)]
             options = [correct] + others
             order = list(range(4)); shuffle.shuffle(order)

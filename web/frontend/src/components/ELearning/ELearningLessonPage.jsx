@@ -6,6 +6,10 @@ import { useTranslation } from "react-i18next";
 import { ArrowLeft, ArrowUp, ArrowDown, BookOpen, Plus } from "lucide-react";
 import { DASHBOARD_ROUTES } from "../../config/routes";
 import { fetchContent, executeContentCommand, uploadContentMedia } from "../../services/elearningContent";
+import { fetchStructure } from "../../services/elearningStructure";
+import { LessonMediaNamingContext, mediaPrefix } from "./content/LessonMediaNaming";
+import { useLearningExperience } from "./LearningExperienceContext";
+import { uploadWithProgress } from "../../utils/uploadWithProgress";
 import { useELearningTerminology } from "../../hooks/useELearningTerminology";
 import ELearningSkeleton from "./ELearningSkeleton";
 import ELearningDialog from "./ELearningDialog";
@@ -37,6 +41,23 @@ function LessonBuilder({ courseId, lessonId }) {
   const [dialog, setDialog] = useState(null);
   const [preview, setPreview] = useState(false);
   const [notice, setNotice] = useState("");
+  // Media-list prefix (e.g. "L03-T02") from the lesson's Level and Topic position.
+  const enhanced = useLearningExperience().lessonComponents === true;
+  const [prefix, setPrefix] = useState("");
+  useEffect(() => {
+    if (!enhanced) return undefined;
+    let cancelled = false;
+    fetchStructure(courseId).then(structure => {
+      const sections = structure.sections || [];
+      const level = sections.findIndex(section => (section.lessons || []).some(lesson => lesson.id === lessonId));
+      const topic = level < 0 ? -1 : sections[level].lessons.findIndex(lesson => lesson.id === lessonId);
+      if (!cancelled) setPrefix(level < 0 ? "" : mediaPrefix(level + 1, topic + 1));
+    }).catch(() => { if (!cancelled) setPrefix(""); });
+    return () => { cancelled = true; };
+  }, [enhanced, courseId, lessonId]);
+  const uploadMedia = (file, onProgress) => onProgress
+    ? uploadWithProgress(`/elearning/courses/${encodeURIComponent(courseId)}/lessons/${encodeURIComponent(lessonId)}/content/media/upload`, file, { onProgress, fallback: source => uploadContentMedia(courseId, lessonId, source) })
+    : uploadContentMedia(courseId, lessonId, file);
   useEffect(() => {
     let cancelled = false;
     fetchContent(courseId, lessonId).then((data) => { if (!cancelled) setState({ data, loading: false, error: "" }); })
@@ -59,7 +80,7 @@ function LessonBuilder({ courseId, lessonId }) {
   function refresh() { setEditor(null); setDialog(null); setState({ data: null, loading: true, error: "" }); setReload((value) => value + 1); }
   if (loading || labelsLoading) return <ELearningSkeleton variant="lesson" label={t("elearning.content.loading")} direction={i18n.dir()} lang={i18n.language} />;
   function confirm(action, block) { setState((previous) => ({ ...previous, error: "" })); setDialog({ action, block }); }
-  return <main className="ecommerce-page elearning-management elearning-content-page" dir={i18n.dir()} lang={i18n.language}>
+  return <LessonMediaNamingContext.Provider value={prefix}><main className="ecommerce-page elearning-management elearning-content-page" dir={i18n.dir()} lang={i18n.language}>
     <header className="ecommerce-page-header app-page-intro"><div><h1>{t("elearning.structure.lessonBuilder")}</h1><p>{data?.lesson.name || t("elearning.navigation.courses")}</p></div></header>
     <nav className="elearning-content-breadcrumb" aria-label={t("elearning.content.breadcrumb")}><Link to={`${DASHBOARD_ROUTES.elearningCourses}/${courseId}`}>{labels.course || t("elearning.content.course")}</Link><span aria-hidden="true">/</span><Link to={`${DASHBOARD_ROUTES.elearningCourses}/${courseId}/structure`}>{t("elearning.courses.tabs.structure")}</Link><span aria-hidden="true">/</span><span aria-current="page">{data?.lesson.name || labels.lesson}</span></nav>
     <Link className="ecommerce-secondary-button elearning-back-link" to={`${DASHBOARD_ROUTES.elearningCourses}/${courseId}/structure`}><ArrowLeft size={16} aria-hidden="true" />{t("elearning.structure.back")}</Link>
@@ -86,11 +107,11 @@ function LessonBuilder({ courseId, lessonId }) {
     </>}
     {dialog?.action === "add" && <ELearningDialog title={t("elearning.content.add")} onClose={() => setDialog(null)} closeLabel={t("elearning.courses.close")}><div className="elearning-block-choices">{["text", "audio", "video", "assessment"].map((type) => <button className="ecommerce-secondary-button" key={type} onClick={() => { setDialog(null); setEditor({ type }); }}>{t(`elearning.content.types.${type}`)}</button>)}</div></ELearningDialog>}
     {editor?.type === "assessment" && <AssessmentBuilder courseId={courseId} lessonId={lessonId} block={editor.block} revision={data.revision} onClose={() => setEditor(null)} onSaved={refresh} />}
-    {editor && editor.type !== "assessment" && <ContentBlockEditor block={editor.block} type={editor.type} busy={busy} error={error} upload={(file) => uploadContentMedia(courseId, lessonId, file)} onClose={() => setEditor(null)} onSave={(payload) => run(editor.block ? "update" : "create", editor.block, payload)} />}
+    {editor && editor.type !== "assessment" && <ContentBlockEditor block={editor.block} type={editor.type} busy={busy} error={error} upload={uploadMedia} onClose={() => setEditor(null)} onSave={(payload) => run(editor.block ? "update" : "create", editor.block, payload)} />}
     {dialog && ["archive", "delete"].includes(dialog.action) && <ELearningDialog title={t(`elearning.content.${dialog.action}Title`)} busy={busy} onClose={() => setDialog(null)} closeLabel={t("elearning.courses.close")}>
       <p>{t(`elearning.content.${dialog.action}Help`, { name: dialog.block.title || t(`elearning.content.types.${dialog.block.type}`) })}</p>{error && <LearningErrorNotice as="p">{t(`elearning.content.${error}`)}</LearningErrorNotice>}
       <footer><button className="ecommerce-secondary-button" disabled={busy} onClick={() => setDialog(null)}>{t("elearning.courses.cancel")}</button><button className="ecommerce-primary-button" disabled={disabled} onClick={() => run(dialog.action, dialog.block, { confirmed: true })}>{t(dialog.action === "delete" ? "elearning.content.delete" : "elearning.courses.archive")}</button></footer>
     </ELearningDialog>}
     {preview && <ELearningDialog title={t("elearning.content.previewLesson", { label: labels.lesson })} onClose={() => setPreview(false)} closeLabel={t("elearning.courses.close")}><div className="elearning-lesson-preview">{active.map((block) => <ContentBlockRenderer key={block.id} block={block} context="preview" courseId={courseId} lessonId={lessonId} />)}</div></ELearningDialog>}
-  </main>;
+  </main></LessonMediaNamingContext.Provider>;
 }

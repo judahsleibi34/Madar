@@ -1849,6 +1849,27 @@
       "continue": "CONTINUE",
       "score": "{{correct}} / {{total}} Correct",
       "retry": "TRY AGAIN"
+    },
+    "mediaSlot": {
+      "pending": "Not uploaded",
+      "uploading": "Uploading",
+      "uploaded": "Uploaded",
+      "upload": "Upload",
+      "replace": "Replace",
+      "remove": "Remove",
+      "audioPlaceholder": "Waiting for the recording named above.",
+      "imagePlaceholder": "Waiting for the photo named above.",
+      "audioRules": "MP3 or WAV, up to 50 MB.",
+      "imageRules": "JPEG, PNG or WebP, up to 5 MB. Landscape, at least 1200 × 900. No text in Listen & Match photos.",
+      "error_type": "This file type is not accepted.",
+      "error_size": "This file is too large.",
+      "error_empty": "This file is empty.",
+      "error_upload": "The upload failed. Please try again.",
+      "warning_small": "This photo is smaller than 1200 × 900 and may look unclear.",
+      "promptAudio": "Listen & Match recording",
+      "photo": "Photo {{number}}",
+      "photoDescription": "Photo description (for screen readers; never shown on the picture)",
+      "dialogueAudio": "Dialogue recording"
     }
   }
 }

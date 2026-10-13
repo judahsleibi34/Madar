@@ -26,7 +26,10 @@ def get_settings(request: Request, response: Response):
         from services.academy_capability_service import capabilities, SETTINGS_CAPABILITIES
         grants = capabilities(context.tenant_id)
         settings = {key: value for key, value in settings.items() if key not in SETTINGS_CAPABILITIES or grants[SETTINGS_CAPABILITIES[key]]}
-        return {"capabilities": grants, "success": True, "settings": settings, "available": available, "referrals_available": service.settings_available(136), "academy": member_profile(context.tenant_id) if settings.get("academy_enabled") else None, "academy_management": management_profile(context.tenant_id) if available else None}
+        management = management_profile(context.tenant_id) if available else None
+        from services.elearning_academy_service import learning_experience
+        experience = learning_experience(((management or {}).get("landing_project") or {}).get("published_schema"))
+        return {"capabilities": grants, "success": True, "settings": settings, "available": available, "referrals_available": service.settings_available(136), "academy": member_profile(context.tenant_id) if settings.get("academy_enabled") else None, "academy_management": management, "experience": experience}
     except HTTPException:
         raise
     except Exception:

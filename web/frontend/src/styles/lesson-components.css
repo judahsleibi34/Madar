@@ -48,3 +48,26 @@
 .listen-match-results { display:flex; flex-wrap:wrap; align-items:center; gap:16px; padding:16px 20px; border-radius:16px; background:color-mix(in srgb,#0D9488 10%,var(--theme-surface)); }
 .listen-match-results strong { font-size:22px; }
 @media (max-width:520px) { .listen-match-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+
+/* EH / Media Slot (owner) */
+.media-slot-group { display:grid; gap:14px; }
+.media-slot { display:grid; gap:10px; padding:16px; border:1px solid var(--theme-border); border-radius:16px; background:var(--theme-surface); }
+.media-slot.is-pending { border-style:dashed; }
+.media-slot-head { display:grid; grid-template-columns:auto 1fr auto; align-items:start; gap:10px; }
+.media-slot-head > div { display:grid; gap:2px; min-width:0; }
+.media-slot-head code { font-size:13px; color:var(--theme-text-soft); overflow-wrap:anywhere; }
+.media-slot-status { display:inline-flex; align-items:center; gap:6px; padding:4px 10px; border-radius:999px; font-size:13px; font-weight:650; white-space:nowrap; }
+.media-slot-status.is-pending { background:color-mix(in srgb,#F59E0B 16%,transparent); color:#92400E; }
+.media-slot-status.is-uploading { background:color-mix(in srgb,#3B82F6 14%,transparent); color:#1D4ED8; }
+.media-slot-status.is-uploaded { background:color-mix(in srgb,#16A34A 14%,transparent); color:#15803D; }
+.media-slot-placeholder { margin:0; color:var(--theme-text-soft); }
+.media-slot-preview { width:min(100%,320px); aspect-ratio:4/3; object-fit:cover; border-radius:12px; }
+.media-slot-progress { position:relative; height:10px; border-radius:999px; background:var(--theme-border); overflow:hidden; }
+.media-slot-progress span { display:block; height:100%; background:var(--theme-primary); }
+.media-slot-progress small { position:absolute; inset-inline-end:0; top:12px; }
+.media-slot-actions { display:flex; flex-wrap:wrap; gap:10px; }
+.media-slot-actions button { display:inline-flex; align-items:center; gap:8px; min-height:44px; }
+.media-slot-help, .media-slot-file { color:var(--theme-text-soft); }
+.media-slot-error, .media-slot-warning { display:flex; align-items:center; gap:8px; margin:0; font-weight:600; }
+.media-slot-error { color:#B91C1C; } .media-slot-warning { color:#92400E; }
+[dir="rtl"] .media-slot-progress span { margin-inline-start:auto; }
