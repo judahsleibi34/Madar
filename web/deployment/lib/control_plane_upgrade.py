@@ -2733,8 +2733,8 @@ class SystemOperations:
                 witnesses['candidate_authority'] = require_candidate_authority(completed_normal_contract)
                 witnesses['provider_record_witness'] = measure_provider_record(
                     self.state_root, completed_normal_contract['provider_record_sha256'])
-                from deployment.lib.completed_normal_profile import MANUAL
-                if selected_profile is MANUAL:
+                from deployment.lib.completed_normal_profile import LEGACY
+                if selected_profile is not LEGACY:
                     origin_runtime_path=Path(completed_normal_contract['source_roles']['completion_root'])/'candidate-runtime.json'
                     origin_runtime=json.loads(protected(origin_runtime_path,private=True).read_text())
                     if (origin_runtime.get('context_sha256')!=origin_runtime_path.parent.name
@@ -2838,6 +2838,9 @@ class SystemOperations:
         if completed_normal_contract is not None:
             from deployment.lib.completed_normal_admission import validate_contract
             validate_contract(completed_normal_contract)
+            from deployment.lib.completed_normal_profile import profile, APPLICATION
+            if profile(completed_normal_contract) is APPLICATION and completed_normal_mode in {'migrate','refresh'}:
+                raise UpgradeError('application_only_migration_operation_denied')
             if (recovery or migration_repair or completed_normal_mode not in modes
                     or completed_normal_contract['candidate']['controller_sha']!=approved_sha):
                 raise UpgradeError('completed_normal_deploy_stage_invalid')

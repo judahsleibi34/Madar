@@ -7,6 +7,7 @@ from dataclasses import dataclass
 
 LEGACY_OPERATION = 'completed-normal-schema115-136-upgrade'
 MANUAL_OPERATION = 'completed-normal-schema136-144-maintenance-release'
+APPLICATION_OPERATION = 'completed-normal-schema144-application-release'
 
 
 @dataclass(frozen=True)
@@ -19,6 +20,11 @@ class UpgradeProfile:
     metadata: str
     manifest: str
     migrations: tuple[int, ...]
+    compatible_min: int | None = None
+
+    @property
+    def minimum(self):
+        return self.source if self.compatible_min is None else self.compatible_min
 
     def supports(self, schema):
         return type(schema) is int and self.source <= schema <= self.target and schema not in self.excluded
@@ -29,13 +35,16 @@ LEGACY = UpgradeProfile(LEGACY_OPERATION, 1, 115, 136, (), 'release.json',
 MANUAL = UpgradeProfile(MANUAL_OPERATION, 2, 136, 144, (142,),
     'schema-136-144-learning-bridge.json', 'migrations-137-144-learning.json',
     (137, 138, 139, 140, 141, 143, 144))
+APPLICATION = UpgradeProfile(APPLICATION_OPERATION, 3, 144, 144, (142,),
+    'schema-144-application-only.json', '', (), compatible_min=136)
 
 
 def profile(contract):
     """Reject unknown operations and version mixing before any side effect."""
     if not isinstance(contract, dict):
         raise RuntimeError('completed_normal_operation_profile_invalid')
-    selected = {LEGACY_OPERATION: LEGACY, MANUAL_OPERATION: MANUAL}.get(contract.get('operation'))
+    selected = {LEGACY_OPERATION: LEGACY, MANUAL_OPERATION: MANUAL,
+        APPLICATION_OPERATION: APPLICATION}.get(contract.get('operation'))
     if selected is None or type(contract.get('version')) is not int or contract['version'] != selected.version:
         raise RuntimeError('completed_normal_operation_profile_invalid')
     return selected
@@ -50,4 +59,6 @@ def expected_origin_grant(contract, mode):
         # This is the actually completed origin's historical range, not the
         # successor range. It must never be widened to authorize the candidate.
         value.update(compatible_min=115, compatible_max=136)
+    elif selected is APPLICATION:
+        value.update(compatible_min=136, compatible_max=144)
     return value

@@ -15,7 +15,7 @@ import tempfile
 from deployment.lib.completed_normal_admission import ADMISSIONS,OPERATION,digest,encoded,require_fresh_authorization
 from deployment.lib.emergency_routing_repair import exclusive
 from deployment.lib.provider_recovery_runtime import protected,file_digest
-from deployment.lib.completed_normal_profile import profile, MANUAL
+from deployment.lib.completed_normal_profile import profile, LEGACY, MANUAL, APPLICATION
 
 UNITS=Path('/etc/systemd/system')
 PROXY='madar-release-proxy.service'
@@ -83,13 +83,26 @@ class CompletedNormalBootInstallation:
         # A completed136 origin already has a99-compatible-normal drop-in.
         # Its ExecStartPre reset must precede the successor's gate regardless
         # of the two context hashes; lexical hash order is not ownership.
-        prefix='99z-compatible-normal-' if self.profile is MANUAL else '99-compatible-normal-'
+        prefix=('99zz-compatible-normal-' if self.profile is APPLICATION else
+            '99z-compatible-normal-' if self.profile is MANUAL else '99-compatible-normal-')
         self.proxy=self.units/(PROXY+'.d')/(prefix+digest(contract)[:12]+'.conf')
         baseline=document['boot_resources']
         compatible_origin='madar-compatible-normal-boot-'+Path(contract['source_roles']['completion_root']).name[:12]+'.service'
+        compatible_units={compatible_origin}
+        if self.profile is APPLICATION:
+            # Earlier compatible actors remain historical files. Only actors
+            # already measured and superseded by the exact origin receipt may
+            # join the currently serving origin in this resource transition.
+            original_path=Path(contract['source_roles']['completion_root'])/'boot-preimages.json'
+            path=protected(original_path,private=True)
+            if file_digest(path)!=contract['historical_files'].get(str(original_path)):
+                raise RuntimeError('completed_boot_origin_preimages_changed')
+            previous=json.loads(path.read_text())
+            compatible_units.update(name for name in previous.get('old_units',[])
+                if re.fullmatch('madar-compatible-normal-boot-[0-9a-f]{12}\\.service',name))
         if (set(baseline)!={'files','proxy_dropins','old_units','old_unit_dropins','unit_states'} or not baseline['old_units']
                 or any(not (name=='madar-emergency-routing.service' or re.fullmatch('madar-normal-local-(boot|fallback)-[0-9a-f]{12}\\.service',name)
-                    or self.profile is MANUAL and name==compatible_origin) for name in baseline['old_units'])
+                    or self.profile is not LEGACY and name in compatible_units) for name in baseline['old_units'])
                 or set(baseline['unit_states'])!={PROXY,*baseline['old_units']}):
             raise RuntimeError('completed_boot_resource_contract_invalid')
         if set(baseline['old_unit_dropins'])!=set(baseline['old_units']):raise RuntimeError('completed_boot_resource_contract_invalid')
@@ -100,7 +113,7 @@ class CompletedNormalBootInstallation:
             *(p for paths in baseline['old_unit_dropins'].values() for p in paths)}
         if set(baseline['files'])!=required or any(Path(p).parent!=DROPINS or not Path(p).name.endswith('.conf') for p in baseline['proxy_dropins']):
             raise RuntimeError('completed_boot_resource_inventory_invalid')
-        if self.profile is MANUAL and any(Path(p).name>=self.proxy.name for p in baseline['proxy_dropins']):
+        if self.profile is not LEGACY and any(Path(p).name>=self.proxy.name for p in baseline['proxy_dropins']):
             raise RuntimeError('completed_boot_proxy_gate_order_unreviewed')
         self.baseline=baseline
     def command(self,mode):
@@ -132,7 +145,7 @@ class CompletedNormalBootInstallation:
         if any((self.root/name).exists() for name in ('boot-installation.json','boot-preimages.json','boot-installation-failed.json')):
             raise RuntimeError('completed_boot_installation_already_consumed')
         legacy={p.name for kind in ('boot','fallback') for p in self.units.glob('madar-normal-local-'+kind+'-*.service')}
-        if self.profile is MANUAL:
+        if self.profile is not LEGACY:
             legacy.update(p.name for p in self.units.glob('madar-compatible-normal-boot-*.service') if p.name!=self.name)
         if (self.units/'madar-emergency-routing.service').exists():legacy.add('madar-emergency-routing.service')
         if legacy!=set(self.baseline['old_units']):raise RuntimeError('completed_boot_legacy_unit_inventory_changed')
@@ -246,3 +259,32 @@ class CompletedNormalBootInstallation:
             self.ops.command('completed_boot_rollback_reload',['systemctl','daemon-reload'])
             raise
         return self.installed()
+
+    def restore_application_preimages(self):
+        """Exact boot backout for the separately approved no-SQL operation."""
+        if self.profile is not APPLICATION:
+            raise RuntimeError('completed_boot_application_restore_operation_invalid')
+        require_fresh_authorization(self.contract)
+        self.installed()
+        paths=self.paths();replaced=self.replacements()
+        exclusive(self.root/'application-boot-restore-intent.json',encoded({
+            'operation':self.profile.operation,'context_sha256':digest(self.contract),
+            'database_restored':False}))
+        self.ops.command('application_boot_disable_successor',['systemctl','disable',self.name])
+        for path,(original,new,mode) in replaced.items():
+            if protected(path).read_bytes()!=new:raise RuntimeError('completed_boot_rollback_resource_changed')
+            atomic_resource(path,original,mode)
+        for path,body in paths.items():
+            if protected(path).read_bytes()!=body:raise RuntimeError('completed_boot_rollback_resource_changed')
+            exclusive(self.root/('retained-'+path.relative_to(self.units).as_posix().replace('/','_')),body)
+            path.unlink()
+        for name,state in self.baseline['unit_states'].items():
+            if name!=PROXY and state['enabled']=='enabled':
+                self.ops.command('application_boot_restore_origin',['systemctl','enable',name])
+        self.ops.command('application_boot_restore_reload',['systemctl','daemon-reload'])
+        for raw,value in self.baseline['files'].items():
+            if file_digest(protected(self.units/Path(raw).relative_to(UNITS)))!=value['sha256']:
+                raise RuntimeError('completed_boot_rollback_resource_changed')
+        exclusive(self.root/'application-boot-restored.json',encoded({
+            'operation':self.profile.operation,'context_sha256':digest(self.contract),
+            'database_restored':False,'historical_units_deleted':False}))

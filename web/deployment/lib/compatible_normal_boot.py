@@ -82,7 +82,7 @@ class CompatibleNormalBoot:
             version = self.runtime.json_http(url+'/health/version')
             fence = self.runtime.json_http(url+'/health/recovery')
             if (version.get('release_sha') != self.contract['candidate']['source_sha']
-                    or version.get('release_slot') != slot or version.get('schema_compatible_min') != self.profile.source
+                    or version.get('release_slot') != slot or version.get('schema_compatible_min') != self.profile.minimum
                     or version.get('schema_compatible_max') != self.profile.target
                     or tuple(version.get('schema_excluded_versions', [])) != self.profile.excluded
                     or fence != {'restricted':not normal,'business_writes_enabled':normal}):

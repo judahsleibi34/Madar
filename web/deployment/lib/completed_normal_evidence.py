@@ -9,7 +9,7 @@ from pathlib import Path
 import re
 
 from deployment.lib.provider_recovery_runtime import readonly_configuration,file_digest
-from deployment.lib.completed_normal_profile import profile, MANUAL
+from deployment.lib.completed_normal_profile import profile, MANUAL, APPLICATION
 
 CASES=frozenset({'frontend_api_origin','backend_readiness','local_schema','existing_authentication',
     'original_mfa_aal2','aal1_privilege_denied','session_cookie_policy','tenant_isolation',
@@ -27,7 +27,7 @@ def measured_record(binding):
     except (ValueError,TypeError):raise RuntimeError('completed_upgrade_evidence_invalid') from None
 
 def verify_application_evidence(actor):
-    if actor.contract.get('operation')==MANUAL.operation:
+    if profile(actor.contract) in (MANUAL,APPLICATION):
         return verify_manual_application_evidence(actor)
     document=actor.document;contract=actor.contract
     bindings=document['application_evidence']
@@ -78,7 +78,7 @@ def verify_application_evidence(actor):
             'images':contract['candidate']['images'],'historical_evidence_relabelled':False}
 
 def verify_complete_rehearsal(actor):
-    if actor.contract.get('operation')==MANUAL.operation:
+    if profile(actor.contract) in (MANUAL,APPLICATION):
         return verify_manual_controller_validation(actor)
     record=measured_record(actor.document['complete_rehearsal'])
     expected={'operation':'actual-private-completed-normal-upgrade','controller_sha':actor.contract['candidate']['controller_sha'],
@@ -105,7 +105,7 @@ def verify_manual_application_evidence(actor):
     """
     contract=actor.contract;selected=profile(contract);document=actor.document
     bindings=document['application_evidence']
-    if set(bindings)!={'144','sql','runner'}:
+    if set(bindings)!=({'144','runner'} if selected is APPLICATION else {'144','sql','runner'}):
         raise RuntimeError('completed_manual_application_evidence_inventory_invalid')
     report=measured_record(bindings['144']);cases=report.get('cases',{})
     runner=readonly_configuration(Path(bindings['runner']['path']),private=True)
@@ -119,8 +119,8 @@ def verify_manual_application_evidence(actor):
             or report.get('isolation',{}).get('interfaces')!=[[1,'lo']]
             or report.get('last_readiness',{}).get('ready') is not True):
         raise RuntimeError('completed_manual_application_acceptance_incompatible')
-    sql=measured_record(bindings['sql'])
-    if (sql.get('scope')!='private-current-backup-seven-migration-rehearsal'
+    sql={} if selected is APPLICATION else measured_record(bindings['sql'])
+    if selected is MANUAL and (sql.get('scope')!='private-current-backup-seven-migration-rehearsal'
             or sql.get('starting_schema')!=selected.source or sql.get('final_schema')!=selected.target
             or sql.get('manifest_sha256')!=contract['migration_manifest_sha256']
             or sql.get('production_modified') is not False or sql.get('invalid_indexes')!=0
@@ -158,8 +158,9 @@ def verify_manual_controller_validation(actor):
     combined private deployment is represented as PASS.
     """
     selected=profile(actor.contract)
-    if selected is not MANUAL:raise RuntimeError('completed_manual_validation_operation_invalid')
-    if (actor.document.get('validation_mode')!='component-verified-maintenance'
+    if selected not in (MANUAL,APPLICATION):raise RuntimeError('completed_manual_validation_operation_invalid')
+    expected_mode='component-verified-application-update' if selected is APPLICATION else 'component-verified-maintenance'
+    if (actor.document.get('validation_mode')!=expected_mode
             or actor.document.get('complete_upgrade_rehearsal') is not False
             or actor.document.get('real_restart_rehearsal') is not False):
         raise RuntimeError('completed_manual_validation_scope_invalid')

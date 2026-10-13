@@ -16,7 +16,7 @@ from pathlib import Path
 import re
 
 from deployment.lib.control_plane_upgrade_authorization import require_upgrade_authorization
-from deployment.lib.completed_normal_profile import profile, LEGACY, MANUAL
+from deployment.lib.completed_normal_profile import profile, LEGACY, MANUAL, APPLICATION
 
 OPERATION = "completed-normal-schema115-136-upgrade"
 ADMISSIONS = Path("/var/lib/madar-control-plane/upgrades/completed-normal-admissions")
@@ -73,7 +73,7 @@ def validate_contract(value: dict) -> None:
     valid_root = (roles['completion_root'] == str(ROOT / roles['original_plan_sha256'])
         if selected is LEGACY else origin_root.parent == ADMISSIONS
         and re.fullmatch('[0-9a-f]{64}', origin_root.name)
-        and roles['completed_compatible_upgrade'] is True and type(roles['schema']) is int and roles['schema'] == 136)
+        and roles['completed_compatible_upgrade'] is True and type(roles['schema']) is int and roles['schema'] == selected.source)
     if not valid_root:
         raise RuntimeError("completed_normal_admission_origin_invalid")
     origin, candidate, database = value["origin"], value["candidate"], value["database"]
@@ -82,7 +82,7 @@ def validate_contract(value: dict) -> None:
             or not isinstance(candidate, dict) or set(candidate) != {
                 "source_sha", "controller_sha", "controller_tree_sha256", "images", "redis_image", "slot", "compatible_min", "compatible_max"}
             or candidate["slot"] not in {"blue", "green"} or candidate["slot"] == origin["slot"]
-            or type(candidate["compatible_min"]) is not int or candidate["compatible_min"] != selected.source
+            or type(candidate["compatible_min"]) is not int or candidate["compatible_min"] != selected.minimum
             or type(candidate["compatible_max"]) is not int or candidate["compatible_max"] != selected.target
             or not isinstance(database, dict) or set(database) != {
                 "container_id", "image", "system_identifier", "schema", "spec_sha256", "network_name", "network_id", "backup_configuration_sha256"}
@@ -238,7 +238,7 @@ def require_candidate_authority(contract: dict, *, mode: str | None = None, admi
             "version", "schema", "release_sha", "contract_digest", "mode", "compatible_min", "compatible_max"}
             or type(value["version"]) is not int or value["version"] != 2
             or not selected.supports(value["schema"])
-            or type(value["compatible_min"]) is not int or value["compatible_min"] != selected.source
+            or type(value["compatible_min"]) is not int or value["compatible_min"] != selected.minimum
             or type(value["compatible_max"]) is not int or value["compatible_max"] != selected.target
             or value["release_sha"] != contract["candidate"]["source_sha"]
             or value["contract_digest"] != digest(contract)
@@ -329,7 +329,7 @@ def publish_admission(contract: dict, operations, state_root: Path, *, admission
     authority.chmod(0o755)
     exclusive(authority / "authority.json", encoded({
         "version": 2, "schema": selected.source, "release_sha": contract["candidate"]["source_sha"],
-        "contract_digest": digest(contract), "mode": "READ_ONLY", "compatible_min": selected.source, "compatible_max": selected.target,
+        "contract_digest": digest(contract), "mode": "READ_ONLY", "compatible_min": selected.minimum, "compatible_max": selected.target,
     }))
     os.chmod(authority / "authority.json", 0o644)
     return root
@@ -343,7 +343,7 @@ def require_admission(state_root: Path, application_sha: str | None, *, admissio
         raise RuntimeError("provider_recovery_requires_separate_operator_exit")
     interlock = json.loads(protected(UPGRADE_INTERLOCK).read_text())
     context = str(interlock.get("context_sha256", ""))
-    if interlock.get("operation") not in {LEGACY.operation, MANUAL.operation} or not re.fullmatch(r"[0-9a-f]{64}", context):
+    if interlock.get("operation") not in {LEGACY.operation, MANUAL.operation, APPLICATION.operation} or not re.fullmatch(r"[0-9a-f]{64}", context):
         raise RuntimeError("provider_recovery_requires_separate_operator_exit")
     receipt = credential_witness('completed_normal_admission','admission_sha256')
     contract = receipt.get("contract")

@@ -42,6 +42,36 @@ class Operations:
         return SimpleNamespace(stdout='')
 
 class CompletedBootInstallationTests(unittest.TestCase):
+    def test_application_successor_preserves_verified_older_compatible_boot_actor(self):
+        from test_completed_normal_application_release import application_contract
+        contract=application_contract();document=copy.deepcopy(self.installer.document)
+        current='madar-compatible-normal-boot-'+Path(contract['source_roles']['completion_root']).name[:12]+'.service'
+        historical='madar-compatible-normal-boot-c3c5ec68f56f.service'
+        receipt=self.path/'origin-boot-preimages.json';receipt.write_text(json.dumps({'old_units':[historical]}))
+        original_path=Path(contract['source_roles']['completion_root'])/'boot-preimages.json'
+        contract['historical_files'][str(original_path)]=hashlib.sha256(receipt.read_bytes()).hexdigest()
+        baseline=document['boot_resources']
+        for name in (current,historical):
+            p=self.units/name;p.write_text('[Unit]\nDescription=verified compatible origin\n');p.chmod(0o644)
+            baseline['old_units'].append(name);baseline['old_unit_dropins'][name]=[]
+            baseline['unit_states'][name]={'enabled':'disabled','active':'inactive'}
+            baseline['files'][str(m.UNITS/name)]={'sha256':hashlib.sha256(p.read_bytes()).hexdigest(),'uid':0,'mode':0o644}
+        old_gate=str(m.DROPINS/'99z-compatible-normal-795df6dc0143.conf')
+        p=self.proxy/Path(old_gate).name;p.write_text('[Unit]\nRequires='+current+'\n');p.chmod(0o644)
+        baseline['proxy_dropins'].append(old_gate);baseline['files'][old_gate]={'sha256':hashlib.sha256(p.read_bytes()).hexdigest(),'uid':0,'mode':0o644}
+        contract['plan_sha256']=admission.digest(document)
+        with patch.object(m,'protected',side_effect=lambda path,**kw:receipt if path==original_path else path):
+            installer=m.CompletedNormalBootInstallation(contract,document,self.installer.package,lambda:None,self.ops,
+                units=self.units,admissions=self.path/'admissions')
+            self.assertTrue(installer.proxy.name.startswith('99zz-compatible-normal-'))
+            self.ops.installation=installer;installer.root.mkdir()
+            self.ops.states.update(baseline['unit_states'])
+            originals={p:p.read_bytes() for p in self.units.rglob('*') if p.is_file()}
+            installer.install();installer.restore_application_preimages()
+            self.assertTrue(all(p.read_bytes()==body for p,body in originals.items()))
+            self.assertFalse(installer.proxy.exists())
+            self.assertTrue((installer.root/'application-boot-restored.json').exists())
+
     def test_manual_successor_gate_sorts_after_existing_completed_origin(self):
         from test_completed_normal_manual_profile import manual_contract
         contract=manual_contract();document=copy.deepcopy(self.installer.document)
