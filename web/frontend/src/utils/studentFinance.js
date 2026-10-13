@@ -11,6 +11,11 @@ export function referralView(referrals) {
   return referrals.enabled && referrals.code ? "link" : "invite";
 }
 
+/** The member's latest Affiliate application, or null. */
+export function latestAffiliate(account) {
+  return (account?.applications || []).filter(row => row.kind === "affiliate").sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0] || null;
+}
+
 /** Tuition Support progress (website document §11C/D): sales X / threshold, remaining. */
 export function tuitionProgress(wallet) {
   const threshold = Number(wallet?.threshold) || 4;

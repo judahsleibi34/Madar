@@ -1,4 +1,48 @@
 {
+  "elearning.affiliateArea.clicksPending": {
+    "en": "Click counts will appear here once click tracking is switched on.",
+    "ar": "ستظهر أعداد النقرات هنا بعد تفعيل تتبّع النقرات."
+  },
+  "elearning.affiliateArea.help_approved": {
+    "en": "Your Affiliate account is active.",
+    "ar": "حساب المسوّق بالعمولة الخاص بك مفعّل."
+  },
+  "elearning.affiliateArea.help_none": {
+    "en": "Apply to become an Affiliate to receive your own referral link.",
+    "ar": "قدّم طلبًا لتصبح مسوّقًا بالعمولة وتحصل على رابط الإحالة الخاص بك."
+  },
+  "elearning.affiliateArea.help_not_approved": {
+    "en": "Your Affiliate application was not approved. You can apply again.",
+    "ar": "لم تتم الموافقة على طلبك لتصبح مسوّقًا بالعمولة. يمكنك التقديم مرة أخرى."
+  },
+  "elearning.affiliateArea.help_submitted": {
+    "en": "Your Affiliate application is under review. Your referral link will appear here after approval.",
+    "ar": "طلبك لتصبح مسوّقًا بالعمولة قيد المراجعة. سيظهر رابط الإحالة هنا بعد الموافقة."
+  },
+  "elearning.affiliateArea.help_suspended": {
+    "en": "Your Affiliate account is suspended, so your referral link is not active. Contact EduHope through the Contact page for help.",
+    "ar": "حساب المسوّق بالعمولة الخاص بك موقوف، لذا فإن رابط الإحالة غير مفعّل. تواصل مع EduHope عبر صفحة التواصل للمساعدة."
+  },
+  "elearning.affiliateArea.help_under_review": {
+    "en": "Your Affiliate application is under review. Your referral link will appear here after approval.",
+    "ar": "طلبك لتصبح مسوّقًا بالعمولة قيد المراجعة. سيظهر رابط الإحالة هنا بعد الموافقة."
+  },
+  "elearning.affiliateArea.intro": {
+    "en": "Promote EduHope with your referral link. You do not need to purchase the course.",
+    "ar": "روّج لـ EduHope عبر رابط الإحالة الخاص بك. لا تحتاج إلى شراء الدورة."
+  },
+  "elearning.affiliateArea.noSales": {
+    "en": "No referred purchases yet.",
+    "ar": "لا توجد عمليات شراء عبر الإحالة بعد."
+  },
+  "elearning.affiliateArea.salesIntro": {
+    "en": "Only valid, verified direct course purchases count.",
+    "ar": "تُحتسب فقط عمليات الشراء المباشرة الصحيحة التي تم التحقق منها."
+  },
+  "elearning.affiliateArea.status_none": {
+    "en": "Not applied",
+    "ar": "لم يتم التقديم"
+  },
   "elearning.student.accessNone": {
     "en": "Not purchased",
     "ar": "لم يتم الشراء"

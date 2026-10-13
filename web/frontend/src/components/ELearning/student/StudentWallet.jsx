@@ -20,6 +20,29 @@ function Balances({ wallet, referrals }) {
   </div>;
 }
 
+/** EH / Transaction history table (website document §18), shared with affiliates. */
+export function WalletHistory({ referrals, withdrawals, currency }) {
+  const { t, i18n } = useTranslation("dashboard");
+  const rows = walletHistory(referrals, withdrawals);
+  const date = value => new Date(value).toLocaleDateString(i18n.language);
+  const money = (value, rowCurrency) => formatMoney(value, rowCurrency || currency, i18n.language);
+  return <section className="student-panel">
+    <h2>{t("elearning.student.transactionHistory")}</h2>
+    {rows.length ? <div className="affiliate-table-scroll"><table className="student-table">
+      <thead><tr>{["date", "type", "description", "amount", "status", "balanceAfter"].map(key => <th scope="col" key={key}>{t(`elearning.student.column_${key}`)}</th>)}</tr></thead>
+      <tbody>{rows.map(row => <tr key={row.id}>
+        <td>{date(row.date)}</td>
+        <td>{t(row.type === "reward" ? "elearning.student.referralReward" : "elearning.student.withdrawal")}</td>
+        <td>{row.type === "reward" ? t(row.simulated ? "elearning.student.rewardTestDescription" : "elearning.student.rewardDescription") : t("elearning.student.withdrawalDescription", { reference: String(row.reference).slice(0, 8) })}</td>
+        <td dir="ltr" className={row.status === "reversed" || row.status === "rejected" ? "is-void" : row.status === "pending" ? "is-pending" : row.amount < 0 ? "is-negative" : "is-positive"}>{row.amount > 0 ? "+" : ""}{money(row.amount, row.currency)}</td>
+        <td><StatusPill status={row.status === "available" ? "earned" : row.status}>{t(row.type === "reward" ? `elearning.student.reward_${row.status}` : `elearning.programmes.${row.status}`)}</StatusPill></td>
+        <td>{row.balanceAfter == null ? "—" : money(row.balanceAfter)}</td>
+      </tr>)}</tbody>
+    </table></div> : <p className="student-empty">{t("elearning.student.noTransactions")}</p>}
+    <small>{t("elearning.student.walletReadOnly")}</small>
+  </section>;
+}
+
 /** EH / Wallet (website document §18): balances and transaction history. */
 export function StudentWallet() {
   const { t, i18n } = useTranslation("dashboard");
@@ -27,26 +50,9 @@ export function StudentWallet() {
   if (data.loading) return <ELearningSkeleton label={t("elearning.loading")} direction={i18n.dir()} />;
   const wallet = data.programmes?.wallet || data.referrals?.wallet;
   if (!wallet) return <StudentPage title={t("elearning.student.wallet")}><LearningErrorNotice as="p">{t("elearning.referrals.unavailable")}</LearningErrorNotice></StudentPage>;
-  const rows = walletHistory(data.referrals, data.programmes?.withdrawals || []);
-  const date = value => new Date(value).toLocaleDateString(i18n.language);
-  const money = (value, currency) => formatMoney(value, currency || wallet.currency, i18n.language);
   return <StudentPage title={t("elearning.student.wallet")} intro={t("elearning.student.walletIntro")}>
     <Balances wallet={wallet} referrals={data.referrals} />
-    <section className="student-panel">
-      <h2>{t("elearning.student.transactionHistory")}</h2>
-      {rows.length ? <div className="affiliate-table-scroll"><table className="student-table">
-        <thead><tr>{["date", "type", "description", "amount", "status", "balanceAfter"].map(key => <th scope="col" key={key}>{t(`elearning.student.column_${key}`)}</th>)}</tr></thead>
-        <tbody>{rows.map(row => <tr key={row.id}>
-          <td>{date(row.date)}</td>
-          <td>{t(row.type === "reward" ? "elearning.student.referralReward" : "elearning.student.withdrawal")}</td>
-          <td>{row.type === "reward" ? t(row.simulated ? "elearning.student.rewardTestDescription" : "elearning.student.rewardDescription") : t("elearning.student.withdrawalDescription", { reference: String(row.reference).slice(0, 8) })}</td>
-          <td dir="ltr" className={row.status === "reversed" || row.status === "rejected" ? "is-void" : row.status === "pending" ? "is-pending" : row.amount < 0 ? "is-negative" : "is-positive"}>{row.amount > 0 ? "+" : ""}{money(row.amount, row.currency)}</td>
-          <td><StatusPill status={row.status === "available" ? "earned" : row.status}>{t(row.type === "reward" ? `elearning.student.reward_${row.status}` : `elearning.programmes.${row.status}`)}</StatusPill></td>
-          <td>{row.balanceAfter == null ? "—" : money(row.balanceAfter)}</td>
-        </tr>)}</tbody>
-      </table></div> : <p className="student-empty">{t("elearning.student.noTransactions")}</p>}
-      <small>{t("elearning.student.walletReadOnly")}</small>
-    </section>
+    <WalletHistory referrals={data.referrals} withdrawals={data.programmes?.withdrawals || []} currency={wallet.currency} />
   </StudentPage>;
 }
 
@@ -78,7 +84,7 @@ function WithdrawalForm({ wallet, settings, onDone }) {
 }
 
 /** EH / Withdraw (website document §19): below-minimum and eligible states. */
-export function StudentWithdraw() {
+export function StudentWithdraw({ walletPath = "/my-learning/wallet" }) {
   const { t, i18n } = useTranslation("dashboard");
   const data = useStudentData({ withCourse: false });
   if (data.loading) return <ELearningSkeleton label={t("elearning.loading")} direction={i18n.dir()} />;
@@ -107,7 +113,7 @@ export function StudentWithdraw() {
         <span dir="auto">{t("elearning.student.withdrawalLine", { reference: String(row.id).slice(0, 8), amount: money(row.amount) })}</span>
         <StatusPill status={row.status}>{t(`elearning.programmes.${row.status}`)}</StatusPill>
       </li>)}</ul> : <p className="student-empty">{t("elearning.student.noWithdrawals")}</p>}
-      <Link to="/my-learning/wallet">{t("elearning.student.wallet")}</Link>
+      <Link to={walletPath}>{t("elearning.student.wallet")}</Link>
     </section>
   </StudentPage>;
 }

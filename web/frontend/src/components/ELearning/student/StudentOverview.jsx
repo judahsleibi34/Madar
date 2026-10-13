@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Bell, BookOpen, ClipboardList, GraduationCap, Layers, Share2, TrendingUp, Wallet } from "lucide-react";
 import { apiFetch, getApiUrl } from "../../../utils/apiClient";
 import { courseLevels, currentLevel } from "../../../utils/studentLevels";
-import { formatMoney, pendingRewards, referralView, tuitionProgress } from "../../../utils/studentFinance";
+import { formatMoney, latestAffiliate, pendingRewards, referralView, tuitionProgress } from "../../../utils/studentFinance";
 import { academyPath } from "../AcademyNav";
 import ELearningSkeleton from "../ELearningSkeleton";
 import LearningErrorNotice from "../LearningErrorNotice";
@@ -23,6 +23,9 @@ export default function StudentOverview() {
   }, []);
   if (data.loading) return <ELearningSkeleton label={t("elearning.loading")} direction={i18n.dir()} />;
   if (data.error) return <LearningErrorNotice as="p">{t("elearning.player.loadError")} <button onClick={data.retry}>{t("elearning.retry")}</button></LearningErrorNotice>;
+  // Affiliates who did not buy the course use the affiliate dashboard (document §20).
+  const affiliate = latestAffiliate(data.programmes);
+  if (!data.enrolled && affiliate && affiliate.status !== "not_approved") return <Navigate to="/my-learning/affiliate" replace />;
   const academy = data.learning?.academy, institution = academy?.institution;
   const levels = courseLevels(data.course), level = currentLevel(levels);
   const completed = levels.filter(item => item.state === "completed").length;

@@ -94,3 +94,43 @@ it("leaves every other academy on the existing learner screens", async () => {
   expect(screen.queryByText("Become an Affiliate")).toBeNull();
   expect(screen.queryByLabelText("Your referral link")).toBeNull();
 });
+
+const affiliateReferrals = { available: true, enabled: true, code: "AFF123", reward_amount: "10", currency: "USD", history: [{ id: "r1", amount: "10", currency: "USD", status: "pending", created_at: "2026-10-01" }], balances: [], referred_count: 1 };
+const asAffiliate = (status, referrals = affiliateReferrals) => setup({ courses: [], referrals, programme: account({ applications: [{ id: "a", kind: "affiliate", status, created_at: "2026-01-01" }] }) });
+
+it("gives approved affiliates their own dashboard without course or Tuition Support", async () => {
+  asAffiliate("approved");
+  const { container } = page("/my-learning/dashboard");
+  await screen.findByText("Total Clicks");
+  const nav = container.querySelector("#learning-navigation nav").textContent;
+  for (const label of ["Referral Link", "Clicks", "Sales", "Rewards", "Wallet", "Withdraw", "Transactions", "Notifications", "Profile"]) expect(nav).toContain(label);
+  expect(nav).not.toContain("My Course");
+  expect(nav).not.toContain("Applications");
+  expect(document.body.textContent).not.toContain("Tuition Support");
+});
+
+it("shows the affiliate referral link with sharing buttons", async () => {
+  asAffiliate("approved");
+  page("/my-learning/affiliate/link");
+  expect((await screen.findByLabelText("Your referral link")).value).toContain("ref=AFF123");
+  for (const name of ["WhatsApp", "Facebook", "Email"]) expect(screen.getByRole("link", { name })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Instagram" })).toBeTruthy();
+});
+
+it("keeps the link hidden while an affiliate is under review or suspended", async () => {
+  for (const [status, label] of [["under_review", "Under Review"], ["suspended", "Suspended"]]) {
+    asAffiliate(status, { ...affiliateReferrals, code: status === "suspended" ? "AFF123" : null });
+    const { container } = page("/my-learning/affiliate/link");
+    await screen.findByText(label);
+    expect(container.querySelector("input")).toBeNull();
+    expect(container.innerHTML).not.toMatch(/[?&;]ref=/);
+    cleanup(); vi.resetAllMocks();
+  }
+});
+
+it("keeps every other academy on the existing affiliate dashboard", async () => {
+  setup({ site: { subdomain: "other", brand: "Other" }, courses: [], referrals: affiliateReferrals, programme: account({ applications: [{ id: "a", kind: "affiliate", status: "approved", created_at: "2026-01-01" }] }) });
+  const { container } = page("/my-learning/affiliate");
+  await waitFor(() => expect(container.querySelector(".affiliate-dashboard")).toBeTruthy());
+  expect(screen.queryByText("Total Clicks")).toBeNull();
+});

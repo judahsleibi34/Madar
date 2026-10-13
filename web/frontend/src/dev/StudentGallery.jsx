@@ -11,6 +11,7 @@ import StudentExams from "../components/ELearning/student/StudentExams";
 import StudentReferral from "../components/ELearning/student/StudentReferral";
 import StudentApplications from "../components/ELearning/student/StudentApplications";
 import { StudentWallet, StudentWithdraw } from "../components/ELearning/student/StudentWallet";
+import AffiliateArea from "../components/ELearning/student/AffiliateArea";
 import "../styles/admin/dashboard/elearning-player.css";
 
 const THEME = { "--theme-primary": "#002A60", "--theme-accent": "#088848", "--theme-surface": "#FFFFFF", "--theme-background": "#F6F7F4", "--theme-border": "#D9E3DF", "--theme-text": "#002A60", "--theme-text-soft": "#43576B" };
@@ -51,6 +52,14 @@ const SCREENS = [
   ["applications", "EH / Applications", "/my-learning/applications", <StudentApplications />, base],
   ["applications-eligible", "EH / Applications — eligible", "/my-learning/applications", <StudentApplications />, { ...base, programmes: programmes("20", { wallet: { ...programmes("20").wallet, verified_sales: 4, remaining_sales: 0, tuition_eligible: true } }) }],
 ];
+const affiliate = status => ({ ...base, learning: { academy, courses: [] }, enrolled: null, course: null, programmes: programmes("60", { applications: [{ id: "af", kind: "affiliate", status, created_at: "2026-08-01" }] }) });
+SCREENS.push(
+  ["affiliate", "EH / Affiliate Dashboard", "/my-learning/affiliate", <AffiliateArea />, affiliate("approved")],
+  ["affiliate-link", "EH / Affiliate — Referral Link", "/my-learning/affiliate/link", <AffiliateArea />, affiliate("approved")],
+  ["affiliate-sales", "EH / Affiliate — Sales", "/my-learning/affiliate/sales", <AffiliateArea />, affiliate("approved")],
+  ["affiliate-review", "EH / Affiliate — Under Review", "/my-learning/affiliate", <AffiliateArea />, affiliate("under_review")],
+  ["affiliate-suspended", "EH / Affiliate — Suspended", "/my-learning/affiliate", <AffiliateArea />, affiliate("suspended")],
+);
 
 export default function StudentGallery() {
   const { i18n } = useTranslation("dashboard");
@@ -63,7 +72,7 @@ export default function StudentGallery() {
       <div style={{ display: "grid", gap: 40, maxWidth: 1120, margin: "0 auto" }}>
         {SCREENS.map(([id, title, path, element, data]) => <section key={id} id={id} data-gallery-section style={{ display: "grid", gap: 14, paddingTop: 16, borderTop: "3px dashed var(--theme-border)" }}>
           <h2 style={{ margin: 0, fontSize: 14, color: "var(--theme-text-soft)" }}>{title}</h2>
-          <StudentDataContext.Provider value={data}><MemoryRouter initialEntries={[path]}><Routes><Route path="/my-learning/course/levels/:sectionId" element={element} /><Route path="*" element={element} /></Routes></MemoryRouter></StudentDataContext.Provider>
+          <StudentDataContext.Provider value={data}><MemoryRouter initialEntries={[path]}><Routes><Route path="/my-learning/course/levels/:sectionId" element={element} /><Route path="/my-learning/affiliate/*" element={element} /><Route path="*" element={element} /></Routes></MemoryRouter></StudentDataContext.Provider>
         </section>)}
       </div>
     </main>

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Award, Check, Copy, Mail, MessageCircle, Send, Share2, ShoppingCart, Wallet } from "lucide-react";
-import { formatMoney, pendingRewards, referralView, shareTargets, tuitionProgress } from "../../../utils/studentFinance";
+import { formatMoney, latestAffiliate, pendingRewards, referralView, shareTargets, tuitionProgress } from "../../../utils/studentFinance";
 import ELearningSkeleton from "../ELearningSkeleton";
 import LearningErrorNotice from "../LearningErrorNotice";
 import { academyPath } from "../AcademyNav";
@@ -26,7 +26,7 @@ export function TuitionProgress({ wallet, title, children }) {
   </section>;
 }
 
-function ReferralLink({ referrals, academy }) {
+export function ReferralLink({ referrals, academy }) {
   const { t } = useTranslation("dashboard");
   const [copied, setCopied] = useState("");
   const url = new URL(academy?.subdomain ? academyPath(academy) : "/", window.location.origin);
@@ -62,7 +62,7 @@ export default function StudentReferral() {
   const view = referralView(referrals);
   if (view === "unavailable") return <StudentPage title={t("elearning.student.myReferral")}><LearningErrorNotice as="p">{t("elearning.referrals.unavailable")}</LearningErrorNotice></StudentPage>;
   if (view === "invite") {
-    const affiliate = (programmes?.applications || []).filter(row => row.kind === "affiliate").sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0];
+    const affiliate = latestAffiliate(programmes);
     return <StudentPage title={t("elearning.student.myReferral")}>
       <section className="student-panel student-invite" data-testid="referral-invite">
         <ShoppingCart size={28} aria-hidden="true" />

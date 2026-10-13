@@ -1,7 +1,7 @@
 import { useCallback, useContext, useEffect, useRef, useState } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { Bell, Award, BadgeCheck, BookOpen, ClipboardList, CreditCard, Globe2, Home, LayoutDashboard, Library, Menu, Share2, UserRound, Wallet, X } from "lucide-react";
+import { Bell, Award, BadgeCheck, BookOpen, ClipboardList, CreditCard, Globe2, Home, LayoutDashboard, Library, Menu, MousePointerClick, Share2, ShoppingCart, UserRound, Wallet, X } from "lucide-react";
 import { getAcademyAppearance } from "../../services/academyAppearance";
 import { getPageBuilderThemeVars } from "../PageBuilder/core/PageBuilder.theme";
 import { apiFetch, getApiUrl } from "../../utils/apiClient";
@@ -60,7 +60,21 @@ export default function ELearningLearnerShell({ site: suppliedSite, children }) 
     ["/my-learning/notifications", t("sidebar.notifications"), Bell],
     ["/my-learning/account", t("elearning.student.profileSettings"), UserRound],
   ];
-  const links = studentLinks || [
+  // Website document §20: approved affiliates get their own navigation (no course, no Tuition Support).
+  const affiliateLinks = studentLinks && location.pathname.startsWith("/my-learning/affiliate") && [
+    [home, t("elearning.academy.home"), Home],
+    ["/my-learning/affiliate", t("elearning.student.navDashboard"), LayoutDashboard],
+    ["/my-learning/affiliate/link", t("elearning.affiliateArea.referralLink"), Share2],
+    ["/my-learning/affiliate/clicks", t("elearning.affiliateArea.clicks"), MousePointerClick],
+    ["/my-learning/affiliate/sales", t("elearning.affiliateArea.sales"), ShoppingCart],
+    ["/my-learning/affiliate/rewards", t("elearning.affiliateArea.rewards"), Award],
+    ["/my-learning/affiliate/wallet", t("elearning.student.wallet"), Wallet],
+    ["/my-learning/affiliate/withdraw", t("elearning.student.withdraw"), CreditCard],
+    ["/my-learning/affiliate/transactions", t("elearning.affiliateArea.transactions"), ClipboardList],
+    ["/my-learning/affiliate/notifications", t("sidebar.notifications"), Bell],
+    ["/my-learning/affiliate/profile", t("elearning.affiliateArea.profile"), UserRound],
+  ];
+  const links = affiliateLinks || studentLinks || [
     ...(site ? [[home, t("elearning.academy.home"), Home]] : []),
     ["/my-learning/dashboard", t("sidebar.dashboard"), Library],
     ["/my-learning", t("elearning.player.myLearning"), BookOpen],
@@ -96,7 +110,7 @@ export default function ELearningLearnerShell({ site: suppliedSite, children }) 
     <div className="learning-shell-layout">
       <aside ref={panelRef} tabIndex={-1} role={open ? "dialog" : undefined} aria-modal={open || undefined} aria-label={t("elearning.academy.navigation")} id="learning-navigation" className={`learning-shell-sidebar${open ? " is-open" : ""}`}>
         <button className="learning-drawer-close" onClick={closeDrawer} aria-label={t("elearning.learner.closeMenu")}><X /></button>
-        <nav aria-label={t("elearning.academy.navigation")}>{links.map(([to, label, Icon], index) => <NavLink key={`${to}:${index}`} end={to === home || to === "/my-learning"} className={({ isActive }) => isActive || (to === (studentLinks ? "/my-learning/course" : "/my-learning") && location.pathname.startsWith("/my-learning/courses/")) ? "active" : undefined} to={to}><Icon size={19} aria-hidden="true" />{label}{to === "/my-learning/notifications" && <LearnerUnreadBadge />}</NavLink>)}</nav>
+        <nav aria-label={t("elearning.academy.navigation")}>{links.map(([to, label, Icon], index) => <NavLink key={`${to}:${index}`} end={to === home || to === "/my-learning" || to === "/my-learning/affiliate"} className={({ isActive }) => isActive || (to === (studentLinks ? "/my-learning/course" : "/my-learning") && location.pathname.startsWith("/my-learning/courses/")) ? "active" : undefined} to={to}><Icon size={19} aria-hidden="true" />{label}{to.endsWith("/notifications") && <LearnerUnreadBadge />}</NavLink>)}</nav>
       </aside>
       <div className="learning-shell-content">{children}</div>
     </div>

@@ -2071,6 +2071,34 @@
       "withdrawalHistory": "Withdrawal History",
       "withdrawalLine": "Withdrawal #{{reference}} — {{amount}}",
       "noWithdrawals": "No withdrawals yet."
+    },
+    "affiliateArea": {
+      "title": "Affiliate Dashboard",
+      "intro": "Promote EduHope with your referral link. You do not need to purchase the course.",
+      "referralLink": "Referral Link",
+      "clicks": "Clicks",
+      "sales": "Sales",
+      "rewards": "Rewards",
+      "transactions": "Transactions",
+      "profile": "Profile",
+      "totalClicks": "Total Clicks",
+      "successfulSales": "Successful Sales",
+      "clicksPending": "Click counts will appear here once click tracking is switched on.",
+      "salesIntro": "Only valid, verified direct course purchases count.",
+      "noSales": "No referred purchases yet.",
+      "column_sale": "Sale",
+      "status_none": "Not applied",
+      "status_submitted": "Under Review",
+      "status_under_review": "Under Review",
+      "status_approved": "Approved",
+      "status_not_approved": "Not Approved",
+      "status_suspended": "Suspended",
+      "help_none": "Apply to become an Affiliate to receive your own referral link.",
+      "help_submitted": "Your Affiliate application is under review. Your referral link will appear here after approval.",
+      "help_under_review": "Your Affiliate application is under review. Your referral link will appear here after approval.",
+      "help_approved": "Your Affiliate account is active.",
+      "help_not_approved": "Your Affiliate application was not approved. You can apply again.",
+      "help_suspended": "Your Affiliate account is suspended, so your referral link is not active. Contact EduHope through the Contact page for help."
     }
   }
 }
