@@ -1,3 +1,4 @@
+import LearningErrorNotice from "../LearningErrorNotice";
 import { useTranslation } from "react-i18next";
 import MediaBlockRenderer from "./MediaBlockRenderer";
 import SpeakingRecorder from "./SpeakingRecorder";
@@ -45,7 +46,7 @@ export default function AssessmentQuestions({ questions, answers, onChange, disa
         setRecordingState(previous => ({...previous,[q.id]:"restored"}));
       }}>{t("elearning.assessment.useSavedRecording")}</button>}
       {recordingState[q.id] === "restored" && answers[q.id]?.recording_id && <audio controls preload="none" src={getApiUrl(`/elearning/assessment-recordings/${answers[q.id].recording_id}`)} aria-label={q.prompt} />}
-      {recordingState[q.id] && <p role={recordingState[q.id] === "error" ? "alert" : "status"}>{t(`elearning.assessment.recordingUpload.${recordingState[q.id]}`)}</p>}
+      {recordingState[q.id] && <LearningErrorNotice as="p" role={recordingState[q.id] === "error" ? "alert" : "status"}>{t(`elearning.assessment.recordingUpload.${recordingState[q.id]}`)}</LearningErrorNotice>}
     </div>}
     {q.type === "picture_listen" && <div>
       <MediaBlockRenderer kind="audio" block={{ title: q.prompt, media: q.config.media }} />

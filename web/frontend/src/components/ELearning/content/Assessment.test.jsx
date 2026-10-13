@@ -53,7 +53,7 @@ it("preserves settings across question actions, confirms deletion and reports pu
   fireEvent.click(screen.getAllByRole("button", { name: "Delete Permanently" })[0]); expect(screen.getByRole("button", { name: "Confirm" })).toBeTruthy(); expect(api.commandAssessment.mock.calls.some(call => call[3].action === "delete_question")).toBe(false);
   fireEvent.click(screen.getByRole("button", { name: "Confirm" })); await waitFor(() => expect(api.commandAssessment.mock.calls.some(call => call[3].action === "delete_question" && call[3].payload.confirmed)).toBe(true));
   api.commandAssessment.mockRejectedValue({ detail: { message: "Add at least one active question before publishing." } }); fireEvent.change(screen.getByLabelText("Status"), { target: { value: "published" } }); fireEvent.click(screen.getByRole("button", { name: "Save" }));
-  await screen.findByText("Add at least one active question before publishing."); expect(api.commandAssessment.mock.calls.at(-1)[3].payload.title).toBe("Unsaved title");
+  await screen.findByText(i18n.t("elearning.assessment.saveError", { ns: "dashboard" })); expect(document.body.textContent).not.toContain("Add at least one active question before publishing."); expect(api.commandAssessment.mock.calls.at(-1)[3].payload.title).toBe("Unsaved title");
 });
 it("returns to assessment settings and resumes a question draft without saving it", async () => {
   render(<AssessmentBuilder courseId="c" lessonId="l" revision={4} onClose={vi.fn()} onSaved={vi.fn()} />);

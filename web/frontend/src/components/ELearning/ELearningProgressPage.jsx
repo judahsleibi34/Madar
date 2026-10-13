@@ -1,3 +1,4 @@
+import LearningErrorNotice from "./LearningErrorNotice";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Search } from "lucide-react";
@@ -38,7 +39,7 @@ export default function ELearningProgressPage({ course }) {
   if (loading) return <ELearningProgressSkeleton label={t("elearning.participation.loading")} />;
   return <section className="elearning-progress-page" aria-labelledby="elearning-progress-title">
     <header><h2 id="elearning-progress-title">{t("elearning.courses.tabs.progress")}</h2><p>{t("elearning.progress.calculationHelp", { lessons: labels.plural.lesson, sections: labels.plural.section })}</p></header>
-    {error && <p role="alert" className="elearning-feedback is-error">{t(error)} <button className="ecommerce-secondary-button" onClick={retry}>{t("elearning.retry")}</button></p>}
+    {error && <LearningErrorNotice as="p" className="elearning-feedback is-error">{t(error)} <button className="ecommerce-secondary-button" onClick={retry}>{t("elearning.retry")}</button></LearningErrorNotice>}
     {data && !error && <>
       <dl className="elearning-progress-overview">{[["enrolled", data.learner_count], ["average", `${data.average_progress}%`], ["completed", data.completed_count], ["active", data.active_count], ["not_started", data.not_started_count]].map(([key, value]) => <div className="ecommerce-list-card" key={key}><dt>{t(key === "enrolled" ? "elearning.progress.enrolled" : `elearning.participation.${key}`)}</dt><dd>{value}</dd></div>)}</dl>
       {enrollments.length === 0 ? <div className="ecommerce-list-card ecommerce-empty-state"><h3>{t("elearning.participation.empty")}</h3><p>{t("elearning.participation.emptyHelp")}</p></div> : <>

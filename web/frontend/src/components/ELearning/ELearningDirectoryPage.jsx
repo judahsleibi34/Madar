@@ -1,3 +1,4 @@
+import LearningErrorNotice from "./LearningErrorNotice";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { fetchDirectorySummary } from "../../services/elearningRelationships";
@@ -67,8 +68,8 @@ export default function ELearningDirectoryPage({ kind }) {
   return <main className="ecommerce-page elearning-management" dir={i18n.dir()}>
     <header className="ecommerce-page-header app-page-intro"><div><h1>{t(`elearning.navigation.${kind}`)}</h1><p>{t(`elearning.directory.${kind}Subtitle`, { labels: labels.plural[entity] })}</p></div></header>
     <div className="elearning-course-toolbar"><button className="ecommerce-primary-button" disabled={disabled} onClick={() => setForm({})}><Plus size={18} aria-hidden="true" />{t(instructor ? "elearning.courses.add" : "elearning.courses.create", { label: labels[entity] })}</button></div>
-    {error && !archiving && !deleting && <div role="alert" className="elearning-feedback is-error">{t(`elearning.${error}`)} <button className="ecommerce-secondary-button" onClick={refresh}>{t("elearning.retry")}</button></div>}
-    {labelsError && <div role="alert" className="elearning-feedback">{t(labelsError.status === 403 ? "elearning.forbidden" : "elearning.courses.labelsUnavailable")} <button className="ecommerce-secondary-button" onClick={retry}>{t("elearning.retry")}</button></div>}
+    {error && !archiving && !deleting && <LearningErrorNotice as="div" className="elearning-feedback is-error">{t(`elearning.${error}`)} <button className="ecommerce-secondary-button" onClick={refresh}>{t("elearning.retry")}</button></LearningErrorNotice>}
+    {labelsError && <LearningErrorNotice as="div" className="elearning-feedback">{t(labelsError.status === 403 ? "elearning.forbidden" : "elearning.courses.labelsUnavailable")} <button className="ecommerce-secondary-button" onClick={retry}>{t("elearning.retry")}</button></LearningErrorNotice>}
     {!available && !error ? <p role="status" className="elearning-feedback">{t("elearning.directory.upgradeRequired")}</p> : !items.length && !error ? <section className="ecommerce-list-card ecommerce-empty-state"><Icon size={36} aria-hidden="true" /><h2>{t(`elearning.placeholders.${kind}Empty`, { labels: labels.plural[entity] })}</h2><p>{t(`elearning.directory.${kind}Help`, { label: labels[entity] })}</p></section> : <section className="ecommerce-list-card elearning-directory-list"><header className="ecommerce-list-header"><h2>{t("commerce:admin.manage", { items: labels.plural[entity] })}</h2></header>
       {items.map((item) => <article key={item.id} className="elearning-directory-card elearning-directory-row">
         <div className="ecommerce-record-icon elearning-directory-row-icon">{instructor ? <GraduationCap size={24} aria-hidden="true" /> : <Tag size={24} aria-hidden="true" />}</div>

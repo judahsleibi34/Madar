@@ -8,7 +8,7 @@ import { initializeAcademyLanding } from '../../services/elearningAcademy';
 vi.mock('../../services/elearningSettings', () => ({ fetchELearningSettings: vi.fn(), saveELearningSettings: vi.fn() }));
 vi.mock('./AcademyOwnerOverview', () => ({ default: () => null }));
 vi.mock('../../services/elearningAcademy', () => ({ initializeAcademyLanding: vi.fn() }));
-const settings = { enabled: true, academy_enabled: true, academy_registration: 'invitation_only', academy_email_domains: [], academy_hero_title: 'Preserved hero', academy_cta_label: 'Preserved CTA', academy_featured_courses: ['course-id'] };
+const settings = { enabled: true, academy_enabled: true, academy_registration: 'invitation_only', academy_email_verification_required: true, academy_email_domains: [], academy_hero_title: 'Preserved hero', academy_cta_label: 'Preserved CTA', academy_featured_courses: ['course-id'] };
 const data = { available: true, settings, academy_management: { subdomain: 'testing', landing_project: null } };
 function Destination() { const location = useLocation(); return <p>{location.pathname + location.search}</p>; }
 function mount() { return render(<MemoryRouter><Routes><Route path="/" element={<AcademyManagementHub user={{ id: 1, tenant_id: 3 }} />} /><Route path="*" element={<Destination />} /></Routes></MemoryRouter>); }
@@ -49,7 +49,7 @@ it('reports changes unpublished using the existing Builder publication compariso
 it('supports loading failures, retry and Arabic direction', async () => {
   await i18n.changeLanguage('ar'); fetchELearningSettings.mockRejectedValueOnce(new Error('private SQL'));
   const { container } = mount(); await screen.findByRole('alert'); expect(document.body.textContent).not.toContain('private SQL');
-  fireEvent.click(screen.getByRole('button')); await screen.findByRole('combobox'); expect(container.querySelector('main').getAttribute('dir')).toBe('rtl');
+  fireEvent.click(screen.getByRole('button', { name: i18n.t('elearning.retry', {ns:'dashboard'}) })); await screen.findByRole('combobox'); expect(container.querySelector('main').getAttribute('dir')).toBe('rtl');
 });
 
 it.each([[404, "The Academy project is unavailable. Open Edit Academy again to recover its binding."], [403, "You need Academy management permission and an active Builder plan to edit the Academy."], [400, "The Academy configuration is invalid. Review its settings and try again."]])("distinguishes Builder error %s from settings save failures", async (status, message) => {
@@ -60,7 +60,7 @@ it.each([[404, "The Academy project is unavailable. Open Edit Academy again to r
 it('offers direct email-domain registration and preserves domains while toggling settings', async () => {
   mount(); fireEvent.change(await screen.findByRole('combobox'), { target: { value: 'email_domain' } });
   fireEvent.change(screen.getByLabelText('Allowed email domains'), { target: { value: 'University.edu, college.edu' } });
-  fireEvent.click(screen.getByRole('switch'));
+  fireEvent.click(screen.getByRole('switch', { name: 'Academy enabled' }));
   fireEvent.change(screen.getByRole('combobox'), { target: { value: 'open' } });
   expect(screen.queryByLabelText('Allowed email domains')).toBeNull();
   fireEvent.change(screen.getByRole('combobox'), { target: { value: 'email_domain' } });
@@ -68,6 +68,16 @@ it('offers direct email-domain registration and preserves domains while toggling
   expect(screen.getByText(/without an invitation/)).toBeTruthy();
   fireEvent.click(screen.getByRole('button', { name: 'Save Changes' })); await screen.findByRole('status');
   expect(saveELearningSettings).toHaveBeenCalledWith({ ...settings, academy_enabled: false, academy_registration: 'email_domain', academy_email_domains: ['University.edu', 'college.edu'] });
+});
+
+it('can disable email verification for only this academy', async () => {
+  mount();
+  const verification = await screen.findByRole('switch', { name: 'Require email verification' });
+  expect(verification.checked).toBe(true);
+  fireEvent.click(verification);
+  fireEvent.click(screen.getByRole('button', { name: 'Save Changes' }));
+  await screen.findByRole('status');
+  expect(saveELearningSettings).toHaveBeenCalledWith({ ...settings, academy_email_verification_required: false });
 });
 
 it('shows a useful domain validation error without backend details', async () => {

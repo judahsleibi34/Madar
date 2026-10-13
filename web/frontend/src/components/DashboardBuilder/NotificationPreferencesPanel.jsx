@@ -1,3 +1,4 @@
+import LearningErrorNotice from "../ELearning/LearningErrorNotice";
 import { useCallback, useEffect, useState } from "react";
 
 import {
@@ -13,13 +14,14 @@ export default function NotificationPreferencesPanel({ copy, showNotification })
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState("");
   const [error, setError] = useState("");
+  const [saveError, setSaveError] = useState("");
 
   const load = useCallback(async () => {
     setError("");
     try {
       setPreferences(await fetchNotificationPreferences());
-    } catch (loadError) {
-      setError(loadError.message || copy.loadError);
+    } catch {
+      setError(copy.loadError);
     } finally {
       setLoading(false);
     }
@@ -35,6 +37,7 @@ export default function NotificationPreferencesPanel({ copy, showNotification })
   const update = async (preference) => {
     const key = `${preference.category}:${preference.channel}`;
     setSaving(key);
+    setSaveError("");
     try {
       const saved = await saveNotificationPreference({ ...preference, enabled: !preference.enabled });
       setPreferences((current) => current.map((item) => (
@@ -42,8 +45,9 @@ export default function NotificationPreferencesPanel({ copy, showNotification })
           ? { ...item, enabled: Boolean(saved.enabled) }
           : item
       )));
-    } catch (saveError) {
-      showNotification?.("error", saveError.message || copy.saveError);
+    } catch {
+      setSaveError(copy.saveError);
+      showNotification?.("error", copy.saveError);
     } finally {
       setSaving("");
     }
@@ -79,7 +83,8 @@ export default function NotificationPreferencesPanel({ copy, showNotification })
           ))}
         </div>
       ) : null}
-      {error ? <p className="notification-preferences-error" role="alert">{error}</p> : null}
+      {error ? <LearningErrorNotice as="p" className="notification-preferences-error">{error}</LearningErrorNotice> : null}
+      {saveError && (showNotification ? <p role="alert">{saveError}</p> : <LearningErrorNotice as="p">{saveError}</LearningErrorNotice>)}
       {!loading && !error ? (
         <div className="notification-preferences-grid">
           {groups.map((group) => (

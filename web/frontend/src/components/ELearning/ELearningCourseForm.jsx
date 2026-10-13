@@ -1,3 +1,4 @@
+import LearningErrorNotice from "./LearningErrorNotice";
 import ELearningDescriptionTextarea from "./ELearningDescriptionTextarea";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -37,7 +38,7 @@ export default function ELearningCourseForm({ course, onClose, onSaved }) {
   return <ELearningDialog className="elearning-course-editor-dialog" title={t(course ? "elearning.courses.edit" : "elearning.courses.create", { label: labels.course })} onClose={onClose} busy={busy} closeLabel={t("elearning.courses.close")}>
     <form className="elearning-course-editor" onSubmit={submit}>
       <div className="elearning-course-editor-body">
-      {error && <p className="elearning-feedback is-error" role="alert">{t(`elearning.${error}`)}</p>}
+      {error && <LearningErrorNotice className="elearning-feedback is-error" as="p">{t(`elearning.${error}`)}</LearningErrorNotice>}
       <fieldset disabled={busy} className="elearning-course-form">
         <label className="elearning-course-name-field">{t("elearning.courses.name", { label: labels.course })}<input autoFocus required maxLength={120} value={form.name} onChange={(event) => update("name", event.target.value)} /></label>
         <label>{t("elearning.courses.description", { label: labels.course })}<ELearningDescriptionTextarea maxLength={4000} value={form.description} onChange={(event) => update("description", event.target.value)} label={t("elearning.courses.description", { label: labels.course })} /></label>

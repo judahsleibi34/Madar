@@ -1,3 +1,4 @@
+import LearningErrorNotice from "./LearningErrorNotice";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { apiFetch, getApiUrl } from "../../utils/apiClient";
@@ -31,6 +32,6 @@ export default function CEFRConfiguration({ course, templates }) {
       <label>{t("elearning.programmes.section")}<select name="section_id" required><option value="">—</option>{data.structure.sections.map(section => <option key={section.id} value={section.id}>{section.name}</option>)}</select></label>
       <label>{t("elearning.certificates.template")}<select name="template_id" required><option value="">—</option>{templates.filter(row => row.status === "active").map(row => <option key={row.id} value={row.id}>{row.design.name}</option>)}</select></label>
       <label><input name="enabled" type="checkbox" defaultChecked />{t("elearning.certificates.enabled")}</label><button className="ecommerce-primary-button" disabled={busy}>{t("elearning.save")}</button>
-    </form>{error && <p role="alert">{t("elearning.programmes.cefrError")}</p>}{saved && <p role="status">{t("elearning.saved")}</p>}
+    </form>{error && <LearningErrorNotice as="p">{t("elearning.programmes.cefrError")}</LearningErrorNotice>}{saved && <p role="status">{t("elearning.saved")}</p>}
   </section>;
 }

@@ -126,7 +126,7 @@ export default function LearningFormResponses({
           {access?.capabilities?.reports && <button onClick={() => learningFormsApi(`/responses/export?${query}`,{download:'learning-form-responses.csv'}).catch(reportError)}>{label('export')}</button>}
         </div>
         {notice && <p role="status">{notice}</p>}
-        <OwnerState error={error || formsError} retry={() => setRevision(value => value+1)}/>
+        <OwnerState error={error || formsError} retry={() => { setFormsError(false); setRevision(value => value+1); }}/>
         {!(error || formsError) && <div className={view === 'table' && rows.length ? 'learning-response-detail-only' : ''}><ResponsesDataBrowser t={content} fields={fields} detailFields={detailFields} displayedResponses={responses} responses={responses} responsesLoading={loading} selectedResponse={selectedResponse} selectedOffset={page*50} setSelectedResponseId={setSelectedId} formatSavedValue={formatSubmissionAnswer} readOnly onOpenSpreadsheet={spreadsheet} renderAnswer={(field,value,row) => <SubmissionAnswer field={field} value={value} responseId={row.id} onError={reportError}/>} detailFooter={selectedResponse && <LearningSubmissionReview key={`${identity}:${selectedResponse.id}`} responseId={selectedResponse.id} onSaved={() => {setNotice(t('elearning.saved'));setRevision(value => value+1);}}/>}/></div>}
         {view !== 'list' && data?.items.length > 0 && <LearningFormSubmissionTables data={data} forms={forms} definitions={definitions} query={query} onError={reportError} selectedResponse={selectedResponse} onSelect={setSelectedId}/>}
       </section>

@@ -1,3 +1,4 @@
+import LearningErrorNotice from "./LearningErrorNotice";
 import ELearningDescriptionTextarea from "./ELearningDescriptionTextarea";
 import { useEffect, useRef, useState } from "react";
 import { CreditCard, Plus } from "lucide-react";
@@ -36,7 +37,7 @@ export default function ELearningPlansPage() {
   if (!plans && !error) return <ELearningSkeleton label={t("elearning.commerce.loading")} direction={i18n.dir()} />;
   return <main className="ecommerce-page elearning-management" dir={i18n.dir()}>
     <header className="ecommerce-page-header app-page-intro"><div><h1>{t("elearning.academy.learningPlans")}</h1><p>{t("elearning.academy.pricingHelp")}</p></div><button className="ecommerce-primary-button" onClick={createPlan}>{t("elearning.commerce.addPlan")}</button></header>
-    {error && !form && <p role="alert">{t("elearning.commerce.error")}</p>}
+    {error && !form && <LearningErrorNotice as="p">{t("elearning.commerce.error")}</LearningErrorNotice>}
     {plans?.length === 0 && !error && <section className="ecommerce-list-card ecommerce-empty-state elearning-plans-empty" aria-labelledby="learning-plans-empty-title">
       <span className="elearning-plans-empty-icon"><CreditCard size={32} aria-hidden="true" /></span>
       <h2 id="learning-plans-empty-title">{t("elearning.commerce.plansEmptyTitle")}</h2>
@@ -50,7 +51,7 @@ export default function ELearningPlansPage() {
     </article>)}</div>
     {form && <dialog ref={dialog} className="ecommerce-modal elearning-dialog elearning-plan-dialog" aria-labelledby="learning-plan-title" onCancel={event => { if (busy) event.preventDefault(); else setForm(null); }}>
       <form onSubmit={save} className="elearning-plan-form"><h2 id="learning-plan-title">{t(form.id ? "elearning.commerce.editPlan" : "elearning.commerce.addPlan")}</h2>
-        {error && <p role="alert">{t("elearning.commerce.error")}</p>}
+        {error && <LearningErrorNotice as="p">{t("elearning.commerce.error")}</LearningErrorNotice>}
         <label className="elearning-field">{t("elearning.commerce.name")}<input value={form.name} maxLength={120} required onChange={e => update("name", e.target.value)} /></label>
         <label className="elearning-field">{t("elearning.commerce.description")}<ELearningDescriptionTextarea label={t("elearning.commerce.description")} value={form.description} maxLength={4000} onChange={e => update("description", e.target.value)} /></label>
         <div className="elearning-plan-options">

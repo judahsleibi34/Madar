@@ -1,3 +1,4 @@
+import LearningErrorNotice from "./LearningErrorNotice";
 import { useCallback, useEffect, useRef, useState } from "react";
 import AcademySupportDocuments from "./AcademySupportDocuments";
 import { Link, useLocation } from "react-router-dom";
@@ -72,7 +73,7 @@ function LearnerProgrammesPage({ admin = false, initialKind = "affiliate", affil
   return <section className="ecommerce-page elearning-management" dir={i18n.dir()}>
     <header className="ecommerce-page-header app-page-intro"><h1>{affiliateOnly ? t("elearning.affiliate.application") : label("title")}</h1><p>{label(admin ? "adminHelp" : "help")}</p></header>
     <nav className="elearning-course-actions" aria-label={label("title")}>{(affiliateOnly ? [] : ["affiliate", "tuition", "exchange", "withdrawal"]).filter(key => configured(key)).map(value => <button type="button" className={kind === value ? "ecommerce-primary-button" : "ecommerce-secondary-button"} key={value} onClick={() => { setKind(value); setRequestKey(crypto.randomUUID()); setPage(0); setSelected(null); setSuccess(false); }}>{value === "tuition" ? data?.settings?.support_programme_name || label("support") : value === "exchange" ? data?.settings?.exchange_programme_name || label(value) : label(value)}</button>)}</nav>
-    {error && <p role="alert">{label(error === "disabled" ? "enableHelp" : "error")} {error === "disabled" && admin && <Link to="/e-learning/settings">{label("settings")}</Link>} <button className="ecommerce-secondary-button" onClick={load}>{t("elearning.retry")}</button></p>}
+    {error && <LearningErrorNotice as="p">{label(error === "disabled" ? "enableHelp" : "error")} {error === "disabled" && admin && <Link to="/e-learning/settings">{label("settings")}</Link>} <button className="ecommerce-secondary-button" onClick={load}>{t("elearning.retry")}</button></LearningErrorNotice>}
     {data && !["affiliate", "tuition", "exchange", "withdrawal"].some(configured) && <p role="status">{t("elearning.player.unavailable")}</p>}
     {openAffiliate && <p role="status">{label(openAffiliate.status)} · <Link to="/my-learning/affiliate">{t("elearning.affiliate.dashboard")}</Link></p>}
     {success && <p role="status">{label("saved")}</p>}

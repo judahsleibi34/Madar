@@ -36,3 +36,11 @@ it('keeps only one section expanded, including Forms, and allows closing it',()=
  fireEvent.click(screen.getByRole('button',{name:'Configuration',exact:true}));
  expect(screen.getAllByRole('button').filter(button=>button.getAttribute('aria-expanded')==='true')).toHaveLength(0);
 });
+it('makes Academy overview a direct active link without an Overview group',()=>{
+ render(<MemoryRouter initialEntries={['/e-learning/dashboard']}><OwnerNavigation/></MemoryRouter>);
+ const overview=screen.getByRole('link',{name:'Academy overview'});
+ expect(overview.getAttribute('href')).toBe('/e-learning/dashboard');
+ expect(overview.getAttribute('aria-current')).toBe('page');
+ expect(overview.closest('.admin-sidebar-subnav')).toBeNull();
+ expect(screen.queryByRole('button',{name:'Overview',exact:true})).toBeNull();
+});

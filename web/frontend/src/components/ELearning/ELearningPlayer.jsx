@@ -1,3 +1,4 @@
+import LearningErrorNotice from "./LearningErrorNotice";
 import { learningDescription } from "../../utils/elearningPresentation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, Route, Routes, useLocation, useParams } from "react-router-dom";
@@ -49,7 +50,7 @@ function useLearningRequest(load, dependencies) {
 function ErrorState({ error, retry }) {
   const { t } = useTranslation("dashboard");
   const key = error?.detail?.code || error?.code;
-  return <div className="ecommerce-list-card ecommerce-empty-state" role="alert"><p>{t(key === "elearning_lesson_locked" ? "elearning.player.lockedHelp" : error?.status === 404 ? "elearning.player.unavailable" : "elearning.player.loadError")}</p><button className="ecommerce-secondary-button" onClick={retry}>{t("elearning.retry")}</button><Link to="/my-learning">{t("elearning.player.myLearning")}</Link></div>;
+  return <LearningErrorNotice className="ecommerce-list-card ecommerce-empty-state" as="div"><p>{t(key === "elearning_lesson_locked" ? "elearning.player.lockedHelp" : error?.status === 404 ? "elearning.player.unavailable" : "elearning.player.loadError")}</p><button className="ecommerce-secondary-button" onClick={retry}>{t("elearning.retry")}</button><Link to="/my-learning">{t("elearning.player.myLearning")}</Link></LearningErrorNotice>;
 }
 
 function Progress({ value }) {

@@ -1,3 +1,4 @@
+import LearningErrorNotice from "../LearningErrorNotice";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { loadAssessment, learnerAssessment, startAssessment, submitAssessment } from "../../../services/elearningAssessments";
@@ -19,7 +20,7 @@ export default function AssessmentBlockRenderer({ block, context = "author", cou
       const value = submit ? await submitAssessment(courseId, lessonId, block.id, data.attempt.id, answers) : await startAssessment(courseId, lessonId, block.id);
       setData(value); setAnswers({});
       if (submit) await onAssessmentChange?.();
-    } catch (failure) { setError(failure.detail?.message || t("elearning.assessment.saveError")); } finally { setBusy(false); }
+    } catch { setError(t("elearning.assessment.saveError")); } finally { setBusy(false); }
   }
   const assessment = data?.assessment || block.assessment;
   if (context !== "author" && !data && !error) return <ELearningSkeleton variant="lesson" label={t("elearning.assessment.loading")} />;
@@ -28,7 +29,7 @@ export default function AssessmentBlockRenderer({ block, context = "author", cou
   return <div className="assessment-runtime" aria-busy={busy}>
     <h3>{assessment?.title}</h3><p>{attempt?.instructions ?? assessment?.instructions}</p>
     <p>{t("elearning.assessment.questionCount", { count: assessment?.question_count || data?.questions?.length || 0 })} · {practice ? t("elearning.assessment.practice") : `${t("elearning.assessment.passing")}: ${attempt?.passing_score ?? assessment?.passing_score}%`} · {t("elearning.assessment.maxAttempts")}: {assessment?.max_attempts ?? t("elearning.assessment.unlimited")}</p>
-    {error && <p role="alert">{error} <button type="button" onClick={() => { setError(""); setReload(n => n + 1); }}>{t("elearning.retry")}</button></p>}
+    {error && <LearningErrorNotice as="p">{error} <button type="button" onClick={() => { setError(""); setReload(n => n + 1); }}>{t("elearning.retry")}</button></LearningErrorNotice>}
     {context === "preview" && data && <AssessmentQuestions questions={data.questions} answers={answers} onChange={(id, value) => setAnswers(previous => ({ ...previous, [id]: value }))} />}
     {context === "learner" && data && <>
       {attempt?.status === "pending_review" && <p role="status"><strong>{t("elearning.assessment.pendingReview")}</strong></p>}

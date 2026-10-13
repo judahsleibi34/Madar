@@ -28,7 +28,9 @@ export const getLocalizedValue = (source, key, lang = "en", fallbackLang = "en")
   if (!source) return "";
   const localized = source.localized?.[key] || source[`${key}I18n`];
   if (localized && typeof localized === "object") {
-    return localized[lang] ?? localized[fallbackLang] ?? localized.en ?? localized.ar ?? source[key] ?? "";
+    // Authored base text beats another language when this language has no translation.
+    const base = typeof source[key] === "string" && source[key] ? source[key] : undefined;
+    return localized[lang] ?? localized[fallbackLang] ?? base ?? localized.en ?? localized.ar ?? "";
   }
   if (source[key] && typeof source[key] === "object") {
     return source[key][lang] ?? source[key][fallbackLang] ?? source[key].en ?? source[key].ar ?? "";

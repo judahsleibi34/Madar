@@ -29,7 +29,7 @@ def normalize_academy_email_domain(value):
 class ELearningSettings(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
-    learning_notifications_enabled: StrictBool = False
+    learning_notifications_enabled: StrictBool = True
     institution_enabled: StrictBool = False
     institution_name: str = Field(default='', max_length=160)
     institution_email_domains: list[str] = Field(default_factory=list, max_length=20)
@@ -66,6 +66,7 @@ class ELearningSettings(BaseModel):
         return self
 
     academy_registration: Literal["open", "invitation_only", "email_domain"] = "invitation_only"
+    academy_email_verification_required: StrictBool = True
     academy_email_domains: list[str] = Field(default_factory=list, max_length=20)
     academy_enabled: StrictBool = False
     academy_hero_title: str = Field(default="", max_length=160)
@@ -142,6 +143,11 @@ def get_settings(tenant_id):
     stored = rows[0]["settings"] if rows else {}
     # Preserve future keys in storage while exposing this version's typed fields.
     known = {key: value for key, value in stored.items() if key in ELearningSettings.model_fields}
+    # Older deployments cannot enqueue learning events until schema137.
+    # Missing settings default on only where the notification contract exists;
+    # an explicit tenant opt-out remains authoritative.
+    if "learning_notifications_enabled" not in known:
+        known["learning_notifications_enabled"] = settings_available(137)
     return ELearningSettings(**known).model_dump(mode="json")
 
 

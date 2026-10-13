@@ -1,3 +1,4 @@
+import LearningErrorNotice from "./LearningErrorNotice";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
@@ -20,7 +21,7 @@ export default function AffiliateDashboard({ site }) {
     return () => { active = false; };
   }, [attempt]);
   if (state.loading) return <ELearningSkeleton label={t("elearning.loading")} direction={i18n.dir()} />;
-  if (state.error) return <section role="alert"><p>{t("elearning.affiliate.unavailable")}</p><button className="ecommerce-secondary-button" onClick={() => { setState({ loading: true }); setAttempt(value => value + 1); }}>{t("elearning.retry")}</button></section>;
+  if (state.error) return <LearningErrorNotice as="section"><p>{t("elearning.affiliate.unavailable")}</p><button className="ecommerce-secondary-button" onClick={() => { setState({ loading: true }); setAttempt(value => value + 1); }}>{t("elearning.retry")}</button></LearningErrorNotice>;
   const { account, referrals } = state;
   const application = account.applications.filter(row => row.kind === "affiliate").sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0];
   const status = application?.status;
@@ -31,7 +32,7 @@ export default function AffiliateDashboard({ site }) {
       {account.settings.affiliates_enabled && <Link className="ecommerce-secondary-button" to={account.application_paths?.affiliate || "/my-learning/affiliate/application"}>{t(!status || status === "not_approved" ? "elearning.affiliate.apply" : "elearning.affiliate.application")}</Link>}
     </section>
     <ReferralInvitation referrals={referrals} academy={site} />
-    {referrals === null && <p role="alert">{t("elearning.referrals.loadError")}</p>}
+    {referrals === null && <LearningErrorNotice as="p">{t("elearning.referrals.loadError")}</LearningErrorNotice>}
     {referrals?.available && <div className="learner-account-stats">
       <section className="learner-account-panel"><h2>{t("elearning.programmes.referrals")}</h2><p>{t("elearning.referrals.counts", { referred: referrals.referred_count, earned: referrals.earned_count })}</p><Link to="/my-learning/referrals">{t("elearning.affiliate.referralLink")}</Link></section>
       <section className="learner-account-panel"><h2>{t("elearning.referrals.rewards")}</h2>{referrals.balances.map(balance => <p key={`${balance.currency}:${balance.simulated}`}>{money(balance.amount, balance.currency)} · {t(balance.simulated ? "elearning.referrals.demoBalance" : "elearning.referrals.balance")}</p>)}<Link to="/my-learning/rewards">{t("elearning.affiliate.rewardDetails")}</Link></section>

@@ -1,3 +1,4 @@
+import LearningErrorNotice from "./LearningErrorNotice";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Search } from "lucide-react";
@@ -52,7 +53,7 @@ export default function ELearningEnrollUsersDialog({ course, onClose, onSaved })
   };
   return <ELearningDialog title={t("elearning.enrollments.enroll")} closeLabel={t("elearning.courses.close")} busy={busy} onClose={onClose}><form onSubmit={submit} className="elearning-enroll-form">
     <p>{t("elearning.enrollments.selectHelp")}</p>
-    {error && <p role="alert" className="elearning-feedback is-error">{t(error === "forbidden" ? "elearning.forbidden" : `elearning.enrollments.${error}`)} <button type="button" className="ecommerce-secondary-button" disabled={busy} onClick={() => { setError(""); setLoading(true); setReload((value) => value + 1); }}>{t("elearning.retry")}</button></p>}
+    {error && <LearningErrorNotice as="p" className="elearning-feedback is-error">{t(error === "forbidden" ? "elearning.forbidden" : `elearning.enrollments.${error}`)} <button type="button" className="ecommerce-secondary-button" disabled={busy} onClick={() => { setError(""); setLoading(true); setReload((value) => value + 1); }}>{t("elearning.retry")}</button></LearningErrorNotice>}
     <label className="ecommerce-search"><Search size={18} aria-hidden="true" /><input type="search" aria-label={t("elearning.enrollments.searchUsers")} placeholder={t("elearning.enrollments.searchUsers")} maxLength={120} value={query} disabled={busy} onChange={(event) => { setQuery(event.target.value); setLoading(true); setError(""); }} /></label>
     <fieldset disabled={busy || loading} className="elearning-enroll-selection"><legend>{t("elearning.enrollments.existingUsers")}</legend>{loading ? <p role="status">{t("elearning.enrollments.loadingUsers")}</p> : users.length === 0 ? <p>{t("elearning.enrollments.noUsers")}</p> : users.map((user) => <label key={user.id}><input type="checkbox" disabled={alreadyEnrolled(user, source)} checked={selected.includes(user.id)} onChange={(event) => setSelected((current) => event.target.checked ? [...current, user.id] : current.filter((id) => id !== user.id))} /><span><strong>{user.name}</strong><small>{user.email}</small></span>{alreadyEnrolled(user, source) && <small>{t("elearning.enrollments.alreadyEnrolled")}</small>}</label>)}</fieldset>
     {hasMore && <button type="button" className="ecommerce-secondary-button" disabled={busy || loading} onClick={loadMore}>{t("elearning.courses.loadMore")}</button>}

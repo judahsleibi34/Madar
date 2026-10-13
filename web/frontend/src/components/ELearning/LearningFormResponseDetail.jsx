@@ -66,7 +66,7 @@ export default function LearningFormResponseDetail() {
   const answers = fields.filter(field => field.type !== 'file' && Object.hasOwn(data?.answers || {}, field.id));
   const files = data?.files || [];
   return <OwnerPage><OwnerHeader title={t('elearning.ui.response')} description={data?.definition.schema.title} back={{to: `/e-learning/forms/responses${location.search}`, label: label('all_responses')}} actions={data && <button className="ecommerce-secondary-button" disabled={busy} onClick={() => save(!data.read_at)}>{label(data.read_at ? 'mark_unread' : 'mark_read')}</button>}/>
-    <OwnerState error={error} retry={() => setAttempt(value => value + 1)} loading={!data && !error}/>{saved && <p role="status">{t('elearning.saved')}</p>}
+    <OwnerState error={error} retry={() => { setError(false); setAttempt(value => value + 1); }} loading={!data && !error}/>{saved && <p role="status">{t('elearning.saved')}</p>}
     {data && <div className="elearning-owner-detail elearning-submission-detail">
       {data.review && <LearningFormDecision key={`${data.id}:${data.review.revision}`} response={data} onChanged={() => setAttempt(value => value + 1)} />}
       {data.exchange && <ExchangeResponseDecision key={`${data.id}:${data.exchange.decision?.revision}`} context={data.exchange} responseId={data.id} onChanged={() => setAttempt(value => value + 1)} />}

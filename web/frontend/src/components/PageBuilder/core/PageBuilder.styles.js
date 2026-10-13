@@ -83,6 +83,9 @@ export const getBuilderElementStyle = ({
     "--builder-element-bg": ["formBlock", "button"].includes(element.type) ? "transparent" : sourceStyles.backgroundColor || "transparent",
     "--builder-element-radius": element.type === "formBlock" ? "0" : sourceStyles.borderRadius || "0",
     "--builder-element-font-size": sourceStyles.fontSize || "inherit",
+    "--builder-authored-font-size": new Set(element.textBlockFormats || []).size > 1
+      ? undefined
+      : sourceStyles.fontSize || undefined,
     "--builder-element-line-height": sourceStyles.lineHeight || "inherit",
     "--builder-element-text-align": sourceStyles.textAlign || "inherit",
     position: "relative",

@@ -1,3 +1,4 @@
+import LearningErrorNotice from "./LearningErrorNotice";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
@@ -121,7 +122,7 @@ export default function AcademyThemePage({ user }) {
   function reload() { setState({ loading: true }); setNotice(null); setAttempt(value => value + 1); }
 
   if (state.loading) return <ELearningSkeleton variant="settings" label={t("elearning.loading")} direction={i18n.dir()} lang={i18n.language} />;
-  if (state.error) return <main className="settings-page" dir={i18n.dir()}><p role="alert">{t(state.error)}</p><button onClick={reload}>{t("elearning.retry")}</button></main>;
+  if (state.error) return <main className="settings-page" dir={i18n.dir()}><LearningErrorNotice as="p">{t(state.error)}</LearningErrorNotice><button onClick={reload}>{t("elearning.retry")}</button></main>;
   const theme = { ...defaultTheme, ...draft?.theme };
   const colorsValid = [...colors, ...additionalColors].every(key => (key === "headerBackground" && !theme[key]) || isHexColor(theme[key]));
   const previewTheme = { ...theme };
@@ -139,7 +140,7 @@ export default function AcademyThemePage({ user }) {
   };
   return <main className="ecommerce-theme-page academy-theme-page" dir={i18n.dir()} lang={i18n.language}>
     <header className="ecommerce-page-header app-page-intro"><div><h1>{t("elearning.theme.designTitle")}</h1><p>{t("elearning.theme.designIntro")}</p></div></header>
-    {notice && <p className={`elearning-feedback${notice.error ? " is-error" : ""}`} role={notice.error ? "alert" : "status"}>{t(notice.key)}{notice.conflict && <button type="button" onClick={reload}>{t("elearning.theme.reload")}</button>}</p>}
+    {notice && <LearningErrorNotice as="p" className={`elearning-feedback${notice.error ? " is-error" : ""}`} role={notice.error ? "alert" : "status"}>{t(notice.key)}{notice.conflict && <button type="button" onClick={reload}>{t("elearning.theme.reload")}</button>}</LearningErrorNotice>}
     {!state.record ? <section className="ecommerce-theme-controls"><p>{t("elearning.theme.createHelp")}</p><button className="ecommerce-primary-button" disabled={busy || !state.data.available} onClick={createHome}>{t("elearning.theme.createHome")}</button></section> : <form onSubmit={save} aria-label={t("elearning.theme.title")}>
       {!state.data.available && <p role="status">{t("elearning.upgradeRequired")}</p>}
       <div className="ecommerce-theme-layout">
@@ -168,7 +169,7 @@ export default function AcademyThemePage({ user }) {
                 <label className="academy-theme-field"><span>{t("elearning.theme.radius")}</span><input type="number" min={0} max={100} required value={theme.radius} onChange={event => editTheme("radius", event.target.value === "" ? "" : Number(event.target.value))} /></label></div>
             </details>
           </section>
-          {!colorsValid && <p className="elearning-feedback is-error" role="alert">{t("elearning.theme.invalidColors")}</p>}
+          {!colorsValid && <LearningErrorNotice className="elearning-feedback is-error" as="p">{t("elearning.theme.invalidColors")}</LearningErrorNotice>}
           <footer className="ecommerce-theme-settings-footer academy-theme-footer"><button className="ecommerce-primary-button" type="submit" disabled={!dirty || !colorsValid}><Save size={16} aria-hidden="true" />{t(busy ? "elearning.saving" : "elearning.theme.saveDraft")}</button><button type="button" className="ecommerce-secondary-button" disabled={dirty || notice?.conflict || notice?.key === "elearning.theme.brandSaveError"} onClick={publish}>{t("elearning.theme.publish")}</button></footer>
           <p className="academy-theme-publish-help">{t("elearning.theme.publishHelp")}</p>
         </fieldset>

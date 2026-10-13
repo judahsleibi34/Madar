@@ -81,6 +81,36 @@ it("shows real plan prices and keeps unconfigured live payments disabled",async(
 it("catalog searches existing metadata and renders Arabic RTL",async()=>{
  await i18n.changeLanguage('ar');mount('/academy/tenant/courses');const search=await screen.findByRole('searchbox');expect(document.querySelector('.academy').dir).toBe('rtl');fireEvent.change(search,{target:{value:'missing'}});expect(screen.queryByText('English Basics')).toBeNull();fireEvent.change(search,{target:{value:'Teacher'}});expect(screen.getByText('English Basics')).toBeTruthy();fireEvent.click(screen.getByRole('button',{name:'القائمة'}));await waitFor(()=>expect(document.querySelector('.academy-header nav').className).toBe('is-open'));
 });
+it("lets guests open every published catalog course without showing a disabled availability action",async()=>{
+ const visibleCourse={...course,access_type:"paid",cta:{action:"unavailable"}};
+ fetchAcademy.mockResolvedValue({...data,courses:[visibleCourse]});
+ mount('/academy/tenant/courses');
+ expect((await screen.findByRole('link',{name:'View Course'})).getAttribute('href')).toBe('/academy/tenant/courses/free');
+ cleanup();
+ mount('/academy/tenant/courses/free');
+ expect(await screen.findByRole('heading',{name:'English Basics'})).toBeTruthy();
+ expect(screen.queryByRole('button',{name:'Not Available'})).toBeNull();
+});
+it("lets guests browse published topics while starting the course requires academy sign-in",async()=>{
+ const login='/academy/tenant/login?returnTo=%2Facademy%2Ftenant%2Fcourses%2Ffree%3Fresume%3Dstart';
+ fetchAcademy.mockResolvedValue({...data,courses:[{...course,access_type:"paid",cta:{action:"unavailable"},outline:[{name:"First level",lesson_count:1,topics:["Greetings"]}]}]});
+ mount('/academy/tenant/courses/free');
+ expect((await screen.findByRole('link',{name:'Start Course'})).getAttribute('href')).toBe(login);
+ fireEvent.click(screen.getByText('First level'));
+ expect(screen.getByRole('link',{name:'Greetings'}).getAttribute('href')).toBe(login);
+});
+it("resumes a started course after sign-in by enrolling or continuing",async()=>{
+ commerce.enrollCatalogCourse.mockResolvedValue({});
+ fetchAcademy.mockResolvedValue({...data,authenticated:true});
+ mount('/academy/tenant/courses/free?resume=start');
+ expect(await screen.findByRole('heading',{name:'Learning runtime'})).toBeTruthy();
+ expect(commerce.enrollCatalogCourse).toHaveBeenCalledWith('free');
+ cleanup();commerce.enrollCatalogCourse.mockClear();
+ fetchAcademy.mockResolvedValue({...data,authenticated:true,courses:[{...course,access_type:"paid",cta:{action:"unavailable"}}]});
+ mount('/academy/tenant/courses/free?resume=start');
+ expect(await screen.findByRole('button',{name:'Not Available'})).toBeTruthy();
+ expect(commerce.enrollCatalogCourse).not.toHaveBeenCalled();
+});
 
 it("renders published Builder pages without overriding the system catalog", async () => {
  const landing = structuredClone(data.landing);
@@ -114,6 +144,7 @@ it('allows direct domain signup without an invitation and shows verification nex
  fireEvent.change(screen.getByLabelText('Full name'), { target: { value: 'Jack' } });
  fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'jack@university.edu' } });
  fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'Safe-password-123' } });
+ fireEvent.change(screen.getByLabelText('Confirm password'), { target: { value: 'Safe-password-123' } });
  fireEvent.click(screen.getByRole('button', { name: 'Create Account' }));
  await waitFor(() => expect(registerAcademy).toHaveBeenCalledWith('tenant', expect.objectContaining({ email: 'jack@university.edu', full_name: 'Jack', return_to: '/academy/tenant/dashboard' })));
  expect(await screen.findByRole('status')).toBeTruthy();
@@ -127,6 +158,7 @@ it('explains a rejected signup domain using the server policy', async () => {
  fireEvent.change(screen.getByLabelText('Full name'), { target: { value: 'Jack' } });
  fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'jack@gmail.com' } });
  fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'Safe-password-123' } });
+ fireEvent.change(screen.getByLabelText('Confirm password'), { target: { value: 'Safe-password-123' } });
  fireEvent.click(screen.getByRole('button', { name: 'Create Account' }));
  expect((await screen.findByRole('alert')).textContent).toBe('Use an email address from a domain allowed by this Academy.');
 });
@@ -139,6 +171,7 @@ it('signs in after signup when the server does not require email verification', 
  fireEvent.change(screen.getByLabelText('Full name'), { target: { value: 'Learner' } });
  fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'learner@example.com' } });
  fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'Safe-password-123' } });
+ fireEvent.change(screen.getByLabelText('Confirm password'), { target: { value: 'Safe-password-123' } });
  fireEvent.click(screen.getByRole('button', { name: 'Create Account' }));
  await waitFor(() => expect(loginAcademy).toHaveBeenCalledWith('tenant', expect.objectContaining({ email: 'learner@example.com', return_to: '/academy/tenant/dashboard' })));
  expect(screen.queryByRole('status')).toBeNull();
@@ -162,6 +195,7 @@ it('keeps the referral code through academy navigation and attaches it only to r
  fireEvent.change(screen.getByLabelText('Full name'),{target:{value:'New Learner'}});
  fireEvent.change(screen.getByLabelText('Email'),{target:{value:'new@example.com'}});
  fireEvent.change(screen.getByLabelText('Password'),{target:{value:'strong-test-password'}});
+ fireEvent.change(screen.getByLabelText('Confirm password'),{target:{value:'strong-test-password'}});
  fireEvent.click(screen.getByRole('button',{name:'Create Account',exact:true}));
  await waitFor(()=>expect(registerAcademy).toHaveBeenCalledWith('tenant',expect.objectContaining({referral_code:code})));
  expect(loginAcademy).not.toHaveBeenCalled();
@@ -207,3 +241,38 @@ function mountHosted(){
 }
 
 function LoginLocation(){const location=useLocation();return <><h1>Hosted login</h1><p>{location.pathname+location.search}</p></>;}
+
+it('switches header signup and login immediately while keeping the tenant return path', async () => {
+ const landing=structuredClone(data.landing); landing.siteChrome={showHeader:true,showFooter:false,brand:'Academy'};
+ fetchAcademy.mockResolvedValue({...data,landing,site:{...data.site,academy_registration:'open'}});
+ mount('/academy/tenant/login?returnTo=%2Fmy-learning%2Fforms');
+ await screen.findByRole('heading',{name:'Sign in'});
+ fireEvent.click(screen.getAllByRole('link',{name:'Sign up',exact:true})[0]);
+ expect(await screen.findByRole('heading',{name:'Create Account'})).toBeTruthy();
+ expect(screen.getByLabelText('Confirm password')).toBeTruthy();
+ expect(screen.getAllByRole('link',{name:'Log in',exact:true})[0].getAttribute('href')).toContain('returnTo=%2Fmy-learning%2Fforms');
+ fireEvent.click(screen.getAllByRole('link',{name:'Log in',exact:true})[0]);
+ expect(await screen.findByRole('heading',{name:'Sign in'})).toBeTruthy();
+ expect(screen.queryByLabelText('Full name')).toBeNull();
+ expect(screen.queryByLabelText('Confirm password')).toBeNull();
+});
+it('blocks mismatched signup passwords before calling the tenant registration service', async () => {
+ fetchAcademy.mockResolvedValue({...data,site:{...data.site,academy_registration:'open'}});
+ mount('/academy/tenant/login?register=1');
+ await screen.findByRole('heading',{name:'Create Account'});
+ fireEvent.change(screen.getByLabelText('Password'),{target:{value:'strong-password-one'}});
+ fireEvent.change(screen.getByLabelText('Confirm password'),{target:{value:'strong-password-two'}});
+ fireEvent.submit(screen.getByRole('heading',{name:'Create Account'}).closest('form'));
+ expect((await screen.findByRole('alert')).textContent).toBe('Passwords do not match.');
+ expect(registerAcademy).not.toHaveBeenCalled();
+});
+
+it('explains email verification failures without displaying provider diagnostics', async () => {
+ loginAcademy.mockRejectedValue({code:'email_not_verified',message:'private provider trace'});
+ mount('/academy/tenant/login');await screen.findByRole('heading',{name:'Sign in'});
+ fireEvent.change(screen.getByLabelText('Email'),{target:{value:'pending@example.com'}});
+ fireEvent.change(screen.getByLabelText('Password'),{target:{value:'test-password'}});
+ fireEvent.click(screen.getByRole('button',{name:'Sign in',exact:true}));
+ expect((await screen.findByRole('alert')).textContent).toBe('Confirm your email, then sign in to continue your enrollment or checkout.');
+ expect(document.body.textContent).not.toContain('private provider trace');
+});

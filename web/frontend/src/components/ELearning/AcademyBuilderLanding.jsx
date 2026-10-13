@@ -1,13 +1,14 @@
+import LearningErrorNotice from "./LearningErrorNotice";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { createSiteChromeRenderers } from "../PageBuilder/core/PageBuilder.siteChrome";
+import useAcademySiteChrome from "./useAcademySiteChrome";
 import { resolveStrictPublishedPageByPath, getPublicPagePath } from "../PageBuilder/core/PageBuilder.routing";
 import { getPageBuilderThemeVars } from "../PageBuilder/core/PageBuilder.theme";
 import SiteRenderer from "../PageBuilder/core/PageBuilder.siteRenderer";
 import { createElementRenderer } from "../PageBuilder/core/PageBuilder.elementRenderer";
 import { carouselElementTypes } from "../PageBuilder/core/PageBuilder.config";
-import { ACADEMY_COMPONENT_TYPES, getAcademyNavigationDestinations } from "../PageBuilder/core/PageBuilder.academyProfile";
+import { ACADEMY_COMPONENT_TYPES } from "../PageBuilder/core/PageBuilder.academyProfile";
 import { getBuilderElementStyle } from "../PageBuilder/core/PageBuilder.styles";
 import { getElementPlacementMargins, getElementLayoutWidth, normalizeElementAlignSelf } from "../PageBuilder/core/PageBuilder.elementLayout";
 import { getLiveArtboardProfile } from "../PageBuilder/core/PageBuilder.artboard";
@@ -44,18 +45,8 @@ export default function AcademyBuilderLanding({ schema: sourceSchema, basePath =
       openExternal: url => { const target = new URL(url, window.location.origin); if (target.origin === window.location.origin) navigate(target.pathname + target.search + target.hash); else window.location.assign(target.href); },
     }),
   });
-  const renderHeaderActions = () => <>
-    {authenticated ? <Link className="academy-login-link" to={`${basePath}/dashboard`}>{t("elearning.player.myLearning")}</Link> : <>
-      <Link className="academy-login-link" to={`${basePath}/login`}>{t("elearning.learner.logIn")}</Link>
-      {["open", "email_domain"].includes(registration) && <Link className="academy-signup-link" to={`${basePath}/login?register=1`}>{t("elearning.learner.signUp")}</Link>}
-    </>}
-    <button type="button" onClick={() => i18n.changeLanguage(i18n.language.startsWith("ar") ? "en" : "ar")}>{i18n.language.startsWith("ar") ? "English" : "العربية"}</button>
-  </>;
-  const { renderSiteHeader, renderSiteFooter } = createSiteChromeRenderers({ project: schema || { pages: [] }, activePage, selected: { type: "", id: "" }, preview: true, publicRuntime: true, selectPage, setSelected: () => {}, navigateUrl: url => navigate(url), navigationDestinations: getAcademyNavigationDestinations(basePath), authenticated, renderHeaderActions,
-    renderFooterActions:()=> <button type="button" onClick={()=>i18n.changeLanguage(language === "ar" ? "en" : "ar")}>English | العربية</button>,
-    direction:i18n.dir(),chromeLabels:{menu:language === "ar" ? "فتح قائمة التنقّل" : "Open navigation menu",attribution:language === "ar" ? "مدعوم بمنصة مدار" : "Powered by Madar"},
-  });
+  const { renderSiteHeader, renderSiteFooter } = useAcademySiteChrome({ schema, basePath, authenticated, registration, activePage });
   if (!schema) return null;
-  if (!activePage) return <p role="alert">{t("elearning.academy.pageNotFound")}</p>;
-  return <div ref={containerRef} dir="ltr" className={`academy-landing-region tenant-runtime-page${schema.name === "Madar Learning" ? " madar-learning-landing" : ""}`} style={getPageBuilderThemeVars(schema.theme)}><SiteRenderer project={schema} activePage={activePage} {...profile} canvasStyle={{ direction: i18n.dir() }} availablePresentationWidth={width} renderElement={renderElement} carouselElementTypes={carouselElementTypes} filterElement={element => ACADEMY_COMPONENT_TYPES.has(element.type)} renderSiteHeader={renderSiteHeader} renderSiteFooter={renderSiteFooter} className="academy-builder-landing" getSectionProps={section => ({ "data-landing-section": section.id })} /></div>;
+  if (!activePage) return <LearningErrorNotice as="p">{t("elearning.academy.pageNotFound")}</LearningErrorNotice>;
+  return <div ref={containerRef} dir="ltr" className={`academy-landing-region tenant-runtime-page${schema.name === "Madar Learning" ? " madar-learning-landing" : ""}`} style={getPageBuilderThemeVars(schema.theme)}><SiteRenderer project={schema} activePage={activePage} {...profile} canvasStyle={{ direction: i18n.dir() }} availablePresentationWidth={width} expandToAvailableWidth renderElement={renderElement} carouselElementTypes={carouselElementTypes} filterElement={element => ACADEMY_COMPONENT_TYPES.has(element.type)} renderSiteHeader={renderSiteHeader} renderSiteFooter={renderSiteFooter} className="academy-builder-landing" getSectionProps={section => ({ "data-landing-section": section.id })} /></div>;
 }

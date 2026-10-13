@@ -1,9 +1,21 @@
+import { AcademyLearningPerformance, AcademyFinanceSummary, AcademyRecentActivity } from "./AcademyOverviewSections";
+import { Users, UserCheck, BookOpen, Award, Handshake, GraduationCap, ShoppingBag, Plus, FilePlus2, PanelsTopLeft, ChartNoAxesCombined, Gift, Settings2, Globe, Wallet, ExternalLink } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import useAcademyCapabilities from "../../hooks/useAcademyCapabilities";
 import { academyOwnerApi } from "./academyOwnerApi";
 import { OwnerHeader, OwnerPage, OwnerState } from "./OwnerUI";
+const metricIcons = {
+  total_learners: Users,
+  active_learners: UserCheck,
+  enrollments: BookOpen,
+  certificates: Award,
+  affiliates: Handshake,
+  support_eligible: GraduationCap,
+  purchases: ShoppingBag,
+};
+
 export default function AcademyOwnerOverview({
   user
 }) {
@@ -13,6 +25,30 @@ export default function AcademyOwnerOverview({
     } = useTranslation('dashboard'),
     label = k => t(`elearning.owner.${k}`),
     access = useAcademyCapabilities(user);
+  const caps = access?.capabilities || {};
+  const flags = access?.programme_flags || {};
+  const programmeSettings = section => `/e-learning/settings?tab=programmes&section=${section}`;
+  const actionGroups = [
+    ['learning', t('elearning.ui.learning_group'), [
+      [true, t('elearning.ui.create_course'), Plus, '/e-learning/courses?create=true'],
+      [caps.forms, t('elearning.forms.create'), FilePlus2, '/e-learning/forms/new'],
+      [caps.reports, t('elearning.programmes.reports'), ChartNoAxesCombined, '/e-learning/reports'],
+    ]],
+    ['website', t('elearning.ui.website_group'), [
+      [caps.contact, t('elearning.ui.edit_website'), PanelsTopLeft, '/e-learning/landing-page'],
+      [access?.academy?.subdomain, t('elearning.ui.view_academy_website'), ExternalLink, `/academy/${encodeURIComponent(access?.academy?.subdomain || '')}`, true],
+    ]],
+    ['programmes', t('elearning.settings_nav.programmes'), [
+      [caps.affiliate || caps.tuition || caps.exchange, t('elearning.ui.commerce_settings'), Settings2, programmeSettings('commerce_settings')],
+      [caps.affiliate, t('elearning.ui.affiliate_settings'), Handshake, flags.affiliate ? '/e-learning/programmes/affiliate' : programmeSettings('affiliate_settings')],
+      [caps.tuition, access?.support_programme_name || t('elearning.ui.support_settings'), GraduationCap, flags.tuition ? '/e-learning/programmes/tuition' : programmeSettings('support_settings')],
+      [caps.exchange, access?.exchange_programme_name || t('elearning.ui.exchange_settings'), Globe, flags.exchange ? '/e-learning/exchange-opportunities' : programmeSettings('exchange_settings')],
+    ]],
+    ['finance', t('elearning.programmes.finance'), [
+      [caps.rewards, t('elearning.referrals.settings'), Gift, '/e-learning/finance/rewards'],
+      [caps.withdrawal, t('elearning.ui.withdrawal_settings'), Wallet, '/e-learning/finance/withdrawals'],
+    ]],
+  ];
   const [data, setData] = useState(null),
     [error, setError] = useState(false),
     [attempt, setAttempt] = useState(0);
@@ -30,9 +66,26 @@ export default function AcademyOwnerOverview({
       active = false;
     };
   }, [attempt]);
-  return <OwnerPage><OwnerHeader title={label('overview')} description={t('elearning.ui.overview_help')} /><OwnerState error={error} retry={() => setAttempt(v => v + 1)} loading={!data && !error} />{data && <><div className="elearning-owner-metrics">{['total_learners', 'active_learners', 'enrollments', 'certificates', 'affiliates', 'support_eligible', 'purchases'].filter(k => data[k] != null).map(k => <article className="ecommerce-list-card" key={k}><h3>{label(k)}</h3><strong>{data[k]}</strong></article>)}</div><section className="elearning-owner-section"><h2>{t('elearning.ui.quick_actions')}</h2><div className="elearning-course-actions"><Link className="ecommerce-primary-button" to="/e-learning/courses?create=true">{t('elearning.ui.create_course')}</Link>{access?.capabilities.forms && <Link className="ecommerce-secondary-button" to="/e-learning/forms/new">{t('elearning.forms.create')}</Link>}{access?.capabilities.contact && <Link className="ecommerce-secondary-button" to="/e-learning/landing-page">{t('elearning.ui.edit_website')}</Link>}{access?.capabilities.reports && <Link className="ecommerce-secondary-button" to="/e-learning/reports">{t('elearning.programmes.reports')}</Link>}</div></section>{data.progress && <section className="elearning-owner-section"><h2>{t('elearning.ui.learning_summary')}</h2><p>{label('completed_courses')}: {data.progress.completed_courses}</p><label>{label('pass_rate')}: {data.progress.pass_rate}%<progress max={100} value={data.progress.pass_rate} /></label></section>}<div className="elearning-course-grid">{['revenue', 'rewards', 'wallets', 'withdrawals'].filter(k => data[k]?.length).map(k => <section className="ecommerce-list-card" key={k}><h2>{label(k)}</h2>{data[k].map((row, index) => <p key={index}>{row.currency} · {t(`elearning.programmes.${row.status}`, {
-              defaultValue: ''
-            })} · {row.amount ?? row.available}{row.pending != null && ` (${label('pending')}: ${row.pending})`}</p>)}</section>)}</div><section className="elearning-owner-section"><h2>{label('recent_activity')}</h2>{!data.recent_activity?.length && <p>{t('elearning.ui.no_activity')}</p>}<ul className="elearning-owner-activity">{data.recent_activity?.map((row, index) => <li key={index}><span>{t(`elearning.ui.events.${row.event_type}`, {
-                defaultValue: t('elearning.ui.academy_activity')
-              })}</span><time dateTime={row.created_at}>{new Date(row.created_at).toLocaleString(i18n.language)}</time></li>)}</ul></section>{data.applications?.length > 0 && <section className="elearning-owner-section"><h2>{t('elearning.owner.applications')}</h2>{data.applications.map(row => <p key={`${row.kind}:${row.status}`}>{t(`elearning.programmes.${row.kind}`)} · {t(`elearning.programmes.${row.status}`)}: {row.count}</p>)}</section>}</>}</OwnerPage>;
+  return <OwnerPage><OwnerHeader showBreadcrumb={false} title={label('overview')} description={t('elearning.ui.overview_help')} /><OwnerState error={error} retry={() => { setError(false); setAttempt(v => v + 1); }} loading={!data && !error} />{data && <><nav className="user-dashboard-quick-actions academy-overview-shortcuts" aria-label={t('elearning.ui.quick_actions')}>
+      {actionGroups.map(([key, title, items]) => {
+        const visible = items.filter(([allowed]) => allowed);
+        return visible.length > 0 && <div className="academy-overview-action-group" role="group" aria-labelledby={`academy-actions-${key}`} key={key}>
+          <h2 id={`academy-actions-${key}`}>{title}</h2>
+          <div className="academy-overview-action-links">{visible.map(([, name, Icon, path, external]) => <Link key={path} to={path} target={external ? '_blank' : undefined} rel={external ? 'noopener noreferrer' : undefined}><Icon size={18} aria-hidden="true" /><span>{name}</span></Link>)}</div>
+        </div>;
+      })}
+    </nav><section className="user-dashboard-metrics-grid" aria-label={t('elearning.ui.learning_summary')}>
+      {Object.entries(metricIcons).filter(([key]) => data[key] != null).map(([key, Icon]) => <article className="user-dashboard-metric-card" key={key}>
+        <div className="user-dashboard-metric-heading">
+          <span className="user-dashboard-metric-icon" aria-hidden="true"><Icon size={21} /></span>
+          <span className="user-dashboard-metric-label">{label(key)}</span>
+        </div>
+        <div><strong className="user-dashboard-metric-value">{Number(data[key]).toLocaleString(i18n.language)}</strong>
+          <p className="user-dashboard-metric-note">{t(`elearning.owner.metric_notes.${key}`)}</p>
+        </div>
+      </article>)}
+    </section>{data.progress && <AcademyLearningPerformance progress={data.progress} />}
+    <AcademyFinanceSummary data={data} capabilities={access?.capabilities} />
+    <AcademyRecentActivity events={data.recent_activity} canReport={Boolean(data.progress)} />
+    {data.applications?.length > 0 && <section className="elearning-owner-section"><h2>{t('elearning.owner.applications')}</h2>{data.applications.map(row => <p key={`${row.kind}:${row.status}`}>{t(`elearning.programmes.${row.kind}`)} · {t(`elearning.programmes.${row.status}`)}: {row.count}</p>)}</section>}</>}</OwnerPage>;
 }

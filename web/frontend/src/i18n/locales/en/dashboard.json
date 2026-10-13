@@ -1096,6 +1096,7 @@
       "card_certificate": "View Course",
       "card_suspended": "Access Suspended",
       "card_unavailable": "Not Available",
+      "startCourse": "Start Course",
       "viewPlans": "View Plans",
       "subscribe": "Subscribe",
       "noPlans": "No plans available yet.",
@@ -1174,13 +1175,15 @@
       "verifyEmail": "Confirm your email, then sign in to continue your enrollment or checkout.",
       "name": "Full name",
       "registrationPolicy": "Learner Registration",
+      "requireEmailVerification": "Require email verification",
+      "requireEmailVerificationHelp": "When disabled, new learner accounts can sign in immediately.",
       "invitationOnly": "Invitation only",
       "openRegistration": "Open",
       "backAdmin": "Back to Admin",
       "changePassword": "Change password",
       "emailDomainRegistration": "Email domain",
       "allowedEmailDomains": "Allowed email domains",
-      "emailDomainHelp": "Enter domains or example emails, separated by commas. jack@university.edu becomes university.edu. Only the domain is saved. Add subdomains separately; email verification is required.",
+      "emailDomainHelp": "Enter domains or example emails, separated by commas. jack@university.edu becomes university.edu. Only the domain is saved. Add subdomains separately.",
       "domainsRequired": "Add at least one allowed email domain.",
       "domainsInvalid": "Enter valid domains or example emails, such as university.edu or jack@university.edu, up to 20 entries.",
       "emailDomainDenied": "Use an email address from a domain allowed by this Academy.",
@@ -1393,7 +1396,14 @@
       "affiliate_applications_enabled": "Affiliate applications enabled",
       "tuition_applications_enabled": "Support applications enabled",
       "exchange_applications_enabled": "Exchange applications enabled",
-      "exchange_opportunities_enabled": "Require a published exchange opportunity"
+      "exchange_opportunities_enabled": "Require a published exchange opportunity",
+      "section_help": {
+        "commerce_settings": "Choose which academy programmes are available to learners.",
+        "affiliate_settings": "Manage affiliate access, applications and programme terms.",
+        "support_settings": "Set tuition support eligibility, applications and programme terms.",
+        "exchange_settings": "Manage exchange access, applications, opportunities and terms.",
+        "withdrawal_settings": "Set withdrawal availability, minimum amount and supported methods."
+      }
     },
     "owner": {
       "overview": "Academy overview",
@@ -1462,7 +1472,16 @@
       "institution_student_label": "Verified institution student label",
       "regular_student_label": "Default student label",
       "institution_domains": "Verified email domains (one per line)",
-      "access_unavailable": "Academy access unavailable."
+      "access_unavailable": "Academy access unavailable.",
+      "metric_notes": {
+        "total_learners": "All academy learners",
+        "active_learners": "Active learner accounts",
+        "enrollments": "Recorded course enrollments",
+        "certificates": "Issued learning credentials",
+        "affiliates": "Approved affiliate applications",
+        "support_eligible": "Meets Tuition Support requirements",
+        "purchases": "Verified learning purchases"
+      }
     },
     "forms": {
       "title": "Forms",
@@ -1522,6 +1541,11 @@
       "previous": "Previous",
       "sending": "Sending",
       "received": "Your response was received.",
+      "sign_in_required": "Sign in to complete this application. You can review every question first.",
+      "sign_in_to_apply": "Log in to apply",
+      "locked_eligibility": "You can review every question, but this programme is open to active learners only. Enrol in a course to apply.",
+      "locked_unavailable": "You can review every question, but this application is not open to your account.",
+      "explore_courses": "Explore courses",
       "error": "Unable to complete the request. Check the fields and refresh.",
       "invalid": "Value is outside the allowed limits.",
       "unavailable": "This form is unavailable. Sign in if required.",
@@ -1666,10 +1690,14 @@
         "learning_exam_submitted": "Exam submitted",
         "learning_exam_result": "Exam result recorded",
         "learning_certificate_issued": "Certificate issued",
-        "learning_certificate_revoked": "Certificate revoked"
+        "learning_certificate_revoked": "Certificate revoked",
+        "learning_exam_pending_review": "Assessment awaiting review"
       },
       "builder_forms_help": "Create forms and edit questions using the Madar Builder editor.",
-      "discard_form_changes": "Leave this form and discard unsaved changes?"
+      "discard_form_changes": "Leave this form and discard unsaved changes?",
+      "view_academy_website": "View academy website",
+      "error_toast_title": "Something went wrong",
+      "error_toast_help": "Please try again. If the problem continues, contact support."
     },
     "affiliate": {
       "dashboard": "Affiliate dashboard",
@@ -1725,6 +1753,56 @@
       "terms_field": "Terms acceptance field",
       "binding_help": "Choose an existing required, single-choice checkbox field. Applications require sign-in; eligibility is enforced by the server.",
       "my_submissions": "My submissions"
+    },
+    "admin_overview": {
+      "learning_title": "Academy learning performance",
+      "learning_help": "Learning totals from the academy report.",
+      "view_reports": "View learner reports",
+      "completed_enrollments": "Completed enrollments",
+      "completed_enrollments_help": "Learners who completed their enrolled course",
+      "topic_completions": "Topic completions",
+      "topic_completions_help": "Completed topics across learner enrollments",
+      "level_completions": "Level completions",
+      "level_completions_help": "Completed Levels across learner enrollments",
+      "submitted_attempts": "Submitted assessments",
+      "submitted_attempts_help": "Recorded assessment attempts across the academy",
+      "average_score": "Average reported score",
+      "average_score_help": "Average available score on submitted attempts",
+      "pass_rate": "Assessment pass rate",
+      "pass_rate_help": "Submitted attempts marked as passed",
+      "no_attempts": "No submitted assessments yet",
+      "finance_title": "Programme finances",
+      "finance_help": "Totals across academy members and programme transactions, grouped by currency.",
+      "wallets": "Learner reward balances",
+      "revenue": "Verified purchase revenue",
+      "rewards": "Referral reward totals",
+      "withdrawals": "Withdrawal requests",
+      "currency": "Currency",
+      "available": "Available balance",
+      "reserved": "Reserved balance",
+      "amount": "Amount",
+      "sales": "Sales",
+      "requests": "Requests",
+      "view_details": "View details",
+      "activity_title": "Recent academy learning events",
+      "activity_help": "Latest recorded learning events. Reports contain learner and course details.",
+      "event": "Event",
+      "recorded_at": "Recorded at"
+    },
+    "settings_nav": {
+      "help": "Manage academy preferences, learning rules and programmes.",
+      "sections": "Settings categories",
+      "general": "General",
+      "learning": "Learning",
+      "branding": "Branding",
+      "programmes": "Programmes",
+      "institution": "Institution",
+      "notifications_help": "Learning events appear in Madar notifications and use web push on subscribed browsers. Browser permission and server push configuration are required.",
+      "web_notifications": "Manage web notifications",
+      "institution_help": "Classify students by their verified institution email address.",
+      "institution_details": "Institution details",
+      "student_labels": "Student labels",
+      "institution_domain_help": "Enter one email domain per line, for example university.edu. Email verification is required."
     }
   }
 }

@@ -1,14 +1,14 @@
+import LearningErrorNotice from "../ELearning/LearningErrorNotice";
+import LearningSettingsAccordion from "../ELearning/LearningSettingsAccordion";
 import AcademyProgrammeSettings from "../ELearning/AcademyProgrammeSettings";
-import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Save, Settings2, BookOpen, ListOrdered, Award, Palette, Info, Upload, Gift } from "lucide-react";
+import { Save, Settings2, BookOpen, ListOrdered, Award, Info, Gift, Building2 } from "lucide-react";
 import { elearningTerminologyGroups } from "../../config/elearningTerminology";
-import { resolveMediaUrl } from "../../utils/media";
 import { useELearningTerminology } from "../../hooks/useELearningTerminology";
 import ELearningDescriptionTextarea from "../ELearning/ELearningDescriptionTextarea";
 import ELearningSkeleton from "../ELearning/ELearningSkeleton";
-import { fetchELearningSettings, saveELearningSettings, uploadELearningLogo } from "../../services/elearningSettings";
+import { fetchELearningSettings, saveELearningSettings } from "../../services/elearningSettings";
 import "../../styles/admin/dashboard/elearning.css";
 
 
@@ -17,10 +17,11 @@ const sections = [
   ["terminology", []],
   ["structure", [["sequential_progression", "toggle"], ["allow_locked_content", "toggle"], ["track_learner_progress", "toggle"]]],
   ["assessments", [["assessments_enabled", "toggle"], ["default_passing_score", "number"], ["certificates_enabled", "toggle"]]],
-  ["appearance", [["primary_display_name", "text", 120], ["logo_url", "url", 2048]]],
 ];
 
-const sectionIcons = { general: Settings2, terminology: BookOpen, structure: ListOrdered, assessments: Award, appearance: Palette, academy: BookOpen };
+const sectionTabs = {general:'general',terminology:'learning',structure:'learning',assessments:'learning'};
+
+const sectionIcons = { general: Settings2, terminology: BookOpen, structure: ListOrdered, assessments: Award, academy: BookOpen };
 
 function TerminologySettings({ settings, update, t }) {
   return <div className="elearning-terminology">
@@ -58,11 +59,11 @@ export default function ELearningSettingsPage({ user }) {
   const [referralsAvailable, setReferralsAvailable] = useState(false);
   const [available, setAvailable] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [uploading, setUploading] = useState(false);
-  const [uploadError, setUploadError] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
+  const [activeTab, setActiveTab] = useState(() => new URLSearchParams(window.location.search).get("tab") || "general");
+  const [requestedSection] = useState(() => new URLSearchParams(window.location.search).get("section"));
   const [reload, setReload] = useState(0);
 
   useEffect(() => {
@@ -80,26 +81,8 @@ export default function ELearningSettingsPage({ user }) {
     setSaved(false);
     setError("");
   };
-  const uploadLogo = async (event, key = "logo_url") => {
-    const file = event.target.files?.[0];
-    event.target.value = "";
-    if (!file) return;
-    setUploadError("");
-    if (!["image/png", "image/jpeg", "image/webp"].includes(file.type) || !file.size || file.size > 5 * 1024 * 1024) {
-      setUploadError("imageUploadInvalid");
-      return;
-    }
-    setUploading(true);
-    try {
-      const data = await uploadELearningLogo(file);
-      update(key, data.asset_url);
-    } catch (failure) {
-      setUploadError(failure.status === 403 ? "imageUploadForbidden" : [400, 413, 422].includes(failure.status) ? "imageUploadInvalid" : "imageUploadError");
-    } finally { setUploading(false); }
-  };
   const save = async (event) => {
     event.preventDefault();
-    if (uploading) return;
     if (!available) { setError("upgradeRequired"); return; }
     setSaving(true); setError(""); setSaved(false);
     try {
@@ -110,41 +93,41 @@ export default function ELearningSettingsPage({ user }) {
     } finally { setSaving(false); }
   };
 
-  if (loading) return <ELearningSkeleton variant="settings" label={t("elearning.loading")} lang={i18n.language} direction={i18n.dir()} />;
-  return <main className="settings-page elearning-settings" dir={i18n.dir()}>
-    <header className="settings-header app-page-intro">
-      <div><h1 id="elearning-settings-title">{t("elearning.settings")}</h1><span>{t("elearning.subtitle")}</span></div>
-    </header>
-    {error && <div role="alert" className="elearning-feedback is-error">{t(`elearning.${error}`)}{!settings && <button type="button" onClick={() => { setError(""); setLoading(true); setReload((value) => value + 1); }}>{t("elearning.retry")}</button>}</div>}
-    {!loading && settings && <form onSubmit={save} id="elearning-settings-panel" aria-labelledby="elearning-settings-title">
-      {!available && <div className="elearning-notice" role="status"><Info size={20} aria-hidden="true" /><p>{t("elearning.upgradeRequired")}</p></div>}
-      <fieldset disabled={saving || uploading} className="elearning-form">
-        {sections.map(([section, fields]) => {
+
+  const tabs=['general','learning',...(['referrals','affiliate','tuition','exchange','withdrawal'].some(key=>capabilities[key])?['programmes']:[]),'institution'];
+  const currentTab=tabs.includes(activeTab)?activeTab:'general';
+  function selectTab(event) {
+    if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;
+    event.preventDefault();
+    const direction=i18n.dir()==='rtl'?-1:1;
+    const index=tabs.indexOf(currentTab);
+    const next=event.key==='Home'?0:event.key==='End'?tabs.length-1:(index+(event.key==='ArrowRight'?direction:-direction)+tabs.length)%tabs.length;
+    setActiveTab(tabs[next]);event.currentTarget.parentElement.querySelectorAll('[role="tab"]')[next].focus();
+  }
+  function revealInvalidField(event) {
+    const input=event.target;
+    const panel=input.closest('[data-settings-tab]');
+    const closed=[];
+    for(let parent=input.parentElement;parent && parent!==event.currentTarget;parent=parent.parentElement) {
+      if(parent.tagName==='DETAILS' && !parent.open)closed.push(parent);
+    }
+    if(!panel?.hidden && !closed.length)return;
+    event.preventDefault();
+    const first=event.currentTarget.querySelector('input:invalid,select:invalid,textarea:invalid');
+    if(input!==first)return;
+    if(panel)setActiveTab(panel.dataset.settingsTab);
+    for(const section of closed)section.open=true;
+    requestAnimationFrame(()=>{if(input.isConnected){input.focus();input.reportValidity();}});
+  }
+  function renderSections(tab) {
+    return sections.filter(([section])=>sectionTabs[section]===tab).map(([section, fields]) => {
           const Icon = sectionIcons[section];
-          return <section className={`settings-card${section === "appearance" ? " elearning-branding-card" : ""}`} key={section} aria-labelledby={`elearning-${section}`}>
-          <header className="elearning-card-heading">
-            <span className="elearning-card-icon"><Icon size={20} aria-hidden="true" /></span>
-            <div><h3 id={`elearning-${section}`}>{t(section === "academy" ? "elearning.academy.settings" : section === "structure" ? "elearning.structureSettings" : `elearning.${section}`)}</h3>
-            <p>{t(section === "academy" ? "elearning.academy.settingsHelp" : `elearning.${section}Help`)}</p></div>
-          </header>
+          const title=t(section === "structure" ? "elearning.structureSettings" : `elearning.${section}`);
+          const description=t(`elearning.${section}Help`);
+          const content=
           <div className="settings-form-grid">
             {section === "terminology" && <TerminologySettings settings={settings} update={update} t={t} />}
-            {fields.map(([key, type, maxLength]) => ["logo_url", "academy_hero_image"].includes(key) ? <div key={key} className="elearning-logo-field settings-wide-field">
-              <label htmlFor={`elearning-${key}-url`}><span>{t(`elearning.fields.${key}`)}</span>
-                <input id={`elearning-${key}-url`} type="text" value={settings[key]} maxLength={maxLength}
-                  onChange={(event) => update(key, event.target.value)} />
-              </label>
-              <div className="elearning-logo-upload">
-                {settings[key] && <img className="elearning-logo-preview" src={resolveMediaUrl(settings[key])} alt={t("elearning.logoPreview")} />}
-                <div><label className="elearning-upload-button" htmlFor={`elearning-${key}-file`}><Upload size={16} aria-hidden="true" /><span>{t("elearning.uploadImage")}</span></label>
-                  <input id={`elearning-${key}-file`} className="elearning-file-input" type="file" accept="image/png,image/jpeg,image/webp"
-                    aria-label={t("elearning.uploadImage")} aria-describedby="elearning-upload-help" disabled={saving || uploading || !available} onChange={event => uploadLogo(event, key)} />
-                </div>
-              </div>
-              <small id="elearning-upload-help">{t("elearning.imageUploadHelp")}</small>
-              {uploading && <p role="status">{t("elearning.uploadingImage")}</p>}
-              {uploadError && <p role="alert" className="elearning-feedback is-error">{t(`elearning.${uploadError}`)}</p>}
-            </div> : <label key={key} className={type === "toggle" ? "elearning-toggle" : `elearning-field${section !== "terminology" ? " settings-wide-field" : ""}`}>
+            {fields.map(([key, type, maxLength]) => <label key={key} className={type === "toggle" ? "elearning-toggle" : `elearning-field${section !== "terminology" ? " settings-wide-field" : ""}`}>
               <span className="elearning-field-copy"><span>{t(`elearning.fields.${key}`)}</span>
                 {type === "toggle" && <small id={`elearning-help-${key}`}>{t(`elearning.hints.${key}`)}</small>}
               </span>
@@ -159,9 +142,33 @@ export default function ELearningSettingsPage({ user }) {
                   maxLength={maxLength} onChange={(event) => update(key, type === "toggle" ? event.target.checked : type === "number" ? (event.target.value === "" ? "" : Number(event.target.value)) : event.target.value)} />}
             </label>)}
           </div>
-        </section>; })}
-        {capabilities.referrals && <section className="settings-card" aria-labelledby="elearning-referrals">
-          <header className="elearning-card-heading"><span className="elearning-card-icon"><Gift size={20} aria-hidden="true" /></span><div><h3 id="elearning-referrals">{t("elearning.referrals.settings")}</h3><p>{t("elearning.referrals.settingsHelp")}</p></div></header>
+        ;
+          return tab==='learning' ? <LearningSettingsAccordion key={section} title={title} description={description} icon={Icon} group="elearning-learning-settings" defaultOpen={section==='terminology'}>{content}</LearningSettingsAccordion>
+            : <section className="settings-card" key={section} aria-labelledby={`elearning-${section}`}>
+              <header className="elearning-card-heading"><span className="elearning-card-icon"><Icon size={20} aria-hidden="true" /></span><div><h3 id={`elearning-${section}`}>{title}</h3><p>{description}</p></div></header>{content}
+            </section>;
+        });
+
+  }
+
+  if (loading) return <ELearningSkeleton variant="settings" label={t("elearning.loading")} lang={i18n.language} direction={i18n.dir()} />;
+  return <main className="settings-page elearning-settings" dir={i18n.dir()}>
+    <header className="settings-header app-page-intro">
+      <div><h1 id="elearning-settings-title">{t("elearning.settings")}</h1><span>{t("elearning.settings_nav.help")}</span></div>
+      {settings && <div className="elearning-settings-header-actions"><button className="settings-save-button" type="submit" form="elearning-settings-panel" disabled={saving || !available}><Save size={16} aria-hidden="true" />{t(saving ? "elearning.saving" : "elearning.save")}</button></div>}
+    </header>
+    {error && <LearningErrorNotice as="div" className="elearning-feedback is-error">{t(`elearning.${error}`)}{!settings && <button type="button" onClick={() => { setError(""); setLoading(true); setReload((value) => value + 1); }}>{t("elearning.retry")}</button>}</LearningErrorNotice>}
+    {!loading && settings && <form onSubmit={save} onInvalidCapture={revealInvalidField} id="elearning-settings-panel" aria-labelledby="elearning-settings-title">
+      {!available && <div className="elearning-notice" role="status"><Info size={20} aria-hidden="true" /><p>{t("elearning.upgradeRequired")}</p></div>}
+      <fieldset disabled={saving} className="elearning-form">
+        <nav className="elearning-settings-tabs" role="tablist" aria-label={t("elearning.settings_nav.sections")}>
+          {tabs.map(tab=><button type="button" role="tab" id={`elearning-tab-${tab}`} aria-controls={`elearning-panel-${tab}`} aria-selected={currentTab===tab} tabIndex={currentTab===tab?0:-1} onClick={()=>setActiveTab(tab)} onKeyDown={selectTab} key={tab}>{t(`elearning.settings_nav.${tab}`)}</button>)}
+        </nav>
+        {tabs.map(tab=><div className="elearning-settings-tab-panel" role="tabpanel" id={`elearning-panel-${tab}`} aria-labelledby={`elearning-tab-${tab}`} data-settings-tab={tab} hidden={currentTab!==tab} key={tab}>
+          {renderSections(tab)}
+          {tab==='general' && <AcademyProgrammeSettings settings={settings} capabilities={capabilities} visibleGroups={['notifications']} update={update} />}
+          {tab==='programmes' && <>
+        {capabilities.referrals && <LearningSettingsAccordion title={t("elearning.referrals.settings")} description={t("elearning.referrals.settingsHelp")} icon={Gift} group="elearning-programme-settings" defaultOpen={requestedSection === "referrals" || (!requestedSection && !capabilities.affiliate && !capabilities.tuition && !capabilities.exchange)}>
           {!referralsAvailable && <p role="status">{t("elearning.referrals.upgradeRequired")}</p>}
           <fieldset disabled={!referralsAvailable} className="settings-form-grid">
             <label className="elearning-toggle"><span>{t("elearning.referrals.enable")}</span><input type="checkbox" role="switch" checked={Boolean(settings.referral_rewards_enabled)} onChange={event => update("referral_rewards_enabled", event.target.checked)} /></label>
@@ -174,11 +181,32 @@ export default function ELearningSettingsPage({ user }) {
             </label>
             <label className="elearning-field">{t("elearning.programmes.referral_eligibility")}<select value={settings.referral_eligibility || "registration"} onChange={e=>update("referral_eligibility",e.target.value)}>{["registration","purchase_or_affiliate"].map(value=><option key={value} value={value}>{t(`elearning.programmes.${value}`)}</option>)}</select></label><p>{t("elearning.referrals.termsHelp")}</p>
           </fieldset>
-        </section>}
-        <AcademyProgrammeSettings settings={settings} capabilities={capabilities} update={update}/>
-        {capabilities.forms && <section className="settings-card"><h3>{t("elearning.forms.title")}</h3><Link className="ecommerce-secondary-button" to="/e-learning/forms">{t("elearning.forms.manage")}</Link></section>}
-        <section className="settings-card"><h3>{t("elearning.owner.institution")}</h3><label><input type="checkbox" checked={Boolean(settings.institution_enabled)} onChange={event => update("institution_enabled", event.target.checked)} />{t("elearning.owner.institution_enabled")}</label>{["institution_name", "institution_student_label", "regular_student_label"].map(key => <label className="elearning-field" key={key}>{t(`elearning.owner.${key}`)}<input maxLength={key === "institution_name" ? 160 : 120} required={settings.institution_enabled} value={settings[key] ?? ""} onChange={event => update(key, event.target.value)} /></label>)}<label>{t("elearning.owner.institution_domains")}<textarea value={(settings.institution_email_domains || []).join("\n")} onChange={event => update("institution_email_domains", event.target.value.split(/[\n,]/).map(value => value.trim()).filter(Boolean))} /></label></section>
-        <div className="elearning-actions"><button className="settings-save-button" type="submit" disabled={saving || uploading || !available}><Save size={16} aria-hidden="true" />{t(saving ? "elearning.saving" : "elearning.save")}</button></div>
+        </LearningSettingsAccordion>}
+
+          <AcademyProgrammeSettings settings={settings} capabilities={capabilities} visibleGroups={['commerce_settings','affiliate_settings','support_settings','exchange_settings','withdrawal_settings']} compact expandedGroup={requestedSection} update={update} />
+          </>}
+          {tab==='institution' && <>
+        <section className="settings-card elearning-institution-card" aria-labelledby="elearning-institution-title">
+          <header className="elearning-card-heading">
+            <span className="elearning-card-icon"><Building2 size={20} aria-hidden="true" /></span>
+            <div><h3 id="elearning-institution-title">{t("elearning.owner.institution")}</h3><p>{t("elearning.settings_nav.institution_help")}</p></div>
+          </header>
+          <label className="elearning-toggle"><span>{t("elearning.owner.institution_enabled")}</span><input type="checkbox" role="switch" checked={Boolean(settings.institution_enabled)} onChange={event => update("institution_enabled", event.target.checked)} /></label>
+          <fieldset className="elearning-institution-group">
+            <legend>{t("elearning.settings_nav.institution_details")}</legend>
+            <div className="elearning-institution-fields">
+              <label className="elearning-field">{t("elearning.owner.institution_name")}<input maxLength={160} required={settings.institution_enabled} value={settings.institution_name ?? ""} onChange={event => update("institution_name", event.target.value)} /></label>
+              <label className="elearning-field">{t("elearning.owner.institution_domains")}<textarea required={settings.institution_enabled} aria-label={t("elearning.owner.institution_domains")} aria-describedby="elearning-institution-domain-help" value={(settings.institution_email_domains || []).join("\n")} onChange={event => update("institution_email_domains", event.target.value.split(/[\n,]/).map(value => value.trim()).filter(Boolean))} /><small id="elearning-institution-domain-help">{t("elearning.settings_nav.institution_domain_help")}</small></label>
+            </div>
+          </fieldset>
+          <fieldset className="elearning-institution-group">
+            <legend>{t("elearning.settings_nav.student_labels")}</legend>
+            <div className="elearning-institution-fields">{["institution_student_label", "regular_student_label"].map(key => <label className="elearning-field" key={key}>{t(`elearning.owner.${key}`)}<input maxLength={120} required={settings.institution_enabled} value={settings[key] ?? ""} onChange={event => update(key, event.target.value)} /></label>)}</div>
+          </fieldset>
+        </section>
+
+          </>}
+        </div>)}
       </fieldset>
       {saved && <p role="status" className="elearning-feedback">{t("elearning.saved")}</p>}
     </form>}

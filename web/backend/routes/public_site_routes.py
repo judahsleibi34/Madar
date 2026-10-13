@@ -2860,6 +2860,9 @@ def register_tenant_account(
     last_name = name_parts[1] if len(name_parts) > 1 else ""
     auth_user_id = None
     local_user_id = None
+    email_verification_required = academy_context is None or academy_context.get(
+        "email_verification_required", True
+    )
 
     enforce_auth_rate_limit(request, "tenant_signup", f"{clean_subdomain}:{clean_email}")
 
@@ -2868,19 +2871,31 @@ def register_tenant_account(
         raise HTTPException(status_code=409, detail="Email is already registered")
 
     try:
-        auth_response = supabase.auth.sign_up(
-            {
-                "email": clean_email,
-                "password": payload.password,
-                "options": {
-                    "email_redirect_to": canonical_tenant_url(
-                        settings.get("subdomain") or clean_subdomain,
-                        academy_context["return_to"] if academy_context else "/shop",
-                    ),
-                    "data": {"first_name": first_name, "last_name": last_name},
-                },
-            }
-        )
+        if email_verification_required:
+            auth_response = supabase.auth.sign_up(
+                {
+                    "email": clean_email,
+                    "password": payload.password,
+                    "options": {
+                        "email_redirect_to": (academy_context or {}).get("email_redirect_to") or canonical_tenant_url(
+                            settings.get("subdomain") or clean_subdomain,
+                            academy_context["return_to"] if academy_context else "/shop",
+                        ),
+                        "data": {"first_name": first_name, "last_name": last_name},
+                    },
+                }
+            )
+        else:
+            # This path is reachable only from an academy route after its stored
+            # tenant setting has been resolved. Public payloads cannot request it.
+            auth_response = service_supabase.auth.admin.create_user(
+                {
+                    "email": clean_email,
+                    "password": payload.password,
+                    "email_confirm": True,
+                    "user_metadata": {"first_name": first_name, "last_name": last_name},
+                }
+            )
         if not auth_response.user:
             raise HTTPException(status_code=400, detail="Could not create account")
 
@@ -2893,9 +2908,9 @@ def register_tenant_account(
                 "email": clean_email,
                 "tenant_id": tenant_id if academy_context else None,
                 "account_kind": "platform" if academy_context else "site_visitor",
-                "account_status": "pending_verification",
-                "email_verified": False,
-                "email_verified_at": None,
+                "account_status": "pending_verification" if email_verification_required else "active",
+                "email_verified": not email_verification_required,
+                "email_verified_at": None if email_verification_required else datetime.now(timezone.utc).isoformat(),
             }
         ).execute()
         local_user = first_row(user_result)
@@ -2932,8 +2947,12 @@ def register_tenant_account(
         )
 
         return {
-            "message": "Account created. We sent you a confirmation email. Confirm it before logging in.",
-            "requires_email_verification": True,
+            "message": (
+                "Account created. We sent you a confirmation email. Confirm it before logging in."
+                if email_verification_required
+                else "Account created. You can sign in now."
+            ),
+            "requires_email_verification": email_verification_required,
         }
     except HTTPException:
         if local_user_id:
@@ -2974,7 +2993,15 @@ def login_tenant_visitor(
     return login_tenant_account(subdomain, payload, request, response)
 
 
-def login_tenant_account(subdomain, payload, request, response, *, allow_learning_membership=False):
+def login_tenant_account(
+    subdomain,
+    payload,
+    request,
+    response,
+    *,
+    allow_learning_membership=False,
+    email_verification_required=True,
+):
     clean_subdomain = normalize_subdomain(subdomain)
     settings = resolve_website_settings(clean_subdomain, request=request)
     tenant_id = resolve_tenant_id(settings)
@@ -2982,13 +3009,40 @@ def login_tenant_account(subdomain, payload, request, response, *, allow_learnin
     enforce_auth_rate_limit(request, "tenant_login", f"{clean_subdomain}:{clean_email}")
 
     try:
-        auth_response = supabase.auth.sign_in_with_password(
-            {"email": clean_email, "password": payload.password}
-        )
+        try:
+            auth_response = supabase.auth.sign_in_with_password(
+                {"email": clean_email, "password": payload.password}
+            )
+        except Exception as error:
+            if getattr(error, "code", None) != "email_not_confirmed" or email_verification_required:
+                raise
+            pending_user = first_row(
+                service_supabase.table("users")
+                .select("id,auth_id,tenant_id")
+                .eq("email", clean_email)
+                .eq("tenant_id", tenant_id)
+                .limit(1)
+                .execute()
+            )
+            membership = (
+                get_tenant_staff_membership(tenant_id, pending_user.get("id"))
+                if pending_user
+                else None
+            )
+            if not pending_user or not membership or membership.get("role") != "learner":
+                raise
+            # GoTrue emits email_not_confirmed only after accepting the supplied
+            # password. Confirm that tenant's existing learner, then retry once.
+            service_supabase.auth.admin.update_user_by_id(
+                str(pending_user["auth_id"]), {"email_confirm": True}
+            )
+            auth_response = supabase.auth.sign_in_with_password(
+                {"email": clean_email, "password": payload.password}
+            )
         if not auth_response.user or not auth_response.session:
             raise HTTPException(status_code=401, detail="Invalid email or password")
-        if not auth_user_email_is_verified(auth_response.user):
-            raise HTTPException(status_code=403, detail="Please verify your email before logging in")
+        if email_verification_required and not auth_user_email_is_verified(auth_response.user):
+            raise api_error(403, "email_not_verified", "Confirm your email before signing in")
 
         user_row = get_local_user_by_auth_id(str(auth_response.user.id))
         access = get_tenant_site_access(settings, user_row) if user_row else None
@@ -3009,6 +3063,8 @@ def login_tenant_account(subdomain, payload, request, response, *, allow_learnin
         raise
     except Exception as error:
         logger.warning("public.tenant_login_failed", extra={"tenant_id": tenant_id, "error_type": type(error).__name__})
+        if getattr(error, "code", None) == "email_not_confirmed":
+            raise api_error(403, "email_not_verified", "Confirm your email before signing in") from error
         raise HTTPException(status_code=401, detail="Invalid email or password") from error
 
 

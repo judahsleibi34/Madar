@@ -1,3 +1,4 @@
+import LearningErrorNotice from "./LearningErrorNotice";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { fetchPlacements, attachAssessment, placementCommand, commandAssessment } from "../../services/elearningAssessments";
@@ -12,7 +13,7 @@ export default function ELearningAssessmentsPage({ course, section }) {
   const [data, setData] = useState(null), [reload, setReload] = useState(0), [error, setError] = useState(""), [busy, setBusy] = useState(false), [editor, setEditor] = useState(null), [dialog, setDialog] = useState(null), [selected, setSelected] = useState(""), [required, setRequired] = useState(false);
   useEffect(() => {
     let active = true;
-    fetchPlacements(course.id, section?.id).then(value => { if (active) setData(value); }).catch(failure => { if (active) setError(failure.detail?.message || t("elearning.assessment.loadError")); });
+    fetchPlacements(course.id, section?.id).then(value => { if (active) setData(value); }).catch(() => { if (active) setError(t("elearning.assessment.loadError")); });
     return () => { active = false; };
   }, [course.id, section?.id, reload, t]);
   function refresh() { setEditor(null); setDialog(null); setError(""); setReload(value => value + 1); }
@@ -23,12 +24,12 @@ export default function ELearningAssessmentsPage({ course, section }) {
       else if (action === "archive") await commandAssessment(course.id, null, placement.id, { action: "settings", expected_revision: placement.assessment.revision, payload: { title: placement.assessment.title, instructions: placement.assessment.instructions, passing_score: Number(placement.assessment.passing_score), max_attempts: placement.assessment.max_attempts, required_for_completion: placement.required_for_completion, status: "archived" } });
       else await placementCommand(course.id, placement.id, { action, expected_revision: data.revision, confirmed: action === "remove" });
       refresh();
-    } catch (failure) { setError(failure.detail?.message || t("elearning.assessment.saveError")); } finally { setBusy(false); }
+    } catch { setError(t("elearning.assessment.saveError")); } finally { setBusy(false); }
   }
   const label = labels[section ? "section" : "course"];
   return <section className="elearning-assessments-page">
     <header className="elearning-structure-header"><div><h2>{t("elearning.placements.heading", { label })}</h2>{section && <p>{section.name}</p>}</div><div className="elearning-content-toolbar"><button className="ecommerce-primary-button" disabled={!data || busy || course.status === "archived" || section?.status === "archived"} onClick={() => setEditor({})}>{t("elearning.placements.add")}</button><button className="ecommerce-secondary-button" disabled={!data || busy} onClick={() => setDialog({ action: "attach" })}>{t("elearning.placements.attach")}</button></div></header>
-    {error && <p role="alert">{error} <button onClick={refresh}>{t("elearning.retry")}</button></p>}
+    {error && <LearningErrorNotice as="p">{error} <button onClick={refresh}>{t("elearning.retry")}</button></LearningErrorNotice>}
     {!data && !error && <ELearningSkeleton variant="course" label={t("elearning.assessment.loading")} />}
     {data?.placements.length === 0 && <p>{t("elearning.placements.empty")}</p>}
     {data?.placements.map(placement => <article key={placement.id} className="ecommerce-list-card assessment-placement-card"><h3>{placement.assessment.title}</h3><p><span className={`elearning-course-status is-${placement.assessment.status}`}>{t(`elearning.courses.statuses.${placement.assessment.status}`)}</span> · {t(`elearning.placements.${placement.required_for_completion ? "required" : "optional"}`)} · {t("elearning.assessment.passing")}: {placement.assessment.passing_score}% · {t("elearning.assessment.attempts")}: {placement.attempts}</p><div className="elearning-content-toolbar">

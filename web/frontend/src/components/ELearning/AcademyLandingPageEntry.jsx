@@ -1,3 +1,4 @@
+import LearningErrorNotice from "./LearningErrorNotice";
 import { lazy, useEffect, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
@@ -39,7 +40,7 @@ export default function AcademyLandingPageEntry(editorProps) {
   if (!current?.error) return <ELearningSkeleton variant="settings" label={t("elearning.loading")} direction={i18n.dir()} lang={i18n.language} />;
   return <main className="ecommerce-page" dir={i18n.dir()} lang={i18n.language}>
     <h1>{t("elearning.academy.landingPage")}</h1>
-    <p role="alert">{t(current.error)}</p>
+    <LearningErrorNotice as="p">{t(current.error)}</LearningErrorNotice>
     {current.error === "elearning.academy.editorPlanError" && <Link className="ecommerce-secondary-button" to="/my-plan">{t("elearning.academy.reviewPlan")}</Link>}
     <button className="ecommerce-primary-button" onClick={() => { setResult(null); setAttempt(value => value + 1); }}>{t("elearning.retry")}</button>
     <Link className="ecommerce-secondary-button" to="/e-learning/academy-access">{t("elearning.academy.accessSettings")}</Link>

@@ -1,3 +1,4 @@
+import LearningErrorNotice from "./LearningErrorNotice";
 import { learningDescription } from "../../utils/elearningPresentation";
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
@@ -32,7 +33,7 @@ export function Checkout({ checkout, local, onChange, onClose }) {
   }
   return <section className="ecommerce-list-card elearning-plan-card" aria-label={t("elearning.commerce.checkout")}>
     <h2>{t("elearning.commerce.checkout")}: {checkout.terms.name}</h2><Price terms={checkout.terms} />
-    <p>{t("elearning.commerce.localOnly")}</p>{failed && <p role="status">{t("elearning.commerce.failedPayment")}</p>}{error && <p role="alert">{t("elearning.commerce.error")}</p>}
+    <p>{t("elearning.commerce.localOnly")}</p>{failed && <p role="status">{t("elearning.commerce.failedPayment")}</p>}{error && <LearningErrorNotice as="p">{t("elearning.commerce.error")}</LearningErrorNotice>}
     <div className="elearning-course-actions">{local && <><button className="ecommerce-primary-button" disabled={busy} onClick={() => payment("paid")}>{t("elearning.commerce.testPay")}</button><button className="ecommerce-secondary-button" disabled={busy} onClick={() => payment("failed")}>{t("elearning.commerce.testFail")}</button></>}<button className="ecommerce-secondary-button" disabled={busy} onClick={onClose}>{t("elearning.commerce.cancel")}</button></div>
   </section>;
 }
@@ -49,7 +50,7 @@ export default function ELearningCatalog() {
     try { setCheckout((await commerce.createCheckout(plan.id, course?.id, crypto.randomUUID())).checkout); } catch (e) { state.setError(e); } finally { setBusy(false); }
   }
   if (!state.data && !state.error) return <ELearningSkeleton direction={i18n.dir()} label={t("elearning.commerce.loading")} />;
-  return <><LearningLinks /><h1>{t("elearning.commerce.catalog")}</h1>{!checkout && !selected && <button className="ecommerce-secondary-button" onClick={() => setSelected({ name: t("elearning.commerce.accessPlans"), plans: state.data?.plans.map(p => p.id) || [] })}>{t("elearning.commerce.accessPlans")}</button>}{state.error && <p role="alert">{t("elearning.commerce.error")} <button onClick={state.retry}>{t("elearning.retry")}</button></p>}
+  return <><LearningLinks /><h1>{t("elearning.commerce.catalog")}</h1>{!checkout && !selected && <button className="ecommerce-secondary-button" onClick={() => setSelected({ name: t("elearning.commerce.accessPlans"), plans: state.data?.plans.map(p => p.id) || [] })}>{t("elearning.commerce.accessPlans")}</button>}{state.error && <LearningErrorNotice as="p">{t("elearning.commerce.error")} <button onClick={state.retry}>{t("elearning.retry")}</button></LearningErrorNotice>}
     {checkout ? <Checkout checkout={checkout} local={state.data.local_adapter} onClose={() => { setCheckout(null); state.retry(); }} onChange={() => { const course = checkout.requested_resource_id; setCheckout(null); setSelected(null); state.retry(); if (course) navigate(`/my-learning/courses/${course}`); }} /> : selected ? <section className="ecommerce-list-card elearning-plan-card">
       <h2>{t("elearning.commerce.choosePlan", { course: selected.name })}</h2>{state.data.plans.filter(p => selected.plans.includes(p.id)).map(plan => <article key={plan.id} className="elearning-plan-option"><h3>{plan.name}</h3><Price terms={plan} /><p>{t(`elearning.commerce.${plan.access_scope}`, { courses: labels.plural.course, course: labels.course })}</p><button className="ecommerce-primary-button" disabled={busy || !state.data.local_adapter} onClick={() => buy(plan, selected)}>{t("elearning.commerce.buy")}</button></article>)}
       {!state.data.local_adapter && <p>{t("elearning.commerce.providerUnavailable")}</p>}<button className="ecommerce-secondary-button" onClick={() => setSelected(null)}>{t("elearning.commerce.cancel")}</button>
@@ -70,7 +71,7 @@ export function MyLearningPlans() {
     try { await commerce.localPaymentEvent(id, action, cancel); state.retry(); } catch (e) { state.setError(e); } finally { setBusy(false); }
   }
   if (!state.data && !state.error) return <ELearningSkeleton direction={i18n.dir()} label={t("elearning.commerce.loading")} />;
-  return <><LearningLinks /><h1>{t("elearning.commerce.myPlans")}</h1>{state.error && <p role="alert">{t("elearning.commerce.error")}</p>}
+  return <><LearningLinks /><h1>{t("elearning.commerce.myPlans")}</h1>{state.error && <LearningErrorNotice as="p">{t("elearning.commerce.error")}</LearningErrorNotice>}
     {checkout && <Checkout checkout={checkout} local={state.data.local_adapter} onClose={() => setCheckout(null)} onChange={() => { setCheckout(null); state.retry(); }} />}
     {!state.data?.entitlements.length && <p>{t("elearning.commerce.noPurchases")}</p>}
     <div className="elearning-course-grid">{state.data?.entitlements.map(ent => <article key={ent.id} className="ecommerce-list-card elearning-plan-card"><h2>{ent.terms.name}</h2><Price terms={ent.terms} /><p>{t(`elearning.commerce.${ent.effective_status}`)}</p>{ent.expires_at ? <p>{t(ent.cancel_at_period_end ? "elearning.commerce.endsAt" : "elearning.commerce.paidUntil", { date: new Date(ent.expires_at).toLocaleString(i18n.language) })}</p> : <p>{t("elearning.commerce.lifetime")}</p>}

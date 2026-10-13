@@ -1,3 +1,4 @@
+import LearningErrorNotice from "../../ELearning/LearningErrorNotice";
 import { useState } from "react";
 import {
   ChevronDown,
@@ -155,8 +156,8 @@ export default function PageBuilderUsersTab({
         status: newUser.status.toLowerCase(),
       });
       setIsCreateOpen(false);
-    } catch (error) {
-      setCreateError(error?.message || "Could not add this user.");
+    } catch {
+      setCreateError("Could not add this user.");
     } finally {
       setCreateBusy(false);
     }
@@ -235,7 +236,7 @@ export default function PageBuilderUsersTab({
             </button>
           </div>
 
-          {usersError && <div className="users-load-error" role="alert">{usersError}</div>}
+          {usersError && <LearningErrorNotice className="users-load-error" as="div">{usersError}</LearningErrorNotice>}
           {usersLoading && <div className="users-loading-state">Loading subdomain users…</div>}
 
           <div className="user-list users-table">
@@ -625,7 +626,7 @@ onClick={() => {
                 </label>
               </div>
 
-              {createError && <div className="user-create-error" role="alert">{createError}</div>}
+              {createError && <LearningErrorNotice className="user-create-error" as="div">{createError}</LearningErrorNotice>}
 
               <div className="user-create-actions">
                 <button type="button" onClick={() => setIsCreateOpen(false)} disabled={createBusy}>

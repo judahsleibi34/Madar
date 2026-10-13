@@ -1,3 +1,4 @@
+import LearningErrorNotice from "./LearningErrorNotice";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { fetchCourseProgress } from "../../services/elearningParticipation";
@@ -21,7 +22,7 @@ export default function ELearningParticipationPage({ courseId, tab }) {
   if (loading) return <ELearningStructureSkeleton label={t("elearning.participation.loading")} />;
   return <section className="elearning-structure" aria-labelledby="elearning-participation-title">
     <header><h2 id="elearning-participation-title">{t(`elearning.courses.tabs.${tab}`)}</h2><p>{t("elearning.participation.help", { labels: labels.plural.lesson })}</p></header>
-    {error && <p role="alert" className="elearning-feedback is-error">{t(error)} <button className="ecommerce-secondary-button" onClick={() => { setError(""); setLoading(true); setReload((value) => value + 1); }}>{t("elearning.retry")}</button></p>}
+    {error && <LearningErrorNotice as="p" className="elearning-feedback is-error">{t(error)} <button className="ecommerce-secondary-button" onClick={() => { setError(""); setLoading(true); setReload((value) => value + 1); }}>{t("elearning.retry")}</button></LearningErrorNotice>}
     {data && !error && <>
       <dl className="elearning-structure-summary"><div><dt>{t("elearning.courses.learners")}</dt><dd>{data.learner_count}</dd></div><div><dt>{t("elearning.participation.average")}</dt><dd>{data.average_progress}%</dd></div><div><dt>{t("elearning.participation.not_started")}</dt><dd>{data.not_started_count}</dd></div><div><dt>{t("elearning.participation.active")}</dt><dd>{data.active_count}</dd></div><div><dt>{t("elearning.participation.completed")}</dt><dd>{data.completed_count}</dd></div></dl>
       {data.enrollments.length === 0 && <div className="ecommerce-list-card ecommerce-empty-state"><h3>{t("elearning.participation.empty")}</h3><p>{t("elearning.participation.emptyHelp")}</p></div>}

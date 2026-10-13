@@ -1,8 +1,9 @@
+import LearningErrorNotice from "../ELearning/LearningErrorNotice";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Eye, EyeOff, KeyRound } from "lucide-react";
 
-import { apiFetch, readApiError } from "../../utils/apiClient";
+import { apiFetch } from "../../utils/apiClient";
 import { meetsMinimumPasswordPolicy, PASSWORD_MIN_LENGTH } from "../AuthPages/passwordPolicy";
 import { getChangePasswordContent } from "../../content";
 
@@ -118,10 +119,9 @@ export default function ChangePasswordPage({ lang = "en", backPath = "/settings"
         }),
       });
 
-      const data = await response.json().catch(() => ({}));
 
       if (!response.ok) {
-        throw new Error(readApiError(data, t.passwordUpdateError));
+        throw new Error(t.passwordUpdateError);
       }
 
       setForm({
@@ -136,9 +136,9 @@ export default function ChangePasswordPage({ lang = "en", backPath = "/settings"
         confirmNewPassword: false,
       });
 
-      setStatus(data.message || t.passwordUpdated);
-    } catch (submitError) {
-      setError(submitError.message || t.passwordUpdateError);
+      setStatus(t.passwordUpdated);
+    } catch {
+      setError(t.passwordUpdateError);
     } finally {
       setIsSubmitting(false);
     }
@@ -163,7 +163,7 @@ export default function ChangePasswordPage({ lang = "en", backPath = "/settings"
         </header>
 
         {status && <div className="change-password-status">{status}</div>}
-        {error && <div className="change-password-error">{error}</div>}
+        {error && <LearningErrorNotice className="change-password-error">{error}</LearningErrorNotice>}
 
         <form className="change-password-form" onSubmit={handleSubmit}>
           {renderPasswordField({

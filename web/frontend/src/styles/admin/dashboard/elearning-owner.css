@@ -62,3 +62,32 @@
 .elearning-submission-download {text-align:start;white-space:normal;overflow-wrap:anywhere;}
 .elearning-submission-filters > .elearning-submission-unread-filter {display:flex;align-items:center;gap:var(--space-2);min-height:44px;}
 .elearning-submission-filters .elearning-submission-unread-filter input {width:18px;height:18px;min-height:0;padding:0;margin:0;}
+
+/* Admin overview panels retain the shared Madar card and table treatment. */
+.academy-overview-section-heading {display:flex;align-items:flex-start;justify-content:space-between;gap:var(--space-4);flex-wrap:wrap;}
+.academy-overview-section-heading :is(h2,h3) {margin:0;}
+.academy-overview-section-heading p {margin:var(--space-2) 0 0;color:var(--color-text-muted);font-size:var(--font-size-sm);line-height:var(--type-small-line);}
+.academy-overview-section-heading > a {font-size:var(--font-size-sm);font-weight:var(--font-weight-semibold);white-space:nowrap;}
+.academy-overview-finance-grid {display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:var(--space-4);}
+.academy-overview-finance-panel {display:grid;align-content:start;gap:var(--space-3);min-width:0;}
+.academy-overview-finance-panel .elearning-owner-table :is(th,td) {white-space:nowrap;}
+
+.admin-dashboard-page .elearning-owner-page .user-dashboard-quick-actions.academy-overview-shortcuts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: var(--space-5) var(--space-6);
+}
+.academy-overview-action-group {display: grid;gap: var(--space-2);min-width: 0;}
+.elearning-owner .academy-overview-shortcuts .academy-overview-action-group > h2 {
+  margin: 0;
+  font-family: var(--font-main);
+  font-size: var(--ui-text-small);
+  line-height: var(--type-small-line);
+  font-weight: var(--font-weight-semibold);
+  color: var(--theme-text-muted);
+}
+.academy-overview-action-links {display: flex;flex-wrap: wrap;gap: var(--space-2);}
+@media (max-width: 900px) {
+  .admin-dashboard-page .elearning-owner-page .user-dashboard-quick-actions.academy-overview-shortcuts {grid-template-columns: minmax(0, 1fr);}
+}

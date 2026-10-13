@@ -1,6 +1,25 @@
 """Tenant-scoped continuations around existing Madar authentication."""
-from urllib.parse import unquote, urlsplit
+import os
+from urllib.parse import quote, unquote, urlsplit
 from fastapi import HTTPException
+
+
+def verification_redirect(identifier, request, target):
+    """Keep verification in its academy, including allowlisted local previews."""
+    from services.frontend_url import resolve_frontend_url_for_request
+    from services.hosted_address_service import canonical_tenant_url
+
+    main_base = f"/academy/{identifier}"
+    origin = (request.headers.get("origin") or "").rstrip("/")
+    frontend = resolve_frontend_url_for_request(origin)
+    if (os.getenv("APP_ENV") == "development" and origin == frontend
+            and urlsplit(frontend).hostname in {"localhost", "127.0.0.1", "::1"}):
+        local_target = safe_return_path(target, main_base)
+        return f"{frontend}{main_base}/login?returnTo={quote(local_target, safe='')}"
+    hosted_target = target
+    if target == main_base or target.startswith(main_base + "/"):
+        hosted_target = "/academy" + target[len(main_base):]
+    return canonical_tenant_url(identifier, f"/academy/login?returnTo={quote(hosted_target, safe='')}")
 
 
 def safe_return_path(requested, base):

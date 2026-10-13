@@ -67,7 +67,7 @@ export default function AcademyContactInbox({
   return <OwnerPage><OwnerHeader title={detail ? selected?.subject || label('contacts') : label('contacts')} description={t('elearning.ui.contacts_help')} back={detail ? {
       to: '/e-learning/contacts',
       label: label('contacts')
-    } : null} /><OwnerState error={error} retry={() => setAttempt(v => v + 1)} loading={!items && !error} empty={!detail && items && !items.length && t('elearning.ui.no_messages')} />{!detail && <><div className="elearning-owner-filters"><label>{t('elearning.programmes.search')}<input value={search} onChange={e => {
+    } : null} /><OwnerState error={error} retry={() => { setError(false); setAttempt(v => v + 1); }} loading={!items && !error} empty={!detail && items && !items.length && t('elearning.ui.no_messages')} />{!detail && <><div className="elearning-owner-filters"><label>{t('elearning.programmes.search')}<input value={search} onChange={e => {
             setSearch(e.target.value);
             setPage(0);
           }} /></label><label><input type="checkbox" checked={unread} onChange={e => {

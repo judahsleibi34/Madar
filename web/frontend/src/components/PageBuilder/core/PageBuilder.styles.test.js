@@ -56,6 +56,17 @@ describe("getResponsiveDirectCanvasStyles", () => {
 });
 
 describe("getBuilderElementStyle", () => {
+  it("honors authored typography while preserving the hierarchy of mixed text blocks", () => {
+    const style = (fontSize, textBlockFormats) => getBuilderElementStyle({
+      element: { id: "typography", type: "heading", styles: { fontSize }, textBlockFormats },
+      selected: { type: "", id: "" }, carouselElementTypes: new Set(),
+      getElementPlacementMargins: () => ({}), getElementLayoutWidth: () => undefined,
+      normalizeElementAlignSelf: () => undefined,
+    });
+    expect(style("22px", ["h2"])["--builder-authored-font-size"]).toBe("22px");
+    expect(style("", ["h2"])["--builder-authored-font-size"]).toBeUndefined();
+    expect(style("22px", ["h2", "text"])["--builder-authored-font-size"]).toBeUndefined();
+  });
   it("renders normal text as black while preserving intentional custom colors", () => {
     const getStyle = (color) => getBuilderElementStyle({
       element: {

@@ -84,7 +84,7 @@ def duplicate(identifier:UUID,request:Request,response:Response):
     result=operation(lambda:service.save(actor,payload));audit(request,actor,'duplicate',result['id']);return result
 
 
-def context(identifier,form_id,request,response):
+def context(identifier,form_id,request,response,viewing=False):
     from routes.public_site_routes import resolve_website_settings
     from database import service_supabase
     from services.elearning_settings_service import get_settings
@@ -104,15 +104,15 @@ def context(identifier,form_id,request,response):
         if candidate.tenant_id==tenant:actor=candidate
     except HTTPException as e:
         if e.status_code not in {401,403}:raise
-    f=service.definition(tenant,form_id);service.public_access(tenant,f,actor)
+    f=service.definition(tenant,form_id);viewer=service.public_access(tenant,f,actor,viewing)
     response.headers['Cache-Control']='private, no-store';response.headers['Vary']='Cookie'
-    return tenant,f,actor
+    return (tenant,f,viewer) if viewing else (tenant,f,actor)
 
 @public.get('/{identifier}/forms/{form_id}')
 def render(identifier:str,form_id:UUID,request:Request,response:Response):
     enforce_public_rate_limit(request,'form_lookup',identifier)
-    _,form,_=context(identifier,form_id,request,response)
-    return {'id':form['id'],'version':form['version'],'schema':form['schema']}
+    _,form,viewer=context(identifier,form_id,request,response,viewing=True)
+    return {'id':form['id'],'version':form['version'],'schema':form['schema'],**viewer}
 
 @public.post('/{identifier}/forms/{form_id}/responses')
 async def submit(identifier:str,form_id:UUID,request:Request,response:Response):

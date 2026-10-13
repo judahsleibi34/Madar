@@ -32,12 +32,12 @@
           "layout": {
             "width": "full",
             "paddingY": "none",
-            "minHeight": 3406,
+            "minHeight": 2735,
             "background": "transparent",
             "minHeightByViewport": {
-              "mobile": 4062,
-              "tablet": 3682,
-              "desktop": 3406
+              "mobile": 3944,
+              "tablet": 2979,
+              "desktop": 2735
             }
           },
           "freeElements": [
@@ -78,9 +78,9 @@
               "imageUrl": "ref:assets.hero.library",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 12,
-                  "width": 366,
+                  "x": 16,
+                  "y": 24,
+                  "width": 358,
                   "height": 740
                 },
                 "tablet": {
@@ -160,10 +160,10 @@
               "styles": {
                 "color": "#002A60",
                 "width": "100%",
-                "fontSize": "36px",
+                "fontSize": "30px",
                 "alignSelf": "auto",
                 "textAlign": "start",
-                "fontWeight": "750",
+                "fontWeight": "700",
                 "lineHeight": "1.25",
                 "borderRadius": "16px",
                 "backgroundColor": ""
@@ -171,22 +171,22 @@
               "content": "Your Gateway to Success. Learn. Grow. Give Back.",
               "position": {
                 "mobile": {
-                  "x": 12,
+                  "x": 16,
                   "y": 812,
-                  "width": 366,
-                  "height": 112
+                  "width": 358,
+                  "height": 102
                 },
                 "tablet": {
                   "x": 24,
-                  "y": 836,
+                  "y": 812,
                   "width": 720,
-                  "height": 112
+                  "height": 68
                 },
                 "desktop": {
                   "x": 24,
-                  "y": 836,
+                  "y": 812,
                   "width": 1152,
-                  "height": 112
+                  "height": 48
                 }
               },
               "localized": {
@@ -221,7 +221,7 @@
               "styles": {
                 "color": "#002A60",
                 "width": "100%",
-                "fontSize": "17px",
+                "fontSize": "16px",
                 "alignSelf": "auto",
                 "textAlign": "start",
                 "fontWeight": "",
@@ -232,22 +232,22 @@
               "content": "Develop the English communication skills you need for university, everyday conversations and future opportunities. Learn from A1 to C1 through practical listening, speaking and real-life activities.",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 938,
-                  "width": 366,
-                  "height": 104
+                  "x": 16,
+                  "y": 929,
+                  "width": 358,
+                  "height": 140
                 },
                 "tablet": {
                   "x": 24,
-                  "y": 968,
+                  "y": 896,
                   "width": 720,
-                  "height": 104
+                  "height": 84
                 },
                 "desktop": {
                   "x": 24,
-                  "y": 968,
+                  "y": 876,
                   "width": 1152,
-                  "height": 104
+                  "height": 84
                 }
               },
               "localized": {
@@ -280,10 +280,10 @@
               "styles": {
                 "color": "#002A60",
                 "width": "100%",
-                "fontSize": "36px",
+                "fontSize": "22px",
                 "alignSelf": "auto",
                 "textAlign": "start",
-                "fontWeight": "750",
+                "fontWeight": "700",
                 "lineHeight": "1.25",
                 "borderRadius": "16px",
                 "backgroundColor": ""
@@ -291,22 +291,22 @@
               "content": "University & everyday life",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 1102,
-                  "width": 366,
-                  "height": 112
+                  "x": 16,
+                  "y": 1117,
+                  "width": 358,
+                  "height": 48
                 },
                 "tablet": {
                   "x": 24,
-                  "y": 1144,
-                  "width": 350,
-                  "height": 112
+                  "y": 1028,
+                  "width": 348,
+                  "height": 48
                 },
                 "desktop": {
                   "x": 24,
-                  "y": 1144,
-                  "width": 370,
-                  "height": 112
+                  "y": 1008,
+                  "width": 368,
+                  "height": 48
                 }
               },
               "localized": {
@@ -341,7 +341,7 @@
               "styles": {
                 "color": "#002A60",
                 "width": "100%",
-                "fontSize": "17px",
+                "fontSize": "16px",
                 "alignSelf": "auto",
                 "textAlign": "start",
                 "fontWeight": "",
@@ -352,22 +352,22 @@
               "content": "Ask questions in class, communicate with new classmates and build useful everyday language.",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 1228,
-                  "width": 366,
-                  "height": 104
+                  "x": 16,
+                  "y": 1181,
+                  "width": 358,
+                  "height": 84
                 },
                 "tablet": {
                   "x": 24,
-                  "y": 1276,
-                  "width": 350,
-                  "height": 104
+                  "y": 1092,
+                  "width": 348,
+                  "height": 84
                 },
                 "desktop": {
                   "x": 24,
-                  "y": 1276,
-                  "width": 370,
-                  "height": 104
+                  "y": 1072,
+                  "width": 368,
+                  "height": 84
                 }
               },
               "localized": {
@@ -400,10 +400,10 @@
               "styles": {
                 "color": "#002A60",
                 "width": "100%",
-                "fontSize": "36px",
+                "fontSize": "22px",
                 "alignSelf": "auto",
                 "textAlign": "start",
-                "fontWeight": "750",
+                "fontWeight": "700",
                 "lineHeight": "1.25",
                 "borderRadius": "16px",
                 "backgroundColor": ""
@@ -411,22 +411,22 @@
               "content": "Speak with purpose",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 1360,
-                  "width": 366,
-                  "height": 112
+                  "x": 16,
+                  "y": 1313,
+                  "width": 358,
+                  "height": 48
                 },
                 "tablet": {
-                  "x": 394,
-                  "y": 1144,
-                  "width": 350,
-                  "height": 112
+                  "x": 396,
+                  "y": 1028,
+                  "width": 348,
+                  "height": 48
                 },
                 "desktop": {
-                  "x": 414,
-                  "y": 1144,
-                  "width": 370,
-                  "height": 112
+                  "x": 416,
+                  "y": 1008,
+                  "width": 368,
+                  "height": 48
                 }
               },
               "localized": {
@@ -461,7 +461,7 @@
               "styles": {
                 "color": "#002A60",
                 "width": "100%",
-                "fontSize": "17px",
+                "fontSize": "16px",
                 "alignSelf": "auto",
                 "textAlign": "start",
                 "fontWeight": "",
@@ -472,22 +472,22 @@
               "content": "Listen to original dialogues, connect meaning with pictures, record your own responses and practise clear communication.",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 1486,
-                  "width": 366,
-                  "height": 104
+                  "x": 16,
+                  "y": 1377,
+                  "width": 358,
+                  "height": 84
                 },
                 "tablet": {
-                  "x": 394,
-                  "y": 1276,
-                  "width": 350,
-                  "height": 104
+                  "x": 396,
+                  "y": 1092,
+                  "width": 348,
+                  "height": 84
                 },
                 "desktop": {
-                  "x": 414,
-                  "y": 1276,
-                  "width": 370,
-                  "height": 104
+                  "x": 416,
+                  "y": 1072,
+                  "width": 368,
+                  "height": 84
                 }
               },
               "localized": {
@@ -520,10 +520,10 @@
               "styles": {
                 "color": "#002A60",
                 "width": "100%",
-                "fontSize": "36px",
+                "fontSize": "22px",
                 "alignSelf": "auto",
                 "textAlign": "start",
-                "fontWeight": "750",
+                "fontWeight": "700",
                 "lineHeight": "1.25",
                 "borderRadius": "16px",
                 "backgroundColor": ""
@@ -531,22 +531,22 @@
               "content": "Future opportunities",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 1618,
-                  "width": 366,
-                  "height": 112
+                  "x": 16,
+                  "y": 1509,
+                  "width": 358,
+                  "height": 48
                 },
                 "tablet": {
                   "x": 24,
-                  "y": 1420,
-                  "width": 350,
-                  "height": 112
+                  "y": 1224,
+                  "width": 348,
+                  "height": 48
                 },
                 "desktop": {
-                  "x": 804,
-                  "y": 1144,
-                  "width": 370,
-                  "height": 112
+                  "x": 808,
+                  "y": 1008,
+                  "width": 368,
+                  "height": 48
                 }
               },
               "localized": {
@@ -581,7 +581,7 @@
               "styles": {
                 "color": "#002A60",
                 "width": "100%",
-                "fontSize": "17px",
+                "fontSize": "16px",
                 "alignSelf": "auto",
                 "textAlign": "start",
                 "fontWeight": "",
@@ -592,22 +592,22 @@
               "content": "Prepare for interviews, teamwork, presentations and international communication.",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 1744,
-                  "width": 366,
-                  "height": 104
+                  "x": 16,
+                  "y": 1573,
+                  "width": 358,
+                  "height": 56
                 },
                 "tablet": {
                   "x": 24,
-                  "y": 1552,
-                  "width": 350,
-                  "height": 104
+                  "y": 1288,
+                  "width": 348,
+                  "height": 56
                 },
                 "desktop": {
-                  "x": 804,
-                  "y": 1276,
-                  "width": 370,
-                  "height": 104
+                  "x": 808,
+                  "y": 1072,
+                  "width": 368,
+                  "height": 56
                 }
               },
               "localized": {
@@ -640,10 +640,10 @@
               "styles": {
                 "color": "#002A60",
                 "width": "100%",
-                "fontSize": "36px",
+                "fontSize": "30px",
                 "alignSelf": "auto",
                 "textAlign": "start",
-                "fontWeight": "750",
+                "fontWeight": "700",
                 "lineHeight": "1.25",
                 "borderRadius": "16px",
                 "backgroundColor": ""
@@ -651,22 +651,22 @@
               "content": "Ten Levels. One confident learning journey.",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 1908,
-                  "width": 366,
-                  "height": 112
+                  "x": 16,
+                  "y": 1677,
+                  "width": 358,
+                  "height": 68
                 },
                 "tablet": {
                   "x": 24,
-                  "y": 1728,
+                  "y": 1392,
                   "width": 720,
-                  "height": 112
+                  "height": 48
                 },
                 "desktop": {
                   "x": 24,
-                  "y": 1452,
+                  "y": 1204,
                   "width": 1152,
-                  "height": 112
+                  "height": 48
                 }
               },
               "localized": {
@@ -701,35 +701,35 @@
               "styles": {
                 "color": "#002A60",
                 "width": "100%",
-                "height": "320px",
-                "fontSize": "",
+                "height": "auto",
+                "fontSize": "18px",
                 "alignSelf": "stretch",
-                "minHeight": "280px",
+                "minHeight": "0",
                 "textAlign": "start",
                 "fontWeight": "",
-                "lineHeight": "1.7",
+                "lineHeight": "1.6",
                 "borderRadius": "18px",
                 "backgroundColor": "var(--theme-surface)"
               },
               "content": "A1 · Levels 1–2: Foundations and everyday communication\nA2 · Levels 3–4: Independent daily conversations\nB1 · Levels 5–6: Opinions and practical problem-solving\nB2 · Levels 7–8: Discussion and professional communication\nC1 · Levels 9–10: Nuance, persuasion and advanced fluency",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 2034,
-                  "width": 366,
-                  "height": 170
+                  "x": 16,
+                  "y": 1761,
+                  "width": 358,
+                  "height": 388
                 },
                 "tablet": {
                   "x": 24,
-                  "y": 1860,
+                  "y": 1456,
                   "width": 720,
-                  "height": 170
+                  "height": 243
                 },
                 "desktop": {
                   "x": 24,
-                  "y": 1584,
+                  "y": 1268,
                   "width": 1152,
-                  "height": 170
+                  "height": 243
                 }
               },
               "listItems": [
@@ -786,6 +786,7 @@
               },
               "styles": {
                 "color": "var(--theme-text)",
+                "width": "100%",
                 "fontSize": "14px",
                 "alignSelf": "auto",
                 "textAlign": "left",
@@ -797,22 +798,22 @@
               "content": "Explore the Course",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 2218,
-                  "width": 366,
-                  "height": 42
+                  "x": 16,
+                  "y": 2165,
+                  "width": 188,
+                  "height": 48
                 },
                 "tablet": {
                   "x": 24,
-                  "y": 2050,
-                  "width": 720,
-                  "height": 42
+                  "y": 1715,
+                  "width": 188,
+                  "height": 48
                 },
                 "desktop": {
                   "x": 24,
-                  "y": 1774,
-                  "width": 1152,
-                  "height": 42
+                  "y": 1527,
+                  "width": 188,
+                  "height": 48
                 }
               },
               "localized": {
@@ -849,10 +850,10 @@
               "styles": {
                 "color": "#002A60",
                 "width": "100%",
-                "fontSize": "36px",
+                "fontSize": "30px",
                 "alignSelf": "auto",
                 "textAlign": "start",
-                "fontWeight": "750",
+                "fontWeight": "700",
                 "lineHeight": "1.25",
                 "borderRadius": "16px",
                 "backgroundColor": ""
@@ -860,22 +861,22 @@
               "content": "Hear it. Understand it. Use it.",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 2320,
-                  "width": 366,
-                  "height": 112
+                  "x": 16,
+                  "y": 2261,
+                  "width": 358,
+                  "height": 68
                 },
                 "tablet": {
                   "x": 24,
-                  "y": 2164,
+                  "y": 1811,
                   "width": 720,
-                  "height": 112
+                  "height": 48
                 },
                 "desktop": {
                   "x": 24,
-                  "y": 1888,
+                  "y": 1623,
                   "width": 1152,
-                  "height": 112
+                  "height": 48
                 }
               },
               "localized": {
@@ -910,7 +911,7 @@
               "styles": {
                 "color": "#002A60",
                 "width": "100%",
-                "fontSize": "17px",
+                "fontSize": "16px",
                 "alignSelf": "auto",
                 "textAlign": "start",
                 "fontWeight": "",
@@ -921,22 +922,22 @@
               "content": "Listen → See → Understand → Match → Practise → Speak → Communicate. Short, purposeful activities keep communication at the centre. No role-play or automated speaking grades.",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 2446,
-                  "width": 366,
-                  "height": 104
+                  "x": 16,
+                  "y": 2345,
+                  "width": 358,
+                  "height": 140
                 },
                 "tablet": {
                   "x": 24,
-                  "y": 2296,
+                  "y": 1875,
                   "width": 720,
-                  "height": 104
+                  "height": 84
                 },
                 "desktop": {
                   "x": 24,
-                  "y": 2020,
+                  "y": 1687,
                   "width": 1152,
-                  "height": 104
+                  "height": 84
                 }
               },
               "localized": {
@@ -968,6 +969,7 @@
               },
               "styles": {
                 "color": "var(--theme-text)",
+                "width": "100%",
                 "fontSize": "14px",
                 "alignSelf": "auto",
                 "textAlign": "left",
@@ -979,22 +981,22 @@
               "content": "How EduHope Works",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 2564,
-                  "width": 366,
-                  "height": 42
+                  "x": 16,
+                  "y": 2501,
+                  "width": 180,
+                  "height": 48
                 },
                 "tablet": {
                   "x": 24,
-                  "y": 2420,
-                  "width": 720,
-                  "height": 42
+                  "y": 1975,
+                  "width": 180,
+                  "height": 48
                 },
                 "desktop": {
                   "x": 24,
-                  "y": 2144,
-                  "width": 1152,
-                  "height": 42
+                  "y": 1787,
+                  "width": 180,
+                  "height": 48
                 }
               },
               "localized": {
@@ -1031,10 +1033,10 @@
               "styles": {
                 "color": "#002A60",
                 "width": "100%",
-                "fontSize": "36px",
+                "fontSize": "22px",
                 "alignSelf": "auto",
                 "textAlign": "start",
-                "fontWeight": "750",
+                "fontWeight": "700",
                 "lineHeight": "1.25",
                 "borderRadius": "16px",
                 "backgroundColor": ""
@@ -1042,22 +1044,22 @@
               "content": "Share an opportunity",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 2666,
-                  "width": 366,
-                  "height": 112
+                  "x": 16,
+                  "y": 2597,
+                  "width": 358,
+                  "height": 48
                 },
                 "tablet": {
                   "x": 24,
-                  "y": 2534,
-                  "width": 350,
-                  "height": 112
+                  "y": 2071,
+                  "width": 348,
+                  "height": 48
                 },
                 "desktop": {
                   "x": 24,
-                  "y": 2258,
-                  "width": 566,
-                  "height": 112
+                  "y": 1883,
+                  "width": 564,
+                  "height": 48
                 }
               },
               "localized": {
@@ -1092,7 +1094,7 @@
               "styles": {
                 "color": "#002A60",
                 "width": "100%",
-                "fontSize": "17px",
+                "fontSize": "16px",
                 "alignSelf": "auto",
                 "textAlign": "start",
                 "fontWeight": "",
@@ -1103,22 +1105,22 @@
               "content": "Eligible students receive a referral link after verified purchase. Approved nonbuyer affiliates can also promote the course. Eligible direct sales earn $10, subject to verification; earnings are not guaranteed.",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 2792,
-                  "width": 366,
-                  "height": 104
+                  "x": 16,
+                  "y": 2661,
+                  "width": 358,
+                  "height": 168
                 },
                 "tablet": {
                   "x": 24,
-                  "y": 2666,
-                  "width": 350,
-                  "height": 104
+                  "y": 2135,
+                  "width": 348,
+                  "height": 168
                 },
                 "desktop": {
                   "x": 24,
-                  "y": 2390,
-                  "width": 566,
-                  "height": 104
+                  "y": 1947,
+                  "width": 564,
+                  "height": 112
                 }
               },
               "localized": {
@@ -1150,6 +1152,7 @@
               },
               "styles": {
                 "color": "var(--theme-text)",
+                "width": "100%",
                 "fontSize": "14px",
                 "alignSelf": "auto",
                 "textAlign": "left",
@@ -1161,22 +1164,22 @@
               "content": "Become an Affiliate",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 2910,
-                  "width": 366,
-                  "height": 42
+                  "x": 16,
+                  "y": 2845,
+                  "width": 196,
+                  "height": 48
                 },
                 "tablet": {
                   "x": 24,
-                  "y": 2790,
-                  "width": 350,
-                  "height": 42
+                  "y": 2319,
+                  "width": 196,
+                  "height": 48
                 },
                 "desktop": {
                   "x": 24,
-                  "y": 2514,
-                  "width": 566,
-                  "height": 42
+                  "y": 2075,
+                  "width": 196,
+                  "height": 48
                 }
               },
               "localized": {
@@ -1213,10 +1216,10 @@
               "styles": {
                 "color": "#002A60",
                 "width": "100%",
-                "fontSize": "36px",
+                "fontSize": "22px",
                 "alignSelf": "auto",
                 "textAlign": "start",
-                "fontWeight": "750",
+                "fontWeight": "700",
                 "lineHeight": "1.25",
                 "borderRadius": "16px",
                 "backgroundColor": ""
@@ -1224,22 +1227,22 @@
               "content": "Tuition Support",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 2980,
-                  "width": 366,
-                  "height": 112
+                  "x": 16,
+                  "y": 2941,
+                  "width": 358,
+                  "height": 48
                 },
                 "tablet": {
-                  "x": 394,
-                  "y": 2534,
-                  "width": 350,
-                  "height": 112
+                  "x": 396,
+                  "y": 2071,
+                  "width": 348,
+                  "height": 48
                 },
                 "desktop": {
-                  "x": 610,
-                  "y": 2258,
-                  "width": 566,
-                  "height": 112
+                  "x": 612,
+                  "y": 1883,
+                  "width": 564,
+                  "height": 48
                 }
               },
               "localized": {
@@ -1274,7 +1277,7 @@
               "styles": {
                 "color": "#002A60",
                 "width": "100%",
-                "fontSize": "17px",
+                "fontSize": "16px",
                 "alignSelf": "auto",
                 "textAlign": "start",
                 "fontWeight": "",
@@ -1285,22 +1288,22 @@
               "content": "Four verified direct course sales create eligibility to apply, not guaranteed assistance. Completing Level 4 is unrelated.",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 3106,
-                  "width": 366,
-                  "height": 104
+                  "x": 16,
+                  "y": 3005,
+                  "width": 358,
+                  "height": 84
                 },
                 "tablet": {
-                  "x": 394,
-                  "y": 2666,
-                  "width": 350,
-                  "height": 104
+                  "x": 396,
+                  "y": 2135,
+                  "width": 348,
+                  "height": 112
                 },
                 "desktop": {
-                  "x": 610,
-                  "y": 2390,
-                  "width": 566,
-                  "height": 104
+                  "x": 612,
+                  "y": 1947,
+                  "width": 564,
+                  "height": 56
                 }
               },
               "localized": {
@@ -1332,6 +1335,7 @@
               },
               "styles": {
                 "color": "var(--theme-text)",
+                "width": "100%",
                 "fontSize": "14px",
                 "alignSelf": "auto",
                 "textAlign": "left",
@@ -1343,22 +1347,22 @@
               "content": "Understand the requirements",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 3224,
-                  "width": 366,
-                  "height": 42
+                  "x": 16,
+                  "y": 3105,
+                  "width": 260,
+                  "height": 48
                 },
                 "tablet": {
-                  "x": 394,
-                  "y": 2790,
-                  "width": 350,
-                  "height": 42
+                  "x": 396,
+                  "y": 2263,
+                  "width": 260,
+                  "height": 48
                 },
                 "desktop": {
-                  "x": 610,
-                  "y": 2514,
-                  "width": 566,
-                  "height": 42
+                  "x": 612,
+                  "y": 2019,
+                  "width": 260,
+                  "height": 48
                 }
               },
               "localized": {
@@ -1395,10 +1399,10 @@
               "styles": {
                 "color": "#002A60",
                 "width": "100%",
-                "fontSize": "36px",
+                "fontSize": "30px",
                 "alignSelf": "auto",
                 "textAlign": "start",
-                "fontWeight": "750",
+                "fontWeight": "700",
                 "lineHeight": "1.25",
                 "borderRadius": "16px",
                 "backgroundColor": ""
@@ -1406,22 +1410,22 @@
               "content": "Learn locally. Communicate globally.",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 3326,
-                  "width": 366,
-                  "height": 112
+                  "x": 16,
+                  "y": 3201,
+                  "width": 358,
+                  "height": 68
                 },
                 "tablet": {
                   "x": 24,
-                  "y": 2904,
+                  "y": 2415,
                   "width": 720,
-                  "height": 112
+                  "height": 48
                 },
                 "desktop": {
                   "x": 24,
-                  "y": 2628,
+                  "y": 2171,
                   "width": 1152,
-                  "height": 112
+                  "height": 48
                 }
               },
               "localized": {
@@ -1456,7 +1460,7 @@
               "styles": {
                 "color": "#002A60",
                 "width": "100%",
-                "fontSize": "17px",
+                "fontSize": "16px",
                 "alignSelf": "auto",
                 "textAlign": "start",
                 "fontWeight": "",
@@ -1467,22 +1471,22 @@
               "content": "English can help you communicate about university life in Bethlehem, work in Ramallah or future international study. Active learners can submit an Exchange enquiry; no partners, scholarships, deadlines or places are promised.",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 3452,
-                  "width": 366,
-                  "height": 104
+                  "x": 16,
+                  "y": 3284,
+                  "width": 358,
+                  "height": 168
                 },
                 "tablet": {
                   "x": 24,
-                  "y": 3036,
+                  "y": 2479,
                   "width": 720,
-                  "height": 104
+                  "height": 84
                 },
                 "desktop": {
                   "x": 24,
-                  "y": 2760,
+                  "y": 2235,
                   "width": 1152,
-                  "height": 104
+                  "height": 84
                 }
               },
               "localized": {
@@ -1514,6 +1518,7 @@
               },
               "styles": {
                 "color": "var(--theme-text)",
+                "width": "100%",
                 "fontSize": "14px",
                 "alignSelf": "auto",
                 "textAlign": "left",
@@ -1525,22 +1530,22 @@
               "content": "Exchange Programme",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 3570,
-                  "width": 366,
-                  "height": 42
+                  "x": 16,
+                  "y": 3468,
+                  "width": 188,
+                  "height": 48
                 },
                 "tablet": {
                   "x": 24,
-                  "y": 3160,
-                  "width": 720,
-                  "height": 42
+                  "y": 2579,
+                  "width": 188,
+                  "height": 48
                 },
                 "desktop": {
                   "x": 24,
-                  "y": 2884,
-                  "width": 1152,
-                  "height": 42
+                  "y": 2335,
+                  "width": 188,
+                  "height": 48
                 }
               },
               "localized": {
@@ -1577,10 +1582,10 @@
               "styles": {
                 "color": "#002A60",
                 "width": "100%",
-                "fontSize": "36px",
+                "fontSize": "30px",
                 "alignSelf": "auto",
                 "textAlign": "start",
-                "fontWeight": "750",
+                "fontWeight": "700",
                 "lineHeight": "1.25",
                 "borderRadius": "16px",
                 "backgroundColor": ""
@@ -1588,22 +1593,22 @@
               "content": "Your questions, answered",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 3672,
-                  "width": 366,
-                  "height": 112
+                  "x": 16,
+                  "y": 3564,
+                  "width": 358,
+                  "height": 68
                 },
                 "tablet": {
                   "x": 24,
-                  "y": 3274,
+                  "y": 2675,
                   "width": 720,
-                  "height": 112
+                  "height": 48
                 },
                 "desktop": {
                   "x": 24,
-                  "y": 2998,
+                  "y": 2431,
                   "width": 1152,
-                  "height": 112
+                  "height": 48
                 }
               },
               "localized": {
@@ -1638,7 +1643,7 @@
               "styles": {
                 "color": "#002A60",
                 "width": "100%",
-                "fontSize": "17px",
+                "fontSize": "16px",
                 "alignSelf": "auto",
                 "textAlign": "start",
                 "fontWeight": "",
@@ -1649,22 +1654,22 @@
               "content": "How many Levels? Ten. Is support based on Level 4? No: four verified sales. Is a course purchase required to become an Affiliate? No.",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 3798,
-                  "width": 366,
-                  "height": 104
+                  "x": 16,
+                  "y": 3648,
+                  "width": 358,
+                  "height": 112
                 },
                 "tablet": {
                   "x": 24,
-                  "y": 3406,
+                  "y": 2739,
                   "width": 720,
-                  "height": 104
+                  "height": 56
                 },
                 "desktop": {
                   "x": 24,
-                  "y": 3130,
+                  "y": 2495,
                   "width": 1152,
-                  "height": 104
+                  "height": 56
                 }
               },
               "localized": {
@@ -1696,6 +1701,7 @@
               },
               "styles": {
                 "color": "var(--theme-text)",
+                "width": "100%",
                 "fontSize": "14px",
                 "alignSelf": "auto",
                 "textAlign": "left",
@@ -1707,22 +1713,22 @@
               "content": "Read all FAQs",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 3916,
-                  "width": 366,
-                  "height": 42
+                  "x": 16,
+                  "y": 3776,
+                  "width": 180,
+                  "height": 48
                 },
                 "tablet": {
                   "x": 24,
-                  "y": 3530,
-                  "width": 720,
-                  "height": 42
+                  "y": 2811,
+                  "width": 180,
+                  "height": 48
                 },
                 "desktop": {
                   "x": 24,
-                  "y": 3254,
-                  "width": 1152,
-                  "height": 42
+                  "y": 2567,
+                  "width": 180,
+                  "height": 48
                 }
               },
               "localized": {
@@ -1758,6 +1764,7 @@
               },
               "styles": {
                 "color": "var(--theme-text)",
+                "width": "100%",
                 "fontSize": "14px",
                 "alignSelf": "auto",
                 "textAlign": "left",
@@ -1769,22 +1776,22 @@
               "content": "Start your journey",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 3972,
-                  "width": 366,
-                  "height": 42
+                  "x": 16,
+                  "y": 3840,
+                  "width": 188,
+                  "height": 48
                 },
                 "tablet": {
                   "x": 24,
-                  "y": 3592,
-                  "width": 720,
-                  "height": 42
+                  "y": 2875,
+                  "width": 188,
+                  "height": 48
                 },
                 "desktop": {
                   "x": 24,
-                  "y": 3316,
-                  "width": 1152,
-                  "height": 42
+                  "y": 2631,
+                  "width": 188,
+                  "height": 48
                 }
               },
               "localized": {
@@ -1854,12 +1861,12 @@
           "layout": {
             "width": "full",
             "paddingY": "none",
-            "minHeight": 1362,
+            "minHeight": 1078,
             "background": "transparent",
             "minHeightByViewport": {
-              "mobile": 1284,
-              "tablet": 1362,
-              "desktop": 1362
+              "mobile": 1599,
+              "tablet": 1071,
+              "desktop": 1078
             }
           },
           "freeElements": [
@@ -1881,10 +1888,10 @@
               "styles": {
                 "color": "#002A60",
                 "width": "100%",
-                "fontSize": "52px",
+                "fontSize": "42px",
                 "alignSelf": "auto",
                 "textAlign": "start",
-                "fontWeight": "750",
+                "fontWeight": "700",
                 "lineHeight": "1.25",
                 "borderRadius": "16px",
                 "backgroundColor": ""
@@ -1892,22 +1899,22 @@
               "content": "EduHope English Conversation Course",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 12,
-                  "width": 366,
-                  "height": 112
+                  "x": 16,
+                  "y": 24,
+                  "width": 358,
+                  "height": 84
                 },
                 "tablet": {
                   "x": 24,
                   "y": 24,
                   "width": 720,
-                  "height": 112
+                  "height": 48
                 },
                 "desktop": {
                   "x": 24,
                   "y": 24,
                   "width": 1152,
-                  "height": 112
+                  "height": 55
                 }
               },
               "localized": {
@@ -1942,7 +1949,7 @@
               "styles": {
                 "color": "#002A60",
                 "width": "100%",
-                "fontSize": "17px",
+                "fontSize": "16px",
                 "alignSelf": "auto",
                 "textAlign": "start",
                 "fontWeight": "",
@@ -1953,22 +1960,22 @@
               "content": "$30 USD · Ten Levels · A1–C1 · Lifetime access after verified purchase. Live checkout remains disabled until the owner configures a payment provider.",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 138,
-                  "width": 366,
-                  "height": 104
+                  "x": 16,
+                  "y": 123,
+                  "width": 358,
+                  "height": 112
                 },
                 "tablet": {
                   "x": 24,
-                  "y": 156,
+                  "y": 88,
                   "width": 720,
-                  "height": 104
+                  "height": 56
                 },
                 "desktop": {
                   "x": 24,
-                  "y": 156,
+                  "y": 95,
                   "width": 1152,
-                  "height": 104
+                  "height": 56
                 }
               },
               "localized": {
@@ -2001,7 +2008,7 @@
               "styles": {
                 "color": "#002A60",
                 "width": "100%",
-                "fontSize": "17px",
+                "fontSize": "16px",
                 "alignSelf": "auto",
                 "textAlign": "start",
                 "fontWeight": "",
@@ -2012,22 +2019,22 @@
               "content": "Develop the English communication skills you need for university, everyday conversations and future opportunities. Learn from A1 to C1 through practical listening, speaking and real-life activities.",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 256,
-                  "width": 366,
-                  "height": 104
+                  "x": 16,
+                  "y": 251,
+                  "width": 358,
+                  "height": 140
                 },
                 "tablet": {
                   "x": 24,
-                  "y": 280,
+                  "y": 160,
                   "width": 720,
-                  "height": 104
+                  "height": 84
                 },
                 "desktop": {
                   "x": 24,
-                  "y": 280,
+                  "y": 167,
                   "width": 1152,
-                  "height": 104
+                  "height": 84
                 }
               },
               "localized": {
@@ -2059,6 +2066,7 @@
               },
               "styles": {
                 "color": "var(--theme-text)",
+                "width": "100%",
                 "fontSize": "14px",
                 "alignSelf": "auto",
                 "textAlign": "left",
@@ -2070,22 +2078,22 @@
               "content": "Open the real course",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 374,
-                  "width": 366,
-                  "height": 42
+                  "x": 16,
+                  "y": 407,
+                  "width": 204,
+                  "height": 48
                 },
                 "tablet": {
                   "x": 24,
-                  "y": 404,
-                  "width": 720,
-                  "height": 42
+                  "y": 260,
+                  "width": 204,
+                  "height": 48
                 },
                 "desktop": {
                   "x": 24,
-                  "y": 404,
-                  "width": 1152,
-                  "height": 42
+                  "y": 267,
+                  "width": 204,
+                  "height": 48
                 }
               },
               "localized": {
@@ -2122,10 +2130,10 @@
               "styles": {
                 "color": "#002A60",
                 "width": "100%",
-                "fontSize": "36px",
+                "fontSize": "30px",
                 "alignSelf": "auto",
                 "textAlign": "start",
-                "fontWeight": "750",
+                "fontWeight": "700",
                 "lineHeight": "1.25",
                 "borderRadius": "16px",
                 "backgroundColor": ""
@@ -2133,22 +2141,22 @@
               "content": "Ten Levels. One confident learning journey.",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 476,
-                  "width": 366,
-                  "height": 112
+                  "x": 16,
+                  "y": 503,
+                  "width": 358,
+                  "height": 68
                 },
                 "tablet": {
                   "x": 24,
-                  "y": 518,
+                  "y": 356,
                   "width": 720,
-                  "height": 112
+                  "height": 48
                 },
                 "desktop": {
                   "x": 24,
-                  "y": 518,
+                  "y": 363,
                   "width": 1152,
-                  "height": 112
+                  "height": 48
                 }
               },
               "localized": {
@@ -2183,35 +2191,35 @@
               "styles": {
                 "color": "#002A60",
                 "width": "100%",
-                "height": "320px",
-                "fontSize": "",
+                "height": "auto",
+                "fontSize": "18px",
                 "alignSelf": "stretch",
-                "minHeight": "280px",
+                "minHeight": "0",
                 "textAlign": "start",
                 "fontWeight": "",
-                "lineHeight": "1.7",
+                "lineHeight": "1.6",
                 "borderRadius": "18px",
                 "backgroundColor": "var(--theme-surface)"
               },
               "content": "A1 · Levels 1–2: Foundations and everyday communication\nA2 · Levels 3–4: Independent daily conversations\nB1 · Levels 5–6: Opinions and practical problem-solving\nB2 · Levels 7–8: Discussion and professional communication\nC1 · Levels 9–10: Nuance, persuasion and advanced fluency",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 602,
-                  "width": 366,
-                  "height": 170
+                  "x": 16,
+                  "y": 587,
+                  "width": 358,
+                  "height": 388
                 },
                 "tablet": {
                   "x": 24,
-                  "y": 650,
+                  "y": 420,
                   "width": 720,
-                  "height": 170
+                  "height": 243
                 },
                 "desktop": {
                   "x": 24,
-                  "y": 650,
+                  "y": 427,
                   "width": 1152,
-                  "height": 170
+                  "height": 243
                 }
               },
               "listItems": [
@@ -2252,68 +2260,6 @@
               "sourceSectionName": "Ten-level pathway"
             },
             {
-              "id": "eduhope-node-289",
-              "mode": "direct",
-              "name": "button",
-              "type": "button",
-              "action": {
-                "url": "",
-                "type": "goToPage",
-                "formId": "",
-                "pageId": "eduhope-page-course",
-                "status": "",
-                "message": "",
-                "sectionId": "",
-                "openInNewTab": true
-              },
-              "styles": {
-                "color": "var(--theme-text)",
-                "fontSize": "14px",
-                "alignSelf": "auto",
-                "textAlign": "left",
-                "fontWeight": "700",
-                "lineHeight": "",
-                "borderRadius": "999px",
-                "backgroundColor": ""
-              },
-              "content": "Explore the Course",
-              "position": {
-                "mobile": {
-                  "x": 12,
-                  "y": 786,
-                  "width": 366,
-                  "height": 42
-                },
-                "tablet": {
-                  "x": 24,
-                  "y": 840,
-                  "width": 720,
-                  "height": 42
-                },
-                "desktop": {
-                  "x": 24,
-                  "y": 840,
-                  "width": 1152,
-                  "height": 42
-                }
-              },
-              "localized": {
-                "content": {
-                  "ar": "اكتشف الدورة",
-                  "en": "Explore the Course"
-                }
-              },
-              "textColor": "#FFFFFF",
-              "richTextSizes": [],
-              "hoverTextColor": "#FFFFFF",
-              "richTextColors": [],
-              "richTextStyles": [],
-              "backgroundColor": "#088848",
-              "connectedFormId": "",
-              "sourceSectionName": "Ten-level pathway",
-              "hoverBackgroundColor": "#006C39"
-            },
-            {
               "id": "eduhope-node-293",
               "mode": "direct",
               "name": "heading",
@@ -2331,10 +2277,10 @@
               "styles": {
                 "color": "#002A60",
                 "width": "100%",
-                "fontSize": "36px",
+                "fontSize": "30px",
                 "alignSelf": "auto",
                 "textAlign": "start",
-                "fontWeight": "750",
+                "fontWeight": "700",
                 "lineHeight": "1.25",
                 "borderRadius": "16px",
                 "backgroundColor": ""
@@ -2342,22 +2288,22 @@
               "content": "Practical learning, meaningful assessment",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 888,
-                  "width": 366,
-                  "height": 112
+                  "x": 16,
+                  "y": 1023,
+                  "width": 358,
+                  "height": 68
                 },
                 "tablet": {
                   "x": 24,
-                  "y": 954,
+                  "y": 711,
                   "width": 720,
-                  "height": 112
+                  "height": 48
                 },
                 "desktop": {
                   "x": 24,
-                  "y": 954,
+                  "y": 718,
                   "width": 1152,
-                  "height": 112
+                  "height": 48
                 }
               },
               "localized": {
@@ -2392,7 +2338,7 @@
               "styles": {
                 "color": "#002A60",
                 "width": "100%",
-                "fontSize": "17px",
+                "fontSize": "16px",
                 "alignSelf": "auto",
                 "textAlign": "start",
                 "fontWeight": "",
@@ -2403,22 +2349,22 @@
               "content": "Original dialogues and temporary spoken demo audio, visible transcripts, listening with pictures, vocabulary, useful expressions, communication questions and local speaking practice. Five final exams combine objective evidence with authorized human grading; results remain Pending Review until grading finishes.",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 1014,
-                  "width": 366,
-                  "height": 104
+                  "x": 16,
+                  "y": 1106,
+                  "width": 358,
+                  "height": 224
                 },
                 "tablet": {
                   "x": 24,
-                  "y": 1086,
+                  "y": 775,
                   "width": 720,
-                  "height": 104
+                  "height": 112
                 },
                 "desktop": {
                   "x": 24,
-                  "y": 1086,
+                  "y": 782,
                   "width": 1152,
-                  "height": 104
+                  "height": 112
                 }
               },
               "localized": {
@@ -2451,7 +2397,7 @@
               "styles": {
                 "color": "#002A60",
                 "width": "100%",
-                "fontSize": "17px",
+                "fontSize": "16px",
                 "alignSelf": "auto",
                 "textAlign": "start",
                 "fontWeight": "",
@@ -2462,22 +2408,22 @@
               "content": "Each CEFR certificate requires its two corresponding Levels, required activities and a final result of at least 70%. Retakes vary the questions or order. The 89-topic syllabus is provisional; original owner topic titles and professional audio are awaiting supply.",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 1132,
-                  "width": 366,
-                  "height": 104
+                  "x": 16,
+                  "y": 1346,
+                  "width": 358,
+                  "height": 196
                 },
                 "tablet": {
                   "x": 24,
-                  "y": 1210,
+                  "y": 903,
                   "width": 720,
-                  "height": 104
+                  "height": 112
                 },
                 "desktop": {
                   "x": 24,
-                  "y": 1210,
+                  "y": 910,
                   "width": 1152,
-                  "height": 104
+                  "height": 112
                 }
               },
               "localized": {
@@ -2543,12 +2489,12 @@
           "layout": {
             "width": "full",
             "paddingY": "none",
-            "minHeight": 806,
+            "minHeight": 768,
             "background": "transparent",
             "minHeightByViewport": {
-              "mobile": 758,
-              "tablet": 806,
-              "desktop": 806
+              "mobile": 1133,
+              "tablet": 790,
+              "desktop": 768
             }
           },
           "freeElements": [
@@ -2570,10 +2516,10 @@
               "styles": {
                 "color": "#002A60",
                 "width": "100%",
-                "fontSize": "52px",
+                "fontSize": "42px",
                 "alignSelf": "auto",
                 "textAlign": "start",
-                "fontWeight": "750",
+                "fontWeight": "700",
                 "lineHeight": "1.25",
                 "borderRadius": "16px",
                 "backgroundColor": ""
@@ -2581,22 +2527,22 @@
               "content": "Learn. Grow. Give Back.",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 12,
-                  "width": 366,
-                  "height": 112
+                  "x": 16,
+                  "y": 24,
+                  "width": 358,
+                  "height": 84
                 },
                 "tablet": {
                   "x": 24,
                   "y": 24,
                   "width": 720,
-                  "height": 112
+                  "height": 48
                 },
                 "desktop": {
                   "x": 24,
                   "y": 24,
                   "width": 1152,
-                  "height": 112
+                  "height": 55
                 }
               },
               "localized": {
@@ -2631,35 +2577,35 @@
               "styles": {
                 "color": "#002A60",
                 "width": "100%",
-                "height": "320px",
-                "fontSize": "",
+                "height": "auto",
+                "fontSize": "18px",
                 "alignSelf": "stretch",
-                "minHeight": "280px",
+                "minHeight": "0",
                 "textAlign": "start",
                 "fontWeight": "",
-                "lineHeight": "1.7",
+                "lineHeight": "1.6",
                 "borderRadius": "18px",
                 "backgroundColor": "var(--theme-surface)"
               },
               "content": "1. Register and verify your email.\n2. Enrol after verified purchase; checkout is currently awaiting provider configuration.\n3. Learn through ten Levels and track your progress.\n4. Receive a student referral link only after verified purchase.\n5. Share directly; eligible verified sales earn $10.\n6. Four verified sales unlock a Tuition Support application.\n7. Active learners can enquire about Exchange independently.",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 138,
-                  "width": 366,
-                  "height": 170
+                  "x": 16,
+                  "y": 123,
+                  "width": 358,
+                  "height": 582
                 },
                 "tablet": {
                   "x": 24,
-                  "y": 156,
+                  "y": 88,
                   "width": 720,
-                  "height": 170
+                  "height": 350
                 },
                 "desktop": {
                   "x": 24,
-                  "y": 156,
+                  "y": 95,
                   "width": 1152,
-                  "height": 170
+                  "height": 321
                 }
               },
               "listItems": [
@@ -2722,6 +2668,7 @@
               },
               "styles": {
                 "color": "var(--theme-text)",
+                "width": "100%",
                 "fontSize": "14px",
                 "alignSelf": "auto",
                 "textAlign": "left",
@@ -2733,22 +2680,22 @@
               "content": "Explore the Course",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 322,
-                  "width": 366,
-                  "height": 42
+                  "x": 16,
+                  "y": 721,
+                  "width": 188,
+                  "height": 48
                 },
                 "tablet": {
                   "x": 24,
-                  "y": 346,
-                  "width": 720,
-                  "height": 42
+                  "y": 454,
+                  "width": 188,
+                  "height": 48
                 },
                 "desktop": {
                   "x": 24,
-                  "y": 346,
-                  "width": 1152,
-                  "height": 42
+                  "y": 432,
+                  "width": 188,
+                  "height": 48
                 }
               },
               "localized": {
@@ -2785,10 +2732,10 @@
               "styles": {
                 "color": "#002A60",
                 "width": "100%",
-                "fontSize": "36px",
+                "fontSize": "30px",
                 "alignSelf": "auto",
                 "textAlign": "start",
-                "fontWeight": "750",
+                "fontWeight": "700",
                 "lineHeight": "1.25",
                 "borderRadius": "16px",
                 "backgroundColor": ""
@@ -2796,22 +2743,22 @@
               "content": "Promote without buying the course",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 424,
-                  "width": 366,
-                  "height": 112
+                  "x": 16,
+                  "y": 817,
+                  "width": 358,
+                  "height": 68
                 },
                 "tablet": {
                   "x": 24,
-                  "y": 460,
+                  "y": 550,
                   "width": 720,
-                  "height": 112
+                  "height": 48
                 },
                 "desktop": {
                   "x": 24,
-                  "y": 460,
+                  "y": 528,
                   "width": 1152,
-                  "height": 112
+                  "height": 48
                 }
               },
               "localized": {
@@ -2846,7 +2793,7 @@
               "styles": {
                 "color": "#002A60",
                 "width": "100%",
-                "fontSize": "17px",
+                "fontSize": "16px",
                 "alignSelf": "auto",
                 "textAlign": "start",
                 "fontWeight": "",
@@ -2857,22 +2804,22 @@
               "content": "Register → Submit the Affiliate Form → Human admin review → Approved Affiliate eligibility and unique referral link. Submission alone grants no privileges.",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 550,
-                  "width": 366,
-                  "height": 104
+                  "x": 16,
+                  "y": 901,
+                  "width": 358,
+                  "height": 112
                 },
                 "tablet": {
                   "x": 24,
-                  "y": 592,
+                  "y": 614,
                   "width": 720,
-                  "height": 104
+                  "height": 56
                 },
                 "desktop": {
                   "x": 24,
                   "y": 592,
                   "width": 1152,
-                  "height": 104
+                  "height": 56
                 }
               },
               "localized": {
@@ -2904,6 +2851,7 @@
               },
               "styles": {
                 "color": "var(--theme-text)",
+                "width": "100%",
                 "fontSize": "14px",
                 "alignSelf": "auto",
                 "textAlign": "left",
@@ -2915,22 +2863,22 @@
               "content": "Apply as an Affiliate",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 668,
-                  "width": 366,
-                  "height": 42
+                  "x": 16,
+                  "y": 1029,
+                  "width": 212,
+                  "height": 48
                 },
                 "tablet": {
                   "x": 24,
-                  "y": 716,
-                  "width": 720,
-                  "height": 42
+                  "y": 686,
+                  "width": 212,
+                  "height": 48
                 },
                 "desktop": {
                   "x": 24,
-                  "y": 716,
-                  "width": 1152,
-                  "height": 42
+                  "y": 664,
+                  "width": 212,
+                  "height": 48
                 }
               },
               "localized": {
@@ -3000,12 +2948,12 @@
           "layout": {
             "width": "full",
             "paddingY": "none",
-            "minHeight": 468,
+            "minHeight": 551,
             "background": "transparent",
             "minHeightByViewport": {
-              "mobile": 444,
-              "tablet": 468,
-              "desktop": 468
+              "mobile": 664,
+              "tablet": 544,
+              "desktop": 551
             }
           },
           "freeElements": [
@@ -3027,10 +2975,10 @@
               "styles": {
                 "color": "#002A60",
                 "width": "100%",
-                "fontSize": "52px",
+                "fontSize": "42px",
                 "alignSelf": "auto",
                 "textAlign": "start",
-                "fontWeight": "750",
+                "fontWeight": "700",
                 "lineHeight": "1.25",
                 "borderRadius": "16px",
                 "backgroundColor": ""
@@ -3038,22 +2986,22 @@
               "content": "Become an Affiliate",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 12,
-                  "width": 366,
-                  "height": 112
+                  "x": 16,
+                  "y": 24,
+                  "width": 358,
+                  "height": 84
                 },
                 "tablet": {
                   "x": 24,
                   "y": 24,
                   "width": 720,
-                  "height": 112
+                  "height": 48
                 },
                 "desktop": {
                   "x": 24,
                   "y": 24,
                   "width": 1152,
-                  "height": 112
+                  "height": 55
                 }
               },
               "localized": {
@@ -3088,7 +3036,7 @@
               "styles": {
                 "color": "#002A60",
                 "width": "100%",
-                "fontSize": "17px",
+                "fontSize": "16px",
                 "alignSelf": "auto",
                 "textAlign": "start",
                 "fontWeight": "",
@@ -3099,22 +3047,22 @@
               "content": "You do not need to buy the course. Apply through the academy Form below. An authorized admin reviews your submission; approval activates eligible direct-referral participation. Rewards require valid provider-confirmed sales. No downline commissions or guaranteed earnings.",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 138,
-                  "width": 366,
-                  "height": 104
+                  "x": 16,
+                  "y": 123,
+                  "width": 358,
+                  "height": 196
                 },
                 "tablet": {
                   "x": 24,
-                  "y": 156,
+                  "y": 88,
                   "width": 720,
-                  "height": 104
+                  "height": 112
                 },
                 "desktop": {
                   "x": 24,
-                  "y": 156,
+                  "y": 95,
                   "width": 1152,
-                  "height": 104
+                  "height": 112
                 }
               },
               "localized": {
@@ -3161,22 +3109,22 @@
               "content": "",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 256,
-                  "width": 366,
-                  "height": 140
+                  "x": 16,
+                  "y": 367,
+                  "width": 358,
+                  "height": 240
                 },
                 "tablet": {
                   "x": 24,
-                  "y": 280,
+                  "y": 248,
                   "width": 720,
-                  "height": 140
+                  "height": 240
                 },
                 "desktop": {
                   "x": 24,
-                  "y": 280,
-                  "width": 1152,
-                  "height": 140
+                  "y": 255,
+                  "width": 880,
+                  "height": 240
                 }
               },
               "connectedFormId": ""
@@ -3199,7 +3147,7 @@
       "visibility": "public",
       "backgroundColor": "var(--theme-surface)",
       "navigationLabel": "Become an Affiliate",
-      "showInNavigation": false,
+      "showInNavigation": true,
       "canvasLayoutVersion": 1
     },
     {
@@ -3232,12 +3180,12 @@
           "layout": {
             "width": "full",
             "paddingY": "none",
-            "minHeight": 564,
+            "minHeight": 455,
             "background": "transparent",
             "minHeightByViewport": {
-              "mobile": 534,
-              "tablet": 564,
-              "desktop": 564
+              "mobile": 671,
+              "tablet": 448,
+              "desktop": 455
             }
           },
           "freeElements": [
@@ -3259,10 +3207,10 @@
               "styles": {
                 "color": "#002A60",
                 "width": "100%",
-                "fontSize": "52px",
+                "fontSize": "42px",
                 "alignSelf": "auto",
                 "textAlign": "start",
-                "fontWeight": "750",
+                "fontWeight": "700",
                 "lineHeight": "1.25",
                 "borderRadius": "16px",
                 "backgroundColor": ""
@@ -3270,22 +3218,22 @@
               "content": "Education, opportunity and hope",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 12,
-                  "width": 366,
-                  "height": 112
+                  "x": 16,
+                  "y": 24,
+                  "width": 358,
+                  "height": 84
                 },
                 "tablet": {
                   "x": 24,
                   "y": 24,
                   "width": 720,
-                  "height": 112
+                  "height": 48
                 },
                 "desktop": {
                   "x": 24,
                   "y": 24,
                   "width": 1152,
-                  "height": 112
+                  "height": 55
                 }
               },
               "localized": {
@@ -3320,7 +3268,7 @@
               "styles": {
                 "color": "#002A60",
                 "width": "100%",
-                "fontSize": "17px",
+                "fontSize": "16px",
                 "alignSelf": "auto",
                 "textAlign": "start",
                 "fontWeight": "",
@@ -3331,22 +3279,22 @@
               "content": "Our mission is to make English learning accessible, practical and meaningful. EduHope helps learners develop real-life communication skills, improve their confidence and use English in everyday, academic and professional situations. Beyond language learning, we aim to create opportunities for learners to grow, share and contribute to their communities.",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 138,
-                  "width": 366,
-                  "height": 104
+                  "x": 16,
+                  "y": 123,
+                  "width": 358,
+                  "height": 252
                 },
                 "tablet": {
                   "x": 24,
-                  "y": 156,
+                  "y": 88,
                   "width": 720,
-                  "height": 104
+                  "height": 140
                 },
                 "desktop": {
                   "x": 24,
-                  "y": 156,
+                  "y": 95,
                   "width": 1152,
-                  "height": 104
+                  "height": 140
                 }
               },
               "localized": {
@@ -3379,10 +3327,10 @@
               "styles": {
                 "color": "#002A60",
                 "width": "100%",
-                "fontSize": "36px",
+                "fontSize": "30px",
                 "alignSelf": "auto",
                 "textAlign": "start",
-                "fontWeight": "750",
+                "fontWeight": "700",
                 "lineHeight": "1.25",
                 "borderRadius": "16px",
                 "backgroundColor": ""
@@ -3390,22 +3338,22 @@
               "content": "Learn. Grow. Give Back.",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 256,
-                  "width": 366,
-                  "height": 112
+                  "x": 16,
+                  "y": 391,
+                  "width": 358,
+                  "height": 68
                 },
                 "tablet": {
                   "x": 24,
-                  "y": 280,
+                  "y": 244,
                   "width": 720,
-                  "height": 112
+                  "height": 48
                 },
                 "desktop": {
                   "x": 24,
-                  "y": 280,
+                  "y": 251,
                   "width": 1152,
-                  "height": 112
+                  "height": 48
                 }
               },
               "localized": {
@@ -3440,7 +3388,7 @@
               "styles": {
                 "color": "#002A60",
                 "width": "100%",
-                "fontSize": "17px",
+                "fontSize": "16px",
                 "alignSelf": "auto",
                 "textAlign": "start",
                 "fontWeight": "",
@@ -3451,22 +3399,22 @@
               "content": "Eligible referral programmes and Tuition Support connect learning with contribution. Every application is reviewed, assistance is not guaranteed and we do not claim an unverified university partnership.",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 382,
-                  "width": 366,
-                  "height": 104
+                  "x": 16,
+                  "y": 475,
+                  "width": 358,
+                  "height": 140
                 },
                 "tablet": {
                   "x": 24,
-                  "y": 412,
+                  "y": 308,
                   "width": 720,
-                  "height": 104
+                  "height": 84
                 },
                 "desktop": {
                   "x": 24,
-                  "y": 412,
+                  "y": 315,
                   "width": 1152,
-                  "height": 104
+                  "height": 84
                 }
               },
               "localized": {
@@ -3532,12 +3480,12 @@
           "layout": {
             "width": "full",
             "paddingY": "none",
-            "minHeight": 592,
+            "minHeight": 651,
             "background": "transparent",
             "minHeightByViewport": {
-              "mobile": 562,
-              "tablet": 592,
-              "desktop": 592
+              "mobile": 848,
+              "tablet": 644,
+              "desktop": 651
             }
           },
           "freeElements": [
@@ -3559,10 +3507,10 @@
               "styles": {
                 "color": "#002A60",
                 "width": "100%",
-                "fontSize": "52px",
+                "fontSize": "42px",
                 "alignSelf": "auto",
                 "textAlign": "start",
-                "fontWeight": "750",
+                "fontWeight": "700",
                 "lineHeight": "1.25",
                 "borderRadius": "16px",
                 "backgroundColor": ""
@@ -3570,22 +3518,22 @@
               "content": "Create opportunities for others",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 12,
-                  "width": 366,
-                  "height": 112
+                  "x": 16,
+                  "y": 24,
+                  "width": 358,
+                  "height": 84
                 },
                 "tablet": {
                   "x": 24,
                   "y": 24,
                   "width": 720,
-                  "height": 112
+                  "height": 48
                 },
                 "desktop": {
                   "x": 24,
                   "y": 24,
                   "width": 1152,
-                  "height": 112
+                  "height": 55
                 }
               },
               "localized": {
@@ -3620,7 +3568,7 @@
               "styles": {
                 "color": "#002A60",
                 "width": "100%",
-                "fontSize": "17px",
+                "fontSize": "16px",
                 "alignSelf": "auto",
                 "textAlign": "start",
                 "fontWeight": "",
@@ -3631,22 +3579,22 @@
               "content": "We believe education should be accessible regardless of financial circumstances. A portion of eligible course sales is intended to support students experiencing difficulty with university tuition. Learn. Grow. Give Back.",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 138,
-                  "width": 366,
-                  "height": 104
+                  "x": 16,
+                  "y": 123,
+                  "width": 358,
+                  "height": 168
                 },
                 "tablet": {
                   "x": 24,
-                  "y": 156,
+                  "y": 88,
                   "width": 720,
-                  "height": 104
+                  "height": 84
                 },
                 "desktop": {
                   "x": 24,
-                  "y": 156,
+                  "y": 95,
                   "width": 1152,
-                  "height": 104
+                  "height": 84
                 }
               },
               "localized": {
@@ -3679,7 +3627,7 @@
               "styles": {
                 "color": "#002A60",
                 "width": "100%",
-                "fontSize": "17px",
+                "fontSize": "16px",
                 "alignSelf": "auto",
                 "textAlign": "start",
                 "fontWeight": "",
@@ -3690,22 +3638,22 @@
               "content": "Eligibility: four valid, verified direct course sales through your own referral link. Not Level 4, course completion or lesson count. Failed, cancelled, refunded, duplicate, self-referred and invalid sales do not count. Eligibility to apply does not guarantee assistance.",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 256,
-                  "width": 366,
-                  "height": 104
+                  "x": 16,
+                  "y": 307,
+                  "width": 358,
+                  "height": 196
                 },
                 "tablet": {
                   "x": 24,
-                  "y": 280,
+                  "y": 188,
                   "width": 720,
-                  "height": 104
+                  "height": 112
                 },
                 "desktop": {
                   "x": 24,
-                  "y": 280,
+                  "y": 195,
                   "width": 1152,
-                  "height": 104
+                  "height": 112
                 }
               },
               "localized": {
@@ -3752,22 +3700,22 @@
               "content": "",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 374,
-                  "width": 366,
-                  "height": 140
+                  "x": 16,
+                  "y": 551,
+                  "width": 358,
+                  "height": 240
                 },
                 "tablet": {
                   "x": 24,
-                  "y": 404,
+                  "y": 348,
                   "width": 720,
-                  "height": 140
+                  "height": 240
                 },
                 "desktop": {
                   "x": 24,
-                  "y": 404,
-                  "width": 1152,
-                  "height": 140
+                  "y": 355,
+                  "width": 880,
+                  "height": 240
                 }
               },
               "connectedFormId": ""
@@ -3790,7 +3738,7 @@
       "visibility": "public",
       "backgroundColor": "var(--theme-surface)",
       "navigationLabel": "Tuition Support",
-      "showInNavigation": false,
+      "showInNavigation": true,
       "canvasLayoutVersion": 1
     },
     {
@@ -3823,12 +3771,12 @@
           "layout": {
             "width": "full",
             "paddingY": "none",
-            "minHeight": 468,
+            "minHeight": 523,
             "background": "transparent",
             "minHeightByViewport": {
-              "mobile": 444,
-              "tablet": 468,
-              "desktop": 468
+              "mobile": 677,
+              "tablet": 552,
+              "desktop": 523
             }
           },
           "freeElements": [
@@ -3850,10 +3798,10 @@
               "styles": {
                 "color": "#002A60",
                 "width": "100%",
-                "fontSize": "52px",
+                "fontSize": "42px",
                 "alignSelf": "auto",
                 "textAlign": "start",
-                "fontWeight": "750",
+                "fontWeight": "700",
                 "lineHeight": "1.25",
                 "borderRadius": "16px",
                 "backgroundColor": ""
@@ -3861,22 +3809,22 @@
               "content": "Connect learning with wider opportunities",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 12,
-                  "width": 366,
-                  "height": 112
+                  "x": 16,
+                  "y": 24,
+                  "width": 358,
+                  "height": 125
                 },
                 "tablet": {
                   "x": 24,
                   "y": 24,
                   "width": 720,
-                  "height": 112
+                  "height": 84
                 },
                 "desktop": {
                   "x": 24,
                   "y": 24,
                   "width": 1152,
-                  "height": 112
+                  "height": 55
                 }
               },
               "localized": {
@@ -3911,7 +3859,7 @@
               "styles": {
                 "color": "#002A60",
                 "width": "100%",
-                "fontSize": "17px",
+                "fontSize": "16px",
                 "alignSelf": "auto",
                 "textAlign": "start",
                 "fontWeight": "",
@@ -3922,22 +3870,22 @@
               "content": "Active learners may apply subject to configured programme requirements. Four referral sales and Tuition Support approval are not required. This is a general enquiry/intake; no actual partner, scholarship, deadline or place is being advertised.",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 138,
-                  "width": 366,
-                  "height": 104
+                  "x": 16,
+                  "y": 165,
+                  "width": 358,
+                  "height": 168
                 },
                 "tablet": {
                   "x": 24,
-                  "y": 156,
+                  "y": 123,
                   "width": 720,
-                  "height": 104
+                  "height": 84
                 },
                 "desktop": {
                   "x": 24,
-                  "y": 156,
+                  "y": 95,
                   "width": 1152,
-                  "height": 104
+                  "height": 84
                 }
               },
               "localized": {
@@ -3984,22 +3932,22 @@
               "content": "",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 256,
-                  "width": 366,
-                  "height": 140
+                  "x": 16,
+                  "y": 381,
+                  "width": 358,
+                  "height": 240
                 },
                 "tablet": {
                   "x": 24,
-                  "y": 280,
+                  "y": 255,
                   "width": 720,
-                  "height": 140
+                  "height": 240
                 },
                 "desktop": {
                   "x": 24,
-                  "y": 280,
-                  "width": 1152,
-                  "height": 140
+                  "y": 227,
+                  "width": 880,
+                  "height": 240
                 }
               },
               "connectedFormId": ""
@@ -4022,7 +3970,7 @@
       "visibility": "public",
       "backgroundColor": "var(--theme-surface)",
       "navigationLabel": "Exchange Programme",
-      "showInNavigation": false,
+      "showInNavigation": true,
       "canvasLayoutVersion": 1
     },
     {
@@ -4055,12 +4003,12 @@
           "layout": {
             "width": "full",
             "paddingY": "none",
-            "minHeight": 4188,
+            "minHeight": 2255,
             "background": "transparent",
             "minHeightByViewport": {
-              "mobile": 3942,
-              "tablet": 4188,
-              "desktop": 4188
+              "mobile": 2684,
+              "tablet": 2248,
+              "desktop": 2255
             }
           },
           "freeElements": [
@@ -4082,10 +4030,10 @@
               "styles": {
                 "color": "#002A60",
                 "width": "100%",
-                "fontSize": "52px",
+                "fontSize": "42px",
                 "alignSelf": "auto",
                 "textAlign": "start",
-                "fontWeight": "750",
+                "fontWeight": "700",
                 "lineHeight": "1.25",
                 "borderRadius": "16px",
                 "backgroundColor": ""
@@ -4093,22 +4041,22 @@
               "content": "Frequently asked questions",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 12,
-                  "width": 366,
-                  "height": 112
+                  "x": 16,
+                  "y": 24,
+                  "width": 358,
+                  "height": 84
                 },
                 "tablet": {
                   "x": 24,
                   "y": 24,
                   "width": 720,
-                  "height": 112
+                  "height": 48
                 },
                 "desktop": {
                   "x": 24,
                   "y": 24,
                   "width": 1152,
-                  "height": 112
+                  "height": 55
                 }
               },
               "localized": {
@@ -4143,10 +4091,10 @@
               "styles": {
                 "color": "#002A60",
                 "width": "100%",
-                "fontSize": "36px",
+                "fontSize": "30px",
                 "alignSelf": "auto",
                 "textAlign": "start",
-                "fontWeight": "750",
+                "fontWeight": "700",
                 "lineHeight": "1.25",
                 "borderRadius": "16px",
                 "backgroundColor": ""
@@ -4154,22 +4102,22 @@
               "content": "What is EduHope?",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 184,
-                  "width": 366,
-                  "height": 112
+                  "x": 16,
+                  "y": 155,
+                  "width": 358,
+                  "height": 48
                 },
                 "tablet": {
                   "x": 24,
-                  "y": 208,
+                  "y": 120,
                   "width": 720,
-                  "height": 112
+                  "height": 48
                 },
                 "desktop": {
                   "x": 24,
-                  "y": 208,
+                  "y": 127,
                   "width": 1152,
-                  "height": 112
+                  "height": 48
                 }
               },
               "localized": {
@@ -4204,7 +4152,7 @@
               "styles": {
                 "color": "#002A60",
                 "width": "100%",
-                "fontSize": "17px",
+                "fontSize": "16px",
                 "alignSelf": "auto",
                 "textAlign": "start",
                 "fontWeight": "",
@@ -4215,22 +4163,22 @@
               "content": "Practical English learning with eligible referral, Tuition Support and Exchange programmes.",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 310,
-                  "width": 366,
-                  "height": 104
+                  "x": 16,
+                  "y": 219,
+                  "width": 358,
+                  "height": 84
                 },
                 "tablet": {
                   "x": 24,
-                  "y": 340,
+                  "y": 184,
                   "width": 720,
-                  "height": 104
+                  "height": 56
                 },
                 "desktop": {
                   "x": 24,
-                  "y": 340,
+                  "y": 191,
                   "width": 1152,
-                  "height": 104
+                  "height": 56
                 }
               },
               "localized": {
@@ -4263,10 +4211,10 @@
               "styles": {
                 "color": "#002A60",
                 "width": "100%",
-                "fontSize": "36px",
+                "fontSize": "30px",
                 "alignSelf": "auto",
                 "textAlign": "start",
-                "fontWeight": "750",
+                "fontWeight": "700",
                 "lineHeight": "1.25",
                 "borderRadius": "16px",
                 "backgroundColor": ""
@@ -4274,22 +4222,22 @@
               "content": "How much does the course cost?",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 474,
-                  "width": 366,
-                  "height": 112
+                  "x": 16,
+                  "y": 351,
+                  "width": 358,
+                  "height": 68
                 },
                 "tablet": {
                   "x": 24,
-                  "y": 516,
+                  "y": 288,
                   "width": 720,
-                  "height": 112
+                  "height": 48
                 },
                 "desktop": {
                   "x": 24,
-                  "y": 516,
+                  "y": 295,
                   "width": 1152,
-                  "height": 112
+                  "height": 48
                 }
               },
               "localized": {
@@ -4324,7 +4272,7 @@
               "styles": {
                 "color": "#002A60",
                 "width": "100%",
-                "fontSize": "17px",
+                "fontSize": "16px",
                 "alignSelf": "auto",
                 "textAlign": "start",
                 "fontWeight": "",
@@ -4335,22 +4283,22 @@
               "content": "$30 USD; configurable by the owner. Live payments are awaiting configuration.",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 600,
-                  "width": 366,
-                  "height": 104
+                  "x": 16,
+                  "y": 435,
+                  "width": 358,
+                  "height": 56
                 },
                 "tablet": {
                   "x": 24,
-                  "y": 648,
+                  "y": 352,
                   "width": 720,
-                  "height": 104
+                  "height": 48
                 },
                 "desktop": {
                   "x": 24,
-                  "y": 648,
+                  "y": 359,
                   "width": 1152,
-                  "height": 104
+                  "height": 48
                 }
               },
               "localized": {
@@ -4383,10 +4331,10 @@
               "styles": {
                 "color": "#002A60",
                 "width": "100%",
-                "fontSize": "36px",
+                "fontSize": "30px",
                 "alignSelf": "auto",
                 "textAlign": "start",
-                "fontWeight": "750",
+                "fontWeight": "700",
                 "lineHeight": "1.25",
                 "borderRadius": "16px",
                 "backgroundColor": ""
@@ -4394,22 +4342,22 @@
               "content": "How many Levels?",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 764,
-                  "width": 366,
-                  "height": 112
+                  "x": 16,
+                  "y": 539,
+                  "width": 358,
+                  "height": 48
                 },
                 "tablet": {
                   "x": 24,
-                  "y": 824,
+                  "y": 448,
                   "width": 720,
-                  "height": 112
+                  "height": 48
                 },
                 "desktop": {
                   "x": 24,
-                  "y": 824,
+                  "y": 455,
                   "width": 1152,
-                  "height": 112
+                  "height": 48
                 }
               },
               "localized": {
@@ -4444,7 +4392,7 @@
               "styles": {
                 "color": "#002A60",
                 "width": "100%",
-                "fontSize": "17px",
+                "fontSize": "16px",
                 "alignSelf": "auto",
                 "textAlign": "start",
                 "fontWeight": "",
@@ -4455,22 +4403,22 @@
               "content": "Ten Levels covering A1 to C1.",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 890,
-                  "width": 366,
-                  "height": 104
+                  "x": 16,
+                  "y": 603,
+                  "width": 358,
+                  "height": 48
                 },
                 "tablet": {
                   "x": 24,
-                  "y": 956,
+                  "y": 512,
                   "width": 720,
-                  "height": 104
+                  "height": 48
                 },
                 "desktop": {
                   "x": 24,
-                  "y": 956,
+                  "y": 519,
                   "width": 1152,
-                  "height": 104
+                  "height": 48
                 }
               },
               "localized": {
@@ -4503,10 +4451,10 @@
               "styles": {
                 "color": "#002A60",
                 "width": "100%",
-                "fontSize": "36px",
+                "fontSize": "30px",
                 "alignSelf": "auto",
                 "textAlign": "start",
-                "fontWeight": "750",
+                "fontWeight": "700",
                 "lineHeight": "1.25",
                 "borderRadius": "16px",
                 "backgroundColor": ""
@@ -4514,22 +4462,22 @@
               "content": "What is included?",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 1054,
-                  "width": 366,
-                  "height": 112
+                  "x": 16,
+                  "y": 699,
+                  "width": 358,
+                  "height": 48
                 },
                 "tablet": {
                   "x": 24,
-                  "y": 1132,
+                  "y": 608,
                   "width": 720,
-                  "height": 112
+                  "height": 48
                 },
                 "desktop": {
                   "x": 24,
-                  "y": 1132,
+                  "y": 615,
                   "width": 1152,
-                  "height": 112
+                  "height": 48
                 }
               },
               "localized": {
@@ -4564,7 +4512,7 @@
               "styles": {
                 "color": "#002A60",
                 "width": "100%",
-                "fontSize": "17px",
+                "fontSize": "16px",
                 "alignSelf": "auto",
                 "textAlign": "start",
                 "fontWeight": "",
@@ -4575,22 +4523,22 @@
               "content": "Speaking, listening, vocabulary, useful expressions and real-life academic/professional communication.",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 1180,
-                  "width": 366,
-                  "height": 104
+                  "x": 16,
+                  "y": 763,
+                  "width": 358,
+                  "height": 84
                 },
                 "tablet": {
                   "x": 24,
-                  "y": 1264,
+                  "y": 672,
                   "width": 720,
-                  "height": 104
+                  "height": 56
                 },
                 "desktop": {
                   "x": 24,
-                  "y": 1264,
+                  "y": 679,
                   "width": 1152,
-                  "height": 104
+                  "height": 56
                 }
               },
               "localized": {
@@ -4623,10 +4571,10 @@
               "styles": {
                 "color": "#002A60",
                 "width": "100%",
-                "fontSize": "36px",
+                "fontSize": "30px",
                 "alignSelf": "auto",
                 "textAlign": "start",
-                "fontWeight": "750",
+                "fontWeight": "700",
                 "lineHeight": "1.25",
                 "borderRadius": "16px",
                 "backgroundColor": ""
@@ -4634,22 +4582,22 @@
               "content": "Do I receive a referral link when I register?",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 1344,
-                  "width": 366,
-                  "height": 112
+                  "x": 16,
+                  "y": 895,
+                  "width": 358,
+                  "height": 68
                 },
                 "tablet": {
                   "x": 24,
-                  "y": 1440,
+                  "y": 776,
                   "width": 720,
-                  "height": 112
+                  "height": 48
                 },
                 "desktop": {
                   "x": 24,
-                  "y": 1440,
+                  "y": 783,
                   "width": 1152,
-                  "height": 112
+                  "height": 48
                 }
               },
               "localized": {
@@ -4684,7 +4632,7 @@
               "styles": {
                 "color": "#002A60",
                 "width": "100%",
-                "fontSize": "17px",
+                "fontSize": "16px",
                 "alignSelf": "auto",
                 "textAlign": "start",
                 "fontWeight": "",
@@ -4695,22 +4643,22 @@
               "content": "No. Students qualify after verified purchase; nonbuyers can apply as Affiliates.",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 1470,
-                  "width": 366,
-                  "height": 104
+                  "x": 16,
+                  "y": 978,
+                  "width": 358,
+                  "height": 56
                 },
                 "tablet": {
                   "x": 24,
-                  "y": 1572,
+                  "y": 840,
                   "width": 720,
-                  "height": 104
+                  "height": 48
                 },
                 "desktop": {
                   "x": 24,
-                  "y": 1572,
+                  "y": 847,
                   "width": 1152,
-                  "height": 104
+                  "height": 48
                 }
               },
               "localized": {
@@ -4743,10 +4691,10 @@
               "styles": {
                 "color": "#002A60",
                 "width": "100%",
-                "fontSize": "36px",
+                "fontSize": "30px",
                 "alignSelf": "auto",
                 "textAlign": "start",
-                "fontWeight": "750",
+                "fontWeight": "700",
                 "lineHeight": "1.25",
                 "borderRadius": "16px",
                 "backgroundColor": ""
@@ -4754,22 +4702,22 @@
               "content": "How much is the direct-referral reward?",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 1634,
-                  "width": 366,
-                  "height": 112
+                  "x": 16,
+                  "y": 1082,
+                  "width": 358,
+                  "height": 68
                 },
                 "tablet": {
                   "x": 24,
-                  "y": 1748,
+                  "y": 936,
                   "width": 720,
-                  "height": 112
+                  "height": 48
                 },
                 "desktop": {
                   "x": 24,
-                  "y": 1748,
+                  "y": 943,
                   "width": 1152,
-                  "height": 112
+                  "height": 48
                 }
               },
               "localized": {
@@ -4804,7 +4752,7 @@
               "styles": {
                 "color": "#002A60",
                 "width": "100%",
-                "fontSize": "17px",
+                "fontSize": "16px",
                 "alignSelf": "auto",
                 "textAlign": "start",
                 "fontWeight": "",
@@ -4815,22 +4763,22 @@
               "content": "$10 per eligible verified sale, subject to terms and verification. Earnings are not guaranteed.",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 1760,
-                  "width": 366,
-                  "height": 104
+                  "x": 16,
+                  "y": 1166,
+                  "width": 358,
+                  "height": 84
                 },
                 "tablet": {
                   "x": 24,
-                  "y": 1880,
+                  "y": 1000,
                   "width": 720,
-                  "height": 104
+                  "height": 56
                 },
                 "desktop": {
                   "x": 24,
-                  "y": 1880,
+                  "y": 1007,
                   "width": 1152,
-                  "height": 104
+                  "height": 56
                 }
               },
               "localized": {
@@ -4863,10 +4811,10 @@
               "styles": {
                 "color": "#002A60",
                 "width": "100%",
-                "fontSize": "36px",
+                "fontSize": "30px",
                 "alignSelf": "auto",
                 "textAlign": "start",
-                "fontWeight": "750",
+                "fontWeight": "700",
                 "lineHeight": "1.25",
                 "borderRadius": "16px",
                 "backgroundColor": ""
@@ -4874,22 +4822,22 @@
               "content": "How do I qualify for Tuition Support?",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 1924,
-                  "width": 366,
-                  "height": 112
+                  "x": 16,
+                  "y": 1298,
+                  "width": 358,
+                  "height": 68
                 },
                 "tablet": {
                   "x": 24,
-                  "y": 2056,
+                  "y": 1104,
                   "width": 720,
-                  "height": 112
+                  "height": 48
                 },
                 "desktop": {
                   "x": 24,
-                  "y": 2056,
+                  "y": 1111,
                   "width": 1152,
-                  "height": 112
+                  "height": 48
                 }
               },
               "localized": {
@@ -4924,7 +4872,7 @@
               "styles": {
                 "color": "#002A60",
                 "width": "100%",
-                "fontSize": "17px",
+                "fontSize": "16px",
                 "alignSelf": "auto",
                 "textAlign": "start",
                 "fontWeight": "",
@@ -4935,22 +4883,22 @@
               "content": "Four verified direct course sales through your own link.",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 2050,
-                  "width": 366,
-                  "height": 104
+                  "x": 16,
+                  "y": 1382,
+                  "width": 358,
+                  "height": 56
                 },
                 "tablet": {
                   "x": 24,
-                  "y": 2188,
+                  "y": 1168,
                   "width": 720,
-                  "height": 104
+                  "height": 48
                 },
                 "desktop": {
                   "x": 24,
-                  "y": 2188,
+                  "y": 1175,
                   "width": 1152,
-                  "height": 104
+                  "height": 48
                 }
               },
               "localized": {
@@ -4983,10 +4931,10 @@
               "styles": {
                 "color": "#002A60",
                 "width": "100%",
-                "fontSize": "36px",
+                "fontSize": "30px",
                 "alignSelf": "auto",
                 "textAlign": "start",
-                "fontWeight": "750",
+                "fontWeight": "700",
                 "lineHeight": "1.25",
                 "borderRadius": "16px",
                 "backgroundColor": ""
@@ -4994,22 +4942,22 @@
               "content": "Do I need to complete Level 4?",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 2214,
-                  "width": 366,
-                  "height": 112
+                  "x": 16,
+                  "y": 1486,
+                  "width": 358,
+                  "height": 68
                 },
                 "tablet": {
                   "x": 24,
-                  "y": 2364,
+                  "y": 1264,
                   "width": 720,
-                  "height": 112
+                  "height": 48
                 },
                 "desktop": {
                   "x": 24,
-                  "y": 2364,
+                  "y": 1271,
                   "width": 1152,
-                  "height": 112
+                  "height": 48
                 }
               },
               "localized": {
@@ -5044,7 +4992,7 @@
               "styles": {
                 "color": "#002A60",
                 "width": "100%",
-                "fontSize": "17px",
+                "fontSize": "16px",
                 "alignSelf": "auto",
                 "textAlign": "start",
                 "fontWeight": "",
@@ -5055,22 +5003,22 @@
               "content": "No. Learning progress does not determine Tuition Support eligibility.",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 2340,
-                  "width": 366,
-                  "height": 104
+                  "x": 16,
+                  "y": 1569,
+                  "width": 358,
+                  "height": 56
                 },
                 "tablet": {
                   "x": 24,
-                  "y": 2496,
+                  "y": 1328,
                   "width": 720,
-                  "height": 104
+                  "height": 48
                 },
                 "desktop": {
                   "x": 24,
-                  "y": 2496,
+                  "y": 1335,
                   "width": 1152,
-                  "height": 104
+                  "height": 48
                 }
               },
               "localized": {
@@ -5103,10 +5051,10 @@
               "styles": {
                 "color": "#002A60",
                 "width": "100%",
-                "fontSize": "36px",
+                "fontSize": "30px",
                 "alignSelf": "auto",
                 "textAlign": "start",
-                "fontWeight": "750",
+                "fontWeight": "700",
                 "lineHeight": "1.25",
                 "borderRadius": "16px",
                 "backgroundColor": ""
@@ -5114,22 +5062,22 @@
               "content": "Does reaching four sales guarantee assistance?",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 2504,
-                  "width": 366,
-                  "height": 112
+                  "x": 16,
+                  "y": 1673,
+                  "width": 358,
+                  "height": 68
                 },
                 "tablet": {
                   "x": 24,
-                  "y": 2672,
+                  "y": 1424,
                   "width": 720,
-                  "height": 112
+                  "height": 48
                 },
                 "desktop": {
                   "x": 24,
-                  "y": 2672,
+                  "y": 1431,
                   "width": 1152,
-                  "height": 112
+                  "height": 48
                 }
               },
               "localized": {
@@ -5164,7 +5112,7 @@
               "styles": {
                 "color": "#002A60",
                 "width": "100%",
-                "fontSize": "17px",
+                "fontSize": "16px",
                 "alignSelf": "auto",
                 "textAlign": "start",
                 "fontWeight": "",
@@ -5175,22 +5123,22 @@
               "content": "No. It permits application; an authorized human reviews the request.",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 2630,
-                  "width": 366,
-                  "height": 104
+                  "x": 16,
+                  "y": 1757,
+                  "width": 358,
+                  "height": 56
                 },
                 "tablet": {
                   "x": 24,
-                  "y": 2804,
+                  "y": 1488,
                   "width": 720,
-                  "height": 104
+                  "height": 48
                 },
                 "desktop": {
                   "x": 24,
-                  "y": 2804,
+                  "y": 1495,
                   "width": 1152,
-                  "height": 104
+                  "height": 48
                 }
               },
               "localized": {
@@ -5223,10 +5171,10 @@
               "styles": {
                 "color": "#002A60",
                 "width": "100%",
-                "fontSize": "36px",
+                "fontSize": "30px",
                 "alignSelf": "auto",
                 "textAlign": "start",
-                "fontWeight": "750",
+                "fontWeight": "700",
                 "lineHeight": "1.25",
                 "borderRadius": "16px",
                 "backgroundColor": ""
@@ -5234,22 +5182,22 @@
               "content": "Can I apply for Exchange without four sales?",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 2794,
-                  "width": 366,
-                  "height": 112
+                  "x": 16,
+                  "y": 1861,
+                  "width": 358,
+                  "height": 68
                 },
                 "tablet": {
                   "x": 24,
-                  "y": 2980,
+                  "y": 1584,
                   "width": 720,
-                  "height": 112
+                  "height": 48
                 },
                 "desktop": {
                   "x": 24,
-                  "y": 2980,
+                  "y": 1591,
                   "width": 1152,
-                  "height": 112
+                  "height": 48
                 }
               },
               "localized": {
@@ -5284,7 +5232,7 @@
               "styles": {
                 "color": "#002A60",
                 "width": "100%",
-                "fontSize": "17px",
+                "fontSize": "16px",
                 "alignSelf": "auto",
                 "textAlign": "start",
                 "fontWeight": "",
@@ -5295,22 +5243,22 @@
               "content": "Yes, if you are an active learner and meet the separately configured requirements.",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 2920,
-                  "width": 366,
-                  "height": 104
+                  "x": 16,
+                  "y": 1944,
+                  "width": 358,
+                  "height": 56
                 },
                 "tablet": {
                   "x": 24,
-                  "y": 3112,
+                  "y": 1648,
                   "width": 720,
-                  "height": 104
+                  "height": 48
                 },
                 "desktop": {
                   "x": 24,
-                  "y": 3112,
+                  "y": 1655,
                   "width": 1152,
-                  "height": 104
+                  "height": 48
                 }
               },
               "localized": {
@@ -5343,10 +5291,10 @@
               "styles": {
                 "color": "#002A60",
                 "width": "100%",
-                "fontSize": "36px",
+                "fontSize": "30px",
                 "alignSelf": "auto",
                 "textAlign": "start",
-                "fontWeight": "750",
+                "fontWeight": "700",
                 "lineHeight": "1.25",
                 "borderRadius": "16px",
                 "backgroundColor": ""
@@ -5354,22 +5302,22 @@
               "content": "Can an Affiliate apply without buying?",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 3084,
-                  "width": 366,
-                  "height": 112
+                  "x": 16,
+                  "y": 2048,
+                  "width": 358,
+                  "height": 68
                 },
                 "tablet": {
                   "x": 24,
-                  "y": 3288,
+                  "y": 1744,
                   "width": 720,
-                  "height": 112
+                  "height": 48
                 },
                 "desktop": {
                   "x": 24,
-                  "y": 3288,
+                  "y": 1751,
                   "width": 1152,
-                  "height": 112
+                  "height": 48
                 }
               },
               "localized": {
@@ -5404,7 +5352,7 @@
               "styles": {
                 "color": "#002A60",
                 "width": "100%",
-                "fontSize": "17px",
+                "fontSize": "16px",
                 "alignSelf": "auto",
                 "textAlign": "start",
                 "fontWeight": "",
@@ -5415,22 +5363,22 @@
               "content": "Yes. Submit the Affiliate Form and await genuine admin approval.",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 3210,
-                  "width": 366,
-                  "height": 104
+                  "x": 16,
+                  "y": 2132,
+                  "width": 358,
+                  "height": 56
                 },
                 "tablet": {
                   "x": 24,
-                  "y": 3420,
+                  "y": 1808,
                   "width": 720,
-                  "height": 104
+                  "height": 48
                 },
                 "desktop": {
                   "x": 24,
-                  "y": 3420,
+                  "y": 1815,
                   "width": 1152,
-                  "height": 104
+                  "height": 48
                 }
               },
               "localized": {
@@ -5463,10 +5411,10 @@
               "styles": {
                 "color": "#002A60",
                 "width": "100%",
-                "fontSize": "36px",
+                "fontSize": "30px",
                 "alignSelf": "auto",
                 "textAlign": "start",
-                "fontWeight": "750",
+                "fontWeight": "700",
                 "lineHeight": "1.25",
                 "borderRadius": "16px",
                 "backgroundColor": ""
@@ -5474,22 +5422,22 @@
               "content": "When can I withdraw?",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 3374,
-                  "width": 366,
-                  "height": 112
+                  "x": 16,
+                  "y": 2236,
+                  "width": 358,
+                  "height": 48
                 },
                 "tablet": {
                   "x": 24,
-                  "y": 3596,
+                  "y": 1904,
                   "width": 720,
-                  "height": 112
+                  "height": 48
                 },
                 "desktop": {
                   "x": 24,
-                  "y": 3596,
+                  "y": 1911,
                   "width": 1152,
-                  "height": 112
+                  "height": 48
                 }
               },
               "localized": {
@@ -5524,7 +5472,7 @@
               "styles": {
                 "color": "#002A60",
                 "width": "100%",
-                "fontSize": "17px",
+                "fontSize": "16px",
                 "alignSelf": "auto",
                 "textAlign": "start",
                 "fontWeight": "",
@@ -5535,22 +5483,22 @@
               "content": "Only eligible available balances above the owner-configured minimum, provisionally $50. Pending rewards cannot be withdrawn; live payouts are not configured.",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 3500,
-                  "width": 366,
-                  "height": 104
+                  "x": 16,
+                  "y": 2300,
+                  "width": 358,
+                  "height": 112
                 },
                 "tablet": {
                   "x": 24,
-                  "y": 3728,
+                  "y": 1968,
                   "width": 720,
-                  "height": 104
+                  "height": 56
                 },
                 "desktop": {
                   "x": 24,
-                  "y": 3728,
+                  "y": 1975,
                   "width": 1152,
-                  "height": 104
+                  "height": 56
                 }
               },
               "localized": {
@@ -5583,10 +5531,10 @@
               "styles": {
                 "color": "#002A60",
                 "width": "100%",
-                "fontSize": "36px",
+                "fontSize": "30px",
                 "alignSelf": "auto",
                 "textAlign": "start",
-                "fontWeight": "750",
+                "fontWeight": "700",
                 "lineHeight": "1.25",
                 "borderRadius": "16px",
                 "backgroundColor": ""
@@ -5594,22 +5542,22 @@
               "content": "How can I contact EduHope?",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 3664,
-                  "width": 366,
-                  "height": 112
+                  "x": 16,
+                  "y": 2460,
+                  "width": 358,
+                  "height": 68
                 },
                 "tablet": {
                   "x": 24,
-                  "y": 3904,
+                  "y": 2072,
                   "width": 720,
-                  "height": 112
+                  "height": 48
                 },
                 "desktop": {
                   "x": 24,
-                  "y": 3904,
+                  "y": 2079,
                   "width": 1152,
-                  "height": 112
+                  "height": 48
                 }
               },
               "localized": {
@@ -5644,7 +5592,7 @@
               "styles": {
                 "color": "#002A60",
                 "width": "100%",
-                "fontSize": "17px",
+                "fontSize": "16px",
                 "alignSelf": "auto",
                 "textAlign": "start",
                 "fontWeight": "",
@@ -5655,22 +5603,22 @@
               "content": "Use the secure Contact Form. Unspecified contact addresses are demonstration values.",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 3790,
-                  "width": 366,
-                  "height": 104
+                  "x": 16,
+                  "y": 2544,
+                  "width": 358,
+                  "height": 84
                 },
                 "tablet": {
                   "x": 24,
-                  "y": 4036,
+                  "y": 2136,
                   "width": 720,
-                  "height": 104
+                  "height": 56
                 },
                 "desktop": {
                   "x": 24,
-                  "y": 4036,
+                  "y": 2143,
                   "width": 1152,
-                  "height": 104
+                  "height": 56
                 }
               },
               "localized": {
@@ -5736,12 +5684,12 @@
           "layout": {
             "width": "full",
             "paddingY": "none",
-            "minHeight": 468,
+            "minHeight": 495,
             "background": "transparent",
             "minHeightByViewport": {
-              "mobile": 444,
-              "tablet": 468,
-              "desktop": 468
+              "mobile": 552,
+              "tablet": 488,
+              "desktop": 495
             }
           },
           "freeElements": [
@@ -5763,10 +5711,10 @@
               "styles": {
                 "color": "#002A60",
                 "width": "100%",
-                "fontSize": "52px",
+                "fontSize": "42px",
                 "alignSelf": "auto",
                 "textAlign": "start",
-                "fontWeight": "750",
+                "fontWeight": "700",
                 "lineHeight": "1.25",
                 "borderRadius": "16px",
                 "backgroundColor": ""
@@ -5774,22 +5722,22 @@
               "content": "Let’s start a conversation",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 12,
-                  "width": 366,
-                  "height": 112
+                  "x": 16,
+                  "y": 24,
+                  "width": 358,
+                  "height": 84
                 },
                 "tablet": {
                   "x": 24,
                   "y": 24,
                   "width": 720,
-                  "height": 112
+                  "height": 48
                 },
                 "desktop": {
                   "x": 24,
                   "y": 24,
                   "width": 1152,
-                  "height": 112
+                  "height": 55
                 }
               },
               "localized": {
@@ -5824,7 +5772,7 @@
               "styles": {
                 "color": "#002A60",
                 "width": "100%",
-                "fontSize": "17px",
+                "fontSize": "16px",
                 "alignSelf": "auto",
                 "textAlign": "start",
                 "fontWeight": "",
@@ -5835,22 +5783,22 @@
               "content": "Ask about learning or the academy programmes. Use the form below to contact the academy.",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 138,
-                  "width": 366,
-                  "height": 104
+                  "x": 16,
+                  "y": 123,
+                  "width": 358,
+                  "height": 84
                 },
                 "tablet": {
                   "x": 24,
-                  "y": 156,
+                  "y": 88,
                   "width": 720,
-                  "height": 104
+                  "height": 56
                 },
                 "desktop": {
                   "x": 24,
-                  "y": 156,
+                  "y": 95,
                   "width": 1152,
-                  "height": 104
+                  "height": 56
                 }
               },
               "localized": {
@@ -5897,22 +5845,22 @@
               "content": "",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 256,
-                  "width": 366,
-                  "height": 140
+                  "x": 16,
+                  "y": 255,
+                  "width": 358,
+                  "height": 240
                 },
                 "tablet": {
                   "x": 24,
-                  "y": 280,
+                  "y": 192,
                   "width": 720,
-                  "height": 140
+                  "height": 240
                 },
                 "desktop": {
                   "x": 24,
-                  "y": 280,
-                  "width": 1152,
-                  "height": 140
+                  "y": 199,
+                  "width": 880,
+                  "height": 240
                 }
               },
               "connectedFormId": ""
@@ -5968,12 +5916,12 @@
           "layout": {
             "width": "full",
             "paddingY": "none",
-            "minHeight": 2156,
+            "minHeight": 1215,
             "background": "transparent",
             "minHeightByViewport": {
-              "mobile": 2030,
-              "tablet": 2156,
-              "desktop": 2156
+              "mobile": 1572,
+              "tablet": 1208,
+              "desktop": 1215
             }
           },
           "freeElements": [
@@ -5995,10 +5943,10 @@
               "styles": {
                 "color": "#002A60",
                 "width": "100%",
-                "fontSize": "52px",
+                "fontSize": "42px",
                 "alignSelf": "auto",
                 "textAlign": "start",
-                "fontWeight": "750",
+                "fontWeight": "700",
                 "lineHeight": "1.25",
                 "borderRadius": "16px",
                 "backgroundColor": ""
@@ -6006,22 +5954,22 @@
               "content": "Terms & Conditions",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 12,
-                  "width": 366,
-                  "height": 112
+                  "x": 16,
+                  "y": 24,
+                  "width": 358,
+                  "height": 48
                 },
                 "tablet": {
                   "x": 24,
                   "y": 24,
                   "width": 720,
-                  "height": 112
+                  "height": 48
                 },
                 "desktop": {
                   "x": 24,
                   "y": 24,
                   "width": 1152,
-                  "height": 112
+                  "height": 55
                 }
               },
               "localized": {
@@ -6056,7 +6004,7 @@
               "styles": {
                 "color": "#002A60",
                 "width": "100%",
-                "fontSize": "17px",
+                "fontSize": "16px",
                 "alignSelf": "auto",
                 "textAlign": "start",
                 "fontWeight": "",
@@ -6067,22 +6015,22 @@
               "content": "Owner/legal approval required. This editable structure is a draft, not a finalized legal agreement.",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 138,
-                  "width": 366,
-                  "height": 104
+                  "x": 16,
+                  "y": 88,
+                  "width": 358,
+                  "height": 84
                 },
                 "tablet": {
                   "x": 24,
-                  "y": 156,
+                  "y": 88,
                   "width": 720,
-                  "height": 104
+                  "height": 56
                 },
                 "desktop": {
                   "x": 24,
-                  "y": 156,
+                  "y": 95,
                   "width": 1152,
-                  "height": 104
+                  "height": 56
                 }
               },
               "localized": {
@@ -6115,10 +6063,10 @@
               "styles": {
                 "color": "#002A60",
                 "width": "100%",
-                "fontSize": "36px",
+                "fontSize": "30px",
                 "alignSelf": "auto",
                 "textAlign": "start",
-                "fontWeight": "750",
+                "fontWeight": "700",
                 "lineHeight": "1.25",
                 "borderRadius": "16px",
                 "backgroundColor": ""
@@ -6126,22 +6074,22 @@
               "content": "Course Purchase",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 302,
-                  "width": 366,
-                  "height": 112
+                  "x": 16,
+                  "y": 220,
+                  "width": 358,
+                  "height": 48
                 },
                 "tablet": {
                   "x": 24,
-                  "y": 332,
+                  "y": 192,
                   "width": 720,
-                  "height": 112
+                  "height": 48
                 },
                 "desktop": {
                   "x": 24,
-                  "y": 332,
+                  "y": 199,
                   "width": 1152,
-                  "height": 112
+                  "height": 48
                 }
               },
               "localized": {
@@ -6176,7 +6124,7 @@
               "styles": {
                 "color": "#002A60",
                 "width": "100%",
-                "fontSize": "17px",
+                "fontSize": "16px",
                 "alignSelf": "auto",
                 "textAlign": "start",
                 "fontWeight": "",
@@ -6187,22 +6135,22 @@
               "content": "Awaiting owner-approved legal wording. Verified eligibility applies; no guaranteed earnings, financial assistance, place or external payout.",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 428,
-                  "width": 366,
-                  "height": 104
+                  "x": 16,
+                  "y": 284,
+                  "width": 358,
+                  "height": 112
                 },
                 "tablet": {
                   "x": 24,
-                  "y": 464,
+                  "y": 256,
                   "width": 720,
-                  "height": 104
+                  "height": 56
                 },
                 "desktop": {
                   "x": 24,
-                  "y": 464,
+                  "y": 263,
                   "width": 1152,
-                  "height": 104
+                  "height": 56
                 }
               },
               "localized": {
@@ -6235,10 +6183,10 @@
               "styles": {
                 "color": "#002A60",
                 "width": "100%",
-                "fontSize": "36px",
+                "fontSize": "30px",
                 "alignSelf": "auto",
                 "textAlign": "start",
-                "fontWeight": "750",
+                "fontWeight": "700",
                 "lineHeight": "1.25",
                 "borderRadius": "16px",
                 "backgroundColor": ""
@@ -6246,22 +6194,22 @@
               "content": "Referral Programme",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 592,
-                  "width": 366,
-                  "height": 112
+                  "x": 16,
+                  "y": 444,
+                  "width": 358,
+                  "height": 48
                 },
                 "tablet": {
                   "x": 24,
-                  "y": 640,
+                  "y": 360,
                   "width": 720,
-                  "height": 112
+                  "height": 48
                 },
                 "desktop": {
                   "x": 24,
-                  "y": 640,
+                  "y": 367,
                   "width": 1152,
-                  "height": 112
+                  "height": 48
                 }
               },
               "localized": {
@@ -6296,7 +6244,7 @@
               "styles": {
                 "color": "#002A60",
                 "width": "100%",
-                "fontSize": "17px",
+                "fontSize": "16px",
                 "alignSelf": "auto",
                 "textAlign": "start",
                 "fontWeight": "",
@@ -6307,22 +6255,22 @@
               "content": "Awaiting owner-approved legal wording. Verified eligibility applies; no guaranteed earnings, financial assistance, place or external payout.",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 718,
-                  "width": 366,
-                  "height": 104
+                  "x": 16,
+                  "y": 508,
+                  "width": 358,
+                  "height": 112
                 },
                 "tablet": {
                   "x": 24,
-                  "y": 772,
+                  "y": 424,
                   "width": 720,
-                  "height": 104
+                  "height": 56
                 },
                 "desktop": {
                   "x": 24,
-                  "y": 772,
+                  "y": 431,
                   "width": 1152,
-                  "height": 104
+                  "height": 56
                 }
               },
               "localized": {
@@ -6355,10 +6303,10 @@
               "styles": {
                 "color": "#002A60",
                 "width": "100%",
-                "fontSize": "36px",
+                "fontSize": "30px",
                 "alignSelf": "auto",
                 "textAlign": "start",
-                "fontWeight": "750",
+                "fontWeight": "700",
                 "lineHeight": "1.25",
                 "borderRadius": "16px",
                 "backgroundColor": ""
@@ -6366,22 +6314,22 @@
               "content": "Affiliate Programme",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 882,
-                  "width": 366,
-                  "height": 112
+                  "x": 16,
+                  "y": 668,
+                  "width": 358,
+                  "height": 48
                 },
                 "tablet": {
                   "x": 24,
-                  "y": 948,
+                  "y": 528,
                   "width": 720,
-                  "height": 112
+                  "height": 48
                 },
                 "desktop": {
                   "x": 24,
-                  "y": 948,
+                  "y": 535,
                   "width": 1152,
-                  "height": 112
+                  "height": 48
                 }
               },
               "localized": {
@@ -6416,7 +6364,7 @@
               "styles": {
                 "color": "#002A60",
                 "width": "100%",
-                "fontSize": "17px",
+                "fontSize": "16px",
                 "alignSelf": "auto",
                 "textAlign": "start",
                 "fontWeight": "",
@@ -6427,22 +6375,22 @@
               "content": "Awaiting owner-approved legal wording. Verified eligibility applies; no guaranteed earnings, financial assistance, place or external payout.",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 1008,
-                  "width": 366,
-                  "height": 104
+                  "x": 16,
+                  "y": 732,
+                  "width": 358,
+                  "height": 112
                 },
                 "tablet": {
                   "x": 24,
-                  "y": 1080,
+                  "y": 592,
                   "width": 720,
-                  "height": 104
+                  "height": 56
                 },
                 "desktop": {
                   "x": 24,
-                  "y": 1080,
+                  "y": 599,
                   "width": 1152,
-                  "height": 104
+                  "height": 56
                 }
               },
               "localized": {
@@ -6475,10 +6423,10 @@
               "styles": {
                 "color": "#002A60",
                 "width": "100%",
-                "fontSize": "36px",
+                "fontSize": "30px",
                 "alignSelf": "auto",
                 "textAlign": "start",
-                "fontWeight": "750",
+                "fontWeight": "700",
                 "lineHeight": "1.25",
                 "borderRadius": "16px",
                 "backgroundColor": ""
@@ -6486,22 +6434,22 @@
               "content": "Tuition Support",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 1172,
-                  "width": 366,
-                  "height": 112
+                  "x": 16,
+                  "y": 892,
+                  "width": 358,
+                  "height": 48
                 },
                 "tablet": {
                   "x": 24,
-                  "y": 1256,
+                  "y": 696,
                   "width": 720,
-                  "height": 112
+                  "height": 48
                 },
                 "desktop": {
                   "x": 24,
-                  "y": 1256,
+                  "y": 703,
                   "width": 1152,
-                  "height": 112
+                  "height": 48
                 }
               },
               "localized": {
@@ -6536,7 +6484,7 @@
               "styles": {
                 "color": "#002A60",
                 "width": "100%",
-                "fontSize": "17px",
+                "fontSize": "16px",
                 "alignSelf": "auto",
                 "textAlign": "start",
                 "fontWeight": "",
@@ -6547,22 +6495,22 @@
               "content": "Awaiting owner-approved legal wording. Verified eligibility applies; no guaranteed earnings, financial assistance, place or external payout.",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 1298,
-                  "width": 366,
-                  "height": 104
+                  "x": 16,
+                  "y": 956,
+                  "width": 358,
+                  "height": 112
                 },
                 "tablet": {
                   "x": 24,
-                  "y": 1388,
+                  "y": 760,
                   "width": 720,
-                  "height": 104
+                  "height": 56
                 },
                 "desktop": {
                   "x": 24,
-                  "y": 1388,
+                  "y": 767,
                   "width": 1152,
-                  "height": 104
+                  "height": 56
                 }
               },
               "localized": {
@@ -6595,10 +6543,10 @@
               "styles": {
                 "color": "#002A60",
                 "width": "100%",
-                "fontSize": "36px",
+                "fontSize": "30px",
                 "alignSelf": "auto",
                 "textAlign": "start",
-                "fontWeight": "750",
+                "fontWeight": "700",
                 "lineHeight": "1.25",
                 "borderRadius": "16px",
                 "backgroundColor": ""
@@ -6606,22 +6554,22 @@
               "content": "Exchange Programme",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 1462,
-                  "width": 366,
-                  "height": 112
+                  "x": 16,
+                  "y": 1116,
+                  "width": 358,
+                  "height": 48
                 },
                 "tablet": {
                   "x": 24,
-                  "y": 1564,
+                  "y": 864,
                   "width": 720,
-                  "height": 112
+                  "height": 48
                 },
                 "desktop": {
                   "x": 24,
-                  "y": 1564,
+                  "y": 871,
                   "width": 1152,
-                  "height": 112
+                  "height": 48
                 }
               },
               "localized": {
@@ -6656,7 +6604,7 @@
               "styles": {
                 "color": "#002A60",
                 "width": "100%",
-                "fontSize": "17px",
+                "fontSize": "16px",
                 "alignSelf": "auto",
                 "textAlign": "start",
                 "fontWeight": "",
@@ -6667,22 +6615,22 @@
               "content": "Awaiting owner-approved legal wording. Verified eligibility applies; no guaranteed earnings, financial assistance, place or external payout.",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 1588,
-                  "width": 366,
-                  "height": 104
+                  "x": 16,
+                  "y": 1180,
+                  "width": 358,
+                  "height": 112
                 },
                 "tablet": {
                   "x": 24,
-                  "y": 1696,
+                  "y": 928,
                   "width": 720,
-                  "height": 104
+                  "height": 56
                 },
                 "desktop": {
                   "x": 24,
-                  "y": 1696,
+                  "y": 935,
                   "width": 1152,
-                  "height": 104
+                  "height": 56
                 }
               },
               "localized": {
@@ -6715,10 +6663,10 @@
               "styles": {
                 "color": "#002A60",
                 "width": "100%",
-                "fontSize": "36px",
+                "fontSize": "30px",
                 "alignSelf": "auto",
                 "textAlign": "start",
-                "fontWeight": "750",
+                "fontWeight": "700",
                 "lineHeight": "1.25",
                 "borderRadius": "16px",
                 "backgroundColor": ""
@@ -6726,22 +6674,22 @@
               "content": "Withdrawals",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 1752,
-                  "width": 366,
-                  "height": 112
+                  "x": 16,
+                  "y": 1340,
+                  "width": 358,
+                  "height": 48
                 },
                 "tablet": {
                   "x": 24,
-                  "y": 1872,
+                  "y": 1032,
                   "width": 720,
-                  "height": 112
+                  "height": 48
                 },
                 "desktop": {
                   "x": 24,
-                  "y": 1872,
+                  "y": 1039,
                   "width": 1152,
-                  "height": 112
+                  "height": 48
                 }
               },
               "localized": {
@@ -6776,7 +6724,7 @@
               "styles": {
                 "color": "#002A60",
                 "width": "100%",
-                "fontSize": "17px",
+                "fontSize": "16px",
                 "alignSelf": "auto",
                 "textAlign": "start",
                 "fontWeight": "",
@@ -6787,22 +6735,22 @@
               "content": "Awaiting owner-approved legal wording. Verified eligibility applies; no guaranteed earnings, financial assistance, place or external payout.",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 1878,
-                  "width": 366,
-                  "height": 104
+                  "x": 16,
+                  "y": 1404,
+                  "width": 358,
+                  "height": 112
                 },
                 "tablet": {
                   "x": 24,
-                  "y": 2004,
+                  "y": 1096,
                   "width": 720,
-                  "height": 104
+                  "height": 56
                 },
                 "desktop": {
                   "x": 24,
-                  "y": 2004,
+                  "y": 1103,
                   "width": 1152,
-                  "height": 104
+                  "height": 56
                 }
               },
               "localized": {
@@ -6868,12 +6816,12 @@
           "layout": {
             "width": "full",
             "paddingY": "none",
-            "minHeight": 308,
+            "minHeight": 263,
             "background": "transparent",
             "minHeightByViewport": {
-              "mobile": 290,
-              "tablet": 308,
-              "desktop": 308
+              "mobile": 368,
+              "tablet": 256,
+              "desktop": 263
             }
           },
           "freeElements": [
@@ -6895,10 +6843,10 @@
               "styles": {
                 "color": "#002A60",
                 "width": "100%",
-                "fontSize": "52px",
+                "fontSize": "42px",
                 "alignSelf": "auto",
                 "textAlign": "start",
-                "fontWeight": "750",
+                "fontWeight": "700",
                 "lineHeight": "1.25",
                 "borderRadius": "16px",
                 "backgroundColor": ""
@@ -6906,22 +6854,22 @@
               "content": "Privacy",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 12,
-                  "width": 366,
-                  "height": 112
+                  "x": 16,
+                  "y": 24,
+                  "width": 358,
+                  "height": 48
                 },
                 "tablet": {
                   "x": 24,
                   "y": 24,
                   "width": 720,
-                  "height": 112
+                  "height": 48
                 },
                 "desktop": {
                   "x": 24,
                   "y": 24,
                   "width": 1152,
-                  "height": 112
+                  "height": 55
                 }
               },
               "localized": {
@@ -6956,7 +6904,7 @@
               "styles": {
                 "color": "#002A60",
                 "width": "100%",
-                "fontSize": "17px",
+                "fontSize": "16px",
                 "alignSelf": "auto",
                 "textAlign": "start",
                 "fontWeight": "",
@@ -6967,22 +6915,22 @@
               "content": "Owner/legal approval required. Submissions and supporting documents are private and available only to authorized academy staff. Personal records, authentication and financial data are excluded from the seed package. Contact the owner to approve retention, legal basis and data-request procedures.",
               "position": {
                 "mobile": {
-                  "x": 12,
-                  "y": 138,
-                  "width": 366,
-                  "height": 104
+                  "x": 16,
+                  "y": 88,
+                  "width": 358,
+                  "height": 224
                 },
                 "tablet": {
                   "x": 24,
-                  "y": 156,
+                  "y": 88,
                   "width": 720,
-                  "height": 104
+                  "height": 112
                 },
                 "desktop": {
                   "x": 24,
-                  "y": 156,
+                  "y": 95,
                   "width": 1152,
-                  "height": 104
+                  "height": 112
                 }
               },
               "localized": {
@@ -7044,7 +6992,7 @@
   "version": 1,
   "workflows": [],
   "siteChrome": {
-    "brand": "EduHope",
+    "brand": "",
     "phone": "",
     "rights": "All rights reserved.",
     "logoUrl": "ref:assets.brand.original-logo",
@@ -7057,9 +7005,6 @@
       },
       "footerHelpTitle": {
         "ar": "معلومات إضافية"
-      },
-      "footerShopTitle": {
-        "ar": "اكتشف"
       }
     },
     "logoWidth": 180,
@@ -7070,8 +7015,8 @@
     "contactEmail": "",
     "footerHelpLinks": "eduhope-page-tuition-support\neduhope-page-exchange\neduhope-page-faq\neduhope-page-contact\neduhope-page-terms\neduhope-page-privacy",
     "footerHelpTitle": "More information",
-    "footerShopLinks": "eduhope-page-home\neduhope-page-course\neduhope-page-how-it-works\neduhope-page-affiliate\neduhope-page-about",
-    "footerShopTitle": "Explore",
+    "footerShopLinks": "",
+    "footerShopTitle": "",
     "footerStoreName": "EduHope",
     "loadingImageUrl": "",
     "headerButtonHref": "",

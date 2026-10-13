@@ -219,10 +219,20 @@ def forms(actor):
     return {'review_available':settings_available(144),'items':rows,'visible':any(f['status'] in {'active','archived'} or f['responses'] for f in rows)}
 
 
-def public_access(tenant,form,actor):
+def public_access(tenant,form,actor,viewing=False):
     gate(tenant);require_entitlement(tenant,'public_form_links')
     if form['status']!='active':raise HTTPException(404,'Form unavailable')
     access=form['schema'].get('access','public')
+    # Anyone may read published questions; submitting still requires sign-in and every eligibility check.
+    if viewing:
+        if form['schema'].get('workflow',{}).get('kind','none')!='none':require_reviews()
+        if actor is None:return {'requires_sign_in':access!='public','locked_reason':None}
+        try:public_access(tenant,form,actor)
+        except HTTPException as error:
+            if error.status_code!=403:raise
+            eligibility=error.detail in {'Programme eligibility requirements are not met','Active course enrollment required'}
+            return {'requires_sign_in':False,'locked_reason':'eligibility' if eligibility else 'unavailable'}
+        return {'requires_sign_in':False,'locked_reason':None}
     if access!='public' and actor is None:raise HTTPException(401,'Sign in to complete this form')
     if actor:
         if actor.tenant_id!=tenant:raise HTTPException(403,'Form tenant mismatch')

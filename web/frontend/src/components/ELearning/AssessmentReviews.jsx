@@ -1,3 +1,4 @@
+import LearningErrorNotice from "./LearningErrorNotice";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
@@ -35,7 +36,7 @@ export default function AssessmentReviews() {
   }
   return <main className="ecommerce-management" aria-busy={busy}>
     <h1>{copy.title}</h1>
-    {error && <p role="alert">{error}</p>}
+    {error && <LearningErrorNotice as="p">{error}</LearningErrorNotice>}
     <button type="button" disabled={busy} onClick={() => { setRefresh(value => value + 1); if (detail) open(detail.id); }}>{copy.refresh}</button>
     {!items.length && <p>{copy.empty}</p>}
     <ul>{items.map(item => <li key={item.id}>{item.title} · {item.student_name || copy.student} <button type="button" disabled={busy} onClick={() => open(item.id)}>{copy.open}</button></li>)}</ul>

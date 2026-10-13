@@ -1,3 +1,4 @@
+import LearningErrorNotice from "./LearningErrorNotice";
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
@@ -10,7 +11,7 @@ export default function LearningFormApplicantResponse() {
   useEffect(()=>{let active=true;learningFormsApi(`/my-responses/${responseId}`).then(data=>{if(active)setState({data});}).catch(()=>{if(active)setState({error:true});});return()=>{active=false;};},[responseId,retry]);
   const language=i18n.language.startsWith("ar")?"ar":"en";
   if(state.loading)return <p role="status">{t("elearning.forms.loading")}</p>;
-  if(state.error)return <div><p role="alert">{t("elearning.forms.error")}</p><button type="button" onClick={()=>setRetry(value=>value+1)}>{t("elearning.retry")}</button></div>;
+  if(state.error)return <div><LearningErrorNotice as="p">{t("elearning.forms.error")}</LearningErrorNotice><button type="button" onClick={()=>setRetry(value=>value+1)}>{t("elearning.retry")}</button></div>;
   const data=state.data;
   return <section className="elearning-owner-page" dir={i18n.dir()}><Link to="/my-learning/dashboard">{t("sidebar.dashboard")}</Link>
     <h1>{getLocalizedValue(data.schema,"title",language)}</h1><p role="status">{t(`elearning.programmes.${data.status}`)}</p>

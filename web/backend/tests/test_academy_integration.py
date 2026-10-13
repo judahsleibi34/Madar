@@ -139,6 +139,34 @@ class AcademyAuthenticationTests(unittest.TestCase):
         self.assertFalse(fake.tables.get('tenant_site_memberships'))
         self.assertFalse(fake.tables.get('elearning_enrollments'))
 
+    def test_tenant_can_create_an_immediately_confirmed_learner(self):
+        from unittest.mock import patch
+        from fastapi import Request
+        from routes import public_site_routes as routes
+        from tests.test_builder_site_members import FakeSupabase
+        fake=FakeSupabase({})
+        payload=routes.TenantRegisterRequest(full_name='Learner Test',email='learner@example.com',password='Safe-password-123')
+        request=Request({'type':'http','method':'POST','path':'/public/academies/testing/auth/register','headers':[(b'host',b'localhost')]})
+        with patch.object(routes,'service_supabase',fake), patch.object(routes,'supabase',fake), patch.object(routes,'resolve_website_settings',return_value={'tenant_id':7,'subdomain':'testing'}), patch.object(routes,'enforce_auth_rate_limit'):
+            result=routes.register_tenant_account('testing',payload,request,academy_context={'return_to':'/academy/login','email_verification_required':False})
+        self.assertFalse(result['requires_email_verification'])
+        self.assertFalse(fake.auth.signed_up)
+        self.assertTrue(fake.auth.admin.created[0]['email_confirm'])
+        self.assertEqual(fake.tables['users'][0]['account_status'],'active')
+        self.assertTrue(fake.tables['users'][0]['email_verified'])
+
+    def test_academy_route_passes_only_its_stored_verification_policy(self):
+        from unittest.mock import patch
+        from fastapi import Request
+        from routes.elearning_academy_routes import register, AcademyRegisterRequest
+        request=Request({'type':'http','method':'POST','path':'/public/academies/testing/auth/register','headers':[(b'host',b'localhost')]})
+        payload=AcademyRegisterRequest(full_name='Learner Test',email='learner@example.com',password='Safe-password-123')
+        settings={'academy_registration':'open','academy_email_verification_required':False}
+        with patch('services.academy_auth_service.academy_auth_settings',return_value=({'subdomain':'testing'},7,settings)),patch('routes.public_site_routes.register_tenant_account',return_value={'requires_email_verification':False}) as shared:
+            result=register('testing',payload,request)
+        self.assertFalse(result['requires_email_verification'])
+        self.assertFalse(shared.call_args.kwargs['academy_context']['email_verification_required'])
+
     def test_academy_relative_buttons_use_shared_publication_validator_only_when_authorized(self):
         from routes.builder_routes import validate_publish_schema
         schema=default_landing({'platform_name':'Academy'},'testing')

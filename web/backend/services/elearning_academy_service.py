@@ -36,6 +36,29 @@ def form_application_paths(tenant_id,website,schema):
     return paths
 
 
+def attach_public_topics(tenant_id, courses):
+    """Published topic names let guests preview a course; lesson content and drafts stay private."""
+    ids = [card["id"] for card in courses if card.get("outline")]
+    if not ids:
+        return
+    sections = (service_supabase.table("elearning_sections").select("id,course_id,name").eq("tenant_id", tenant_id).eq("status", "published")
+                .in_("course_id", ids).order("position").order("id").limit(2000).execute().data or [])
+    lessons = (service_supabase.table("elearning_lessons").select("section_id,name").eq("tenant_id", tenant_id).eq("status", "published")
+               .in_("course_id", ids).order("position").order("id").limit(5000).execute().data or [])
+    topics, by_course = {}, {}
+    for lesson in lessons:
+        topics.setdefault(lesson["section_id"], []).append(lesson["name"])
+    for section in sections:
+        by_course.setdefault(section["course_id"], []).append(section)
+    for card in courses:
+        published = by_course.get(card["id"], [])
+        # The RPC outline uses the same published filter and order; skip on any drift.
+        if [s["name"] for s in published] != [entry["name"] for entry in card.get("outline") or []]:
+            continue
+        for entry, section in zip(card["outline"], published):
+            entry["topics"] = topics.get(section["id"], [])[:entry["lesson_count"]]
+
+
 def profile(tenant_id, website, academy_theme=None, application_paths=None):
     cfg = get_settings(tenant_id)
     return {
@@ -66,6 +89,7 @@ def storefront(tenant_id, website, actor=None, course_id=None, *, preview=False)
         if error.code == "42501":
             raise HTTPException(403, "Academy access denied") from error
         raise
+    attach_public_topics(tenant_id, result["courses"])
     continuing = []
     if actor and course_id is None:
         # Consume the existing bounded My Learning feed, including authorized

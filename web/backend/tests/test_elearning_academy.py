@@ -85,6 +85,22 @@ class AcademyProjectionTests(unittest.TestCase):
             result=service.storefront(17,{"subdomain":"testing"})
         self.assertEqual(result["continue_courses"],[]);self.assertEqual([call.args[0] for call in db.rpc.call_args_list],["get_elearning_academy", "get_academy_public_instructors"])
 
+    def test_public_outline_lists_published_topic_names_only(self):
+        db=MagicMock()
+        rows={"elearning_sections":[{"id":"s1","course_id":"c1","name":"Level 1"},{"id":"s2","course_id":"c1","name":"Level 2"}],
+              "elearning_lessons":[{"section_id":"s1","name":"Greetings"},{"section_id":"s2","name":"Directions"}]}
+        queries={}
+        def table(name):
+            query=queries[name]=MagicMock();query.select.return_value.eq.return_value.eq.return_value.in_.return_value.order.return_value.order.return_value.limit.return_value.execute.return_value.data=rows[name]
+            return query
+        db.table.side_effect=table
+        courses=[{"id":"c1","outline":[{"name":"Level 1","lesson_count":1},{"name":"Level 2","lesson_count":1}]},{"id":"c2","outline":[{"name":"Moved","lesson_count":1}]}]
+        with patch.object(service,"service_supabase",db):service.attach_public_topics(17,courses)
+        self.assertEqual([entry["topics"] for entry in courses[0]["outline"]],[["Greetings"],["Directions"]])
+        self.assertNotIn("topics",courses[1]["outline"][0])
+        for query in queries.values():
+            self.assertEqual(query.select.return_value.eq.return_value.eq.call_args.args,("status","published"))
+
 class PublishedIntakeNavigationTests(unittest.TestCase):
     def test_navigation_uses_published_tenant_form_current_version_binding(self):
         db=MagicMock();forms=db.table.return_value.select.return_value.eq.return_value.eq.return_value.in_.return_value.limit.return_value

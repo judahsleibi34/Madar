@@ -46,6 +46,8 @@ const en = {
     search: "Search...",
   },
   notifications: {
+    requestError: "Could not complete this notification request. Please try again.",
+    retry: "Try again",
     title: "Notifications",
     kicker: "Workspace",
     subtitle: "Review recent workspace, builder, and account activity.",
