@@ -42,3 +42,15 @@ it("shows a clear placeholder until the recording is uploaded", () => {
   expect(screen.getByRole("status").textContent).toContain("This recording has not been uploaded yet.");
   expect(screen.queryByRole("button", { name: "LISTEN" })).toBeNull();
 });
+
+it("keeps the existing native player unless the academy opts in", async () => {
+  const { default: MediaBlockRenderer } = await import("./MediaBlockRenderer");
+  const { LearningExperienceContext } = await import("../LearningExperienceContext");
+  const block = { title: "Listen", media: { url: "/uploads/tenant_1/builder_assets/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.wav" }, content: {} };
+  const { container, unmount } = render(<MediaBlockRenderer kind="audio" block={block} />);
+  expect(container.querySelector("audio").hasAttribute("controls")).toBe(true);
+  expect(screen.queryByRole("button", { name: "LISTEN" })).toBeNull();
+  unmount();
+  render(<LearningExperienceContext.Provider value={{ lessonComponents: true }}><MediaBlockRenderer kind="audio" block={block} /></LearningExperienceContext.Provider>);
+  expect(screen.getByRole("button", { name: "LISTEN" })).toBeTruthy();
+});

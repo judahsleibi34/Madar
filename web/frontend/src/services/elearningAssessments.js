@@ -11,6 +11,7 @@ export const createAssessment = (c, l, body) => request(c, l, null, "", body);
 export const commandAssessment = (c, l, b, body) => request(c, l, b, "/commands", body);
 export const learnerAssessment = (c, l, b) => request(c, l, b, "", undefined, true);
 export const startAssessment = (c, l, b) => request(c, l, b, "/attempts", {}, true);
+export const checkPracticeAnswer = (c, l, b, attempt, question, option) => request(c, l, b, `/attempts/${encodeURIComponent(attempt)}/check`, { question_id: question, option_id: option }, true);
 export const submitAssessment = (c, l, b, attempt, answers) => request(c, l, b, `/attempts/${encodeURIComponent(attempt)}/submission`, { answers }, true);
 
 export const fetchPlacements = (course, section) => request(course, null, null, section ? `?section_id=${encodeURIComponent(section)}` : "");

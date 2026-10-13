@@ -8,6 +8,7 @@ import { ELearningTerminologyContext } from "../../context/ELearningTerminologyC
 import { getELearningTerminology } from "../../config/elearningTerminology";
 import { useELearningTerminology } from "../../hooks/useELearningTerminology";
 import { fetchLearningAccountContext, fetchMyLearning, fetchLearningCourse, fetchLearningLesson, completeLearningLesson } from "../../services/elearningPlayer";
+import { LearningExperienceContext } from "./LearningExperienceContext";
 import { getApiUrl } from "../../utils/apiClient";
 import ELearningSkeleton from "./ELearningSkeleton";
 import ContentBlockRenderer from "./content/ContentBlockRenderer";
@@ -72,9 +73,9 @@ export default function ELearningPlayer() {
   if (state.loading) return <ELearningSkeleton label={t("elearning.player.loading")} direction={i18n.dir()} lang={i18n.language} />;
   if (state.error) return <main className="ecommerce-page elearning-management" dir={i18n.dir()}><ErrorState {...state} /></main>;
   const terminology = { labels: getELearningTerminology(state.data.settings), loading: false, error: null };
-  return <ELearningTerminologyContext.Provider value={terminology}><ELearningLearnerShell site={state.data.academy}><main className="ecommerce-page elearning-management elearning-player" dir={i18n.dir()} lang={i18n.language}>
+  return <ELearningTerminologyContext.Provider value={terminology}><LearningExperienceContext.Provider value={state.data.academy?.experience || {}}><ELearningLearnerShell site={state.data.academy}><main className="ecommerce-page elearning-management elearning-player" dir={i18n.dir()} lang={i18n.language}>
     <Routes><Route path="form-responses" element={<LearningFormApplicantResponses />} /><Route path="form-responses/:responseId" element={<LearningFormApplicantResponse />} /><Route path="assessment-reviews" element={<AssessmentReviews />} /><Route path="assessment-reviews/:attemptId" element={<AssessmentReviews />} /><Route path="exchange" element={<LearnerExchange />} /><Route path="exchange/:opportunityId" element={<LearnerExchange detail />} /><Route path="affiliate" element={<AffiliateDashboard site={state.data.academy} />} /><Route path="affiliate/application" element={<AcademyProgrammesPage key="affiliate-application" affiliateOnly />} /><Route path="programmes" element={<AcademyProgrammesPage key="programmes" />} /><Route path="notifications" element={<NotificationsPage />} /><Route index element={<MyLearning />} /><Route path="dashboard" element={<LearnerDashboard />} /><Route path="referrals" element={<LearnerAccount key="referrals" view="referrals" site={state.data.academy} />} /><Route path="rewards" element={<LearnerAccount key="rewards" view="rewards" site={state.data.academy} />} /><Route path="wallet" element={<LearnerAccount key="wallet" view="wallet" site={state.data.academy} />} /><Route path="withdrawals" element={<AcademyProgrammesPage key="withdrawals" initialKind="withdrawal" />} /><Route path="account" element={<LearnerAccount key="profile" />} /><Route path="account/password" element={<ChangePasswordPage lang={i18n.language.startsWith("ar") ? "ar" : "en"} backPath="/my-learning/account" backLabel={t("elearning.learner.account")} />} /><Route path="certificates" element={<MyCertificates />} /><Route path="certificates/:credentialId" element={<CredentialView />} /><Route path="catalog" element={<ELearningCatalog />} /><Route path="plans" element={<MyLearningPlans />} /><Route path="courses/:courseId" element={<CourseEntry />} /><Route path="courses/:courseId/lessons/:lessonId" element={<CourseEntry />} /><Route path="courses/:courseId/assessments/:placementId" element={<CourseEntry />} /><Route path="*" element={<ErrorState error={{ status: 404 }} retry={state.retry} />} /></Routes>
-  </main></ELearningLearnerShell></ELearningTerminologyContext.Provider>;
+  </main></ELearningLearnerShell></LearningExperienceContext.Provider></ELearningTerminologyContext.Provider>;
 }
 
 function MyLearning() {

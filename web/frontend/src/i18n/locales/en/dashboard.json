@@ -1837,6 +1837,18 @@
       "institution_details": "Institution details",
       "student_labels": "Student labels",
       "institution_domain_help": "Enter one email domain per line, for example university.edu. Email verification is required."
+    },
+    "listenMatch": {
+      "title": "Listen & Match",
+      "questionOf": "Question {{current}} of {{total}}",
+      "whatDidYouHear": "What did you hear?",
+      "pictures": "Pictures",
+      "picture": "Picture {{number}}",
+      "correct": "Excellent! That's correct.",
+      "incorrect": "Not quite. Listen again and try again.",
+      "continue": "CONTINUE",
+      "score": "{{correct}} / {{total}} Correct",
+      "retry": "TRY AGAIN"
     }
   }
 }

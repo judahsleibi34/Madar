@@ -287,3 +287,12 @@ class AcademyManagementProfileTests(unittest.TestCase):
         self.assertEqual(client.rpc.call_args.args[0], 'ensure_academy_builder_project')
         self.assertEqual(client.rpc.call_args.args[1]['p_tenant_id'], 17)
         client.table.return_value.insert.assert_not_called()
+
+
+class AcademyExperienceFlagTests(unittest.TestCase):
+    def test_only_known_flags_set_to_true_are_enabled(self):
+        from services.elearning_academy_service import learning_experience
+        self.assertEqual(learning_experience({}), {})
+        self.assertEqual(learning_experience(None), {})
+        self.assertEqual(learning_experience({'academyExperience': {'lessonComponents': True, 'unknown': True}}), {'lessonComponents': True})
+        self.assertEqual(learning_experience({'academyExperience': {'lessonComponents': 'yes'}}), {'lessonComponents': False})

@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import LoadingBar from "../../common/LoadingBar";
 import { getApiUrl } from "../../../utils/apiClient";
 import LessonAudioPlayer from "./LessonAudioPlayer";
+import { useLearningExperience } from "../LearningExperienceContext";
 
 export default function MediaBlockRenderer({ block, kind }) {
   const { t } = useTranslation("dashboard");
@@ -13,14 +14,15 @@ export default function MediaBlockRenderer({ block, kind }) {
   const transcriptId = useId();
   const [transcriptVisible, setTranscriptVisible] = useState(false);
   const Tag = kind;
+  const enhanced = useLearningExperience().lessonComponents === true;
   // Only managed URLs supplied by the backend are rendered. No arbitrary embeds.
   const url = block.media?.url;
   // Audio waits for the owner's recording: show a clear placeholder, not an error.
-  if (kind === "audio" && !block.media) return <LessonAudioPlayer title={block.title} transcript={block.content?.transcript} caption={block.content?.caption} />;
+  if (enhanced && kind === "audio" && !block.media) return <LessonAudioPlayer title={block.title} transcript={block.content?.transcript} caption={block.content?.caption} />;
   if (!url || !/^\/uploads\/tenant_[1-9][0-9]*\/builder_assets\/[a-f0-9]{32}\.(mp3|wav|mp4|webm)$/.test(url)) {
     return <LearningErrorNotice as="p">{t("elearning.content.mediaError")}</LearningErrorNotice>;
   }
-  if (kind === "audio") return <LessonAudioPlayer src={getApiUrl(url)} title={block.title || block.media.filename} transcript={block.content?.transcript} caption={block.content?.caption} />;
+  if (enhanced && kind === "audio") return <LessonAudioPlayer src={getApiUrl(url)} title={block.title || block.media.filename} transcript={block.content?.transcript} caption={block.content?.caption} />;
   return <div className="elearning-media-content">
     {loading && <LoadingBar mode="inline" label={t("elearning.content.loadingMedia")} />}
     <Tag ref={mediaRef} key={url} controls preload="metadata" src={getApiUrl(url)} aria-label={block.title || block.media.filename} onError={() => { setFailed(true); setLoading(false); }} onLoadedMetadata={() => { setFailed(false); setLoading(false); }} />

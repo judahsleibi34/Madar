@@ -2142,7 +2142,79 @@
           ]
         },
         {
-          "id": "eduhope-v2-section-121",
+          "id": "eduhope-v2-section-111",
+          "name": "Lesson preview",
+          "layout": {
+            "width": "full",
+            "paddingY": "large",
+            "background": "#F6F7F4"
+          },
+          "rows": [
+            {
+              "id": "eduhope-v2-row-112",
+              "layout": {
+                "columns": 1,
+                "align": "start",
+                "gap": "large"
+              },
+              "columns": [
+                {
+                  "id": "eduhope-v2-column-113",
+                  "elements": [
+                    {
+                      "id": "eduhope-v2-heading-109",
+                      "type": "heading",
+                      "name": "heading",
+                      "content": "Lesson preview",
+                      "styles": {
+                        "color": "#002A60",
+                        "width": "100%",
+                        "textAlign": "start",
+                        "lineHeight": "1.25",
+                        "fontSize": "32px",
+                        "fontWeight": "750"
+                      },
+                      "action": {
+                        "type": "none"
+                      },
+                      "headingTag": "h2",
+                      "localized": {
+                        "content": {
+                          "en": "Lesson preview",
+                          "ar": "معاينة درس"
+                        }
+                      }
+                    },
+                    {
+                      "id": "eduhope-v2-text-110",
+                      "type": "text",
+                      "name": "text",
+                      "content": "Level 3 · A2 · Topic 2: Making an Appointment",
+                      "styles": {
+                        "color": "#002A60",
+                        "width": "100%",
+                        "textAlign": "start",
+                        "lineHeight": "1.7",
+                        "fontSize": "17px"
+                      },
+                      "action": {
+                        "type": "none"
+                      },
+                      "localized": {
+                        "content": {
+                          "en": "Level 3 · A2 · Topic 2: Making an Appointment",
+                          "ar": "المستوى 3 · A2 · الموضوع 2: Making an Appointment"
+                        }
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "eduhope-v2-section-126",
           "name": "Topic structure",
           "layout": {
             "width": "full",
@@ -2151,7 +2223,7 @@
           },
           "rows": [
             {
-              "id": "eduhope-v2-row-122",
+              "id": "eduhope-v2-row-127",
               "layout": {
                 "columns": 1,
                 "align": "start",
@@ -2159,10 +2231,10 @@
               },
               "columns": [
                 {
-                  "id": "eduhope-v2-column-123",
+                  "id": "eduhope-v2-column-128",
                   "elements": [
                     {
-                      "id": "eduhope-v2-heading-109",
+                      "id": "eduhope-v2-heading-114",
                       "type": "heading",
                       "name": "heading",
                       "content": "Every topic follows a consistent structure",
@@ -2186,7 +2258,7 @@
                       }
                     },
                     {
-                      "id": "eduhope-v2-text-110",
+                      "id": "eduhope-v2-text-115",
                       "type": "text",
                       "name": "text",
                       "content": "1. Topic title",
@@ -2209,7 +2281,7 @@
                       }
                     },
                     {
-                      "id": "eduhope-v2-text-111",
+                      "id": "eduhope-v2-text-116",
                       "type": "text",
                       "name": "text",
                       "content": "2. Real-life situation",
@@ -2232,7 +2304,7 @@
                       }
                     },
                     {
-                      "id": "eduhope-v2-text-112",
+                      "id": "eduhope-v2-text-117",
                       "type": "text",
                       "name": "text",
                       "content": "3. Short dialogue",
@@ -2255,7 +2327,7 @@
                       }
                     },
                     {
-                      "id": "eduhope-v2-text-113",
+                      "id": "eduhope-v2-text-118",
                       "type": "text",
                       "name": "text",
                       "content": "4. Listen",
@@ -2278,7 +2350,7 @@
                       }
                     },
                     {
-                      "id": "eduhope-v2-text-114",
+                      "id": "eduhope-v2-text-119",
                       "type": "text",
                       "name": "text",
                       "content": "5. Transcript",
@@ -2301,7 +2373,7 @@
                       }
                     },
                     {
-                      "id": "eduhope-v2-text-115",
+                      "id": "eduhope-v2-text-120",
                       "type": "text",
                       "name": "text",
                       "content": "6. Understand",
@@ -2324,7 +2396,7 @@
                       }
                     },
                     {
-                      "id": "eduhope-v2-text-116",
+                      "id": "eduhope-v2-text-121",
                       "type": "text",
                       "name": "text",
                       "content": "7. Useful expressions",
@@ -2347,7 +2419,7 @@
                       }
                     },
                     {
-                      "id": "eduhope-v2-text-117",
+                      "id": "eduhope-v2-text-122",
                       "type": "text",
                       "name": "text",
                       "content": "8. Vocabulary",
@@ -2370,7 +2442,7 @@
                       }
                     },
                     {
-                      "id": "eduhope-v2-text-118",
+                      "id": "eduhope-v2-text-123",
                       "type": "text",
                       "name": "text",
                       "content": "9. Listen & Match with Pictures",
@@ -2393,7 +2465,7 @@
                       }
                     },
                     {
-                      "id": "eduhope-v2-text-119",
+                      "id": "eduhope-v2-text-124",
                       "type": "text",
                       "name": "text",
                       "content": "10. Communication practice",
@@ -2416,7 +2488,7 @@
                       }
                     },
                     {
-                      "id": "eduhope-v2-text-120",
+                      "id": "eduhope-v2-text-125",
                       "type": "text",
                       "name": "text",
                       "content": "11. Speak Now",
@@ -2445,7 +2517,7 @@
           ]
         },
         {
-          "id": "eduhope-v2-section-133",
+          "id": "eduhope-v2-section-138",
           "name": "Exams and certificates",
           "layout": {
             "width": "full",
@@ -2454,7 +2526,7 @@
           },
           "rows": [
             {
-              "id": "eduhope-v2-row-134",
+              "id": "eduhope-v2-row-139",
               "layout": {
                 "columns": 1,
                 "align": "start",
@@ -2462,10 +2534,10 @@
               },
               "columns": [
                 {
-                  "id": "eduhope-v2-column-135",
+                  "id": "eduhope-v2-column-140",
                   "elements": [
                     {
-                      "id": "eduhope-v2-heading-124",
+                      "id": "eduhope-v2-heading-129",
                       "type": "heading",
                       "name": "heading",
                       "content": "Exams and certificates",
@@ -2489,7 +2561,7 @@
                       }
                     },
                     {
-                      "id": "eduhope-v2-text-125",
+                      "id": "eduhope-v2-text-130",
                       "type": "text",
                       "name": "text",
                       "content": "Five final exams: A1, A2, B1, B2 and C1. The required passing score is 70%. Students must be allowed to retake final exams; retakes use new questions.",
@@ -2511,7 +2583,7 @@
                       }
                     },
                     {
-                      "id": "eduhope-v2-text-126",
+                      "id": "eduhope-v2-text-131",
                       "type": "text",
                       "name": "text",
                       "content": "• A1 English Speaking Certificate",
@@ -2534,7 +2606,7 @@
                       }
                     },
                     {
-                      "id": "eduhope-v2-text-127",
+                      "id": "eduhope-v2-text-132",
                       "type": "text",
                       "name": "text",
                       "content": "• A2 English Speaking Certificate",
@@ -2557,7 +2629,7 @@
                       }
                     },
                     {
-                      "id": "eduhope-v2-text-128",
+                      "id": "eduhope-v2-text-133",
                       "type": "text",
                       "name": "text",
                       "content": "• B1 English Speaking Certificate",
@@ -2580,7 +2652,7 @@
                       }
                     },
                     {
-                      "id": "eduhope-v2-text-129",
+                      "id": "eduhope-v2-text-134",
                       "type": "text",
                       "name": "text",
                       "content": "• B2 English Speaking Certificate",
@@ -2603,7 +2675,7 @@
                       }
                     },
                     {
-                      "id": "eduhope-v2-text-130",
+                      "id": "eduhope-v2-text-135",
                       "type": "text",
                       "name": "text",
                       "content": "• C1 English Speaking Certificate",
@@ -2626,7 +2698,7 @@
                       }
                     },
                     {
-                      "id": "eduhope-v2-text-131",
+                      "id": "eduhope-v2-text-136",
                       "type": "text",
                       "name": "text",
                       "content": "• Complete English Speaking Course Certificate",
@@ -2649,7 +2721,7 @@
                       }
                     },
                     {
-                      "id": "eduhope-v2-text-132",
+                      "id": "eduhope-v2-text-137",
                       "type": "text",
                       "name": "text",
                       "content": "Students do not need to complete the entire course to receive a level certificate.",
@@ -2714,7 +2786,7 @@
       "showInNavigation": true,
       "sections": [
         {
-          "id": "eduhope-v2-section-137",
+          "id": "eduhope-v2-section-142",
           "name": "How It Works",
           "layout": {
             "width": "full",
@@ -2723,7 +2795,7 @@
           },
           "rows": [
             {
-              "id": "eduhope-v2-row-138",
+              "id": "eduhope-v2-row-143",
               "layout": {
                 "columns": 1,
                 "align": "start",
@@ -2731,10 +2803,10 @@
               },
               "columns": [
                 {
-                  "id": "eduhope-v2-column-139",
+                  "id": "eduhope-v2-column-144",
                   "elements": [
                     {
-                      "id": "eduhope-v2-heading-136",
+                      "id": "eduhope-v2-heading-141",
                       "type": "heading",
                       "name": "heading",
                       "content": "How It Works",
@@ -2764,7 +2836,7 @@
           ]
         },
         {
-          "id": "eduhope-v2-section-144",
+          "id": "eduhope-v2-section-149",
           "name": "Learn and Share",
           "layout": {
             "width": "full",
@@ -2773,7 +2845,7 @@
           },
           "rows": [
             {
-              "id": "eduhope-v2-row-145",
+              "id": "eduhope-v2-row-150",
               "layout": {
                 "columns": 2,
                 "align": "start",
@@ -2781,10 +2853,10 @@
               },
               "columns": [
                 {
-                  "id": "eduhope-v2-column-146",
+                  "id": "eduhope-v2-column-151",
                   "elements": [
                     {
-                      "id": "eduhope-v2-heading-140",
+                      "id": "eduhope-v2-heading-145",
                       "type": "heading",
                       "name": "heading",
                       "content": "🎓 Learn",
@@ -2808,7 +2880,7 @@
                       }
                     },
                     {
-                      "id": "eduhope-v2-text-141",
+                      "id": "eduhope-v2-text-146",
                       "type": "text",
                       "name": "text",
                       "content": "Improve your English-speaking skills through our practical 10-level course, designed to help you communicate confidently in real-life situations.",
@@ -2832,10 +2904,10 @@
                   ]
                 },
                 {
-                  "id": "eduhope-v2-column-147",
+                  "id": "eduhope-v2-column-152",
                   "elements": [
                     {
-                      "id": "eduhope-v2-heading-142",
+                      "id": "eduhope-v2-heading-147",
                       "type": "heading",
                       "name": "heading",
                       "content": "🔗 Share",
@@ -2859,7 +2931,7 @@
                       }
                     },
                     {
-                      "id": "eduhope-v2-text-143",
+                      "id": "eduhope-v2-text-148",
                       "type": "text",
                       "name": "text",
                       "content": "Enjoy the course and share it with others. Earn a $10 reward for every eligible course purchase made through your personal link.",
@@ -2887,7 +2959,7 @@
           ]
         },
         {
-          "id": "eduhope-v2-section-161",
+          "id": "eduhope-v2-section-166",
           "name": "Steps",
           "layout": {
             "width": "full",
@@ -2896,7 +2968,7 @@
           },
           "rows": [
             {
-              "id": "eduhope-v2-row-162",
+              "id": "eduhope-v2-row-167",
               "layout": {
                 "columns": 1,
                 "align": "start",
@@ -2904,10 +2976,10 @@
               },
               "columns": [
                 {
-                  "id": "eduhope-v2-column-163",
+                  "id": "eduhope-v2-column-168",
                   "elements": [
                     {
-                      "id": "eduhope-v2-heading-148",
+                      "id": "eduhope-v2-heading-153",
                       "type": "heading",
                       "name": "heading",
                       "content": "How EduHope Works",
@@ -2931,7 +3003,7 @@
                       }
                     },
                     {
-                      "id": "eduhope-v2-text-149",
+                      "id": "eduhope-v2-text-154",
                       "type": "text",
                       "name": "text",
                       "content": "1. Create an account.",
@@ -2954,7 +3026,7 @@
                       }
                     },
                     {
-                      "id": "eduhope-v2-text-150",
+                      "id": "eduhope-v2-text-155",
                       "type": "text",
                       "name": "text",
                       "content": "2. Purchase the English course.",
@@ -2977,7 +3049,7 @@
                       }
                     },
                     {
-                      "id": "eduhope-v2-text-151",
+                      "id": "eduhope-v2-text-156",
                       "type": "text",
                       "name": "text",
                       "content": "3. Start learning through 10 course levels.",
@@ -3000,7 +3072,7 @@
                       }
                     },
                     {
-                      "id": "eduhope-v2-text-152",
+                      "id": "eduhope-v2-text-157",
                       "type": "text",
                       "name": "text",
                       "content": "4. Receive a referral link after purchasing the course.",
@@ -3023,7 +3095,7 @@
                       }
                     },
                     {
-                      "id": "eduhope-v2-text-153",
+                      "id": "eduhope-v2-text-158",
                       "type": "text",
                       "name": "text",
                       "content": "5. Share the course with others.",
@@ -3046,7 +3118,7 @@
                       }
                     },
                     {
-                      "id": "eduhope-v2-text-154",
+                      "id": "eduhope-v2-text-159",
                       "type": "text",
                       "name": "text",
                       "content": "6. Earn eligible referral rewards.",
@@ -3069,7 +3141,7 @@
                       }
                     },
                     {
-                      "id": "eduhope-v2-text-155",
+                      "id": "eduhope-v2-text-160",
                       "type": "text",
                       "name": "text",
                       "content": "7. Make 4 successful course sales to become eligible to apply for Tuition Support.",
@@ -3092,7 +3164,7 @@
                       }
                     },
                     {
-                      "id": "eduhope-v2-text-156",
+                      "id": "eduhope-v2-text-161",
                       "type": "text",
                       "name": "text",
                       "content": "8. Apply for an Exchange Programme while studying with EduHope.",
@@ -3115,7 +3187,7 @@
                       }
                     },
                     {
-                      "id": "eduhope-v2-text-157",
+                      "id": "eduhope-v2-text-162",
                       "type": "text",
                       "name": "text",
                       "content": "Completing Level 4 is not a Tuition Support eligibility requirement.",
@@ -3137,7 +3209,7 @@
                       }
                     },
                     {
-                      "id": "eduhope-v2-button-158",
+                      "id": "eduhope-v2-button-163",
                       "type": "button",
                       "name": "button",
                       "content": "Explore the Course",
@@ -3167,7 +3239,7 @@
                       }
                     },
                     {
-                      "id": "eduhope-v2-text-159",
+                      "id": "eduhope-v2-text-164",
                       "type": "text",
                       "name": "text",
                       "content": "If you would like to promote EduHope without purchasing the course, you can apply to become an Affiliate.",
@@ -3189,7 +3261,7 @@
                       }
                     },
                     {
-                      "id": "eduhope-v2-button-160",
+                      "id": "eduhope-v2-button-165",
                       "type": "button",
                       "name": "button",
                       "content": "Become an Affiliate",
@@ -3263,7 +3335,7 @@
       "showInNavigation": true,
       "sections": [
         {
-          "id": "eduhope-v2-section-172",
+          "id": "eduhope-v2-section-177",
           "name": "Become an Affiliate",
           "layout": {
             "width": "full",
@@ -3272,7 +3344,7 @@
           },
           "rows": [
             {
-              "id": "eduhope-v2-row-173",
+              "id": "eduhope-v2-row-178",
               "layout": {
                 "columns": 1,
                 "align": "start",
@@ -3280,10 +3352,10 @@
               },
               "columns": [
                 {
-                  "id": "eduhope-v2-column-174",
+                  "id": "eduhope-v2-column-179",
                   "elements": [
                     {
-                      "id": "eduhope-v2-heading-164",
+                      "id": "eduhope-v2-heading-169",
                       "type": "heading",
                       "name": "heading",
                       "content": "Become an Affiliate",
@@ -3307,7 +3379,7 @@
                       }
                     },
                     {
-                      "id": "eduhope-v2-text-165",
+                      "id": "eduhope-v2-text-170",
                       "type": "text",
                       "name": "text",
                       "content": "This page is for users who want to promote EduHope without purchasing the English course.",
@@ -3329,7 +3401,7 @@
                       }
                     },
                     {
-                      "id": "eduhope-v2-text-166",
+                      "id": "eduhope-v2-text-171",
                       "type": "text",
                       "name": "text",
                       "content": "• An affiliate does not have to purchase the English course.",
@@ -3352,7 +3424,7 @@
                       }
                     },
                     {
-                      "id": "eduhope-v2-text-167",
+                      "id": "eduhope-v2-text-172",
                       "type": "text",
                       "name": "text",
                       "content": "• After approval, they receive a unique affiliate referral link.",
@@ -3375,7 +3447,7 @@
                       }
                     },
                     {
-                      "id": "eduhope-v2-text-168",
+                      "id": "eduhope-v2-text-173",
                       "type": "text",
                       "name": "text",
                       "content": "• $10 for each eligible direct course sale.",
@@ -3398,7 +3470,7 @@
                       }
                     },
                     {
-                      "id": "eduhope-v2-text-169",
+                      "id": "eduhope-v2-text-174",
                       "type": "text",
                       "name": "text",
                       "content": "• Only direct referrals count.",
@@ -3421,7 +3493,7 @@
                       }
                     },
                     {
-                      "id": "eduhope-v2-text-170",
+                      "id": "eduhope-v2-text-175",
                       "type": "text",
                       "name": "text",
                       "content": "• Rewards are subject to verification and the Referral Programme Terms & Conditions.",
@@ -3444,7 +3516,7 @@
                       }
                     },
                     {
-                      "id": "eduhope-v2-text-171",
+                      "id": "eduhope-v2-text-176",
                       "type": "text",
                       "name": "text",
                       "content": "• Earnings are not guaranteed.",
@@ -3473,7 +3545,7 @@
           ]
         },
         {
-          "id": "eduhope-v2-section-177",
+          "id": "eduhope-v2-section-182",
           "name": "Affiliate Application",
           "layout": {
             "width": "full",
@@ -3482,7 +3554,7 @@
           },
           "rows": [
             {
-              "id": "eduhope-v2-row-178",
+              "id": "eduhope-v2-row-183",
               "layout": {
                 "columns": 1,
                 "align": "start",
@@ -3490,10 +3562,10 @@
               },
               "columns": [
                 {
-                  "id": "eduhope-v2-column-179",
+                  "id": "eduhope-v2-column-184",
                   "elements": [
                     {
-                      "id": "eduhope-v2-heading-175",
+                      "id": "eduhope-v2-heading-180",
                       "type": "heading",
                       "name": "heading",
                       "content": "Affiliate Application",
@@ -3517,7 +3589,7 @@
                       }
                     },
                     {
-                      "id": "eduhope-v2-form-176",
+                      "id": "eduhope-v2-form-181",
                       "type": "academyForm",
                       "name": "Learning form placement",
                       "content": "",
@@ -3575,7 +3647,7 @@
       "showInNavigation": true,
       "sections": [
         {
-          "id": "eduhope-v2-section-187",
+          "id": "eduhope-v2-section-192",
           "name": "About EduHope",
           "layout": {
             "width": "full",
@@ -3584,7 +3656,7 @@
           },
           "rows": [
             {
-              "id": "eduhope-v2-row-188",
+              "id": "eduhope-v2-row-193",
               "layout": {
                 "columns": 1,
                 "align": "start",
@@ -3592,10 +3664,10 @@
               },
               "columns": [
                 {
-                  "id": "eduhope-v2-column-189",
+                  "id": "eduhope-v2-column-194",
                   "elements": [
                     {
-                      "id": "eduhope-v2-heading-180",
+                      "id": "eduhope-v2-heading-185",
                       "type": "heading",
                       "name": "heading",
                       "content": "About EduHope",
@@ -3619,7 +3691,7 @@
                       }
                     },
                     {
-                      "id": "eduhope-v2-text-181",
+                      "id": "eduhope-v2-text-186",
                       "type": "text",
                       "name": "text",
                       "content": "EduHope combines practical English language education with opportunity and hope.",
@@ -3641,7 +3713,7 @@
                       }
                     },
                     {
-                      "id": "eduhope-v2-text-182",
+                      "id": "eduhope-v2-text-187",
                       "type": "text",
                       "name": "text",
                       "content": "Our primary mission is to make English learning accessible, practical, and meaningful. EduHope helps learners develop real-life English communication skills, improve their confidence, and use English in everyday, academic, and professional situations.",
@@ -3663,7 +3735,7 @@
                       }
                     },
                     {
-                      "id": "eduhope-v2-text-183",
+                      "id": "eduhope-v2-text-188",
                       "type": "text",
                       "name": "text",
                       "content": "Beyond language learning, EduHope aims to create opportunities for learners to grow, share, and contribute to their communities.",
@@ -3685,7 +3757,7 @@
                       }
                     },
                     {
-                      "id": "eduhope-v2-text-184",
+                      "id": "eduhope-v2-text-189",
                       "type": "text",
                       "name": "text",
                       "content": "Through our referral programme, eligible learners and approved affiliates can help introduce others to EduHope and earn rewards for successful course sales.",
@@ -3707,7 +3779,7 @@
                       }
                     },
                     {
-                      "id": "eduhope-v2-text-185",
+                      "id": "eduhope-v2-text-190",
                       "type": "text",
                       "name": "text",
                       "content": "Through our Tuition Support initiative, a portion of eligible course sales will be allocated to supporting students facing financial difficulties with their university tuition fees.",
@@ -3729,7 +3801,7 @@
                       }
                     },
                     {
-                      "id": "eduhope-v2-text-186",
+                      "id": "eduhope-v2-text-191",
                       "type": "text",
                       "name": "text",
                       "content": "We also aim to connect learning with wider opportunities through exchange programmes.",
@@ -3757,7 +3829,7 @@
           ]
         },
         {
-          "id": "eduhope-v2-section-193",
+          "id": "eduhope-v2-section-198",
           "name": "Philosophy",
           "layout": {
             "width": "full",
@@ -3766,7 +3838,7 @@
           },
           "rows": [
             {
-              "id": "eduhope-v2-row-194",
+              "id": "eduhope-v2-row-199",
               "layout": {
                 "columns": 1,
                 "align": "start",
@@ -3774,10 +3846,10 @@
               },
               "columns": [
                 {
-                  "id": "eduhope-v2-column-195",
+                  "id": "eduhope-v2-column-200",
                   "elements": [
                     {
-                      "id": "eduhope-v2-text-190",
+                      "id": "eduhope-v2-text-195",
                       "type": "text",
                       "name": "text",
                       "content": "EduHope is built around one simple idea:",
@@ -3799,7 +3871,7 @@
                       }
                     },
                     {
-                      "id": "eduhope-v2-heading-191",
+                      "id": "eduhope-v2-heading-196",
                       "type": "heading",
                       "name": "heading",
                       "content": "Learn. Grow. Give Back.",
@@ -3823,7 +3895,7 @@
                       }
                     },
                     {
-                      "id": "eduhope-v2-text-192",
+                      "id": "eduhope-v2-text-197",
                       "type": "text",
                       "name": "text",
                       "content": "EduHope is not only about learning English. It is about helping learners grow, creating opportunities, and making education more accessible to those who need support.",
@@ -3888,7 +3960,7 @@
       "showInNavigation": true,
       "sections": [
         {
-          "id": "eduhope-v2-section-199",
+          "id": "eduhope-v2-section-204",
           "name": "Tuition Support",
           "layout": {
             "width": "full",
@@ -3897,7 +3969,7 @@
           },
           "rows": [
             {
-              "id": "eduhope-v2-row-200",
+              "id": "eduhope-v2-row-205",
               "layout": {
                 "columns": 1,
                 "align": "start",
@@ -3905,10 +3977,10 @@
               },
               "columns": [
                 {
-                  "id": "eduhope-v2-column-201",
+                  "id": "eduhope-v2-column-206",
                   "elements": [
                     {
-                      "id": "eduhope-v2-heading-196",
+                      "id": "eduhope-v2-heading-201",
                       "type": "heading",
                       "name": "heading",
                       "content": "Tuition Support",
@@ -3932,7 +4004,7 @@
                       }
                     },
                     {
-                      "id": "eduhope-v2-text-197",
+                      "id": "eduhope-v2-text-202",
                       "type": "text",
                       "name": "text",
                       "content": "At EduHope, we believe that learning is not only about helping individual learners—it is also about creating opportunities for others to learn and succeed. We believe that education is a right for everyone, and every learner should have the opportunity to pursue their education regardless of their financial circumstances. Through EduHope, a portion of eligible course sales will be allocated to support students who are facing financial difficulties and need assistance with their university tuition fees. In this way, every learner who chooses to learn with EduHope can also help create an opportunity for another student.",
@@ -3954,7 +4026,7 @@
                       }
                     },
                     {
-                      "id": "eduhope-v2-heading-198",
+                      "id": "eduhope-v2-heading-203",
                       "type": "heading",
                       "name": "heading",
                       "content": "Learn. Grow. Give Back.",
@@ -3984,7 +4056,7 @@
           ]
         },
         {
-          "id": "eduhope-v2-section-214",
+          "id": "eduhope-v2-section-219",
           "name": "Eligibility",
           "layout": {
             "width": "full",
@@ -3993,7 +4065,7 @@
           },
           "rows": [
             {
-              "id": "eduhope-v2-row-215",
+              "id": "eduhope-v2-row-220",
               "layout": {
                 "columns": 1,
                 "align": "start",
@@ -4001,10 +4073,10 @@
               },
               "columns": [
                 {
-                  "id": "eduhope-v2-column-216",
+                  "id": "eduhope-v2-column-221",
                   "elements": [
                     {
-                      "id": "eduhope-v2-heading-202",
+                      "id": "eduhope-v2-heading-207",
                       "type": "heading",
                       "name": "heading",
                       "content": "Tuition Support Eligibility",
@@ -4028,7 +4100,7 @@
                       }
                     },
                     {
-                      "id": "eduhope-v2-text-203",
+                      "id": "eduhope-v2-text-208",
                       "type": "text",
                       "name": "text",
                       "content": "The student must make 4 successful course sales through their own EduHope referral link. After reaching 4 eligible sales, the student becomes eligible to apply for Tuition Support.",
@@ -4050,7 +4122,7 @@
                       }
                     },
                     {
-                      "id": "eduhope-v2-text-204",
+                      "id": "eduhope-v2-text-209",
                       "type": "text",
                       "name": "text",
                       "content": "Completing Level 4 is not a Tuition Support eligibility requirement.",
@@ -4072,7 +4144,7 @@
                       }
                     },
                     {
-                      "id": "eduhope-v2-text-205",
+                      "id": "eduhope-v2-text-210",
                       "type": "text",
                       "name": "text",
                       "content": "Only valid and verified purchases count. The system must not count:",
@@ -4094,7 +4166,7 @@
                       }
                     },
                     {
-                      "id": "eduhope-v2-text-206",
+                      "id": "eduhope-v2-text-211",
                       "type": "text",
                       "name": "text",
                       "content": "• Failed payments.",
@@ -4117,7 +4189,7 @@
                       }
                     },
                     {
-                      "id": "eduhope-v2-text-207",
+                      "id": "eduhope-v2-text-212",
                       "type": "text",
                       "name": "text",
                       "content": "• Cancelled purchases.",
@@ -4140,7 +4212,7 @@
                       }
                     },
                     {
-                      "id": "eduhope-v2-text-208",
+                      "id": "eduhope-v2-text-213",
                       "type": "text",
                       "name": "text",
                       "content": "• Refunded purchases.",
@@ -4163,7 +4235,7 @@
                       }
                     },
                     {
-                      "id": "eduhope-v2-text-209",
+                      "id": "eduhope-v2-text-214",
                       "type": "text",
                       "name": "text",
                       "content": "• Duplicate purchases.",
@@ -4186,7 +4258,7 @@
                       }
                     },
                     {
-                      "id": "eduhope-v2-text-210",
+                      "id": "eduhope-v2-text-215",
                       "type": "text",
                       "name": "text",
                       "content": "• Self-referrals.",
@@ -4209,7 +4281,7 @@
                       }
                     },
                     {
-                      "id": "eduhope-v2-text-211",
+                      "id": "eduhope-v2-text-216",
                       "type": "text",
                       "name": "text",
                       "content": "• Fraudulent purchases.",
@@ -4232,7 +4304,7 @@
                       }
                     },
                     {
-                      "id": "eduhope-v2-text-212",
+                      "id": "eduhope-v2-text-217",
                       "type": "text",
                       "name": "text",
                       "content": "• Invalid referral transactions.",
@@ -4255,7 +4327,7 @@
                       }
                     },
                     {
-                      "id": "eduhope-v2-text-213",
+                      "id": "eduhope-v2-text-218",
                       "type": "text",
                       "name": "text",
                       "content": "Submitting an application does not guarantee financial assistance.",
@@ -4283,7 +4355,7 @@
           ]
         },
         {
-          "id": "eduhope-v2-section-219",
+          "id": "eduhope-v2-section-224",
           "name": "Application",
           "layout": {
             "width": "full",
@@ -4292,7 +4364,7 @@
           },
           "rows": [
             {
-              "id": "eduhope-v2-row-220",
+              "id": "eduhope-v2-row-225",
               "layout": {
                 "columns": 1,
                 "align": "start",
@@ -4300,10 +4372,10 @@
               },
               "columns": [
                 {
-                  "id": "eduhope-v2-column-221",
+                  "id": "eduhope-v2-column-226",
                   "elements": [
                     {
-                      "id": "eduhope-v2-heading-217",
+                      "id": "eduhope-v2-heading-222",
                       "type": "heading",
                       "name": "heading",
                       "content": "Tuition Support Application",
@@ -4327,7 +4399,7 @@
                       }
                     },
                     {
-                      "id": "eduhope-v2-form-218",
+                      "id": "eduhope-v2-form-223",
                       "type": "academyForm",
                       "name": "Learning form placement",
                       "content": "",
@@ -4385,7 +4457,7 @@
       "showInNavigation": false,
       "sections": [
         {
-          "id": "eduhope-v2-section-229",
+          "id": "eduhope-v2-section-234",
           "name": "Exchange Programme",
           "layout": {
             "width": "full",
@@ -4394,7 +4466,7 @@
           },
           "rows": [
             {
-              "id": "eduhope-v2-row-230",
+              "id": "eduhope-v2-row-235",
               "layout": {
                 "columns": 1,
                 "align": "start",
@@ -4402,10 +4474,10 @@
               },
               "columns": [
                 {
-                  "id": "eduhope-v2-column-231",
+                  "id": "eduhope-v2-column-236",
                   "elements": [
                     {
-                      "id": "eduhope-v2-heading-222",
+                      "id": "eduhope-v2-heading-227",
                       "type": "heading",
                       "name": "heading",
                       "content": "Exchange Programme",
@@ -4429,7 +4501,7 @@
                       }
                     },
                     {
-                      "id": "eduhope-v2-text-223",
+                      "id": "eduhope-v2-text-228",
                       "type": "text",
                       "name": "text",
                       "content": "Active EduHope learners can apply for available exchange opportunities, subject to programme requirements.",
@@ -4451,7 +4523,7 @@
                       }
                     },
                     {
-                      "id": "eduhope-v2-text-224",
+                      "id": "eduhope-v2-text-229",
                       "type": "text",
                       "name": "text",
                       "content": "Exchange Programme eligibility is separate from Tuition Support. Students do not need:",
@@ -4473,7 +4545,7 @@
                       }
                     },
                     {
-                      "id": "eduhope-v2-text-225",
+                      "id": "eduhope-v2-text-230",
                       "type": "text",
                       "name": "text",
                       "content": "• 4 referral sales.",
@@ -4496,7 +4568,7 @@
                       }
                     },
                     {
-                      "id": "eduhope-v2-text-226",
+                      "id": "eduhope-v2-text-231",
                       "type": "text",
                       "name": "text",
                       "content": "• Tuition Support eligibility.",
@@ -4519,7 +4591,7 @@
                       }
                     },
                     {
-                      "id": "eduhope-v2-text-227",
+                      "id": "eduhope-v2-text-232",
                       "type": "text",
                       "name": "text",
                       "content": "• Tuition Support approval.",
@@ -4542,7 +4614,7 @@
                       }
                     },
                     {
-                      "id": "eduhope-v2-text-228",
+                      "id": "eduhope-v2-text-233",
                       "type": "text",
                       "name": "text",
                       "content": "The student must simply be an active EduHope learner and meet the specific programme requirements.",
@@ -4570,7 +4642,7 @@
           ]
         },
         {
-          "id": "eduhope-v2-section-234",
+          "id": "eduhope-v2-section-239",
           "name": "Application",
           "layout": {
             "width": "full",
@@ -4579,7 +4651,7 @@
           },
           "rows": [
             {
-              "id": "eduhope-v2-row-235",
+              "id": "eduhope-v2-row-240",
               "layout": {
                 "columns": 1,
                 "align": "start",
@@ -4587,10 +4659,10 @@
               },
               "columns": [
                 {
-                  "id": "eduhope-v2-column-236",
+                  "id": "eduhope-v2-column-241",
                   "elements": [
                     {
-                      "id": "eduhope-v2-heading-232",
+                      "id": "eduhope-v2-heading-237",
                       "type": "heading",
                       "name": "heading",
                       "content": "Exchange Application Form",
@@ -4614,7 +4686,7 @@
                       }
                     },
                     {
-                      "id": "eduhope-v2-form-233",
+                      "id": "eduhope-v2-form-238",
                       "type": "academyForm",
                       "name": "Learning form placement",
                       "content": "",
@@ -4672,7 +4744,7 @@
       "showInNavigation": true,
       "sections": [
         {
-          "id": "eduhope-v2-section-238",
+          "id": "eduhope-v2-section-243",
           "name": "FAQ",
           "layout": {
             "width": "full",
@@ -4681,7 +4753,7 @@
           },
           "rows": [
             {
-              "id": "eduhope-v2-row-239",
+              "id": "eduhope-v2-row-244",
               "layout": {
                 "columns": 1,
                 "align": "start",
@@ -4689,10 +4761,10 @@
               },
               "columns": [
                 {
-                  "id": "eduhope-v2-column-240",
+                  "id": "eduhope-v2-column-245",
                   "elements": [
                     {
-                      "id": "eduhope-v2-heading-237",
+                      "id": "eduhope-v2-heading-242",
                       "type": "heading",
                       "name": "heading",
                       "content": "Frequently Asked Questions",
@@ -4722,7 +4794,7 @@
           ]
         },
         {
-          "id": "eduhope-v2-section-243",
+          "id": "eduhope-v2-section-248",
           "name": "FAQ 1",
           "layout": {
             "width": "full",
@@ -4731,7 +4803,7 @@
           },
           "rows": [
             {
-              "id": "eduhope-v2-row-244",
+              "id": "eduhope-v2-row-249",
               "layout": {
                 "columns": 1,
                 "align": "start",
@@ -4739,10 +4811,10 @@
               },
               "columns": [
                 {
-                  "id": "eduhope-v2-column-245",
+                  "id": "eduhope-v2-column-250",
                   "elements": [
                     {
-                      "id": "eduhope-v2-heading-241",
+                      "id": "eduhope-v2-heading-246",
                       "type": "heading",
                       "name": "heading",
                       "content": "What is EduHope?",
@@ -4766,7 +4838,7 @@
                       }
                     },
                     {
-                      "id": "eduhope-v2-text-242",
+                      "id": "eduhope-v2-text-247",
                       "type": "text",
                       "name": "text",
                       "content": "EduHope is an online English-learning platform that combines practical English education with referral opportunities, Tuition Support, and Exchange Programme opportunities.",
@@ -4794,7 +4866,7 @@
           ]
         },
         {
-          "id": "eduhope-v2-section-248",
+          "id": "eduhope-v2-section-253",
           "name": "FAQ 2",
           "layout": {
             "width": "full",
@@ -4803,7 +4875,7 @@
           },
           "rows": [
             {
-              "id": "eduhope-v2-row-249",
+              "id": "eduhope-v2-row-254",
               "layout": {
                 "columns": 1,
                 "align": "start",
@@ -4811,10 +4883,10 @@
               },
               "columns": [
                 {
-                  "id": "eduhope-v2-column-250",
+                  "id": "eduhope-v2-column-255",
                   "elements": [
                     {
-                      "id": "eduhope-v2-heading-246",
+                      "id": "eduhope-v2-heading-251",
                       "type": "heading",
                       "name": "heading",
                       "content": "How much does the English course cost?",
@@ -4838,7 +4910,7 @@
                       }
                     },
                     {
-                      "id": "eduhope-v2-text-247",
+                      "id": "eduhope-v2-text-252",
                       "type": "text",
                       "name": "text",
                       "content": "The EduHope English Conversation Course costs $30 USD. The price can be changed by Admin.",
@@ -4866,7 +4938,7 @@
           ]
         },
         {
-          "id": "eduhope-v2-section-253",
+          "id": "eduhope-v2-section-258",
           "name": "FAQ 3",
           "layout": {
             "width": "full",
@@ -4875,7 +4947,7 @@
           },
           "rows": [
             {
-              "id": "eduhope-v2-row-254",
+              "id": "eduhope-v2-row-259",
               "layout": {
                 "columns": 1,
                 "align": "start",
@@ -4883,10 +4955,10 @@
               },
               "columns": [
                 {
-                  "id": "eduhope-v2-column-255",
+                  "id": "eduhope-v2-column-260",
                   "elements": [
                     {
-                      "id": "eduhope-v2-heading-251",
+                      "id": "eduhope-v2-heading-256",
                       "type": "heading",
                       "name": "heading",
                       "content": "How many levels are in the course?",
@@ -4910,7 +4982,7 @@
                       }
                     },
                     {
-                      "id": "eduhope-v2-text-252",
+                      "id": "eduhope-v2-text-257",
                       "type": "text",
                       "name": "text",
                       "content": "The course contains 10 levels.",
@@ -4938,7 +5010,7 @@
           ]
         },
         {
-          "id": "eduhope-v2-section-258",
+          "id": "eduhope-v2-section-263",
           "name": "FAQ 4",
           "layout": {
             "width": "full",
@@ -4947,7 +5019,7 @@
           },
           "rows": [
             {
-              "id": "eduhope-v2-row-259",
+              "id": "eduhope-v2-row-264",
               "layout": {
                 "columns": 1,
                 "align": "start",
@@ -4955,10 +5027,10 @@
               },
               "columns": [
                 {
-                  "id": "eduhope-v2-column-260",
+                  "id": "eduhope-v2-column-265",
                   "elements": [
                     {
-                      "id": "eduhope-v2-heading-256",
+                      "id": "eduhope-v2-heading-261",
                       "type": "heading",
                       "name": "heading",
                       "content": "What does the course include?",
@@ -4982,7 +5054,7 @@
                       }
                     },
                     {
-                      "id": "eduhope-v2-text-257",
+                      "id": "eduhope-v2-text-262",
                       "type": "text",
                       "name": "text",
                       "content": "The course focuses on practical English communication, speaking, listening, vocabulary, pronunciation, useful expressions, everyday English, academic English, and professional communication.",
@@ -5010,7 +5082,7 @@
           ]
         },
         {
-          "id": "eduhope-v2-section-263",
+          "id": "eduhope-v2-section-268",
           "name": "FAQ 5",
           "layout": {
             "width": "full",
@@ -5019,7 +5091,7 @@
           },
           "rows": [
             {
-              "id": "eduhope-v2-row-264",
+              "id": "eduhope-v2-row-269",
               "layout": {
                 "columns": 1,
                 "align": "start",
@@ -5027,10 +5099,10 @@
               },
               "columns": [
                 {
-                  "id": "eduhope-v2-column-265",
+                  "id": "eduhope-v2-column-270",
                   "elements": [
                     {
-                      "id": "eduhope-v2-heading-261",
+                      "id": "eduhope-v2-heading-266",
                       "type": "heading",
                       "name": "heading",
                       "content": "Do I receive a referral link when I register?",
@@ -5054,7 +5126,7 @@
                       }
                     },
                     {
-                      "id": "eduhope-v2-text-262",
+                      "id": "eduhope-v2-text-267",
                       "type": "text",
                       "name": "text",
                       "content": "No. A student receives a referral link after successfully purchasing the English course. A user who has not purchased the course can apply to become an Affiliate.",
@@ -5082,7 +5154,7 @@
           ]
         },
         {
-          "id": "eduhope-v2-section-268",
+          "id": "eduhope-v2-section-273",
           "name": "FAQ 6",
           "layout": {
             "width": "full",
@@ -5091,7 +5163,7 @@
           },
           "rows": [
             {
-              "id": "eduhope-v2-row-269",
+              "id": "eduhope-v2-row-274",
               "layout": {
                 "columns": 1,
                 "align": "start",
@@ -5099,10 +5171,10 @@
               },
               "columns": [
                 {
-                  "id": "eduhope-v2-column-270",
+                  "id": "eduhope-v2-column-275",
                   "elements": [
                     {
-                      "id": "eduhope-v2-heading-266",
+                      "id": "eduhope-v2-heading-271",
                       "type": "heading",
                       "name": "heading",
                       "content": "How much is the referral reward?",
@@ -5126,7 +5198,7 @@
                       }
                     },
                     {
-                      "id": "eduhope-v2-text-267",
+                      "id": "eduhope-v2-text-272",
                       "type": "text",
                       "name": "text",
                       "content": "The current reward is $10 for each eligible direct course sale. Rewards are subject to verification and the Referral Programme Terms & Conditions. Earnings are not guaranteed.",
@@ -5154,7 +5226,7 @@
           ]
         },
         {
-          "id": "eduhope-v2-section-273",
+          "id": "eduhope-v2-section-278",
           "name": "FAQ 7",
           "layout": {
             "width": "full",
@@ -5163,7 +5235,7 @@
           },
           "rows": [
             {
-              "id": "eduhope-v2-row-274",
+              "id": "eduhope-v2-row-279",
               "layout": {
                 "columns": 1,
                 "align": "start",
@@ -5171,10 +5243,10 @@
               },
               "columns": [
                 {
-                  "id": "eduhope-v2-column-275",
+                  "id": "eduhope-v2-column-280",
                   "elements": [
                     {
-                      "id": "eduhope-v2-heading-271",
+                      "id": "eduhope-v2-heading-276",
                       "type": "heading",
                       "name": "heading",
                       "content": "How can I become eligible for Tuition Support?",
@@ -5198,7 +5270,7 @@
                       }
                     },
                     {
-                      "id": "eduhope-v2-text-272",
+                      "id": "eduhope-v2-text-277",
                       "type": "text",
                       "name": "text",
                       "content": "You must make 4 successful course sales through your EduHope referral link.",
@@ -5226,7 +5298,7 @@
           ]
         },
         {
-          "id": "eduhope-v2-section-278",
+          "id": "eduhope-v2-section-283",
           "name": "FAQ 8",
           "layout": {
             "width": "full",
@@ -5235,7 +5307,7 @@
           },
           "rows": [
             {
-              "id": "eduhope-v2-row-279",
+              "id": "eduhope-v2-row-284",
               "layout": {
                 "columns": 1,
                 "align": "start",
@@ -5243,10 +5315,10 @@
               },
               "columns": [
                 {
-                  "id": "eduhope-v2-column-280",
+                  "id": "eduhope-v2-column-285",
                   "elements": [
                     {
-                      "id": "eduhope-v2-heading-276",
+                      "id": "eduhope-v2-heading-281",
                       "type": "heading",
                       "name": "heading",
                       "content": "Do I need to complete Level 4?",
@@ -5270,7 +5342,7 @@
                       }
                     },
                     {
-                      "id": "eduhope-v2-text-277",
+                      "id": "eduhope-v2-text-282",
                       "type": "text",
                       "name": "text",
                       "content": "No. Completing Level 4 is not a Tuition Support requirement. Tuition Support eligibility is based on making 4 successful course sales through your referral link.",
@@ -5298,7 +5370,7 @@
           ]
         },
         {
-          "id": "eduhope-v2-section-283",
+          "id": "eduhope-v2-section-288",
           "name": "FAQ 9",
           "layout": {
             "width": "full",
@@ -5307,7 +5379,7 @@
           },
           "rows": [
             {
-              "id": "eduhope-v2-row-284",
+              "id": "eduhope-v2-row-289",
               "layout": {
                 "columns": 1,
                 "align": "start",
@@ -5315,10 +5387,10 @@
               },
               "columns": [
                 {
-                  "id": "eduhope-v2-column-285",
+                  "id": "eduhope-v2-column-290",
                   "elements": [
                     {
-                      "id": "eduhope-v2-heading-281",
+                      "id": "eduhope-v2-heading-286",
                       "type": "heading",
                       "name": "heading",
                       "content": "Does reaching 4 sales guarantee Tuition Support?",
@@ -5342,7 +5414,7 @@
                       }
                     },
                     {
-                      "id": "eduhope-v2-text-282",
+                      "id": "eduhope-v2-text-287",
                       "type": "text",
                       "name": "text",
                       "content": "No. Reaching 4 successful sales makes you eligible to apply. The application is reviewed and financial assistance is not guaranteed.",
@@ -5370,7 +5442,7 @@
           ]
         },
         {
-          "id": "eduhope-v2-section-288",
+          "id": "eduhope-v2-section-293",
           "name": "FAQ 10",
           "layout": {
             "width": "full",
@@ -5379,7 +5451,7 @@
           },
           "rows": [
             {
-              "id": "eduhope-v2-row-289",
+              "id": "eduhope-v2-row-294",
               "layout": {
                 "columns": 1,
                 "align": "start",
@@ -5387,10 +5459,10 @@
               },
               "columns": [
                 {
-                  "id": "eduhope-v2-column-290",
+                  "id": "eduhope-v2-column-295",
                   "elements": [
                     {
-                      "id": "eduhope-v2-heading-286",
+                      "id": "eduhope-v2-heading-291",
                       "type": "heading",
                       "name": "heading",
                       "content": "Can I apply for an Exchange Programme without making 4 sales?",
@@ -5414,7 +5486,7 @@
                       }
                     },
                     {
-                      "id": "eduhope-v2-text-287",
+                      "id": "eduhope-v2-text-292",
                       "type": "text",
                       "name": "text",
                       "content": "Yes. Active EduHope learners can apply for available Exchange Programmes, subject to programme requirements.",
@@ -5442,7 +5514,7 @@
           ]
         },
         {
-          "id": "eduhope-v2-section-293",
+          "id": "eduhope-v2-section-298",
           "name": "FAQ 11",
           "layout": {
             "width": "full",
@@ -5451,7 +5523,7 @@
           },
           "rows": [
             {
-              "id": "eduhope-v2-row-294",
+              "id": "eduhope-v2-row-299",
               "layout": {
                 "columns": 1,
                 "align": "start",
@@ -5459,10 +5531,10 @@
               },
               "columns": [
                 {
-                  "id": "eduhope-v2-column-295",
+                  "id": "eduhope-v2-column-300",
                   "elements": [
                     {
-                      "id": "eduhope-v2-heading-291",
+                      "id": "eduhope-v2-heading-296",
                       "type": "heading",
                       "name": "heading",
                       "content": "Can I become an Affiliate without purchasing the course?",
@@ -5486,7 +5558,7 @@
                       }
                     },
                     {
-                      "id": "eduhope-v2-text-292",
+                      "id": "eduhope-v2-text-297",
                       "type": "text",
                       "name": "text",
                       "content": "Yes. You can apply through the Become an Affiliate page.",
@@ -5514,7 +5586,7 @@
           ]
         },
         {
-          "id": "eduhope-v2-section-298",
+          "id": "eduhope-v2-section-303",
           "name": "FAQ 12",
           "layout": {
             "width": "full",
@@ -5523,7 +5595,7 @@
           },
           "rows": [
             {
-              "id": "eduhope-v2-row-299",
+              "id": "eduhope-v2-row-304",
               "layout": {
                 "columns": 1,
                 "align": "start",
@@ -5531,10 +5603,10 @@
               },
               "columns": [
                 {
-                  "id": "eduhope-v2-column-300",
+                  "id": "eduhope-v2-column-305",
                   "elements": [
                     {
-                      "id": "eduhope-v2-heading-296",
+                      "id": "eduhope-v2-heading-301",
                       "type": "heading",
                       "name": "heading",
                       "content": "When can I withdraw rewards?",
@@ -5558,7 +5630,7 @@
                       }
                     },
                     {
-                      "id": "eduhope-v2-text-297",
+                      "id": "eduhope-v2-text-302",
                       "type": "text",
                       "name": "text",
                       "content": "You can request a withdrawal when your available balance reaches the minimum withdrawal amount configured by EduHope. Pending rewards cannot be withdrawn.",
@@ -5586,7 +5658,7 @@
           ]
         },
         {
-          "id": "eduhope-v2-section-303",
+          "id": "eduhope-v2-section-308",
           "name": "FAQ 13",
           "layout": {
             "width": "full",
@@ -5595,7 +5667,7 @@
           },
           "rows": [
             {
-              "id": "eduhope-v2-row-304",
+              "id": "eduhope-v2-row-309",
               "layout": {
                 "columns": 1,
                 "align": "start",
@@ -5603,10 +5675,10 @@
               },
               "columns": [
                 {
-                  "id": "eduhope-v2-column-305",
+                  "id": "eduhope-v2-column-310",
                   "elements": [
                     {
-                      "id": "eduhope-v2-heading-301",
+                      "id": "eduhope-v2-heading-306",
                       "type": "heading",
                       "name": "heading",
                       "content": "How can I contact EduHope?",
@@ -5630,7 +5702,7 @@
                       }
                     },
                     {
-                      "id": "eduhope-v2-text-302",
+                      "id": "eduhope-v2-text-307",
                       "type": "text",
                       "name": "text",
                       "content": "Use the Contact page to send a message to the EduHope team.",
@@ -5695,7 +5767,7 @@
       "showInNavigation": true,
       "sections": [
         {
-          "id": "eduhope-v2-section-309",
+          "id": "eduhope-v2-section-314",
           "name": "Contact",
           "layout": {
             "width": "full",
@@ -5704,7 +5776,7 @@
           },
           "rows": [
             {
-              "id": "eduhope-v2-row-310",
+              "id": "eduhope-v2-row-315",
               "layout": {
                 "columns": 1,
                 "align": "start",
@@ -5712,10 +5784,10 @@
               },
               "columns": [
                 {
-                  "id": "eduhope-v2-column-311",
+                  "id": "eduhope-v2-column-316",
                   "elements": [
                     {
-                      "id": "eduhope-v2-heading-306",
+                      "id": "eduhope-v2-heading-311",
                       "type": "heading",
                       "name": "heading",
                       "content": "Contact",
@@ -5739,7 +5811,7 @@
                       }
                     },
                     {
-                      "id": "eduhope-v2-text-307",
+                      "id": "eduhope-v2-text-312",
                       "type": "text",
                       "name": "text",
                       "content": "Use the Contact page to send a message to the EduHope team.",
@@ -5761,7 +5833,7 @@
                       }
                     },
                     {
-                      "id": "eduhope-v2-form-308",
+                      "id": "eduhope-v2-form-313",
                       "type": "academyForm",
                       "name": "Learning form placement",
                       "content": "",
@@ -5899,5 +5971,8 @@
       "ar": "التسجيل"
     },
     "languageSwitcher": "text"
+  },
+  "academyExperience": {
+    "lessonComponents": true
   }
 }

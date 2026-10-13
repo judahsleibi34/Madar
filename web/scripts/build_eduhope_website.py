@@ -152,6 +152,15 @@ def home():
                     button('Register Now', 'سجّل الآن', 'ref:routes.register'), button('Explore the Course', 'استكشف الدورة', 'course', True)], SOFT)]
 
 
+def preview_line(level, number):
+    """Label a topic exactly as the approved topic map names it."""
+    topic_map = json.loads((ROOT / 'topic-map.draft.json').read_text())
+    entry = next(item for item in topic_map['levels'] if item['level'] == level)
+    title = next(item['title'] for item in entry['topics'] if item['number'] == number)
+    return (f"Level {level} · {entry['cefr']} · Topic {number}: {title}",
+            f"المستوى {level} · {entry['cefr']} · الموضوع {number}: {title}")
+
+
 def course():
     areas = ['Speaking', 'Listening', 'Everyday Conversations', 'Vocabulary Development', 'Useful Expressions', 'Pronunciation',
              'Everyday English', 'Academic English', 'Professional Communication', 'Confidence Building']
@@ -185,6 +194,8 @@ def course():
                 [heading('Course Features', 'مزايا الدورة', 'h3'), bullets(features, features_ar)]]),
             section('Levels', [heading('10 Levels', '10 مستويات'), bullets(levels, levels_ar, True),
                     paragraph('The original course contains 89 topics.', 'تحتوي الدورة الأصلية على 89 موضوعاً.')], SOFT),
+            section('Lesson preview', [heading('Lesson preview', 'معاينة درس'),
+                    paragraph(*preview_line(3, 2))], SOFT),
             section('Topic structure', [heading('Every topic follows a consistent structure', 'يتبع كل موضوع بنية ثابتة'),
                     bullets(topic_steps, topic_steps_ar, True)]),
             section('Exams and certificates', [heading('Exams and certificates', 'الامتحانات والشهادات'),
@@ -433,6 +444,7 @@ def main():
     project['academyRegistration'] = {'fields': ['country', 'university'], 'requireTerms': PUBLISH_LEGAL,
                                       'termsPageId': 'eduhope-page-terms', 'privacyPageId': 'eduhope-page-privacy',
                                       'verifiedEmailDomains': VERIFIED_EMAIL_DOMAINS}
+    project['academyExperience'] = {'lessonComponents': True}
     project['academyChrome'] = {'signUpLabel': {'en': 'Register', 'ar': 'التسجيل'}, 'languageSwitcher': 'text'}
     (ROOT / 'website.json').write_text(json.dumps(project, ensure_ascii=False, indent=2) + '\n')
     (ROOT / 'legal-drafts.json').write_text(json.dumps([{'key': k, 'slug': sl, 'name': {'en': en, 'ar': ar}, 'sections': sec} for k, sl, en, ar, sec in legal], ensure_ascii=False, indent=2) + '\n')

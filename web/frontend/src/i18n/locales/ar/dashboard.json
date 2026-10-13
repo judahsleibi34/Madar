@@ -1837,6 +1837,18 @@
       "institution_details": "بيانات المؤسسة",
       "student_labels": "تسميات الطلاب",
       "institution_domain_help": "أدخل نطاق بريد إلكتروني في كل سطر، مثل university.edu. يلزم التحقق من البريد الإلكتروني."
+    },
+    "listenMatch": {
+      "title": "استمع وطابق",
+      "questionOf": "السؤال {{current}} من {{total}}",
+      "whatDidYouHear": "ماذا سمعت؟",
+      "pictures": "الصور",
+      "picture": "الصورة {{number}}",
+      "correct": "ممتاز! إجابة صحيحة.",
+      "incorrect": "ليس تماماً. استمع مرة أخرى وحاول من جديد.",
+      "continue": "متابعة",
+      "score": "{{correct}} / {{total}} إجابات صحيحة",
+      "retry": "حاول مرة أخرى"
     }
   }
 }

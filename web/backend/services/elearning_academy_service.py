@@ -167,4 +167,13 @@ def member_profile(tenant_id):
         projects=service_supabase.table('builder_projects').select('published_schema,status').eq('tenant_id',tenant_id).eq('id',rows[0]['academy_project_id']).eq('usage_profile','academy').limit(1).execute().data or []
         if projects and projects[0]['status']=='published':
             schema=projects[0].get('published_schema') or {};theme=schema.get('theme')
-    return profile(tenant_id, rows[0], theme,form_application_paths(tenant_id,rows[0],schema))
+    return {**profile(tenant_id, rows[0], theme,form_application_paths(tenant_id,rows[0],schema)), "experience": learning_experience(schema)}
+
+
+# Opt-in learner-app improvements, switched on per academy in its own website.
+EXPERIENCE_FLAGS = frozenset({"lessonComponents"})
+
+
+def learning_experience(schema):
+    value = (schema or {}).get("academyExperience")
+    return {key: value[key] is True for key in EXPERIENCE_FLAGS if key in value} if isinstance(value, dict) else {}

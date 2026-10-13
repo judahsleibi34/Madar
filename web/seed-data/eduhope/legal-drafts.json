@@ -8,7 +8,7 @@
     },
     "sections": [
       {
-        "id": "eduhope-v2-section-314",
+        "id": "eduhope-v2-section-319",
         "name": "Terms & Conditions",
         "layout": {
           "width": "full",
@@ -17,7 +17,7 @@
         },
         "rows": [
           {
-            "id": "eduhope-v2-row-315",
+            "id": "eduhope-v2-row-320",
             "layout": {
               "columns": 1,
               "align": "start",
@@ -25,10 +25,10 @@
             },
             "columns": [
               {
-                "id": "eduhope-v2-column-316",
+                "id": "eduhope-v2-column-321",
                 "elements": [
                   {
-                    "id": "eduhope-v2-heading-312",
+                    "id": "eduhope-v2-heading-317",
                     "type": "heading",
                     "name": "heading",
                     "content": "Terms & Conditions",
@@ -52,7 +52,7 @@
                     }
                   },
                   {
-                    "id": "eduhope-v2-text-313",
+                    "id": "eduhope-v2-text-318",
                     "type": "text",
                     "name": "text",
                     "content": "Draft for owner approval. This text summarises the EduHope programme rules and is not final legal advice.",
@@ -80,7 +80,7 @@
         ]
       },
       {
-        "id": "eduhope-v2-section-321",
+        "id": "eduhope-v2-section-326",
         "name": "Course Purchase",
         "layout": {
           "width": "full",
@@ -89,7 +89,7 @@
         },
         "rows": [
           {
-            "id": "eduhope-v2-row-322",
+            "id": "eduhope-v2-row-327",
             "layout": {
               "columns": 1,
               "align": "start",
@@ -97,10 +97,10 @@
             },
             "columns": [
               {
-                "id": "eduhope-v2-column-323",
+                "id": "eduhope-v2-column-328",
                 "elements": [
                   {
-                    "id": "eduhope-v2-heading-317",
+                    "id": "eduhope-v2-heading-322",
                     "type": "heading",
                     "name": "heading",
                     "content": "Course Purchase",
@@ -124,7 +124,7 @@
                     }
                   },
                   {
-                    "id": "eduhope-v2-text-318",
+                    "id": "eduhope-v2-text-323",
                     "type": "text",
                     "name": "text",
                     "content": "• The EduHope English Conversation Course costs $30 USD as a one-time payment. The price can be changed by Admin.",
@@ -147,7 +147,7 @@
                     }
                   },
                   {
-                    "id": "eduhope-v2-text-319",
+                    "id": "eduhope-v2-text-324",
                     "type": "text",
                     "name": "text",
                     "content": "• Course access is activated only after confirmed successful payment and gives lifetime access to one complete course of 10 levels.",
@@ -170,7 +170,7 @@
                     }
                   },
                   {
-                    "id": "eduhope-v2-text-320",
+                    "id": "eduhope-v2-text-325",
                     "type": "text",
                     "name": "text",
                     "content": "• Payment is verified by the backend; a success message shown in the browser alone does not activate the course.",
@@ -199,7 +199,7 @@
         ]
       },
       {
-        "id": "eduhope-v2-section-329",
+        "id": "eduhope-v2-section-334",
         "name": "Referral Programme",
         "layout": {
           "width": "full",
@@ -208,7 +208,7 @@
         },
         "rows": [
           {
-            "id": "eduhope-v2-row-330",
+            "id": "eduhope-v2-row-335",
             "layout": {
               "columns": 1,
               "align": "start",
@@ -216,10 +216,10 @@
             },
             "columns": [
               {
-                "id": "eduhope-v2-column-331",
+                "id": "eduhope-v2-column-336",
                 "elements": [
                   {
-                    "id": "eduhope-v2-heading-324",
+                    "id": "eduhope-v2-heading-329",
                     "type": "heading",
                     "name": "heading",
                     "content": "Referral Programme",
@@ -243,7 +243,7 @@
                     }
                   },
                   {
-                    "id": "eduhope-v2-text-325",
+                    "id": "eduhope-v2-text-330",
                     "type": "text",
                     "name": "text",
                     "content": "• A student receives a referral link only after successfully purchasing the course.",
@@ -266,7 +266,7 @@
                     }
                   },
                   {
-                    "id": "eduhope-v2-text-326",
+                    "id": "eduhope-v2-text-331",
                     "type": "text",
                     "name": "text",
                     "content": "• The reward is $10 for each eligible direct course sale. Only direct referrals count; there are no multi-level, downline, second-level or indirect rewards.",
@@ -289,7 +289,7 @@
                     }
                   },
                   {
-                    "id": "eduhope-v2-text-327",
+                    "id": "eduhope-v2-text-332",
                     "type": "text",
                     "name": "text",
                     "content": "• Failed, cancelled, refunded, duplicate, self-referral and fraudulent purchases do not count. Rewards start as Pending and become Available after verification.",
@@ -312,7 +312,7 @@
                     }
                   },
                   {
-                    "id": "eduhope-v2-text-328",
+                    "id": "eduhope-v2-text-333",
                     "type": "text",
                     "name": "text",
                     "content": "• Referral rewards are based on eligible successful sales. Earnings are not guaranteed.",
@@ -341,7 +341,7 @@
         ]
       },
       {
-        "id": "eduhope-v2-section-335",
+        "id": "eduhope-v2-section-340",
         "name": "Affiliate Programme",
         "layout": {
           "width": "full",
@@ -350,7 +350,7 @@
         },
         "rows": [
           {
-            "id": "eduhope-v2-row-336",
+            "id": "eduhope-v2-row-341",
             "layout": {
               "columns": 1,
               "align": "start",
@@ -358,10 +358,10 @@
             },
             "columns": [
               {
-                "id": "eduhope-v2-column-337",
+                "id": "eduhope-v2-column-342",
                 "elements": [
                   {
-                    "id": "eduhope-v2-heading-332",
+                    "id": "eduhope-v2-heading-337",
                     "type": "heading",
                     "name": "heading",
                     "content": "Affiliate Programme",
@@ -385,7 +385,7 @@
                     }
                   },
                   {
-                    "id": "eduhope-v2-text-333",
+                    "id": "eduhope-v2-text-338",
                     "type": "text",
                     "name": "text",
                     "content": "• An affiliate does not have to purchase the English course. Applications are reviewed by Admin, who can approve, reject, suspend or reactivate affiliates.",
@@ -408,7 +408,7 @@
                     }
                   },
                   {
-                    "id": "eduhope-v2-text-334",
+                    "id": "eduhope-v2-text-339",
                     "type": "text",
                     "name": "text",
                     "content": "• Approved affiliates receive a unique referral link and follow the same reward and withdrawal rules.",
@@ -437,7 +437,7 @@
         ]
       },
       {
-        "id": "eduhope-v2-section-342",
+        "id": "eduhope-v2-section-347",
         "name": "Tuition Support",
         "layout": {
           "width": "full",
@@ -446,7 +446,7 @@
         },
         "rows": [
           {
-            "id": "eduhope-v2-row-343",
+            "id": "eduhope-v2-row-348",
             "layout": {
               "columns": 1,
               "align": "start",
@@ -454,10 +454,10 @@
             },
             "columns": [
               {
-                "id": "eduhope-v2-column-344",
+                "id": "eduhope-v2-column-349",
                 "elements": [
                   {
-                    "id": "eduhope-v2-heading-338",
+                    "id": "eduhope-v2-heading-343",
                     "type": "heading",
                     "name": "heading",
                     "content": "Tuition Support",
@@ -481,7 +481,7 @@
                     }
                   },
                   {
-                    "id": "eduhope-v2-text-339",
+                    "id": "eduhope-v2-text-344",
                     "type": "text",
                     "name": "text",
                     "content": "• Eligibility to apply requires 4 successful, verified course sales through your own referral link. Completing Level 4 or any level is not a requirement.",
@@ -504,7 +504,7 @@
                     }
                   },
                   {
-                    "id": "eduhope-v2-text-340",
+                    "id": "eduhope-v2-text-345",
                     "type": "text",
                     "name": "text",
                     "content": "• If a counted purchase is later refunded or invalidated, the eligible sales count is updated.",
@@ -527,7 +527,7 @@
                     }
                   },
                   {
-                    "id": "eduhope-v2-text-341",
+                    "id": "eduhope-v2-text-346",
                     "type": "text",
                     "name": "text",
                     "content": "• Submitting an application does not guarantee financial assistance.",
@@ -556,7 +556,7 @@
         ]
       },
       {
-        "id": "eduhope-v2-section-348",
+        "id": "eduhope-v2-section-353",
         "name": "Exchange Programme",
         "layout": {
           "width": "full",
@@ -565,7 +565,7 @@
         },
         "rows": [
           {
-            "id": "eduhope-v2-row-349",
+            "id": "eduhope-v2-row-354",
             "layout": {
               "columns": 1,
               "align": "start",
@@ -573,10 +573,10 @@
             },
             "columns": [
               {
-                "id": "eduhope-v2-column-350",
+                "id": "eduhope-v2-column-355",
                 "elements": [
                   {
-                    "id": "eduhope-v2-heading-345",
+                    "id": "eduhope-v2-heading-350",
                     "type": "heading",
                     "name": "heading",
                     "content": "Exchange Programme",
@@ -600,7 +600,7 @@
                     }
                   },
                   {
-                    "id": "eduhope-v2-text-346",
+                    "id": "eduhope-v2-text-351",
                     "type": "text",
                     "name": "text",
                     "content": "• Active EduHope learners can apply for available exchange opportunities, subject to programme requirements. 4 referral sales are not required.",
@@ -623,7 +623,7 @@
                     }
                   },
                   {
-                    "id": "eduhope-v2-text-347",
+                    "id": "eduhope-v2-text-352",
                     "type": "text",
                     "name": "text",
                     "content": "• Applications are reviewed by Admin and receive one of these statuses: Submitted, Under Review, Approved or Not Approved.",
@@ -652,7 +652,7 @@
         ]
       },
       {
-        "id": "eduhope-v2-section-354",
+        "id": "eduhope-v2-section-359",
         "name": "Withdrawals",
         "layout": {
           "width": "full",
@@ -661,7 +661,7 @@
         },
         "rows": [
           {
-            "id": "eduhope-v2-row-355",
+            "id": "eduhope-v2-row-360",
             "layout": {
               "columns": 1,
               "align": "start",
@@ -669,10 +669,10 @@
             },
             "columns": [
               {
-                "id": "eduhope-v2-column-356",
+                "id": "eduhope-v2-column-361",
                 "elements": [
                   {
-                    "id": "eduhope-v2-heading-351",
+                    "id": "eduhope-v2-heading-356",
                     "type": "heading",
                     "name": "heading",
                     "content": "Withdrawals",
@@ -696,7 +696,7 @@
                     }
                   },
                   {
-                    "id": "eduhope-v2-text-352",
+                    "id": "eduhope-v2-text-357",
                     "type": "text",
                     "name": "text",
                     "content": "• Only Available Balance can be withdrawn, and only once it reaches the minimum withdrawal amount set by Admin. Pending rewards cannot be withdrawn.",
@@ -719,7 +719,7 @@
                     }
                   },
                   {
-                    "id": "eduhope-v2-text-353",
+                    "id": "eduhope-v2-text-358",
                     "type": "text",
                     "name": "text",
                     "content": "• You must confirm that the payment information you provide is correct and belongs to you. Users cannot manually edit their wallet.",
@@ -758,7 +758,7 @@
     },
     "sections": [
       {
-        "id": "eduhope-v2-section-359",
+        "id": "eduhope-v2-section-364",
         "name": "Privacy Policy",
         "layout": {
           "width": "full",
@@ -767,7 +767,7 @@
         },
         "rows": [
           {
-            "id": "eduhope-v2-row-360",
+            "id": "eduhope-v2-row-365",
             "layout": {
               "columns": 1,
               "align": "start",
@@ -775,10 +775,10 @@
             },
             "columns": [
               {
-                "id": "eduhope-v2-column-361",
+                "id": "eduhope-v2-column-366",
                 "elements": [
                   {
-                    "id": "eduhope-v2-heading-357",
+                    "id": "eduhope-v2-heading-362",
                     "type": "heading",
                     "name": "heading",
                     "content": "Privacy Policy",
@@ -802,7 +802,7 @@
                     }
                   },
                   {
-                    "id": "eduhope-v2-text-358",
+                    "id": "eduhope-v2-text-363",
                     "type": "text",
                     "name": "text",
                     "content": "Draft for owner approval. This text summarises the EduHope programme rules and is not final legal advice.",
@@ -830,7 +830,7 @@
         ]
       },
       {
-        "id": "eduhope-v2-section-368",
+        "id": "eduhope-v2-section-373",
         "name": "What we collect",
         "layout": {
           "width": "full",
@@ -839,7 +839,7 @@
         },
         "rows": [
           {
-            "id": "eduhope-v2-row-369",
+            "id": "eduhope-v2-row-374",
             "layout": {
               "columns": 1,
               "align": "start",
@@ -847,10 +847,10 @@
             },
             "columns": [
               {
-                "id": "eduhope-v2-column-370",
+                "id": "eduhope-v2-column-375",
                 "elements": [
                   {
-                    "id": "eduhope-v2-heading-362",
+                    "id": "eduhope-v2-heading-367",
                     "type": "heading",
                     "name": "heading",
                     "content": "What we collect",
@@ -874,7 +874,7 @@
                     }
                   },
                   {
-                    "id": "eduhope-v2-text-363",
+                    "id": "eduhope-v2-text-368",
                     "type": "text",
                     "name": "text",
                     "content": "• Account details: full name, email address, country and university (if provided).",
@@ -897,7 +897,7 @@
                     }
                   },
                   {
-                    "id": "eduhope-v2-text-364",
+                    "id": "eduhope-v2-text-369",
                     "type": "text",
                     "name": "text",
                     "content": "• Course purchases, payment status and course progress.",
@@ -920,7 +920,7 @@
                     }
                   },
                   {
-                    "id": "eduhope-v2-text-365",
+                    "id": "eduhope-v2-text-370",
                     "type": "text",
                     "name": "text",
                     "content": "• Referral, reward, wallet and withdrawal records.",
@@ -943,7 +943,7 @@
                     }
                   },
                   {
-                    "id": "eduhope-v2-text-366",
+                    "id": "eduhope-v2-text-371",
                     "type": "text",
                     "name": "text",
                     "content": "• Affiliate, Tuition Support and Exchange Programme applications, including any supporting documents you upload.",
@@ -966,7 +966,7 @@
                     }
                   },
                   {
-                    "id": "eduhope-v2-text-367",
+                    "id": "eduhope-v2-text-372",
                     "type": "text",
                     "name": "text",
                     "content": "• Messages you send through the Contact page.",
@@ -995,7 +995,7 @@
         ]
       },
       {
-        "id": "eduhope-v2-section-376",
+        "id": "eduhope-v2-section-381",
         "name": "How we use it",
         "layout": {
           "width": "full",
@@ -1004,7 +1004,7 @@
         },
         "rows": [
           {
-            "id": "eduhope-v2-row-377",
+            "id": "eduhope-v2-row-382",
             "layout": {
               "columns": 1,
               "align": "start",
@@ -1012,10 +1012,10 @@
             },
             "columns": [
               {
-                "id": "eduhope-v2-column-378",
+                "id": "eduhope-v2-column-383",
                 "elements": [
                   {
-                    "id": "eduhope-v2-heading-371",
+                    "id": "eduhope-v2-heading-376",
                     "type": "heading",
                     "name": "heading",
                     "content": "How we use it",
@@ -1039,7 +1039,7 @@
                     }
                   },
                   {
-                    "id": "eduhope-v2-text-372",
+                    "id": "eduhope-v2-text-377",
                     "type": "text",
                     "name": "text",
                     "content": "• To provide course access and track your progress.",
@@ -1062,7 +1062,7 @@
                     }
                   },
                   {
-                    "id": "eduhope-v2-text-373",
+                    "id": "eduhope-v2-text-378",
                     "type": "text",
                     "name": "text",
                     "content": "• To verify payments, referral sales, rewards and withdrawals.",
@@ -1085,7 +1085,7 @@
                     }
                   },
                   {
-                    "id": "eduhope-v2-text-374",
+                    "id": "eduhope-v2-text-379",
                     "type": "text",
                     "name": "text",
                     "content": "• To review your applications.",
@@ -1108,7 +1108,7 @@
                     }
                   },
                   {
-                    "id": "eduhope-v2-text-375",
+                    "id": "eduhope-v2-text-380",
                     "type": "text",
                     "name": "text",
                     "content": "• To send in-dashboard notifications and answer your messages.",
@@ -1137,7 +1137,7 @@
         ]
       },
       {
-        "id": "eduhope-v2-section-382",
+        "id": "eduhope-v2-section-387",
         "name": "Access",
         "layout": {
           "width": "full",
@@ -1146,7 +1146,7 @@
         },
         "rows": [
           {
-            "id": "eduhope-v2-row-383",
+            "id": "eduhope-v2-row-388",
             "layout": {
               "columns": 1,
               "align": "start",
@@ -1154,10 +1154,10 @@
             },
             "columns": [
               {
-                "id": "eduhope-v2-column-384",
+                "id": "eduhope-v2-column-389",
                 "elements": [
                   {
-                    "id": "eduhope-v2-heading-379",
+                    "id": "eduhope-v2-heading-384",
                     "type": "heading",
                     "name": "heading",
                     "content": "Who can see it",
@@ -1181,7 +1181,7 @@
                     }
                   },
                   {
-                    "id": "eduhope-v2-text-380",
+                    "id": "eduhope-v2-text-385",
                     "type": "text",
                     "name": "text",
                     "content": "Applications, supporting documents and contact messages are private and available only to authorized EduHope administrators. Wallet balances and payment status can only be changed by secure backend processes.",
@@ -1203,7 +1203,7 @@
                     }
                   },
                   {
-                    "id": "eduhope-v2-text-381",
+                    "id": "eduhope-v2-text-386",
                     "type": "text",
                     "name": "text",
                     "content": "To ask about your data, use the Contact page to send a message to the EduHope team.",
