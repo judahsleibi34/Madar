@@ -38,6 +38,9 @@ COMPATIBLE_HISTORICAL_NAMES = (
     'migration-execution.json', 'migration-manifest.json',
     'migration-customer-preservation.json',
 )
+APPLICATION_HISTORICAL_NAMES = tuple(
+    name for name in COMPATIBLE_HISTORICAL_NAMES if not name.startswith('migration-')
+)
 
 
 def encoded(value: dict) -> bytes:
@@ -114,7 +117,8 @@ def validate_contract(value: dict) -> None:
     required = {str(origin_root / name) for name in names}
     # These are historical protected records only, never arbitrary executable or
     # operator-selected paths. The retained provider record is checked separately.
-    if set(files) != required:
+    application_required = {str(origin_root / name) for name in APPLICATION_HISTORICAL_NAMES}
+    if set(files) != required and not (selected is APPLICATION and set(files) == application_required):
         raise RuntimeError("completed_normal_admission_history_invalid")
     hashes.extend(files.values())
     if any(not re.fullmatch(r"[0-9a-f]{64}", str(v)) for v in hashes):
@@ -187,12 +191,40 @@ def credential_witness(name: str, hash_key: str) -> dict:
     return value
 
 
-def verify_history(contract: dict) -> None:
+def verify_history(contract: dict, *, _visited=frozenset()) -> None:
     from deployment.lib.provider_recovery_runtime import protected, file_digest
     for name, expected in contract["historical_files"].items():
         nonsecret_admission=(profile(contract) is not LEGACY and Path(name)==Path(contract['source_roles']['completion_root'])/'admission.json')
         if file_digest(protected(Path(name), private=not nonsecret_admission)) != expected:
             raise RuntimeError("completed_normal_admission_historical_evidence_changed")
+    root = Path(contract['source_roles']['completion_root'])
+    if (profile(contract) is APPLICATION and set(contract['historical_files']) ==
+            {str(root / name) for name in APPLICATION_HISTORICAL_NAMES}):
+        # A no-SQL receipt set is valid only for an actually completed no-SQL
+        # origin. It cannot hide missing migration evidence from another profile.
+        if root in _visited or len(_visited) >= 32:
+            raise RuntimeError('completed_normal_application_history_cycle')
+        admission = json.loads(protected(root/'admission.json').read_text())
+        previous = admission.get('contract')
+        validate_contract(previous)
+        completion = json.loads(protected(root/'normal-completion.json',private=True).read_text())
+        roles = contract['source_roles'];candidate = previous['candidate']
+        if (profile(previous) is not APPLICATION or admission.get('operation') != APPLICATION.operation
+                or digest(previous) != root.name
+                or candidate['source_sha'] != roles['application_sha']
+                or candidate['controller_sha'] != roles['controller_sha']
+                or candidate['images'] != contract['origin']['images']
+                or completion.get('operation') != APPLICATION.operation
+                or completion.get('context_sha256') != root.name or completion.get('mode') != 'NORMAL'
+                or completion.get('schema') != contract['database']['schema']
+                or completion.get('application_sha') != roles['application_sha']
+                or completion.get('controller_sha') != roles['controller_sha']
+                or completion.get('images') != candidate['images']
+                or completion.get('customer_database_restored') is not False
+                or completion.get('sql_executed') is not False
+                or file_digest(root/'normal-completion.json') != roles['completion_sha256']):
+            raise RuntimeError('completed_normal_application_origin_history_invalid')
+        verify_history(previous, _visited=_visited | {root})
 
 
 def provider_record_metadata(state_root: Path) -> dict:
