@@ -21,6 +21,17 @@ class AcademyReferralServiceTests(unittest.TestCase):
             self.assertTrue(service.account(SimpleNamespace(tenant_id=3,user_id=7))['available'])
             db.rpc.assert_called_once_with('get_academy_referral_account',{'p_tenant_id':3,'p_user_id':7})
 
+    def test_clicks_are_the_members_own_and_only_with_a_code(self):
+        with patch.object(service,'settings_available',return_value=True),patch.object(service,'capabilities',return_value={'referrals':True}),patch.object(service,'service_supabase') as db:
+            db.rpc.return_value.execute.return_value.data={'available':True,'code':'c0de'}
+            db.table.return_value.select.return_value.eq.return_value.eq.return_value.limit.return_value.execute.return_value.data=[{'clicks':12}]
+            self.assertEqual(service.account(SimpleNamespace(tenant_id=3,user_id=7))['clicks'],12)
+            db.table.assert_called_with('academy_referral_codes')
+            db.table.return_value.select.return_value.eq.assert_called_with('tenant_id',3)
+            db.table.return_value.select.return_value.eq.return_value.eq.assert_called_with('user_id',7)
+            db.rpc.return_value.execute.return_value.data={'available':True,'code':None}
+            self.assertNotIn('clicks',service.account(SimpleNamespace(tenant_id=3,user_id=7)))
+
     def test_reward_amount_validation_is_exact_and_bounded(self):
         for values in ({'referral_rewards_enabled':True},{'referral_reward_amount':'1.001'},{'referral_reward_amount':'-1'},{'referral_reward_currency':'usd'},{'referral_reward_currency':'US'},{'referral_reward_amount':'NaN'}):
             with self.subTest(values=values),self.assertRaises(ValidationError):ELearningSettings(**values)

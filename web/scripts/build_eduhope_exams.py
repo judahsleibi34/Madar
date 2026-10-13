@@ -50,11 +50,11 @@ def main():
   for index,prompt in enumerate([scenes[0]['goal'],scenes[1]['goal'],'Explain a possible alternative to the speakers’ plan and give your reason.','Describe a comparable situation from your own experience.','Summarize what each speaker needs and propose a practical next step.']):questions.append({'type':'speaking','prompt':prompt+' Use your own words.','points':5,'config':{'rubric':f'{band}: assess relevance, intelligibility, appropriate language and fluency at this band; for B2/C1 include nuance and supported reasoning. Do not grade accent identity. Human review only.','max_duration_seconds':120,'max_size_bytes':10485760}})
   # Drawing62 of65 guarantees at least2 of5 speaking and at least57 objective/
   # written questions, while changing which questions appear on retakes.
-  banks.append({'key':'exam.'+band,'cefr':band,'section_number':scenes[-1]['level'],'status':'draft','title':band+' provisional CEFR final — educator review required','passing_score':70,'max_attempts':5,'pool_size':62,'shuffle_questions':True,'shuffle_options':True,'questions':questions,'official_publication_approved':False})
+  banks.append({'key':'exam.'+band,'cefr':band,'section_number':scenes[-1]['level'],'status':'draft','title':band+' Final Exam','passing_score':70,'max_attempts':5,'pool_size':62,'shuffle_questions':True,'shuffle_options':True,'questions':questions,'official_publication_approved':False})
  for scene in teaching:
   qs=[choice('review:'+scene['key']+':'+str(i),q['prompt'],q['choices']) for i,q in enumerate(scene['understanding'])]
   qs.append({'type':'written','prompt':scene['goal'],'points':5,'config':{'rubric':'A relevant, original response using the topic’s language. Human review required.','max_characters':1500}})
-  reviews.append({'key':'review.level-'+str(scene['level']),'section_number':scene['level'],'title':'Level '+str(scene['level'])+' review — provisional','status':'draft','passing_score':70,'max_attempts':5,'questions':qs})
+  reviews.append({'key':'review.level-'+str(scene['level']),'section_number':scene['level'],'title':'Level '+str(scene['level'])+' Review','status':'draft','passing_score':70,'max_attempts':5,'questions':qs})
  (ROOT/'assessments.json').write_text(json.dumps({'version':1,'provisional':True,'educator_review_required':True,'level_reviews':reviews,'cefr_finals':banks},ensure_ascii=False,indent=2)+'\n')
  print('Authored10 draft Level reviews and5 distinct65-question CEFR banks; each draw62 guarantees2–5 speaking questions. No DB writes.')
 if __name__=='__main__':main()

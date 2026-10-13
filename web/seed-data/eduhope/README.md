@@ -32,8 +32,9 @@ web/backend/madar_env/bin/python web/scripts/import_eduhope_seed.py --target-ten
 
 An explicit initial local application requires `--apply --initialize-existing`,
 an authenticated native owner cookie file and the marked isolated144 database.
-The importer rejects normal localhost141, production/staging, remote hosts,
-wrong tenant/project ownership and unsupported schema. It captures a private
+The local mode rejects normal localhost141, remote hosts, wrong tenant/project
+ownership and unsupported schema; production uses only the explicit
+`--destination production` mode below. It captures a private
 backup before the first mutation. Native owner APIs enforce revision/authorization.
 It checkpoints logical-key → actual-ID mappings inside existing Builder seed
 metadata after each resource. No additional CMS or schema is introduced.
@@ -87,15 +88,34 @@ Preview frontend5180/backend8010/provider55440–55443 are distinct from normal
 frontend5173/backend8000/application database141. Emails/push/payouts remain off;
 the existing in-app notification worker runs locally on health8098.
 
-## Production destination preparation
+## Production destination
 
-`destination.example.json` requires explicit actual tenant mapping and reviewed
-ownership/entitlement/schema compatibility evidence. The owner's supplied account
-mapping is retained privately. Production tenant/schema are not guessed.
-The current importer intentionally authorizes only the local preview. A governed
-production-compatible143/144 release, destination verification and explicit import
-approval remain required before a remote apply mode can be selected. Git alone
+Production import is an owner-approved content operation, not a deployment or
+migration. It never connects to the production database: every write goes through
+the same madarportal.com owner APIs, as the named tenant owner/admin session.
+Before any request it requires the canonical `https://api.madarportal.com` API (the
+`madarportal.com/api` frontend proxy rejects uploads over 1 MB)
+and `--owner-email`; `/auth/user_status` must return exactly that email and
+`--target-tenant`. It stops unless E-Learning Forms report schema144 review
+availability and the tenant already has an Academy website (the owner opens the
+Academy builder once). Plan entitlements still apply; filtered capabilities are
+printed in the dry-run.
+
+Export the owner's madarportal.com cookies (`madar_access_token`,
+`madar_refresh_token`, `madar_csrf_token`) to `~/.madar-eduhope-production/owner-cookies.json`
+(mode 0600). Dry-run first:
+
+```bash
+web/backend/madar_env/bin/python web/scripts/import_eduhope_seed.py \
+  --destination production --owner-email OWNER@EXAMPLE --target-tenant TENANT_ID
+```
+
+Only after reviewing it, add `--apply --initialize-existing --publish --learning
+--publish-demo`. Before the first mutation the importer saves the owner-visible
+settings, website, Forms and courses to `~/.madar-eduhope-production/seed/`;
+production database backups remain governed by the release tooling. The same
+journal makes reruns resumable and stops on owner edits. Learning-content hash
+baselines read a local database and are not captured in production. Git alone
 never transfers PostgreSQL rows, auth accounts, responses or customer finances.
-Migrations001–143 and excluded142 are unchanged;144 is an unselected candidate.
 See `docs/eduhope/local-delivery-report.md` and `requirements.json` for exact
 coverage, proof and dependencies.

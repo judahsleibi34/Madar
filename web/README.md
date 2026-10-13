@@ -544,11 +544,39 @@ unset until explicitly configured; no EduHope prices or reward presets are appli
 Prices remain in existing Learning Plans/commerce offerings. Migration139 preserves
 historical opt-in settings while replacing the brand gate with `programmes_enabled`.
 
-Live payments intentionally return `payment_provider_unavailable` until a concrete
-provider adapter is implemented, registered and configured. `MADAR_PAYMENT_PROVIDER`
-alone cannot activate payments. No provider credentials have been supplied. The
-existing explicit local commerce simulator creates no payable academy rewards or
-qualifying Tuition Support sales.
+Online payments use the registered Stripe Checkout adapter
+(`services/stripe_payment_provider.py`) for one-time plans. Payments stay
+`payment_provider_unavailable` until the backend env file sets all of:
+
+```text
+MADAR_PAYMENT_PROVIDER=stripe
+STRIPE_SECRET_KEY=sk_test_...        # test mode; sk_live_ also needs MADAR_STRIPE_LIVE_MODE=true
+STRIPE_WEBHOOK_SECRET=whsec_...
+```
+
+The Stripe webhook endpoint is `https://api.madarportal.com/elearning/payments/webhook`
+with events `checkout.session.completed`, `checkout.session.async_payment_succeeded`
+and `checkout.session.async_payment_failed`. Access is granted only from a signed
+webhook or the buyer's server-side reconciliation of Stripe's PaymentIntent; both
+derive the same event identity, so the atomic SQL deduplicates them. Learners return
+to My Plans, which confirms the payment and opens the purchased course. In test mode,
+card `4242 4242 4242 4242` with any future expiry and CVC succeeds without a charge.
+Monthly/yearly plans are refused online until subscription billing is implemented.
+The explicit local commerce simulator creates no payable academy rewards or
+qualifying Tuition Support sales. It is the dummy adapter
+(`services/dummy_payment_provider.py`, provider `local_test`) behind the same
+`PaymentProvider` interface: configured only with `APP_ENV=development` against
+the loopback development database, it never accepts webhooks and every outcome
+(paid, failed, cancelled, refunded) is built from server-held checkout terms. In
+production it is never configured, so it cannot unlock a course or create a
+reward or withdrawal.
+
+An academy can opt in to live-only enrollment with
+`academyExperience.liveEnrollmentOnly` in its published website. In production
+its checkout then opens only with a live provider: without one, or with a
+provider in test mode, plans show "Enrollment opens soon" and `POST
+/elearning/checkout` returns 409 `enrollment_not_open` before any order exists.
+Other academies are unaffected.
 
 A destructive-data-free SQL rehearsal creates and removes a marked disposable
 localhost database, validates fresh history and transactional rollback, and runs

@@ -16,7 +16,19 @@ def account(member):
         "p_tenant_id": member.tenant_id, "p_user_id": member.user_id,
     }).execute().data
     if result.get('wallet'): result['wallet'] = permitted_wallet(result['wallet'], grants)
+    if result.get('code'):
+        result['clicks'] = own_clicks(member)
     return result
+
+
+def own_clicks(member):
+    """Clicks on the member's own referral link (counted by
+    academy_record_referral_click); None when unavailable."""
+    try:
+        rows = service_supabase.table("academy_referral_codes").select("clicks").eq("tenant_id", member.tenant_id).eq("user_id", member.user_id).limit(1).execute().data or []
+        return int(rows[0]["clicks"]) if rows else 0
+    except Exception:
+        return None
 
 
 def attach(tenant_id, user_id, code):

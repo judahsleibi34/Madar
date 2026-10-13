@@ -1,4 +1,6 @@
 import { AcademyLearningPerformance, AcademyFinanceSummary, AcademyRecentActivity } from "./AcademyOverviewSections";
+import { EduHopeAdminCharts, EduHopeSettingsSummary } from "./EduHopeAdminPanels";
+import { useLearningExperience } from "./LearningExperienceContext";
 import { Users, UserCheck, BookOpen, Award, Handshake, GraduationCap, ShoppingBag, Plus, FilePlus2, PanelsTopLeft, ChartNoAxesCombined, Gift, Settings2, Globe, Wallet, ExternalLink } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -24,7 +26,9 @@ export default function AcademyOwnerOverview({
       i18n
     } = useTranslation('dashboard'),
     label = k => t(`elearning.owner.${k}`),
-    access = useAcademyCapabilities(user);
+    access = useAcademyCapabilities(user),
+    // EduHope admin additions are opt-in per academy (academyExperience.studentDashboard).
+    enhanced = useLearningExperience()?.studentDashboard === true;
   const caps = access?.capabilities || {};
   const flags = access?.programme_flags || {};
   const programmeSettings = section => `/e-learning/settings?tab=programmes&section=${section}`;
@@ -84,7 +88,7 @@ export default function AcademyOwnerOverview({
           <p className="user-dashboard-metric-note">{t(`elearning.owner.metric_notes.${key}`)}</p>
         </div>
       </article>)}
-    </section>{data.progress && <AcademyLearningPerformance progress={data.progress} />}
+    </section>{enhanced && <EduHopeAdminCharts data={data} />}{enhanced && <EduHopeSettingsSummary />}{data.progress && <AcademyLearningPerformance progress={data.progress} />}
     <AcademyFinanceSummary data={data} capabilities={access?.capabilities} />
     <AcademyRecentActivity events={data.recent_activity} canReport={Boolean(data.progress)} />
     {data.applications?.length > 0 && <section className="elearning-owner-section"><h2>{t('elearning.owner.applications')}</h2>{data.applications.map(row => <p key={`${row.kind}:${row.status}`}>{t(`elearning.programmes.${row.kind}`)} · {t(`elearning.programmes.${row.status}`)}: {row.count}</p>)}</section>}</>}</OwnerPage>;

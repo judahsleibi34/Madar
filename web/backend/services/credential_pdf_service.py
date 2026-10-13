@@ -45,6 +45,10 @@ def render_certificate(data):
         font = min(12, 140/max(len(lines), 1))
         for index, line in enumerate(lines): text(line, .36-index*.13/max(len(lines), 1), font)
         text('Completion / إتمام: ' + data['completion_date'] + '    ·    Issued / إصدار: ' + data['issue_date'], .19, 10, width=.68)
+        if data.get('final_score') is not None:
+            # Opt-in academies: CEFR level and final exam score, as the book requires.
+            level = f"CEFR {data['cefr_level']}  ·  " if data.get('cefr_level') else ''
+            text(f"{level}Final exam score: {data['final_score']:g}%   /   درجة الامتحان النهائي", .145, 10, width=.68)
         text(data['credential_number'], .10, 9, width=.65)
         qr = qrcode.make(data['verification_url']).convert('RGB')
         qr_ax = fig.add_axes([.80, .075, .13, .17]); qr_ax.imshow(qr, interpolation='nearest'); qr_ax.axis('off')

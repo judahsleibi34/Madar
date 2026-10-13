@@ -1,0 +1,1235 @@
+[
+  {
+    "key": "terms",
+    "slug": "/terms",
+    "name": {
+      "en": "Terms & Conditions",
+      "ar": "الشروط والأحكام"
+    },
+    "sections": [
+      {
+        "id": "eduhope-v2-section-319",
+        "name": "Terms & Conditions",
+        "layout": {
+          "width": "full",
+          "paddingY": "large",
+          "background": "#FFFFFF"
+        },
+        "rows": [
+          {
+            "id": "eduhope-v2-row-320",
+            "layout": {
+              "columns": 1,
+              "align": "start",
+              "gap": "large"
+            },
+            "columns": [
+              {
+                "id": "eduhope-v2-column-321",
+                "elements": [
+                  {
+                    "id": "eduhope-v2-heading-317",
+                    "type": "heading",
+                    "name": "heading",
+                    "content": "Terms & Conditions",
+                    "styles": {
+                      "color": "#002A60",
+                      "width": "100%",
+                      "textAlign": "start",
+                      "lineHeight": "1.25",
+                      "fontSize": "44px",
+                      "fontWeight": "750"
+                    },
+                    "action": {
+                      "type": "none"
+                    },
+                    "headingTag": "h1",
+                    "localized": {
+                      "content": {
+                        "en": "Terms & Conditions",
+                        "ar": "الشروط والأحكام"
+                      }
+                    }
+                  },
+                  {
+                    "id": "eduhope-v2-text-318",
+                    "type": "text",
+                    "name": "text",
+                    "content": "Draft for owner approval. This text summarises the EduHope programme rules and is not final legal advice.",
+                    "styles": {
+                      "color": "#002A60",
+                      "width": "100%",
+                      "textAlign": "start",
+                      "lineHeight": "1.7",
+                      "fontSize": "17px"
+                    },
+                    "action": {
+                      "type": "none"
+                    },
+                    "localized": {
+                      "content": {
+                        "en": "Draft for owner approval. This text summarises the EduHope programme rules and is not final legal advice.",
+                        "ar": "مسودة بانتظار اعتماد المالك. يلخّص هذا النص قواعد برامج EduHope وليس صيغة قانونية نهائية."
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "eduhope-v2-section-326",
+        "name": "Course Purchase",
+        "layout": {
+          "width": "full",
+          "paddingY": "large",
+          "background": "#F6F7F4"
+        },
+        "rows": [
+          {
+            "id": "eduhope-v2-row-327",
+            "layout": {
+              "columns": 1,
+              "align": "start",
+              "gap": "large"
+            },
+            "columns": [
+              {
+                "id": "eduhope-v2-column-328",
+                "elements": [
+                  {
+                    "id": "eduhope-v2-heading-322",
+                    "type": "heading",
+                    "name": "heading",
+                    "content": "Course Purchase",
+                    "styles": {
+                      "color": "#002A60",
+                      "width": "100%",
+                      "textAlign": "start",
+                      "lineHeight": "1.25",
+                      "fontSize": "22px",
+                      "fontWeight": "750"
+                    },
+                    "action": {
+                      "type": "none"
+                    },
+                    "headingTag": "h3",
+                    "localized": {
+                      "content": {
+                        "en": "Course Purchase",
+                        "ar": "شراء الدورة"
+                      }
+                    }
+                  },
+                  {
+                    "id": "eduhope-v2-text-323",
+                    "type": "text",
+                    "name": "text",
+                    "content": "• The EduHope English Conversation Course costs $30 USD as a one-time payment. The price can be changed by Admin.",
+                    "styles": {
+                      "color": "#002A60",
+                      "width": "100%",
+                      "textAlign": "start",
+                      "lineHeight": "1.7",
+                      "fontSize": "17px",
+                      "paddingInlineStart": "8px"
+                    },
+                    "action": {
+                      "type": "none"
+                    },
+                    "localized": {
+                      "content": {
+                        "en": "• The EduHope English Conversation Course costs $30 USD as a one-time payment. The price can be changed by Admin.",
+                        "ar": "• تبلغ تكلفة دورة EduHope للمحادثة باللغة الإنجليزية 30 دولاراً أمريكياً تُدفع مرة واحدة. ويمكن للإدارة تغيير السعر."
+                      }
+                    }
+                  },
+                  {
+                    "id": "eduhope-v2-text-324",
+                    "type": "text",
+                    "name": "text",
+                    "content": "• Course access is activated only after confirmed successful payment and gives lifetime access to one complete course of 10 levels.",
+                    "styles": {
+                      "color": "#002A60",
+                      "width": "100%",
+                      "textAlign": "start",
+                      "lineHeight": "1.7",
+                      "fontSize": "17px",
+                      "paddingInlineStart": "8px"
+                    },
+                    "action": {
+                      "type": "none"
+                    },
+                    "localized": {
+                      "content": {
+                        "en": "• Course access is activated only after confirmed successful payment and gives lifetime access to one complete course of 10 levels.",
+                        "ar": "• يُفعَّل الوصول إلى الدورة فقط بعد تأكيد نجاح الدفع، ويمنح وصولاً مدى الحياة إلى دورة واحدة كاملة من 10 مستويات."
+                      }
+                    }
+                  },
+                  {
+                    "id": "eduhope-v2-text-325",
+                    "type": "text",
+                    "name": "text",
+                    "content": "• Payment is verified by the backend; a success message shown in the browser alone does not activate the course.",
+                    "styles": {
+                      "color": "#002A60",
+                      "width": "100%",
+                      "textAlign": "start",
+                      "lineHeight": "1.7",
+                      "fontSize": "17px",
+                      "paddingInlineStart": "8px"
+                    },
+                    "action": {
+                      "type": "none"
+                    },
+                    "localized": {
+                      "content": {
+                        "en": "• Payment is verified by the backend; a success message shown in the browser alone does not activate the course.",
+                        "ar": "• يتحقّق النظام من الدفع؛ ولا تكفي رسالة نجاح تظهر في المتصفح وحدها لتفعيل الدورة."
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "eduhope-v2-section-334",
+        "name": "Referral Programme",
+        "layout": {
+          "width": "full",
+          "paddingY": "large",
+          "background": "#FFFFFF"
+        },
+        "rows": [
+          {
+            "id": "eduhope-v2-row-335",
+            "layout": {
+              "columns": 1,
+              "align": "start",
+              "gap": "large"
+            },
+            "columns": [
+              {
+                "id": "eduhope-v2-column-336",
+                "elements": [
+                  {
+                    "id": "eduhope-v2-heading-329",
+                    "type": "heading",
+                    "name": "heading",
+                    "content": "Referral Programme",
+                    "styles": {
+                      "color": "#002A60",
+                      "width": "100%",
+                      "textAlign": "start",
+                      "lineHeight": "1.25",
+                      "fontSize": "22px",
+                      "fontWeight": "750"
+                    },
+                    "action": {
+                      "type": "none"
+                    },
+                    "headingTag": "h3",
+                    "localized": {
+                      "content": {
+                        "en": "Referral Programme",
+                        "ar": "برنامج الإحالة"
+                      }
+                    }
+                  },
+                  {
+                    "id": "eduhope-v2-text-330",
+                    "type": "text",
+                    "name": "text",
+                    "content": "• A student receives a referral link only after successfully purchasing the course.",
+                    "styles": {
+                      "color": "#002A60",
+                      "width": "100%",
+                      "textAlign": "start",
+                      "lineHeight": "1.7",
+                      "fontSize": "17px",
+                      "paddingInlineStart": "8px"
+                    },
+                    "action": {
+                      "type": "none"
+                    },
+                    "localized": {
+                      "content": {
+                        "en": "• A student receives a referral link only after successfully purchasing the course.",
+                        "ar": "• يحصل الطالب على رابط إحالة فقط بعد شراء الدورة بنجاح."
+                      }
+                    }
+                  },
+                  {
+                    "id": "eduhope-v2-text-331",
+                    "type": "text",
+                    "name": "text",
+                    "content": "• The reward is $10 for each eligible direct course sale. Only direct referrals count; there are no multi-level, downline, second-level or indirect rewards.",
+                    "styles": {
+                      "color": "#002A60",
+                      "width": "100%",
+                      "textAlign": "start",
+                      "lineHeight": "1.7",
+                      "fontSize": "17px",
+                      "paddingInlineStart": "8px"
+                    },
+                    "action": {
+                      "type": "none"
+                    },
+                    "localized": {
+                      "content": {
+                        "en": "• The reward is $10 for each eligible direct course sale. Only direct referrals count; there are no multi-level, downline, second-level or indirect rewards.",
+                        "ar": "• المكافأة 10 دولارات عن كل عملية بيع مباشرة مؤهلة للدورة. تُحتسب الإحالات المباشرة فقط؛ ولا توجد مكافآت متعدّدة المستويات أو من المستوى الثاني أو غير مباشرة."
+                      }
+                    }
+                  },
+                  {
+                    "id": "eduhope-v2-text-332",
+                    "type": "text",
+                    "name": "text",
+                    "content": "• Failed, cancelled, refunded, duplicate, self-referral and fraudulent purchases do not count. Rewards start as Pending and become Available after verification.",
+                    "styles": {
+                      "color": "#002A60",
+                      "width": "100%",
+                      "textAlign": "start",
+                      "lineHeight": "1.7",
+                      "fontSize": "17px",
+                      "paddingInlineStart": "8px"
+                    },
+                    "action": {
+                      "type": "none"
+                    },
+                    "localized": {
+                      "content": {
+                        "en": "• Failed, cancelled, refunded, duplicate, self-referral and fraudulent purchases do not count. Rewards start as Pending and become Available after verification.",
+                        "ar": "• لا تُحتسب عمليات الشراء الفاشلة أو الملغاة أو المستردّة أو المكرّرة أو الإحالات الذاتية أو الاحتيالية. تبدأ المكافآت بحالة «معلّقة» وتصبح «متاحة» بعد التحقّق."
+                      }
+                    }
+                  },
+                  {
+                    "id": "eduhope-v2-text-333",
+                    "type": "text",
+                    "name": "text",
+                    "content": "• Referral rewards are based on eligible successful sales. Earnings are not guaranteed.",
+                    "styles": {
+                      "color": "#002A60",
+                      "width": "100%",
+                      "textAlign": "start",
+                      "lineHeight": "1.7",
+                      "fontSize": "17px",
+                      "paddingInlineStart": "8px"
+                    },
+                    "action": {
+                      "type": "none"
+                    },
+                    "localized": {
+                      "content": {
+                        "en": "• Referral rewards are based on eligible successful sales. Earnings are not guaranteed.",
+                        "ar": "• تعتمد مكافآت الإحالة على المبيعات الناجحة المؤهلة. الأرباح غير مضمونة."
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "eduhope-v2-section-340",
+        "name": "Affiliate Programme",
+        "layout": {
+          "width": "full",
+          "paddingY": "large",
+          "background": "#F6F7F4"
+        },
+        "rows": [
+          {
+            "id": "eduhope-v2-row-341",
+            "layout": {
+              "columns": 1,
+              "align": "start",
+              "gap": "large"
+            },
+            "columns": [
+              {
+                "id": "eduhope-v2-column-342",
+                "elements": [
+                  {
+                    "id": "eduhope-v2-heading-337",
+                    "type": "heading",
+                    "name": "heading",
+                    "content": "Affiliate Programme",
+                    "styles": {
+                      "color": "#002A60",
+                      "width": "100%",
+                      "textAlign": "start",
+                      "lineHeight": "1.25",
+                      "fontSize": "22px",
+                      "fontWeight": "750"
+                    },
+                    "action": {
+                      "type": "none"
+                    },
+                    "headingTag": "h3",
+                    "localized": {
+                      "content": {
+                        "en": "Affiliate Programme",
+                        "ar": "برنامج المسوّقين بالعمولة"
+                      }
+                    }
+                  },
+                  {
+                    "id": "eduhope-v2-text-338",
+                    "type": "text",
+                    "name": "text",
+                    "content": "• An affiliate does not have to purchase the English course. Applications are reviewed by Admin, who can approve, reject, suspend or reactivate affiliates.",
+                    "styles": {
+                      "color": "#002A60",
+                      "width": "100%",
+                      "textAlign": "start",
+                      "lineHeight": "1.7",
+                      "fontSize": "17px",
+                      "paddingInlineStart": "8px"
+                    },
+                    "action": {
+                      "type": "none"
+                    },
+                    "localized": {
+                      "content": {
+                        "en": "• An affiliate does not have to purchase the English course. Applications are reviewed by Admin, who can approve, reject, suspend or reactivate affiliates.",
+                        "ar": "• لا يلزم المسوّق بالعمولة شراء دورة اللغة الإنجليزية. تراجع الإدارة الطلبات، ويمكنها الموافقة عليها أو رفضها أو تعليق المسوّقين أو إعادة تفعيلهم."
+                      }
+                    }
+                  },
+                  {
+                    "id": "eduhope-v2-text-339",
+                    "type": "text",
+                    "name": "text",
+                    "content": "• Approved affiliates receive a unique referral link and follow the same reward and withdrawal rules.",
+                    "styles": {
+                      "color": "#002A60",
+                      "width": "100%",
+                      "textAlign": "start",
+                      "lineHeight": "1.7",
+                      "fontSize": "17px",
+                      "paddingInlineStart": "8px"
+                    },
+                    "action": {
+                      "type": "none"
+                    },
+                    "localized": {
+                      "content": {
+                        "en": "• Approved affiliates receive a unique referral link and follow the same reward and withdrawal rules.",
+                        "ar": "• يحصل المسوّقون المعتمدون على رابط إحالة فريد ويخضعون لقواعد المكافآت والسحب نفسها."
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "eduhope-v2-section-347",
+        "name": "Tuition Support",
+        "layout": {
+          "width": "full",
+          "paddingY": "large",
+          "background": "#FFFFFF"
+        },
+        "rows": [
+          {
+            "id": "eduhope-v2-row-348",
+            "layout": {
+              "columns": 1,
+              "align": "start",
+              "gap": "large"
+            },
+            "columns": [
+              {
+                "id": "eduhope-v2-column-349",
+                "elements": [
+                  {
+                    "id": "eduhope-v2-heading-343",
+                    "type": "heading",
+                    "name": "heading",
+                    "content": "Tuition Support",
+                    "styles": {
+                      "color": "#002A60",
+                      "width": "100%",
+                      "textAlign": "start",
+                      "lineHeight": "1.25",
+                      "fontSize": "22px",
+                      "fontWeight": "750"
+                    },
+                    "action": {
+                      "type": "none"
+                    },
+                    "headingTag": "h3",
+                    "localized": {
+                      "content": {
+                        "en": "Tuition Support",
+                        "ar": "دعم الرسوم الجامعية"
+                      }
+                    }
+                  },
+                  {
+                    "id": "eduhope-v2-text-344",
+                    "type": "text",
+                    "name": "text",
+                    "content": "• Eligibility to apply requires 4 successful, verified course sales through your own referral link. Completing Level 4 or any level is not a requirement.",
+                    "styles": {
+                      "color": "#002A60",
+                      "width": "100%",
+                      "textAlign": "start",
+                      "lineHeight": "1.7",
+                      "fontSize": "17px",
+                      "paddingInlineStart": "8px"
+                    },
+                    "action": {
+                      "type": "none"
+                    },
+                    "localized": {
+                      "content": {
+                        "en": "• Eligibility to apply requires 4 successful, verified course sales through your own referral link. Completing Level 4 or any level is not a requirement.",
+                        "ar": "• تتطلّب الأهلية للتقديم 4 مبيعات ناجحة وموثّقة للدورة عبر رابط إحالتك. إكمال المستوى الرابع أو أي مستوى آخر ليس شرطاً."
+                      }
+                    }
+                  },
+                  {
+                    "id": "eduhope-v2-text-345",
+                    "type": "text",
+                    "name": "text",
+                    "content": "• If a counted purchase is later refunded or invalidated, the eligible sales count is updated.",
+                    "styles": {
+                      "color": "#002A60",
+                      "width": "100%",
+                      "textAlign": "start",
+                      "lineHeight": "1.7",
+                      "fontSize": "17px",
+                      "paddingInlineStart": "8px"
+                    },
+                    "action": {
+                      "type": "none"
+                    },
+                    "localized": {
+                      "content": {
+                        "en": "• If a counted purchase is later refunded or invalidated, the eligible sales count is updated.",
+                        "ar": "• إذا استُردّت عملية شراء محتسبة أو أُلغيت صلاحيتها لاحقاً، يُحدَّث عدد المبيعات المؤهلة."
+                      }
+                    }
+                  },
+                  {
+                    "id": "eduhope-v2-text-346",
+                    "type": "text",
+                    "name": "text",
+                    "content": "• Submitting an application does not guarantee financial assistance.",
+                    "styles": {
+                      "color": "#002A60",
+                      "width": "100%",
+                      "textAlign": "start",
+                      "lineHeight": "1.7",
+                      "fontSize": "17px",
+                      "paddingInlineStart": "8px"
+                    },
+                    "action": {
+                      "type": "none"
+                    },
+                    "localized": {
+                      "content": {
+                        "en": "• Submitting an application does not guarantee financial assistance.",
+                        "ar": "• تقديم الطلب لا يضمن الحصول على مساعدة مالية."
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "eduhope-v2-section-353",
+        "name": "Exchange Programme",
+        "layout": {
+          "width": "full",
+          "paddingY": "large",
+          "background": "#F6F7F4"
+        },
+        "rows": [
+          {
+            "id": "eduhope-v2-row-354",
+            "layout": {
+              "columns": 1,
+              "align": "start",
+              "gap": "large"
+            },
+            "columns": [
+              {
+                "id": "eduhope-v2-column-355",
+                "elements": [
+                  {
+                    "id": "eduhope-v2-heading-350",
+                    "type": "heading",
+                    "name": "heading",
+                    "content": "Exchange Programme",
+                    "styles": {
+                      "color": "#002A60",
+                      "width": "100%",
+                      "textAlign": "start",
+                      "lineHeight": "1.25",
+                      "fontSize": "22px",
+                      "fontWeight": "750"
+                    },
+                    "action": {
+                      "type": "none"
+                    },
+                    "headingTag": "h3",
+                    "localized": {
+                      "content": {
+                        "en": "Exchange Programme",
+                        "ar": "برنامج التبادل"
+                      }
+                    }
+                  },
+                  {
+                    "id": "eduhope-v2-text-351",
+                    "type": "text",
+                    "name": "text",
+                    "content": "• Active EduHope learners can apply for available exchange opportunities, subject to programme requirements. 4 referral sales are not required.",
+                    "styles": {
+                      "color": "#002A60",
+                      "width": "100%",
+                      "textAlign": "start",
+                      "lineHeight": "1.7",
+                      "fontSize": "17px",
+                      "paddingInlineStart": "8px"
+                    },
+                    "action": {
+                      "type": "none"
+                    },
+                    "localized": {
+                      "content": {
+                        "en": "• Active EduHope learners can apply for available exchange opportunities, subject to programme requirements. 4 referral sales are not required.",
+                        "ar": "• يمكن لمتعلّمي EduHope النشطين التقديم على فرص التبادل المتاحة وفقاً لمتطلبات البرنامج. لا تُشترط 4 مبيعات إحالة."
+                      }
+                    }
+                  },
+                  {
+                    "id": "eduhope-v2-text-352",
+                    "type": "text",
+                    "name": "text",
+                    "content": "• Applications are reviewed by Admin and receive one of these statuses: Submitted, Under Review, Approved or Not Approved.",
+                    "styles": {
+                      "color": "#002A60",
+                      "width": "100%",
+                      "textAlign": "start",
+                      "lineHeight": "1.7",
+                      "fontSize": "17px",
+                      "paddingInlineStart": "8px"
+                    },
+                    "action": {
+                      "type": "none"
+                    },
+                    "localized": {
+                      "content": {
+                        "en": "• Applications are reviewed by Admin and receive one of these statuses: Submitted, Under Review, Approved or Not Approved.",
+                        "ar": "• تراجع الإدارة الطلبات، ويحصل كل طلب على إحدى الحالات التالية: مُقدَّم، قيد المراجعة، مقبول، غير مقبول."
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "eduhope-v2-section-359",
+        "name": "Withdrawals",
+        "layout": {
+          "width": "full",
+          "paddingY": "large",
+          "background": "#FFFFFF"
+        },
+        "rows": [
+          {
+            "id": "eduhope-v2-row-360",
+            "layout": {
+              "columns": 1,
+              "align": "start",
+              "gap": "large"
+            },
+            "columns": [
+              {
+                "id": "eduhope-v2-column-361",
+                "elements": [
+                  {
+                    "id": "eduhope-v2-heading-356",
+                    "type": "heading",
+                    "name": "heading",
+                    "content": "Withdrawals",
+                    "styles": {
+                      "color": "#002A60",
+                      "width": "100%",
+                      "textAlign": "start",
+                      "lineHeight": "1.25",
+                      "fontSize": "22px",
+                      "fontWeight": "750"
+                    },
+                    "action": {
+                      "type": "none"
+                    },
+                    "headingTag": "h3",
+                    "localized": {
+                      "content": {
+                        "en": "Withdrawals",
+                        "ar": "السحوبات"
+                      }
+                    }
+                  },
+                  {
+                    "id": "eduhope-v2-text-357",
+                    "type": "text",
+                    "name": "text",
+                    "content": "• Only Available Balance can be withdrawn, and only once it reaches the minimum withdrawal amount set by Admin. Pending rewards cannot be withdrawn.",
+                    "styles": {
+                      "color": "#002A60",
+                      "width": "100%",
+                      "textAlign": "start",
+                      "lineHeight": "1.7",
+                      "fontSize": "17px",
+                      "paddingInlineStart": "8px"
+                    },
+                    "action": {
+                      "type": "none"
+                    },
+                    "localized": {
+                      "content": {
+                        "en": "• Only Available Balance can be withdrawn, and only once it reaches the minimum withdrawal amount set by Admin. Pending rewards cannot be withdrawn.",
+                        "ar": "• يمكن سحب الرصيد المتاح فقط، وذلك بعد أن يبلغ الحد الأدنى للسحب الذي تحدّده الإدارة. لا يمكن سحب المكافآت المعلّقة."
+                      }
+                    }
+                  },
+                  {
+                    "id": "eduhope-v2-text-358",
+                    "type": "text",
+                    "name": "text",
+                    "content": "• You must confirm that the payment information you provide is correct and belongs to you. Users cannot manually edit their wallet.",
+                    "styles": {
+                      "color": "#002A60",
+                      "width": "100%",
+                      "textAlign": "start",
+                      "lineHeight": "1.7",
+                      "fontSize": "17px",
+                      "paddingInlineStart": "8px"
+                    },
+                    "action": {
+                      "type": "none"
+                    },
+                    "localized": {
+                      "content": {
+                        "en": "• You must confirm that the payment information you provide is correct and belongs to you. Users cannot manually edit their wallet.",
+                        "ar": "• يجب أن تؤكّد أن معلومات الدفع التي تقدّمها صحيحة وتعود إليك. لا يمكن للمستخدمين تعديل محافظهم يدوياً."
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "key": "privacy",
+    "slug": "/privacy",
+    "name": {
+      "en": "Privacy Policy",
+      "ar": "سياسة الخصوصية"
+    },
+    "sections": [
+      {
+        "id": "eduhope-v2-section-364",
+        "name": "Privacy Policy",
+        "layout": {
+          "width": "full",
+          "paddingY": "large",
+          "background": "#FFFFFF"
+        },
+        "rows": [
+          {
+            "id": "eduhope-v2-row-365",
+            "layout": {
+              "columns": 1,
+              "align": "start",
+              "gap": "large"
+            },
+            "columns": [
+              {
+                "id": "eduhope-v2-column-366",
+                "elements": [
+                  {
+                    "id": "eduhope-v2-heading-362",
+                    "type": "heading",
+                    "name": "heading",
+                    "content": "Privacy Policy",
+                    "styles": {
+                      "color": "#002A60",
+                      "width": "100%",
+                      "textAlign": "start",
+                      "lineHeight": "1.25",
+                      "fontSize": "44px",
+                      "fontWeight": "750"
+                    },
+                    "action": {
+                      "type": "none"
+                    },
+                    "headingTag": "h1",
+                    "localized": {
+                      "content": {
+                        "en": "Privacy Policy",
+                        "ar": "سياسة الخصوصية"
+                      }
+                    }
+                  },
+                  {
+                    "id": "eduhope-v2-text-363",
+                    "type": "text",
+                    "name": "text",
+                    "content": "Draft for owner approval. This text summarises the EduHope programme rules and is not final legal advice.",
+                    "styles": {
+                      "color": "#002A60",
+                      "width": "100%",
+                      "textAlign": "start",
+                      "lineHeight": "1.7",
+                      "fontSize": "17px"
+                    },
+                    "action": {
+                      "type": "none"
+                    },
+                    "localized": {
+                      "content": {
+                        "en": "Draft for owner approval. This text summarises the EduHope programme rules and is not final legal advice.",
+                        "ar": "مسودة بانتظار اعتماد المالك. يلخّص هذا النص قواعد برامج EduHope وليس صيغة قانونية نهائية."
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "eduhope-v2-section-373",
+        "name": "What we collect",
+        "layout": {
+          "width": "full",
+          "paddingY": "large",
+          "background": "#F6F7F4"
+        },
+        "rows": [
+          {
+            "id": "eduhope-v2-row-374",
+            "layout": {
+              "columns": 1,
+              "align": "start",
+              "gap": "large"
+            },
+            "columns": [
+              {
+                "id": "eduhope-v2-column-375",
+                "elements": [
+                  {
+                    "id": "eduhope-v2-heading-367",
+                    "type": "heading",
+                    "name": "heading",
+                    "content": "What we collect",
+                    "styles": {
+                      "color": "#002A60",
+                      "width": "100%",
+                      "textAlign": "start",
+                      "lineHeight": "1.25",
+                      "fontSize": "22px",
+                      "fontWeight": "750"
+                    },
+                    "action": {
+                      "type": "none"
+                    },
+                    "headingTag": "h3",
+                    "localized": {
+                      "content": {
+                        "en": "What we collect",
+                        "ar": "ما البيانات التي نجمعها"
+                      }
+                    }
+                  },
+                  {
+                    "id": "eduhope-v2-text-368",
+                    "type": "text",
+                    "name": "text",
+                    "content": "• Account details: full name, email address, country and university (if provided).",
+                    "styles": {
+                      "color": "#002A60",
+                      "width": "100%",
+                      "textAlign": "start",
+                      "lineHeight": "1.7",
+                      "fontSize": "17px",
+                      "paddingInlineStart": "8px"
+                    },
+                    "action": {
+                      "type": "none"
+                    },
+                    "localized": {
+                      "content": {
+                        "en": "• Account details: full name, email address, country and university (if provided).",
+                        "ar": "• بيانات الحساب: الاسم الكامل والبريد الإلكتروني والدولة والجامعة (إن وُجدت)."
+                      }
+                    }
+                  },
+                  {
+                    "id": "eduhope-v2-text-369",
+                    "type": "text",
+                    "name": "text",
+                    "content": "• Course purchases, payment status and course progress.",
+                    "styles": {
+                      "color": "#002A60",
+                      "width": "100%",
+                      "textAlign": "start",
+                      "lineHeight": "1.7",
+                      "fontSize": "17px",
+                      "paddingInlineStart": "8px"
+                    },
+                    "action": {
+                      "type": "none"
+                    },
+                    "localized": {
+                      "content": {
+                        "en": "• Course purchases, payment status and course progress.",
+                        "ar": "• عمليات شراء الدورة وحالة الدفع والتقدّم في الدورة."
+                      }
+                    }
+                  },
+                  {
+                    "id": "eduhope-v2-text-370",
+                    "type": "text",
+                    "name": "text",
+                    "content": "• Referral, reward, wallet and withdrawal records.",
+                    "styles": {
+                      "color": "#002A60",
+                      "width": "100%",
+                      "textAlign": "start",
+                      "lineHeight": "1.7",
+                      "fontSize": "17px",
+                      "paddingInlineStart": "8px"
+                    },
+                    "action": {
+                      "type": "none"
+                    },
+                    "localized": {
+                      "content": {
+                        "en": "• Referral, reward, wallet and withdrawal records.",
+                        "ar": "• سجلات الإحالة والمكافآت والمحفظة والسحوبات."
+                      }
+                    }
+                  },
+                  {
+                    "id": "eduhope-v2-text-371",
+                    "type": "text",
+                    "name": "text",
+                    "content": "• Affiliate, Tuition Support and Exchange Programme applications, including any supporting documents you upload.",
+                    "styles": {
+                      "color": "#002A60",
+                      "width": "100%",
+                      "textAlign": "start",
+                      "lineHeight": "1.7",
+                      "fontSize": "17px",
+                      "paddingInlineStart": "8px"
+                    },
+                    "action": {
+                      "type": "none"
+                    },
+                    "localized": {
+                      "content": {
+                        "en": "• Affiliate, Tuition Support and Exchange Programme applications, including any supporting documents you upload.",
+                        "ar": "• طلبات برنامج المسوّقين بالعمولة ودعم الرسوم الجامعية وبرنامج التبادل، بما في ذلك أي مستندات داعمة ترفعها."
+                      }
+                    }
+                  },
+                  {
+                    "id": "eduhope-v2-text-372",
+                    "type": "text",
+                    "name": "text",
+                    "content": "• Messages you send through the Contact page.",
+                    "styles": {
+                      "color": "#002A60",
+                      "width": "100%",
+                      "textAlign": "start",
+                      "lineHeight": "1.7",
+                      "fontSize": "17px",
+                      "paddingInlineStart": "8px"
+                    },
+                    "action": {
+                      "type": "none"
+                    },
+                    "localized": {
+                      "content": {
+                        "en": "• Messages you send through the Contact page.",
+                        "ar": "• الرسائل التي ترسلها عبر صفحة «تواصل معنا»."
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "eduhope-v2-section-381",
+        "name": "How we use it",
+        "layout": {
+          "width": "full",
+          "paddingY": "large",
+          "background": "#FFFFFF"
+        },
+        "rows": [
+          {
+            "id": "eduhope-v2-row-382",
+            "layout": {
+              "columns": 1,
+              "align": "start",
+              "gap": "large"
+            },
+            "columns": [
+              {
+                "id": "eduhope-v2-column-383",
+                "elements": [
+                  {
+                    "id": "eduhope-v2-heading-376",
+                    "type": "heading",
+                    "name": "heading",
+                    "content": "How we use it",
+                    "styles": {
+                      "color": "#002A60",
+                      "width": "100%",
+                      "textAlign": "start",
+                      "lineHeight": "1.25",
+                      "fontSize": "22px",
+                      "fontWeight": "750"
+                    },
+                    "action": {
+                      "type": "none"
+                    },
+                    "headingTag": "h3",
+                    "localized": {
+                      "content": {
+                        "en": "How we use it",
+                        "ar": "كيف نستخدمها"
+                      }
+                    }
+                  },
+                  {
+                    "id": "eduhope-v2-text-377",
+                    "type": "text",
+                    "name": "text",
+                    "content": "• To provide course access and track your progress.",
+                    "styles": {
+                      "color": "#002A60",
+                      "width": "100%",
+                      "textAlign": "start",
+                      "lineHeight": "1.7",
+                      "fontSize": "17px",
+                      "paddingInlineStart": "8px"
+                    },
+                    "action": {
+                      "type": "none"
+                    },
+                    "localized": {
+                      "content": {
+                        "en": "• To provide course access and track your progress.",
+                        "ar": "• لتوفير الوصول إلى الدورة ومتابعة تقدّمك."
+                      }
+                    }
+                  },
+                  {
+                    "id": "eduhope-v2-text-378",
+                    "type": "text",
+                    "name": "text",
+                    "content": "• To verify payments, referral sales, rewards and withdrawals.",
+                    "styles": {
+                      "color": "#002A60",
+                      "width": "100%",
+                      "textAlign": "start",
+                      "lineHeight": "1.7",
+                      "fontSize": "17px",
+                      "paddingInlineStart": "8px"
+                    },
+                    "action": {
+                      "type": "none"
+                    },
+                    "localized": {
+                      "content": {
+                        "en": "• To verify payments, referral sales, rewards and withdrawals.",
+                        "ar": "• للتحقّق من المدفوعات ومبيعات الإحالة والمكافآت والسحوبات."
+                      }
+                    }
+                  },
+                  {
+                    "id": "eduhope-v2-text-379",
+                    "type": "text",
+                    "name": "text",
+                    "content": "• To review your applications.",
+                    "styles": {
+                      "color": "#002A60",
+                      "width": "100%",
+                      "textAlign": "start",
+                      "lineHeight": "1.7",
+                      "fontSize": "17px",
+                      "paddingInlineStart": "8px"
+                    },
+                    "action": {
+                      "type": "none"
+                    },
+                    "localized": {
+                      "content": {
+                        "en": "• To review your applications.",
+                        "ar": "• لمراجعة طلباتك."
+                      }
+                    }
+                  },
+                  {
+                    "id": "eduhope-v2-text-380",
+                    "type": "text",
+                    "name": "text",
+                    "content": "• To send in-dashboard notifications and answer your messages.",
+                    "styles": {
+                      "color": "#002A60",
+                      "width": "100%",
+                      "textAlign": "start",
+                      "lineHeight": "1.7",
+                      "fontSize": "17px",
+                      "paddingInlineStart": "8px"
+                    },
+                    "action": {
+                      "type": "none"
+                    },
+                    "localized": {
+                      "content": {
+                        "en": "• To send in-dashboard notifications and answer your messages.",
+                        "ar": "• لإرسال الإشعارات داخل لوحة التحكم والرد على رسائلك."
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "eduhope-v2-section-387",
+        "name": "Access",
+        "layout": {
+          "width": "full",
+          "paddingY": "large",
+          "background": "#F6F7F4"
+        },
+        "rows": [
+          {
+            "id": "eduhope-v2-row-388",
+            "layout": {
+              "columns": 1,
+              "align": "start",
+              "gap": "large"
+            },
+            "columns": [
+              {
+                "id": "eduhope-v2-column-389",
+                "elements": [
+                  {
+                    "id": "eduhope-v2-heading-384",
+                    "type": "heading",
+                    "name": "heading",
+                    "content": "Who can see it",
+                    "styles": {
+                      "color": "#002A60",
+                      "width": "100%",
+                      "textAlign": "start",
+                      "lineHeight": "1.25",
+                      "fontSize": "22px",
+                      "fontWeight": "750"
+                    },
+                    "action": {
+                      "type": "none"
+                    },
+                    "headingTag": "h3",
+                    "localized": {
+                      "content": {
+                        "en": "Who can see it",
+                        "ar": "من يمكنه الاطّلاع عليها"
+                      }
+                    }
+                  },
+                  {
+                    "id": "eduhope-v2-text-385",
+                    "type": "text",
+                    "name": "text",
+                    "content": "Applications, supporting documents and contact messages are private and available only to authorized EduHope administrators. Wallet balances and payment status can only be changed by secure backend processes.",
+                    "styles": {
+                      "color": "#002A60",
+                      "width": "100%",
+                      "textAlign": "start",
+                      "lineHeight": "1.7",
+                      "fontSize": "17px"
+                    },
+                    "action": {
+                      "type": "none"
+                    },
+                    "localized": {
+                      "content": {
+                        "en": "Applications, supporting documents and contact messages are private and available only to authorized EduHope administrators. Wallet balances and payment status can only be changed by secure backend processes.",
+                        "ar": "الطلبات والمستندات الداعمة ورسائل التواصل خاصة ومتاحة فقط لمسؤولي EduHope المخوّلين. ولا يمكن تغيير أرصدة المحافظ وحالة الدفع إلا من خلال عمليات آمنة في النظام."
+                      }
+                    }
+                  },
+                  {
+                    "id": "eduhope-v2-text-386",
+                    "type": "text",
+                    "name": "text",
+                    "content": "To ask about your data, use the Contact page to send a message to the EduHope team.",
+                    "styles": {
+                      "color": "#002A60",
+                      "width": "100%",
+                      "textAlign": "start",
+                      "lineHeight": "1.7",
+                      "fontSize": "17px"
+                    },
+                    "action": {
+                      "type": "none"
+                    },
+                    "localized": {
+                      "content": {
+                        "en": "To ask about your data, use the Contact page to send a message to the EduHope team.",
+                        "ar": "للاستفسار عن بياناتك، استخدم صفحة «تواصل معنا» لإرسال رسالة إلى فريق EduHope."
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+]

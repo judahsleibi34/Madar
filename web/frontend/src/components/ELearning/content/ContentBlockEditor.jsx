@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import ELearningDialog from "../ELearningDialog";
 import TextBlockEditor from "./TextBlockEditor";
 import MediaBlockEditor from "./MediaBlockEditor";
+import { componentComplete } from "../../../utils/lessonComponentBody";
 
 const editors = { text: TextBlockEditor, audio: MediaBlockEditor, video: MediaBlockEditor };
 export default function ContentBlockEditor({ block, type, busy, error, upload, onSave, onClose }) {
@@ -12,7 +13,7 @@ export default function ContentBlockEditor({ block, type, busy, error, upload, o
   const [uploading, setUploading] = useState(false);
   const disabled = busy || uploading;
   const Editor = editors[type];
-  const valid = type === "text" ? value.content.body.trim().length > 0 : Boolean(value.media_id);
+  const valid = type === "text" ? (value.content.component ? componentComplete(value.content.component) : value.content.body.trim().length > 0) : Boolean(value.media_id);
   function save(event) {
     event.preventDefault();
     if (disabled || !valid) return;

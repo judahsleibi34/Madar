@@ -1,3 +1,5 @@
+import { createPortal } from "react-dom";
+import EcommerceToast from "../DashboardBuilder/EcommerceToast";
 import LearningErrorNotice from "./LearningErrorNotice";
 import { localizePresentation } from "../PageBuilder/core/PageBuilder.presentationLocalization";
 import { learningDescription } from "../../utils/elearningPresentation";
@@ -11,7 +13,7 @@ import { AcademyCompositionContext } from "../PageBuilder/blocks/AcademyDataBloc
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { Link, Navigate, Route, Routes, useLocation, useNavigate, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { Award, BookOpen, ArrowUpRight, Search, SlidersHorizontal, ChevronDown } from "lucide-react";
+import { Award, BookOpen, ArrowUpRight, Search, SlidersHorizontal, ChevronDown, Clock, Eye, EyeOff } from "lucide-react";
 import { fetchAcademy, academyReturnPath, loginAcademy, registerAcademy, recordReferralClick } from "../../services/elearningAcademy";
 import ELearningLearnerShell from "./ELearningLearnerShell";
 import * as commerce from "../../services/elearningCommerce";
@@ -22,6 +24,8 @@ import ELearningSkeleton from "./ELearningSkeleton";
 import ELearningPlayer from "./ELearningPlayer";
 import { fetchLearningAccountContext } from "../../services/elearningPlayer";
 import { Checkout, Price } from "./ELearningCatalog";
+import { enrollmentClosed, openCheckout, paymentNotice, paymentsAvailable, testPayments } from "../../utils/learningPayments";
+import EnrollmentCheckout, { TestModeBanner } from "./EnrollmentCheckout";
 
 const AcademyContext = createContext(null);
 
@@ -78,7 +82,7 @@ function AcademyContent({ data, refresh }) {
   const Surface = learnerSurface ? ELearningLearnerShell : GuestSurface;
   return <AcademyContext.Provider value={{ data, refresh }}><Surface site={site}><div className={`academy${presentation ? " academy-presentation" : ""}${learnerSurface ? " academy-learner" : ""}${authPage ? " academy-auth" : ""}`} dir={i18n.dir()} lang={i18n.language} style={theme}>
     <StorefrontSeo origin={window.location.origin} storePath={base} locale={i18n.language} site={site} view={view} publicPage={{ title, description: learningDescription(selected?.description) || localizedPage?.seo?.description || site.description, path: publishedPage ? getPublicPagePath(base, publishedPage) : `${base}${relativePath === "/" ? "" : relativePath}` }} />
-    {!learnerSurface && !presentation && <AcademyNav site={site} authenticated={data.authenticated} hasPlans={data.plans.length > 0} />}
+    {!learnerSurface && !presentation && <AcademyNav site={site} authenticated={data.authenticated} hasPlans={data.plans.length > 0} chrome={data.landing?.academyChrome} />}
     <main className="academy-main"><Routes>
       <Route index element={<AcademyPresentation data={data} />} />
       <Route path="dashboard" element={data.authenticated ? <LearnerHome data={data} /> : <Navigate to={`${base}/login?returnTo=${encodeURIComponent(`${base}/dashboard`)}`} replace />} />
@@ -172,7 +176,7 @@ function PrimaryAction({ course, card = false }) {
     setBusy(true); setError(null);
     try { await commerce.enrollCatalogCourse(course.id); refresh(); navigate(`/my-learning/courses/${course.id}`); } catch (e) { setError(e); } finally { setBusy(false); }
   }
-  return <>{action === "continue" ? <Link className="academy-button" to={course.resume}>{t("elearning.player.continue")}</Link> : action === "certificate" ? <Link className="academy-button" to={card ? `${base}/courses/${course.id}` : `/my-learning/certificates/${course.credential.id}`}>{t(card ? "elearning.academy.card_certificate" : "elearning.certificates.viewCertificate")}</Link> : ["enroll", "enroll_free"].includes(action) ? <button className="academy-button" onClick={enroll} disabled={busy}>{t(`elearning.academy.card_${action}`)}</button> : action === "buy" ? card ? <Link className="academy-button" to={`${base}/courses/${course.id}`}>{t("elearning.academy.card_buy")}</Link> : <a className="academy-button" href="#access-options">{t("elearning.academy.viewPlans")}</a> : <button className="academy-button" disabled>{t(`elearning.academy.card_${action}`)}</button>}{error && <LearningErrorNotice as="p">{t("elearning.commerce.error")}</LearningErrorNotice>}</>;
+  return <>{action === "continue" ? <Link className="academy-button" to={course.resume}>{t("elearning.player.continue")}</Link> : action === "certificate" ? <Link className="academy-button" to={card ? `${base}/courses/${course.id}` : `/my-learning/certificates/${course.credential.id}`}>{t(card ? "elearning.academy.card_certificate" : "elearning.certificates.viewCertificate")}</Link> : ["enroll", "enroll_free"].includes(action) ? <button className="academy-button" onClick={enroll} disabled={busy}>{t(`elearning.academy.card_${action}`)}</button> : action === "buy" ? card ? <Link className="academy-button" to={`${base}/courses/${course.id}`}>{t("elearning.academy.card_buy")}</Link> : <a className="academy-button" href="#access-options">{t("elearning.academy.viewPlans")}</a> : card ? <button className="academy-button" disabled>{t(`elearning.academy.card_${action}`)}</button> : <div className="academy-access-blocked" role="status"><strong>{t(`elearning.academy.card_${action}`)}</strong><p>{t(action === "suspended" ? "elearning.academy.suspendedHelp" : "elearning.academy.unavailableHelp")}</p></div>}{error && <LearningErrorNotice as="p">{t("elearning.commerce.error")}</LearningErrorNotice>}</>;
 }
 function Details({ data, refresh }) {
   const { courseId } = useParams(), { t } = useTranslation("dashboard");
@@ -204,23 +208,25 @@ function CourseOutline({ course, data }) {
     <ol className="academy-outline-topics">{s.topics.map((topic, j) => <li key={j}>{start ? <Link to={start}>{topic}</Link> : <span>{topic}</span>}</li>)}</ol>
   </details> : <div className="academy-outline-row"><strong>{s.name}</strong><span>{s.lesson_count} {data.site.lesson_label}</span></div>}</li>)}</ol>;
 }
-function PlanCards({ data, preview = false, buy, busy, available = false }) {
+function PlanCards({ data, preview = false, buy, busy, available = false, closed = false }) {
   const { t } = useTranslation("dashboard");
-  return <div className="academy-grid">{data.plans.slice(0, preview ? 3 : undefined).map(plan => <article className="academy-plan" key={plan.id}><span className="academy-eyebrow">{t(`elearning.commerce.${plan.access_scope}`, { courses: data.site.course_label, course: data.site.course_label })}</span><h3>{plan.name}</h3><Price terms={plan} /><p>{plan.description}</p>{preview ? <Link className="academy-button" to={`${academyPath(data.site)}/plans`}>{t("elearning.academy.viewPlans")}</Link> : <button className="academy-button" disabled={busy || (data.authenticated && !available)} onClick={() => buy(plan)}>{t(!data.authenticated ? "elearning.learner.logIn" : plan.billing_type === "one_time" ? "elearning.commerce.buy" : "elearning.academy.subscribe")}</button>}</article>)}</div>;
+  return <div className="academy-grid">{data.plans.slice(0, preview ? 3 : undefined).map(plan => <article className="academy-plan" key={plan.id}><span className="academy-eyebrow">{t(`elearning.commerce.${plan.access_scope}`, { courses: data.site.course_label, course: data.site.course_label })}</span><h3>{plan.name}</h3><Price terms={plan} /><p>{plan.description}</p>{preview ? <Link className="academy-button" to={`${academyPath(data.site)}/plans`}>{t("elearning.academy.viewPlans")}</Link> : <button className="academy-button" disabled={closed || busy || (data.authenticated && !available)} onClick={() => buy(plan)}>{t(closed ? "elearning.enrollment.opensSoon" : !data.authenticated ? "elearning.learner.logIn" : plan.billing_type === "one_time" ? "elearning.commerce.buy" : "elearning.academy.subscribe")}</button>}</article>)}</div>;
 }
 function Plans({ data, refresh, course }) {
-  const { t } = useTranslation("dashboard"), navigate = useNavigate(), location = useLocation(); const [checkout, setCheckout] = useState(null), [busy, setBusy] = useState(false), [error, setError] = useState(null), [local, setLocal] = useState(false), [availability, setAvailability] = useState("loading"), [availabilityRevision, setAvailabilityRevision] = useState(0);
+  const { t } = useTranslation("dashboard"), navigate = useNavigate(), location = useLocation(); const [checkout, setCheckout] = useState(null), [busy, setBusy] = useState(false), [error, setError] = useState(null), [local, setLocal] = useState(false), [availability, setAvailability] = useState("loading"), [availabilityRevision, setAvailabilityRevision] = useState(0), [notice, setNotice] = useState("elearning.commerce.localOnly"), [account, setAccount] = useState(null);
+  // Opt-in academies (academyExperience.liveEnrollmentOnly) sell only through a live provider.
+  const gate = data.site.enrollment, closed = Boolean(gate && (gate.open === false || enrollmentClosed(account)));
   useEffect(() => {
     if (!data.authenticated) return undefined;
     let active = true;
-    commerce.fetchMyPlans().then(account => { if (active) { setLocal(Boolean(account.local_adapter)); setAvailability(account.local_adapter ? "available" : "unavailable"); } }).catch(() => { if (active) setAvailability("error"); });
+    commerce.fetchMyPlans().then(account => { if (active) { setAccount(account); setLocal(Boolean(account.local_adapter)); setNotice(paymentNotice(account)); setAvailability(paymentsAvailable(account) ? "available" : "unavailable"); } }).catch(() => { if (active) setAvailability("error"); });
     return () => { active = false; };
   }, [data.authenticated, availabilityRevision]);
   async function buy(plan) {
     const base = academyPath(data.site);
     if (!data.authenticated) return navigate(`${base}/login?returnTo=${encodeURIComponent(`${course ? `${base}/courses/${course.id}` : `${base}/plans`}?resume=checkout&plan=${encodeURIComponent(plan.id)}`)}`);
     setBusy(true); setError(null);
-    try { const account = await commerce.fetchMyPlans(); setLocal(account.local_adapter); if (!account.local_adapter) { setError({ unavailable: true }); return; } const result = await commerce.createCheckout(plan.id, course?.id, crypto.randomUUID()); setCheckout(result.checkout); }
+    try { const account = await commerce.fetchMyPlans(); setLocal(account.local_adapter); if (!paymentsAvailable(account)) { setError({ unavailable: true }); return; } openCheckout(await commerce.createCheckout(plan.id, course?.id, crypto.randomUUID()), setCheckout); }
     catch (e) { setError(e); } finally { setBusy(false); }
   }
   useEffect(() => {
@@ -232,26 +238,46 @@ function Plans({ data, refresh, course }) {
     // buy reads the current authoritative projection; this effect consumes only the URL intent.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data.authenticated, location.search, availability]);
-  return <>{!course && <h1>{t("elearning.academy.chooseAccess")}</h1>}{data.plans.length > 0 && <LearningErrorNotice as="p" role={availability === "error" ? "alert" : "status"}>{t(!data.authenticated || availability === "unavailable" ? "elearning.commerce.providerUnavailable" : availability === "available" ? "elearning.commerce.localOnly" : availability === "error" ? "elearning.commerce.error" : "elearning.loading")}</LearningErrorNotice>}{availability === "error" && <button type="button" onClick={() => { setAvailability("loading"); setAvailabilityRevision(value => value + 1); }}>{t("elearning.retry")}</button>}{error && <LearningErrorNotice as="p">{t(error.unavailable ? "elearning.commerce.providerUnavailable" : "elearning.commerce.error")}</LearningErrorNotice>}{checkout ? <Checkout checkout={checkout} local={local} onClose={() => setCheckout(null)} onChange={() => { setCheckout(null); refresh(); if (course) navigate(`/my-learning/courses/${course.id}`); else navigate("/my-learning/plans"); }} /> : data.plans.length ? <PlanCards data={data} buy={buy} busy={busy || (data.authenticated && availability === "loading")} available={availability === "available"} /> : <p>{t("elearning.academy.noPlans")}</p>}</>;
+  if (gate) return <>{!course && <h1>{t("elearning.academy.chooseAccess")}</h1>}
+    {closed ? <div className="enrollment-closed" role="status"><Clock size={20} aria-hidden="true" /><p><strong>{t("elearning.enrollment.opensSoon")}</strong> {t("elearning.enrollment.opensSoonHelp")}</p></div> : data.authenticated && testPayments(account) && <TestModeBanner />}
+    {error && <LearningErrorNotice as="p">{t(error.unavailable || error.detail?.code === "enrollment_not_open" ? "elearning.enrollment.opensSoon" : "elearning.commerce.error")}</LearningErrorNotice>}
+    {checkout ? <EnrollmentCheckout checkout={checkout} local={local} testMode={testPayments(account)} referralCode={account?.referral_code} courseId={checkout.requested_resource_id || course?.id} onClose={() => setCheckout(null)} />
+      : data.plans.length ? <PlanCards data={data} buy={buy} busy={busy || (data.authenticated && availability === "loading")} available={availability === "available"} closed={closed} /> : <p>{t("elearning.academy.noPlans")}</p>}</>;
+  return <>{!course && <h1>{t("elearning.academy.chooseAccess")}</h1>}{data.plans.length > 0 && <LearningErrorNotice as="p" role={availability === "error" ? "alert" : "status"}>{t(!data.authenticated || availability === "unavailable" ? "elearning.commerce.providerUnavailable" : availability === "available" ? notice : availability === "error" ? "elearning.commerce.error" : "elearning.loading")}</LearningErrorNotice>}{availability === "error" && <button type="button" onClick={() => { setAvailability("loading"); setAvailabilityRevision(value => value + 1); }}>{t("elearning.retry")}</button>}{error && <LearningErrorNotice as="p">{t(error.unavailable ? "elearning.commerce.providerUnavailable" : "elearning.commerce.error")}</LearningErrorNotice>}{checkout ? <Checkout checkout={checkout} local={local} onClose={() => setCheckout(null)} onChange={() => { setCheckout(null); refresh(); if (course) navigate(`/my-learning/courses/${course.id}`); else navigate("/my-learning/plans"); }} /> : data.plans.length ? <PlanCards data={data} buy={buy} busy={busy || (data.authenticated && availability === "loading")} available={availability === "available"} /> : <p>{t("elearning.academy.noPlans")}</p>}</>;
 }
 function AcademyLogin({ data }) {
-  const { t } = useTranslation("dashboard"), location = useLocation(), navigate = useNavigate();
-  const [email, setEmail] = useState(""), [password, setPassword] = useState(""), [name, setName] = useState(""), [confirmPassword, setConfirmPassword] = useState(""), [verification, setVerification] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState(null);
+  const { t, i18n } = useTranslation("dashboard"), location = useLocation(), navigate = useNavigate();
+  const [email, setEmail] = useState(""), [password, setPassword] = useState(""), [firstName, setFirstName] = useState(""), [lastName, setLastName] = useState(""), [confirmPassword, setConfirmPassword] = useState(""), [fieldErrors, setFieldErrors] = useState({}), [visible, setVisible] = useState({}), [country, setCountry] = useState(""), [university, setUniversity] = useState(""), [termsAccepted, setTermsAccepted] = useState(false), [verification, setVerification] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState(null);
   const registering = new URLSearchParams(location.search).get("register") === "1" && ["open", "email_domain"].includes(data.site.academy_registration);
-  const switchMode = next => { const query = new URLSearchParams(location.search); if (next) query.set("register", "1"); else query.delete("register"); setPassword(""); setConfirmPassword(""); setError(null); navigate({ pathname: location.pathname, search: query.toString() }); };
+  const switchMode = next => { const query = new URLSearchParams(location.search); if (next) query.set("register", "1"); else query.delete("register"); setPassword(""); setConfirmPassword(""); setError(null); setFieldErrors({}); navigate({ pathname: location.pathname, search: query.toString() }); };
+  // Tenant-owned options from the academy's published website (e.g. EduHope).
+  const profile = data.landing?.academyRegistration || {}, extraFields = Array.isArray(profile.fields) ? profile.fields : [];
+  const legalPath = id => { const page = (data.landing?.pages || []).find(item => item.id === id); return page ? `${academyPath(data.site)}${page.slug === "/" ? "" : page.slug}` : null; };
   const base = academyPath(data.site), requested = new URLSearchParams(location.search).get("returnTo");
   const safeTarget = academyReturnPath(requested, base, window.location.origin, true);
   const target = safeTarget === base || safeTarget.split(/[?#]/)[0] === `${base}/login` ? `${base}/dashboard` : safeTarget;
   async function submit(e) {
     e.preventDefault();
-    if (registering && password !== confirmPassword) { setError({ code: "password_mismatch" }); return; }
+    if (registering) {
+      // Same per-field rules and copy as the main Madar sign-up form.
+      const required = t("validation.required", { ns: "auth" }), next = {};
+      if (!firstName.trim()) next.firstName = required;
+      if (!lastName.trim()) next.lastName = required;
+      if (!email.trim()) next.email = required; else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) next.email = t("validation.invalidEmail", { ns: "auth" });
+      if (!password) next.password = required; else if (password.length < 8) next.password = t("validation.passwordLength", { ns: "auth" });
+      if (extraFields.includes("country") && !country.trim()) next.country = required;
+      if (profile.requireTerms && !termsAccepted) next.terms = t("elearning.academy.termsRequired");
+      if (!confirmPassword) next.confirmPassword = required; else if (password && password !== confirmPassword) next.confirmPassword = t("signup.passwordMismatch", { ns: "auth" });
+      setFieldErrors(next);
+      if (Object.keys(next).length) return;
+    }
     setBusy(true); setError(null);
     try {
       const payload = { email, password, return_to: target };
       if (registering) {
         let referralCode = new URLSearchParams(location.search).get("ref");
         try { referralCode ||= sessionStorage.getItem(`academy-referral:${data.site.subdomain}`); } catch { /* Storage is optional. */ }
-        const result = await registerAcademy(data.site.subdomain, { ...payload, full_name: name, ...(referralCode ? { referral_code: referralCode } : {}) });
+        const result = await registerAcademy(data.site.subdomain, { ...payload, full_name: `${firstName.trim()} ${lastName.trim()}`, ...(extraFields.includes("country") ? { country: country.trim() } : {}), ...(extraFields.includes("university") && university.trim() ? { university: university.trim() } : {}), ...(profile.requireTerms ? { terms_accepted: termsAccepted } : {}), ...(referralCode ? { referral_code: referralCode } : {}) });
         try { sessionStorage.removeItem(`academy-referral:${data.site.subdomain}`); } catch { /* Storage is optional. */ }
         if (result.requires_email_verification) { setVerification(true); switchMode(false); }
         else { const session = await loginAcademy(data.site.subdomain, payload); window.location.assign(session.return_to); }
@@ -260,16 +286,38 @@ function AcademyLogin({ data }) {
     } catch (failure) { setError(failure); } finally { setBusy(false); }
   }
   if (data.authenticated) return <Navigate to={target} replace />;
-  return <form className="academy-login builder-auth-component" autoComplete="on" onSubmit={submit}><h1>{t(registering ? "elearning.learner.createAccount" : "elearning.academy.signIn")}</h1>
+  const fieldError = key => fieldErrors[key] ? <span className="academy-field-error" id={`academy-${key}-error`} role="alert">{fieldErrors[key]}</span> : null;
+  const invalid = key => fieldErrors[key] ? { "aria-invalid": true, "aria-describedby": `academy-${key}-error` } : {};
+  const edit = (key, setter) => e => { setter(e.target.value); if (fieldErrors[key]) setFieldErrors(current => ({ ...current, [key]: undefined })); };
+  const secret = (key, value, setter, label, toggle) => <label>{label}<span className="academy-password-field"><input type={visible[key] ? "text" : "password"} name={key} placeholder={label} autoComplete="new-password" dir="ltr" value={value} onChange={edit(key, setter)} {...invalid(key)} /><button type="button" aria-label={t(toggle, { ns: "auth" })} onClick={() => setVisible(current => ({ ...current, [key]: !current[key] }))}>{visible[key] ? <EyeOff size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}</button></span>{fieldError(key)}</label>;
+  // Server outcomes are explained once in a toast; field problems stay inline.
+  const failure = !error ? null : registering && error.status === 409 ? ["accountExistsTitle", "accountExists"] : error.code === "email_not_verified" ? ["loginErrorTitle", "verifyEmail"] : error.code === "academy_email_domain_not_allowed" ? ["signupErrorTitle", "emailDomainDenied"] : registering ? ["signupErrorTitle", "signupError"] : error.status === 401 ? ["loginErrorTitle", "wrongCredentials"] : error.status === 403 ? ["notMemberTitle", "notMember"] : ["loginErrorTitle", "loginError"];
+  const toast = failure && createPortal(<EcommerceToast type="error" dir={i18n.dir()} onDismiss={() => setError(null)} title={t(`elearning.academy.${failure[0]}`)} message={t(failure[1] === "verifyEmail" || failure[1] === "emailDomainDenied" ? `elearning.learner.${failure[1]}` : `elearning.academy.${failure[1]}`)} />, document.body);
+  return <>{toast}<form className={`academy-login builder-auth-component${registering ? " academy-register" : ""}`} autoComplete="on" noValidate={registering} onSubmit={submit}><h1>{t(registering ? "elearning.learner.createAccount" : "elearning.academy.signIn")}</h1>
     {verification && <p role="status">{t("elearning.learner.verifyEmail")}</p>}
-    {registering && <label>{t("elearning.learner.name")}<input autoComplete="name" required value={name} onChange={e => setName(e.target.value)} /></label>}
-    <label>{t("elearning.academy.email")}<input type="email" autoComplete="username" required value={email} onChange={e => setEmail(e.target.value)} /></label>
-    <label>{t("elearning.academy.password")}<input type="password" minLength={registering ? 8 : undefined} autoComplete={registering ? "new-password" : "current-password"} required value={password} onChange={e => setPassword(e.target.value)} /></label>
-    {registering && <label>{t("signup.confirmPassword", { ns: "auth" })}<input type="password" minLength={8} autoComplete="new-password" required value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} /></label>}
-    {error && <LearningErrorNotice as="p">{error.code === "password_mismatch" ? t("signup.passwordMismatch", { ns: "auth" }) : error.code === "email_not_verified" ? t("elearning.learner.verifyEmail") : t(error.code === "academy_email_domain_not_allowed" ? "elearning.learner.emailDomainDenied" : "elearning.academy.loginError")}</LearningErrorNotice>}<button className="academy-button" disabled={busy}>{t(registering ? "elearning.learner.createAccount" : "elearning.academy.signIn")}</button>
-    {["open", "email_domain"].includes(data.site.academy_registration) && <button type="button" disabled={busy} onClick={() => switchMode(!registering)}>{t(registering ? "elearning.academy.signIn" : "elearning.learner.createAccount")}</button>}
-    <Link to={base}>{t("elearning.academy.home")}</Link>
-  </form>;
+    {registering ? <>
+      <h2 className="academy-auth-section">{t("signup.accountSection", { ns: "auth" })}</h2>
+      <div className="academy-register-row">
+        <label>{t("signup.firstName", { ns: "auth" })}<input name="firstName" autoComplete="given-name" placeholder={t("signup.firstName", { ns: "auth" })} value={firstName} onChange={edit("firstName", setFirstName)} {...invalid("firstName")} />{fieldError("firstName")}</label>
+        <label>{t("signup.lastName", { ns: "auth" })}<input name="lastName" autoComplete="family-name" placeholder={t("signup.lastName", { ns: "auth" })} value={lastName} onChange={edit("lastName", setLastName)} {...invalid("lastName")} />{fieldError("lastName")}</label>
+      </div>
+      <label>{t("signup.email", { ns: "auth" })}<input type="email" name="email" autoComplete="username" dir="ltr" placeholder={t("signup.email", { ns: "auth" })} value={email} onChange={edit("email", setEmail)} {...invalid("email")} />{fieldError("email")}</label>
+      <div className="academy-register-row">
+        {secret("password", password, setPassword, t("signup.password", { ns: "auth" }), "signup.togglePassword")}
+        {secret("confirmPassword", confirmPassword, setConfirmPassword, t("signup.confirmPassword", { ns: "auth" }), "signup.toggleConfirmPassword")}
+      </div>
+      {(extraFields.includes("country") || extraFields.includes("university")) && <div className="academy-register-row">
+        {extraFields.includes("country") && <label>{t("elearning.academy.country")}<input name="country" autoComplete="country-name" placeholder={t("elearning.academy.country")} value={country} onChange={edit("country", setCountry)} {...invalid("country")} />{fieldError("country")}</label>}
+        {extraFields.includes("university") && <label>{t("elearning.academy.university")}<input name="university" autoComplete="organization" placeholder={t("elearning.academy.university")} value={university} onChange={e => setUniversity(e.target.value)} /></label>}
+      </div>}
+      {profile.requireTerms && <label className="academy-terms-check"><span><input type="checkbox" name="terms" checked={termsAccepted} onChange={e => { setTermsAccepted(e.target.checked); if (fieldErrors.terms) setFieldErrors(current => ({ ...current, terms: undefined })); }} {...invalid("terms")} /><span>{t("elearning.academy.termsAgreePrefix")} {legalPath(profile.termsPageId) ? <Link to={legalPath(profile.termsPageId)} target="_blank" rel="noopener">{t("elearning.academy.termsLink")}</Link> : t("elearning.academy.termsLink")} {t("elearning.academy.termsAnd")} {legalPath(profile.privacyPageId) ? <Link to={legalPath(profile.privacyPageId)} target="_blank" rel="noopener">{t("elearning.academy.privacyLink")}</Link> : t("elearning.academy.privacyLink")}</span></span>{fieldError("terms")}</label>}
+    </> : <>
+      <label>{t("elearning.academy.email")}<input type="email" autoComplete="username" required value={email} onChange={e => setEmail(e.target.value)} /></label>
+      <label>{t("elearning.academy.password")}<input type="password" autoComplete="current-password" required value={password} onChange={e => setPassword(e.target.value)} /></label>
+    </>}
+    <button className="academy-button" disabled={busy}>{t(registering ? "elearning.learner.createAccount" : "elearning.academy.signIn")}</button>
+    {["open", "email_domain"].includes(data.site.academy_registration) && <p className="academy-auth-switch">{t(registering ? "elearning.academy.haveAccount" : "elearning.academy.noAccount")} <button type="button" className="academy-inline-link" disabled={busy} onClick={() => switchMode(!registering)}>{t(registering ? "elearning.academy.signIn" : "elearning.learner.createAccount")}</button></p>}
+  </form></>;
 }
 export function HostedAcademyLearning({ subdomain }) {
   const state = useAcademy(subdomain, fetchHostedLearningContext);

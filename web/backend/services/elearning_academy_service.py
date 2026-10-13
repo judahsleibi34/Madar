@@ -128,6 +128,10 @@ def storefront(tenant_id, website, actor=None, course_id=None, *, preview=False)
     if settings_available(133):
         instructors = service_supabase.rpc("get_academy_public_instructors", {"p_tenant_id": tenant_id, "p_course_ids": [card["id"] for card in result["courses"]]}).execute().data or []
     site = profile(tenant_id, website, landing.get('theme'),form_application_paths(tenant_id,website,landing))
+    if learning_experience(landing).get("liveEnrollmentOnly"):
+        # Opt-in academies show "Enrollment opens soon" until a live provider is set.
+        from services.elearning_commerce_service import enrollment_open, payment_state
+        site["enrollment"] = {"open": enrollment_open(payment_state())}
     if actor and actor.role in {"owner", "admin"}:
         site["management_path"] = "/e-learning/settings/academy"
     contact_enabled = False
@@ -167,4 +171,46 @@ def member_profile(tenant_id):
         projects=service_supabase.table('builder_projects').select('published_schema,status').eq('tenant_id',tenant_id).eq('id',rows[0]['academy_project_id']).eq('usage_profile','academy').limit(1).execute().data or []
         if projects and projects[0]['status']=='published':
             schema=projects[0].get('published_schema') or {};theme=schema.get('theme')
-    return profile(tenant_id, rows[0], theme,form_application_paths(tenant_id,rows[0],schema))
+    return {**profile(tenant_id, rows[0], theme,form_application_paths(tenant_id,rows[0],schema)), "experience": learning_experience(schema)}
+
+
+# Opt-in learner-app improvements, switched on per academy in its own website.
+EXPERIENCE_FLAGS = frozenset({"lessonComponents", "studentDashboard", "liveEnrollmentOnly"})
+
+
+def learning_experience(schema):
+    value = (schema or {}).get("academyExperience")
+    return {key: value[key] is True for key in EXPERIENCE_FLAGS if key in value} if isinstance(value, dict) else {}
+
+
+def experience_for_tenant(tenant_id):
+    """The academy's opt-in flags from its published website ({} when none)."""
+    try:
+        if not settings_available(132):
+            return {}
+        rows = service_supabase.table("website_settings").select("academy_project_id").eq("tenant_id", tenant_id).limit(1).execute().data or []
+        project = rows[0].get("academy_project_id") if rows else None
+        if not project:
+            return {}
+        projects = service_supabase.table("builder_projects").select("published_schema,status").eq("tenant_id", tenant_id).eq("id", project).eq("usage_profile", "academy").limit(1).execute().data or []
+        return learning_experience(projects[0].get("published_schema")) if projects and projects[0].get("status") == "published" else {}
+    except Exception:
+        return {}
+
+
+def institution_for_member(tenant_id, user_id):
+    """Institution (e.g. PAU) membership for the signed-in learner: the email
+    domain matches the owner's Settings → Institution domains. Selects the
+    welcome and "PAU Student" label only; it never marks anyone verified."""
+    try:
+        cfg = get_settings(tenant_id)
+        if not cfg.get("institution_enabled") or not cfg.get("institution_email_domains"):
+            return None
+        rows = service_supabase.table("users").select("email").eq("id", user_id).limit(1).execute().data or []
+        email = (rows[0].get("email") if rows else "") or ""
+        from routes.elearning_academy_routes import institution_member
+        if not institution_member(cfg, email):
+            return None
+        return {"member": True, "name": cfg.get("institution_name") or "", "label": cfg.get("institution_student_label") or ""}
+    except Exception:
+        return None
