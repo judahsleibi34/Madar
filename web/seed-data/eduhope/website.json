@@ -5971,6 +5971,7 @@
   },
   "academyExperience": {
     "lessonComponents": true,
-    "studentDashboard": true
+    "studentDashboard": true,
+    "liveEnrollmentOnly": true
   }
 }

@@ -12,6 +12,8 @@ import StudentReferral from "../components/ELearning/student/StudentReferral";
 import StudentApplications from "../components/ELearning/student/StudentApplications";
 import { StudentWallet, StudentWithdraw } from "../components/ELearning/student/StudentWallet";
 import AffiliateArea from "../components/ELearning/student/AffiliateArea";
+import EnrollmentCheckout from "../components/ELearning/EnrollmentCheckout";
+import { EnrollmentClosedSample } from "./CheckoutSamples";
 import "../styles/admin/dashboard/elearning-player.css";
 
 const THEME = { "--theme-primary": "#002A60", "--theme-accent": "#088848", "--theme-surface": "#FFFFFF", "--theme-background": "#F6F7F4", "--theme-border": "#D9E3DF", "--theme-text": "#002A60", "--theme-text-soft": "#43576B" };
@@ -59,6 +61,14 @@ SCREENS.push(
   ["affiliate-sales", "EH / Affiliate — Sales", "/my-learning/affiliate/sales", <AffiliateArea />, affiliate("approved")],
   ["affiliate-review", "EH / Affiliate — Under Review", "/my-learning/affiliate", <AffiliateArea />, affiliate("under_review")],
   ["affiliate-suspended", "EH / Affiliate — Suspended", "/my-learning/affiliate", <AffiliateArea />, affiliate("suspended")],
+);
+const order = state => ({ id: `co-${state}`, state, requested_resource_id: "c", terms: { name: "EduHope English Conversation Course", amount: "30.00", currency: "USD", billing_type: "one_time" } });
+SCREENS.push(
+  ["enrollment-closed", "EH / Checkout — production (Enrollment opens soon)", "/academy/aooloo/plans", <EnrollmentClosedSample />, base],
+  ["checkout-processing", "EH / Checkout — TEST MODE, Processing", "/academy/aooloo/plans", <EnrollmentCheckout checkout={order("pending")} local testMode referralCode="6f1d2c9e-41a7-4c1e-9b2f-0d3e5a7c8b90" courseId="c" />, base],
+  ["checkout-confirmed", "EH / Checkout — Confirmed", "/academy/aooloo/plans", <EnrollmentCheckout checkout={order("paid")} testMode courseId="c" />, base],
+  ["checkout-failed", "EH / Checkout — Failed", "/academy/aooloo/plans", <EnrollmentCheckout checkout={order("failed")} testMode courseId="c" />, base],
+  ["checkout-refunded", "EH / Checkout — Refunded", "/academy/aooloo/plans", <EnrollmentCheckout checkout={order("refunded")} testMode courseId="c" onClose={() => {}} />, base],
 );
 
 export default function StudentGallery() {

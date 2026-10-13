@@ -441,7 +441,7 @@ def main():
     # Terms acceptance is required once the approved Terms & Privacy pages are published.
     project['academyRegistration'] = {'fields': ['country', 'university'], 'requireTerms': PUBLISH_LEGAL,
                                       'termsPageId': 'eduhope-page-terms', 'privacyPageId': 'eduhope-page-privacy'}
-    project['academyExperience'] = {'lessonComponents': True, 'studentDashboard': True}
+    project['academyExperience'] = {'lessonComponents': True, 'studentDashboard': True, 'liveEnrollmentOnly': True}
     project['academyChrome'] = {'signUpLabel': {'en': 'Register', 'ar': 'التسجيل'}, 'languageSwitcher': 'text'}
     (ROOT / 'website.json').write_text(json.dumps(project, ensure_ascii=False, indent=2) + '\n')
     (ROOT / 'legal-drafts.json').write_text(json.dumps([{'key': k, 'slug': sl, 'name': {'en': en, 'ar': ar}, 'sections': sec} for k, sl, en, ar, sec in legal], ensure_ascii=False, indent=2) + '\n')

@@ -131,3 +131,4 @@ def reconcile_checkout(actor, checkout_id):
 
 # Concrete adapters register into PROVIDERS; MADAR_PAYMENT_PROVIDER selects one.
 import services.stripe_payment_provider  # noqa: E402,F401
+import services.dummy_payment_provider  # noqa: E402,F401  (development only; never configured in production)

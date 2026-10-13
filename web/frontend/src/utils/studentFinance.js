@@ -23,28 +23,36 @@ export function tuitionProgress(wallet) {
   return { sales, threshold, remaining: Math.max(0, threshold - sales), eligible: wallet?.tuition_eligible ?? sales >= threshold };
 }
 
-const REWARD_STATUS = { pending: "pending", earned: "available", reversed: "reversed" };
-const HELD = new Set(["pending", "approved", "processing", "paid"]);
-
 /**
- * Pending referral rewards: referred purchases whose reward is not earned yet.
- * (The wallet's own "pending" is money held for withdrawal requests.)
+ * A referral row is created when someone signs up through the link; its reward
+ * exists only after that person's payment is confirmed. Rows without a reward
+ * ("pending" in the referral account) are sign-ups, never money.
+ * reward_status, when present, is the reward's own state (pending review,
+ * earned or reversed).
  */
-export function pendingRewards(referrals) {
-  return (referrals?.history || []).filter(row => row.status === "pending" && !row.simulated).reduce((sum, row) => sum + Number(row.amount || 0), 0);
+export function referralState(row) {
+  const reward = row.reward_status || (row.status === "pending" ? null : row.status);
+  return { signup: !reward, reward: reward === "earned" ? "available" : reward };
 }
+
+/** Pending rewards: confirmed, referred purchases whose reward is awaiting review. */
+export function pendingRewards(referrals) {
+  return (referrals?.history || []).filter(row => referralState(row).reward === "pending" && !row.simulated).reduce((sum, row) => sum + Number(row.amount || 0), 0);
+}
+
+const HELD = new Set(["pending", "approved", "processing", "paid"]);
 
 /**
  * Wallet history (website document §18): referral rewards and withdrawals,
  * newest first. "Balance after" follows the Available Balance the backend
- * computes — earned real rewards add; withdrawals that are pending, approved,
- * processing or paid subtract; pending, reversed and test-mode rewards do not
- * count — and is only given when the history is complete.
+ * computes — available real rewards add; withdrawals that are pending,
+ * approved, processing or paid subtract; pending, reversed and test-mode
+ * rewards do not count — and is only given when the history is complete.
  */
 export function walletHistory(referrals, withdrawals = []) {
-  const rewards = (referrals?.history || []).map(row => ({
+  const rewards = (referrals?.history || []).filter(row => !referralState(row).signup).map(row => ({
     id: `reward:${row.id}`, type: "reward", date: row.reversed_at || row.earned_at || row.created_at,
-    amount: Number(row.amount), currency: row.currency, status: REWARD_STATUS[row.status] || row.status, simulated: Boolean(row.simulated),
+    amount: Number(row.amount), currency: row.currency, status: referralState(row).reward, simulated: Boolean(row.simulated),
   }));
   const payouts = withdrawals.map(row => ({
     id: `withdrawal:${row.id}`, type: "withdrawal", date: row.created_at,

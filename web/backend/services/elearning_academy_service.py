@@ -128,6 +128,10 @@ def storefront(tenant_id, website, actor=None, course_id=None, *, preview=False)
     if settings_available(133):
         instructors = service_supabase.rpc("get_academy_public_instructors", {"p_tenant_id": tenant_id, "p_course_ids": [card["id"] for card in result["courses"]]}).execute().data or []
     site = profile(tenant_id, website, landing.get('theme'),form_application_paths(tenant_id,website,landing))
+    if learning_experience(landing).get("liveEnrollmentOnly"):
+        # Opt-in academies show "Enrollment opens soon" until a live provider is set.
+        from services.elearning_commerce_service import enrollment_open, payment_state
+        site["enrollment"] = {"open": enrollment_open(payment_state())}
     if actor and actor.role in {"owner", "admin"}:
         site["management_path"] = "/e-learning/settings/academy"
     contact_enabled = False
@@ -171,7 +175,7 @@ def member_profile(tenant_id):
 
 
 # Opt-in learner-app improvements, switched on per academy in its own website.
-EXPERIENCE_FLAGS = frozenset({"lessonComponents", "studentDashboard"})
+EXPERIENCE_FLAGS = frozenset({"lessonComponents", "studentDashboard", "liveEnrollmentOnly"})
 
 
 def learning_experience(schema):

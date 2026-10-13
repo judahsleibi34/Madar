@@ -35,6 +35,18 @@
     "en": "No referred purchases yet.",
     "ar": "لا توجد عمليات شراء عبر الإحالة بعد."
   },
+  "elearning.affiliateArea.sale_purchased": {
+    "en": "Purchased",
+    "ar": "تم الشراء"
+  },
+  "elearning.affiliateArea.sale_refunded": {
+    "en": "Refunded",
+    "ar": "مسترد"
+  },
+  "elearning.affiliateArea.sale_signup": {
+    "en": "Signed up — no purchase yet",
+    "ar": "سجّل — لم يشترِ بعد"
+  },
   "elearning.affiliateArea.salesIntro": {
     "en": "Only valid, verified direct course purchases count.",
     "ar": "تُحتسب فقط عمليات الشراء المباشرة الصحيحة التي تم التحقق منها."
@@ -42,6 +54,58 @@
   "elearning.affiliateArea.status_none": {
     "en": "Not applied",
     "ar": "لم يتم التقديم"
+  },
+  "elearning.enrollment.help_cancelled": {
+    "en": "This payment was cancelled. Nothing was charged.",
+    "ar": "تم إلغاء عملية الدفع هذه. لم يُخصم أي مبلغ."
+  },
+  "elearning.enrollment.help_confirmed": {
+    "en": "Your payment is confirmed and your course is unlocked.",
+    "ar": "تم تأكيد الدفع وفتح دورتك."
+  },
+  "elearning.enrollment.help_failed": {
+    "en": "The payment did not go through and no money was taken. You can try again.",
+    "ar": "لم تتم عملية الدفع ولم يُخصم أي مبلغ. يمكنك المحاولة مرة أخرى."
+  },
+  "elearning.enrollment.help_processing": {
+    "en": "We are waiting for the payment to be confirmed.",
+    "ar": "ننتظر تأكيد الدفع."
+  },
+  "elearning.enrollment.help_refunded": {
+    "en": "This payment was refunded, so course access has been removed.",
+    "ar": "تم استرداد هذه الدفعة، لذلك أُزيل الوصول إلى الدورة."
+  },
+  "elearning.enrollment.noReferral": {
+    "en": "None",
+    "ar": "لا يوجد"
+  },
+  "elearning.enrollment.opensSoonHelp": {
+    "en": "You can create your account now. Buying the course will open here as soon as payments are switched on.",
+    "ar": "يمكنك إنشاء حسابك الآن. سيُتاح شراء الدورة هنا فور تفعيل الدفع."
+  },
+  "elearning.enrollment.orderSummary": {
+    "en": "Order summary",
+    "ar": "ملخص الطلب"
+  },
+  "elearning.enrollment.referralReady": {
+    "en": "Your referral link is ready",
+    "ar": "رابط الإحالة الخاص بك جاهز"
+  },
+  "elearning.enrollment.startLearning": {
+    "en": "Start learning",
+    "ar": "ابدأ التعلّم"
+  },
+  "elearning.enrollment.testFail": {
+    "en": "Simulate a failed payment",
+    "ar": "محاكاة دفعة فاشلة"
+  },
+  "elearning.enrollment.testPay": {
+    "en": "Confirm test payment",
+    "ar": "تأكيد دفعة اختبارية"
+  },
+  "elearning.enrollment.testRefund": {
+    "en": "Simulate a refund",
+    "ar": "محاكاة استرداد"
   },
   "elearning.student.accessNone": {
     "en": "Not purchased",

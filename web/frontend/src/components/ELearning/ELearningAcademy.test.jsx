@@ -299,3 +299,31 @@ it('explains email verification failures without displaying provider diagnostics
  expect((await screen.findByRole('alert')).textContent).toContain('Confirm your email, then sign in to continue your enrollment or checkout.');
  expect(document.body.textContent).not.toContain('private provider trace');
 });
+it("shows 'Enrollment opens soon' for live-only academies without a live provider and never starts checkout",async()=>{
+ const eduPlan={...plan,name:"EduHope English Conversation Course",amount:30};
+ fetchAcademy.mockResolvedValue({...data,site:{...data.site,enrollment:{open:false}},plans:[eduPlan]});mount('/academy/tenant/plans');
+ expect((await screen.findAllByText('Enrollment opens soon')).length).toBeGreaterThan(0);expect(screen.getByRole('button',{name:'Enrollment opens soon'}).disabled).toBe(true);cleanup();
+ fetchAcademy.mockResolvedValue({...data,authenticated:true,site:{...data.site,enrollment:{open:true}},plans:[eduPlan]});commerce.fetchMyPlans.mockResolvedValue({payments_available:true,payments_test_mode:true,enrollment_gate:true,enrollment_open:false});mount('/academy/tenant/plans');
+ await waitFor(()=>expect(screen.getByRole('button',{name:'Enrollment opens soon'}).disabled).toBe(true));fireEvent.click(screen.getByRole('button',{name:'Enrollment opens soon'}));expect(commerce.createCheckout).not.toHaveBeenCalled();
+});
+it("runs the test checkout with the TEST MODE banner, order summary and Confirmed state",async()=>{
+ const eduPlan={...plan,name:"EduHope English Conversation Course",amount:30};
+ fetchAcademy.mockResolvedValue({...data,authenticated:true,site:{...data.site,enrollment:{open:true}},plans:[eduPlan]});
+ commerce.fetchMyPlans.mockResolvedValue({local_adapter:true,payments_available:true,enrollment_gate:true,enrollment_open:true,referral_code:"REF-1"});
+ commerce.createCheckout.mockResolvedValue({checkout:{id:"co",state:"pending",requested_resource_id:"course-1",terms:{name:eduPlan.name,amount:"30.00",currency:"USD",billing_type:"one_time"}}});
+ commerce.localPaymentEvent.mockResolvedValue({});
+ mount('/academy/tenant/plans');await waitFor(()=>expect(screen.getByRole('button',{name:'Buy'}).disabled).toBe(false));fireEvent.click(screen.getByRole('button',{name:'Buy'}));
+ await screen.findByText('Order summary');expect(screen.getAllByText('TEST MODE — no real payment is taken').length).toBeGreaterThan(0);expect(screen.getByText('$30.00')).toBeTruthy();expect(screen.getByText('Lifetime access')).toBeTruthy();expect(screen.getByText('REF-1')).toBeTruthy();
+ expect(screen.getByText('Processing')).toBeTruthy();expect(screen.queryByRole('link',{name:'Your referral link is ready'})).toBeNull();
+ fireEvent.click(screen.getByRole('button',{name:'Confirm test payment'}));await screen.findByText('Confirmed');
+ expect(commerce.localPaymentEvent).toHaveBeenCalledWith("co","paid");expect(screen.getByRole('link',{name:'Start learning'}).getAttribute('href')).toBe('/my-learning/courses/course-1');expect(screen.getByRole('link',{name:'Your referral link is ready'})).toBeTruthy();
+ fireEvent.click(screen.getByRole('button',{name:'Simulate a refund'}));await screen.findByText('Refunded');expect(screen.queryByRole('link',{name:'Start learning'})).toBeNull();
+});
+it("shows Failed and Cancelled test outcomes without unlocking anything",async()=>{
+ fetchAcademy.mockResolvedValue({...data,authenticated:true,site:{...data.site,enrollment:{open:true}},plans:[plan]});
+ commerce.fetchMyPlans.mockResolvedValue({local_adapter:true,payments_available:true,enrollment_gate:true,enrollment_open:true});
+ commerce.createCheckout.mockResolvedValue({checkout:{id:"co",state:"pending",terms:{name:plan.name,amount:"49.00",currency:"USD",billing_type:"one_time"}}});commerce.localPaymentEvent.mockResolvedValue({});
+ mount('/academy/tenant/plans');await waitFor(()=>expect(screen.getByRole('button',{name:'Buy'}).disabled).toBe(false));fireEvent.click(screen.getByRole('button',{name:'Buy'}));
+ fireEvent.click(await screen.findByRole('button',{name:'Simulate a failed payment'}));await screen.findByText('Failed');expect(screen.queryByRole('link',{name:'Start learning'})).toBeNull();
+ fireEvent.click(screen.getByRole('button',{name:'Cancel'}));await screen.findByText('Cancelled');expect(screen.queryByRole('link',{name:'Your referral link is ready'})).toBeNull();
+});

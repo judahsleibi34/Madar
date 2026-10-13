@@ -76,21 +76,60 @@ def save(actor, payload, plan_id=None):
     return call("manage_elearning_offering", actor, p_id=str(plan_id) if plan_id else None, p_revision=payload.revision, p_details=details)
 
 
-def payment_state():
+def payment_state(tenant_id=None):
     from services import learning_payment_provider as payments
     local = local_adapter_enabled()
-    return {"local_adapter": local, "payments_available": local or payments.available(), "payments_test_mode": not local and payments.test_mode()}
+    state = {"local_adapter": local, "payments_available": local or payments.available(), "payments_test_mode": not local and payments.test_mode()}
+    if tenant_id is not None and live_enrollment_only(tenant_id):
+        state.update(enrollment_gate=True, enrollment_open=enrollment_open(state))
+    return state
+
+
+def live_enrollment_only(tenant_id):
+    """Academies that opt in (academyExperience.liveEnrollmentOnly) sell only
+    through a live provider in production: test payments — the dummy adapter or
+    a provider in test mode — never unlock their courses or create rewards
+    there; checkout shows "Enrollment opens soon" instead."""
+    from services.elearning_academy_service import experience_for_tenant
+    return experience_for_tenant(tenant_id).get("liveEnrollmentOnly") is True
+
+
+def enrollment_open(state):
+    if state["local_adapter"]:
+        return True
+    if not state["payments_available"]:
+        return False
+    return not state["payments_test_mode"] or os.getenv("APP_ENV") == "development"
 
 
 def catalog(actor):
-    return {**call("get_elearning_catalog", actor), **plans(actor), "settings": get_settings(actor.tenant_id), **payment_state()}
+    return {**call("get_elearning_catalog", actor), **plans(actor), "settings": get_settings(actor.tenant_id), **payment_state(actor.tenant_id)}
 
 
 def account(actor):
-    return {**call("get_commerce_learning_account", actor), "settings": get_settings(actor.tenant_id), **payment_state()}
+    result = {**call("get_commerce_learning_account", actor), "settings": get_settings(actor.tenant_id), **payment_state(actor.tenant_id)}
+    if result.get("enrollment_gate"):
+        result["referral_code"] = applied_referral_code(actor)
+    return result
+
+
+def applied_referral_code(actor):
+    """The referral code attached when this member registered, for the order
+    summary. Read-only; rewards are still decided by the database on payment."""
+    from database import service_supabase
+    try:
+        rows = service_supabase.table("academy_referrals").select("sender_id").eq("tenant_id", actor.tenant_id).eq("referred_id", actor.user_id).limit(1).execute().data or []
+        if not rows:
+            return None
+        codes = service_supabase.table("academy_referral_codes").select("code").eq("tenant_id", actor.tenant_id).eq("user_id", rows[0]["sender_id"]).limit(1).execute().data or []
+        return str(codes[0]["code"]) if codes else None
+    except Exception:
+        return None
 
 
 def checkout(actor, payload, request):
+    if live_enrollment_only(actor.tenant_id) and not enrollment_open(payment_state()):
+        raise HTTPException(409, detail={"code": "enrollment_not_open", "message": "Enrollment opens soon."})
     if not local_adapter_enabled():
         from services.learning_payment_provider import checkout as provider_checkout
         from services.request_security import normalize_origin
@@ -104,27 +143,14 @@ def checkout(actor, payload, request):
 
 def simulate(actor, checkout_id, event, request):
     adapter(request)
-    from datetime import datetime, timedelta, timezone
-    from database import service_supabase
+    from services.dummy_payment_provider import NAME, PROVIDERS
+    from services.learning_payment_provider import apply_verified_event
     history = account(actor)
-    records = history["checkouts"]
-    record = next((value for value in records if value["id"] == str(checkout_id)), None)
-    if not record or record["provider"] != "local_test":
+    record = next((value for value in history["checkouts"] if value["id"] == str(checkout_id)), None)
+    if not record:
         raise HTTPException(404, "Local checkout not found")
-    terms = record["terms"]
-    period = None
-    if terms["billing_type"] != "one_time" and event.state in {"paid", "active"}:
-        period = (datetime.now(timezone.utc) + timedelta(days=30 if terms["billing_type"] == "monthly" else 365)).isoformat()
-        if event.cancel_at_period_end:
-            current = next((value for value in history["entitlements"] if value["checkout_id"] == str(checkout_id)), None)
-            if current:
-                period = current["expires_at"]
+    current = next((value for value in history["entitlements"] if value["checkout_id"] == str(checkout_id)), None) if event.cancel_at_period_end else None
     # Amount, currency, transaction ownership and period are adapter data. The
     # client can select only a local test outcome, never authoritative prices.
-    return service_supabase.rpc("apply_commerce_payment_event", {
-        "p_tenant_id": actor.tenant_id, "p_checkout_id": str(checkout_id), "p_provider": "local_test",
-        "p_event_id": str(uuid4()), "p_transaction_id": "local:" + str(checkout_id),
-        "p_sequence": record["event_sequence"] + 1, "p_state": event.state,
-        "p_amount": terms["amount"], "p_currency": terms["currency"],
-        "p_period_end": period, "p_cancel_at_period_end": event.cancel_at_period_end,
-    }).execute().data
+    verified = PROVIDERS[NAME].event(actor.tenant_id, record, event.state, current_period_end=current and current["expires_at"], cancel_at_period_end=event.cancel_at_period_end)
+    return apply_verified_event(NAME, verified)

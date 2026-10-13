@@ -3,7 +3,7 @@ import { Link, Route, Routes } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { ArrowDownCircle, Award, Clock, KeyRound, MousePointerClick, ShoppingCart, Wallet } from "lucide-react";
 import { apiFetch, getApiUrl } from "../../../utils/apiClient";
-import { formatMoney, latestAffiliate, pendingRewards, referralView } from "../../../utils/studentFinance";
+import { formatMoney, latestAffiliate, pendingRewards, referralState, referralView } from "../../../utils/studentFinance";
 import ELearningSkeleton from "../ELearningSkeleton";
 import AcademyProgrammesPage from "../AcademyProgrammesPage";
 import NotificationsPage from "../../DashboardBuilder/NotificationsPage";
@@ -11,8 +11,6 @@ import useStudentData from "./useStudentData";
 import { ReferralLink } from "./StudentReferral";
 import { StudentWallet, StudentWithdraw, WalletHistory } from "./StudentWallet";
 import { StatCard, StatusPill, StudentPage } from "./StudentParts";
-
-const REWARD = { pending: "pending", earned: "available", reversed: "reversed" };
 
 /** Not applied, Under Review, Not Approved and Suspended (website document §10). */
 function AffiliateStatus({ application, paths }) {
@@ -45,17 +43,23 @@ function Overview({ data }) {
   </StudentPage>;
 }
 
+/** Sales: every referred sign-up and purchase. Rewards: purchases only. */
 function ReferralRows({ data, rewards }) {
   const { t, i18n } = useTranslation("dashboard");
-  const rows = data.referrals?.history || [];
+  const rows = (data.referrals?.history || []).filter(row => !rewards || !referralState(row).signup);
   if (!rows.length) return <p className="student-empty">{t(rewards ? "elearning.student.noTransactions" : "elearning.affiliateArea.noSales")}</p>;
   return <div className="affiliate-table-scroll"><table className="student-table">
     <thead><tr><th scope="col">{t("elearning.student.column_date")}</th><th scope="col">{t(rewards ? "elearning.student.column_amount" : "elearning.affiliateArea.column_sale")}</th><th scope="col">{t("elearning.student.column_status")}</th></tr></thead>
-    <tbody>{rows.map(row => { const status = REWARD[row.status] || row.status; return <tr key={row.id}>
-      <td>{new Date(rewards ? row.reversed_at || row.earned_at || row.created_at : row.created_at).toLocaleDateString(i18n.language)}</td>
-      <td dir={rewards ? "ltr" : undefined}>{rewards ? `+${formatMoney(row.amount, row.currency, i18n.language)}` : t(row.simulated ? "elearning.student.rewardTestDescription" : "elearning.student.rewardDescription")}</td>
-      <td><StatusPill status={status === "available" ? "earned" : status}>{t(`elearning.student.reward_${status}`)}</StatusPill></td>
-    </tr>; })}</tbody>
+    <tbody>{rows.map(row => {
+      const { signup, reward } = referralState(row);
+      const sale = signup ? "signup" : reward === "reversed" ? "refunded" : "purchased";
+      return <tr key={row.id}>
+        <td>{new Date(rewards ? row.reversed_at || row.earned_at || row.created_at : row.created_at).toLocaleDateString(i18n.language)}</td>
+        <td dir={rewards ? "ltr" : undefined}>{rewards ? `+${formatMoney(row.amount, row.currency, i18n.language)}` : t(row.simulated ? "elearning.student.rewardTestDescription" : "elearning.student.rewardDescription")}</td>
+        <td>{rewards ? <StatusPill status={reward === "available" ? "earned" : reward}>{t(`elearning.student.reward_${reward}`)}</StatusPill>
+          : <StatusPill status={{ signup: "pending", purchased: "earned", refunded: "reversed" }[sale]}>{t(`elearning.affiliateArea.sale_${sale}`)}</StatusPill>}</td>
+      </tr>;
+    })}</tbody>
   </table></div>;
 }
 

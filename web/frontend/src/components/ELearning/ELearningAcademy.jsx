@@ -13,7 +13,7 @@ import { AcademyCompositionContext } from "../PageBuilder/blocks/AcademyDataBloc
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { Link, Navigate, Route, Routes, useLocation, useNavigate, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { Award, BookOpen, ArrowUpRight, Search, SlidersHorizontal, ChevronDown, Eye, EyeOff } from "lucide-react";
+import { Award, BookOpen, ArrowUpRight, Search, SlidersHorizontal, ChevronDown, Clock, Eye, EyeOff } from "lucide-react";
 import { fetchAcademy, academyReturnPath, loginAcademy, registerAcademy, recordReferralClick } from "../../services/elearningAcademy";
 import ELearningLearnerShell from "./ELearningLearnerShell";
 import * as commerce from "../../services/elearningCommerce";
@@ -24,7 +24,8 @@ import ELearningSkeleton from "./ELearningSkeleton";
 import ELearningPlayer from "./ELearningPlayer";
 import { fetchLearningAccountContext } from "../../services/elearningPlayer";
 import { Checkout, Price } from "./ELearningCatalog";
-import { openCheckout, paymentNotice, paymentsAvailable } from "../../utils/learningPayments";
+import { enrollmentClosed, openCheckout, paymentNotice, paymentsAvailable, testPayments } from "../../utils/learningPayments";
+import EnrollmentCheckout, { TestModeBanner } from "./EnrollmentCheckout";
 
 const AcademyContext = createContext(null);
 
@@ -207,16 +208,18 @@ function CourseOutline({ course, data }) {
     <ol className="academy-outline-topics">{s.topics.map((topic, j) => <li key={j}>{start ? <Link to={start}>{topic}</Link> : <span>{topic}</span>}</li>)}</ol>
   </details> : <div className="academy-outline-row"><strong>{s.name}</strong><span>{s.lesson_count} {data.site.lesson_label}</span></div>}</li>)}</ol>;
 }
-function PlanCards({ data, preview = false, buy, busy, available = false }) {
+function PlanCards({ data, preview = false, buy, busy, available = false, closed = false }) {
   const { t } = useTranslation("dashboard");
-  return <div className="academy-grid">{data.plans.slice(0, preview ? 3 : undefined).map(plan => <article className="academy-plan" key={plan.id}><span className="academy-eyebrow">{t(`elearning.commerce.${plan.access_scope}`, { courses: data.site.course_label, course: data.site.course_label })}</span><h3>{plan.name}</h3><Price terms={plan} /><p>{plan.description}</p>{preview ? <Link className="academy-button" to={`${academyPath(data.site)}/plans`}>{t("elearning.academy.viewPlans")}</Link> : <button className="academy-button" disabled={busy || (data.authenticated && !available)} onClick={() => buy(plan)}>{t(!data.authenticated ? "elearning.learner.logIn" : plan.billing_type === "one_time" ? "elearning.commerce.buy" : "elearning.academy.subscribe")}</button>}</article>)}</div>;
+  return <div className="academy-grid">{data.plans.slice(0, preview ? 3 : undefined).map(plan => <article className="academy-plan" key={plan.id}><span className="academy-eyebrow">{t(`elearning.commerce.${plan.access_scope}`, { courses: data.site.course_label, course: data.site.course_label })}</span><h3>{plan.name}</h3><Price terms={plan} /><p>{plan.description}</p>{preview ? <Link className="academy-button" to={`${academyPath(data.site)}/plans`}>{t("elearning.academy.viewPlans")}</Link> : <button className="academy-button" disabled={closed || busy || (data.authenticated && !available)} onClick={() => buy(plan)}>{t(closed ? "elearning.enrollment.opensSoon" : !data.authenticated ? "elearning.learner.logIn" : plan.billing_type === "one_time" ? "elearning.commerce.buy" : "elearning.academy.subscribe")}</button>}</article>)}</div>;
 }
 function Plans({ data, refresh, course }) {
-  const { t } = useTranslation("dashboard"), navigate = useNavigate(), location = useLocation(); const [checkout, setCheckout] = useState(null), [busy, setBusy] = useState(false), [error, setError] = useState(null), [local, setLocal] = useState(false), [availability, setAvailability] = useState("loading"), [availabilityRevision, setAvailabilityRevision] = useState(0), [notice, setNotice] = useState("elearning.commerce.localOnly");
+  const { t } = useTranslation("dashboard"), navigate = useNavigate(), location = useLocation(); const [checkout, setCheckout] = useState(null), [busy, setBusy] = useState(false), [error, setError] = useState(null), [local, setLocal] = useState(false), [availability, setAvailability] = useState("loading"), [availabilityRevision, setAvailabilityRevision] = useState(0), [notice, setNotice] = useState("elearning.commerce.localOnly"), [account, setAccount] = useState(null);
+  // Opt-in academies (academyExperience.liveEnrollmentOnly) sell only through a live provider.
+  const gate = data.site.enrollment, closed = Boolean(gate && (gate.open === false || enrollmentClosed(account)));
   useEffect(() => {
     if (!data.authenticated) return undefined;
     let active = true;
-    commerce.fetchMyPlans().then(account => { if (active) { setLocal(Boolean(account.local_adapter)); setNotice(paymentNotice(account)); setAvailability(paymentsAvailable(account) ? "available" : "unavailable"); } }).catch(() => { if (active) setAvailability("error"); });
+    commerce.fetchMyPlans().then(account => { if (active) { setAccount(account); setLocal(Boolean(account.local_adapter)); setNotice(paymentNotice(account)); setAvailability(paymentsAvailable(account) ? "available" : "unavailable"); } }).catch(() => { if (active) setAvailability("error"); });
     return () => { active = false; };
   }, [data.authenticated, availabilityRevision]);
   async function buy(plan) {
@@ -235,6 +238,11 @@ function Plans({ data, refresh, course }) {
     // buy reads the current authoritative projection; this effect consumes only the URL intent.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data.authenticated, location.search, availability]);
+  if (gate) return <>{!course && <h1>{t("elearning.academy.chooseAccess")}</h1>}
+    {closed ? <div className="enrollment-closed" role="status"><Clock size={20} aria-hidden="true" /><p><strong>{t("elearning.enrollment.opensSoon")}</strong> {t("elearning.enrollment.opensSoonHelp")}</p></div> : data.authenticated && testPayments(account) && <TestModeBanner />}
+    {error && <LearningErrorNotice as="p">{t(error.unavailable || error.detail?.code === "enrollment_not_open" ? "elearning.enrollment.opensSoon" : "elearning.commerce.error")}</LearningErrorNotice>}
+    {checkout ? <EnrollmentCheckout checkout={checkout} local={local} testMode={testPayments(account)} referralCode={account?.referral_code} courseId={checkout.requested_resource_id || course?.id} onClose={() => setCheckout(null)} />
+      : data.plans.length ? <PlanCards data={data} buy={buy} busy={busy || (data.authenticated && availability === "loading")} available={availability === "available"} closed={closed} /> : <p>{t("elearning.academy.noPlans")}</p>}</>;
   return <>{!course && <h1>{t("elearning.academy.chooseAccess")}</h1>}{data.plans.length > 0 && <LearningErrorNotice as="p" role={availability === "error" ? "alert" : "status"}>{t(!data.authenticated || availability === "unavailable" ? "elearning.commerce.providerUnavailable" : availability === "available" ? notice : availability === "error" ? "elearning.commerce.error" : "elearning.loading")}</LearningErrorNotice>}{availability === "error" && <button type="button" onClick={() => { setAvailability("loading"); setAvailabilityRevision(value => value + 1); }}>{t("elearning.retry")}</button>}{error && <LearningErrorNotice as="p">{t(error.unavailable ? "elearning.commerce.providerUnavailable" : "elearning.commerce.error")}</LearningErrorNotice>}{checkout ? <Checkout checkout={checkout} local={local} onClose={() => setCheckout(null)} onChange={() => { setCheckout(null); refresh(); if (course) navigate(`/my-learning/courses/${course.id}`); else navigate("/my-learning/plans"); }} /> : data.plans.length ? <PlanCards data={data} buy={buy} busy={busy || (data.authenticated && availability === "loading")} available={availability === "available"} /> : <p>{t("elearning.academy.noPlans")}</p>}</>;
 }
 function AcademyLogin({ data }) {

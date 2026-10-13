@@ -563,7 +563,20 @@ to My Plans, which confirms the payment and opens the purchased course. In test 
 card `4242 4242 4242 4242` with any future expiry and CVC succeeds without a charge.
 Monthly/yearly plans are refused online until subscription billing is implemented.
 The explicit local commerce simulator creates no payable academy rewards or
-qualifying Tuition Support sales.
+qualifying Tuition Support sales. It is the dummy adapter
+(`services/dummy_payment_provider.py`, provider `local_test`) behind the same
+`PaymentProvider` interface: configured only with `APP_ENV=development` against
+the loopback development database, it never accepts webhooks and every outcome
+(paid, failed, cancelled, refunded) is built from server-held checkout terms. In
+production it is never configured, so it cannot unlock a course or create a
+reward or withdrawal.
+
+An academy can opt in to live-only enrollment with
+`academyExperience.liveEnrollmentOnly` in its published website. In production
+its checkout then opens only with a live provider: without one, or with a
+provider in test mode, plans show "Enrollment opens soon" and `POST
+/elearning/checkout` returns 409 `enrollment_not_open` before any order exists.
+Other academies are unaffected.
 
 A destructive-data-free SQL rehearsal creates and removes a marked disposable
 localhost database, validates fresh history and transactional rollback, and runs

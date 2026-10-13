@@ -2098,7 +2098,40 @@
       "help_under_review": "Your Affiliate application is under review. Your referral link will appear here after approval.",
       "help_approved": "Your Affiliate account is active.",
       "help_not_approved": "Your Affiliate application was not approved. You can apply again.",
-      "help_suspended": "Your Affiliate account is suspended, so your referral link is not active. Contact EduHope through the Contact page for help."
+      "help_suspended": "Your Affiliate account is suspended, so your referral link is not active. Contact EduHope through the Contact page for help.",
+      "sale_signup": "Signed up — no purchase yet",
+      "sale_purchased": "Purchased",
+      "sale_refunded": "Refunded"
+    },
+    "enrollment": {
+      "testMode": "TEST MODE — no real payment is taken",
+      "opensSoon": "Enrollment opens soon",
+      "opensSoonHelp": "You can create your account now. Buying the course will open here as soon as payments are switched on.",
+      "orderSummary": "Order summary",
+      "item": "Course",
+      "price": "Price",
+      "payment": "Payment",
+      "oneTime": "One-time payment",
+      "access": "Access",
+      "lifetime": "Lifetime access",
+      "referralCode": "Referral code",
+      "noReferral": "None",
+      "state_processing": "Processing",
+      "state_confirmed": "Confirmed",
+      "state_failed": "Failed",
+      "state_cancelled": "Cancelled",
+      "state_refunded": "Refunded",
+      "help_processing": "We are waiting for the payment to be confirmed.",
+      "help_confirmed": "Your payment is confirmed and your course is unlocked.",
+      "help_failed": "The payment did not go through and no money was taken. You can try again.",
+      "help_cancelled": "This payment was cancelled. Nothing was charged.",
+      "help_refunded": "This payment was refunded, so course access has been removed.",
+      "startLearning": "Start learning",
+      "referralReady": "Your referral link is ready",
+      "testPay": "Confirm test payment",
+      "testFail": "Simulate a failed payment",
+      "testRefund": "Simulate a refund",
+      "close": "Close"
     }
   }
 }

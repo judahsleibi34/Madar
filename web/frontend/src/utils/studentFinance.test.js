@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { pendingRewards, referralView, shareTargets, tuitionProgress, walletHistory, withdrawState } from "./studentFinance";
+import { pendingRewards, referralState, referralView, shareTargets, tuitionProgress, walletHistory, withdrawState } from "./studentFinance";
 
 describe("referralView", () => {
   it("shows a link only when the backend issued a code", () => {
@@ -21,24 +21,27 @@ describe("tuitionProgress", () => {
 });
 
 describe("wallet", () => {
-  const referrals = { referred_count: 4, history: [
+  const referrals = { referred_count: 5, history: [
     { id: "r1", amount: "10", currency: "USD", status: "earned", created_at: "2026-01-01", earned_at: "2026-01-02" },
     { id: "r2", amount: "10", currency: "USD", status: "pending", created_at: "2026-01-03" },
     { id: "r3", amount: "10", currency: "USD", status: "reversed", created_at: "2026-01-01", reversed_at: "2026-01-04" },
     { id: "r4", amount: "10", currency: "USD", status: "earned", created_at: "2026-01-01", earned_at: "2026-01-05", simulated: true },
+    { id: "r5", amount: "10", currency: "USD", status: "pending", reward_status: "pending", created_at: "2026-01-06" },
   ] };
-  it("only counts pending, real rewards as pending", () => {
+  it("never treats a sign-up without a purchase as money", () => {
+    expect(referralState({ status: "pending" })).toEqual({ signup: true, reward: null });
+    expect(referralState({ status: "earned" })).toEqual({ signup: false, reward: "available" });
     expect(pendingRewards(referrals)).toBe(10);
-    expect(pendingRewards({ history: [{ status: "pending", amount: 10, simulated: true }] })).toBe(0);
+    expect(pendingRewards({ history: [{ status: "pending", amount: 10 }] })).toBe(0);
   });
   it("lists rewards and withdrawals newest first with the available balance after each", () => {
-    const rows = walletHistory(referrals, [{ id: "w1", amount: "5", currency: "USD", status: "paid", created_at: "2026-01-06" }, { id: "w2", amount: "3", currency: "USD", status: "rejected", created_at: "2026-01-07" }]);
+    const rows = walletHistory(referrals, [{ id: "w1", amount: "5", currency: "USD", status: "paid", created_at: "2026-01-07" }, { id: "w2", amount: "3", currency: "USD", status: "rejected", created_at: "2026-01-08" }]);
     expect(rows.map(row => [row.id, row.status, row.amount, row.balanceAfter])).toEqual([
       ["withdrawal:w2", "rejected", -3, 5],
       ["withdrawal:w1", "paid", -5, 5],
+      ["reward:r5", "pending", 10, 10],
       ["reward:r4", "available", 10, 10],
       ["reward:r3", "reversed", 10, 10],
-      ["reward:r2", "pending", 10, 10],
       ["reward:r1", "available", 10, 10],
     ]);
   });

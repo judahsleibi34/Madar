@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { openCheckout, paymentNotice, paymentsAvailable } from "./learningPayments";
+import { checkoutStatus, enrollmentClosed, openCheckout, paymentNotice, paymentsAvailable } from "./learningPayments";
 
 describe("learning payments", () => {
   afterEach(() => vi.unstubAllGlobals());
@@ -28,5 +28,16 @@ describe("learning payments", () => {
     expect(paymentNotice({ local_adapter: true })).toBe("elearning.commerce.localOnly");
     expect(paymentNotice({ payments_test_mode: true })).toBe("elearning.commerce.testMode");
     expect(paymentNotice({ payments_available: true })).toBe("elearning.commerce.securePayment");
+  });
+
+  it("closes enrollment for opt-in academies without a live provider", () => {
+    expect(enrollmentClosed({ enrollment_gate: true, enrollment_open: false, payments_available: true })).toBe(true);
+    expect(paymentsAvailable({ enrollment_gate: true, enrollment_open: false, payments_available: true, payments_test_mode: true })).toBe(false);
+    expect(paymentsAvailable({ enrollment_gate: true, enrollment_open: true, payments_available: true })).toBe(true);
+    expect(enrollmentClosed({ payments_available: true, payments_test_mode: true })).toBe(false);
+  });
+
+  it("maps checkout states to the document's payment states", () => {
+    expect(["pending", "paid", "failed", "cancelled", "refunded", "reversed"].map(checkoutStatus)).toEqual(["processing", "confirmed", "failed", "cancelled", "refunded", "refunded"]);
   });
 });
