@@ -2070,7 +2070,8 @@
       "withdrawalSubmitted": "Withdrawal request submitted.",
       "withdrawalHistory": "Withdrawal History",
       "withdrawalLine": "Withdrawal #{{reference}} — {{amount}}",
-      "noWithdrawals": "No withdrawals yet."
+      "noWithdrawals": "No withdrawals yet.",
+      "referralClicks": "Referral clicks"
     },
     "affiliateArea": {
       "title": "Affiliate Dashboard",
@@ -2083,7 +2084,7 @@
       "profile": "Profile",
       "totalClicks": "Total Clicks",
       "successfulSales": "Successful Sales",
-      "clicksPending": "Click counts will appear here once click tracking is switched on.",
+      "clicksPending": "Click counts are not available right now.",
       "salesIntro": "Only valid, verified direct course purchases count.",
       "noSales": "No referred purchases yet.",
       "column_sale": "Sale",
@@ -2101,7 +2102,8 @@
       "help_suspended": "Your Affiliate account is suspended, so your referral link is not active. Contact EduHope through the Contact page for help.",
       "sale_signup": "Signed up — no purchase yet",
       "sale_purchased": "Purchased",
-      "sale_refunded": "Refunded"
+      "sale_refunded": "Refunded",
+      "clicksIntro": "How many times your referral link was opened."
     },
     "enrollment": {
       "testMode": "TEST MODE — no real payment is taken",

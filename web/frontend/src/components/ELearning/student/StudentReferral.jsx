@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { Award, Check, Copy, Mail, MessageCircle, Send, Share2, ShoppingCart, Wallet } from "lucide-react";
+import { Award, Check, Copy, Mail, MessageCircle, MousePointerClick, Send, Share2, ShoppingCart, Wallet } from "lucide-react";
 import { formatMoney, latestAffiliate, pendingRewards, referralView, shareTargets, tuitionProgress } from "../../../utils/studentFinance";
 import ELearningSkeleton from "../ELearningSkeleton";
 import LearningErrorNotice from "../LearningErrorNotice";
@@ -79,6 +79,7 @@ export default function StudentReferral() {
   return <StudentPage title={t("elearning.student.myReferral")} intro={t("elearning.student.referralIntro", { reward: money(referrals.reward_amount) })}>
     <ReferralLink referrals={referrals} academy={academy} />
     <div className="stat-grid">
+      {referrals.clicks != null && <StatCard icon={MousePointerClick} label={t("elearning.student.referralClicks")} value={Number(referrals.clicks).toLocaleString(i18n.language)} />}
       <StatCard icon={ShoppingCart} label={t("elearning.student.successfulCourseSales")} value={String(tuitionProgress(wallet).sales)} />
       <StatCard icon={Wallet} label={t("elearning.student.pendingRewards")} value={money(pendingRewards(referrals))} />
       <StatCard icon={Wallet} label={t("elearning.student.availableRewards")} value={money(wallet?.available)} to="/my-learning/wallet" />

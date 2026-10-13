@@ -32,7 +32,7 @@ function Overview({ data }) {
   return <StudentPage title={t("elearning.affiliateArea.title")} intro={t("elearning.affiliateArea.intro")}>
     <StatusPill status="approved">{t("elearning.affiliateArea.status_approved")}</StatusPill>
     <div className="stat-grid">
-      <StatCard icon={MousePointerClick} label={t("elearning.affiliateArea.totalClicks")} value="—" detail={t("elearning.affiliateArea.clicksPending")} />
+      <StatCard icon={MousePointerClick} label={t("elearning.affiliateArea.totalClicks")} value={data.referrals?.clicks == null ? "—" : Number(data.referrals.clicks).toLocaleString(i18n.language)} detail={data.referrals?.clicks == null ? t("elearning.affiliateArea.clicksPending") : undefined} to="/my-learning/affiliate/clicks" />
       <StatCard icon={ShoppingCart} label={t("elearning.affiliateArea.successfulSales")} value={String(Number(wallet?.verified_sales) || 0)} to="/my-learning/affiliate/sales" />
       <StatCard icon={Clock} label={t("elearning.student.pendingRewards")} value={money(pendingRewards(data.referrals))} to="/my-learning/affiliate/rewards" />
       <StatCard icon={Wallet} label={t("elearning.student.availableBalance")} value={money(wallet?.available)} to="/my-learning/affiliate/wallet" />
@@ -61,6 +61,18 @@ function ReferralRows({ data, rewards }) {
       </tr>;
     })}</tbody>
   </table></div>;
+}
+
+/** Clicks on the affiliate's link and how many became successful sales. */
+function Clicks({ data }) {
+  const { t, i18n } = useTranslation("dashboard");
+  const clicks = data.referrals?.clicks, sales = Number(data.programmes?.wallet?.verified_sales) || 0;
+  return <StudentPage title={t("elearning.affiliateArea.clicks")} intro={t("elearning.affiliateArea.clicksIntro")}>
+    {clicks == null ? <section className="student-panel"><p>{t("elearning.affiliateArea.clicksPending")}</p></section> : <div className="stat-grid">
+      <StatCard icon={MousePointerClick} label={t("elearning.affiliateArea.totalClicks")} value={Number(clicks).toLocaleString(i18n.language)} />
+      <StatCard icon={ShoppingCart} label={t("elearning.affiliateArea.successfulSales")} value={sales.toLocaleString(i18n.language)} />
+    </div>}
+  </StudentPage>;
 }
 
 /** Affiliate profile: account details only (no course list). */
@@ -97,7 +109,7 @@ export default function AffiliateArea() {
     <Route index element={gated(<Overview data={data} />)} />
     <Route path="application" element={<AcademyProgrammesPage key="affiliate-application" affiliateOnly />} />
     <Route path="link" element={gated(<StudentPage title={t("elearning.affiliateArea.referralLink")}><ReferralLink referrals={data.referrals} academy={academy} /></StudentPage>)} />
-    <Route path="clicks" element={gated(<StudentPage title={t("elearning.affiliateArea.clicks")}><section className="student-panel"><p>{t("elearning.affiliateArea.clicksPending")}</p></section></StudentPage>)} />
+    <Route path="clicks" element={gated(<Clicks data={data} />)} />
     <Route path="sales" element={gated(<StudentPage title={t("elearning.affiliateArea.sales")} intro={t("elearning.affiliateArea.salesIntro")}><section className="student-panel"><ReferralRows data={data} /></section></StudentPage>)} />
     <Route path="rewards" element={gated(<StudentPage title={t("elearning.affiliateArea.rewards")} intro={t("elearning.student.rewardRules")}><section className="student-panel"><ReferralRows data={data} rewards /></section></StudentPage>)} />
     <Route path="wallet" element={gated(<StudentWallet />)} />

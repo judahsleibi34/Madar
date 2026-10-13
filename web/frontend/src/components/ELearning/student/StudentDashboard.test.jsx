@@ -95,13 +95,14 @@ it("leaves every other academy on the existing learner screens", async () => {
   expect(screen.queryByLabelText("Your referral link")).toBeNull();
 });
 
-const affiliateReferrals = { available: true, enabled: true, code: "AFF123", reward_amount: "10", currency: "USD", history: [{ id: "r1", amount: "10", currency: "USD", status: "pending", created_at: "2026-10-01" }], balances: [], referred_count: 1 };
+const affiliateReferrals = { available: true, enabled: true, code: "AFF123", clicks: 37, reward_amount: "10", currency: "USD", history: [{ id: "r1", amount: "10", currency: "USD", status: "pending", created_at: "2026-10-01" }], balances: [], referred_count: 1 };
 const asAffiliate = (status, referrals = affiliateReferrals) => setup({ courses: [], referrals, programme: account({ applications: [{ id: "a", kind: "affiliate", status, created_at: "2026-01-01" }] }) });
 
 it("gives approved affiliates their own dashboard without course or Tuition Support", async () => {
   asAffiliate("approved");
   const { container } = page("/my-learning/dashboard");
   await screen.findByText("Total Clicks");
+  expect(screen.getByText("37")).toBeTruthy();
   const nav = container.querySelector("#learning-navigation nav").textContent;
   for (const label of ["Referral Link", "Clicks", "Sales", "Rewards", "Wallet", "Withdraw", "Transactions", "Notifications", "Profile"]) expect(nav).toContain(label);
   expect(nav).not.toContain("My Course");

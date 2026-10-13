@@ -1,7 +1,11 @@
 {
+  "elearning.affiliateArea.clicksIntro": {
+    "en": "How many times your referral link was opened.",
+    "ar": "عدد المرات التي فُتح فيها رابط الإحالة الخاص بك."
+  },
   "elearning.affiliateArea.clicksPending": {
-    "en": "Click counts will appear here once click tracking is switched on.",
-    "ar": "ستظهر أعداد النقرات هنا بعد تفعيل تتبّع النقرات."
+    "en": "Click counts are not available right now.",
+    "ar": "أعداد النقرات غير متاحة حاليًا."
   },
   "elearning.affiliateArea.help_approved": {
     "en": "Your Affiliate account is active.",

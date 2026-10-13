@@ -2074,7 +2074,8 @@
       "topicCount_two": "موضوعان",
       "topicCount_few": "{{count}} موضوعات",
       "topicCount_many": "{{count}} موضوعًا",
-      "topicCount_other": "{{count}} موضوع"
+      "topicCount_other": "{{count}} موضوع",
+      "referralClicks": "نقرات الإحالة"
     },
     "affiliateArea": {
       "title": "لوحة المسوّق بالعمولة",
@@ -2087,7 +2088,7 @@
       "profile": "الملف الشخصي",
       "totalClicks": "إجمالي النقرات",
       "successfulSales": "المبيعات الناجحة",
-      "clicksPending": "ستظهر أعداد النقرات هنا بعد تفعيل تتبّع النقرات.",
+      "clicksPending": "أعداد النقرات غير متاحة حاليًا.",
       "salesIntro": "تُحتسب فقط عمليات الشراء المباشرة الصحيحة التي تم التحقق منها.",
       "noSales": "لا توجد عمليات شراء عبر الإحالة بعد.",
       "column_sale": "عملية البيع",
@@ -2105,7 +2106,8 @@
       "help_suspended": "حساب المسوّق بالعمولة الخاص بك موقوف، لذا فإن رابط الإحالة غير مفعّل. تواصل مع EduHope عبر صفحة التواصل للمساعدة.",
       "sale_signup": "سجّل — لم يشترِ بعد",
       "sale_purchased": "تم الشراء",
-      "sale_refunded": "مسترد"
+      "sale_refunded": "مسترد",
+      "clicksIntro": "عدد المرات التي فُتح فيها رابط الإحالة الخاص بك."
     },
     "enrollment": {
       "testMode": "وضع الاختبار — لا يتم تحصيل أي دفعة حقيقية",
