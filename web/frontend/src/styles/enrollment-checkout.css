@@ -1,7 +1,7 @@
 /* EduHope checkout: order summary, test-mode banner, payment states (icon + text). */
 .enrollment-checkout { display:grid; grid-template-columns:minmax(0,1fr); gap:14px; max-width:640px; padding:20px; border:1px solid var(--theme-border,#D9E3DF); border-radius:16px; background:var(--theme-surface,#fff); }
 .enrollment-checkout h2 { margin:0; font-size:20px; }
-.enrollment-test-banner { display:flex; align-items:center; gap:8px; margin:0; padding:10px 14px; border:2px dashed #B45309; border-radius:12px; background:#FEF3C7; color:#7C2D12; font-weight:800; letter-spacing:.02em; }
+.enrollment-test-banner { display:flex; align-items:center; gap:8px; margin:0; padding:10px 14px; border:2px dashed #B45309; border-radius:12px; background:color-mix(in srgb,var(--theme-warning) 18%,var(--theme-surface)); color:#7C2D12; font-weight:800; letter-spacing:.02em; }
 .enrollment-test-banner svg { flex:none; }
 .enrollment-summary { display:grid; gap:0; margin:0; }
 .enrollment-summary div { display:flex; flex-wrap:wrap; justify-content:space-between; gap:8px; padding:10px 0; border-bottom:1px solid var(--theme-border,#D9E3DF); }
@@ -9,13 +9,13 @@
 .enrollment-summary dd { margin:0; font-weight:750; overflow-wrap:anywhere; }
 .enrollment-status { display:flex; align-items:flex-start; gap:10px; margin:0; padding:12px 14px; border-radius:12px; line-height:1.5; }
 .enrollment-status svg { flex:none; margin-top:2px; }
-.enrollment-status.is-processing { background:#DBEAFE; color:#1E3A8A; }
-.enrollment-status.is-confirmed { background:#DCFCE7; color:#14532D; }
-.enrollment-status.is-failed, .enrollment-status.is-cancelled { background:#FEE2E2; color:#7F1D1D; }
-.enrollment-status.is-refunded { background:#F3F4F6; color:#1F2937; }
+.enrollment-status.is-processing { background:color-mix(in srgb,var(--theme-info) 16%,var(--theme-surface)); color:#1E3A8A; }
+.enrollment-status.is-confirmed { background:color-mix(in srgb,var(--theme-success) 16%,var(--theme-surface)); color:#14532D; }
+.enrollment-status.is-failed, .enrollment-status.is-cancelled { background:color-mix(in srgb,var(--theme-danger) 15%,var(--theme-surface)); color:#7F1D1D; }
+.enrollment-status.is-refunded { background:color-mix(in srgb,var(--theme-border) 48%,var(--theme-surface)); color:#1F2937; }
 .enrollment-actions { display:flex; flex-wrap:wrap; gap:10px; }
 .enrollment-actions > * { min-height:48px; }
-.enrollment-closed { display:flex; align-items:flex-start; gap:10px; padding:14px 16px; border-radius:14px; background:#FEF3C7; color:#7C2D12; line-height:1.6; }
+.enrollment-closed { display:flex; align-items:flex-start; gap:10px; padding:14px 16px; border-radius:14px; background:color-mix(in srgb,var(--theme-warning) 18%,var(--theme-surface)); color:#7C2D12; line-height:1.6; }
 .enrollment-closed svg { flex:none; margin-top:3px; }
 .enrollment-closed p { margin:0; }
 @media (max-width:520px) { .enrollment-checkout { padding:16px; } .enrollment-actions > * { flex:1 1 100%; justify-content:center; } }
