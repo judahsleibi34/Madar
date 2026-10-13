@@ -55,6 +55,7 @@ it("uses Listen & Match only for opted-in academies and submits the practice res
   checkPracticeAnswer.mockResolvedValue({ correct: true });
   submitAssessment.mockResolvedValue({ assessment: { title: "Listen and match", activity_mode: "practice" }, attempt: { ...attempt, status: "submitted" }, summary: { attempts: 1 } });
   render(<LearningExperienceContext.Provider value={{ lessonComponents: true }}><AssessmentBlockRenderer block={block} context="learner" courseId="c" lessonId="l" /></LearningExperienceContext.Provider>);
+  expect(screen.queryByText(/Unlimited/)).toBeNull();
   fireEvent.click((await screen.findAllByRole("button", { name: /^Picture \d/ }))[1]);
   fireEvent.click(await screen.findByRole("button", { name: "CONTINUE" }));
   fireEvent.click((await screen.findAllByRole("button", { name: /^Picture \d/ }))[2]);

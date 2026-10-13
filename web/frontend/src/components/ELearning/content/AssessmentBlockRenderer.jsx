@@ -40,7 +40,11 @@ export default function AssessmentBlockRenderer({ block, context = "author", cou
   const finish = result => { if (result.total) setListenResult(result); run(true, result.answers); };
   return <div className="assessment-runtime" aria-busy={busy}>
     <h3>{assessment?.title}</h3><p>{attempt?.instructions ?? assessment?.instructions}</p>
-    <p>{t("elearning.assessment.questionCount", { count: assessment?.question_count || data?.questions?.length || 0 })} · {practice ? t("elearning.assessment.practice") : `${t("elearning.assessment.passing")}: ${attempt?.passing_score ?? assessment?.passing_score}%`} · {t("elearning.assessment.maxAttempts")}: {assessment?.max_attempts ?? t("elearning.assessment.unlimited")}</p>
+    <p>
+      {t("elearning.assessment.questionCount", { count: assessment?.question_count || data?.questions?.length || 0 })} · {practice
+        ? t("elearning.assessment.practice")
+        : <>{t("elearning.assessment.passing")}: {attempt?.passing_score ?? assessment?.passing_score}% · {t("elearning.assessment.maxAttempts")}: {assessment?.max_attempts ?? t("elearning.assessment.unlimited")}</>}
+    </p>
     {error && <LearningErrorNotice as="p">{error} <button type="button" onClick={() => { setError(""); setReload(n => n + 1); }}>{t("elearning.retry")}</button></LearningErrorNotice>}
     {context === "preview" && data && <AssessmentQuestions questions={data.questions} answers={answers} onChange={(id, value) => setAnswers(previous => ({ ...previous, [id]: value }))} />}
     {context === "learner" && data && <>
