@@ -29,6 +29,16 @@ from deployment.lib.runtime_authority import (  # noqa: E402
 
 PORTS = {"blue": (8101, 3100), "green": (8201, 3200)}
 
+def verify_completed_identity(contract,slot,identity):
+    from deployment.lib.completed_normal_profile import profile
+    selected=profile(contract)
+    if (slot!=contract['candidate']['slot'] or identity.get('release_slot')!=slot
+            or identity.get('release_sha')!=contract['candidate']['source_sha']
+            or identity.get('schema_compatible_min')!=selected.minimum
+            or identity.get('schema_compatible_max')!=selected.target
+            or tuple(identity.get('schema_excluded_versions') or ())!=selected.excluded):
+        raise RuntimeError('completed_normal_traffic_identity_changed')
+
 
 def _read_json(url: str) -> dict:
     with urllib.request.urlopen(url, timeout=5) as response:
@@ -130,9 +140,7 @@ def _switch_locked(slot: str) -> int:
             from deployment.lib.completed_normal_resources import verify_runtime_binding
             from deployment.lib.emergency_routing_repair import Runtime
             contract=require_admission(state_root,expected_sha)
-            if (slot!=contract['candidate']['slot'] or expected_identity.get('release_slot')!=slot
-                    or expected_identity.get('schema_compatible_min')!=115 or expected_identity.get('schema_compatible_max')!=136):
-                raise RuntimeError('completed_normal_traffic_identity_changed')
+            verify_completed_identity(contract,slot,expected_identity)
             require_candidate_authority(contract,mode='READ_ONLY')
             publication=credential_witness('candidate_runtime','candidate_runtime_sha256')
             rows=verify_runtime_binding(contract,publication,Runtime(),state_root)
