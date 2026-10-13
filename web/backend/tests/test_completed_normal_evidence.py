@@ -40,7 +40,8 @@ class EvidenceTests(unittest.TestCase):
                 'com.madar.release.built_at':'fixture-time','com.madar.frontend.api_origin':'/api'}
             return json.dumps([{'Id':self.images[role],'Config':{'Labels':labels}}])
         self.actor=SimpleNamespace(document=self.document,
-            contract={'candidate':{'source_sha':self.source,'images':self.images}},runtime=SimpleNamespace(command=inspect))
+            contract={'operation':'completed-normal-schema115-136-upgrade','version':1,
+                'candidate':{'source_sha':self.source,'images':self.images}},runtime=SimpleNamespace(command=inspect))
         p=patch.object(m,'readonly_configuration',lambda p,**kw:p);p.start();self.addCleanup(p.stop)
 
     def rebind(self):

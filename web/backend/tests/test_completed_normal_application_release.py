@@ -32,7 +32,8 @@ class ApplicationContractTests(unittest.TestCase):
         self.assertEqual((APPLICATION.source,APPLICATION.target,APPLICATION.minimum),(144,144,136))
         self.assertTrue(APPLICATION.supports(144))
         for schema in (136,142,143,145,True):self.assertFalse(APPLICATION.supports(schema))
-        metadata=Path(__file__).resolve().parents[2]/'deployment/releases'/APPLICATION.metadata
+        from test_completed_normal_compose import WEB
+        metadata=WEB/'deployment/releases'/APPLICATION.metadata
         loaded=Compatibility.load(metadata)
         self.assertEqual(loaded.migration_class,'none')
         self.assertTrue(loaded.accepts_schema(144));self.assertFalse(loaded.accepts_schema(142))
