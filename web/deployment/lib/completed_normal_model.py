@@ -127,7 +127,7 @@ def render_candidate_model(actor, *, read_only=False):
     contract=actor.contract;sha=contract['candidate']['source_sha'];slot=contract['candidate']['slot']
     selected=profile(actor.contract)
     compatibility=module.Compatibility.load(source/'web/deployment/releases'/selected.metadata)
-    if ((compatibility.schema_min,compatibility.schema_max,compatibility.target_schema)!=(selected.source,selected.target,selected.target)
+    if ((compatibility.schema_min,compatibility.schema_max,compatibility.target_schema)!=(selected.minimum,selected.target,selected.target)
             or compatibility.excluded_schemas!=selected.excluded):
         raise RuntimeError('completed_model_loader_schema_contract_changed')
     cfg=actor.document['application_artifacts']
