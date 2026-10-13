@@ -8,7 +8,10 @@ import { ELearningTerminologyContext } from "../../context/ELearningTerminologyC
 import { getELearningTerminology } from "../../config/elearningTerminology";
 import { useELearningTerminology } from "../../hooks/useELearningTerminology";
 import { fetchLearningAccountContext, fetchMyLearning, fetchLearningCourse, fetchLearningLesson, completeLearningLesson } from "../../services/elearningPlayer";
-import { LearningExperienceContext } from "./LearningExperienceContext";
+import { LearningExperienceContext, useLearningExperience } from "./LearningExperienceContext";
+import LessonStepTracker from "./content/LessonStepTracker";
+import { assembleLessonSteps, stepAnchor } from "../../utils/lessonSteps";
+import { CircleDot, Circle } from "lucide-react";
 import { getApiUrl } from "../../utils/apiClient";
 import ELearningSkeleton from "./ELearningSkeleton";
 import ContentBlockRenderer from "./content/ContentBlockRenderer";
@@ -116,6 +119,7 @@ function CoursePlayer({ courseId, lessonId, placementId }) {
   const [busy, setBusy] = useState(false);
   const [saveError, setSaveError] = useState(null);
   const [outlineOpen, setOutlineOpen] = useState(false);
+  const enhanced = useLearningExperience().lessonComponents === true;
   const outlineRef = useRef(null);
   const closeOutline = useCallback(() => setOutlineOpen(false), []);
   useLearningDrawer(outlineOpen, outlineRef, closeOutline);
@@ -140,11 +144,12 @@ function CoursePlayer({ courseId, lessonId, placementId }) {
     {!lessonId && !placementId && <section className="ecommerce-list-card elearning-course-resume" aria-label={t("elearning.player.openCourse")}><div><h2>{t("elearning.player.continue")}</h2><p>{t("elearning.player.overviewHelp")}</p></div><Continue data={data} /></section>}
     <div className={`elearning-player-layout${lessonId || placementId ? " has-lesson" : ""}`}>
       <aside ref={outlineRef} tabIndex={-1} role={outlineOpen ? "dialog" : undefined} aria-modal={outlineOpen || undefined} id="course-learning-outline" className={`ecommerce-list-card elearning-player-outline${outlineOpen ? " is-open" : ""}`} aria-label={t("elearning.player.outline")}><button className="elearning-outline-close ecommerce-secondary-button" onClick={closeOutline}>{t("elearning.learner.closeMenu")}</button><h2>{t("elearning.player.outline")}</h2>{lessons.some(lesson => lesson.locked) && <p className="elearning-outline-help">{t("elearning.player.lockedHelp")}</p>}
-        {data.sections.map((section) => <section key={section.id}><h3>{section.name} <small>{section.progress_percent}%</small></h3><span className="elearning-player-label">{labels.section}</span><ol>{section.lessons.map((lesson) => <li key={lesson.id} className={`${lesson.id === lessonId ? "is-current" : ""}${lesson.locked ? " is-locked" : ""}`}>{lesson.completed ? <CheckCircle2 size={17} aria-label={t("elearning.player.completed")} /> : lesson.locked ? <Lock size={17} aria-label={t("elearning.player.locked")} /> : <span aria-hidden="true">○</span>}{lesson.locked ? <span>{lesson.name}<small className="elearning-lesson-state">{t("elearning.player.locked")}</small></span> : <Link aria-current={lesson.id === lessonId ? "page" : undefined} to={lessonPath(courseId, lesson.id)}>{lesson.name}</Link>}</li>)}</ol>{section.completion && <small>{t(`elearning.placements.${section.completion.completed ? "sectionComplete" : "sectionIncomplete"}`, { label: labels.section })}</small>}<AssessmentOutline assessments={section.assessments || []} courseId={courseId} placementId={placementId} /></section>)}<AssessmentOutline assessments={data.assessments || []} courseId={courseId} placementId={placementId} />
+        {data.sections.map((section) => <section key={section.id}><h3>{section.name} <small>{section.progress_percent}%</small></h3><span className="elearning-player-label">{labels.section}</span><ol>{section.lessons.map((lesson) => <li key={lesson.id} className={`${lesson.id === lessonId ? "is-current" : ""}${lesson.locked ? " is-locked" : ""}`}>{enhanced ? <TopicStatus lesson={lesson} current={lesson.id === (lessonId || data.continue_lesson_id)} /> : lesson.completed ? <CheckCircle2 size={17} aria-label={t("elearning.player.completed")} /> : lesson.locked ? <Lock size={17} aria-label={t("elearning.player.locked")} /> : <span aria-hidden="true">○</span>}{lesson.locked ? <span>{lesson.name}{!enhanced && <small className="elearning-lesson-state">{t("elearning.player.locked")}</small>}</span> : <Link aria-current={lesson.id === lessonId ? "page" : undefined} to={lessonPath(courseId, lesson.id)}>{lesson.name}</Link>}</li>)}</ol>{section.completion && <small>{t(`elearning.placements.${section.completion.completed ? "sectionComplete" : "sectionIncomplete"}`, { label: labels.section })}</small>}<AssessmentOutline assessments={section.assessments || []} courseId={courseId} placementId={placementId} /></section>)}<AssessmentOutline assessments={data.assessments || []} courseId={courseId} placementId={placementId} />
       </aside>
       {selectedAssessment && <article className="elearning-player-reading">{selectedAssessment.locked ? <p role="status">{t("elearning.placements.lockedHelp")}</p> : <ContentBlockRenderer key={placementId} block={{ id: placementId, type: "assessment", assessment: selectedAssessment }} context="learner" courseId={courseId} onAssessmentChange={async () => state.setState({ data: await fetchLearningCourse(courseId) })} />}<footer className="elearning-assessment-actions"><Link className="ecommerce-secondary-button" to={coursePath(courseId)}>{t("elearning.placements.backCourse", { label: labels.course })}</Link>{selectedAssessment.passed && (data.continue_lesson_id || (data.continue_assessment_id && data.continue_assessment_id !== placementId)) && <Continue data={data} currentAssessment={placementId} />}</footer></article>}
       {data.lesson && <article className="elearning-player-reading" aria-label={t("elearning.content.context", { label: labels.lesson })}>
-        <div className="elearning-player-blocks">{data.blocks.map((block) => <ContentBlockRenderer key={block.id} block={block} context="learner" courseId={courseId} lessonId={lessonId} onAssessmentChange={async () => state.setState({ data: await fetchLearningLesson(courseId, lessonId) })} />)}{!data.blocks.length && <p>{t("elearning.player.emptyLesson")}</p>}</div>
+        {enhanced && data.blocks.length > 0 ? <TopicLesson data={data} courseId={courseId} lessonId={lessonId} onAssessmentChange={async () => state.setState({ data: await fetchLearningLesson(courseId, lessonId) })} />
+        : <div className="elearning-player-blocks">{data.blocks.map((block) => <ContentBlockRenderer key={block.id} block={block} context="learner" courseId={courseId} lessonId={lessonId} onAssessmentChange={async () => state.setState({ data: await fetchLearningLesson(courseId, lessonId) })} />)}{!data.blocks.length && <p>{t("elearning.player.emptyLesson")}</p>}</div>}
         {saveError && <ErrorState error={saveError} retry={complete} />}
         {!data.lesson.completed && data.assessment_requirements?.some(requirement => !requirement.passed) && <p role="status">{t("elearning.assessment.completionBlocked", { lesson: labels.lesson })}</p>}
         <footer className="ecommerce-list-card elearning-player-lesson-actions"><div className="elearning-content-toolbar">{previous && !previous.locked && <Link className="ecommerce-secondary-button" to={lessonPath(courseId, previous.id)}>{t("elearning.player.previous", { label: labels.lesson })}</Link>}{next && (next.locked ? <span className="elearning-course-status">{t("elearning.player.nextLocked", { label: labels.lesson })}</span> : <Link className={data.lesson.completed ? "ecommerce-primary-button" : "ecommerce-secondary-button"} to={lessonPath(courseId, next.id)}>{t("elearning.player.next", { label: labels.lesson })}</Link>)}</div>
@@ -153,6 +158,32 @@ function CoursePlayer({ courseId, lessonId, placementId }) {
       </article>}
     </div>
   </>;
+}
+
+// EH / Topic Row status: icon + text, never colour alone.
+function TopicStatus({ lesson, current }) {
+  const { t } = useTranslation("dashboard");
+  const status = lesson.completed ? "completed" : lesson.locked ? "locked" : current ? "current" : "available";
+  const Icon = { completed: CheckCircle2, locked: Lock, current: CircleDot, available: Circle }[status];
+  return <span className={`topic-row-status is-${status}`}><Icon size={16} aria-hidden="true" />{t(`elearning.topicStatus.${status}`)}</span>;
+}
+
+// EH / Topic Lesson: the lesson's blocks grouped into the book's topic steps.
+function TopicLesson({ data, courseId, lessonId, onAssessmentChange }) {
+  const { t } = useTranslation("dashboard");
+  const steps = assembleLessonSteps(data.blocks);
+  const passed = new Map((data.assessment_requirements || []).map(item => [item.id, item.passed]));
+  const passedSteps = steps.filter(({ blocks }) => {
+    const required = blocks.filter(block => block.type === "assessment" && passed.has(block.assessment?.id));
+    return required.length > 0 && required.every(block => passed.get(block.assessment.id));
+  }).map(({ step }) => step);
+  return <div className="topic-lesson">
+    <LessonStepTracker steps={steps} passedSteps={passedSteps} />
+    {steps.map(({ step, blocks }, index) => <section key={step} id={stepAnchor(step)} data-step={step} className="topic-lesson-step" aria-labelledby={`${stepAnchor(step)}-title`}>
+      <h2 id={`${stepAnchor(step)}-title`}><span aria-hidden="true">{index + 1}</span>{t(`elearning.lessonSteps.${step}`)}</h2>
+      <div className="elearning-player-blocks">{blocks.map(block => <ContentBlockRenderer key={block.id} block={block} context="learner" courseId={courseId} lessonId={lessonId} onAssessmentChange={onAssessmentChange} />)}</div>
+    </section>)}
+  </div>;
 }
 
 function AssessmentOutline({ assessments, courseId, placementId }) {

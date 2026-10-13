@@ -1870,6 +1870,71 @@
       "photo": "Photo {{number}}",
       "photoDescription": "Photo description (for screen readers; never shown on the picture)",
       "dialogueAudio": "Dialogue recording"
+    },
+    "lessonCards": {
+      "vocabulary": "Vocabulary",
+      "expressions": "Useful Expressions",
+      "speakerTip": "Arabic Speaker Tip",
+      "situation": "Real-Life Situation",
+      "pronunciation": "Pronunciation",
+      "stress": "Stress",
+      "meaning": "Meaning:",
+      "arabic": "Arabic:",
+      "avoid": "Avoid:",
+      "say": "Say:",
+      "kind": "Content type",
+      "item": "Item {{number}}",
+      "addItem": "Add item",
+      "removeItem": "Remove item",
+      "kinds": {
+        "text": "Text",
+        "situation": "Real-Life Situation",
+        "vocabulary": "Vocabulary card",
+        "expressions": "Useful Expressions card",
+        "speaker_tip": "Arabic Speaker Tip"
+      },
+      "fields": {
+        "word": "English word",
+        "meaning": "Simple English meaning",
+        "arabic": "Arabic meaning",
+        "example": "Example sentence",
+        "pronunciation": "Pronunciation support",
+        "stress": "Word stress",
+        "expression": "Expression",
+        "situation": "Situation (English)",
+        "tip": "Tip (English)",
+        "tipArabic": "Explanation in Arabic",
+        "avoid": "Avoid (common mistake)",
+        "say": "Say instead (natural English)"
+      }
+    },
+    "practice": {
+      "bestResponse": "Choose the Best Response",
+      "responses": "Responses",
+      "incorrect": "Not quite. Read the situation again and try another response.",
+      "speakNow": "Speak Now",
+      "speakNote": "Record your answer, listen to it, then continue. Speaking practice is not scored automatically."
+    },
+    "lessonSteps": {
+      "label": "Topic steps",
+      "situation": "Real-Life Situation",
+      "listen": "Listen",
+      "understand": "Understand",
+      "expressions": "Useful Expressions",
+      "vocabulary": "Vocabulary",
+      "listenMatch": "Listen & Match with Pictures",
+      "communication": "Communication Practice",
+      "speak": "Speak Now",
+      "review": "Review",
+      "status_completed": "Completed",
+      "status_current": "Current",
+      "status_next": "Next"
+    },
+    "topicStatus": {
+      "completed": "Completed",
+      "current": "Current",
+      "locked": "Locked",
+      "available": "Available"
     }
   }
 }

@@ -1,3 +1,8 @@
+import { VocabularyCard, ExpressionCard, SpeakerTip, SituationCard } from "../components/ELearning/content/LessonCards";
+import { ChooseBestResponse, SpeakNow } from "../components/ELearning/content/PracticeActivities";
+import LessonStepTracker from "../components/ELearning/content/LessonStepTracker";
+import { LESSON_STEPS, stepAnchor } from "../utils/lessonSteps";
+import TopicRowsSample from "./TopicRowsSample";
 // Sample data and extra sections for the dev-only EH component gallery.
 // Existing EduHope (tenant 18) uploads, read through the dev proxy.
 export const SAMPLE = {
@@ -7,8 +12,6 @@ export const SAMPLE = {
   dialogue: "Lina: Hello. Is this seat free?\nOmar: Yes, it is. Please sit here.\nLina: Thank you. My name is Lina. What is your name?\nOmar: I am Omar. I study engineering.",
 };
 
-// Each phase adds { id, title, render } entries here.
-export const GALLERY_SECTIONS = [];
 
 // Lesson recordings are private to enrolled learners, so the gallery plays a
 // generated one-second tone instead.
@@ -20,3 +23,28 @@ export function sampleToneUrl() {
   for (let i = 0; i < samples; i += 1) data.setInt16(44 + i * 2, Math.sin(i / 4) * 8000, true);
   return URL.createObjectURL(new Blob([data], { type: "audio/wav" }));
 }
+
+const vocab = [{ word: "seat", meaning: "A place for one person to sit.", arabic: "مقعد", example: "Hello. Is this seat free?", pronunciation: "/siːt/", stress: "SEAT" },
+  { word: "classmate", meaning: "A person in the same class as you.", arabic: "زميل في الصف", example: "This is my new classmate, Omar.", pronunciation: "", stress: "CLASS-mate" }];
+const expressions = [{ expression: "Nice to meet you.", meaning: "A polite thing to say when you meet someone.", arabic: "سعيد بلقائك.", example: "Hi, I'm Lina. Nice to meet you." }];
+const best = [{ id: "b1", type: "multiple_choice", prompt: "A new classmate asks: \"Is this seat free?\" What is the most natural response?", config: { options: [{ id: "x", label: "Yes, it is. Please sit here." }, { id: "y", label: "I have twenty years." }, { id: "z", label: "Seat is free." }] } }];
+const speak = [{ id: "s1", type: "speaking_practice", prompt: "Introduce yourself to a new classmate and ask one question.", config: { max_duration_seconds: 60, max_size_bytes: 1048576 } }];
+
+// Each phase adds { id, title, render } entries here.
+export const GALLERY_SECTIONS = [
+  { id: "cards", title: "EH / Lesson cards", render: () => <>
+    <SituationCard text="You are meeting a new classmate at university." />
+    <VocabularyCard items={vocab} />
+    <ExpressionCard items={expressions} />
+    <SpeakerTip tip="In English, we say our age with 'be', not 'have'." arabic="في الإنجليزية نعبّر عن العمر باستخدام الفعل be وليس have." avoid="I have 20 years." say="I am 20 years old." />
+  </> },
+  { id: "practice", title: "EH / Choose the Best Response · Speak Now", render: () => <>
+    <ChooseBestResponse title="Choose the best response" questions={best} check={async (q, o) => ({ correct: o === "x" })} onFinish={() => {}} />
+    <SpeakNow questions={speak} onFinish={() => {}} />
+  </> },
+  { id: "tracker", title: "EH / Lesson Step Tracker · Topic Lesson", render: () => <>
+    <LessonStepTracker steps={LESSON_STEPS.slice(0, 8).map(step => ({ step }))} passedSteps={["situation", "listen"]} />
+    <section id={stepAnchor("situation")} data-step="situation"><SituationCard text="You are meeting a new classmate at university." /></section>
+  </> },
+  { id: "topic-rows", title: "EH / Topic Row statuses", render: () => <TopicRowsSample /> },
+];

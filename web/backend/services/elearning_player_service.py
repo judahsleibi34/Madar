@@ -27,8 +27,30 @@ def my_learning(member, limit, offset):
 
 
 def course(member, course_id, lesson_id=None, complete=False):
-    return call("complete_elearning_learner_lesson" if complete else "get_elearning_learner_course", member,
-                p_course_id=str(course_id), p_lesson_id=str(lesson_id) if lesson_id else None)
+    result = call("complete_elearning_learner_lesson" if complete else "get_elearning_learner_course", member,
+                  p_course_id=str(course_id), p_lesson_id=str(lesson_id) if lesson_id else None)
+    return with_question_types(member.tenant_id, result)
+
+
+def with_question_types(tenant_id, result):
+    """Add each lesson assessment's question TYPES (never prompts or answers) so
+    the opt-in lesson step tracker can place it in the book's topic order."""
+    blocks = (result or {}).get("blocks") if isinstance(result, dict) else None
+    ids = [block["assessment"]["id"] for block in blocks or [] if block.get("type") == "assessment" and isinstance(block.get("assessment"), dict) and block["assessment"].get("id")]
+    if not ids:
+        return result
+    try:
+        rows = service_supabase.table("elearning_assessment_questions").select("assessment_id,type").eq("tenant_id", tenant_id).in_("assessment_id", ids).is_("archived_at", "null").execute().data or []
+    except Exception:
+        return result
+    types = {}
+    for row in rows:
+        types.setdefault(row["assessment_id"], set()).add(row["type"])
+    for block in blocks:
+        assessment = block.get("assessment") if block.get("type") == "assessment" else None
+        if isinstance(assessment, dict) and assessment.get("id") in types:
+            assessment["question_types"] = sorted(types[assessment["id"]])
+    return result
 
 
 

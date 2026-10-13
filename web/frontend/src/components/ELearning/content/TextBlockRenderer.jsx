@@ -1,6 +1,11 @@
 import { renderRichText } from "../../PageBuilder/core/PageBuilder.text";
+import LessonComponentCard from "./LessonCards";
+import { useLearningExperience } from "../LearningExperienceContext";
 
-export default function TextBlockRenderer({ content }) {
+export default function TextBlockRenderer({ content, title }) {
+  // Opted-in academies show structured lesson cards; everyone else reads the text body.
+  const enhanced = useLearningExperience().lessonComponents === true;
+  if (enhanced && content?.component) return <LessonComponentCard title={title} component={content.component} />;
   const lines = String(content?.body ?? "").split("\n");
   let offset = 0;
   const nodes = [];

@@ -1870,6 +1870,71 @@
       "photo": "الصورة {{number}}",
       "photoDescription": "وصف الصورة (لقارئات الشاشة؛ لا يظهر على الصورة)",
       "dialogueAudio": "تسجيل الحوار"
+    },
+    "lessonCards": {
+      "vocabulary": "المفردات",
+      "expressions": "عبارات مفيدة",
+      "speakerTip": "نصيحة للمتحدّثين بالعربية",
+      "situation": "موقف من الحياة الواقعية",
+      "pronunciation": "النطق",
+      "stress": "النبر",
+      "meaning": "المعنى:",
+      "arabic": "بالعربية:",
+      "avoid": "تجنّب:",
+      "say": "قل:",
+      "kind": "نوع المحتوى",
+      "item": "العنصر {{number}}",
+      "addItem": "إضافة عنصر",
+      "removeItem": "إزالة العنصر",
+      "kinds": {
+        "text": "نص",
+        "situation": "موقف من الحياة الواقعية",
+        "vocabulary": "بطاقة مفردات",
+        "expressions": "بطاقة عبارات مفيدة",
+        "speaker_tip": "نصيحة للمتحدّثين بالعربية"
+      },
+      "fields": {
+        "word": "الكلمة الإنجليزية",
+        "meaning": "معنى إنجليزي بسيط",
+        "arabic": "المعنى بالعربية",
+        "example": "جملة مثال",
+        "pronunciation": "دعم النطق",
+        "stress": "نبر الكلمة",
+        "expression": "العبارة",
+        "situation": "الموقف (بالإنجليزية)",
+        "tip": "النصيحة (بالإنجليزية)",
+        "tipArabic": "الشرح بالعربية",
+        "avoid": "تجنّب (خطأ شائع)",
+        "say": "قل بدلاً من ذلك (إنجليزية طبيعية)"
+      }
+    },
+    "practice": {
+      "bestResponse": "اختر أفضل ردّ",
+      "responses": "الردود",
+      "incorrect": "ليس تماماً. اقرأ الموقف مرة أخرى وجرّب رداً آخر.",
+      "speakNow": "تحدّث الآن",
+      "speakNote": "سجّل إجابتك واستمع إليها ثم تابع. لا يُقيَّم التدرّب على التحدّث آلياً."
+    },
+    "lessonSteps": {
+      "label": "خطوات الموضوع",
+      "situation": "موقف من الحياة الواقعية",
+      "listen": "استمع",
+      "understand": "افهم",
+      "expressions": "عبارات مفيدة",
+      "vocabulary": "المفردات",
+      "listenMatch": "استمع وطابق مع الصور",
+      "communication": "تدريب على التواصل",
+      "speak": "تحدّث الآن",
+      "review": "مراجعة",
+      "status_completed": "مكتمل",
+      "status_current": "الحالي",
+      "status_next": "التالي"
+    },
+    "topicStatus": {
+      "completed": "مكتمل",
+      "current": "الحالي",
+      "locked": "مقفل",
+      "available": "متاح"
     }
   }
 }
