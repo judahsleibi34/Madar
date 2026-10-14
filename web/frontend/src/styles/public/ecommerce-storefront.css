@@ -1033,7 +1033,8 @@
 }
 
 .live-store-detail-copy {
-  align-self: center;
+  align-self: start;
+  padding-top: 24px;
 }
 
 .live-store-back {
@@ -1701,6 +1702,7 @@
 
   .live-store-detail-visual { gap: 22px; }
   .live-store-detail-about { padding-top: 18px; }
+  .live-store-detail-copy { padding-top: 0; }
 
   .live-store-detail-main-image {
     min-height: 330px;
@@ -2782,11 +2784,12 @@
   pointer-events: none;
 }
 
-.live-store-sale-popup-close {
+.live-store .live-store-sale-popup-close {
   position: absolute;
   z-index: 2;
-  inset-block-start: 16px;
-  inset-inline-end: 16px;
+  inset: 16px 16px auto auto;
+  margin: 0;
+  transform: none;
   width: 42px;
   height: 42px;
   padding: 0;
@@ -2798,7 +2801,7 @@
   color: var(--store-ink);
   cursor: pointer;
 }
-.live-store-sale-popup-close:hover { border-color: var(--store-accent); color: var(--store-accent); }
+.live-store .live-store-sale-popup-close:hover { border-color: var(--store-accent); color: var(--store-accent); }
 
 .live-store-sale-popup-offer {
   position: relative;

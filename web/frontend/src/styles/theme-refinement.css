@@ -84,13 +84,8 @@ li {
 }
 
 a,
-.gradient-text,
 .arabic-name {
   color: var(--color-accent-text);
-}
-
-.gradient-text {
-  background-image: none;
 }
 
 button,
@@ -250,15 +245,6 @@ body.theme-dark .preview-device-toolbar {
 .workspace-tabs button:hover {
   background: var(--theme-primary-soft) !important;
   border-color: rgba(var(--theme-primary-rgb), 0.28) !important;
-}
-
-.header-theme-toggle,
-.mobile-theme-toggle,
-.header-theme-toggle:hover,
-.mobile-theme-toggle:hover {
-  border-color: transparent !important;
-  background: transparent !important;
-  box-shadow: none !important;
 }
 
 .workspace-tabs button.active,

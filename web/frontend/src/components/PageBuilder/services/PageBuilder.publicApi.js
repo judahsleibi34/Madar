@@ -12,6 +12,34 @@ const parseJsonResponse = async (response) => {
   return data;
 };
 
+// The hosted-tenant entry starts the runtime's primary read while the route
+// code is still downloading. The runtime's own fetch adopts that in-flight
+// request instead of issuing a second one. Entries are tenant/form scoped,
+// single-page-load only, and expire quickly so they are never served as a
+// cache.
+const EARLY_PUBLIC_READ_TTL_MS = 10_000;
+const earlyPublicReads = new Map();
+
+const startEarlyPublicRead = (key, load) => {
+  if (earlyPublicReads.has(key)) return;
+  const promise = load();
+  promise.catch(() => {}); // The adopting caller owns error presentation.
+  earlyPublicReads.set(key, { promise, startedAt: Date.now() });
+};
+
+const adoptEarlyPublicRead = (key) => {
+  const entry = earlyPublicReads.get(key);
+  if (!entry) return null;
+  if (Date.now() - entry.startedAt > EARLY_PUBLIC_READ_TTL_MS) {
+    earlyPublicReads.delete(key);
+    return null;
+  }
+  // Keep the entry until the current task ends so React StrictMode's
+  // synchronous effect replay adopts the same request.
+  queueMicrotask(() => earlyPublicReads.delete(key));
+  return entry.promise;
+};
+
 export const submitPublicFormSubmission = async (
   subdomain,
   formId,
@@ -142,13 +170,19 @@ export const fetchPublicSiteBootstrap = async (subdomain) => {
 
 // Initial hosted-site response: publication, filtered schema, and visitor state
 // are resolved together. The lightweight bootstrap remains available for polling.
-export const fetchPublicSiteRuntime = async (subdomain) => {
+const loadPublicSiteRuntime = async (subdomain) => {
   const response = await apiFetch(getApiUrl(`/public/sites/${subdomain}/runtime`), {
     method: "GET",
     cache: "no-store",
   });
   return (await parseJsonResponse(response)) || null;
 };
+
+export const fetchPublicSiteRuntime = (subdomain) =>
+  adoptEarlyPublicRead(`runtime:${subdomain}`) || loadPublicSiteRuntime(subdomain);
+
+export const prefetchPublicSiteRuntime = (subdomain) =>
+  startEarlyPublicRead(`runtime:${subdomain}`, () => loadPublicSiteRuntime(subdomain));
 
 export const fetchProtectedSitePage = async (subdomain, pageReference) => {
   const normalizedReference = String(pageReference || "").replace(/^\/+/, "");
@@ -164,7 +198,13 @@ export const fetchProtectedSitePage = async (subdomain, pageReference) => {
   return parseJsonResponse(response);
 };
 
-export const fetchPublicForm = async (subdomain, formId) => {
+export const fetchPublicForm = (subdomain, formId) =>
+  adoptEarlyPublicRead(`form:${subdomain}:${formId}`) || loadPublicForm(subdomain, formId);
+
+export const prefetchPublicForm = (subdomain, formId) =>
+  startEarlyPublicRead(`form:${subdomain}:${formId}`, () => loadPublicForm(subdomain, formId));
+
+const loadPublicForm = async (subdomain, formId) => {
   const response = await apiFetch(
     getApiUrl(`/public/sites/${subdomain}/forms/${encodeURIComponent(formId)}`),
     {

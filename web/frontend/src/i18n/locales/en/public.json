@@ -19,39 +19,57 @@
   },
   "about": {
     "hero": {
-      "eyebrow": "About Madar",
-      "titlePrefix": "About",
+      "eyebrow": "One platform for your operation",
+      "titlePrefix": "Build, sell, and teach with",
       "titleHighlight": "Madar",
       "name": "Madar",
-      "description": "helps organizations replace paper forms, scattered files, and manual follow-ups with clear digital workflows that teams can manage from one place.",
-      "secondDescription": "It is built for teams that want to modernize daily operations without losing the way they already work. Madar turns requests, approvals, records, users, and internal processes into organized digital systems that are easier to track, update, and grow."
+      "description": "brings website creation, forms, data tools, online commerce, reservations, and digital learning into one managed workspace.",
+      "secondDescription": "Start with a visual website and form builder, then manage submissions, analyze data, coordinate reservations, run an online store, or deliver structured learning. Madar keeps the public experience and the work behind it connected in the same dashboard."
+    },
+    "actions": {
+      "explorePlans": "Compare plans",
+      "contactUs": "Talk to us"
+    },
+    "visual": {
+      "ariaLabel": "Websites, online commerce, and learning connected through Madar",
+      "forms": "Websites",
+      "workflows": "Commerce",
+      "records": "Learning"
+    },
+    "story": {
+      "eyebrow": "What you can run",
+      "title": "The tools your organization needs, working together"
+    },
+    "closingSection": {
+      "eyebrow": "Start with what you need",
+      "title": "Choose the tools that fit your operation."
     },
     "panel": {
-      "ariaLabel": "Madar digitalization focus",
-      "title": "Digital operations, without the clutter",
-      "description": "Replace scattered paperwork with structured pages, forms, records, and workflows your team can actually use every day."
+      "ariaLabel": "Madar connected product areas",
+      "title": "One workspace, several ways to grow",
+      "description": "Create your public experience and manage the daily work behind it without stitching together separate systems."
     },
-    "metricsAriaLabel": "Madar platform strengths",
+    "metricsAriaLabel": "Madar product areas",
     "metrics": [
-      { "value": "Paperless", "label": "Move forms, records, and approvals into one digital workspace." },
-      { "value": "Connected", "label": "Keep teams, requests, files, and decisions linked together." },
-      { "value": "Flexible", "label": "Shape pages, workflows, and data around how your organization works." }
+      { "value": "Websites & Forms", "label": "Build branded pages, publish hosted sites, collect submissions, and manage uploaded files." },
+      { "value": "Online Store", "label": "Organize your catalog and manage orders, delivery, storefront design, and customer loyalty." },
+      { "value": "Digital Learning", "label": "Create courses, organize learners and instructors, and follow learning progress." }
     ],
     "sections": [
       {
-        "title": "Digitize the Work You Already Do",
-        "body": "Madar helps your organization turn printed forms, notebooks, spreadsheets, and repeated manual steps into structured digital workflows. Your team can collect information, follow requests, manage approvals, and keep important records in a cleaner, more reliable workspace."
+        "title": "Build websites and operational workflows",
+        "body": "Use the visual page builder to create and publish your website, add forms and image uploads, and give each project a hosted public address. Incoming submissions flow into response management and data tools, while reservations can be organized through requests, schedules, calendars, and an archive."
       },
       {
-        "title": "Built for Real Operations",
-        "body": "Every organization has its own departments, services, forms, and approval paths. Madar gives you the flexibility to shape the system around those needs, so your digital workspace feels practical for your team instead of forcing everyone into a rigid process."
+        "title": "Run your online store from one dashboard",
+        "body": "Create products and organize them with categories, brands, and tags. Customize the storefront theme and landing page, connect social links, configure delivery, process orders, and manage loyalty features without separating your catalog from the rest of your operation."
       },
       {
-        "title": "A Smarter Way to Manage Growth",
-        "body": "By keeping information connected, searchable, and easier to update, Madar helps teams save time, reduce mistakes, respond faster, and make better decisions. It gives your organization a strong digital foundation for smoother work today and more scalable operations tomorrow."
+        "title": "Create a complete learning experience",
+        "body": "Build courses from sections and lessons, manage students, groups, instructors, and learning plans, and give learners a dedicated place to continue their work. Track progress and outcomes, support assessments and certificates, and publish an academy landing experience from the same platform."
       }
     ],
-    "closing": "Madar is not just about replacing paper with screens. It is about giving your organization a clearer way to work, communicate, and manage information with confidence."
+    "closing": "Whether you are digitizing a service, launching a storefront, or building an academy, Madar keeps what your audience sees connected to the tools your team uses every day."
   },
   "contact": {
     "hero": {

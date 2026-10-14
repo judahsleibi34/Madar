@@ -32,7 +32,7 @@ const adminRoutes = [
 const userRoutes = [
   "/dashboard", "/page-builder", "/builder-responses", "/builder-data", "/calendar",
   "/agenda", "/archive", "/ecommerce/tags", "/ecommerce/categories",
-  "/ecommerce/products", "/ecommerce/products/new", "/ecommerce/delivery", "/ecommerce/orders", "/ecommerce/loyalty", "/ecommerce/theme", "/ecommerce/cv-rerank",
+  "/ecommerce/products", "/ecommerce/products/new", "/ecommerce/delivery", "/ecommerce/orders", "/ecommerce/loyalty", "/ecommerce/theme",
   "/ecommerce/store", "/my-plan", "/notifications", "/settings/change-password",
   "/settings/security", "/settings", "/settings?tab=website", "/settings?tab=ecommerce", "/settings?tab=devices", "/settings?tab=notifications", "/admin/users",
 ];

@@ -56,7 +56,7 @@ function isAppActivelyViewed() {
 
 export default function useWeeklyScreenTime(
   user,
-  { endpoint = "/screen-time/heartbeat", scope = "workspace" } = {}
+  { endpoint = "/screen-time/heartbeat", scope = "workspace", reportSeconds = true } = {}
 ) {
   const userKey = String(user?.id || user?.auth_id || user?.email || "").trim();
   const storageKey = userKey ? STORAGE_PREFIX + scope + ":" + userKey : "";
@@ -69,10 +69,15 @@ export default function useWeeklyScreenTime(
   const [seconds, setSeconds] = useState(0);
 
   useEffect(() => {
+    // Callers that never display the total opt out of per-second re-renders;
+    // tracking, storage and heartbeats are unchanged either way.
+    const showSeconds = (value) => {
+      if (reportSeconds) setSeconds(value);
+    };
     if (!storageKey) {
       secondsRef.current = 0;
       pendingHeartbeatRef.current = 0;
-      const resetId = window.setTimeout(() => setSeconds(0), 0);
+      const resetId = window.setTimeout(() => showSeconds(0), 0);
       return () => window.clearTimeout(resetId);
     }
 
@@ -82,7 +87,7 @@ export default function useWeeklyScreenTime(
     lastTickRef.current = Date.now();
     lastPersistRef.current = Date.now();
     const initialUpdateId = window.setTimeout(
-      () => setSeconds(Math.floor(secondsRef.current)),
+      () => showSeconds(Math.floor(secondsRef.current)),
       0
     );
 
@@ -123,7 +128,7 @@ export default function useWeeklyScreenTime(
         weekKeyRef.current = currentWeek;
         secondsRef.current = 0;
         pendingHeartbeatRef.current = 0;
-        setSeconds(0);
+        showSeconds(0);
       }
 
       const elapsedSeconds = Math.min(
@@ -135,7 +140,7 @@ export default function useWeeklyScreenTime(
       if (isAppActivelyViewed()) {
         secondsRef.current += elapsedSeconds;
         pendingHeartbeatRef.current += elapsedSeconds;
-        setSeconds(Math.floor(secondsRef.current));
+        showSeconds(Math.floor(secondsRef.current));
       }
 
       if (now - lastPersistRef.current >= PERSIST_INTERVAL_MS) persist();
@@ -151,7 +156,7 @@ export default function useWeeklyScreenTime(
       const storedSeconds = readStoredTime(storageKey, weekKeyRef.current);
       if (storedSeconds > secondsRef.current) {
         secondsRef.current = storedSeconds;
-        setSeconds(Math.floor(storedSeconds));
+        showSeconds(Math.floor(storedSeconds));
       }
     };
 
@@ -172,7 +177,7 @@ export default function useWeeklyScreenTime(
       window.removeEventListener("storage", syncAcrossTabs);
       persist();
     };
-  }, [endpoint, storageKey]);
+  }, [endpoint, reportSeconds, storageKey]);
 
   return seconds;
 }

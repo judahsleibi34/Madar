@@ -6,6 +6,7 @@ import UserDashboard from "./UserDashboard";
 import { clearAllDashboardSnapshotCaches } from "./utils/dashboardSnapshotCache";
 import { listBuilderProjects, fetchBuilderStorageUsage, listBuilderReservations } from "../PageBuilder/services/PageBuilder.api";
 import { fetchSiteVisitMetrics } from "../../services/siteVisitApi";
+import { fetchEcommerceDashboardSummary } from "../../services/ecommerceApi";
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
@@ -33,6 +34,30 @@ vi.mock("../../services/siteVisitApi", () => ({
   fetchSiteVisitMetrics: vi.fn().mockResolvedValue({
     website_visits: 42,
     store_visits: 17,
+  }),
+}));
+
+vi.mock("../../services/ecommerceApi", () => ({
+  fetchEcommerceDashboardSummary: vi.fn().mockResolvedValue({
+    catalog: {
+      products: 12,
+      active_products: 10,
+      tags: 8,
+      categories: 4,
+      low_stock: 2,
+      out_of_stock: 1,
+    },
+    sales: {
+      revenue: "1234.50",
+      currency: "USD",
+      orders: 9,
+      paid_orders: 6,
+      pending_orders: 2,
+      average_order_value: "205.75",
+    },
+    top_products: [
+      { product_id: "product-1", name: "Everyday Linen Shirt", units_sold: 7, revenue: "476.00" },
+    ],
   }),
 }));
 
@@ -78,11 +103,23 @@ describe("UserDashboard shortcuts", () => {
       "Used space",
       "Forms used",
       "Reservation forms used",
+      "Products",
+      "Categories",
+      "Tags",
+      "Revenue",
+      "Orders",
+      "Average order value",
+      "Inventory alerts",
+      "Top 5 products",
     ]);
     expect(
       document.querySelector(".user-dashboard-metric-card--plan")
         ?.textContent,
     ).toContain("Workspace plan");
+    expect(screen.getByText("Top 5 products")).toBeTruthy();
+    expect(screen.getByText("Everyday Linen Shirt")).toBeTruthy();
+    expect(screen.getByText("7 sold")).toBeTruthy();
+    expect(screen.getByText("$1,234.50")).toBeTruthy();
   });
 
   it("renders safely when an older cache entry lacks visit metrics", () => {
@@ -147,6 +184,7 @@ it("renders cached dashboard metrics on return without another backend request",
   await waitFor(() => expect(document.querySelector(".user-dashboard-skeleton")).toBeNull());
   expect(listBuilderProjects.mock.calls.length).toBe(projectCalls);
   expect(fetchSiteVisitMetrics.mock.calls.length).toBe(visitCalls);
+  expect(fetchEcommerceDashboardSummary).toHaveBeenCalledTimes(1);
 });
 
 it("starts storage, reservations, and visit reads before the project list finishes", async () => {
@@ -156,6 +194,15 @@ it("starts storage, reservations, and visit reads before the project list finish
   await waitFor(() => expect(fetchBuilderStorageUsage).toHaveBeenCalled());
   expect(listBuilderReservations).toHaveBeenCalled();
   expect(fetchSiteVisitMetrics).toHaveBeenCalled();
+  expect(fetchEcommerceDashboardSummary).toHaveBeenCalled();
   resolve({ projects: [] });
   await screen.findByText("42");
+});
+
+it("keeps the dashboard usable without exposing a failed commerce response", async () => {
+  fetchEcommerceDashboardSummary.mockRejectedValueOnce(new Error("database connection details"));
+  render(<MemoryRouter><UserDashboard user={{ id: 22, tenant_id: 7 }} /></MemoryRouter>);
+  await screen.findByText("No paid product sales yet.");
+  expect(document.body.textContent).not.toContain("database connection details");
+  expect(screen.getByText("Top 5 products")).toBeTruthy();
 });

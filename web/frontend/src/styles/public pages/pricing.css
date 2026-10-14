@@ -187,21 +187,12 @@
 
 .pricing-choice-card:hover,
 .pricing-choice-card:focus-visible {
-  background:
-    linear-gradient(
-      180deg,
-      rgba(var(--theme-primary-rgb), 0.045),
-      transparent 58%
-    ),
-    var(--theme-surface);
+  background: var(--theme-surface-2);
 }
 
 .pricing-choice-card:hover::before,
 .pricing-choice-card:focus-visible::before {
-  background: var(
-    --theme-gradient,
-    linear-gradient(90deg, var(--theme-primary), var(--theme-text))
-  );
+  background: var(--theme-primary);
 }
 
 .pricing-choice-card span {
@@ -855,13 +846,7 @@ body.theme-dark .pricing-custom-summary {
 [data-theme="dark"] .pricing-choice-card:focus-visible,
 body.theme-dark .pricing-choice-card:hover,
 body.theme-dark .pricing-choice-card:focus-visible {
-  background:
-    linear-gradient(
-      180deg,
-      rgba(var(--theme-primary-rgb), 0.12),
-      transparent 58%
-    ),
-    var(--theme-surface);
+  background: var(--theme-surface-2);
 }
 
 [data-theme="dark"] .pricing-choice-card em,
@@ -1277,9 +1262,7 @@ body.theme-dark .pricing-plan-button.secondary {
 .pricing-mini-plan:hover,
 .pricing-mini-plan.is-selected {
   border-color: rgba(var(--theme-primary-rgb), 0.42);
-  background:
-    linear-gradient(180deg, rgba(var(--theme-primary-rgb), 0.06), transparent),
-    var(--theme-surface);
+  background: var(--theme-surface-2);
 }
 
 .pricing-mini-plan span {

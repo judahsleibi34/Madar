@@ -11,7 +11,7 @@
 
 .page-builder .go-live-action:hover {
   transform: translateY(-1px);
-  background: linear-gradient(135deg, var(--theme-bg) 0%, var(--theme-primary-hover) 100%) !important;
+  background: var(--theme-primary-hover) !important;
   color: var(--theme-text-inverse) !important;
 }
 

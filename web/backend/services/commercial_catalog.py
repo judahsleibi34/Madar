@@ -12,9 +12,9 @@ from datetime import date
 from typing import Any
 
 
-CATALOG_VERSION = "2026-09-30-v2"
+CATALOG_VERSION = "2026-10-14-v1"
 CATALOG_CURRENCY = "USD"
-CATALOG_EFFECTIVE_DATE = date(2026, 9, 30).isoformat()
+CATALOG_EFFECTIVE_DATE = date(2026, 10, 14).isoformat()
 GIB = 1024 * 1024 * 1024
 
 CORE_MODULE_IDS = ("forms", "website", "ecommerce")
@@ -188,7 +188,6 @@ PRODUCTS: dict[str, dict[str, Any]] = {
             "data_cleaning",
             "charts_data_exports",
             "reservation_system",
-            "cv_reranker",
         ),
     ),
     "business_plus": _plan(

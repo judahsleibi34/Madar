@@ -14,6 +14,7 @@
 
 @import "./public layout/header.css";
 @import "./public pages/home.css";
+@import "./public pages/about.css";
 @import "./public pages/contact.css";
 @import "./public layout/footer.css";
 
@@ -27,7 +28,6 @@
 @import "./public pages/subscription-modal.css";
 
 @import "./shared/buttons.css";
-@import "./shared/gradient-text.css";
 @import "./shared/page-skeleton.css";
 @import "./shared/split-text.css";
 
@@ -39,12 +39,12 @@
 @import "./route-refinement.css";
 @import "/src/styles/settings-item-flattening.css";
 @import "/src/styles/preview-theme-isolation.css";
-@import "/src/styles/theme-transition.css";
 /* Canonical Page Builder geometry must follow legacy route refinements. */
 @import "./admin/PageBuilder/workspace-stability.css";
 @import "./admin/PageBuilder/selection-toolbar.css";
 @import "./admin/PageBuilder/workspace-controls.css";
 @import "/src/styles/admin/PageBuilder/footer-responsive.css";
+@import "./core/red-headings.css";
 
 /* ============================================================
    TEMP: Builder demo route styles

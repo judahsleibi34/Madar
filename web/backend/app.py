@@ -76,6 +76,7 @@ from services.observability_service import (
     end_request_timings,
     record_request,
     record_request_timing,
+    request_timing_markers_snapshot,
     request_timings_snapshot,
     server_timing_value,
     timed_operation,
@@ -239,24 +240,35 @@ async def observability_middleware(request: Request, call_next):
             elapsed_seconds=elapsed,
         )
         response.headers["X-Request-ID"] = request_id
-        measured = request_timings_snapshot()
-        record_request_timing("app", max(0.0, elapsed - sum(measured.values())))
-        timing_header = server_timing_value()
-        if timing_header:
-            response.headers["Server-Timing"] = timing_header
-        if route in PERFORMANCE_TIMING_ROUTES or elapsed >= 0.5:
-            logger.info(
-                "http.request_timing",
-                extra={
-                    "method": request.method,
-                    "route": route,
-                    "status_code": response.status_code,
-                    "duration_ms": round(elapsed * 1000, 1),
-                    "timings": {
-                        name: round(duration * 1000, 1)
-                        for name, duration in request_timings_snapshot().items()
+        try:
+            measured = request_timings_snapshot()
+            record_request_timing("app", max(0.0, elapsed - sum(measured.values())))
+            timing_header = server_timing_value()
+            if timing_header:
+                response.headers["Server-Timing"] = timing_header
+            if route in PERFORMANCE_TIMING_ROUTES or elapsed >= 0.5:
+                logger.info(
+                    "http.request_timing",
+                    extra={
+                        "method": request.method,
+                        "route": route,
+                        "status_code": response.status_code,
+                        "duration_ms": round(elapsed * 1000, 1),
+                        "timings": {
+                            name: round(duration * 1000, 1)
+                            for name, duration in request_timings_snapshot().items()
+                        },
+                        "timing_offsets": {
+                            name: round(offset * 1000, 1)
+                            for name, offset in request_timing_markers_snapshot().items()
+                        },
                     },
-                },
+                )
+        except Exception as error:
+            # Timing instrumentation must never turn a valid response into a 5xx.
+            logger.warning(
+                "http.request_timing_failed",
+                extra={"route": route, "error_type": type(error).__name__},
             )
         return response
     except Exception as error:
@@ -269,6 +281,7 @@ async def observability_middleware(request: Request, call_next):
             "http.request_unhandled",
             extra={"method": request.method, "route": route, "status_code": 500, "error_type": type(error).__name__},
         )
+        timing_header = server_timing_value()
         error_response = JSONResponse(
             status_code=500,
             content={
@@ -278,7 +291,7 @@ async def observability_middleware(request: Request, call_next):
             },
             headers={
                 "X-Request-ID": request_id,
-                **({"Server-Timing": server_timing_value()} if server_timing_value() else {}),
+                **({"Server-Timing": timing_header} if timing_header else {}),
             },
         )
         return error_response

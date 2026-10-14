@@ -11,7 +11,6 @@ const routes = [
   [/^\/ecommerce\/landing-page(?:\/|$)/, () => import("../components/DashboardBuilder/EcommerceLandingPage")],
   [/^\/ecommerce\/social-links(?:\/|$)/, () => import("../components/DashboardBuilder/EcommerceSocialLinksPage")],
   [/^\/ecommerce\/store(?:\/|$)/, () => import("../components/DashboardBuilder/EcommerceStorePage")],
-  [/^\/(?:ecommerce\/)?cv-rerank(?:\/|$)/, () => import("../components/DashboardBuilder/CvRerankPage")],
   [/^\/ecommerce(?:\/|$)/, () => import("../components/DashboardBuilder/EcommercePage")],
   [/^\/dashboard(?:\/|$)/, () => Promise.all([import("../components/DashboardBuilder/UserDashboard"), import("../components/DashboardBuilder/Dashboard")])],
   [/^\/demo(?:\/|$)/, () => import("../components/PageBuilder")],

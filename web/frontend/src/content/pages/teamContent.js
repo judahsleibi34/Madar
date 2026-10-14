@@ -117,6 +117,7 @@ const salibaLinksAr = [
 
 export const teamContent = {
   en: {
+    eyebrow: "The people behind Madar",
     title: "Meet the Team",
     subtitle:
       "The people behind Madar, combining AI, software engineering, and business insight to build smarter management tools.",
@@ -134,7 +135,7 @@ export const teamContent = {
       },
       {
         name: "Saliba Rishmawi",
-        role: "AI & Full-Stack Developer",
+        role: "Cyber Security & Full-Stack Developer",
         description:
           "Supports Madar's backend and AI direction, bringing experience in computer vision, medical imaging AI, and system-level problem solving.",
         initials: "SR",
@@ -147,6 +148,7 @@ export const teamContent = {
   },
 
   ar: {
+    eyebrow: "الفريق وراء مدار",
     title: "تعرّف على الفريق",
     subtitle:
       "الفريق وراء مدار، يجمع بين الذكاء الاصطناعي وهندسة البرمجيات وفهم الأعمال لبناء أدوات إدارة أكثر ذكاء.",
@@ -164,7 +166,7 @@ export const teamContent = {
       },
       {
         name: "صليبا ريشماوي",
-        role: "مطوّر ذكاء اصطناعي وFull-Stack",
+        role: "مطوّر أمن سيبراني وFull-Stack",
         description:
           "يدعم اتجاه مدار في الخلفية والذكاء الاصطناعي، بخبرة في الرؤية الحاسوبية، والذكاء الاصطناعي للتصوير الطبي، وحل المشكلات على مستوى الأنظمة.",
         initials: "SR",

@@ -56,7 +56,6 @@ const labels = {
   "elearning.academy.landingPage": "Home Page",
   "elearning.theme.title": "Theme",
   "elearning.certificates.myCertificates": "My Certificates",
-  "sidebar.cvRerank": "CV Rerank",
   "sidebar.store": "Store",
   "sidebar.pageBuilder": "Page Builder",
   "sidebar.submissions": "Submissions",
@@ -66,7 +65,6 @@ const labels = {
   "sidebar.myPlan": "My Plan",
   "sidebar.security": "Security",
   "sidebar.settings": "Settings",
-  "sidebar.themeMode": "Theme",
   "sidebar.logout": "Log out",
   "sidebar.userRole": "User",
   "user.fallbackName": "Madar User",
@@ -87,14 +85,6 @@ vi.mock("../LanguageSwitcher", () => ({
   ),
 }));
 
-vi.mock("../ThemeChanger/ThemeToggle", () => ({
-  default: ({ label, onChange }) => (
-    <button type="button" onClick={() => onChange("dark")}>
-      {label}
-    </button>
-  ),
-}));
-
 vi.mock("./NotificationBell", () => ({
   default: () => (
     <div className="admin-sidebar-notifications">
@@ -110,9 +100,7 @@ function renderSidebar(pathname = "/dashboard") {
     onLogout: vi.fn(),
     onLanguageChange: vi.fn(),
     onNavigate: vi.fn(),
-    onThemeModeChange: vi.fn(),
     showNotifications: true,
-    themeMode: "light",
   };
 
   render(
@@ -140,7 +128,6 @@ describe("DashboardSidebar navigation hierarchy", () => {
       "Workspace",
       "Online Store",
       "E-Learning",
-      "CV Rerank",
       "My Plan",
     ]);
 
@@ -176,7 +163,6 @@ describe("DashboardSidebar navigation hierarchy", () => {
     expect(screen.getByRole("link", { name: "Store" }).hasAttribute("aria-current")).toBe(false);
     expect(screen.getByRole("link", { name: "Store theme" })).toBeTruthy();
     expect(screen.getByRole("link", { name: "Social links" }).getAttribute("href")).toBe("/ecommerce/social-links");
-    expect(within(document.getElementById("dashboard-sidebar-ecommerce")).queryByRole("button", { name: "CV Rerank" })).toBeNull();
     expect(screen.getByRole("link", { name: "Store" })).toBeTruthy();
   });
 
@@ -194,18 +180,6 @@ describe("DashboardSidebar navigation hierarchy", () => {
     expect(
       screen.getByRole("link", { name: "Products" }).hasAttribute("aria-current"),
     ).toBe(false);
-  });
-
-  it("renders CV Rerank before My Plan as a top-level active route", () => {
-    renderSidebar("/ecommerce/cv-rerank");
-    const ecommerce = screen.getByRole("button", { name: "Online Store" });
-    const cvRerank = screen.getByRole("button", { name: "CV Rerank" });
-    const myPlan = screen.getByRole("button", { name: "My Plan" });
-
-    expect(ecommerce.getAttribute("aria-expanded")).toBe("false");
-    expect(cvRerank.getAttribute("aria-current")).toBe("page");
-    expect(ecommerce.compareDocumentPosition(cvRerank) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(cvRerank.compareDocumentPosition(myPlan) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it("keeps Ecommerce expanded on the live view route", () => {
@@ -332,7 +306,7 @@ describe("DashboardSidebar navigation hierarchy", () => {
     expect(settings.classList.contains("active-parent")).toBe(false);
     expect(settings.classList.contains("active")).toBe(false);
     expect(screen.getByRole("button", { name: "Language" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Theme" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Theme" })).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "Log out" }));
     expect(props.onLogout).toHaveBeenCalledOnce();
@@ -351,7 +325,7 @@ describe("DashboardSidebar navigation hierarchy", () => {
 it("shows only supported Platform Administration destinations", () => {
   render(<MemoryRouter><DashboardSidebar user={{ account_kind: "platform", user_type: "admin" }} showNotifications /></MemoryRouter>);
   for (const label of ["Dashboard", "Users / Tenants", "Account Access", "Security", "Settings"]) expect(screen.getByRole("button", { name: label, exact: true })).toBeTruthy();
-  for (const label of ["Workspace", "Online Store", "My Plan", "CV Rerank", "Home", "Notifications"]) expect(screen.queryByRole("button", { name: label, exact: true })).toBeNull();
+  for (const label of ["Workspace", "Online Store", "My Plan", "Home", "Notifications"]) expect(screen.queryByRole("button", { name: label, exact: true })).toBeNull();
 });
 
 it("expands E-Learning and highlights only its active Settings child", () => {

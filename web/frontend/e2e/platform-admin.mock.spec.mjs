@@ -75,7 +75,7 @@ for (const width of [1440, 390]) test(`platform sidebar and truthful dashboard a
   if (width === 390) await page.getByRole("button", { name: "Open menu" }).click();
   const nav = page.getByRole("navigation", { name: "Dashboard navigation" });
   for (const name of ["Dashboard", "Users / Tenants", "Account Access", "Security"]) await expect(nav.getByRole("button", { name, exact: true })).toBeVisible();
-  for (const name of ["Workspace", "Online Store", "My Plan", "CV Rerank", "Home"]) await expect(nav.getByRole("button", { name, exact: true })).toHaveCount(0);
+  for (const name of ["Workspace", "Online Store", "My Plan", "Home"]) await expect(nav.getByRole("button", { name, exact: true })).toHaveCount(0);
   for (const fake of ["4,862", "$62.4K", "99.98%", "1,284", "6,420", "142ms", "18"]) await expect(page.getByText(fake, { exact: true })).toHaveCount(0);
   await expect(page.getByText(/Not available/)).toHaveCount(3);
   expect(counts.tenantCalls()).toBe(0);

@@ -133,29 +133,16 @@ const getAvatarLetter = (accountForm, fallback) => {
     .toUpperCase();
 };
 
-const getApiErrorMessage = (detail, fallback) => {
-  if (typeof detail === "string" && detail.trim()) {
-    return detail;
+class SafeSettingsError extends Error {
+  constructor(publicMessage) {
+    super("Settings request failed");
+    this.name = "SafeSettingsError";
+    this.publicMessage = publicMessage;
   }
+}
 
-  if (Array.isArray(detail)) {
-    const message = detail
-      .map((error) => {
-        const field = Array.isArray(error.loc) ? error.loc.at(-1) : "";
-        return [field, error.msg].filter(Boolean).join(": ");
-      })
-      .filter(Boolean)
-      .join(" ");
-
-    return message || fallback;
-  }
-
-  if (detail && typeof detail === "object") {
-    return detail.message || detail.error || fallback;
-  }
-
-  return fallback;
-};
+const getSafeSettingsErrorMessage = (error, fallback) =>
+  error instanceof SafeSettingsError ? error.publicMessage : fallback;
 
 const resizeTextareaToContent = (textarea) => {
   if (!textarea) return;
@@ -567,10 +554,7 @@ export default function SettingsPage({
           if (!cancelled && response.status === 401) {
             showNotification("error", t.sessionExpired);
           } else if (!cancelled) {
-            showNotification(
-              "error",
-              getApiErrorMessage(data.detail, t.accountError)
-            );
+            showNotification("error", t.accountError);
           }
 
           return;
@@ -694,17 +678,12 @@ export default function SettingsPage({
     try {
       const assetUrl = await uploadBuilderAsset(file);
 
-      if (!assetUrl) {
-        throw new Error(t.logoUploadError);
-      }
+      if (!assetUrl) throw new SafeSettingsError(t.logoUploadError);
 
       updateSiteField("logoUrl", assetUrl);
       showNotification("success", t.logoUploaded);
     } catch (error) {
-      showNotification(
-        "error",
-        error.message || t.logoUploadError
-      );
+      showNotification("error", getSafeSettingsErrorMessage(error, t.logoUploadError));
     } finally {
       setIsUploadingLogo(false);
     }
@@ -742,10 +721,10 @@ export default function SettingsPage({
 
       if (!response.ok) {
         if (response.status === 401) {
-          throw new Error(t.sessionExpired);
+          throw new SafeSettingsError(t.sessionExpired);
         }
 
-        throw new Error(getApiErrorMessage(data.detail, t.avatarUploadError));
+        throw new SafeSettingsError(t.avatarUploadError);
       }
 
       const nextUser = data.user || {};
@@ -759,7 +738,7 @@ export default function SettingsPage({
       onUserUpdated?.(nextUser);
       showNotification("success", data.message || t.avatarUploaded);
     } catch (error) {
-      showNotification("error", error.message || t.avatarUploadError);
+      showNotification("error", getSafeSettingsErrorMessage(error, t.avatarUploadError));
     } finally {
       setIsUploadingAvatar(false);
     }
@@ -788,10 +767,10 @@ export default function SettingsPage({
 
       if (!response.ok) {
         if (response.status === 401) {
-          throw new Error(t.sessionExpired);
+          throw new SafeSettingsError(t.sessionExpired);
         }
 
-        throw new Error(getApiErrorMessage(data.detail, t.accountError));
+        throw new SafeSettingsError(t.accountError);
       }
 
       if (data.user) {
@@ -802,7 +781,7 @@ export default function SettingsPage({
 
       showNotification("success", data.message || t.accountSaved);
     } catch (error) {
-      showNotification("error", error.message || t.accountError);
+      showNotification("error", getSafeSettingsErrorMessage(error, t.accountError));
     } finally {
       setIsSavingAccount(false);
     }
@@ -857,10 +836,10 @@ export default function SettingsPage({
 
       if (!response.ok) {
         if (response.status === 401) {
-          throw new Error(t.sessionExpired);
+          throw new SafeSettingsError(t.sessionExpired);
         }
 
-        throw new Error(getApiErrorMessage(data.detail, t.accountError));
+        throw new SafeSettingsError(t.accountError);
       }
 
       clearEcommerceAdminCache(null, "website-settings");
@@ -881,7 +860,7 @@ export default function SettingsPage({
       setProject(savedProject);
       showNotification("success", data.message || t.websiteSaved);
     } catch (error) {
-      showNotification("error", error.message || t.accountError);
+      showNotification("error", getSafeSettingsErrorMessage(error, t.accountError));
     } finally {
       setIsSavingSite(false);
     }
@@ -920,8 +899,8 @@ export default function SettingsPage({
       const data = await readApiResponse(response);
 
       if (!response.ok) {
-        if (response.status === 401) throw new Error(t.sessionExpired);
-        throw new Error(getApiErrorMessage(data.detail, t.storeSaveError));
+        if (response.status === 401) throw new SafeSettingsError(t.sessionExpired);
+        throw new SafeSettingsError(t.storeSaveError);
       }
 
       clearEcommerceAdminCache(null, "website-settings");
@@ -946,7 +925,7 @@ export default function SettingsPage({
       clearPublicEcommerceCache();
       showNotification("success", data.message || t.storeSaved);
     } catch (error) {
-      showNotification("error", error.message || t.storeSaveError);
+      showNotification("error", getSafeSettingsErrorMessage(error, t.storeSaveError));
     } finally {
       setIsSavingStore(false);
     }

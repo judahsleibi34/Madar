@@ -1613,6 +1613,148 @@ ORDER_STATUSES = {"pending", "confirmed", "preparing", "out_for_delivery", "deli
 PAYMENT_STATUSES = {"unpaid", "collected", "paid", "refunded"}
 
 
+def _dashboard_decimal(value: Any) -> Decimal:
+    try:
+        return Decimal(str(value or 0))
+    except Exception:
+        return Decimal("0")
+
+
+def _dashboard_product_name(product: dict[str, Any]) -> str:
+    translations = product.get("translations")
+    if isinstance(translations, dict):
+        for locale in ("en", "ar"):
+            translated = translations.get(locale)
+            if isinstance(translated, dict) and str(translated.get("name") or "").strip():
+                return str(translated["name"]).strip()
+        for translated in translations.values():
+            if isinstance(translated, dict) and str(translated.get("name") or "").strip():
+                return str(translated["name"]).strip()
+    return str(product.get("name") or product.get("slug") or "Product").strip()
+
+
+def _summarize_ecommerce_dashboard(
+    catalog: dict[str, Any],
+    orders: list[dict[str, Any]],
+    order_items: list[dict[str, Any]],
+    currency: str,
+    *,
+    truncated: bool = False,
+) -> dict[str, Any]:
+    products = catalog.get("products") if isinstance(catalog.get("products"), list) else []
+    tags = catalog.get("tags") if isinstance(catalog.get("tags"), list) else []
+    categories = catalog.get("categories") if isinstance(catalog.get("categories"), list) else []
+    stock = catalog.get("stock_summary") if isinstance(catalog.get("stock_summary"), dict) else {}
+    normalized_currency = str(currency or catalog.get("commerce_currency") or "USD").upper()
+
+    paid_orders = [
+        order for order in orders
+        if str(order.get("payment_status") or "").lower() in {"paid", "collected"}
+        and str(order.get("status") or "").lower() not in {"cancelled", "rejected"}
+        and str(order.get("currency") or normalized_currency).upper() == normalized_currency
+    ]
+    paid_order_ids = {str(order.get("id")) for order in paid_orders if order.get("id") is not None}
+    revenue = sum((_dashboard_decimal(order.get("total")) for order in paid_orders), Decimal("0"))
+    pending_orders = sum(
+        1 for order in orders
+        if str(order.get("status") or "pending").lower() not in {"delivered", "fulfilled", "cancelled", "rejected"}
+    )
+
+    product_names = {str(product.get("id")): _dashboard_product_name(product) for product in products}
+    product_totals: dict[str, dict[str, Any]] = {}
+    for item in order_items:
+        if str(item.get("order_id")) not in paid_order_ids:
+            continue
+        product_id = str(item.get("product_id") or "")
+        name = str(item.get("product_name") or product_names.get(product_id) or "Product").strip()
+        key = product_id or name.lower()
+        current = product_totals.setdefault(key, {
+            "product_id": product_id or None,
+            "name": name,
+            "units_sold": 0,
+            "revenue": Decimal("0"),
+        })
+        current["units_sold"] += max(0, int(item.get("quantity") or 0))
+        current["revenue"] += _dashboard_decimal(item.get("line_total"))
+
+    ranked_products = sorted(
+        product_totals.values(),
+        key=lambda item: (item["units_sold"], item["revenue"], item["name"].lower()),
+        reverse=True,
+    )[:5]
+    for item in ranked_products:
+        item["revenue"] = format(item["revenue"], ".2f")
+
+    return {
+        "catalog": {
+            "products": len(products),
+            "active_products": sum(1 for product in products if str(product.get("status") or "").lower() == "active"),
+            "tags": len(tags),
+            "categories": len(categories),
+            "low_stock": int(stock.get("low_stock") or 0),
+            "out_of_stock": int(stock.get("out_of_stock") or 0),
+        },
+        "sales": {
+            "revenue": format(revenue, ".2f"),
+            "currency": normalized_currency,
+            "orders": len(orders),
+            "paid_orders": len(paid_orders),
+            "pending_orders": pending_orders,
+            "average_order_value": format(revenue / len(paid_orders), ".2f") if paid_orders else "0.00",
+        },
+        "top_products": ranked_products,
+        "truncated": bool(truncated),
+    }
+
+
+def _dashboard_paged_rows(query_factory, *, page_size: int = 1000, max_rows: int = 10000):
+    rows: list[dict[str, Any]] = []
+    for offset in range(0, max_rows, page_size):
+        batch = _rows(query_factory().range(offset, offset + page_size - 1))
+        rows.extend(batch)
+        if len(batch) < page_size:
+            return rows, False
+    return rows, True
+
+
+@router.get("/dashboard-summary")
+def get_dashboard_summary(request: Request, response: Response):
+    context = _require_ecommerce_access(request, response)
+    try:
+        catalog = _cached_catalog_resource(
+            context.tenant_id,
+            "dashboard-catalog",
+            lambda: _catalog_for_tenant(context.tenant_id),
+        )
+        orders, orders_truncated = _dashboard_paged_rows(
+            lambda: service_supabase.table("ecommerce_orders")
+            .select("id,total,currency,payment_status,status")
+            .eq("tenant_id", context.tenant_id)
+            .order("created_at", desc=True)
+        )
+        order_items, items_truncated = _dashboard_paged_rows(
+            lambda: service_supabase.table("ecommerce_order_items")
+            .select("order_id,product_id,product_name,quantity,line_total")
+            .eq("tenant_id", context.tenant_id)
+            .order("created_at", desc=True)
+        )
+        return _summarize_ecommerce_dashboard(
+            catalog,
+            orders,
+            order_items,
+            _store_currency_for_tenant(context.tenant_id),
+            truncated=orders_truncated or items_truncated,
+        )
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Ecommerce dashboard summary failed for tenant %s", context.tenant_id)
+        raise HTTPException(
+            status_code=503,
+            detail="Store dashboard statistics are temporarily unavailable",
+        ) from None
+
+
 @router.get("/loyalty")
 def get_loyalty_rule(request: Request, response: Response):
     context = _require_ecommerce_access(request, response)

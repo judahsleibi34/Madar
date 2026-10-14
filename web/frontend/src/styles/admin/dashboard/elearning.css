@@ -11,11 +11,9 @@
   font-weight: 950;
   line-height: 0.95;
   letter-spacing: -0.04em;
-  /* Restore the shared title gradient suppressed by the settings reset. */
-  background-image: linear-gradient(to right, var(--color-heading-accent) 0 22%, var(--color-text) 46% 100%) !important;
-  background-clip: text;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent !important;
+  color: var(--theme-primary) !important;
+  background-image: none !important;
+  -webkit-text-fill-color: var(--theme-primary) !important;
 }
 
 .admin-dashboard-page .settings-page.elearning-settings[dir="rtl"] .settings-header h1 {

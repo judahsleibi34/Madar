@@ -957,7 +957,6 @@ img.admin-sidebar-avatar {
   text-align: start !important;
 }
 
-/* ThemeToggle internal row must also not reverse */
 .admin-sidebar[dir="rtl"] .admin-sidebar-theme-row .theme-toggle-left,
 .admin-sidebar.is-rtl .admin-sidebar-theme-row .theme-toggle-left {
   direction: rtl !important;

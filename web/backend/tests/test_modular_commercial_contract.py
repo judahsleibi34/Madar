@@ -87,6 +87,7 @@ class ModularCommercialContractTests(unittest.TestCase):
         self.assertTrue(catalog['sales_activation_required'])
         self.assertNotIn('business',[p['id'] for p in catalog['products']])
         self.assertNotIn('business_plus',[p['id'] for p in catalog['products']])
+        self.assertFalse(any('cv_reranker' in product.get('public_feature_keys', ()) for product in get_catalog()['products']))
 
     def test_website_native_form_exception_cannot_authorize_standalone_form(self):
         from routes import public_site_routes as routes

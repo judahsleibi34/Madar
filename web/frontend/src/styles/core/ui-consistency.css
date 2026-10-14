@@ -161,14 +161,20 @@ textarea {
   font-weight: var(--weight-regular);
 }
 
-.public-app-shell h1:not(.brand-name):not(.hero-title),
+.public-app-shell h1:not(.brand-name):not(.hero-title) {
+  margin-block-start: 0;
+  font-size: clamp(2.75rem, 5vw, 4.75rem);
+  line-height: 1.02;
+  font-weight: var(--weight-bold);
+  letter-spacing: -0.045em;
+  text-wrap: balance;
+}
 .login-heading h1,
 .forgot-card h1 {
   margin-block-start: 0;
   font-size: var(--type-h1-size);
   line-height: var(--type-h1-line);
   font-weight: var(--weight-bold);
-  letter-spacing: 0;
 }
 .public-app-shell :where(h2) {
   font-size: var(--type-h2-size);
@@ -190,6 +196,12 @@ textarea {
   font-size: var(--type-body-size);
   line-height: var(--type-body-line);
   font-weight: var(--weight-regular);
+}
+
+@media (max-width: 620px) {
+  .public-app-shell h1:not(.brand-name):not(.hero-title) {
+    font-size: clamp(2.5rem, 12vw, 3.4rem);
+  }
 }
 .public-app-shell .hero-title {
   font-size: var(--type-display-size);

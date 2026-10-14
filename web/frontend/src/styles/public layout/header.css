@@ -1356,8 +1356,7 @@ html[data-darkreader-mode] .hamburger,
 html[data-darkreader-scheme] .hamburger,
 html[data-darkreader-mode] .mobile-menu-close,
 html[data-darkreader-scheme] .mobile-menu-close {
-  background:
-    linear-gradient(145deg, color-mix(in srgb, var(--theme-surface) 98%, transparent), color-mix(in srgb, var(--theme-surface-2) 96%, transparent)) !important;
+  background: var(--theme-surface) !important;
   border: 1px solid var(--theme-border-strong) !important;
   color: var(--theme-text-soft) !important;
   box-shadow:
@@ -1385,8 +1384,7 @@ html.theme-dark .hamburger:hover,
 html.theme-dark .mobile-menu-close:hover,
 body.theme-dark .hamburger:hover,
 body.theme-dark .mobile-menu-close:hover {
-  background:
-    linear-gradient(145deg, color-mix(in srgb, var(--theme-surface) 98%, transparent), color-mix(in srgb, var(--theme-surface-2) 96%, transparent)) !important;
+  background: var(--theme-surface) !important;
   border-color: var(--theme-border-strong) !important;
   color: var(--theme-text-soft) !important;
   box-shadow:

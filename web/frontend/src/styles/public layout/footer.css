@@ -276,7 +276,7 @@
 
 .footer-social-link:hover {
   color: var(--theme-text-inverse);
-  background: linear-gradient(180deg, var(--theme-primary), var(--theme-primary-hover));
+  background: var(--theme-primary-hover);
   border-color: rgba(var(--theme-primary-rgb), 0.85);
   transform: translateY(-3px);
   box-shadow:

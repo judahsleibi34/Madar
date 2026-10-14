@@ -43,12 +43,7 @@
   transform: translateY(-1px);
   border-color: rgba(var(--theme-primary-rgb), 0.18);
 
-  background:
-    linear-gradient(
-      180deg,
-      rgba(var(--theme-text-inverse-rgb), 1),
-      rgba(252, 248, 246, 0.98)
-    );
+  background: var(--theme-surface);
 
   box-shadow:
     0 18px 42px rgba(var(--theme-shadow-rgb), 0.1),
@@ -269,12 +264,7 @@
 .theme-dark .language-toggle-button:hover {
   border-color: rgba(var(--theme-danger-rgb), 0.22);
 
-  background:
-    linear-gradient(
-      180deg,
-      rgba(24, 31, 48, 0.98),
-      rgba(var(--theme-shadow-rgb), 0.96)
-    );
+  background: var(--theme-surface);
 }
 
 [data-theme="dark"] .language-toggle-animation,

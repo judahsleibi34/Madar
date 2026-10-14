@@ -13,6 +13,7 @@ vi.mock("./services/notificationsApi", () => ({ reconcileBrowserPushLifecycle: m
 vi.mock("./utils/scheduleIdleWork", () => ({ scheduleIdleWork: fn => { const timer = setTimeout(fn, 0); return () => clearTimeout(timer); } }));
 vi.mock("./notifications/NotificationProvider", () => ({ NotificationProvider: ({ children }) => { useEffect(() => { mocks.notifications(); }, []); return children; } }));
 vi.mock("./notifications/NotificationToastViewport", () => ({ default: () => null }));
+vi.mock("./notifications/NotificationPermissionPrompt", () => ({ default: () => null }));
 vi.mock("./components/DashboardBuilder/CommerceActionToast", () => ({ default: () => null }));
 vi.mock("./routes/UserWorkspaceRoutes", () => ({ default: ({ user, onUserUpdated }) => <button onClick={() => onUserUpdated({ ...user, user_type: "admin" })}>Switch synthetic account</button> }));
 vi.mock("./routes/AdminRoutes", () => ({ default: () => <p>Platform shell</p> }));

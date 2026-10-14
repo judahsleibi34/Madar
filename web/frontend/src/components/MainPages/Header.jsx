@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { NavLink, Link } from "react-router-dom";
-import { Moon, Sun } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import LanguageSwitcher from "../LanguageSwitcher";
@@ -18,14 +17,11 @@ export default function Header({
   onLanguageChange,
   isLoggedIn = false,
   onLogout,
-  themeMode = "light",
-  onThemeModeChange,
 }) {
   const { t } = useTranslation(["common", "public"]);
   const [menuOpen, setMenuOpen] = useState(false);
 
   const isRTL = lang === "ar";
-  const isDark = themeMode === "dark";
   const navigation = getNavigationContent(lang);
 
   const finalNavItems = isLoggedIn
@@ -37,12 +33,6 @@ export default function Header({
 
   const closeMenu = () => {
     setMenuOpen(false);
-  };
-
-  const handleThemeClick = () => {
-    if (typeof onThemeModeChange === "function") {
-      onThemeModeChange(isDark ? "light" : "dark");
-    }
   };
 
   const handleLangSelect = (code) => {
@@ -126,24 +116,6 @@ export default function Header({
         </nav>
 
         <div className="header-right">
-          <button
-            type="button"
-            className={`header-theme-toggle ${isDark ? "is-dark" : "is-light"}`}
-            onClick={handleThemeClick}
-            aria-label={
-              isDark
-                ? t("common:theme.switchLight")
-                : t("common:theme.switchDark")
-            }
-            title={
-              isDark
-                ? t("common:theme.switchLight")
-                : t("common:theme.switchDark")
-            }
-          >
-            {isDark ? <Sun size={18} /> : <Moon size={18} />}
-          </button>
-
           {isLoggedIn && (
             <LanguageSwitcher
               current={lang}
@@ -248,20 +220,6 @@ export default function Header({
 
             <div className="mobile-menu-body">
               <div className="mobile-menu-title">{t("common:navigation.menu")}</div>
-
-              <button
-                type="button"
-                className={`mobile-theme-toggle ${isDark ? "is-dark" : "is-light"}`}
-                onClick={handleThemeClick}
-              >
-                <span>
-                  {isDark ? <Sun size={18} /> : <Moon size={18} />}
-                  {t("common:theme.appearance")}
-                </span>
-                <strong>
-                  {isDark ? t("common:theme.dark") : t("common:theme.light")}
-                </strong>
-              </button>
 
               <nav
                 className="mobile-menu-links"

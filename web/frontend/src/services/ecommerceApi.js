@@ -247,6 +247,14 @@ export const fetchEcommerceOrders = (filters = {}, { scope, force = false } = {}
   return loadEcommerceAdminResource(scope, `orders:${path}`, () => request(path), { force });
 };
 
+export const fetchEcommerceDashboardSummary = ({ scope, force = false } = {}) =>
+  loadEcommerceAdminResource(
+    scope,
+    "dashboard-summary",
+    () => request("/ecommerce/dashboard-summary"),
+    { force },
+  );
+
 export const fetchEcommerceOrder = (orderId, { scope, force = false } = {}) => {
   const path = `/ecommerce/orders/${encodeURIComponent(orderId)}`;
   return loadEcommerceAdminResource(scope, `order:${orderId}`, () => request(path), { force });

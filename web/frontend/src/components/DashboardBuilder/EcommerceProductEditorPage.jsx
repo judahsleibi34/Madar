@@ -21,7 +21,7 @@ const skuCode = (value, suffix) => {
 const localized = (en = "", ar = "") => ({ en: normalizePlainText(en), ...(normalizePlainText(ar) ? { ar: normalizePlainText(ar) } : {}) });
 const emptyProduct = (currency = "USD") => ({
   slug: "", sku: "", barcode: null, category_id: null, category_ids: [], brand_id: null, tag_ids: [], product_type: "physical",
-  translations: { en: { name: "", description: "" }, ar: { name: "", description: "" } }, status: "draft",
+  translations: { en: { name: "", description: "" }, ar: { name: "", description: "" } }, status: "active",
   price: 0, compare_at_price: null, cost_price: null, currency: currency || "USD", track_inventory: true, inventory_quantity: 0,
   low_stock_threshold: 5, allow_backorder: false, images: [], weight: null, weight_unit: "kg",
   requires_shipping: true, taxable: true, seo_title: "", seo_description: "", attributes: [], options: [], variants: [],

@@ -58,6 +58,25 @@ function LocationProbe() {
 }
 
 describe("EcommerceStorefront", () => {
+  it("returns the production storefront to the top after every route navigation", async () => {
+    const windowScrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => {});
+    fetchPublicEcommerceCatalog.mockResolvedValue(catalog);
+    fetchPublicEcommerceProfile.mockResolvedValue({ site: catalog.site });
+
+    render(<MemoryRouter initialEntries={["/shop"]}><Routes><Route path="/shop/*" element={<EcommerceStorefront subdomain="demo" />} /></Routes></MemoryRouter>);
+
+    await screen.findByRole("heading", { level: 1, name: "Test Store" });
+    const storefront = document.querySelector(".live-store");
+    storefront.scrollTo = vi.fn();
+    storefront.scrollTop = 480;
+    windowScrollTo.mockClear();
+
+    fireEvent.click(screen.getAllByRole("link", { name: "Products" })[0]);
+
+    expect(windowScrollTo).toHaveBeenCalledWith({ top: 0, left: 0, behavior: "auto" });
+    expect(storefront.scrollTo).toHaveBeenCalledWith({ top: 0, left: 0, behavior: "auto" });
+  });
+
   it("renders the configured responsive landing carousel and supports manual navigation", async () => {
     const carouselCatalog = {
       site: {
@@ -745,6 +764,12 @@ describe("EcommerceStorefront", () => {
     categoryTrack.scrollBy = vi.fn();
     fireEvent.click(screen.getByRole("button", { name: "Next categories" }));
     expect(categoryTrack.scrollBy).toHaveBeenCalledWith(expect.objectContaining({ behavior: "smooth" }));
+    fireEvent.click(screen.getByRole("button", { name: "Next categories" }));
+    categoryTrack.scrollBy.mockClear();
+    fireEvent.scroll(categoryTrack);
+    expect(categoryTrack.scrollBy).not.toHaveBeenCalled();
+    await new Promise((resolve) => window.setTimeout(resolve, 550));
+    expect(categoryTrack.scrollBy).not.toHaveBeenCalledWith(expect.objectContaining({ behavior: "auto" }));
     expect(document.querySelectorAll(".live-store-category-section")[1].querySelector(".live-store-category-media img")?.getAttribute("src")).toContain("home.webp");
     expect(screen.getAllByText("Olive tray").length).toBeGreaterThan(0);
     expect(screen.getAllByText("36").length).toBeGreaterThan(0);

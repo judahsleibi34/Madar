@@ -15,7 +15,6 @@ import {
   Gift,
   Badge,
   FolderTree,
-  FileSearch,
   Package,
   MapPin,
   Palette,
@@ -33,13 +32,7 @@ import {
 import OwnerNavigation from "../ELearning/OwnerNavigation";
 import useAcademyCapabilities from "../../hooks/useAcademyCapabilities";
 import LanguageSwitcher from "../LanguageSwitcher";
-import ThemeToggle from "../ThemeChanger/ThemeToggle";
 import NotificationBell from "./NotificationBell";
-import {
-  applyThemeMode,
-  readStoredThemeMode,
-  normalizeThemeMode,
-} from "../../utils/themeMode";
 import { DASHBOARD_ROUTES, PUBLIC_ROUTES } from "../../config/routes";
 
 function normalizeRoleValue(value) {
@@ -137,8 +130,6 @@ export default function DashboardSidebar({
   onLanguageChange,
   onNavigate,
   hideLanguage = false,
-  themeMode,
-  onThemeModeChange,
   showNotifications = false,
 }) {
   const { t, i18n } = useTranslation(["dashboard"]);
@@ -153,14 +144,6 @@ export default function DashboardSidebar({
     i18n?.resolvedLanguage?.split("-")[0] || lang;
   const isRtl = activeSidebarLanguage === "ar";
   const sidebarDir = isRtl ? "rtl" : "ltr";
-
-  const [internalThemeMode, setInternalThemeMode] = useState(() => {
-    if (themeMode === "dark" || themeMode === "light") {
-      return themeMode;
-    }
-
-    return readStoredThemeMode();
-  });
 
   const workspaceRouteActive = [
     DASHBOARD_ROUTES.pageBuilder,
@@ -236,11 +219,6 @@ export default function DashboardSidebar({
     };
   }, [isWorkspaceSidebarCollapsed, compactSidebarRouteActive]);
 
-  const activeThemeMode =
-    themeMode === "dark" || themeMode === "light"
-      ? normalizeThemeMode(themeMode)
-      : internalThemeMode;
-
   const displayName = user?.name || user?.email || t("user.fallbackName");
   const displayEmail = user?.email || "";
 
@@ -259,11 +237,6 @@ export default function DashboardSidebar({
       label: t("sidebar.dashboard"),
       path: DASHBOARD_ROUTES.dashboard,
       icon: LayoutDashboard,
-    },
-    {
-      label: t("sidebar.cvRerank", { defaultValue: "CV Rerank" }),
-      path: DASHBOARD_ROUTES.ecommerceCvRerank,
-      icon: FileSearch,
     },
     {
       label: t("sidebar.myPlan"),
@@ -372,52 +345,9 @@ export default function DashboardSidebar({
       : settingsRouteActive;
 
   useEffect(() => {
-    applyThemeMode(activeThemeMode);
-  }, [activeThemeMode]);
-
-  useEffect(() => {
     document.documentElement.dir = isRtl ? "rtl" : "ltr";
     document.documentElement.lang = isRtl ? "ar" : "en";
   }, [isRtl]);
-
-  useEffect(() => {
-    const handleThemeStorage = (event) => {
-      if (event.key !== "madar-theme-mode") return;
-
-      const nextMode = event.newValue === "dark" ? "dark" : "light";
-      setInternalThemeMode(nextMode);
-      applyThemeMode(nextMode);
-    };
-
-    const handleThemeEvent = (event) => {
-      const nextMode = event.detail?.mode === "dark" ? "dark" : "light";
-      setInternalThemeMode(nextMode);
-    };
-
-    window.addEventListener("storage", handleThemeStorage);
-    window.addEventListener("madar-theme-change", handleThemeEvent);
-
-    return () => {
-      window.removeEventListener("storage", handleThemeStorage);
-      window.removeEventListener("madar-theme-change", handleThemeEvent);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (themeMode === "dark" || themeMode === "light") {
-      applyThemeMode(themeMode);
-    }
-  }, [themeMode]);
-
-  const handleThemeChange = (nextMode) => {
-    const safeMode = applyThemeMode(nextMode);
-
-    setInternalThemeMode(safeMode);
-
-    if (typeof onThemeModeChange === "function") {
-      onThemeModeChange(safeMode);
-    }
-  };
 
   const goTo = (path) => {
     navigate(path);
@@ -770,15 +700,6 @@ export default function DashboardSidebar({
                 <Settings size={16} aria-hidden="true" />
                 <span>{t("sidebar.settings")}</span>
               </button>
-
-              <ThemeToggle
-                mode={activeThemeMode}
-                onChange={handleThemeChange}
-                label={t("sidebar.themeMode")}
-                showLabel
-                showSwitch
-                className="admin-sidebar-theme-row"
-              />
 
               <button
                 type="button"

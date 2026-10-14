@@ -29,7 +29,7 @@ import {
   clearCsrfToken,
   syncCsrfTokenFromResponseData,
 } from "./utils/apiClient";
-import { applyThemeMode, readStoredThemeMode, transitionThemeMode } from "./utils/themeMode";
+import { applyThemeMode } from "./utils/themeMode";
 import { clearAllCalendarWorkspaceCaches } from "./components/DashboardBuilder/utils/calendarWorkspaceCache";
 import { getInstallationId, registerInstallation } from "./pwa/installation";
 import { isMadarPwaHost } from "./pwa/pwaContext";
@@ -40,6 +40,7 @@ import { subscribeAppInstalled } from "./pwa/installPromptStore";
 import { reconcileBrowserPushLifecycle } from "./services/notificationsApi";
 import { NotificationProvider } from "./notifications/NotificationProvider";
 import NotificationToastViewport from "./notifications/NotificationToastViewport";
+import NotificationPermissionPrompt from "./notifications/NotificationPermissionPrompt";
 import useWeeklyScreenTime from "./hooks/useWeeklyScreenTime";
 
 import "./components/DashboardBuilder/DashboardShellFix.css";
@@ -56,7 +57,7 @@ export default function App() {
   useRoutePreloading();
   const { t, i18n } = useTranslation(["auth", "dashboard", "common"]);
   const [lang, setLang] = useState(getCurrentLanguage);
-  const [themeMode, setThemeMode] = useState(readStoredThemeMode);
+  const themeMode = "light";
 
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
@@ -347,30 +348,8 @@ export default function App() {
     };
   }, [location.pathname]);
 
-  useEffect(() => {
-    const handleThemeEvent = (event) => {
-      const nextMode = event.detail?.mode === "dark" ? "dark" : "light";
-      setThemeMode(nextMode);
-    };
-
-    const handleStorage = (event) => {
-      if (event.key !== "madar-theme-mode") return;
-      const nextMode = event.newValue === "dark" ? "dark" : "light";
-      applyThemeMode(nextMode, { emit: false, persist: false });
-      setThemeMode(nextMode);
-    };
-
-    window.addEventListener("madar-theme-change", handleThemeEvent);
-    window.addEventListener("storage", handleStorage);
-
-    return () => {
-      window.removeEventListener("madar-theme-change", handleThemeEvent);
-      window.removeEventListener("storage", handleStorage);
-    };
-  }, []);
-
-  const handleThemeModeChange = useCallback((nextMode) => {
-    transitionThemeMode(nextMode);
+  const handleThemeModeChange = useCallback(() => {
+    applyThemeMode("light");
   }, []);
 
   useEffect(() => {
@@ -758,6 +737,14 @@ export default function App() {
       <RecoveryBanner />
       <ScrollToTop />
       <CommerceActionToast />
+      {authChecked
+        && isLoggedIn
+        && isDashboardRoute
+        && (user?.tenant_id || isAdminUser)
+        && (user?.id || user?.auth_id)
+        && isMadarPwaHost(window.location) ? (
+          <NotificationPermissionPrompt user={user} lang={lang} />
+        ) : null}
       <RouteSuspense fallback={routeFallback} lang={lang} variant="public-page" delay={isTenantSiteRoute || isEcommerceRoute ? 0 : undefined}>
         <RouteErrorBoundary
           key={errorSurface}

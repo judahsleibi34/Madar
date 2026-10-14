@@ -1,24 +1,20 @@
 (() => {
   const root = document.documentElement;
-  let mode;
+  root.dataset.theme = "light";
+  root.classList.remove("theme-dark");
+  root.classList.add("theme-light");
+  root.style.colorScheme = "light";
 
   try {
-    mode = localStorage.getItem("madar-theme-mode") === "dark" ? "dark" : "light";
+    localStorage.setItem("madar-theme-mode", "light");
   } catch {
-    mode = "light";
+    // The interface remains light when storage is unavailable.
   }
-
-  const themeClass = mode === "dark" ? "theme-dark" : "theme-light";
-  const otherThemeClass = mode === "dark" ? "theme-light" : "theme-dark";
-  root.dataset.theme = mode;
-  root.classList.remove(otherThemeClass);
-  root.classList.add(themeClass);
-  root.style.colorScheme = mode;
 
   const applyBodyTheme = () => {
     if (!document.body) return false;
-    document.body.classList.remove(otherThemeClass);
-    document.body.classList.add(themeClass);
+    document.body.classList.remove("theme-dark");
+    document.body.classList.add("theme-light");
     return true;
   };
 

@@ -35,7 +35,6 @@ const EcommerceLandingPage = lazy(loadEcommerceLandingPage);
 const EcommerceThemePage = lazy(loadEcommerceThemePage);
 const EcommerceSocialLinksPage = lazy(loadEcommerceSocialLinksPage);
 const EcommerceStorePage = lazy(loadEcommerceStorePage);
-const CvRerankPage = lazy(() => import("../components/DashboardBuilder/CvRerankPage"));
 const ReservationCalendarPage = lazy(() =>
   import("../components/DashboardBuilder/ReservationCalendarPage")
 );
@@ -296,10 +295,6 @@ export default function UserWorkspaceRoutes({
       <Route
         path="/ecommerce/social-links/*"
         element={renderShell(<EcommerceSocialLinksPage user={user} />)}
-      />
-      <Route
-        path="/ecommerce/cv-rerank/*"
-        element={renderShell(<CvRerankPage user={user} />)}
       />
       <Route
         path="/ecommerce/store/*"

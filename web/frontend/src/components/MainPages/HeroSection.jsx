@@ -2,7 +2,6 @@ import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { Trans, useTranslation } from "react-i18next";
 
-import GradientText from "../Animations/GradientText";
 import SplitText from "../Animations/SplitText";
 
 const OrbitVisual = lazy(() => import("./OrbitVisual"));
@@ -97,7 +96,7 @@ export default function HeroSection({ lang }) {
             ns="public"
             i18nKey="hero.titleRich"
             components={{
-              brand: <GradientText pauseOnHover />,
+              brand: <span className="heading-accent" />,
             }}
           />
         </motion.h1>

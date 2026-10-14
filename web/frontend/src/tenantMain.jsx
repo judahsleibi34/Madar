@@ -49,16 +49,45 @@ import "@fontsource/oswald/latin-400.css";
 import "@fontsource/oswald/latin-500.css";
 import "@fontsource/oswald/latin-700.css";
 import "@fontsource/bebas-neue/latin-400.css";
-import { LanguageProvider } from "./i18n";
+import i18n, { ensureTranslations, LanguageProvider, registerTranslationBundles } from "./i18n";
 import TenantSiteRoutes from "./routes/TenantSiteRoutes";
+import {
+  getHostedTenantRuntime,
+  getInitialTenantTranslations,
+  ROUTE_TRANSLATION_NAMESPACES,
+  whenPrimaryReadSettled,
+} from "./tenantRuntimePreload";
 import "./styles/tenant-entry.css";
 
-createRoot(document.getElementById("root")).render(
-  <StrictMode>
-    <BrowserRouter>
-      <LanguageProvider>
-        <TenantSiteRoutes />
-      </LanguageProvider>
-    </BrowserRouter>
-  </StrictMode>,
-);
+const renderTenant = () => {
+  createRoot(document.getElementById("root")).render(
+    <StrictMode>
+      <BrowserRouter>
+        <LanguageProvider>
+          <TenantSiteRoutes />
+        </LanguageProvider>
+      </BrowserRouter>
+    </StrictMode>,
+  );
+};
+
+// The entry started this route's translations alongside the tenant code.
+// Register them before the first render; if that download failed, each route
+// loads its own namespaces again before it renders.
+getInitialTenantTranslations()
+  .then(registerTranslationBundles, () => {})
+  .then(renderTenant);
+
+// The storefront switches language in place; keep that switch instant by
+// fetching the other language once the page is idle.
+// It waits for the storefront's primary read so it never competes with it.
+if (getHostedTenantRuntime()?.kind === "store") {
+  const prefetchOtherLanguage = () => {
+    const other = i18n.language === "ar" ? "en" : "ar";
+    ensureTranslations(ROUTE_TRANSLATION_NAMESPACES.store, other)?.catch(() => {});
+  };
+  whenPrimaryReadSettled().then(() => {
+    if (typeof window.requestIdleCallback === "function") window.requestIdleCallback(prefetchOtherLanguage, { timeout: 4000 });
+    else window.setTimeout(prefetchOtherLanguage, 2000);
+  });
+}

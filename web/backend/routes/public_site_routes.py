@@ -7,6 +7,8 @@ import json
 import os
 import re
 import secrets
+import threading
+from concurrent.futures import Future, wait
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Any, Literal, Optional
@@ -37,6 +39,8 @@ from services.rate_limit_service import (
 from services.api_errors import api_error
 from services.form_draft_service import build_form_draft_token, parse_form_draft_token
 from services.account_lifecycle_service import synchronize_verified_account
+from services.bounded_query_service import submit_db_read
+from services.observability_service import traced_operation
 from services.ecommerce_cache_service import (
     ecommerce_cache_key,
     get_or_create_ecommerce_cache,
@@ -46,6 +50,7 @@ from services.ecommerce_cache_service import (
 from services.screen_time_service import record_screen_time
 from services.site_permission_service import (
     assign_project_role,
+    get_project_role,
     has_project_permission,
     resource_is_role_restricted,
 )
@@ -53,7 +58,7 @@ from services.entitlement_service import (
     increment_operational_usage,
     require_public_runtime_entitlement,
 )
-from services.tenant_lifecycle_service import tenant_is_active
+from services.tenant_lifecycle_service import embedded_tenant_is_active, tenant_is_active
 from services.hosted_address_service import (
     HOSTED_ADDRESS_PATTERN,
     canonical_tenant_url,
@@ -1903,24 +1908,47 @@ def _case_insensitive_identifier_filter(query, column: str, value: str):
     return matcher(column, value) if callable(matcher) else query.eq(column, value)
 
 
+# The site row carries its tenant's lifecycle state as a non-filtering to-one
+# embed, so resolution and the lifecycle gate share one round trip. Filtering
+# inactive tenants inside the query would turn an ambiguous hostname (two
+# rows) into a single match, so the active decision stays in Python.
+_SETTINGS_TENANT_EMBED = "tenant_lifecycle:tenants(lifecycle_state)"
+
+
+def _read_website_settings_rows(resolved_identifier: str, requested_identifier: str, hosted: bool, columns: str):
+    settings_response = _case_insensitive_identifier_filter(
+        service_supabase.table("website_settings").select(columns), "subdomain", resolved_identifier
+    ).limit(2).execute()
+    settings_rows = getattr(settings_response, "data", None) or []
+    if not settings_rows and not hosted:
+        # Legacy path aliases are compatibility-only and never become hosted
+        # identities. Host-derived requests resolve only the canonical column.
+        settings_response = _case_insensitive_identifier_filter(
+            service_supabase.table("website_settings").select(columns), "standard_path_slug", requested_identifier
+        ).limit(2).execute()
+    return settings_response
+
+
+def _is_missing_tenant_embed(error: Exception) -> bool:
+    message = str(error).lower()
+    return "lifecycle_state" in message or ("tenants" in message and ("pgrst200" in message or "relationship" in message))
+
+
 def resolve_website_settings(site_identifier: str, *, request: Request):
     requested_identifier = normalize_subdomain(site_identifier)
     resolved_identifier = enforce_request_tenant_identity(request, requested_identifier)
     hosted = bool(request_hosted_tenant(request))
-    settings_query = service_supabase.table("website_settings").select("*")
-    settings_response = _case_insensitive_identifier_filter(
-        settings_query, "subdomain", resolved_identifier
-    ).limit(2).execute()
-
-    settings_rows = getattr(settings_response, "data", None) or []
-
-    if not settings_rows and not hosted:
-        # Legacy path aliases are compatibility-only and never become hosted
-        # identities. Host-derived requests resolve only the canonical column.
-        legacy_query = service_supabase.table("website_settings").select("*")
-        settings_response = _case_insensitive_identifier_filter(
-            legacy_query, "standard_path_slug", requested_identifier
-        ).limit(2).execute()
+    with traced_operation("site_resolution"):
+        try:
+            settings_response = _read_website_settings_rows(
+                resolved_identifier, requested_identifier, hosted, f"*,{_SETTINGS_TENANT_EMBED}"
+            )
+        except Exception as error:
+            # Legacy schemas without the lifecycle column (081/082) keep the
+            # standalone lookup and its compatibility bridge.
+            if not _is_missing_tenant_embed(error):
+                raise
+            settings_response = _read_website_settings_rows(resolved_identifier, requested_identifier, hosted, "*")
 
     settings = unique_public_row(
         settings_response,
@@ -1928,9 +1956,12 @@ def resolve_website_settings(site_identifier: str, *, request: Request):
         ambiguous_code="publication_hostname_ambiguous",
     )
     tenant_id = settings.get("tenant_id")
-    if tenant_id is None or not tenant_is_active(
-        tenant_id, client=service_supabase
-    ):
+    if "tenant_lifecycle" in settings:
+        embedded = settings.pop("tenant_lifecycle")
+        active = tenant_id is not None and embedded_tenant_is_active(tenant_id, embedded, client=service_supabase)
+    else:
+        active = tenant_id is not None and tenant_is_active(tenant_id, client=service_supabase)
+    if not active:
         raise HTTPException(status_code=404, detail="Published site not found")
     return settings
 
@@ -1985,6 +2016,70 @@ def redirect_legacy_form(identifier: str, form_id: str, request: Request):
     )
 
 
+# In-flight (not cached) cold store resolutions, keyed exactly like the store
+# settings cache. Concurrent requests for the same host/store wait for one
+# resolution instead of repeating it; the entry is removed as soon as that
+# resolution finishes or fails, so later requests always resolve afresh.
+_store_resolutions_in_flight: dict[str, Future] = {}
+_store_resolutions_lock = threading.Lock()
+
+
+def _share_in_flight_store_resolution(key: str, resolve):
+    with _store_resolutions_lock:
+        shared = _store_resolutions_in_flight.get(key)
+        owner = shared is None
+        if owner:
+            shared = Future()
+            _store_resolutions_in_flight[key] = shared
+    if not owner:
+        try:
+            # Waiters never share a mutable settings object with another request.
+            return copy.deepcopy(shared.result())
+        except HTTPException as error:
+            # Each waiter raises its own copy of the shared denial.
+            raise HTTPException(status_code=error.status_code, detail=error.detail, headers=error.headers) from error
+    try:
+        result = resolve()
+    except BaseException as error:
+        shared.set_exception(error)
+        raise
+    else:
+        shared.set_result(result)
+        return result
+    finally:
+        with _store_resolutions_lock:
+            if _store_resolutions_in_flight.get(key) is shared:
+                del _store_resolutions_in_flight[key]
+
+
+def _require_fresh_store_access(settings: dict) -> None:
+    """Fresh lifecycle and entitlement checks for cached store settings.
+
+    Both need only the tenant id, so they run concurrently on the shared
+    bounded executor. Lifecycle is decided first so a deleted or inactive
+    tenant receives the same 404 as an uncached resolution.
+    """
+    tenant_id = settings.get("tenant_id")
+
+    def entitlement():
+        try:
+            with traced_operation("entitlement"):
+                require_public_runtime_entitlement(settings, "ecommerce")
+        except HTTPException as error:
+            return error
+        return None
+
+    def lifecycle():
+        with traced_operation("tenant_lifecycle"):
+            return tenant_id is not None and tenant_is_active(tenant_id, client=service_supabase)
+
+    checks = _run_parallel_reads({"lifecycle": lifecycle, "entitlement": entitlement})
+    if not checks["lifecycle"]:
+        raise HTTPException(status_code=404, detail="Published site not found")
+    if checks["entitlement"] is not None:
+        raise checks["entitlement"]
+
+
 def resolve_public_store_settings(site_identifier: str, *, request: Request) -> dict:
     """Reuse public store identity/profile lookups without sharing data across tenants."""
     requested_identifier = normalize_subdomain(site_identifier)
@@ -2004,24 +2099,31 @@ def resolve_public_store_settings(site_identifier: str, *, request: Request) -> 
         hosted_tenant=hosted_tenant,
     )
 
-    cached = read_ecommerce_cache(cache_key)
-    if isinstance(cached, dict):
-        require_public_runtime_entitlement(cached, "ecommerce")
-        return cached
+    with traced_operation("store_resolution"):
+        cached = read_ecommerce_cache(cache_key)
+        if isinstance(cached, dict):
+            # Cached identity/profile only: tenant lifecycle and entitlement
+            # are re-verified on every request.
+            _require_fresh_store_access(cached)
+            return cached
 
-    settings = resolve_website_settings(
-        resolved_identifier,
-        request=request,
-    )
-    tenant_id = resolve_tenant_id(settings)
-    require_public_runtime_entitlement(settings, "ecommerce")
-    write_ecommerce_cache(
-        cache_key,
-        tenant_id,
-        settings,
-        ttl_seconds=30,
-    )
-    return settings
+        def resolve() -> dict:
+            settings = resolve_website_settings(
+                resolved_identifier,
+                request=request,
+            )
+            tenant_id = resolve_tenant_id(settings)
+            with traced_operation("entitlement"):
+                require_public_runtime_entitlement(settings, "ecommerce")
+            write_ecommerce_cache(
+                cache_key,
+                tenant_id,
+                settings,
+                ttl_seconds=30,
+            )
+            return settings
+
+        return _share_in_flight_store_resolution(cache_key, resolve)
 
 
 def _localized_catalog_text(translations: Any, locale: str) -> dict[str, str]:
@@ -2158,100 +2260,288 @@ def _catalog_descendant_ids(
     return descendants
 
 
-def _read_public_catalog_rows(tenant_id: int) -> tuple[list[dict], list[dict], list[dict], list[dict], list[dict], list[dict]]:
-    category_rows = rows(
-        service_supabase.table("ecommerce_categories")
-        .select("*")
-        .eq("tenant_id", tenant_id)
-        .eq("status", "active")
-        .order("sort_order")
-        .order("created_at")
-        .execute()
+# PostgREST caps every response (Supabase max_rows, 1000 by default), so an
+# unpaginated select silently truncates large tenants. Public catalog reads
+# therefore filter, order, count and page in the database, and the few reads
+# that must enumerate rows do so in complete, deterministic batches.
+PUBLIC_CATALOG_READ_BATCH = 1000
+# Independent catalog reads share the process-wide bounded executor, at most
+# this many at a time per request (the same cap as other catalog fan-outs).
+PUBLIC_CATALOG_FAN_OUT = 4
+PUBLIC_PRODUCT_COLUMNS = (
+    "id,slug,sku,category_id,brand_id,translations,product_type,brand,price,"
+    "compare_at_price,currency,track_inventory,inventory_quantity,"
+    "allow_backorder,images,weight,weight_unit,requires_shipping,"
+    "taxable,seo_title,seo_description,created_at,updated_at"
+)
+# Light columns used only where the storefront's localized search/name order
+# cannot be expressed in PostgREST: exactly what search (localized name and
+# description, brand, sku), name order, price filters and price bounds read.
+# Ordering itself runs in the database.
+PUBLIC_PRODUCT_SCAN_COLUMNS = "id,translations,brand,sku,price,currency"
+# Product rows carry their own tag and category links as embedded resources,
+# so a page needs no separate link round trips. Filters use their own aliased
+# !inner embeds, so these embeds always hold every link of the product.
+_TAG_LINKS_EMBED = "public_tag_links:ecommerce_product_tags(tag_id)"
+_CATEGORY_LINKS_EMBED = "public_category_links:ecommerce_product_categories(category_id,sort_order)"
+_PRODUCT_EMBED_KEYS = ("filter_tag_links", "filter_category_links", "public_tag_links", "public_category_links")
+_UUID_TEXT = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
+
+
+def _is_missing_optional_table(error: Exception) -> bool:
+    message = str(error).lower()
+    return "pgrst205" in message or "could not find the table" in message or "schema cache" in message
+
+
+def _is_missing_category_links(error: Exception) -> bool:
+    message = str(error).lower()
+    return "ecommerce_product_categories" in message and (
+        "pgrst200" in message or "pgrst205" in message or "could not find" in message
     )
-    tag_rows = rows(
-        service_supabase.table("ecommerce_tags")
-        .select("id,slug,translations,updated_at")
-        .eq("tenant_id", tenant_id)
-        .eq("status", "active")
-        .order("created_at", desc=True)
-        .execute()
-    )
-    brand_rows = _optional_p1a_rows(
-        service_supabase.table("ecommerce_brands")
-        .select("id,slug,name,image_url,updated_at")
-        .eq("tenant_id", tenant_id)
-        .eq("status", "active")
-        .order("name")
-    ) or []
-    product_select = (
-            "id,slug,sku,category_id,brand_id,translations,product_type,brand,price,"
-            "compare_at_price,currency,track_inventory,inventory_quantity,"
-            "allow_backorder,images,weight,weight_unit,requires_shipping,"
-            "taxable,seo_title,seo_description,created_at,updated_at"
-    )
+
+
+def _is_missing_brand_column(error: Exception) -> bool:
+    raw = str(error).lower()
+    if _is_missing_category_links(error):
+        return False
+    return "brand_id" in raw or "schema cache" in raw or "pgrst204" in raw
+
+
+def _run_parallel_reads(loaders: dict[str, Any]) -> dict[str, Any]:
+    """Run independent reads on the shared bounded executor.
+
+    Each loader builds its own query, so no query builder or session state is
+    shared across threads. At most PUBLIC_CATALOG_FAN_OUT reads run at once
+    for this request, and loaders never fan out themselves (a worker waiting
+    on its own pool could starve it). Every read finishes before the first
+    error is raised.
+    """
+    names = list(loaders)
+    if len(names) == 1:
+        return {names[0]: loaders[names[0]]()}
+    results: dict[str, Any] = {}
+    for start in range(0, len(names), PUBLIC_CATALOG_FAN_OUT):
+        batch = {name: submit_db_read(loaders[name]) for name in names[start:start + PUBLIC_CATALOG_FAN_OUT]}
+        wait(batch.values())
+        for name, future in batch.items():
+            results[name] = future.result()
+    return results
+
+
+def _read_all_rows(build_query, *, parallel_batches: bool = False) -> list[dict[str, Any]]:
+    """Read every row of ``build_query(count)`` in ordered batches.
+
+    ``build_query`` must apply a unique final ordering so batches never skip or
+    repeat rows. The exact count bounds the loop even if the server's row cap
+    is smaller than the requested batch. With ``parallel_batches`` (request
+    threads only, never inside a worker) the remaining batches, whose offsets
+    the count fixes, are read through the bounded executor.
+    """
+    first = build_query("exact").range(0, PUBLIC_CATALOG_READ_BATCH - 1).execute()
+    collected = list(rows(first))
+    total = getattr(first, "count", None)
+    if parallel_batches and total is not None and collected and len(collected) < total:
+        step = len(collected)
+        offsets = range(step, total, step)
+        batches = _run_parallel_reads({
+            offset: (lambda offset=offset: rows(build_query(None).range(offset, offset + step - 1).execute()))
+            for offset in offsets
+        })
+        for offset in offsets:
+            collected.extend(batches[offset])
+    while collected and (len(collected) < total if total is not None else len(collected) % PUBLIC_CATALOG_READ_BATCH == 0):
+        batch = rows(build_query(None).range(len(collected), len(collected) + PUBLIC_CATALOG_READ_BATCH - 1).execute())
+        if not batch:
+            break
+        collected.extend(batch)
+    return collected
+
+
+def _read_all_optional_rows(build_query) -> list[dict[str, Any]] | None:
     try:
-        product_rows = rows(
-            service_supabase.table("ecommerce_products").select(product_select)
-            .eq("tenant_id", tenant_id).eq("status", "active")
-            .order("created_at", desc=True).execute()
-        )
+        return _read_all_rows(build_query)
     except Exception as error:
-        raw = str(error).lower()
-        if "brand_id" not in raw and "schema cache" not in raw and "pgrst204" not in raw:
-            raise
-        product_rows = rows(
-            service_supabase.table("ecommerce_products")
-            .select(product_select.replace("brand_id,", ""))
-            .eq("tenant_id", tenant_id).eq("status", "active")
-            .order("created_at", desc=True).execute()
-        )
-    link_rows = rows(
-        service_supabase.table("ecommerce_product_tags")
-        .select("product_id,tag_id")
-        .eq("tenant_id", tenant_id)
-        .execute()
-    )
-    category_link_rows = _optional_p1a_rows(
-        service_supabase.table("ecommerce_product_categories")
-        .select("product_id,category_id,sort_order")
-        .eq("tenant_id", tenant_id)
-        .order("sort_order")
-    )
-    if category_link_rows is None:
-        category_link_rows = [
-            {"product_id": row.get("id"), "category_id": row.get("category_id"), "sort_order": 0}
-            for row in product_rows
-            if row.get("category_id")
-        ]
-    return category_rows, tag_rows, brand_rows, product_rows, link_rows, category_link_rows
+        if _is_missing_optional_table(error):
+            return None
+        raise
 
 
-def _cached_public_catalog_rows(tenant_id: int) -> tuple[list[dict], list[dict], list[dict], list[dict], list[dict], list[dict]]:
-    cache_key = ecommerce_cache_key(tenant_id, "public-catalog-source-v3")
+def _read_public_catalog_taxonomy(tenant_id: int) -> dict[str, Any]:
+    reads = _run_parallel_reads({
+        "categories": lambda: _read_all_rows(
+            lambda count: service_supabase.table("ecommerce_categories")
+            .select("*", count=count)
+            .eq("tenant_id", tenant_id)
+            .eq("status", "active")
+            .order("sort_order")
+            .order("created_at")
+            .order("id")
+        ),
+        "tags": lambda: _read_all_rows(
+            lambda count: service_supabase.table("ecommerce_tags")
+            .select("id,slug,translations,updated_at", count=count)
+            .eq("tenant_id", tenant_id)
+            .eq("status", "active")
+            .order("created_at", desc=True)
+            .order("id")
+        ),
+        "brands": lambda: _read_all_optional_rows(
+            lambda count: service_supabase.table("ecommerce_brands")
+            .select("id,slug,name,image_url,updated_at", count=count)
+            .eq("tenant_id", tenant_id)
+            .eq("status", "active")
+            .order("name")
+            .order("id")
+        ) or [],
+        # Only discounted products can contribute to the store-wide sale summary.
+        "discounted": lambda: _read_all_rows(
+            lambda count: service_supabase.table("ecommerce_products")
+            .select("id,price,compare_at_price", count=count)
+            .eq("tenant_id", tenant_id)
+            .eq("status", "active")
+            .not_.is_("compare_at_price", "null")
+            .order("id")
+        ),
+    })
+    sale_summary = _public_sale_summary([
+        {"price": str(row.get("price") or "0"), "compare_at_price": str(row.get("compare_at_price"))}
+        for row in reads["discounted"]
+    ])
+    return {
+        "category_rows": reads["categories"],
+        "tag_rows": reads["tags"],
+        "brand_rows": reads["brands"],
+        "sale_summary": sale_summary,
+    }
+
+
+def _cached_public_catalog_taxonomy(tenant_id: int) -> dict[str, Any]:
+    cache_key = ecommerce_cache_key(tenant_id, "public-catalog-taxonomy-v2")
     cached, _cache_hit = get_or_create_ecommerce_cache(
         cache_key,
         tenant_id,
-        lambda: _read_public_catalog_rows(tenant_id),
+        lambda: _read_public_catalog_taxonomy(tenant_id),
     )
     return cached
 
 
-def _split_public_catalog_rows(catalog_rows):
-    if len(catalog_rows) == 4:
-        category_rows, tag_rows, product_rows, link_rows = catalog_rows
-        category_links = [
-            {"product_id": row.get("id"), "category_id": row.get("category_id"), "sort_order": 0}
-            for row in product_rows if row.get("category_id")
-        ]
-        return category_rows, tag_rows, [], product_rows, link_rows, category_links
-    if len(catalog_rows) == 5:
-        category_rows, tag_rows, brand_rows, product_rows, link_rows = catalog_rows
-        category_links = [
-            {"product_id": row.get("id"), "category_id": row.get("category_id"), "sort_order": 0}
-            for row in product_rows if row.get("category_id")
-        ]
-        return category_rows, tag_rows, brand_rows, product_rows, link_rows, category_links
-    return catalog_rows
+def _resolve_public_catalog_filters(
+    taxonomy: dict[str, Any],
+    *,
+    category: str = "",
+    tag: str = "",
+    brand: str = "",
+) -> dict[str, Any] | None:
+    """Resolve slugs exactly as the storefront always has; ``None`` means a
+    requested category, tag or brand does not exist, so nothing matches."""
+    resolved: dict[str, Any] = {"category_ids": None, "tag_id": "", "brand_id": ""}
+    clean_category = str(category or "").strip().lower()
+    if clean_category:
+        root = next((item for item in taxonomy["category_rows"] if str(item.get("slug") or "").lower() == clean_category), None)
+        if not root:
+            return None
+        resolved["category_ids"] = sorted(_catalog_descendant_ids(taxonomy["category_rows"], str(root.get("id"))))
+    clean_tag = str(tag or "").strip().lower()
+    if clean_tag:
+        selected_tag = next((item for item in taxonomy["tag_rows"] if str(item.get("slug") or "").lower() == clean_tag), None)
+        if not selected_tag or not str(selected_tag.get("id") or ""):
+            return None
+        resolved["tag_id"] = str(selected_tag.get("id"))
+    clean_brand = str(brand or "").strip().lower()
+    if clean_brand:
+        selected_brand = next((item for item in taxonomy["brand_rows"] if str(item.get("slug") or "").lower() == clean_brand), None)
+        if not selected_brand or not str(selected_brand.get("id") or ""):
+            return None
+        resolved["brand_id"] = str(selected_brand.get("id"))
+    return resolved
+
+
+def _public_product_query(
+    tenant_id: int,
+    columns: str,
+    filters: dict[str, Any],
+    uses_category_links: bool,
+    *,
+    count: str | None = None,
+    min_price: Decimal | None = None,
+    max_price: Decimal | None = None,
+    embed_links: bool = False,
+):
+    # Product categories come from their category links whenever that table
+    # exists: migration 111 backfilled a link for every category_id and product
+    # saves keep category_id equal to the first link.
+    by_category_link = filters["category_ids"] is not None and uses_category_links
+    selected = [columns]
+    if embed_links:
+        selected.append(_TAG_LINKS_EMBED)
+        if uses_category_links:
+            selected.append(_CATEGORY_LINKS_EMBED)
+    if filters["tag_id"]:
+        selected.append("filter_tag_links:ecommerce_product_tags!inner(tag_id)")
+    if by_category_link:
+        selected.append("filter_category_links:ecommerce_product_categories!inner(category_id)")
+    query = (
+        service_supabase.table("ecommerce_products")
+        .select(",".join(selected), count=count)
+        .eq("tenant_id", tenant_id)
+        .eq("status", "active")
+    )
+    if embed_links and uses_category_links:
+        query = query.order("sort_order", foreign_table="public_category_links")
+    if filters["tag_id"]:
+        query = query.eq("filter_tag_links.tag_id", filters["tag_id"])
+    if filters["category_ids"] is not None:
+        if by_category_link:
+            query = query.in_("filter_category_links.category_id", filters["category_ids"])
+        else:
+            query = query.in_("category_id", filters["category_ids"])
+    if filters["brand_id"]:
+        query = query.eq("brand_id", filters["brand_id"])
+    if min_price is not None:
+        query = query.gte("price", str(min_price))
+    if max_price is not None:
+        query = query.lte("price", str(max_price))
+    return query
+
+
+def _execute_product_read(read):
+    """Run ``read(columns, scan_columns, uses_category_links)``.
+
+    Schemas without brands omit the brand_id column, and schemas without the
+    category link table fall back to each product's category_id.
+    """
+    def with_columns(uses_category_links: bool):
+        try:
+            return read(PUBLIC_PRODUCT_COLUMNS, PUBLIC_PRODUCT_SCAN_COLUMNS, uses_category_links)
+        except Exception as error:
+            if not _is_missing_brand_column(error):
+                raise
+            return read(
+                PUBLIC_PRODUCT_COLUMNS.replace("brand_id,", ""),
+                PUBLIC_PRODUCT_SCAN_COLUMNS.replace("brand_id,", ""),
+                uses_category_links,
+            )
+
+    try:
+        return with_columns(True)
+    except Exception as error:
+        if not _is_missing_category_links(error):
+            raise
+        return with_columns(False)
+
+
+def _strip_product_link_embeds(row: dict[str, Any]) -> dict[str, Any]:
+    return {key: value for key, value in row.items() if key not in _PRODUCT_EMBED_KEYS}
+
+
+def _embedded_product_links(row: dict[str, Any], uses_category_links: bool) -> tuple[list[str], list[str]]:
+    tag_ids = [str(link.get("tag_id") or "") for link in row.get("public_tag_links") or []]
+    category_ids = (
+        [str(link.get("category_id") or "") for link in row.get("public_category_links") or []]
+        if uses_category_links
+        else []
+    )
+    return tag_ids, category_ids
 
 
 def _filter_catalog_taxonomy(
@@ -2378,23 +2668,26 @@ def _attach_public_variant_options(
         return
 
     option_ids = [str(option.get("id") or "") for option in option_rows if option.get("id")]
-    value_rows = rows(
-        service_supabase.table("ecommerce_product_option_values")
-        .select("id,product_id,option_id,value_translations,sort_order")
-        .eq("tenant_id", tenant_id)
-        .eq("active", True)
-        .in_("option_id", option_ids)
-        .order("sort_order")
-        .execute()
-    )
-    variant_rows = rows(
-        service_supabase.table("ecommerce_product_variants")
-        .select("id,product_id,track_inventory,inventory_quantity,allow_backorder")
-        .eq("tenant_id", tenant_id)
-        .eq("active", True)
-        .in_("product_id", product_ids)
-        .execute()
-    )
+    reads = _run_parallel_reads({
+        "values": lambda: rows(
+            service_supabase.table("ecommerce_product_option_values")
+            .select("id,product_id,option_id,value_translations,sort_order")
+            .eq("tenant_id", tenant_id)
+            .eq("active", True)
+            .in_("option_id", option_ids)
+            .order("sort_order")
+            .execute()
+        ),
+        "variants": lambda: rows(
+            service_supabase.table("ecommerce_product_variants")
+            .select("id,product_id,track_inventory,inventory_quantity,allow_backorder,public_option_links:ecommerce_variant_option_values(option_value_id)")
+            .eq("tenant_id", tenant_id)
+            .eq("active", True)
+            .in_("product_id", product_ids)
+            .execute()
+        ),
+    })
+    value_rows, variant_rows = reads["values"], reads["variants"]
     available_variant_ids = {
         str(variant.get("id") or "")
         for variant in variant_rows
@@ -2402,13 +2695,12 @@ def _attach_public_variant_options(
         or bool(variant.get("allow_backorder"))
         or int(variant.get("inventory_quantity") or 0) > 0
     }
-    links = [] if not available_variant_ids else rows(
-        service_supabase.table("ecommerce_variant_option_values")
-        .select("variant_id,option_id,option_value_id")
-        .eq("tenant_id", tenant_id)
-        .in_("variant_id", sorted(available_variant_ids))
-        .execute()
-    )
+    links = [
+        link
+        for variant in variant_rows
+        if str(variant.get("id") or "") in available_variant_ids
+        for link in variant.get("public_option_links") or []
+    ]
     available_value_ids = {str(link.get("option_value_id") or "") for link in links}
     available_product_ids = {
         str(variant.get("product_id") or "")
@@ -2460,6 +2752,10 @@ def _current_ecommerce_option_rows(tenant_id: int, *, product_id=None, product_i
     fields = columns.split(",")
     return [{key: row[key] for key in fields if key in row} for row in result if row.get("active", True)]
 
+_NO_CATALOG_FILTERS = {"category_ids": None, "tag_id": "", "brand_id": ""}
+
+
+@traced_operation("catalog")
 def _catalog_payload(
     *,
     tenant_id: int,
@@ -2476,61 +2772,46 @@ def _catalog_payload(
     featured_product_ids: list[str] | None = None,
     featured_category_ids: list[str] | None = None,
 ) -> dict[str, Any]:
-    category_rows, tag_rows, brand_rows, product_rows, link_rows, category_link_rows = _split_public_catalog_rows(_cached_public_catalog_rows(tenant_id))
-    tags_by_product: dict[str, list[str]] = {}
-    for link in link_rows:
-        tags_by_product.setdefault(
-            str(link.get("product_id") or ""),
-            [],
-        ).append(str(link.get("tag_id") or ""))
-    categories_by_product: dict[str, list[str]] = {}
-    for link in category_link_rows:
-        categories_by_product.setdefault(
-            str(link.get("product_id") or ""),
-            [],
-        ).append(str(link.get("category_id") or ""))
-
-    categories = [_public_catalog_item(row, locale) for row in category_rows]
-    tags = [_public_catalog_item(row, locale) for row in tag_rows]
-    brands = [_public_catalog_brand(row) for row in brand_rows]
-    products = [
-        _public_catalog_product(
-            row,
-            locale=locale,
-            tag_ids=tags_by_product.get(str(row.get("id") or ""), []),
-            category_ids=categories_by_product.get(str(row.get("id") or ""), []),
-        )
-        for row in product_rows
-    ]
-    sale_summary = _public_sale_summary(products)
-    products = _filter_catalog_taxonomy(
-        products,
-        category_rows=category_rows,
-        tag_rows=tag_rows,
-        brand_rows=brand_rows,
-        category=category,
-        tag=tag,
-        brand=brand,
-    )
-    products = _search_catalog(products, search)
-    available_prices = [Decimal(str(item.get("price") or 0)) for item in products]
-    price_bounds = {
-        "min": str(min(available_prices)) if available_prices else None,
-        "max": str(max(available_prices)) if available_prices else None,
-        "currency": str(products[0].get("currency") or "") if products else "",
-    }
-    products = _filter_catalog_price(products, min_price, max_price)
-    products = _sort_catalog(products, sort)
-    products_by_id = {str(item.get("id")): item for item in products}
+    taxonomy = _cached_public_catalog_taxonomy(tenant_id)
+    categories = [_public_catalog_item(row, locale) for row in taxonomy["category_rows"]]
+    tags = [_public_catalog_item(row, locale) for row in taxonomy["tag_rows"]]
+    brands = [_public_catalog_brand(row) for row in taxonomy["brand_rows"]]
     categories_by_id = {str(item.get("id")): item for item in categories}
-    selected_products = [products_by_id[item] for item in (featured_product_ids or []) if item in products_by_id]
     selected_categories = [categories_by_id[item] for item in (featured_category_ids or []) if item in categories_by_id]
-
-    total = len(products)
     safe_page = max(1, page)
     safe_limit = max(1, min(limit, 48))
     start = (safe_page - 1) * safe_limit
-    visible_products = products[start:start + safe_limit]
+    featured_ids = [str(item) for item in (featured_product_ids or []) if _UUID_TEXT.fullmatch(str(item))]
+
+    filters = _resolve_public_catalog_filters(taxonomy, category=category, tag=tag, brand=brand)
+    uses_category_links = True
+    if filters is None:
+        page_rows, featured_rows, total = [], [], 0
+        price_bounds = {"min": None, "max": None, "currency": ""}
+    elif str(search or "").strip() or sort == "name":
+        page_rows, featured_rows, total, price_bounds, uses_category_links = _scan_public_catalog_page(
+            tenant_id, filters, locale=locale, search=search, sort=sort,
+            min_price=min_price, max_price=max_price, start=start, limit=safe_limit,
+            featured_ids=featured_ids,
+        )
+    else:
+        page_rows, featured_rows, total, price_bounds, uses_category_links = _query_public_catalog_page(
+            tenant_id, filters, sort=sort, min_price=min_price, max_price=max_price,
+            start=start, limit=safe_limit, featured_ids=featured_ids,
+        )
+
+    def build(row: dict[str, Any]) -> dict[str, Any]:
+        tag_ids, category_ids = _embedded_product_links(row, uses_category_links)
+        return _public_catalog_product(
+            _strip_product_link_embeds(row),
+            locale=locale,
+            tag_ids=tag_ids,
+            category_ids=category_ids,
+        )
+
+    visible_products = [build(row) for row in page_rows]
+    built_by_id = {str(item.get("id")): item for item in visible_products}
+    selected_products = [built_by_id.get(str(row.get("id"))) or build(row) for row in featured_rows]
     variant_summary_products = list({
         str(product.get("id")): product
         for product in [*visible_products, *selected_products]
@@ -2548,7 +2829,7 @@ def _catalog_payload(
         "products": visible_products,
         "featured_products": selected_products,
         "featured_categories": selected_categories,
-        "sale_summary": sale_summary,
+        "sale_summary": taxonomy["sale_summary"],
         "price_bounds": price_bounds,
         "pagination": {
             "page": safe_page,
@@ -2559,35 +2840,213 @@ def _catalog_payload(
     }
 
 
+_PUBLIC_CATALOG_ORDER = {
+    # Mirrors the former in-memory order: newest first, then a stable sort by
+    # price that keeps newest-first among equal prices. Every order ends with
+    # the unique product id, so equal timestamps/prices page deterministically
+    # and no product can repeat or be skipped between pages.
+    "latest": (("created_at", True),),
+    "price_low": (("price", False), ("created_at", True)),
+    "price_high": (("price", True), ("created_at", True)),
+}
+# A page-1 read without price filters already holds the bound its sort orders by.
+_BOUND_FROM_FIRST_ROW = {"latest": "newest", "price_low": "cheapest", "price_high": "dearest"}
+_PRICE_BOUND_READS = (
+    ("cheapest", "price", (("price", False),)),
+    ("dearest", "price", (("price", True),)),
+    ("newest", "currency", (("created_at", True),)),
+)
+
+
+def _ordered(query, ordering) -> Any:
+    for column, descending in ordering:
+        query = query.order(column, desc=descending)
+    return query.order("id")
+
+
+def _price_bounds_from(cheapest, dearest, newest) -> dict[str, Any]:
+    if cheapest is None:
+        return {"min": None, "max": None, "currency": ""}
+    return {
+        "min": str(Decimal(str(cheapest.get("price") or 0))),
+        "max": str(Decimal(str((dearest or cheapest).get("price") or 0))),
+        "currency": str((newest or cheapest).get("currency") or "USD"),
+    }
+
+
+def _query_public_catalog_page(
+    tenant_id: int,
+    filters: dict[str, Any],
+    *,
+    sort: str,
+    min_price: Decimal | None,
+    max_price: Decimal | None,
+    start: int,
+    limit: int,
+    featured_ids: list[str],
+) -> tuple[list[dict], list[dict], int, dict[str, Any], bool]:
+    """Filter, order, count and page entirely in the database. The page,
+    featured products and price bounds are independent reads."""
+    unfiltered = filters["category_ids"] is None and not filters["tag_id"] and not filters["brand_id"]
+    bounds_key = ecommerce_cache_key(tenant_id, "public-catalog-bounds-v1") if unfiltered else None
+    cached_bounds = read_ecommerce_cache(bounds_key, tenant_id) if bounds_key else None
+    first_row_bound = _BOUND_FROM_FIRST_ROW[sort] if start == 0 and min_price is None and max_price is None else None
+
+    def read(columns: str, _scan_columns: str, uses_category_links: bool):
+        def page_query():
+            return _ordered(
+                _public_product_query(
+                    tenant_id, columns, filters, uses_category_links, count="exact",
+                    min_price=min_price, max_price=max_price, embed_links=True,
+                ),
+                _PUBLIC_CATALOG_ORDER[sort],
+            )
+
+        def load_page():
+            try:
+                response = page_query().range(start, start + limit - 1).execute()
+            except Exception as error:
+                # PostgREST rejects an offset past the end (PGRST103); an
+                # out-of-range page is simply empty, with the real total.
+                if "pgrst103" not in str(error).lower():
+                    raise
+                response = page_query().range(0, 0).execute()
+                response.data = []
+            return rows(response), int(getattr(response, "count", None) or 0)
+
+        loaders = {"page": load_page}
+        if featured_ids:
+            loaders["featured"] = lambda: rows(
+                _public_product_query(
+                    tenant_id, columns, filters, uses_category_links,
+                    min_price=min_price, max_price=max_price, embed_links=True,
+                ).in_("id", featured_ids).execute()
+            )
+        if cached_bounds is None:
+            for name, column, ordering in _PRICE_BOUND_READS:
+                if name == first_row_bound:
+                    continue
+                # Price bounds describe the taxonomy-filtered catalog before price filters.
+                loaders[name] = lambda column=column, ordering=ordering: first_row(
+                    _ordered(_public_product_query(tenant_id, column, filters, uses_category_links), ordering)
+                    .limit(1)
+                    .execute()
+                )
+        return uses_category_links, _run_parallel_reads(loaders)
+
+    uses_category_links, reads = _execute_product_read(read)
+    page_rows, total = reads["page"]
+    if cached_bounds is not None:
+        price_bounds = cached_bounds
+    else:
+        bounds = {name: reads.get(name) for name, _column, _ordering in _PRICE_BOUND_READS}
+        if first_row_bound:
+            bounds[first_row_bound] = page_rows[0] if page_rows else None
+        price_bounds = _price_bounds_from(bounds["cheapest"], bounds["dearest"], bounds["newest"])
+        if bounds_key:
+            write_ecommerce_cache(bounds_key, tenant_id, price_bounds)
+    featured_by_id = {str(row.get("id")): row for row in reads.get("featured", [])}
+    return (
+        page_rows,
+        [featured_by_id[item] for item in featured_ids if item in featured_by_id],
+        total,
+        price_bounds,
+        uses_category_links,
+    )
+
+
+def _scan_public_catalog_page(
+    tenant_id: int,
+    filters: dict[str, Any],
+    *,
+    locale: str,
+    search: str,
+    sort: str,
+    min_price: Decimal | None,
+    max_price: Decimal | None,
+    start: int,
+    limit: int,
+    featured_ids: list[str],
+) -> tuple[list[dict], list[dict], int, dict[str, Any], bool]:
+    """Search and name order use localized text with language fallback, which
+    PostgREST cannot express. Taxonomy filters still run in the database; the
+    matching light rows are read completely, and full rows only for the page."""
+
+    def read(columns: str, scan_columns: str, uses_category_links: bool):
+        candidates = _read_all_rows(
+            lambda count: _ordered(
+                _public_product_query(tenant_id, scan_columns, filters, uses_category_links, count=count),
+                _PUBLIC_CATALOG_ORDER["latest"],
+            ),
+            parallel_batches=True,
+        )
+        return columns, uses_category_links, candidates
+
+    columns, uses_category_links, candidates = _execute_product_read(read)
+    products = [
+        _public_catalog_product(_strip_product_link_embeds(row), locale=locale, tag_ids=[], category_ids=[])
+        for row in candidates
+    ]
+    products = _search_catalog(products, search)
+    available_prices = [Decimal(str(item.get("price") or 0)) for item in products]
+    price_bounds = {
+        "min": str(min(available_prices)) if available_prices else None,
+        "max": str(max(available_prices)) if available_prices else None,
+        "currency": str(products[0].get("currency") or "") if products else "",
+    }
+    products = _sort_catalog(_filter_catalog_price(products, min_price, max_price), sort)
+    matching_ids = [str(item.get("id")) for item in products]
+    page_ids = matching_ids[start:start + limit]
+    matching = set(matching_ids)
+    featured_page_ids = [item for item in featured_ids if item in matching]
+    wanted = list(dict.fromkeys([*page_ids, *featured_page_ids]))
+    full_rows = {
+        str(row.get("id")): row
+        for row in rows(
+            _public_product_query(tenant_id, columns, _NO_CATALOG_FILTERS, uses_category_links, embed_links=True)
+            .in_("id", wanted)
+            .execute()
+        )
+    } if wanted else {}
+    return (
+        [full_rows[item] for item in page_ids if item in full_rows],
+        [full_rows[item] for item in featured_page_ids if item in full_rows],
+        len(matching_ids),
+        price_bounds,
+        uses_category_links,
+    )
+
+
+@traced_operation("catalog_product")
 def _catalog_product_payload(
     *,
     tenant_id: int,
     product_slug: str,
     locale: str,
 ) -> dict[str, Any]:
-    category_rows, tag_rows, _brand_rows, product_rows, link_rows, category_link_rows = _split_public_catalog_rows(_cached_public_catalog_rows(tenant_id))
-    row = next(
-        (
-            item for item in product_rows
-            if str(item.get("slug") or "").lower() == product_slug
-        ),
-        None,
+    taxonomy = _cached_public_catalog_taxonomy(tenant_id)
+    category_rows, tag_rows = taxonomy["category_rows"], taxonomy["tag_rows"]
+    # Slugs are stored lowercase (ecommerce_products slug CHECK), so an exact
+    # match equals the former case-insensitive scan without loading the catalog.
+    row, uses_category_links = _execute_product_read(
+        lambda columns, _scan_columns, uses_links: (
+            first_row(
+                _public_product_query(tenant_id, columns, _NO_CATALOG_FILTERS, uses_links, embed_links=True)
+                .eq("slug", product_slug)
+                .limit(1)
+                .execute()
+            ),
+            uses_links,
+        )
     )
     if not row:
         raise HTTPException(status_code=404, detail="Product not found")
     product_id = str(row.get("id") or "")
-    product_tag_ids = [
-        str(link.get("tag_id") or "")
-        for link in link_rows
-        if str(link.get("product_id") or "") == product_id
-    ]
-    product_category_ids = [
-        str(link.get("category_id") or "")
-        for link in category_link_rows
-        if str(link.get("product_id") or "") == product_id
-    ]
+    product_tag_ids, product_category_ids = _embedded_product_links(row, uses_category_links)
+    if not uses_category_links:
+        product_category_ids = [str(row.get("category_id"))] if row.get("category_id") else []
     product = _public_catalog_product(
-        row,
+        _strip_product_link_embeds(row),
         locale=locale,
         tag_ids=product_tag_ids,
         category_ids=product_category_ids,
@@ -2611,25 +3070,48 @@ def _catalog_product_payload(
         for item in category_rows
         if str(item.get("id") or "") in product_category_ids
     ]
-    attribute_rows = _optional_p1a_rows(service_supabase.table("ecommerce_product_attributes").select("id,name_translations,value_translations,sort_order").eq("tenant_id", tenant_id).eq("product_id", product_id).order("sort_order"))
+
+    def load_values():
+        def values_query(columns: str):
+            return (
+                service_supabase.table("ecommerce_product_option_values")
+                .select(columns)
+                .eq("tenant_id", tenant_id)
+                .eq("product_id", product_id)
+                .eq("active", True)
+                .order("sort_order")
+            )
+        try:
+            return rows(values_query("id,option_id,code,value_translations,sort_order,color_hex").execute())
+        except Exception as error:
+            if "color_hex" not in str(error).lower():
+                if _is_missing_optional_table(error):
+                    return None
+                raise
+            return _optional_p1a_rows(values_query("id,option_id,code,value_translations,sort_order"))
+
+    # Attributes, options, option values and variants (with their option
+    # links embedded) all depend only on the product id.
+    reads = _run_parallel_reads({
+        "attributes": lambda: _optional_p1a_rows(service_supabase.table("ecommerce_product_attributes").select("id,name_translations,value_translations,sort_order").eq("tenant_id", tenant_id).eq("product_id", product_id).order("sort_order")),
+        "options": lambda: _current_ecommerce_option_rows(tenant_id, product_id=product_id, columns="id,code,name_translations,required,sort_order,display_type"),
+        "values": load_values,
+        "variants": lambda: _optional_p1a_rows(service_supabase.table("ecommerce_product_variants").select("id,sku,price_override,compare_at_price_override,track_inventory,inventory_quantity,allow_backorder,images,public_option_links:ecommerce_variant_option_values(option_id,option_value_id)").eq("tenant_id", tenant_id).eq("product_id", product_id).eq("active", True)),
+    })
+    attribute_rows = reads["attributes"]
     if attribute_rows is None:
         return {"product": product, "category": category, "categories": categories, "tags": tags, "attributes": [], "options": [], "variants": []}
-    option_rows = _current_ecommerce_option_rows(tenant_id, product_id=product_id, columns="id,code,name_translations,required,sort_order,display_type") or []
+    option_rows = reads["options"] or []
     for option in option_rows:
         option["display_type"] = option.get("display_type") or "text"
-    option_ids = [str(item["id"]) for item in option_rows]
-    if not option_ids:
-        value_rows = []
-    else:
-        try:
-            value_rows = rows(service_supabase.table("ecommerce_product_option_values").select("id,option_id,code,value_translations,sort_order,color_hex").eq("tenant_id", tenant_id).eq("product_id", product_id).eq("active", True).in_("option_id", option_ids).order("sort_order").execute())
-        except Exception as error:
-            if "color_hex" not in str(error).lower() and "schema cache" not in str(error).lower():
-                raise
-            value_rows = rows(service_supabase.table("ecommerce_product_option_values").select("id,option_id,code,value_translations,sort_order").eq("tenant_id", tenant_id).eq("product_id", product_id).eq("active", True).in_("option_id", option_ids).order("sort_order").execute())
-    variant_rows = rows(service_supabase.table("ecommerce_product_variants").select("id,sku,price_override,compare_at_price_override,track_inventory,inventory_quantity,allow_backorder,images").eq("tenant_id", tenant_id).eq("product_id", product_id).eq("active", True).execute())
-    variant_ids = [str(item["id"]) for item in variant_rows]
-    links = [] if not variant_ids else rows(service_supabase.table("ecommerce_variant_option_values").select("variant_id,option_id,option_value_id").eq("tenant_id", tenant_id).in_("variant_id", variant_ids).execute())
+    option_ids = {str(item["id"]) for item in option_rows}
+    # Values of the product's current (active) options, in sort order.
+    value_rows = [value for value in reads["values"] or [] if str(value.get("option_id")) in option_ids] if option_ids else []
+    variant_rows = reads["variants"] or []
+    links = []
+    for variant in variant_rows:
+        for link in variant.pop("public_option_links", None) or []:
+            links.append({"variant_id": variant["id"], **link})
     for option in option_rows:
         names = option.pop("name_translations") or {}
         option["name"] = names.get(locale) or names.get("en") or next(iter(names.values()), "")
@@ -3071,6 +3553,10 @@ def login_tenant_account(
 @router.get("/sites/{subdomain}/auth/status")
 def tenant_visitor_status(subdomain: str, request: Request, response: Response):
     enforce_request_tenant_identity(request, normalize_subdomain(subdomain))
+    if not request.cookies.get("madar_access_token") and not request.cookies.get("madar_refresh_token"):
+        # Without either session cookie the visitor check always fails with
+        # 401 before reading or changing anything, so the answer is fixed.
+        return {"logged_in": False, "user": None}
     try:
         user_row, membership = require_tenant_visitor(subdomain, request, response)
         return {"logged_in": True, "user": build_user_payload(user_row), "role": membership.get("role")}
@@ -3136,7 +3622,16 @@ def _canonical_storefront_base(settings: dict, site_identifier: str, request: Re
 
 def _storefront_sitemap_xml(settings: dict, site_identifier: str, request: Request) -> str:
     tenant_id = resolve_tenant_id(settings)
-    categories, _tags, _brands, products, _links, _category_links = _split_public_catalog_rows(_cached_public_catalog_rows(tenant_id))
+    categories = _cached_public_catalog_taxonomy(tenant_id)["category_rows"]
+    products = _read_all_rows(
+        lambda count: service_supabase.table("ecommerce_products")
+        .select("slug,updated_at", count=count)
+        .eq("tenant_id", tenant_id)
+        .eq("status", "active")
+        .order("created_at", desc=True)
+        .order("id"),
+        parallel_batches=True,
+    )
     base = _canonical_storefront_base(settings, site_identifier, request)
     entries = [(base, settings.get("updated_at"))]
     entries.extend((f"{base}/catalog?category={quote(str(row.get('slug') or ''), safe='-')}", row.get("updated_at")) for row in categories if row.get("slug"))
@@ -3787,7 +4282,8 @@ def resolve_public_site_runtime_context(subdomain: str, request: Request) -> tup
 def get_public_site_runtime(subdomain: str, request: Request, response: Response):
     clean_subdomain = normalize_subdomain(subdomain)
     enforce_public_rate_limit(request, "site_lookup", clean_subdomain)
-    settings, project = resolve_public_site_runtime_context(clean_subdomain, request)
+    with traced_operation("site_runtime"):
+        settings, project = resolve_public_site_runtime_context(clean_subdomain, request)
     # Schema 115 joins the canonical ledger in the same authoritative DB read.
     # Never cache this snapshot or expose it in the public response.
     snapshot = None
@@ -3871,16 +4367,21 @@ def build_public_site_response(
     authorized_page_ids: set[str] = set()
     if identity:
         _, membership = identity
+        project_id = str(project.get("id") or "")
+        # The visitor's role depends only on membership and project, so one
+        # lookup serves every page instead of two queries per page.
+        role = get_project_role(membership=membership, project_id=project_id, client=service_supabase)
         for page in (project.get("published_schema") or {}).get("pages", []):
             page_id = str(page.get("id") or "") if isinstance(page, dict) else ""
             if page_id and has_project_permission(
                 membership=membership,
-                project_id=str(project.get("id") or ""),
+                project_id=project_id,
                 capability="view_protected_page",
                 client=service_supabase,
                 project=project,
                 resource_type="page",
                 resource_id=page_id,
+                role=role,
             ):
                 authorized_page_ids.add(page_id)
 
@@ -3992,8 +4493,10 @@ def get_public_form(subdomain: str, form_id: str, request: Request, response: Re
         f"{clean_subdomain}:{clean_form_id}",
     )
     settings = resolve_website_settings(clean_subdomain, request=request)
-    require_public_form_product(settings, clean_form_id)
-    project, form, published_schema = get_published_form_for_site(settings, clean_form_id)
+    with traced_operation("entitlement"):
+        require_public_form_product(settings, clean_form_id)
+    with traced_operation("form"):
+        project, form, published_schema = get_published_form_for_site(settings, clean_form_id)
     authorize_site_resource(
         subdomain=clean_subdomain,
         request=request,

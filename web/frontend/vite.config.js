@@ -14,9 +14,26 @@ const publicIconModules = new Set([
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, import.meta.dirname, "");
   const devApiTarget = env.VITE_DEV_PROXY_TARGET || "http://127.0.0.1:8000";
+  const devProxyRequestOrigin = env.VITE_DEV_PROXY_REQUEST_ORIGIN?.replace(/\/+$/, "");
+  const devProxyOptions = {
+    target: devApiTarget,
+    changeOrigin: true,
+    ...(devProxyRequestOrigin
+      ? {
+          headers: {
+            Origin: devProxyRequestOrigin,
+            Referer: `${devProxyRequestOrigin}/`,
+          },
+        }
+      : {}),
+  };
 
   return {
     plugins: [react()],
+    test: {
+      // Components under test expect every translation namespace, as the portal has.
+      setupFiles: ["./src/i18n/allTranslations.js"],
+    },
     build: {
       manifest: true,
       // Safari 14 cannot parse some modern syntax shipped by dependencies such as Three.js.
@@ -37,18 +54,15 @@ export default defineConfig(({ mode }) => {
     server: {
       proxy: {
         "/uploads": {
-          target: devApiTarget,
-          changeOrigin: true,
+          ...devProxyOptions,
         },
         "/api": {
-          target: devApiTarget,
-          changeOrigin: true,
+          ...devProxyOptions,
           rewrite: (path) => path.replace(/^\/api/, ""),
         },
 
         "/avatar_uploads": {
-          target: devApiTarget,
-          changeOrigin: true,
+          ...devProxyOptions,
         },
       },
     },

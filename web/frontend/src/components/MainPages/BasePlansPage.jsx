@@ -19,7 +19,7 @@ const formatStorage = (bytes) => `${Math.round(Number(bytes || 0) / 1024 ** 3)} 
 
 const CARD_FEATURE_KEYS = {
   website: ["reservation_system"],
-  business: ["reservation_system", "cv_reranker"],
+  business: ["reservation_system"],
 };
 
 export default function BasePlansPage({ lang = "en" }) {
@@ -137,7 +137,7 @@ export default function BasePlansPage({ lang = "en" }) {
               const recommended = plan.id === "business";
               const visibleFeatureKeys = [
                 ...new Set([...(plan.public_feature_keys || []), ...(CARD_FEATURE_KEYS[plan.id] || [])]),
-              ];
+              ].filter((featureKey) => featureKey !== "cv_reranker");
               return (
                 <article className={`pricing-mini-plan pricing-catalog-plan ${recommended ? "is-selected" : ""}`} key={plan.id}>
                   <header className="pricing-catalog-plan-header">

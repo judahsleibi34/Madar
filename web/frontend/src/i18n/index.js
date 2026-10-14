@@ -10,22 +10,9 @@ import {
 import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
 
-import enCommon from "./locales/en/common.json";
-import enAuth from "./locales/en/auth.json";
-import enPublic from "./locales/en/public.json";
-import enDashboard from "./locales/en/dashboard.json";
-import enPageBuilder from "./locales/en/pageBuilder.json";
-import enCommerce from "./locales/en/commerce.json";
-import enDataAnalysis from "./locales/en/dataAnalysis.json";
-import en from "./locales/en";
+import { loadTranslationBundles, translationLanguagesFor } from "./translationBundles";
 
-import arCommon from "./locales/ar/common.json";
-import arAuth from "./locales/ar/auth.json";
-import arPublic from "./locales/ar/public.json";
-import arDashboard from "./locales/ar/dashboard.json";
-import arPageBuilder from "./locales/ar/pageBuilder.json";
-import arDataAnalysis from "./locales/ar/dataAnalysis.json";
-import arCommerce from "./locales/ar/commerce.json";
+import en from "./locales/en";
 import ar from "./locales/ar";
 
 export const LANGUAGE_STORAGE_KEY = "madar.language";
@@ -165,45 +152,59 @@ export function translate(key, fallback, params, language = i18n.language) {
   return interpolate(resolvedValue, interpolationParams);
 }
 
-const resources = {
-  en: {
-    common: deepMerge(enCommon, {
-      common: en.common,
-      language: en.language,
-    }),
-    auth: enAuth,
-    public: enPublic,
-    dashboard: deepMerge(enDashboard, {
-      sidebar: en.sidebar,
-      notifications: en.notifications,
-      myPlan: en.myPlan,
-    }),
-    commerce: enCommerce,
-    pageBuilder: enPageBuilder,
-    dataAnalysis: enDataAnalysis,
-  },
-  ar: {
-    common: deepMerge(arCommon, {
-      common: ar.common,
-      language: ar.language,
-    }),
-    auth: arAuth,
-    public: arPublic,
-    dashboard: deepMerge(arDashboard, {
-      sidebar: ar.sidebar,
-      notifications: ar.notifications,
-      myPlan: ar.myPlan,
-    }),
-    commerce: arCommerce,
-    pageBuilder: arPageBuilder,
-    dataAnalysis: arDataAnalysis,
-  },
-};
+// Translation JSON is registered per language and namespace: the portal and
+// tests register everything up front (allTranslations.js), hosted tenant
+// pages register only what their route renders. The merged shapes below are
+// exactly the resources every page had before bundles were split.
+function buildTranslationNamespace(language, namespace, data) {
+  const locale = appLocales[language];
+  if (namespace === "common") {
+    return deepMerge(data, { common: locale.common, language: locale.language });
+  }
+  if (namespace === "dashboard") {
+    return deepMerge(data, {
+      sidebar: locale.sidebar,
+      notifications: locale.notifications,
+      myPlan: locale.myPlan,
+    });
+  }
+  return data;
+}
+
+const registeredNamespaces = new Set();
+
+export function registerTranslationBundles(bundles) {
+  Object.entries(bundles || {}).forEach(([language, namespaces]) => {
+    Object.entries(namespaces).forEach(([namespace, data]) => {
+      registeredNamespaces.add(namespace);
+      if (!i18n.hasResourceBundle(language, namespace)) {
+        i18n.addResourceBundle(language, namespace, buildTranslationNamespace(language, namespace, data), true, true);
+      }
+    });
+  });
+  if (!i18n.resolvedLanguage && i18n.language) {
+    i18n.setResolvedLanguage(i18n.language);
+  }
+}
+
+export function hasTranslations(namespaces, language = i18n.language) {
+  return translationLanguagesFor(normalizeLanguage(language)).every((lng) =>
+    namespaces.every((namespace) => i18n.hasResourceBundle(lng, namespace))
+  );
+}
+
+// Returns null when every bundle is present, otherwise a promise that
+// resolves once the missing bundles are registered.
+export function ensureTranslations(namespaces, language = i18n.language) {
+  if (hasTranslations(namespaces, language)) return null;
+  return loadTranslationBundles(translationLanguagesFor(normalizeLanguage(language)), namespaces)
+    .then(registerTranslationBundles);
+}
 
 const initialLanguage = getStoredLanguage();
 
 i18n.use(initReactI18next).init({
-  resources,
+  resources: {},
   lng: initialLanguage,
   fallbackLng: DEFAULT_LANGUAGE,
   defaultNS: "common",
@@ -214,6 +215,15 @@ i18n.use(initReactI18next).init({
 });
 
 applyDocumentLanguage(initialLanguage);
+
+// A language switch first registers that language's bundles for every
+// namespace already in use, then switches, so text, direction and the stored
+// preference still change together.
+const changeLanguageNow = i18n.changeLanguage.bind(i18n);
+i18n.changeLanguage = (nextLanguage, callback) => {
+  const pending = ensureTranslations([...registeredNamespaces], nextLanguage);
+  return pending ? pending.then(() => changeLanguageNow(nextLanguage, callback)) : changeLanguageNow(nextLanguage, callback);
+};
 
 i18n.on("languageChanged", (nextLanguage) => {
   applyDocumentLanguage(nextLanguage);

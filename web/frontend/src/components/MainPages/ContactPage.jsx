@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import GradientText from "../Animations/GradientText";
 import { FormBlock, HeroBlock, SectionBlock } from "../../blocks";
 import { PUBLIC_API_ROUTES } from "../../services/apiRoutes";
 import { postPublicJson, readApiErrorCode } from "../../utils/apiClient";
@@ -50,9 +49,7 @@ export default function ContactPage({ lang = "en" }) {
   return (
     <main className="contact-page" dir={lang === "ar" ? "rtl" : "ltr"}>
       <HeroBlock className="contact-hero app-page-intro">
-        <h1>
-          <GradientText pauseOnHover>{content.hero.title}</GradientText>
-        </h1>
+        <h1>{content.hero.title}</h1>
         <p>{content.hero.subtitle}</p>
       </HeroBlock>
 
@@ -106,9 +103,7 @@ export default function ContactPage({ lang = "en" }) {
         </FormBlock>
 
         <div className="contact-info-card">
-          <h2>
-            <GradientText pauseOnHover>{content.info.title}</GradientText>
-          </h2>
+          <h2>{content.info.title}</h2>
 
           <div>
             <strong>{content.info.emailLabel}</strong>

@@ -27,14 +27,17 @@ describe("CSP-safe early theme bootstrap", () => {
     expect(packageJson.dependencies["react-i18next"]).toBeTruthy();
   });
 
-  it("applies dark mode to the root and body before application render", () => {
+  it("ignores a legacy dark preference and applies light mode before application render", () => {
     localStorage.setItem("madar-theme-mode", "dark");
     Function(bootstrap)();
 
-    expect(document.documentElement.dataset.theme).toBe("dark");
-    expect(document.documentElement.classList.contains("theme-dark")).toBe(true);
-    expect(document.documentElement.style.colorScheme).toBe("dark");
-    expect(document.body.classList.contains("theme-dark")).toBe(true);
+    expect(document.documentElement.dataset.theme).toBe("light");
+    expect(document.documentElement.classList.contains("theme-dark")).toBe(false);
+    expect(document.documentElement.classList.contains("theme-light")).toBe(true);
+    expect(document.documentElement.style.colorScheme).toBe("light");
+    expect(document.body.classList.contains("theme-dark")).toBe(false);
+    expect(document.body.classList.contains("theme-light")).toBe(true);
+    expect(localStorage.getItem("madar-theme-mode")).toBe("light");
   });
 
   it("fails safely to light mode when storage is unavailable", () => {

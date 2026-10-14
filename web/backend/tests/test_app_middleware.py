@@ -62,6 +62,42 @@ class AppMiddlewareTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertRegex(response.headers.get("Server-Timing", ""), r"(?:^|, )app;dur=\d+(?:\.\d)?")
 
+    def test_detailed_trace_offsets_are_logged_not_sent_as_headers(self):
+        from services.observability_service import traced_operation
+
+        def traced():
+            for index in range(40):
+                with traced_operation(f"calendar_branch_{index:02d}"):
+                    pass
+            return {"ok": True}
+
+        path = "/__test_traced_offsets"
+        app.add_api_route(path, traced, methods=["GET"])
+        try:
+            with patch("app.PERFORMANCE_TIMING_ROUTES", {path}), patch("app.logger.info") as logged:
+                response = TestClient(app).get(path)
+        finally:
+            app.router.routes[:] = [route for route in app.router.routes if getattr(route, "path", "") != path]
+
+        self.assertEqual(response.status_code, 200)
+        header = response.headers.get("Server-Timing", "")
+        self.assertLessEqual(len(header), 1024)
+        self.assertNotIn("_start", header)
+        offsets = logged.call_args.kwargs["extra"]["timing_offsets"]
+        self.assertIn("calendar_branch_39_start", offsets)
+        self.assertLessEqual(offsets["calendar_branch_00_start"], offsets["calendar_branch_00_end"])
+
+    def test_timing_instrumentation_failure_does_not_fail_response(self):
+        with patch("app.PERFORMANCE_TIMING_ROUTES", {"/"}), patch(
+            "app.logger.info", side_effect=RuntimeError("log sink failed")
+        ), patch("app.logger.warning") as warned, patch("app.logger.error") as errored:
+            response = TestClient(app, raise_server_exceptions=False).get("/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"message": "All working"})
+        warned.assert_called_once()
+        errored.assert_not_called()
+
     def test_unhandled_exception_returns_sanitized_json_with_cors_and_request_id(self):
         with self.cors_origins(["http://localhost:3000"]):
             response = self.unhandled_response(origin="http://localhost:3000")

@@ -15,6 +15,22 @@ def enforcement_enabled() -> bool:
     }
 
 
+def embedded_tenant_is_active(tenant_id: int | str, embedded, *, client=None) -> bool:
+    """Decide lifecycle from a ``tenants`` row embedded in the same read.
+
+    ``embedded`` is the to-one embed (``None`` when no tenant row exists).
+    When the embed is unavailable, or carries no lifecycle column (legacy
+    schemas), the standalone fail-closed lookup decides instead.
+    """
+    if not enforcement_enabled():
+        return True
+    if embedded is None:
+        return False
+    if isinstance(embedded, dict) and "lifecycle_state" in embedded:
+        return embedded.get("lifecycle_state") == "active"
+    return tenant_is_active(tenant_id, client=client)
+
+
 def tenant_is_active(tenant_id: int | str, *, client=None) -> bool:
     if not enforcement_enabled():
         return True

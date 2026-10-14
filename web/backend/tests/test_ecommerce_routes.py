@@ -4,7 +4,7 @@ from fastapi import HTTPException
 from pydantic import ValidationError
 from unittest.mock import patch
 
-from routes.ecommerce_routes import BrandPayload, CategoryPayload, CatalogItemPayload, ProductPayload, StoreSocialLinksPayload, StoreThemePayload, _clean_slug, _handle_product_delete_error, _managed_catalog_asset_keys, _product_data, _require_multi_category_storage
+from routes.ecommerce_routes import BrandPayload, CategoryPayload, CatalogItemPayload, ProductPayload, StoreSocialLinksPayload, StoreThemePayload, _clean_slug, _handle_product_delete_error, _managed_catalog_asset_keys, _product_data, _require_multi_category_storage, _summarize_ecommerce_dashboard
 from routes.public_site_routes import (
     _filter_catalog_taxonomy,
     _localized_catalog_text,
@@ -24,6 +24,49 @@ def translations(name="Product"):
 
 
 class EcommerceRoutesTests(unittest.TestCase):
+
+    def test_dashboard_summary_counts_catalog_and_paid_sales(self):
+        summary = _summarize_ecommerce_dashboard(
+            {
+                "products": [
+                    {"id": "p-1", "status": "active", "translations": {"en": {"name": "Linen Shirt"}}},
+                    {"id": "p-2", "status": "draft", "translations": {"en": {"name": "City Jacket"}}},
+                ],
+                "tags": [{"id": "tag-1"}],
+                "categories": [{"id": "category-1"}, {"id": "category-2"}],
+                "stock_summary": {"low_stock": 2, "out_of_stock": 1},
+            },
+            [
+                {"id": "o-1", "total": "68.00", "currency": "USD", "payment_status": "paid", "status": "fulfilled"},
+                {"id": "o-2", "total": "99.00", "currency": "USD", "payment_status": "unpaid", "status": "pending"},
+                {"id": "o-3", "total": "50.00", "currency": "USD", "payment_status": "paid", "status": "cancelled"},
+            ],
+            [
+                {"order_id": "o-1", "product_id": "p-1", "product_name": "Linen Shirt", "quantity": 2, "line_total": "68.00"},
+                {"order_id": "o-2", "product_id": "p-2", "product_name": "City Jacket", "quantity": 1, "line_total": "99.00"},
+                {"order_id": "o-3", "product_id": "p-2", "product_name": "City Jacket", "quantity": 1, "line_total": "50.00"},
+            ],
+            "USD",
+        )
+
+        self.assertEqual(summary["catalog"], {
+            "products": 2,
+            "active_products": 1,
+            "tags": 1,
+            "categories": 2,
+            "low_stock": 2,
+            "out_of_stock": 1,
+        })
+        self.assertEqual(summary["sales"]["revenue"], "68.00")
+        self.assertEqual(summary["sales"]["orders"], 3)
+        self.assertEqual(summary["sales"]["paid_orders"], 1)
+        self.assertEqual(summary["sales"]["pending_orders"], 1)
+        self.assertEqual(summary["top_products"], [{
+            "product_id": "p-1",
+            "name": "Linen Shirt",
+            "units_sold": 2,
+            "revenue": "68.00",
+        }])
 
     def test_product_delete_migration_is_mirrored_and_keeps_history_protection(self):
         web_root = Path(__file__).resolve().parents[2]
