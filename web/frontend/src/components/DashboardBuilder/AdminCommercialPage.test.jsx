@@ -13,7 +13,7 @@ function fixture(modules = ["website"], amount = 2000) {
   return { tenant: { brand_name: "Synthetic tenant", owner_name: "Synthetic owner" }, hold: {}, commercial_access: { revision: 17, access_state: "active", review_state: "reviewed", period: { source_type: "complimentary", valid_from: "2026-09-01T00:00:00Z", valid_until: "2027-09-01T00:00:00Z", module_ids: modules }, addons: [] }, entitlements: { assigned_modules: modules, effective_modules: modules, module_commercial_basis: basis, capabilities: ["website_publish"], pricing: { recurring_minor: amount, currency: "USD", billing_interval: "month", price_groups: [{ price_book_id: "launch_2026", module_ids: modules, recurring_minor: amount, grandfathered: true, new_sales_active: false }] } } };
 }
 function mount(user = admin) { return render(<MemoryRouter initialEntries={["/admin/tenants/42/commercial"]}><Routes><Route path="/admin/tenants/:tenantId/commercial" element={<AdminCommercialPage currentUser={user} />} /></Routes></MemoryRouter>); }
-async function ready() { mount(); await screen.findByText("Assigned modules & founding basis"); }
+async function ready() { mount(); await screen.findByText("Assigned modules & price-book evidence"); }
 async function open(label) { await ready(); fireEvent.click(screen.getByRole("button", { name: label })); }
 beforeEach(() => {
   state = fixture(); history = { payments: [], periods: [], events: [] };
@@ -44,6 +44,20 @@ describe("Platform commercial management", () => {
   it("shows corrections without hiding originals", async () => { history.payments = [{ id: "original", actual_minor: 2000, receipt_reference: "ORIGINAL" }, { id: "correction", actual_minor: 2100, receipt_reference: "CORRECTED", corrects_payment_id: "original" }]; await ready(); expect(screen.getByText("ORIGINAL")).toBeTruthy(); expect(screen.getByText("CORRECTED")).toBeTruthy(); });
   it("has read-only prepared price books without activation", async () => { await ready(); expect(screen.getByText(/Prepared — not activated/)).toBeTruthy(); expect(screen.queryByRole("button", { name: /Activate/ })).toBeNull(); });
   it("keeps expired access visibly expired", async () => { state.commercial_access.access_state = "expired"; state.commercial_access.period = null; await ready(); expect(screen.getByText("expired")).toBeTruthy(); expect(screen.getByText("No current access period")).toBeTruthy(); });
+  it("restores a basis only through the explicit audited command payload", async () => {
+    await open("Restore founding price basis");
+    fireEvent.change(screen.getByLabelText("Supporting approval reference"), { target: { value: "CAB-204" } });
+    fireEvent.change(screen.getByLabelText("Required reason"), { target: { value: "Approved exception" } });
+    fireEvent.click(screen.getByLabelText(/I have reviewed/));
+    fireEvent.click(screen.getByRole("button", { name: "Confirm action" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    const call = commercialRequest.mock.calls.find(([path]) => path.endsWith("/restore-price-basis"));
+    expect(call[1]).toEqual(expect.objectContaining({
+      expected_revision: 17, reference: "CAB-204", reason: "Approved exception",
+      module_ids: ["website"], price_books: { website: "launch_2026" },
+    }));
+    expect(call[1].idempotency_key).toBeTruthy();
+  });
 });
 
 it.each(["Record manual payment", "Grant complimentary access", "Revoke access", "Correct payment evidence", "Review as inactive"])("opens the canonical %s action with mandatory review", async label => {

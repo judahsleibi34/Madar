@@ -282,6 +282,8 @@ def get_tenant_entitlements(tenant_id: int | str, *, commercial_snapshot: dict |
         "next_transition_at": ledger.get("next_transition_at"),
         "effective_at": ledger.get("effective_at"),
         "access_period": ledger.get("period"),
+        "protection_contract_version": ledger.get("protection_contract_version"),
+        "protection_policy": ledger.get("protection_policy"),
         "commercial_entitlements_enforced": commercial_entitlements_enforced(),
         "commercial_suspended_at": ledger.get("commercial_suspended_at"),
     }

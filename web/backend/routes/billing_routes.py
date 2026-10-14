@@ -1,7 +1,10 @@
 import os
 import secrets
+from datetime import datetime, timezone
+from typing import Literal
 
 from fastapi import APIRouter, Header, HTTPException, Request, Response
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from classes import (
     BillingCheckoutRequest,
@@ -19,20 +22,53 @@ from services.billing_service import (
 )
 from services.commercial_billing_service import request_addon, request_plan
 from services.commercial_catalog import get_catalog
+from services.commercial_access_service import resolve_commercial_access
 from services.entitlement_service import (
     get_operational_usage,
     get_tenant_entitlements,
     get_workspace_seat_capacity,
     get_workspace_seat_usage,
 )
+from database import service_supabase
 
 
 router = APIRouter(tags=["Billing"])
 
 
 @router.get("/billing/catalog")
-def billing_catalog():
-    return {"success": True, "catalog": get_catalog(public_only=True)}
+def billing_catalog(response: Response):
+    response.headers["Cache-Control"] = "no-store"
+    catalog = get_catalog(public_only=True)
+    catalog["price_book"] = None
+    try:
+        rows = (
+            service_supabase.table("commercial_price_books")
+            .select(
+                "id,version,effective_from,currency,billing_interval,"
+                "standalone_minor,bundle_minor,sales_start_at,sales_end_at"
+            )
+            .eq("id", catalog["price_book_id"])
+            .limit(1)
+            .execute()
+            .data
+            or []
+        )
+        if rows:
+            book = rows[0]
+            now = datetime.now(timezone.utc)
+            start = book.get("sales_start_at")
+            end = book.get("sales_end_at")
+            starts_at = datetime.fromisoformat(start.replace("Z", "+00:00")) if start else None
+            ends_at = datetime.fromisoformat(end.replace("Z", "+00:00")) if end else None
+            book["new_sales_active"] = bool(
+                starts_at and starts_at <= now and (ends_at is None or ends_at > now)
+            )
+            catalog["price_book"] = book
+    except Exception:
+        # Public clients must fail closed instead of falling back to duplicated
+        # or stale frontend prices when the commercial catalog is unavailable.
+        pass
+    return {"success": True, "catalog": catalog}
 
 
 def _commercial_context(request: Request, response: Response) -> TenantContext:
@@ -66,6 +102,13 @@ def current_commercial_plan(request: Request, response: Response):
         "commercial_access_state": entitlements.get("commercial_access_state"),
         "commercial_denial_code": entitlements.get("commercial_denial_code"),
         "commercial_revision": entitlements.get("commercial_revision"),
+        "access_period": entitlements.get("access_period"),
+        "paid_through": (entitlements.get("access_period") or {}).get("valid_until"),
+        "next_transition_at": entitlements.get("next_transition_at"),
+        "effective_at": entitlements.get("effective_at"),
+        "commercial_suspended_at": entitlements.get("commercial_suspended_at"),
+        "protection_contract_version": entitlements.get("protection_contract_version"),
+        "protection_policy": entitlements.get("protection_policy"),
         "state": (
             (entitlements.get("assigned_subscription") or entitlements.get("subscription") or {}).get("state")
             or ("review_required" if entitlements.get("review_required") else "legacy")
@@ -73,6 +116,86 @@ def current_commercial_plan(request: Request, response: Response):
         "source": entitlements.get("source"),
         "review_required": entitlements.get("review_required", False),
     }
+
+
+class CustomerModuleQuoteRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    module_ids: list[Literal["forms", "website", "ecommerce"]] = Field(
+        ..., min_length=1, max_length=3
+    )
+
+    @model_validator(mode="after")
+    def unique_modules(self):
+        if len(self.module_ids) != len(set(self.module_ids)):
+            raise ValueError("Unique modules are required")
+        return self
+
+
+@router.post("/billing/module-quote")
+def customer_module_quote(
+    selection: CustomerModuleQuoteRequest,
+    request: Request,
+    response: Response,
+):
+    """Return a ledger-authoritative quote for the signed-in tenant.
+
+    This endpoint is deliberately read-only. Subscription changes remain in
+    the existing reviewed commercial workflow.
+    """
+    context = _commercial_context(request, response)
+    state = resolve_commercial_access(context.tenant_id)
+    if (
+        state.get("protection_contract_version") != 145
+        or state.get("protection_policy") != "strict_paid_continuity_v1"
+    ):
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "code": "commercial_protection_upgrade_required",
+                "message": "Subscription quoting is temporarily unavailable.",
+            },
+        )
+    try:
+        quote = service_supabase.rpc(
+            "quote_commercial_modules",
+            {
+                "p_tenant_id": context.tenant_id,
+                "r": {"module_ids": selection.module_ids, "price_books": {}},
+            },
+        ).execute().data
+        pricing = quote.get("pricing") if isinstance(quote, dict) else None
+        if (
+            not isinstance(quote, dict)
+            or not isinstance(quote.get("revision"), int)
+            or isinstance(quote.get("revision"), bool)
+            or not isinstance(quote.get("module_basis"), dict)
+            or set(quote.get("module_basis") or {}) != set(selection.module_ids)
+            or not isinstance(pricing, dict)
+            or pricing.get("module_ids") != sorted(selection.module_ids)
+            or not isinstance(pricing.get("recurring_minor"), int)
+            or isinstance(pricing.get("recurring_minor"), bool)
+        ):
+            raise ValueError("invalid_quote")
+        response.headers["Cache-Control"] = "no-store"
+        return {"success": True, "quote": quote}
+    except HTTPException:
+        raise
+    except Exception as error:
+        if getattr(error, "code", None) in {"22023", "P0002"}:
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "commercial_price_book_unavailable",
+                    "message": "No eligible price book is available for this module selection.",
+                },
+            ) from error
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "code": "commercial_dependency_unavailable",
+                "message": "Subscription quoting is temporarily unavailable.",
+            },
+        ) from error
 
 
 @router.get("/billing/add-ons")

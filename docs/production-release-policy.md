@@ -1,5 +1,34 @@
 # Madar production release acceptance policy
 
+## Unselected revised launch price-book candidate145→146
+
+Schema146 is an additive, unselected successor to exact schema145, validated by
+`web/scripts/launch_price_book_candidate.py`; the active schema115→136 release remains unchanged. It
+adds the prepared `launch_2026_v2` price book (Commerce USD 25; other modules and bundles unchanged)
+and permanently retires the never-activated `launch_2026`. Activation still requires the governed
+`sales_start_at` step. Application code that targets `launch_2026_v2` must not be promoted ahead of
+schema146: the public catalog then reports no authoritative price book and pricing fails closed.
+The AI assistant add-on (any Core Module) is catalog-only (`coming_soon`) and cannot be requested until the
+feature exists and the add-on ledger constraint is separately migrated.
+
+## Unselected strict commercial-continuity candidate144→145
+
+Schema145 is an additive, unselected successor to exact schema144. Its pinned manifest/bridge and
+mirrored SQL are validated by `web/scripts/commercial_continuity_candidate.py`; the active
+schema115→136 release remains unchanged. The candidate replaces schema115's `paid_since` eligibility
+shortcut with confirmed, uninterrupted paid-ledger continuity and the authoritative database clock.
+Exact adjacent half-open renewals preserve eligible pricing; expiration ends access and ordinary
+closed-book eligibility without a job, grace period, recovery deadline, retry restoration, data
+deletion, or evidence rewrite. Holds retain their existing denial semantics without changing paid
+dates or pricing basis.
+
+Historical-price restoration is available only through the dedicated platform-admin AAL2 command
+with exact module/book approval, reason, supporting reference, expected revision, idempotency, and
+immutable audit evidence. Application price-basis mutations fail closed until schema145 identifies
+the strict protection contract. This source change performs no production migration or deployment;
+production schema115 requires a separately governed path through the already reviewed candidates to
+schema144 before this transition can ever be selected.
+
 ## Separately authorized schema144 maintenance release
 
 An exact compensated boot-failure interlock can be reconciled only when explicitly

@@ -1,0 +1,14 @@
+{
+  "manifest_version": 1,
+  "release_sha": "STAGING",
+  "migrations": [
+    {
+      "number": 145,
+      "from_schema": 144,
+      "to_schema": 145,
+      "path": "web/database/migrations/145_enforce_paid_commercial_continuity.sql",
+      "sha256": "dc9882fbbe8582c021cfca0f3a97a0621e237dde8c66406516a7d84ca5338288",
+      "compatibility": "forward-compatible"
+    }
+  ]
+}

@@ -17,7 +17,9 @@ from tests.test_admin_mfa_aal2_enforcement import ADMIN_USER, REGULAR_USER, _Fak
 
 def snapshot(tenant=7, **changes):
     now = datetime.now(timezone.utc)
-    state = {"contract_version": 115, "tenant_id": tenant, "revision": 17, "review_state": "reviewed",
+    state = {"contract_version": 115, "protection_contract_version": 145,
+             "protection_policy": "strict_paid_continuity_v1",
+             "tenant_id": tenant, "revision": 17, "review_state": "reviewed",
              "commercial_suspended_at": None, "effective_at": now.isoformat(), "has_history": True, "access_state": "active",
              "next_transition_at": (now + timedelta(days=1)).isoformat(),
              "period": {"tenant_id": tenant, "plan_id": None, "module_ids": ["forms","website","ecommerce"], "valid_from": (now-timedelta(days=1)).isoformat(),
@@ -341,6 +343,34 @@ class CommercialCommandSecurityTests(unittest.TestCase):
                 self.assertEqual(command.call_args.kwargs["operation"],"assign_modules")
             else:command.assert_not_called()
 
+    def test_price_restoration_requires_aal2_and_complete_evidence(self):
+        payload={**self.payload,"reference":"approved-exception-42",
+                 "module_ids":["forms","ecommerce"],
+                 "price_books":{"forms":"launch_2026","ecommerce":"launch_2026"}}
+        self.assertEqual(self.client.post(
+            "/admin/billing/tenants/7/restore-price-basis",json=payload).status_code,401)
+        response,command=self.call_as(
+            ADMIN_USER,"aal1","restore-price-basis",payload)
+        self.assertEqual(response.status_code,403); command.assert_not_called()
+        with patch.object(auth_service,"get_authenticated_user_row",
+                          return_value=(SimpleNamespace(id=ADMIN_USER["auth_id"]),ADMIN_USER)), \
+             patch.object(auth_service,"get_current_aal",return_value={"current_level":"aal2"}), \
+             patch.object(admin_billing_routes,"apply_commercial_command",
+                          return_value={"revision":18,"operation":"restore_price_basis"}) as command:
+            response=self.client.post(
+                "/admin/billing/tenants/7/restore-price-basis",json=payload)
+        self.assertEqual(response.status_code,200)
+        self.assertEqual(command.call_args.kwargs["operation"],"restore_price_basis")
+        self.assertEqual(command.call_args.kwargs["command"]["reference"],"approved-exception-42")
+        for invalid in (
+            {**payload,"reference":" "},
+            {**payload,"price_books":{"forms":"launch_2026"}},
+            {**payload,"module_ids":["forms","forms"]},
+        ):
+            response,command=self.call_as(
+                ADMIN_USER,"aal2","restore-price-basis",invalid)
+            self.assertEqual(response.status_code,422); command.assert_not_called()
+
     def test_reason_and_expected_revision_required(self):
         for change in ({"reason":"   "}, {"expected_revision":0}, {"expected_revision":"17"}):
             response, command = self.call_as(ADMIN_USER, "aal2", payload={**self.payload, **change})
@@ -368,8 +398,27 @@ class CommercialCommandSecurityTests(unittest.TestCase):
                 access.apply_commercial_command(tenant_id=7,actor_user_id=99,operation="suspend",idempotency_key="commercial-test-request",request_id="request-test",command=self.payload)
         self.assertEqual(error.exception.detail["code"], "commercial_upgrade_required"); db.rpc.assert_not_called()
 
+    def test_schema_115_refuses_price_basis_mutations(self):
+        old={**snapshot()}
+        old.pop("protection_contract_version")
+        old.pop("protection_policy")
+        for operation in ("manual_payment","complimentary","assign_modules","restore_price_basis"):
+            with self.subTest(operation=operation), \
+                 patch.object(access,"resolve_commercial_access",return_value=old), \
+                 patch.object(access,"service_supabase") as db:
+                with self.assertRaises(HTTPException) as error:
+                    access.apply_commercial_command(
+                        tenant_id=7,actor_user_id=99,operation=operation,
+                        idempotency_key="commercial-test-request",request_id="request-test",
+                        command=self.payload)
+                self.assertEqual(error.exception.detail["code"],
+                                 "commercial_protection_upgrade_required")
+                db.rpc.assert_not_called()
+
     def test_malformed_or_missing_snapshot_fails_closed_even_bypass(self):
         for state in (None, {}, {**snapshot(),"revision":True}, {**snapshot(),"contract_version":116},
+                      {**snapshot(),"protection_contract_version":144},
+                      {**snapshot(),"protection_policy":"unknown"},
                       {k:v for k,v in snapshot().items() if k!="commercial_suspended_at"},
                       {k:v for k,v in snapshot().items() if k!="subscriptions"}):
             db = Mock(); db.rpc.return_value.execute.return_value.data=state

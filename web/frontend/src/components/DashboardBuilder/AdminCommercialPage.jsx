@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { commercialRequest, moduleNames, money, date } from "../../services/adminCommercialApi";
+import { useLanguage } from "../../i18n";
 import AdminCommercialStepUp from "./AdminCommercialStepUp";
 import "../../styles/admin/commercial.css";
 
@@ -8,6 +9,7 @@ const names = {
   modules: "Manage modules", suspend: "Suspend commercial access", reactivate: "Reactivate commercial access",
   "manual-payments": "Record manual payment", "complimentary-access": "Grant complimentary access",
   "revoke-access": "Revoke access", "correct-payment": "Correct payment evidence", "review-inactive": "Review as inactive",
+  "restore-price-basis": "Restore founding price basis",
 };
 const effects = {
   modules: "Assignment does not record payment or grant dated access. Removing a module ends that module’s automatic founding price lock.",
@@ -18,6 +20,13 @@ const effects = {
   "revoke-access": "Ends the selected access period. This is distinct from a reversible commercial hold. Historical evidence remains stored.",
   "correct-payment": "Appends correction evidence; the original payment remains visible. Coverage is not silently extended.",
   "review-inactive": "Explicitly resolves legacy review as inactive; does not grant modules or access.",
+  "restore-price-basis": "Exceptional restoration only. Select the approved historical basis and provide a supporting reference. This does not rewrite payment or access-period history.",
+};
+const arabicNames = {
+  modules: "إدارة الوحدات", suspend: "إيقاف الوصول التجاري", reactivate: "إزالة الإيقاف الإداري",
+  "manual-payments": "تسجيل دفعة يدوية", "complimentary-access": "منح وصول مجاني محدد المدة",
+  "revoke-access": "إلغاء فترة وصول", "correct-payment": "تصحيح إثبات دفعة", "review-inactive": "اعتماد الحالة غير النشطة",
+  "restore-price-basis": "استعادة أساس سعر التأسيس",
 };
 
 function Pricing({ pricing }) {
@@ -25,14 +34,15 @@ function Pricing({ pricing }) {
     {(pricing?.price_groups || []).map(group => <p key={group.price_book_id}>{group.module_ids.map(id => moduleNames[id] || id).join(" + ")} · {group.price_book_id} · {money(group.recurring_minor, pricing.currency)} · {group.grandfathered ? "Continuous paid basis protected" : "No continuous paid lock"} · {group.new_sales_active ? "Open for new sales" : "Not open for new sales"}</p>)}</>;
 }
 
-function CommercialDialog({ action, snapshot, history, tenantId, onClose, onSuccess, onConflict, onStepUp }) {
+function CommercialDialog({ action, snapshot, history, books, tenantId, language, onClose, onSuccess, onConflict, onStepUp }) {
   const dialog = useRef(null);
   const inFlight = useRef(false);
   const intent = useRef(null);
   const draftRevision = useRef(0);
   const ent = snapshot.entitlements || {};
   const assigned = ent.assigned_modules || [];
-  const [fields, setFields] = useState({ module_ids: assigned, reason: "", reference: "", billing_months: 1, method: "bank_transfer", actual_minor: "", paid_at: "", valid_from: "", valid_until: "", receipt_reference: "", override_reason: "", period_id: "", payment_id: "", supersedes_period_id: "" });
+  const initialBooks = Object.fromEntries(assigned.map(id => [id, ent.module_commercial_basis?.[id]?.price_book_id || ""]));
+  const [fields, setFields] = useState({ module_ids: assigned, price_books: initialBooks, reason: "", reference: "", billing_months: 1, method: "bank_transfer", actual_minor: "", paid_at: "", valid_from: "", valid_until: "", receipt_reference: "", override_reason: "", period_id: "", payment_id: "", supersedes_period_id: "" });
   const [quote, setQuote] = useState(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -71,6 +81,14 @@ function CommercialDialog({ action, snapshot, history, tenantId, onClose, onSucc
     const body = { expected_revision: snapshot.commercial_access.revision, reason: fields.reason.trim(), ...(fields.reference ? { reference: fields.reference } : {}) };
     if (body.reason.length < 3) { setError("Enter a reason of at least three characters."); return; }
     if (action === "modules" || grant) body.module_ids = fields.module_ids;
+    if (action === "restore-price-basis") {
+      body.module_ids = fields.module_ids;
+      body.price_books = Object.fromEntries(fields.module_ids.map(id => [id, fields.price_books[id]]));
+      body.reference = fields.reference.trim();
+      if (!fields.module_ids.length || Object.values(body.price_books).some(value => !value) || !body.reference) {
+        setError("Select at least one module, an explicit price book for each module, and a supporting reference."); return;
+      }
+    }
     if (action === "modules") body.price_books = Object.fromEntries(Object.entries(quote.module_basis || {}).map(([id, basis]) => [id, basis.price_book_id]));
     if (grant) {
       if (!fields.module_ids.length) { setError("Select at least one assigned module."); return; }
@@ -99,12 +117,13 @@ function CommercialDialog({ action, snapshot, history, tenantId, onClose, onSucc
   const removed = assigned.filter(id => !fields.module_ids.includes(id));
   return <dialog ref={dialog} open={!HTMLDialogElement.prototype.showModal} className="commercial-dialog" aria-labelledby="commercial-action-title" onCancel={e => { if (busy) e.preventDefault(); else onClose(); }}>
     <form onSubmit={submit}>
-      <h2 id="commercial-action-title">{names[action]}</h2>
+      <h2 id="commercial-action-title">{language === "ar" ? arabicNames[action] : names[action]}</h2>
       <p>{snapshot.tenant?.brand_name || `Tenant ${tenantId}`} · {snapshot.commercial_access.access_state} · Revision {snapshot.commercial_access.revision}</p>
       <p>{effects[action]}</p>
       <p>Existing modules: {assigned.map(id => moduleNames[id]).join(", ") || "None / legacy review required"}</p>
       {action === "modules" && <><h3>Current pricing</h3><Pricing pricing={ent.pricing} /></>}
       {(action === "modules" || grant) && <fieldset><legend>{action === "modules" ? "Proposed modules (none means full cancellation)" : "Assigned modules covered"}</legend>{Object.entries(moduleNames).map(([id, label]) => <label key={id}><input type="checkbox" checked={fields.module_ids.includes(id)} disabled={grant} onChange={e => change("module_ids", e.target.checked ? [...fields.module_ids, id] : fields.module_ids.filter(m => m !== id))} />{label}</label>)}</fieldset>}
+      {action === "restore-price-basis" && <fieldset><legend>Approved modules and historical price books</legend>{Object.entries(moduleNames).map(([id, label]) => { const selected = fields.module_ids.includes(id); return <div key={id}><label><input type="checkbox" checked={selected} onChange={e => change("module_ids", e.target.checked ? [...fields.module_ids, id] : fields.module_ids.filter(m => m !== id))} />{label}</label>{selected && <label>Price book for {label}<select required value={fields.price_books[id] || ""} onChange={e => change("price_books", { ...fields.price_books, [id]: e.target.value })}><option value="">Select approved basis</option>{books.filter(book => !book.new_sales_active).map(book => <option key={book.id} value={book.id}>{book.id} · {book.version}</option>)}</select></label>}</div>; })}</fieldset>}
       {action === "modules" && removed.length > 0 && <p className="commercial-warning" role="status">Price-lock warning: removal of {removed.map(id => moduleNames[id]).join(", ")} forfeits its continuous founding basis. Re-adding does not automatically restore launch eligibility.</p>}
       {grant && <>{input("valid_from", "Coverage starts (local time)", "datetime-local")}{input("valid_until", "Coverage ends (local time)", "datetime-local")}<label>Explicitly supersede an access period<select value={fields.supersedes_period_id} onChange={e => change("supersedes_period_id", e.target.value)}><option value="">Do not supersede (overlaps will be rejected)</option>{(history.periods || []).filter(p => !p.revoked_at).map(p => <option key={p.id} value={p.id}>{p.id} · {date(p.valid_until)}</option>)}</select></label></>}
       {action === "manual-payments" && <>{input("billing_months", "Billing months (coverage must match calendar months)", "number")}<label>Method<select value={fields.method} onChange={e => change("method", e.target.value)}>{["bank_transfer", "cash", "other_manual"].map(method => <option key={method}>{method}</option>)}</select></label></>}
@@ -112,7 +131,7 @@ function CommercialDialog({ action, snapshot, history, tenantId, onClose, onSucc
       {action === "revoke-access" && <label>Access period<select required value={fields.period_id} onChange={e => change("period_id", e.target.value)}><option value="">Select period</option>{(history.periods || []).filter(p => !p.revoked_at).map(p => <option key={p.id} value={p.id}>{p.id} · {p.source_type} · {date(p.valid_from)} — {date(p.valid_until)}</option>)}</select></label>}
       {action === "correct-payment" && <label>Original payment<select required value={fields.payment_id} onChange={e => change("payment_id", e.target.value)}><option value="">Select payment</option>{(history.payments || []).map(p => <option key={p.id} value={p.id}>{p.id} · {money(p.actual_minor, p.currency)} · {p.receipt_reference}</option>)}</select></label>}
       <label>Required reason<textarea required minLength={3} maxLength={1000} value={fields.reason} onChange={e => change("reason", e.target.value)} /></label>
-      {input("reference", "Safe action reference (optional)", "text", false)}
+      {input("reference", action === "restore-price-basis" ? "Supporting approval reference" : "Safe action reference (optional)", "text", action === "restore-price-basis")}
       {requiresQuote && <><button type="button" disabled={busy || stale || !!intent.current} onClick={preview}>Preview server quote</button>{quote && <section aria-label="Server quote"><Pricing pricing={quote.pricing} />{action === "manual-payments" && <p>Expected payment: {money(quote.expected_payment_minor, quote.pricing.currency)}</p>}{action === "manual-payments" && !quote.payment_eligible && <p role="alert">This basis is not eligible for payment. Launch pricing is prepared, not activated; use an approved complimentary workflow if appropriate.</p>}<p>Proposed modules: {quote.pricing.module_ids.map(id => moduleNames[id]).join(", ") || "Full cancellation"}</p></section>}</>}
       <label><input type="checkbox" checked={confirmed} onChange={e => setConfirmed(e.target.checked)} required />I have reviewed this tenant, commercial basis and the effect of this action.</label>
       {error && <p role="alert">{error}</p>}
@@ -123,6 +142,7 @@ function CommercialDialog({ action, snapshot, history, tenantId, onClose, onSucc
 }
 
 export default function AdminCommercialPage({ currentUser }) {
+  const { direction, language } = useLanguage();
   const { tenantId } = useParams();
   const [loadedSnapshot, setSnapshot] = useState(null);
   const snapshot = loadedSnapshot?._inspectedTenantId === tenantId ? loadedSnapshot : null;
@@ -148,32 +168,45 @@ export default function AdminCommercialPage({ currentUser }) {
     finally { if (sequence === loadSequence.current) setLoading(false); }
   }, [tenantId, currentUser?.user_type]);
   useEffect(() => { let active = true; queueMicrotask(() => { if (active) load(); }); return () => { active = false; invalidateLoads(); }; }, [load, invalidateLoads]);
-  if (currentUser?.user_type !== "admin") return <section><h1>Platform administrator access required</h1></section>;
+  const pageCopy = language === "ar" ? {
+    denied: "يتطلب الوصول صلاحية مدير المنصة", back: "إدارة المستخدمين والعملاء", title: "الوصول التجاري",
+    reload: "إعادة تحميل الحالة المعتمدة", loading: "جارٍ تحميل الحالة التجارية…", status: "الحالة التجارية",
+    recurring: "القيمة الشهرية الحالية", dated: "الوصول المحدد بالتاريخ", modules: "الوحدات وأدلة سجل الأسعار",
+    actions: "الإجراءات التجارية", capabilities: "الصلاحيات الفعّالة", payments: "الدفعات", periods: "فترات الوصول",
+    audit: "السجل التجاري والتدقيق", books: "سجلات الأسعار (للقراءة فقط)",
+  } : {
+    denied: "Platform administrator access required", back: "User & tenant management", title: "Commercial access",
+    reload: "Reload authoritative state", loading: "Loading commercial state…", status: "Commercial status",
+    recurring: "Current recurring core amount", dated: "Dated access", modules: "Assigned modules & price-book evidence",
+    actions: "Commercial actions", capabilities: "Effective capabilities", payments: "Payments", periods: "Access periods",
+    audit: "Commercial events / audit context", books: "Price books (read-only)",
+  };
+  if (currentUser?.user_type !== "admin") return <section dir={direction}><h1>{pageCopy.denied}</h1></section>;
   const ent = snapshot?.entitlements || {};
   const state = snapshot?.commercial_access || {};
   const period = state.period;
-  return <main className="commercial-page dashboard-page">
-    <header className="app-page-intro"><Link to="/admin/users">← User & tenant management</Link><h1>Commercial access</h1><p>{snapshot?.tenant?.brand_name || `Tenant ${tenantId}`} · Tenant ID {tenantId} · Owner: {snapshot?.tenant?.owner_name || "Unavailable"}</p></header>
+  return <main className="commercial-page dashboard-page" dir={direction}>
+    <header className="app-page-intro"><Link to="/admin/users">← {pageCopy.back}</Link><h1>{pageCopy.title}</h1><p>{snapshot?.tenant?.brand_name || `Tenant ${tenantId}`} · Tenant ID {tenantId} · Owner: {snapshot?.tenant?.owner_name || "Unavailable"}</p></header>
     {error && <p role="alert">{error}</p>}{success && <p role="status">{success}</p>}
     {stepUp && <section className="commercial-card"><AdminCommercialStepUp userId={currentUser?.id} onVerified={load} /></section>}
-    <button type="button" disabled={loading} onClick={load}>Reload authoritative state</button>
-    {loading && <p role="status">Loading commercial state…</p>}
+    <button type="button" disabled={loading} onClick={load}>{pageCopy.reload}</button>
+    {loading && <p role="status">{pageCopy.loading}</p>}
     {snapshot && !loading && <>
       <div className="commercial-grid">
-        <section className="commercial-card"><h2>Commercial status</h2><dl><dt>Effective state</dt><dd>{state.access_state || "Unavailable"}</dd><dt>Review</dt><dd>{state.review_state || "Unavailable"}</dd><dt>Revision</dt><dd>{state.revision ?? "Unavailable"}</dd><dt>Next transition</dt><dd>{date(state.next_transition_at)}</dd><dt>Commercial hold</dt><dd>{snapshot.hold?.commercial_suspended_at ? `Held since ${date(snapshot.hold.commercial_suspended_at)}` : "No administrative hold"}</dd><dt>Hold reason</dt><dd>{snapshot.hold?.commercial_suspension_reason || "None"}</dd><dt>Tenant lifecycle</dt><dd>Unavailable in current tenant API</dd></dl></section>
-        <section className="commercial-card"><h2>Current recurring core amount</h2><Pricing pricing={ent.pricing} /><p>Add-ons and variable provider costs are separate.</p></section>
-        <section className="commercial-card"><h2>Dated access</h2>{period ? <><p>{period.source_type || "Source unavailable"}</p><p>{date(period.valid_from)} — {date(period.valid_until)}</p><p>{(period.module_ids || []).map(id => moduleNames[id]).join(", ") || "Historical legacy coverage"}</p></> : <p>No current access period</p>}</section>
+        <section className="commercial-card"><h2>{pageCopy.status}</h2><dl><dt>Effective state</dt><dd>{state.access_state || "Unavailable"}</dd><dt>Review</dt><dd>{state.review_state || "Unavailable"}</dd><dt>Revision</dt><dd>{state.revision ?? "Unavailable"}</dd><dt>Next transition</dt><dd>{date(state.next_transition_at)}</dd><dt>Commercial hold</dt><dd>{snapshot.hold?.commercial_suspended_at ? `Held since ${date(snapshot.hold.commercial_suspended_at)}` : "No administrative hold"}</dd><dt>Hold reason</dt><dd>{snapshot.hold?.commercial_suspension_reason || "None"}</dd><dt>Tenant lifecycle</dt><dd>Unavailable in current tenant API</dd></dl></section>
+        <section className="commercial-card"><h2>{pageCopy.recurring}</h2><Pricing pricing={ent.pricing} /><p>Add-ons and variable provider costs are separate.</p></section>
+        <section className="commercial-card"><h2>{pageCopy.dated}</h2>{period ? <><p>{period.source_type || "Source unavailable"}</p><p>{date(period.valid_from)} — {date(period.valid_until)}</p><p>{(period.module_ids || []).map(id => moduleNames[id]).join(", ") || "Historical legacy coverage"}</p></> : <p>No current access period</p>}</section>
       </div>
-      <section className="commercial-card"><h2>Assigned modules & founding basis</h2><div className="commercial-grid">{Object.entries(moduleNames).map(([id, label]) => { const basis = ent.module_commercial_basis?.[id]; return <article key={id}><h3>{label}</h3><p>{(ent.assigned_modules || []).includes(id) ? "Assigned" : "Not assigned"} · {Array.isArray(ent.effective_modules) ? ent.effective_modules.includes(id) ? "Effective" : "Not effective" : ent.commercial_denial_code ? "Not effective" : "Effective module state unavailable"}</p>{basis && <><p>{basis.price_book_id} · {basis.paid_since ? (basis.price_book_id === "launch_2026" ? "Founding price protected while continuously assigned" : "Continuous paid price-book basis") : "No founding paid lock"}</p><p>Acquired: {date(basis.acquired_at)} · Paid since: {date(basis.paid_since)}</p></>}</article>; })}</div></section>
+      <section className="commercial-card"><h2>{pageCopy.modules}</h2><div className="commercial-grid">{Object.entries(moduleNames).map(([id, label]) => { const basis = ent.module_commercial_basis?.[id]; const group = ent.pricing?.price_groups?.find(item => item.module_ids?.includes(id)); return <article key={id}><h3>{label}</h3><p>{(ent.assigned_modules || []).includes(id) ? "Assigned" : "Not assigned"} · {Array.isArray(ent.effective_modules) ? ent.effective_modules.includes(id) ? "Effective" : "Not effective" : ent.commercial_denial_code ? "Not effective" : "Effective module state unavailable"}</p>{basis && <><p>{basis.price_book_id} · {group?.grandfathered ? "Protected by confirmed paid continuity" : "Historical basis only — not protected"}</p><p>Acquired: {date(basis.acquired_at)} · Historical paid-since evidence: {date(basis.paid_since)}</p></>}</article>; })}</div></section>
       {ent.legacy_assignment_requires_review && <section className="commercial-warning"><h2>Legacy commercial state — Review required</h2><p>Historical legacy plan: {ent.assigned_plan_id || "Unavailable"}. This is historical context only. Explicit reviewed modules and legitimate dated coverage are required; no automatic Business/Business Plus mapping.</p></section>}
-      <section className="commercial-card"><h2>Commercial actions</h2><div className="commercial-actions">{Object.entries(names).filter(([id]) => id !== "suspend" || !snapshot.hold?.commercial_suspended_at).filter(([id]) => id !== "reactivate" || snapshot.hold?.commercial_suspended_at).map(([id, label]) => <button key={id} disabled={!!error} onClick={() => { setSuccess(""); setAction(id); }}>{label}</button>)}</div></section>
-      <section className="commercial-card"><h2>Effective capabilities</h2><p>Source: {ent.source || "Unavailable"} · {ent.commercial_denial_code || ent.reason || "No denial reported"}</p><ul>{(ent.capabilities || []).map(capability => <li key={capability}>{capability}</li>)}</ul><h3>Current add-ons</h3>{(state.addons || []).length ? state.addons.map(addon => <p key={addon.id}>{addon.addon_id} · Quantity {addon.quantity ?? "Unavailable"} · {addon.state}</p>) : <p>No current valid add-ons</p>}<p>Storage allowance: {ent.allowances?.storage_bytes != null ? `${ent.allowances.storage_bytes} bytes` : "Unavailable"}</p></section>
-      <section className="commercial-card"><h2>Payments</h2><HistoryTable rows={history.payments} columns={[["Received", p => money(p.actual_minor, p.currency)], ["Date", p => date(p.paid_at)], ["Method", p => p.method], ["Reference", p => p.receipt_reference], ["Correction of", p => p.corrects_payment_id], ["Modules / price snapshot", p => snapshotText(p)]]} /></section>
-      <section className="commercial-card"><h2>Access periods</h2><HistoryTable rows={history.periods} columns={[["Source", p => p.source_type], ["From", p => date(p.valid_from)], ["Until", p => date(p.valid_until)], ["Revoked", p => p.revoked_at ? date(p.revoked_at) : "No"], ["Modules / price snapshot", snapshotText]]} /></section>
-      <section className="commercial-card"><h2>Commercial events / audit context</h2><p>Latest 100 records per history section. Immutable ledger evidence is retained.</p><HistoryTable rows={history.events} columns={[["Action", p => p.operation], ["Actor", p => p.actor_user_id], ["Time", p => date(p.created_at)], ["Revision", p => `${p.result?.previous_state?.revision ?? "Unavailable"} → ${p.result?.revision ?? "Unavailable"}`], ["Reason", p => p.request_payload?.request?.reason || p.result?.reason], ["Reference", p => p.result?.reference], ["AAL / request", p => `${p.aal || "Unavailable"} · ${p.request_id || "Unavailable"}`], ["State transition", p => `${p.result?.previous_state?.access_state || "Unavailable"} → ${p.result?.resulting_state?.access_state || "Unavailable"}`], ["Pricing", p => snapshotText({ module_ids: p.result?.price_snapshot?.module_ids, price_snapshot: p.result?.price_snapshot })]]} /></section>
-      <section className="commercial-card"><h2>Price books (read-only)</h2>{books.length ? books.map(book => <article key={book.id}><h3>{book.id} · Version {book.version}</h3><p>{book.currency} / {book.billing_interval} · Effective {date(book.effective_from)}</p><p>Sales start: {date(book.sales_start_at)} · Sales end: {book.sales_end_at ? date(book.sales_end_at) : "No closing date configured"}</p><p>{!book.sales_start_at ? "Prepared — not activated" : book.new_sales_active ? "Open for new sales" : "Closed to new sales"} · Continuous paid grandfathered renewals remain eligible under the canonical contract.</p><ul>{Object.entries(book.standalone_minor || {}).map(([id, amount]) => <li key={id}>{moduleNames[id] || id}: {money(amount, book.currency)}</li>)}{Object.entries(book.bundle_minor || {}).map(([count, amount]) => <li key={count}>{count} modules: {money(amount, book.currency)}</li>)}</ul></article>) : <p>No price books available</p>}</section>
+      <section className="commercial-card"><h2>{pageCopy.actions}</h2><div className="commercial-actions">{Object.entries(names).filter(([id]) => id !== "suspend" || !snapshot.hold?.commercial_suspended_at).filter(([id]) => id !== "reactivate" || snapshot.hold?.commercial_suspended_at).map(([id, label]) => <button key={id} disabled={!!error} onClick={() => { setSuccess(""); setAction(id); }}>{language === "ar" ? arabicNames[id] : label}</button>)}</div></section>
+      <section className="commercial-card"><h2>{pageCopy.capabilities}</h2><p>Source: {ent.source || "Unavailable"} · {ent.commercial_denial_code || ent.reason || "No denial reported"}</p><ul>{(ent.capabilities || []).map(capability => <li key={capability}>{capability}</li>)}</ul><h3>Current add-ons</h3>{(state.addons || []).length ? state.addons.map(addon => <p key={addon.id}>{addon.addon_id} · Quantity {addon.quantity ?? "Unavailable"} · {addon.state}</p>) : <p>No current valid add-ons</p>}<p>Storage allowance: {ent.allowances?.storage_bytes != null ? `${ent.allowances.storage_bytes} bytes` : "Unavailable"}</p></section>
+      <section className="commercial-card"><h2>{pageCopy.payments}</h2><HistoryTable rows={history.payments} columns={[["Received", p => money(p.actual_minor, p.currency)], ["Date", p => date(p.paid_at)], ["Method", p => p.method], ["Reference", p => p.receipt_reference], ["Correction of", p => p.corrects_payment_id], ["Modules / price snapshot", p => snapshotText(p)]]} /></section>
+      <section className="commercial-card"><h2>{pageCopy.periods}</h2><HistoryTable rows={history.periods} columns={[["Source", p => p.source_type], ["From", p => date(p.valid_from)], ["Until", p => date(p.valid_until)], ["Revoked", p => p.revoked_at ? date(p.revoked_at) : "No"], ["Modules / price snapshot", snapshotText]]} /></section>
+      <section className="commercial-card"><h2>{pageCopy.audit}</h2><p>Latest 100 records per history section. Immutable ledger evidence is retained.</p><HistoryTable rows={history.events} columns={[["Action", p => p.operation], ["Actor", p => p.actor_user_id], ["Time", p => date(p.created_at)], ["Revision", p => `${p.result?.previous_state?.revision ?? "Unavailable"} → ${p.result?.revision ?? "Unavailable"}`], ["Reason", p => p.request_payload?.request?.reason || p.result?.reason], ["Reference", p => p.result?.reference], ["AAL / request", p => `${p.aal || "Unavailable"} · ${p.request_id || "Unavailable"}`], ["State transition", p => `${p.result?.previous_state?.access_state || "Unavailable"} → ${p.result?.resulting_state?.access_state || "Unavailable"}`], ["Pricing", p => snapshotText({ module_ids: p.result?.price_snapshot?.module_ids, price_snapshot: p.result?.price_snapshot })]]} /></section>
+      <section className="commercial-card"><h2>{pageCopy.books}</h2>{books.length ? books.map(book => <article key={book.id}><h3>{book.id} · Version {book.version}</h3><p>{book.currency} / {book.billing_interval} · Effective {date(book.effective_from)}</p><p>Sales start: {date(book.sales_start_at)} · Sales end: {book.sales_end_at ? date(book.sales_end_at) : "No closing date configured"}</p><p>{!book.sales_start_at ? "Prepared — not activated" : book.new_sales_active ? "Open for new sales" : "Closed to new sales"} · Continuous paid grandfathered renewals remain eligible under the canonical contract.</p><ul>{Object.entries(book.standalone_minor || {}).map(([id, amount]) => <li key={id}>{moduleNames[id] || id}: {money(amount, book.currency)}</li>)}{Object.entries(book.bundle_minor || {}).map(([count, amount]) => <li key={count}>{count} modules: {money(amount, book.currency)}</li>)}</ul></article>) : <p>No price books available</p>}</section>
     </>}
-    {action && snapshot && <CommercialDialog key={`${tenantId}-${action}`} action={action} snapshot={snapshot} history={history} tenantId={tenantId} onClose={() => setAction("")} onStepUp={() => setStepUp(true)} onConflict={load} onSuccess={async () => { setAction(""); setSuccess("Commercial action recorded. Reloading authoritative state."); await load(); }} />}
+    {action && snapshot && <CommercialDialog key={`${tenantId}-${action}`} action={action} snapshot={snapshot} history={history} books={books} tenantId={tenantId} language={language} onClose={() => setAction("")} onStepUp={() => setStepUp(true)} onConflict={load} onSuccess={async () => { setAction(""); setSuccess("Commercial action recorded. Reloading authoritative state."); await load(); }} />}
   </main>;
 }
 function snapshotText(row) { return `${(row.module_ids || []).map(id => moduleNames[id] || id).join(", ") || `Legacy ${row.plan_id || "basis unavailable"}`} · ${money(row.price_snapshot?.recurring_minor, row.price_snapshot?.currency)} · ${(row.price_snapshot?.price_groups || []).map(group => group.price_book_id).join(", ") || "Historical pricing unavailable"}`; }

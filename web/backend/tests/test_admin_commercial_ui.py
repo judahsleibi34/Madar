@@ -14,7 +14,7 @@ class CommercialQuoteAPITests(unittest.TestCase):
     def test_read_only_rpc_and_server_amount(self):
         db = MagicMock()
         db.rpc.return_value.execute.return_value.data = {"revision": 17, "module_basis": {"website": {"price_book_id": "launch_2026"}}, "pricing": {"module_ids": ["website"], "recurring_minor": 2000, "price_groups": [{"grandfathered": True}]}}
-        with patch("routes.admin_billing_routes._admin") as admin, patch("routes.admin_billing_routes.resolve_commercial_access", return_value={"contract_version": 115}), patch("routes.admin_billing_routes.service_supabase", db):
+        with patch("routes.admin_billing_routes._admin") as admin, patch("routes.admin_billing_routes.resolve_commercial_access", return_value={"contract_version": 115, "protection_contract_version": 145, "protection_policy": "strict_paid_continuity_v1"}), patch("routes.admin_billing_routes.service_supabase", db):
             result = quote_commercial_modules(42, self.payload, self.request, Response())
         admin.assert_called_once()
         db.table.assert_not_called()
@@ -38,7 +38,7 @@ class CommercialQuoteAPITests(unittest.TestCase):
     def test_unavailable_price_safe_conflict(self):
         db=MagicMock(); err=Exception("private SQL"); err.code="22023"
         db.rpc.return_value.execute.side_effect=err
-        with patch("routes.admin_billing_routes._admin"), patch("routes.admin_billing_routes.resolve_commercial_access",return_value={"contract_version":115}), patch("routes.admin_billing_routes.service_supabase",db):
+        with patch("routes.admin_billing_routes._admin"), patch("routes.admin_billing_routes.resolve_commercial_access",return_value={"contract_version":115,"protection_contract_version":145,"protection_policy":"strict_paid_continuity_v1"}), patch("routes.admin_billing_routes.service_supabase",db):
             with self.assertRaises(HTTPException) as result:
                 quote_commercial_modules(42,self.payload,self.request,Response())
         self.assertEqual(result.exception.status_code,409)
@@ -51,7 +51,7 @@ class CommercialQuoteAPITests(unittest.TestCase):
 
     def test_malformed_quote_fails_closed(self):
         db=MagicMock(); db.rpc.return_value.execute.return_value.data={"pricing":{"recurring_minor":2000}}
-        with patch("routes.admin_billing_routes._admin"), patch("routes.admin_billing_routes.resolve_commercial_access",return_value={"contract_version":115}), patch("routes.admin_billing_routes.service_supabase",db):
+        with patch("routes.admin_billing_routes._admin"), patch("routes.admin_billing_routes.resolve_commercial_access",return_value={"contract_version":115,"protection_contract_version":145,"protection_policy":"strict_paid_continuity_v1"}), patch("routes.admin_billing_routes.service_supabase",db):
             with self.assertRaises(HTTPException) as result:
                 quote_commercial_modules(42,self.payload,self.request,Response())
         self.assertEqual(result.exception.status_code,503)

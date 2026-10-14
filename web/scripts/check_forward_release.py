@@ -37,6 +37,20 @@ _forms_review_spec = importlib.util.spec_from_file_location("madar_forms_review_
 _forms_review_candidate = importlib.util.module_from_spec(_forms_review_spec)
 _forms_review_spec.loader.exec_module(_forms_review_candidate)
 validated_forms_review_entries = _forms_review_candidate.validated_entries
+_commercial_continuity_spec = importlib.util.spec_from_file_location(
+    "madar_commercial_continuity_candidate",
+    Path(__file__).with_name("commercial_continuity_candidate.py"),
+)
+_commercial_continuity_candidate = importlib.util.module_from_spec(_commercial_continuity_spec)
+_commercial_continuity_spec.loader.exec_module(_commercial_continuity_candidate)
+validated_commercial_continuity_entries = _commercial_continuity_candidate.validated_entries
+_launch_price_book_spec = importlib.util.spec_from_file_location(
+    "madar_launch_price_book_candidate",
+    Path(__file__).with_name("launch_price_book_candidate.py"),
+)
+_launch_price_book_candidate = importlib.util.module_from_spec(_launch_price_book_spec)
+_launch_price_book_spec.loader.exec_module(_launch_price_book_candidate)
+validated_launch_price_book_entries = _launch_price_book_candidate.validated_entries
 import re
 
 
@@ -394,10 +408,10 @@ def validate(root: Path = ROOT) -> list[str]:
                 ).glob("*.sql")
             )
 
-            if versions != list(range(1, 145 if learning_contract['status']=='finalized' else 143)):
+            if versions != list(range(1, 147 if learning_contract['status']=='finalized' else 143)):
                 errors.append(
                     "migration namespace must contain exactly "
-                    f"001 through {144 if learning_contract['status']=='finalized' else 142}: {tree}"
+                    f"001 through {146 if learning_contract['status']=='finalized' else 142}: {tree}"
                 )
 
     except (OSError, KeyError, ValueError, TypeError) as error:
@@ -410,6 +424,14 @@ def validate(root: Path = ROOT) -> list[str]:
         _learning_candidate.validate(root)
     except (OSError, ValueError, TypeError, KeyError) as error:
         errors.append(f"learning migration reservation invalid: {error}")
+    try:
+        validated_commercial_continuity_entries(root)
+    except (OSError, ValueError, TypeError, KeyError) as error:
+        errors.append(f"commercial continuity candidate invalid: {error}")
+    try:
+        validated_launch_price_book_entries(root)
+    except (OSError, ValueError, TypeError, KeyError) as error:
+        errors.append(f"launch price-book candidate invalid: {error}")
     return errors
 
 

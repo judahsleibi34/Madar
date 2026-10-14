@@ -468,6 +468,26 @@ def assign_commercial_modules(tenant_id: int, payload: CommercialModuleAssignmen
     return _commercial_command(tenant_id, payload, "assign_modules", request, response)
 
 
+class CommercialPriceRestorationRequest(CommercialCommandRequest):
+    reference: str = Field(..., min_length=1, max_length=200)
+    module_ids: list[Literal["forms", "website", "ecommerce"]] = Field(..., min_length=1, max_length=3)
+    price_books: dict[Literal["forms", "website", "ecommerce"], str]
+
+    @model_validator(mode="after")
+    def exact_historical_basis(self):
+        if (len(self.module_ids) != len(set(self.module_ids))
+            or set(self.price_books) != set(self.module_ids)
+            or not self.reference.strip()):
+            raise ValueError("Unique modules, exact price-book bases, and a supporting reference are required")
+        return self
+
+
+@router.post("/tenants/{tenant_id}/restore-price-basis")
+def restore_commercial_price_basis(tenant_id: int, payload: CommercialPriceRestorationRequest,
+                                   request: Request, response: Response):
+    return _commercial_command(tenant_id, payload, "restore_price_basis", request, response)
+
+
 @router.get("/tenants/{tenant_id}/modules")
 def inspect_commercial_modules(tenant_id: int, request: Request, response: Response):
     _admin(request, response)
@@ -515,8 +535,12 @@ def quote_commercial_modules(tenant_id: int, payload: CommercialModuleQuoteReque
     _admin(request, response)
     response.headers["Cache-Control"] = "no-store"
     state = resolve_commercial_access(tenant_id)
-    if state.get("contract_version", 114) < 115:
-        raise HTTPException(status_code=503, detail={"code": "commercial_upgrade_required", "message": "Quoting requires schema 115."})
+    if (state.get("protection_contract_version") != 145
+        or state.get("protection_policy") != "strict_paid_continuity_v1"):
+        raise HTTPException(status_code=503, detail={
+            "code": "commercial_protection_upgrade_required",
+            "message": "Quoting requires the paid-continuity protection schema.",
+        })
     try:
         quote = service_supabase.rpc("quote_commercial_modules", {
             "p_tenant_id": tenant_id,

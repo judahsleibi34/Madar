@@ -1,5 +1,35 @@
 # Madar Auto-Deploy Merge Contract
 
+## Unselected revised launch price-book candidate145→146
+
+The mirrored schema146 candidate, `migrations-145-146-price-book.json` and
+`schema-145-146-price-book-bridge.json`, is checksum-pinned by
+`web/scripts/launch_price_book_candidate.py`. It requires exact source schema145, refuses to run if
+`launch_2026` ever recorded a sales start, inserts the prepared `launch_2026_v2` book (Commerce USD 25;
+Forms, Website and bundles unchanged), and adds a trigger that permanently prevents `launch_2026` from
+opening. It opens no book for sales and mutates no tenant, subscription, payment, or access record.
+
+This candidate is source preparation only. It is not selected by `release.json`, cannot be applied to
+production schema115, and grants no deployment, migration, activation, or production-data authority.
+The application catalog targets `launch_2026_v2`, so public pricing fails closed until schema146 is
+present; the governed path to schema145, a verified backup, and all ordinary release gates remain
+prerequisites.
+
+## Unselected strict commercial-continuity candidate144→145
+
+The mirrored schema145 candidate, `migrations-144-145-commercial.json` and
+`schema-144-145-commercial-bridge.json`, is checksum-pinned by
+`web/scripts/commercial_continuity_candidate.py`. It requires exact source schema144 and preserves
+the active release descriptor, all001–144 SQL, and all production data. It derives closed-book
+protection from uninterrupted confirmed paid periods at the database clock, retains half-open access
+intervals, and provides only a dedicated AAL2/revision/idempotency/audit protected historical-price
+exception. It creates no grace, retry-recovery, expiration job, deletion, or production mutation.
+
+This candidate is source preparation only. It is not selected by `release.json`, cannot be applied
+directly to production schema115, and grants no deployment, migration, customer-data, or traffic
+authority. A governed path to schema144, a verified backup, exact candidate selection, compatible
+images, and all ordinary release gates remain prerequisites to any later execution.
+
 ## Approved unselected generic Forms review candidate143→144
 
 The separately approved mirrored144 candidate follows learning143 consecutively.

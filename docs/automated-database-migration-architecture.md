@@ -1,5 +1,39 @@
 # Automated database migration architecture
 
+## Unselected revised launch price-book transition145→146
+
+`migrations-145-146-price-book.json` contains exactly mirrored migration146 and is paired with
+`schema-145-146-price-book-bridge.json`; the candidate validator pins both descriptors and the SQL
+checksum. The transition requires exact schema145, advances the core schema state only after the new
+book and retirement trigger are installed, and remains absent from the active release descriptor.
+It is data-additive plus one row-level trigger, adds no scheduler, and changes no function used by
+access or price resolution. Rollback compatibility is schema145 before an application that targets
+`launch_2026_v2` is activated. The disposable rehearsal (`web/scripts/rehearse_migration_146.sh`)
+proves transactional rollback, exact145→146 execution, refusal of a second application, the
+retired-book guard, price-book immutability, the full schema145 continuity suite, and database quotes
+of USD 15/20/25 standalone and USD 30/40 bundles under a rolled-back activation.
+
+## Unselected strict commercial-continuity transition144→145
+
+`migrations-144-145-commercial.json` contains exactly mirrored migration145 and is paired with
+`schema-144-145-commercial-bridge.json`. The candidate validator pins both descriptors and the SQL
+checksum. The transition requires exact schema144, updates the core schema state only after all
+objects are installed, and remains absent from the active release descriptor. It cannot skip from
+production schema115 to145.
+
+Migration145 adds no scheduler or mutable expiration state. Runtime access and price protection are
+derived at the authoritative database clock from immutable half-open paid periods, recursively
+following only exact adjacent coverage. A closed basis with no live continuity is historical only;
+ordinary successor assignment selects an open book. The sole restoration path is an AAL2,
+revision-protected, idempotent, audited one-use authorization and does not grant access or rewrite old
+payments/periods. Rollback compatibility is schema144 before application145 activation; verified
+backup, locks, resume handling, exact-source authorization, and forward repair remain mandatory.
+
+The disposable rehearsal proves transactional rollback, exact144→145 execution, boundary races,
+all founding modules, mixed books, holds, restoration authorization, and content/evidence
+preservation. Adding these artifacts does not authorize production SQL, deployment, traffic changes,
+or production data mutation.
+
 ## Manual136→144 execution binding
 
 The separately authorized version-2 completed-NORMAL profile selects the existing
