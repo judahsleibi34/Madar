@@ -1,0 +1,274 @@
+{
+  "elearning.affiliateArea.clicksIntro": {
+    "en": "How many times your referral link was opened.",
+    "ar": "عدد المرات التي فُتح فيها رابط الإحالة الخاص بك."
+  },
+  "elearning.affiliateArea.clicksPending": {
+    "en": "Click counts are not available right now.",
+    "ar": "أعداد النقرات غير متاحة حاليًا."
+  },
+  "elearning.affiliateArea.help_approved": {
+    "en": "Your Affiliate account is active.",
+    "ar": "حساب المسوّق بالعمولة الخاص بك مفعّل."
+  },
+  "elearning.affiliateArea.help_none": {
+    "en": "Apply to become an Affiliate to receive your own referral link.",
+    "ar": "قدّم طلبًا لتصبح مسوّقًا بالعمولة وتحصل على رابط الإحالة الخاص بك."
+  },
+  "elearning.affiliateArea.help_not_approved": {
+    "en": "Your Affiliate application was not approved. You can apply again.",
+    "ar": "لم تتم الموافقة على طلبك لتصبح مسوّقًا بالعمولة. يمكنك التقديم مرة أخرى."
+  },
+  "elearning.affiliateArea.help_submitted": {
+    "en": "Your Affiliate application is under review. Your referral link will appear here after approval.",
+    "ar": "طلبك لتصبح مسوّقًا بالعمولة قيد المراجعة. سيظهر رابط الإحالة هنا بعد الموافقة."
+  },
+  "elearning.affiliateArea.help_suspended": {
+    "en": "Your Affiliate account is suspended, so your referral link is not active. Contact EduHope through the Contact page for help.",
+    "ar": "حساب المسوّق بالعمولة الخاص بك موقوف، لذا فإن رابط الإحالة غير مفعّل. تواصل مع EduHope عبر صفحة التواصل للمساعدة."
+  },
+  "elearning.affiliateArea.help_under_review": {
+    "en": "Your Affiliate application is under review. Your referral link will appear here after approval.",
+    "ar": "طلبك لتصبح مسوّقًا بالعمولة قيد المراجعة. سيظهر رابط الإحالة هنا بعد الموافقة."
+  },
+  "elearning.affiliateArea.intro": {
+    "en": "Promote EduHope with your referral link. You do not need to purchase the course.",
+    "ar": "روّج لـ EduHope عبر رابط الإحالة الخاص بك. لا تحتاج إلى شراء الدورة."
+  },
+  "elearning.affiliateArea.noSales": {
+    "en": "No referred purchases yet.",
+    "ar": "لا توجد عمليات شراء عبر الإحالة بعد."
+  },
+  "elearning.affiliateArea.sale_purchased": {
+    "en": "Purchased",
+    "ar": "تم الشراء"
+  },
+  "elearning.affiliateArea.sale_refunded": {
+    "en": "Refunded",
+    "ar": "مسترد"
+  },
+  "elearning.affiliateArea.sale_signup": {
+    "en": "Signed up — no purchase yet",
+    "ar": "سجّل — لم يشترِ بعد"
+  },
+  "elearning.affiliateArea.salesIntro": {
+    "en": "Only valid, verified direct course purchases count.",
+    "ar": "تُحتسب فقط عمليات الشراء المباشرة الصحيحة التي تم التحقق منها."
+  },
+  "elearning.affiliateArea.status_none": {
+    "en": "Not applied",
+    "ar": "لم يتم التقديم"
+  },
+  "elearning.ehAdmin.chartsHelp": {
+    "en": "Live counts from your academy. Each bar shows its number.",
+    "ar": "أعداد مباشرة من أكاديميتك. يظهر الرقم بجانب كل شريط."
+  },
+  "elearning.ehAdmin.chartsTitle": {
+    "en": "At a glance",
+    "ar": "نظرة سريعة"
+  },
+  "elearning.ehAdmin.languagesValue": {
+    "en": "English and Arabic (Arabic right to left)",
+    "ar": "الإنجليزية والعربية (العربية من اليمين إلى اليسار)"
+  },
+  "elearning.ehAdmin.noActivePlan": {
+    "en": "No active one-time plan",
+    "ar": "لا توجد خطة دفع واحدة مفعّلة"
+  },
+  "elearning.ehAdmin.notSet": {
+    "en": "Not set",
+    "ar": "غير محدد"
+  },
+  "elearning.ehAdmin.off": {
+    "en": "Off",
+    "ar": "متوقف"
+  },
+  "elearning.ehAdmin.people": {
+    "en": "Students and affiliates",
+    "ar": "الطلاب والمسوّقون بالعمولة"
+  },
+  "elearning.ehAdmin.settingsHelp": {
+    "en": "The current values. Use Edit to change each one in its settings page.",
+    "ar": "القيم الحالية. استخدم «تعديل» لتغيير كل قيمة في صفحة إعداداتها."
+  },
+  "elearning.ehAdmin.settingsUnavailable": {
+    "en": "Settings could not be loaded.",
+    "ar": "تعذّر تحميل الإعدادات."
+  },
+  "elearning.enrollment.help_cancelled": {
+    "en": "This payment was cancelled. Nothing was charged.",
+    "ar": "تم إلغاء عملية الدفع هذه. لم يُخصم أي مبلغ."
+  },
+  "elearning.enrollment.help_confirmed": {
+    "en": "Your payment is confirmed and your course is unlocked.",
+    "ar": "تم تأكيد الدفع وفتح دورتك."
+  },
+  "elearning.enrollment.help_failed": {
+    "en": "The payment did not go through and no money was taken. You can try again.",
+    "ar": "لم تتم عملية الدفع ولم يُخصم أي مبلغ. يمكنك المحاولة مرة أخرى."
+  },
+  "elearning.enrollment.help_processing": {
+    "en": "We are waiting for the payment to be confirmed.",
+    "ar": "ننتظر تأكيد الدفع."
+  },
+  "elearning.enrollment.help_refunded": {
+    "en": "This payment was refunded, so course access has been removed.",
+    "ar": "تم استرداد هذه الدفعة، لذلك أُزيل الوصول إلى الدورة."
+  },
+  "elearning.enrollment.noReferral": {
+    "en": "None",
+    "ar": "لا يوجد"
+  },
+  "elearning.enrollment.opensSoonHelp": {
+    "en": "You can create your account now. Buying the course will open here as soon as payments are switched on.",
+    "ar": "يمكنك إنشاء حسابك الآن. سيُتاح شراء الدورة هنا فور تفعيل الدفع."
+  },
+  "elearning.enrollment.orderSummary": {
+    "en": "Order summary",
+    "ar": "ملخص الطلب"
+  },
+  "elearning.enrollment.referralReady": {
+    "en": "Your referral link is ready",
+    "ar": "رابط الإحالة الخاص بك جاهز"
+  },
+  "elearning.enrollment.startLearning": {
+    "en": "Start learning",
+    "ar": "ابدأ التعلّم"
+  },
+  "elearning.enrollment.testFail": {
+    "en": "Simulate a failed payment",
+    "ar": "محاكاة دفعة فاشلة"
+  },
+  "elearning.enrollment.testPay": {
+    "en": "Confirm test payment",
+    "ar": "تأكيد دفعة اختبارية"
+  },
+  "elearning.enrollment.testRefund": {
+    "en": "Simulate a refund",
+    "ar": "محاكاة استرداد"
+  },
+  "elearning.student.accessNone": {
+    "en": "Not purchased",
+    "ar": "لم يتم الشراء"
+  },
+  "elearning.student.allLevels": {
+    "en": "All Levels",
+    "ar": "كل المستويات"
+  },
+  "elearning.student.applyExchange": {
+    "en": "Apply",
+    "ar": "قدّم طلبًا"
+  },
+  "elearning.student.certificateEarned": {
+    "en": "Earned",
+    "ar": "تم الحصول عليها"
+  },
+  "elearning.student.copiedForInstagram": {
+    "en": "Copied — paste it on Instagram",
+    "ar": "تم النسخ — الصقه في إنستغرام"
+  },
+  "elearning.student.enrollNow": {
+    "en": "View the course",
+    "ar": "عرض الدورة"
+  },
+  "elearning.student.examsIntro": {
+    "en": "Pass each final exam with 70% or higher to earn its certificate.",
+    "ar": "اجتز كل امتحان نهائي بنسبة 70% أو أكثر للحصول على شهادته."
+  },
+  "elearning.student.heldForWithdrawal": {
+    "en": "{{amount}} held for withdrawal requests",
+    "ar": "{{amount}} محجوزة لطلبات السحب"
+  },
+  "elearning.student.levelProgress": {
+    "en": "Level progress",
+    "ar": "تقدم المستوى"
+  },
+  "elearning.student.maximumAmount": {
+    "en": "Up to {{amount}}",
+    "ar": "حتى {{amount}}"
+  },
+  "elearning.student.noExams": {
+    "en": "No exams are available yet.",
+    "ar": "لا توجد امتحانات متاحة بعد."
+  },
+  "elearning.student.noTransactions": {
+    "en": "No transactions yet.",
+    "ar": "لا توجد معاملات بعد."
+  },
+  "elearning.student.noWithdrawals": {
+    "en": "No withdrawals yet.",
+    "ar": "لا توجد سحوبات بعد."
+  },
+  "elearning.student.referralActive": {
+    "en": "Referral link active",
+    "ar": "رابط الإحالة مفعّل"
+  },
+  "elearning.student.referralAfterPurchase": {
+    "en": "Referral link after purchase",
+    "ar": "رابط الإحالة بعد الشراء"
+  },
+  "elearning.student.requestWithdrawal": {
+    "en": "Request Withdrawal",
+    "ar": "طلب سحب"
+  },
+  "elearning.student.rewardDescription": {
+    "en": "Eligible direct course sale",
+    "ar": "عملية بيع مباشرة مؤهلة للدورة"
+  },
+  "elearning.student.rewardRules": {
+    "en": "Rewards start as Pending and become Available after verification. Only direct sales count. Failed, cancelled, refunded, duplicate and self-referral purchases do not count. Rewards are not guaranteed.",
+    "ar": "تبدأ المكافآت بحالة «معلّقة» وتصبح «متاحة» بعد التحقق. تُحتسب المبيعات المباشرة فقط. لا تُحتسب عمليات الشراء الفاشلة أو الملغاة أو المستردة أو المكررة أو الإحالة الذاتية. المكافآت غير مضمونة."
+  },
+  "elearning.student.rewardTestDescription": {
+    "en": "Test-mode sale (not counted)",
+    "ar": "عملية بيع تجريبية (لا تُحتسب)"
+  },
+  "elearning.student.reward_reversed": {
+    "en": "Reversed",
+    "ar": "ملغاة"
+  },
+  "elearning.student.shareMessage": {
+    "en": "Learn English with EduHope:",
+    "ar": "تعلّم الإنجليزية مع EduHope:"
+  },
+  "elearning.student.topicCount_one": {
+    "en": "{{count}} topic",
+    "ar": "موضوع واحد"
+  },
+  "elearning.student.topicCount_other": {
+    "en": "{{count}} topics",
+    "ar": "{{count}} موضوعات"
+  },
+  "elearning.student.viewNotifications": {
+    "en": "View notifications",
+    "ar": "عرض الإشعارات"
+  },
+  "elearning.student.walletIntro": {
+    "en": "Your wallet changes only through verified transactions.",
+    "ar": "لا تتغير محفظتك إلا من خلال معاملات تم التحقق منها."
+  },
+  "elearning.student.welcome": {
+    "en": "Welcome to EduHope",
+    "ar": "مرحبًا بك في EduHope"
+  },
+  "elearning.student.welcomeName": {
+    "en": "Welcome, {{name}}",
+    "ar": "مرحبًا، {{name}}"
+  },
+  "elearning.student.withdrawBlocked": {
+    "en": "Withdrawals are paused while your wallet has a negative balance.",
+    "ar": "السحب متوقف مؤقتًا ما دام رصيد محفظتك سالبًا."
+  },
+  "elearning.student.withdrawEligible": {
+    "en": "Your available balance can be withdrawn.",
+    "ar": "يمكن سحب رصيدك المتاح."
+  },
+  "elearning.student.withdrawUnavailable": {
+    "en": "Withdrawals are not open yet.",
+    "ar": "السحب غير متاح بعد."
+  },
+  "elearning.student.withdrawalSubmitted": {
+    "en": "Withdrawal request submitted.",
+    "ar": "تم إرسال طلب السحب."
+  }
+}

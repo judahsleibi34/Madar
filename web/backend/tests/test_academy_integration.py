@@ -97,6 +97,54 @@ class AcademyAuthenticationTests(unittest.TestCase):
                 self.assertEqual(failure.exception.detail['code'], 'academy_email_domain_not_allowed')
                 shared.assert_not_called()
 
+    def test_registration_profile_fields_are_enforced_and_stored_only_when_requested(self):
+        from unittest.mock import patch
+        from fastapi import Request
+        from routes.elearning_academy_routes import register, AcademyRegisterRequest
+        request = Request({'type':'http','method':'POST','path':'/public/academies/testing/auth/register','headers':[(b'host',b'localhost')]})
+        auth = ({'subdomain':'testing'},7,{'academy_registration':'open','academy_email_verification_required':False})
+        options = {'fields':['country','university'],'requireTerms':True}
+        cases = [({'terms_accepted':True}, 'academy_country_required'), ({'country':'Palestine'}, 'academy_terms_required')]
+        for extra, code in cases:
+            with self.subTest(code=code), patch('services.academy_auth_service.academy_auth_settings', return_value=auth), patch('routes.elearning_academy_routes.registration_profile', return_value=options), patch('routes.public_site_routes.register_tenant_account') as shared:
+                with self.assertRaises(HTTPException) as failure:
+                    register('testing', AcademyRegisterRequest(full_name='Jack Tester', email='jack@example.org', password='Safe-password-123', **extra), request)
+                self.assertEqual((failure.exception.status_code, failure.exception.detail['code']), (422, code))
+                shared.assert_not_called()
+        with patch('services.academy_auth_service.academy_auth_settings', return_value=auth), patch('routes.elearning_academy_routes.registration_profile', return_value=options), patch('routes.public_site_routes.register_tenant_account', return_value={'requires_email_verification':False}) as shared:
+            register('testing', AcademyRegisterRequest(full_name='Jack Tester', email='jack@example.org', password='Safe-password-123', country=' Palestine ', university='PAU', terms_accepted=True), request)
+            profile = shared.call_args.kwargs['academy_context']['profile']
+            self.assertEqual((profile['country'], profile['university']), ('Palestine', 'PAU'))
+            self.assertIn('terms_accepted_at', profile)
+        # Academies without a profile ignore extra values and store nothing extra.
+        with patch('services.academy_auth_service.academy_auth_settings', return_value=auth), patch('routes.elearning_academy_routes.registration_profile', return_value={}), patch('routes.public_site_routes.register_tenant_account', return_value={'requires_email_verification':False}) as shared:
+            register('testing', AcademyRegisterRequest(full_name='Jack Tester', email='jack@example.org', password='Safe-password-123', country='Elsewhere'), request)
+            self.assertEqual(shared.call_args.kwargs['academy_context']['profile'], {})
+
+    def test_institution_addresses_register_and_log_in_without_email_confirmation(self):
+        from unittest.mock import patch
+        from fastapi import Request, Response
+        from routes.elearning_academy_routes import register, login, institution_member, AcademyRegisterRequest, AcademyLoginRequest
+        pau = {'institution_enabled': True, 'institution_email_domains': ['paluniv.edu.ps', 'second.example.edu']}
+        self.assertTrue(institution_member(pau, 'Student@PALUNIV.edu.ps'))
+        self.assertTrue(institution_member(pau, 'student@students.paluniv.edu.ps'))
+        self.assertTrue(institution_member(pau, 'student@second.example.edu'))
+        for email in ['student@paluniv.edu.ps.evil.com', 'student@fakepaluniv.edu.ps', 'student@gmail.com']:
+            self.assertFalse(institution_member(pau, email), email)
+        self.assertFalse(institution_member({**pau, 'institution_enabled': False}, 'student@paluniv.edu.ps'))
+        request = Request({'type':'http','method':'POST','path':'/public/academies/testing/auth/register','headers':[(b'host',b'localhost')]})
+        auth = ({'subdomain':'testing'},7,{'academy_registration':'open','academy_email_verification_required':False,**pau})
+        for email, member in [('learner@paluniv.edu.ps', True), ('learner@gmail.com', False)]:
+            with self.subTest(register=email), patch('services.academy_auth_service.academy_auth_settings', return_value=auth), patch('routes.elearning_academy_routes.registration_profile', return_value={'verifiedEmailDomains': ['paluniv.edu.ps']}), patch('routes.public_site_routes.register_tenant_account', return_value={'requires_email_verification': False}) as shared:
+                result = register('testing', AcademyRegisterRequest(full_name='Jack Tester', email=email, password='Safe-password-123'), request)
+                # No confirmation is ever required, even for institution domains.
+                self.assertIs(shared.call_args.kwargs['academy_context']['email_verification_required'], False)
+                self.assertIs(result['institution_member'], member)
+            with self.subTest(login=email), patch('services.academy_auth_service.academy_auth_settings', return_value=auth), patch('routes.elearning_academy_routes.registration_profile', return_value={}), patch('routes.public_site_routes.login_tenant_account', return_value={'user': {'tenant_id': 7, 'id': 3}}) as shared, patch('routes.public_site_routes.get_tenant_staff_membership', return_value={'role': 'learner'}):
+                result = login('testing', AcademyLoginRequest(email=email, password='Safe-password-123'), request, Response())
+                self.assertIs(shared.call_args.kwargs['email_verification_required'], False)
+                self.assertIs(result['institution_member'], member)
+
     def test_invitation_policy_is_enforced_before_registration(self):
         from unittest.mock import patch
         from fastapi import Request
@@ -242,3 +290,32 @@ class AcademyManagementProfileTests(unittest.TestCase):
         self.assertEqual(client.rpc.call_args.args[0], 'ensure_academy_builder_project')
         self.assertEqual(client.rpc.call_args.args[1]['p_tenant_id'], 17)
         client.table.return_value.insert.assert_not_called()
+
+
+class AcademyExperienceFlagTests(unittest.TestCase):
+    def test_only_known_flags_set_to_true_are_enabled(self):
+        from services.elearning_academy_service import learning_experience
+        self.assertEqual(learning_experience({}), {})
+        self.assertEqual(learning_experience(None), {})
+        self.assertEqual(learning_experience({'academyExperience': {'lessonComponents': True, 'unknown': True}}), {'lessonComponents': True})
+        self.assertEqual(learning_experience({'academyExperience': {'lessonComponents': 'yes'}}), {'lessonComponents': False})
+        self.assertEqual(learning_experience({'academyExperience': {'studentDashboard': True}}), {'studentDashboard': True})
+
+
+class InstitutionForMemberTests(unittest.TestCase):
+    def run_with(self, settings, email):
+        from unittest.mock import MagicMock, patch
+        from services import elearning_academy_service as service
+        db = MagicMock()
+        db.table.return_value.select.return_value.eq.return_value.limit.return_value.execute.return_value.data = [{'email': email}]
+        with patch.object(service, 'get_settings', return_value=settings), patch.object(service, 'service_supabase', db):
+            return service.institution_for_member(18, 7)
+
+    def test_matching_domain_gets_label_but_never_verification(self):
+        settings = {'institution_enabled': True, 'institution_email_domains': ['paluniv.edu.ps'], 'institution_name': 'Palestine Ahliya University', 'institution_student_label': 'PAU Student'}
+        self.assertEqual(self.run_with(settings, 'learner@paluniv.edu.ps'), {'member': True, 'name': 'Palestine Ahliya University', 'label': 'PAU Student'})
+        self.assertIsNone(self.run_with(settings, 'learner@gmail.com'))
+
+    def test_academies_without_institution_settings_are_unchanged(self):
+        self.assertIsNone(self.run_with({}, 'learner@paluniv.edu.ps'))
+        self.assertIsNone(self.run_with({'institution_enabled': True, 'institution_email_domains': []}, 'learner@paluniv.edu.ps'))

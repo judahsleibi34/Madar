@@ -18,12 +18,61 @@ class TextRange(Payload):
     textDecoration: Literal['underline'] | None = None
 
 
+Short = Annotated[str, Field(min_length=1, max_length=300)]
+Optional = Annotated[str, Field(default='', max_length=300)]
+
+
+class VocabularyItem(Payload):
+    word: Short
+    meaning: Short
+    arabic: Optional = ''
+    example: Optional = ''
+    pronunciation: Optional = ''
+    stress: Optional = ''
+
+
+class ExpressionItem(Payload):
+    expression: Short
+    meaning: Optional = ''
+    arabic: Optional = ''
+    example: Optional = ''
+
+
+class VocabularyComponent(Payload):
+    kind: Literal['vocabulary']
+    items: list[VocabularyItem] = Field(min_length=1, max_length=40)
+
+
+class ExpressionsComponent(Payload):
+    kind: Literal['expressions']
+    items: list[ExpressionItem] = Field(min_length=1, max_length=40)
+
+
+class SpeakerTipComponent(Payload):
+    kind: Literal['speaker_tip']
+    tip: Annotated[str, Field(min_length=1, max_length=2000)]
+    arabic: Annotated[str, Field(default='', max_length=2000)] = ''
+    avoid: Optional = ''
+    say: Optional = ''
+
+
+class SituationComponent(Payload):
+    kind: Literal['situation']
+    text: Annotated[str, Field(min_length=1, max_length=2000)]
+
+
+# Optional structured lesson card stored inside a text block (EduHope opt-in
+# components). The plain-text body stays required as a readable fallback.
+LessonComponent = Annotated[VocabularyComponent | ExpressionsComponent | SpeakerTipComponent | SituationComponent, Field(discriminator='kind')]
+
+
 class TextContent(Payload):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=False)
     version: Literal[1] = 1
     body: str = Field(min_length=1, max_length=50000)
     formats: list[Literal['p', 'h2', 'h3', 'bullet', 'numbered']] = Field(default_factory=list, max_length=2000)
     ranges: list[TextRange] = Field(default_factory=list, max_length=500)
+    component: LessonComponent | None = None
 
     @model_validator(mode='after')
     def valid_text(self):

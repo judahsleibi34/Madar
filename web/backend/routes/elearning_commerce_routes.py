@@ -72,6 +72,18 @@ def checkout(payload: service.Checkout, request: Request, response: Response):
     return operation(execute)
 
 
+@router.post("/checkout/{checkout_id}/reconcile")
+def reconcile(checkout_id: UUID, request: Request, response: Response):
+    """The buyer confirms a hosted payment on return; provider truth decides."""
+    actor = member(request, response)
+    def execute():
+        from services.learning_payment_provider import reconcile_checkout
+        result = reconcile_checkout(actor, checkout_id)
+        audit(request, actor, "payment_reconciled", checkout_id)
+        return result
+    return operation(execute)
+
+
 @router.post("/checkout/{checkout_id}/local-event")
 def local_event(checkout_id: UUID, payload: service.LocalEvent, request: Request, response: Response):
     actor = member(request, response)
@@ -95,4 +107,6 @@ async def payment_webhook(request: Request):
         event = provider.verify_webhook(body, request.headers)
     except payments.InvalidPaymentSignature as error:
         raise HTTPException(400, 'Payment verification failed') from error
+    except payments.IgnoredPaymentEvent:
+        return {'ignored': True}
     return operation(lambda: payments.apply_verified_event(name, event))

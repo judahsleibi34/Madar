@@ -36,9 +36,11 @@
     "minimum_withdrawal_amount": "50.00",
     "withdrawals_enabled": false,
     "withdrawal_methods": [],
-    "institution_enabled": false,
-    "institution_name": "PAU",
-    "institution_email_domains": [],
+    "institution_enabled": true,
+    "institution_name": "Palestine Ahliya University",
+    "institution_email_domains": [
+      "paluniv.edu.ps"
+    ],
     "institution_student_label": "PAU Student",
     "regular_student_label": "Regular Student"
   },

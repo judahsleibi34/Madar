@@ -3363,7 +3363,7 @@ def register_tenant_account(
                             settings.get("subdomain") or clean_subdomain,
                             academy_context["return_to"] if academy_context else "/shop",
                         ),
-                        "data": {"first_name": first_name, "last_name": last_name},
+                        "data": {"first_name": first_name, "last_name": last_name, **(academy_context or {}).get("profile", {})},
                     },
                 }
             )
@@ -3375,7 +3375,7 @@ def register_tenant_account(
                     "email": clean_email,
                     "password": payload.password,
                     "email_confirm": True,
-                    "user_metadata": {"first_name": first_name, "last_name": last_name},
+                    "user_metadata": {"first_name": first_name, "last_name": last_name, **(academy_context or {}).get("profile", {})},
                 }
             )
         if not auth_response.user:

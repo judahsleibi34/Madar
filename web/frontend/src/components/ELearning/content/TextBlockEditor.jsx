@@ -2,11 +2,22 @@ import { useId, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { replaceRichTextRangeStyle } from "../../PageBuilder/core/PageBuilder.text";
 import TextBlockRenderer from "./TextBlockRenderer";
+import LessonCardEditor from "./LessonCardEditor";
+import { useLearningExperience } from "../LearningExperienceContext";
+import { LESSON_COMPONENT_KINDS, componentBody, emptyComponent } from "../../../utils/lessonComponentBody";
 
 export default function TextBlockEditor({ value, onChange }) {
   const { t } = useTranslation("dashboard");
   const input = useRef(null);
   const bodyLabelId = useId();
+  const enhanced = useLearningExperience().lessonComponents === true;
+  const kind = value.component?.kind || "text";
+  // Structured cards keep a generated plain-text body as the readable fallback.
+  const setComponent = component => onChange({ version: 1, body: componentBody(component), formats: [], ranges: [], component });
+  const chooseKind = next => next === "text" ? onChange({ version: 1, body: value.body || "", formats: value.body ? value.formats : [], ranges: [] }) : setComponent(emptyComponent(next));
+  const kindPicker = enhanced && <label>{t("elearning.lessonCards.kind")}<select value={kind} onChange={event => chooseKind(event.target.value)}>
+    {["text", ...LESSON_COMPONENT_KINDS].map(name => <option key={name} value={name}>{t(`elearning.lessonCards.kinds.${name}`)}</option>)}
+  </select></label>;
   function style(property, setting) {
     const { selectionStart: start, selectionEnd: end } = input.current;
     if (end > start) onChange({ ...value, ranges: replaceRichTextRangeStyle(value.ranges, { field: "content", start, end }, property, setting) });
@@ -35,7 +46,9 @@ export default function TextBlockEditor({ value, onChange }) {
     formats.splice(first, last - first + 1, ...Array.from({ length: newLines.length - oldLines.length + last - first + 1 }, () => value.formats?.[first] || "p"));
     onChange({ ...value, body, ranges, formats });
   }
+  if (enhanced && kind !== "text") return <div className="elearning-text-editor">{kindPicker}<LessonCardEditor component={value.component} onChange={setComponent} /></div>;
   return <div className="elearning-text-editor">
+    {kindPicker}
     <p>{t("elearning.content.formatHelp")}</p>
     <div className="elearning-content-toolbar" role="group" aria-label={t("elearning.content.formatting")}>
       <button type="button" className="ecommerce-secondary-button" onClick={() => style("fontWeight", "700")}>{t("elearning.content.bold")}</button>

@@ -256,3 +256,33 @@ def manage(member,course,lesson,block,payload):
 
 def runtime(member,course,lesson,block,start=False,attempt=None,payload=None):
     return call('submit_elearning_assessment_attempt' if attempt else 'start_elearning_assessment_attempt' if start else 'elearning_assessment_runtime',member.tenant_id,**args(course,lesson,block),p_user_id=member.user_id,**({'p_attempt_id':str(attempt),'p_answers':payload.model_dump(mode='json')['answers']} if attempt else {}))
+
+
+class PracticeCheck(Payload):
+    question_id: UUID
+    option_id: UUID
+
+
+CHECKABLE_PRACTICE_TYPES = frozenset({'picture_listen', 'multiple_choice'})
+
+
+def check_practice_answer(actor, course_id, block_id, attempt_id, payload):
+    """Immediate feedback for one choice in a learner's own open PRACTICE attempt.
+
+    Graded attempts never reveal correctness before submission. The answer key
+    comes from the attempt's private snapshot; nothing is stored or scored.
+    """
+    rows = service_supabase.table('elearning_assessment_attempts').select('private_snapshot').eq('tenant_id', actor.tenant_id) \
+        .eq('id', str(attempt_id)).eq('user_id', actor.user_id).eq('course_id', str(course_id)).eq('status', 'in_progress').limit(1).execute().data or []
+    if not rows:
+        raise HTTPException(404, 'Attempt not found')
+    snapshot = rows[0]['private_snapshot'] or {}
+    if (snapshot.get('assessment') or {}).get('activity_mode') != 'practice':
+        raise HTTPException(403, detail={'code': 'assessment_feedback_after_submission'})
+    question = next((item for item in snapshot.get('questions') or [] if item.get('id') == str(payload.question_id)), None)
+    if not question or question.get('type') not in CHECKABLE_PRACTICE_TYPES:
+        raise HTTPException(404, 'Question not found')
+    config = question.get('config') or {}
+    if str(payload.option_id) not in {str(option.get('id')) for option in config.get('options') or []}:
+        raise HTTPException(422, 'Unknown option')
+    return {'question_id': str(payload.question_id), 'correct': str(payload.option_id) == str(config.get('correct_option_id'))}

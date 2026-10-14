@@ -79,12 +79,20 @@ if (madarPwaHost) {
   }
 }
 
-createRoot(document.getElementById("root")).render(
-  <StrictMode>
-    <BrowserRouter>
-      <LanguageProvider>
-        <App />
-      </LanguageProvider>
-    </BrowserRouter>
-  </StrictMode>
-);
+const root = createRoot(document.getElementById("root"));
+// Development-only gallery of EduHope lesson components with sample data, used
+// for visual checks. import.meta.env.DEV is false in production builds, so this
+// branch and its module are removed from the production bundle.
+if (import.meta.env.DEV && window.location.pathname.startsWith("/__eh-components")) {
+  (window.location.pathname.startsWith("/__eh-components/student") ? import("./dev/StudentGallery.jsx") : import("./dev/LessonComponentGallery.jsx")).then(({ default: Gallery }) => root.render(<StrictMode><LanguageProvider><Gallery /></LanguageProvider></StrictMode>));
+} else {
+  root.render(
+    <StrictMode>
+      <BrowserRouter>
+        <LanguageProvider>
+          <App />
+        </LanguageProvider>
+      </BrowserRouter>
+    </StrictMode>
+  );
+}

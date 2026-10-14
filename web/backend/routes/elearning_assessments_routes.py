@@ -62,6 +62,12 @@ def start(course_id:UUID,lesson_id:UUID,block_id:UUID,request:Request,response:R
     return operation(lambda:service.runtime(actor,course_id,lesson_id,block_id,start=True))
 
 
+@router.post(learner+'/attempts/{attempt_id}/check')
+def check(course_id:UUID,lesson_id:UUID,block_id:UUID,attempt_id:UUID,payload:service.PracticeCheck,request:Request,response:Response):
+    actor=member(request,response)
+    return operation(lambda:service.check_practice_answer(actor,course_id,block_id,attempt_id,payload))
+
+
 @router.post(learner+'/attempts/{attempt_id}/submission')
 def submit(course_id:UUID,lesson_id:UUID,block_id:UUID,attempt_id:UUID,payload:service.Submission,request:Request,response:Response):
     actor=member(request,response)
@@ -153,6 +159,12 @@ def placed_start(course_id:UUID,block_id:UUID,request:Request,response:Response)
 def placed_submit(course_id:UUID,block_id:UUID,attempt_id:UUID,payload:service.Submission,request:Request,response:Response):
     actor=member(request,response);placements.available()
     return operation(lambda:service.runtime(actor,course_id,None,block_id,attempt=attempt_id,payload=payload))
+
+@router.post(placed_learner+'/attempts/{attempt_id}/check')
+def placed_check(course_id:UUID,block_id:UUID,attempt_id:UUID,payload:service.PracticeCheck,request:Request,response:Response):
+    actor=member(request,response);placements.available()
+    return operation(lambda:service.check_practice_answer(actor,course_id,block_id,attempt_id,payload))
+
 
 # Review authority derives from existing active course/group assignments in SQL.
 from fastapi import Query, Form

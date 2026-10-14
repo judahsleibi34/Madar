@@ -717,7 +717,7 @@ class CompletedNormalUpgrade:
             saved=json.loads(protected(self.root/'application-rollback-source.json',private=True).read_text())
             staged=Path(saved['path'])
             if (not staged.is_relative_to(self.ops.staging_root)
-                    or self.ops.staging_git('application_rollback_source_head','rev-parse','HEAD',cwd=staged).stdout!=old_sha
+                    or self.ops.staging_git('application_rollback_source_head','-C',str(staged),'rev-parse','HEAD').stdout!=old_sha
                     or self.ops.protected_tree_digest(staged)!=saved['tree_sha256']):
                 raise RuntimeError('application_rollback_frozen_source_changed')
             backup=self.root/'rollback-controller-backup';backup.mkdir(mode=0o700)

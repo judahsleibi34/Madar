@@ -572,11 +572,11 @@ describe("EcommerceStorefront", () => {
 
     await waitFor(() => {
       expect(screen.getByLabelText("current query").textContent).toContain("min_price=25");
+      expect(fetchPublicEcommerceCatalog).toHaveBeenLastCalledWith(
+        "demo",
+        expect.objectContaining({ min_price: "25", max_price: "80" })
+      );
     });
-    expect(fetchPublicEcommerceCatalog).toHaveBeenLastCalledWith(
-      "demo",
-      expect.objectContaining({ min_price: "25", max_price: "80" })
-    );
   });
 
   it("defaults public English catalogs to LTR independently of the dashboard language", async () => {

@@ -5,7 +5,7 @@ import SpeakingRecorder from "./SpeakingRecorder";
 import { useRef, useState } from "react";
 import { uploadAssessmentRecording } from "../../../services/elearningAssessments";
 import { getApiUrl } from "../../../utils/apiClient";
-export default function AssessmentQuestions({ questions, answers, onChange, disabled, attemptId, recordings = {} }) {
+export default function AssessmentQuestions({ questions, answers, onChange, disabled, attemptId, recordings = {}, visibleIndex = null }) {
   const { t } = useTranslation("dashboard");
   const revisions = useRef({});
   const [savedRecordings,setSavedRecordings]=useState({});
@@ -32,7 +32,7 @@ export default function AssessmentQuestions({ questions, answers, onChange, disa
       if (revisions.current[question.id] === revision) setRecordingState(previous => ({ ...previous, [question.id]: "error" }));
     }
   }
-  return questions.map((q, index) => <fieldset className="ecommerce-list-card assessment-question" key={q.id} disabled={disabled}>
+  return questions.map((q, index) => <fieldset className="ecommerce-list-card assessment-question" key={q.id} disabled={disabled} hidden={visibleIndex !== null && index !== visibleIndex}>
     <legend>{t("elearning.assessment.question", { number: index + 1 })}: {q.prompt}</legend>
     {q.type !== "speaking_practice" && <small>{t("elearning.assessment.points")}: {q.points}</small>}
     {q.type === "written" && <label>{t("elearning.assessment.writtenAnswer")}<textarea required maxLength={q.config.max_characters} value={answers[q.id]?.text || ""} onChange={event => onChange(q.id, { text: event.target.value })} /></label>}

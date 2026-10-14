@@ -1,0 +1,5802 @@
+{
+  "status": "Draft for owner",
+  "recording_guidelines": [
+    "Natural, clear speech at a normal conversational speed for the CEFR level (A1 slightly slower, never robotic). Record each line as a real conversation, not a reading.",
+    "Quiet room with soft furnishings; no echo, fans, traffic, music or background voices.",
+    "Microphone 15–20 cm from the mouth, with a pop filter; keep the same distance and level for every clip.",
+    "Format: WAV, 44.1 kHz or 48 kHz, 16-bit or 24-bit, mono. MP3 at 192 kbps or higher is also accepted.",
+    "Loudness about −16 LUFS (peaks below −1 dBFS); no clipping, no added effects or background music.",
+    "Leave about 0.5 seconds of silence at the start and end of each file; one clip per file, named exactly as listed.",
+    "Use different adult voices (female and male) where a dialogue has two speakers; clear international English accents.",
+    "Listen & Match prompts are recorded alone, once, exactly as written — no introduction such as \"Number one\"."
+  ],
+  "photo_guidelines": [
+    "Real, high-quality photographs of real people and places. No illustrations, cartoons or AI-looking images.",
+    "Listen & Match photos must contain NO text: no readable signs, labels, captions, logos, brand names or screen text.",
+    "Each question needs four photos that are clearly different. Only one may reasonably match the recording.",
+    "Orientation: landscape 4:3, at least 1200 × 900 pixels; JPEG, PNG or WebP; under 5 MB each.",
+    "Culturally appropriate for Arabic-speaking learners: modest clothing, respectful situations, no alcohol, no pork, no gambling, no religious symbols used as decoration.",
+    "Show people of a range of ages and genders, including Arab and Middle Eastern settings where natural (university, home, city, workplace).",
+    "Use only photos you own or have a licence for, with model releases for recognisable people. Keep the licence record.",
+    "Level cover images may include more atmosphere, but still no text, so they work in both English and Arabic."
+  ],
+  "items": [
+    {
+      "level": 1,
+      "kind": "photo",
+      "use": "level cover",
+      "file": "L01-cover.jpg"
+    },
+    {
+      "level": 1,
+      "topic": 1,
+      "kind": "audio",
+      "use": "dialogue",
+      "speakers": [
+        "Lina",
+        "Omar"
+      ],
+      "script": [
+        {
+          "speaker": "Lina",
+          "line": "Hello. Is this seat free?"
+        },
+        {
+          "speaker": "Omar",
+          "line": "Yes, it is. Please sit here."
+        },
+        {
+          "speaker": "Lina",
+          "line": "Thank you. My name is Lina. What is your name?"
+        },
+        {
+          "speaker": "Omar",
+          "line": "I am Omar. I study engineering."
+        },
+        {
+          "speaker": "Lina",
+          "line": "I study business. Are you from Bethlehem?"
+        },
+        {
+          "speaker": "Omar",
+          "line": "No, I am from Ramallah. And you?"
+        },
+        {
+          "speaker": "Lina",
+          "line": "I am from Bethlehem. Nice to meet you."
+        },
+        {
+          "speaker": "Omar",
+          "line": "Nice to meet you too. Is this your first English class?"
+        }
+      ],
+      "file": "L01-T01-dialogue.wav"
+    },
+    {
+      "level": 1,
+      "topic": 1,
+      "kind": "audio",
+      "use": "vocabulary word",
+      "script": "seat",
+      "file": "L01-T01-vocab-01-word.wav"
+    },
+    {
+      "level": 1,
+      "topic": 1,
+      "kind": "audio",
+      "use": "vocabulary example",
+      "script": "Hello. Is this seat free?",
+      "file": "L01-T01-vocab-01-example.wav"
+    },
+    {
+      "level": 1,
+      "topic": 1,
+      "kind": "audio",
+      "use": "vocabulary word",
+      "script": "free",
+      "file": "L01-T01-vocab-02-word.wav"
+    },
+    {
+      "level": 1,
+      "topic": 1,
+      "kind": "audio",
+      "use": "vocabulary example",
+      "script": "Hello. Is this seat free?",
+      "file": "L01-T01-vocab-02-example.wav"
+    },
+    {
+      "level": 1,
+      "topic": 1,
+      "kind": "audio",
+      "use": "vocabulary word",
+      "script": "study",
+      "file": "L01-T01-vocab-03-word.wav"
+    },
+    {
+      "level": 1,
+      "topic": 1,
+      "kind": "audio",
+      "use": "vocabulary example",
+      "script": "I am Omar. I study engineering.",
+      "file": "L01-T01-vocab-03-example.wav"
+    },
+    {
+      "level": 1,
+      "topic": 1,
+      "kind": "audio",
+      "use": "vocabulary word",
+      "script": "first",
+      "file": "L01-T01-vocab-04-word.wav"
+    },
+    {
+      "level": 1,
+      "topic": 1,
+      "kind": "audio",
+      "use": "vocabulary example",
+      "script": "Nice to meet you too. Is this your first English class?",
+      "file": "L01-T01-vocab-04-example.wav"
+    },
+    {
+      "level": 1,
+      "topic": 1,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "Student.",
+      "file": "L01-T01-LM1-prompt.wav"
+    },
+    {
+      "level": 1,
+      "topic": 1,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A chef cooking in a kitchen",
+      "file": "L01-T01-LM1-photo-1.jpg",
+      "correct": false
+    },
+    {
+      "level": 1,
+      "topic": 1,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A doctor in a white coat in a clinic",
+      "file": "L01-T01-LM1-photo-2.jpg",
+      "correct": false
+    },
+    {
+      "level": 1,
+      "topic": 1,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A young adult with a backpack and books standing outside a university building",
+      "file": "L01-T01-LM1-photo-3.jpg",
+      "correct": true
+    },
+    {
+      "level": 1,
+      "topic": 1,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A bus driver at the wheel of a bus",
+      "file": "L01-T01-LM1-photo-4.jpg",
+      "correct": false
+    },
+    {
+      "level": 1,
+      "topic": 2,
+      "kind": "audio",
+      "use": "dialogue",
+      "script": null,
+      "status": "script pending",
+      "file": "L01-T02-dialogue.wav"
+    },
+    {
+      "level": 1,
+      "topic": 2,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "Goodbye.",
+      "file": "L01-T02-LM1-prompt.wav"
+    },
+    {
+      "level": 1,
+      "topic": 2,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A person sleeping on a sofa",
+      "file": "L01-T02-LM1-photo-1.jpg",
+      "correct": false
+    },
+    {
+      "level": 1,
+      "topic": 2,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "Two people shaking hands for the first time at a desk",
+      "file": "L01-T02-LM1-photo-2.jpg",
+      "correct": false
+    },
+    {
+      "level": 1,
+      "topic": 2,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "Two friends waving goodbye to each other at a doorway",
+      "file": "L01-T02-LM1-photo-3.jpg",
+      "correct": true
+    },
+    {
+      "level": 1,
+      "topic": 2,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A person reading a book alone",
+      "file": "L01-T02-LM1-photo-4.jpg",
+      "correct": false
+    },
+    {
+      "level": 1,
+      "topic": 3,
+      "kind": "audio",
+      "use": "dialogue",
+      "script": null,
+      "status": "script pending",
+      "file": "L01-T03-dialogue.wav"
+    },
+    {
+      "level": 1,
+      "topic": 3,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "Family.",
+      "file": "L01-T03-LM1-prompt.wav"
+    },
+    {
+      "level": 1,
+      "topic": 3,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A group of office colleagues around a meeting table",
+      "file": "L01-T03-LM1-photo-1.jpg",
+      "correct": false
+    },
+    {
+      "level": 1,
+      "topic": 3,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A class of students facing a whiteboard",
+      "file": "L01-T03-LM1-photo-2.jpg",
+      "correct": false
+    },
+    {
+      "level": 1,
+      "topic": 3,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A football team on a pitch",
+      "file": "L01-T03-LM1-photo-3.jpg",
+      "correct": false
+    },
+    {
+      "level": 1,
+      "topic": 3,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "Parents, grandparents and children sitting together on a sofa at home",
+      "file": "L01-T03-LM1-photo-4.jpg",
+      "correct": true
+    },
+    {
+      "level": 1,
+      "topic": 4,
+      "kind": "audio",
+      "use": "dialogue",
+      "script": null,
+      "status": "script pending",
+      "file": "L01-T04-dialogue.wav"
+    },
+    {
+      "level": 1,
+      "topic": 4,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "Phone.",
+      "file": "L01-T04-LM1-prompt.wav"
+    },
+    {
+      "level": 1,
+      "topic": 4,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A laptop computer, closed",
+      "file": "L01-T04-LM1-photo-1.jpg",
+      "correct": false
+    },
+    {
+      "level": 1,
+      "topic": 4,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A wristwatch",
+      "file": "L01-T04-LM1-photo-2.jpg",
+      "correct": false
+    },
+    {
+      "level": 1,
+      "topic": 4,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A wallet",
+      "file": "L01-T04-LM1-photo-3.jpg",
+      "correct": false
+    },
+    {
+      "level": 1,
+      "topic": 4,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A smartphone lying on a table, screen dark",
+      "file": "L01-T04-LM1-photo-4.jpg",
+      "correct": true
+    },
+    {
+      "level": 1,
+      "topic": 5,
+      "kind": "audio",
+      "use": "dialogue",
+      "script": null,
+      "status": "script pending",
+      "file": "L01-T05-dialogue.wav"
+    },
+    {
+      "level": 1,
+      "topic": 5,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "Clock.",
+      "file": "L01-T05-LM1-prompt.wav"
+    },
+    {
+      "level": 1,
+      "topic": 5,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A calendar hanging on a wall",
+      "file": "L01-T05-LM1-photo-1.jpg",
+      "correct": false
+    },
+    {
+      "level": 1,
+      "topic": 5,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A framed photograph on a wall",
+      "file": "L01-T05-LM1-photo-2.jpg",
+      "correct": false
+    },
+    {
+      "level": 1,
+      "topic": 5,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A mirror on a wall",
+      "file": "L01-T05-LM1-photo-3.jpg",
+      "correct": false
+    },
+    {
+      "level": 1,
+      "topic": 5,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A round wall clock on a plain wall",
+      "file": "L01-T05-LM1-photo-4.jpg",
+      "correct": true
+    },
+    {
+      "level": 1,
+      "topic": 6,
+      "kind": "audio",
+      "use": "dialogue",
+      "script": null,
+      "status": "script pending",
+      "file": "L01-T06-dialogue.wav"
+    },
+    {
+      "level": 1,
+      "topic": 6,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "Birthday cake.",
+      "file": "L01-T06-LM1-prompt.wav"
+    },
+    {
+      "level": 1,
+      "topic": 6,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A birthday cake with lit candles on a table",
+      "file": "L01-T06-LM1-photo-1.jpg",
+      "correct": true
+    },
+    {
+      "level": 1,
+      "topic": 6,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A plate of rice and chicken",
+      "file": "L01-T06-LM1-photo-2.jpg",
+      "correct": false
+    },
+    {
+      "level": 1,
+      "topic": 6,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A cup of tea with a teapot",
+      "file": "L01-T06-LM1-photo-3.jpg",
+      "correct": false
+    },
+    {
+      "level": 1,
+      "topic": 6,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A bowl of fruit on a table",
+      "file": "L01-T06-LM1-photo-4.jpg",
+      "correct": false
+    },
+    {
+      "level": 1,
+      "topic": 7,
+      "kind": "audio",
+      "use": "dialogue",
+      "script": null,
+      "status": "script pending",
+      "file": "L01-T07-dialogue.wav"
+    },
+    {
+      "level": 1,
+      "topic": 7,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "Chair.",
+      "file": "L01-T07-LM1-prompt.wav"
+    },
+    {
+      "level": 1,
+      "topic": 7,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A whiteboard on a wall",
+      "file": "L01-T07-LM1-photo-1.jpg",
+      "correct": false
+    },
+    {
+      "level": 1,
+      "topic": 7,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A bookshelf full of books",
+      "file": "L01-T07-LM1-photo-2.jpg",
+      "correct": false
+    },
+    {
+      "level": 1,
+      "topic": 7,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A single classroom chair, empty",
+      "file": "L01-T07-LM1-photo-3.jpg",
+      "correct": true
+    },
+    {
+      "level": 1,
+      "topic": 7,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A desk with nothing on it",
+      "file": "L01-T07-LM1-photo-4.jpg",
+      "correct": false
+    },
+    {
+      "level": 1,
+      "topic": 8,
+      "kind": "audio",
+      "use": "dialogue",
+      "script": null,
+      "status": "script pending",
+      "file": "L01-T08-dialogue.wav"
+    },
+    {
+      "level": 1,
+      "topic": 8,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "Kitchen.",
+      "file": "L01-T08-LM1-prompt.wav"
+    },
+    {
+      "level": 1,
+      "topic": 8,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A living room with a sofa and television",
+      "file": "L01-T08-LM1-photo-1.jpg",
+      "correct": false
+    },
+    {
+      "level": 1,
+      "topic": 8,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A bathroom with a sink and mirror",
+      "file": "L01-T08-LM1-photo-2.jpg",
+      "correct": false
+    },
+    {
+      "level": 1,
+      "topic": 8,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A clean home kitchen with a cooker, sink and cupboards",
+      "file": "L01-T08-LM1-photo-3.jpg",
+      "correct": true
+    },
+    {
+      "level": 1,
+      "topic": 8,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A bedroom with a made bed",
+      "file": "L01-T08-LM1-photo-4.jpg",
+      "correct": false
+    },
+    {
+      "level": 2,
+      "kind": "photo",
+      "use": "level cover",
+      "file": "L02-cover.jpg"
+    },
+    {
+      "level": 2,
+      "topic": 1,
+      "kind": "audio",
+      "use": "dialogue",
+      "speakers": [
+        "Lina",
+        "Omar"
+      ],
+      "script": [
+        {
+          "speaker": "Omar",
+          "line": "What time do you get up on class days?"
+        },
+        {
+          "speaker": "Lina",
+          "line": "I get up at seven. I have breakfast at half past seven."
+        },
+        {
+          "speaker": "Omar",
+          "line": "Do you walk to campus?"
+        },
+        {
+          "speaker": "Lina",
+          "line": "No. I take the bus at eight."
+        },
+        {
+          "speaker": "Omar",
+          "line": "When does your first class start?"
+        },
+        {
+          "speaker": "Lina",
+          "line": "At nine. I study in the library after class."
+        },
+        {
+          "speaker": "Omar",
+          "line": "Do you study there every day?"
+        },
+        {
+          "speaker": "Lina",
+          "line": "Usually. On Fridays I study at home."
+        }
+      ],
+      "file": "L02-T01-dialogue.wav"
+    },
+    {
+      "level": 2,
+      "topic": 1,
+      "kind": "audio",
+      "use": "vocabulary word",
+      "script": "breakfast",
+      "file": "L02-T01-vocab-01-word.wav"
+    },
+    {
+      "level": 2,
+      "topic": 1,
+      "kind": "audio",
+      "use": "vocabulary example",
+      "script": "I get up at seven. I have breakfast at half past seven.",
+      "file": "L02-T01-vocab-01-example.wav"
+    },
+    {
+      "level": 2,
+      "topic": 1,
+      "kind": "audio",
+      "use": "vocabulary word",
+      "script": "campus",
+      "file": "L02-T01-vocab-02-word.wav"
+    },
+    {
+      "level": 2,
+      "topic": 1,
+      "kind": "audio",
+      "use": "vocabulary example",
+      "script": "Do you walk to campus?",
+      "file": "L02-T01-vocab-02-example.wav"
+    },
+    {
+      "level": 2,
+      "topic": 1,
+      "kind": "audio",
+      "use": "vocabulary word",
+      "script": "usually",
+      "file": "L02-T01-vocab-03-word.wav"
+    },
+    {
+      "level": 2,
+      "topic": 1,
+      "kind": "audio",
+      "use": "vocabulary example",
+      "script": "Usually. On Fridays I study at home.",
+      "file": "L02-T01-vocab-03-example.wav"
+    },
+    {
+      "level": 2,
+      "topic": 1,
+      "kind": "audio",
+      "use": "vocabulary word",
+      "script": "start",
+      "file": "L02-T01-vocab-04-word.wav"
+    },
+    {
+      "level": 2,
+      "topic": 1,
+      "kind": "audio",
+      "use": "vocabulary example",
+      "script": "When does your first class start?",
+      "file": "L02-T01-vocab-04-example.wav"
+    },
+    {
+      "level": 2,
+      "topic": 1,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "Wake up.",
+      "file": "L02-T01-LM1-prompt.wav"
+    },
+    {
+      "level": 2,
+      "topic": 1,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A person stretching in bed next to a ringing alarm clock in the morning",
+      "file": "L02-T01-LM1-photo-1.jpg",
+      "correct": true
+    },
+    {
+      "level": 2,
+      "topic": 1,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A person driving a car on a highway",
+      "file": "L02-T01-LM1-photo-2.jpg",
+      "correct": false
+    },
+    {
+      "level": 2,
+      "topic": 1,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A person eating lunch at a café",
+      "file": "L02-T01-LM1-photo-3.jpg",
+      "correct": false
+    },
+    {
+      "level": 2,
+      "topic": 1,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A person studying at a library desk",
+      "file": "L02-T01-LM1-photo-4.jpg",
+      "correct": false
+    },
+    {
+      "level": 2,
+      "topic": 2,
+      "kind": "audio",
+      "use": "dialogue",
+      "script": null,
+      "status": "script pending",
+      "file": "L02-T02-dialogue.wav"
+    },
+    {
+      "level": 2,
+      "topic": 2,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "Coffee.",
+      "file": "L02-T02-LM1-prompt.wav"
+    },
+    {
+      "level": 2,
+      "topic": 2,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A cup of coffee on a café table",
+      "file": "L02-T02-LM1-photo-1.jpg",
+      "correct": true
+    },
+    {
+      "level": 2,
+      "topic": 2,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A glass of orange juice",
+      "file": "L02-T02-LM1-photo-2.jpg",
+      "correct": false
+    },
+    {
+      "level": 2,
+      "topic": 2,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A bottle of water",
+      "file": "L02-T02-LM1-photo-3.jpg",
+      "correct": false
+    },
+    {
+      "level": 2,
+      "topic": 2,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A cup of hot chocolate with cream",
+      "file": "L02-T02-LM1-photo-4.jpg",
+      "correct": false
+    },
+    {
+      "level": 2,
+      "topic": 3,
+      "kind": "audio",
+      "use": "dialogue",
+      "script": null,
+      "status": "script pending",
+      "file": "L02-T03-dialogue.wav"
+    },
+    {
+      "level": 2,
+      "topic": 3,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "Bag.",
+      "file": "L02-T03-LM1-prompt.wav"
+    },
+    {
+      "level": 2,
+      "topic": 3,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A shopping bag full of groceries on a counter",
+      "file": "L02-T03-LM1-photo-1.jpg",
+      "correct": true
+    },
+    {
+      "level": 2,
+      "topic": 3,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A school backpack",
+      "file": "L02-T03-LM1-photo-2.jpg",
+      "correct": false
+    },
+    {
+      "level": 2,
+      "topic": 3,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A suitcase standing on the floor",
+      "file": "L02-T03-LM1-photo-3.jpg",
+      "correct": false
+    },
+    {
+      "level": 2,
+      "topic": 3,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A cardboard box",
+      "file": "L02-T03-LM1-photo-4.jpg",
+      "correct": false
+    },
+    {
+      "level": 2,
+      "topic": 4,
+      "kind": "audio",
+      "use": "dialogue",
+      "script": null,
+      "status": "script pending",
+      "file": "L02-T04-dialogue.wav"
+    },
+    {
+      "level": 2,
+      "topic": 4,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "Turn left.",
+      "file": "L02-T04-LM1-prompt.wav"
+    },
+    {
+      "level": 2,
+      "topic": 4,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A person climbing stairs",
+      "file": "L02-T04-LM1-photo-1.jpg",
+      "correct": false
+    },
+    {
+      "level": 2,
+      "topic": 4,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A person pointing straight ahead down a road",
+      "file": "L02-T04-LM1-photo-2.jpg",
+      "correct": false
+    },
+    {
+      "level": 2,
+      "topic": 4,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A person at a street corner pointing to their left",
+      "file": "L02-T04-LM1-photo-3.jpg",
+      "correct": true
+    },
+    {
+      "level": 2,
+      "topic": 4,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A person crossing a pedestrian bridge",
+      "file": "L02-T04-LM1-photo-4.jpg",
+      "correct": false
+    },
+    {
+      "level": 2,
+      "topic": 5,
+      "kind": "audio",
+      "use": "dialogue",
+      "script": null,
+      "status": "script pending",
+      "file": "L02-T05-dialogue.wav"
+    },
+    {
+      "level": 2,
+      "topic": 5,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "Bus.",
+      "file": "L02-T05-LM1-prompt.wav"
+    },
+    {
+      "level": 2,
+      "topic": 5,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A bicycle parked on a pavement",
+      "file": "L02-T05-LM1-photo-1.jpg",
+      "correct": false
+    },
+    {
+      "level": 2,
+      "topic": 5,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A taxi on a street",
+      "file": "L02-T05-LM1-photo-2.jpg",
+      "correct": false
+    },
+    {
+      "level": 2,
+      "topic": 5,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A train at a platform",
+      "file": "L02-T05-LM1-photo-3.jpg",
+      "correct": false
+    },
+    {
+      "level": 2,
+      "topic": 5,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A city bus stopped at a bus stop",
+      "file": "L02-T05-LM1-photo-4.jpg",
+      "correct": true
+    },
+    {
+      "level": 2,
+      "topic": 6,
+      "kind": "audio",
+      "use": "dialogue",
+      "script": null,
+      "status": "script pending",
+      "file": "L02-T06-dialogue.wav"
+    },
+    {
+      "level": 2,
+      "topic": 6,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "Football.",
+      "file": "L02-T06-LM1-prompt.wav"
+    },
+    {
+      "level": 2,
+      "topic": 6,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A person running on a treadmill",
+      "file": "L02-T06-LM1-photo-1.jpg",
+      "correct": false
+    },
+    {
+      "level": 2,
+      "topic": 6,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A person swimming in a pool",
+      "file": "L02-T06-LM1-photo-2.jpg",
+      "correct": false
+    },
+    {
+      "level": 2,
+      "topic": 6,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "Young people playing football in a park",
+      "file": "L02-T06-LM1-photo-3.jpg",
+      "correct": true
+    },
+    {
+      "level": 2,
+      "topic": 6,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "Young people playing basketball indoors",
+      "file": "L02-T06-LM1-photo-4.jpg",
+      "correct": false
+    },
+    {
+      "level": 2,
+      "topic": 7,
+      "kind": "audio",
+      "use": "dialogue",
+      "script": null,
+      "status": "script pending",
+      "file": "L02-T07-dialogue.wav"
+    },
+    {
+      "level": 2,
+      "topic": 7,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "Rain.",
+      "file": "L02-T07-LM1-prompt.wav"
+    },
+    {
+      "level": 2,
+      "topic": 7,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A sunny beach with clear sky",
+      "file": "L02-T07-LM1-photo-1.jpg",
+      "correct": false
+    },
+    {
+      "level": 2,
+      "topic": 7,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "Rain falling on a street with people holding umbrellas",
+      "file": "L02-T07-LM1-photo-2.jpg",
+      "correct": true
+    },
+    {
+      "level": 2,
+      "topic": 7,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "Snow covering trees and a road",
+      "file": "L02-T07-LM1-photo-3.jpg",
+      "correct": false
+    },
+    {
+      "level": 2,
+      "topic": 7,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A windy field with bending grass",
+      "file": "L02-T07-LM1-photo-4.jpg",
+      "correct": false
+    },
+    {
+      "level": 2,
+      "topic": 8,
+      "kind": "audio",
+      "use": "dialogue",
+      "script": null,
+      "status": "script pending",
+      "file": "L02-T08-dialogue.wav"
+    },
+    {
+      "level": 2,
+      "topic": 8,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "Teacher.",
+      "file": "L02-T08-LM1-prompt.wav"
+    },
+    {
+      "level": 2,
+      "topic": 8,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A teacher standing at the front of a classroom explaining to students",
+      "file": "L02-T08-LM1-photo-1.jpg",
+      "correct": true
+    },
+    {
+      "level": 2,
+      "topic": 8,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A shop assistant behind a counter",
+      "file": "L02-T08-LM1-photo-2.jpg",
+      "correct": false
+    },
+    {
+      "level": 2,
+      "topic": 8,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A nurse checking a patient",
+      "file": "L02-T08-LM1-photo-3.jpg",
+      "correct": false
+    },
+    {
+      "level": 2,
+      "topic": 8,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A waiter carrying plates",
+      "file": "L02-T08-LM1-photo-4.jpg",
+      "correct": false
+    },
+    {
+      "level": 3,
+      "kind": "photo",
+      "use": "level cover",
+      "file": "L03-cover.jpg"
+    },
+    {
+      "level": 3,
+      "topic": 1,
+      "kind": "audio",
+      "use": "dialogue",
+      "speakers": [
+        "Lina",
+        "Omar"
+      ],
+      "script": [
+        {
+          "speaker": "Lina",
+          "line": "Did you enjoy the student book fair on Saturday?"
+        },
+        {
+          "speaker": "Omar",
+          "line": "Yes. I went with my cousin and bought two used books."
+        },
+        {
+          "speaker": "Lina",
+          "line": "Were the books expensive?"
+        },
+        {
+          "speaker": "Omar",
+          "line": "No. They cost less than the new editions. One was about photography."
+        },
+        {
+          "speaker": "Lina",
+          "line": "That sounds interesting. Did you stay all afternoon?"
+        },
+        {
+          "speaker": "Omar",
+          "line": "We left at three because my cousin had a family visit."
+        },
+        {
+          "speaker": "Lina",
+          "line": "I missed the fair. I was helping my sister move."
+        },
+        {
+          "speaker": "Omar",
+          "line": "There is another one next month. We can go together."
+        }
+      ],
+      "file": "L03-T01-dialogue.wav"
+    },
+    {
+      "level": 3,
+      "topic": 1,
+      "kind": "audio",
+      "use": "vocabulary word",
+      "script": "fair",
+      "file": "L03-T01-vocab-01-word.wav"
+    },
+    {
+      "level": 3,
+      "topic": 1,
+      "kind": "audio",
+      "use": "vocabulary example",
+      "script": "Did you enjoy the student book fair on Saturday?",
+      "file": "L03-T01-vocab-01-example.wav"
+    },
+    {
+      "level": 3,
+      "topic": 1,
+      "kind": "audio",
+      "use": "vocabulary word",
+      "script": "used",
+      "file": "L03-T01-vocab-02-word.wav"
+    },
+    {
+      "level": 3,
+      "topic": 1,
+      "kind": "audio",
+      "use": "vocabulary example",
+      "script": "Yes. I went with my cousin and bought two used books.",
+      "file": "L03-T01-vocab-02-example.wav"
+    },
+    {
+      "level": 3,
+      "topic": 1,
+      "kind": "audio",
+      "use": "vocabulary word",
+      "script": "edition",
+      "file": "L03-T01-vocab-03-word.wav"
+    },
+    {
+      "level": 3,
+      "topic": 1,
+      "kind": "audio",
+      "use": "vocabulary example",
+      "script": "No. They cost less than the new editions. One was about photography.",
+      "file": "L03-T01-vocab-03-example.wav"
+    },
+    {
+      "level": 3,
+      "topic": 1,
+      "kind": "audio",
+      "use": "vocabulary word",
+      "script": "miss",
+      "file": "L03-T01-vocab-04-word.wav"
+    },
+    {
+      "level": 3,
+      "topic": 1,
+      "kind": "audio",
+      "use": "vocabulary example",
+      "script": "I missed the fair. I was helping my sister move.",
+      "file": "L03-T01-vocab-04-example.wav"
+    },
+    {
+      "level": 3,
+      "topic": 1,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "Went to the beach.",
+      "file": "L03-T01-LM1-prompt.wav"
+    },
+    {
+      "level": 3,
+      "topic": 1,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "Friends shopping in a mall",
+      "file": "L03-T01-LM1-photo-1.jpg",
+      "correct": false
+    },
+    {
+      "level": 3,
+      "topic": 1,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A group of friends walking on a beach at sunset",
+      "file": "L03-T01-LM1-photo-2.jpg",
+      "correct": true
+    },
+    {
+      "level": 3,
+      "topic": 1,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "Friends studying together at a table",
+      "file": "L03-T01-LM1-photo-3.jpg",
+      "correct": false
+    },
+    {
+      "level": 3,
+      "topic": 1,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "Friends sitting in a cinema",
+      "file": "L03-T01-LM1-photo-4.jpg",
+      "correct": false
+    },
+    {
+      "level": 3,
+      "topic": 2,
+      "kind": "audio",
+      "use": "dialogue",
+      "script": null,
+      "status": "script pending",
+      "file": "L03-T02-dialogue.wav"
+    },
+    {
+      "level": 3,
+      "topic": 2,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "Book an appointment.",
+      "file": "L03-T02-LM1-prompt.wav"
+    },
+    {
+      "level": 3,
+      "topic": 2,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A person boarding a plane",
+      "file": "L03-T02-LM1-photo-1.jpg",
+      "correct": false
+    },
+    {
+      "level": 3,
+      "topic": 2,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A person paying at a supermarket checkout",
+      "file": "L03-T02-LM1-photo-2.jpg",
+      "correct": false
+    },
+    {
+      "level": 3,
+      "topic": 2,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A person at a clinic reception desk talking to a receptionist with a calendar",
+      "file": "L03-T02-LM1-photo-3.jpg",
+      "correct": true
+    },
+    {
+      "level": 3,
+      "topic": 2,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A person ordering at a fast-food counter",
+      "file": "L03-T02-LM1-photo-4.jpg",
+      "correct": false
+    },
+    {
+      "level": 3,
+      "topic": 3,
+      "kind": "audio",
+      "use": "dialogue",
+      "script": null,
+      "status": "script pending",
+      "file": "L03-T03-dialogue.wav"
+    },
+    {
+      "level": 3,
+      "topic": 3,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "Meet at the café.",
+      "file": "L03-T03-LM1-prompt.wav"
+    },
+    {
+      "level": 3,
+      "topic": 3,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "Two friends at a gym",
+      "file": "L03-T03-LM1-photo-1.jpg",
+      "correct": false
+    },
+    {
+      "level": 3,
+      "topic": 3,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "Two friends greeting each other at the door of a café",
+      "file": "L03-T03-LM1-photo-2.jpg",
+      "correct": true
+    },
+    {
+      "level": 3,
+      "topic": 3,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "Two friends in a classroom",
+      "file": "L03-T03-LM1-photo-3.jpg",
+      "correct": false
+    },
+    {
+      "level": 3,
+      "topic": 3,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "Two friends meeting at a train station platform",
+      "file": "L03-T03-LM1-photo-4.jpg",
+      "correct": false
+    },
+    {
+      "level": 3,
+      "topic": 4,
+      "kind": "audio",
+      "use": "dialogue",
+      "script": null,
+      "status": "script pending",
+      "file": "L03-T04-dialogue.wav"
+    },
+    {
+      "level": 3,
+      "topic": 4,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "Information desk.",
+      "file": "L03-T04-LM1-prompt.wav"
+    },
+    {
+      "level": 3,
+      "topic": 4,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A person waiting alone on a bench",
+      "file": "L03-T04-LM1-photo-1.jpg",
+      "correct": false
+    },
+    {
+      "level": 3,
+      "topic": 4,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A person reading a newspaper",
+      "file": "L03-T04-LM1-photo-2.jpg",
+      "correct": false
+    },
+    {
+      "level": 3,
+      "topic": 4,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A traveller asking a question at an information desk in a station",
+      "file": "L03-T04-LM1-photo-3.jpg",
+      "correct": true
+    },
+    {
+      "level": 3,
+      "topic": 4,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A person buying a snack from a vending machine",
+      "file": "L03-T04-LM1-photo-4.jpg",
+      "correct": false
+    },
+    {
+      "level": 3,
+      "topic": 5,
+      "kind": "audio",
+      "use": "dialogue",
+      "script": null,
+      "status": "script pending",
+      "file": "L03-T05-dialogue.wav"
+    },
+    {
+      "level": 3,
+      "topic": 5,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "Tall man with glasses.",
+      "file": "L03-T05-LM1-prompt.wav"
+    },
+    {
+      "level": 3,
+      "topic": 5,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A man with a beard and a hat, no glasses",
+      "file": "L03-T05-LM1-photo-1.jpg",
+      "correct": false
+    },
+    {
+      "level": 3,
+      "topic": 5,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A child with curly hair",
+      "file": "L03-T05-LM1-photo-2.jpg",
+      "correct": false
+    },
+    {
+      "level": 3,
+      "topic": 5,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A short woman with long hair",
+      "file": "L03-T05-LM1-photo-3.jpg",
+      "correct": false
+    },
+    {
+      "level": 3,
+      "topic": 5,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A tall man wearing glasses standing next to shorter people",
+      "file": "L03-T05-LM1-photo-4.jpg",
+      "correct": true
+    },
+    {
+      "level": 3,
+      "topic": 6,
+      "kind": "audio",
+      "use": "dialogue",
+      "script": null,
+      "status": "script pending",
+      "file": "L03-T06-dialogue.wav"
+    },
+    {
+      "level": 3,
+      "topic": 6,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "Playing the guitar.",
+      "file": "L03-T06-LM1-prompt.wav"
+    },
+    {
+      "level": 3,
+      "topic": 6,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A young person cooking",
+      "file": "L03-T06-LM1-photo-1.jpg",
+      "correct": false
+    },
+    {
+      "level": 3,
+      "topic": 6,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A young person sitting and playing the guitar",
+      "file": "L03-T06-LM1-photo-2.jpg",
+      "correct": true
+    },
+    {
+      "level": 3,
+      "topic": 6,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A young person reading on a bench",
+      "file": "L03-T06-LM1-photo-3.jpg",
+      "correct": false
+    },
+    {
+      "level": 3,
+      "topic": 6,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A young person painting a picture",
+      "file": "L03-T06-LM1-photo-4.jpg",
+      "correct": false
+    },
+    {
+      "level": 3,
+      "topic": 7,
+      "kind": "audio",
+      "use": "dialogue",
+      "script": null,
+      "status": "script pending",
+      "file": "L03-T07-dialogue.wav"
+    },
+    {
+      "level": 3,
+      "topic": 7,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "A sore throat.",
+      "file": "L03-T07-LM1-prompt.wav"
+    },
+    {
+      "level": 3,
+      "topic": 7,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A doctor bandaging a patient's hand",
+      "file": "L03-T07-LM1-photo-1.jpg",
+      "correct": false
+    },
+    {
+      "level": 3,
+      "topic": 7,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A doctor checking a patient's throat with a small light",
+      "file": "L03-T07-LM1-photo-2.jpg",
+      "correct": true
+    },
+    {
+      "level": 3,
+      "topic": 7,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A doctor listening to a patient's heart",
+      "file": "L03-T07-LM1-photo-3.jpg",
+      "correct": false
+    },
+    {
+      "level": 3,
+      "topic": 7,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A dentist examining teeth",
+      "file": "L03-T07-LM1-photo-4.jpg",
+      "correct": false
+    },
+    {
+      "level": 3,
+      "topic": 8,
+      "kind": "audio",
+      "use": "dialogue",
+      "script": null,
+      "status": "script pending",
+      "file": "L03-T08-dialogue.wav"
+    },
+    {
+      "level": 3,
+      "topic": 8,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "Come to my party.",
+      "file": "L03-T08-LM1-prompt.wav"
+    },
+    {
+      "level": 3,
+      "topic": 8,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A person posting a parcel",
+      "file": "L03-T08-LM1-photo-1.jpg",
+      "correct": false
+    },
+    {
+      "level": 3,
+      "topic": 8,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A person handing an invitation card to a friend",
+      "file": "L03-T08-LM1-photo-2.jpg",
+      "correct": true
+    },
+    {
+      "level": 3,
+      "topic": 8,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A person returning a book to a library",
+      "file": "L03-T08-LM1-photo-3.jpg",
+      "correct": false
+    },
+    {
+      "level": 3,
+      "topic": 8,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A person paying a bill",
+      "file": "L03-T08-LM1-photo-4.jpg",
+      "correct": false
+    },
+    {
+      "level": 3,
+      "topic": 9,
+      "kind": "audio",
+      "use": "dialogue",
+      "script": null,
+      "status": "script pending",
+      "file": "L03-T09-dialogue.wav"
+    },
+    {
+      "level": 3,
+      "topic": 9,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "Studying for an exam.",
+      "file": "L03-T09-LM1-prompt.wav"
+    },
+    {
+      "level": 3,
+      "topic": 9,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A student playing a video game",
+      "file": "L03-T09-LM1-photo-1.jpg",
+      "correct": false
+    },
+    {
+      "level": 3,
+      "topic": 9,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A student eating in a cafeteria",
+      "file": "L03-T09-LM1-photo-2.jpg",
+      "correct": false
+    },
+    {
+      "level": 3,
+      "topic": 9,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A student sleeping in class",
+      "file": "L03-T09-LM1-photo-3.jpg",
+      "correct": false
+    },
+    {
+      "level": 3,
+      "topic": 9,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A student surrounded by notes and books studying late at a desk",
+      "file": "L03-T09-LM1-photo-4.jpg",
+      "correct": true
+    },
+    {
+      "level": 4,
+      "kind": "photo",
+      "use": "level cover",
+      "file": "L04-cover.jpg"
+    },
+    {
+      "level": 4,
+      "topic": 1,
+      "kind": "audio",
+      "use": "dialogue",
+      "speakers": [
+        "Clerk",
+        "Omar"
+      ],
+      "script": [
+        {
+          "speaker": "Omar",
+          "line": "I would like two seats on the morning bus to Nablus, please."
+        },
+        {
+          "speaker": "Clerk",
+          "line": "We have departures at eight and ten. Which one would you prefer?"
+        },
+        {
+          "speaker": "Omar",
+          "line": "The eight o’clock bus. Does it stop near the university?"
+        },
+        {
+          "speaker": "Clerk",
+          "line": "Yes, but you need to tell the driver before you leave."
+        },
+        {
+          "speaker": "Omar",
+          "line": "How long does the journey usually take?"
+        },
+        {
+          "speaker": "Clerk",
+          "line": "About an hour and a half, depending on traffic."
+        },
+        {
+          "speaker": "Omar",
+          "line": "Can I change the booking if our class time changes?"
+        },
+        {
+          "speaker": "Clerk",
+          "line": "You can change it before six this evening. Keep your confirmation number."
+        }
+      ],
+      "file": "L04-T01-dialogue.wav"
+    },
+    {
+      "level": 4,
+      "topic": 1,
+      "kind": "audio",
+      "use": "vocabulary word",
+      "script": "departure",
+      "file": "L04-T01-vocab-01-word.wav"
+    },
+    {
+      "level": 4,
+      "topic": 1,
+      "kind": "audio",
+      "use": "vocabulary example",
+      "script": "We have departures at eight and ten. Which one would you prefer?",
+      "file": "L04-T01-vocab-01-example.wav"
+    },
+    {
+      "level": 4,
+      "topic": 1,
+      "kind": "audio",
+      "use": "vocabulary word",
+      "script": "prefer",
+      "file": "L04-T01-vocab-02-word.wav"
+    },
+    {
+      "level": 4,
+      "topic": 1,
+      "kind": "audio",
+      "use": "vocabulary example",
+      "script": "We have departures at eight and ten. Which one would you prefer?",
+      "file": "L04-T01-vocab-02-example.wav"
+    },
+    {
+      "level": 4,
+      "topic": 1,
+      "kind": "audio",
+      "use": "vocabulary word",
+      "script": "depending on",
+      "file": "L04-T01-vocab-03-word.wav"
+    },
+    {
+      "level": 4,
+      "topic": 1,
+      "kind": "audio",
+      "use": "vocabulary example",
+      "script": "About an hour and a half, depending on traffic.",
+      "file": "L04-T01-vocab-03-example.wav"
+    },
+    {
+      "level": 4,
+      "topic": 1,
+      "kind": "audio",
+      "use": "vocabulary word",
+      "script": "confirmation",
+      "file": "L04-T01-vocab-04-word.wav"
+    },
+    {
+      "level": 4,
+      "topic": 1,
+      "kind": "audio",
+      "use": "vocabulary example",
+      "script": "You can change it before six this evening. Keep your confirmation number.",
+      "file": "L04-T01-vocab-04-example.wav"
+    },
+    {
+      "level": 4,
+      "topic": 1,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "Check in at the hotel.",
+      "file": "L04-T01-LM1-prompt.wav"
+    },
+    {
+      "level": 4,
+      "topic": 1,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A guest eating breakfast at a buffet",
+      "file": "L04-T01-LM1-photo-1.jpg",
+      "correct": false
+    },
+    {
+      "level": 4,
+      "topic": 1,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A guest swimming in a hotel pool",
+      "file": "L04-T01-LM1-photo-2.jpg",
+      "correct": false
+    },
+    {
+      "level": 4,
+      "topic": 1,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A guest with a suitcase at a hotel reception desk receiving a key card",
+      "file": "L04-T01-LM1-photo-3.jpg",
+      "correct": true
+    },
+    {
+      "level": 4,
+      "topic": 1,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A guest sleeping in a hotel room",
+      "file": "L04-T01-LM1-photo-4.jpg",
+      "correct": false
+    },
+    {
+      "level": 4,
+      "topic": 2,
+      "kind": "audio",
+      "use": "dialogue",
+      "script": null,
+      "status": "script pending",
+      "file": "L04-T02-dialogue.wav"
+    },
+    {
+      "level": 4,
+      "topic": 2,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "Waiting at the gate.",
+      "file": "L04-T02-LM1-prompt.wav"
+    },
+    {
+      "level": 4,
+      "topic": 2,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A pilot in a cockpit",
+      "file": "L04-T02-LM1-photo-1.jpg",
+      "correct": false
+    },
+    {
+      "level": 4,
+      "topic": 2,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "Passengers collecting bags at a baggage belt",
+      "file": "L04-T02-LM1-photo-2.jpg",
+      "correct": false
+    },
+    {
+      "level": 4,
+      "topic": 2,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "Passengers walking through security",
+      "file": "L04-T02-LM1-photo-3.jpg",
+      "correct": false
+    },
+    {
+      "level": 4,
+      "topic": 2,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "Passengers sitting and waiting at an airport departure gate",
+      "file": "L04-T02-LM1-photo-4.jpg",
+      "correct": true
+    },
+    {
+      "level": 4,
+      "topic": 3,
+      "kind": "audio",
+      "use": "dialogue",
+      "script": null,
+      "status": "script pending",
+      "file": "L04-T03-dialogue.wav"
+    },
+    {
+      "level": 4,
+      "topic": 3,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "Buying a ticket.",
+      "file": "L04-T03-LM1-prompt.wav"
+    },
+    {
+      "level": 4,
+      "topic": 3,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A person cycling to work",
+      "file": "L04-T03-LM1-photo-1.jpg",
+      "correct": false
+    },
+    {
+      "level": 4,
+      "topic": 3,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A person waiting at a taxi rank",
+      "file": "L04-T03-LM1-photo-2.jpg",
+      "correct": false
+    },
+    {
+      "level": 4,
+      "topic": 3,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A person sitting on a moving train",
+      "file": "L04-T03-LM1-photo-3.jpg",
+      "correct": false
+    },
+    {
+      "level": 4,
+      "topic": 3,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A person buying a ticket from a ticket machine at a station",
+      "file": "L04-T03-LM1-photo-4.jpg",
+      "correct": true
+    },
+    {
+      "level": 4,
+      "topic": 4,
+      "kind": "audio",
+      "use": "dialogue",
+      "script": null,
+      "status": "script pending",
+      "file": "L04-T04-dialogue.wav"
+    },
+    {
+      "level": 4,
+      "topic": 4,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "The shirt is too small.",
+      "file": "L04-T04-LM1-prompt.wav"
+    },
+    {
+      "level": 4,
+      "topic": 4,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A customer at a shop counter holding up a small shirt to show the assistant",
+      "file": "L04-T04-LM1-photo-1.jpg",
+      "correct": true
+    },
+    {
+      "level": 4,
+      "topic": 4,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A customer trying on shoes",
+      "file": "L04-T04-LM1-photo-2.jpg",
+      "correct": false
+    },
+    {
+      "level": 4,
+      "topic": 4,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A customer choosing fruit at a market",
+      "file": "L04-T04-LM1-photo-3.jpg",
+      "correct": false
+    },
+    {
+      "level": 4,
+      "topic": 4,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A customer paying for groceries",
+      "file": "L04-T04-LM1-photo-4.jpg",
+      "correct": false
+    },
+    {
+      "level": 4,
+      "topic": 5,
+      "kind": "audio",
+      "use": "dialogue",
+      "script": null,
+      "status": "script pending",
+      "file": "L04-T05-dialogue.wav"
+    },
+    {
+      "level": 4,
+      "topic": 5,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "Opening a bank account.",
+      "file": "L04-T05-LM1-prompt.wav"
+    },
+    {
+      "level": 4,
+      "topic": 5,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A customer sitting at a bank desk signing forms with a bank employee",
+      "file": "L04-T05-LM1-photo-1.jpg",
+      "correct": true
+    },
+    {
+      "level": 4,
+      "topic": 5,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A person counting coins at home",
+      "file": "L04-T05-LM1-photo-2.jpg",
+      "correct": false
+    },
+    {
+      "level": 4,
+      "topic": 5,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A person using a cash machine on the street",
+      "file": "L04-T05-LM1-photo-3.jpg",
+      "correct": false
+    },
+    {
+      "level": 4,
+      "topic": 5,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A person shopping online on a laptop",
+      "file": "L04-T05-LM1-photo-4.jpg",
+      "correct": false
+    },
+    {
+      "level": 4,
+      "topic": 6,
+      "kind": "audio",
+      "use": "dialogue",
+      "script": null,
+      "status": "script pending",
+      "file": "L04-T06-dialogue.wav"
+    },
+    {
+      "level": 4,
+      "topic": 6,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "An apartment with a balcony.",
+      "file": "L04-T06-LM1-prompt.wav"
+    },
+    {
+      "level": 4,
+      "topic": 6,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A hotel corridor",
+      "file": "L04-T06-LM1-photo-1.jpg",
+      "correct": false
+    },
+    {
+      "level": 4,
+      "topic": 6,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A house with a large garden",
+      "file": "L04-T06-LM1-photo-2.jpg",
+      "correct": false
+    },
+    {
+      "level": 4,
+      "topic": 6,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "An office with many desks",
+      "file": "L04-T06-LM1-photo-3.jpg",
+      "correct": false
+    },
+    {
+      "level": 4,
+      "topic": 6,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "An empty apartment living room with a door open onto a balcony",
+      "file": "L04-T06-LM1-photo-4.jpg",
+      "correct": true
+    },
+    {
+      "level": 4,
+      "topic": 7,
+      "kind": "audio",
+      "use": "dialogue",
+      "script": null,
+      "status": "script pending",
+      "file": "L04-T07-dialogue.wav"
+    },
+    {
+      "level": 4,
+      "topic": 7,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "I am calling about my order.",
+      "file": "L04-T07-LM1-prompt.wav"
+    },
+    {
+      "level": 4,
+      "topic": 7,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A person on a video call in an office meeting",
+      "file": "L04-T07-LM1-photo-1.jpg",
+      "correct": false
+    },
+    {
+      "level": 4,
+      "topic": 7,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A person listening to music with headphones",
+      "file": "L04-T07-LM1-photo-2.jpg",
+      "correct": false
+    },
+    {
+      "level": 4,
+      "topic": 7,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A person on the phone at home looking at a delivery box",
+      "file": "L04-T07-LM1-photo-3.jpg",
+      "correct": true
+    },
+    {
+      "level": 4,
+      "topic": 7,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A person on the phone while running",
+      "file": "L04-T07-LM1-photo-4.jpg",
+      "correct": false
+    },
+    {
+      "level": 4,
+      "topic": 8,
+      "kind": "audio",
+      "use": "dialogue",
+      "script": null,
+      "status": "script pending",
+      "file": "L04-T08-dialogue.wav"
+    },
+    {
+      "level": 4,
+      "topic": 8,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "Our train is cancelled.",
+      "file": "L04-T08-LM1-prompt.wav"
+    },
+    {
+      "level": 4,
+      "topic": 8,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "Travellers looking worried at a station departures board with crossed-out times (no readable text)",
+      "file": "L04-T08-LM1-photo-1.jpg",
+      "correct": true
+    },
+    {
+      "level": 4,
+      "topic": 8,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "Travellers happily boarding a train",
+      "file": "L04-T08-LM1-photo-2.jpg",
+      "correct": false
+    },
+    {
+      "level": 4,
+      "topic": 8,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A person buying souvenirs",
+      "file": "L04-T08-LM1-photo-3.jpg",
+      "correct": false
+    },
+    {
+      "level": 4,
+      "topic": 8,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A person relaxing on a beach",
+      "file": "L04-T08-LM1-photo-4.jpg",
+      "correct": false
+    },
+    {
+      "level": 4,
+      "topic": 9,
+      "kind": "audio",
+      "use": "dialogue",
+      "script": null,
+      "status": "script pending",
+      "file": "L04-T09-dialogue.wav"
+    },
+    {
+      "level": 4,
+      "topic": 9,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "We visited an old city.",
+      "file": "L04-T09-LM1-prompt.wav"
+    },
+    {
+      "level": 4,
+      "topic": 9,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "Tourists on a modern shopping street",
+      "file": "L04-T09-LM1-photo-1.jpg",
+      "correct": false
+    },
+    {
+      "level": 4,
+      "topic": 9,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "Tourists walking through narrow streets of an old stone city",
+      "file": "L04-T09-LM1-photo-2.jpg",
+      "correct": true
+    },
+    {
+      "level": 4,
+      "topic": 9,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "Tourists on a boat at sea",
+      "file": "L04-T09-LM1-photo-3.jpg",
+      "correct": false
+    },
+    {
+      "level": 4,
+      "topic": 9,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "Tourists on a mountain hike",
+      "file": "L04-T09-LM1-photo-4.jpg",
+      "correct": false
+    },
+    {
+      "level": 5,
+      "kind": "photo",
+      "use": "level cover",
+      "file": "L05-cover.jpg"
+    },
+    {
+      "level": 5,
+      "topic": 1,
+      "kind": "audio",
+      "use": "dialogue",
+      "speakers": [
+        "Lina",
+        "Omar"
+      ],
+      "script": [
+        {
+          "speaker": "Lina",
+          "line": "I think our study group should meet twice a week before the exam."
+        },
+        {
+          "speaker": "Omar",
+          "line": "I see your point, but two long meetings may be difficult for students who work."
+        },
+        {
+          "speaker": "Lina",
+          "line": "What if one meeting were online and only lasted thirty minutes?"
+        },
+        {
+          "speaker": "Omar",
+          "line": "That would help. We could use it to ask questions rather than repeat the lecture."
+        },
+        {
+          "speaker": "Lina",
+          "line": "Agreed. The campus meeting could focus on solving practice problems."
+        },
+        {
+          "speaker": "Omar",
+          "line": "We should ask everyone which evening works best before fixing a time."
+        },
+        {
+          "speaker": "Lina",
+          "line": "I will send a short poll today. Could you prepare three practice problems?"
+        },
+        {
+          "speaker": "Omar",
+          "line": "Yes. Then we can review the plan after the first week."
+        }
+      ],
+      "file": "L05-T01-dialogue.wav"
+    },
+    {
+      "level": 5,
+      "topic": 1,
+      "kind": "audio",
+      "use": "vocabulary word",
+      "script": "concern",
+      "file": "L05-T01-vocab-01-word.wav"
+    },
+    {
+      "level": 5,
+      "topic": 1,
+      "kind": "audio",
+      "use": "vocabulary example",
+      "script": "Use “concern” to describe an example from your own experience.",
+      "file": "L05-T01-vocab-01-example.wav"
+    },
+    {
+      "level": 5,
+      "topic": 1,
+      "kind": "audio",
+      "use": "vocabulary word",
+      "script": "focus on",
+      "file": "L05-T01-vocab-02-word.wav"
+    },
+    {
+      "level": 5,
+      "topic": 1,
+      "kind": "audio",
+      "use": "vocabulary example",
+      "script": "Agreed. The campus meeting could focus on solving practice problems.",
+      "file": "L05-T01-vocab-02-example.wav"
+    },
+    {
+      "level": 5,
+      "topic": 1,
+      "kind": "audio",
+      "use": "vocabulary word",
+      "script": "poll",
+      "file": "L05-T01-vocab-03-word.wav"
+    },
+    {
+      "level": 5,
+      "topic": 1,
+      "kind": "audio",
+      "use": "vocabulary example",
+      "script": "I will send a short poll today. Could you prepare three practice problems?",
+      "file": "L05-T01-vocab-03-example.wav"
+    },
+    {
+      "level": 5,
+      "topic": 1,
+      "kind": "audio",
+      "use": "vocabulary word",
+      "script": "review",
+      "file": "L05-T01-vocab-04-word.wav"
+    },
+    {
+      "level": 5,
+      "topic": 1,
+      "kind": "audio",
+      "use": "vocabulary example",
+      "script": "Yes. Then we can review the plan after the first week.",
+      "file": "L05-T01-vocab-04-example.wav"
+    },
+    {
+      "level": 5,
+      "topic": 1,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "She thinks online classes are useful.",
+      "file": "L05-T01-LM1-prompt.wav"
+    },
+    {
+      "level": 5,
+      "topic": 1,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A young woman smiling and speaking while pointing to a laptop showing an online class",
+      "file": "L05-T01-LM1-photo-1.jpg",
+      "correct": true
+    },
+    {
+      "level": 5,
+      "topic": 1,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A young woman frowning at a broken laptop",
+      "file": "L05-T01-LM1-photo-2.jpg",
+      "correct": false
+    },
+    {
+      "level": 5,
+      "topic": 1,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A young woman walking to class",
+      "file": "L05-T01-LM1-photo-3.jpg",
+      "correct": false
+    },
+    {
+      "level": 5,
+      "topic": 1,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A young woman reading a printed book",
+      "file": "L05-T01-LM1-photo-4.jpg",
+      "correct": false
+    },
+    {
+      "level": 5,
+      "topic": 2,
+      "kind": "audio",
+      "use": "dialogue",
+      "script": null,
+      "status": "script pending",
+      "file": "L05-T02-dialogue.wav"
+    },
+    {
+      "level": 5,
+      "topic": 2,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "They disagree, but they are listening to each other.",
+      "file": "L05-T02-LM1-prompt.wav"
+    },
+    {
+      "level": 5,
+      "topic": 2,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "Two people laughing together at a joke",
+      "file": "L05-T02-LM1-photo-1.jpg",
+      "correct": false
+    },
+    {
+      "level": 5,
+      "topic": 2,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "Two people working silently side by side",
+      "file": "L05-T02-LM1-photo-2.jpg",
+      "correct": false
+    },
+    {
+      "level": 5,
+      "topic": 2,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "Two people in a calm discussion, one speaking and one listening attentively",
+      "file": "L05-T02-LM1-photo-3.jpg",
+      "correct": true
+    },
+    {
+      "level": 5,
+      "topic": 2,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "Two people shouting angrily",
+      "file": "L05-T02-LM1-photo-4.jpg",
+      "correct": false
+    },
+    {
+      "level": 5,
+      "topic": 3,
+      "kind": "audio",
+      "use": "dialogue",
+      "script": null,
+      "status": "script pending",
+      "file": "L05-T03-dialogue.wav"
+    },
+    {
+      "level": 5,
+      "topic": 3,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "His laptop will not turn on.",
+      "file": "L05-T03-LM1-prompt.wav"
+    },
+    {
+      "level": 5,
+      "topic": 3,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A man buying a new laptop in a shop",
+      "file": "L05-T03-LM1-photo-1.jpg",
+      "correct": false
+    },
+    {
+      "level": 5,
+      "topic": 3,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A man charging his phone",
+      "file": "L05-T03-LM1-photo-2.jpg",
+      "correct": false
+    },
+    {
+      "level": 5,
+      "topic": 3,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A man pressing the power button of a laptop with a black screen, looking confused",
+      "file": "L05-T03-LM1-photo-3.jpg",
+      "correct": true
+    },
+    {
+      "level": 5,
+      "topic": 3,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A man typing quickly on a working laptop",
+      "file": "L05-T03-LM1-photo-4.jpg",
+      "correct": false
+    },
+    {
+      "level": 5,
+      "topic": 4,
+      "kind": "audio",
+      "use": "dialogue",
+      "script": null,
+      "status": "script pending",
+      "file": "L05-T04-dialogue.wav"
+    },
+    {
+      "level": 5,
+      "topic": 4,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "She is telling her friends about her first job.",
+      "file": "L05-T04-LM1-prompt.wav"
+    },
+    {
+      "level": 5,
+      "topic": 4,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A young woman writing alone in a diary",
+      "file": "L05-T04-LM1-photo-1.jpg",
+      "correct": false
+    },
+    {
+      "level": 5,
+      "topic": 4,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A young woman giving a lecture to a large hall",
+      "file": "L05-T04-LM1-photo-2.jpg",
+      "correct": false
+    },
+    {
+      "level": 5,
+      "topic": 4,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A young woman on the phone in a car",
+      "file": "L05-T04-LM1-photo-3.jpg",
+      "correct": false
+    },
+    {
+      "level": 5,
+      "topic": 4,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A young woman talking enthusiastically to friends around a table",
+      "file": "L05-T04-LM1-photo-4.jpg",
+      "correct": true
+    },
+    {
+      "level": 5,
+      "topic": 5,
+      "kind": "audio",
+      "use": "dialogue",
+      "script": null,
+      "status": "script pending",
+      "file": "L05-T05-dialogue.wav"
+    },
+    {
+      "level": 5,
+      "topic": 5,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "Why don't we take a break?",
+      "file": "L05-T05-LM1-prompt.wav"
+    },
+    {
+      "level": 5,
+      "topic": 5,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A study group taking a photo",
+      "file": "L05-T05-LM1-photo-1.jpg",
+      "correct": false
+    },
+    {
+      "level": 5,
+      "topic": 5,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A study group arguing",
+      "file": "L05-T05-LM1-photo-2.jpg",
+      "correct": false
+    },
+    {
+      "level": 5,
+      "topic": 5,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A study group starting a new exam",
+      "file": "L05-T05-LM1-photo-3.jpg",
+      "correct": false
+    },
+    {
+      "level": 5,
+      "topic": 5,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A small study group closing books and standing up to stretch",
+      "file": "L05-T05-LM1-photo-4.jpg",
+      "correct": true
+    },
+    {
+      "level": 5,
+      "topic": 6,
+      "kind": "audio",
+      "use": "dialogue",
+      "script": null,
+      "status": "script pending",
+      "file": "L05-T06-dialogue.wav"
+    },
+    {
+      "level": 5,
+      "topic": 6,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "He wants to study abroad next year.",
+      "file": "L05-T06-LM1-prompt.wav"
+    },
+    {
+      "level": 5,
+      "topic": 6,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A young man at home looking at a world map and university brochures (no readable text)",
+      "file": "L05-T06-LM1-photo-1.jpg",
+      "correct": true
+    },
+    {
+      "level": 5,
+      "topic": 6,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A young man cooking dinner",
+      "file": "L05-T06-LM1-photo-2.jpg",
+      "correct": false
+    },
+    {
+      "level": 5,
+      "topic": 6,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A young man packing for a beach holiday",
+      "file": "L05-T06-LM1-photo-3.jpg",
+      "correct": false
+    },
+    {
+      "level": 5,
+      "topic": 6,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A young man watching football on television",
+      "file": "L05-T06-LM1-photo-4.jpg",
+      "correct": false
+    },
+    {
+      "level": 5,
+      "topic": 7,
+      "kind": "audio",
+      "use": "dialogue",
+      "script": null,
+      "status": "script pending",
+      "file": "L05-T07-dialogue.wav"
+    },
+    {
+      "level": 5,
+      "topic": 7,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "The story ends with a surprise.",
+      "file": "L05-T07-LM1-prompt.wav"
+    },
+    {
+      "level": 5,
+      "topic": 7,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "Children sleeping",
+      "file": "L05-T07-LM1-photo-1.jpg",
+      "correct": false
+    },
+    {
+      "level": 5,
+      "topic": 7,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "Children eating lunch",
+      "file": "L05-T07-LM1-photo-2.jpg",
+      "correct": false
+    },
+    {
+      "level": 5,
+      "topic": 7,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A group of children looking surprised while an adult reads them a story",
+      "file": "L05-T07-LM1-photo-3.jpg",
+      "correct": true
+    },
+    {
+      "level": 5,
+      "topic": 7,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "Children playing football outside",
+      "file": "L05-T07-LM1-photo-4.jpg",
+      "correct": false
+    },
+    {
+      "level": 5,
+      "topic": 8,
+      "kind": "audio",
+      "use": "dialogue",
+      "script": null,
+      "status": "script pending",
+      "file": "L05-T08-dialogue.wav"
+    },
+    {
+      "level": 5,
+      "topic": 8,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "They are watching a film together.",
+      "file": "L05-T08-LM1-prompt.wav"
+    },
+    {
+      "level": 5,
+      "topic": 8,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "Friends at a live concert",
+      "file": "L05-T08-LM1-photo-1.jpg",
+      "correct": false
+    },
+    {
+      "level": 5,
+      "topic": 8,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "Friends on a sofa watching a film with popcorn",
+      "file": "L05-T08-LM1-photo-2.jpg",
+      "correct": true
+    },
+    {
+      "level": 5,
+      "topic": 8,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "Friends reading in a library",
+      "file": "L05-T08-LM1-photo-3.jpg",
+      "correct": false
+    },
+    {
+      "level": 5,
+      "topic": 8,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "Friends at a museum looking at paintings",
+      "file": "L05-T08-LM1-photo-4.jpg",
+      "correct": false
+    },
+    {
+      "level": 5,
+      "topic": 9,
+      "kind": "audio",
+      "use": "dialogue",
+      "script": null,
+      "status": "script pending",
+      "file": "L05-T09-dialogue.wav"
+    },
+    {
+      "level": 5,
+      "topic": 9,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "She is sharing a video with her followers.",
+      "file": "L05-T09-LM1-prompt.wav"
+    },
+    {
+      "level": 5,
+      "topic": 9,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A young woman filming herself with a phone on a small tripod",
+      "file": "L05-T09-LM1-photo-1.jpg",
+      "correct": true
+    },
+    {
+      "level": 5,
+      "topic": 9,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A young woman talking on a landline phone",
+      "file": "L05-T09-LM1-photo-2.jpg",
+      "correct": false
+    },
+    {
+      "level": 5,
+      "topic": 9,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A young woman reading a newspaper",
+      "file": "L05-T09-LM1-photo-3.jpg",
+      "correct": false
+    },
+    {
+      "level": 5,
+      "topic": 9,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A young woman sending a letter at the post office",
+      "file": "L05-T09-LM1-photo-4.jpg",
+      "correct": false
+    },
+    {
+      "level": 6,
+      "kind": "photo",
+      "use": "level cover",
+      "file": "L06-cover.jpg"
+    },
+    {
+      "level": 6,
+      "topic": 1,
+      "kind": "audio",
+      "use": "dialogue",
+      "speakers": [
+        "Interviewer",
+        "Omar"
+      ],
+      "script": [
+        {
+          "speaker": "Interviewer",
+          "line": "Tell me about a time you worked with a team."
+        },
+        {
+          "speaker": "Omar",
+          "line": "In a university project, our group had to present a simple energy-saving plan."
+        },
+        {
+          "speaker": "Interviewer",
+          "line": "What was your responsibility?"
+        },
+        {
+          "speaker": "Omar",
+          "line": "I compared three options and summarized their costs. At first, I included too many technical details."
+        },
+        {
+          "speaker": "Interviewer",
+          "line": "How did you deal with that?"
+        },
+        {
+          "speaker": "Omar",
+          "line": "I asked a classmate to listen to my explanation. Her questions helped me make the summary clearer."
+        },
+        {
+          "speaker": "Interviewer",
+          "line": "What did you learn from the experience?"
+        },
+        {
+          "speaker": "Omar",
+          "line": "A good explanation depends on the audience. I now check that my main point is clear before adding detail."
+        }
+      ],
+      "file": "L06-T01-dialogue.wav"
+    },
+    {
+      "level": 6,
+      "topic": 1,
+      "kind": "audio",
+      "use": "vocabulary word",
+      "script": "responsibility",
+      "file": "L06-T01-vocab-01-word.wav"
+    },
+    {
+      "level": 6,
+      "topic": 1,
+      "kind": "audio",
+      "use": "vocabulary example",
+      "script": "What was your responsibility?",
+      "file": "L06-T01-vocab-01-example.wav"
+    },
+    {
+      "level": 6,
+      "topic": 1,
+      "kind": "audio",
+      "use": "vocabulary word",
+      "script": "summarize",
+      "file": "L06-T01-vocab-02-word.wav"
+    },
+    {
+      "level": 6,
+      "topic": 1,
+      "kind": "audio",
+      "use": "vocabulary example",
+      "script": "I compared three options and summarized their costs. At first, I included too many technical details.",
+      "file": "L06-T01-vocab-02-example.wav"
+    },
+    {
+      "level": 6,
+      "topic": 1,
+      "kind": "audio",
+      "use": "vocabulary word",
+      "script": "audience",
+      "file": "L06-T01-vocab-03-word.wav"
+    },
+    {
+      "level": 6,
+      "topic": 1,
+      "kind": "audio",
+      "use": "vocabulary example",
+      "script": "A good explanation depends on the audience. I now check that my main point is clear before adding detail.",
+      "file": "L06-T01-vocab-03-example.wav"
+    },
+    {
+      "level": 6,
+      "topic": 1,
+      "kind": "audio",
+      "use": "vocabulary word",
+      "script": "technical",
+      "file": "L06-T01-vocab-04-word.wav"
+    },
+    {
+      "level": 6,
+      "topic": 1,
+      "kind": "audio",
+      "use": "vocabulary example",
+      "script": "I compared three options and summarized their costs. At first, I included too many technical details.",
+      "file": "L06-T01-vocab-04-example.wav"
+    },
+    {
+      "level": 6,
+      "topic": 1,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "He is waiting nervously for his interview.",
+      "file": "L06-T01-LM1-prompt.wav"
+    },
+    {
+      "level": 6,
+      "topic": 1,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A man jogging in a park",
+      "file": "L06-T01-LM1-photo-1.jpg",
+      "correct": false
+    },
+    {
+      "level": 6,
+      "topic": 1,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A man relaxing at a café",
+      "file": "L06-T01-LM1-photo-2.jpg",
+      "correct": false
+    },
+    {
+      "level": 6,
+      "topic": 1,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A man leading a meeting confidently",
+      "file": "L06-T01-LM1-photo-3.jpg",
+      "correct": false
+    },
+    {
+      "level": 6,
+      "topic": 1,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A man in a suit sitting in a reception area holding a folder, looking nervous",
+      "file": "L06-T01-LM1-photo-4.jpg",
+      "correct": true
+    },
+    {
+      "level": 6,
+      "topic": 2,
+      "kind": "audio",
+      "use": "dialogue",
+      "script": null,
+      "status": "script pending",
+      "file": "L06-T02-dialogue.wav"
+    },
+    {
+      "level": 6,
+      "topic": 2,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "She checks the reports every morning.",
+      "file": "L06-T02-LM1-prompt.wav"
+    },
+    {
+      "level": 6,
+      "topic": 2,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A woman on lunch break outside",
+      "file": "L06-T02-LM1-photo-1.jpg",
+      "correct": false
+    },
+    {
+      "level": 6,
+      "topic": 2,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A woman leaving the office at night",
+      "file": "L06-T02-LM1-photo-2.jpg",
+      "correct": false
+    },
+    {
+      "level": 6,
+      "topic": 2,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A woman at an office desk reviewing documents with coffee in the morning light",
+      "file": "L06-T02-LM1-photo-3.jpg",
+      "correct": true
+    },
+    {
+      "level": 6,
+      "topic": 2,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A woman presenting to a large audience",
+      "file": "L06-T02-LM1-photo-4.jpg",
+      "correct": false
+    },
+    {
+      "level": 6,
+      "topic": 3,
+      "kind": "audio",
+      "use": "dialogue",
+      "script": null,
+      "status": "script pending",
+      "file": "L06-T03-dialogue.wav"
+    },
+    {
+      "level": 6,
+      "topic": 3,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "The customer is complaining about cold food.",
+      "file": "L06-T03-LM1-prompt.wav"
+    },
+    {
+      "level": 6,
+      "topic": 3,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A diner smiling and paying the bill",
+      "file": "L06-T03-LM1-photo-1.jpg",
+      "correct": false
+    },
+    {
+      "level": 6,
+      "topic": 3,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A diner pointing at a plate while speaking to a waiter, looking unhappy",
+      "file": "L06-T03-LM1-photo-2.jpg",
+      "correct": true
+    },
+    {
+      "level": 6,
+      "topic": 3,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A chef tasting soup in a kitchen",
+      "file": "L06-T03-LM1-photo-3.jpg",
+      "correct": false
+    },
+    {
+      "level": 6,
+      "topic": 3,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A waiter carrying a birthday cake",
+      "file": "L06-T03-LM1-photo-4.jpg",
+      "correct": false
+    },
+    {
+      "level": 6,
+      "topic": 4,
+      "kind": "audio",
+      "use": "dialogue",
+      "script": null,
+      "status": "script pending",
+      "file": "L06-T04-dialogue.wav"
+    },
+    {
+      "level": 6,
+      "topic": 4,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "Some people have their cameras off.",
+      "file": "L06-T04-LM1-prompt.wav"
+    },
+    {
+      "level": 6,
+      "topic": 4,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A laptop showing a spreadsheet",
+      "file": "L06-T04-LM1-photo-1.jpg",
+      "correct": false
+    },
+    {
+      "level": 6,
+      "topic": 4,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A laptop with a blank screen",
+      "file": "L06-T04-LM1-photo-2.jpg",
+      "correct": false
+    },
+    {
+      "level": 6,
+      "topic": 4,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A laptop showing a film",
+      "file": "L06-T04-LM1-photo-3.jpg",
+      "correct": false
+    },
+    {
+      "level": 6,
+      "topic": 4,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A laptop screen showing a video meeting grid where several tiles show only initials (no readable text)",
+      "file": "L06-T04-LM1-photo-4.jpg",
+      "correct": true
+    },
+    {
+      "level": 6,
+      "topic": 5,
+      "kind": "audio",
+      "use": "dialogue",
+      "script": null,
+      "status": "script pending",
+      "file": "L06-T05-dialogue.wav"
+    },
+    {
+      "level": 6,
+      "topic": 5,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "Could you show me how this works?",
+      "file": "L06-T05-LM1-prompt.wav"
+    },
+    {
+      "level": 6,
+      "topic": 5,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A new employee watching as a colleague demonstrates a machine or software",
+      "file": "L06-T05-LM1-photo-1.jpg",
+      "correct": true
+    },
+    {
+      "level": 6,
+      "topic": 5,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "Colleagues celebrating with a cake",
+      "file": "L06-T05-LM1-photo-2.jpg",
+      "correct": false
+    },
+    {
+      "level": 6,
+      "topic": 5,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A manager giving a presentation",
+      "file": "L06-T05-LM1-photo-3.jpg",
+      "correct": false
+    },
+    {
+      "level": 6,
+      "topic": 5,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "An employee working alone at night",
+      "file": "L06-T05-LM1-photo-4.jpg",
+      "correct": false
+    },
+    {
+      "level": 6,
+      "topic": 6,
+      "kind": "audio",
+      "use": "dialogue",
+      "script": null,
+      "status": "script pending",
+      "file": "L06-T06-dialogue.wav"
+    },
+    {
+      "level": 6,
+      "topic": 6,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "Let's meet on Tuesday at ten.",
+      "file": "L06-T06-LM1-prompt.wav"
+    },
+    {
+      "level": 6,
+      "topic": 6,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A person reading emails",
+      "file": "L06-T06-LM1-photo-1.jpg",
+      "correct": false
+    },
+    {
+      "level": 6,
+      "topic": 6,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A person on the phone writing an appointment in a paper diary",
+      "file": "L06-T06-LM1-photo-2.jpg",
+      "correct": true
+    },
+    {
+      "level": 6,
+      "topic": 6,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A person texting while walking",
+      "file": "L06-T06-LM1-photo-3.jpg",
+      "correct": false
+    },
+    {
+      "level": 6,
+      "topic": 6,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A person on the phone while cooking",
+      "file": "L06-T06-LM1-photo-4.jpg",
+      "correct": false
+    },
+    {
+      "level": 6,
+      "topic": 7,
+      "kind": "audio",
+      "use": "dialogue",
+      "script": null,
+      "status": "script pending",
+      "file": "L06-T07-dialogue.wav"
+    },
+    {
+      "level": 6,
+      "topic": 7,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "He has started cycling to work to stay healthy.",
+      "file": "L06-T07-LM1-prompt.wav"
+    },
+    {
+      "level": 6,
+      "topic": 7,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A man driving a car in traffic",
+      "file": "L06-T07-LM1-photo-1.jpg",
+      "correct": false
+    },
+    {
+      "level": 6,
+      "topic": 7,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A man in office clothes cycling on a city bike lane in the morning",
+      "file": "L06-T07-LM1-photo-2.jpg",
+      "correct": true
+    },
+    {
+      "level": 6,
+      "topic": 7,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A man eating fast food",
+      "file": "L06-T07-LM1-photo-3.jpg",
+      "correct": false
+    },
+    {
+      "level": 6,
+      "topic": 7,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A man sleeping on a train",
+      "file": "L06-T07-LM1-photo-4.jpg",
+      "correct": false
+    },
+    {
+      "level": 6,
+      "topic": 8,
+      "kind": "audio",
+      "use": "dialogue",
+      "script": null,
+      "status": "script pending",
+      "file": "L06-T08-dialogue.wav"
+    },
+    {
+      "level": 6,
+      "topic": 8,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "Volunteers are cleaning the park.",
+      "file": "L06-T08-LM1-prompt.wav"
+    },
+    {
+      "level": 6,
+      "topic": 8,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A group having a picnic in a park",
+      "file": "L06-T08-LM1-photo-1.jpg",
+      "correct": false
+    },
+    {
+      "level": 6,
+      "topic": 8,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A group of volunteers in gloves picking up litter in a park",
+      "file": "L06-T08-LM1-photo-2.jpg",
+      "correct": true
+    },
+    {
+      "level": 6,
+      "topic": 8,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "Children playing on swings",
+      "file": "L06-T08-LM1-photo-3.jpg",
+      "correct": false
+    },
+    {
+      "level": 6,
+      "topic": 8,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "Gardeners being paid to cut grass",
+      "file": "L06-T08-LM1-photo-4.jpg",
+      "correct": false
+    },
+    {
+      "level": 6,
+      "topic": 9,
+      "kind": "audio",
+      "use": "dialogue",
+      "script": null,
+      "status": "script pending",
+      "file": "L06-T09-dialogue.wav"
+    },
+    {
+      "level": 6,
+      "topic": 9,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "Many young people cannot find affordable housing.",
+      "file": "L06-T09-LM1-prompt.wav"
+    },
+    {
+      "level": 6,
+      "topic": 9,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A young couple on holiday",
+      "file": "L06-T09-LM1-photo-1.jpg",
+      "correct": false
+    },
+    {
+      "level": 6,
+      "topic": 9,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A young couple looking anxiously at apartment adverts on a phone in a café (no readable text)",
+      "file": "L06-T09-LM1-photo-2.jpg",
+      "correct": true
+    },
+    {
+      "level": 6,
+      "topic": 9,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A young couple moving into a large house",
+      "file": "L06-T09-LM1-photo-3.jpg",
+      "correct": false
+    },
+    {
+      "level": 6,
+      "topic": 9,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A young couple at a wedding",
+      "file": "L06-T09-LM1-photo-4.jpg",
+      "correct": false
+    },
+    {
+      "level": 7,
+      "kind": "photo",
+      "use": "level cover",
+      "file": "L07-cover.jpg"
+    },
+    {
+      "level": 7,
+      "topic": 1,
+      "kind": "audio",
+      "use": "dialogue",
+      "speakers": [
+        "Lina",
+        "Omar"
+      ],
+      "script": [
+        {
+          "speaker": "Lina",
+          "line": "Extending library hours could benefit students who have daytime jobs."
+        },
+        {
+          "speaker": "Omar",
+          "line": "I support the idea, although staffing costs would have to be considered."
+        },
+        {
+          "speaker": "Lina",
+          "line": "Perhaps we could trial longer hours during the exam period rather than throughout the year."
+        },
+        {
+          "speaker": "Omar",
+          "line": "A trial would give us evidence, but attendance alone would not show whether the service was useful."
+        },
+        {
+          "speaker": "Lina",
+          "line": "We could collect anonymous feedback as well as counting visits."
+        },
+        {
+          "speaker": "Omar",
+          "line": "Provided the questions are neutral, that would strengthen the evaluation."
+        },
+        {
+          "speaker": "Lina",
+          "line": "Let us propose a four-week pilot with a clear budget and a review date."
+        },
+        {
+          "speaker": "Omar",
+          "line": "Agreed. We should also explain what would justify continuing or ending it."
+        }
+      ],
+      "file": "L07-T01-dialogue.wav"
+    },
+    {
+      "level": 7,
+      "topic": 1,
+      "kind": "audio",
+      "use": "vocabulary word",
+      "script": "trial",
+      "file": "L07-T01-vocab-01-word.wav"
+    },
+    {
+      "level": 7,
+      "topic": 1,
+      "kind": "audio",
+      "use": "vocabulary example",
+      "script": "Perhaps we could trial longer hours during the exam period rather than throughout the year.",
+      "file": "L07-T01-vocab-01-example.wav"
+    },
+    {
+      "level": 7,
+      "topic": 1,
+      "kind": "audio",
+      "use": "vocabulary word",
+      "script": "neutral",
+      "file": "L07-T01-vocab-02-word.wav"
+    },
+    {
+      "level": 7,
+      "topic": 1,
+      "kind": "audio",
+      "use": "vocabulary example",
+      "script": "Provided the questions are neutral, that would strengthen the evaluation.",
+      "file": "L07-T01-vocab-02-example.wav"
+    },
+    {
+      "level": 7,
+      "topic": 1,
+      "kind": "audio",
+      "use": "vocabulary word",
+      "script": "evaluation",
+      "file": "L07-T01-vocab-03-word.wav"
+    },
+    {
+      "level": 7,
+      "topic": 1,
+      "kind": "audio",
+      "use": "vocabulary example",
+      "script": "Provided the questions are neutral, that would strengthen the evaluation.",
+      "file": "L07-T01-vocab-03-example.wav"
+    },
+    {
+      "level": 7,
+      "topic": 1,
+      "kind": "audio",
+      "use": "vocabulary word",
+      "script": "justify",
+      "file": "L07-T01-vocab-04-word.wav"
+    },
+    {
+      "level": 7,
+      "topic": 1,
+      "kind": "audio",
+      "use": "vocabulary example",
+      "script": "Agreed. We should also explain what would justify continuing or ending it.",
+      "file": "L07-T01-vocab-04-example.wav"
+    },
+    {
+      "level": 7,
+      "topic": 1,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "Everyone in the group is sharing an idea before they decide.",
+      "file": "L07-T01-LM1-prompt.wav"
+    },
+    {
+      "level": 7,
+      "topic": 1,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A group watching a film",
+      "file": "L07-T01-LM1-photo-1.jpg",
+      "correct": false
+    },
+    {
+      "level": 7,
+      "topic": 1,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A group eating dinner",
+      "file": "L07-T01-LM1-photo-2.jpg",
+      "correct": false
+    },
+    {
+      "level": 7,
+      "topic": 1,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A seminar group around a table where several people are speaking with notes and sticky notes (no readable text)",
+      "file": "L07-T01-LM1-photo-3.jpg",
+      "correct": true
+    },
+    {
+      "level": 7,
+      "topic": 1,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "One person giving a lecture to silent students",
+      "file": "L07-T01-LM1-photo-4.jpg",
+      "correct": false
+    },
+    {
+      "level": 7,
+      "topic": 2,
+      "kind": "audio",
+      "use": "dialogue",
+      "script": null,
+      "status": "script pending",
+      "file": "L07-T02-dialogue.wav"
+    },
+    {
+      "level": 7,
+      "topic": 2,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "He is weighing both sides before giving his view.",
+      "file": "L07-T02-LM1-prompt.wav"
+    },
+    {
+      "level": 7,
+      "topic": 2,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A man throwing papers away",
+      "file": "L07-T02-LM1-photo-1.jpg",
+      "correct": false
+    },
+    {
+      "level": 7,
+      "topic": 2,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A man signing a contract quickly",
+      "file": "L07-T02-LM1-photo-2.jpg",
+      "correct": false
+    },
+    {
+      "level": 7,
+      "topic": 2,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A man sleeping at his desk",
+      "file": "L07-T02-LM1-photo-3.jpg",
+      "correct": false
+    },
+    {
+      "level": 7,
+      "topic": 2,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A man looking thoughtfully at two sets of papers in each hand",
+      "file": "L07-T02-LM1-photo-4.jpg",
+      "correct": true
+    },
+    {
+      "level": 7,
+      "topic": 3,
+      "kind": "audio",
+      "use": "dialogue",
+      "script": null,
+      "status": "script pending",
+      "file": "L07-T03-dialogue.wav"
+    },
+    {
+      "level": 7,
+      "topic": 3,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "Working from home saves time, but it can feel lonely.",
+      "file": "L07-T03-LM1-prompt.wav"
+    },
+    {
+      "level": 7,
+      "topic": 3,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A person working on a laptop alone at home, looking a little isolated",
+      "file": "L07-T03-LM1-photo-1.jpg",
+      "correct": true
+    },
+    {
+      "level": 7,
+      "topic": 3,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A person on a crowded train",
+      "file": "L07-T03-LM1-photo-2.jpg",
+      "correct": false
+    },
+    {
+      "level": 7,
+      "topic": 3,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A person laughing with colleagues in an office",
+      "file": "L07-T03-LM1-photo-3.jpg",
+      "correct": false
+    },
+    {
+      "level": 7,
+      "topic": 3,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A person on holiday by a pool",
+      "file": "L07-T03-LM1-photo-4.jpg",
+      "correct": false
+    },
+    {
+      "level": 7,
+      "topic": 4,
+      "kind": "audio",
+      "use": "dialogue",
+      "script": null,
+      "status": "script pending",
+      "file": "L07-T04-dialogue.wav"
+    },
+    {
+      "level": 7,
+      "topic": 4,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "She is presenting her project to a small audience.",
+      "file": "L07-T04-LM1-prompt.wav"
+    },
+    {
+      "level": 7,
+      "topic": 4,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A woman shopping for clothes",
+      "file": "L07-T04-LM1-photo-1.jpg",
+      "correct": false
+    },
+    {
+      "level": 7,
+      "topic": 4,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A woman presenting slides to a small seated group (slides show only charts, no readable text)",
+      "file": "L07-T04-LM1-photo-2.jpg",
+      "correct": true
+    },
+    {
+      "level": 7,
+      "topic": 4,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A woman cooking for friends",
+      "file": "L07-T04-LM1-photo-3.jpg",
+      "correct": false
+    },
+    {
+      "level": 7,
+      "topic": 4,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A woman teaching a child to read",
+      "file": "L07-T04-LM1-photo-4.jpg",
+      "correct": false
+    },
+    {
+      "level": 7,
+      "topic": 5,
+      "kind": "audio",
+      "use": "dialogue",
+      "script": null,
+      "status": "script pending",
+      "file": "L07-T05-dialogue.wav"
+    },
+    {
+      "level": 7,
+      "topic": 5,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "Fewer people are buying newspapers than before.",
+      "file": "L07-T05-LM1-prompt.wav"
+    },
+    {
+      "level": 7,
+      "topic": 5,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A printing factory at full speed",
+      "file": "L07-T05-LM1-photo-1.jpg",
+      "correct": false
+    },
+    {
+      "level": 7,
+      "topic": 5,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A nearly empty newspaper stand while people nearby read on phones",
+      "file": "L07-T05-LM1-photo-2.jpg",
+      "correct": true
+    },
+    {
+      "level": 7,
+      "topic": 5,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A library full of readers",
+      "file": "L07-T05-LM1-photo-3.jpg",
+      "correct": false
+    },
+    {
+      "level": 7,
+      "topic": 5,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A busy newspaper stand with a queue",
+      "file": "L07-T05-LM1-photo-4.jpg",
+      "correct": false
+    },
+    {
+      "level": 7,
+      "topic": 6,
+      "kind": "audio",
+      "use": "dialogue",
+      "script": null,
+      "status": "script pending",
+      "file": "L07-T06-dialogue.wav"
+    },
+    {
+      "level": 7,
+      "topic": 6,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "Plastic waste is polluting the beach.",
+      "file": "L07-T06-LM1-prompt.wav"
+    },
+    {
+      "level": 7,
+      "topic": 6,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A beach with plastic bottles and bags washed up on the sand",
+      "file": "L07-T06-LM1-photo-1.jpg",
+      "correct": true
+    },
+    {
+      "level": 7,
+      "topic": 6,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A clean beach with families",
+      "file": "L07-T06-LM1-photo-2.jpg",
+      "correct": false
+    },
+    {
+      "level": 7,
+      "topic": 6,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A forest with clean paths",
+      "file": "L07-T06-LM1-photo-3.jpg",
+      "correct": false
+    },
+    {
+      "level": 7,
+      "topic": 6,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A recycling centre with sorted bins",
+      "file": "L07-T06-LM1-photo-4.jpg",
+      "correct": false
+    },
+    {
+      "level": 7,
+      "topic": 7,
+      "kind": "audio",
+      "use": "dialogue",
+      "script": null,
+      "status": "script pending",
+      "file": "L07-T07-dialogue.wav"
+    },
+    {
+      "level": 7,
+      "topic": 7,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "The reporter is speaking outside a flooded building.",
+      "file": "L07-T07-LM1-prompt.wav"
+    },
+    {
+      "level": 7,
+      "topic": 7,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A reporter at a fashion show",
+      "file": "L07-T07-LM1-photo-1.jpg",
+      "correct": false
+    },
+    {
+      "level": 7,
+      "topic": 7,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A reporter in a studio",
+      "file": "L07-T07-LM1-photo-2.jpg",
+      "correct": false
+    },
+    {
+      "level": 7,
+      "topic": 7,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A reporter at a football match",
+      "file": "L07-T07-LM1-photo-3.jpg",
+      "correct": false
+    },
+    {
+      "level": 7,
+      "topic": 7,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A television reporter with a microphone standing in front of a flooded street",
+      "file": "L07-T07-LM1-photo-4.jpg",
+      "correct": true
+    },
+    {
+      "level": 7,
+      "topic": 8,
+      "kind": "audio",
+      "use": "dialogue",
+      "script": null,
+      "status": "script pending",
+      "file": "L07-T08-dialogue.wav"
+    },
+    {
+      "level": 7,
+      "topic": 8,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "In the future, deliveries might be made by drones.",
+      "file": "L07-T08-LM1-prompt.wav"
+    },
+    {
+      "level": 7,
+      "topic": 8,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A cargo ship at a port",
+      "file": "L07-T08-LM1-photo-1.jpg",
+      "correct": false
+    },
+    {
+      "level": 7,
+      "topic": 8,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A postman on a bicycle",
+      "file": "L07-T08-LM1-photo-2.jpg",
+      "correct": false
+    },
+    {
+      "level": 7,
+      "topic": 8,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A delivery van stuck in traffic",
+      "file": "L07-T08-LM1-photo-3.jpg",
+      "correct": false
+    },
+    {
+      "level": 7,
+      "topic": 8,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A small drone carrying a parcel above a residential street",
+      "file": "L07-T08-LM1-photo-4.jpg",
+      "correct": true
+    },
+    {
+      "level": 7,
+      "topic": 9,
+      "kind": "audio",
+      "use": "dialogue",
+      "script": null,
+      "status": "script pending",
+      "file": "L07-T09-dialogue.wav"
+    },
+    {
+      "level": 7,
+      "topic": 9,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "She is giving her colleague helpful suggestions about his report.",
+      "file": "L07-T09-LM1-prompt.wav"
+    },
+    {
+      "level": 7,
+      "topic": 9,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A manager shouting at an employee",
+      "file": "L07-T09-LM1-photo-1.jpg",
+      "correct": false
+    },
+    {
+      "level": 7,
+      "topic": 9,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "Two colleagues ignoring each other",
+      "file": "L07-T09-LM1-photo-2.jpg",
+      "correct": false
+    },
+    {
+      "level": 7,
+      "topic": 9,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A colleague throwing a report in the bin",
+      "file": "L07-T09-LM1-photo-3.jpg",
+      "correct": false
+    },
+    {
+      "level": 7,
+      "topic": 9,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "Two colleagues looking at a document together while one points kindly at a section",
+      "file": "L07-T09-LM1-photo-4.jpg",
+      "correct": true
+    },
+    {
+      "level": 8,
+      "kind": "photo",
+      "use": "level cover",
+      "file": "L08-cover.jpg"
+    },
+    {
+      "level": 8,
+      "topic": 1,
+      "kind": "audio",
+      "use": "dialogue",
+      "speakers": [
+        "Lina",
+        "Omar"
+      ],
+      "script": [
+        {
+          "speaker": "Omar",
+          "line": "The team needs the rehearsal room on Thursday, but the music society has already booked it."
+        },
+        {
+          "speaker": "Lina",
+          "line": "Could we negotiate a shorter session rather than asking them to cancel?"
+        },
+        {
+          "speaker": "Omar",
+          "line": "We need forty minutes to test the presentation equipment. They need an uninterrupted hour."
+        },
+        {
+          "speaker": "Lina",
+          "line": "If we move our test to the start of the afternoon, they could keep their full session afterward."
+        },
+        {
+          "speaker": "Omar",
+          "line": "That depends on whether the technician is available earlier."
+        },
+        {
+          "speaker": "Lina",
+          "line": "I can check with her. We should make our proposal conditional on that confirmation."
+        },
+        {
+          "speaker": "Omar",
+          "line": "Good. Let us also offer to reset the room so their rehearsal can start on time."
+        },
+        {
+          "speaker": "Lina",
+          "line": "That makes the arrangement fairer. Both groups keep the time they actually need."
+        }
+      ],
+      "file": "L08-T01-dialogue.wav"
+    },
+    {
+      "level": 8,
+      "topic": 1,
+      "kind": "audio",
+      "use": "vocabulary word",
+      "script": "negotiate",
+      "file": "L08-T01-vocab-01-word.wav"
+    },
+    {
+      "level": 8,
+      "topic": 1,
+      "kind": "audio",
+      "use": "vocabulary example",
+      "script": "Could we negotiate a shorter session rather than asking them to cancel?",
+      "file": "L08-T01-vocab-01-example.wav"
+    },
+    {
+      "level": 8,
+      "topic": 1,
+      "kind": "audio",
+      "use": "vocabulary word",
+      "script": "uninterrupted",
+      "file": "L08-T01-vocab-02-word.wav"
+    },
+    {
+      "level": 8,
+      "topic": 1,
+      "kind": "audio",
+      "use": "vocabulary example",
+      "script": "We need forty minutes to test the presentation equipment. They need an uninterrupted hour.",
+      "file": "L08-T01-vocab-02-example.wav"
+    },
+    {
+      "level": 8,
+      "topic": 1,
+      "kind": "audio",
+      "use": "vocabulary word",
+      "script": "conditional on",
+      "file": "L08-T01-vocab-03-word.wav"
+    },
+    {
+      "level": 8,
+      "topic": 1,
+      "kind": "audio",
+      "use": "vocabulary example",
+      "script": "I can check with her. We should make our proposal conditional on that confirmation.",
+      "file": "L08-T01-vocab-03-example.wav"
+    },
+    {
+      "level": 8,
+      "topic": 1,
+      "kind": "audio",
+      "use": "vocabulary word",
+      "script": "arrangement",
+      "file": "L08-T01-vocab-04-word.wav"
+    },
+    {
+      "level": 8,
+      "topic": 1,
+      "kind": "audio",
+      "use": "vocabulary example",
+      "script": "That makes the arrangement fairer. Both groups keep the time they actually need.",
+      "file": "L08-T01-vocab-04-example.wav"
+    },
+    {
+      "level": 8,
+      "topic": 1,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "Both sides are making compromises to reach an agreement.",
+      "file": "L08-T01-LM1-prompt.wav"
+    },
+    {
+      "level": 8,
+      "topic": 1,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "One person signing alone",
+      "file": "L08-T01-LM1-photo-1.jpg",
+      "correct": false
+    },
+    {
+      "level": 8,
+      "topic": 1,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "Two small groups across a table shaking hands over documents after a discussion",
+      "file": "L08-T01-LM1-photo-2.jpg",
+      "correct": true
+    },
+    {
+      "level": 8,
+      "topic": 1,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "Two groups arguing loudly",
+      "file": "L08-T01-LM1-photo-3.jpg",
+      "correct": false
+    },
+    {
+      "level": 8,
+      "topic": 1,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A group celebrating a sports win",
+      "file": "L08-T01-LM1-photo-4.jpg",
+      "correct": false
+    },
+    {
+      "level": 8,
+      "topic": 2,
+      "kind": "audio",
+      "use": "dialogue",
+      "script": null,
+      "status": "script pending",
+      "file": "L08-T02-dialogue.wav"
+    },
+    {
+      "level": 8,
+      "topic": 2,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "The team is working together to fix a delay in the project.",
+      "file": "L08-T02-LM1-prompt.wav"
+    },
+    {
+      "level": 8,
+      "topic": 2,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A team standing around a planning board moving cards and timelines (no readable text)",
+      "file": "L08-T02-LM1-photo-1.jpg",
+      "correct": true
+    },
+    {
+      "level": 8,
+      "topic": 2,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "One person working alone late",
+      "file": "L08-T02-LM1-photo-2.jpg",
+      "correct": false
+    },
+    {
+      "level": 8,
+      "topic": 2,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A team at a party",
+      "file": "L08-T02-LM1-photo-3.jpg",
+      "correct": false
+    },
+    {
+      "level": 8,
+      "topic": 2,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A team relaxing in a break room",
+      "file": "L08-T02-LM1-photo-4.jpg",
+      "correct": false
+    },
+    {
+      "level": 8,
+      "topic": 3,
+      "kind": "audio",
+      "use": "dialogue",
+      "script": null,
+      "status": "script pending",
+      "file": "L08-T03-dialogue.wav"
+    },
+    {
+      "level": 8,
+      "topic": 3,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "The manager is calmly telling an employee some difficult news.",
+      "file": "L08-T03-LM1-prompt.wav"
+    },
+    {
+      "level": 8,
+      "topic": 3,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A manager congratulating an employee",
+      "file": "L08-T03-LM1-photo-1.jpg",
+      "correct": false
+    },
+    {
+      "level": 8,
+      "topic": 3,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "Two employees chatting at a coffee machine",
+      "file": "L08-T03-LM1-photo-2.jpg",
+      "correct": false
+    },
+    {
+      "level": 8,
+      "topic": 3,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A manager presenting to a full room",
+      "file": "L08-T03-LM1-photo-3.jpg",
+      "correct": false
+    },
+    {
+      "level": 8,
+      "topic": 3,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A manager speaking gently to an upset employee in a private office",
+      "file": "L08-T03-LM1-photo-4.jpg",
+      "correct": true
+    },
+    {
+      "level": 8,
+      "topic": 4,
+      "kind": "audio",
+      "use": "dialogue",
+      "script": null,
+      "status": "script pending",
+      "file": "L08-T04-dialogue.wav"
+    },
+    {
+      "level": 8,
+      "topic": 4,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "She is updating the team on what has been finished and what is still delayed.",
+      "file": "L08-T04-LM1-prompt.wav"
+    },
+    {
+      "level": 8,
+      "topic": 4,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A woman greeting new clients at reception",
+      "file": "L08-T04-LM1-photo-1.jpg",
+      "correct": false
+    },
+    {
+      "level": 8,
+      "topic": 4,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A woman packing boxes",
+      "file": "L08-T04-LM1-photo-2.jpg",
+      "correct": false
+    },
+    {
+      "level": 8,
+      "topic": 4,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A woman reading emails alone",
+      "file": "L08-T04-LM1-photo-3.jpg",
+      "correct": false
+    },
+    {
+      "level": 8,
+      "topic": 4,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A woman standing beside a progress chart with some bars complete and some short, speaking to a team (no readable text)",
+      "file": "L08-T04-LM1-photo-4.jpg",
+      "correct": true
+    },
+    {
+      "level": 8,
+      "topic": 5,
+      "kind": "audio",
+      "use": "dialogue",
+      "script": null,
+      "status": "script pending",
+      "file": "L08-T05-dialogue.wav"
+    },
+    {
+      "level": 8,
+      "topic": 5,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "He is explaining why the company chose the cheaper option.",
+      "file": "L08-T05-LM1-prompt.wav"
+    },
+    {
+      "level": 8,
+      "topic": 5,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A man buying lunch",
+      "file": "L08-T05-LM1-photo-1.jpg",
+      "correct": false
+    },
+    {
+      "level": 8,
+      "topic": 5,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A man fixing a car",
+      "file": "L08-T05-LM1-photo-2.jpg",
+      "correct": false
+    },
+    {
+      "level": 8,
+      "topic": 5,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A man reading a novel",
+      "file": "L08-T05-LM1-photo-3.jpg",
+      "correct": false
+    },
+    {
+      "level": 8,
+      "topic": 5,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A man presenting two product samples and pointing to one while colleagues listen",
+      "file": "L08-T05-LM1-photo-4.jpg",
+      "correct": true
+    },
+    {
+      "level": 8,
+      "topic": 6,
+      "kind": "audio",
+      "use": "dialogue",
+      "script": null,
+      "status": "script pending",
+      "file": "L08-T06-dialogue.wav"
+    },
+    {
+      "level": 8,
+      "topic": 6,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "Some schools focus on exams, while others focus on projects.",
+      "file": "L08-T06-LM1-prompt.wav"
+    },
+    {
+      "level": 8,
+      "topic": 6,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A single empty classroom",
+      "file": "L08-T06-LM1-photo-1.jpg",
+      "correct": false
+    },
+    {
+      "level": 8,
+      "topic": 6,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "Split scene: one classroom silently taking a written exam, another with students building a model together",
+      "file": "L08-T06-LM1-photo-2.jpg",
+      "correct": true
+    },
+    {
+      "level": 8,
+      "topic": 6,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "Students at a graduation ceremony",
+      "file": "L08-T06-LM1-photo-3.jpg",
+      "correct": false
+    },
+    {
+      "level": 8,
+      "topic": 6,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "Students on a school trip to a museum",
+      "file": "L08-T06-LM1-photo-4.jpg",
+      "correct": false
+    },
+    {
+      "level": 8,
+      "topic": 7,
+      "kind": "audio",
+      "use": "dialogue",
+      "script": null,
+      "status": "script pending",
+      "file": "L08-T07-dialogue.wav"
+    },
+    {
+      "level": 8,
+      "topic": 7,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "She is convincing her friends to join a charity run.",
+      "file": "L08-T07-LM1-prompt.wav"
+    },
+    {
+      "level": 8,
+      "topic": 7,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A young woman holding a running bib and talking enthusiastically to hesitant friends (no readable text)",
+      "file": "L08-T07-LM1-photo-1.jpg",
+      "correct": true
+    },
+    {
+      "level": 8,
+      "topic": 7,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A young woman buying running shoes",
+      "file": "L08-T07-LM1-photo-2.jpg",
+      "correct": false
+    },
+    {
+      "level": 8,
+      "topic": 7,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A young woman running alone in the rain",
+      "file": "L08-T07-LM1-photo-3.jpg",
+      "correct": false
+    },
+    {
+      "level": 8,
+      "topic": 7,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "Friends watching a race on television",
+      "file": "L08-T07-LM1-photo-4.jpg",
+      "correct": false
+    },
+    {
+      "level": 8,
+      "topic": 8,
+      "kind": "audio",
+      "use": "dialogue",
+      "script": null,
+      "status": "script pending",
+      "file": "L08-T08-dialogue.wav"
+    },
+    {
+      "level": 8,
+      "topic": 8,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "They realise they were talking about different meetings.",
+      "file": "L08-T08-LM1-prompt.wav"
+    },
+    {
+      "level": 8,
+      "topic": 8,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "Two colleagues arguing angrily",
+      "file": "L08-T08-LM1-photo-1.jpg",
+      "correct": false
+    },
+    {
+      "level": 8,
+      "topic": 8,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "Two colleagues with calendars on their phones, looking at each other and laughing in sudden understanding",
+      "file": "L08-T08-LM1-photo-2.jpg",
+      "correct": true
+    },
+    {
+      "level": 8,
+      "topic": 8,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "Two colleagues shaking hands at a first meeting",
+      "file": "L08-T08-LM1-photo-3.jpg",
+      "correct": false
+    },
+    {
+      "level": 8,
+      "topic": 8,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "Two colleagues eating lunch quietly",
+      "file": "L08-T08-LM1-photo-4.jpg",
+      "correct": false
+    },
+    {
+      "level": 8,
+      "topic": 9,
+      "kind": "audio",
+      "use": "dialogue",
+      "script": null,
+      "status": "script pending",
+      "file": "L08-T09-dialogue.wav"
+    },
+    {
+      "level": 8,
+      "topic": 9,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "He is exchanging contact details with someone he has just met at a conference.",
+      "file": "L08-T09-LM1-prompt.wav"
+    },
+    {
+      "level": 8,
+      "topic": 9,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "Two professionals at a conference exhibition hall scanning a phone code to exchange details",
+      "file": "L08-T09-LM1-photo-1.jpg",
+      "correct": true
+    },
+    {
+      "level": 8,
+      "topic": 9,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A person sleeping in a hotel room",
+      "file": "L08-T09-LM1-photo-2.jpg",
+      "correct": false
+    },
+    {
+      "level": 8,
+      "topic": 9,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A speaker giving a keynote",
+      "file": "L08-T09-LM1-photo-3.jpg",
+      "correct": false
+    },
+    {
+      "level": 8,
+      "topic": 9,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "An empty conference hall",
+      "file": "L08-T09-LM1-photo-4.jpg",
+      "correct": false
+    },
+    {
+      "level": 9,
+      "kind": "photo",
+      "use": "level cover",
+      "file": "L09-cover.jpg"
+    },
+    {
+      "level": 9,
+      "topic": 1,
+      "kind": "audio",
+      "use": "dialogue",
+      "speakers": [
+        "Lina",
+        "Omar"
+      ],
+      "script": [
+        {
+          "speaker": "Lina",
+          "line": "The survey suggests that students who attend language workshops report greater confidence."
+        },
+        {
+          "speaker": "Omar",
+          "line": "That is encouraging, but it does not establish that the workshops caused the improvement."
+        },
+        {
+          "speaker": "Lina",
+          "line": "Students who were already motivated may have been more likely to attend."
+        },
+        {
+          "speaker": "Omar",
+          "line": "Exactly. We should distinguish an association from a causal claim."
+        },
+        {
+          "speaker": "Lina",
+          "line": "Would comparing participants’ confidence before and after the workshop address that limitation?"
+        },
+        {
+          "speaker": "Omar",
+          "line": "It would help, although a comparable non-participant group would make the interpretation stronger."
+        },
+        {
+          "speaker": "Lina",
+          "line": "Then our recommendation should be a carefully evaluated pilot, rather than immediate expansion."
+        },
+        {
+          "speaker": "Omar",
+          "line": "Yes. Acknowledge the promising findings while making the uncertainty explicit."
+        }
+      ],
+      "file": "L09-T01-dialogue.wav"
+    },
+    {
+      "level": 9,
+      "topic": 1,
+      "kind": "audio",
+      "use": "vocabulary word",
+      "script": "association",
+      "file": "L09-T01-vocab-01-word.wav"
+    },
+    {
+      "level": 9,
+      "topic": 1,
+      "kind": "audio",
+      "use": "vocabulary example",
+      "script": "Exactly. We should distinguish an association from a causal claim.",
+      "file": "L09-T01-vocab-01-example.wav"
+    },
+    {
+      "level": 9,
+      "topic": 1,
+      "kind": "audio",
+      "use": "vocabulary word",
+      "script": "causal",
+      "file": "L09-T01-vocab-02-word.wav"
+    },
+    {
+      "level": 9,
+      "topic": 1,
+      "kind": "audio",
+      "use": "vocabulary example",
+      "script": "Exactly. We should distinguish an association from a causal claim.",
+      "file": "L09-T01-vocab-02-example.wav"
+    },
+    {
+      "level": 9,
+      "topic": 1,
+      "kind": "audio",
+      "use": "vocabulary word",
+      "script": "comparable",
+      "file": "L09-T01-vocab-03-word.wav"
+    },
+    {
+      "level": 9,
+      "topic": 1,
+      "kind": "audio",
+      "use": "vocabulary example",
+      "script": "It would help, although a comparable non-participant group would make the interpretation stronger.",
+      "file": "L09-T01-vocab-03-example.wav"
+    },
+    {
+      "level": 9,
+      "topic": 1,
+      "kind": "audio",
+      "use": "vocabulary word",
+      "script": "explicit",
+      "file": "L09-T01-vocab-04-word.wav"
+    },
+    {
+      "level": 9,
+      "topic": 1,
+      "kind": "audio",
+      "use": "vocabulary example",
+      "script": "Yes. Acknowledge the promising findings while making the uncertainty explicit.",
+      "file": "L09-T01-vocab-04-example.wav"
+    },
+    {
+      "level": 9,
+      "topic": 1,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "Although the plan is expensive, she argues that it will save money in the long term.",
+      "file": "L09-T01-LM1-prompt.wav"
+    },
+    {
+      "level": 9,
+      "topic": 1,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A woman shopping for luxury goods",
+      "file": "L09-T01-LM1-photo-1.jpg",
+      "correct": false
+    },
+    {
+      "level": 9,
+      "topic": 1,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A woman counting cash at a shop till",
+      "file": "L09-T01-LM1-photo-2.jpg",
+      "correct": false
+    },
+    {
+      "level": 9,
+      "topic": 1,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A woman presenting a chart where costs rise at first and then fall over time (no readable text)",
+      "file": "L09-T01-LM1-photo-3.jpg",
+      "correct": true
+    },
+    {
+      "level": 9,
+      "topic": 1,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A woman reading a menu",
+      "file": "L09-T01-LM1-photo-4.jpg",
+      "correct": false
+    },
+    {
+      "level": 9,
+      "topic": 2,
+      "kind": "audio",
+      "use": "dialogue",
+      "script": null,
+      "status": "script pending",
+      "file": "L09-T02-dialogue.wav"
+    },
+    {
+      "level": 9,
+      "topic": 2,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "The students are questioning the evidence behind the professor's claim.",
+      "file": "L09-T02-LM1-prompt.wav"
+    },
+    {
+      "level": 9,
+      "topic": 2,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "University students raising hands and pointing at a projected chart during a seminar (no readable text)",
+      "file": "L09-T02-LM1-photo-1.jpg",
+      "correct": true
+    },
+    {
+      "level": 9,
+      "topic": 2,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "Students taking photos at graduation",
+      "file": "L09-T02-LM1-photo-2.jpg",
+      "correct": false
+    },
+    {
+      "level": 9,
+      "topic": 2,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "Students eating in a cafeteria",
+      "file": "L09-T02-LM1-photo-3.jpg",
+      "correct": false
+    },
+    {
+      "level": 9,
+      "topic": 2,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "Students sleeping in a lecture",
+      "file": "L09-T02-LM1-photo-4.jpg",
+      "correct": false
+    },
+    {
+      "level": 9,
+      "topic": 3,
+      "kind": "audio",
+      "use": "dialogue",
+      "script": null,
+      "status": "script pending",
+      "file": "L09-T03-dialogue.wav"
+    },
+    {
+      "level": 9,
+      "topic": 3,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "The researcher is explaining an unexpected result in her study.",
+      "file": "L09-T03-LM1-prompt.wav"
+    },
+    {
+      "level": 9,
+      "topic": 3,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A researcher reading in a library",
+      "file": "L09-T03-LM1-photo-1.jpg",
+      "correct": false
+    },
+    {
+      "level": 9,
+      "topic": 3,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A researcher pouring liquid in a lab",
+      "file": "L09-T03-LM1-photo-2.jpg",
+      "correct": false
+    },
+    {
+      "level": 9,
+      "topic": 3,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A researcher at a conference pointing at one data point that stands apart on a scatter chart (no readable text)",
+      "file": "L09-T03-LM1-photo-3.jpg",
+      "correct": true
+    },
+    {
+      "level": 9,
+      "topic": 3,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A researcher on a field trip in a forest",
+      "file": "L09-T03-LM1-photo-4.jpg",
+      "correct": false
+    },
+    {
+      "level": 9,
+      "topic": 4,
+      "kind": "audio",
+      "use": "dialogue",
+      "script": null,
+      "status": "script pending",
+      "file": "L09-T04-dialogue.wav"
+    },
+    {
+      "level": 9,
+      "topic": 4,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "They are discussing whether it is fair to use AI to choose job candidates.",
+      "file": "L09-T04-LM1-prompt.wav"
+    },
+    {
+      "level": 9,
+      "topic": 4,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A computer repair shop",
+      "file": "L09-T04-LM1-photo-1.jpg",
+      "correct": false
+    },
+    {
+      "level": 9,
+      "topic": 4,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A robot vacuum cleaning a floor",
+      "file": "L09-T04-LM1-photo-2.jpg",
+      "correct": false
+    },
+    {
+      "level": 9,
+      "topic": 4,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A diverse panel around a table looking at a laptop showing anonymous candidate profiles, with thoughtful expressions (no readable text)",
+      "file": "L09-T04-LM1-photo-3.jpg",
+      "correct": true
+    },
+    {
+      "level": 9,
+      "topic": 4,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A job interview with one candidate",
+      "file": "L09-T04-LM1-photo-4.jpg",
+      "correct": false
+    },
+    {
+      "level": 9,
+      "topic": 5,
+      "kind": "audio",
+      "use": "dialogue",
+      "script": null,
+      "status": "script pending",
+      "file": "L09-T05-dialogue.wav"
+    },
+    {
+      "level": 9,
+      "topic": 5,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "The forecast suggests it may rain, but it is far from certain.",
+      "file": "L09-T05-LM1-prompt.wav"
+    },
+    {
+      "level": 9,
+      "topic": 5,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A person at a window holding an umbrella while the sky is half sunny and half cloudy",
+      "file": "L09-T05-LM1-photo-1.jpg",
+      "correct": true
+    },
+    {
+      "level": 9,
+      "topic": 5,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A person shovelling snow",
+      "file": "L09-T05-LM1-photo-2.jpg",
+      "correct": false
+    },
+    {
+      "level": 9,
+      "topic": 5,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A person in a heavy storm",
+      "file": "L09-T05-LM1-photo-3.jpg",
+      "correct": false
+    },
+    {
+      "level": 9,
+      "topic": 5,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A person sunbathing under a clear sky",
+      "file": "L09-T05-LM1-photo-4.jpg",
+      "correct": false
+    },
+    {
+      "level": 9,
+      "topic": 6,
+      "kind": "audio",
+      "use": "dialogue",
+      "script": null,
+      "status": "script pending",
+      "file": "L09-T06-dialogue.wav"
+    },
+    {
+      "level": 9,
+      "topic": 6,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "The data shows sales grew, but only in the summer months.",
+      "file": "L09-T06-LM1-prompt.wav"
+    },
+    {
+      "level": 9,
+      "topic": 6,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A pie chart on a screen",
+      "file": "L09-T06-LM1-photo-1.jpg",
+      "correct": false
+    },
+    {
+      "level": 9,
+      "topic": 6,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A chart with bars rising steadily",
+      "file": "L09-T06-LM1-photo-2.jpg",
+      "correct": false
+    },
+    {
+      "level": 9,
+      "topic": 6,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A blank whiteboard",
+      "file": "L09-T06-LM1-photo-3.jpg",
+      "correct": false
+    },
+    {
+      "level": 9,
+      "topic": 6,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A bar chart with only a few tall bars in the middle and short bars elsewhere, being examined by two colleagues (no readable text)",
+      "file": "L09-T06-LM1-photo-4.jpg",
+      "correct": true
+    },
+    {
+      "level": 9,
+      "topic": 7,
+      "kind": "audio",
+      "use": "dialogue",
+      "script": null,
+      "status": "script pending",
+      "file": "L09-T07-dialogue.wav"
+    },
+    {
+      "level": 9,
+      "topic": 7,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "She is making sure the quieter members of the group get a chance to speak.",
+      "file": "L09-T07-LM1-prompt.wav"
+    },
+    {
+      "level": 9,
+      "topic": 7,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A discussion leader gesturing towards a quiet participant who begins to speak while others listen",
+      "file": "L09-T07-LM1-photo-1.jpg",
+      "correct": true
+    },
+    {
+      "level": 9,
+      "topic": 7,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A leader speaking alone while others look at phones",
+      "file": "L09-T07-LM1-photo-2.jpg",
+      "correct": false
+    },
+    {
+      "level": 9,
+      "topic": 7,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A group shouting over each other",
+      "file": "L09-T07-LM1-photo-3.jpg",
+      "correct": false
+    },
+    {
+      "level": 9,
+      "topic": 7,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A group watching a video",
+      "file": "L09-T07-LM1-photo-4.jpg",
+      "correct": false
+    },
+    {
+      "level": 9,
+      "topic": 8,
+      "kind": "audio",
+      "use": "dialogue",
+      "script": null,
+      "status": "script pending",
+      "file": "L09-T08-dialogue.wav"
+    },
+    {
+      "level": 9,
+      "topic": 8,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "He adapts his greeting because his colleague comes from a different culture.",
+      "file": "L09-T08-LM1-prompt.wav"
+    },
+    {
+      "level": 9,
+      "topic": 8,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A man shaking hands with a robot",
+      "file": "L09-T08-LM1-photo-1.jpg",
+      "correct": false
+    },
+    {
+      "level": 9,
+      "topic": 8,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "Two old friends hugging at an airport",
+      "file": "L09-T08-LM1-photo-2.jpg",
+      "correct": false
+    },
+    {
+      "level": 9,
+      "topic": 8,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A businessman pausing and offering a respectful nod instead of a handshake to an international colleague",
+      "file": "L09-T08-LM1-photo-3.jpg",
+      "correct": true
+    },
+    {
+      "level": 9,
+      "topic": 8,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A man waving at a bus",
+      "file": "L09-T08-LM1-photo-4.jpg",
+      "correct": false
+    },
+    {
+      "level": 9,
+      "topic": 9,
+      "kind": "audio",
+      "use": "dialogue",
+      "script": null,
+      "status": "script pending",
+      "file": "L09-T09-dialogue.wav"
+    },
+    {
+      "level": 9,
+      "topic": 9,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "The speaker pauses to consider a difficult question from the audience.",
+      "file": "L09-T09-LM1-prompt.wav"
+    },
+    {
+      "level": 9,
+      "topic": 9,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A speaker laughing with the audience",
+      "file": "L09-T09-LM1-photo-1.jpg",
+      "correct": false
+    },
+    {
+      "level": 9,
+      "topic": 9,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A speaker on stage thinking carefully while an audience member stands with a microphone",
+      "file": "L09-T09-LM1-photo-2.jpg",
+      "correct": true
+    },
+    {
+      "level": 9,
+      "topic": 9,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "An empty stage with a microphone",
+      "file": "L09-T09-LM1-photo-3.jpg",
+      "correct": false
+    },
+    {
+      "level": 9,
+      "topic": 9,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A speaker walking off stage",
+      "file": "L09-T09-LM1-photo-4.jpg",
+      "correct": false
+    },
+    {
+      "level": 10,
+      "kind": "photo",
+      "use": "level cover",
+      "file": "L10-cover.jpg"
+    },
+    {
+      "level": 10,
+      "topic": 1,
+      "kind": "audio",
+      "use": "dialogue",
+      "speakers": [
+        "Lina",
+        "Omar"
+      ],
+      "script": [
+        {
+          "speaker": "Omar",
+          "line": "I recommend a phased introduction of the peer-mentoring scheme rather than a campus-wide launch."
+        },
+        {
+          "speaker": "Lina",
+          "line": "Which constraint has most influenced that recommendation?"
+        },
+        {
+          "speaker": "Omar",
+          "line": "We can recruit mentors quickly, but consistent training and supervision would be harder to scale."
+        },
+        {
+          "speaker": "Lina",
+          "line": "How would you judge whether the initial phase had succeeded?"
+        },
+        {
+          "speaker": "Omar",
+          "line": "I would combine participation data with confidential feedback and evidence that support needs were being addressed."
+        },
+        {
+          "speaker": "Lina",
+          "line": "We also need safeguards so that enthusiasm does not substitute for qualified guidance."
+        },
+        {
+          "speaker": "Omar",
+          "line": "Agreed. Mentors should know when to refer a student to an authorized professional."
+        },
+        {
+          "speaker": "Lina",
+          "line": "Then present the proposal with clear boundaries, review criteria and conditions for expansion."
+        }
+      ],
+      "file": "L10-T01-dialogue.wav"
+    },
+    {
+      "level": 10,
+      "topic": 1,
+      "kind": "audio",
+      "use": "vocabulary word",
+      "script": "phased",
+      "file": "L10-T01-vocab-01-word.wav"
+    },
+    {
+      "level": 10,
+      "topic": 1,
+      "kind": "audio",
+      "use": "vocabulary example",
+      "script": "I recommend a phased introduction of the peer-mentoring scheme rather than a campus-wide launch.",
+      "file": "L10-T01-vocab-01-example.wav"
+    },
+    {
+      "level": 10,
+      "topic": 1,
+      "kind": "audio",
+      "use": "vocabulary word",
+      "script": "constraint",
+      "file": "L10-T01-vocab-02-word.wav"
+    },
+    {
+      "level": 10,
+      "topic": 1,
+      "kind": "audio",
+      "use": "vocabulary example",
+      "script": "Which constraint has most influenced that recommendation?",
+      "file": "L10-T01-vocab-02-example.wav"
+    },
+    {
+      "level": 10,
+      "topic": 1,
+      "kind": "audio",
+      "use": "vocabulary word",
+      "script": "safeguard",
+      "file": "L10-T01-vocab-03-word.wav"
+    },
+    {
+      "level": 10,
+      "topic": 1,
+      "kind": "audio",
+      "use": "vocabulary example",
+      "script": "We also need safeguards so that enthusiasm does not substitute for qualified guidance.",
+      "file": "L10-T01-vocab-03-example.wav"
+    },
+    {
+      "level": 10,
+      "topic": 1,
+      "kind": "audio",
+      "use": "vocabulary word",
+      "script": "criteria",
+      "file": "L10-T01-vocab-04-word.wav"
+    },
+    {
+      "level": 10,
+      "topic": 1,
+      "kind": "audio",
+      "use": "vocabulary example",
+      "script": "Then present the proposal with clear boundaries, review criteria and conditions for expansion.",
+      "file": "L10-T01-vocab-04-example.wav"
+    },
+    {
+      "level": 10,
+      "topic": 1,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "They need to deliver on time, stay within budget and keep the client satisfied.",
+      "file": "L10-T01-LM1-prompt.wav"
+    },
+    {
+      "level": 10,
+      "topic": 1,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A team on a lunch break",
+      "file": "L10-T01-LM1-photo-1.jpg",
+      "correct": false
+    },
+    {
+      "level": 10,
+      "topic": 1,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A project team looking at a whiteboard sketch of a triangle with three icons: a clock, coins and a smiling face (no words)",
+      "file": "L10-T01-LM1-photo-2.jpg",
+      "correct": true
+    },
+    {
+      "level": 10,
+      "topic": 1,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A team celebrating a finished project with balloons",
+      "file": "L10-T01-LM1-photo-3.jpg",
+      "correct": false
+    },
+    {
+      "level": 10,
+      "topic": 1,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "One person reading a contract",
+      "file": "L10-T01-LM1-photo-4.jpg",
+      "correct": false
+    },
+    {
+      "level": 10,
+      "topic": 2,
+      "kind": "audio",
+      "use": "dialogue",
+      "script": null,
+      "status": "script pending",
+      "file": "L10-T02-dialogue.wav"
+    },
+    {
+      "level": 10,
+      "topic": 2,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "The chair is bringing the discussion back to the agenda.",
+      "file": "L10-T02-LM1-prompt.wav"
+    },
+    {
+      "level": 10,
+      "topic": 2,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "An empty meeting room",
+      "file": "L10-T02-LM1-photo-1.jpg",
+      "correct": false
+    },
+    {
+      "level": 10,
+      "topic": 2,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A meeting with everyone talking at once",
+      "file": "L10-T02-LM1-photo-2.jpg",
+      "correct": false
+    },
+    {
+      "level": 10,
+      "topic": 2,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A meeting chair raising a hand calmly while participants turn to face her",
+      "file": "L10-T02-LM1-photo-3.jpg",
+      "correct": true
+    },
+    {
+      "level": 10,
+      "topic": 2,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A chair leaving the meeting early",
+      "file": "L10-T02-LM1-photo-4.jpg",
+      "correct": false
+    },
+    {
+      "level": 10,
+      "topic": 3,
+      "kind": "audio",
+      "use": "dialogue",
+      "script": null,
+      "status": "script pending",
+      "file": "L10-T03-dialogue.wav"
+    },
+    {
+      "level": 10,
+      "topic": 3,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "The speaker is addressing a large audience at a formal event.",
+      "file": "L10-T03-LM1-prompt.wav"
+    },
+    {
+      "level": 10,
+      "topic": 3,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A speaker at a podium in a large formal hall facing a seated audience",
+      "file": "L10-T03-LM1-photo-1.jpg",
+      "correct": true
+    },
+    {
+      "level": 10,
+      "topic": 3,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A small team meeting in an office",
+      "file": "L10-T03-LM1-photo-2.jpg",
+      "correct": false
+    },
+    {
+      "level": 10,
+      "topic": 3,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A teacher with five students",
+      "file": "L10-T03-LM1-photo-3.jpg",
+      "correct": false
+    },
+    {
+      "level": 10,
+      "topic": 3,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A person speaking on the phone",
+      "file": "L10-T03-LM1-photo-4.jpg",
+      "correct": false
+    },
+    {
+      "level": 10,
+      "topic": 4,
+      "kind": "audio",
+      "use": "dialogue",
+      "script": null,
+      "status": "script pending",
+      "file": "L10-T04-dialogue.wav"
+    },
+    {
+      "level": 10,
+      "topic": 4,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "He listens to the client's concern before responding with evidence.",
+      "file": "L10-T04-LM1-prompt.wav"
+    },
+    {
+      "level": 10,
+      "topic": 4,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A consultant listening carefully to a sceptical client, then showing a document with charts (no readable text)",
+      "file": "L10-T04-LM1-photo-1.jpg",
+      "correct": true
+    },
+    {
+      "level": 10,
+      "topic": 4,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "Two people celebrating a deal",
+      "file": "L10-T04-LM1-photo-2.jpg",
+      "correct": false
+    },
+    {
+      "level": 10,
+      "topic": 4,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A salesperson leaving a shop",
+      "file": "L10-T04-LM1-photo-3.jpg",
+      "correct": false
+    },
+    {
+      "level": 10,
+      "topic": 4,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A consultant ignoring a client",
+      "file": "L10-T04-LM1-photo-4.jpg",
+      "correct": false
+    },
+    {
+      "level": 10,
+      "topic": 5,
+      "kind": "audio",
+      "use": "dialogue",
+      "script": null,
+      "status": "script pending",
+      "file": "L10-T05-dialogue.wav"
+    },
+    {
+      "level": 10,
+      "topic": 5,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "Three interviewers are asking her questions at the same time.",
+      "file": "L10-T05-LM1-prompt.wav"
+    },
+    {
+      "level": 10,
+      "topic": 5,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A candidate facing a panel of three interviewers at a long table",
+      "file": "L10-T05-LM1-photo-1.jpg",
+      "correct": true
+    },
+    {
+      "level": 10,
+      "topic": 5,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A candidate talking to one interviewer",
+      "file": "L10-T05-LM1-photo-2.jpg",
+      "correct": false
+    },
+    {
+      "level": 10,
+      "topic": 5,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A candidate filling in a form alone",
+      "file": "L10-T05-LM1-photo-3.jpg",
+      "correct": false
+    },
+    {
+      "level": 10,
+      "topic": 5,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A group interview with many candidates",
+      "file": "L10-T05-LM1-photo-4.jpg",
+      "correct": false
+    },
+    {
+      "level": 10,
+      "topic": 6,
+      "kind": "audio",
+      "use": "dialogue",
+      "script": null,
+      "status": "script pending",
+      "file": "L10-T06-dialogue.wav"
+    },
+    {
+      "level": 10,
+      "topic": 6,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "An experienced employee is guiding a new colleague through her first project.",
+      "file": "L10-T06-LM1-prompt.wav"
+    },
+    {
+      "level": 10,
+      "topic": 6,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A manager giving a speech to staff",
+      "file": "L10-T06-LM1-photo-1.jpg",
+      "correct": false
+    },
+    {
+      "level": 10,
+      "topic": 6,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "Two colleagues arguing",
+      "file": "L10-T06-LM1-photo-2.jpg",
+      "correct": false
+    },
+    {
+      "level": 10,
+      "topic": 6,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A new employee working alone",
+      "file": "L10-T06-LM1-photo-3.jpg",
+      "correct": false
+    },
+    {
+      "level": 10,
+      "topic": 6,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "An older colleague sitting beside a younger colleague, pointing at a screen and explaining patiently",
+      "file": "L10-T06-LM1-photo-4.jpg",
+      "correct": true
+    },
+    {
+      "level": 10,
+      "topic": 7,
+      "kind": "audio",
+      "use": "dialogue",
+      "script": null,
+      "status": "script pending",
+      "file": "L10-T07-dialogue.wav"
+    },
+    {
+      "level": 10,
+      "topic": 7,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "She is helping two colleagues resolve a disagreement.",
+      "file": "L10-T07-LM1-prompt.wav"
+    },
+    {
+      "level": 10,
+      "topic": 7,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A team party",
+      "file": "L10-T07-LM1-photo-1.jpg",
+      "correct": false
+    },
+    {
+      "level": 10,
+      "topic": 7,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "Two colleagues in an angry argument with no one else",
+      "file": "L10-T07-LM1-photo-2.jpg",
+      "correct": false
+    },
+    {
+      "level": 10,
+      "topic": 7,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A woman sitting between two colleagues who are listening to each other with calmer expressions",
+      "file": "L10-T07-LM1-photo-3.jpg",
+      "correct": true
+    },
+    {
+      "level": 10,
+      "topic": 7,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A woman working alone",
+      "file": "L10-T07-LM1-photo-4.jpg",
+      "correct": false
+    },
+    {
+      "level": 10,
+      "topic": 8,
+      "kind": "audio",
+      "use": "dialogue",
+      "script": null,
+      "status": "script pending",
+      "file": "L10-T08-dialogue.wav"
+    },
+    {
+      "level": 10,
+      "topic": 8,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "The founder has three minutes to convince the investors.",
+      "file": "L10-T08-LM1-prompt.wav"
+    },
+    {
+      "level": 10,
+      "topic": 8,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A shop owner serving customers",
+      "file": "L10-T08-LM1-photo-1.jpg",
+      "correct": false
+    },
+    {
+      "level": 10,
+      "topic": 8,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "Investors playing golf",
+      "file": "L10-T08-LM1-photo-2.jpg",
+      "correct": false
+    },
+    {
+      "level": 10,
+      "topic": 8,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A young founder presenting a prototype to a small panel of investors with a timer visible (no readable text)",
+      "file": "L10-T08-LM1-photo-3.jpg",
+      "correct": true
+    },
+    {
+      "level": 10,
+      "topic": 8,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A founder working alone in a garage at night",
+      "file": "L10-T08-LM1-photo-4.jpg",
+      "correct": false
+    },
+    {
+      "level": 10,
+      "topic": 9,
+      "kind": "audio",
+      "use": "dialogue",
+      "script": null,
+      "status": "script pending",
+      "file": "L10-T09-dialogue.wav"
+    },
+    {
+      "level": 10,
+      "topic": 9,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "She is answering questions about her organisation at an international fair.",
+      "file": "L10-T09-LM1-prompt.wav"
+    },
+    {
+      "level": 10,
+      "topic": 9,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A tourist taking photos",
+      "file": "L10-T09-LM1-photo-1.jpg",
+      "correct": false
+    },
+    {
+      "level": 10,
+      "topic": 9,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A shop assistant folding clothes",
+      "file": "L10-T09-LM1-photo-2.jpg",
+      "correct": false
+    },
+    {
+      "level": 10,
+      "topic": 9,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A professional at an exhibition stand speaking with visitors from different countries",
+      "file": "L10-T09-LM1-photo-3.jpg",
+      "correct": true
+    },
+    {
+      "level": 10,
+      "topic": 9,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A professional working from home",
+      "file": "L10-T09-LM1-photo-4.jpg",
+      "correct": false
+    },
+    {
+      "level": 10,
+      "topic": 10,
+      "kind": "audio",
+      "use": "dialogue",
+      "script": null,
+      "status": "script pending",
+      "file": "L10-T10-dialogue.wav"
+    },
+    {
+      "level": 10,
+      "topic": 10,
+      "kind": "audio",
+      "use": "listen & match prompt",
+      "script": "After a long debate, he summarises the main points everyone agreed on.",
+      "file": "L10-T10-LM1-prompt.wav"
+    },
+    {
+      "level": 10,
+      "topic": 10,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A group leaving the room in disagreement",
+      "file": "L10-T10-LM1-photo-1.jpg",
+      "correct": false
+    },
+    {
+      "level": 10,
+      "topic": 10,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A man starting a new debate",
+      "file": "L10-T10-LM1-photo-2.jpg",
+      "correct": false
+    },
+    {
+      "level": 10,
+      "topic": 10,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A man standing at a whiteboard grouping notes into three clear clusters while the group nods (no readable text)",
+      "file": "L10-T10-LM1-photo-3.jpg",
+      "correct": true
+    },
+    {
+      "level": 10,
+      "topic": 10,
+      "kind": "photo",
+      "use": "listen & match option",
+      "shows": "A man reading alone",
+      "file": "L10-T10-LM1-photo-4.jpg",
+      "correct": false
+    }
+  ]
+}

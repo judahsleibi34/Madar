@@ -11,4 +11,5 @@ export const fetchCatalog = () => request("/catalog");
 export const fetchMyPlans = () => request("/my-plans");
 export const enrollCatalogCourse = (id) => request(`/catalog/${encodeURIComponent(id)}/enrollment`, "POST");
 export const createCheckout = (offering, course, key) => request("/checkout", "POST", { offering_id: offering, course_id: course || null, idempotency_key: key });
+export const reconcileCheckout = (id) => request(`/checkout/${encodeURIComponent(id)}/reconcile`, "POST");
 export const localPaymentEvent = (id, state, cancel = false) => request(`/checkout/${encodeURIComponent(id)}/local-event`, "POST", { state, cancel_at_period_end: cancel });
