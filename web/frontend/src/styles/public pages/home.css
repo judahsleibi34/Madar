@@ -125,7 +125,6 @@
   font-family: var(--font-heading);
 }
 
-.hero-title .gradient-text,
 .hero-description .arabic-name {
   unicode-bidi: isolate;
 }

@@ -4,7 +4,7 @@
 **Version:** 2.0
 **Status:** Approved commercial policy; schema-115 foundation implemented locally, production activation pending
 **Document date:** 2026-09-30
-**Target catalog:** `launch_2026`
+**Target catalog:** `launch_2026_v2` (supersedes the never-activated `launch_2026`; see §10.6)
 **Currency:** USD
 **Billing basis:** Monthly recurring subscription unless an approved tenant-specific order states otherwise
 **Repository target:** `docs/commercial-authority-contract.md`
@@ -110,9 +110,11 @@ Examples:
 ### 4.4 Price Book
 A versioned and effective-dated collection of commercial pricing rules.
 
-The initial price book defined by this Contract is:
+The launch price book defined by this Contract is:
 
-`launch_2026`
+`launch_2026_v2`
+
+It supersedes the prepared `launch_2026` book, which was never opened for sales (§10.6).
 
 ### 4.5 Launch Customer / Founding Customer
 A tenant that enters a paid commercial relationship under `launch_2026` while that price book is
@@ -136,6 +138,11 @@ The rule that a Grandfathered Module or Grandfathered Module Set continues to us
 ### 4.9 Add-on
 A separately priced capability, allowance, integration, usage pack, or service that is not one of the
 three Core Modules.
+
+The **AI assistant** (`ai_website_assistant`) is an optional add-on at USD 10/month that may be added
+to any Core Module Set (Forms, Website, Commerce, or any bundle). It is billed in addition to the
+Module Set price and is never part of a bundle. It SHALL NOT be requested, assigned, or billed until
+the assistant is delivered and the add-on ledger explicitly accepts it.
 
 ### 4.10 Product Assignment
 The canonical statement of **what** Core Modules and add-ons a tenant is assigned.
@@ -253,7 +260,7 @@ distinct.
 
 **Canonical module ID:** `ecommerce`
 **Customer-facing name:** **Madar Commerce**
-**Launch standalone price:** **USD 20/month**
+**Launch standalone price:** **USD 25/month**
 
 Madar Commerce includes the commerce/storefront product, including at minimum where those features
 exist in the current product:
@@ -281,7 +288,7 @@ Commerce does **not** automatically grant the general-purpose Website builder. A
 may operate its Commerce storefront without receiving the full `website` module.
 
 Payment processor/acquirer charges and other third-party transaction costs are not included in the
-USD 20 subscription unless an approved commercial document explicitly states otherwise.
+USD 25 subscription unless an approved commercial document explicitly states otherwise.
 
 This Contract defines no Madar platform transaction percentage fee. Any future platform transaction
 fee requires an explicit contract amendment or new price-book term before activation.
@@ -310,7 +317,7 @@ A tenant MUST NOT lose authentication merely because commercial access is suspen
 
 ### 10.1 Price-book identifier
 
-`launch_2026`
+`launch_2026_v2`
 
 ### 10.2 New-sales availability
 
@@ -341,7 +348,7 @@ All prices in this section are:
 |---|---:|
 | Forms only | **$15** |
 | Website only | **$20** |
-| Commerce only | **$20** |
+| Commerce only | **$25** |
 | Forms + Website | **$30** |
 | Forms + Commerce | **$30** |
 | Website + Commerce | **$30** |
@@ -360,6 +367,16 @@ customer-facing plans.
 
 The resolved Module Set and amount MUST be snapshotted in commercial history.
 
+### 10.6 Superseded `launch_2026` book (amendment, 2026-10-14)
+
+Before any launch sale, the founders revised Commerce from USD 20 to USD 25/month; Forms, Website and
+all bundle prices are unchanged. Because price books are immutable, schema146 adds the prepared
+`launch_2026_v2` book (version `2026-10-14`) and permanently prevents `launch_2026` from opening.
+`launch_2026` remains readable as historical evidence for any basis already recorded against it.
+
+Throughout §11 and later sections, references to `launch_2026` as the launch/founding offer apply to
+`launch_2026_v2`. `launch_2026_v2` SHALL be closed to new sales before any successor book is opened.
+
 ---
 
 ## 11. Founding-customer / grandfathering policy
@@ -367,7 +384,8 @@ The resolved Module Set and amount MUST be snapshotted in commercial history.
 ### 11.1 General rule
 
 A tenant that purchases a Core Module under `launch_2026` acquires the launch price for that module
-while the module remains continuously assigned.
+while confirmed paid access remains uninterrupted. Assignment and historical `module_basis` evidence
+alone do not preserve eligibility after paid coverage expires.
 
 Launch pricing is a real commercial commitment, not a UI label.
 
@@ -375,7 +393,7 @@ Future price books MUST NOT silently reprice grandfathered modules.
 
 ### 11.2 Existing module price protection
 
-After `launch_2026` closes to new sales:
+After `launch_2026` closes to new sales, and only while confirmed paid periods remain uninterrupted:
 
 - a continuously maintained Forms module remains eligible for `launch_2026`;
 - a continuously maintained Website module remains eligible for `launch_2026`;
@@ -449,17 +467,31 @@ future service under `launch_2026`.
 
 A later re-subscription uses the Current Price Book unless an explicit approved exception applies.
 
-### 11.8 Nonpayment, expiration, and administrative hold
+### 11.8 Paid-access expiration and administrative hold
 
-Past due, expired access, or a Commercial Hold MAY deny product use.
+Subscriptions are paid in advance. Existing commercial access remains effective through its recorded
+`valid_until`, with an exclusive upper bound. A failed attempt to fund a future period does not shorten
+that already-paid interval.
 
-Those states MUST NOT, by themselves, silently destroy a grandfathered price lock.
+At `valid_until`, when no confirmed adjacent paid period exists, access expires and ordinary
+grandfathering eligibility ends at the same instant. There is no grace state, recovery deadline,
+retry-based recovery, or automatic restoration. A later ordinary subscription or acquisition uses
+the Current Price Book. Historical `module_basis`, payments, access periods, events, and snapshots
+remain immutable evidence but do not authorize reuse of an expired closed-book basis.
 
-Grandfathering ends through an explicit module cancellation/removal, full cancellation, an approved
-commercial correction, or another expressly documented commercial event.
+An advance-confirmed paid period that starts exactly at the previous `valid_until` is uninterrupted;
+the half-open periods are adjacent and preserve eligible founding pricing without an artificial gap.
 
-This prevents a temporary payment dispute, administrative review, or operational hold from
-accidentally destroying a founding customer's commercial terms.
+A Commercial Hold denies use under the existing hold semantics but does not change paid-period dates
+or independently end pricing protection. Only elapsed paid coverage, removal/cancellation, or another
+approved commercial event ends ordinary eligibility.
+
+Historical pricing may be restored only through a dedicated AAL2-protected, revision-safe,
+idempotent administrative exception with explicit modules, price-book bases, reason, supporting
+reference, and immutable audit evidence. It never rewrites historical payment or access records.
+
+Commercial expiration is separate from tenant deletion. Expiration MUST NOT delete tenant content,
+identity records, or historical financial evidence.
 
 ### 11.9 Tenant scope
 
@@ -1103,7 +1135,7 @@ Before production activation, automated tests SHALL prove at minimum:
 
 1. Forms only resolves to USD 15/month.
 2. Website only resolves to USD 20/month.
-3. Commerce only resolves to USD 20/month.
+3. Commerce only resolves to USD 25/month.
 4. Every two-module combination resolves to USD 30/month.
 5. All three modules resolve to USD 40/month.
 6. Module order does not affect bundle price.
@@ -1336,7 +1368,7 @@ The modular `launch_2026` price book defined by Version 2.0 supersedes the old c
 Forms/Website/Business/Business Plus pricing ladder for new sales once activated.
 
 
-## Appendix D — Current schema-115 engineering implementation
+## Appendix D — Historical schema-115 engineering implementation
 
 ### Representation and authority
 
@@ -1359,8 +1391,9 @@ subset independently and sums the approved group charges. It does not infer a
 cross-book discount. Future price books require separately approved definitions;
 no standard/future amount is seeded in production migrations.
 
-Manual payment sets `paid_since` for currently assigned covered modules. An
-unpaid trial or complimentary grant never sets it. Removing a module drops its
+Manual payment sets `paid_since` for currently assigned covered modules. In schema115 this marker was
+also treated as sufficient closed-book eligibility; Appendix E supersedes that unsafe resolver rule.
+An unpaid trial or complimentary grant never sets it. Removing a module drops its
 current basis; re-addition acquires a fresh basis under an available book. Past
 due/expired access and admin holds do not change module bases. Full cancellation
 leaves historical bases in canceled records but no current rights to reuse them.
@@ -1475,13 +1508,31 @@ module and pricing metadata. Legacy plan assignment/request endpoints return
 modular_assignment_required. Customer-facing modular purchase selection and
 commercial activation are separate next-phase work; no full admin UI is added.
 
-Migration 115 is unpublished and paired byte-for-byte in both migration trees.
-No applied migration through 114 changes. The manifest checksum and schema-114
-bridge metadata must be validated after amendments. This remains a protected
-release requiring the existing governed control-plane path after review, source
-schema attestation, known-good bridge and verified backup. No production action
-is performed. The prior schema-114 binary cannot enforce new holds/modules at
-115: forward repair remains mandatory after advancement. Future Billing Admin
-RBAC can replace the shared authorization seam. Future payment providers must
-use the same ledger with their own trustworthy machine authority, never spoof
-human AAL2 or create another paid state.
+Migration115 is the immutable production baseline and remains paired byte-for-byte in both migration
+trees; it is not edited by schema145. The new migration is an unselected144→145 candidate, so a
+production115 installation cannot apply it directly and must first follow a separately authorized,
+checksum-pinned path to144. Source schema attestation, a verified backup, exact bridge selection, and
+the governed control-plane path remain mandatory. No production action is performed. Future Billing
+Admin RBAC can replace the shared authorization seam. Future payment providers must use the same
+ledger with their own trustworthy machine authority, never spoof human AAL2 or create another paid
+state.
+
+## Appendix E — Unselected schema-145 strict paid-continuity implementation
+
+Schema145 preserves the schema115 ledger, events, subscriptions, snapshots, and public access
+contract while adding `protection_contract_version: 145` and
+`protection_policy: strict_paid_continuity_v1` to canonical snapshots. The application accepts older
+snapshots for reads but fails closed for payment, complimentary module coverage, module reassignment,
+pricing quotes, and price-basis restoration until the protection marker is present.
+
+Closed-book eligibility is derived from the authoritative database clock and immutable confirmed-paid
+access periods whose price snapshots cover the same module and price book. Recursive exact adjacency
+extends continuity across `[valid_from, valid_until)` periods. `paid_since` remains evidence only.
+Ordinary quoting drops an expired closed basis from the successor assignment and requires a currently
+open price book. No mutable grace/recovery state or expiration job is introduced.
+
+The dedicated `restore_price_basis` command requires an active platform administrator at AAL2,
+expected revision, idempotency key, exact module-to-book mapping, reason, supporting reference, and
+matching historical paid basis. It creates a one-use pending authorization in a new subscription
+container, records an immutable event/audit entry, and consumes the authorization on the successful
+paid period. It grants no access by itself and rewrites no historical evidence.

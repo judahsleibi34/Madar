@@ -165,6 +165,42 @@ const renderStandaloneForm = () => {
   );
 };
 
+describe("TenantSiteRuntime standalone form requests", () => {
+  beforeEach(() => vi.clearAllMocks());
+  afterEach(cleanup);
+
+  it("renders a standalone form without a protected-page lookup for the form path", async () => {
+    renderStandaloneForm();
+
+    await waitFor(() => {
+      expect(document.querySelector(".tenant-runtime-page .runtime-form")).toBeTruthy();
+    });
+    await waitFor(() => expect(getTenantVisitorStatus).toHaveBeenCalled());
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(fetchPublicForm).toHaveBeenCalledTimes(1);
+    expect(fetchPublicForm).toHaveBeenCalledWith("tenant-site", "form-1");
+    expect(fetchProtectedSitePage).not.toHaveBeenCalled();
+  });
+
+  it("shows the standalone form without waiting for the visitor status", async () => {
+    let finishVisitorStatus;
+    getTenantVisitorStatus.mockImplementationOnce(() => new Promise((resolve) => { finishVisitorStatus = resolve; }));
+    renderStandaloneForm();
+
+    await waitFor(() => {
+      expect(document.querySelector(".tenant-runtime-page .runtime-form")).toBeTruthy();
+    });
+    expect(finishVisitorStatus).toBeTypeOf("function");
+    const formMarkup = document.querySelector(".tenant-runtime-page").outerHTML;
+    expect(recordPublicSiteVisit).not.toHaveBeenCalled();
+
+    finishVisitorStatus({ logged_in: true, user: { id: 5, email: "visitor@example.test" } });
+    await waitFor(() => expect(recordPublicSiteVisit).toHaveBeenCalled());
+    expect(document.querySelector(".tenant-runtime-page").outerHTML).toBe(formMarkup);
+  });
+});
+
 describe("TenantSiteRuntime publication updates", () => {
   beforeEach(() => vi.clearAllMocks());
   afterEach(() => {

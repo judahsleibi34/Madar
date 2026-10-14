@@ -78,9 +78,52 @@ class ObservabilityServiceTests(unittest.TestCase):
 
         self.assertIn("parallel_read", timings)
         self.assertLessEqual(markers["parallel_read_start"], markers["parallel_read_end"])
-        self.assertIn('parallel_read_start;dur=', rendered)
-        self.assertIn('desc="offset"', rendered)
+        self.assertRegex(rendered, r"^parallel_read;dur=\d+\.\d$")
+        self.assertNotIn("_start", rendered)
+        self.assertNotIn('desc="offset"', rendered)
         self.assertEqual(observability_service.request_timing_markers_snapshot(), {})
+
+    def test_calendar_sized_trace_header_stays_compact(self):
+        traced = [
+            "auth_provider", "user_profile", "calendar_authorization", "calendar_reservations",
+            "calendar_response", "calendar_lookup", "calendar_event_query", "calendar_recurrence",
+            "calendar_task_query", "calendar_connections", "calendar_invitations",
+            "calendar_workload", "calendar_transform",
+        ]
+        token = observability_service.begin_request_timings()
+        try:
+            for name in traced:
+                with observability_service.traced_operation(name):
+                    pass
+                observability_service.record_request_timing(name, 12.3456)
+            observability_service.record_request_timing("app", 12.3456)
+            rendered = observability_service.server_timing_value()
+        finally:
+            observability_service.end_request_timings(token)
+
+        self.assertLessEqual(len(rendered), 512)
+        self.assertNotIn("truncated", rendered)
+        self.assertEqual(rendered.count(";dur="), len(traced) + 1)
+
+    def test_server_timing_over_budget_keeps_app_and_slowest_stages(self):
+        token = observability_service.begin_request_timings()
+        try:
+            for index in range(200):
+                observability_service.record_request_timing(f"stage_{index:03d}", index / 1000)
+            observability_service.record_request_timing("app", 0.0001)
+            rendered = observability_service.server_timing_value()
+        finally:
+            observability_service.end_request_timings(token)
+
+        self.assertLessEqual(len(rendered), observability_service.SERVER_TIMING_MAX_BYTES)
+        self.assertIn("app;dur=0.1", rendered)
+        self.assertIn("stage_199;dur=199.0", rendered)
+        self.assertNotIn("stage_000;", rendered)
+        self.assertRegex(rendered, r'truncated;desc="\d+"$')
+
+    def test_server_timing_rendering_failure_returns_empty_header(self):
+        with patch.object(observability_service, "request_timings_snapshot", side_effect=RuntimeError("boom")):
+            self.assertEqual(observability_service.server_timing_value(), "")
 
     def test_traced_operation_records_end_when_operation_fails(self):
         token = observability_service.begin_request_timings()

@@ -1,0 +1,15 @@
+{
+  "release_metadata_version": 1,
+  "deployment_profile": "strict-commercial-continuity144-145",
+  "schema": {
+    "compatible_min": 144,
+    "compatible_max": 145,
+    "target": 145,
+    "migration_class": "forward-compatible",
+    "rollback_compatible_min": 144,
+    "rollback_compatible_max": 144
+  },
+  "migration_policy": "automatic-after-known-good-backup-first-forward-repair",
+  "migration_manifest": "migrations-144-145-commercial.json",
+  "notes": "Unselected schema144 to schema145 commercial protection candidate. Enforces confirmed paid-period continuity, no grace or automatic recovery, audited AAL2 historical-basis exceptions, and preservation of tenant and financial history. No production or application database activation granted."
+}

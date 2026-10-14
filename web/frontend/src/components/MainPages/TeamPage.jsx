@@ -1,5 +1,4 @@
 import FadeIn from "../Animations/FadeIn";
-import GradientText from "../Animations/GradientText";
 import { getTeamContent } from "../../content";
 
 const icons = {
@@ -34,10 +33,10 @@ export default function TeamPage({ lang = "en" }) {
   const t = getTeamContent(lang);
 
   return (
-    <section id="team" className="team-page">
+    <section id="team" className="team-page" dir={lang === "ar" ? "rtl" : "ltr"}>
       <FadeIn>
         <header className="team-hero app-page-section-heading app-major-section">
-          <h2><GradientText pauseOnHover>{t.title}</GradientText></h2>
+          <h2>{t.title}</h2>
           <p>{t.subtitle}</p>
         </header>
       </FadeIn>
@@ -65,7 +64,7 @@ export default function TeamPage({ lang = "en" }) {
 
               <div className="profile-content">
                 <h3>{member.name}</h3>
-                <p className="profile-role"><GradientText pauseOnHover>{member.role}</GradientText></p>
+                <p className="profile-role">{member.role}</p>
                 <p className="profile-description">{member.description}</p>
 
                 {member.links?.length > 0 && (

@@ -1,3 +1,5 @@
+// Must stay first: every portal module expects all translations at startup.
+import "./i18n/allTranslations";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";

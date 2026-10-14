@@ -527,6 +527,7 @@ export default function TenantSiteRuntime({ draftPreview = false, siteIdentifier
   useWeeklyScreenTime(draftPreview ? null : tenantAuth.user, {
     endpoint: "/public/sites/" + encodeURIComponent(cleanSubdomain) + "/screen-time/heartbeat",
     scope: "site:" + cleanSubdomain,
+    reportSeconds: false, // the runtime never displays the total
   });
   const publicSubmissionStartedAtRef = useRef(Date.now());
   const formIdempotencyKeysRef = useRef({});
@@ -1101,7 +1102,10 @@ export default function TenantSiteRuntime({ draftPreview = false, siteIdentifier
       publicSiteState !== "ready" ||
       tenantAuth.loading ||
       requestedPage ||
-      pagePath === "/"
+      pagePath === "/" ||
+      // A standalone form route renders its form, never a site page, so a
+      // protected-page lookup for the form path can only return 404.
+      standaloneFormId
     ) {
       return;
     }
@@ -1124,6 +1128,7 @@ export default function TenantSiteRuntime({ draftPreview = false, siteIdentifier
     publicSiteState,
     requestedPage,
     runtimeBasePath,
+    standaloneFormId,
     tenantAuth.loading,
     tenantAuth.user,
   ]);
@@ -2309,7 +2314,10 @@ export default function TenantSiteRuntime({ draftPreview = false, siteIdentifier
   };
 
   const renderPublishedPage = () => {
-    if (isPublicRuntime && (publicSiteState === "loading" || tenantAuth.loading)) {
+    // A standalone form page renders only the form, which never reads visitor
+    // state; it needs its own data, not the separate visitor-status request.
+    // Site pages still wait because their visitor state gates page access.
+    if (isPublicRuntime && (publicSiteState === "loading" || (tenantAuth.loading && !standaloneFormId))) {
       return renderLoadingState();
     }
 

@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import {
   BellRing,
+  Boxes,
   CalendarClock,
   Check,
   CircleCheckBig,
@@ -14,8 +15,13 @@ import {
   HardDrive,
   KeyRound,
   ListRestart,
+  PackageSearch,
+  ReceiptText,
   ShoppingBag,
   SlidersHorizontal,
+  Tags,
+  TriangleAlert,
+  TrendingUp,
   Users,
 } from "lucide-react";
 import { STORAGE_KEY } from "../PageBuilder/core/PageBuilder.constants";
@@ -23,6 +29,7 @@ import { getProductionTenantUrl } from "../PageBuilder/core/PageBuilder.routing"
 import { getBuilderWorkspacePath } from "../PageBuilder/core/PageBuilder.workspaceRouting";
 import WeeklyScreenTimePanel from "./WeeklyScreenTimePanel";
 import { fetchSiteVisitMetrics } from "../../services/siteVisitApi";
+import { fetchEcommerceDashboardSummary } from "../../services/ecommerceApi";
 import {
   getDashboardCacheScope,
   readDashboardMetricsCache,
@@ -57,6 +64,19 @@ const EMPTY_METRICS = {
   projectId: "",
   storeUrl: "",
   websiteUrl: "",
+  ecommerceProducts: 0,
+  ecommerceActiveProducts: 0,
+  ecommerceTags: 0,
+  ecommerceCategories: 0,
+  ecommerceRevenue: "0.00",
+  ecommerceCurrency: "USD",
+  ecommerceOrders: 0,
+  ecommercePaidOrders: 0,
+  ecommercePendingOrders: 0,
+  ecommerceAverageOrderValue: "0.00",
+  ecommerceLowStock: 0,
+  ecommerceOutOfStock: 0,
+  ecommerceTopProducts: [],
 };
 
 const DASHBOARD_VISIBILITY_STORAGE_KEY = "madar-dashboard-card-visibility-v1";
@@ -82,6 +102,9 @@ const normalizeDashboardMetrics = (value) => {
     permissionTypes: Array.isArray(cached.permissionTypes)
       ? cached.permissionTypes
       : EMPTY_METRICS.permissionTypes,
+    ecommerceTopProducts: Array.isArray(cached.ecommerceTopProducts)
+      ? cached.ecommerceTopProducts.slice(0, 5)
+      : EMPTY_METRICS.ecommerceTopProducts,
   };
 };
 
@@ -181,6 +204,19 @@ function formatBytes(value) {
   return amount.toFixed(precision) + " " + units[index];
 }
 
+function formatCommerceMoney(value, currency) {
+  const amount = Number(value) || 0;
+  try {
+    return new Intl.NumberFormat(undefined, {
+      style: "currency",
+      currency: String(currency || "USD").toUpperCase(),
+      maximumFractionDigits: 2,
+    }).format(amount);
+  } catch {
+    return amount.toLocaleString(undefined, { maximumFractionDigits: 2 }) + " " + String(currency || "USD");
+  }
+}
+
 async function loadAllReservations() {
   const reservations = [];
   let offset = 0;
@@ -265,15 +301,17 @@ function UserDashboardContent({ user, weeklyScreenTimeSeconds = 0, cacheScope = 
       }
 
       const projectRequest = listBuilderProjects({ limit: 100 }).catch(() => null);
+      const ecommerceRequest = fetchEcommerceDashboardSummary({ scope: cacheScope }).catch(() => null);
       const membersRequest = projectRequest.then(result => Promise.all((result?.projects || []).map(record => {
         const id = record?.id || record?.project_id;
         return id ? fetchBuilderSiteMembers(id).catch(() => null) : Promise.resolve([]);
       })));
-      const [projectResult, storage, reservations, visitMetrics] = await Promise.all([
+      const [projectResult, storage, reservations, visitMetrics, ecommerceSummary] = await Promise.all([
         projectRequest,
         fetchBuilderStorageUsage().catch(() => null),
         loadAllReservations().catch(() => null),
         fetchSiteVisitMetrics().catch(() => null),
+        ecommerceRequest,
       ]);
       if (!projectResult && cachedMetrics) throw new Error("Dashboard refresh unavailable");
       const records = projectResult?.projects || [];
@@ -294,6 +332,8 @@ function UserDashboardContent({ user, weeklyScreenTimeSeconds = 0, cacheScope = 
 
       const usedBytes =
         storage ? Number(storage.used_bytes || 0) + Number(storage.reserved_bytes || 0) : Number(cachedMetrics?.usedBytes || 0);
+      const commerceCatalog = ecommerceSummary?.catalog || {};
+      const commerceSales = ecommerceSummary?.sales || {};
 
       const nextMetrics = {
         projects: projects.length,
@@ -318,6 +358,21 @@ function UserDashboardContent({ user, weeklyScreenTimeSeconds = 0, cacheScope = 
         projectId,
         storeUrl: primaryProject ? getProductionTenantUrl(primaryProject, "/shop") : "",
         websiteUrl: primaryProject ? getProductionTenantUrl(primaryProject) : "",
+        ecommerceProducts: Number(commerceCatalog.products ?? cachedMetrics?.ecommerceProducts ?? 0),
+        ecommerceActiveProducts: Number(commerceCatalog.active_products ?? cachedMetrics?.ecommerceActiveProducts ?? 0),
+        ecommerceTags: Number(commerceCatalog.tags ?? cachedMetrics?.ecommerceTags ?? 0),
+        ecommerceCategories: Number(commerceCatalog.categories ?? cachedMetrics?.ecommerceCategories ?? 0),
+        ecommerceRevenue: String(commerceSales.revenue ?? cachedMetrics?.ecommerceRevenue ?? "0.00"),
+        ecommerceCurrency: String(commerceSales.currency ?? cachedMetrics?.ecommerceCurrency ?? "USD"),
+        ecommerceOrders: Number(commerceSales.orders ?? cachedMetrics?.ecommerceOrders ?? 0),
+        ecommercePaidOrders: Number(commerceSales.paid_orders ?? cachedMetrics?.ecommercePaidOrders ?? 0),
+        ecommercePendingOrders: Number(commerceSales.pending_orders ?? cachedMetrics?.ecommercePendingOrders ?? 0),
+        ecommerceAverageOrderValue: String(commerceSales.average_order_value ?? cachedMetrics?.ecommerceAverageOrderValue ?? "0.00"),
+        ecommerceLowStock: Number(commerceCatalog.low_stock ?? cachedMetrics?.ecommerceLowStock ?? 0),
+        ecommerceOutOfStock: Number(commerceCatalog.out_of_stock ?? cachedMetrics?.ecommerceOutOfStock ?? 0),
+        ecommerceTopProducts: Array.isArray(ecommerceSummary?.top_products)
+          ? ecommerceSummary.top_products.slice(0, 5)
+          : (cachedMetrics?.ecommerceTopProducts || []),
       };
 
       // Member enumeration is secondary dashboard data. Let the core snapshot
@@ -441,6 +496,56 @@ function UserDashboardContent({ user, weeklyScreenTimeSeconds = 0, cacheScope = 
         value: metrics.reservationForms.toLocaleString(),
         note: "Configured booking blocks",
         icon: CalendarClock,
+      },
+      {
+        id: "ecommerce-products",
+        label: "Products",
+        value: metrics.ecommerceProducts.toLocaleString(),
+        note: metrics.ecommerceActiveProducts.toLocaleString() + " active products",
+        icon: PackageSearch,
+      },
+      {
+        id: "ecommerce-categories",
+        label: "Categories",
+        value: metrics.ecommerceCategories.toLocaleString(),
+        note: "Store catalog groups",
+        icon: Boxes,
+      },
+      {
+        id: "ecommerce-tags",
+        label: "Tags",
+        value: metrics.ecommerceTags.toLocaleString(),
+        note: "Product discovery labels",
+        icon: Tags,
+      },
+      {
+        id: "ecommerce-revenue",
+        label: "Revenue",
+        value: formatCommerceMoney(metrics.ecommerceRevenue, metrics.ecommerceCurrency),
+        note: metrics.ecommercePaidOrders.toLocaleString() + " paid orders",
+        icon: TrendingUp,
+      },
+      {
+        id: "ecommerce-orders",
+        label: "Orders",
+        value: metrics.ecommerceOrders.toLocaleString(),
+        note: metrics.ecommercePendingOrders.toLocaleString() + " awaiting completion",
+        icon: ReceiptText,
+      },
+      {
+        id: "ecommerce-average-order",
+        label: "Average order value",
+        value: formatCommerceMoney(metrics.ecommerceAverageOrderValue, metrics.ecommerceCurrency),
+        note: "Across paid orders",
+        icon: CreditCard,
+      },
+      {
+        id: "ecommerce-inventory-alerts",
+        label: "Inventory alerts",
+        value: (metrics.ecommerceLowStock + metrics.ecommerceOutOfStock).toLocaleString(),
+        note: metrics.ecommerceLowStock.toLocaleString() + " low stock · " + metrics.ecommerceOutOfStock.toLocaleString() + " out of stock",
+        icon: TriangleAlert,
+        accent: metrics.ecommerceLowStock + metrics.ecommerceOutOfStock > 0,
       },
     ];
   }, [metrics, planLabel, planStatus]);
@@ -621,6 +726,30 @@ function UserDashboardContent({ user, weeklyScreenTimeSeconds = 0, cacheScope = 
             No cards selected. Use Customize dashboard to add cards.
           </div>
         )}
+        <article className="user-dashboard-metric-card user-dashboard-commerce-wide-card user-dashboard-top-products">
+          <div className="user-dashboard-metric-heading">
+            <span className="user-dashboard-metric-icon" aria-hidden="true"><TrendingUp size={21} /></span>
+            <span className="user-dashboard-metric-label">Top 5 products</span>
+            <Link className="user-dashboard-commerce-card-link" to="/ecommerce/products">Manage store</Link>
+          </div>
+          <div>
+            <small className="user-dashboard-commerce-card-caption">By paid units sold</small>
+            {metrics.ecommerceTopProducts.length > 0 ? (
+              <ol>
+                {metrics.ecommerceTopProducts.map((product, index) => (
+                  <li key={product.product_id || `${product.name}-${index}`}>
+                    <span className="user-dashboard-product-rank">{index + 1}</span>
+                    <strong>{product.name || "Product"}</strong>
+                    <span>{Number(product.units_sold || 0).toLocaleString()} sold</span>
+                    <b>{formatCommerceMoney(product.revenue, metrics.ecommerceCurrency)}</b>
+                  </li>
+                ))}
+              </ol>
+            ) : (
+              <p className="user-dashboard-commerce-empty">{loading ? "Loading product sales…" : "No paid product sales yet."}</p>
+            )}
+          </div>
+        </article>
       </section>
 
       <WeeklyScreenTimePanel

@@ -1,0 +1,14 @@
+{
+  "manifest_version": 1,
+  "release_sha": "STAGING",
+  "migrations": [
+    {
+      "number": 146,
+      "from_schema": 145,
+      "to_schema": 146,
+      "path": "web/database/migrations/146_revise_launch_price_book.sql",
+      "sha256": "0e92310c8c995c1d7a42b2b4f34c525a6bd082af3bcb39194f6776b8a82565af",
+      "compatibility": "forward-compatible"
+    }
+  ]
+}

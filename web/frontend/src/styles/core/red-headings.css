@@ -1,0 +1,17 @@
+/* Keep primary headings calm and readable; reserve Madar red for deliberate emphasis. */
+html body h1 {
+  color: var(--theme-text) !important;
+  background: none !important;
+  background-image: none !important;
+  -webkit-text-fill-color: var(--theme-text) !important;
+}
+
+html body h1 :where(*) {
+  color: inherit !important;
+  -webkit-text-fill-color: inherit !important;
+}
+
+html body h1 .heading-accent {
+  color: var(--theme-primary) !important;
+  -webkit-text-fill-color: var(--theme-primary) !important;
+}

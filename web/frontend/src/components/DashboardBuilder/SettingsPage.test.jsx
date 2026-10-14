@@ -27,6 +27,12 @@ const response = (data) => ({
   text: async () => JSON.stringify(data),
 });
 
+const errorResponse = (data, status = 500) => ({
+  ok: false,
+  status,
+  text: async () => JSON.stringify(data),
+});
+
 beforeEach(() => {
   vi.clearAllMocks();
   listBuilderProjects.mockResolvedValue({ projects: [], pagination: {} });
@@ -259,6 +265,46 @@ describe("SettingsPage canonical email handling", () => {
         phone: "+970000000",
       });
     });
+  });
+
+  it("never exposes backend error details in settings notifications", async () => {
+    const secret = "Invalid request origin; DATABASE_URL=private; SQL failed";
+    const currentUser = { id: 25, tenant_id: 7, email: "owner@example.com" };
+    apiFetch.mockImplementation((url, options = {}) => {
+      if (String(url).endsWith("/info")) {
+        return Promise.resolve(errorResponse({ detail: secret }, 403));
+      }
+      if (String(url).includes("/website/settings") && options.method === "PUT") {
+        return Promise.resolve(errorResponse({ detail: secret }, 500));
+      }
+      if (String(url).includes("/website/settings")) {
+        return Promise.resolve(response({
+          website: {
+            footer_store_name: "Previous Store",
+            description: "Store description",
+          },
+        }));
+      }
+      return Promise.resolve(response({}));
+    });
+
+    render(
+      <MemoryRouter initialEntries={["/settings?tab=ecommerce"]}>
+        <SettingsPage user={currentUser} onUserUpdated={vi.fn()} />
+      </MemoryRouter>
+    );
+
+    expect((await screen.findByRole("alert")).textContent).toContain("Could not update account settings.");
+    expect(document.body.textContent).not.toContain(secret);
+
+    const storeName = await screen.findByLabelText(/^store name \(English\)/i);
+    fireEvent.change(storeName, { target: { value: "Madar Store" } });
+    fireEvent.click(screen.getByRole("button", { name: /save store details/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert").textContent).toContain("Could not update Online Store settings.");
+    });
+    expect(document.body.textContent).not.toContain(secret);
   });
 });
 

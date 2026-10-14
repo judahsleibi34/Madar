@@ -1,8 +1,8 @@
 import unittest
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.testclient import TestClient
 
 from routes import admin_billing_routes, billing_routes
@@ -20,6 +20,64 @@ def fake_tenant_context(tenant_id=7, user_id=3):
 
 
 class BillingRoutesTests(unittest.TestCase):
+    def test_public_catalog_uses_authoritative_price_book(self):
+        query = Mock()
+        query.select.return_value = query
+        query.eq.return_value = query
+        query.limit.return_value = query
+        query.execute.return_value.data = [{
+            "id": "launch_2026", "version": "2026-09-30",
+            "effective_from": "2026-09-30T00:00:00Z", "currency": "USD",
+            "billing_interval": "month",
+            "standalone_minor": {"forms": 1500, "website": 2000, "ecommerce": 2000},
+            "bundle_minor": {"2": 3000, "3": 4000},
+            "sales_start_at": "2026-01-01T00:00:00Z", "sales_end_at": None,
+        }]
+        with patch.object(billing_routes.service_supabase, "table", return_value=query):
+            result = billing_routes.billing_catalog(Response())
+        book = result["catalog"]["price_book"]
+        self.assertEqual(book["bundle_minor"]["3"], 4000)
+        self.assertTrue(book["new_sales_active"])
+
+    def test_public_catalog_fails_closed_when_price_book_is_unavailable(self):
+        with patch.object(billing_routes.service_supabase, "table", side_effect=RuntimeError("offline")):
+            result = billing_routes.billing_catalog(Response())
+        self.assertIsNone(result["catalog"]["price_book"])
+
+    def test_customer_module_quote_is_tenant_scoped_and_read_only(self):
+        db = Mock()
+        db.rpc.return_value.execute.return_value.data = {
+            "revision": 9,
+            "module_basis": {"forms": {"price_book_id": "launch_2026"}, "website": {"price_book_id": "launch_2026"}},
+            "pricing": {"module_ids": ["forms", "website"], "recurring_minor": 3000, "currency": "USD", "billing_interval": "month"},
+        }
+        ledger = {"protection_contract_version": 145, "protection_policy": "strict_paid_continuity_v1"}
+        with patch.object(billing_routes, "_commercial_context", return_value=fake_tenant_context(tenant_id=7)), \
+             patch.object(billing_routes, "resolve_commercial_access", return_value=ledger), \
+             patch.object(billing_routes, "service_supabase", db):
+            result = billing_routes.customer_module_quote(
+                billing_routes.CustomerModuleQuoteRequest(module_ids=["website", "forms"]),
+                Request({"type": "http", "method": "POST", "path": "/billing/module-quote", "headers": []}),
+                Response(),
+            )
+        self.assertEqual(result["quote"]["pricing"]["recurring_minor"], 3000)
+        db.rpc.assert_called_once_with("quote_commercial_modules", {
+            "p_tenant_id": 7,
+            "r": {"module_ids": ["website", "forms"], "price_books": {}},
+        })
+
+    def test_customer_module_quote_rejects_incompatible_schema(self):
+        with patch.object(billing_routes, "_commercial_context", return_value=fake_tenant_context()), \
+             patch.object(billing_routes, "resolve_commercial_access", return_value={"protection_contract_version": 115}):
+            with self.assertRaises(HTTPException) as error:
+                billing_routes.customer_module_quote(
+                    billing_routes.CustomerModuleQuoteRequest(module_ids=["forms"]),
+                    Request({"type": "http", "method": "POST", "path": "/billing/module-quote", "headers": []}),
+                    Response(),
+                )
+        self.assertEqual(error.exception.status_code, 503)
+        self.assertEqual(error.exception.detail["code"], "commercial_protection_upgrade_required")
+
     def test_current_billing_is_tenant_scoped_and_returns_persisted_state(self):
         client = build_client()
         state = {

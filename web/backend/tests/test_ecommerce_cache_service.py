@@ -192,17 +192,25 @@ def test_public_store_settings_cache_cannot_bypass_host_identity():
     invalidate_ecommerce_cache(7)
 
 
-def test_public_catalog_source_rows_are_reused_across_filter_payloads():
-    source_rows = ([], [], [], [])
+def test_public_catalog_taxonomy_is_reused_across_filter_payloads():
+    taxonomy = {
+        "category_rows": [],
+        "tag_rows": [],
+        "brand_rows": [],
+        "sale_summary": {"active": False, "max_percentage": 0},
+    }
+    empty_page = ([], [], 0, {"min": None, "max": None, "currency": ""}, True)
     with patch.object(
         public_site_routes,
-        "_read_public_catalog_rows",
-        return_value=source_rows,
-    ) as read_rows:
+        "_read_public_catalog_taxonomy",
+        return_value=taxonomy,
+    ) as read_taxonomy, patch.object(
+        public_site_routes, "_scan_public_catalog_page", return_value=empty_page
+    ), patch.object(public_site_routes, "_attach_public_variant_options"):
         public_site_routes._catalog_payload(tenant_id=9, locale="en", search="first")
         public_site_routes._catalog_payload(tenant_id=9, locale="en", search="second")
 
-    assert read_rows.call_count == 1
+    assert read_taxonomy.call_count == 1
 
 
 def test_public_catalog_price_filter_applies_both_bounds():

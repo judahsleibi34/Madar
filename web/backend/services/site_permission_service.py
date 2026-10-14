@@ -116,6 +116,9 @@ def resource_is_role_restricted(*, project: dict[str, Any], resource_type: str, 
     return False
 
 
+_LOOK_UP_ROLE = object()
+
+
 def has_project_permission(
     *,
     membership: dict[str, Any],
@@ -125,14 +128,18 @@ def has_project_permission(
     project: dict[str, Any] | None = None,
     resource_type: str | None = None,
     resource_id: str | None = None,
+    role: Any = _LOOK_UP_ROLE,
 ) -> bool:
+    """``role`` lets a caller checking many resources for one membership and
+    project pass the result of a single get_project_role lookup."""
     if capability not in CAPABILITIES:
         return False
-    role = get_project_role(
-        membership=membership,
-        project_id=project_id,
-        client=client,
-    )
+    if role is _LOOK_UP_ROLE:
+        role = get_project_role(
+            membership=membership,
+            project_id=project_id,
+            client=client,
+        )
     if not role:
         return False
     if role.get("_staff"):

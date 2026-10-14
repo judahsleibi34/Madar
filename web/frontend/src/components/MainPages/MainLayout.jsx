@@ -8,8 +8,6 @@ export default function MainLayout({
   lang,
   onLanguageChange,
   onLogout,
-  onThemeModeChange,
-  themeMode,
   user,
 }) {
   return (
@@ -20,8 +18,6 @@ export default function MainLayout({
         lang={lang}
         onLanguageChange={onLanguageChange}
         onLogout={onLogout}
-        onThemeModeChange={onThemeModeChange}
-        themeMode={themeMode}
         user={user}
       />
 

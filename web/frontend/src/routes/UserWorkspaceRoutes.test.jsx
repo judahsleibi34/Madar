@@ -77,7 +77,6 @@ describe("workspace settings routes", () => {
     ["/ecommerce/landing-page", "Landing page"],
     ["/ecommerce/theme", "Store theme"],
     ["/ecommerce/social-links", "Social links"],
-    ["/ecommerce/cv-rerank", "CV Rerank"],
   ])("renders the Ecommerce page for %s", async (pathname, heading) => {
     render(
       <MemoryRouter initialEntries={[pathname]}>

@@ -140,6 +140,7 @@ describe("EcommercePage", () => {
     await screen.findByText("No tags yet");
 
     fireEvent.click(screen.getByRole("button", { name: "Add tag" }));
+    expect(screen.getByLabelText("Status").value).toBe("active");
     const formElement = screen.getByRole("button", { name: "Save" }).closest("form");
     expect(formElement.noValidate).toBe(true);
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
@@ -173,7 +174,6 @@ describe("EcommercePage", () => {
     fireEvent.change(nameFields[0], { target: { value: "Summer" } });
     fireEvent.change(nameFields[1], { target: { value: "الصيف" } });
     fireEvent.change(screen.getByLabelText("Slug"), { target: { value: "summer" } });
-    fireEvent.change(screen.getByLabelText("Status"), { target: { value: "active" } });
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
     await waitFor(() => expect(saveEcommerceItem).toHaveBeenCalledOnce());
@@ -204,7 +204,9 @@ describe("EcommercePage", () => {
     expect(screen.getByText("Category image")).toBeTruthy();
     expect(screen.getByText("Add one landscape image for this category carousel card.")).toBeTruthy();
     expect(screen.getByLabelText("Display position").value).toBe("");
-    expect(screen.getByLabelText("Status").value).toBe("");
+    const categoryImageSection = screen.getByText("Category image").closest("fieldset");
+    expect(screen.getByLabelText("Display position").compareDocumentPosition(categoryImageSection) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByLabelText("Status").value).toBe("active");
     expect(screen.getByLabelText("Status").querySelector('option[value="inactive"]')?.textContent).toBe("Inactive");
     expect(screen.getByLabelText("Slug").value).toBe("");
     expect(screen.getByText("Lower numbers appear first. Use 0 for the first position.")).toBeTruthy();
@@ -217,6 +219,7 @@ describe("EcommercePage", () => {
     expect(await screen.findByRole("dialog", { name: "New product" })).toBeTruthy();
     expect(screen.queryByText("Loading product editor...")).toBeNull();
     expect(screen.getByRole("heading", { name: "New product" })).toBeTruthy();
+    expect(screen.getByLabelText("Status").value).toBe("active");
     expect(screen.getByRole("heading", { name: "Specifications" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Variants & inventory" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Add size" })).toBeTruthy();
@@ -296,11 +299,13 @@ describe("EcommercePage", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Open full editor for Shirt" }));
     expect(await screen.findByRole("dialog", { name: "Edit product" })).toBeTruthy();
     await waitFor(() => expect(screen.getByLabelText("Name (English)").value).toBe("Shirt"));
+    expect(screen.getByLabelText("Status").value).toBe("draft");
     fireEvent.click(screen.getByRole("button", { name: "Close", exact: true }));
     expect(screen.queryByRole("dialog")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Add product" }));
     expect(await screen.findByRole("dialog", { name: "New product" })).toBeTruthy();
     expect(screen.getByLabelText("Name (English)").value).toBe("");
+    expect(screen.getByLabelText("Status").value).toBe("active");
   });
 });
   it("shows aggregate stock counts and filters simple and variant products", async () => {

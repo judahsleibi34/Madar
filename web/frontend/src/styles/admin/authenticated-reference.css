@@ -100,8 +100,7 @@
   .user-management-row,
   .ecommerce-summary-card,
   .ecommerce-list-card,
-  .ecommerce-form-section,
-  .cv-rerank-card
+  .ecommerce-form-section
 ) {
   border-color: var(--theme-border);
   background: var(--theme-surface);

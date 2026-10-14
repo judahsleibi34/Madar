@@ -12,15 +12,17 @@ from datetime import date
 from typing import Any
 
 
-CATALOG_VERSION = "2026-09-30-v2"
+CATALOG_VERSION = "2026-10-14-v1"
 CATALOG_CURRENCY = "USD"
-CATALOG_EFFECTIVE_DATE = date(2026, 9, 30).isoformat()
+CATALOG_EFFECTIVE_DATE = date(2026, 10, 14).isoformat()
 GIB = 1024 * 1024 * 1024
 
 CORE_MODULE_IDS = ("forms", "website", "ecommerce")
 LEGACY_PLAN_IDS = ("business", "business_plus")
 # Compatibility name for catalog consumers; these are independent modules.
 BASE_PLAN_IDS = CORE_MODULE_IDS
+# Schema146 supersedes the never-activated launch_2026 book (Commerce USD 20).
+LAUNCH_PRICE_BOOK_ID = "launch_2026_v2"
 ADD_ON_IDS = (
     "branded_madar_subdomain",
     "additional_storage_5gb",
@@ -29,6 +31,7 @@ ADD_ON_IDS = (
     "ai_analytics_starter",
     "ai_analytics_plus",
     "ai_token_pack_750k",
+    "ai_website_assistant",
     "google_drive_private",
     "ocr",
     "hosted_email_mailbox",
@@ -188,7 +191,6 @@ PRODUCTS: dict[str, dict[str, Any]] = {
             "data_cleaning",
             "charts_data_exports",
             "reservation_system",
-            "cv_reranker",
         ),
     ),
     "business_plus": _plan(
@@ -308,6 +310,23 @@ PRODUCTS: dict[str, dict[str, Any]] = {
         "capabilities": ["ai_analytics"],
         "allowances": {"standard_tokens": 1_500_000},
     },
+    "ai_website_assistant": {
+        "id": "ai_website_assistant",
+        "type": "add_on",
+        "name": "AI website assistant",
+        "summary": "An AI chatbot that answers customer questions across Forms, Website, and Commerce.",
+        "price_minor": 1000,
+        "currency": CATALOG_CURRENCY,
+        "billing_interval": "month",
+        "publicly_available": True,
+        # Not requestable until the assistant ships and tenant_addons accepts it.
+        "coming_soon": True,
+        "deprecated": False,
+        "display_order": 155,
+        "effective_date": CATALOG_EFFECTIVE_DATE,
+        "capabilities": [],
+        "allowances": {},
+    },
     "ai_token_pack_750k": {
         "id": "ai_token_pack_750k",
         "type": "token_pack",
@@ -400,11 +419,11 @@ MODULE_CAPABILITIES = {
 for _module, _name, _minor, _storage, _order in (
     ("forms", "Madar Forms", 1500, GIB, 10),
     ("website", "Madar Website", 2000, 2*GIB, 20),
-    ("ecommerce", "Madar Commerce", 2000, 5*GIB, 30),
+    ("ecommerce", "Madar Commerce", 2500, 5*GIB, 30),
 ):
     PRODUCTS[_module] = _plan(_module, _name, _minor, _storage, MODULE_CAPABILITIES[_module], _order,
                             "Independently assigned core module; bundle pricing is resolved by price book.", ())
-    PRODUCTS[_module].update(type="core_module", price_book_id="launch_2026", sales_activation_required=True)
+    PRODUCTS[_module].update(type="core_module", price_book_id=LAUNCH_PRICE_BOOK_ID, sales_activation_required=True)
 
 
 def normalize_module_ids(module_ids) -> tuple[str, ...]:
@@ -463,7 +482,7 @@ def get_catalog(*, public_only: bool = False) -> dict[str, Any]:
         "manual_activation": True,
         "contract_version": "2.0",
         "core_module_ids": list(CORE_MODULE_IDS),
-        "price_book_id": "launch_2026",
+        "price_book_id": LAUNCH_PRICE_BOOK_ID,
         "sales_activation_required": True,
         "products": products,
     }

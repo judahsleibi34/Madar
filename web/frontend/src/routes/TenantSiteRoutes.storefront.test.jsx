@@ -77,3 +77,17 @@ it("mounts the fixed Academy and learner runtime on the existing tenant host", a
   expect(await screen.findByText("Learning:madar-demo")).toBeTruthy();
   expect(screen.queryByText("Builder website runtime:madar-demo")).toBeNull();
 });
+
+it("renders an entry-preloaded route on the first render without a Suspense fallback", async () => {
+  const { loadTenantRouteModule } = await import("../tenantRuntimePreload");
+  await loadTenantRouteModule("site");
+  await loadTenantRouteModule("store");
+
+  const site = render(<MemoryRouter initialEntries={["/about/team"]}><TenantSiteRoutes /></MemoryRouter>);
+  expect(screen.getByText("Builder website runtime:madar-demo")).toBeTruthy();
+  expect(document.querySelector("[aria-busy='true']")).toBeNull();
+  site.unmount();
+
+  render(<MemoryRouter initialEntries={["/shop"]}><TenantSiteRoutes /></MemoryRouter>);
+  expect(screen.getByText("External ecommerce storefront")).toBeTruthy();
+});

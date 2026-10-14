@@ -32,11 +32,28 @@ class CommercialCatalogTests(unittest.TestCase):
         self.assertEqual(tuple(plans), BASE_PLAN_IDS)
         self.assertEqual(
             {key: plans[key]["price_minor"] for key in BASE_PLAN_IDS},
-            {"forms": 1500, "website": 2000, "ecommerce": 2000},
+            {"forms": 1500, "website": 2000, "ecommerce": 2500},
         )
+        self.assertEqual(catalog["price_book_id"], "launch_2026_v2")
+        self.assertEqual({plans[key]["price_book_id"] for key in BASE_PLAN_IDS}, {"launch_2026_v2"})
         self.assertEqual(catalog["currency"], "USD")
         self.assertNotIn("whatsapp", str(catalog).lower())
         self.assertIsNone(validate_catalog())
+
+    def test_ai_assistant_is_an_extra_for_any_module_not_yet_requestable(self):
+        from services.commercial_billing_service import request_addon
+
+        addon = next(item for item in get_catalog(public_only=True)["products"]
+                     if item["id"] == "ai_website_assistant")
+        self.assertEqual((addon["type"], addon["price_minor"], addon["billing_interval"]),
+                         ("add_on", 1000, "month"))
+        self.assertNotIn("requires_capability", addon)
+        self.assertEqual(addon["capabilities"], [])
+        self.assertTrue(addon["coming_soon"])
+        with self.assertRaises(HTTPException) as error:
+            request_addon(tenant_id=7, user_id=3, addon_id="ai_website_assistant",
+                          quantity=1, idempotency_key="assistant-request-test")
+        self.assertEqual(error.exception.status_code, 409)
 
     def test_unlimited_volume_allowances_are_not_commercial_quotas(self):
         for plan in get_catalog()["products"]:

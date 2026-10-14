@@ -28,6 +28,7 @@ import { estimateCartDiscount } from "../../utils/ecommerceDiscounts";
 import { normalizeWhatsAppNumber } from "../../utils/whatsapp";
 import { trackCommerceEvent, trackPurchaseOnce } from "../../services/commerceAnalytics";
 import { recordPublicSiteVisit } from "../../services/siteVisitApi";
+import { buildStorefrontPrimaryRequest, parseStorefrontRoute, readStorefrontFilters } from "./storefrontPrimaryRequest";
 import "../../styles/public/ecommerce-storefront.css";
 
 const EMPTY_CATALOG = {
@@ -1158,6 +1159,7 @@ function ProductCard({ product, locale, productPath, onAdd, eager = false }) {
 function CategoryCarousel({ categories, shopPath, categoriesPath, kind = "category" }) {
   const trackRef = useRef(null);
   const loopResetRef = useRef(null);
+  const programmaticScrollRef = useRef(false);
   const [activeIndex, setActiveIndex] = useState(0);
   const rtl = activeLocale() === "ar";
   const isBrandCarousel = kind === "brand";
@@ -1175,7 +1177,8 @@ function CategoryCarousel({ categories, shopPath, categoriesPath, kind = "catego
     const trackRect = track.getBoundingClientRect();
     const itemRect = item.getBoundingClientRect();
     const left = rtl ? itemRect.right - trackRect.right : itemRect.left - trackRect.left;
-    if (typeof track.scrollBy === "function") track.scrollBy({ left, behavior });
+    if (behavior === "auto") track.scrollLeft += left;
+    else if (typeof track.scrollBy === "function") track.scrollBy({ left, behavior });
     else track.scrollLeft += left;
   }, [rtl]);
   const scheduleLoopReset = useCallback((renderIndex, categoryIndex, delay = 220) => {
@@ -1202,9 +1205,14 @@ function CategoryCarousel({ categories, shopPath, categoriesPath, kind = "catego
         ? categoryCount - 1
         : categoryCount + nextIndex;
     setActiveIndex(nextIndex);
+    programmaticScrollRef.current = true;
     scrollToItem(renderIndex);
-    if (crossesEnd || crossesStart) scheduleLoopReset(renderIndex, nextIndex, 520);
-  }, [activeIndex, categoryCount, scheduleLoopReset, scrollToItem]);
+    window.clearTimeout(loopResetRef.current);
+    loopResetRef.current = window.setTimeout(() => {
+      if (crossesEnd || crossesStart) scrollToItem(categoryCount + nextIndex, "auto");
+      programmaticScrollRef.current = false;
+    }, 520);
+  }, [activeIndex, categoryCount, scrollToItem]);
   useEffect(() => {
     const prefersReducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
     if (categoryCount < 2 || prefersReducedMotion) return undefined;
@@ -1212,6 +1220,7 @@ function CategoryCarousel({ categories, shopPath, categoriesPath, kind = "catego
     return () => window.clearInterval(timer);
   }, [categoryCount, move]);
   const syncActiveIndex = () => {
+    if (programmaticScrollRef.current) return;
     const track = trackRef.current;
     if (!track) return;
     const trackRect = track.getBoundingClientRect();
@@ -1463,6 +1472,8 @@ export default function EcommerceStorefront({ subdomain: suppliedSubdomain = "",
   const params = useParams();
   const location = useLocation();
   const navigate = useNavigate();
+  const storefrontRef = useRef(null);
+  const previousLocationKeyRef = useRef(location.key);
   const subdomain = suppliedSubdomain || (previewBasePath ? params.subdomain : "");
   const storePath = previewBasePath || "/shop";
   const { i18n: commerceI18n } = useTranslation("commerce");
@@ -1474,12 +1485,9 @@ export default function EcommerceStorefront({ subdomain: suppliedSubdomain = "",
   const checkoutPath = `${storePath}/checkout`;
   const homePath = storePath;
   const routeTail = String(params["*"] || "");
-  const productSlug = routeTail.match(/^(?:catalog\/)?product\/([^/]+)\/?$/)?.[1] || "";
+  const { productSlug, contactRoute, checkoutRoute, confirmationToken } = parseStorefrontRoute(routeTail);
   const catalogRoute = /^catalog\/?$/.test(routeTail);
   const categoriesRoute = /^categories\/?$/.test(routeTail);
-  const contactRoute = /^contact\/?$/.test(routeTail);
-  const checkoutRoute = /^checkout\/?$/.test(routeTail);
-  const confirmationToken = routeTail.match(/^confirmation\/([0-9a-f]{64})\/?$/)?.[1] || "";
   const confirmationRoute = Boolean(confirmationToken);
   const urlFilters = useMemo(() => new URLSearchParams(location.search), [location.search]);
   const embeddedPreviewMode = Boolean(previewBasePath);
@@ -1512,6 +1520,21 @@ export default function EcommerceStorefront({ subdomain: suppliedSubdomain = "",
   const cartReconcileRef = useRef("");
   const analyticsViewsRef = useRef(new Set());
   const recordedVisitRef = useRef("");
+
+  useLayoutEffect(() => {
+    if (previousLocationKeyRef.current === location.key) return;
+    previousLocationKeyRef.current = location.key;
+
+    const scrollOptions = { top: 0, left: 0, behavior: "auto" };
+    window.scrollTo(scrollOptions);
+
+    const storefront = storefrontRef.current;
+    if (typeof storefront?.scrollTo === "function") storefront.scrollTo(scrollOptions);
+    else if (storefront) {
+      storefront.scrollTop = 0;
+      storefront.scrollLeft = 0;
+    }
+  }, [location.key]);
 
   const salePercentage = useMemo(() => {
     const reportedMaximum = Number(catalog.sale_summary?.max_percentage) || 0;
@@ -1557,17 +1580,7 @@ export default function EcommerceStorefront({ subdomain: suppliedSubdomain = "",
     recordPublicSiteVisit(subdomain, "store").catch(() => {});
   }, [embeddedPreviewMode, subdomain]);
 
-  const filters = {
-    search: urlFilters.get("search") || "",
-    category: urlFilters.get("category") || "",
-    brand: urlFilters.get("brand") || "",
-    tag: urlFilters.get("tag") || "",
-    minPrice: urlFilters.get("min_price") || "",
-    maxPrice: urlFilters.get("max_price") || "",
-    sort: urlFilters.get("sort") || "latest",
-    page: urlFilters.get("page") || "1",
-    locale,
-  };
+  const filters = readStorefrontFilters(urlFilters, locale);
 
   const hasCatalogFilters = Boolean(filters.search || filters.category || filters.brand || filters.tag || filters.minPrice || filters.maxPrice || filters.page !== "1" || filters.sort !== "latest");
   const landingRoute = routeTail === "";
@@ -1596,24 +1609,30 @@ export default function EcommerceStorefront({ subdomain: suppliedSubdomain = "",
 
   useEffect(() => {
     let cancelled = false;
-    const request = confirmationToken
-      ? fetchPublicEcommerceOrderConfirmation(subdomain, confirmationToken)
-      : productSlug
-      ? fetchPublicEcommerceProduct(subdomain, productSlug, locale)
-      : contactRoute || checkoutRoute
+    const primaryRequest = buildStorefrontPrimaryRequest({
+      productSlug,
+      contactRoute,
+      checkoutRoute,
+      confirmationToken,
+      filters: {
+        search: filters.search,
+        category: filters.category,
+        brand: filters.brand,
+        tag: filters.tag,
+        minPrice: filters.minPrice,
+        maxPrice: filters.maxPrice,
+        sort: filters.sort,
+        page: filters.page,
+      },
+      locale,
+    });
+    const request = primaryRequest.type === "confirmation"
+      ? fetchPublicEcommerceOrderConfirmation(subdomain, primaryRequest.token)
+      : primaryRequest.type === "product"
+      ? fetchPublicEcommerceProduct(subdomain, primaryRequest.slug, primaryRequest.locale)
+      : primaryRequest.type === "profile"
         ? fetchPublicEcommerceProfile(subdomain)
-        : fetchPublicEcommerceCatalog(subdomain, {
-          search: filters.search,
-          category: filters.category,
-          brand: filters.brand,
-          tag: filters.tag,
-          min_price: filters.minPrice,
-          max_price: filters.maxPrice,
-          sort: filters.sort,
-          page: filters.page,
-          locale,
-          limit: "12",
-        });
+        : fetchPublicEcommerceCatalog(subdomain, primaryRequest.filters);
     request
       .then((result) => {
         if (cancelled) return;
@@ -1981,7 +2000,7 @@ export default function EcommerceStorefront({ subdomain: suppliedSubdomain = "",
   }, [locale]);
 
   return (
-    <div className="live-store" style={storeStyle} dir={locale === "ar" ? "rtl" : "ltr"} lang={locale}>
+    <div ref={storefrontRef} className="live-store" style={storeStyle} dir={locale === "ar" ? "rtl" : "ltr"} lang={locale}>
       <StorefrontSeo origin={window.location.origin} storePath={canonicalStorePath} locale={locale} site={site} productDetail={productDetail} category={activeCategory} view={seoView} />
       <StoreHeader brand={brand} logoUrl={site?.logo_url} cartCount={cartCount} shopPath={shopPath} homePath={homePath} categoriesPath={categoriesPath} contactPath={contactPath} onCartOpen={openCart} subdomain={subdomain} account={account} loyalty={loyalty} onAccountChange={handleAccountChange} />
       {saleBarVisible && <StoreSaleBar percentage={salePercentage} shopPath={shopPath} onDismiss={dismissSaleBar} />}

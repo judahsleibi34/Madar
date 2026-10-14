@@ -111,16 +111,37 @@ def request_timing_markers_snapshot() -> dict[str, float]:
         return dict(state.get("markers") or {})
 
 
-def server_timing_value() -> str:
-    durations = [
-        f'{name};dur={duration_seconds * 1000:.1f}'
-        for name, duration_seconds in request_timings_snapshot().items()
-    ]
-    markers = [
-        f'{name};dur={offset_seconds * 1000:.1f};desc="offset"'
-        for name, offset_seconds in request_timing_markers_snapshot().items()
-    ]
-    return ", ".join([*durations, *markers])
+# Response headers share nginx's default 4 KiB upstream header buffer at both
+# the frontend and release proxy hops; overflowing it turns a valid response
+# into a 502. Server-Timing therefore carries only aggregate durations within
+# this budget, while request-relative start/end offsets go to the structured
+# request timing log.
+SERVER_TIMING_MAX_BYTES = 1024
+_SERVER_TIMING_TRUNCATION_RESERVE = 32
+
+
+def server_timing_value(max_bytes: int = SERVER_TIMING_MAX_BYTES) -> str:
+    try:
+        durations = request_timings_snapshot()
+        entries = {name: f'{name};dur={seconds * 1000:.1f}' for name, seconds in durations.items()}
+        rendered = ", ".join(entries.values())
+        if len(rendered) <= max_bytes:
+            return rendered
+        # Keep app time and the slowest stages; drop the rest and say how many.
+        kept: set[str] = set()
+        used = 0
+        for name in sorted(entries, key=lambda item: (item != "app", -durations[item])):
+            size = len(entries[name]) + (2 if kept else 0)
+            if used + size <= max_bytes - _SERVER_TIMING_TRUNCATION_RESERVE:
+                kept.add(name)
+                used += size
+        return ", ".join([
+            *(entry for name, entry in entries.items() if name in kept),
+            f'truncated;desc="{len(entries) - len(kept)}"',
+        ])
+    except Exception:
+        # Observability must never fail an otherwise valid response.
+        return ""
 
 
 def _escape(value: str) -> str:
@@ -217,7 +238,7 @@ def metrics_access_allowed(*, client_host: str | None, authorization: str | None
 
 
 class JsonFormatter(logging.Formatter):
-    SAFE_EXTRA = ("correlation_id", "security_event_id", "error_code", "error_type", "status_code", "duration_ms", "timings", "method", "route", "tenant_id", "user_id", "product_id", "sqlstate", "constraint", "operation_stage")
+    SAFE_EXTRA = ("correlation_id", "security_event_id", "error_code", "error_type", "status_code", "duration_ms", "timings", "timing_offsets", "method", "route", "tenant_id", "user_id", "product_id", "sqlstate", "constraint", "operation_stage")
     converter = time.gmtime
 
     def format(self, record: logging.LogRecord) -> str:

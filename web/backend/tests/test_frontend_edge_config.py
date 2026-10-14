@@ -67,6 +67,13 @@ class FrontendEdgeConfigTests(unittest.TestCase):
         self.assertIn('"/uploads": {', vite)
         self.assertNotIn("location /uploads/ {\n        try_files", nginx)
 
+    def test_development_proxy_can_use_one_explicit_request_origin_everywhere(self):
+        vite = (ROOT / "frontend" / "vite.config.js").read_text(encoding="utf-8")
+        self.assertIn("VITE_DEV_PROXY_REQUEST_ORIGIN", vite)
+        self.assertIn("Origin: devProxyRequestOrigin", vite)
+        self.assertIn("Referer: `${devProxyRequestOrigin}/`", vite)
+        self.assertEqual(vite.count("...devProxyOptions"), 3)
+
     def test_compose_drops_privileges_and_keeps_dev_ports_loopback_only(self):
         compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
         development = (ROOT / "docker-compose.dev.yml").read_text(encoding="utf-8")

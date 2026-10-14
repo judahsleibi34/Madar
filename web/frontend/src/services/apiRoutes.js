@@ -11,5 +11,6 @@ export const BILLING_API_ROUTES = {
   entitlements: "/billing/entitlements",
   addons: "/billing/add-ons",
   planRequest: "/billing/plan-request",
+  moduleQuote: "/billing/module-quote",
   addonRequest: "/billing/add-on-request",
 };

@@ -1,7 +1,8 @@
 """Canonical commercial ledger read/command boundary.
 
 No process or Redis entitlement cache: each access check sees a statement-time
-snapshot. The schema-114 bridge can read access, but mutations require 115.
+snapshot. The schema-114 bridge can read access. Commands that can create or
+reuse a price basis require the schema-145 paid-continuity contract.
 """
 from __future__ import annotations
 
@@ -32,6 +33,13 @@ def validate_commercial_snapshot(data: Any, tenant_id: int | str) -> dict[str, A
         "commercial_suspended_at" not in data or "subscriptions" not in data
     ):
         raise ValueError("incomplete_commercial_snapshot")
+    protection_version = data.get("protection_contract_version")
+    if protection_version is not None and (
+        isinstance(protection_version, bool)
+        or protection_version != 145
+        or data.get("protection_policy") != "strict_paid_continuity_v1"
+    ):
+        raise ValueError("unknown_commercial_protection_contract")
     return data
 
 
@@ -61,6 +69,14 @@ def apply_commercial_command(*, tenant_id: int, actor_user_id: int, operation: s
     if state.get("contract_version", 114) < 115:
         raise HTTPException(status_code=503, detail=error_detail(
             "commercial_upgrade_required", "Commercial administration is unavailable until the schema upgrade is complete."))
+    if operation in {"manual_payment", "complimentary", "assign_modules", "restore_price_basis"} and (
+        state.get("protection_contract_version") != 145
+        or state.get("protection_policy") != "strict_paid_continuity_v1"
+    ):
+        raise HTTPException(status_code=503, detail=error_detail(
+            "commercial_protection_upgrade_required",
+            "Price-basis administration is unavailable until paid-continuity protection is active.",
+        ))
     try:
         result = service_supabase.rpc("apply_commercial_access_command", {
             "p_tenant_id": tenant_id, "p_actor_user_id": actor_user_id, "p_aal": "aal2",
@@ -78,7 +94,11 @@ def apply_commercial_command(*, tenant_id: int, actor_user_id: int, operation: s
         message = getattr(error, "message", "")
         errors = {
             "commercial_price_book_unavailable": (409, "commercial_price_book_unavailable", "No approved price book is available for this purchase."),
+            "commercial_paid_continuity_required": (409, "commercial_paid_continuity_required", "The previous paid price protection has expired."),
             "commercial_assignment_mismatch": (409, "commercial_assignment_mismatch", "Access coverage must match the assigned module set."),
+            "commercial_restoration_requires_expired_access": (409, "commercial_restoration_requires_expired_access", "Historical pricing can only be restored after paid access expires."),
+            "commercial_restoration_basis_invalid": (409, "commercial_restoration_basis_invalid", "The requested historical price basis is not eligible for restoration."),
+            "commercial_restoration_history_missing": (409, "commercial_restoration_history_missing", "No matching historical paid price basis exists."),
             "commercial_revision_conflict": (409, "commercial_revision_conflict", "Commercial state changed. Reload and retry."),
             "commercial_idempotency_conflict": (409, "commercial_idempotency_conflict", "This command key was used for a different request."),
             "platform_admin_aal2_required": (403, "aal2_required", "MFA verification is required for this admin action."),

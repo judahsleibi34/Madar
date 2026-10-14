@@ -1,0 +1,15 @@
+{
+  "release_metadata_version": 1,
+  "deployment_profile": "revised-launch-price-book145-146",
+  "schema": {
+    "compatible_min": 145,
+    "compatible_max": 146,
+    "target": 146,
+    "migration_class": "forward-compatible",
+    "rollback_compatible_min": 145,
+    "rollback_compatible_max": 145
+  },
+  "migration_policy": "automatic-after-known-good-backup-first-forward-repair",
+  "migration_manifest": "migrations-145-146-price-book.json",
+  "notes": "Unselected schema145 to schema146 candidate. Adds the prepared launch_2026_v2 price book (Commerce USD 25; bundles unchanged) and permanently prevents the never-activated launch_2026 book from opening. Opens no price book for sales and grants no production or application database activation."
+}

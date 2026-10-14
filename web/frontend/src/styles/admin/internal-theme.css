@@ -35,7 +35,6 @@
   .ecommerce-page,
   .ecommerce-theme-page,
   .ecommerce-store-admin-page,
-  .cv-rerank-page,
   .restricted-access-page
 ) {
   width: min(100%, var(--internal-content-max-width));
@@ -109,7 +108,6 @@
   .reservation-calendar-toolbar,
   .ecommerce-page-header,
   .ecommerce-store-admin-header,
-  .cv-rerank-header,
   .archive-header,
   .workspace-header,
   .daw-header
@@ -176,7 +174,6 @@
   .ecommerce-store-admin-card,
   .calendar-panel,
   .calendar-history-drawer,
-  .cv-rerank-card,
   .restricted-access-card,
   .builder-project-card,
   .builder-project-chooser-panel
