@@ -131,6 +131,34 @@ class CompletedNormalWriteTests(unittest.TestCase):
         with patch('deployment.lib.completed_normal_database.require_normal_migration_boundary'):
             with self.assertRaises(FileExistsError):self.boundary.grant(schema=136)
         self.assertEqual(self.grant()['mode'],'READ_ONLY')
+    def test_fresh_grant_uses_its_own_receipt_and_cannot_replay_an_old_boundary(self):
+        import hashlib
+        self.boundary.grant();self.boundary.revoke();self.kernel.schema=136
+        with patch('deployment.lib.completed_normal_database.require_normal_migration_boundary'):
+            self.boundary.grant(schema=136)
+        historical={name:(self.root/name).read_bytes() for name in ('pre-grant-authority-136.json','write-boundary-136.json','normal-publication.json','target-normal-publication.json')}
+        self.boundary.revoke()
+        plan={'operation':'unit-backup-completion','source_sha256':'f'*64,'parent_context_sha256':self.root.name,
+            'target_schema':136,'migrations':[],'restore_old_customer_database':False,'automatic_retry':False}
+        h=admission.digest(plan);scope=self.root/'continuations'/h;scope.mkdir(parents=True)
+        (scope/'plan.json').write_bytes(admission.encoded(plan))
+        (scope/'operator-authorization.json').write_bytes(admission.encoded({
+            'operation':plan['operation'],'plan_sha256':h,'source_sha256':'f'*64,
+            'parent_context_sha256':self.root.name,'historical_authorization_reused':False}))
+        witness={'operation':plan['operation'],'plan_sha256':h,'source_sha256':'f'*64,
+            'parent_context_sha256':self.root.name,'application_sha':self.contract['candidate']['source_sha']}
+        with patch.object(admission,'credential_witness',return_value=dict(witness,application_sha='e'*40)),                 patch('deployment.lib.completed_normal_database.require_normal_migration_boundary'):
+            with self.assertRaisesRegex(RuntimeError,'fresh_grant_scope_invalid'):
+                self.boundary.grant(schema=136,fresh_attempt_root=scope)
+        self.assertEqual(self.grant()['mode'],'READ_ONLY')
+        with patch.object(admission,'credential_witness',return_value=witness),                 patch('deployment.lib.completed_normal_database.require_normal_migration_boundary'):
+            self.boundary.grant(schema=136,fresh_attempt_root=scope)
+            self.assertEqual(self.grant()['mode'],'NORMAL');self.boundary.revoke()
+            with self.assertRaises(FileExistsError):self.boundary.grant(schema=136,fresh_attempt_root=scope)
+        self.assertEqual(self.grant()['mode'],'READ_ONLY')
+        self.assertTrue((scope/'target-normal-publication.json').exists())
+        for name,body in historical.items():self.assertEqual((self.root/name).read_bytes(),body)
+
     def test_partial_schema_cannot_obtain_target_grant(self):
         for schema in (116,119,135):
             self.kernel.schema=schema
