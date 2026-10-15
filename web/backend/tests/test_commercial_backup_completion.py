@@ -11,6 +11,9 @@ class BackupCompletionTests(unittest.TestCase):
         calls={n.func.attr for n in ast.walk(tree) if isinstance(n,ast.Call) and isinstance(n.func,ast.Attribute)}
         self.assertTrue({'child','run_deploy_service','run_migration','install_controller','installer_apply','stage_candidate','seal_intent','seal_completion'}.isdisjoint(calls))
         self.assertIn('fresh_attempt_root=self.scope',source)
+        self.assertIn("publication_name='candidate-runtime.json'",source)
+        self.assertIn("constructor.CompletedNormalWriteHandoff(self.contract,kernel",source)
+        self.assertIn('BINDING_FAILURE_PLAN',source)
         self.assertIn("'migrations':[]",source)
         self.assertIn('super().validate(plan,root,driver.actor.package)',source)
         self.assertIn("backup.scope=digest({'operation':OPERATION,'plan_sha256':digest(self.plan)",source)

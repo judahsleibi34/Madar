@@ -22,6 +22,7 @@ PARENT_PLAN='7e27ac761f6571bfd1c2101f7717cdbcbb904aec0ab4914a08e07340bf6588ad'
 PARENT_CONTEXT='b3e4084534ff0453acda8c59a3a064cf01691cc19350311036b50c9a0a0a2234'
 OPERATION='retained-normal-schema146-backup-completion'
 PREVIOUS_PLAN='2305e6f1360c83ce50eee90031cd57a9b14a07ad28287b294f9b4f56f77c2196'
+BINDING_FAILURE_PLAN='dc0b3e0c66a5dd0e41eb8aa13fbdd067da302d8dd9a067a151dd210dc050cf50'
 
 
 def encoded(value):return (json.dumps(value,sort_keys=True,indent=2)+'\n').encode()
@@ -79,14 +80,32 @@ class Continuation:
             accepted[name]=record
         return accepted
 
+    def candidate(self):
+        # A repeated positive boundary uses the immutable candidate identity.
+        # The earlier NORMAL publication is verified separately as history.
+        from deployment.lib.compatible_normal_boot import CompatibleNormalBoot
+        return CompatibleNormalBoot(self.contract,source_guard=self.guard,native_verifier=self.actor.native,
+            publish_authority=self.actor.publish,compensate_current_data=self.actor.compensate,
+            runtime=self.actor.runtime,publication_name='candidate-runtime.json')
+
     def measurement(self):
         from deployment.lib.provider_recovery_runtime import protected,readonly_configuration
         from deployment.lib.runtime_authority import load_worker_authority
         from deployment.lib.completed_normal_database import migration_customer_snapshot,require_normal_migration_boundary
         from deployment.lib.completed_normal_resources import measured_spec
         from deployment.lib.control_plane_upgrade import BACKUP_TIMERS
-        actor=self.actor;actor.guard();kernel=actor.candidate();kernel.verify_mode(normal=False)
+        actor=self.actor;actor.guard();kernel=self.candidate();kernel.verify_mode(normal=False)
         if actor.native()!=146:raise RuntimeError('backup_completion_target_schema_changed')
+        constructor=load('preflight_measured_write_boundary',self.package/'write-handoff.py')
+        constructor.CompletedNormalWriteHandoff(self.contract,kernel,source_guard=self.guard,
+            boot_guard=actor.installation.installed,artifact_guard=lambda:self.evidence()[0])
+        binding=actor.root/'continuations'/BINDING_FAILURE_PLAN
+        rejected=json.loads(protected(binding/'failure.json',private=True).read_text())
+        if (rejected.get('operation')!=OPERATION or rejected.get('phase')!='normal_grant_pending'
+                or rejected.get('database_restored') is not False or 'compensation_exception_type' in rejected
+                or not any(f.get('file')=='write-handoff.py' and f.get('function')=='__init__' for f in rejected.get('frames',[]))
+                or any((binding/name).exists() for name in ('completion.json','pre-grant-authority-146.json','write-boundary-146.json'))):
+            raise RuntimeError('backup_completion_binding_failure_changed')
         require_normal_migration_boundary(self.contract,146,actor.root,actor.ops.state_root)
         previous=actor.root/'continuations'/PREVIOUS_PLAN
         failure=json.loads(protected(previous/'failure.json',private=True).read_text())
@@ -118,6 +137,7 @@ class Continuation:
         gateway=actor.runtime.inspect(['supabase-envoy'])['supabase-envoy'];actor.proxy_identity()
         fixed=[actor.root/n for n in ('admission.json','operator-authorization.json','failure.json','controller-installation.json','controller-installation-intent.json','boot-installation.json','candidate-runtime.json','migration-intent.json','migration-inputs.json','pre-migration-backup.json','pre-migration-customer-snapshot.json','migration-completion.json','migration-execution.json','migration-manifest.json','migration-customer-preservation.json')]
         fixed += [previous/n for n in ('plan.json','operator-authorization.json','failure.json','live-write-verification.json')]
+        fixed += [binding/n for n in ('plan.json','operator-authorization.json','failure.json')]
         fixed += [actor.root/'write-authority/authority.json',Path(self.contract['source_roles']['completion_root'])/'write-authority/authority.json',actor.ops.interlock_file]
         records={str(p):sha(protected(p)) for p in fixed}
         owner_path=readonly_configuration(actor.ops.state_root/'worker-ownership.json',private=True);records[str(owner_path)]=sha(owner_path)
@@ -197,7 +217,7 @@ class Continuation:
                 self.active=True;self.guard()
                 with self.credential():
                     self.event('sealed_schema146_runtime_verified')
-                    kernel=self.actor.candidate();kernel.verify_mode(normal=False)
+                    kernel=self.candidate();kernel.verify_mode(normal=False)
                 with self.credential():
                     self.event('normal_grant_pending')
                     measured_handoff=load('source_bound_fresh_write_boundary',self.package/'write-handoff.py')
