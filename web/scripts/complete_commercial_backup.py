@@ -155,6 +155,9 @@ class Continuation:
         for name,h in self.manifest['files'].items():
             if sha(secure(self.package/name))!=h:raise RuntimeError('continuation_executable_changed')
         self.actor.guard()
+        if self.plan is None:
+            if self.active:raise RuntimeError('continuation_frozen_plan_required')
+            return
         fixed=self.plan['initial']['bindings']['records']
         for path,h in fixed.items():
             if any(path.endswith('/'+name) for name in ('worker-ownership.json','in-progress.json','latest.json','LATEST','boot-events.jsonl')):
