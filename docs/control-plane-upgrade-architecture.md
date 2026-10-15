@@ -2,6 +2,9 @@
 
 ## Manual commercial144→146 release
 
+The protected installer inventory includes the selected144→146 bridge metadata;
+all operation profiles must resolve their contracts after installation.
+
 The exact completed-NORMAL maintenance coordinator may select
 `schema-144-146-commercial-bridge.json` and its composition of the unchanged
 145 and146 manifests. Historical profiles, receipts, SQL and grants retain their
