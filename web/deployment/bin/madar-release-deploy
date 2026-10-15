@@ -2066,9 +2066,13 @@ def automatic_migrate_known_good(
     admission=getattr(operations,'completed_normal_admission',None)
     if admission is not None:
         from deployment.lib.completed_normal_migration import run_migration
+        from deployment.lib.completed_normal_profile import profile
+        selected=profile(admission)
         operations.verify_source(sha)
         if (admission['candidate']['source_sha']!=sha or operations.release_root is None
-                or compatibility.schema_min!=115 or compatibility.schema_max!=136 or compatibility.target_schema!=136):
+                or (compatibility.schema_min,compatibility.schema_max,compatibility.target_schema,
+                    compatibility.excluded_schemas)!=(selected.minimum,selected.target,selected.target,selected.excluded)
+                or not selected.migrations):
             raise RuntimeError('completed_migration_release_binding_invalid')
         # An explicit root-issued current-data backup + native connection lease
         # replaces neither historical receipts nor the ordinary release path.
