@@ -16,7 +16,7 @@ from pathlib import Path
 import re
 
 from deployment.lib.control_plane_upgrade_authorization import require_upgrade_authorization
-from deployment.lib.completed_normal_profile import profile, LEGACY, MANUAL, APPLICATION
+from deployment.lib.completed_normal_profile import profile, LEGACY, MANUAL, APPLICATION, COMMERCIAL
 
 OPERATION = "completed-normal-schema115-136-upgrade"
 ADMISSIONS = Path("/var/lib/madar-control-plane/upgrades/completed-normal-admissions")
@@ -58,12 +58,15 @@ def prepared_path(contract, state_root):
 
 
 def validate_contract(value: dict) -> None:
-    if not isinstance(value, dict) or set(value) != {
+    if not isinstance(value, dict):
+        raise RuntimeError("completed_normal_admission_contract_invalid")
+    selected = profile(value)
+    if set(value) != {
         "version", "operation", "source_roles", "origin", "candidate",
         "historical_files", "database", "migration_manifest_sha256",
         "rehearsal_sha256", "plan_sha256", "provider_record_sha256", "resources",
         "customer_table_roots_sha256", "customer_identity_roots_sha256",
-    }:
+    } | ({"database_structure_sha256"} if selected is COMMERCIAL else set()):
         raise RuntimeError("completed_normal_admission_contract_invalid")
     selected = profile(value)
     roles = value["source_roles"]
@@ -118,8 +121,9 @@ def validate_contract(value: dict) -> None:
     # These are historical protected records only, never arbitrary executable or
     # operator-selected paths. The retained provider record is checked separately.
     application_required = {str(origin_root / name) for name in APPLICATION_HISTORICAL_NAMES}
-    if set(files) != required and not (selected is APPLICATION and set(files) == application_required):
+    if set(files) != required and not (selected in (APPLICATION, COMMERCIAL) and set(files) == application_required):
         raise RuntimeError("completed_normal_admission_history_invalid")
+    if selected is COMMERCIAL:hashes.append(value["database_structure_sha256"])
     hashes.extend(files.values())
     if any(not re.fullmatch(r"[0-9a-f]{64}", str(v)) for v in hashes):
         raise RuntimeError("completed_normal_admission_digest_invalid")
@@ -198,7 +202,7 @@ def verify_history(contract: dict, *, _visited=frozenset()) -> None:
         if file_digest(protected(Path(name), private=not nonsecret_admission)) != expected:
             raise RuntimeError("completed_normal_admission_historical_evidence_changed")
     root = Path(contract['source_roles']['completion_root'])
-    if (profile(contract) is APPLICATION and set(contract['historical_files']) ==
+    if (profile(contract) in (APPLICATION, COMMERCIAL) and set(contract['historical_files']) ==
             {str(root / name) for name in APPLICATION_HISTORICAL_NAMES}):
         # A no-SQL receipt set is valid only for an actually completed no-SQL
         # origin. It cannot hide missing migration evidence from another profile.
@@ -274,7 +278,7 @@ def require_candidate_authority(contract: dict, *, mode: str | None = None, admi
             or type(value["compatible_max"]) is not int or value["compatible_max"] != selected.target
             or value["release_sha"] != contract["candidate"]["source_sha"]
             or value["contract_digest"] != digest(contract)
-            or selected is MANUAL and value.get('mode')=='NORMAL' and value['schema']!=selected.target
+            or selected.maintenance and value.get('mode')=='NORMAL' and value['schema']!=selected.target
             or value["mode"] not in {"READ_ONLY", "NORMAL"} or mode is not None and value["mode"] != mode):
         raise RuntimeError("completed_normal_candidate_authority_changed")
     return value
@@ -312,9 +316,12 @@ def publish_admission(contract: dict, operations, state_root: Path, *, admission
     from deployment.lib.completed_normal_database import customer_baseline
     from deployment.lib.emergency_routing_repair import Runtime
     baseline=customer_baseline(contract,Runtime())
-    if (baseline['table_roots_sha256']!=contract['customer_table_roots_sha256']
-            or baseline['identity_roots_sha256']!=contract['customer_identity_roots_sha256']):
-        raise RuntimeError('completed_normal_admission_current_customer_data_changed')
+    from deployment.lib.completed_normal_database import verify_preparation_baseline
+    try:verify_preparation_baseline(contract,Runtime(),baseline)
+    except RuntimeError as error:
+        if str(error)=='completed_upgrade_current_customer_data_changed':
+            raise RuntimeError('completed_normal_admission_current_customer_data_changed') from None
+        raise
     db = contract["database"]
     result = operations.command("completed_normal_admission_database_identity", [
         "docker", "inspect", db["container_id"]])
@@ -375,7 +382,7 @@ def require_admission(state_root: Path, application_sha: str | None, *, admissio
         raise RuntimeError("provider_recovery_requires_separate_operator_exit")
     interlock = json.loads(protected(UPGRADE_INTERLOCK).read_text())
     context = str(interlock.get("context_sha256", ""))
-    if interlock.get("operation") not in {LEGACY.operation, MANUAL.operation, APPLICATION.operation} or not re.fullmatch(r"[0-9a-f]{64}", context):
+    if interlock.get("operation") not in {LEGACY.operation, MANUAL.operation, APPLICATION.operation, COMMERCIAL.operation} or not re.fullmatch(r"[0-9a-f]{64}", context):
         raise RuntimeError("provider_recovery_requires_separate_operator_exit")
     receipt = credential_witness('completed_normal_admission','admission_sha256')
     contract = receipt.get("contract")

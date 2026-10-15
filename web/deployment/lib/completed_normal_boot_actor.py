@@ -322,7 +322,7 @@ class CompletedNormalBootActor:
         route=(f'upstream madar_backend_active {{ server 127.0.0.1:{8101 if slot=="blue" else 8201}; }}\n'
             f'upstream madar_frontend_active {{ server 127.0.0.1:{3100 if slot=="blue" else 3200}; }}\n').encode()
         actual=readonly_configuration(Path('/var/lib/madar/proxy/active-upstreams.conf'),private=False).read_bytes()
-        if self.profile is MANUAL and grant['mode']=='READ_ONLY':
+        if self.profile.maintenance and grant['mode']=='READ_ONLY':
             from deployment.lib.completed_normal_execution import manual_maintenance_route
             if actual==manual_maintenance_route(self.contract):
                 return {'schema':self.native(),'mode':'READ_ONLY','maintenance':True}

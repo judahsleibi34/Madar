@@ -39,13 +39,17 @@ def read_authority() -> dict | None:
         # root-issued source/context-bound grant; no legacy grant is widened.
         if (type(value.get("compatible_min")) is not int
                 or type(value.get("compatible_max")) is not int
-                or (value["compatible_min"],value["compatible_max"]) not in {(115,136),(136,144)}
+                or (value["compatible_min"],value["compatible_max"]) not in {(115,136),(136,144),(144,146)}
                 or os.getenv("SCHEMA_COMPATIBLE_MIN") != str(value["compatible_min"])
                 or os.getenv("SCHEMA_COMPATIBLE_MAX") != str(value["compatible_max"])):
             raise RuntimeError("business_write_authority_binding_invalid")
         minimum, maximum = value["compatible_min"],value["compatible_max"]
         if (minimum,maximum) == (136,144) and (
                 os.getenv("SCHEMA_EXCLUDED_VERSIONS") != "142" or value.get("schema") == 142):
+            raise RuntimeError("business_write_authority_binding_invalid")
+        if (minimum,maximum) == (144,146) and (
+                os.getenv("SCHEMA_EXCLUDED_VERSIONS", "") != ""
+                or value.get("mode") == "NORMAL" and value.get("schema") != 146):
             raise RuntimeError("business_write_authority_binding_invalid")
     if (set(value) != fields
             or type(value.get("schema")) is not int

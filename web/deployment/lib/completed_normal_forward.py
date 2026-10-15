@@ -20,7 +20,8 @@ from deployment.lib.completed_normal_profile import profile, LEGACY
 OPERATION='completed-normal-schema115-136-forward-resumption'
 
 def forward_operation(contract):
-    return OPERATION if profile(contract) is LEGACY else 'completed-normal-schema136-144-forward-resumption'
+    selected=profile(contract)
+    return OPERATION if selected is LEGACY else f'completed-normal-schema{selected.source}-{selected.target}-forward-resumption'
 
 def executor_path(state_root,sha,relative):
     if not isinstance(relative,str) or not re.fullmatch(r'execution\.json|resumptions/[0-9a-f]{64}/execution\.json',relative):
