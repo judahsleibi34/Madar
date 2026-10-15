@@ -45,6 +45,14 @@ class CommercialContractTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError,'current_customer_data_changed'):
             verify_preparation_baseline(application_contract(),object(),live)
 
+    def test_every_operation_metadata_is_in_the_protected_installer_inventory(self):
+        from test_completed_normal_compose import WEB
+        import re
+        text=(WEB/'deployment/bin/madar-install-control-plane').read_text()
+        inventory=re.search(r'declare -a tracked_files=\((.*?)\n\)',text,re.S).group(1).split()
+        for selected in (LEGACY,MANUAL,APPLICATION,COMMERCIAL):
+            self.assertIn('releases/'+selected.metadata,inventory)
+
     def test_only_original_checksum_pinned_145_and146_are_selected(self):
         from test_completed_normal_compose import WEB
         import tempfile,shutil
