@@ -262,7 +262,7 @@ def validate(root: Path = ROOT) -> list[str]:
         )
 
         schema = release["schema"]
-        if release.get("deployment_profile") not in {None, "local-supabase-schema115", SCHEMA115_BRIDGE_PROFILE}:
+        if release.get("deployment_profile") not in {None, "local-supabase-schema115", SCHEMA115_BRIDGE_PROFILE, "completed-normal-commercial144-146"}:
             errors.append("unknown deployment profile")
 
         if release.get("deployment_profile") == "local-supabase-schema115":
@@ -274,6 +274,18 @@ def validate(root: Path = ROOT) -> list[str]:
             if (schema != expected_schema or release.get("migration_policy") != "none"
                     or "migration_manifest" in release):
                 errors.append("local Supabase candidate must be exact schema115 with no migration selected")
+        elif release.get("deployment_profile") == "completed-normal-commercial144-146":
+            bridge = json.loads((release_dir / "schema-144-146-commercial-bridge.json").read_text())
+            combined = json.loads((release_dir / "migrations-145-146-commercial.json").read_text())
+            entries145 = validated_commercial_continuity_entries(root)
+            entries146 = validated_launch_price_book_entries(root)
+            expected_schema = {"compatible_min":144,"compatible_max":146,"target":146,
+                "migration_class":"forward-compatible","rollback_compatible_min":144,"rollback_compatible_max":144}
+            if (release != bridge or schema != expected_schema
+                    or release.get("migration_manifest") != "migrations-145-146-commercial.json"
+                    or release.get("migration_policy") != "automatic-after-known-good-backup-first-forward-repair"
+                    or combined != {"release_sha":"CURRENT","migrations":entries145+entries146}):
+                errors.append("commercial144..146 release composition changed")
         elif release.get("deployment_profile") == SCHEMA115_BRIDGE_PROFILE:
             if not schema115_bridge_valid(release):
                 errors.append("local Supabase bridge must span schema115..136 with rollback bounded at115")

@@ -61,7 +61,7 @@ class NormalLearningReleaseContractTests(unittest.TestCase):
         expected += json.loads((releases/'migrations-143-144-forms.json').read_text())['migrations']
         actual = json.loads((self.root/route.NORMAL_MANIFEST_PATH).read_text())['migrations']
         self.assertEqual(actual,expected)
-        self.assertEqual(json.loads((releases/'release.json').read_text())['schema']['target'],136)
+        self.assertEqual(json.loads((releases/'schema-115-136-bridge.json').read_text())['schema']['target'],136)
 
     def test_no_arbitrary_path_can_borrow_branch_authority(self):
         with tempfile.TemporaryDirectory() as directory:

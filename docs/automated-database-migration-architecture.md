@@ -1,5 +1,21 @@
 # Automated database migration architecture
 
+## Manual commercial144→146 release
+
+The exact completed-NORMAL maintenance coordinator may select
+`schema-144-146-commercial-bridge.json` and its composition of the unchanged
+145 and146 manifests. Historical profiles, receipts, SQL and grants retain their
+original bounds. The candidate is READ_ONLY through144 and145; only verified146
+permits a fresh root-issued144..146 NORMAL grant. Existing customer rows, Auth,
+MFA and storage must remain exact; the only catalog addition is the independently
+verified immutable `launch_2026_v2` row. No sales activation is included.
+
+Source-bound controller CI, exact-image acceptance, private current-data SQL
+rehearsal, backups, independent restore and Node1 replication remain required.
+Manual execution uses the existing locks, boot supersession and forward repair;
+no automatic deployment is enabled. Component checks do not claim host reboot
+acceptance. Explicit operation authorization remains required.
+
 ## Unselected revised launch price-book transition145→146
 
 `migrations-145-146-price-book.json` contains exactly mirrored migration146 and is paired with

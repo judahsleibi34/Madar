@@ -2,9 +2,51 @@
 import json
 from pathlib import Path
 from deployment.lib.completed_normal_admission import digest
-from deployment.lib.completed_normal_profile import profile, LEGACY, APPLICATION
+from deployment.lib.completed_normal_profile import profile, LEGACY, APPLICATION, COMMERCIAL
 
 IDENTITY_SQL="BEGIN READ ONLY; SELECT json_build_object('system_identifier',system_identifier::text,'schema',schema_version)::text FROM pg_control_system(),public.application_schema_state WHERE contract_key='core'; COMMIT;"
+
+def database_structure_digest(contract,runtime):
+    """Bind schema/roles/ACLs during NORMAL activity without freezing rows.
+
+    No role verifier or definition leaves PostgreSQL, only one digest. The
+    authoritative row baseline is still sealed after fencing and checked after
+    SQL. This never changes an already approved source or migration contract.
+    """
+    observe_native(contract,runtime)
+    sql="""BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY;
+    SELECT encode(sha256(convert_to(coalesce(string_agg(v,'' ORDER BY v COLLATE "C"),''),'UTF8')),'hex')
+    FROM (
+      SELECT 'class:'||(to_jsonb(c)-ARRAY['relpages','reltuples','relallvisible','relallfrozen','relfrozenxid','relminmxid'])::text v FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+        WHERE n.nspname IN ('public','auth','storage')
+      UNION ALL SELECT 'attribute:'||to_jsonb(a)::text FROM pg_attribute a JOIN pg_class c ON c.oid=a.attrelid
+        JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname IN ('public','auth','storage') AND a.attnum>0
+      UNION ALL SELECT 'constraint:'||to_jsonb(x)::text FROM pg_constraint x JOIN pg_namespace n ON n.oid=x.connamespace
+        WHERE n.nspname IN ('public','auth','storage')
+      UNION ALL SELECT 'proc:'||to_jsonb(p)::text FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname IN ('public','auth','storage')
+      UNION ALL SELECT 'policy:'||to_jsonb(p)::text FROM pg_policy p JOIN pg_class c ON c.oid=p.polrelid
+        JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname IN ('public','auth','storage')
+      UNION ALL SELECT 'trigger:'||to_jsonb(t)::text FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid
+        JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname IN ('public','auth','storage')
+      UNION ALL SELECT 'role:'||to_jsonb(r)::text FROM pg_authid r
+      UNION ALL SELECT 'membership:'||to_jsonb(m)::text FROM pg_auth_members m
+    ) objects; COMMIT;"""
+    value=runtime.command(['docker','exec',contract['database']['container_id'],'psql','-XqAt',
+        '-v','ON_ERROR_STOP=1','-U','postgres','-d','postgres','-c',sql]).strip()
+    import re
+    if not re.fullmatch('[0-9a-f]{64}',value):raise RuntimeError('completed_database_structure_invalid')
+    return value
+
+def verify_preparation_baseline(contract,runtime,baseline):
+    """Only the explicit new profile uses a protected execution row boundary."""
+    if profile(contract) is COMMERCIAL:
+        if database_structure_digest(contract,runtime)!=contract['database_structure_sha256']:
+            raise RuntimeError('completed_upgrade_database_structure_changed')
+        return
+    if (baseline['table_roots_sha256']!=contract['customer_table_roots_sha256']
+            or baseline['identity_roots_sha256']!=contract['customer_identity_roots_sha256']):
+        raise RuntimeError('completed_upgrade_current_customer_data_changed')
 
 def observe_native(contract,runtime, *, allow_pending=False):
     expected=contract['database']
@@ -200,7 +242,27 @@ def migration_customer_snapshot(contract,runtime,*,columns=None):
         raise RuntimeError('completed_migration_customer_snapshot_invalid')
     if observe_native(contract,runtime)!=schema:
         raise RuntimeError('completed_migration_customer_snapshot_schema_changed')
-    return {'schema':schema,'columns':columns,'roots':{row['table']:row for row in rows[:-1]}}
+    result={'schema':schema,'columns':columns,'roots':{row['table']:row for row in rows[:-1]}}
+    if profile(contract) is COMMERCIAL:
+        #146 adds exactly one immutable catalog row, not customer activity.
+        #Measure every original row as well as the exact approved addition.
+        expected="""jsonb_build_object('id','launch_2026_v2','version','2026-10-14',
+            'effective_from','2026-10-14T00:00:00+00:00','currency','USD','billing_interval','month',
+            'standalone_minor','{"forms":1500,"website":2000,"ecommerce":2500}'::jsonb,
+            'bundle_minor','{"2":3000,"3":4000}'::jsonb,'sales_start_at',null,'sales_end_at',null)"""
+        addition=query("SELECT json_build_object('count',count(*),'exact',coalesce(bool_and(to_jsonb(b)="+
+            expected+"),false))::text FROM public.commercial_price_books b WHERE id='launch_2026_v2';")[0]
+        if schema==144:
+            if addition['count']!=0:raise RuntimeError('completed_commercial_price_book_already_present')
+        elif schema==146:
+            if addition!={'count':1,'exact':True}:
+                raise RuntimeError('completed_commercial_price_book_delta_changed')
+            original=query("SELECT json_build_object('table','public.commercial_price_books','count',count(*),'sha256',"
+                "encode(sha256(convert_to(coalesce(string_agg(h,'' ORDER BY h COLLATE \"C\"),''),'UTF8')),'hex'))::text "
+                "FROM (SELECT encode(sha256(convert_to(to_jsonb(ROW(t.*))::text,'UTF8')),'hex') h "
+                "FROM public.commercial_price_books t WHERE id<>'launch_2026_v2') rows;")[0]
+            result['commercial_addition']={'verified':True,'preserved_original_rows':original}
+    return result
 
 
 def verify_migration_customer_preservation(before,after, *, contract=None):
@@ -212,6 +274,18 @@ def verify_migration_customer_preservation(before,after, *, contract=None):
             or (len(before['roots'])!=101 if selected is LEGACY else len(before['roots'])<101)):
         raise RuntimeError('completed_migration_customer_preservation_inventory_changed')
     changed=[name for name in before['roots'] if before['roots'][name]!=after['roots'][name]]
+    if selected is COMMERCIAL:
+        delta=after.get('commercial_addition',{})
+        original=before['roots']['public.commercial_price_books']
+        if (set(changed)!={'public.application_schema_state','public.commercial_price_books'}
+                or delta.get('verified') is not True or delta.get('preserved_original_rows')!=original
+                or after['roots']['public.commercial_price_books']['count']!=original['count']+1
+                or before['roots']['public.application_schema_state']['count']!=after['roots']['public.application_schema_state']['count']):
+            raise RuntimeError('completed_migration_existing_customer_values_changed')
+        return {'operation':'current-data-commercial-migration-comparison',
+            'starting_schema':selected.source,'final_schema':selected.target,
+            'original_rows_preserved':True,'price_book_delta_verified':True,
+            'source_snapshot_sha256':digest(before),'target_snapshot_sha256':digest(after),'database_restored':False}
     if (changed!=['public.application_schema_state']
             or before['roots']['public.application_schema_state']['count']!=after['roots']['public.application_schema_state']['count']):
         raise RuntimeError('completed_migration_existing_customer_values_changed')

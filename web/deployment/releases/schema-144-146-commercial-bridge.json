@@ -1,0 +1,15 @@
+{
+  "release_metadata_version": 1,
+  "deployment_profile": "completed-normal-commercial144-146",
+  "schema": {
+    "compatible_min": 144,
+    "compatible_max": 146,
+    "target": 146,
+    "migration_class": "forward-compatible",
+    "rollback_compatible_min": 144,
+    "rollback_compatible_max": 144
+  },
+  "migration_policy": "automatic-after-known-good-backup-first-forward-repair",
+  "migration_manifest": "migrations-145-146-commercial.json",
+  "notes": "Exact 144 to 146 manual maintenance selection; existing checksum-pinned migrations 145 and 146 only. Candidate stays READ_ONLY until target validation. No price-book sales activation."
+}
