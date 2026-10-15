@@ -2,6 +2,13 @@
 
 ## Manual commercial144→146 release
 
+A post-SQL backup failure requires a separate backup-only completion. It binds
+the sealed146 executor and current rows, keeps earlier attempts immutable, and
+uses a new append-only backup/replica scope. A fresh positive grant requires its
+own protected receipt and systemd credential witness; prior grant/publication
+files are verified as history and never overwritten or replayed. Schema146 is
+explicitly admitted by the checksum-verifying backup sender and receiver.
+
 A sealed failure before the SQL executor may use the existing credential-delivered
 retained continuation, freshly bound to the exact failed context, current144 rows,
 verified backup, runtime, worker owner and controller tree. The consumed parent

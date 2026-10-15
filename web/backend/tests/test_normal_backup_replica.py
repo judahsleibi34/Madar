@@ -94,6 +94,14 @@ class AppendOnlyNormalReplicaTests(unittest.TestCase):
         self.assertEqual((self.base/'LATEST').read_text(),'historical fixture')
         self.assertEqual(int(backup_support.verify(Path(report['destination']),dump=False)['database']['schema_version']),136)
 
+    def test_exact_schema146_requires_matching_verified_manifest_and_keeps_old_latest(self):
+        stream=self.target_archive(146)
+        with patch('normal_backup_replica.sys',SimpleNamespace(stdin=SimpleNamespace(buffer=stream))):
+            report=receiver.receive(self.plan,self.identifier,self.sums,self.uuid,146)
+        self.assertEqual(report['schema'],146)
+        self.assertEqual((self.base/'LATEST').read_text(),'historical fixture')
+        self.assertEqual(int(backup_support.verify(Path(report['destination']),dump=False)['database']['schema_version']),146)
+
     def test_schema136_archive_is_not_silently_accepted_by_legacy115_receiver(self):
         stream=self.target_archive(136)
         with patch('normal_backup_replica.sys',SimpleNamespace(stdin=SimpleNamespace(buffer=stream))):
@@ -101,7 +109,7 @@ class AppendOnlyNormalReplicaTests(unittest.TestCase):
         self.assertTrue((self.base/'normal-local-production'/self.plan/'incoming').is_dir())
 
     def test_wrong_target_and_untrusted_namespace_fail_before_effects(self):
-        for schema,namespace in ((116,'normal-local-production'),(True,'normal-local-production'),
+        for schema,namespace in ((145,'normal-local-production'),(147,'normal-local-production'),(116,'normal-local-production'),(True,'normal-local-production'),
                 ('136','normal-local-production'),(136,'../production')):
             with self.subTest(schema=schema,namespace=namespace):
                 with self.assertRaisesRegex(RuntimeError,'binding_invalid'):
