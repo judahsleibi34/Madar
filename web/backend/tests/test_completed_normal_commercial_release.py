@@ -46,8 +46,15 @@ class CommercialContractTests(unittest.TestCase):
             verify_preparation_baseline(application_contract(),object(),live)
 
     def test_only_original_checksum_pinned_145_and146_are_selected(self):
-        root=Path(__file__).resolve().parents[3]
-        base=root/'web/deployment/releases'
+        from test_completed_normal_compose import WEB
+        import tempfile,shutil
+        temporary=tempfile.TemporaryDirectory();self.addCleanup(temporary.cleanup)
+        root=Path(temporary.name);base=root/'web/deployment/releases'
+        shutil.copytree(WEB/'deployment/releases',base)
+        for filename in ('145_enforce_paid_commercial_continuity.sql','146_revise_launch_price_book.sql'):
+            source=WEB/'database/migrations'/filename
+            if not source.exists():source=Path('/database/migrations')/filename
+            target=root/'web/database/migrations'/filename;target.parent.mkdir(parents=True,exist_ok=True);target.write_bytes(source.read_bytes())
         manifest=MigrationManifest.load(base/COMMERCIAL.manifest,root)
         self.assertEqual(tuple(m.number for m in manifest.migrations),(145,146))
         original=[]
