@@ -2,6 +2,12 @@
 
 ## Manual commercial144→146 release
 
+A sealed failure before the SQL executor may use the existing credential-delivered
+retained continuation, freshly bound to the exact failed context, current144 rows,
+verified backup, runtime, worker owner and controller tree. The consumed parent
+authorization is preserved. The measured child validates144..146 from the selected
+contract and uses the existing locked executor; no installed executable is edited.
+
 The protected installer inventory includes the selected144→146 bridge metadata;
 all operation profiles must resolve their contracts after installation.
 

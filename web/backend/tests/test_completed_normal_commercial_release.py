@@ -45,6 +45,21 @@ class CommercialContractTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError,'current_customer_data_changed'):
             verify_preparation_baseline(application_contract(),object(),live)
 
+    def test_real_migration_entrypoint_uses_the_selected_contract_not_legacy_bounds(self):
+        from types import SimpleNamespace
+        from test_completed_normal_compose import cli,WEB
+        contract=commercial_contract();sha=contract['candidate']['source_sha']
+        operations=SimpleNamespace(completed_normal_admission=contract,release_root=WEB.parent,verify_source=lambda sha:None)
+        compatibility=cli.Compatibility.load(WEB/'deployment/releases'/COMMERCIAL.metadata)
+        with patch('deployment.lib.completed_normal_migration.run_migration',return_value={'verified':True}) as called:
+            self.assertEqual(cli.automatic_migrate_known_good(sha=sha,state_root=Path('/fixture'),compatibility=compatibility,operations=operations),{'verified':True})
+            called.assert_called_once_with(contract,WEB.parent,Path('/fixture'),operations)
+        wrong=cli.Compatibility.load(WEB/'deployment/releases'/MANUAL.metadata)
+        with patch('deployment.lib.completed_normal_migration.run_migration') as called:
+            with self.assertRaisesRegex(RuntimeError,'release_binding_invalid'):
+                cli.automatic_migrate_known_good(sha=sha,state_root=Path('/fixture'),compatibility=wrong,operations=operations)
+            called.assert_not_called()
+
     def test_every_operation_metadata_is_in_the_protected_installer_inventory(self):
         from test_completed_normal_compose import WEB
         import re
