@@ -1,5 +1,45 @@
 # Madar Auto-Deploy Merge Contract
 
+## Unselected coordinated notification claim fencing146→147
+
+The mirrored147 candidate and checksum-pinned
+`migrations-146-147-notification-fencing.json` /
+`schema-146-147-notification-fencing.json` are source-only preparation. Active
+`release.json`, every001–146 migration and prior manifest remain unchanged.
+This candidate is **coordinated**, policy `none`, exact application schema147;
+the automatic executor must reject it. It is deliberately not mislabeled as a
+rolling forward-compatible worker change. No controller installation, production
+SQL, release selection, write grant or worker activation is authorized.
+
+147 takes the core schema/table locks and refuses every processing delivery,
+including expired leases. Stop old consumers, drain known work, reconcile
+provider-accepted/unknown sends through existing approved operations, verify no
+processing rows and obtain the normal verified-backup/maintenance authorization.
+Never reset an uncertain send to pending solely to satisfy the precondition.
+A failed or disconnected SQL transaction leaves146 and its original ACLs intact.
+Committed147 is not down-migrated; resume by verifying protocol2 and starting only
+accepted generation-aware worker images. An old image is not a147 rollback target.
+The existing governed controller must separately admit any future147 production
+operation; this unselected descriptor does not extend its authority.
+
+Protocol2 claim increments a persistent generation and uses database time. Finish
+locks the row, samples the database clock after waiting, then atomically compares
+id/generation/processing/live lease before every sent/retry/dead/revoked update.
+Unfenced RPCs and direct service-role writes are denied; existing security-definer
+resolvers/cleanup retain their functions. New workers fail before consumption on
+pre147, reject rows without a generation before delivery, and never fall back to
+legacy acknowledgement. A stale result cannot finalize a reminder or count sent.
+
+External SMTP/push acceptance and database acknowledgement are not one transaction.
+Lost acknowledgements or crashes can still cause duplicate external delivery on
+lease recovery. Fencing prevents stale database mutation, not exactly-once sends.
+Workers report ownership loss/unknown provider outcomes and never immediately
+resend on an acknowledgement error. Production rollout needs provider reconciliation
+and a duplicate-aware policy; only providers with a stable idempotency contract
+can remove that external ambiguity. Synthetic provider restart tests cover both
+idempotent and non-idempotent boundaries without real email, push or billing.
+
+
 ## Manual commercial144→146 release
 
 The exact completed-NORMAL maintenance coordinator may select

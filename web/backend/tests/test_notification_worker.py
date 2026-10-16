@@ -7,10 +7,10 @@ from workers import notification_worker
 
 class NotificationWorkerTests(unittest.TestCase):
     def setUp(self):
-        notification_worker.STATE.update({"healthy": False, "last_poll_at": None, "processed": 0, "resolved": 0, "sent": 0, "failed": 0, "dead": 0, "queue_depth": 0, "oldest_pending_age_seconds": 0})
+        notification_worker.STATE.update({"healthy": False, "last_poll_at": None, "processed": 0, "resolved": 0, "sent": 0, "failed": 0, "dead": 0, "ownership_lost": 0, "acknowledgement_failed": 0, "queue_depth": 0, "oldest_pending_age_seconds": 0})
 
     def test_claim_success_and_deduplicated_row_processed_once(self):
-        rows = [{"id": "one", "channel": "internal", "attempts": 1, "max_attempts": 5}]
+        rows = [{"id": "one", "channel": "internal", "claim_generation": 1, "attempts": 1, "max_attempts": 5}]
         delivered, finished = [], []
         count = notification_worker.process_batch(
             limit=5,
@@ -24,7 +24,7 @@ class NotificationWorkerTests(unittest.TestCase):
         self.assertEqual(notification_worker.STATE["sent"], 1)
 
     def test_retry_dead_letter_and_structured_failure(self):
-        rows = [{"id": "last", "channel": "email", "attempts": 5, "max_attempts": 5}]
+        rows = [{"id": "last", "channel": "email", "claim_generation": 1, "attempts": 5, "max_attempts": 5}]
         finished = []
         notification_worker.process_batch(
             limit=1,
@@ -37,7 +37,7 @@ class NotificationWorkerTests(unittest.TestCase):
         self.assertEqual(notification_worker.STATE["dead"], 1)
 
     def test_unsupported_channel_is_permanent_and_logs_no_payload(self):
-        row = {"id": "bad", "channel": "sms", "payload": {"password": "secret"}, "attempts": 1}
+        row = {"id": "bad", "channel": "sms", "payload": {"password": "secret"}, "claim_generation": 1, "attempts": 1}
         finished = []
         with self.assertLogs(notification_worker.logger, level="INFO") as logs:
             notification_worker.process_batch(
@@ -55,7 +55,7 @@ class NotificationWorkerTests(unittest.TestCase):
         with self.assertLogs(notification_worker.logger, level="ERROR") as logs:
             notification_worker.process_batch(
                 limit=1,
-                claim=lambda **_kwargs: [{"id": "push", "channel": "web_push", "attempts": 1}],
+                claim=lambda **_kwargs: [{"id": "push", "channel": "web_push", "claim_generation": 1, "attempts": 1}],
                 deliver=lambda _row: (_ for _ in ()).throw(RuntimeError("provider token secret")),
                 finish=lambda _delivery_id, **kwargs: finished.append(kwargs) or {"status": "pending"},
             )
@@ -67,12 +67,12 @@ class NotificationWorkerTests(unittest.TestCase):
             self.assertEqual(notification_worker.main(), 0)
 
     def test_retry_delay_is_bounded_and_deterministic(self):
-        row = {"id": "stable", "attempts": 20}
+        row = {"id": "stable", "claim_generation": 1, "attempts": 20}
         self.assertEqual(notification_worker.retry_delay(row), notification_worker.retry_delay(row))
         self.assertLessEqual(notification_worker.retry_delay(row), 3600)
 
     def test_resolution_creates_deliveries_before_outbox_completion(self):
-        rows = [{"id": "outbox", "channel": "internal", "attempts": 1}]
+        rows = [{"id": "outbox", "channel": "internal", "claim_generation": 1, "attempts": 1}]
         resolved = []
         count = notification_worker.process_resolution_batch(
             limit=1,
@@ -85,9 +85,9 @@ class NotificationWorkerTests(unittest.TestCase):
 
     def test_partial_push_retry_only_reprocesses_failed_subscription(self):
         first_claim = [
-            {"id": "A", "channel": "web_push", "subscription_id": "A", "attempts": 1},
-            {"id": "B", "channel": "web_push", "subscription_id": "B", "attempts": 1},
-            {"id": "C", "channel": "web_push", "subscription_id": "C", "attempts": 1},
+            {"id": "A", "channel": "web_push", "subscription_id": "A", "claim_generation": 1, "attempts": 1},
+            {"id": "B", "channel": "web_push", "subscription_id": "B", "claim_generation": 1, "attempts": 1},
+            {"id": "C", "channel": "web_push", "subscription_id": "C", "claim_generation": 1, "attempts": 1},
         ]
         calls = []
         statuses = {}
@@ -123,7 +123,7 @@ class NotificationWorkerTests(unittest.TestCase):
 
         notification_worker.process_batch(
             limit=1,
-            claim=lambda **_kwargs: [{**first_claim[1], "attempts": 2}],
+            claim=lambda **_kwargs: [{**first_claim[1], "claim_generation": 1, "attempts": 2}],
             deliver=lambda row: calls.append(row["subscription_id"]),
             finish=finish,
         )
@@ -134,7 +134,7 @@ class NotificationWorkerTests(unittest.TestCase):
             count = notification_worker.process_batch(
                 limit=1,
                 claim=lambda **_kwargs: [
-                    {"id": "delivery", "channel": "email", "attempts": 1}
+                    {"id": "delivery", "channel": "email", "claim_generation": 1, "attempts": 1}
                 ],
                 deliver=lambda _row: None,
                 finish=lambda *_args, **_kwargs: (_ for _ in ()).throw(
