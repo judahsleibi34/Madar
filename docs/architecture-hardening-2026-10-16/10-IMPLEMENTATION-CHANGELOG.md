@@ -48,3 +48,12 @@ Auth remains1CPU/192MiB. Staging-only pg_stat_statements exports query IDs and
 aggregate costs without SQL text. The benchmark rejects anonymous session-status
 HTTP200, records effective provider quotas and CPU throttling. None of these
 changes touch production configuration or authorize production resource changes.
+
+## Continuous SQL rehearsal gates
+
+Backend Check now runs existing validated115/145/146 disposable SQL rehearsal
+scripts sequentially, each with a10-minute timeout, using its freshly locked
+backend test image. The deterministic preflight also checks the existing forward
+release contract. No production deployment workflow or automatic promotion was
+added. Exact script bodies ran successfully on the clean staging candidate;
+GitHub-hosted fresh-build execution is reported separately from that evidence.
