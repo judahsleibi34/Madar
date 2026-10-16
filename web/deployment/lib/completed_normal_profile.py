@@ -9,6 +9,7 @@ LEGACY_OPERATION = 'completed-normal-schema115-136-upgrade'
 MANUAL_OPERATION = 'completed-normal-schema136-144-maintenance-release'
 APPLICATION_OPERATION = 'completed-normal-schema144-application-release'
 COMMERCIAL_OPERATION = 'completed-normal-schema144-146-maintenance-release'
+FENCED_OPERATION = 'completed-normal-schema146-148-coordinated-release'
 
 
 @dataclass(frozen=True)
@@ -32,7 +33,7 @@ class UpgradeProfile:
 
     @property
     def maintenance(self):
-        return self.operation in {MANUAL_OPERATION, COMMERCIAL_OPERATION}
+        return self.operation in {MANUAL_OPERATION, COMMERCIAL_OPERATION, FENCED_OPERATION}
 
 
 LEGACY = UpgradeProfile(LEGACY_OPERATION, 1, 115, 136, (), 'release.json',
@@ -44,6 +45,8 @@ APPLICATION = UpgradeProfile(APPLICATION_OPERATION, 3, 144, 144, (142,),
     'schema-144-application-only.json', '', (), compatible_min=136)
 COMMERCIAL = UpgradeProfile(COMMERCIAL_OPERATION, 4, 144, 146, (),
     'schema-144-146-commercial-bridge.json', 'migrations-145-146-commercial.json', (145, 146))
+FENCED = UpgradeProfile(FENCED_OPERATION, 5, 146, 148, (),
+    'schema-146-148-coordinated.json', 'migrations-147-148-coordinated.json', (147, 148))
 
 
 def profile(contract):
@@ -51,7 +54,8 @@ def profile(contract):
     if not isinstance(contract, dict):
         raise RuntimeError('completed_normal_operation_profile_invalid')
     selected = {LEGACY_OPERATION: LEGACY, MANUAL_OPERATION: MANUAL,
-        APPLICATION_OPERATION: APPLICATION, COMMERCIAL_OPERATION: COMMERCIAL}.get(contract.get('operation'))
+        APPLICATION_OPERATION: APPLICATION, COMMERCIAL_OPERATION: COMMERCIAL,
+        FENCED_OPERATION: FENCED}.get(contract.get('operation'))
     if selected is None or type(contract.get('version')) is not int or contract['version'] != selected.version:
         raise RuntimeError('completed_normal_operation_profile_invalid')
     return selected
@@ -68,4 +72,6 @@ def expected_origin_grant(contract, mode):
         value.update(compatible_min=115, compatible_max=136)
     elif selected in (APPLICATION, COMMERCIAL):
         value.update(compatible_min=136, compatible_max=144)
+    elif selected is FENCED:
+        value.update(compatible_min=144, compatible_max=146)
     return value

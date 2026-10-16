@@ -2,7 +2,7 @@ name: Backend Check
 
 on:
   pull_request:
-    branches: [main, codex/architecture-hardening-20261016]
+    branches: [main, codex/architecture-hardening-20261016, codex/notification-claim-fencing-20261016]
   push:
     branches: [main]
 

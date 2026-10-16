@@ -2,7 +2,7 @@
 import json
 from pathlib import Path
 from deployment.lib.completed_normal_admission import digest
-from deployment.lib.completed_normal_profile import profile, LEGACY, APPLICATION, COMMERCIAL
+from deployment.lib.completed_normal_profile import profile, LEGACY, APPLICATION, COMMERCIAL, FENCED
 
 IDENTITY_SQL="BEGIN READ ONLY; SELECT json_build_object('system_identifier',system_identifier::text,'schema',schema_version)::text FROM pg_control_system(),public.application_schema_state WHERE contract_key='core'; COMMIT;"
 
@@ -40,7 +40,7 @@ def database_structure_digest(contract,runtime):
 
 def verify_preparation_baseline(contract,runtime,baseline):
     """Only the explicit new profile uses a protected execution row boundary."""
-    if profile(contract) is COMMERCIAL:
+    if profile(contract) in (COMMERCIAL,FENCED):
         if database_structure_digest(contract,runtime)!=contract['database_structure_sha256']:
             raise RuntimeError('completed_upgrade_database_structure_changed')
         return

@@ -73,6 +73,15 @@ docker exec "$CONTAINER_NAME" psql -X -U postgres -v ON_ERROR_STOP=1 -Atc \
 
 docker exec -e PGOPTIONS='-c client_min_messages=warning' -i "$CONTAINER_NAME" \
   psql -X -U postgres -v ON_ERROR_STOP=1 -q < "$WEB_ROOT/database/migrations/146_revise_launch_price_book.sql"
+if [[ "${RUN_SCHEMA148_ADMISSION:-false}" == true ]]; then
+  docker run --rm --memory=1g --cpus=1 --pids-limit=256 --network host --read-only \
+    --tmpfs /tmp:rw,noexec,nosuid,size=128m --env PYTHONPATH=/app:/release/web --env PYTHONDONTWRITEBYTECODE=1 \
+    --env SCHEMA148_SYNTHETIC_DATABASE_DSN='host=127.0.0.1 port=55448 dbname=postgres user=postgres connect_timeout=5' \
+    --env SCHEMA148_SOURCE_ROOT=/release \
+    --volume "$WEB_ROOT/backend:/app:ro" --volume "$WEB_ROOT/..:/release:ro" \
+    --entrypoint python "$BACKEND_TEST_IMAGE" -m unittest tests.test_schema148_cutover_database -v
+fi
+
 docker run --rm --memory=1g --cpus=1 --pids-limit=256 --network host --read-only \
   --tmpfs /tmp:rw,noexec,nosuid,size=128m \
   --env PYTHONDONTWRITEBYTECODE=1 --env PYTHONPATH=/app --env APP_ENV=test \

@@ -441,5 +441,16 @@ def main() -> int:
     return 0
 
 
+def check_schema148_source():
+    import importlib.util
+    root = Path(__file__).resolve().parents[2]
+    path = root / 'web/deployment/lib/schema148_release.py'
+    spec = importlib.util.spec_from_file_location('schema148_source_gate', path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    module.source_manifest(root)
+
+
 if __name__ == "__main__":
+    check_schema148_source()
     raise SystemExit(main())

@@ -36,6 +36,20 @@ class BusinessWriteAuthorityTests(unittest.TestCase):
     def write(self):
         self.path.write_text(json.dumps(self.data))
 
+    def test_coordinated148_range_cannot_grant_normal_before_target(self):
+        self.data.update(version=2,compatible_min=146,compatible_max=148)
+        with patch.dict(os.environ,{"SCHEMA_COMPATIBLE_MIN":"146","SCHEMA_COMPATIBLE_MAX":"148","SCHEMA_EXCLUDED_VERSIONS":""}):
+            for schema in (146,147,148):
+                self.data.update(schema=schema,mode="READ_ONLY");self.write()
+                self.assertTrue(authority.restricted())
+                self.data["mode"]="NORMAL";self.write()
+                if schema==148:
+                    self.assertFalse(authority.restricted())
+                else:
+                    with self.assertRaises(RuntimeError):authority.read_authority()
+            self.data.update(schema=146,compatible_min=144,compatible_max=146);self.write()
+            with self.assertRaises(RuntimeError):authority.read_authority()
+
     def test_read_only_authority_uses_existing_request_and_provider_fences(self):
         self.assertTrue(authority.restricted() and recovery.restricted())
         response = self.client.post("/auth/signup", json={})
