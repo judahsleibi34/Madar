@@ -191,6 +191,22 @@ class EcommerceCacheTests(unittest.TestCase):
 
         invalidate_ecommerce_cache(7)
 
+    def test_public_settings_invalidated_during_lookup_are_not_cached(self):
+        request = Request({"type": "http", "method": "GET", "path": "/", "headers": [],
+                           "query_string": b"", "server": ("testserver", 80), "scheme": "http"})
+        stale = {"tenant_id": 7, "standard_path_slug": "demo", "brand": "Deleted"}
+        current = {**stale, "brand": "Current"}
+
+        def lookup(*args, **kwargs):
+            invalidate_ecommerce_cache(7)
+            return stale
+
+        with patch.object(public_site_routes, "resolve_website_settings", side_effect=lookup):
+            self.assertEqual(public_site_routes.resolve_public_store_settings("demo", request=request), stale)
+        with patch.object(public_site_routes, "resolve_website_settings", return_value=current) as fresh:
+            self.assertEqual(public_site_routes.resolve_public_store_settings("demo", request=request), current)
+            self.assertEqual(fresh.call_count, 1)
+
     def test_public_catalog_taxonomy_is_reused_across_filter_payloads(self):
         taxonomy = {
             "category_rows": [],

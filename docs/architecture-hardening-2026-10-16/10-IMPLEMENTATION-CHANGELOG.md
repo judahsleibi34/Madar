@@ -13,3 +13,17 @@ Catalog and calendar caches fence in-flight fills during invalidation and clear.
 ## CI coverage
 
 Converted21 previously undiscovered function tests to existing `unittest.TestCase` conventions without adding dependencies or weakening assertions. Notification monkeypatch fixtures use unittest patch cleanup; route tests install explicit canonical commercial fixtures. New AST-based discovery-contract test rejects future silently omitted top-level tests unless the module supplies `load_tests`.
+
+## Public-store direct cache fills
+
+`public_site_routes.py` has two direct writers outside the get-or-create helper:
+identity resolution (tenant unknown until lookup) and catalog price bounds.
+Both now capture a bounded global generation before provider reads and suppress
+publication if any tenant invalidation/clear intervenes. Warm entries for other
+tenants remain untouched. Added route-level mutation interleavings and direct
+publication tests:31 focused cache/catalog tests PASS on native staging's isolated
+test container. The initial focused invocation used identical placeholder keys
+and correctly failed startup validation; distinct CI placeholders fixed the command.
+An already-running request can still return its pre-mutation snapshot; this
+change prevents that snapshot from repopulating the cache. Cross-process immediate
+invalidation remains unimplemented.

@@ -65,6 +65,17 @@ class CacheInvalidationRaceTests(unittest.TestCase):
         self.assertFalse(hit)
         self.assertEqual(result, {"tenant": 8})
 
+    def test_direct_fill_generation_survives_only_until_invalidation_or_clear(self):
+        for mutation in (lambda: catalog.invalidate_ecommerce_cache(7), catalog.clear_ecommerce_cache):
+            with self.subTest(mutation=mutation):
+                generation = catalog.capture_ecommerce_cache_generation()
+                mutation()
+                current = catalog.capture_ecommerce_cache_generation()
+                catalog.write_ecommerce_cache("host-lookup", 7, {"version": 2}, expected_generation=current)
+                result = catalog.write_ecommerce_cache("host-lookup", 7, {"version": 1}, expected_generation=generation)
+                self.assertEqual(result, {"version": 1})
+                self.assertEqual(catalog.read_ecommerce_cache("host-lookup"), {"version": 2})
+
     def test_fill_tracking_is_released_after_success_failure_and_invalidation(self):
         for module, load, invalidate in (
             (catalog, catalog.get_or_create_ecommerce_cache, catalog.invalidate_ecommerce_cache),
