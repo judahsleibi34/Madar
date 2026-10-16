@@ -19,34 +19,41 @@ begin;
 do $$
 declare identifier uuid; first_claim public.notification_deliveries;
  second_claim public.notification_deliveries; final_claim public.notification_deliveries;
- finished public.notification_deliveries; available timestamptz; amount integer;
+ finished public.notification_deliveries; amount integer; outcome text;
 begin
  insert into public.notification_deliveries(tenant_id,user_id,channel,template,deduplication_key,max_attempts)
  values({tenant},{user},'internal','synthetic-recovery','{key}',3) returning id into identifier;
- select * into first_claim from public.claim_notification_deliveries(1,clock_timestamp(),30);
- if first_claim.id is distinct from identifier or first_claim.attempts<>1 then
+ select * into first_claim from public.claim_notification_deliveries_v2(1,30);
+ if first_claim.id is distinct from identifier or first_claim.claim_generation<>1 then
    raise exception 'synthetic first lease assertion failed'; end if;
- -- A worker disappears after claiming and before acknowledgement.
- select * into second_claim from public.claim_notification_deliveries(1,first_claim.processing_lease_until+interval '1 second',30);
- if second_claim.id is distinct from identifier or second_claim.attempts<>2 then
+ update public.notification_deliveries set processing_lease_until=clock_timestamp()-interval '1 second' where id=identifier;
+ select * into second_claim from public.claim_notification_deliveries_v2(1,30);
+ if second_claim.id is distinct from identifier or second_claim.claim_generation<>2 then
    raise exception 'synthetic expired lease recovery assertion failed'; end if;
- available:=second_claim.processing_started_at+interval '60 seconds';
- finished:=public.finish_notification_delivery(identifier,'retry','synthetic_transient',null,available,null,second_claim.processing_started_at);
- if finished.status<>'pending' then raise exception 'synthetic retry assertion failed'; end if;
- select count(*) into amount from public.claim_notification_deliveries(1,available-interval '1 second',30);
+ foreach outcome in array array['sent','retry','dead','revoked'] loop
+   begin
+     perform public.finish_notification_delivery_v2(identifier,first_claim.claim_generation,outcome);
+     raise exception 'synthetic stale finish was accepted';
+   exception when raise_exception then
+     if sqlerrm<>'notification_delivery_claim_lost' then raise; end if;
+   end;
+ end loop;
+ finished:=public.finish_notification_delivery_v2(identifier,second_claim.claim_generation,'retry','synthetic_transient',null,60);
+ if finished.status<>'pending' or finished.available_at<=clock_timestamp() then raise exception 'synthetic retry assertion failed'; end if;
+ select count(*) into amount from public.claim_notification_deliveries_v2(1,30);
  if amount<>0 then raise exception 'synthetic backoff assertion failed'; end if;
- select * into final_claim from public.claim_notification_deliveries(1,available,30);
- if final_claim.id is distinct from identifier or final_claim.attempts<>3 then
+ update public.notification_deliveries set available_at=clock_timestamp()-interval '1 second' where id=identifier;
+ select * into final_claim from public.claim_notification_deliveries_v2(1,30);
+ if final_claim.id is distinct from identifier or final_claim.claim_generation<>3 then
    raise exception 'synthetic retry claim assertion failed'; end if;
- finished:=public.finish_notification_delivery(identifier,'retry','synthetic_exhausted',null,available+interval '60 seconds',null,available);
- if finished.status<>'dead' or finished.dead_at is null then
-   raise exception 'synthetic dead letter assertion failed'; end if;
- select count(*) into amount from public.claim_notification_deliveries(1,available+interval '1 day',30);
+ finished:=public.finish_notification_delivery_v2(identifier,final_claim.claim_generation,'retry','synthetic_exhausted');
+ if finished.status<>'dead' or finished.dead_at is null then raise exception 'synthetic dead letter assertion failed'; end if;
+ select count(*) into amount from public.claim_notification_deliveries_v2(1,30);
  if amount<>0 then raise exception 'synthetic terminal delivery reclaimed'; end if;
 end $$;
 rollback;
 """)
-        print("PASS actual SQL claim, worker-loss lease expiry, reclaim, bounded retry availability, exhausted-attempt dead letter and terminal exclusion; fixture rolled back")
+        print("PASS protocol2 SQL generation, lease expiry/reclaim, four stale outcome denials, bounded retry/dead letter; fixture rolled back")
     finally:
         manage.compose("start", "--wait", "--wait-timeout", "60", "notification-worker")
 

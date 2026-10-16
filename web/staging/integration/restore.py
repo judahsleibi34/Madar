@@ -62,6 +62,7 @@ def main():
     manage.require_database_marker()
     if not (manage.RUNTIME / "smoke-fixture.json").is_file():
         raise RuntimeError("Native MFA/object/worker smoke fixtures must exist before this restore drill")
+    schema = int(manage.sql("select schema_version from public.application_schema_state where contract_key='core';"))
     token = secrets.token_hex(8)
     destination = "madar_hardening_restore_" + token
     volume = manage.PROJECT + "_restore_objects_" + token
@@ -101,7 +102,7 @@ def main():
             raise RuntimeError("Restored synthetic object bytes differ")
         report = {
             "scope": "synthetic logical database and native object byte restore; same PostgreSQL cluster/roles",
-            "source_sha": manage.state()["source_sha"], "schema": 146, "restored_database": destination,
+            "source_sha": manage.state()["source_sha"], "schema": schema, "restored_database": destination,
             "restored_object_volume": volume, "tables_verified": len(before["tables"]),
             "sequences_verified": len(before["sequences"] or {}), "objects_verified": len(objects_before),
             "mfa_factors_verified": before["tables"]["auth.mfa_factors"]["rows"],
