@@ -3,6 +3,7 @@
 
 import argparse
 import base64
+from datetime import datetime, timezone
 import hashlib
 import hmac
 import json
@@ -274,7 +275,9 @@ def up():
         application = application.replace("FRONTEND_URLS=http://127.0.0.1:18080\n",
             "FRONTEND_URLS=http://127.0.0.1:18080,https://127.0.0.1:18443\n")
         private_write("application.env", application)
+    built_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
     docker("build", "--network=none", "--memory=1536m", "--build-arg", "SOURCE_SHA=" + value["source_sha"],
+           "--build-arg", "BUILD_TIMESTAMP=" + built_at,
            "--file", str(HERE / "Dockerfile"), "--tag", "madar-hardening-application:" + value["source_sha"],
            str(REPOSITORY), timeout=240)
     compose("up", "-d", "--wait", "--wait-timeout", "90", "postgres", "redis")

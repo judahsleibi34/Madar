@@ -57,3 +57,12 @@ backend test image. The deterministic preflight also checks the existing forward
 release contract. No production deployment workflow or automatic promotion was
 added. Exact script bodies ran successfully on the clean staging candidate;
 GitHub-hosted fresh-build execution is reported separately from that evidence.
+
+## Staging artifact provenance
+
+Final image inspection found inherited base-image release SHA/build labels even
+though OCI revision and runtime environment correctly identified the candidate.
+The staging Dockerfile now overrides both release and OCI identity/timestamp,
+records the old dependency base revision separately and labels its offline source
+overlay mode explicitly. This avoids presenting the old release as the newly
+built artifact; it does not confer production provenance or admission authority.
