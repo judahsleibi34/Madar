@@ -37,9 +37,9 @@ services:
       - database:/var/lib/postgresql/data
       - ${HARDENING_ROOT:?}/bootstrap.sql:/docker-entrypoint-initdb.d/10-hardening.sql:ro
     mem_limit: 768m
-    cpus: 0.75
+    cpus: 1.0
     healthcheck:
-      test: [CMD-SHELL, "pg_isready -U postgres -d madar_hardening"]
+      test: [CMD-SHELL, "pg_isready -h 127.0.0.1 -U postgres -d madar_hardening"]
       interval: 2s
       timeout: 2s
       retries: 30
@@ -71,7 +71,7 @@ services:
     depends_on:
       postgres: {condition: service_healthy}
     mem_limit: 192m
-    cpus: 0.5
+    cpus: 1.0
     healthcheck:
       test: [CMD, wget, --spider, --quiet, http://127.0.0.1:9999/health]
       interval: 2s
@@ -121,13 +121,14 @@ services:
 
   gateway:
     <<: *service
+    networks: [isolated, ingress]
     image: madar-frontend:b0fdfe049510724c06a04706390cd174ea57a1d1
     pull_policy: never
     entrypoint: [nginx, -c, /staging/nginx.conf, -g, "daemon off;"]
     user: "65534:65534"
     read_only: true
-    tmpfs: [/tmp:rw,nosuid,nodev,size=32m,mode=1777]
-    volumes: ["${HARDENING_ROOT:?}/nginx.conf:/staging/nginx.conf:ro"]
+    tmpfs: ["/tmp:rw,nosuid,nodev,size=32m,mode=1777"]
+    volumes: ["./gateway.conf:/staging/nginx.conf:ro"]
     ports: ["127.0.0.1:18081:8081"]
     depends_on:
       auth: {condition: service_healthy}
@@ -143,7 +144,7 @@ services:
     read_only: true
     user: "999:1000"
     command: [redis-server, --save, "", --appendonly, "no", --maxmemory, 48mb, --maxmemory-policy, noeviction]
-    tmpfs: [/data:rw,nosuid,nodev,size=64m,uid=999,gid=1000]
+    tmpfs: ["/data:rw,nosuid,nodev,size=64m,uid=999,gid=1000"]
     mem_limit: 128m
     cpus: 0.25
     healthcheck:
@@ -176,9 +177,35 @@ services:
       timeout: 3s
       retries: 30
 
+  frontend:
+    <<: *service
+    networks: [isolated, ingress]
+    image: madar-frontend:b0fdfe049510724c06a04706390cd174ea57a1d1
+    pull_policy: never
+    entrypoint: [nginx, -c, /staging/nginx.conf, -g, "daemon off;"]
+    user: "65534:65534"
+    read_only: true
+    tmpfs: ["/tmp:rw,nosuid,nodev,size=32m,mode=1777"]
+    volumes:
+      - ./frontend.conf:/staging/nginx.conf:ro
+      - ../../frontend/dist:/site:ro
+      - ${HARDENING_ROOT:?}/tls.crt:/staging/tls.crt:ro
+      - ${HARDENING_ROOT:?}/tls.key:/staging/tls.key:ro
+    ports: ["127.0.0.1:18080:8080", "127.0.0.1:18443:8443"]
+    depends_on:
+      backend: {condition: service_healthy}
+    mem_limit: 64m
+    cpus: 0.25
+
 networks:
   isolated:
     internal: true
+    labels: {com.madar.staging.owner: architecture-hardening-20261016}
+  ingress:
+    # Docker suppresses published ports on internal-only containers. Only the
+    # two proxies join this separate bridge; database/application stay internal.
+    driver_opts:
+      com.docker.network.bridge.enable_ip_masquerade: "false"
     labels: {com.madar.staging.owner: architecture-hardening-20261016}
 
 volumes:

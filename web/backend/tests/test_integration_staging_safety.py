@@ -23,6 +23,9 @@ class IntegrationStagingSafetyTests(unittest.TestCase):
         self.enterContext(patch.object(self.manager, "RUNTIME", self.runtime))
         self.enterContext(patch.object(self.manager.Path, "home", return_value=Path(self.directory)))
         self.enterContext(patch.object(self.manager.socket, "gethostname", return_value="madar-staging"))
+        # Certificate generation is exercised by the native VM/browser drill;
+        # config/ownership unit tests do not require a host OpenSSL executable.
+        self.enterContext(patch.object(self.manager, "ensure_tls"))
 
     def test_primary_host_rejects_before_docker_or_filesystem_mutation(self):
         with patch.object(self.manager.socket, "gethostname", return_value="madar-gpu"), \
@@ -67,3 +70,21 @@ class IntegrationStagingSafetyTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "unverified"):
                 self.manager.schema()
             self.assertEqual(query.call_count, 1)
+
+    def test_source_selection_preserves_credentials_and_binds_both_environments(self):
+        self.manager.prepare("a" * 40)
+        before = dict(line.split("=", 1) for line in (self.runtime / "application.env").read_text().splitlines())
+        self.manager.select_source("b" * 40)
+        after = dict(line.split("=", 1) for line in (self.runtime / "application.env").read_text().splitlines())
+        self.assertEqual(self.manager.state()["source_sha"], "b" * 40)
+        self.assertEqual(after["MADAR_RELEASE_SHA"], "b" * 40)
+        self.assertEqual(after["SUPABASE_SERVICE_KEY"], before["SUPABASE_SERVICE_KEY"])
+        self.assertEqual(after["CSRF_SECRET"], before["CSRF_SECRET"])
+
+    def test_partial_source_binding_rejects_before_container_mutation(self):
+        self.manager.prepare("a" * 40)
+        self.manager.private_write("compose.env", "SOURCE_SHA=" + "b" * 40 + "\n")
+        with patch.object(self.manager, "docker") as docker:
+            with self.assertRaisesRegex(RuntimeError, "binding mismatch"):
+                self.manager.up()
+            docker.assert_not_called()
