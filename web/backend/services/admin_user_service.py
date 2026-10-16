@@ -103,29 +103,22 @@ def list_users_with_features(
         query = (
             service_supabase
             .table("users")
-            .select(USER_SELECT_COLUMNS, count="exact")
+            .select(USER_SELECT_COLUMNS)
             .order("created_at", desc=True)
         )
 
         if normalized_search:
             query = query.ilike("email", f"%{normalized_search}%")
 
-        try:
-            users_response = query.range(safe_offset, end).execute()
-        except Exception as error:
-            if getattr(error, "code", None) != "PGRST103" or safe_offset == 0:
-                raise
-            # An exact-count request beyond the final row returns HTTP416 in
-            # PostgREST. Preserve the existing empty-page API contract without
-            # parsing a provider's human-readable error or guessing its count.
-            count_query = service_supabase.table("users").select("id", count="exact")
-            if normalized_search:
-                count_query = count_query.ilike("email", f"%{normalized_search}%")
-            fetched_users = []
-            total_count = count_query.range(0, 0).execute().count or 0
-        else:
-            fetched_users = users_response.data or []
-            total_count = users_response.count or 0
+        count_query = service_supabase.table("users").select("id", count="exact")
+
+        if normalized_search:
+            count_query = count_query.ilike("email", f"%{normalized_search}%")
+
+        users_response = query.range(safe_offset, end).execute()
+        count_response = count_query.range(0, 0).execute()
+        fetched_users = users_response.data or []
+        total_count = count_response.count or 0
         has_more = len(fetched_users) > safe_limit
         users = fetched_users[:safe_limit]
         tenant_ids = sorted({

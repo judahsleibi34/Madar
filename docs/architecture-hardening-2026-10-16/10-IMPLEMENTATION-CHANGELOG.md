@@ -27,3 +27,13 @@ and correctly failed startup validation; distinct CI placeholders fixed the comm
 An already-running request can still return its pre-mutation snapshot; this
 change prevents that snapshot from repopulating the cache. Cross-process immediate
 invalidation remains unimplemented.
+
+## Measured admin-query experiment withdrawn
+
+Commit595dff8d requested an exact count on the existing page query to avoid a
+second provider round trip. Native pagination behavior passed, but repeated
+same-stack comparisons showed no stable latency benefit and worse observed
+admin tails (DB2CPU experiment p95 baseline391.888ms/candidate468.463ms).
+The runtime service is restored byte-for-byte to baseline876b65e7; three
+pagination/filter/empty-offset/error-redaction contract tests are retained.
+No latency improvement is attributed to the withdrawn implementation.
