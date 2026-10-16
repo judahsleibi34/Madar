@@ -36,7 +36,7 @@ zero errors. Health tails exceeded paired baseline; admin target remains unmet.
 An unproven count-query optimization was withdrawn, with contracts retained.
 
 Remaining high-priority gates: service-role tenant defense-in-depth/full mutation
-audit, notification claim-owner fencing, branch protection (main unprotected;
+audit, notification claim-owner fencing (native stale-ack probe FAIL), branch protection (main unprotected;
 credentials lack admin), operator commercial override decision, native critical
 transaction/concurrency coverage, full restored-app/off-host DR, full product and
 public tenant parity, representative sustained load and governed release admission.

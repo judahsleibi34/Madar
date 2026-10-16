@@ -63,7 +63,7 @@ Notification fixture replay returned the same intent and a real worker consumed
 it. SQL drill proved lease expiration/reclaim, delayed retry, exhaustion/dead
 letter and terminal exclusion. **Unresolved:** migration073
 `finish_notification_delivery` checks id/status but has no lease owner or claim
-version argument. A late old-worker acknowledgement can race a new claim.
+version argument. A native adversarial probe confirmed FAIL: attempt1 could mark the row sent after attempt2 reclaimed it.
 A safe repair needs a new mirrored forward migration, versioned finish RPC,
 worker compatibility handling and adversarial concurrent acceptance; editing073
 or granting immediate production migration authority would be incorrect.
@@ -81,3 +81,36 @@ subscription reconciliation, concurrent builder mutation, deleted-form stale
 writes and integration conflict semantics need additional native adversarial
 coverage. Existing hermetic tests are useful evidence, not a substitute for
 those drills. No new schema/index/currency authority is claimed here.
+
+
+## Executed stale-owner failure probe
+
+`evidence/notification-stale-ack.json` records schema146, source0c591b8f,
+old_attempt1, reclaimed/current_attempt2, stale_finish_accepted:true, status:FAIL.
+The marked synthetic database and owned worker were verified, the worker paused,
+and all fixture writes rolled back before resuming it. This is a pre-existing
+invariant failure, not a newly introduced regression or a passing acceptance.
+
+The executed core sequence was an isolated transaction with synthetic tenant/user
+values from the private smoke fixture and a generated deduplication key:
+
+```sql
+-- BEGIN; insert a synthetic internal notification with max_attempts=3;
+-- old_claim := claim_notification_deliveries(1, clock_timestamp(), 30);
+-- new_claim := claim_notification_deliveries(
+--   1, old_claim.processing_lease_until + interval '1 second', 30);
+-- Assert both claims identify this fixture and new_claim.attempts=2.
+-- Then the old worker invokes the existing finish API:
+select public.finish_notification_delivery(
+  :fixture_id, 'sent', null, null, null,
+  'synthetic-old-worker', :old_processing_started_at);
+-- Actual result: status sent, attempts2; no claim generation was checked.
+-- ROLLBACK; resume only the owned staging notification worker.
+```
+
+The pseudovariables above intentionally avoid publishing private fixture values;
+the function signature/source and sanitized result make the failure auditable.
+Acceptance for repair must reject stale sent/retry/dead completion atomically,
+keep the newer claim intact, and preserve current-worker completion/retry and
+old/new release compatibility. A separate read-before-finish application check
+would still race and is not an adequate repair.

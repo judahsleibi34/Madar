@@ -30,3 +30,6 @@ acceptance evidence. Old failed attempts remain private diagnostic evidence.
 
 - staging-final-status.json: final source/image provenance, ready:true and nine
   running owned services after metadata-only rebuild0c591b8f.
+
+- notification-stale-ack.json: confirmed pre-existing native ownership invariant
+  FAIL; fixture transaction rolled back and staging worker resumed.

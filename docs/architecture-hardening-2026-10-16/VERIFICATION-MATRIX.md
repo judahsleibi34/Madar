@@ -17,7 +17,7 @@ Commands/results are in09-TEST-RESULTS.md and sanitized evidence in `evidence/`.
 | Forms | PARTIAL | Previously omitted draft tests now collected; native concurrent edit/delete/stale-write acceptance pending |
 | Website builder | PARTIAL | Native project read isolation; full publish/host/custom-domain write isolation pending |
 | Assets | PARTIAL | Native private object denial, legacy synthetic avatar bytes, restore byte checks; full managed upload/GC/quota matrix pending |
-| Workers | PARTIAL | Actual notification consumption, replay, expired lease/retry/dead letter; no stale-owner fence/all-worker crash matrix |
+| Workers | FAIL | Consumption/retry/dead-letter checks passed, but native stale attempt1 acknowledgement accepted after attempt2 reclaim; existing schema146 ownership defect, fixture rolled back |
 | Cache | PARTIAL | Thread/route tenant race, clear and wrong-tenant tests PASS; multi-process invalidation incomplete |
 | Redis | PASS | Owned staging48MiB/noeviction under128MiB, no published ports; controlled login503/readiness/recovery drill; not full OOM endurance |
 | Staging | PARTIAL | Deployed native schema146/API/frontend/worker, health and actual interactions; external/all-worker/full edge parity incomplete |

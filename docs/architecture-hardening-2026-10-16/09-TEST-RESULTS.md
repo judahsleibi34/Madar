@@ -124,3 +124,18 @@ readiness true, all nine owned services running. Correct build timestamp/base mo
 and image ID are recorded in evidence/staging-final-status.json. Full application
 smokes/performance remain explicitly bound to27860bf2, not relabeled as a fresh
 execution on an artifact that differs only in metadata/tooling.
+
+
+## Confirmed pre-existing native failure
+
+After final code validation, an additional rolled-back native ownership probe
+returned **FAIL**: expired attempt1 could acknowledge a notification after attempt2
+reclaimed it. Schema146 `finish_notification_delivery` has no claim-owner/version
+argument. Evidence:notification-stale-ack.json; reproduction and required atomic
+repair are in04-DATABASE-INTEGRITY.md. Owned worker resumed successfully. This
+fails a native reliability invariant despite the green CI suite; that gap is
+explicitly reported, not skipped or weakened. Workers row is FAIL in the matrix.
+
+Hosted Backend38850253051 PASS on report/source head7e0b5987, including all3630
+tests and SQL rehearsals. Earlier hosted Frontend38849623985 PASS remains valid
+for unchanged frontend code; the7e0b5987 frontend rerun status is visible in PR209.

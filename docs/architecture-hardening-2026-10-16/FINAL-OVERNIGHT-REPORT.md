@@ -10,7 +10,7 @@ MFA, tenant read isolation, object access, queue retry, Redis outage and compone
 restore checks now exist as reproducible code.
 
 The platform retains service-role authorization risk, incomplete native mutation/
-concurrency/product coverage, unfenced stale notification acknowledgement,
+concurrency/product coverage, confirmed native stale-notification acknowledgement failure,
 unprotected main, a deliberate production commercial override and unproven full
 DR/performance objectives. Staging is materially more representative, still not
 full production parity. The changes are ready for engineering review; production
@@ -75,7 +75,7 @@ No new dependency or provider/ORM/broker/microservice was introduced.
 **Critical:** no newly confirmed P0 exploit; incomplete audit prevents a statement
 that none exist. **High fixed:** CSRF bypass configuration/origin handling,
 cache stale publication, omitted security/integrity regressions. **High unresolved:**
-service-role tenant enforcement audit, stale worker finish fencing, unprotected
+service-role tenant enforcement audit, native-confirmed stale worker finish fencing, unprotected
 main and deliberate commercial override. **Medium fixed:** SQL target safety,
 probe redirect/proxy escape, CI credential scope and persistent fill metadata.
 **Medium unresolved:** cross-process cache consistency, complete asset/SSRF/OAuth/
@@ -140,6 +140,12 @@ See07/08 for image identities/procedures, source binding and parity limitations.
 - Hosted Backend Check38849623975 and Frontend Check38849623985 PASS on0cb384ab,
   including fresh locked backend build, actual tests and new SQL rehearsals.
 
+An additional native stale-owner probe FAILS: expired attempt1 can mark a row
+sent after attempt2 reclaimed it. This pre-existing schema146 defect remains
+unfixed; the synthetic transaction was rolled back and worker resumed. See
+evidence/notification-stale-ack.json and04-DATABASE-INTEGRITY.md. Green CI does
+not certify that native invariant.
+
 Earlier fixture/import/provider/build/restore failures were corrected and rerun;
 09 describes them. No known new executed-test regression remains. Skipped cases,
 full product E2E, native critical mutation matrix, external services and production
@@ -196,7 +202,7 @@ commands the agent could safely perform on the production host.
 | Security | Specific CSRF/config/cache/SQL-target/CI risks fixed; complete tenant/security audit and main protection still needed |
 | Data integrity | Existing RPCs/history preserved and selected SQL/replay tests pass; native financial/capacity/stale-write gates incomplete |
 | Performance | Measured honestly; quota pressure identified; no stable app speedup, admin target and observed tails unresolved |
-| Reliability | Selected retry/Redis recovery/component restore proven; lease-owner/all-worker/full DR incomplete |
+| Reliability | Selected retry/Redis recovery/component restore proven; stale-owner invariant FAIL, all-worker/full DR incomplete |
 | Maintainability | Focused commits, no new dependencies, discovery guard/contracts and reproducible procedures improve reviewability |
 | Observability | Existing request/log/health signals retained; staging CPU/query-cost evidence added; alerts/complete metrics unverified |
 | Staging maturity | Real native provider/API/worker/browser/recovery interactions, still incomplete parity |
