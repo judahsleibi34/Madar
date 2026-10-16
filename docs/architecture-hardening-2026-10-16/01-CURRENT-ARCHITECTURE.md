@@ -21,10 +21,38 @@ Primary is `madar-gpu`, kernel7.0.0-38, ~38GiB RAM, ~25GiB available at discover
 
 Canonical production controller `/opt/madar/control-plane/deployment`; checkout `/srv/madar/production`; runtime state `/var/lib/madar/releases`; secrets `/etc/madar/production.env`. Never invoke production mutators for this session.
 
-Staging `madar-staging` at10.250.250.2: Ubuntu26.04.1, kernel7.0.0-30,4vCPU,5402MiB RAM (~4694MiB available),60GiB disk free. SSH and sudo verified. Existing `madar-staging-data` has healthy PostgreSQL17 (1GiB cap,0.75CPU) and Redis (256MiB cap,0.25CPU,128MiB maxmemory,noeviction), internal network, no published database ports. Existing data and backups belong to previous staging work and are preserved. SSH is the only externally listening TCP service observed; UFW inactive. VM has no default route or DNS configuration; public registry build failed at DNS resolution. Offline image import is an alternative, not evidence of a fresh locked build.
+Staging `madar-staging` at10.250.250.2: Ubuntu26.04.1, kernel7.0.0-30,4vCPU,5402MiB RAM (~4694MiB available),60GiB disk free. SSH and sudo verified. Existing `madar-staging-data` has healthy PostgreSQL 17 (1GiB cap,0.75CPU) and Redis (256MiB cap,0.25CPU,128MiB maxmemory,noeviction), internal network, no published database ports. Existing data and backups belong to previous staging work and are preserved. SSH is the only externally listening TCP service observed; UFW inactive. VM has no default route or DNS configuration; public registry build failed at DNS resolution. Offline image import is an alternative, not evidence of a fresh locked build.
 
 `web/staging` is explicitly a synthetic Auth/Storage facade and schema81/83 rehearsal; it is not current full Supabase parity. `web/precutover` contains provider overlays with historical schema115 notes; source code and current release descriptor take precedence over those stale notes.
 
 ## Validation inventory
 
-CI backend builds a locked Python3.12 test image then runs `scripts/run_tests_no_external_network.py` with unittest discovery and external-network guard. Discovery currently misses21 top-level pytest-style functions in4 modules (four require monkeypatch fixtures). CI frontend runs npm ci, lint, Vitest, build and production dependency audit. No coverage or PASS is inferred from merely finding these tests.
+CI backend builds a locked Python3.12 test image then runs `scripts/run_tests_no_external_network.py` with unittest discovery and external-network guard. Baseline discovery missed21 top-level pytest-style functions in4 modules (four required monkeypatch fixtures); this branch now collects them and guards against recurrence. CI frontend runs npm ci, lint, Vitest, build and production dependency audit. No coverage or PASS is inferred from merely finding these tests.
+
+
+## Additional implementation inventory
+
+FastAPI includes explicit auth/MFA/callback, user/password/install, admin/billing,
+calendar, ecommerce, builder/public sites, notifications/deletion, learning/academy
+and protected data-analysis routers. Six worker entry points exist: notification,
+calendar sync, deletion, parser, remote ingestion and generated code. Only the
+notification consumer was deployed and exercised in the new native staging.
+Existing `observability_service.py` uses request IDs, structured safe-field logs,
+route-template/status/method metrics and bounded Server-Timing headers. Middleware
+passes matched route templates rather than customer URLs to metric labels. No
+redundant Prometheus/Grafana/Loki service was installed. Alert behavior, long-term
+metric resource growth and complete queue/storage/backup signal coverage remain
+unverified.
+
+React entry separation and route loading are retained. `utils/apiClient.js`,
+`services/apiRoutes.js` and PageBuilder API helpers provide existing request/session
+behavior; auth and public tenant rendering have dedicated suites. The exact-lock
+frontend suite/build and native portal browser flow passed; no frontend source
+or bundle-splitting strategy was changed without measured product evidence.
+
+Current native staging topology/resources are in07-INFRASTRUCTURE.md and its
+parity limits in08-STAGING-DEPLOYMENT.md. The older synthetic facade remains
+intact and explicitly distinct. Database authority and unresolved lease fencing
+are in04-DATABASE-INTEGRITY.md. Enterprise connector coverage and Athena tool
+boundaries were inventoried only at service-boundary level; no claim of a complete
+connector registry or authorized inference deployment is made.

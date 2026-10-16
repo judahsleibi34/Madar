@@ -1,0 +1,1 @@
+PASS Redis48MiB/noeviction under128MiB cap, no published ports, login fail-closed503, degraded readiness and recovery after controlled outage
