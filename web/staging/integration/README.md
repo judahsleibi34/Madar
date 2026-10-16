@@ -46,7 +46,7 @@ After transferring a newer committed source archive, preserve credentials/data
 and select that exact source with `manage.py up --source-sha <new-commit>`.
 Partial source/configuration identity mismatches reject before Docker mutation.
 Base application/dependency image IDs are checked before building. `up` restarts
-the API/worker/frontend on an already initialized146 database without replaying
+the API/worker/frontend on an already initialized148 database without replaying
 SQL. It never advances a populated schema automatically.
 
 `smoke.py` creates native synthetic Auth/TOTP/Storage/notification fixtures and
@@ -98,7 +98,7 @@ login viewport. Its desktop context blocks external network hosts. This limited
 flow does not replace the repository's full authenticated Playwright suite.
 
 `schema` accepts only a fresh marked owned database and rehearses immutable
-history to146 via the selected learning143 branch, excluding142. It refuses a
+history to148 via the selected learning143 branch, excluding142. It refuses a
 second initialization. Existing shared staging databases are never selected.
 Do not use this command for production migrations or claim it grants production
 migration/release authority. Private Docker errors can contain generated staging
@@ -115,3 +115,27 @@ is deliberately no broad cleanup or automatic volume deletion command. Full
 production parity additionally requires external delivery, OAuth, all workers,
 durable application filesystem mounts, TLS/edge routing and governed release
 acceptance; those are not implied by successful startup.
+
+
+## Explicit synthetic146→148 follow-up
+
+This follow-up worker requires protocol2/schema147; the branch harness targets148.
+The historical `madar-hardening-synthetic-146` comment remains an ownership marker,
+not a claim about the current version. `up` refuses an older populated schema;
+it does not silently migrate or start the new consumer against146.
+
+After verifying the exact committed source/archive and the owned madar-staging
+project, run `python3 web/staging/integration/upgrade_notifications.py`. This
+validates both source-pinned candidates, pauses only the owned synthetic writers,
+refuses any processing delivery, retains a private logical backup and records
+committed147/148 checkpoints. It verifies original application/Auth/MFA/Storage rows and sequences across SQL, excluding only the new generation field when starting at146 and core schema state. It leaves those writers stopped on success. A failure
+may restart the original writers ONLY if the database remains146; after147 it must
+remain stopped for forward repair. Re-running resumes147 or recognizes148 without
+replaying committed SQL. No automatic requeue or production path exists.
+
+Then `manage.py up --source-sha <exact-new-sha>` builds the source-overlay image,
+verifies target148 before publishing148 runtime compatibility, and starts the new
+API/worker. Run smoke.py and worker_recovery.py against the actual native provider.
+Restore evidence reads the observed schema instead of a hardcoded146. A fresh
+`prepare`/`schema` initializes to148 directly; production still requires its separate
+reviewed controller admission, maintenance/backup gates and approval.

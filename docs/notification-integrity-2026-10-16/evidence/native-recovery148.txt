@@ -1,0 +1,1 @@
+PASS protocol2 SQL generation, lease expiry/reclaim, four stale outcome denials, bounded retry/dead letter; fixture rolled back

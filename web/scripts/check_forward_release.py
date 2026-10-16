@@ -51,6 +51,18 @@ _launch_price_book_spec = importlib.util.spec_from_file_location(
 _launch_price_book_candidate = importlib.util.module_from_spec(_launch_price_book_spec)
 _launch_price_book_spec.loader.exec_module(_launch_price_book_candidate)
 validated_launch_price_book_entries = _launch_price_book_candidate.validated_entries
+_notification_fencing_spec = importlib.util.spec_from_file_location(
+    "madar_notification_fencing_candidate", Path(__file__).with_name("notification_fencing_candidate.py"))
+_notification_fencing_candidate = importlib.util.module_from_spec(_notification_fencing_spec)
+_notification_fencing_spec.loader.exec_module(_notification_fencing_candidate)
+validated_notification_fencing_entries = _notification_fencing_candidate.validated_entries
+_reservation_integrity_spec = importlib.util.spec_from_file_location(
+    "madar_reservation_integrity_candidate", Path(__file__).with_name("reservation_integrity_candidate.py"))
+_reservation_integrity_candidate = importlib.util.module_from_spec(_reservation_integrity_spec)
+_reservation_integrity_spec.loader.exec_module(_reservation_integrity_candidate)
+validated_reservation_integrity_entries = _reservation_integrity_candidate.validated_entries
+
+
 import re
 
 
@@ -420,10 +432,10 @@ def validate(root: Path = ROOT) -> list[str]:
                 ).glob("*.sql")
             )
 
-            if versions != list(range(1, 147 if learning_contract['status']=='finalized' else 143)):
+            if versions != list(range(1, 149 if learning_contract['status']=='finalized' else 143)):
                 errors.append(
                     "migration namespace must contain exactly "
-                    f"001 through {146 if learning_contract['status']=='finalized' else 142}: {tree}"
+                    f"001 through {148 if learning_contract['status']=='finalized' else 142}: {tree}"
                 )
 
     except (OSError, KeyError, ValueError, TypeError) as error:
@@ -444,6 +456,14 @@ def validate(root: Path = ROOT) -> list[str]:
         validated_launch_price_book_entries(root)
     except (OSError, ValueError, TypeError, KeyError) as error:
         errors.append(f"launch price-book candidate invalid: {error}")
+    try:
+        validated_notification_fencing_entries(root)
+    except (OSError, ValueError, TypeError, KeyError) as error:
+        errors.append(f"notification fencing candidate invalid: {error}")
+    try:
+        validated_reservation_integrity_entries(root)
+    except (OSError, ValueError, TypeError, KeyError) as error:
+        errors.append(f"reservation integrity candidate invalid: {error}")
     return errors
 
 

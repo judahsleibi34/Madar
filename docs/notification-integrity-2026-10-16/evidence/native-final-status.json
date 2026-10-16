@@ -1,0 +1,18 @@
+{
+  "source_sha": "9c084293d5583a18cb59a6478684ae2ed980219d",
+  "schema": 148,
+  "runtime_schema_bounds": [
+    148,
+    148
+  ],
+  "ready": true,
+  "worker_consuming": true,
+  "protocol": 2,
+  "native_fenced_deliveries_sent": 1,
+  "legacy_claim_http_status": 403,
+  "legacy_finish_http_status": 403,
+  "direct_delivery_update_http_status": 403,
+  "owned_services_running": 9,
+  "image_id": "sha256:3de4a885250c279e015d9e3539393e285fa847d890cb0700a295519556acca49",
+  "scope": "owned synthetic native stack; no production changes"
+}

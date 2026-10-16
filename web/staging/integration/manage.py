@@ -20,6 +20,7 @@ import urllib.request
 OWNER = "architecture-hardening-20261016"
 PROJECT = "madar-hardening-20261016"
 MARKER = "madar-hardening-synthetic-146"
+TARGET_SCHEMA = 148  # Marker identifies fixture ownership, not current schema.
 HERE = Path(__file__).resolve().parent
 REPOSITORY = HERE.parents[2]
 RUNTIME = Path.home() / PROJECT
@@ -102,7 +103,7 @@ def prepare(source_sha):
         "REDIS_URL": "redis://redis:6379/0", "RATE_LIMIT_ENABLED": "true", "RATE_LIMIT_FAIL_OPEN": "false",
         "ADMIN_MFA_LOGIN_ENFORCEMENT": "true", "COMMERCIAL_ENTITLEMENTS_ENFORCED": "true",
         "MADAR_RELEASE_SHA": source_sha, "MADAR_BUILD_TIMESTAMP": "staging-source-overlay",
-        "SCHEMA_COMPATIBLE_MIN": "144", "SCHEMA_COMPATIBLE_MAX": "146",
+        "SCHEMA_COMPATIBLE_MIN": str(TARGET_SCHEMA), "SCHEMA_COMPATIBLE_MAX": str(TARGET_SCHEMA),
         "PUBLIC_UPLOADS_DIR": "/tmp/public/uploads", "DATA_UPLOAD_DIR": "/tmp/private/uploads",
         "PRIVATE_CHARTS_DIR": "/tmp/private/charts", "MADAR_UPLOAD_WORKSPACE_DIR": "/tmp/parser",
         "MPLCONFIGDIR": "/tmp/matplotlib", "XDG_CACHE_HOME": "/tmp/cache",
@@ -285,8 +286,9 @@ def up():
     compose("up", "-d", "--wait", "--wait-timeout", "90", "auth", "rest", "storage", "gateway")
     configure_provider_access()
     if sql("select to_regclass('public.application_schema_state') is not null;") == "t":
-        if sql("select schema_version from public.application_schema_state where contract_key='core';") != "146":
-            raise RuntimeError("Existing staging schema requires diagnosis before starting the API")
+        if sql("select schema_version from public.application_schema_state where contract_key='core';") != str(TARGET_SCHEMA):
+            raise RuntimeError("Existing staging schema requires explicit upgrade before starting the API")
+        configure_application_schema()
         compose("up", "-d", "--wait", "--wait-timeout", "90", "backend", "notification-worker", "frontend")
     print("Native provider services started on the isolated staging network")
 
@@ -300,14 +302,28 @@ def schema():
         raise RuntimeError("Schema initialization requires a fresh owned database")
     for path in sorted((REPOSITORY / "web/database/migrations").glob("*.sql")):
         number = int(path.name.split("_", 1)[0])
-        if number == 142 or number > 146:
+        if number == 142 or number > TARGET_SCHEMA:
             continue  # The selected learning143 branch explicitly excludes142.
         sql(path.read_text())
-    if sql("select schema_version from public.application_schema_state where contract_key='core';") != "146":
+    if sql("select schema_version from public.application_schema_state where contract_key='core';") != str(TARGET_SCHEMA):
         raise RuntimeError("Staging schema target was not reached")
     sql("notify pgrst, 'reload schema';")
     compose("up", "-d", "--wait", "--wait-timeout", "90", "backend", "notification-worker", "frontend")
-    print("Immutable migrations rehearsed to schema146; API and notification worker started")
+    print(f"Immutable migrations rehearsed to schema{TARGET_SCHEMA}; API and notification worker started")
+
+
+def configure_application_schema():
+    # Called only after this database actually reaches the branch target. Never
+    # make a146 deployment claim148 compatibility merely by changing its env.
+    receipt = RUNTIME / "notification-upgrade.json"
+    if receipt.exists() and not json.loads(receipt.read_text()).get("preservation_verified"):
+        raise RuntimeError("Staging upgrade preservation remains unverified before consumer admission")
+    application = (RUNTIME / "application.env").read_text()
+    for key in ("SCHEMA_COMPATIBLE_MIN", "SCHEMA_COMPATIBLE_MAX"):
+        if not re.search(rf"^{key}=", application, flags=re.M):
+            raise RuntimeError("Staging schema compatibility configuration missing")
+        application = re.sub(rf"^{key}=.*$", f"{key}={TARGET_SCHEMA}", application, flags=re.M)
+    private_write("application.env", application)
 
 
 def configure_provider_access():
