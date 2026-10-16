@@ -88,3 +88,15 @@ class IntegrationStagingSafetyTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "binding mismatch"):
                 self.manager.up()
             docker.assert_not_called()
+
+    def test_unmarked_database_stops_before_native_provider_migrations(self):
+        self.manager.prepare("a" * 40)
+        images = [b"sha256:3e97770112fda376932c3ddfec9d7f9a80fb014b4bd25476c544b52e85999b28",
+                  b"sha256:9889c69c8d3526c94abcf36d4099d5d47fb80dd03c4954ddc5051faab9ba6467", b""]
+        with patch.object(self.manager, "attest_resources"), \
+             patch.object(self.manager, "docker", side_effect=images), \
+             patch.object(self.manager, "compose") as compose, \
+             patch.object(self.manager, "require_database_marker", side_effect=RuntimeError("unverified")):
+            with self.assertRaisesRegex(RuntimeError, "unverified"):
+                self.manager.up()
+        compose.assert_called_once_with("up", "-d", "--wait", "--wait-timeout", "90", "postgres", "redis")

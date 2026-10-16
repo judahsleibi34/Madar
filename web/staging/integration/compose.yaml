@@ -29,6 +29,7 @@ services:
     <<: *service
     image: postgres:17-alpine@sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73
     pull_policy: never
+    command: [postgres, -c, shared_preload_libraries=pg_stat_statements]
     environment:
       POSTGRES_DB: madar_hardening
       POSTGRES_USER: postgres
@@ -37,7 +38,7 @@ services:
       - database:/var/lib/postgresql/data
       - ${HARDENING_ROOT:?}/bootstrap.sql:/docker-entrypoint-initdb.d/10-hardening.sql:ro
     mem_limit: 768m
-    cpus: 1.0
+    cpus: 2.0
     healthcheck:
       test: [CMD-SHELL, "pg_isready -h 127.0.0.1 -U postgres -d madar_hardening"]
       interval: 2s

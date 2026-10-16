@@ -18,7 +18,9 @@ python3 web/staging/integration/manage.py up
 python3 web/staging/integration/manage.py schema
 python3 web/staging/integration/manage.py status
 python3 web/staging/integration/smoke.py
+python3 web/staging/integration/tenant_smoke.py
 python3 web/staging/integration/worker_recovery.py
+python3 web/staging/integration/redis_failure.py
 python3 web/staging/integration/restore.py
 ```
 
@@ -50,6 +52,11 @@ SQL. It never advances a populated schema automatically.
 `smoke.py` creates native synthetic Auth/TOTP/Storage/notification fixtures and
 checks actual API MFA admission, denied AAL1 admin access, rejected CSRF,
 single-use pending sessions, private object denial and worker processing.
+`tenant_smoke.py` creates two synthetic tenants and verifies native authenticated
+builder ownership, cross-tenant404, spoofed user403 and ordinary-user admin403.
+`redis_failure.py` verifies memory/noeviction/network bounds, briefly stops only
+the owned Redis, checks login503 and degraded readiness, then restores it in
+`finally`. Run these drills serially, outside performance measurement.
 `worker_recovery.py` pauses only this worker, tests lease/retry/dead-letter SQL
 within a rolled-back transaction, then resumes it.
 
@@ -71,6 +78,10 @@ This uses60 requests/four clients per selected endpoint, private synthetic
 cookies, and equally bounded temporary baseline API/proxy services. It removes
 only those temporary services afterward. It never follows HTTP redirects or
 uses environment HTTP proxies. Do not run other test load concurrently.
+The default PostgreSQL2CPU/768MiB and Auth1CPU/192MiB limits reflect observed
+quota pressure in this four-vCPU VM. The benchmark records CPU throttling and
+query IDs/costs (never query text); pg_stat_statements is staging-only. Sixty
+requests cannot establish a stable production p99 or a capacity limit.
 
 For browser verification, forward ONLY loopback18443 to this VM's18443 with
 `ssh -F ~/.ssh/config -o ExitOnForwardFailure=yes -L 127.0.0.1:18443:127.0.0.1:18443 -N madar-staging`.

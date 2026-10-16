@@ -20,8 +20,10 @@ def measure(port, endpoint, headers, *, requests=60):
         started = time.perf_counter()
         try:
             with OPENER.open(Request(f"http://127.0.0.1:{port}/api{endpoint}", headers=headers), timeout=15) as response:
-                response.read()
+                content = response.read()
                 status = response.status
+                if endpoint == "/auth/user_status" and not json.loads(content).get("logged_in"):
+                    status = 401  # HTTP200 anonymous status is not an authenticated measurement.
         except HTTPError as error:
             with error:
                 error.read()
@@ -90,17 +92,40 @@ def main():
     manage.private_write("baseline-compose.json", json.dumps(configuration))
     def compose(*command):
         return manage.compose("--file", str(manage.RUNTIME / "baseline-compose.json"), *command)
+    def cpu_snapshot():
+        result = {}
+        for service in ("auth", "postgres"):
+            identifier = manage.compose("ps", "-q", service).decode().strip()
+            result[service] = dict((key, int(value)) for key, value in
+                (line.split() for line in manage.docker("exec", identifier, "cat", "/sys/fs/cgroup/cpu.stat").decode().splitlines()))
+        return result
     try:
         compose("up", "--no-deps", "-d", "--wait", "--wait-timeout", "90", "baseline-backend", "baseline-frontend")
         report = {"baseline_sha": BASELINE_SHA, "candidate_sha": manage.state()["source_sha"],
                   "conditions": "dedicated4vCPU/5402MiB VM; same native PostgreSQL/Auth/REST/Redis; API1.5CPU/1280MiB; nginx0.25CPU/64MiB; 3warmups,60requests,4clients per endpoint; synthetic data; no other test load",
                   "endpoints": {}}
+        report["provider_resource_limits"] = {}
+        for service in ("auth", "postgres"):
+            identifier = manage.compose("ps", "-q", service).decode().strip()
+            config = json.loads(manage.docker("inspect", identifier))[0]["HostConfig"]
+            report["provider_resource_limits"][service] = {"cpus": config["NanoCpus"] / 1e9, "memory_bytes": config["Memory"]}
+        cpu_before = cpu_snapshot()
         for endpoint in ("/health/live", "/auth/user_status", "/admin/users"):
             headers = {} if endpoint == "/health/live" else cookie_header(fixture["cookies"])
             before = measure(18082, endpoint, headers)
             after = measure(18080, endpoint, headers)
             report["endpoints"][endpoint] = {"baseline": before, "candidate": after,
                 "p95_change_percent": round((after["p95_ms"] / before["p95_ms"] - 1) * 100, 2)}
+        cpu_after = cpu_snapshot()
+        report["provider_cpu_stat_delta"] = {service: {key: cpu_after[service][key] - cpu_before[service][key]
+            for key in ("usage_usec", "nr_periods", "nr_throttled", "throttled_usec")} for service in cpu_before}
+        # Query IDs/costs are useful evidence without exporting normalized SQL,
+        # whose utility statements can still contain credential literals.
+        report["database_query_costs"] = json.loads(manage.sql("select coalesce(json_agg(t),'[]') from "
+            "(select queryid,calls,round(total_exec_time::numeric,3) as total_exec_ms,"
+            "round(mean_exec_time::numeric,3) as mean_exec_ms,rows "
+            "from extensions.pg_stat_statements where dbid=(select oid from pg_database where datname=current_database()) "
+            "order by total_exec_time desc limit 8) t;"))
         manage.private_write("benchmark-result.json", json.dumps(report, indent=2) + "\n")
         print(json.dumps(report, sort_keys=True))
     finally:

@@ -277,8 +277,9 @@ def up():
     docker("build", "--network=none", "--memory=1536m", "--build-arg", "SOURCE_SHA=" + value["source_sha"],
            "--file", str(HERE / "Dockerfile"), "--tag", "madar-hardening-application:" + value["source_sha"],
            str(REPOSITORY), timeout=240)
-    compose("up", "-d", "--wait", "--wait-timeout", "90", "postgres", "auth", "rest", "storage", "gateway", "redis")
+    compose("up", "-d", "--wait", "--wait-timeout", "90", "postgres", "redis")
     require_database_marker()
+    compose("up", "-d", "--wait", "--wait-timeout", "90", "auth", "rest", "storage", "gateway")
     configure_provider_access()
     if sql("select to_regclass('public.application_schema_state') is not null;") == "t":
         if sql("select schema_version from public.application_schema_state where contract_key='core';") != "146":
@@ -313,6 +314,7 @@ def configure_provider_access():
     sql("grant usage on schema storage to anon, authenticated, service_role; "
         "grant select,insert,update,delete on storage.buckets,storage.objects to anon,authenticated,service_role; "
         "grant usage on all sequences in schema storage to service_role;")
+    sql("create extension if not exists pg_stat_statements with schema extensions;")
 
 
 def down():

@@ -37,3 +37,14 @@ admin tails (DB2CPU experiment p95 baseline391.888ms/candidate468.463ms).
 The runtime service is restored byte-for-byte to baseline876b65e7; three
 pagination/filter/empty-offset/error-redaction contract tests are retained.
 No latency improvement is attributed to the withdrawn implementation.
+
+## Native staging isolation and resource validation
+
+Added real two-tenant builder access checks and controlled owned-Redis failure
+and recovery. Provider startup now checks the disposable database marker before
+native Auth/Storage migrations can execute. Eight orchestration safety tests
+PASS. PostgreSQL is bounded at2CPU/768MiB after observed throttling at1CPU;
+Auth remains1CPU/192MiB. Staging-only pg_stat_statements exports query IDs and
+aggregate costs without SQL text. The benchmark rejects anonymous session-status
+HTTP200, records effective provider quotas and CPU throttling. None of these
+changes touch production configuration or authorize production resource changes.
