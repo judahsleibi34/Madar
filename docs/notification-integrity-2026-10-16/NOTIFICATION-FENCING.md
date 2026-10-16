@@ -14,8 +14,8 @@ have one winner; new claims use SKIP LOCKED. Direct service-role queue writes an
 legacy claim/finish RPCs are denied. Resolvers/cleanup remain security-definer.
 
 A worker validates a generation before any provider call, carries it to finish,
-and never uses a legacy fallback. Startup requires protocol2 before resolution
-or consumption. Ownership loss and acknowledgement failure have bounded counters;
+and never uses a legacy fallback. Every authorized consumption poll requires protocol2 before resolution
+or delivery; restricted standbys do not make business RPCs. Ownership loss and acknowledgement failure have bounded counters;
 unknown successful provider outcomes are logged safely, never counted sent or
 used to finalize a reminder. A failed acknowledgement never causes an immediate
 second send in the same batch.
