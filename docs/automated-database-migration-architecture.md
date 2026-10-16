@@ -1,5 +1,32 @@
 # Automated database migration architecture
 
+## Unselected reservation-capacity repair147→148
+
+The mirrored148 migration and pinned
+`migrations-147-148-reservation-capacity.json` /
+`schema-147-148-reservation-capacity.json` follow the coordinated147 worker cutover;
+they do not change147, historical migrations/manifests or active release146.
+Policy is none and the candidate remains unselected. No production installation,
+SQL, write grant or release selection is authorized.
+
+Native tests confirmed that cancelled exclusive reservations could be reactivated
+into occupied slots.148 takes the same per-block advisory lock as public create,
+then the reservation row lock, rechecks identity and overlap before active status
+mutation and email intent. Adjacent/free slots and nonexclusive bookings retain
+their existing behavior. Cross-tenant lookup remains null/404. Direct runtime
+UPDATE is revoked; normal production SDK status/cancellation/ownership operations
+already use retained security-definer RPCs. API capacity conflicts return409.
+The migration does not repair historical overlapping reservations automatically.
+
+A disposable146→147→148 rehearsal proves147 rollback/cutover refusal, all four
+stale acknowledgement denials, process crashes/restarts,148 transactional
+function/ACL/schema rollback and re-entry refusal, native reservation/variant
+stock/order atomicity and synthetic payment/reversal idempotency. No live billing
+or real external delivery is used. The future production operation must bind a
+reviewed target148 candidate and the existing controller's separate admission;
+no intermediate schema may be mistaken for complete application acceptance.
+
+
 ## Unselected coordinated notification claim fencing146→147
 
 The mirrored147 candidate and checksum-pinned

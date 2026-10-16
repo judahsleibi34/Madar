@@ -15,10 +15,11 @@ cleanup() {
 }
 trap cleanup EXIT
 
-docker run -d --memory=768m --cpus=0.75 --pids-limit=128 --name "$CONTAINER_NAME" --label madar.rehearsal=synthetic-notification-147 \
+docker create --memory=768m --cpus=0.75 --pids-limit=128 --name "$CONTAINER_NAME" --label madar.rehearsal=synthetic-notification-147 \
   --publish 127.0.0.1:55448:5432 --tmpfs /var/lib/postgresql/data:rw,noexec,nosuid,size=1g \
   -e POSTGRES_HOST_AUTH_METHOD=trust "$POSTGRES_IMAGE" >/dev/null
 created=true
+docker start "$CONTAINER_NAME" >/dev/null
 for attempt in $(seq 1 60); do
   if docker exec "$CONTAINER_NAME" pg_isready -h 127.0.0.1 -U postgres >/dev/null 2>&1; then
     break
@@ -85,3 +86,36 @@ docker run --rm --memory=1g --cpus=1 --pids-limit=256 --network host --read-only
   --volume "$WEB_ROOT/database/migrations/147_fence_notification_delivery_claims.sql:/migration147.sql:ro" \
   --entrypoint python "$BACKEND_TEST_IMAGE" tests/test_notification_fencing_database.py
 echo "Migration147 coordinated rollback/upgrade and native claim ownership suite passed"
+if [[ "${RUN_BUSINESS_INTEGRITY:-false}" == true ]]; then
+  docker exec "$CONTAINER_NAME" psql -X -U postgres -Atc \
+    "select shobj_description(oid,'pg_database') from pg_database where datname=current_database()" \
+    | grep -qx madar-notification-synthetic-rehearsal
+  before_status_function="$(docker exec "$CONTAINER_NAME" psql -X -U postgres -Atc "select md5(pg_get_functiondef('public.update_builder_reservation_status_notified_safe(uuid,integer,text,timestamptz)'::regprocedure))")"
+  {
+    printf 'begin;\n'
+    sed -e '/^begin;$/Id' -e '/^commit;$/Id' "$WEB_ROOT/database/migrations/148_guard_reservation_reactivation_capacity.sql"
+    printf '\nrollback;\n'
+  } | docker exec -i "$CONTAINER_NAME" psql -X -U postgres -v ON_ERROR_STOP=1 -q
+  docker exec "$CONTAINER_NAME" psql -X -U postgres -Atc \
+    "select schema_version=147 and has_table_privilege('service_role','public.builder_reservations','UPDATE') from public.application_schema_state where contract_key='core'" | grep -qx t
+  test "$before_status_function" = "$(docker exec "$CONTAINER_NAME" psql -X -U postgres -Atc "select md5(pg_get_functiondef('public.update_builder_reservation_status_notified_safe(uuid,integer,text,timestamptz)'::regprocedure))")"
+  docker exec -i "$CONTAINER_NAME" psql -X -U postgres -v ON_ERROR_STOP=1 -q \
+    < "$WEB_ROOT/database/migrations/148_guard_reservation_reactivation_capacity.sql"
+  docker exec "$CONTAINER_NAME" psql -X -U postgres -Atc \
+    "select schema_version=148 from public.application_schema_state where contract_key='core'" | grep -qx t
+
+  docker run --rm --memory=768m --cpus=1 --pids-limit=256 --network host --read-only \
+    --tmpfs /tmp:rw,noexec,nosuid,size=64m --env PYTHONPATH=/app --env PYTHONDONTWRITEBYTECODE=1 \
+    --env BUSINESS_INTEGRITY_SYNTHETIC_DATABASE_DSN='host=127.0.0.1 port=55448 dbname=postgres user=postgres connect_timeout=5' \
+    --volume "$WEB_ROOT/backend:/app:ro" --entrypoint python "$BACKEND_TEST_IMAGE" \
+    -m unittest tests.test_native_business_integrity_database -v
+  if replay_output="$(docker exec -i "$CONTAINER_NAME" psql -X -U postgres -v ON_ERROR_STOP=1 -q \
+      < "$WEB_ROOT/database/migrations/148_guard_reservation_reactivation_capacity.sql" 2>&1)"; then
+    echo "Migration148 unexpectedly accepted re-entry" >&2
+    exit 1
+  fi
+  [[ "$replay_output" == *migration_148_expected_schema_147* ]]
+  docker exec "$CONTAINER_NAME" psql -X -U postgres -Atc \
+    "select schema_version=148 from public.application_schema_state where contract_key='core'" | grep -qx t
+  echo "Migration148 rollback, native business integrity and re-entry refusal passed"
+fi

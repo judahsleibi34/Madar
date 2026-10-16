@@ -61,6 +61,12 @@ _notification_fencing_spec = importlib.util.spec_from_file_location(
 _notification_fencing_candidate = importlib.util.module_from_spec(_notification_fencing_spec)
 _notification_fencing_spec.loader.exec_module(_notification_fencing_candidate)
 validated_notification_fencing_entries = _notification_fencing_candidate.validated_entries
+_reservation_integrity_spec = importlib.util.spec_from_file_location(
+    "madar_reservation_integrity_candidate", Path(__file__).with_name("reservation_integrity_candidate.py"))
+_reservation_integrity_candidate = importlib.util.module_from_spec(_reservation_integrity_spec)
+_reservation_integrity_spec.loader.exec_module(_reservation_integrity_candidate)
+validated_reservation_integrity_entries = _reservation_integrity_candidate.validated_entries
+
 
 
 
@@ -364,6 +370,7 @@ def check_production_lineage(errors: list[str]) -> None:
             retained_future.update({entry["number"]: entry for entry in validated_commercial_continuity_entries(REPO_ROOT.parent)})
             retained_future.update({entry["number"]: entry for entry in validated_launch_price_book_entries(REPO_ROOT.parent)})
             retained_future.update({entry["number"]: entry for entry in validated_notification_fencing_entries(REPO_ROOT.parent)})
+            retained_future.update({entry["number"]: entry for entry in validated_reservation_integrity_entries(REPO_ROOT.parent)})
             learning=validate_learning_path(REPO_ROOT.parent)
             if learning['status']=='finalized':
                 learning_manifest=json.loads((REPO_ROOT.parent / learning['manifest_path']).read_text())
