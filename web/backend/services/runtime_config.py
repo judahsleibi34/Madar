@@ -30,6 +30,8 @@ CONFIG_CLASSIFICATION: dict[str, ConfigClass] = {
     "RATE_LIMIT_ENABLED": "required",
     "RATE_LIMIT_FAIL_OPEN": "production-only",
     "ADMIN_MFA_LOGIN_ENFORCEMENT": "production-only",
+    "CSRF_ORIGIN_CHECK_ENABLED": "production-only",
+    "CSRF_ALLOW_MISSING_ORIGIN": "production-only",
     "EMAIL_CHANNEL_ENABLED": "optional",
     "WEB_PUSH_ENABLED": "optional",
     "SMTP_HOST": "secret",
@@ -220,6 +222,10 @@ def validate_runtime_configuration() -> RuntimeConfiguration:
             raise RuntimeError("production rate limiting is configured fail-open")
         if not env_bool("ADMIN_MFA_LOGIN_ENFORCEMENT", False):
             raise RuntimeError("administrator MFA login enforcement is disabled")
+        if not env_bool("CSRF_ORIGIN_CHECK_ENABLED", True):
+            raise RuntimeError("production CSRF origin checking is disabled")
+        if env_bool("CSRF_ALLOW_MISSING_ORIGIN", False):
+            raise RuntimeError("production CSRF missing-origin bypass is enabled")
         if email_enabled and not all(os.getenv(name, "").strip() for name in ("SMTP_HOST", "SMTP_FROM_EMAIL")):
             raise RuntimeError("enabled email channel is missing SMTP configuration")
         web_push = get_web_push_configuration()
@@ -230,9 +236,15 @@ def validate_runtime_configuration() -> RuntimeConfiguration:
             )
         if not re.fullmatch(r"[0-9a-f]{40}", release_sha):
             raise RuntimeError("production release identity is missing")
-        origins = os.getenv("CSRF_TRUSTED_ORIGINS", "").strip() or os.getenv("FRONTEND_URLS", "")
+        # Both lists are consumed by request middleware. A safe CSRF override
+        # must not hide an unsafe frontend CORS origin from startup validation.
+        origins = ",".join(os.getenv(name, "") for name in ("FRONTEND_URLS", "CSRF_TRUSTED_ORIGINS"))
         for origin in (value.strip() for value in origins.split(",") if value.strip()):
-            parsed = urlsplit(origin)
+            try:
+                parsed = urlsplit(origin)
+                parsed.port  # Reject malformed ports before serving requests.
+            except ValueError:
+                raise RuntimeError("production trusted origin configuration is unsafe") from None
             staging_loopback = (
                 environment == "staging"
                 and parsed.scheme == "http"
@@ -243,6 +255,11 @@ def validate_runtime_configuration() -> RuntimeConfiguration:
                 or (parsed.scheme != "https" and not staging_loopback)
                 or not parsed.hostname
                 or parsed.path not in {"", "/"}
+                or parsed.username is not None
+                or parsed.password is not None
+                or parsed.query
+                or parsed.fragment
+                or any(character.isspace() or character == "\\" for character in origin)
             ):
                 raise RuntimeError("production trusted origin configuration is unsafe")
         if not os.getenv("REDIS_URL", "").startswith(("redis://", "rediss://")):
