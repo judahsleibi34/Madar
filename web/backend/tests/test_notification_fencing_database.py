@@ -356,6 +356,9 @@ class NotificationFencingDatabaseTests(unittest.TestCase):
                 stack.enter_context(patch.object(worker,name))
             stack.enter_context(patch('signal.signal'))
             stack.enter_context(patch.object(worker,'require_delivery_fencing',side_effect=lambda:queue.require_delivery_fencing(client=SqlRpcClient())))
+            # This test isolates delivery protocol2 at147. The149 resolver protocol
+            # startup boundary is exercised independently by the successor suite.
+            stack.enter_context(patch.object(worker,'require_outbox_fencing'))
             stack.enter_context(patch.object(worker,'process_resolution_batch',return_value=0))
             stack.enter_context(patch.object(worker,'process_batch',side_effect=batch))
             stack.enter_context(patch.object(worker,'get_queue_metrics',return_value={'sent':40,'dead':5,'failed':7,'queue_depth':1,'oldest_pending_age_seconds':123}))

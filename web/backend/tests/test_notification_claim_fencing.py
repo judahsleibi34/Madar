@@ -81,7 +81,7 @@ class ClaimFencingContractTests(unittest.TestCase):
             with self.subTest(error=type(error).__name__), \
                     patch.dict('os.environ',{'NOTIFICATION_WORKER_ENABLED':'true'}), \
                     patch('services.provider_recovery.worker_consumption_status',return_value=(True,True)), \
-                    patch.object(worker,'require_delivery_fencing'),patch.object(worker,'archive_ended_calendar_tasks'), \
+                    patch.object(worker,'require_delivery_fencing'),patch.object(worker,'require_outbox_fencing'),patch.object(worker,'archive_ended_calendar_tasks'), \
                     patch.object(worker,'enqueue_due_calendar_reminders'),patch.object(worker,'cleanup_delivery_data'), \
                     patch.object(worker,'process_resolution_batch',return_value=0), \
                     patch.object(worker,'process_batch',side_effect=delivery), \

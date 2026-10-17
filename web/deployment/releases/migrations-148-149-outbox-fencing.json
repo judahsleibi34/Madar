@@ -1,0 +1,14 @@
+{
+  "manifest_version": 1,
+  "release_sha": "STAGING",
+  "migrations": [
+    {
+      "number": 149,
+      "from_schema": 148,
+      "to_schema": 149,
+      "path": "web/database/migrations/149_fence_notification_outbox_claims.sql",
+      "sha256": "8ed767df57f5c02be50d83621fe45d314b3d1fdb42d2b7a470170519bdf1f869",
+      "compatibility": "coordinated"
+    }
+  ]
+}

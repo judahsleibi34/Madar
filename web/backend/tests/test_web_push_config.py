@@ -42,7 +42,7 @@ class WebPushConfigurationTests(unittest.TestCase):
             public = notification_service.get_web_push_public_config()
             readiness = readiness_service.check_notification_push()
             notification_delivery_queue_service.resolve_outbox_notification(
-                {"id": "00000000-0000-0000-0000-000000000001"}, client=client
+                {"id": "00000000-0000-0000-0000-000000000001", "claim_generation": 1}, client=client
             )
         self.assertFalse(config.operational)
         self.assertEqual(public, {"enabled": False, "status": "disabled", "public_key": ""})
@@ -55,7 +55,7 @@ class WebPushConfigurationTests(unittest.TestCase):
             public = notification_service.get_web_push_public_config()
             readiness = readiness_service.check_notification_push()
             notification_delivery_queue_service.resolve_outbox_notification(
-                {"id": "00000000-0000-0000-0000-000000000001"}, client=client
+                {"id": "00000000-0000-0000-0000-000000000001", "claim_generation": 1}, client=client
             )
         self.assertEqual(public, {"enabled": True, "status": "configured", "public_key": "public"})
         self.assertEqual(readiness, "configured")
@@ -73,7 +73,7 @@ class WebPushConfigurationTests(unittest.TestCase):
                 public = notification_service.get_web_push_public_config()
                 readiness = readiness_service.check_notification_push()
                 notification_delivery_queue_service.resolve_outbox_notification(
-                    {"id": "00000000-0000-0000-0000-000000000001"}, client=client
+                    {"id": "00000000-0000-0000-0000-000000000001", "claim_generation": 1}, client=client
                 )
             self.assertEqual(public["status"], "misconfigured")
             self.assertFalse(public["enabled"])

@@ -85,6 +85,11 @@ class Client:
         ))
 
     def table(self, name): return Query(self, name)
+    def rpc(self, name, parameters):
+        if name != "stop_deletion_notification_work":
+            raise AssertionError("Unexpected deletion RPC")
+        self.notification_stop_parameters = parameters
+        return SimpleNamespace(execute=lambda: Response(0))
     def delete_auth(self, auth_id): self.deleted_auth.append(auth_id)
 
 
@@ -99,6 +104,7 @@ def workflow(request_type="user"):
     request = {
         "id": "request-1", "request_type": request_type, "state": "in_progress",
         "current_phase": "freeze", "attempt_count": 1, "max_attempts": 12,
+        "lease_owner": "synthetic-deletion-worker",
         "target_user_id_snapshot": 9 if request_type == "user" else None,
         "target_tenant_id_snapshot": 7,
         "verification_status": "pending", "retained_classes": [], "completion_report": {},
@@ -245,7 +251,11 @@ class DeletionLifecycleTests(unittest.TestCase):
             {"id": "job-other", "connection_id": "other", "status": "pending"},
         ]
         client.tables["calendar_connection_sync_jobs"] = []
-        lifecycle._step_stop_queued_work(request, client=client)
+        lifecycle._step_stop_queued_work(request, client=client,
+            worker_lease_owner=request['lease_owner'], worker_claim_attempt=request['attempt_count'])
+        self.assertEqual(client.notification_stop_parameters, {
+            'p_request_id': request['id'], 'p_lease_owner': request['lease_owner'],
+            'p_claim_attempt': request['attempt_count']})
         jobs = {row["id"]: row for row in client.tables["calendar_task_sync_jobs"]}
         self.assertEqual(jobs["job-own"]["status"], "failed")
         self.assertEqual(jobs["job-other"]["status"], "pending")

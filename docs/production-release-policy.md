@@ -1,5 +1,38 @@
 # Madar production release acceptance policy
 
+## Unselected outbox resolver successor148→149
+
+The separate149 candidate fixes a reproduced resolver-ownership defect still
+present at148. It does not modify147/148, the active release descriptor or the
+146→148 coordinated controller profile. Its checksum-pinned mirrored SQL and
+`schema-148-149-outbox-fencing.json` remain unselected, coordinated, policy none.
+The ordinary automatic executor rejects it; no production149 admission or
+controller installation is provided by this candidate.
+
+149 requires every processing outbox claim (including expired) to be drained
+or independently reconciled, then revokes unfenced resolver/finish/claim RPCs and
+direct runtime UPDATE/DELETE. New RPCs use durable generations, database-clock
+leases and locked atomic updates. Materialization and acknowledgement roll back
+together if ownership expires, including expiry during materialization. Runtime
+INSERT remains available to existing enqueuers. Delivery protocol2 is unchanged.
+
+149 also supplies a dedicated notification-cancellation RPC for the retained
+data-deletion workflow. It derives subject scope from a frozen, active deletion
+request and checks its original lease owner, claim attempt and database-clock
+expiry, including after queue lock waits.147 delivery and149 outbox direct UPDATE
+privileges remain revoked. Both notification and deletion worker images must be
+reviewed in the successor rollout. Other deletion-step ownership remains a
+separate unproven boundary.
+
+The successor worker requires both delivery protocol2 and outbox protocol2 before
+any scheduling, resolution, delivery or cleanup. It cannot consume schema148 and
+never falls back. Keep it off the schema148 release. After149 commit only accepted
+generation-aware resolver images may start; rollback to an unfenced resolver is
+unsafe. A future separately reviewed admission must bind artifacts, source,
+consumer/supervisor quiescence, backups, preservation and recovery. Unknown external
+provider outcomes remain a delivery-layer reconciliation concern; this resolver
+fence does not establish exactly-once external sends.
+
 ## Phase-IV verified migration byte snapshots
 
 The migration executor captures checksum-verified regular UTF-8 SQL files once

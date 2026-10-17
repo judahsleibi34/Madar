@@ -128,3 +128,26 @@ if [[ "${RUN_BUSINESS_INTEGRITY:-false}" == true ]]; then
     "select schema_version=148 from public.application_schema_state where contract_key='core'" | grep -qx t
   echo "Migration148 rollback, native business integrity and re-entry refusal passed"
 fi
+
+if [[ "${RUN_OUTBOX_INTEGRITY:-false}" == true ]]; then
+  docker run --rm --memory=768m --cpus=1 --pids-limit=256 --network host --read-only \
+    --tmpfs /tmp:rw,noexec,nosuid,size=64m --env PYTHONPATH=/app --env PYTHONDONTWRITEBYTECODE=1 \
+    --env APP_ENV=test --env EMAIL_CHANNEL_ENABLED=false --env WEB_PUSH_ENABLED=false \
+    --env SUPABASE_URL=http://127.0.0.1:54321 \
+    --env SUPABASE_ANON_KEY=madar-ci-placeholder-anon-not-a-secret \
+    --env SUPABASE_SERVICE_KEY=madar-ci-placeholder-service-not-a-secret \
+    --env OUTBOX_SYNTHETIC_DATABASE_DSN='host=127.0.0.1 port=55448 dbname=postgres user=postgres connect_timeout=5' \
+    --env OUTBOX_MIGRATION_SQL=/migration149.sql \
+    --volume "$WEB_ROOT/backend:/app:ro" \
+    --volume "$WEB_ROOT/database/migrations/149_fence_notification_outbox_claims.sql:/migration149.sql:ro" \
+    --entrypoint python "$BACKEND_TEST_IMAGE" tests/test_notification_outbox_fencing_database.py
+  echo "Migration149 coordinated rollback/upgrade and native outbox ownership suite passed"
+  # New queue ACLs must preserve transactional business notification enqueuers.
+  # Repeat the same22 business invariants on149, after all fencing cases.
+  docker run --rm --memory=768m --cpus=1 --pids-limit=256 --network host --read-only \
+    --tmpfs /tmp:rw,noexec,nosuid,size=64m --env PYTHONPATH=/app --env PYTHONDONTWRITEBYTECODE=1 \
+    --env BUSINESS_INTEGRITY_SYNTHETIC_DATABASE_DSN='host=127.0.0.1 port=55448 dbname=postgres user=postgres connect_timeout=5' \
+    --volume "$WEB_ROOT/backend:/app:ro" --entrypoint python "$BACKEND_TEST_IMAGE" \
+    -m unittest tests.test_native_business_integrity_database -v
+  echo "Schema149 reservation, inventory/order and simulated payment invariants passed"
+fi

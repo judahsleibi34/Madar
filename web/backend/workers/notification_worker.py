@@ -24,7 +24,10 @@ from services.notification_delivery_queue_service import (
     get_delivery_metrics,
     resolve_outbox_notification,
 )
-from services.notification_outbox_service import claim_notifications, get_queue_metrics, mark_notification_result
+from services.notification_outbox_service import (
+    OutboxOwnershipLost, validate_outbox_generation, require_outbox_fencing,
+    claim_notifications, get_queue_metrics, mark_notification_result,
+)
 from services.calendar_reminder_service import (
     enqueue_due_calendar_reminders,
     finalize_calendar_reminder_deliveries,
@@ -58,17 +61,33 @@ def process_resolution_batch(
     if not worker_consumption_allowed():
         return 0
     rows = claim(limit=limit)
+    invalid_claims = threading.Event()
     def process(row: dict[str, Any]) -> None:
         outbox_id = str(row.get("id") or "")
         if not outbox_id:
             logger.error("notification_worker.row_invalid", extra={"error_code": "outbox_id_missing"})
             return
         try:
+            generation = validate_outbox_generation(row.get("claim_generation"))
+        except ValueError:
+            invalid_claims.set()
+            STATE["failed"] += 1
+            logger.error("notification_worker.row_invalid", extra={"error_code": "outbox_claim_generation_missing"})
+            return
+        try:
             delivery_count = resolve(row)
+        except OutboxOwnershipLost:
+            STATE["ownership_lost"] += 1
+            STATE["failed"] += 1
+            logger.warning("notification_worker.resolution_ownership_lost", extra={"outbox_id": outbox_id})
         except Exception as error:
             try:
-                finish(outbox_id, succeeded=False, failure_code="resolution_failed", retry_after_seconds=retry_delay(row))
+                finish(outbox_id, claim_generation=generation, succeeded=False, failure_code="resolution_failed", retry_after_seconds=retry_delay(row))
+            except OutboxOwnershipLost:
+                STATE["ownership_lost"] += 1
+                logger.warning("notification_worker.resolution_ownership_lost", extra={"outbox_id": outbox_id})
             except Exception as finish_error:
+                STATE["acknowledgement_failed"] += 1
                 logger.error(
                     "notification_worker.resolution_result_persist_failed",
                     extra={
@@ -86,7 +105,7 @@ def process_resolution_batch(
     with ThreadPoolExecutor(max_workers=max(1, min(int(concurrency), 16))) as executor:
         list(executor.map(process, rows))
     STATE["last_poll_at"] = datetime.now(timezone.utc).isoformat()
-    STATE["healthy"] = True
+    STATE["healthy"] = not invalid_claims.is_set()
     return len(rows)
 
 
@@ -284,6 +303,7 @@ def main() -> int:
             # and before *any* scheduling/resolution or provider side effect.
             try:
                 require_delivery_fencing()
+                require_outbox_fencing()
             except Exception as error:
                 STATE["healthy"] = False
                 STATE["consuming"] = False
