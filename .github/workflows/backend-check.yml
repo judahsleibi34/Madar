@@ -29,6 +29,9 @@ jobs:
       - name: Build locked backend test image
         run: docker build --target test -t madar-backend-test web/backend
 
+      - name: Validate loopback notification alert inspection
+        run: python3 web/staging/integration/test_notification_observer.py
+
       - name: Run backend tests
         run: |
           docker run --rm \
