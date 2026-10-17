@@ -41,8 +41,6 @@ from services.calendar_sync_service import (
 from services.calendar_task_sync_queue_service import enqueue_task_sync
 from services.calendar_connection_sync_queue_service import enqueue_connection_sync
 from services.calendar_workspace_cache_service import (
-    calendar_workspace_cache_key,
-    get_or_create_calendar_workspace,
     invalidate_calendar_workspace_cache,
 )
 from services.bounded_query_service import submit_db_read
@@ -1220,26 +1218,17 @@ def calendar_bootstrap(request: Request, response: Response, start: datetime, en
     if not calendar_feature_enabled():
         return _calendar_disabled_payload(context, start, end)
     try:
-        cache_key = calendar_workspace_cache_key(
-            tenant_id=context.tenant_id,
-            user_id=context.user_id,
-            role=context.role,
-            start=iso(start),
-            end=iso(end),
-        )
-        if getattr(request, "headers", {}).get("X-Calendar-Cache-Bypass") == "1":
-            invalidate_calendar_workspace_cache(context.tenant_id)
+        # Calendar ACLs and event visibility can change in another process.
+        # This combined payload includes permission-filtered details, so a local
+        # TTL/invalidation token cannot authorize reuse after a role downgrade.
+        # Read authoritative ACLs and data each time; reservations stay parallel.
         def load_reservations():
             with traced_operation("calendar_reservations"):
                 return reservation_events_for_range(context, start, end)
 
         reservation_future = submit_db_read(load_reservations)
         try:
-            payload, cache_hit = get_or_create_calendar_workspace(
-                cache_key,
-                context.tenant_id,
-                lambda: _calendar_workspace_payload(context, start, end),
-            )
+            payload = _calendar_workspace_payload(context, start, end)
             fresh_reservations = reservation_future.result()
         except Exception:
             reservation_future.cancel()
@@ -1251,7 +1240,7 @@ def calendar_bootstrap(request: Request, response: Response, start: datetime, en
                 "events": sorted([*cached_events, *fresh_reservations], key=lambda item: item.get("starts_at") or ""),
             }
         payload["calendar_features_available"] = True
-        response.headers["X-Calendar-Cache"] = "hit" if cache_hit else "miss"
+        response.headers["X-Calendar-Cache"] = "miss"
         response.headers["Cache-Control"] = "private, no-store"
         return payload
     except Exception as error:
