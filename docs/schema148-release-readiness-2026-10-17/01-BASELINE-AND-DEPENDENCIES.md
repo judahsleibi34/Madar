@@ -6,13 +6,11 @@ PR209 and PR210 remain OPEN/unmerged at their reported SHAs; origin/main is
 and preserved. New branch: `codex/schema148-release-readiness-20261017`.
 Integration order:209 →210 →this continuation; no merge/promotion authorized.
 
-Read-only production observation: host madar-gpu; native supabase-db schema146,
-cluster system identifier7693515850808332323. Serving application image source
-b0fdfe049510724c06a04706390cd174ea57a1d1, BLUE context b3e4084534ff0453.
-Installed controller source c1d03ce38023aaf45b6414146c9dd11674fb909d.
-Notification worker running with restart policy no; compatible boot actor and
-stable proxy remain installed. Other production/demo applications are present;
-none may be treated as disposable or stopped. No production writes performed.
+Read-only production inspection verified schema146 and distinguished serving
+application/controller identity from Git HEAD. Detailed host, cluster, slot,
+container and supervisor observations are retained only in the private operator
+handoff, excluded from Git. Production contains unrelated workloads; none may be
+treated as disposable. No production writes performed.
 
 Staging: madar-staging,4vCPU,5402MiB RAM,3895MiB available/no swap used at entry,
 53GiB free disk. Owned nine-service native project retained; actual observed

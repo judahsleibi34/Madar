@@ -40,3 +40,24 @@ Production current-data rehearsal, accepted fresh images, complete consumer/host
 inventory, exact-source CI and independent approval remain required. Synthetic
 native SQL and transport-fixture controller tests are scoped evidence, not full
 privileged deployment/reboot acceptance.
+
+Fresh-artifact acceptance additionally authenticates the exact-source GitHub
+workflow run and artifact ID/name/attempt/digest, strictly bounded ZIP inventory,
+image archive hashes, immutable image IDs and six Dockerfile/dependency-lock
+inputs. It requeries latest exact-application Backend Check and Frontend Check
+runs independently of artifact-build success. A later failed/running check blocks
+admission. Source overlays cannot satisfy this gate. Artifact expiry after seven
+days requires a fresh accepted build; retaining bytes does not renew approval.
+
+The optional reviewed unrelated-consumer policy now checks target-native signing
+authority and live PostgREST responses plus measured spec/image identity. Manual
+host workers and unavailable positive PID visibility block admission. No production
+policy was generated or supervisor stopped. The new profile's preservation scope
+includes all Auth/Storage tables; historical profile scopes remain unchanged.
+
+The fresh build proves exact accepted artifact identity and locked source inputs,
+not bit-for-bit reproducibility across rebuild timestamps/engines. The first
+actual cross-engine import demonstrated why configuration and OCI manifest IDs
+must be recorded separately. The corrected producer validates both blobs and
+selects the native containerd manifest identity before publication. Other archive
+layouts/ambiguous multi-platform inventories fail closed pending reviewed support.

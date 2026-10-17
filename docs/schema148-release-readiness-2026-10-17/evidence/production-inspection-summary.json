@@ -1,0 +1,142 @@
+{
+  "scope": "sanitized read-only production inspection summary; not a protected admission receipt",
+  "source_sha": "a42e11ab7cd5dc1e30c9eaf54e84aa1f046a91d2",
+  "environment": "production",
+  "actual_schema": 146,
+  "assessment": "NOT READY",
+  "mutations_performed": false,
+  "production_authorized": false,
+  "raw_operational_evidence_included": false,
+  "evidence_location": "private operator handoff, excluded from Git",
+  "gates": {
+    "application.auth": {
+      "status": "NOT TESTED"
+    },
+    "application.backend": {
+      "status": "NOT TESTED"
+    },
+    "application.frontend": {
+      "status": "NOT TESTED"
+    },
+    "application.mfa": {
+      "status": "NOT TESTED"
+    },
+    "application.notifications": {
+      "status": "NOT TESTED"
+    },
+    "application.readiness": {
+      "status": "NOT TESTED"
+    },
+    "application.reservations": {
+      "status": "NOT TESTED"
+    },
+    "application.storage": {
+      "status": "NOT TESTED"
+    },
+    "application.tenant_isolation": {
+      "status": "NOT TESTED"
+    },
+    "application.workers": {
+      "status": "NOT TESTED"
+    },
+    "database.locks": {
+      "status": "NOT TESTED"
+    },
+    "database.migration_history": {
+      "status": "NOT TESTED"
+    },
+    "database.origin": {
+      "status": "PASS"
+    },
+    "database.preservation": {
+      "status": "NOT TESTED"
+    },
+    "database.quiescence": {
+      "status": "PASS"
+    },
+    "database.structure": {
+      "status": "NOT TESTED"
+    },
+    "infrastructure.backup_paths": {
+      "status": "NOT TESTED"
+    },
+    "infrastructure.capacity": {
+      "status": "NOT TESTED"
+    },
+    "infrastructure.database": {
+      "status": "PASS"
+    },
+    "infrastructure.host": {
+      "status": "PASS"
+    },
+    "infrastructure.network": {
+      "status": "NOT TESTED"
+    },
+    "infrastructure.redis": {
+      "status": "NOT TESTED"
+    },
+    "infrastructure.worker_inventory": {
+      "status": "PARTIAL"
+    },
+    "operator.artifacts": {
+      "status": "NOT TESTED"
+    },
+    "operator.authorization": {
+      "status": "NOT TESTED"
+    },
+    "operator.maintenance": {
+      "status": "NOT TESTED"
+    },
+    "operator.reconciliation": {
+      "status": "NOT TESTED"
+    },
+    "operator.rollback_limits": {
+      "status": "NOT TESTED"
+    },
+    "recovery.backup": {
+      "status": "NOT TESTED"
+    },
+    "recovery.checkpoints": {
+      "status": "NOT TESTED"
+    },
+    "recovery.forward_plan": {
+      "status": "NOT TESTED"
+    },
+    "recovery.independent_application": {
+      "status": "NOT TESTED"
+    },
+    "recovery.replica": {
+      "status": "NOT TESTED"
+    },
+    "security.controller": {
+      "status": "NOT TESTED"
+    },
+    "security.privileges": {
+      "status": "NOT TESTED"
+    },
+    "security.secrets_identity": {
+      "status": "NOT TESTED"
+    },
+    "security.write_authority": {
+      "status": "NOT TESTED"
+    },
+    "source.ci_backend": {
+      "status": "NOT TESTED"
+    },
+    "source.ci_frontend": {
+      "status": "NOT TESTED"
+    },
+    "source.dependencies": {
+      "status": "NOT TESTED"
+    },
+    "source.exact": {
+      "status": "PASS"
+    },
+    "source.immutable_migrations": {
+      "status": "NOT TESTED"
+    },
+    "source.release_manifest": {
+      "status": "PASS"
+    }
+  }
+}
