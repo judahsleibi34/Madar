@@ -23,3 +23,12 @@ class FreshArtifactAcceptanceSafetyTests(unittest.TestCase):
                 with self.subTest(path=str(path)),self.assertRaises(RuntimeError):
                     acceptance.main(path,source,3,'INSPECT')
                 state.assert_not_called()
+
+    def test_explicit_resume_cannot_adopt_a_different_selected_source(self):
+        with patch.object(acceptance.manage,'require_staging_host'), \
+                patch.object(acceptance.manage,'state',return_value={'source_sha':'b'*40}), \
+                patch.object(acceptance.manage,'attest_resources'),patch.object(acceptance.manage,'require_database_marker'), \
+                patch.object(acceptance.manage,'compose') as compose:
+            with self.assertRaisesRegex(RuntimeError,'already selected exact'):
+                acceptance.main(Path.home()/'unused-artifact-scope','a'*40,3,'REHEARSE',resume=True)
+            compose.assert_not_called()

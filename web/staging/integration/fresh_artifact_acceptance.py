@@ -20,14 +20,16 @@ sys.path.insert(0,str(ROOT/'web'))
 from deployment.lib.schema148_artifacts import INPUTS,verify_archive
 
 
-def main(directory,source_sha,attempt,mode):
+def main(directory,source_sha,attempt,mode,*,resume=False):
     manage.require_staging_host()
     if (not directory.is_relative_to(Path.home()) or directory.is_symlink() or not re.fullmatch('[0-9a-f]{40}',source_sha)):
         raise RuntimeError('Fresh artifact scope invalid')
     project='madar-independent-recovery-20261017'+('' if attempt==1 else '-attempt'+str(attempt))
     recovery.TARGET_PROJECT=project;runtime=Path.home()/project
     with recovery.target_context(runtime):
-        manage.state();manage.attest_resources();manage.require_database_marker()
+        state=manage.state();manage.attest_resources();manage.require_database_marker()
+        if resume and (mode!='REHEARSE' or state['source_sha']!=source_sha):
+            raise RuntimeError('Explicit resume requires the already selected exact synthetic source')
         if manage.sql("select schema_version from public.application_schema_state where contract_key='core';")!='148':raise RuntimeError('Fresh image acceptance requires schema148')
         run=json.loads((directory/'run.json').read_text());artifact=json.loads((directory/'artifact.json').read_text())
         images=json.loads((directory/'receipt.json').read_text())['images']
@@ -36,19 +38,28 @@ def main(directory,source_sha,attempt,mode):
         if mode=='INSPECT':
             print(json.dumps({'mode':mode,'source_sha':source_sha,'images':images,'target_project':project,'production_authorized':False}));return
         output=runtime/('fresh-images-'+source_sha)
-        if output.exists():raise RuntimeError('Fresh image acceptance scope already consumed')
-        output.mkdir(mode=0o700)
+        if output.is_symlink() or (output.exists() and not resume):raise RuntimeError('Fresh image acceptance scope already consumed')
+        if resume:
+            if not output.is_dir():raise RuntimeError('Previously imported scope missing')
+        else:output.mkdir(mode=0o700)
         if __import__('shutil').disk_usage(output).free<8*1024**3:raise RuntimeError('Fresh image disk headroom insufficient')
         started=time.monotonic()
         with zipfile.ZipFile(directory/'candidate.zip') as archive:
             for role in ('backend','frontend'):
                 path=output/(role+'.tar.gz')
-                descriptor=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
-                with os.fdopen(descriptor,'wb') as destination,archive.open(role+'.tar.gz') as source:
-                    __import__('shutil').copyfileobj(source,destination,1024*1024)
-                result=subprocess.run(manage.DOCKER+['image','load','--input',str(path)],capture_output=True,timeout=600,
-                    env={'PATH':os.defpath,'HOME':str(Path.home())})
-                if result.returncode:raise RuntimeError('Fresh staging image import failed')
+                if resume:
+                    if path.is_symlink() or not path.is_file() or path.stat().st_size!=receipt['archives'][role]['bytes']:
+                        raise RuntimeError('Imported archive scope changed')
+                    from deployment.lib.schema148_artifacts import digest
+                    with path.open('rb') as source:
+                        if digest(source)!=receipt['archives'][role]['sha256']:raise RuntimeError('Imported archive bytes changed')
+                else:
+                    descriptor=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+                    with os.fdopen(descriptor,'wb') as destination,archive.open(role+'.tar.gz') as source:
+                        __import__('shutil').copyfileobj(source,destination,1024*1024)
+                    result=subprocess.run(manage.DOCKER+['image','load','--input',str(path)],capture_output=True,timeout=600,
+                        env={'PATH':os.defpath,'HOME':str(Path.home())})
+                    if result.returncode:raise RuntimeError('Fresh staging image import failed')
                 row=json.loads(manage.docker('image','inspect',images[role]))[0];labels=row['Config'].get('Labels',{})
                 if (row['Id']!=images[role] or labels.get('com.madar.release.sha')!=source_sha
                         or labels.get('org.opencontainers.image.revision')!=source_sha
@@ -60,6 +71,7 @@ def main(directory,source_sha,attempt,mode):
 error_log /dev/stderr warn;
 events { worker_connections 128; }
 http { access_log off; client_body_temp_path /tmp/client; proxy_temp_path /tmp/proxy;
+ fastcgi_temp_path /tmp/fastcgi; uwsgi_temp_path /tmp/uwsgi; scgi_temp_path /tmp/scgi;
  server { listen 8080; listen 8443 ssl; ssl_certificate /staging/tls.crt; ssl_certificate_key /staging/tls.key;
  location / { proxy_pass http://accepted-frontend:8080; proxy_set_header Host $http_host; proxy_set_header X-Forwarded-Proto $scheme; proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for; } } }
 '''
@@ -86,7 +98,7 @@ http { access_log off; client_body_temp_path /tmp/client; proxy_temp_path /tmp/p
         report={'scope':'fresh authenticated CI images on independent synthetic native restore','source_sha':source_sha,
             'images':images,'artifact_id':artifact['id'],'run_id':run['id'],'schema':148,'target_project':project,
             'native_auth_mfa_storage_worker_api':True,'production_frontend_image_and_nginx':True,
-            'source_overlay_used':False,'elapsed_seconds':round(time.monotonic()-started,3),'production_modified':False,
+            'source_overlay_used':False,'explicit_imported_scope_resume':resume,'elapsed_seconds':round(time.monotonic()-started,3),'production_modified':False,
             'production_authorized':False,'limitations':['synthetic same-VM native integration','not complete product E2E','not protected controller installation/current-data acceptance or production authorization']}
         manage.private_write('fresh-image-acceptance.json',json.dumps(report,indent=2)+'\n');print(json.dumps(report,sort_keys=True))
 
@@ -94,4 +106,5 @@ http { access_log off; client_body_temp_path /tmp/client; proxy_temp_path /tmp/p
 if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('mode',choices=('INSPECT','REHEARSE'),nargs='?',default='INSPECT');parser.add_argument('--artifacts',required=True,type=Path)
     parser.add_argument('--source-sha',required=True);parser.add_argument('--attempt',type=int,choices=(1,2,3),default=3)
-    args=parser.parse_args();main(args.artifacts.resolve(),args.source_sha,args.attempt,args.mode)
+    parser.add_argument('--resume-imported',action='store_true',help='Explicitly revalidate an interrupted synthetic import; never replay production effects')
+    args=parser.parse_args();main(args.artifacts.resolve(),args.source_sha,args.attempt,args.mode,resume=args.resume_imported)
