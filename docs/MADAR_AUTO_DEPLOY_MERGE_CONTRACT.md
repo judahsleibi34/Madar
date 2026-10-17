@@ -1,5 +1,72 @@
 # Madar Auto-Deploy Merge Contract
 
+## Unselected reservation-capacity repair147→148
+
+The mirrored148 migration and pinned
+`migrations-147-148-reservation-capacity.json` /
+`schema-147-148-reservation-capacity.json` follow the coordinated147 worker cutover;
+they do not change147, historical migrations/manifests or active release146.
+Policy is none and the candidate remains unselected. No production installation,
+SQL, write grant or release selection is authorized.
+
+Native tests confirmed that cancelled exclusive reservations could be reactivated
+into occupied slots.148 takes the same per-block advisory lock as public create,
+then the reservation row lock, rechecks identity and overlap before active status
+mutation and email intent. Adjacent/free slots and nonexclusive bookings retain
+their existing behavior. Cross-tenant lookup remains null/404. Direct runtime
+UPDATE is revoked; normal production SDK status/cancellation/ownership operations
+already use retained security-definer RPCs. API capacity conflicts return409.
+The migration does not repair historical overlapping reservations automatically.
+
+A disposable146→147→148 rehearsal proves147 rollback/cutover refusal, all four
+stale acknowledgement denials, process crashes/restarts,148 transactional
+function/ACL/schema rollback and re-entry refusal, native reservation/variant
+stock/order atomicity and synthetic payment/reversal idempotency. No live billing
+or real external delivery is used. The future production operation must bind a
+reviewed target148 candidate and the existing controller's separate admission;
+no intermediate schema may be mistaken for complete application acceptance.
+
+
+## Unselected coordinated notification claim fencing146→147
+
+The mirrored147 candidate and checksum-pinned
+`migrations-146-147-notification-fencing.json` /
+`schema-146-147-notification-fencing.json` are source-only preparation. Active
+`release.json`, every001–146 migration and prior manifest remain unchanged.
+This candidate is **coordinated**, policy `none`, exact application schema147;
+the automatic executor must reject it. It is deliberately not mislabeled as a
+rolling forward-compatible worker change. No controller installation, production
+SQL, release selection, write grant or worker activation is authorized.
+
+147 takes the core schema/table locks and refuses every processing delivery,
+including expired leases. Stop old consumers, drain known work, reconcile
+provider-accepted/unknown sends through existing approved operations, verify no
+processing rows and obtain the normal verified-backup/maintenance authorization.
+Never reset an uncertain send to pending solely to satisfy the precondition.
+A failed or disconnected SQL transaction leaves146 and its original ACLs intact.
+Committed147 is not down-migrated; resume by verifying protocol2 and starting only
+accepted generation-aware worker images. An old image is not a147 rollback target.
+The existing governed controller must separately admit any future147 production
+operation; this unselected descriptor does not extend its authority.
+
+Protocol2 claim increments a persistent generation and uses database time. Finish
+locks the row, samples the database clock after waiting, then atomically compares
+id/generation/processing/live lease before every sent/retry/dead/revoked update.
+Unfenced RPCs and direct service-role writes are denied; existing security-definer
+resolvers/cleanup retain their functions. New workers fail before consumption on
+pre147, reject rows without a generation before delivery, and never fall back to
+legacy acknowledgement. A stale result cannot finalize a reminder or count sent.
+
+External SMTP/push acceptance and database acknowledgement are not one transaction.
+Lost acknowledgements or crashes can still cause duplicate external delivery on
+lease recovery. Fencing prevents stale database mutation, not exactly-once sends.
+Workers report ownership loss/unknown provider outcomes and never immediately
+resend on an acknowledgement error. Production rollout needs provider reconciliation
+and a duplicate-aware policy; only providers with a stable idempotency contract
+can remove that external ambiguity. Synthetic provider restart tests cover both
+idempotent and non-idempotent boundaries without real email, push or billing.
+
+
 ## Manual commercial144→146 release
 
 The exact completed-NORMAL maintenance coordinator may select

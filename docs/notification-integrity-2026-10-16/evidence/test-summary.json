@@ -1,0 +1,46 @@
+{
+  "application_source_sha": "9c084293d5583a18cb59a6478684ae2ed980219d",
+  "parent_sha": "f65aa4722674cd63dbebbc5139a35a67e99ecee9",
+  "hermetic_backend": {
+    "status": "PASS",
+    "collected": 3691,
+    "skipped": 727,
+    "executed": 2964,
+    "seconds": 62.929,
+    "external_attempts": []
+  },
+  "native_upgrade": {
+    "status": "PASS",
+    "tests": 5,
+    "seconds": 0.208
+  },
+  "native_fencing": {
+    "status": "PASS",
+    "tests": 17,
+    "seconds": 11.389
+  },
+  "native_business": {
+    "status": "PASS",
+    "tests": 22,
+    "seconds": 3.308
+  },
+  "hosted_backend": {
+    "run_id": 38927327897,
+    "status": "PASS",
+    "fresh_locked_build": true,
+    "collected": 3691,
+    "skipped": 727,
+    "executed": 2964,
+    "seconds": 56.263,
+    "sql_stage_test_counts": [
+      32,
+      8,
+      8,
+      4,
+      5,
+      17,
+      22
+    ]
+  },
+  "production_mutation": false
+}
