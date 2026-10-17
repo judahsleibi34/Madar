@@ -14,6 +14,16 @@ import urllib.parse
 import urllib.request
 
 
+class NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, *_args, **_kwargs):
+        # The verified loopback endpoint must not redirect a load test into
+        # production or another service. Measure its actual redirect response.
+        return None
+
+
+OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect())
+
+
 def percentile(values: list[float], fraction: float) -> float:
     ordered = sorted(values)
     index = max(0, min(len(ordered) - 1, math.ceil(len(ordered) * fraction) - 1))
@@ -23,12 +33,13 @@ def percentile(values: list[float], fraction: float) -> float:
 def request(url: str, timeout: float) -> tuple[int, float, int]:
     started = time.perf_counter()
     try:
-        with urllib.request.urlopen(url, timeout=timeout) as response:
+        with OPENER.open(url, timeout=timeout) as response:
             content = response.read()
             status = response.status
     except urllib.error.HTTPError as error:
-        content = error.read()
-        status = error.code
+        with error:
+            content = error.read()
+            status = error.code
     except (urllib.error.URLError, TimeoutError, OSError):
         # Transport failures are measurements, not harness crashes. Status 0
         # is deliberately outside the HTTP status space and is included in
@@ -46,9 +57,16 @@ def main() -> int:
     parser.add_argument("--expect", type=int, default=200)
     parser.add_argument("--timeout", type=float, default=10)
     args = parser.parse_args()
-    parsed = urllib.parse.urlsplit(args.url)
-    if parsed.scheme != "http" or parsed.hostname not in {"127.0.0.1", "localhost", "::1"}:
+    try:
+        parsed = urllib.parse.urlsplit(args.url)
+        parsed.port
+    except ValueError:
+        raise SystemExit("only valid loopback HTTP targets are allowed") from None
+    if (parsed.scheme != "http" or parsed.hostname not in {"127.0.0.1", "localhost", "::1"}
+            or parsed.username is not None or parsed.password is not None or parsed.fragment):
         raise SystemExit("only loopback HTTP targets are allowed")
+    if not math.isfinite(args.timeout) or not 0 < args.timeout <= 60:
+        raise SystemExit("timeout must be finite and between 0 and 60 seconds")
     amount = max(1, min(args.requests, 10000))
     concurrency = max(1, min(args.concurrency, 200))
     started = time.perf_counter()

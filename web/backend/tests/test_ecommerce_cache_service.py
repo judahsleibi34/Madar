@@ -1,9 +1,11 @@
+import unittest
 from decimal import Decimal
 from unittest.mock import patch
 
 from fastapi import Request, Response
 
 from routes import public_site_routes
+from tests.entitlement_test_support import installed_business_fixture
 from services.ecommerce_cache_service import (
     clear_ecommerce_cache,
     ecommerce_cache_key,
@@ -15,226 +17,237 @@ from services.ecommerce_cache_service import (
 )
 
 
-def setup_function():
-    clear_ecommerce_cache()
+class EcommerceCacheTests(unittest.TestCase):
+    def setUp(self):
+        clear_ecommerce_cache()
+        self.addCleanup(clear_ecommerce_cache)
+        self.enterContext(installed_business_fixture(7, 9))
 
+    def test_cache_keys_are_tenant_and_filter_scoped(self):
+        first = ecommerce_cache_key(1, "catalog", locale="en", category="chairs")
+        second = ecommerce_cache_key(2, "catalog", locale="en", category="chairs")
+        filtered = ecommerce_cache_key(1, "catalog", locale="ar", category="chairs")
+        assert len({first, second, filtered}) == 3
 
-def test_cache_keys_are_tenant_and_filter_scoped():
-    first = ecommerce_cache_key(1, "catalog", locale="en", category="chairs")
-    second = ecommerce_cache_key(2, "catalog", locale="en", category="chairs")
-    filtered = ecommerce_cache_key(1, "catalog", locale="ar", category="chairs")
-    assert len({first, second, filtered}) == 3
+    def test_cached_values_are_copied_and_reused(self):
+        key = ecommerce_cache_key(4, "catalog", page=1)
+        write_ecommerce_cache(key, 4, {"products": [{"id": "one"}]})
+        value = read_ecommerce_cache(key)
+        value["products"].append({"id": "mutated"})
+        assert read_ecommerce_cache(key) == {"products": [{"id": "one"}]}
 
-
-def test_cached_values_are_copied_and_reused():
-    key = ecommerce_cache_key(4, "catalog", page=1)
-    write_ecommerce_cache(key, 4, {"products": [{"id": "one"}]})
-    value = read_ecommerce_cache(key)
-    value["products"].append({"id": "mutated"})
-    assert read_ecommerce_cache(key) == {"products": [{"id": "one"}]}
-
-    calls = []
-    result, hit = get_or_create_ecommerce_cache(
-        key,
-        4,
-        lambda: calls.append(True) or {},
-    )
-    assert hit is True
-    assert not calls
-    assert result["products"][0]["id"] == "one"
-
-
-def test_invalidation_removes_only_one_tenant():
-    one = ecommerce_cache_key(1, "catalog")
-    two = ecommerce_cache_key(2, "catalog")
-    write_ecommerce_cache(one, 1, {"tenant": 1})
-    write_ecommerce_cache(two, 2, {"tenant": 2})
-    assert invalidate_ecommerce_cache(1) == 1
-    assert read_ecommerce_cache(one) is None
-    assert read_ecommerce_cache(two) == {"tenant": 2}
-    assert ecommerce_cache_size() == 1
-
-
-def test_public_catalog_route_reuses_warm_tenant_cache():
-    request = Request({
-        "type": "http",
-        "method": "GET",
-        "path": "/public/sites/demo/catalog",
-        "headers": [],
-        "query_string": b"",
-        "client": ("127.0.0.1", 1),
-        "server": ("testserver", 80),
-        "scheme": "http",
-    })
-    payload = {
-        "categories": [],
-        "tags": [],
-        "products": [{"id": "one"}],
-        "pagination": {"page": 1, "limit": 12, "total": 1, "pages": 1},
-    }
-    with (
-        patch.object(public_site_routes, "enforce_public_rate_limit"),
-        patch.object(
-            public_site_routes,
-            "resolve_website_settings",
-            return_value={"tenant_id": 7, "published_project_id": "project-1"},
-        ),
-        patch.object(public_site_routes, "build_public_store_profile", return_value={"subdomain": "demo"}),
-        patch.object(public_site_routes, "_catalog_payload", return_value=payload) as build_payload,
-    ):
-        first_response = Response()
-        first = public_site_routes.get_public_catalog(
-            "demo",
-            request,
-            first_response,
+        calls = []
+        result, hit = get_or_create_ecommerce_cache(
+            key,
+            4,
+            lambda: calls.append(True) or {},
         )
-        second_response = Response()
-        second = public_site_routes.get_public_catalog(
-            "demo",
-            request,
-            second_response,
+        assert hit is True
+        assert not calls
+        assert result["products"][0]["id"] == "one"
+
+    def test_invalidation_removes_only_one_tenant(self):
+        one = ecommerce_cache_key(1, "catalog")
+        two = ecommerce_cache_key(2, "catalog")
+        write_ecommerce_cache(one, 1, {"tenant": 1})
+        write_ecommerce_cache(two, 2, {"tenant": 2})
+        assert invalidate_ecommerce_cache(1) == 1
+        assert read_ecommerce_cache(one) is None
+        assert read_ecommerce_cache(two) == {"tenant": 2}
+        assert ecommerce_cache_size() == 1
+
+    def test_public_catalog_route_reuses_warm_tenant_cache(self):
+        request = Request({
+            "type": "http",
+            "method": "GET",
+            "path": "/public/sites/demo/catalog",
+            "headers": [],
+            "query_string": b"",
+            "client": ("127.0.0.1", 1),
+            "server": ("testserver", 80),
+            "scheme": "http",
+        })
+        payload = {
+            "categories": [],
+            "tags": [],
+            "products": [{"id": "one"}],
+            "pagination": {"page": 1, "limit": 12, "total": 1, "pages": 1},
+        }
+        with (
+            patch.object(public_site_routes, "enforce_public_rate_limit"),
+            patch.object(
+                public_site_routes,
+                "resolve_website_settings",
+                return_value={"tenant_id": 7, "published_project_id": "project-1"},
+            ),
+            patch.object(public_site_routes, "build_public_store_profile", return_value={"subdomain": "demo"}),
+            patch.object(public_site_routes, "_catalog_payload", return_value=payload) as build_payload,
+        ):
+            first_response = Response()
+            first = public_site_routes.get_public_catalog(
+                "demo",
+                request,
+                first_response,
+            )
+            second_response = Response()
+            second = public_site_routes.get_public_catalog(
+                "demo",
+                request,
+                second_response,
+            )
+
+        assert first["catalog"] == second["catalog"]
+        assert build_payload.call_count == 1
+        assert first_response.headers["X-Ecommerce-Cache"] == "MISS"
+        assert second_response.headers["X-Ecommerce-Cache"] == "HIT"
+
+    def test_cache_rejects_a_key_when_the_expected_tenant_does_not_match(self):
+        key = ecommerce_cache_key(1, "authenticated-catalog")
+        write_ecommerce_cache(key, 1, {"tenant": 1})
+
+        assert read_ecommerce_cache(key, tenant_id=2) is None
+        created, hit = get_or_create_ecommerce_cache(
+            key,
+            2,
+            lambda: {"tenant": 2},
         )
+        assert hit is False
+        assert created == {"tenant": 2}
+        assert read_ecommerce_cache(key, tenant_id=2) == {"tenant": 2}
 
-    assert first["catalog"] == second["catalog"]
-    assert build_payload.call_count == 1
-    assert first_response.headers["X-Ecommerce-Cache"] == "MISS"
-    assert second_response.headers["X-Ecommerce-Cache"] == "HIT"
-
-def test_cache_rejects_a_key_when_the_expected_tenant_does_not_match():
-    key = ecommerce_cache_key(1, "authenticated-catalog")
-    write_ecommerce_cache(key, 1, {"tenant": 1})
-
-    assert read_ecommerce_cache(key, tenant_id=2) is None
-    created, hit = get_or_create_ecommerce_cache(
-        key,
-        2,
-        lambda: {"tenant": 2},
-    )
-    assert hit is False
-    assert created == {"tenant": 2}
-    assert read_ecommerce_cache(key, tenant_id=2) == {"tenant": 2}
-
-def test_public_store_settings_lookup_is_reused_and_tenant_scoped():
-    request = Request({
-        "type": "http",
-        "method": "GET",
-        "path": "/public/sites/demo/store-profile",
-        "headers": [],
-        "query_string": b"",
-        "client": ("127.0.0.1", 1),
-        "server": ("testserver", 80),
-        "scheme": "http",
-    })
-    settings = {"tenant_id": 7, "standard_path_slug": "demo", "brand": "Demo"}
-    with patch.object(
-        public_site_routes,
-        "resolve_website_settings",
-        return_value=settings,
-    ) as lookup:
-        first = public_site_routes.resolve_public_store_settings("demo", request=request)
-        second = public_site_routes.resolve_public_store_settings("demo", request=request)
-
-    assert first == second == settings
-    assert lookup.call_count == 1
-    assert invalidate_ecommerce_cache(7) == 1
-
-
-def test_public_store_settings_cache_cannot_bypass_host_identity():
-    def request_for(host):
-        return Request({
+    def test_public_store_settings_lookup_is_reused_and_tenant_scoped(self):
+        request = Request({
             "type": "http",
             "method": "GET",
             "path": "/public/sites/demo/store-profile",
-            "headers": [(b"host", host.encode())],
+            "headers": [],
             "query_string": b"",
             "client": ("127.0.0.1", 1),
-            "server": (host, 443),
-            "scheme": "https",
+            "server": ("testserver", 80),
+            "scheme": "http",
         })
+        settings = {"tenant_id": 7, "standard_path_slug": "demo", "brand": "Demo"}
+        with patch.object(
+            public_site_routes,
+            "resolve_website_settings",
+            return_value=settings,
+        ) as lookup:
+            first = public_site_routes.resolve_public_store_settings("demo", request=request)
+            second = public_site_routes.resolve_public_store_settings("demo", request=request)
 
-    settings = {
-        "tenant_id": 7,
-        "standard_path_slug": "demo",
-        "subdomain": "demo",
-        "brand": "Demo",
-    }
+        assert first == second == settings
+        assert lookup.call_count == 1
+        assert invalidate_ecommerce_cache(7) == 1
 
-    invalidate_ecommerce_cache(7)
+    def test_public_store_settings_cache_cannot_bypass_host_identity(self):
+        def request_for(host):
+            return Request({
+                "type": "http",
+                "method": "GET",
+                "path": "/public/sites/demo/store-profile",
+                "headers": [(b"host", host.encode())],
+                "query_string": b"",
+                "client": ("127.0.0.1", 1),
+                "server": (host, 443),
+                "scheme": "https",
+            })
 
-    with patch.object(
-        public_site_routes,
-        "resolve_website_settings",
-        return_value=settings,
-    ) as lookup:
-        correct = public_site_routes.resolve_public_store_settings(
-            "demo",
-            request=request_for("demo.madarportal.com"),
+        settings = {
+            "tenant_id": 7,
+            "standard_path_slug": "demo",
+            "subdomain": "demo",
+            "brand": "Demo",
+        }
+
+        invalidate_ecommerce_cache(7)
+
+        with patch.object(
+            public_site_routes,
+            "resolve_website_settings",
+            return_value=settings,
+        ) as lookup:
+            correct = public_site_routes.resolve_public_store_settings(
+                "demo",
+                request=request_for("demo.madarportal.com"),
+            )
+
+            assert correct == settings
+            assert lookup.call_count == 1
+
+            try:
+                public_site_routes.resolve_public_store_settings(
+                    "demo",
+                    request=request_for("wrong-tenant.madarportal.com"),
+                )
+            except Exception as exc:
+                assert getattr(exc, "status_code", None) == 404
+            else:
+                raise AssertionError(
+                    "cached tenant settings bypassed hostname/path identity enforcement"
+                )
+
+            # The rejected request must fail before either cache reuse or DB resolution.
+            assert lookup.call_count == 1
+
+        invalidate_ecommerce_cache(7)
+
+    def test_public_settings_invalidated_during_lookup_are_not_cached(self):
+        request = Request({"type": "http", "method": "GET", "path": "/", "headers": [],
+                           "query_string": b"", "server": ("testserver", 80), "scheme": "http"})
+        stale = {"tenant_id": 7, "standard_path_slug": "demo", "brand": "Deleted"}
+        current = {**stale, "brand": "Current"}
+
+        def lookup(*args, **kwargs):
+            invalidate_ecommerce_cache(7)
+            return stale
+
+        with patch.object(public_site_routes, "resolve_website_settings", side_effect=lookup):
+            self.assertEqual(public_site_routes.resolve_public_store_settings("demo", request=request), stale)
+        with patch.object(public_site_routes, "resolve_website_settings", return_value=current) as fresh:
+            self.assertEqual(public_site_routes.resolve_public_store_settings("demo", request=request), current)
+            self.assertEqual(fresh.call_count, 1)
+
+    def test_public_catalog_taxonomy_is_reused_across_filter_payloads(self):
+        taxonomy = {
+            "category_rows": [],
+            "tag_rows": [],
+            "brand_rows": [],
+            "sale_summary": {"active": False, "max_percentage": 0},
+        }
+        empty_page = ([], [], 0, {"min": None, "max": None, "currency": ""}, True)
+        with patch.object(
+            public_site_routes,
+            "_read_public_catalog_taxonomy",
+            return_value=taxonomy,
+        ) as read_taxonomy, patch.object(
+            public_site_routes, "_scan_public_catalog_page", return_value=empty_page
+        ), patch.object(public_site_routes, "_attach_public_variant_options"):
+            public_site_routes._catalog_payload(tenant_id=9, locale="en", search="first")
+            public_site_routes._catalog_payload(tenant_id=9, locale="en", search="second")
+
+        assert read_taxonomy.call_count == 1
+
+    def test_public_catalog_price_filter_applies_both_bounds(self):
+        products = [
+            {"id": "low", "price": "9.99"},
+            {"id": "middle", "price": "25.00"},
+            {"id": "high", "price": "80.00"},
+        ]
+
+        filtered = public_site_routes._filter_catalog_price(
+            products,
+            Decimal("10"),
+            Decimal("50"),
         )
 
-        assert correct == settings
-        assert lookup.call_count == 1
+        assert [item["id"] for item in filtered] == ["middle"]
 
-        try:
-            public_site_routes.resolve_public_store_settings(
-                "demo",
-                request=request_for("wrong-tenant.madarportal.com"),
-            )
-        except Exception as exc:
-            assert getattr(exc, "status_code", None) == 404
-        else:
-            raise AssertionError(
-                "cached tenant settings bypassed hostname/path identity enforcement"
-            )
+    def test_public_catalog_price_filter_keeps_open_bounds(self):
+        products = [
+            {"id": "low", "price": "9.99"},
+            {"id": "middle", "price": "25.00"},
+            {"id": "high", "price": "80.00"},
+        ]
 
-        # The rejected request must fail before either cache reuse or DB resolution.
-        assert lookup.call_count == 1
-
-    invalidate_ecommerce_cache(7)
-
-
-def test_public_catalog_taxonomy_is_reused_across_filter_payloads():
-    taxonomy = {
-        "category_rows": [],
-        "tag_rows": [],
-        "brand_rows": [],
-        "sale_summary": {"active": False, "max_percentage": 0},
-    }
-    empty_page = ([], [], 0, {"min": None, "max": None, "currency": ""}, True)
-    with patch.object(
-        public_site_routes,
-        "_read_public_catalog_taxonomy",
-        return_value=taxonomy,
-    ) as read_taxonomy, patch.object(
-        public_site_routes, "_scan_public_catalog_page", return_value=empty_page
-    ), patch.object(public_site_routes, "_attach_public_variant_options"):
-        public_site_routes._catalog_payload(tenant_id=9, locale="en", search="first")
-        public_site_routes._catalog_payload(tenant_id=9, locale="en", search="second")
-
-    assert read_taxonomy.call_count == 1
-
-
-def test_public_catalog_price_filter_applies_both_bounds():
-    products = [
-        {"id": "low", "price": "9.99"},
-        {"id": "middle", "price": "25.00"},
-        {"id": "high", "price": "80.00"},
-    ]
-
-    filtered = public_site_routes._filter_catalog_price(
-        products,
-        Decimal("10"),
-        Decimal("50"),
-    )
-
-    assert [item["id"] for item in filtered] == ["middle"]
-
-
-def test_public_catalog_price_filter_keeps_open_bounds():
-    products = [
-        {"id": "low", "price": "9.99"},
-        {"id": "middle", "price": "25.00"},
-        {"id": "high", "price": "80.00"},
-    ]
-
-    assert [item["id"] for item in public_site_routes._filter_catalog_price(products, Decimal("25"), None)] == ["middle", "high"]
-    assert [item["id"] for item in public_site_routes._filter_catalog_price(products, None, Decimal("25"))] == ["low", "middle"]
+        assert [item["id"] for item in public_site_routes._filter_catalog_price(products, Decimal("25"), None)] == ["middle", "high"]
+        assert [item["id"] for item in public_site_routes._filter_catalog_price(products, None, Decimal("25"))] == ["low", "middle"]

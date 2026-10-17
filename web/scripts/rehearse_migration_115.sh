@@ -8,15 +8,15 @@ BACKEND_TEST_IMAGE="${BACKEND_TEST_IMAGE:-madar-backend-test}"
 created=false
 cleanup() { if "$created"; then docker rm -f "$CONTAINER_NAME" >/dev/null; fi; }
 trap cleanup EXIT
-docker run -d --name "$CONTAINER_NAME" --label madar.rehearsal=synthetic-commercial-115 \
+docker run -d --memory=768m --cpus=0.75 --pids-limit=128 --name "$CONTAINER_NAME" --label madar.rehearsal=synthetic-commercial-115 \
   --publish 127.0.0.1:55445:5432 --tmpfs /var/lib/postgresql/data:rw,noexec,nosuid,size=1g \
   -e POSTGRES_HOST_AUTH_METHOD=trust "$POSTGRES_IMAGE" >/dev/null
 created=true
 for attempt in $(seq 1 60); do
-  if docker exec "$CONTAINER_NAME" pg_isready -U postgres >/dev/null 2>&1; then break; fi
+  if docker exec "$CONTAINER_NAME" pg_isready -h 127.0.0.1 -U postgres >/dev/null 2>&1; then break; fi
   sleep 1
 done
-docker exec "$CONTAINER_NAME" pg_isready -U postgres >/dev/null
+docker exec "$CONTAINER_NAME" pg_isready -h 127.0.0.1 -U postgres >/dev/null
 docker exec -e PGOPTIONS='-c client_min_messages=warning' -i "$CONTAINER_NAME" psql -X -U postgres -v ON_ERROR_STOP=1 -q <<'SQL'
 create role anon nologin;
 create role authenticated nologin;
@@ -37,10 +37,11 @@ for migration in "$WEB_ROOT"/database/migrations/*.sql; do
   ((10#$number > 114)) && continue
   docker exec -e PGOPTIONS='-c client_min_messages=warning' -i "$CONTAINER_NAME" psql -X -U postgres -v ON_ERROR_STOP=1 -q < "$migration"
 done
-docker exec "$CONTAINER_NAME" psql -X -U postgres -v ON_ERROR_STOP=1 -Atc "select schema_version=114 from public.application_schema_state where contract_key='core'" | rg '^t$'
+docker exec "$CONTAINER_NAME" psql -X -U postgres -v ON_ERROR_STOP=1 -Atc "select schema_version=114 from public.application_schema_state where contract_key='core'" | grep -qx t
 docker exec -e PGOPTIONS='-c client_min_messages=warning' -i "$CONTAINER_NAME" psql -X -U postgres -v ON_ERROR_STOP=1 -q < "$WEB_ROOT/database/migrations/115_reconcile_commercial_access.sql"
-docker run --rm --network host --read-only --tmpfs /tmp:rw,noexec,nosuid,size=64m \
+docker run --rm --memory=256m --cpus=0.5 --pids-limit=128 --network host --read-only --tmpfs /tmp:rw,noexec,nosuid,size=64m \
   --env PYTHONPATH=/app \
+  --volume "$WEB_ROOT/backend/tests/disposable_database_support.py:/app/tests/disposable_database_support.py:ro" \
   --env APP_ENV=test \
   --env SUPABASE_URL=http://127.0.0.1:54321 \
   --env SUPABASE_ANON_KEY=madar-ci-placeholder-anon-not-a-secret \
