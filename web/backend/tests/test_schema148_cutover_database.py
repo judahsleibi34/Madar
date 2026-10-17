@@ -181,6 +181,34 @@ class CoordinatedCutoverDatabaseTests(unittest.TestCase):
         bad=replace(self.manifest,migrations=(replace(self.manifest.migrations[0],sha256='0'*64),self.manifest.migrations[1]))
         with self.assertRaisesRegex(RuntimeError,'checksum_mismatch'):self.executor(factory=factory,manifest=bad).run()
         factory.assert_not_called();self.assertEqual(self.schema(),146)
+
+    def file_substitution_attempt(self,stage):
+        original=self.manifest.migrations[0]
+        captured=self.directory/'captured147.sql'
+        approved=original.path.read_text()
+        captured.write_text(approved)
+        manifest=replace(self.manifest,migrations=(replace(original,path=captured),self.manifest.migrations[1]))
+        def substitute():
+            captured.write_text(approved.replace('begin;','begin;\nCREATE TABLE public.unreviewed_sql_substitution(id integer);',1))
+            self.assertNotEqual(captured.read_text(),approved)
+        def backup(_):
+            if stage=='backup':substitute()
+        def guard(cursor,migration):
+            self.guard(cursor,migration)
+            if stage=='guard' and migration.number==147:substitute()
+        result=LockedMigrationExecutor(connection_factory=self.connect,manifest=manifest,
+            state_file=self.directory/'snapshot-execution.json',backup_dir=self.directory,
+            backup_verifier=backup,migration_guard=guard).run()
+        self.assertEqual((self.schema(),result['status']),(148,'completed'))
+        self.assertIsNone(self.db.execute("select to_regclass('public.unreviewed_sql_substitution')").fetchone()[0])
+        self.assertEqual(result['migrations'][0]['checksum'],release.SQL_SHA256[147])
+        self.assertEqual(self.db.execute('select public.notification_delivery_protocol()').fetchone()[0],2)
+
+    def test_backup_time_sql_substitution_never_reaches_postgresql(self):
+        self.file_substitution_attempt('backup')
+
+    def test_guard_time_sql_substitution_never_reaches_postgresql(self):
+        self.file_substitution_attempt('guard')
     def test_sql_failure_before147_commit_preserves_schema_and_original_grants(self):
         # Run the exact immutable147 text, but disconnect after its DDL before COMMIT.
         migration=self.manifest.migrations[0]

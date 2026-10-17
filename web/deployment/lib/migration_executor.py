@@ -11,6 +11,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import stat
 import tempfile
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -115,6 +116,8 @@ class LockedMigrationExecutor:
     """Execute a contiguous manifest while holding one PostgreSQL session lock."""
 
     LOCK_KEY = 487_062_024_082_083
+    MAX_MIGRATION_BYTES = 16 * 1024 * 1024
+    MAX_BATCH_BYTES = 64 * 1024 * 1024
 
     def __init__(
         self,
@@ -138,14 +141,6 @@ class LockedMigrationExecutor:
         self.migration_guard = migration_guard
 
     @staticmethod
-    def _checksum(path: Path) -> str:
-        digest = hashlib.sha256()
-        with path.open("rb") as handle:
-            for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-                digest.update(chunk)
-        return digest.hexdigest()
-
-    @staticmethod
     def _schema(cursor: Any) -> int:
         cursor.execute(
             "select schema_version from public.application_schema_state "
@@ -156,18 +151,47 @@ class LockedMigrationExecutor:
             raise RuntimeError("application_schema_state_missing")
         return int(row[0])
 
-    def verify_migrations(self) -> None:
-        """Verify every pinned input before backup creation or DB access."""
+    def verify_migrations(self) -> tuple[str, ...]:
+        """Capture exact verified SQL before backup creation or DB access.
+
+        Release worktrees can be operator owned. Never reopen a verified path
+        for execution after backup verification or a live admission callback:
+        the pathname could then name different bytes. Only these immutable,
+        checksum-bound strings may reach the migration connection.
+        """
+        statements = []
+        total = 0
         for migration in self.manifest.migrations:
-            if not migration.path.is_file():
+            try:
+                descriptor = os.open(migration.path, os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW | os.O_NONBLOCK)
+            except FileNotFoundError:
                 raise RuntimeError(f"migration_missing:{migration.number}")
-            if self._checksum(migration.path) != migration.sha256:
+            except OSError:
+                raise RuntimeError(f"migration_source_invalid:{migration.number}") from None
+            with os.fdopen(descriptor, "rb") as handle:
+                metadata = os.fstat(handle.fileno())
+                if not stat.S_ISREG(metadata.st_mode):
+                    raise RuntimeError(f"migration_source_not_regular:{migration.number}")
+                if metadata.st_size > self.MAX_MIGRATION_BYTES:
+                    raise RuntimeError(f"migration_size_exceeded:{migration.number}")
+                data = handle.read(self.MAX_MIGRATION_BYTES + 1)
+            if len(data) > self.MAX_MIGRATION_BYTES:
+                raise RuntimeError(f"migration_size_exceeded:{migration.number}")
+            total += len(data)
+            if total > self.MAX_BATCH_BYTES:
+                raise RuntimeError("migration_batch_size_exceeded")
+            if hashlib.sha256(data).hexdigest() != migration.sha256:
                 raise RuntimeError(f"migration_checksum_mismatch:{migration.number}")
+            try:
+                statements.append(data.decode("utf-8"))
+            except UnicodeDecodeError:
+                raise RuntimeError(f"migration_encoding_invalid:{migration.number}") from None
+        return tuple(statements)
 
     def run(self) -> dict[str, Any]:
         if self.manifest.coordinated and self.state_file.exists():
             raise RuntimeError('coordinated_migration_attempt_consumed')
-        self.verify_migrations()
+        statements = self.verify_migrations()
         self.backup_verifier(self.backup_dir)
 
         state: dict[str, Any] = {
@@ -195,7 +219,7 @@ class LockedMigrationExecutor:
                 target = self.manifest.migrations[-1].to_schema
                 if not self.manifest.accepts_schema(current):
                     raise RuntimeError(f"unexpected_schema:{current}")
-                for migration in self.manifest.migrations:
+                for migration, statement in zip(self.manifest.migrations, statements):
                     if current >= migration.to_schema:
                         state["migrations"].append({
                             "number": migration.number, "status": "already_applied",
@@ -220,7 +244,7 @@ class LockedMigrationExecutor:
                     state["phase"] = f"migration_{migration.number}"
                     state["migrations"].append(record)
                     atomic_json(self.state_file, state)
-                    cursor.execute(migration.path.read_text(encoding="utf-8"))
+                    cursor.execute(statement)
                     current = self._schema(cursor)
                     if current != migration.to_schema:
                         raise RuntimeError(f"migration_schema_not_advanced:{migration.number}")

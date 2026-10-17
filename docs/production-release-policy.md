@@ -1,5 +1,14 @@
 # Madar production release acceptance policy
 
+## Phase-IV verified migration byte snapshots
+
+The migration executor captures checksum-verified regular UTF-8 SQL files once
+before backup verification or database access. It executes those captured bytes
+after live admission callbacks, never a reopened operator-owned pathname.
+Symlinks/nonregular files, invalid encoding, more than16MiB per migration or
+64MiB per batch fail before effects. Existing manifest hashes, SQL history,
+ordering, locks, backup gates and single-use coordinated journals are unchanged.
+
 ## Phase-IV provider-writer readiness
 
 The readiness accounting model now requires separate `database.provider_quiescence`
