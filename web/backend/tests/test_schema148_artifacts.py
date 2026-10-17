@@ -27,10 +27,10 @@ class ArtifactTests(unittest.TestCase):
             'inputs_sha256':self.inputs,'run_id':11,'run_attempt':1,'production_authorized':False,
             'archives':{role:{'file':role+'.tar.gz','sha256':hashlib.sha256(role.encode()).hexdigest(),'bytes':len(role)} for role in self.images}}
         self.write()
-    def write(self,extra=None):
+    def write(self,extra=None,payloads=None):
         with zipfile.ZipFile(self.path,'w') as archive:
             archive.writestr('receipt.json',json.dumps(self.receipt))
-            for role in self.images:archive.writestr(role+'.tar.gz',role)
+            for role in self.images:archive.writestr(role+'.tar.gz',(payloads or {}).get(role,role.encode()))
             if extra:archive.writestr(extra,'untrusted')
         self.artifact['digest']='sha256:'+hashlib.sha256(self.path.read_bytes()).hexdigest()
     def verify(self):return verify_archive(self.path,self.artifact,self.run,source_sha=self.sha,images=self.images,expected_inputs=self.inputs)
@@ -42,7 +42,9 @@ class ArtifactTests(unittest.TestCase):
         with self.assertRaises(RuntimeError):self.verify()
     def test_path_replacement_after_authentication_cannot_substitute_parsed_receipt(self):
         original=self.path.read_bytes()
-        self.receipt['build_mode']='substituted-after-authentication';self.write()
+        payload=b'substituted image archive'
+        self.receipt['archives']['backend'].update(bytes=len(payload),sha256=hashlib.sha256(payload).hexdigest())
+        self.write(payloads={'backend':payload})
         replacement=self.path.with_name('replacement.zip');self.path.rename(replacement)
         self.path.write_bytes(original)
         self.artifact['digest']='sha256:'+hashlib.sha256(original).hexdigest()
@@ -51,11 +53,13 @@ class ArtifactTests(unittest.TestCase):
             replacement.replace(self.path)
             return original_open(*args,**kwargs)
         with patch('deployment.lib.schema148_artifacts.zipfile.ZipFile',side_effect=replace_then_open):
-            self.assertEqual(self.verify()['build_mode'],'fresh-locked-ci')
+            self.assertEqual(self.verify()['archives']['backend']['sha256'],hashlib.sha256(b'backend').hexdigest())
         self.assertNotEqual('sha256:'+hashlib.sha256(self.path.read_bytes()).hexdigest(),self.artifact['digest'])
     def test_same_inode_mutation_after_authentication_cannot_change_consumed_bytes(self):
         original=self.path.read_bytes()
-        self.receipt['build_mode']='substituted-after-authentication';self.write()
+        payload=b'substituted image archive'
+        self.receipt['archives']['backend'].update(bytes=len(payload),sha256=hashlib.sha256(payload).hexdigest())
+        self.write(payloads={'backend':payload})
         replacement=self.path.read_bytes();self.path.write_bytes(original)
         self.artifact['digest']='sha256:'+hashlib.sha256(original).hexdigest()
         original_open=zipfile.ZipFile
@@ -63,7 +67,7 @@ class ArtifactTests(unittest.TestCase):
             self.path.write_bytes(replacement)
             return original_open(*args,**kwargs)
         with patch('deployment.lib.schema148_artifacts.zipfile.ZipFile',side_effect=overwrite_then_open):
-            self.assertEqual(self.verify()['build_mode'],'fresh-locked-ci')
+            self.assertEqual(self.verify()['archives']['backend']['sha256'],hashlib.sha256(b'backend').hexdigest())
     def test_symlink_archive_refuses(self):
         actual=self.path.with_name('actual.zip');self.path.rename(actual)
         self.path.symlink_to(actual)
