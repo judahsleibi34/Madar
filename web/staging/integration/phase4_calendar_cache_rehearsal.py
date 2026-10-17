@@ -14,13 +14,15 @@ from pathlib import Path
 import secrets
 import subprocess
 import time
+import random
+from concurrent.futures import ThreadPoolExecutor
 from urllib.parse import urlencode
 
 import independent_recovery as recovery
 import manage
 import smoke
 
-OWNER = 'phase4-calendar-cache-20261017-attempt3'
+OWNER = 'phase4-calendar-cache-20261017-attempt8'
 SCOPE = Path.home() / OWNER
 BASELINE = Path.home() / 'schema148-readiness-20261017/revisions/32c77afd'
 BASELINE_SHA = '32c77afd01a012c7d21240316d4a46e52c3cbf14'
@@ -28,7 +30,7 @@ PORTS = {'baseline': 19086, 'candidate': 19087}
 BASES = {}
 
 
-def main(mode):
+def main(mode, benchmark=False):
     manage.require_staging_host()
     if SCOPE.is_symlink() or not SCOPE.is_dir() or SCOPE.stat().st_mode & 0o077:
         raise RuntimeError('Private owned calendar rehearsal scope required')
@@ -94,15 +96,18 @@ def main(mode):
                 # Docker29 does not publish host ports on an internal-only
                 # network. Use only the measured temporary private endpoint.
                 BASES[role] = 'http://' + address + ':8000'
-            for role in PORTS:
+            for role,identifier in zip(PORTS,containers):
                 smoke.APPLICATION = BASES[role]
-                for attempt in range(90):
+                deadline=time.monotonic()+90
+                while time.monotonic()<deadline:
+                    if not json.loads(manage.docker('inspect',identifier))[0]['State']['Running']:
+                        raise RuntimeError('Temporary '+role+' API exited before readiness')
                     try:
                         smoke.http('GET', '/health/live', application=True); break
                     except Exception:
-                        if attempt == 89: raise
                         time.sleep(1)
-            result = exercise(values['SUPABASE_SERVICE_KEY'])
+                else:raise RuntimeError('Temporary '+role+' API readiness deadline exceeded')
+            result = exercise(values['SUPABASE_SERVICE_KEY'], benchmark=benchmark)
             result.update({'scope': OWNER, 'baseline_source_sha': BASELINE_SHA, 'candidate_source': binding,
                 'source_class': 'source-overlay-on-previously-accepted-dependency-image',
                 'production_modified': False, 'elapsed_seconds': round(time.monotonic() - started, 3),
@@ -116,10 +121,15 @@ def main(mode):
                 measured = json.loads(manage.docker('inspect', identifier))[0]
                 if measured['Id'] != identifier or measured['Config']['Labels'].get('com.madar.staging.owner') != OWNER:
                     raise RuntimeError('Temporary API cleanup ownership mismatch')
+                descriptor=os.open(SCOPE/(measured['Name'].split('/')[-1]+'.log'),os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+                with os.fdopen(descriptor,'wb') as output:
+                    logs=subprocess.run(manage.DOCKER+['logs','--tail','60',identifier],capture_output=True,timeout=15,
+                        env={'PATH':os.defpath,'HOME':str(Path.home())})
+                    output.write((logs.stdout+logs.stderr)[:1024*1024])
                 manage.docker('rm', '--force', identifier)
 
 
-def exercise(service):
+def exercise(service, benchmark=False):
     token = secrets.token_hex(8)
     tenant = int(manage.sql("insert into public.tenants(brand_name,owner_name) values('Phase4 calendar synthetic','Fixture') returning tenant_id;"))
     users = []
@@ -156,6 +166,7 @@ def exercise(service):
     created, _ = smoke.http('POST', '/calendar/events', application=True, headers=mutation, expected=(201,),
         body={'calendar_id': calendar_id, 'title': secret, 'starts_at': start.isoformat(), 'ends_at': (start + timedelta(hours=1)).isoformat(), 'visibility': 'private'})
     query = '/calendar/bootstrap?' + urlencode({'start': (start - timedelta(hours=1)).isoformat(), 'end': (start + timedelta(hours=2)).isoformat()})
+    measured = None
     before = {}
     for role in PORTS:
         smoke.APPLICATION = BASES[role]
@@ -175,13 +186,72 @@ def exercise(service):
     assert next(c for c in after['candidate']['calendars'] if c['id'] == calendar_id)['access_role'] == 'availability'
     # A calendar membership change must not alter the user's tenant membership.
     assert manage.sql(f"select role from public.tenant_memberships where tenant_id={tenant} and user_id={member['id']};") == 'member'
+    if benchmark:
+        smoke.APPLICATION=BASES['candidate']
+        smoke.http('PUT','/calendar/calendars/'+calendar_id+'/members',application=True,
+            body={'user_id':member['id'],'role':'editor'},headers=mutation)
+        # Fixture insertion only; no copied customer data or external provider.
+        manage.sql("insert into public.calendar_events(calendar_id,tenant_id,created_by,title,starts_at,ends_at,visibility) "
+            "select " + smoke.literal(calendar_id) + ',' + str(tenant) + ',' + str(owner['id']) +
+            ",'Synthetic calendar load '||n," + smoke.literal(start.isoformat()) + '::timestamptz,' +
+            smoke.literal((start + timedelta(hours=1)).isoformat()) + "::timestamptz,'private' from generate_series(1,500) n;")
+        measured=benchmark_reads(query,member['cookies'],expected_events=501)
     return {'status': 'PASS', 'native_authentication': True, 'commercial_enforcement': True,
             'baseline_stale_private_details_reproduced': stale, 'candidate_private_details_denied': safe,
             'candidate_role': 'availability', 'single_request_elapsed_ms': elapsed,
-            'latency_samples_not_benchmark': True}
+            'latency_samples_not_benchmark': True, 'benchmark': measured}
+
+
+def benchmark_reads(query, cookies, *, expected_events):
+    """Bounded paired business reads; no cache optimization claim is implied."""
+    import urllib.request
+    import urllib.error
+    deadline=time.monotonic()+180
+    orders=[['baseline','candidate'],['candidate','baseline'],['baseline','candidate']]
+    random.Random(148).shuffle(orders)
+    runs=[]
+    for pair,order in enumerate(orders):
+        for role in order:
+            endpoint=BASES[role]+query
+            def one(_):
+                if time.monotonic()>deadline:raise RuntimeError('Calendar benchmark deadline exceeded')
+                request=urllib.request.Request(endpoint,headers={**smoke.cookie_header(cookies),**({'X-Calendar-Cache-Bypass':'1'} if _==0 else {})})
+                started=time.monotonic()
+                # Independent opener per thread; no redirect/proxy or external URL.
+                try:
+                    with urllib.request.build_opener(urllib.request.ProxyHandler({}),smoke.NoRedirect()).open(request,timeout=15) as response:
+                        payload=json.loads(response.read(2*1024*1024))
+                        if response.status!=200 or len(payload['events'])!=expected_events:
+                            raise RuntimeError('Calendar benchmark response contract failed')
+                        return (time.monotonic()-started)*1000,response.headers.get('X-Calendar-Cache')
+                except urllib.error.HTTPError as error:
+                    if not (SCOPE/('http-error-'+role+'.json')).exists():
+                        descriptor=os.open(SCOPE/('http-error-'+role+'.json'),os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+                        with os.fdopen(descriptor,'wb') as output:output.write(error.read(65536))
+                    raise RuntimeError('Calendar benchmark '+role+' HTTP '+str(error.code)) from None
+            try:
+                for n in range(5):one(n)
+            except RuntimeError:
+                if role!='baseline':raise
+                runs.append({'pair':pair,'role':role,'completed_warmup':False,'errors':1,'measured_requests':0,
+                    'reason':'baseline cannot load501-event workspace; provider request-line failure'})
+                continue
+            start=time.monotonic()
+            with ThreadPoolExecutor(max_workers=2) as pool:observations=list(pool.map(one,range(60)))
+            values=sorted(row[0] for row in observations)
+            runs.append({'pair':pair,'role':role,'requests':len(values),'errors':0,
+                'p50_ms':round(values[(len(values)-1)//2],3),'p95_ms':round(values[int(len(values)*.95)-1],3),
+                'throughput_rps':round(len(values)/(time.monotonic()-start),3),
+                'cache_hits':sum(row[1]=='hit' for row in observations)})
+    return {'workflow':'native authenticated calendar bootstrap','dataset':{'tenants':1,'users':2,'private_events':expected_events},
+        'concurrency':2,'warmup_per_run':5,'measured_requests':sum(row.get('requests',0) for row in runs),'runs':runs,
+        'method':'three randomized-order pairs; same native provider and synthetic dataset; one API process per role',
+        'p99_reported':False,'interpretation':'security correction cost; no general speedup, SLO or production capacity claim'}
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('mode', choices=('INSPECT', 'REHEARSE'), nargs='?', default='INSPECT')
-    main(parser.parse_args().mode)
+    parser.add_argument('--benchmark',action='store_true')
+    args=parser.parse_args()
+    main(args.mode,benchmark=args.benchmark)

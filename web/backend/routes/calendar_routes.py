@@ -1060,6 +1060,22 @@ def queue_task_to_provider(
     return queued_task
 
 
+def workspace_invitation_reviews(context, event_ids: set[str]) -> list[dict[str, Any]]:
+    # UUID lists in GET filters must fit the provider/proxy request-line bound.
+    # The top50 of each disjoint batch contains every possible global top50.
+    identifiers=sorted(event_ids)
+    rows=[]
+    for offset in range(0,len(identifiers),50):
+        result=service_supabase.table("calendar_invitation_reviews").select(
+            "id,event_id,sender_email,trust_level,reasons,disposition,created_at"
+        ).eq("tenant_id",context.tenant_id).in_("event_id",identifiers[offset:offset+50]).eq(
+            "disposition","quarantined"
+        ).order("created_at",desc=True).limit(50).execute()
+        rows.extend(getattr(result,"data",None) or [])
+    rows.sort(key=lambda row:(str(row.get("created_at") or ""),str(row.get("id") or "")),reverse=True)
+    return [sanitized_invitation(row) for row in rows[:50]]
+
+
 def _calendar_workspace_payload(context, start: datetime, end: datetime) -> dict[str, Any]:
     with traced_operation("calendar_lookup"):
         from services.provider_recovery import restricted
@@ -1155,14 +1171,7 @@ def _calendar_workspace_payload(context, start: datetime, end: datetime) -> dict
             }
             if not review_event_ids:
                 return []
-            review_rows = getattr(
-                service_supabase.table("calendar_invitation_reviews")
-                .select("id,event_id,sender_email,trust_level,reasons,disposition,created_at")
-                .eq("tenant_id", context.tenant_id).in_("event_id", sorted(review_event_ids))
-                .eq("disposition", "quarantined").order("created_at", desc=True).limit(50).execute(),
-                "data", None,
-            ) or []
-            return [sanitized_invitation(row) for row in review_rows]
+            return workspace_invitation_reviews(context,review_event_ids)
 
     invitation_future = submit_db_read(load_invitation_reviews)
     tasks, linked_task_event_ids, task_reminder_rows = task_future.result()
