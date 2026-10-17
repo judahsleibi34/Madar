@@ -41,8 +41,6 @@ from services.calendar_sync_service import (
 from services.calendar_task_sync_queue_service import enqueue_task_sync
 from services.calendar_connection_sync_queue_service import enqueue_connection_sync
 from services.calendar_workspace_cache_service import (
-    calendar_workspace_cache_key,
-    get_or_create_calendar_workspace,
     invalidate_calendar_workspace_cache,
 )
 from services.bounded_query_service import submit_db_read
@@ -1062,6 +1060,22 @@ def queue_task_to_provider(
     return queued_task
 
 
+def workspace_invitation_reviews(context, event_ids: set[str]) -> list[dict[str, Any]]:
+    # UUID lists in GET filters must fit the provider/proxy request-line bound.
+    # The top50 of each disjoint batch contains every possible global top50.
+    identifiers=sorted(event_ids)
+    rows=[]
+    for offset in range(0,len(identifiers),50):
+        result=service_supabase.table("calendar_invitation_reviews").select(
+            "id,event_id,sender_email,trust_level,reasons,disposition,created_at"
+        ).eq("tenant_id",context.tenant_id).in_("event_id",identifiers[offset:offset+50]).eq(
+            "disposition","quarantined"
+        ).order("created_at",desc=True).limit(50).execute()
+        rows.extend(getattr(result,"data",None) or [])
+    rows.sort(key=lambda row:(str(row.get("created_at") or ""),str(row.get("id") or "")),reverse=True)
+    return [sanitized_invitation(row) for row in rows[:50]]
+
+
 def _calendar_workspace_payload(context, start: datetime, end: datetime) -> dict[str, Any]:
     with traced_operation("calendar_lookup"):
         from services.provider_recovery import restricted
@@ -1157,14 +1171,7 @@ def _calendar_workspace_payload(context, start: datetime, end: datetime) -> dict
             }
             if not review_event_ids:
                 return []
-            review_rows = getattr(
-                service_supabase.table("calendar_invitation_reviews")
-                .select("id,event_id,sender_email,trust_level,reasons,disposition,created_at")
-                .eq("tenant_id", context.tenant_id).in_("event_id", sorted(review_event_ids))
-                .eq("disposition", "quarantined").order("created_at", desc=True).limit(50).execute(),
-                "data", None,
-            ) or []
-            return [sanitized_invitation(row) for row in review_rows]
+            return workspace_invitation_reviews(context,review_event_ids)
 
     invitation_future = submit_db_read(load_invitation_reviews)
     tasks, linked_task_event_ids, task_reminder_rows = task_future.result()
@@ -1220,26 +1227,17 @@ def calendar_bootstrap(request: Request, response: Response, start: datetime, en
     if not calendar_feature_enabled():
         return _calendar_disabled_payload(context, start, end)
     try:
-        cache_key = calendar_workspace_cache_key(
-            tenant_id=context.tenant_id,
-            user_id=context.user_id,
-            role=context.role,
-            start=iso(start),
-            end=iso(end),
-        )
-        if getattr(request, "headers", {}).get("X-Calendar-Cache-Bypass") == "1":
-            invalidate_calendar_workspace_cache(context.tenant_id)
+        # Calendar ACLs and event visibility can change in another process.
+        # This combined payload includes permission-filtered details, so a local
+        # TTL/invalidation token cannot authorize reuse after a role downgrade.
+        # Read authoritative ACLs and data each time; reservations stay parallel.
         def load_reservations():
             with traced_operation("calendar_reservations"):
                 return reservation_events_for_range(context, start, end)
 
         reservation_future = submit_db_read(load_reservations)
         try:
-            payload, cache_hit = get_or_create_calendar_workspace(
-                cache_key,
-                context.tenant_id,
-                lambda: _calendar_workspace_payload(context, start, end),
-            )
+            payload = _calendar_workspace_payload(context, start, end)
             fresh_reservations = reservation_future.result()
         except Exception:
             reservation_future.cancel()
@@ -1251,7 +1249,7 @@ def calendar_bootstrap(request: Request, response: Response, start: datetime, en
                 "events": sorted([*cached_events, *fresh_reservations], key=lambda item: item.get("starts_at") or ""),
             }
         payload["calendar_features_available"] = True
-        response.headers["X-Calendar-Cache"] = "hit" if cache_hit else "miss"
+        response.headers["X-Calendar-Cache"] = "miss"
         response.headers["Cache-Control"] = "private, no-store"
         return payload
     except Exception as error:

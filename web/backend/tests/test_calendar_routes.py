@@ -136,7 +136,7 @@ class CalendarRouteTests(unittest.TestCase):
         self.assertEqual(raised.exception.status_code, 503)
         self.assertEqual(raised.exception.detail["code"], "calendar_schema_unavailable")
 
-    def test_enabled_calendar_bootstrap_reuses_private_user_range_cache(self):
+    def test_enabled_calendar_bootstrap_recomputes_permission_filtered_data(self):
         context = SimpleNamespace(
             tenant_id=7, user_id=12, role="member", membership_status="active",
             user={"timezone": "UTC"},
@@ -165,11 +165,34 @@ class CalendarRouteTests(unittest.TestCase):
             second = calendar_routes.calendar_bootstrap(object(), second_response, start, end)
 
         self.assertEqual(first, second)
-        self.assertEqual(loader.call_count, 1)
+        self.assertEqual(loader.call_count, 2)
         self.assertEqual(reservations.call_count, 2)
         self.assertEqual(first_response.headers["X-Calendar-Cache"], "miss")
-        self.assertEqual(second_response.headers["X-Calendar-Cache"], "hit")
+        self.assertEqual(second_response.headers["X-Calendar-Cache"], "miss")
         self.assertEqual(second_response.headers["Cache-Control"], "private, no-store")
+
+    def test_bootstrap_does_not_reuse_details_after_calendar_role_downgrade(self):
+        context = SimpleNamespace(tenant_id=7, user_id=12, role="member",
+                                  membership_status="active", user={"timezone": "UTC"})
+        start = datetime(2026, 7, 1, tzinfo=timezone.utc)
+        end = datetime(2026, 7, 8, tzinfo=timezone.utc)
+        editor = {"success": True, "calendars": [{"id": "private", "role": "editor"}],
+                  "events": [{"title": "Confidential fixture", "source_type": "madar"}],
+                  "tasks": [{"title": "Confidential task"}], "connections": []}
+        availability = {"success": True, "calendars": [{"id": "private", "role": "availability"}],
+                        "events": [{"title": "Busy", "source_type": "madar"}],
+                        "tasks": [], "connections": []}
+        with patch.object(calendar_routes, "require_active_tenant_member", return_value=context), \
+                patch.object(calendar_routes, "_calendar_workspace_payload", side_effect=[editor, availability]) as loader, \
+                patch.object(calendar_routes, "reservation_events_for_range", return_value=[]), \
+                patch.dict(os.environ, {"CALENDAR_FEATURE_ENABLED": "true"}):
+            first = calendar_routes.calendar_bootstrap(object(), SimpleNamespace(headers={}), start, end)
+            second = calendar_routes.calendar_bootstrap(object(), SimpleNamespace(headers={}), start, end)
+        self.assertEqual(first["events"][0]["title"], "Confidential fixture")
+        self.assertEqual(second["calendars"][0]["role"], "availability")
+        self.assertEqual(second["events"][0]["title"], "Busy")
+        self.assertEqual(second["tasks"], [])
+        self.assertEqual(loader.call_count, 2)
 
     def test_workspace_payload_excludes_fresh_reservations_and_records_breakdown(self):
         context = SimpleNamespace(
@@ -250,7 +273,7 @@ class CalendarRouteTests(unittest.TestCase):
         self.assertLess(markers["calendar_task_query_start"], markers["calendar_event_query_end"])
         self.assertLess(markers["calendar_connections_start"], markers["calendar_event_query_end"])
 
-    def test_cached_bootstrap_refreshes_reservations_on_every_request(self):
+    def test_authoritative_bootstrap_refreshes_reservations_on_every_request(self):
         context = SimpleNamespace(
             tenant_id=7, user_id=12, role="member", membership_status="active",
             user={"timezone": "UTC"},
@@ -289,8 +312,8 @@ class CalendarRouteTests(unittest.TestCase):
 
         self.assertEqual(first["events"], [])
         self.assertEqual(second["events"], [reservation])
-        self.assertEqual(loader.call_count, 1)
-        self.assertEqual(second_response.headers["X-Calendar-Cache"], "hit")
+        self.assertEqual(loader.call_count, 2)
+        self.assertEqual(second_response.headers["X-Calendar-Cache"], "miss")
 
         bypass_response = SimpleNamespace(headers={})
         bypass_request = SimpleNamespace(
