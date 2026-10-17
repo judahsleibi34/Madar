@@ -1,13 +1,13 @@
 # Phase IV implementation report
 
-##1. Executive summary
+## 1. Executive summary
 
 Independent automated review reproduced and corrected concrete implementation
 defects. The review is not a substitute for independently authorized human review.
 Production remains schema146 and unchanged. The source is READY FOR CODE REVIEW;
 the production release remains NOT READY and NOT AUTHORIZED.
 
-##2. Repository and identity
+## 2. Repository and identity
 
 Baseline main876b65e73ea8ceaf398145d8677019184798a95c; original209/210/211
 heads and ancestry are in01-BASELINE-AND-ANCESTRY.md. All remain open/unmerged at
@@ -44,7 +44,7 @@ da10aa87 integration: preview notification and reservation integrity PR210
 The final immutable SHA and subsequent acceptance are recorded in the PR update;
 see ACCEPTANCE-EVIDENCE.md for why runtime receipts are external to their source.
 
-##3. Independent review
+## 3. Independent review
 
 See02/03 for exact components and prerequisites. Fixed: selected preservation
 contract in forward repair; PR-head CI identity; authenticated artifact snapshot
@@ -53,7 +53,7 @@ cache disclosure;501-event query request-line failure. The outbox ownership and
 deletion queue ACL defects require the separate149 successor, not alteration of
 147/148 or an automatic expansion of the existing release profile.
 
-##4. Security
+## 4. Security
 
 No new CRITICAL exposure was confirmed. HIGH findings include SQL source changes
 after verification, stale private calendar access, outbox ownership, deletion
@@ -62,7 +62,7 @@ are explicit in03. No current credential exposure was confirmed by private histo
 triage; metadata remains in published history, and forward redaction is not purge.
 No secrets, raw production observations or private fixture credentials are committed.
 
-##5. Integration
+## 5. Integration
 
 Three conflict-free no-fast-forward preview merges preserve every published head
 and initially reproduce the exact211 tree. Focused corrections follow in new
@@ -70,7 +70,7 @@ commits. Exact-head checkout/cleanliness guards and main/preview branch filters
 make backend/frontend/artifact checks runnable. Existing unchanged PRs must not be
 accepted as if these corrections were already present. No merge is authorized.
 
-##6. Release engineering
+## 6. Release engineering
 
 Original147/148 hashes and active146 descriptor remain intact. Fresh protected
 operation, immutable source/images, backups/replica, READ_ONLY boundaries and
@@ -81,14 +81,14 @@ installation/systemd/reboot and current-data acceptance remain BLOCKED.
 Provider writer quiescence is separately required in the44-gate readiness model;
 its native role proof does not implement the missing production lifecycle.
 
-##7. Application functionality
+## 7. Application functionality
 
 Frontend233files:1713pass/1skip, lint and production-origin build pass. Native
 calendar creation/sharing/private event/downgrade and501-event reads pass on the
 candidate. Full forms/builder/assets/checkout browser workflows remain incomplete.
 Final fresh-source Auth/MFA/Storage/browser results are published after source freeze.
 
-##8. Reliability
+## 8. Reliability
 
 Separate149 has durable outbox generations and atomic resolution/finish,
 startup protocol refusal, stale reminder protection, lost-response handling,
@@ -99,21 +99,21 @@ steps/queues are not declared fenced. Calendar caches no longer authorize reuse;
 catalog multi-process invalidation remains incomplete. Alert delivery/recovery
 passes a real isolated loopback drill, not an installed production pipeline.
 
-##9. Disaster recovery
+## 9. Disaster recovery
 
 Prior independent restore/PITR evidence is historical. New provider fence crash,
 restart and explicit recovery preserve original roots. Final source acceptance
 uses the retained independently restored native stack. Off-host recovery, full-app
 PITR, object-version consistency and RPO/RTO certification remain unproven.
 
-##10. Performance
+## 10. Performance
 
 Baseline501-event calendar fails500 due provider414. Candidate180 measured reads
 have zero errors; run p95 467.333/539.649/515.759ms, throughput6.122/5.092/5.119rps
 at concurrency2. Baseline had no successful timed run; no improvement percentage,
 p99, general speedup, production capacity or SLO assertion is made. See13.
 
-##11. Tests
+## 11. Tests
 
 See20-TEST-RESULTS.md and sanitized evidence. Preview broad source3ab2bd50:
 3033pass/749skip; successor5e5c0c3e:3044pass/770skip; no external attempts.
@@ -123,7 +123,7 @@ fixture corrections are retained without skipped assertions. Hosted3ab2bd50
 backend39026532964/frontend39026533017/artifact39026533018 all passed; these are
 not relabelled as final-head runs. Final exact-head run IDs follow in PR acceptance.
 
-##12. Production readiness
+## 12. Production readiness
 
 The detailed matrix and18-PRODUCTION-READINESS.md keep all operational/human gates
 explicit. Staging success is not production authority. Remaining blockers include
@@ -131,7 +131,7 @@ provider lifecycle,149 governance, current-data evidence, root controller/boot
 acceptance, backup/restore/replica, main protection, independent review,
 reconciliation/maintenance and fresh protected authorization.
 
-##13. Remaining work and manual actions
+## 13. Remaining work and manual actions
 
 See19 for P0–P3 acceptance criteria. Human-controlled actions are independent code
 review/integration, separately authorized administrator ruleset/environment changes,
@@ -140,7 +140,7 @@ acceptance and eventual protected production authorization. This session perform
 none of those operational actions. Routine uncompleted engineering is a roadmap,
 not an instruction for the user to repeat completed work.
 
-##14. Recommendation
+## 14. Recommendation
 
 Review212's corrections together with209–211; review213 as a separate successor.
 Do not promote the148 source as production-ready while confirmed outbox/deletion
