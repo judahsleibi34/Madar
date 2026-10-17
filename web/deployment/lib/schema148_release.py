@@ -110,6 +110,28 @@ def verify_consumer_inventory(observed,policy,candidate_ids):
     return {'legacy_consumers':len(legacy),'candidate_consumers':len(candidate_ids),'unknown_consumers':0}
 
 
+def live_consumer_inventory(runtime,contract,policy,candidate_ids,*,rows=None):
+    from deployment.lib.schema148_consumers import unrelated_consumers,host_processes
+    if rows is None:
+        identifiers=runtime.command(['docker','ps','--all','--quiet','--no-trunc']).split()
+        rows=list(runtime.inspect(identifiers).values())
+    excluded=unrelated_consumers(rows,contract,policy.get('unrelated_consumers',{}),candidate_ids=candidate_ids,target_rest_binding=policy.get('target_rest'))
+    if excluded & (set(policy.get('legacy_consumers',{}))|set(candidate_ids)):
+        raise RuntimeError('schema148_consumer_scope_overlap')
+    if set(policy) not in ({'version','operation','legacy_consumers'},{'version','operation','legacy_consumers','unrelated_consumers','target_rest'}):
+        raise RuntimeError('schema148_consumer_policy_invalid')
+    inventory=consumer_inventory(rows,contract['origin']['images']['backend'],contract['candidate']['images']['backend'])
+    if not excluded.issubset(inventory):raise RuntimeError('schema148_unrelated_consumer_missing')
+    result=verify_consumer_inventory({key:value for key,value in inventory.items() if key not in excluded},
+        {key:policy[key] for key in ('version','operation','legacy_consumers')},candidate_ids)
+    for identifier in candidate_ids:
+        if inventory[identifier]['image']!=contract['candidate']['images']['backend'] or inventory[identifier]['restart']!='no':
+            raise RuntimeError('schema148_candidate_consumer_changed')
+    result.update(unrelated_consumers_verified=len(excluded),host_processes_verified=host_processes(runtime,set(candidate_ids)|excluded,
+        required_pids={row['State'].get('Pid',0) for row in rows if row['Id'] in candidate_ids}))
+    return result
+
+
 def verify_actor_consumers(actor):
     from deployment.lib.completed_normal_admission import digest
     from deployment.lib.provider_recovery_runtime import protected
@@ -122,10 +144,7 @@ def verify_actor_consumers(actor):
         raise RuntimeError('schema148_origin_consumer_missing')
     candidate=json.loads(protected(actor.root/'candidate-runtime.json',private=True).read_text())
     new_id=candidate['runtimes']['notification-worker']['id']
-    identifiers=actor.runtime.command(['docker','ps','--all','--quiet','--no-trunc']).split()
-    rows=list(actor.runtime.inspect(identifiers).values())
-    inventory=consumer_inventory(rows,actor.contract['origin']['images']['backend'],actor.contract['candidate']['images']['backend'])
-    return verify_consumer_inventory(inventory,policy,{new_id})
+    return live_consumer_inventory(actor.runtime,actor.contract,policy,{new_id})
 
 
 def seal_quiescence(actor):

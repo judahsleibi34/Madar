@@ -187,7 +187,7 @@ def run_migration(contract,release_root,state_root,operations):
     if execution.exists():raise RuntimeError('completed_migration_attempt_already_consumed')
     extra={}
     if selected is FENCED:
-        from deployment.lib.schema148_release import migration_guard,consumer_inventory,verify_consumer_inventory
+        from deployment.lib.schema148_release import migration_guard,consumer_inventory,live_consumer_inventory
         policy=witness['notification_cutover']
         if digest(policy)!=contract['notification_cutover_sha256']:
             raise RuntimeError('schema148_cutover_policy_changed')
@@ -195,10 +195,11 @@ def run_migration(contract,release_root,state_root,operations):
             require_candidate_authority(contract,mode='READ_ONLY')
             operations.validate_candidate_core(sha,state['active_slot'])
             ids=runtime.command(['docker','ps','--all','--quiet','--no-trunc']).split()
-            observed=consumer_inventory(list(runtime.inspect(ids).values()),contract['origin']['images']['backend'],contract['candidate']['images']['backend'])
+            rows=list(runtime.inspect(ids).values())
+            observed=consumer_inventory(rows,contract['origin']['images']['backend'],contract['candidate']['images']['backend'])
             candidates={key for key,row in observed.items() if row['image']==contract['candidate']['images']['backend'] and key not in policy['legacy_consumers']}
             if len(candidates)!=1:raise RuntimeError('schema148_candidate_consumer_ambiguous')
-            verify_consumer_inventory(observed,policy,candidates)
+            live_consumer_inventory(runtime,contract,policy,candidates,rows=rows)
         extra['migration_guard']=lambda cursor,migration:migration_guard(contract,cursor,migration,consumer_guard=consumers)
     executor=LockedMigrationExecutor(connection_factory=lambda:connection_factory(contract),manifest=manifest,
         state_file=execution,backup_dir=backup,backup_verifier=verify_backup,

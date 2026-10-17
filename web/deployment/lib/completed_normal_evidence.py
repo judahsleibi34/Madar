@@ -106,7 +106,9 @@ def verify_manual_application_evidence(actor):
     contract=actor.contract;selected=profile(contract);document=actor.document
     bindings=document['application_evidence']
     target=str(selected.target)
-    if set(bindings)!=({target,'runner'} if selected is APPLICATION else {target,'sql','runner'}):
+    expected_bindings=({target,'runner'} if selected is APPLICATION else {target,'sql','runner'})
+    if selected is FENCED:expected_bindings.add('provenance')
+    if set(bindings)!=expected_bindings:
         raise RuntimeError('completed_manual_application_evidence_inventory_invalid')
     report=measured_record(bindings[target]);cases=report.get('cases',{})
     runner=readonly_configuration(Path(bindings['runner']['path']),private=True)
@@ -145,15 +147,20 @@ def verify_manual_application_evidence(actor):
             or sql.get('manifest_sha256')!=contract['migration_manifest_sha256']
             or sql.get('production_modified') is not False or sql.get('invalid_indexes')!=0
             or any(sql.get(k) is not True for k in ('original_rows_preserved','auth_storage_roots_preserved',
-                'protocol2_verified','legacy_writes_denied','reservation_guard_verified','interruption_matrix_verified'))
+                'protocol2_verified','legacy_writes_denied','reservation_guard_verified','interruption_matrix_verified','full_auth_storage_inventory_verified'))
             or sql.get('forward_resume',{}).get('status')!='completed'):
         raise RuntimeError('schema148_current_data_evidence_incompatible')
+    if selected is FENCED:
+        from deployment.lib.schema148_artifacts import verify_provenance
+        verify_provenance(actor,measured_record(bindings['provenance']))
     artifacts=document['application_artifacts']
     for role in ('backend','frontend'):
         rows=json.loads(actor.runtime.command(['docker','image','inspect',artifacts[role]]))
         if len(rows)!=1 or rows[0]['Id']!=contract['candidate']['images'][role]:
             raise RuntimeError('completed_upgrade_accepted_image_changed')
         labels=rows[0]['Config'].get('Labels',{})
+        if selected is FENCED and (labels.get('com.madar.build.mode')!='fresh-locked-ci' or labels.get('com.madar.staging.build_mode')):
+            raise RuntimeError('schema148_source_overlay_is_not_release_provenance')
         if (labels.get('org.opencontainers.image.revision')!=contract['candidate']['source_sha']
                 or labels.get('com.madar.release.sha')!=contract['candidate']['source_sha']
                 or labels.get('com.madar.release.built_at')!=artifacts['build_timestamp']

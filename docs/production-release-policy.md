@@ -2,6 +2,21 @@
 
 ## Unselected governed schema146→148 maintenance admission
 
+The version5 profile additionally requires authenticated fresh-CI provenance:
+exact repository/workflow/source/run/attempt, immutable GitHub artifact digest,
+archive/image/lockfile hashes and actual fresh-image labels. Offline overlays,
+expired artifacts, forged local PASS packets and wrong-source runs reject. The
+read-only verifier loads no images and issues no authority. New official checkout
+and upload actions are immutable pins; artifact retention is7 days. Existing
+profiles retain their acceptance contracts. Full Auth/Storage tables now enter
+only the version5 preservation snapshot; historical five-table snapshots remain
+unchanged. Active/manual native worker processes are checked through host cgroups
+with a visible candidate PID as positive control. A separately digest-bound
+unrelated native SDK worker can be excluded only after immutable specification,
+different signing authority AND live PostgREST cryptographic-denial proofs; shared
+keys, direct DB credentials, unknown schemes or hidden processes remain blocked.
+No unrelated workload is stopped by these inspectors.
+
 The new version-5 `completed-normal-schema146-148-coordinated-release` profile
 composes unchanged147/148 SQL with `schema-146-148-coordinated.json` and
 `migrations-147-148-coordinated.json`. Active release146 and historical profiles,

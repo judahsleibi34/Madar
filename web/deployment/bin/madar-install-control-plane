@@ -51,6 +51,8 @@ declare -a tracked_files=(
   lib/control_plane_upgrade.py
   lib/completed_normal_baseline.py
   lib/completed_normal_admission.py
+  lib/schema148_consumers.py
+  lib/schema148_artifacts.py
   lib/schema148_release.py
   lib/completed_normal_profile.py
   lib/compatible_normal_boot.py

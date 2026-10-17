@@ -8,6 +8,8 @@ import json
 import os
 from pathlib import Path
 import tempfile
+import subprocess
+import sys
 import unittest
 from unittest.mock import patch
 from uuid import uuid4
@@ -22,6 +24,38 @@ from deployment.lib.migration_executor import LockedMigrationExecutor
 DSN=os.getenv('SCHEMA148_SYNTHETIC_DATABASE_DSN')
 ROOT=Path(os.getenv('SCHEMA148_SOURCE_ROOT','/release'))
 MARKER='madar-notification-synthetic-rehearsal'
+
+
+def crash_executor_child(dsn,root,state_file,point):
+    def connect():return connect_disposable_database(dsn,markers={MARKER})
+    with connect() as db:identifier=db.execute('select system_identifier::text from pg_control_system()').fetchone()[0]
+    contract={'version':5,'operation':'completed-normal-schema146-148-coordinated-release',
+        'database':{'system_identifier':identifier},'migration_manifest_sha256':release.MANIFEST_SHA256,
+        'candidate':{'source_sha':'a'*40}}
+    with patch('deployment.lib.completed_normal_admission.require_fresh_authorization'):
+        manifest=release.admitted_manifest(root,contract);first=manifest.migrations[0].path.read_text()
+        class Cursor:
+            def __init__(self,inner):self.inner=inner
+            def __getattr__(self,name):return getattr(self.inner,name)
+            def __enter__(self):self.inner.__enter__();return self
+            def __exit__(self,*args):return self.inner.__exit__(*args)
+            def execute(self,statement,*args):
+                if statement==first and point=='before_sql':os._exit(80)
+                result=self.inner.execute(statement,*args)
+                if statement==first and point=='after_commit':os._exit(81)
+                return result
+        class Connection:
+            def __init__(self):self.inner=connect()
+            def __getattr__(self,name):return getattr(self.inner,name)
+            @property
+            def autocommit(self):return self.inner.autocommit
+            @autocommit.setter
+            def autocommit(self,value):self.inner.autocommit=value
+            def cursor(self):return Cursor(self.inner.cursor())
+        executor=LockedMigrationExecutor(connection_factory=Connection,manifest=manifest,state_file=Path(state_file),
+            backup_dir=Path(state_file).parent,backup_verifier=lambda _:None,
+            migration_guard=lambda cursor,migration:release.migration_guard(contract,cursor,migration,consumer_guard=lambda:None))
+        executor.run()
 
 
 @unittest.skipUnless(DSN,'Requires marked disposable schema146 PostgreSQL')
@@ -64,6 +98,29 @@ class CoordinatedCutoverDatabaseTests(unittest.TestCase):
         return identifier
     def apply147(self):self.db.execute((ROOT/self.manifest.migrations[0].path).read_text())
 
+    def test_root_preservation_includes_all_auth_storage_tables_and_detects_change(self):
+        from deployment.lib.completed_normal_database import migration_customer_snapshot,verify_migration_customer_preservation
+        from types import SimpleNamespace
+        self.db.execute("create table auth.identities(id uuid); create table auth.mfa_factors(id uuid,secret text); create table auth.sessions(id int,marker text); insert into auth.sessions values(1,'synthetic-original'); create table storage.recovery_fixture(id int,marker text); insert into storage.recovery_fixture values(1,'synthetic-object-metadata')")
+        def command(args):
+            cursor=self.db.execute(args[-1]);lines=[]
+            while True:
+                if cursor.description:lines += [str(row[0]) for row in cursor.fetchall()]
+                if not cursor.nextset():break
+            return '\n'.join(lines)
+        runtime=SimpleNamespace(command=command)
+        self.contract['database']['container_id']='synthetic-transport-only'
+        with patch('deployment.lib.completed_normal_database.observe_native',side_effect=lambda *a,**kw:self.schema()):
+            before=migration_customer_snapshot(self.contract,runtime)
+            self.assertIn('auth.sessions',before['columns']);self.assertIn('storage.recovery_fixture',before['columns'])
+            self.executor().run()
+            after=migration_customer_snapshot(self.contract,runtime,columns=before['columns'])
+            self.assertTrue(verify_migration_customer_preservation(before,after,contract=self.contract)['full_auth_storage_inventory_verified'])
+            self.db.execute("update auth.sessions set marker='synthetic-changed'")
+            changed=migration_customer_snapshot(self.contract,runtime,columns=before['columns'])
+            with self.assertRaisesRegex(RuntimeError,'existing_customer_values_changed'):
+                verify_migration_customer_preservation(before,changed,contract=self.contract)
+
     def test_exact_executor_completes147_then148_and_records_both_checksums(self):
         result=self.executor().run()
         self.assertEqual(self.schema(),148);self.assertEqual(result['status'],'completed')
@@ -98,6 +155,22 @@ class CoordinatedCutoverDatabaseTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError,'not_quiescent'):self.executor().run()
             other.execute('rollback')
         self.assertEqual(self.schema(),146)
+    def crash_and_recover(self,point,expected_schema,exit_code):
+        process=subprocess.run([sys.executable,'-c',
+            'from tests.test_schema148_cutover_database import crash_executor_child; import sys; crash_executor_child(*sys.argv[1:])',
+            self.dsn,str(ROOT),str(self.directory/'execution.json'),point],capture_output=True,text=True,timeout=20)
+        self.assertEqual(process.returncode,exit_code,process.stderr)
+        self.assertEqual(self.schema(),expected_schema)
+        journal=json.loads((self.directory/'execution.json').read_text())
+        self.assertEqual((journal['status'],journal['phase']),('running','migration_147'))
+        with self.assertRaisesRegex(RuntimeError,'attempt_consumed'):self.executor().run()
+        result=self.executor(name='fresh-authorization-after-crash.json').run()
+        self.assertEqual((self.schema(),result['status']),(148,'completed'))
+    def test_real_executor_crash_before_sql_keeps146_and_requires_new_attempt(self):
+        self.crash_and_recover('before_sql',146,80)
+    def test_real_executor_crash_after147_commit_recovers_from_database_not_old_journal(self):
+        self.crash_and_recover('after_commit',147,81)
+
     def test_wrong_schema_identity_refuses_without_sql(self):
         self.contract['database']['system_identifier']='different'
         with self.assertRaisesRegex(RuntimeError,'not_quiescent'):self.executor().run()
