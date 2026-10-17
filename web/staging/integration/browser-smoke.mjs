@@ -32,7 +32,9 @@ const browser = await chromium.launch({
   headless: true,
   ...(process.env.MADAR_STAGING_CHROMIUM ? { executablePath: process.env.MADAR_STAGING_CHROMIUM } : {}),
 });
-const baseURL = "https://127.0.0.1:18443";
+const port = process.env.MADAR_STAGING_BROWSER_PORT || "18443";
+assert.match(port, /^[0-9]{4,5}$/);
+const baseURL = "https://127.0.0.1:" + port;
 try {
   const context = await browser.newContext({ viewport: { width: 1280, height: 800 }, ignoreHTTPSErrors: true });
   const blockedExternalHosts = new Set();
@@ -45,6 +47,11 @@ try {
   const page = await context.newPage();
   const errors = [];
   page.on("pageerror", () => errors.push("pageerror"));
+  if (process.env.MADAR_STAGING_BROWSER_SHA) {
+    assert.match(process.env.MADAR_STAGING_BROWSER_SHA, /^[a-f0-9]{40}$/);
+    const observed = await context.request.get(baseURL + "/api/health/version");
+    assert.equal((await observed.json()).release_sha, process.env.MADAR_STAGING_BROWSER_SHA);
+  }
   await page.goto(baseURL + "/login");
   await page.locator('input[type="email"]').fill(fixture.admin_email);
   await page.locator('input[name="password"]').fill(fixture.admin_password);
@@ -54,7 +61,7 @@ try {
   assert.ok(pending.some(cookie => cookie.name === "madar_mfa_pending" && cookie.httpOnly && cookie.secure));
   assert.ok(!pending.some(cookie => cookie.name === "madar_access_token"));
   const remaining = 30000 - Date.now() % 30000;
-  if (remaining < 5000) await new Promise(resolve => setTimeout(resolve, remaining + 100));
+  if (remaining < 5000 || process.env.MADAR_STAGING_FRESH_TOTP === "true") await new Promise(resolve => setTimeout(resolve, remaining + 1500));
   await page.locator('input[autocomplete="one-time-code"]').fill(totp(fixture.mfa_secret));
   const verification = page.waitForResponse(response => response.url().endsWith("/api/auth/mfa/login/verify"));
   await page.locator('form.login-card button[type="submit"]').click();
@@ -68,9 +75,19 @@ try {
   assert.ok(!ordinary.some(cookie => cookie.name === "madar_mfa_pending"));
   assert.ok(!(await page.evaluate(() => document.cookie)).includes("madar_access_token="));
   assert.equal(await page.evaluate(async () => (await fetch("/api/admin/users", { credentials: "include" })).status), 200);
+  await page.reload({ waitUntil: "domcontentloaded" });
+  assert.equal(await page.evaluate(async () => (await fetch("/api/admin/users", { credentials: "include" })).status), 200);
   const desktopPath = new URL(page.url()).pathname;
   await context.close();
   const mobile = await browser.newContext({ viewport: { width: 390, height: 844 }, ignoreHTTPSErrors: true });
+  await mobile.route("**/*", route => {
+    const url = new URL(route.request().url());
+    if (["127.0.0.1", "localhost"].includes(url.hostname) || ["data:", "blob:"].includes(url.protocol)) return route.continue();
+    blockedExternalHosts.add(url.hostname);
+    return route.abort();
+  });
+  const denied = await mobile.request.get(baseURL + "/api/admin/users");
+  assert.ok([401, 403].includes(denied.status()));
   const mobilePage = await mobile.newPage();
   await mobilePage.goto(baseURL + "/login");
   const email = mobilePage.locator('input[type="email"]');
@@ -84,7 +101,7 @@ try {
   assert.equal(errors.length, 0);
   console.log(JSON.stringify({ status: "PASS", browser: browser.version(), desktopPath,
     checks: ["password-to-restricted-MFA", "native-TOTP-admission", "admin-page-and-API", "Secure-HttpOnly-SameSite-cookies",
-      "pending-cookie-removal", "script-cannot-read-access-cookie", "mobile-login-label-keyboard-and-width"],
+      "pending-cookie-removal", "script-cannot-read-access-cookie", "authenticated-refresh", "anonymous-admin-denied", "mobile-login-label-keyboard-and-width"],
     blockedExternalHostCount: blockedExternalHosts.size, pageErrors: errors.length }));
 } finally {
   await browser.close();

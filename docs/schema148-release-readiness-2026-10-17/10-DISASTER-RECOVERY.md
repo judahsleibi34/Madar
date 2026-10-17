@@ -37,3 +37,20 @@ This remains same-VM independent-cluster recovery, not off-host/bare-host, PITR,
 full product browser certification, live gateway settlement or production RPO/RTO.
 Application images initially remain offline source overlays, separately identified
 from fresh CI candidate artifacts and privileged production acceptance.
+
+## Physical base backup and named-target WAL recovery
+
+Separate network-none PostgreSQL17 containers verified a real pg_basebackup with
+pg_verifybackup, archived WAL and recovered to a named point before a synthetic
+delete. Source rows became[2,3]; restored rows remained[1,2], with recovery paused
+at the requested point. Incomplete base backup, missing WAL and corrupt WAL all
+refused recovery acceptance/writability.66.84s component drill; source/targets
+removed after ownership checks, small owned volumes retained for review. No
+promotion, quorum/failover, off-host archiving, PITR full-app or production RPO/RTO
+claim follows. See pitr_rehearsal.py and sanitized evidence/pitr.json.
+
+Real restored-app Chromium151 acceptance PASS: native login/TOTP, AAL2 admin,
+authenticated browser refresh, anonymous admin denial, Secure/HttpOnly/SameSite
+cookies, pending-cookie removal, script cookie isolation and mobile labels/Tab/
+width;0 page errors,0 external hosts. This is selected browser coverage, not all
+Forms/builder/checkout E2E. Temporary synthetic credentials/tunnel were removed.
