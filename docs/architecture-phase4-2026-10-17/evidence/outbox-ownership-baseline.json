@@ -1,0 +1,52 @@
+{
+  "mode": "REPRODUCE",
+  "fixture": "synthetic-independent-postgresql",
+  "schema": 148,
+  "source_migrations_applied": 147,
+  "migration147_sha256": "bc76737e03ddf3dc369e444f34435dbded600ab1cae3209555b5bde6647d60f3",
+  "migration148_sha256": "a6788acfbe91129fcc55cbcd9c42440bbb91a785518afb99830c6137ed3c3096",
+  "cases": [
+    {
+      "scenario": "superseded_finish_sent",
+      "ownership_invariant": "FAIL",
+      "successor_attempts": 2,
+      "stale_mutation_accepted": true,
+      "result_status": "sent",
+      "successor_lease_cleared": true
+    },
+    {
+      "scenario": "superseded_finish_failed",
+      "ownership_invariant": "FAIL",
+      "successor_attempts": 2,
+      "stale_mutation_accepted": true,
+      "result_status": "failed",
+      "successor_lease_cleared": true
+    },
+    {
+      "scenario": "superseded_finish_dead",
+      "ownership_invariant": "FAIL",
+      "successor_attempts": 2,
+      "stale_mutation_accepted": true,
+      "result_status": "dead",
+      "successor_lease_cleared": true
+    },
+    {
+      "scenario": "superseded_resolver_disabled_channel",
+      "ownership_invariant": "FAIL",
+      "successor_attempts": 2,
+      "stale_mutation_accepted": true,
+      "result_status": "sent",
+      "materialized_deliveries": 0
+    },
+    {
+      "scenario": "expired_unreclaimed_finish",
+      "ownership_invariant": "FAIL",
+      "stale_mutation_accepted": true,
+      "result_status": "sent"
+    }
+  ],
+  "elapsed_seconds": 20.474,
+  "external_provider_requests": 0,
+  "retained_stack_mutations": 0,
+  "production_authorized": false
+}

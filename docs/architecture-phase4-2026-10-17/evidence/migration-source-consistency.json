@@ -1,0 +1,38 @@
+{
+  "baseline_source": "9a89f4b6c146f5d4649440926efd798ff8be3f4c",
+  "before": {
+    "native_cutover": {
+      "passed": 19,
+      "failed": 2,
+      "errors": 0,
+      "seconds": 12.798
+    },
+    "failure": "approved checksum journal did not bind subsequently executed path contents"
+  },
+  "after": {
+    "local_focused_passed": 41,
+    "native_suites": [
+      {
+        "passed": 21,
+        "seconds": 12.707
+      },
+      {
+        "passed": 5,
+        "seconds": 0.061
+      },
+      {
+        "passed": 18,
+        "seconds": 7.011
+      },
+      {
+        "passed": 22,
+        "seconds": 3.074
+      }
+    ],
+    "failed": 0,
+    "skipped": 0
+  },
+  "scope": "real disposable PG17, synthetic authorization/consumer transport fixtures; captured migration SQL copies only",
+  "historical_sql_changed": false,
+  "production_modified": false
+}

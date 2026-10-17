@@ -1,0 +1,15 @@
+{
+  "scanned_blobs": 12551,
+  "scanned_bytes": 247090273,
+  "skipped_blobs": 0,
+  "coverage_complete": true,
+  "counts": {
+    "credential_assignment": 346,
+    "private_network_metadata": 470,
+    "database_credential_uri": 11,
+    "private_key": 1
+  },
+  "scope": "Selected textual source/configuration/document suffixes on main and PR209-211 reachable history; heuristic triage, not proof of secret absence",
+  "review": "No active credential exposure confirmed. Vendored parser marker, synthetic/default URI fixtures, code expressions and mock API literals account for reviewed credential candidates; network metadata remains in historical commits.",
+  "raw_evidence_private": true
+}
