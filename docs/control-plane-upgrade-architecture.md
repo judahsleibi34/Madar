@@ -1,5 +1,12 @@
 # Privileged control-plane upgrade architecture
 
+## Phase-IV forward-repair preservation
+
+Fresh forward completion passes the selected operation contract to customer
+preservation validation. Each retained profile keeps its own source/target and
+Auth/Storage rules; successful SQL never permits legacy-default validation or
+a NORMAL grant from this READ_ONLY recovery path.
+
 ## Unselected governed schema146→148 maintenance admission
 
 The version5 profile additionally requires authenticated fresh-CI provenance:

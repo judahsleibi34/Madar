@@ -183,7 +183,7 @@ class CompletedNormalForwardResumption:
                 with self.credential():
                     original=json.loads(protected(self.actor.root/'pre-migration-customer-snapshot.json',private=True).read_text())
                     current=migration_customer_snapshot(self.actor.contract,self.actor.runtime,columns=original['columns'])
-                    preservation=verify_migration_customer_preservation(original,current)
+                    preservation=verify_migration_customer_preservation(original,current,contract=self.actor.contract)
                     exclusive(self.root/'customer-preservation.json',encoded(preservation))
                     path=executor_path(self.actor.ops.state_root,self.plan['application_sha'],'resumptions/'+digest(self.plan)+'/execution.json')
                     seal_completion(self.actor.contract,self.actor.ops.state_root/'releases'/self.plan['application_sha'],self.actor.ops.state_root,
