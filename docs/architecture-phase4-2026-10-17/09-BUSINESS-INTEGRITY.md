@@ -21,3 +21,16 @@ successor149, preserving restricted direct access. Schema148 itself remains
 unrepaired for this compatibility issue. See successor README and native evidence.
 Full deletion-step ownership, external gateway behavior and broader business
 browser workflows remain unproven.
+
+A final adversarial check reproduced another confirmed calendar integrity defect:
+`update_event` and `delete_event` checked a revision before writing, then omitted
+that revision from the UPDATE predicate. Two independent PostgreSQL connections
+both succeeded at version1, losing an edit or racing a deletion. The correction
+uses one database UPDATE with tenant/id/version and `deleted_at IS NULL` predicates;
+losers receive409 before child replacement or audit effects. The same helper
+guards recurring parent edits and exclusions. Optional client-version behavior
+remains compatible while the server-read version always fences the write.
+Recurring splits and child replacement still use multiple provider requests;
+this change does not make those workflows fully transactional. No migration is
+needed. The new races use actual route logic and native SQL, with authorization
+and side-effect transports explicitly stubbed. Final results are in evidence.

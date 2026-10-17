@@ -7,6 +7,7 @@
 | HIGH | Schema148 outbox owners can finish/resolve superseded claims | Five native ownership invariants fail | Separate149 successor; absent from148 |
 | HIGH | Delivery UPDATE revocation breaks deletion stop_queued_work at147/148 | Real runtime ACL denial plus application direct-update call path | Dedicated149 RPC under validation |
 | HIGH | Provider writers remain unfenced during coordinated preservation interval | Live controller source has no complete provider lifecycle | BLOCKED |
+| HIGH | Calendar event revision check did not guard the actual UPDATE or deletion | Two native route/SQL races both returned200/200 instead of200/409 | Fixed; both races PASS, full68-case rehearsal PASS |
 | MEDIUM | Forward repair uses legacy preservation contract | Execute-path regression across MANUAL/COMMERCIAL/FENCED | Fixed |
 | MEDIUM | PR-head CI identity differed from checked-out merge tree | Actual shell guards on temporary Git trees | Fixed |
 | MEDIUM | Artifact path/inode changes after digest verification | Two self-consistent substitution regressions fail old source, pass frozen snapshots | Fixed |
