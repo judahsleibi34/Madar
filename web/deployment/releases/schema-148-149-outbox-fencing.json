@@ -1,0 +1,15 @@
+{
+  "release_metadata_version": 1,
+  "deployment_profile": "notification-outbox-fencing148-149",
+  "schema": {
+    "compatible_min": 149,
+    "compatible_max": 149,
+    "target": 149,
+    "migration_class": "coordinated",
+    "rollback_compatible_min": 149,
+    "rollback_compatible_max": 149
+  },
+  "migration_policy": "none",
+  "migration_manifest": "migrations-148-149-outbox-fencing.json",
+  "notes": "Unselected successor only. Stop and drain all outbox resolvers, reconcile processing work, obtain independently governed production admission before SQL. Outbox protocol2 worker requires149 and has no fallback. Existing146-to148 admission remains unchanged and does not authorize149. Delivery protocol2 remains unchanged. No production activation or accepted image is supplied."
+}

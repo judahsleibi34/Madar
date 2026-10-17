@@ -312,19 +312,20 @@ def _step_revoke_integrations(request: dict[str, Any], *, client, http_client=No
     return {"connections": len(connections), "provider_revoked": revoked, "local_credentials_removed": len(connections), "provider_revocation_unsupported": local_only}
 
 
-def _step_stop_queued_work(request: dict[str, Any], *, client, **_kwargs) -> dict[str, Any]:
+def _step_stop_queued_work(request: dict[str, Any], *, client, worker_lease_owner=None, worker_claim_attempt=None, **_kwargs) -> dict[str, Any]:
     tenant_id = request.get("target_tenant_id_snapshot")
     user_id = request.get("target_user_id_snapshot")
-    filters = [("tenant_id", tenant_id)] if request["request_type"] == "tenant" else [("user_id", user_id)]
-    touched = 0
-    for table, states, payload in (
-        ("notification_outbox", ["pending", "processing", "failed"], {"status": "dead", "last_error_code": "deletion_pending"}),
-        ("notification_deliveries", ["pending", "processing"], {"status": "dead", "last_error_code": "deletion_pending", "dead_at": utc_now().isoformat()}),
-    ):
-        query = client.table(table).update(payload).in_("status", states)
-        for key, value in filters:
-            query = query.eq(key, value)
-        touched += len(_rows(query.execute()))
+    # Authority comes from the originally claimed request, not a reread that
+    # may already belong to another worker. The database derives subject scope.
+    if not worker_lease_owner or type(worker_claim_attempt) is not int or worker_claim_attempt <= 0:
+        raise DeletionStepError("deletion_notification_authority_missing", retryable=False)
+    result = client.rpc("stop_deletion_notification_work", {
+        "p_request_id": str(request["id"]), "p_lease_owner": worker_lease_owner,
+        "p_claim_attempt": worker_claim_attempt,
+    }).execute()
+    touched = getattr(result, "data", None)
+    if type(touched) is not int or touched < 0:
+        raise DeletionStepError("deletion_notification_result_invalid", retryable=False)
     now = utc_now().isoformat()
     for table in ("calendar_task_sync_jobs", "calendar_connection_sync_jobs"):
         query = client.table(table).update({
@@ -561,7 +562,9 @@ def process_deletion_request(request: dict[str, Any], *, client=None, http_clien
         step = _mark_step_processing(step, client=database_client)
         database_client.table("data_deletion_requests").update({"current_phase": step["step_key"]}).eq("id", request["id"]).execute()
         try:
-            output = STEP_HANDLERS[step["step_key"]](current, client=database_client, http_client=http_client)
+            claim = ({"worker_lease_owner": request.get("lease_owner"), "worker_claim_attempt": request.get("attempt_count")}
+                     if step["step_key"] == "stop_queued_work" else {})
+            output = STEP_HANDLERS[step["step_key"]](current, client=database_client, http_client=http_client, **claim)
             _finish_step(step, output, client=database_client)
         except DeletionStepError as error:
             _fail_step(current, step, error, client=database_client)

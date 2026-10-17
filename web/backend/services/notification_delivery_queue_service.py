@@ -8,6 +8,8 @@ from typing import Any
 
 from database import service_supabase
 from services.notification_outbox_service import (
+    OutboxOwnershipLost,
+    validate_outbox_generation,
     is_recent_dead_for_readiness,
     is_terminal_recipient_error,
 )
@@ -43,6 +45,7 @@ def resolve_outbox_notification(row: dict[str, Any], *, client=None) -> int:
     outbox_id = str(row.get("id") or "")
     if not outbox_id:
         raise ValueError("notification outbox id is required")
+    generation = validate_outbox_generation(row.get("claim_generation"))
     payload = row.get("payload") if isinstance(row.get("payload"), dict) else {}
     if str(row.get("template") or "") == "tenant_event" and not payload.get("event_id"):
         try:
@@ -59,17 +62,22 @@ def resolve_outbox_notification(row: dict[str, Any], *, client=None) -> int:
             # migration-first rolling deployment; genuinely abandoned rows are
             # recovered after the settling window.
             raise ResolutionDeferred("legacy_tenant_event_settling")
-    response = (client or service_supabase).rpc(
-        "resolve_notification_outbox_v2",
-        {
-            "p_outbox_id": outbox_id,
-            "p_now": _now().isoformat(),
-            "p_email_enabled": os.getenv(
-                "EMAIL_CHANNEL_ENABLED", "false"
-            ).strip().lower() in {"1", "true", "yes", "on"},
-            "p_web_push_enabled": get_web_push_configuration().operational,
-        },
-    ).execute()
+    try:
+        response = (client or service_supabase).rpc(
+            "resolve_notification_outbox_v3",
+            {
+                "p_outbox_id": outbox_id,
+                "p_claim_generation": generation,
+                "p_email_enabled": os.getenv(
+                    "EMAIL_CHANNEL_ENABLED", "false"
+                ).strip().lower() in {"1", "true", "yes", "on"},
+                "p_web_push_enabled": get_web_push_configuration().operational,
+            },
+        ).execute()
+    except Exception as error:
+        if str(getattr(error, "message", "")) == "notification_outbox_claim_lost":
+            raise OutboxOwnershipLost("notification_outbox_claim_lost") from None
+        raise
     data = getattr(response, "data", None)
     if isinstance(data, list):
         data = data[0] if data else 0

@@ -134,74 +134,61 @@ def enqueue_notification(
         return None
 
 
+class OutboxOwnershipLost(RuntimeError):
+    """The database rejected an expired, superseded or completed resolver claim."""
+
+
+def validate_outbox_generation(value: Any) -> int:
+    if isinstance(value, bool) or not isinstance(value, (int, str)):
+        raise ValueError("notification outbox claim generation is required")
+    if isinstance(value, str) and not value.isdecimal():
+        raise ValueError("invalid notification outbox claim generation")
+    generation = int(value)
+    if not 0 < generation <= 9223372036854775807:
+        raise ValueError("invalid notification outbox claim generation")
+    return generation
+
+
+def require_outbox_fencing(*, client=None) -> None:
+    response = (client or service_supabase).rpc("notification_outbox_protocol", {}).execute()
+    if getattr(response, "data", None) != 2:
+        raise RuntimeError("notification outbox protocol 2/schema149 is required")
+
+
 def mark_notification_result(
     outbox_id: str,
     *,
+    claim_generation: int,
     succeeded: bool,
     failure_code: str | None = None,
     retry_after_seconds: int = 60,
     client=None,
 ) -> bool:
-    now = _now()
-    payload: dict[str, Any]
-    if succeeded:
-        payload = {
-            "status": "sent",
-            "sent_at": now.isoformat(),
-            "processing_started_at": None,
-            "last_error_code": None,
-        }
-    else:
-        payload = {
-            "status": "failed",
-            "available_at": (
-                now + timedelta(seconds=max(1, min(int(retry_after_seconds), 86400)))
-            ).isoformat(),
-            "processing_started_at": None,
-            "last_error_code": _safe_code(failure_code),
-        }
+    generation = validate_outbox_generation(claim_generation)
     try:
-        database_client = client or service_supabase
-        rpc = getattr(database_client, "rpc", None)
-        if callable(rpc):
-            response = rpc(
-                "finish_notification_outbox",
-                {
-                    "p_outbox_id": outbox_id,
-                    "p_succeeded": bool(succeeded),
-                    "p_failure_code": None if succeeded else _safe_code(failure_code),
-                    "p_available_at": (
-                        now
-                        + timedelta(
-                            seconds=max(1, min(int(retry_after_seconds), 86400))
-                        )
-                    ).isoformat()
-                    if not succeeded
-                    else None,
-                    "p_finished_at": now.isoformat(),
-                },
-            ).execute()
-            return bool(getattr(response, "data", None))
-        response = (
-            database_client.table("notification_outbox")
-            .update(payload)
-            .eq("id", outbox_id)
-            .execute()
-        )
-        return bool(getattr(response, "data", None))
+        response = (client or service_supabase).rpc(
+            "finish_notification_outbox_v2",
+            {"p_outbox_id": outbox_id, "p_claim_generation": generation,
+             "p_outcome": "sent" if succeeded else "retry",
+             "p_failure_code": None if succeeded else _safe_code(failure_code),
+             "p_retry_after_seconds": max(1, min(int(retry_after_seconds), 86400))},
+        ).execute()
     except Exception as error:
-        logger.warning(
-            "notifications.outbox_result_failed",
-            extra={"error_type": type(error).__name__},
-        )
-        return False
+        if str(getattr(error, "message", "")) == "notification_outbox_claim_lost":
+            raise OutboxOwnershipLost("notification_outbox_claim_lost") from None
+        # A failed acknowledgement must not be represented as success or retried
+        # using legacy RPCs/direct UPDATE.
+        raise
+    if not getattr(response, "data", None):
+        raise OutboxOwnershipLost("notification_outbox_claim_lost")
+    return True
 
 
-def claim_notifications(*, limit: int = 25) -> list[dict[str, Any]]:
-    safe_limit = max(1, min(int(limit), 100))
-    response = service_supabase.rpc(
-        "claim_notification_outbox",
-        {"p_limit": safe_limit, "p_now": _now().isoformat()},
+def claim_notifications(*, limit: int = 25, lease_seconds: int = 900, client=None) -> list[dict[str, Any]]:
+    response = (client or service_supabase).rpc(
+        "claim_notification_outbox_v2",
+        {"p_limit": max(1, min(int(limit), 100)),
+         "p_lease_seconds": max(30, min(int(lease_seconds), 3600))},
     ).execute()
     data = getattr(response, "data", None)
     if isinstance(data, dict):
