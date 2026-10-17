@@ -58,6 +58,7 @@ class MigrationManifest:
     release_sha: str
     migrations: tuple[Migration, ...]
     excluded_schemas: tuple[int, ...] = ()
+    coordinated: bool = False
 
     @classmethod
     def load(cls, path: Path, repository_root: Path) -> "MigrationManifest":
@@ -124,6 +125,7 @@ class LockedMigrationExecutor:
         backup_dir: Path,
         backup_verifier: Callable[[Path], None],
         failure_formatter: Callable[[Exception], str] | None = None,
+        migration_guard: Callable[[Any, Migration], None] | None = None,
     ):
         self.connection_factory = connection_factory
         self.manifest = manifest
@@ -131,6 +133,9 @@ class LockedMigrationExecutor:
         self.backup_dir = backup_dir
         self.backup_verifier = backup_verifier
         self.failure_formatter = failure_formatter or (lambda error: str(error)[:160])
+        if manifest.coordinated and not callable(migration_guard):
+            raise RuntimeError('coordinated_migration_guard_required')
+        self.migration_guard = migration_guard
 
     @staticmethod
     def _checksum(path: Path) -> str:
@@ -160,6 +165,8 @@ class LockedMigrationExecutor:
                 raise RuntimeError(f"migration_checksum_mismatch:{migration.number}")
 
     def run(self) -> dict[str, Any]:
+        if self.manifest.coordinated and self.state_file.exists():
+            raise RuntimeError('coordinated_migration_attempt_consumed')
         self.verify_migrations()
         self.backup_verifier(self.backup_dir)
 
@@ -199,6 +206,8 @@ class LockedMigrationExecutor:
                         raise RuntimeError(
                             f"migration_transition_mismatch:{current}->{migration.to_schema}"
                         )
+                    if self.migration_guard is not None:
+                        self.migration_guard(cursor, migration)
                     record = {
                         "number": migration.number,
                         "from_schema": migration.from_schema,

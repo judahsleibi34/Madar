@@ -16,7 +16,7 @@ from pathlib import Path
 import re
 
 from deployment.lib.control_plane_upgrade_authorization import require_upgrade_authorization
-from deployment.lib.completed_normal_profile import profile, LEGACY, MANUAL, APPLICATION, COMMERCIAL
+from deployment.lib.completed_normal_profile import profile, LEGACY, MANUAL, APPLICATION, COMMERCIAL, FENCED
 
 OPERATION = "completed-normal-schema115-136-upgrade"
 ADMISSIONS = Path("/var/lib/madar-control-plane/upgrades/completed-normal-admissions")
@@ -66,8 +66,10 @@ def validate_contract(value: dict) -> None:
         "historical_files", "database", "migration_manifest_sha256",
         "rehearsal_sha256", "plan_sha256", "provider_record_sha256", "resources",
         "customer_table_roots_sha256", "customer_identity_roots_sha256",
-    } | ({"database_structure_sha256"} if selected is COMMERCIAL else set()):
+    } | ({"notification_cutover_sha256"} if selected is FENCED else set()) | ({"database_structure_sha256"} if selected in (COMMERCIAL,FENCED) else set()):
         raise RuntimeError("completed_normal_admission_contract_invalid")
+    if selected is FENCED and not re.fullmatch("[0-9a-f]{64}",str(value.get("notification_cutover_sha256"))):
+        raise RuntimeError("schema148_cutover_binding_invalid")
     selected = profile(value)
     roles = value["source_roles"]
     role_keys = ({'application_sha', 'controller_sha', 'completion_root', 'original_plan_sha256', 'completion_sha256'}
@@ -121,9 +123,9 @@ def validate_contract(value: dict) -> None:
     # These are historical protected records only, never arbitrary executable or
     # operator-selected paths. The retained provider record is checked separately.
     application_required = {str(origin_root / name) for name in APPLICATION_HISTORICAL_NAMES}
-    if set(files) != required and not (selected in (APPLICATION, COMMERCIAL) and set(files) == application_required):
+    if set(files) != required and not (selected in (APPLICATION, COMMERCIAL, FENCED) and set(files) == application_required):
         raise RuntimeError("completed_normal_admission_history_invalid")
-    if selected is COMMERCIAL:hashes.append(value["database_structure_sha256"])
+    if selected in (COMMERCIAL,FENCED):hashes.append(value["database_structure_sha256"])
     hashes.extend(files.values())
     if any(not re.fullmatch(r"[0-9a-f]{64}", str(v)) for v in hashes):
         raise RuntimeError("completed_normal_admission_digest_invalid")
@@ -202,7 +204,7 @@ def verify_history(contract: dict, *, _visited=frozenset()) -> None:
         if file_digest(protected(Path(name), private=not nonsecret_admission)) != expected:
             raise RuntimeError("completed_normal_admission_historical_evidence_changed")
     root = Path(contract['source_roles']['completion_root'])
-    if (profile(contract) in (APPLICATION, COMMERCIAL) and set(contract['historical_files']) ==
+    if (profile(contract) in (APPLICATION, COMMERCIAL, FENCED) and set(contract['historical_files']) ==
             {str(root / name) for name in APPLICATION_HISTORICAL_NAMES}):
         # A no-SQL receipt set is valid only for an actually completed no-SQL
         # origin. It cannot hide missing migration evidence from another profile.
@@ -382,7 +384,7 @@ def require_admission(state_root: Path, application_sha: str | None, *, admissio
         raise RuntimeError("provider_recovery_requires_separate_operator_exit")
     interlock = json.loads(protected(UPGRADE_INTERLOCK).read_text())
     context = str(interlock.get("context_sha256", ""))
-    if interlock.get("operation") not in {LEGACY.operation, MANUAL.operation, APPLICATION.operation, COMMERCIAL.operation} or not re.fullmatch(r"[0-9a-f]{64}", context):
+    if interlock.get("operation") not in {LEGACY.operation, MANUAL.operation, APPLICATION.operation, COMMERCIAL.operation, FENCED.operation} or not re.fullmatch(r"[0-9a-f]{64}", context):
         raise RuntimeError("provider_recovery_requires_separate_operator_exit")
     receipt = credential_witness('completed_normal_admission','admission_sha256')
     contract = receipt.get("contract")

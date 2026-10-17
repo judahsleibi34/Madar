@@ -1,0 +1,18 @@
+{
+  "backend-check.yml": {
+    "id": 38987861093,
+    "head_sha": "32c77afd01a012c7d21240316d4a46e52c3cbf14",
+    "status": "completed",
+    "conclusion": "success",
+    "path": ".github/workflows/backend-check.yml",
+    "html_url": "https://github.com/judahsleibi34/Madar/actions/runs/38987861093"
+  },
+  "frontend-check.yml": {
+    "id": 38987861101,
+    "head_sha": "32c77afd01a012c7d21240316d4a46e52c3cbf14",
+    "status": "completed",
+    "conclusion": "success",
+    "path": ".github/workflows/frontend-check.yml",
+    "html_url": "https://github.com/judahsleibi34/Madar/actions/runs/38987861101"
+  }
+}

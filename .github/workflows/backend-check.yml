@@ -2,7 +2,7 @@ name: Backend Check
 
 on:
   pull_request:
-    branches: [main, codex/architecture-hardening-20261016]
+    branches: [main, codex/architecture-hardening-20261016, codex/notification-claim-fencing-20261016]
   push:
     branches: [main]
 
@@ -28,6 +28,9 @@ jobs:
 
       - name: Build locked backend test image
         run: docker build --target test -t madar-backend-test web/backend
+
+      - name: Validate loopback notification alert inspection
+        run: python3 web/staging/integration/test_notification_observer.py
 
       - name: Run backend tests
         run: |

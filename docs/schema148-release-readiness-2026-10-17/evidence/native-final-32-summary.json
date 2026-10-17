@@ -1,0 +1,34 @@
+{
+  "source_sha": "32c77afd01a012c7d21240316d4a46e52c3cbf14",
+  "source_kind": "exact git archive, unmodified public source",
+  "command": "sudo -n env BACKEND_TEST_IMAGE=madar-schema136-preparation-test:working bash web/scripts/rehearse_migration_148.sh",
+  "host": "madar-staging",
+  "database": "owned marked disposable PostgreSQL17",
+  "suites": [
+    {
+      "name": "coordinated executor",
+      "passed": 19,
+      "seconds": 12.551
+    },
+    {
+      "name": "baseline upgrade",
+      "passed": 5,
+      "seconds": 0.074
+    },
+    {
+      "name": "generation fencing/worker",
+      "passed": 18,
+      "seconds": 6.923
+    },
+    {
+      "name": "business integrity",
+      "passed": 22,
+      "seconds": 2.813
+    }
+  ],
+  "total_pass": 64,
+  "failures": 0,
+  "errors": 0,
+  "skips": 0,
+  "production_modified": false
+}

@@ -336,6 +336,37 @@ class NotificationFencingDatabaseTests(unittest.TestCase):
         row=self.snapshot(identifier)
         self.assertEqual((row['status'],row['claim_generation']),('processing',2))
 
+    def test_polling_real_stale_ack_cannot_be_reported_as_sent(self):
+        from contextlib import ExitStack
+        from unittest.mock import patch
+        from services import notification_delivery_queue_service as queue
+        from workers import notification_worker as worker
+        identifier=self.new();old=queue.claim_deliveries(limit=1,client=SqlRpcClient())[0]
+        original=worker.process_batch
+        def accepted(_row):
+            self.expire(identifier);self.assertEqual(self.claim()[0]['claim_generation'],2)
+        def batch(**_):
+            return original(limit=1,claim=lambda **_:[old],deliver=accepted,
+                finish=lambda key,**kwargs:queue.finish_delivery(key,client=SqlRpcClient(),**kwargs))
+        with ExitStack() as stack:
+            stack.enter_context(patch.dict(worker.STATE,{key:0 for key in ('sent','dead','failed','processed','ownership_lost','acknowledgement_failed')}))
+            stack.enter_context(patch.dict(os.environ,{'NOTIFICATION_WORKER_ENABLED':'true'}))
+            stack.enter_context(patch('services.provider_recovery.worker_consumption_status',return_value=(True,True)))
+            for name in ('archive_ended_calendar_tasks','enqueue_due_calendar_reminders','cleanup_delivery_data','ThreadingHTTPServer'):
+                stack.enter_context(patch.object(worker,name))
+            stack.enter_context(patch('signal.signal'))
+            stack.enter_context(patch.object(worker,'require_delivery_fencing',side_effect=lambda:queue.require_delivery_fencing(client=SqlRpcClient())))
+            stack.enter_context(patch.object(worker,'process_resolution_batch',return_value=0))
+            stack.enter_context(patch.object(worker,'process_batch',side_effect=batch))
+            stack.enter_context(patch.object(worker,'get_queue_metrics',return_value={'sent':40,'dead':5,'failed':7,'queue_depth':1,'oldest_pending_age_seconds':123}))
+            stack.enter_context(patch.object(worker,'get_delivery_metrics',return_value={'deliveries_sent':0}))
+            stop=stack.enter_context(patch.object(worker,'STOP_EVENT'));stop.is_set.side_effect=[False,True]
+            self.assertEqual(worker.main(),0)
+            self.assertEqual((worker.STATE['sent'],worker.STATE['failed'],worker.STATE['dead'],worker.STATE['ownership_lost']),(0,1,0,1))
+            self.assertEqual(worker.STATE['queue_depth'],1)
+        row=self.snapshot(identifier)
+        self.assertEqual((row['status'],row['claim_generation']),('processing',2))
+
     def test_second_migration_application_refuses_without_changes(self):
         with self.assertRaisesRegex(psycopg.Error,'migration_147_expected_schema_146'):self.db.execute(MIGRATION.read_text())
         self.db.execute('rollback')

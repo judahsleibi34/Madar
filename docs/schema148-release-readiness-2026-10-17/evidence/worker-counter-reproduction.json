@@ -1,0 +1,18 @@
+{
+  "scope": "one real worker main-loop iteration; provider/queue transports fixtures; HTTP server mocked",
+  "source_before": "c3f9ce591f4706e535795b979064d3baefe421be",
+  "failure": "AssertionError: 40 != 0",
+  "cause": "historical resolved-outbox sent gauge overwrote acknowledged-delivery counter after ownership loss",
+  "expected_sent": 0,
+  "observed_before_sent": 40,
+  "native_fix_suite_passed": 64,
+  "native_fix_seconds": [
+    12.969,
+    0.072,
+    8.486,
+    2.816
+  ],
+  "counter_fixed_contract_passed": 8,
+  "counter_fixed_contract_seconds": 0.01,
+  "production_modified": false
+}

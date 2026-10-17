@@ -14,7 +14,7 @@ from psycopg.types.json import Jsonb
 from tests.disposable_database_support import connect_disposable_database
 
 DSN=os.getenv('BUSINESS_INTEGRITY_SYNTHETIC_DATABASE_DSN')
-MARKERS={'madar-notification-synthetic-rehearsal'}
+MARKERS={'madar-notification-synthetic-rehearsal','madar-hardening-synthetic-148-independent'}
 
 
 def connect():

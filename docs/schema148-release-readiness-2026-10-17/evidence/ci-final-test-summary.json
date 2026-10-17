@@ -1,0 +1,26 @@
+{
+  "backend": [
+    "test-backend\tValidate loopback notification alert inspection\t2026-10-17T00:47:11.1728812Z Ran 4 tests in 2.145s",
+    "test-backend\tRun backend tests\t2026-10-17T00:48:16.6412691Z Ran 3755 tests in 57.998s",
+    "test-backend\tRun backend tests\t2026-10-17T00:48:16.6413198Z EXTERNAL_ATTEMPTS []",
+    "test-backend\tRun backend tests\t2026-10-17T00:48:16.6413676Z EXTERNAL_SITES []",
+    "test-backend\tRun backend tests\t2026-10-17T00:48:16.6414219Z OK (skipped=747)",
+    "test-backend\tRehearse isolated commercial database transitions\t2026-10-17T00:48:40.4223563Z Ran 32 tests in 6.282s",
+    "test-backend\tRehearse isolated commercial database transitions\t2026-10-17T00:48:40.7943585Z Migration 115 synthetic 114 to 115 upgrade and ledger regression suite passed",
+    "test-backend\tRehearse isolated commercial database transitions\t2026-10-17T00:48:57.9564156Z Ran 8 tests in 2.130s",
+    "test-backend\tRehearse isolated commercial database transitions\t2026-10-17T00:48:58.0163296Z Migration 145 synthetic 144 to 145 rollback, upgrade, and strict continuity suite passed",
+    "test-backend\tRehearse isolated commercial database transitions\t2026-10-17T00:49:15.3299165Z Ran 8 tests in 2.165s",
+    "test-backend\tRehearse isolated commercial database transitions\t2026-10-17T00:49:16.0286514Z Ran 4 tests in 0.076s",
+    "test-backend\tRehearse isolated commercial database transitions\t2026-10-17T00:49:16.0887298Z Migration 146 synthetic 145 to 146 rollback, upgrade, and price-book suite passed",
+    "test-backend\tRehearse isolated commercial database transitions\t2026-10-17T00:49:44.8793645Z Ran 19 tests in 14.157s",
+    "test-backend\tRehearse isolated commercial database transitions\t2026-10-17T00:49:45.4036334Z Ran 5 tests in 0.101s",
+    "test-backend\tRehearse isolated commercial database transitions\t2026-10-17T00:49:55.5615248Z Ran 18 tests in 10.141s",
+    "test-backend\tRehearse isolated commercial database transitions\t2026-10-17T00:49:55.7947169Z Migration147 coordinated rollback/upgrade and native claim ownership suite passed",
+    "test-backend\tRehearse isolated commercial database transitions\t2026-10-17T00:50:00.7010145Z Ran 22 tests in 4.151s",
+    "test-backend\tRehearse isolated commercial database transitions\t2026-10-17T00:50:00.8722184Z Migration148 rollback, native business integrity and re-entry refusal passed"
+  ],
+  "frontend": [
+    "build-frontend\tTest frontend\t2026-10-17T00:48:50.8069183Z  Test Files  233 passed (233)",
+    "build-frontend\tTest frontend\t2026-10-17T00:48:50.8076916Z       Tests  1713 passed | 1 skipped (1714)"
+  ]
+}

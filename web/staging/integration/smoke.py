@@ -12,6 +12,7 @@ import struct
 import time
 from urllib.error import HTTPError
 from urllib.request import Request, build_opener, ProxyHandler, HTTPRedirectHandler
+from urllib.parse import urlsplit
 from uuid import UUID
 
 import manage
@@ -25,6 +26,11 @@ class NoRedirect(HTTPRedirectHandler):
 OPENER = build_opener(ProxyHandler({}), NoRedirect())
 PROVIDER = "http://127.0.0.1:18081"
 APPLICATION = "http://127.0.0.1:18080/api"
+
+
+def application_origin():
+    parsed=urlsplit(APPLICATION)
+    return parsed.scheme+'://'+parsed.netloc
 
 
 def http(method, path, *, token=None, body=None, headers=None, expected=(200,), application=False):
@@ -103,7 +109,7 @@ def main():
     assert "madar_mfa_pending" in pending and "madar_access_token" not in pending
     http("POST", "/auth/mfa/login/challenge", application=True, body={"factor_id": factor_id},
          headers={**cookie_header(pending), "Origin": "https://untrusted.example"}, expected=(403,))
-    headers = {**cookie_header(pending), "Origin": "http://127.0.0.1:18080"}
+    headers = {**cookie_header(pending), "Origin": application_origin()}
     application_challenge, _ = http("POST", "/auth/mfa/login/challenge", application=True,
                                     body={"factor_id": factor_id}, headers=headers)
     # Native TOTP verification forbids replaying a code from the enrollment.
