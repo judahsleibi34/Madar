@@ -1,0 +1,39 @@
+{
+  "archives": {
+    "backend": {
+      "bytes": 398940616,
+      "file": "backend.tar.gz",
+      "sha256": "208cc98c00965c0b5ed477001d1bd867c7e73ead3bddf314d3db37ec471cd21a"
+    },
+    "frontend": {
+      "bytes": 63692263,
+      "file": "frontend.tar.gz",
+      "sha256": "4ae58659cb8d0c413af212716463beba7af540d2a77a88f844c033c519b23847"
+    }
+  },
+  "build_host_image_ids": {
+    "backend": "sha256:27f347498a8265f0c1b9c4f47c93559a7ac4eaa77ca078d2a04287afd6b1cf9f",
+    "frontend": "sha256:779373ed539a2c0d3d9f31e18277e4e530c4d3580e89fbe7054a1627895c06a7"
+  },
+  "build_mode": "fresh-locked-ci",
+  "build_timestamp": "2026-10-17T00:45:57.633169Z",
+  "images": {
+    "backend": "sha256:e9a5e0924547e28b39ed7348a6998d5397b5688bebb030f46847e50a26091399",
+    "frontend": "sha256:b50bd74273456b1da2d9e9d938951bc2c1d509ddaa174f7deb8a27b584ba8741"
+  },
+  "inputs_sha256": {
+    "web/backend/Dockerfile": "1d0612c2cca07bc1023148fe034d1bf1182e9820389e8df7af82db08120d5ad5",
+    "web/backend/constraints.txt": "1740424189b4aa3e71952c491a13e0ce83de2bea1383e1314e736ecd0e07f1a0",
+    "web/backend/requirements.txt": "e69006672dae7ccabcfa2feabbeee7cdb167ff00515b32be78e912dc3878784a",
+    "web/frontend/Dockerfile": "182e4cf4f947d0a2c01b92fafe01ae4f50a45ba29fe9cdd4b4b292367c1b2dbc",
+    "web/frontend/package-lock.json": "cba9664fc59ca7be638faa756ca3f84c2dd675c90e7d9930ea57027931d6acbf",
+    "web/frontend/package.json": "cd2c6ae34cbd4e211f1e8603c31f6a2fb2db72bd5a77a462fba042fbb34acf0e"
+  },
+  "production_authorized": false,
+  "repository": "judahsleibi34/Madar",
+  "run_attempt": 1,
+  "run_id": 38987861104,
+  "runtime_identity": "single-OCI-manifest-containerd",
+  "source_sha": "32c77afd01a012c7d21240316d4a46e52c3cbf14",
+  "version": 1
+}

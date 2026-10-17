@@ -319,8 +319,17 @@ def main() -> int:
                     extra={"error_type": type(error).__name__},
                 )
             try:
-                STATE.update(get_queue_metrics())
-                STATE.update(get_delivery_metrics())
+                # Queue status totals are gauges, not this process's delivery
+                # outcome counters. In particular an outbox can be resolved
+                # before its provider delivery is acknowledged. Copying its
+                # `sent` value would report success after a lost acknowledgement.
+                queue_metrics = get_queue_metrics()
+                STATE.update({key: queue_metrics[key] for key in
+                              ("queue_depth", "oldest_pending_age_seconds") if key in queue_metrics})
+                delivery_metrics = get_delivery_metrics()
+                STATE.update({key: delivery_metrics[key] for key in
+                              ("deliveries_pending", "deliveries_processing", "deliveries_sent", "deliveries_dead")
+                              if key in delivery_metrics})
             except Exception as error:
                 STATE["healthy"] = False
                 logger.error("notification_worker.metrics_failed", extra={"error_type": type(error).__name__})

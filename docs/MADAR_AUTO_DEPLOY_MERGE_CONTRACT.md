@@ -1,5 +1,49 @@
 # Madar Auto-Deploy Merge Contract
 
+## Unselected governed schema146→148 maintenance admission
+
+The version5 profile additionally requires authenticated fresh-CI provenance:
+exact repository/workflow/source/run/attempt, immutable GitHub artifact digest,
+archive/image/lockfile hashes and actual fresh-image labels. Offline overlays,
+expired artifacts, forged local PASS packets and wrong-source runs reject. The
+read-only verifier loads no images and issues no authority. New official checkout
+and upload actions are immutable pins; artifact retention is7 days. Existing
+profiles retain their acceptance contracts. Full Auth/Storage tables now enter
+only the version5 preservation snapshot; historical five-table snapshots remain
+unchanged. Active/manual native worker processes are checked through host cgroups
+with a visible candidate PID as positive control. A separately digest-bound
+unrelated native SDK worker can be excluded only after immutable specification,
+different signing authority AND live PostgREST cryptographic-denial proofs; shared
+keys, direct DB credentials, unknown schemes or hidden processes remain blocked.
+No unrelated workload is stopped by these inspectors.
+
+The new version-5 `completed-normal-schema146-148-coordinated-release` profile
+composes unchanged147/148 SQL with `schema-146-148-coordinated.json` and
+`migrations-147-148-coordinated.json`. Active release146 and historical profiles,
+manifests, grants and receipts remain unchanged. Automatic policy is none and
+ordinary automatic manifest loading still rejects coordinated SQL. Only the
+existing protected coordinator's fresh source/context-bound authorization may
+select this exact manifest. No installation or production operation is authorized.
+
+READ_ONLY compatibility is146..148; NORMAL requires148 plus existing sealed SQL,
+preservation, artifact, backup/restore/replica and boot gates. Old workers must
+be stopped with restart policy no after existing exclusive worker/boot/write
+handoff. A digest-bound complete consumer inventory and live database quiescence
+must verify before backup and before each SQL step. Unknown consumers, processing
+deliveries (including expired), active transactions, prepared transactions or
+queue locks refuse. No queue reconciliation mutation or uncertain-send retry is
+performed automatically. Missing protocol authority never falls back to legacy.
+
+Before147 commit, SQL rollback preserves146; after147 commit, no protocol1 or
+old NORMAL grant can be restored.147 interruption recovers READ_ONLY/maintenance
+and requires separately authorized forward repair;148 completion alone is not
+NORMAL authority. A new boot drop-in sorts after the measured146 predecessor;
+unknown later drop-ins reject. Existing root installation, deploy/upgrade locks,
+single-use credentials, source/image verification and append-only backup scopes
+remain mandatory. Component/native synthetic tests do not satisfy current-data,
+exact accepted-image, independent review, production approval or real reboot gates.
+See docs/schema148-release-readiness-2026-10-17/ for scoped evidence and runbook.
+
 ## Unselected reservation-capacity repair147→148
 
 The mirrored148 migration and pinned
@@ -1131,3 +1175,10 @@ reviewed file before loading the gateway overlay. Existing API callbacks,
 upstreams, port bindings and routing headers are unchanged. No live proxy was
 reloaded. This protected proxy source still needs governed installation approval;
 edge logging policies remain an operator gate.
+
+Schema148 fresh artifact identities explicitly distinguish the build-host image
+configuration ID from the single OCI archive manifest ID used by the target
+containerd image store. The producer verifies both blobs before publishing the
+receipt. Imported runtime IDs must equal the accepted manifest IDs; a mismatch
+refuses before replacing services. Latest exact-application-source backend and
+frontend workflow success is independently requeried, in addition to artifact CI.

@@ -559,6 +559,10 @@ class CompletedNormalUpgrade:
                 # owners or relying on a status flag. The same healthy bridge
                 # stays publicly available while the database is advanced.
                 handoff.revoke();kernel.verify_mode(normal=False)
+                from deployment.lib.completed_normal_profile import FENCED
+                if self.profile is FENCED:
+                    from deployment.lib.schema148_release import seal_quiescence
+                    self.event('notification_quiescence_pending');seal_quiescence(self.actor)
                 self.event('pre_migration_backup_pending')
                 backup=CompletedNormalBackupContext(self.contract,self.document,self.package,kernel,
                     stage='pre-migration',source_guard=self.actor.guard,artifact_guard=self.artifact_guard)

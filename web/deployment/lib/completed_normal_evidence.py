@@ -9,7 +9,7 @@ from pathlib import Path
 import re
 
 from deployment.lib.provider_recovery_runtime import readonly_configuration,file_digest
-from deployment.lib.completed_normal_profile import profile, MANUAL, APPLICATION, COMMERCIAL
+from deployment.lib.completed_normal_profile import profile, MANUAL, APPLICATION, COMMERCIAL, FENCED
 
 CASES=frozenset({'frontend_api_origin','backend_readiness','local_schema','existing_authentication',
     'original_mfa_aal2','aal1_privilege_denied','session_cookie_policy','tenant_isolation',
@@ -27,7 +27,7 @@ def measured_record(binding):
     except (ValueError,TypeError):raise RuntimeError('completed_upgrade_evidence_invalid') from None
 
 def verify_application_evidence(actor):
-    if profile(actor.contract) in (MANUAL,APPLICATION,COMMERCIAL):
+    if profile(actor.contract) in (MANUAL,APPLICATION,COMMERCIAL,FENCED):
         return verify_manual_application_evidence(actor)
     document=actor.document;contract=actor.contract
     bindings=document['application_evidence']
@@ -78,7 +78,7 @@ def verify_application_evidence(actor):
             'images':contract['candidate']['images'],'historical_evidence_relabelled':False}
 
 def verify_complete_rehearsal(actor):
-    if profile(actor.contract) in (MANUAL,APPLICATION,COMMERCIAL):
+    if profile(actor.contract) in (MANUAL,APPLICATION,COMMERCIAL,FENCED):
         return verify_manual_controller_validation(actor)
     record=measured_record(actor.document['complete_rehearsal'])
     expected={'operation':'actual-private-completed-normal-upgrade','controller_sha':actor.contract['candidate']['controller_sha'],
@@ -106,7 +106,9 @@ def verify_manual_application_evidence(actor):
     contract=actor.contract;selected=profile(contract);document=actor.document
     bindings=document['application_evidence']
     target=str(selected.target)
-    if set(bindings)!=({target,'runner'} if selected is APPLICATION else {target,'sql','runner'}):
+    expected_bindings=({target,'runner'} if selected is APPLICATION else {target,'sql','runner'})
+    if selected is FENCED:expected_bindings.add('provenance')
+    if set(bindings)!=expected_bindings:
         raise RuntimeError('completed_manual_application_evidence_inventory_invalid')
     report=measured_record(bindings[target]);cases=report.get('cases',{})
     runner=readonly_configuration(Path(bindings['runner']['path']),private=True)
@@ -139,12 +141,26 @@ def verify_manual_application_evidence(actor):
                 'auth_storage_roots_preserved','price_book_delta_verified'))
             or sql.get('forward_resume',{}).get('status')!='completed'):
         raise RuntimeError('completed_commercial_sql_evidence_incompatible')
+    if selected is FENCED and (
+            sql.get('scope')!='private-current-backup-coordinated148-rehearsal'
+            or sql.get('starting_schema')!=146 or sql.get('final_schema')!=148
+            or sql.get('manifest_sha256')!=contract['migration_manifest_sha256']
+            or sql.get('production_modified') is not False or sql.get('invalid_indexes')!=0
+            or any(sql.get(k) is not True for k in ('original_rows_preserved','auth_storage_roots_preserved',
+                'protocol2_verified','legacy_writes_denied','reservation_guard_verified','interruption_matrix_verified','full_auth_storage_inventory_verified'))
+            or sql.get('forward_resume',{}).get('status')!='completed'):
+        raise RuntimeError('schema148_current_data_evidence_incompatible')
+    if selected is FENCED:
+        from deployment.lib.schema148_artifacts import verify_provenance
+        verify_provenance(actor,measured_record(bindings['provenance']))
     artifacts=document['application_artifacts']
     for role in ('backend','frontend'):
         rows=json.loads(actor.runtime.command(['docker','image','inspect',artifacts[role]]))
         if len(rows)!=1 or rows[0]['Id']!=contract['candidate']['images'][role]:
             raise RuntimeError('completed_upgrade_accepted_image_changed')
         labels=rows[0]['Config'].get('Labels',{})
+        if selected is FENCED and (labels.get('com.madar.build.mode')!='fresh-locked-ci' or labels.get('com.madar.staging.build_mode')):
+            raise RuntimeError('schema148_source_overlay_is_not_release_provenance')
         if (labels.get('org.opencontainers.image.revision')!=contract['candidate']['source_sha']
                 or labels.get('com.madar.release.sha')!=contract['candidate']['source_sha']
                 or labels.get('com.madar.release.built_at')!=artifacts['build_timestamp']
@@ -168,7 +184,7 @@ def verify_manual_controller_validation(actor):
     combined private deployment is represented as PASS.
     """
     selected=profile(actor.contract)
-    if selected not in (MANUAL,APPLICATION,COMMERCIAL):raise RuntimeError('completed_manual_validation_operation_invalid')
+    if selected not in (MANUAL,APPLICATION,COMMERCIAL,FENCED):raise RuntimeError('completed_manual_validation_operation_invalid')
     expected_mode='component-verified-application-update' if selected is APPLICATION else 'component-verified-maintenance'
     if (actor.document.get('validation_mode')!=expected_mode
             or actor.document.get('complete_upgrade_rehearsal') is not False

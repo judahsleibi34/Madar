@@ -71,6 +71,32 @@ class ClaimFencingContractTests(unittest.TestCase):
         self.assertEqual(worker.STATE["acknowledgement_failed"], 1)
         self.assertEqual(worker.STATE["sent"], 0)
 
+    def test_queue_poll_never_counts_unacknowledged_provider_acceptance_as_sent(self):
+        original=worker.process_batch
+        for error in (queue.DeliveryOwnershipLost('notification_delivery_claim_lost'),RuntimeError('database unavailable')):
+            for key in ('sent','failed','dead','processed','ownership_lost','acknowledgement_failed'):worker.STATE[key]=0
+            def delivery(**_):
+                return original(limit=1,claim=lambda **_:[{'id':'fixture','claim_generation':1}],
+                    deliver=Mock(),finish=Mock(side_effect=error))
+            with self.subTest(error=type(error).__name__), \
+                    patch.dict('os.environ',{'NOTIFICATION_WORKER_ENABLED':'true'}), \
+                    patch('services.provider_recovery.worker_consumption_status',return_value=(True,True)), \
+                    patch.object(worker,'require_delivery_fencing'),patch.object(worker,'archive_ended_calendar_tasks'), \
+                    patch.object(worker,'enqueue_due_calendar_reminders'),patch.object(worker,'cleanup_delivery_data'), \
+                    patch.object(worker,'process_resolution_batch',return_value=0), \
+                    patch.object(worker,'process_batch',side_effect=delivery), \
+                    patch.object(worker,'get_queue_metrics',return_value={'sent':40,'failed':7,'dead':5,'queue_depth':1,'oldest_pending_age_seconds':123}), \
+                    patch.object(worker,'get_delivery_metrics',return_value={'deliveries_sent':0,'sent':100}), \
+                    patch.object(worker,'STOP_EVENT') as stop,patch.object(worker,'ThreadingHTTPServer'), \
+                    patch('signal.signal'):
+                stop.is_set.side_effect=[False,True]
+                self.assertEqual(worker.main(),0)
+            self.assertEqual(worker.STATE['sent'],0)
+            self.assertEqual(worker.STATE['failed'],1)
+            self.assertEqual(worker.STATE['dead'],0)
+            self.assertEqual(worker.STATE['queue_depth'],1)
+            self.assertEqual(worker.STATE['oldest_pending_age_seconds'],123)
+
     def test_enabled_worker_rejects_missing_protocol_before_consumption(self):
         with patch.dict("os.environ", {"NOTIFICATION_WORKER_ENABLED": "true"}), \
              patch.object(worker, "require_delivery_fencing", side_effect=RuntimeError("schema147 required")), \

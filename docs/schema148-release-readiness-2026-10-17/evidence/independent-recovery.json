@@ -1,0 +1,37 @@
+{
+  "scope": "synthetic independent PostgreSQL roles/data/object restoration plus full native application",
+  "source_sha": "4f2c31aea7a10e33d337f506763258afa7e4419c",
+  "schema": 148,
+  "source_system_identifier": "7697097132868993059",
+  "restored_system_identifier": "7697415265751089186",
+  "target_project": "madar-independent-recovery-20261017-attempt3",
+  "independent_cluster": true,
+  "roles_absent_before_restore": true,
+  "role_attributes_passwords_memberships_preserved": true,
+  "owners_grants_rls_definer_settings_preserved": true,
+  "restored_native_business_tests": 22,
+  "original_rows_and_sequences_preserved": true,
+  "tables_verified": 177,
+  "sequences_verified": 21,
+  "objects_verified": 8,
+  "original_identity_acceptance": {
+    "original_password_login": true,
+    "original_auth_id": true,
+    "original_totp": true,
+    "original_private_storage": true,
+    "anonymous_storage_denied": true
+  },
+  "new_auth_mfa_storage_worker_api_acceptance": true,
+  "database_sha256": "b2727811fbfca0dacb6c75810f16d82d90290e606c52ea367fb8b6b18ea364db",
+  "roles_sha256": "a6cd00c7132bce15375ac7c418c8a4dc8f3a3942c84cbad1fa80f99224f18a82",
+  "objects_sha256": "f0a541e07af875c8b4adb5478f10e568fe0bd622eb59e9c6fea574499c756ee1",
+  "elapsed_seconds": 115.19,
+  "production_modified": false,
+  "limitations": [
+    "same VM, different cluster/volumes/networks",
+    "offline source-overlay application images",
+    "not off-host/bare-host/PITR",
+    "not full browser product E2E",
+    "not production RPO/RTO or authorization"
+  ]
+}
