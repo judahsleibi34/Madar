@@ -12,11 +12,19 @@ permissions:
 jobs:
   test-backend:
     runs-on: ubuntu-latest
+    env:
+      CI_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
+
+      - name: Verify exact clean source
+        run: |
+          test "$(git rev-parse HEAD)" = "$CI_SOURCE_SHA"
+          test -z "$(git status --porcelain)"
 
       - name: Verify deterministic release preflight checks
         run: |
@@ -61,7 +69,7 @@ jobs:
             --volume "$PWD/web/supabase:/workspace/supabase:ro" \
             --volume "$PWD/web/database:/database:ro" \
             --volume "$PWD/web/supabase:/supabase:ro" \
-            --volume "$PWD/.github/workflows/backend-check.yml:/test-repository/.github/workflows/backend-check.yml:ro" \
+            --volume "$PWD/.github/workflows:/test-repository/.github/workflows:ro" \
             --volume "$PWD/web/backend/Dockerfile:/test-repository/backend/Dockerfile:ro" \
             --volume "$PWD/web/frontend/Dockerfile:/test-repository/frontend/Dockerfile:ro" \
             --volume "$PWD/web/frontend/security_headers.conf.template:/test-repository/frontend/security_headers.conf.template:ro" \

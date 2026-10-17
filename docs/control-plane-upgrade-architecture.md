@@ -1,5 +1,15 @@
 # Privileged control-plane upgrade architecture
 
+## Phase-IV exact-source and artifact consumption
+
+Application CI checks out and verifies the exact PR head used by fresh artifact
+builds. Integration previews targeting main also run the candidate-image check;
+no path filter may leave this required check permanently pending. Artifact ZIP
+verification hashes and parses one bounded private snapshot. Staging import
+re-authenticates that snapshot and loads verified members through private file
+descriptors, so rename or in-place edits cannot substitute bytes after hashing.
+These checks issue no deployment or production authority.
+
 ## Phase-IV forward-repair preservation
 
 Fresh forward completion passes the selected operation contract to customer

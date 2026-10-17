@@ -9,6 +9,7 @@ import sys
 import tempfile
 import tarfile
 import unittest
+from unittest.mock import patch
 import zipfile
 sys.path.insert(0,os.getenv('MADAR_TEST_REPOSITORY_ROOT') or str(Path(__file__).resolve().parents[2]))
 from deployment.lib.schema148_artifacts import archive_runtime_identity,verify_archive,verify_required_ci,INPUTS,WORKFLOW
@@ -39,6 +40,34 @@ class ArtifactTests(unittest.TestCase):
     def test_tampered_archive_digest_refuses(self):
         self.path.write_bytes(self.path.read_bytes()+b'changed')
         with self.assertRaises(RuntimeError):self.verify()
+    def test_path_replacement_after_authentication_cannot_substitute_parsed_receipt(self):
+        original=self.path.read_bytes()
+        self.receipt['build_mode']='substituted-after-authentication';self.write()
+        replacement=self.path.with_name('replacement.zip');self.path.rename(replacement)
+        self.path.write_bytes(original)
+        self.artifact['digest']='sha256:'+hashlib.sha256(original).hexdigest()
+        original_open=zipfile.ZipFile
+        def replace_then_open(*args,**kwargs):
+            replacement.replace(self.path)
+            return original_open(*args,**kwargs)
+        with patch('deployment.lib.schema148_artifacts.zipfile.ZipFile',side_effect=replace_then_open):
+            self.assertEqual(self.verify()['build_mode'],'fresh-locked-ci')
+        self.assertNotEqual('sha256:'+hashlib.sha256(self.path.read_bytes()).hexdigest(),self.artifact['digest'])
+    def test_same_inode_mutation_after_authentication_cannot_change_consumed_bytes(self):
+        original=self.path.read_bytes()
+        self.receipt['build_mode']='substituted-after-authentication';self.write()
+        replacement=self.path.read_bytes();self.path.write_bytes(original)
+        self.artifact['digest']='sha256:'+hashlib.sha256(original).hexdigest()
+        original_open=zipfile.ZipFile
+        def overwrite_then_open(*args,**kwargs):
+            self.path.write_bytes(replacement)
+            return original_open(*args,**kwargs)
+        with patch('deployment.lib.schema148_artifacts.zipfile.ZipFile',side_effect=overwrite_then_open):
+            self.assertEqual(self.verify()['build_mode'],'fresh-locked-ci')
+    def test_symlink_archive_refuses(self):
+        actual=self.path.with_name('actual.zip');self.path.rename(actual)
+        self.path.symlink_to(actual)
+        with self.assertRaisesRegex(RuntimeError,'schema148_ci_archive_invalid'):self.verify()
     def test_expired_wrong_run_source_repository_workflow_and_failed_ci_refuse(self):
         for key,value in (('head_sha','e'*40),('path','untrusted.yml'),('conclusion','failure'),('run_attempt',True),('repository',{'full_name':'untrusted/repo'})):
             original=copy.deepcopy(self.run);self.run[key]=value

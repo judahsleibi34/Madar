@@ -2,13 +2,7 @@ name: Schema148 Candidate Artifacts
 
 on:
   pull_request:
-    branches: [codex/notification-claim-fencing-20261016]
-    paths:
-      - web/backend/**
-      - web/frontend/**
-      - web/scripts/build_schema148_artifacts.py
-      - web/deployment/lib/schema148_artifacts.py
-      - .github/workflows/schema148-artifacts.yml
+    branches: [main, codex/notification-claim-fencing-20261016]
   workflow_dispatch:
 
 permissions:

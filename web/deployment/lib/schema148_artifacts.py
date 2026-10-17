@@ -1,10 +1,13 @@
 """Authenticate fresh CI image archives; never load images or issue authority."""
+from contextlib import contextmanager
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
 import stat
 import tarfile
+import tempfile
 import zipfile
 
 REPOSITORY='judahsleibi34/Madar'
@@ -68,6 +71,39 @@ def digest(stream):
     return value.hexdigest()
 
 
+@contextmanager
+def authenticated_archive(path,expected_digest):
+    """Parse exactly the authenticated bytes, even if an operator changes the path.
+
+    The source is operator-owned read-only input, not a protected receipt. A
+    private unnamed bounded snapshot binds hashing and ZIP consumption without
+    assuming that either its directory entry or its open inode stays immutable.
+    Callers importing archive contents must use this same boundary as well.
+    """
+    if not re.fullmatch('sha256:[0-9a-f]{64}',str(expected_digest)):
+        raise RuntimeError('schema148_ci_archive_digest_invalid')
+    path=Path(path)
+    try:
+        descriptor=os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
+    except OSError:
+        raise RuntimeError('schema148_ci_archive_invalid') from None
+    with os.fdopen(descriptor,'rb') as source:
+        measured=os.fstat(source.fileno())
+        if not stat.S_ISREG(measured.st_mode) or not 0<measured.st_size<=6*1024**3:
+            raise RuntimeError('schema148_ci_archive_invalid')
+        with tempfile.TemporaryFile(mode='w+b') as frozen:
+            value=hashlib.sha256();remaining=measured.st_size
+            while remaining:
+                chunk=source.read(min(1024*1024,remaining))
+                if not chunk:raise RuntimeError('schema148_ci_archive_changed')
+                frozen.write(chunk);value.update(chunk);remaining-=len(chunk)
+            if source.read(1) or 'sha256:'+value.hexdigest()!=expected_digest:
+                raise RuntimeError('schema148_ci_archive_digest_changed')
+            frozen.seek(0)
+            with zipfile.ZipFile(frozen) as archive:
+                yield archive
+
+
 def verify_archive(path,artifact,run,*,source_sha,images,expected_inputs):
     if (not re.fullmatch('[0-9a-f]{40}',source_sha) or run.get('head_sha')!=source_sha
             or run.get('repository',{}).get('full_name')!=REPOSITORY
@@ -81,12 +117,7 @@ def verify_archive(path,artifact,run,*,source_sha,images,expected_inputs):
             or artifact.get('name')!=f"schema148-candidate-{source_sha}-{run['id']}-{run['run_attempt']}"
             or not re.fullmatch('sha256:[0-9a-f]{64}',str(artifact.get('digest')))):
         raise RuntimeError('schema148_ci_artifact_identity_invalid')
-    path=Path(path)
-    if path.is_symlink() or not path.is_file() or not 0<path.stat().st_size<=6*1024**3:
-        raise RuntimeError('schema148_ci_archive_invalid')
-    with path.open('rb') as stream:
-        if 'sha256:'+digest(stream)!=artifact['digest']:raise RuntimeError('schema148_ci_archive_digest_changed')
-    with zipfile.ZipFile(path) as archive:
+    with authenticated_archive(path,artifact['digest']) as archive:
         entries=archive.infolist()
         if (len(entries)!=3 or {item.filename for item in entries}!={'receipt.json','backend.tar.gz','frontend.tar.gz'}
                 or any(item.is_dir() or stat.S_ISLNK(item.external_attr>>16) or item.file_size>3*1024**3 for item in entries)

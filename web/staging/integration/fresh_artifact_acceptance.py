@@ -8,7 +8,7 @@ from pathlib import Path
 import re
 import subprocess
 import time
-import zipfile
+import tempfile
 
 import manage
 import independent_recovery as recovery
@@ -17,7 +17,26 @@ import smoke
 ROOT=manage.REPOSITORY
 import sys
 sys.path.insert(0,str(ROOT/'web'))
-from deployment.lib.schema148_artifacts import INPUTS,verify_archive
+from deployment.lib.schema148_artifacts import INPUTS,authenticated_archive,verify_archive
+
+
+def import_authenticated_image(archive,role,metadata,path):
+    """Load the verified member through a private fd, never an operator path."""
+    manage.require_staging_host()
+    descriptor=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+    with os.fdopen(descriptor,'wb') as destination,tempfile.TemporaryFile(mode='w+b') as frozen:
+        value=hashlib.sha256();size=0
+        with archive.open(role+'.tar.gz') as source:
+            while chunk:=source.read(1024*1024):
+                size+=len(chunk)
+                if size>metadata['bytes'] or size>3*1024**3:raise RuntimeError('Fresh image archive size changed')
+                destination.write(chunk);frozen.write(chunk);value.update(chunk)
+        if size!=metadata['bytes'] or value.hexdigest()!=metadata['sha256']:
+            raise RuntimeError('Fresh image archive digest changed')
+        destination.flush();frozen.seek(0)
+        result=subprocess.run(manage.DOCKER+['image','load'],stdin=frozen,capture_output=True,timeout=600,
+            env={'PATH':os.defpath,'HOME':str(Path.home())})
+        if result.returncode:raise RuntimeError('Fresh staging image import failed')
 
 
 def main(directory,source_sha,attempt,mode,*,resume=False):
@@ -42,9 +61,11 @@ def main(directory,source_sha,attempt,mode,*,resume=False):
         if resume:
             if not output.is_dir():raise RuntimeError('Previously imported scope missing')
         else:output.mkdir(mode=0o700)
-        if __import__('shutil').disk_usage(output).free<8*1024**3:raise RuntimeError('Fresh image disk headroom insufficient')
+        sizes=[item['bytes'] for item in receipt['archives'].values()]
+        required=max(8*1024**3,(directory/'candidate.zip').stat().st_size+sum(sizes)+max(sizes)+256*1024**2)
+        if __import__('shutil').disk_usage(output).free<required:raise RuntimeError('Fresh image disk headroom insufficient')
         started=time.monotonic()
-        with zipfile.ZipFile(directory/'candidate.zip') as archive:
+        with authenticated_archive(directory/'candidate.zip',artifact['digest']) as archive:
             for role in ('backend','frontend'):
                 path=output/(role+'.tar.gz')
                 if resume:
@@ -54,12 +75,7 @@ def main(directory,source_sha,attempt,mode,*,resume=False):
                     with path.open('rb') as source:
                         if digest(source)!=receipt['archives'][role]['sha256']:raise RuntimeError('Imported archive bytes changed')
                 else:
-                    descriptor=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
-                    with os.fdopen(descriptor,'wb') as destination,archive.open(role+'.tar.gz') as source:
-                        __import__('shutil').copyfileobj(source,destination,1024*1024)
-                    result=subprocess.run(manage.DOCKER+['image','load','--input',str(path)],capture_output=True,timeout=600,
-                        env={'PATH':os.defpath,'HOME':str(Path.home())})
-                    if result.returncode:raise RuntimeError('Fresh staging image import failed')
+                    import_authenticated_image(archive,role,receipt['archives'][role],path)
                 row=json.loads(manage.docker('image','inspect',images[role]))[0];labels=row['Config'].get('Labels',{})
                 if (row['Id']!=images[role] or labels.get('com.madar.release.sha')!=source_sha
                         or labels.get('org.opencontainers.image.revision')!=source_sha
