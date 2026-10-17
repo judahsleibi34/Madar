@@ -1,0 +1,19 @@
+{
+  "source_sha": "3ab2bd506ed89f9457f0010e2b50cb01cb031ff1",
+  "checks": {
+    "test-backend": {
+      "run": 39026532964,
+      "conclusion": "success"
+    },
+    "build-frontend": {
+      "run": 39026533017,
+      "conclusion": "success"
+    },
+    "build-candidate": {
+      "run": 39026533018,
+      "conclusion": "success"
+    }
+  },
+  "status": "PASS",
+  "final_source_relabelled": false
+}

@@ -1,0 +1,32 @@
+{
+  "command": "python3 provider_quiescence_rehearsal.py REHEARSE",
+  "customer_roots_preserved": true,
+  "elapsed_seconds": 16.317,
+  "exact_role_preimage_restored": true,
+  "existing_session_survives_login_fence": true,
+  "fence_survives_database_restart": true,
+  "identified_idle_transaction_drained": true,
+  "independent_interrupted_fixture_recovery": {
+    "customer_roots_preserved": true,
+    "exact_role_preimage_restored": true,
+    "provider_writes_resume": true,
+    "status": "PASS"
+  },
+  "initial_harness_failure": "PostgreSQL startup readiness race after owned restart; bounded positive-control wait added before rerun.",
+  "limitations": [
+    "synthetic tables, not real GoTrue/Storage services",
+    "no protected-controller integration or source admission",
+    "postgres superuser deliberately remains the isolated maintenance channel",
+    "no production login policy, pg_hba policy, writer inventory or supervisor fencing proven",
+    "no full application restore, object bytes, production authorization or RPO/RTO claim"
+  ],
+  "login_fence_committed_before_orchestrator_crash": true,
+  "mode": "REHEARSE",
+  "new_connections_denied": true,
+  "production_modified": false,
+  "production_provider_gate": "BLOCKED: governed provider lifecycle and continuous production writer exclusion are not integrated",
+  "provider_writes_resume": true,
+  "scope": "isolated synthetic PostgreSQL provider-writer fence",
+  "source_sha256": "e33b54312e2a57f31f6173161e4308ec54750fe285885f7fe6a4b0e6bda0cdaf",
+  "uncommitted_auth_storage_changes_rolled_back": true
+}

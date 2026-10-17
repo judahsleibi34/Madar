@@ -1,0 +1,97 @@
+{
+  "status": "PASS",
+  "native_authentication": true,
+  "commercial_enforcement": true,
+  "baseline_stale_private_details_reproduced": true,
+  "candidate_private_details_denied": true,
+  "candidate_role": "availability",
+  "single_request_elapsed_ms": {
+    "baseline": 73.001,
+    "candidate": 58.262
+  },
+  "latency_samples_not_benchmark": true,
+  "benchmark": {
+    "workflow": "native authenticated calendar bootstrap",
+    "dataset": {
+      "tenants": 1,
+      "users": 2,
+      "private_events": 501
+    },
+    "concurrency": 2,
+    "warmup_per_run": 5,
+    "measured_requests": 180,
+    "runs": [
+      {
+        "pair": 0,
+        "role": "baseline",
+        "completed_warmup": false,
+        "errors": 1,
+        "measured_requests": 0,
+        "reason": "baseline cannot load501-event workspace; provider request-line failure"
+      },
+      {
+        "pair": 0,
+        "role": "candidate",
+        "requests": 60,
+        "errors": 0,
+        "p50_ms": 304.049,
+        "p95_ms": 467.333,
+        "throughput_rps": 6.122,
+        "cache_hits": 0
+      },
+      {
+        "pair": 1,
+        "role": "baseline",
+        "completed_warmup": false,
+        "errors": 1,
+        "measured_requests": 0,
+        "reason": "baseline cannot load501-event workspace; provider request-line failure"
+      },
+      {
+        "pair": 1,
+        "role": "candidate",
+        "requests": 60,
+        "errors": 0,
+        "p50_ms": 388.91,
+        "p95_ms": 539.649,
+        "throughput_rps": 5.092,
+        "cache_hits": 0
+      },
+      {
+        "pair": 2,
+        "role": "candidate",
+        "requests": 60,
+        "errors": 0,
+        "p50_ms": 395.28,
+        "p95_ms": 515.759,
+        "throughput_rps": 5.119,
+        "cache_hits": 0
+      },
+      {
+        "pair": 2,
+        "role": "baseline",
+        "completed_warmup": false,
+        "errors": 1,
+        "measured_requests": 0,
+        "reason": "baseline cannot load501-event workspace; provider request-line failure"
+      }
+    ],
+    "method": "three randomized-order pairs; same native provider and synthetic dataset; one API process per role",
+    "p99_reported": false,
+    "interpretation": "security correction cost; no general speedup, SLO or production capacity claim"
+  },
+  "scope": "phase4-calendar-cache-20261017-attempt8",
+  "baseline_source_sha": "32c77afd01a012c7d21240316d4a46e52c3cbf14",
+  "candidate_source": {
+    "base_sha": "0c2d609eb1a04bb5c6b6f12bc0b47f7bfdbbfb25",
+    "route_sha256": "d264e501369e06da7d940e4049f4d6164f3418a6498f52944d0e3e7694bb152e"
+  },
+  "source_class": "source-overlay-on-previously-accepted-dependency-image",
+  "production_modified": false,
+  "elapsed_seconds": 68.956,
+  "limitations": [
+    "synthetic fixture, no production artifact acceptance",
+    "immutable synthetic commercial ledger fixtures retained privately",
+    "authoritative recomputation increases calendar read workload"
+  ]
+}
