@@ -18,9 +18,10 @@ PATTERNS = {
     'aws_access_key': re.compile(rb'\b(?:AKIA|ASIA)[A-Z0-9]{16}\b'),
     'database_credential_uri': re.compile(rb'postgres(?:ql)?://[^\s/:@]{1,100}:[^\s/@]{8,200}@[^\s"\x27<>]{3,200}'),
     'jwt': re.compile(rb'\beyJ[A-Za-z0-9_-]{10,2000}\.[A-Za-z0-9_-]{10,8000}\.[A-Za-z0-9_-]{20,1000}\b'),
+    'credential_assignment': re.compile(rb'(?i)\b(?:password|api[_-]?key|jwt[_-]?secret|service[_-]?role[_-]?key|supabase_service_key)\s*[=:]\s*["\x27]?[A-Za-z0-9_/+=.!:-]{12,500}'),
     'private_network_metadata': re.compile(rb'\b(?:10\.(?:\d{1,3}\.){2}\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|172\.(?:1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3})\b'),
 }
-TEXT_SUFFIXES = {'.py', '.js', '.ts', '.jsx', '.tsx', '.md', '.json', '.yml', '.yaml', '.sql', '.sh', '.conf', '.toml', '.ini', '.txt', '.env'}
+TEXT_SUFFIXES = {'.py', '.js', '.ts', '.jsx', '.tsx', '.md', '.json', '.yml', '.yaml', '.sql', '.sh', '.conf', '.toml', '.ini', '.txt', '.env', '.pem', '.key'}
 
 
 def git(root, *args):
@@ -32,12 +33,12 @@ def scan(root, refs, *, byte_limit=512 * 1024 * 1024):
         raise ValueError('Explicit safe Git refs required')
     pins = [git(root, 'rev-parse', '--verify', ref + '^{commit}').decode().strip() for ref in refs]
     objects = git(root, 'rev-list', '--objects', *pins).decode(errors='replace').splitlines()
-    findings = []; scanned = total = skipped = 0
+    findings = []; omissions = []; scanned = total = skipped = 0
     # Batch metadata before content reads: oversize objects never enter memory.
     candidates = []
     for entry in objects:
         oid, separator, path = entry.partition(' ')
-        if separator and (Path(path).suffix.lower() in TEXT_SUFFIXES or Path(path).name in {'.env', 'Dockerfile'}):
+        if separator and (Path(path).suffix.lower() in TEXT_SUFFIXES or Path(path).name.startswith('.env') or Path(path).name == 'Dockerfile'):
             candidates.append((oid, path))
     metadata = subprocess.run(['git', 'cat-file', '--batch-check=%(objectname) %(objecttype) %(objectsize)'],
                               cwd=root, input=('\n'.join(oid for oid, _ in candidates) + '\n').encode(),
@@ -47,8 +48,11 @@ def scan(root, refs, *, byte_limit=512 * 1024 * 1024):
         if len(fields) != 3 or fields[1] != 'blob':
             continue
         size = int(fields[2])
-        if size > 1024 * 1024 or total + size > byte_limit:
-            skipped += 1; continue
+        if size > 16 * 1024 * 1024 or total + size > byte_limit:
+            skipped += 1
+            omissions.append({'blob': oid, 'path': path, 'bytes': size,
+                              'reason': 'per-blob bound' if size > 16 * 1024 * 1024 else 'total byte bound'})
+            continue
         data = git(root, 'cat-file', 'blob', oid)
         scanned += 1; total += size
         if b'\0' in data:
@@ -60,6 +64,8 @@ def scan(root, refs, *, byte_limit=512 * 1024 * 1024):
                                      'value_sha256': hashlib.sha256(match.group()).hexdigest()})
     return {'refs': dict(zip(refs, pins)), 'scanned_blobs': scanned, 'scanned_bytes': total,
             'skipped_blobs': skipped, 'coverage_complete': skipped == 0,
+            'coverage_scope': 'Selected source/configuration/document/PEM/key suffixes and .env names; binary contents and other suffixes are not certified',
+            'omissions': omissions,
             'classification': 'UNREVIEWED CANDIDATES; no active-secret determination',
             'findings': findings}
 
