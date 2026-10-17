@@ -1,0 +1,216 @@
+name: madar-hardening-20261016
+
+x-service: &service
+  restart: "no"
+  networks: [isolated]
+  labels:
+    com.madar.staging.owner: architecture-hardening-20261016
+  security_opt: [no-new-privileges:true]
+  pids_limit: 128
+  logging:
+    driver: json-file
+    options: {max-size: "5m", max-file: "2"}
+
+x-application: &application
+  <<: *service
+  image: madar-hardening-application:${SOURCE_SHA:?}
+  pull_policy: never
+  user: "65534:65534"
+  read_only: true
+  env_file: ["${HARDENING_ROOT:?}/application.env"]
+  tmpfs:
+    - /tmp:rw,nosuid,nodev,size=256m,mode=1777
+  mem_limit: 1280m
+  cpus: 1.5
+  pids_limit: 256
+
+services:
+  postgres:
+    <<: *service
+    image: postgres:17-alpine@sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73
+    pull_policy: never
+    command: [postgres, -c, shared_preload_libraries=pg_stat_statements]
+    environment:
+      POSTGRES_DB: madar_hardening
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:?}
+    volumes:
+      - database:/var/lib/postgresql/data
+      - ${HARDENING_ROOT:?}/bootstrap.sql:/docker-entrypoint-initdb.d/10-hardening.sql:ro
+    mem_limit: 768m
+    cpus: 2.0
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -h 127.0.0.1 -U postgres -d madar_hardening"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
+  auth:
+    <<: *service
+    image: supabase/gotrue:v2.196.0@sha256:c0c25187a6b835e65a6f6e6c6b39d090e832d40e6de5186f2c038e0411944232
+    pull_policy: never
+    environment:
+      GOTRUE_API_HOST: 0.0.0.0
+      GOTRUE_API_PORT: 9999
+      API_EXTERNAL_URL: http://127.0.0.1:18081/auth/v1
+      GOTRUE_DB_DRIVER: postgres
+      GOTRUE_DB_DATABASE_URL: postgres://supabase_auth_admin:${DATABASE_PASSWORD:?}@postgres:5432/madar_hardening
+      GOTRUE_DB_NAMESPACE: auth
+      GOTRUE_SITE_URL: http://127.0.0.1:18080
+      GOTRUE_URI_ALLOW_LIST: http://127.0.0.1:18080/**
+      GOTRUE_JWT_SECRET: ${JWT_SECRET:?}
+      GOTRUE_JWT_ADMIN_ROLES: service_role
+      GOTRUE_JWT_AUD: authenticated
+      GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
+      GOTRUE_JWT_EXP: 3600
+      GOTRUE_JWT_ISSUER: http://127.0.0.1:18081/auth/v1
+      GOTRUE_EXTERNAL_EMAIL_ENABLED: "true"
+      GOTRUE_MAILER_AUTOCONFIRM: "true"
+      GOTRUE_DISABLE_SIGNUP: "false"
+      GOTRUE_MFA_TOTP_ENROLL_ENABLED: "true"
+      GOTRUE_MFA_TOTP_VERIFY_ENABLED: "true"
+    depends_on:
+      postgres: {condition: service_healthy}
+    mem_limit: 192m
+    cpus: 1.0
+    healthcheck:
+      test: [CMD, wget, --spider, --quiet, http://127.0.0.1:9999/health]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
+  rest:
+    <<: *service
+    image: postgrest/postgrest:v14.17@sha256:c9dc201e555f5d8e37e7f39cdd4df0229774996e213bfd7de8d10ac609030f2c
+    pull_policy: never
+    environment:
+      PGRST_DB_URI: postgres://authenticator:${DATABASE_PASSWORD:?}@postgres:5432/madar_hardening
+      PGRST_DB_SCHEMAS: public,storage
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_JWT_SECRET: ${JWT_SECRET:?}
+      PGRST_DB_POOL: 8
+      PGRST_DB_MAX_ROWS: 1000
+    depends_on:
+      postgres: {condition: service_healthy}
+    mem_limit: 128m
+    cpus: 0.5
+
+  storage:
+    <<: *service
+    image: supabase/storage-api:v1.74.0@sha256:f1546fac6d1c7e345428ac904bfaa7be7cecd50a1f549fe1cf38c628a7b15c85
+    pull_policy: never
+    environment:
+      ANON_KEY: ${ANON_KEY:?}
+      SERVICE_KEY: ${SERVICE_KEY:?}
+      AUTH_JWT_SECRET: ${JWT_SECRET:?}
+      POSTGREST_URL: http://rest:3000
+      DATABASE_URL: postgres://supabase_storage_admin:${DATABASE_PASSWORD:?}@postgres:5432/madar_hardening
+      STORAGE_PUBLIC_URL: http://127.0.0.1:18081
+      STORAGE_BACKEND: file
+      FILE_STORAGE_BACKEND_PATH: /var/lib/storage
+      GLOBAL_S3_BUCKET: hardening
+      TENANT_ID: hardening
+      REGION: local
+      FILE_SIZE_LIMIT: 5242880
+      ENABLE_IMAGE_TRANSFORMATION: "false"
+    volumes: [objects:/var/lib/storage]
+    depends_on:
+      postgres: {condition: service_healthy}
+      rest: {condition: service_started}
+    mem_limit: 256m
+    cpus: 0.5
+
+  gateway:
+    <<: *service
+    networks: [isolated, ingress]
+    image: madar-frontend:b0fdfe049510724c06a04706390cd174ea57a1d1
+    pull_policy: never
+    entrypoint: [nginx, -c, /staging/nginx.conf, -g, "daemon off;"]
+    user: "65534:65534"
+    read_only: true
+    tmpfs: ["/tmp:rw,nosuid,nodev,size=32m,mode=1777"]
+    volumes: ["./gateway.conf:/staging/nginx.conf:ro"]
+    ports: ["127.0.0.1:18081:8081"]
+    depends_on:
+      auth: {condition: service_healthy}
+      rest: {condition: service_started}
+      storage: {condition: service_started}
+    mem_limit: 64m
+    cpus: 0.25
+
+  redis:
+    <<: *service
+    image: redis@sha256:6ab0b6e7381779332f97b8ca76193e45b0756f38d4c0dcda72dbb3c32061ab99
+    pull_policy: never
+    read_only: true
+    user: "999:1000"
+    command: [redis-server, --save, "", --appendonly, "no", --maxmemory, 48mb, --maxmemory-policy, noeviction]
+    tmpfs: ["/data:rw,nosuid,nodev,size=64m,uid=999,gid=1000"]
+    mem_limit: 128m
+    cpus: 0.25
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 2s
+      timeout: 2s
+      retries: 20
+
+  backend:
+    <<: *application
+    depends_on:
+      gateway: {condition: service_started}
+      redis: {condition: service_healthy}
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/live', timeout=2)"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+  notification-worker:
+    <<: *application
+    command: [python, -m, workers.notification_worker]
+    mem_limit: 256m
+    cpus: 0.5
+    depends_on:
+      backend: {condition: service_healthy}
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8090/health', timeout=2)"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+  frontend:
+    <<: *service
+    networks: [isolated, ingress]
+    image: madar-frontend:b0fdfe049510724c06a04706390cd174ea57a1d1
+    pull_policy: never
+    entrypoint: [nginx, -c, /staging/nginx.conf, -g, "daemon off;"]
+    user: "65534:65534"
+    read_only: true
+    tmpfs: ["/tmp:rw,nosuid,nodev,size=32m,mode=1777"]
+    volumes:
+      - ./frontend.conf:/staging/nginx.conf:ro
+      - ../../frontend/dist:/site:ro
+      - ${HARDENING_ROOT:?}/tls.crt:/staging/tls.crt:ro
+      - ${HARDENING_ROOT:?}/tls.key:/staging/tls.key:ro
+    ports: ["127.0.0.1:18080:8080", "127.0.0.1:18443:8443"]
+    depends_on:
+      backend: {condition: service_healthy}
+    mem_limit: 64m
+    cpus: 0.25
+
+networks:
+  isolated:
+    internal: true
+    labels: {com.madar.staging.owner: architecture-hardening-20261016}
+  ingress:
+    # Docker suppresses published ports on internal-only containers. Only the
+    # two proxies join this separate bridge; database/application stay internal.
+    driver_opts:
+      com.docker.network.bridge.enable_ip_masquerade: "false"
+    labels: {com.madar.staging.owner: architecture-hardening-20261016}
+
+volumes:
+  database:
+    labels: {com.madar.staging.owner: architecture-hardening-20261016}
+  objects:
+    labels: {com.madar.staging.owner: architecture-hardening-20261016}

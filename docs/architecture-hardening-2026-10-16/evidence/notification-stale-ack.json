@@ -1,0 +1,1 @@
+{"current_attempts": 2, "deployed_source_sha": "0c591b8fc790246936df6d370ebe455f46a17cd2", "old_attempt": 1, "reclaimed_attempt": 2, "requirement": "reject acknowledgement from an expired/reclaimed lease", "schema": 146, "scope": "native synthetic transaction; rolled back; owned notification worker resumed", "stale_finish_accepted": true, "status": "FAIL"}

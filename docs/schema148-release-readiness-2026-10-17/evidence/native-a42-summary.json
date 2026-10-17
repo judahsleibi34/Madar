@@ -1,0 +1,31 @@
+{
+  "source_sha": "a42e11ab7cd5dc1e30c9eaf54e84aa1f046a91d2",
+  "command": "sudo -n env BACKEND_TEST_IMAGE=madar-schema136-preparation-test:working bash web/scripts/rehearse_migration_148.sh",
+  "scope": "dedicated VM marked disposable PostgreSQL17 actual exact SQL/journals/locks/process exits; supervisor/authorization transport fixtures",
+  "suites": [
+    {
+      "name": "coordinated admission",
+      "passed": 19,
+      "seconds": 13.611
+    },
+    {
+      "name": "146 repro/147 upgrade",
+      "passed": 5,
+      "seconds": 0.183
+    },
+    {
+      "name": "fencing",
+      "passed": 17,
+      "seconds": 7.876
+    },
+    {
+      "name": "148 business integrity",
+      "passed": 22,
+      "seconds": 2.628
+    }
+  ],
+  "total_pass": 63,
+  "failures": 0,
+  "skips": 0,
+  "production_modified": false
+}

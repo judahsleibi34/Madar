@@ -1,0 +1,7 @@
+{
+  "original_password_login": true,
+  "original_auth_id": true,
+  "original_totp": true,
+  "original_private_storage": true,
+  "anonymous_storage_denied": true
+}

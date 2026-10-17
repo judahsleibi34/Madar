@@ -56,7 +56,7 @@ def verify_backup_execution_context(package, *, expected_schema=115):
     No dump, freshness publication, retention, service or customer write occurs.
     """
     from scripts import backup_support
-    if type(expected_schema) is not int or expected_schema not in {115,136,144,146}:
+    if type(expected_schema) is not int or expected_schema not in {115,136,144,146,148}:
         raise RuntimeError('normal_backup_execution_schema_invalid')
     identity = pwd.getpwnam('madar')
     cfg = {}
@@ -109,7 +109,7 @@ print(json.dumps({'uid':os.getuid(),'gid':os.getgid(),'supplementary_groups':os.
 
 
 def remote_receiver(package,plan,backup,sums,filesystem_uuid,*,expected_schema=115,namespace='normal-local-production'):
-    if type(expected_schema) is not int or expected_schema not in {115,136,144,146} or namespace not in {'normal-local-production','private-schema136-rehearsal'}:
+    if type(expected_schema) is not int or expected_schema not in {115,136,144,146,148} or namespace not in {'normal-local-production','private-schema136-rehearsal'}:
         raise RuntimeError('normal_backup_replica_scope_invalid')
     # Freeze only reviewed non-secret code at a NEW append-only Node 1 path.
     # SSH uses the operator's existing alias/host-key/key policy; no private key

@@ -70,8 +70,7 @@ def _app_env() -> str:
 
 
 def _cookie_secure() -> bool:
-    default = "true" if _app_env() in {"prod", "production"} else "false"
-    return os.getenv("COOKIE_SECURE", default).lower() == "true"
+    return _env_bool("COOKIE_SECURE", _app_env() in {"staging", "prod", "production"})
 
 
 def _cookie_samesite() -> str:
@@ -90,12 +89,25 @@ def get_csrf_secret() -> str:
     return "madar-development-csrf-secret"
 
 
-def normalize_origin(value: str | None) -> str | None:
+def normalize_origin(value: str | None, *, allow_path: bool = True) -> str | None:
     if not value:
         return None
 
-    parsed = urlparse(value.strip())
-    if not parsed.scheme or not parsed.netloc:
+    raw = value.strip()
+    if any(character.isspace() or character == "\\" for character in raw):
+        return None
+    try:
+        parsed = urlparse(raw)
+        parsed.port
+    except ValueError:
+        return None
+    if (
+        parsed.scheme.lower() not in {"http", "https"}
+        or not parsed.hostname
+        or parsed.username is not None
+        or parsed.password is not None
+        or (not allow_path and (parsed.path not in {"", "/"} or parsed.params or parsed.query or parsed.fragment))
+    ):
         return None
 
     return f"{parsed.scheme.lower()}://{parsed.netloc.lower()}"
@@ -260,9 +272,10 @@ def validate_csrf_token_value(token: str, session_token: str) -> bool:
 
 
 def origin_from_request(request: Request) -> str | None:
-    origin = normalize_origin(request.headers.get("origin"))
-    if origin:
-        return origin
+    # An explicit opaque/malformed Origin must fail closed. Referer fallback
+    # is only for clients which actually omitted the Origin header.
+    if "origin" in request.headers:
+        return normalize_origin(request.headers["origin"], allow_path=False)
 
     referer = normalize_origin(request.headers.get("referer"))
     if referer:

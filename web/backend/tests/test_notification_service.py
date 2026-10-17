@@ -1,3 +1,5 @@
+import unittest
+import os
 from unittest.mock import patch
 
 from services import notification_delivery_service, notification_service, observability_service
@@ -118,137 +120,139 @@ class FakeQueryResult:
         return self
 
 
-def test_notification_read_exposes_serial_query_timing_breakdown():
-    fake_supabase = FakeSupabase()
-    token = observability_service.begin_request_timings()
-    try:
-        with patch.object(notification_service, "service_supabase", fake_supabase):
-            notification_service.list_user_notifications(tenant_id=7, user_id=11)
-        timings = observability_service.request_timings_snapshot()
-    finally:
-        observability_service.end_request_timings(token)
+class NotificationServiceTests(unittest.TestCase):
+    def setUp(self):
+        self.enterContext(patch.dict(os.environ))
 
-    assert {
-        "notifications_list_query",
-        "notifications_transform",
-        "notifications_unread_query",
-    }.issubset(timings)
+    def patch_attribute(self, target, name, value):
+        self.enterContext(patch.object(target, name, value))
 
+    def test_notification_read_exposes_serial_query_timing_breakdown(self):
+        fake_supabase = FakeSupabase()
+        token = observability_service.begin_request_timings()
+        try:
+            with patch.object(notification_service, "service_supabase", fake_supabase):
+                notification_service.list_user_notifications(tenant_id=7, user_id=11)
+            timings = observability_service.request_timings_snapshot()
+        finally:
+            observability_service.end_request_timings(token)
 
-def test_create_tenant_notification_event_creates_atomic_durable_intent(monkeypatch):
-    fake_supabase = FakeSupabase()
-    monkeypatch.setattr(notification_service, "service_supabase", fake_supabase)
-    monkeypatch.delenv("WEB_PUSH_VAPID_PUBLIC_KEY", raising=False)
-    monkeypatch.delenv("WEB_PUSH_VAPID_PRIVATE_KEY", raising=False)
-    monkeypatch.delenv("WEB_PUSH_VAPID_SUBJECT", raising=False)
+        assert {
+            "notifications_list_query",
+            "notifications_transform",
+            "notifications_unread_query",
+        }.issubset(timings)
 
-    event = notification_service.create_builder_block_event_notification(
-        tenant_id=7,
-        event_type="builder.form_submitted",
-        block_type="form",
-        source_id="submission-1",
-        title="New form submission",
-        body="Contact form received a new response.",
-        data={"form_id": "contact"},
-    )
+    def test_create_tenant_notification_event_creates_atomic_durable_intent(self):
+        fake_supabase = FakeSupabase()
+        self.patch_attribute(notification_service, "service_supabase", fake_supabase)
+        os.environ.pop("WEB_PUSH_VAPID_PUBLIC_KEY", None)
+        os.environ.pop("WEB_PUSH_VAPID_PRIVATE_KEY", None)
+        os.environ.pop("WEB_PUSH_VAPID_SUBJECT", None)
 
-    assert event["event_type"] == "builder.form_submitted"
-    assert len(fake_supabase.tables["notification_events"]) == 1
-    assert len(fake_supabase.tables["notification_outbox"]) == 1
-    assert fake_supabase.tables["user_notifications"] == []
-    assert event["data"]["block_type"] == "form"
+        event = notification_service.create_builder_block_event_notification(
+            tenant_id=7,
+            event_type="builder.form_submitted",
+            block_type="form",
+            source_id="submission-1",
+            title="New form submission",
+            body="Contact form received a new response.",
+            data={"form_id": "contact"},
+        )
 
+        assert event["event_type"] == "builder.form_submitted"
+        assert len(fake_supabase.tables["notification_events"]) == 1
+        assert len(fake_supabase.tables["notification_outbox"]) == 1
+        assert fake_supabase.tables["user_notifications"] == []
+        assert event["data"]["block_type"] == "form"
 
-def test_internal_reminder_is_delivered_only_to_its_target_user(monkeypatch):
-    fake_supabase = FakeSupabase()
-    monkeypatch.setattr(
-        notification_delivery_service, "service_supabase", fake_supabase
-    )
+    def test_internal_reminder_is_delivered_only_to_its_target_user(self):
+        fake_supabase = FakeSupabase()
+        self.patch_attribute(
+            notification_delivery_service, "service_supabase", fake_supabase
+        )
 
-    notification_delivery_service.deliver_notification({
-        "channel": "internal",
-        "tenant_id": 7,
-        "user_id": 11,
-        "payload": {
-            "event_type": "calendar_task_reminder",
-            "source_type": "calendar_task",
-            "source_id": "task-1",
-            "title": "Task starts soon",
-            "body": "Scheduled for now",
-            "data": {"task_id": "task-1"},
-        },
-    })
-
-    assert len(fake_supabase.tables["user_notifications"]) == 1
-    assert fake_supabase.tables["user_notifications"][0]["user_id"] == 11
-
-
-def test_ecommerce_order_notification_reaches_active_store_owner(monkeypatch):
-    fake_supabase = FakeSupabase()
-    monkeypatch.setattr(
-        notification_delivery_service, "service_supabase", fake_supabase
-    )
-
-    notification_delivery_service.deliver_notification({
-        "channel": "internal",
-        "tenant_id": 7,
-        "payload": {
-            "event_type": "ecommerce_order_created",
-            "source_type": "ecommerce_order",
-            "source_id": "order-1",
-            "title": "New order: MD-1001",
-            "body": "MD-1001 was placed for ILS 25.00.",
-            "data": {"order_id": "order-1", "order_number": "MD-1001"},
-            "event_deduplication_key": "ecommerce-order:order-1",
-        },
-    })
-
-    recipients = {
-        row["user_id"] for row in fake_supabase.tables["user_notifications"]
-    }
-    assert recipients == {11, 12}
-    owner_notification = next(
-        row for row in fake_supabase.tables["user_notifications"]
-        if row["user_id"] == 11
-    )
-    assert owner_notification["event_type"] == "ecommerce_order_created"
-    assert owner_notification["data"]["order_id"] == "order-1"
-
-
-def test_notification_rpc_accepts_single_object_response():
-    assert notification_service._rows(FakeResponse({"id": "event-1"})) == [
-        {"id": "event-1"}
-    ]
-
-
-def test_ecommerce_order_in_app_notification_is_mandatory_for_owner(monkeypatch):
-    fake_supabase = FakeSupabase()
-    monkeypatch.setattr(
-        notification_delivery_service, "service_supabase", fake_supabase
-    )
-    monkeypatch.setattr(
-        notification_delivery_service,
-        "preference_enabled",
-        lambda **_kwargs: False,
-    )
-
-    notification_delivery_service.deliver_notification({
-        "channel": "internal",
-        "tenant_id": 7,
-        "payload": {
-            "event_type": "ecommerce_order_created",
-            "source_type": "ecommerce_order",
-            "source_id": "order-mandatory-1",
-            "title": "New order: MD-1002",
-            "body": "MD-1002 was placed for ILS 25.00.",
-            "data": {
-                "order_id": "order-mandatory-1",
-                "order_number": "MD-1002",
+        notification_delivery_service.deliver_notification({
+            "channel": "internal",
+            "tenant_id": 7,
+            "user_id": 11,
+            "payload": {
+                "event_type": "calendar_task_reminder",
+                "source_type": "calendar_task",
+                "source_id": "task-1",
+                "title": "Task starts soon",
+                "body": "Scheduled for now",
+                "data": {"task_id": "task-1"},
             },
-            "event_deduplication_key": "ecommerce-order:order-mandatory-1",
-        },
-    })
+        })
 
-    assert {
-        row["user_id"] for row in fake_supabase.tables["user_notifications"]
-    } == {11}
+        assert len(fake_supabase.tables["user_notifications"]) == 1
+        assert fake_supabase.tables["user_notifications"][0]["user_id"] == 11
+
+    def test_ecommerce_order_notification_reaches_active_store_owner(self):
+        fake_supabase = FakeSupabase()
+        self.patch_attribute(
+            notification_delivery_service, "service_supabase", fake_supabase
+        )
+
+        notification_delivery_service.deliver_notification({
+            "channel": "internal",
+            "tenant_id": 7,
+            "payload": {
+                "event_type": "ecommerce_order_created",
+                "source_type": "ecommerce_order",
+                "source_id": "order-1",
+                "title": "New order: MD-1001",
+                "body": "MD-1001 was placed for ILS 25.00.",
+                "data": {"order_id": "order-1", "order_number": "MD-1001"},
+                "event_deduplication_key": "ecommerce-order:order-1",
+            },
+        })
+
+        recipients = {
+            row["user_id"] for row in fake_supabase.tables["user_notifications"]
+        }
+        assert recipients == {11, 12}
+        owner_notification = next(
+            row for row in fake_supabase.tables["user_notifications"]
+            if row["user_id"] == 11
+        )
+        assert owner_notification["event_type"] == "ecommerce_order_created"
+        assert owner_notification["data"]["order_id"] == "order-1"
+
+    def test_notification_rpc_accepts_single_object_response(self):
+        assert notification_service._rows(FakeResponse({"id": "event-1"})) == [
+            {"id": "event-1"}
+        ]
+
+    def test_ecommerce_order_in_app_notification_is_mandatory_for_owner(self):
+        fake_supabase = FakeSupabase()
+        self.patch_attribute(
+            notification_delivery_service, "service_supabase", fake_supabase
+        )
+        self.patch_attribute(
+            notification_delivery_service,
+            "preference_enabled",
+            lambda **_kwargs: False,
+        )
+
+        notification_delivery_service.deliver_notification({
+            "channel": "internal",
+            "tenant_id": 7,
+            "payload": {
+                "event_type": "ecommerce_order_created",
+                "source_type": "ecommerce_order",
+                "source_id": "order-mandatory-1",
+                "title": "New order: MD-1002",
+                "body": "MD-1002 was placed for ILS 25.00.",
+                "data": {
+                    "order_id": "order-mandatory-1",
+                    "order_number": "MD-1002",
+                },
+                "event_deduplication_key": "ecommerce-order:order-mandatory-1",
+            },
+        })
+
+        assert {
+            row["user_id"] for row in fake_supabase.tables["user_notifications"]
+        } == {11}

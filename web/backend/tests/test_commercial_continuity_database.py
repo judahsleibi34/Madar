@@ -8,16 +8,18 @@ from uuid import uuid4
 
 import psycopg
 from psycopg.types.json import Jsonb
+from tests.disposable_database_support import connect_disposable_database
 
 
 DSN = os.getenv("COMMERCIAL_SYNTHETIC_DATABASE_DSN")
+DISPOSABLE_MARKERS = frozenset({"madar-commercial-continuity-synthetic-rehearsal", "madar-price-book-synthetic-rehearsal", "madar-hardening-synthetic-146"})
 MODULES = ["forms", "website", "ecommerce"]
 
 
 @unittest.skipUnless(DSN, "Requires disposable PostgreSQL commercial rehearsal")
 class StrictPaidContinuityDatabaseTests(unittest.TestCase):
     def setUp(self):
-        self.db = psycopg.connect(DSN, autocommit=True)
+        self.db = connect_disposable_database(DSN, markers=DISPOSABLE_MARKERS)
         self.addCleanup(self.db.close)
         token = uuid4().hex
         self.tenant = self.db.execute(
@@ -243,7 +245,7 @@ class StrictPaidContinuityDatabaseTests(unittest.TestCase):
         def run(kind):
             delay = max(0, (boundary - datetime.now(timezone.utc)).total_seconds())
             time.sleep(delay)
-            with psycopg.connect(DSN, autocommit=True) as db:
+            with connect_disposable_database(DSN, markers=DISPOSABLE_MARKERS) as db:
                 try:
                     if kind == "renew":
                         self.pay(boundary, boundary + timedelta(days=1), modules=["website"],

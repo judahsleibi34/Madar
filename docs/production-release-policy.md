@@ -1,5 +1,154 @@
 # Madar production release acceptance policy
 
+## Phase-IV verified migration byte snapshots
+
+The migration executor captures checksum-verified regular UTF-8 SQL files once
+before backup verification or database access. It executes those captured bytes
+after live admission callbacks, never a reopened operator-owned pathname.
+Symlinks/nonregular files, invalid encoding, more than16MiB per migration or
+64MiB per batch fail before effects. Existing manifest hashes, SQL history,
+ordering, locks, backup gates and single-use coordinated journals are unchanged.
+
+## Phase-IV provider-writer readiness
+
+The readiness accounting model now requires separate `database.provider_quiescence`
+evidence. Stopping notification consumers or observing an instant with zero
+transactions cannot supply this gate. The isolated native provider drill proves
+that NOLOGIN survives a crash/restart but does not drain existing sessions, and
+that exact explicit recovery must follow preserved roots and role preimages.
+It is not a production coordinator adapter. Provider stop/restart ownership,
+backup role preimages, maintenance health/probes and controlled recovery remain
+release blockers; no provider lifecycle or privilege mutation is authorized by
+this source. Historical operation contracts and migration hashes are unchanged.
+
+## Phase-IV exact-source and artifact consumption
+
+Application CI checks out and verifies the exact PR head used by fresh artifact
+builds. Integration previews targeting main also run the candidate-image check;
+no path filter may leave this required check permanently pending. Artifact ZIP
+verification hashes and parses one bounded private snapshot. Staging import
+re-authenticates that snapshot and loads verified members through private file
+descriptors, so rename or in-place edits cannot substitute bytes after hashing.
+These checks issue no deployment or production authority.
+
+## Phase-IV forward-repair preservation
+
+Fresh forward completion passes the selected operation contract to customer
+preservation validation. Each retained profile keeps its own source/target and
+Auth/Storage rules; successful SQL never permits legacy-default validation or
+a NORMAL grant from this READ_ONLY recovery path.
+
+## Unselected governed schema146→148 maintenance admission
+
+The version5 profile additionally requires authenticated fresh-CI provenance:
+exact repository/workflow/source/run/attempt, immutable GitHub artifact digest,
+archive/image/lockfile hashes and actual fresh-image labels. Offline overlays,
+expired artifacts, forged local PASS packets and wrong-source runs reject. The
+read-only verifier loads no images and issues no authority. New official checkout
+and upload actions are immutable pins; artifact retention is7 days. Existing
+profiles retain their acceptance contracts. Full Auth/Storage tables now enter
+only the version5 preservation snapshot; historical five-table snapshots remain
+unchanged. Active/manual native worker processes are checked through host cgroups
+with a visible candidate PID as positive control. A separately digest-bound
+unrelated native SDK worker can be excluded only after immutable specification,
+different signing authority AND live PostgREST cryptographic-denial proofs; shared
+keys, direct DB credentials, unknown schemes or hidden processes remain blocked.
+No unrelated workload is stopped by these inspectors.
+
+The new version-5 `completed-normal-schema146-148-coordinated-release` profile
+composes unchanged147/148 SQL with `schema-146-148-coordinated.json` and
+`migrations-147-148-coordinated.json`. Active release146 and historical profiles,
+manifests, grants and receipts remain unchanged. Automatic policy is none and
+ordinary automatic manifest loading still rejects coordinated SQL. Only the
+existing protected coordinator's fresh source/context-bound authorization may
+select this exact manifest. No installation or production operation is authorized.
+
+READ_ONLY compatibility is146..148; NORMAL requires148 plus existing sealed SQL,
+preservation, artifact, backup/restore/replica and boot gates. Old workers must
+be stopped with restart policy no after existing exclusive worker/boot/write
+handoff. A digest-bound complete consumer inventory and live database quiescence
+must verify before backup and before each SQL step. Unknown consumers, processing
+deliveries (including expired), active transactions, prepared transactions or
+queue locks refuse. No queue reconciliation mutation or uncertain-send retry is
+performed automatically. Missing protocol authority never falls back to legacy.
+
+Before147 commit, SQL rollback preserves146; after147 commit, no protocol1 or
+old NORMAL grant can be restored.147 interruption recovers READ_ONLY/maintenance
+and requires separately authorized forward repair;148 completion alone is not
+NORMAL authority. A new boot drop-in sorts after the measured146 predecessor;
+unknown later drop-ins reject. Existing root installation, deploy/upgrade locks,
+single-use credentials, source/image verification and append-only backup scopes
+remain mandatory. Component/native synthetic tests do not satisfy current-data,
+exact accepted-image, independent review, production approval or real reboot gates.
+See docs/schema148-release-readiness-2026-10-17/ for scoped evidence and runbook.
+
+## Unselected reservation-capacity repair147→148
+
+The mirrored148 migration and pinned
+`migrations-147-148-reservation-capacity.json` /
+`schema-147-148-reservation-capacity.json` follow the coordinated147 worker cutover;
+they do not change147, historical migrations/manifests or active release146.
+Policy is none and the candidate remains unselected. No production installation,
+SQL, write grant or release selection is authorized.
+
+Native tests confirmed that cancelled exclusive reservations could be reactivated
+into occupied slots.148 takes the same per-block advisory lock as public create,
+then the reservation row lock, rechecks identity and overlap before active status
+mutation and email intent. Adjacent/free slots and nonexclusive bookings retain
+their existing behavior. Cross-tenant lookup remains null/404. Direct runtime
+UPDATE is revoked; normal production SDK status/cancellation/ownership operations
+already use retained security-definer RPCs. API capacity conflicts return409.
+The migration does not repair historical overlapping reservations automatically.
+
+A disposable146→147→148 rehearsal proves147 rollback/cutover refusal, all four
+stale acknowledgement denials, process crashes/restarts,148 transactional
+function/ACL/schema rollback and re-entry refusal, native reservation/variant
+stock/order atomicity and synthetic payment/reversal idempotency. No live billing
+or real external delivery is used. The future production operation must bind a
+reviewed target148 candidate and the existing controller's separate admission;
+no intermediate schema may be mistaken for complete application acceptance.
+
+
+## Unselected coordinated notification claim fencing146→147
+
+The mirrored147 candidate and checksum-pinned
+`migrations-146-147-notification-fencing.json` /
+`schema-146-147-notification-fencing.json` are source-only preparation. Active
+`release.json`, every001–146 migration and prior manifest remain unchanged.
+This candidate is **coordinated**, policy `none`, exact application schema147;
+the automatic executor must reject it. It is deliberately not mislabeled as a
+rolling forward-compatible worker change. No controller installation, production
+SQL, release selection, write grant or worker activation is authorized.
+
+147 takes the core schema/table locks and refuses every processing delivery,
+including expired leases. Stop old consumers, drain known work, reconcile
+provider-accepted/unknown sends through existing approved operations, verify no
+processing rows and obtain the normal verified-backup/maintenance authorization.
+Never reset an uncertain send to pending solely to satisfy the precondition.
+A failed or disconnected SQL transaction leaves146 and its original ACLs intact.
+Committed147 is not down-migrated; resume by verifying protocol2 and starting only
+accepted generation-aware worker images. An old image is not a147 rollback target.
+The existing governed controller must separately admit any future147 production
+operation; this unselected descriptor does not extend its authority.
+
+Protocol2 claim increments a persistent generation and uses database time. Finish
+locks the row, samples the database clock after waiting, then atomically compares
+id/generation/processing/live lease before every sent/retry/dead/revoked update.
+Unfenced RPCs and direct service-role writes are denied; existing security-definer
+resolvers/cleanup retain their functions. New workers fail before consumption on
+pre147, reject rows without a generation before delivery, and never fall back to
+legacy acknowledgement. A stale result cannot finalize a reminder or count sent.
+
+External SMTP/push acceptance and database acknowledgement are not one transaction.
+Lost acknowledgements or crashes can still cause duplicate external delivery on
+lease recovery. Fencing prevents stale database mutation, not exactly-once sends.
+Workers report ownership loss/unknown provider outcomes and never immediately
+resend on an acknowledgement error. Production rollout needs provider reconciliation
+and a duplicate-aware policy; only providers with a stable idempotency contract
+can remove that external ambiguity. Synthetic provider restart tests cover both
+idempotent and non-idempotent boundaries without real email, push or billing.
+
+
 ## Manual commercial144→146 release
 
 A post-SQL backup failure requires a separate backup-only completion. It binds
@@ -2726,3 +2875,10 @@ preparation, CI, historical receipts and private tests provide no authorization.
 Stable runtime verification records whether a live customer mutation was
 actually performed; private authentication acceptance is never reported as a
 live customer login.
+
+Schema148 fresh artifact identities explicitly distinguish the build-host image
+configuration ID from the single OCI archive manifest ID used by the target
+containerd image store. The producer verifies both blobs before publishing the
+receipt. Imported runtime IDs must equal the accepted manifest IDs; a mismatch
+refuses before replacing services. Latest exact-application-source backend and
+frontend workflow success is independently requeried, in addition to artifact CI.

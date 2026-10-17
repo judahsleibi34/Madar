@@ -15,6 +15,9 @@ from typing import Any, Callable
 
 from services.notification_delivery_service import DeliveryError, deliver_notification
 from services.notification_delivery_queue_service import (
+    DeliveryOwnershipLost,
+    validate_claim_generation,
+    require_delivery_fencing,
     claim_deliveries,
     cleanup_delivery_data,
     finish_delivery,
@@ -32,7 +35,7 @@ from services.observability_service import configure_structured_logging
 
 logger = logging.getLogger(__name__)
 STOP_EVENT = threading.Event()
-STATE: dict[str, Any] = {"healthy": False, "last_poll_at": None, "processed": 0, "resolved": 0, "sent": 0, "failed": 0, "dead": 0, "queue_depth": 0, "oldest_pending_age_seconds": 0}
+STATE: dict[str, Any] = {"healthy": False, "last_poll_at": None, "processed": 0, "resolved": 0, "sent": 0, "failed": 0, "dead": 0, "ownership_lost": 0, "acknowledgement_failed": 0, "queue_depth": 0, "oldest_pending_age_seconds": 0}
 
 
 def retry_delay(row: dict[str, Any], *, base: int = 30, maximum: int = 3600) -> int:
@@ -100,17 +103,28 @@ def process_batch(
     if not worker_consumption_allowed():
         return 0
     rows = claim(limit=limit)
+    invalid_claims = threading.Event()
 
     def process(row: dict[str, Any]) -> None:
         delivery_id = str(row.get("id") or "")
         if not delivery_id:
             logger.error("notification_worker.row_invalid", extra={"error_code": "delivery_id_missing"})
             return
+        try:
+            generation = validate_claim_generation(row.get("claim_generation"))
+        except ValueError:
+            invalid_claims.set()
+            STATE["failed"] += 1
+            STATE["healthy"] = False
+            logger.error("notification_worker.row_invalid", extra={"error_code": "claim_generation_missing"})
+            return
+        provider_accepted = False
         outcome = "sent"
         error_code = None
         selected_retry_delay = retry_delay(row)
         try:
             deliver(row)
+            provider_accepted = True
         except DeliveryError as error:
             error_code = error.code
             outcome = "retry" if error.retryable else error.terminal_outcome
@@ -137,11 +151,25 @@ def process_batch(
         try:
             result = finish(
                 delivery_id,
+                claim_generation=generation,
                 outcome=outcome,
                 error_code=error_code,
                 retry_after_seconds=selected_retry_delay,
             )
+        except DeliveryOwnershipLost:
+            STATE["ownership_lost"] += 1
+            STATE["failed"] += 1
+            STATE["processed"] += 1
+            logger.warning("notification_worker.delivery_ownership_lost", extra={
+                "delivery_id": delivery_id, "attempt": row.get("attempts"),
+                "error_code": "provider_outcome_unknown" if provider_accepted else "claim_lost",
+            })
+            # The provider may have accepted the side effect. Never send again
+            # here, retry the acknowledgement without its generation, or finalize
+            # an outbox/reminder using another worker's claim.
+            return
         except Exception as error:
+            STATE["acknowledgement_failed"] += 1
             STATE["failed"] += 1
             STATE["processed"] += 1
             logger.error(
@@ -153,6 +181,7 @@ def process_batch(
                     "channel": row.get("channel"),
                     "attempt": row.get("attempts"),
                     "error_type": type(error).__name__,
+                    "error_code": "provider_outcome_unknown" if provider_accepted else "acknowledgement_failed",
                 },
             )
             return
@@ -193,7 +222,7 @@ def process_batch(
     with ThreadPoolExecutor(max_workers=max(1, min(int(concurrency), 16))) as executor:
         list(executor.map(process, rows))
     STATE["last_poll_at"] = datetime.now(timezone.utc).isoformat()
-    STATE["healthy"] = True
+    STATE["healthy"] = not invalid_claims.is_set()
     return len(rows)
 
 
@@ -212,7 +241,7 @@ class HealthHandler(BaseHTTPRequestHandler):
             self.wfile.write(body)
             return
         if self.path == "/metrics":
-            lines = [f"madar_notification_worker_{key} {int(value)}" for key, value in STATE.items() if key in {"processed", "sent", "failed", "dead", "queue_depth", "oldest_pending_age_seconds"}]
+            lines = [f"madar_notification_worker_{key} {int(value)}" for key, value in STATE.items() if key in {"processed", "sent", "failed", "dead", "ownership_lost", "acknowledgement_failed", "queue_depth", "oldest_pending_age_seconds"}]
             body = ("\n".join(lines) + "\n").encode()
             self.send_response(200)
             self.send_header("Content-Type", "text/plain; version=0.0.4")
@@ -250,6 +279,18 @@ def main() -> int:
                 STATE["consuming"] = False
                 STOP_EVENT.wait(1.0)
                 continue
+            # A governed READ_ONLY standby must stay healthy without issuing
+            # business RPCs. Probe only after authority permits consumption,
+            # and before *any* scheduling/resolution or provider side effect.
+            try:
+                require_delivery_fencing()
+            except Exception as error:
+                STATE["healthy"] = False
+                STATE["consuming"] = False
+                logger.error("notification_worker.fencing_protocol_unavailable",
+                             extra={"error_type": type(error).__name__})
+                STOP_EVENT.wait(poll_seconds)
+                continue
             STATE["consuming"] = True
             try:
                 archive_ended_calendar_tasks(limit=batch_size)
@@ -278,8 +319,17 @@ def main() -> int:
                     extra={"error_type": type(error).__name__},
                 )
             try:
-                STATE.update(get_queue_metrics())
-                STATE.update(get_delivery_metrics())
+                # Queue status totals are gauges, not this process's delivery
+                # outcome counters. In particular an outbox can be resolved
+                # before its provider delivery is acknowledged. Copying its
+                # `sent` value would report success after a lost acknowledgement.
+                queue_metrics = get_queue_metrics()
+                STATE.update({key: queue_metrics[key] for key in
+                              ("queue_depth", "oldest_pending_age_seconds") if key in queue_metrics})
+                delivery_metrics = get_delivery_metrics()
+                STATE.update({key: delivery_metrics[key] for key in
+                              ("deliveries_pending", "deliveries_processing", "deliveries_sent", "deliveries_dead")
+                              if key in delivery_metrics})
             except Exception as error:
                 STATE["healthy"] = False
                 logger.error("notification_worker.metrics_failed", extra={"error_type": type(error).__name__})

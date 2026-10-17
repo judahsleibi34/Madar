@@ -5,6 +5,8 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from dataclasses import replace
+from unittest.mock import Mock, patch
 
 WEB_ROOT = Path(os.getenv("MADAR_TEST_REPOSITORY_ROOT") or Path(__file__).resolve().parents[2])
 sys.path.insert(0, str(WEB_ROOT))
@@ -45,6 +47,20 @@ class FakeConnection:
         self.closed = False
     def cursor(self): return FakeCursor(self)
     def close(self): self.closed = True
+
+
+class RecordingCursor(FakeCursor):
+    def execute(self, query, params=None):
+        if 'MIGRATION_TO=' in str(query):
+            self.connection.executed_sql.append(str(query))
+        return super().execute(query, params)
+
+
+class RecordingConnection(FakeConnection):
+    def __init__(self):
+        super().__init__()
+        self.executed_sql = []
+    def cursor(self): return RecordingCursor(self)
 
 
 class MigrationExecutorTests(unittest.TestCase):
@@ -163,6 +179,68 @@ class MigrationExecutorTests(unittest.TestCase):
                     manifest=manifest, state_file=root / "state.json", backup_dir=backup,
                     backup_verifier=lambda _path: None,
                 ).run()
+
+    def test_backup_time_file_substitution_cannot_change_executed_sql_or_receipt(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root=Path(temporary)
+            repository,manifest_path,backup=self.fixture(root)
+            manifest=MigrationManifest.load(manifest_path,repository)
+            approved=[migration.path.read_text() for migration in manifest.migrations]
+            connection=RecordingConnection()
+            def substitute(_):
+                manifest.migrations[0].path.write_text('-- unreviewed substitution\n'+approved[0])
+            result=LockedMigrationExecutor(connection_factory=lambda:connection,manifest=manifest,
+                state_file=root/'state.json',backup_dir=backup,backup_verifier=substitute).run()
+            self.assertNotEqual(manifest.migrations[0].path.read_text(),approved[0])
+            self.assertEqual(connection.executed_sql,approved)
+            self.assertEqual([row['checksum'] for row in result['migrations']],
+                             [hashlib.sha256(value.encode()).hexdigest() for value in connection.executed_sql])
+
+    def test_coordinated_guard_time_replace_or_symlink_cannot_substitute_sql(self):
+        for replacement in ('bytes','symlink'):
+            with self.subTest(replacement=replacement),tempfile.TemporaryDirectory() as temporary:
+                root=Path(temporary)
+                repository,manifest_path,backup=self.fixture(root)
+                manifest=replace(MigrationManifest.load(manifest_path,repository),coordinated=True)
+                approved=[migration.path.read_text() for migration in manifest.migrations]
+                connection=RecordingConnection()
+                def guard(cursor,migration):
+                    if migration.number!=82:return
+                    changed='-- unreviewed guard-time substitution\n'+approved[0]
+                    if replacement=='bytes':migration.path.write_text(changed)
+                    else:
+                        evil=root/'unreviewed.sql';evil.write_text(changed)
+                        migration.path.unlink();migration.path.symlink_to(evil)
+                LockedMigrationExecutor(connection_factory=lambda:connection,manifest=manifest,
+                    state_file=root/'state.json',backup_dir=backup,backup_verifier=lambda _:None,
+                    migration_guard=guard).run()
+                self.assertEqual(connection.executed_sql,approved)
+
+    def test_symlink_fifo_encoding_and_size_are_rejected_before_backup_or_connection(self):
+        for invalid in ('symlink','fifo','encoding','size','batch_size'):
+            with self.subTest(invalid=invalid),tempfile.TemporaryDirectory() as temporary:
+                root=Path(temporary)
+                repository,manifest_path,backup=self.fixture(root)
+                manifest=MigrationManifest.load(manifest_path,repository)
+                migration=manifest.migrations[0]
+                if invalid=='symlink':
+                    target=root/'copied.sql';target.write_bytes(migration.path.read_bytes())
+                    migration.path.unlink();migration.path.symlink_to(target)
+                elif invalid=='fifo':
+                    migration.path.unlink();os.mkfifo(migration.path)
+                elif invalid=='encoding':
+                    migration.path.write_bytes(b'\xff\xfe')
+                    manifest=replace(manifest,migrations=(replace(migration,sha256=hashlib.sha256(b'\xff\xfe').hexdigest()),
+                                                          manifest.migrations[1]))
+                backup_verifier=Mock();connection_factory=Mock()
+                executor=LockedMigrationExecutor(connection_factory=connection_factory,manifest=manifest,
+                    state_file=root/'state.json',backup_dir=backup,backup_verifier=backup_verifier)
+                with patch.object(executor,'MAX_MIGRATION_BYTES',1 if invalid=='size' else 16*1024*1024,create=True), \
+                        patch.object(executor,'MAX_BATCH_BYTES',1 if invalid=='batch_size' else 64*1024*1024,create=True):
+                    with self.assertRaisesRegex(RuntimeError,'migration_(source|encoding|size|batch)'):
+                        executor.run()
+                backup_verifier.assert_not_called();connection_factory.assert_not_called()
+                self.assertFalse((root/'state.json').exists())
 
     def test_refuses_missing_backup_and_held_database_lock(self):
         with tempfile.TemporaryDirectory() as temporary:

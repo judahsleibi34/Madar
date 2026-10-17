@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import os
 import re
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import Any
 
 from database import service_supabase
@@ -76,14 +76,32 @@ def resolve_outbox_notification(row: dict[str, Any], *, client=None) -> int:
     return int(data or 0)
 
 
+class DeliveryOwnershipLost(RuntimeError):
+    """The database rejected a superseded, expired or completed claim."""
+
+
+def validate_claim_generation(value: Any) -> int:
+    if isinstance(value, bool) or not isinstance(value, (int, str)):
+        raise ValueError("notification delivery claim generation is required")
+    if isinstance(value, str) and not value.isdecimal():
+        raise ValueError("invalid notification delivery claim generation")
+    generation = int(value)
+    if not 0 < generation <= 9223372036854775807:
+        raise ValueError("invalid notification delivery claim generation")
+    return generation
+
+
+def require_delivery_fencing(*, client=None) -> None:
+    response = (client or service_supabase).rpc("notification_delivery_protocol", {}).execute()
+    if getattr(response, "data", None) != 2:
+        raise RuntimeError("notification delivery protocol 2/schema147 is required")
+
+
 def claim_deliveries(*, limit: int = 25, lease_seconds: int = 900, client=None) -> list[dict[str, Any]]:
     response = (client or service_supabase).rpc(
-        "claim_notification_deliveries",
-        {
-            "p_limit": max(1, min(int(limit), 100)),
-            "p_now": _now().isoformat(),
-            "p_lease_seconds": max(30, min(int(lease_seconds), 3600)),
-        },
+        "claim_notification_deliveries_v2",
+        {"p_limit": max(1, min(int(limit), 100)),
+         "p_lease_seconds": max(30, min(int(lease_seconds), 3600))},
     ).execute()
     return _rows(response)
 
@@ -91,40 +109,38 @@ def claim_deliveries(*, limit: int = 25, lease_seconds: int = 900, client=None) 
 def finish_delivery(
     delivery_id: str,
     *,
+    claim_generation: int,
     outcome: str,
     error_code: str | None = None,
     error_detail_safe: str | None = None,
     retry_after_seconds: int = 60,
     provider_message_id: str | None = None,
     client=None,
-) -> dict[str, Any] | None:
+) -> dict[str, Any]:
     clean_outcome = str(outcome or "").strip().lower()
     if clean_outcome not in {"sent", "retry", "dead", "revoked"}:
         raise ValueError("invalid notification delivery outcome")
-    now = _now()
-    response = (client or service_supabase).rpc(
-        "finish_notification_delivery",
-        {
-            "p_delivery_id": delivery_id,
-            "p_outcome": clean_outcome,
-            "p_error_code": None if clean_outcome == "sent" else _safe_code(error_code),
-            "p_error_detail_safe": (
-                str(error_detail_safe or "")[:500] or None
-                if clean_outcome != "sent"
-                else None
-            ),
-            "p_available_at": (
-                now
-                + timedelta(seconds=max(1, min(int(retry_after_seconds), 86400)))
-            ).isoformat()
-            if clean_outcome == "retry"
-            else None,
-            "p_provider_message_id": str(provider_message_id or "")[:200] or None,
-            "p_finished_at": now.isoformat(),
-        },
-    ).execute()
+    generation = validate_claim_generation(claim_generation)
+    try:
+        response = (client or service_supabase).rpc(
+            "finish_notification_delivery_v2",
+            {"p_delivery_id": delivery_id, "p_claim_generation": generation,
+             "p_outcome": clean_outcome,
+             "p_error_code": None if clean_outcome == "sent" else _safe_code(error_code),
+             "p_error_detail_safe": None if clean_outcome == "sent" else str(error_detail_safe or "")[:500] or None,
+             "p_retry_after_seconds": max(1, min(int(retry_after_seconds), 86400)),
+             "p_provider_message_id": str(provider_message_id or "")[:200] or None},
+        ).execute()
+    except Exception as error:
+        # Match the explicit SQL error, never interpret unrelated provider errors
+        # as ownership loss or fall back to an unfenced write.
+        if str(getattr(error, "message", "")) == "notification_delivery_claim_lost":
+            raise DeliveryOwnershipLost("notification_delivery_claim_lost") from None
+        raise
     rows = _rows(response)
-    return rows[0] if rows else None
+    if not rows:
+        raise DeliveryOwnershipLost("notification_delivery_claim_lost")
+    return rows[0]
 
 
 def cleanup_delivery_data(*, limit: int = 1000, client=None) -> dict[str, int]:
