@@ -7,7 +7,7 @@ import textwrap
 import unittest
 
 
-ROOT = Path(os.getenv("MADAR_TEST_REPOSITORY_ROOT", Path(__file__).resolve().parents[3]))
+ROOT = Path(os.getenv("MADAR_TEST_REPOSITORY_ROOT") or Path(__file__).resolve().parents[3])
 WORKFLOWS = ROOT / ".github" / "workflows"
 SOURCE = "${{ github.event.pull_request.head.sha || github.sha }}"
 
