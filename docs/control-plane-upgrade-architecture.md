@@ -1548,3 +1548,10 @@ complete private coordinator evidence; fixture packages are rejected before
 privileged imports. Execute still requires separate exact-package operator
 authorization. Stable-route verification uses three complete rounds spanning
 five seconds within 180 seconds and makes no unsupported live-login claim.
+
+Schema148 fresh artifact identities explicitly distinguish the build-host image
+configuration ID from the single OCI archive manifest ID used by the target
+containerd image store. The producer verifies both blobs before publishing the
+receipt. Imported runtime IDs must equal the accepted manifest IDs; a mismatch
+refuses before replacing services. Latest exact-application-source backend and
+frontend workflow success is independently requeried, in addition to artifact CI.

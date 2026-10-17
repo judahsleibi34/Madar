@@ -4,12 +4,62 @@ import json
 from pathlib import Path
 import re
 import stat
+import tarfile
 import zipfile
 
 REPOSITORY='judahsleibi34/Madar'
 WORKFLOW='.github/workflows/schema148-artifacts.yml'
 INPUTS=('web/backend/Dockerfile','web/backend/requirements.txt','web/backend/constraints.txt',
         'web/frontend/Dockerfile','web/frontend/package.json','web/frontend/package-lock.json')
+
+
+def archive_runtime_identity(path,build_host_id):
+    """Bind this supported OCI archive to the containerd runtime manifest ID.
+
+    The hosted classic builder's .Id is the config digest; the target native
+    engine's .Id is the manifest digest. Never substitute one after acceptance.
+    This producer-side inspection extracts no files and retains bounded metadata.
+    """
+    metadata={};total=0
+    with tarfile.open(path,mode='r|gz') as archive:
+        for index,member in enumerate(archive):
+            if index>1000:raise RuntimeError('schema148_image_archive_inventory_invalid')
+            if not member.isfile() or member.size>1024*1024:continue
+            total+=member.size
+            if total>8*1024*1024 or member.name in metadata:raise RuntimeError('schema148_image_archive_metadata_invalid')
+            metadata[member.name]=archive.extractfile(member).read()
+    try:
+        index=json.loads(metadata['index.json']);docker=json.loads(metadata['manifest.json'])
+        manifests=index['manifests']
+        if len(manifests)!=1 or len(docker)!=1:raise ValueError()
+        identity=manifests[0]['digest']
+        if not re.fullmatch('sha256:[0-9a-f]{64}',identity):raise ValueError()
+        raw=metadata['blobs/sha256/'+identity.split(':')[1]]
+        manifest=json.loads(raw)
+        config=manifest['config']['digest']
+        if ('sha256:'+hashlib.sha256(raw).hexdigest()!=identity or build_host_id not in {config,identity}
+                or docker[0]['Config']!='blobs/sha256/'+config.split(':')[1]
+                or 'sha256:'+hashlib.sha256(metadata[docker[0]['Config']]).hexdigest()!=config):raise ValueError()
+    except (KeyError,TypeError,ValueError,IndexError):
+        raise RuntimeError('schema148_image_archive_identity_invalid') from None
+    return identity
+
+
+def verify_required_ci(records,source_sha):
+    """Require the latest exact-application-source runs, separately from build CI."""
+    required={'backend-check.yml':'Backend Check','frontend-check.yml':'Frontend Check'}
+    if set(records)!=set(required):raise RuntimeError('schema148_application_ci_missing')
+    for workflow,name in required.items():
+        rows=records[workflow].get('workflow_runs',[])
+        if not rows or any(type(row.get('id')) is not int for row in rows):
+            raise RuntimeError('schema148_application_ci_missing')
+        latest=max(rows,key=lambda row:row['id'])
+        if (latest.get('head_sha')!=source_sha or latest.get('name')!=name
+                or latest.get('path')!='.github/workflows/'+workflow
+                or latest.get('repository',{}).get('full_name')!=REPOSITORY
+                or latest.get('head_repository',{}).get('full_name')!=REPOSITORY
+                or latest.get('status')!='completed' or latest.get('conclusion')!='success'):
+            raise RuntimeError('schema148_application_ci_incomplete')
 
 
 def digest(stream):
@@ -47,6 +97,10 @@ def verify_archive(path,artifact,run,*,source_sha,images,expected_inputs):
         if not isinstance(images,dict):raise RuntimeError('schema148_ci_image_identity_invalid')
         if (type(receipt.get('version')) is not int or receipt.get('version')!=1 or receipt.get('repository')!=REPOSITORY
                 or receipt.get('source_sha')!=source_sha or receipt.get('build_mode')!='fresh-locked-ci'
+                or receipt.get('runtime_identity')!='single-OCI-manifest-containerd'
+                or not isinstance(receipt.get('build_host_image_ids'),dict)
+                or set(receipt['build_host_image_ids'])!={'backend','frontend'}
+                or any(not re.fullmatch('sha256:[0-9a-f]{64}',str(value)) for value in receipt['build_host_image_ids'].values())
                 or receipt.get('images')!=images or set(images)!={'backend','frontend'}
                 or any(not re.fullmatch('sha256:[0-9a-f]{64}',str(value)) for value in images.values())
                 or receipt.get('inputs_sha256')!=expected_inputs or set(expected_inputs)!=set(INPUTS)
@@ -73,8 +127,11 @@ def verify_provenance(actor,binding):
     artifact=api('artifacts/'+str(binding['artifact_id']));run=api('runs/'+str(binding['run_id']))
     if artifact.get('id')!=binding['artifact_id'] or run.get('id')!=binding['run_id']:
         raise RuntimeError('schema148_ci_provenance_binding_changed')
+    candidate=actor.contract['candidate']['source_sha']
+    verify_required_ci({workflow:api('workflows/'+workflow+'/runs?head_sha='+candidate+'&per_page=100')
+        for workflow in ('backend-check.yml','frontend-check.yml')},candidate)
     source=actor.package/'source'
     inputs={relative:file_digest(readonly_configuration(source/relative,private=True)) for relative in INPUTS}
     archive=readonly_configuration(Path(binding['archive']),private=True)
-    return verify_archive(archive,artifact,run,source_sha=actor.contract['candidate']['source_sha'],
+    return verify_archive(archive,artifact,run,source_sha=candidate,
                           images=actor.contract['candidate']['images'],expected_inputs=inputs)

@@ -1,15 +1,17 @@
 """Adversarial provenance parsing; synthetic API/ZIP fixtures grant no authority."""
 import copy
+import io
 import hashlib
 import json
 import os
 from pathlib import Path
 import sys
 import tempfile
+import tarfile
 import unittest
 import zipfile
 sys.path.insert(0,os.getenv('MADAR_TEST_REPOSITORY_ROOT') or str(Path(__file__).resolve().parents[2]))
-from deployment.lib.schema148_artifacts import verify_archive,INPUTS,WORKFLOW
+from deployment.lib.schema148_artifacts import archive_runtime_identity,verify_archive,verify_required_ci,INPUTS,WORKFLOW
 
 class ArtifactTests(unittest.TestCase):
     def setUp(self):
@@ -20,6 +22,7 @@ class ArtifactTests(unittest.TestCase):
             'head_repository':{'full_name':'judahsleibi34/Madar'},'path':WORKFLOW,'name':'Schema148 Candidate Artifacts','status':'completed','conclusion':'success'}
         self.artifact={'id':22,'expired':False,'name':f'schema148-candidate-{self.sha}-11-1','workflow_run':{'id':11,'head_sha':self.sha}}
         self.receipt={'version':1,'repository':'judahsleibi34/Madar','source_sha':self.sha,'build_mode':'fresh-locked-ci','images':self.images,
+            'build_host_image_ids':self.images,'runtime_identity':'single-OCI-manifest-containerd',
             'inputs_sha256':self.inputs,'run_id':11,'run_attempt':1,'production_authorized':False,
             'archives':{role:{'file':role+'.tar.gz','sha256':hashlib.sha256(role.encode()).hexdigest(),'bytes':len(role)} for role in self.images}}
         self.write()
@@ -60,3 +63,41 @@ class ArtifactTests(unittest.TestCase):
         with self.assertRaises(RuntimeError):self.verify()
         self.artifact['workflow_run']['head_sha']=self.sha;self.artifact['name']='other'
         with self.assertRaises(RuntimeError):self.verify()
+
+    def test_application_ci_must_be_exact_source_and_latest_successful_run(self):
+        records={workflow:{'workflow_runs':[{**self.run,'name':name,'path':'.github/workflows/'+workflow}]}
+            for workflow,name in (('backend-check.yml','Backend Check'),('frontend-check.yml','Frontend Check'))}
+        verify_required_ci(records,self.sha)
+        for changed in ('failure','in_progress','wrong_source','wrong_repository','wrong_workflow'):
+            invalid=copy.deepcopy(records);row=invalid['backend-check.yml']['workflow_runs'][0]
+            if changed=='failure':row['conclusion']='failure'
+            elif changed=='in_progress':row['status']='in_progress'
+            elif changed=='wrong_source':row['head_sha']='e'*40
+            elif changed=='wrong_repository':row['repository']={'full_name':'untrusted/repo'}
+            else:row['path']='untrusted.yml'
+            with self.subTest(reason=changed),self.assertRaises(RuntimeError):verify_required_ci(invalid,self.sha)
+        older=copy.deepcopy(records['backend-check.yml']['workflow_runs'][0])
+        records['backend-check.yml']['workflow_runs'].append({**older,'id':12,'conclusion':'failure'})
+        with self.assertRaises(RuntimeError):verify_required_ci(records,self.sha)
+
+    def test_runtime_manifest_and_config_id_are_explicitly_bound_across_engines(self):
+        config=b'{"architecture":"amd64","os":"linux"}'
+        config_id='sha256:'+hashlib.sha256(config).hexdigest()
+        manifest=json.dumps({'schemaVersion':2,'config':{'digest':config_id}}).encode()
+        identity='sha256:'+hashlib.sha256(manifest).hexdigest()
+        path=self.path.parent/'image.tar.gz'
+        def write(config_bytes=config,manifests=None):
+            files={'index.json':json.dumps({'manifests':manifests or [{'digest':identity}]}).encode(),
+                'manifest.json':json.dumps([{'Config':'blobs/sha256/'+config_id.split(':')[1]}]).encode(),
+                'blobs/sha256/'+identity.split(':')[1]:manifest,'blobs/sha256/'+config_id.split(':')[1]:config_bytes}
+            with tarfile.open(path,'w:gz') as archive:
+                for name,data in files.items():
+                    member=tarfile.TarInfo(name);member.size=len(data);archive.addfile(member,io.BytesIO(data))
+        write()
+        self.assertEqual(archive_runtime_identity(path,config_id),identity)
+        self.assertEqual(archive_runtime_identity(path,identity),identity)
+        with self.assertRaises(RuntimeError):archive_runtime_identity(path,'sha256:'+'0'*64)
+        write(config_bytes=b'tampered')
+        with self.assertRaises(RuntimeError):archive_runtime_identity(path,config_id)
+        write(manifests=[{'digest':identity},{'digest':identity}])
+        with self.assertRaises(RuntimeError):archive_runtime_identity(path,config_id)

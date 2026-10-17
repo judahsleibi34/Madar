@@ -8,6 +8,9 @@ import os
 from pathlib import Path
 import re
 import subprocess
+import sys
+sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
+from deployment.lib.schema148_artifacts import archive_runtime_identity
 
 ROOT=Path(__file__).resolve().parents[2]
 INPUTS=('web/backend/Dockerfile','web/backend/requirements.txt','web/backend/constraints.txt',
@@ -31,7 +34,7 @@ def main():
     subprocess.run(['python3','web/scripts/check_dependency_locks.py'],cwd=ROOT,check=True)
     timestamp=datetime.now(timezone.utc).isoformat().replace('+00:00','Z')
     destination=ROOT/'candidate-artifacts';destination.mkdir(mode=0o700,exist_ok=False)
-    images={};archives={}
+    images={};archives={};build_host_ids={}
     for role in ('backend','frontend'):
         tag='madar-schema148-'+role+':'+source
         args=['docker','build','--pull','--no-cache','--build-arg','MADAR_RELEASE_SHA='+source,
@@ -42,8 +45,8 @@ def main():
         else:args+=['--build-arg','VITE_API_URL=/api','--build-arg','MADAR_REQUIRE_PRODUCTION_API_URL=true',
                     '--label','com.madar.frontend.api_origin=/api']
         subprocess.run(args+['web/'+role],cwd=ROOT,check=True)
-        images[role]=subprocess.check_output(['docker','image','inspect',tag,'--format','{{.Id}}'],text=True).strip()
-        if not re.fullmatch('sha256:[0-9a-f]{64}',images[role]):raise RuntimeError('Invalid built image identity')
+        build_host_ids[role]=subprocess.check_output(['docker','image','inspect',tag,'--format','{{.Id}}'],text=True).strip()
+        if not re.fullmatch('sha256:[0-9a-f]{64}',build_host_ids[role]):raise RuntimeError('Invalid built image identity')
         path=destination/(role+'.tar.gz')
         with path.open('xb') as target,gzip.GzipFile(fileobj=target,mode='wb',compresslevel=1,mtime=0) as compressed:
             process=subprocess.Popen(['docker','image','save',tag],stdout=subprocess.PIPE)
@@ -51,9 +54,11 @@ def main():
                 for chunk in iter(lambda:process.stdout.read(1024*1024),b''):compressed.write(chunk)
             finally:process.stdout.close()
             if process.wait()!=0:raise RuntimeError('Image export failed')
+        images[role]=archive_runtime_identity(path,build_host_ids[role])
         archives[role]={'file':path.name,'sha256':digest(path),'bytes':path.stat().st_size}
     receipt={'version':1,'repository':'judahsleibi34/Madar','source_sha':source,'build_mode':'fresh-locked-ci',
-        'images':images,'archives':archives,'inputs_sha256':{name:digest(ROOT/name) for name in INPUTS},
+        'images':images,'build_host_image_ids':build_host_ids,'runtime_identity':'single-OCI-manifest-containerd',
+        'archives':archives,'inputs_sha256':{name:digest(ROOT/name) for name in INPUTS},
         'run_id':int(os.environ['GITHUB_RUN_ID']),'run_attempt':int(os.environ['GITHUB_RUN_ATTEMPT']),
         'build_timestamp':timestamp,'production_authorized':False}
     (destination/'receipt.json').write_text(json.dumps(receipt,indent=2,sort_keys=True)+'\n')

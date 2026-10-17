@@ -2837,3 +2837,10 @@ preparation, CI, historical receipts and private tests provide no authorization.
 Stable runtime verification records whether a live customer mutation was
 actually performed; private authentication acceptance is never reported as a
 live customer login.
+
+Schema148 fresh artifact identities explicitly distinguish the build-host image
+configuration ID from the single OCI archive manifest ID used by the target
+containerd image store. The producer verifies both blobs before publishing the
+receipt. Imported runtime IDs must equal the accepted manifest IDs; a mismatch
+refuses before replacing services. Latest exact-application-source backend and
+frontend workflow success is independently requeried, in addition to artifact CI.

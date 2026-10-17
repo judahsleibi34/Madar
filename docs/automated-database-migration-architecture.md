@@ -1524,3 +1524,10 @@ renamed/changed retained files, altered manifests or historical files, and any
 schema115 descriptor that selects a migration. Retention never authorizes SQL.
 No migration file was changed; learning features keep their existing schema gates
 and remain unavailable at115 wherever they require117..135.
+
+Schema148 fresh artifact identities explicitly distinguish the build-host image
+configuration ID from the single OCI archive manifest ID used by the target
+containerd image store. The producer verifies both blobs before publishing the
+receipt. Imported runtime IDs must equal the accepted manifest IDs; a mismatch
+refuses before replacing services. Latest exact-application-source backend and
+frontend workflow success is independently requeried, in addition to artifact CI.

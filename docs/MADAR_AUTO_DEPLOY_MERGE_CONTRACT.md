@@ -1175,3 +1175,10 @@ reviewed file before loading the gateway overlay. Existing API callbacks,
 upstreams, port bindings and routing headers are unchanged. No live proxy was
 reloaded. This protected proxy source still needs governed installation approval;
 edge logging policies remain an operator gate.
+
+Schema148 fresh artifact identities explicitly distinguish the build-host image
+configuration ID from the single OCI archive manifest ID used by the target
+containerd image store. The producer verifies both blobs before publishing the
+receipt. Imported runtime IDs must equal the accepted manifest IDs; a mismatch
+refuses before replacing services. Latest exact-application-source backend and
+frontend workflow success is independently requeried, in addition to artifact CI.
