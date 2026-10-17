@@ -49,7 +49,10 @@ see ACCEPTANCE-EVIDENCE.md for why runtime receipts are external to their source
 See02/03 for exact components and prerequisites. Fixed: selected preservation
 contract in forward repair; PR-head CI identity; authenticated artifact snapshot
 consumption; captured checksum-bound SQL execution; calendar role-revocation
-cache disclosure;501-event query request-line failure. The outbox ownership and
+cache disclosure;501-event query request-line failure; calendar event lost-update
+and deletion races. The latter were reproduced after the first d00dd952 source
+freeze, invalidating that head as the final acceptance source; its successful CI
+and runtime receipts remain historical evidence, never relabelled. The outbox ownership and
 deletion queue ACL defects require the separate149 successor, not alteration of
 147/148 or an automatic expansion of the existing release profile.
 

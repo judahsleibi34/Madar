@@ -35,3 +35,9 @@ calendar500/provider414; first new CI-source test had an eager default-path bug
 41pass); disposable fixture source/mount permissions and missing fields/role
 attributes were corrected without weakening assertions. Conditional skips are
 not passes. Final exact-source CI results after source freeze are in PR updates.
+
+Final follow-up: two native calendar route races FAIL at d00dd952 (both writers
+reported200), then PASS with atomic version/active-row predicates (one200,one409).
+The full corrected148 rehearsal passes68 cases with0 skips; existing calendar
+route suite43PASS. Earlier66/109 counts above remain historical, not relabelled.
+Exact final CI and fresh runtime acceptance must be rerun after this source change.

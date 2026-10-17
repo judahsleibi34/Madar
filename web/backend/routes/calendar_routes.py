@@ -607,15 +607,31 @@ def truncated_recurrence_rule(rule: str, until: datetime) -> str:
     return ";".join(parts)
 
 
+def update_event_versioned(context, before: dict[str, Any], changes: dict[str, Any]) -> dict[str, Any]:
+    """Compare and update in PostgreSQL, including when the client omits a version.
+
+    The earlier read is needed for authorization and validation, but cannot grant
+    ownership of a later write. A competing edit or deletion must win only once.
+    """
+    version = int(before.get("version") or 1)
+    rows = getattr(service_supabase.table("calendar_events").update({
+        **changes, "version": version + 1,
+    }).eq("id", before["id"]).eq("tenant_id", context.tenant_id)
+        .eq("version", version).is_("deleted_at", "null").execute(), "data", None) or []
+    if not rows:
+        raise HTTPException(status_code=409, detail={
+            "code": "calendar_version_conflict",
+            "message": "This event changed in another session. Refresh before trying again.",
+        })
+    return rows[0]
+
+
 def exclude_occurrence(context, event: dict[str, Any], occurrence_start: datetime) -> dict[str, Any]:
     occurrence = iso(occurrence_start)
     exclusions = list(event.get("recurrence_exclusions") or [])
     if occurrence not in exclusions:
         exclusions.append(occurrence)
-    rows = getattr(service_supabase.table("calendar_events").update({
-        "recurrence_exclusions": exclusions, "version": int(event.get("version") or 1) + 1,
-    }).eq("id", event["id"]).eq("tenant_id", context.tenant_id).execute(), "data", None) or []
-    return rows[0] if rows else event
+    return update_event_versioned(context, event, {"recurrence_exclusions": exclusions})
 
 
 class CalendarCreate(BaseModel):
@@ -1397,24 +1413,21 @@ def update_event(event_id: str, payload: EventWrite, request: Request, response:
             record_calendar_audit(context, request, "calendar.event_updated", "calendar_event", event_id, {"scope": scope})
             return {"success": True, "event": created[0], "series": parent, "conflicts": conflicts}
         parent_rule = truncated_recurrence_rule(before["recurrence_rule"], occurrence_start - timedelta(seconds=1))
-        parent_rows = getattr(service_supabase.table("calendar_events").update({"recurrence_rule": parent_rule, "version": int(before.get("version") or 1) + 1}).eq("id", event_id).eq("tenant_id", context.tenant_id).execute(), "data", None) or []
+        parent = update_event_versioned(context, before, {"recurrence_rule": parent_rule})
         row.update({"recurrence_parent_id": None, "recurrence_original_start": None, "version": 1})
         created = getattr(service_supabase.table("calendar_events").insert(row).execute(), "data", None) or []
         if not created:
             raise HTTPException(status_code=500, detail="Future recurring events could not be updated")
         replace_event_children(context, created[0], payload)
-        write_change(context, event_id, "updated", "future", before, parent_rows[0] if parent_rows else before)
+        write_change(context, event_id, "updated", "future", before, parent)
         write_change(context, created[0]["id"], "created", "future", None, created[0])
         record_calendar_audit(context, request, "calendar.event_updated", "calendar_event", event_id, {"scope": scope})
-        return {"success": True, "event": created[0], "series": parent_rows[0] if parent_rows else before, "conflicts": conflicts}
-    row["version"] = int(before.get("version") or 1) + 1
-    updated = getattr(service_supabase.table("calendar_events").update(row).eq("id", event_id).eq("tenant_id", context.tenant_id).execute(), "data", None) or []
-    if not updated:
-        raise HTTPException(status_code=404, detail="Event not found")
-    replace_event_children(context, updated[0], payload)
-    write_change(context, event_id, "updated", scope, before, updated[0])
+        return {"success": True, "event": created[0], "series": parent, "conflicts": conflicts}
+    updated = update_event_versioned(context, before, row)
+    replace_event_children(context, updated, payload)
+    write_change(context, event_id, "updated", scope, before, updated)
     record_calendar_audit(context, request, "calendar.event_updated", "calendar_event", event_id, {"scope": scope})
-    return {"success": True, "event": updated[0], "conflicts": conflicts}
+    return {"success": True, "event": updated, "conflicts": conflicts}
 
 
 @router.delete("/events/{event_id}")
@@ -1431,17 +1444,15 @@ def delete_event(event_id: str, request: Request, response: Response, expected_v
         if scope == "occurrence":
             updated = exclude_occurrence(context, before, occurrence_start)
         else:
-            updated_rows = getattr(service_supabase.table("calendar_events").update({
+            updated = update_event_versioned(context, before, {
                 "recurrence_rule": truncated_recurrence_rule(before["recurrence_rule"], occurrence_start - timedelta(seconds=1)),
-                "version": expected_version + 1,
-            }).eq("id", event_id).eq("tenant_id", context.tenant_id).execute(), "data", None) or []
-            updated = updated_rows[0] if updated_rows else before
+            })
         write_change(context, event_id, "cancelled", scope, before, updated)
         record_calendar_audit(context, request, "calendar.event_deleted", "calendar_event", event_id, {"scope": scope})
         return {"success": True, "event": updated}
     deleted_at = iso(utc_now())
-    updated = getattr(service_supabase.table("calendar_events").update({"deleted_at": deleted_at, "version": expected_version + 1}).eq("id", event_id).eq("tenant_id", context.tenant_id).execute(), "data", None) or []
-    write_change(context, event_id, "deleted", scope, before, updated[0] if updated else None)
+    updated = update_event_versioned(context, before, {"deleted_at": deleted_at})
+    write_change(context, event_id, "deleted", scope, before, updated)
     record_calendar_audit(context, request, "calendar.event_deleted", "calendar_event", event_id, {"scope": scope})
     return {"success": True}
 

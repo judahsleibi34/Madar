@@ -1,0 +1,43 @@
+{
+  "environment": "marked disposable staging PostgreSQL17",
+  "baseline_source": "d00dd9522092a83d42084d03d92af30ce58a582b",
+  "transport": "actual route UPDATE predicates executed by two independent psycopg connections; authorization and side-effect transports are fixtures",
+  "before": {
+    "tests": 2,
+    "failed": 2,
+    "observed_each_race": [
+      200,
+      200
+    ],
+    "required_each_race": [
+      200,
+      409
+    ]
+  },
+  "after": {
+    "state": "PASS",
+    "tests": 2,
+    "passed": 2,
+    "observed_each_race": [
+      200,
+      409
+    ],
+    "schema148_complete_suite": {
+      "passed": 68,
+      "skipped": 0
+    },
+    "existing_calendar_route_suite": {
+      "passed": 43,
+      "skipped": 0
+    }
+  },
+  "scope": [
+    "edit versus edit",
+    "edit versus soft deletion"
+  ],
+  "limitations": [
+    "recurrence split and child replacement remain multiple provider requests",
+    "not an authenticated HTTP or browser concurrency test"
+  ],
+  "production_mutations": false
+}

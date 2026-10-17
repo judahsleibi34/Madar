@@ -29,3 +29,5 @@ in PR212/213 acceptance updates; no later result is presumed here.
 | Performance | PASS | 501-event baseline fails;180 candidate reads succeed; no general speedup claim |
 | Production | PASS | Read-only schema/controller/timer observation only; no unauthorized mutation |
 | Operator approval | BLOCKED | Independent protected authorization is explicitly absent |
+
+| Calendar event edits/deletion | PASS | Two native competing-route writes: baseline2FAIL, corrected2PASS, full68-case148 rehearsal PASS; authorization/side-effect transports stubbed; recurrence/children not fully transactional |
