@@ -6,7 +6,7 @@ STATES=frozenset({'PASS','FAIL','PARTIAL','BLOCKED','NOT TESTED'})
 GROUPS={
  'source':('exact','dependencies','ci_backend','ci_frontend','immutable_migrations','release_manifest'),
  'infrastructure':('host','capacity','database','worker_inventory','redis','backup_paths','network'),
- 'database':('origin','structure','migration_history','quiescence','preservation','locks'),
+ 'database':('origin','structure','migration_history','quiescence','provider_quiescence','preservation','locks'),
  'security':('controller','privileges','secrets_identity','write_authority'),
  'recovery':('backup','independent_application','replica','checkpoints','forward_plan'),
  'application':('backend','frontend','workers','auth','mfa','storage','tenant_isolation','reservations','notifications','readiness'),

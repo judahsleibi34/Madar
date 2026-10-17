@@ -20,6 +20,16 @@ class ReadinessTests(unittest.TestCase):
         self.assertEqual(result['assessment'],'TECHNICALLY READY FOR OPERATOR REVIEW')
         self.assertFalse(result['production_authorized'])
         self.assertEqual(result['gates']['operator.authorization']['status'],'BLOCKED')
+    def test_worker_quiescence_cannot_substitute_for_provider_writer_quiescence(self):
+        packet={gate:dict(self.record) for gate in GATES if gate!='database.provider_quiescence'}
+        result=self.evaluate(packet)
+        self.assertEqual(result['gates']['database.quiescence']['status'],'PASS')
+        self.assertEqual(result['gates']['database.provider_quiescence']['status'],'NOT TESTED')
+        self.assertEqual(result['assessment'],'NOT READY')
+        packet['database.provider_quiescence']=dict(self.record,scope='staging')
+        result=self.evaluate(packet)
+        self.assertEqual(result['gates']['database.provider_quiescence']['status'],'PARTIAL')
+        self.assertEqual(result['assessment'],'NOT READY')
     def test_synthetic_evidence_does_not_satisfy_production_gate(self):
         record=dict(self.record,scope='staging')
         self.assertEqual(self.evaluate({'recovery.independent_application':record})['gates']['recovery.independent_application']['status'],'PARTIAL')

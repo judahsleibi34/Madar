@@ -1,5 +1,17 @@
 # Madar production release acceptance policy
 
+## Phase-IV provider-writer readiness
+
+The readiness accounting model now requires separate `database.provider_quiescence`
+evidence. Stopping notification consumers or observing an instant with zero
+transactions cannot supply this gate. The isolated native provider drill proves
+that NOLOGIN survives a crash/restart but does not drain existing sessions, and
+that exact explicit recovery must follow preserved roots and role preimages.
+It is not a production coordinator adapter. Provider stop/restart ownership,
+backup role preimages, maintenance health/probes and controlled recovery remain
+release blockers; no provider lifecycle or privilege mutation is authorized by
+this source. Historical operation contracts and migration hashes are unchanged.
+
 ## Phase-IV exact-source and artifact consumption
 
 Application CI checks out and verifies the exact PR head used by fresh artifact
