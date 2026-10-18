@@ -24,6 +24,25 @@ STOP_EVENT = threading.Event()
 STATE = {"healthy": False, "last_poll_at": None, "processed": 0, "failed": 0}
 
 
+def require_deletion_ownership_protocol(*, client=None) -> None:
+    """Contain the retained unfenced lifecycle until its successor is reviewed.
+
+    Migrations001..149 do not provide this ownership contract. An enabled
+    successor worker must remain stopped on those schemas. This startup/poll
+    barrier does not repair the service-role mutations in the old lifecycle.
+    """
+    if client is None:
+        from database import service_supabase
+        client = service_supabase
+    try:
+        response = client.rpc("data_deletion_ownership_protocol", {}).execute()
+        protocol = getattr(response, "data", None)
+    except Exception:
+        raise RuntimeError("data_deletion_ownership_protocol_required") from None
+    if type(protocol) is not int or protocol != 2:
+        raise RuntimeError("data_deletion_ownership_protocol_required")
+
+
 class HealthHandler(BaseHTTPRequestHandler):
     def log_message(self, _format, *_args):
         return
@@ -53,6 +72,14 @@ def run_batch(*, worker_id: str, batch_size: int) -> int:
     from services.provider_recovery import worker_consumption_allowed
     if not worker_consumption_allowed():
         return 0
+    # Recheck on every poll: a database restore or replacement must not let an
+    # already-running worker claim from an incompatible ownership protocol.
+    try:
+        require_deletion_ownership_protocol()
+    except RuntimeError:
+        STATE["healthy"] = False
+        STATE["consuming"] = False
+        raise
     requests = claim_deletion_requests(worker_id=worker_id, limit=batch_size)
     for request in requests:
         try:
@@ -75,6 +102,13 @@ def main() -> int:
     if os.getenv("DATA_DELETION_WORKER_ENABLED", "false").strip().lower() not in {"1", "true", "yes", "on"}:
         logger.info("deletion.worker_disabled")
         return 0
+    try:
+        require_deletion_ownership_protocol()
+    except RuntimeError:
+        STATE["healthy"] = False
+        STATE["consuming"] = False
+        logger.error("deletion.ownership_protocol_required")
+        raise
     for selected in (signal.SIGINT, signal.SIGTERM):
         signal.signal(selected, lambda *_args: STOP_EVENT.set())
     host = os.getenv("DATA_DELETION_WORKER_HEALTH_HOST", "127.0.0.1").strip()
