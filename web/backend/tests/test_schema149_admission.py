@@ -20,10 +20,6 @@ from deployment.lib.completed_normal_write_handoff import CompletedNormalWriteHa
 from deployment.lib.migration_executor import MigrationManifest, LockedMigrationExecutor
 from test_schema148_admission import fenced_contract
 
-ROOT = Path(__file__).resolve().parents[3]
-if os.getenv('MADAR_TEST_REPOSITORY_ROOT'):
-    ROOT = Path(os.environ['MADAR_TEST_REPOSITORY_ROOT']).parent
-
 
 def successor_contract():
     value = fenced_contract()

@@ -46,6 +46,7 @@ class CiSourceIdentityTests(unittest.TestCase):
         for name in ("backend-check.yml", "frontend-check.yml"):
             with self.subTest(workflow=name):
                 source = (WORKFLOWS / name).read_text()
+                self.assertIn("codex/outbox-claim-fencing-20261017", source)
                 self.assertIn("CI_SOURCE_SHA: " + SOURCE, source)
                 self.assertIn("          ref: " + SOURCE, source)
                 self.assertIn("          persist-credentials: false", source)
@@ -69,6 +70,7 @@ class CiSourceIdentityTests(unittest.TestCase):
         source = (WORKFLOWS / "schema148-artifacts.yml").read_text()
         self.assertIn("branches: [main,", source)
         self.assertIn("codex/integration-review-20261017", source)
+        self.assertIn("codex/outbox-claim-fencing-20261017", source)
         self.assertNotIn("    paths:", source)
         self.assertNotIn("    paths-ignore:", source)
 

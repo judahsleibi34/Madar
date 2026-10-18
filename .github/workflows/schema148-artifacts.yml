@@ -2,7 +2,7 @@ name: Schema148 Candidate Artifacts
 
 on:
   pull_request:
-    branches: [main, codex/notification-claim-fencing-20261016, codex/integration-review-20261017]
+    branches: [main, codex/notification-claim-fencing-20261016, codex/integration-review-20261017, codex/outbox-claim-fencing-20261017]
   workflow_dispatch:
 
 permissions:
