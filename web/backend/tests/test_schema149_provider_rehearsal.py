@@ -50,6 +50,16 @@ class ProviderRehearsalSafetyTests(unittest.TestCase):
                     actor.drain_sessions({}, preimage)
                 sql.assert_not_called()
 
+    def test_recovery_does_not_invent_unexecuted_fault_controls(self):
+        self.assertFalse(any(rehearsal.fault_evidence([]).values()))
+        records=[{'event':'effect_complete','payload':{'step':step,'reconciled':True}}
+                 for step in rehearsal.FENCE_STEPS]
+        observed=rehearsal.fault_evidence(records)
+        self.assertTrue(observed['six_effect_children_interrupted'])
+        self.assertFalse(observed['database_restart_preserved_fence'])
+        self.assertFalse(observed['existing_session_survived_nologin'])
+        self.assertFalse(rehearsal.fault_evidence([],{'database_restart_preserved_fence':'true'})['database_restart_preserved_fence'])
+
     def test_native_fixture_cannot_claim_privileged_controller_or_replica_gates(self):
         actor = rehearsal.StagingActor.__new__(rehearsal.StagingActor)
         with patch.object(rehearsal, 'sql', return_value='149:2:2'):

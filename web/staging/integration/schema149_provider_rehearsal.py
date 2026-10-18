@@ -267,7 +267,17 @@ class StagingActor:
                 **{key: key in {'preservation', 'accepted_images', 'worker_ownership'} for key in ACTIVATION_GATES}}
 
 
-def recover(runtime, driver, actor):
+def fault_evidence(records, controls=None):
+    controls = controls or {}
+    reconciled = {row['payload'].get('step') for row in records
+                  if row['event'] == 'effect_complete' and row['payload'].get('reconciled') is True}
+    return {'six_effect_children_interrupted': reconciled == set(FENCE_STEPS),
+            **{key: controls.get(key) is True for key in (
+                'new_role_connections_denied', 'existing_session_survived_nologin',
+                'database_restart_preserved_fence')}}
+
+
+def recover(runtime, driver, actor, *, snapshot_name="provider149-fenced-snapshot.json", report_name="provider149-result.json", native_controls=None):
     actor.require_authority(actor.binding, purpose='synthetic-recovery')
     preimage = driver._preimage()
     driver.require_quiescence(149)
@@ -275,7 +285,7 @@ def recover(runtime, driver, actor):
     except RuntimeError as error:
         if str(error) != 'provider_maintenance_target_activation_not_authorized': raise
     else: raise RuntimeError('provider149_missing_controller_gates_falsely_accepted')
-    snapshot = private(runtime / 'provider149-fenced-snapshot.json')
+    snapshot = private(runtime / snapshot_name)
     if (digest(json.loads(sql(restore.FINGERPRINT_SQL))) != snapshot['rows_sha256']
             or restore.inventory(PROJECT + '_objects') != preimage['objects']['inventory']):
         raise RuntimeError('provider149_preservation_changed_before_recovery')
@@ -303,9 +313,8 @@ def recover(runtime, driver, actor):
     manage.docker('start', *[actor.inventory[name]['id'] for name in ('accepted-frontend', 'frontend', 'notification-worker')])
     result = {'scope': 'native synthetic149 provider lifecycle; not protected controller acceptance',
         'schema': 149, 'source_sha': actor.binding['source_sha'], 'both_protocols': 2,
-        'positive_probes_before_barrier': True, 'six_effect_children_interrupted': True,
-        'exact_known_session_drained': True, 'new_role_connections_denied': True,
-        'existing_session_survived_nologin': True, 'database_restart_preserved_fence': True,
+        'positive_probes_before_barrier': True, **fault_evidence(driver.journal.read(), native_controls),
+        'exact_known_session_drained': True,
         'original_all_role_state_restored': True, 'row_and_object_roots_preserved': True,
         'missing_privileged_activation_gates_rejected': True, 'native_provider_restart_acceptance': True, 'deletion_worker_retained_stopped': True,
         'production_modified': False, 'production_authorization_issued': False,
@@ -314,7 +323,7 @@ def recover(runtime, driver, actor):
             'prepared transactions checked but max_prepared_transactions fault not injected',
             'postgres superuser remains exact synthetic maintenance channel',
             'synthetic explicit recovery is not protected production NORMAL activation']}
-    manage.private_write('provider149-result.json', json.dumps(result, indent=2) + '\n')
+    manage.private_write(report_name, json.dumps(result, indent=2) + '\n')
     return result
 
 
@@ -386,7 +395,9 @@ def main(mode, stage=None):
                 except RuntimeError: time.sleep(1)
             else: raise RuntimeError('provider149_fenced_database_restart_failed')
             driver.require_quiescence(149)
-            print(json.dumps(recover(runtime, driver, actor), sort_keys=True))
+            print(json.dumps(recover(runtime, driver, actor, native_controls={
+                'new_role_connections_denied': True, 'existing_session_survived_nologin': True,
+                'database_restart_preserved_fence': True}), sort_keys=True))
         finally:
             if writer.poll() is None:
                 writer.kill(); writer.communicate(timeout=10)
