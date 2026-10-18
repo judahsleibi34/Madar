@@ -174,6 +174,21 @@ def _validate(inventory, binding=None):
             if phase == 'private' and logical.startswith('candidate:') and logical.split(':', 1)[1] in WORKER_ROLES:
                 _require(not state['running'])
             if logical.startswith('candidate:') and phase != 'prepared': _require(state['restart'] == 'no')
+        # Admit only states reachable by the fixed concrete adapter. It stops
+        # all non-DB actors with restart=no, starts the private provider trio,
+        # then only starts (never silently stops) accepted active actors.
+        prepared, fenced, private, active=(actor['states'][p] for p in PHASES)
+        if logical == 'native:db':
+            _require(all(state['restart']==prepared['restart'] for state in (fenced,private,active)),
+                     'schema150_database_restart_preimage_changed')
+        else:
+            _require(active['restart']=='no','schema150_active_restart_not_reachable')
+        if logical in PRIVATE_PROVIDER_ROLES:
+            _require(private['running'] and active['running'],'schema150_private_provider_state_not_reachable')
+        if logical=='proxy' or actor['generation']=='candidate':
+            _require(active['running'],'schema150_normal_actor_not_active')
+        if private['running']:
+            _require(active['running'],'schema150_active_state_not_reachable')
     _require(len(ids) == len(set(ids)) and len(names) == len(set(names)))
     for generation in ('origin', 'candidate'):
         selected = {name for name in actors if name.startswith(generation+':')}

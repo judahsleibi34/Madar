@@ -91,6 +91,20 @@ def phase_rows(data, rows, phase):
 
 
 class ActorInventoryTests(unittest.TestCase):
+    def test_fixed_effects_reject_unreachable_private_and_active_states_before_execution(self):
+        for logical,phase,key,value in (
+                ('native:auth','private','running',False),
+                ('native:rest','private','running',False),
+                ('native:storage','active','running',False),
+                ('native:auth','active','restart','always'),
+                ('proxy','active','restart','unless-stopped'),
+                ('native:db','private','restart','no')):
+            with self.subTest(logical=logical,phase=phase,key=key):
+                (data,scope),_=fixture()
+                data['containers'][logical]['states'][phase][key]=value
+                data,scope=repin(data,scope)
+                with self.assertRaises(RuntimeError):inventory.validate_inventory(data,scope)
+
     def test_exact_complete_inventory_detaches_and_authenticates_non_circular_binding(self):
         (data, scope), rows = fixture()
         validated = inventory.validate_inventory(data, scope)

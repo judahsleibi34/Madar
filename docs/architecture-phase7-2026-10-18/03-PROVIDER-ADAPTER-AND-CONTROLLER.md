@@ -97,3 +97,9 @@ supervisor must be inactive/dead with no queued job or main/control PID before
 quiescence/private recovery. Private providers must have neither configured nor
 effective host publication. These were corrected before operational registration;
 no production execution or exploitation was performed.
+
+The inventory now rejects unreachable declared states before effects: the private
+provider trio must remain running through activation, accepted candidate/proxy
+actors must be active at NORMAL, non-DB restart policies remain no until a reviewed
+restoration effect exists, and DB restart policy retains its original preimage.
+This closes a reproduced preparation dead-end without enabling admission.
