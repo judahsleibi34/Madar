@@ -1,33 +1,34 @@
 # Madar production release acceptance policy
 
-## Phase VII privileged source inventory
+## Phase VII reviewed source and isolated privileged acceptance
 
 The exact privileged-client inventory check is mandatory in backend CI on the
-complete checkout. Reviewed omissions are classified with concrete route/service/
-SQL boundaries; inventory completeness is not authorization certification.
-Phase VII successor PRs run backend/frontend/fresh-image checks when targeting
-the Phase VI dependency branch, with exact PR-head checkout and read-only tokens.
-No main merge, operational registration or production authority follows.
+complete checkout. Classifications record concrete route/service/SQL boundaries;
+inventory completeness is not authorization certification. Successor PRs targeting
+the Phase VI branch run exact-head backend/frontend/fresh-image checks with
+read-only workflow credentials.
 
-## Phase VII source inventory and isolated test guest
+The staging-only fixed KVM/QEMU guest authenticates an official signed pinned
+image and content-addressed committed source. Loopback pinned SSH, restricted
+user networking and an independent disk separate guest-root/systemd rehearsal
+from host controller/application resources. Guest-only native installation,
+restart and authorization refusal must be reported separately from model tests
+and from a complete protected coordinated release. No production authority follows.
 
-The exact privileged-client inventory check is mandatory in backend CI on the
-complete checkout. Reviewed omissions are classified with concrete route/service/
-SQL boundaries; inventory completeness is not authorization certification. A
-staging-only fixed QEMU/KVM guest bootstrap authenticates an official signed pinned
-image and exact content-addressed committed source. Its loopback SSH, independent
-disk and guest-root/systemd checks issue no production authority and do not change
-host controller/systemd/application resources. Source150 remains unregistered.
+The concrete schema150 provider adapter is subordinate source, with fixed effects,
+original private role/service preimages, exact inventory/held-lock/fresh-credential
+checks, persistent boot fencing, bounded session drain and separate private
+provider recovery. Filesystem identity and quiescent object-byte measurements are
+distinct; historical hash references cannot substitute for measured preservation.
+The installer and frozen source inventory must include all150 helpers and exact
+unselected metadata; copying files is not operational profile registration.
 
-## Phase VII isolated privileged guest
-
-The staging-only fixed QEMU/KVM guest bootstrap verifies an official signed,
-checksum-pinned image and exact content-addressed committed source. QEMU consumes
-an authenticated unnamed image snapshot. Its loopback-only pinned SSH, restricted
-user network, independent disk and guest-root/systemd checks issue no production
-authority and do not change host controller/systemd/application resources.
-Operational150 registration remains disabled pending complete integration and
-actual privileged acceptance; provisioning a test guest does not satisfy them.
+The ordinary150 backup/candidate/migration/write-handoff/boot integrations and
+complete privileged interruption acceptance remain mandatory. Operational150
+registration stays disabled while these or exhaustive writer ownership remain
+unproven. INSPECT reports historical private journal state only and cannot issue
+authority, clear maintenance, select images or execute recovery. Neither a local
+PASS packet nor a healthy guest can satisfy independent production authorization.
 
 ## Phase VI schema150 preparation remains non-executable
 

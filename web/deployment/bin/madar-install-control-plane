@@ -58,6 +58,12 @@ declare -a tracked_files=(
   lib/schema149_consumers.py
   lib/schema149_provider_lifecycle.py
   lib/schema149_controller.py
+  lib/schema150_release.py
+  lib/schema150_provider_lifecycle.py
+  lib/schema150_actor_inventory.py
+  lib/schema150_object_inventory.py
+  lib/schema150_provider_adapter.py
+  lib/schema150_status.py
   lib/completed_normal_profile.py
   lib/compatible_normal_boot.py
   lib/completed_normal_write_handoff.py
@@ -129,6 +135,7 @@ declare -a tracked_files=(
   releases/schema-146-148-coordinated.json
   releases/migrations-147-148-coordinated.json
   releases/schema-146-149-coordinated.json
+  releases/schema-146-150-coordinated.json
   releases/migrations-147-149-coordinated.json
   releases/schema-144-146-commercial-bridge.json
   releases/learning-136-144-path.json

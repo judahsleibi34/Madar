@@ -22,7 +22,7 @@ REQUIRED_FILES={'web/scripts/continue_completed_normal_upgrade.py',*(
         'completed_normal_runtime','completed_normal_migration','completed_normal_database',
         'completed_normal_resources','compatible_normal_boot','completed_normal_boot_installation',
         'completed_normal_write_handoff','completed_normal_backup','completed_normal_execution',
-        'completed_normal_model','completed_normal_evidence','completed_normal_forward','completed_normal_profile','schema148_release','schema148_artifacts','schema148_consumers','schema149_release','schema149_consumers','schema149_provider_lifecycle','schema149_controller'))}
+        'completed_normal_model','completed_normal_evidence','completed_normal_forward','completed_normal_profile','schema148_release','schema148_artifacts','schema148_consumers','schema149_release','schema149_consumers','schema149_provider_lifecycle','schema149_controller','schema150_release','schema150_provider_lifecycle','schema150_actor_inventory','schema150_object_inventory','schema150_provider_adapter','schema150_status'))}
 REQUIRED_FILES.update({
     'web/backend/Dockerfile','web/backend/requirements.txt','web/backend/constraints.txt',
     'web/frontend/Dockerfile','web/frontend/package.json','web/frontend/package-lock.json',
