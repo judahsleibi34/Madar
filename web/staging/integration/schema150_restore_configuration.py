@@ -1,4 +1,6 @@
 """Fixed staging restore configuration; never imports origin Compose inputs."""
+from contextlib import contextmanager
+import fcntl
 import hashlib
 import json
 import os
@@ -23,6 +25,35 @@ BOUNDS = {'postgres': (512, 1), 'redis': (128, .25), 'auth': (192, 1), 'rest': (
           'storage': (256, .5), 'gateway': (64, .25), 'backend': (1280, 1.5),
           'notification-worker': (256, .5), 'deletion-worker': (256, .5),
           'frontend': (64, .25), 'accepted-frontend': (128, .5)}
+
+
+@contextmanager
+def private_directory_lock(path):
+    """Serialize one fixed staging project without a replaceable lock file."""
+    descriptor = os.open(path, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC)
+    try:
+        original = os.fstat(descriptor)
+        def require_identity():
+            current = Path(path).lstat()
+            observed = os.fstat(descriptor)
+            if (not stat.S_ISDIR(current.st_mode) or current.st_uid != os.getuid()
+                    or stat.S_IMODE(current.st_mode) != 0o700
+                    or (current.st_dev, current.st_ino) != (original.st_dev, original.st_ino)
+                    or (observed.st_dev, observed.st_ino) != (original.st_dev, original.st_ino)
+                    or observed.st_uid != os.getuid() or stat.S_IMODE(observed.st_mode) != 0o700):
+                raise RuntimeError('restore150_project_lock_identity_invalid')
+        require_identity()
+        try:
+            fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            raise RuntimeError('restore150_project_busy') from None
+        require_identity()
+        try:
+            yield
+        finally:
+            require_identity()
+    finally:
+        os.close(descriptor)
 
 
 def regular(path, maximum=4 * 1024 * 1024):

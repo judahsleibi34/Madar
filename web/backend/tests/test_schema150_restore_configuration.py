@@ -59,6 +59,31 @@ def valid_plan(runtime):
 
 
 class RestoreConfigurationTests(unittest.TestCase):
+    def test_private_directory_lock_is_exclusive_and_releases_without_files(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            with configuration.private_directory_lock(root):
+                with self.assertRaisesRegex(RuntimeError, 'project_busy'):
+                    with configuration.private_directory_lock(root): self.fail('Second lock acquired')
+            with configuration.private_directory_lock(root): pass
+            self.assertEqual(list(root.iterdir()), [])
+
+    def test_project_lock_rejects_shared_mode_symlink_wrong_owner_or_replacement(self):
+        with tempfile.TemporaryDirectory() as directory:
+            parent = Path(directory); root = parent / 'project'; root.mkdir(mode=0o755)
+            with self.assertRaisesRegex(RuntimeError, 'identity_invalid'):
+                with configuration.private_directory_lock(root): self.fail('Shared directory accepted')
+            root.chmod(0o700)
+            alias = parent / 'alias'; alias.symlink_to(root, target_is_directory=True)
+            with self.assertRaises(OSError):
+                with configuration.private_directory_lock(alias): self.fail('Symlink accepted')
+            with patch.object(configuration.os, 'getuid', return_value=os.getuid() + 1):
+                with self.assertRaisesRegex(RuntimeError, 'identity_invalid'):
+                    with configuration.private_directory_lock(root): self.fail('Foreign owner accepted')
+            with self.assertRaisesRegex(RuntimeError, 'identity_invalid'):
+                with configuration.private_directory_lock(root):
+                    root.rename(parent / 'old-project'); root.mkdir(mode=0o700)
+
     def test_fixed_resolved_configuration_is_accepted(self):
         root = Path('/private/owned-target')
         configuration.validate(valid_plan(root), root, SHA, IMAGES, PROJECT, OWNER)

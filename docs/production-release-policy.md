@@ -2978,3 +2978,11 @@ application acceptance. Its INSPECT/REHEARSE/RESUME-SOURCE modes cannot register
 the unadmitted150profile,issue operational authority,or substitute same-VM synthetic
 recovery for current-data/replica/privileged-controller acceptance. See
 `docs/architecture-phase6-2026-10-18/15-DISASTER-RECOVERY.md`.
+
+Staging150 candidate refresh is restricted to the fixed independently restored
+synthetic project and authenticates original8e17 images/report separately from a
+new exact-source artifact. It preserves the consumed restore attempt,uses a fresh
+private configuration runtime and verifies unchanged database/object ownership
+before provider activation. Fixed-project directory locks serialize all candidate
+SHAs and source resumption (SOURCE→TARGET ordering). This staging-only same-database
+image refresh neither admits production migration nor issues write authority.

@@ -54,7 +54,42 @@ python3 web/staging/integration/schema150_application_restore.py INSPECT \
 Use the same exact arguments with REHEARSE,then separately RESUME-SOURCE. Inspect
 preserves existing attempts;rehearsal refuses reuse. Source-only safety validation:
 49tests PASS (restore/config/native150/prior149 safety/image checks),compilation
-PASS,and actual nonmutating Compose config rendering PASS. Actual restoration
-runtime is a separate pending gate until its private report confirms execution.
+PASS,and actual nonmutating Compose config rendering PASS. Actual full restoration executed and PASS at exact8e17a128c0fadfc0f2eb6de95ab35f4a588240d1:
+394.893s,independent new PostgreSQL system identifier,original role/password/
+membership and owner/ACL/RLS/definer roots,all rows/sequences and object bytes
+verified before activation. Original identity/password/TOTP/private object and new
+native Auth/MFA/Storage/notifications passed;actual restored user+tenant deletion
+completed all ten steps with two confirmed effects each and foreign tenant/object
+preserved. Worker restart consumption passed. Source quiescence and unchanged
+rows/sequences/objects were re-observed after target acceptance. No source overlay.
+Fresh images6da42a7eee965644bf320ea055415b995755b80c2ac7f08a2739507058bd1416
+and a149c259d53bba072bd545cc9e9bad92b253ec672ae66c02f73473c94a65d682 came from
+run39126113202/artifact12135754482. Browser nine auth/admin/mobile checks also PASS.
+
 Same-VM full restore cannot establish independent-host RPO/RTO or object-aware
 full application PITR. Missing/corrupt WAL/base backup/object cases remain work.
+
+## New source after a consumed restore attempt
+
+schema150_candidate_refresh.py separately accepts fresh source/images on the fixed
+already-restored150project. Default INSPECT;REHEARSE requires authenticated fixed
+8e17origin images/full-restore report,exact prepared container IDs/images,source
+labels and live scoped credentials. It creates a NEW private runtime;the consumed
+restore directory/report remains unchanged. Known target writers stop,processing/
+sessions/locks/object writers must be absent,and same cluster/rows/sequences/
+roles/ACL/object roots must survive infrastructure recreation before provider
+activation. Original and new native identity/MFA/Storage/notification/deletion and
+code/image identity probes run again. It reports same-database refresh explicitly,
+not another database restore,migration,PITR or production authority.
+
+Fixed-project directory flock serializes DIFFERENT candidate SHAs before origin
+attestation through effects/cleanup. Original restoration/resumption holds SOURCE;
+resumption takes TARGET second,so it cannot stop a concurrent refresh. Locks require
+current-user0700directories,no symlink,inode/device stability and nonblocking
+exclusion;no replaceable lockfile. Initial identity substitution rejects before
+stopping anything. Cleanup can stop known surviving owned actors after a partial
+failure without requiring everyservice still exist. Disk≥8GiB and availableRAM
+≥1300MiB are mandatory before effects. No original a8fac source is selected by
+refresh. Use the updated harness for explicit RESUME-SOURCE so it shares TARGET
+arbitration.89combined admission/recovery safety tests PASS before source freeze;
+actual fresh candidate refresh remains a separate runtime gate.

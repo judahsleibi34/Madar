@@ -7,7 +7,7 @@ an explicit, separately invoked staging recovery and stops the target first.
 No production paths, migrations, operator authority, off-host or PITR support.
 """
 import argparse
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 import hashlib
 import json
 import os
@@ -220,9 +220,10 @@ def require_ingress_fenced():
         try:
             with smoke.OPENER.open(Request(url), timeout=2):
                 raise RuntimeError('restore150_source_ingress_still_reachable')
-        except HTTPError:
+        except HTTPError as error:
             # Even a denial/redirect/error proves an unexpected responder still
             # owns the supposedly stopped source ingress. Never follow it.
+            error.close()
             raise RuntimeError('restore150_source_ingress_still_reachable') from None
         except URLError:
             pass
@@ -347,7 +348,7 @@ def verify_retained_source(preimage, checkpoint):
             'original_rows_sequences_objects_preserved_after_target_acceptance': True}
 
 
-def resume_source(source_sha, images):
+def _resume_source(source_sha, images):
     """Explicitly restore only the recorded original staging preimages."""
     runtime = Path.home() / SOURCE
     with source():
@@ -414,7 +415,17 @@ def resume_source(source_sha, images):
                 'production_modified': False, 'production_authorized': False}
 
 
-def main(mode, directory, source_sha, origin_directory=None, origin_sha=None):
+def resume_source(source_sha, images):
+    # The CLI already holds SOURCE. Acquire TARGET second so a refresh cannot
+    # recreate target actors while this operation stops them/resumes source.
+    # Before target creation the SOURCE lock alone excludes original rehearsal.
+    runtime = Path.home() / PROJECT
+    barrier = configuration.private_directory_lock(runtime) if runtime.exists() or runtime.is_symlink() else nullcontext()
+    with barrier:
+        return _resume_source(source_sha, images)
+
+
+def _run(mode, directory, source_sha, origin_directory=None, origin_sha=None):
     if mode not in ('INSPECT', 'REHEARSE', 'RESUME-SOURCE') or not re.fullmatch('[0-9a-f]{40}', source_sha or ''):
         raise RuntimeError('restore150_explicit_mode_and_source_required')
     if ((origin_directory is None) != (origin_sha is None)
@@ -488,6 +499,21 @@ def main(mode, directory, source_sha, origin_directory=None, origin_sha=None):
                 manage.state(); manage.attest_resources()
                 manage.compose('--file', str(runtime / 'acceptance-compose.json'), 'stop', '--timeout', '15')
         raise
+
+
+def main(mode, directory, source_sha, origin_directory=None, origin_sha=None):
+    if mode not in ('INSPECT', 'REHEARSE', 'RESUME-SOURCE') or not re.fullmatch('[0-9a-f]{40}', source_sha or ''):
+        raise RuntimeError('restore150_explicit_mode_and_source_required')
+    if ((origin_directory is None) != (origin_sha is None)
+            or (origin_sha is not None and not re.fullmatch('[0-9a-f]{40}', origin_sha))):
+        raise RuntimeError('restore150_paired_exact_origin_identity_required')
+    manage.require_staging_host()
+    if mode in ('REHEARSE', 'RESUME-SOURCE'):
+        # Original restore and source resumption share the same original source
+        # even before a target directory exists. Nested order is SOURCE→TARGET.
+        with configuration.private_directory_lock(Path.home() / SOURCE):
+            return _run(mode, directory, source_sha, origin_directory, origin_sha)
+    return _run(mode, directory, source_sha, origin_directory, origin_sha)
 
 
 if __name__ == '__main__':

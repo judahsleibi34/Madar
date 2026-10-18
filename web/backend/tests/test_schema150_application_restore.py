@@ -220,5 +220,47 @@ class Schema150ApplicationRestoreSafetyTests(unittest.TestCase):
                 rehearsal.verify_retained_source({}, {})
             sql.assert_not_called(); objects.assert_not_called()
 
+    def test_restore_and_resume_cli_serialize_original_source_before_any_run(self):
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory); source = home / rehearsal.SOURCE; source.mkdir(mode=0o700)
+            with rehearsal.configuration.private_directory_lock(source), patch.object(Path, 'home', return_value=home), \
+                    patch.object(rehearsal.manage, 'require_staging_host'), patch.object(rehearsal, '_run') as run:
+                for mode in ('REHEARSE', 'RESUME-SOURCE'):
+                    with self.subTest(mode=mode), self.assertRaisesRegex(RuntimeError, 'project_busy'):
+                        rehearsal.main(mode, home / 'target', 'b' * 40)
+                run.assert_not_called()
+
+    def test_resume_arbitrates_same_target_lock_as_candidate_refresh(self):
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory); source = home / rehearsal.SOURCE; source.mkdir(mode=0o700)
+            target = home / rehearsal.PROJECT; target.mkdir(mode=0o700)
+            with rehearsal.configuration.private_directory_lock(target), patch.object(Path, 'home', return_value=home), \
+                    patch.object(rehearsal.manage, 'require_staging_host'), \
+                    patch.object(rehearsal, '_run', side_effect=lambda *_args: rehearsal.resume_source('a' * 40, {})), \
+                    patch.object(rehearsal, '_resume_source') as resume:
+                with self.assertRaisesRegex(RuntimeError, 'project_busy'):
+                    rehearsal.main('RESUME-SOURCE', home / 'artifacts', 'b' * 40)
+                resume.assert_not_called()
+            # Failed nonblocking target acquisition releases SOURCE too.
+            with rehearsal.configuration.private_directory_lock(source): pass
+
+    def test_resume_acquires_source_then_target_and_rejects_ambiguous_target_root(self):
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory); source = home / rehearsal.SOURCE; source.mkdir(mode=0o700)
+            target = home / rehearsal.PROJECT; target.mkdir(mode=0o700)
+            def observe(*_args):
+                for path in (source, target):
+                    with self.assertRaisesRegex(RuntimeError, 'project_busy'):
+                        with rehearsal.configuration.private_directory_lock(path): self.fail('Lock not held')
+                return {'locked': True}
+            with patch.object(Path, 'home', return_value=home), patch.object(rehearsal.manage, 'require_staging_host'), \
+                    patch.object(rehearsal, '_run', side_effect=lambda *_args: rehearsal.resume_source('a' * 40, {})), \
+                    patch.object(rehearsal, '_resume_source', side_effect=observe):
+                self.assertTrue(rehearsal.main('RESUME-SOURCE', home / 'artifacts', 'b' * 40)['locked'])
+            target.rmdir(); target.symlink_to(home / 'missing', target_is_directory=True)
+            with patch.object(Path, 'home', return_value=home), patch.object(rehearsal, '_resume_source') as resume:
+                with self.assertRaises(OSError): rehearsal.resume_source('a' * 40, {})
+                resume.assert_not_called()
+
 
 if __name__ == '__main__': unittest.main()
