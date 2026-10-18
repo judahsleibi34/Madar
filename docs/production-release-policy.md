@@ -19,6 +19,16 @@ image and exact content-addressed committed source. Its loopback SSH, independen
 disk and guest-root/systemd checks issue no production authority and do not change
 host controller/systemd/application resources. Source150 remains unregistered.
 
+## Phase VII isolated privileged guest
+
+The staging-only fixed QEMU/KVM guest bootstrap verifies an official signed,
+checksum-pinned image and exact content-addressed committed source. QEMU consumes
+an authenticated unnamed image snapshot. Its loopback-only pinned SSH, restricted
+user network, independent disk and guest-root/systemd checks issue no production
+authority and do not change host controller/systemd/application resources.
+Operational150 registration remains disabled pending complete integration and
+actual privileged acceptance; provisioning a test guest does not satisfy them.
+
 ## Phase VI schema150 preparation remains non-executable
 
 The separate preparation profile `completed-normal-schema146-150-coordinated-release`
