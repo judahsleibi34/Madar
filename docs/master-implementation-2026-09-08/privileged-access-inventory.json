@@ -88,7 +88,8 @@
         "web/backend/services/learning_payment_provider.py:reconcile_checkout"
       ],
       "user_reachability": "Mixed owner-only, active member and explicitly public published-contact ingress; no caller-supplied tenant controls direct queries.",
-      "database_authority": "Privileged SUPABASE_SERVICE_KEY client; treat service_role as RLS-bypassing. Direct filters/caller checks and explicit SECURITY DEFINER RPC guards are required; current live role flags were not inspected in this source review."
+      "database_authority": "Privileged SUPABASE_SERVICE_KEY client; treat service_role as RLS-bypassing. Direct filters/caller checks and explicit SECURITY DEFINER RPC guards are required; current live role flags were not inspected in this source review.",
+      "candidate_schema_limitation": "Exchange142 is an alternate source candidate excluded by the selected141-to143 learning branch. Its RPC/column presence is not established by numeric settings_available(142); this inventory does not certify Exchange runtime availability on schema150."
     },
     {
       "path": "web/backend/routes/academy_programme_routes.py",
@@ -361,7 +362,8 @@
         "web/backend/services/elearning_forms_service.py:submit"
       ],
       "user_reachability": "Owner/admin response management, applicant-only projection, or explicitly published anonymous form ingress; project and tenant binding precede public persistence.",
-      "database_authority": "Privileged SUPABASE_SERVICE_KEY client; treat service_role as RLS-bypassing. Direct filters/caller checks and explicit SECURITY DEFINER RPC guards are required; current live role flags were not inspected in this source review."
+      "database_authority": "Privileged SUPABASE_SERVICE_KEY client; treat service_role as RLS-bypassing. Direct filters/caller checks and explicit SECURITY DEFINER RPC guards are required; current live role flags were not inspected in this source review.",
+      "candidate_schema_limitation": "Exchange142 is an alternate source candidate excluded by the selected141-to143 learning branch. Its RPC/column presence is not established by numeric settings_available(142); this inventory does not certify Exchange runtime availability on schema150."
     },
     {
       "path": "web/backend/routes/mfa_routes.py",
@@ -464,7 +466,8 @@
         "web/backend/services/elearning_forms_service.py:response_detail"
       ],
       "user_reachability": "Authorized actor is supplied by routes or already-authorized response management; direct reads use tenant and, for personal applications, user filters.",
-      "database_authority": "Privileged SUPABASE_SERVICE_KEY client; treat service_role as RLS-bypassing. Direct filters/caller checks and explicit SECURITY DEFINER RPC guards are required; current live role flags were not inspected in this source review."
+      "database_authority": "Privileged SUPABASE_SERVICE_KEY client; treat service_role as RLS-bypassing. Direct filters/caller checks and explicit SECURITY DEFINER RPC guards are required; current live role flags were not inspected in this source review.",
+      "candidate_schema_limitation": "Exchange142 is an alternate source candidate excluded by the selected141-to143 learning branch. Its RPC/column presence is not established by numeric settings_available(142); this inventory does not certify Exchange runtime availability on schema150."
     },
     {
       "path": "web/backend/services/academy_owner_service.py",
@@ -489,7 +492,9 @@
         "web/backend/services/academy_programme_service.py:available"
       ],
       "user_reachability": "Caller-authorized tenant owner tools or application-specific applicant/private-document access; storage service credentials do not supply authorization themselves.",
-      "database_authority": "Privileged SUPABASE_SERVICE_KEY client; treat service_role as RLS-bypassing. Direct filters/caller checks and explicit SECURITY DEFINER RPC guards are required; current live role flags were not inspected in this source review."
+      "database_authority": "Privileged SUPABASE_SERVICE_KEY client; treat service_role as RLS-bypassing. Direct filters/caller checks and explicit SECURITY DEFINER RPC guards are required; current live role flags were not inspected in this source review.",
+      "candidate_schema_limitation": "Exchange142 is an alternate source candidate excluded by the selected141-to143 learning branch. Its RPC/column presence is not established by numeric settings_available(142); this inventory does not certify Exchange runtime availability on schema150.",
+      "known_integrity_finding": "Confirmed native schema150 metadata-commit/lost-response diagnostic initially removed already-referenced private bytes. Separate source repair now retains bytes/quota and returns explicit unknown-outcome HTTP503; both original native byte-survival assertions pass. Authorization classification is independent; conservative orphan reconciliation remains required. See docs/architecture-phase7-2026-10-18/private-upload-integrity.md. External storage in the diagnostic was an owned temporary filesystem."
     },
     {
       "path": "web/backend/services/academy_programme_service.py",
@@ -788,7 +793,9 @@
         "web/backend/routes/academy_owner_routes.py:exchange_submit"
       ],
       "user_reachability": "Distinct owner, applicant and explicitly published public boundaries; RLS is not relied on to repair missing service-level tenant filters.",
-      "database_authority": "Privileged SUPABASE_SERVICE_KEY client; treat service_role as RLS-bypassing. Direct filters/caller checks and explicit SECURITY DEFINER RPC guards are required; current live role flags were not inspected in this source review."
+      "database_authority": "Privileged SUPABASE_SERVICE_KEY client; treat service_role as RLS-bypassing. Direct filters/caller checks and explicit SECURITY DEFINER RPC guards are required; current live role flags were not inspected in this source review.",
+      "candidate_schema_limitation": "Exchange142 is an alternate source candidate excluded by the selected141-to143 learning branch. Its RPC/column presence is not established by numeric settings_available(142); this inventory does not certify Exchange runtime availability on schema150.",
+      "known_integrity_finding": "Confirmed native schema150 metadata-commit/lost-response diagnostic initially removed already-referenced private bytes. Separate source repair now retains bytes/quota and returns explicit unknown-outcome HTTP503; both original native byte-survival assertions pass. Authorization classification is independent; conservative orphan reconciliation remains required. See docs/architecture-phase7-2026-10-18/private-upload-integrity.md. External storage in the diagnostic was an owned temporary filesystem."
     },
     {
       "path": "web/backend/services/elearning_participation_service.py",

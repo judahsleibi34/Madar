@@ -195,4 +195,18 @@ if [[ "${RUN_DELETION_INTEGRITY:-false}" == true ]]; then
     --volume "$WEB_ROOT/backend:/app:ro" --entrypoint python "$BACKEND_TEST_IMAGE" \
     -m unittest tests.test_native_business_integrity_database tests.test_calendar_event_concurrency_database -v
   echo "Schema150 reservation, stock, order/payment and calendar invariants passed"
+  # A committed metadata RPC can lose its response. Retain its referenced
+  # private bytes and quota instead of treating transport failure as rollback.
+  docker run --rm --memory=512m --cpus=0.5 --pids-limit=128 --network host --read-only \
+    --tmpfs /tmp:rw,noexec,nosuid,size=128m --env PYTHONPATH=/app --env PYTHONDONTWRITEBYTECODE=1 \
+    --env APP_ENV=test --env SUPABASE_URL=http://127.0.0.1:54321 \
+    --env SUPABASE_ANON_KEY=madar-ci-placeholder-anon-not-a-secret \
+    --env SUPABASE_SERVICE_KEY=madar-ci-placeholder-service-not-a-secret \
+    --env PUBLIC_UPLOADS_DIR=/tmp/madar-test/public --env DATA_UPLOAD_DIR=/tmp/madar-test/data \
+    --env PRIVATE_CHARTS_DIR=/tmp/madar-test/charts --env MADAR_UPLOAD_WORKSPACE_DIR=/tmp/madar-test/parser \
+    --env MPLCONFIGDIR=/tmp/matplotlib --env XDG_CACHE_HOME=/tmp/cache --env PYGWALKER_TELEMETRY_ENABLED=false \
+    --env LEARNING_PRIVATE_UPLOAD_SYNTHETIC_DATABASE_DSN='host=127.0.0.1 port=55448 dbname=postgres user=postgres connect_timeout=5' \
+    --volume "$WEB_ROOT/backend:/app:ro" --entrypoint python "$BACKEND_TEST_IMAGE" \
+    -m unittest tests.test_learning_private_upload_ack_database -v
+  echo "Schema150 committed private-upload metadata retains referenced bytes after acknowledgement loss"
 fi

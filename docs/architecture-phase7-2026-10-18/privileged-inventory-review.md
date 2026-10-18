@@ -42,6 +42,17 @@ The shared HTTP boundary is concrete:
   These SQL guards accept IDs from a trusted service caller; they do not bind a
   browser JWT themselves. Their role-limited EXECUTE grants remain important.
 
+## Candidate schema qualification
+
+Migration142 is an alternate Exchange candidate. Migration143 explicitly moves
+141 to143 while excluding Exchange142; the retained147/150 rehearsal harness
+also skips142. References below to142 explain that candidate's source guards,
+not proof that its RPCs/columns exist in the selected150 runtime. A numeric
+`settings_available(142)` check alone cannot certify feature availability. Missing
+RPC/column operations can fail closed without making the feature functional.
+Exchange runtime capability detection and a separately reviewed compatibility
+path require independent validation; no historical migration is rewritten here.
+
 ## The eleven paths
 
 ### 1. `routes/academy_owner_routes.py`
@@ -216,8 +227,9 @@ necessary. The protocol marker alone is not evidence of ownership correctness.
 | New path/function/caller evidence references | PASS:all11 resolve in current AST/source |
 | Checker algorithm/client names/exclusions changed | No |
 | Live database role/grant inspection in this review | NOT TESTED |
-| New native tenant/HTTP tests executed by this review | NOT TESTED |
-| Production or staging mutation by this review | None |
+| New native tenant/HTTP authorization tests executed by this review | NOT TESTED |
+| Separate native private-byte acknowledgement diagnostic | Before repair:2 FAIL; after repair:2 PASS; metadata/byte assertions unchanged |
+| Production or retained staging application mutation by this review | None; owned synthetic diagnostic containers only |
 
 Executed commands:
 
@@ -241,9 +253,36 @@ marked native academy/Forms/recording tests. Their presence is not a claim that
 this source review reran them or established complete tenant isolation.
 
 No confirmed authorization bypass was found in the eleven reviewed paths.
-A separate integrity concern remains under investigation: private-document and
-Forms upload exception paths clean staged bytes without the recording service's
-equivalent commit-unknown reconciliation. A persisted-metadata/lost-response
-reproduction is required before calling that a confirmed data-loss defect.
-No application repair, migration change or operational approval is included in
-this inventory closure.
+A separate HIGH integrity defect was subsequently confirmed in both
+`academy_owner_service.upload_document` and `elearning_forms_service.submit`.
+On a positively marked, isolated PostgreSQL17/schema150 fixture, the real
+service-role metadata RPC committed on an independently closed autocommit
+connection. A synthetic lost acknowledgement then caused the real service
+exception handler to remove its already-referenced bytes from an owned temporary
+filesystem. Both required byte-survival assertions failed: **2 FAIL,0 errors,
+1.806 seconds**. An independent observer saw one persisted academy document
+and one persisted Forms file. These were synthetic fixtures; the storage boundary
+was a real owned temporary filesystem, not a live Supabase Storage API. No
+customer/provider deletion or production operation occurred.
+
+The opt-in diagnostic is
+`web/backend/tests/test_learning_private_upload_ack_database.py`, enabled only by
+`LEARNING_PRIVATE_UPLOAD_SYNTHETIC_DATABASE_DSN` and exact disposable marker
+`madar-phase7-private-upload-ack-synthetic`. It intentionally preserves the failing
+safety assertions. A first loader-only environment attempt failed before tests
+because public input directories were not readable by the cached image's non-root
+user; its log was preserved, public-source permissions were corrected, and the
+native result above was then obtained. The one network-none PG fixture was
+bounded to512MiB/.5CPU/PIDs128/tmpfs1GiB; its test container was separately
+bounded and shared only that isolated network namespace. Both owned containers
+were removed afterward; unrelated projects were not modified. Raw evidence is
+private and excluded from Git.
+
+The separately scoped two-service repair and exact before/after evidence are
+documented in [private-upload-integrity.md](private-upload-integrity.md). It
+retains bytes/quota once metadata execution is attempted and its outcome is
+uncertain, surfaces an explicit unknown-outcome response and restricts duplicate
+cleanup to newly staged keys that cannot belong to the acknowledged response.
+The repaired native assertions pass. Conservative orphan/quota retention and
+manual reconciliation limits remain documented. No historical migration change
+or operational approval is part of this work.
