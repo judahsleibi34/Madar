@@ -84,6 +84,132 @@ class PrivilegedVmSafetyTests(unittest.TestCase):
         self.assertEqual(len(drives), 2)
         self.assertTrue(all(value.startswith('file=/private/owned/') for value in drives))
         self.assertFalse(any('backing' in value for value in drives))
+        self.assertNotIn('-daemonize', arguments)
+        self.assertEqual(arguments[arguments.index('-sandbox') + 1],
+                         'on,obsolete=deny,elevateprivileges=deny,spawn=deny,resourcecontrol=deny')
+
+    def repair_fixture(self, root):
+        source = 'a' * 40
+        owner = {'owner': vm.NAME, 'source_sha': source}
+        files = {'guest.qcow2': b'initial disk', 'seed.iso': b'initial seed', 'source.tar': b'initial source',
+                 'serial.log': b'', 'failure-1.log': b'',
+                 'daemon-nonboot-strace.1': b'seccomp(SECCOMP_SET_MODE_FILTER, flags, filter) = 0\nclone(child_stack=NULL, flags=CLONE_CHILD_CLEARTID|CLONE_CHILD_SETTID|SIGCHLD, child_tidptr=0x1) = -1 EPERM (Operation not permitted)\nexit_group(1)\n',
+                 'boot-attempt.json': json.dumps({'source_sha': source, 'started_at': 1}).encode(),
+                 'owner.json': json.dumps(owner).encode()}
+        prepared = {**owner, 'production_authority': False,
+                    'disk_sha256_before_first_boot': vm.hashlib.sha256(files['guest.qcow2']).hexdigest(),
+                    'seed_sha256': vm.hashlib.sha256(files['seed.iso']).hexdigest(),
+                    'source_archive_sha256': vm.hashlib.sha256(files['source.tar']).hexdigest()}
+        files['prepared.json'] = json.dumps(prepared).encode()
+        for name, body in files.items():
+            (root / name).write_bytes(body); (root / name).chmod(0o600)
+        return source
+
+    def test_repair_requires_explicit_committed_driver_before_host_access(self):
+        for mode, driver in (('REPAIR', None), ('REPAIR', 'main'), ('REHEARSE', 'b' * 40)):
+            with self.subTest(mode=mode, driver=driver), patch.object(vm, 'host') as host:
+                with self.assertRaises(RuntimeError): vm.main(mode, 'a' * 40, driver)
+                host.assert_not_called()
+
+    def test_repair_preserves_consumed_attempt_and_separates_driver_from_guest_source(self):
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory); source = self.repair_fixture(target)
+            original = (target / 'boot-attempt.json').read_bytes()
+            with patch.object(vm, 'root', return_value=target), patch.object(vm, 'no_existing_guest'), \
+                    patch.object(vm, 'dependencies', return_value=[]), patch.object(vm, 'headroom'), \
+                    patch.object(vm, 'run', return_value=json.dumps({'format': 'qcow2', 'virtual-size': 8 * 1024**3}).encode()), \
+                    patch.object(vm, 'authenticate_repair_driver', return_value='c' * 64), \
+                    patch.object(vm, 'launch_foreground', side_effect=RuntimeError('test stops before actual VM')) as launch:
+                with self.assertRaisesRegex(RuntimeError, 'test stops'): vm.rehearse(source, 'b' * 40)
+                launch.assert_called_once()
+            self.assertEqual((target / 'boot-attempt.json').read_bytes(), original)
+            receipt = json.loads((target / 'repair-attempt.json').read_text())
+            self.assertEqual(receipt['source_sha'], source)
+            self.assertEqual(receipt['repair_driver_sha'], 'b' * 40)
+            self.assertEqual(receipt['original_boot_attempt_sha256'], vm.hashlib.sha256(original).hexdigest())
+
+    def test_repair_rejects_any_changed_initial_content_before_driver_or_launch(self):
+        for changed in ('guest.qcow2', 'seed.iso', 'source.tar'):
+            with self.subTest(changed=changed), tempfile.TemporaryDirectory() as directory:
+                target = Path(directory); source = self.repair_fixture(target)
+                (target / changed).write_bytes(b'changed')
+                with patch.object(vm, 'root', return_value=target), patch.object(vm, 'no_existing_guest'), \
+                        patch.object(vm, 'dependencies', return_value=[]), patch.object(vm, 'headroom'), \
+                        patch.object(vm, 'run', return_value=json.dumps({'format': 'qcow2', 'virtual-size': 8 * 1024**3}).encode()), \
+                        patch.object(vm, 'authenticate_repair_driver') as driver, patch.object(vm, 'launch_foreground') as launch:
+                    with self.assertRaisesRegex(RuntimeError, 'changed'): vm.rehearse(source, 'b' * 40)
+                    driver.assert_not_called(); launch.assert_not_called()
+                    self.assertFalse((target / 'repair-attempt.json').exists())
+
+    def test_repair_rejects_started_unknown_or_repeated_attempts(self):
+        for changed, body in (('serial.log', b'guest kernel started'), ('failure-1.log', b'other error'),
+                              ('daemon-nonboot-strace.1', b'unknown failure'), ('repair-attempt.json', b'{}'),
+                              ('rehearsal.json', b'{}'), ('boot-attempt.json', b'{"source_sha":"other"}')):
+            with self.subTest(changed=changed), tempfile.TemporaryDirectory() as directory:
+                target = Path(directory); source = self.repair_fixture(target)
+                (target / changed).write_bytes(body); (target / changed).chmod(0o600)
+                with patch.object(vm, 'root', return_value=target), patch.object(vm, 'no_existing_guest'):
+                    with self.assertRaises(RuntimeError): vm.validate_unstarted_repair(source)
+
+    def test_existing_pid_even_broken_symlink_blocks_repair(self):
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory); (target / 'qemu.pid').symlink_to(target / 'missing')
+            with patch.object(vm, 'root', return_value=target), patch.object(vm.socket, 'socket') as socket:
+                with self.assertRaisesRegex(RuntimeError, 'existing_pid'): vm.no_existing_guest()
+                socket.assert_not_called()
+
+    def test_matching_live_qemu_process_blocks_repair(self):
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory); process = target / '123'; process.mkdir()
+            (process / 'cmdline').write_bytes(b'/usr/bin/qemu-system-x86_64\0-name\0' + vm.NAME.encode() + b'\0')
+            actual = Path.iterdir
+            def entries(path): return iter([process]) if path == Path('/proc') else actual(path)
+            with patch.object(vm, 'root', return_value=target), patch.object(Path, 'iterdir', entries), patch.object(vm.socket, 'socket') as socket:
+                with self.assertRaisesRegex(RuntimeError, 'existing_process'): vm.no_existing_guest()
+                socket.assert_not_called()
+
+    def test_existing_loopback_listener_blocks_repair(self):
+        with tempfile.TemporaryDirectory() as directory:
+            with patch.object(vm, 'root', return_value=Path(directory)), \
+                    patch.object(Path, 'iterdir', return_value=iter(())), patch.object(vm.socket, 'socket') as socket:
+                socket.return_value.__enter__.return_value.bind.side_effect = OSError('Address already in use')
+                with self.assertRaises(OSError): vm.no_existing_guest()
+                socket.return_value.__enter__.return_value.bind.assert_called_once_with(('127.0.0.1', vm.PORT))
+
+    def test_repair_driver_must_match_exact_git_blob(self):
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory); bundle = target / vm.BUNDLE; bundle.mkdir(mode=0o700)
+            (bundle / 'source.pack').write_bytes(b'fixed pack'); (bundle / 'source.pack').chmod(0o600)
+            with patch.object(Path, 'home', return_value=target), patch.object(vm, 'root', return_value=target), \
+                    patch.object(vm, 'run', return_value=b'substituted driver'):
+                with self.assertRaisesRegex(RuntimeError, 'driver_source_changed'): vm.authenticate_repair_driver('b' * 40)
+
+    def test_foreground_launcher_starts_new_session_without_weakening_qemu_sandbox(self):
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory)
+            class Process:
+                def poll(self): return 1
+            with patch.object(vm, 'root', return_value=target), patch.object(vm.subprocess, 'Popen', return_value=Process()) as popen:
+                with self.assertRaisesRegex(RuntimeError, 'foreground_launch_failed'): vm.launch_foreground()
+            self.assertTrue(popen.call_args.kwargs['start_new_session'])
+            self.assertTrue(popen.call_args.kwargs['close_fds'])
+            self.assertNotIn('-daemonize', popen.call_args.args[0])
+            self.assertIn('on,obsolete=deny,elevateprivileges=deny,spawn=deny,resourcecontrol=deny', popen.call_args.args[0])
+
+    def test_launcher_returns_attested_qemu_pid_instead_of_sudo_pid(self):
+        from types import SimpleNamespace
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory); (target / 'qemu.pid').write_text('424242')
+            arguments = (b'/usr/bin/qemu-system-x86_64\0-name\0' + vm.NAME.encode()
+                         + b'\0-drive\0file=' + str(target / 'guest.qcow2').encode() + b',if=virtio\0')
+            actual_read, actual_stat = Path.read_bytes, Path.stat
+            def read(path): return arguments if path == Path('/proc/424242/cmdline') else actual_read(path)
+            def stat(path, *args, **kwargs):
+                return SimpleNamespace(st_uid=os.getuid()) if path == Path('/proc/424242') else actual_stat(path, *args, **kwargs)
+            process = SimpleNamespace(pid=111111, poll=lambda: None)
+            with patch.object(vm, 'root', return_value=target), patch.object(vm.subprocess, 'Popen', return_value=process), \
+                    patch.object(Path, 'read_bytes', read), patch.object(Path, 'stat', stat):
+                self.assertEqual(vm.launch_foreground(), 424242)
 
     def test_ssh_pins_guest_host_key_ignores_host_user_configuration_and_agent(self):
         with patch.object(vm, 'root', return_value=Path('/private/owned')):

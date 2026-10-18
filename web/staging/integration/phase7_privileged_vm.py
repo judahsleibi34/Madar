@@ -238,7 +238,7 @@ def qemu_command():
     return ['sudo', '-n', '-u', 'staging-admin', '-g', 'kvm', '--', 'qemu-system-x86_64',
         '-name', NAME, '-machine', 'q35,accel=kvm', '-cpu', 'host', '-smp', str(CPUS), '-m', str(MEMORY_MIB),
         '-nodefaults', '-no-user-config', '-display', 'none', '-monitor', 'none',
-        '-serial', 'file:' + str(root() / 'serial.log'), '-pidfile', str(root() / 'qemu.pid'), '-daemonize',
+        '-serial', 'file:' + str(root() / 'serial.log'), '-pidfile', str(root() / 'qemu.pid'),
         '-sandbox', 'on,obsolete=deny,elevateprivileges=deny,spawn=deny,resourcecontrol=deny',
         '-drive', 'file=' + str(root() / 'guest.qcow2') + ',if=virtio,format=qcow2,cache=none',
         '-drive', 'file=' + str(root() / 'seed.iso') + ',if=virtio,format=raw,readonly=on',
@@ -254,17 +254,88 @@ def ssh_arguments():
         '-p', str(PORT), GUEST_USER + '@127.0.0.1']
 
 
-def rehearse(source_sha):
+def no_existing_guest():
+    if os.path.lexists(root() / 'qemu.pid'):
+        raise RuntimeError('phase7_vm_existing_pid_requires_independent_inspection')
+    for process in Path('/proc').iterdir():
+        if not process.name.isdecimal(): continue
+        try: arguments = (process / 'cmdline').read_bytes().split(b'\0')
+        except (FileNotFoundError, ProcessLookupError, PermissionError): continue
+        if arguments and b'qemu-system' in arguments[0] and (
+                NAME.encode() in arguments or any(str(root() / 'guest.qcow2').encode() in arg for arg in arguments)):
+            raise RuntimeError('phase7_vm_existing_process_requires_independent_inspection')
+    with socket.socket() as probe: probe.bind(('127.0.0.1', PORT))
+
+
+def validate_unstarted_repair(source_sha):
+    """One repair only for the observed seccomp/daemonize zero-effect failure."""
+    if os.path.lexists(root() / 'repair-attempt.json') or os.path.lexists(root() / 'rehearsal.json'):
+        raise RuntimeError('phase7_vm_repair_attempt_already_consumed')
+    attempt = json.loads(read(root() / 'boot-attempt.json'))
+    if attempt.get('source_sha') != source_sha:
+        raise RuntimeError('phase7_vm_original_attempt_invalid')
+    if read(root() / 'serial.log') != b'': raise RuntimeError('phase7_vm_repair_guest_may_have_started')
+    failures = list(root().glob('failure-*.log'))
+    if len(failures) != 1 or read(failures[0]) != b'':
+        raise RuntimeError('phase7_vm_repair_requires_known_launch_failure')
+    traces = [read(path).decode(errors='replace') for path in root().glob('daemon-nonboot-strace.*')]
+    if not any(re.search(r'clone\(child_stack=NULL, flags=CLONE_CHILD_CLEARTID\|CLONE_CHILD_SETTID\|SIGCHLD[^\n]* = -1 EPERM', trace)
+               and 'exit_group(1)' in trace and 'SECCOMP_SET_MODE_FILTER' in trace for trace in traces):
+        raise RuntimeError('phase7_vm_repair_requires_known_seccomp_daemonize_failure')
+    no_existing_guest()
+    return hashlib.sha256(read(root() / 'boot-attempt.json')).hexdigest()
+
+
+def authenticate_repair_driver(driver_sha):
+    if not re.fullmatch('[0-9a-f]{40}', driver_sha or ''):
+        raise RuntimeError('phase7_vm_committed_repair_driver_required')
+    repository = root() / 'repair-driver.git'
+    pack = read(Path.home() / BUNDLE / 'source.pack', 256 * 1024**2)
+    run(['git', 'init', '--quiet', '--bare', str(repository)])
+    run(['git', '-C', str(repository), 'index-pack', '--stdin'], data=pack)
+    relative = 'web/staging/integration/phase7_privileged_vm.py'
+    committed = run(['git', '-C', str(repository), 'show', driver_sha + ':' + relative])
+    if committed != Path(__file__).read_bytes():
+        raise RuntimeError('phase7_vm_repair_driver_source_changed')
+    return hashlib.sha256(committed).hexdigest()
+
+
+def launch_foreground():
+    # QEMU10 applies spawn=deny before its own -daemonize fork. Start a new
+    # host session before QEMU installs seccomp; retain every sandbox rule.
+    fd = os.open(root() / 'qemu-launch.log', os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+    with os.fdopen(fd, 'wb') as output:
+        process = subprocess.Popen(qemu_command(), stdin=subprocess.DEVNULL, stdout=output, stderr=output,
+            start_new_session=True, close_fds=True, env={'PATH': os.defpath, 'HOME': str(Path.home())})
+    deadline = time.monotonic() + 15
+    while time.monotonic() < deadline:
+        if process.poll() is not None:
+            raise RuntimeError('phase7_vm_foreground_launch_failed_private_diagnostic_retained')
+        if (root() / 'qemu.pid').exists():
+            (root() / 'qemu.pid').chmod(0o600)
+            pid = int(read(root() / 'qemu.pid').decode().strip())
+            arguments = Path('/proc', str(pid), 'cmdline').read_bytes().split(b'\0')
+            if (b'qemu-system' not in arguments[0] or NAME.encode() not in arguments
+                    or not any(str(root() / 'guest.qcow2').encode() in arg for arg in arguments)
+                    or Path('/proc', str(pid)).stat().st_uid != os.getuid()):
+                raise RuntimeError('phase7_vm_started_pid_identity_invalid')
+            return pid
+        time.sleep(.1)
+    raise RuntimeError('phase7_vm_started_pid_not_observed_requires_independent_inspection')
+
+
+def rehearse(source_sha, repair_driver_sha=None):
     private_directory(root())
     with lock(root()):
         owner = json.loads(read(root() / 'owner.json')); prepared = json.loads(read(root() / 'prepared.json'))
         if owner.get('owner') != NAME or owner.get('source_sha') != source_sha or prepared.get('owner') != NAME or prepared.get('source_sha') != source_sha or prepared.get('production_authority') is not False:
             raise RuntimeError('phase7_vm_owner_or_source_mismatch')
-        if (root() / 'boot-attempt.json').exists() or (root() / 'qemu.pid').exists():
+        if repair_driver_sha is None and (os.path.lexists(root() / 'boot-attempt.json') or os.path.lexists(root() / 'qemu.pid')):
             raise RuntimeError('phase7_vm_boot_attempt_already_consumed')
+        repair_preimage = validate_unstarted_repair(source_sha) if repair_driver_sha is not None else None
         if dependencies(): raise RuntimeError('phase7_vm_dependencies_missing')
         headroom()
-        with socket.socket() as probe: probe.bind(('127.0.0.1', PORT))
+        no_existing_guest()
         image = json.loads(run(['qemu-img', 'info', '--output=json', str(root() / 'guest.qcow2')]))
         if image.get('format') != 'qcow2' or image.get('backing-filename') or image.get('virtual-size') != DISK_GIB * 1024**3:
             raise RuntimeError('phase7_vm_prepared_disk_identity_invalid')
@@ -274,10 +345,15 @@ def rehearse(source_sha):
             raise RuntimeError('phase7_vm_source_archive_changed')
         if digest_file(root() / 'guest.qcow2') != prepared['disk_sha256_before_first_boot']:
             raise RuntimeError('phase7_vm_prepared_disk_changed')
-        write('boot-attempt.json', json.dumps({'source_sha': source_sha, 'started_at': int(time.time())}) + '\n')
-        write('serial.log', b'')
-        run(qemu_command(), timeout=30)
-        (root() / 'qemu.pid').chmod(0o600)
+        if repair_driver_sha is not None:
+            driver_hash = authenticate_repair_driver(repair_driver_sha)
+            write('repair-attempt.json', json.dumps({'source_sha': source_sha, 'repair_driver_sha': repair_driver_sha,
+                'repair_driver_sha256': driver_hash, 'original_boot_attempt_sha256': repair_preimage,
+                'reason': 'qemu10_spawn_deny_blocks_daemonize_clone', 'started_at': int(time.time())}) + '\n')
+        else:
+            write('boot-attempt.json', json.dumps({'source_sha': source_sha, 'started_at': int(time.time())}) + '\n')
+            write('serial.log', b'')
+        guest_pid = launch_foreground()
         started = time.monotonic()
         while time.monotonic() - started < 180:
             result = subprocess.run(ssh_arguments() + ['true'], capture_output=True, timeout=5,
@@ -309,7 +385,8 @@ assert unit.stat().st_uid==0 and pathlib.Path('/var/lib/madar-phase7/proof.start
 print(json.dumps({'guest_root':True,'pid1_systemd':True,'actual_unit_install_start_restart':True,'source_archive_verified':True,'source_sha':m['source_sha']}))
 """ % (NAME, source_sha)
         proof = json.loads(run(ssh_arguments() + ['sudo -n python3 -'], data=script.encode(), timeout=120))
-        report = {'mode': 'REHEARSE', 'source_sha': source_sha, 'official_image_sha256': IMAGE_SHA256,
+        report = {'mode': 'REPAIR' if repair_driver_sha else 'REHEARSE', 'source_sha': source_sha,
+            'repair_driver_sha': repair_driver_sha, 'guest_pid': guest_pid, 'official_image_sha256': IMAGE_SHA256,
             'guest_proof': proof, 'memory_mib': MEMORY_MIB, 'vcpus': CPUS, 'standalone_disk_gib': DISK_GIB,
             'ssh_binding': '127.0.0.1:' + str(PORT), 'host_filesystem_mounted': False,
             'outbound_network_restricted': True, 'guest_reboot_tested': False,
@@ -321,8 +398,10 @@ print(json.dumps({'guest_root':True,'pid1_systemd':True,'actual_unit_install_sta
         return report
 
 
-def main(mode, source_sha):
-    if mode not in ('INSPECT', 'PREPARE', 'REHEARSE') or not re.fullmatch('[0-9a-f]{40}', source_sha or ''):
+def main(mode, source_sha, repair_driver_sha=None):
+    if (mode not in ('INSPECT', 'PREPARE', 'REHEARSE', 'REPAIR') or not re.fullmatch('[0-9a-f]{40}', source_sha or '')
+            or (mode == 'REPAIR' and not re.fullmatch('[0-9a-f]{40}', repair_driver_sha or ''))
+            or (mode != 'REPAIR' and repair_driver_sha is not None)):
         raise RuntimeError('phase7_vm_explicit_mode_and_committed_source_required')
     host()
     if mode == 'INSPECT':
@@ -331,12 +410,13 @@ def main(mode, source_sha):
             'memory_mib': MEMORY_MIB, 'vcpus': CPUS, 'disk_gib': DISK_GIB, 'ssh_loopback_port': PORT,
             'official_image_sha256': IMAGE_SHA256, 'source_sha': source_sha,
             'mutations_executed': False, 'production_modified': False}
-    return prepare(source_sha) if mode == 'PREPARE' else rehearse(source_sha)
+    return prepare(source_sha) if mode == 'PREPARE' else rehearse(source_sha, repair_driver_sha)
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('mode', nargs='?', choices=('INSPECT', 'PREPARE', 'REHEARSE'), default='INSPECT')
+    parser.add_argument('mode', nargs='?', choices=('INSPECT', 'PREPARE', 'REHEARSE', 'REPAIR'), default='INSPECT')
     parser.add_argument('--source-sha', required=True)
+    parser.add_argument('--repair-driver-sha')
     args = parser.parse_args()
-    print(json.dumps(main(args.mode, args.source_sha), sort_keys=True))
+    print(json.dumps(main(args.mode, args.source_sha, args.repair_driver_sha), sort_keys=True))

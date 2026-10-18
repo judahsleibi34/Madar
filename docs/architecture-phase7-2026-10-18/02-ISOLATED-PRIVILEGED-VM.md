@@ -12,8 +12,10 @@ Read-only discovery on the dedicated staging VM found KVM available, four vCPUs,
 were `qemu-system-x86_64`, `qemu-img`, and `cloud-localds`. Parent coordination is
 required for `sudo -n apt-get install --no-install-recommends qemu-system-x86
 qemu-utils cloud-image-utils`; no virtualization service needs enabling. The
-parent subsequently reported installation complete. The script author did not
-install packages, launch a VM, restart services, or reboot a host.
+parent subsequently completed installation. The script author did not install
+packages, change retained services, or reboot a host. Parent-authorized native
+PREPARE later passed; the first launch exposed the QEMU daemonization defect
+described below before any guest disk write or running guest.
 
 The staging user is not in `kvm`, but the read-only test
 `sudo -n -u staging-admin -g kvm -- test -w /dev/kvm` passed. QEMU uses that exact
@@ -111,11 +113,48 @@ The parent must verify ownership/source/known-host key before connecting, and
 coordinate guest-only shutdown with `sudo -n systemctl poweroff` over that pinned
 SSH channel. Do not kill an unverified PID or remove unidentified disks.
 
+## Narrow unstarted-launch repair
+
+The first native launch used source
+`1b1dc54d8f19a2b1c83c618da89a42d8758b6993`. Ubuntu's QEMU10.2.1 applies its
+`spawn=deny` seccomp filter before its own `-daemonize` fork. An isolated,
+diskless/networkless paused diagnostic reproduced the failed `clone(...)=EPERM`
+and exit1. The equivalent foreground nonboot diagnostic retained the same
+sandbox and ran until its three-second timeout. There was no QEMU process, PID
+file, listener or serial output after the failed real launch; disk, seed and
+archive hashes remained equal to their prepared values.
+
+The correction retains all four QEMU sandbox restrictions and launches QEMU in
+the foreground from a new host session established before seccomp. QEMU remains
+the unprivileged staging owner with group `kvm`. The recorded live PID comes from
+QEMU's own pidfile and is checked against UID, fixed guest name and disk path;
+the intermediate sudo launcher PID is not treated as guest identity.
+
+`REHEARSE` still rejects a consumed attempt. A separate, explicit `REPAIR` accepts
+only this diagnosed, unstarted failure, once. It requires the original boot
+receipt and empty serial/launch-error evidence, the retained matching seccomp
+diagnostic, no PID file (including broken symlinks), no matching live QEMU process,
+an unused loopback port, and all three unchanged initial hashes. It authenticates
+the repair driver's exact tool blob from a separately supplied fixed private
+`source.pack`, records a new repair receipt, and preserves the original attempt.
+
+```bash
+python3 web/staging/integration/phase7_privileged_vm.py REPAIR \
+  --source-sha 1b1dc54d8f19a2b1c83c618da89a42d8758b6993 \
+  --repair-driver-sha <exact-reviewed-repair-commit>
+```
+
+The original guest marker/archive retain source1b1dc54d; the repair-driver commit
+is separately reported. Neither is relabelled as the other. Unknown failures,
+changed guest bytes, an existing process or any prior repair require independent
+inspection rather than automatic retry. Native repair/guest proof remains
+NOT TESTED until a committed driver is transferred and explicitly run.
+
 ## Evidence scope
 
 The new refusal tests run without QEMU, package installation or service effects.
-Actual guest provisioning/systemd proof remains NOT TESTED until the parent runs
-the explicit commands and obtains `rehearsal.json`. Guest root is not production
+Actual guest root/systemd proof remains NOT TESTED until a successful explicit
+attempt produces `rehearsal.json`. Guest root is not production
 authority. Host-root isolation is the normal KVM/QEMU boundary, not a certification
 against hypervisor vulnerabilities. The existing source150 application stays
 active and the retained recovery target stays stopped throughout this bootstrap.
