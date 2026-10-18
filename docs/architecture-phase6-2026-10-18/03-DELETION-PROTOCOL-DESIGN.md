@@ -36,3 +36,20 @@ service-role grants on users/tenants/providers are not blanket-revoked. Full
 cutover must exclude old/manual/supervised actors; narrower dedicated deletion
 credentials and a scoped external-effect broker remain follow-up security work.
 Native tests,full runtime acceptance and controller admission are separate gates.
+
+## Decision record
+
+Context:request/step read-then-write updates and reusable worker IDs allowed three
+confirmed stale-owner violations. Decision:one durable request generation plus
+per-step attempt/generation,atomic fixed RPCs and request-first lock ordering.
+Alternatives:application pre-read(rejected:TOCTOU),worker ID alone(rejected:restart
+reuse),external transactions(rejected:provider effects cannot share PostgreSQL
+commit),automatic uncertain resend(rejected:may repeat irreversible operations).
+Benefits:durable ownership,denied unfenced lifecycle mutation,independently testable
+clock/lock/retry transitions. Costs:coordinated quiescent migration,legacy consumer
+exclusion,manual uncertain-effect reconciliation and new worker protocol.
+Risks:global service-role authority remains outside the reviewed boundary;external
+calls already dispatched cannot be undone. Migration impact:exact149→150forward
+only;historical SQL stays immutable. Reversibility:uncommitted150rolls back;after
+commit use compatible forward repair,not restored legacy grants. The broader
+146→150operation stays unregistered until controller integration is proven.

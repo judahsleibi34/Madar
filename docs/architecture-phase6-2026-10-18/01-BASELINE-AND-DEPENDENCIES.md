@@ -24,3 +24,8 @@ was used. Raw evidence and exact script are private under
 Canonical source dependency remains212→213→214→PhaseVI. Earlier overlapping PRs
 must not be mechanically merged. No main merge or production operation is
 performed or authorized by this branch.
+
+Later bounded production inspection used an explicit READ ONLY transaction and
+2s statement timeout to observe core schema146. The auto-deploy timer is disabled.
+No production write/service/controller mutation followed. These observations do
+not authorize release or attest every webhook/controller/replica acceptance gate.

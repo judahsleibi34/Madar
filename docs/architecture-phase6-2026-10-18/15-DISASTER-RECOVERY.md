@@ -93,3 +93,52 @@ failure without requiring everyservice still exist. Disk≥8GiB and availableRAM
 refresh. Use the updated harness for explicit RESUME-SOURCE so it shares TARGET
 arbitration.89combined admission/recovery safety tests PASS before source freeze;
 actual fresh candidate refresh remains a separate runtime gate.
+
+## Actual negative restore drills
+
+Two new real PostgreSQL17 pg_restore failures were exercised against independent
+owned network-none temporary databases,384MiB/0.5CPU/128PIDs/tmpfs768MiB. Original
+synthetic archive hashes were checked. Missing role restoration failed as expected;
+restoring original roles then a half-truncated custom archive failed on incomplete
+input. Both used --single-transaction --exit-on-error and left zero application,
+Auth or Storage tables after rollback.2PASS,5.745s;temporary container removed with
+owner-label checks. Accepted source and recovery target were untouched. This is
+logical backup failure evidence,not missing/corrupt WAL or full application PITR.
+
+Final refresh executed at36bb910fa028d380a0fb130bb8beeb1b0990bd2d:PASS311.759s,
+same database identity and preactivation role/ACL/row/sequence/object preservation,
+original Auth/MFA/Storage and new actual user/tenant deletion/consuming restart.
+Fresh images are bound in14. This advances exact-source runtime evidence without
+replaying the already consumed full-restore attempt.
+
+## Explicit source recovery and final resource state
+
+Final36bb910f harness RESUME-SOURCE executed successfully against authenticated
+originala8fac208 source artifacts,under shared SOURCE→TARGET locks. Original
+role/service preimages were restored,preservation checkpoint verified,and positive
+provider/actual worker-consumption probes passed. It stopped ONLY the positively
+owned recovery target first;all final36bbtarget volumes,private configuration,
+journals and acceptance evidence remain retained. The original source remains
+a8fac208 at150/2/2/2,active;it was not relabeled/upgraded to36bb. Accepted final
+36bb150candidate is deliberately stopped after LIVE acceptance to bound VMmemory.
+Do not describe that final stopped state as positive consumption evidence;the
+positive native/browser/worker-restart proof preceded the resource handoff.
+
+```text
+python3 web/staging/integration/schema150_candidate_refresh.py REHEARSE \
+  --artifacts "$HOME/phase6-ci-36bb910f" \
+  --source-sha 36bb910fa028d380a0fb130bb8beeb1b0990bd2d \
+  --origin-artifacts "$HOME/phase6-ci-8e17a128"
+python3 web/staging/integration/schema150_application_restore.py RESUME-SOURCE \
+  --artifacts "$HOME/phase6-ci-36bb910f" \
+  --source-sha 36bb910fa028d380a0fb130bb8beeb1b0990bd2d \
+  --origin-artifacts "$HOME/phase6-ci-a8fac208" \
+  --origin-source-sha a8fac208586a331d79ce5d02cc5adf32410d57f3
+```
+
+Repeated completed RESUME-SOURCE was then actually invoked and rejected with
+restore150_source_resume_already_consumed. Source AND target container identities,
+images,running state,start timestamps and restart counts were unchanged across
+the rejected call. No source/target restart or replay was hidden. Final observed
+staging headroom:2929MiB available memory,19.47GiB free disk. Unrelated projects
+were preserved;no broad Docker cleanup was performed.

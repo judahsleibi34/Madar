@@ -47,3 +47,66 @@ plus211native executions across its workflow's retained and successor groups.
 The new183-execution working harness is not added to or relabeled that older
 exact-source receipt. Latest application-focused staging unit run:30PASS,including
 Storage pagination rejection and consuming-readiness tests;no external network.
+
+Final legacy-admission correction adds3native149cases before the38case150suite.
+Working complete rehearsal187PASS (groups21,11,5,18,22,2,5,16,22,41,24),zero failures,
+errors/skips. The combined41are3legacy+38deletion/upgrade assertions. The new
+legacy cases had2FAIL/1PASS before correction;the same assertions now pass. No
+provider was actually called by that diagnostic and no duplicate external harm
+is inferred. Original150SQL and all published mirror hashes remain unchanged.
+
+## Frozen candidate CI
+
+Exact36bb910fa028d380a0fb130bb8beeb1b0990bd2d hosted backend check
+[39128295671](https://github.com/judahsleibi34/Madar/actions/runs/39128295671)
+PASS:4 observer checks;4012 backend collected,3183PASS,829conditionalSKIP,58.463s;
+239native executions,zero failures/errors/skips. Native groups:
+32,8,8,4,21,11,5,18,22,2,5,16,22,41,24. These include retained commercial115/145/146
+rehearsals,147/148/149ownership/integrity,3legacy-admission cases+38deletion150
+cases,and24business/calendar regressions at150. Repeated schema executions are
+not distinct coverage. EXTERNAL_ATTEMPTS=[] and EXTERNAL_SITES=[] in broad suite.
+
+Frontend exact-source check
+[39128295628](https://github.com/judahsleibi34/Madar/actions/runs/39128295628):
+1713PASS,1SKIP,233files;lint,build and dependency audit also PASS.
+
+## Commands and boundaries
+
+Hosted workflow commands at frozen candidate source:
+
+```bash
+python3 web/scripts/check_dependency_locks.py
+python3 web/scripts/check_migrations.py
+python3 web/scripts/check_migration_transitions.py
+python3 web/scripts/check_forward_release.py
+python3 web/scripts/check_secret_hygiene.py
+docker build --target test -t madar-backend-test web/backend
+python3 web/staging/integration/test_notification_observer.py
+# Full docker run mounts/test environment are in .github/workflows/backend-check.yml
+# The image executes: python scripts/run_tests_no_external_network.py
+BACKEND_TEST_IMAGE=madar-backend-test timeout 10m bash web/scripts/rehearse_migration_115.sh
+BACKEND_TEST_IMAGE=madar-backend-test timeout 10m bash web/scripts/rehearse_migration_145.sh
+BACKEND_TEST_IMAGE=madar-backend-test timeout 10m bash web/scripts/rehearse_migration_146.sh
+BACKEND_TEST_IMAGE=madar-backend-test timeout 10m bash web/scripts/rehearse_migration_150.sh
+```
+
+Frontend workflow,from web/frontend:
+
+```bash
+npm ci
+npm run lint
+npm test
+npm run build
+npm audit --omit=dev --audit-level=high
+```
+
+Staging full-stack/recovery commands are in13/15;all require separately authenticated
+exact-source artifact directories and positive fixed-project/database identity.
+These scripts are not approved production SQL executors. Browser command uses
+web/staging/integration/browser-smoke.mjs with private fixture and loopback SSH
+forwarding;no account,TOTP,JWT or role backup belongs in Git.
+
+The extra python3 web/scripts/check_privileged_inventory.py check FAILS with the
+same11unclassified paths at parent214;this baseline debt remains visible. No CI
+assertion was removed or weakened. Broader unexecuted product/performance/recovery
+acceptance is recorded explicitly in the verification matrix.
