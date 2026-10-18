@@ -2,7 +2,7 @@ name: Backend Check
 
 on:
   pull_request:
-    branches: [main, codex/architecture-hardening-20261016, codex/notification-claim-fencing-20261016, codex/integration-review-20261017, codex/outbox-claim-fencing-20261017]
+    branches: [main, codex/architecture-hardening-20261016, codex/notification-claim-fencing-20261016, codex/integration-review-20261017, codex/outbox-claim-fencing-20261017, codex/schema149-release-engineering-20261017]
   push:
     branches: [main]
 
@@ -91,4 +91,4 @@ jobs:
           timeout 10m bash web/scripts/rehearse_migration_115.sh
           timeout 10m bash web/scripts/rehearse_migration_145.sh
           timeout 10m bash web/scripts/rehearse_migration_146.sh
-          timeout 10m bash web/scripts/rehearse_migration_149.sh
+          timeout 10m bash web/scripts/rehearse_migration_150.sh
