@@ -1,5 +1,24 @@
 # Madar production release acceptance policy
 
+## Phase VII privileged source inventory
+
+The exact privileged-client inventory check is mandatory in backend CI on the
+complete checkout. Reviewed omissions are classified with concrete route/service/
+SQL boundaries; inventory completeness is not authorization certification.
+Phase VII successor PRs run backend/frontend/fresh-image checks when targeting
+the Phase VI dependency branch, with exact PR-head checkout and read-only tokens.
+No main merge, operational registration or production authority follows.
+
+## Phase VII source inventory and isolated test guest
+
+The exact privileged-client inventory check is mandatory in backend CI on the
+complete checkout. Reviewed omissions are classified with concrete route/service/
+SQL boundaries; inventory completeness is not authorization certification. A
+staging-only fixed QEMU/KVM guest bootstrap authenticates an official signed pinned
+image and exact content-addressed committed source. Its loopback SSH, independent
+disk and guest-root/systemd checks issue no production authority and do not change
+host controller/systemd/application resources. Source150 remains unregistered.
+
 ## Phase VI schema150 preparation remains non-executable
 
 The separate preparation profile `completed-normal-schema146-150-coordinated-release`

@@ -56,6 +56,12 @@ class CiSourceIdentityTests(unittest.TestCase):
         for name in ('backend-check.yml', 'frontend-check.yml', 'schema148-artifacts.yml'):
             self.assertIn('codex/schema149-release-engineering-20261017', (WORKFLOWS/name).read_text())
 
+    def test_phase7_base_runs_all_required_checks_and_real_inventory(self):
+        for name in ('backend-check.yml', 'frontend-check.yml', 'schema148-artifacts.yml'):
+            self.assertIn('codex/schema150-deletion-integrity-20261018', (WORKFLOWS/name).read_text())
+        self.assertIn('python3 web/scripts/check_privileged_inventory.py',
+                      (WORKFLOWS/'backend-check.yml').read_text())
+
     def test_guard_rejects_a_different_merge_tree(self):
         for name in ("backend-check.yml", "frontend-check.yml"):
             with self.subTest(workflow=name):
