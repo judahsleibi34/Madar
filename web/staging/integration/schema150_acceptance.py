@@ -73,6 +73,8 @@ def prepare(runtime, directory, source, images, receipt, snapshots):
         value = previous.regular(runtime / name).decode()
         value = re.sub(r'^SCHEMA_COMPATIBLE_(MIN|MAX)=149$', r'SCHEMA_COMPATIBLE_\g<1>=150', value, flags=re.M)
         value = '\n'.join(line for line in value.splitlines() if line) + '\n'
+        value += ('DATA_DELETION_WORKER_REQUIRED=true\n'
+                  'DATA_DELETION_WORKER_HEALTH_URL=http://deletion-worker:8094/health\n')
         manage.private_write(name, value)
     # prepare149 intentionally creates a future deletion worker;150 is the first
     # compatible target. Keep its fixed restart=no and bounded resources.

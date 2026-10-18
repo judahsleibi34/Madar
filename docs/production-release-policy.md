@@ -2970,3 +2970,11 @@ containerd image store. The producer verifies both blobs before publishing the
 receipt. Imported runtime IDs must equal the accepted manifest IDs; a mismatch
 refuses before replacing services. Latest exact-application-source backend and
 frontend workflow success is independently requeried, in addition to artifact CI.
+
+The schema150 staging full-application recovery harness authenticates original150
+and target source/artifacts independently,regenerates validated fixed Compose
+configuration,and restores original role preimages before independent-cluster
+application acceptance. Its INSPECT/REHEARSE/RESUME-SOURCE modes cannot register
+the unadmitted150profile,issue operational authority,or substitute same-VM synthetic
+recovery for current-data/replica/privileged-controller acceptance. See
+`docs/architecture-phase6-2026-10-18/15-DISASTER-RECOVERY.md`.
