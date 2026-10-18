@@ -129,13 +129,16 @@ class DeletionAdmissionPreparationTests(unittest.TestCase):
                 self.observation, self.protocols, self.calls = observation, protocols, []
             def execute(self, sql, args=None):
                 self.calls.append((sql, args))
-                self.value = self.observation if sql == release.QUIESCENCE_SQL else self.protocols.pop(0)
+                if sql=='select pg_catalog.pg_stat_clear_snapshot()':self.value=None
+                else:self.value = self.observation if sql == release.QUIESCENCE_SQL else self.protocols.pop(0)
             def fetchone(self): return (self.value,)
         base = self.observation(150)
         for key in ('delivery_protocol', 'outbox_protocol', 'deletion_protocol'): base.pop(key)
         good = Cursor(dict(base), [2, 2, 2])
         release.observe_database_quiescence(good, deletion_contract(), 150)
-        self.assertEqual([row[0] for row in good.calls[1:]], [
+        self.assertEqual([row[0] for row in good.calls[:2]], [
+            'select pg_catalog.pg_stat_clear_snapshot()',release.QUIESCENCE_SQL])
+        self.assertEqual([row[0] for row in good.calls[2:]], [
             'select public.notification_delivery_protocol()', 'select public.notification_outbox_protocol()',
             'select public.data_deletion_ownership_protocol()'])
         for values in ([2, 2, 1], [2, 1, 2], [True, 2, 2]):

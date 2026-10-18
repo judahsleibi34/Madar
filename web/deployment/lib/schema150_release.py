@@ -151,6 +151,11 @@ def observe_database_quiescence(cursor, contract, expected_schema):
     """Call actual protocol functions; their presence alone is insufficient."""
     if type(expected_schema) is not int or expected_schema not in (146, 147, 148, 149, 150):
         raise RuntimeError('schema150_database_not_quiescent')
+    # PostgreSQL retains activity/statistics snapshots inside a transaction.
+    # Refresh before EVERY admission observation: cached zero can miss a newly
+    # connected writer, and cached one can retain an already closed backend.
+    # This clears only this session's statistics cache, not business state.
+    cursor.execute('select pg_catalog.pg_stat_clear_snapshot()')
     cursor.execute(QUIESCENCE_SQL)
     observed = cursor.fetchone()[0]
     for key, function, available in (

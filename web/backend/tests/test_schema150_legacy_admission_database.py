@@ -6,10 +6,15 @@ legacy ambiguous-outcome fixture represents an attempted operation, not proof
 that a provider actually accepted it. Every fixture rolls back after the test.
 """
 import os
+import json
 from pathlib import Path
 import sys
+import time
 import unittest
 from uuid import uuid4
+from unittest.mock import patch
+
+import psycopg
 
 from tests.disposable_database_support import connect_disposable_database
 
@@ -24,6 +29,21 @@ class LegacyDeletionAdmissionDatabaseTests(unittest.TestCase):
     def setUp(self):
         self.db = connect_disposable_database(DSN, markers={'madar-notification-synthetic-rehearsal'})
         self.addCleanup(self.db.close)
+        # A client close sends Terminate without waiting for the server backend
+        # to exit. Establish the isolated fixture baseline on the server, using
+        # fresh autocommit observations; never terminate an unknown session or
+        # weaken the production quiescence gate to accommodate fixture timing.
+        deadline = time.monotonic() + 5
+        while True:
+            others = self.db.execute(
+                "select count(*) from pg_stat_activity where datname=current_database() "
+                "and backend_type='client backend' and pid<>pg_backend_pid()"
+            ).fetchone()[0]
+            if others == 0:
+                break
+            if time.monotonic() >= deadline:
+                self.fail('Disposable admission fixture still has other client sessions')
+            time.sleep(.01)
         self.assertEqual(self.db.execute(
             "select schema_version from public.application_schema_state where contract_key='core'"
         ).fetchone()[0], 149)
@@ -38,7 +58,18 @@ class LegacyDeletionAdmissionDatabaseTests(unittest.TestCase):
         self.addCleanup(lambda: self.db.execute('rollback'))
 
     def observation(self):
-        with self.db.cursor() as cursor:
+        verify=release.require_database_quiescence
+        def diagnosed(observed,contract,schema):
+            try:
+                return verify(observed,contract,schema)
+            except RuntimeError as error:
+                # Preserve the exact strict decision and observed counters for
+                # a failed native fixture, never credentials/cluster identity.
+                keys=('schema','delivery_protocol','outbox_protocol','deletion_protocol',*release.COUNTERS)
+                safe={k:observed.get(k) if type(observed.get(k)) is int else 'invalid' for k in keys}
+                error.add_note('Synthetic fixture observed counters: '+json.dumps(safe,sort_keys=True))
+                raise
+        with self.db.cursor() as cursor,patch.object(release,'require_database_quiescence',side_effect=diagnosed):
             return release.observe_database_quiescence(cursor, self.contract, 149)
 
     def test_legacy_retry_with_external_attempt_and_no_live_claim_rejects(self):
@@ -94,6 +125,40 @@ class LegacyDeletionAdmissionDatabaseTests(unittest.TestCase):
         self.assertEqual(self.db.execute(
             "select count(*) from public.data_deletion_steps where request_id=%s and state='pending'",
             (self.key,)).fetchone()[0], 10)
+
+    def test_new_live_client_cannot_hide_behind_cached_zero_session_snapshot(self):
+        self.assertEqual(self.observation()['other_client_sessions'], 0)
+        other = connect_disposable_database(DSN, markers={'madar-notification-synthetic-rehearsal'})
+        self.addCleanup(other.close)
+        # PostgreSQL caches pg_stat_activity in this transaction. The public
+        # guard must refresh its observation and detect even an idle new client.
+        with self.assertRaisesRegex(RuntimeError, 'not_quiescent'):
+            self.observation()
+
+    def test_server_confirmed_client_exit_cannot_leave_cached_one_session_snapshot(self):
+        # Observe the same verified disposable cluster through another database
+        # so the read-only monitor cannot inflate the tested database's count.
+        monitor = psycopg.connect(self.db.info.dsn, dbname='template1',
+                                  hostaddr=self.db.info.hostaddr, autocommit=True, connect_timeout=5)
+        self.addCleanup(monitor.close)
+        self.assertEqual(monitor.execute(
+            'select system_identifier::text from pg_control_system()'
+        ).fetchone()[0], self.contract['database']['system_identifier'])
+        monitor.execute('set default_transaction_read_only=on')
+        other = connect_disposable_database(DSN, markers={'madar-notification-synthetic-rehearsal'})
+        self.addCleanup(other.close)
+        other_pid = other.execute('select pg_backend_pid()').fetchone()[0]
+        with self.assertRaisesRegex(RuntimeError, 'not_quiescent'):
+            self.observation()
+        other.close()
+        deadline = time.monotonic() + 5
+        while monitor.execute('select count(*) from pg_stat_activity where pid=%s', (other_pid,)).fetchone()[0]:
+            if time.monotonic() >= deadline:
+                self.fail('Known disposable client backend did not exit after close')
+            time.sleep(.01)
+        # No fixture-side pg_stat_clear_snapshot() here: this must exercise the
+        # actual guard after independent server confirmation, in the SAME txn.
+        self.assertEqual(self.observation()['other_client_sessions'], 0)
 
 
 if __name__ == '__main__':
