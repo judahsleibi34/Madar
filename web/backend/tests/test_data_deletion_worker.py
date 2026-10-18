@@ -105,6 +105,21 @@ class DeletionWorkerOwnershipBarrierTests(unittest.TestCase):
             self.assertEqual(worker.STATE['ownership_lost'], before + 1)
         self.client.table.assert_not_called()
 
+    def test_valid_read_only_startup_is_healthy_and_never_calls_provider_or_claims(self):
+        from contextlib import ExitStack
+        with ExitStack() as stack:
+            stack.enter_context(patch.dict(os.environ, {'DATA_DELETION_WORKER_ENABLED':'true'}))
+            stack.enter_context(patch.object(provider_recovery,'prohibit_worker_start'))
+            stack.enter_context(patch.object(provider_recovery,'worker_consumption_status',return_value=(False,True)))
+            event=stack.enter_context(patch.object(worker,'STOP_EVENT'));event.is_set.side_effect=[False,True]
+            stack.enter_context(patch.object(worker,'ThreadingHTTPServer'))
+            stack.enter_context(patch('signal.signal'));stack.enter_context(patch('threading.Thread'))
+            protocol=stack.enter_context(patch.object(worker,'require_deletion_ownership_protocol'))
+            claim=stack.enter_context(patch.object(worker,'claim_deletion_requests'))
+            self.assertEqual(worker.main(),0)
+            protocol.assert_not_called();claim.assert_not_called()
+            self.assertTrue(worker.STATE['healthy']);self.assertFalse(worker.STATE['consuming'])
+
     def test_disabled_worker_does_not_attempt_protocol_or_claim(self):
         with patch.dict(os.environ, {'DATA_DELETION_WORKER_ENABLED': 'false'}), patch.object(
                 provider_recovery, 'prohibit_worker_start'), patch.object(

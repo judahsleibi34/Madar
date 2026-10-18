@@ -224,8 +224,11 @@ def check_data_deletion_worker() -> str:
         return "misconfigured"
     try:
         response = requests.get(url, timeout=READINESS_TIMEOUT_SECONDS, allow_redirects=False)
-        return "ok" if response.status_code == 200 else "unavailable"
-    except requests.RequestException:
+        if response.status_code != 200:
+            return "unavailable"
+        payload = response.json()
+        return "ok" if isinstance(payload, dict) and payload.get("status") == "ok" and payload.get("consuming") is True else "unavailable"
+    except (requests.RequestException, ValueError):
         return "unavailable"
 
 

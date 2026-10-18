@@ -451,6 +451,31 @@ def _step_delete_auth_identities(request: dict[str, Any], *, client, **_kwargs) 
     return {"deleted": deleted, "already_absent": absent}
 
 
+def _provider_object_present(client, bucket: str, key: str) -> bool:
+    folder, _, filename = key.rpartition("/")
+    # Search is substring-based and paginated. An empty first exact-match set
+    # does not establish absence. Bound provider work and refuse incomplete or
+    # malformed listings instead of falsely certifying deletion.
+    page_size = 100
+    for offset in range(0, 1000, page_size):
+        try:
+            listed = client.storage.from_(bucket).list(folder, {
+                "search": filename, "limit": page_size, "offset": offset,
+                "sortBy": {"column": "name", "order": "asc"},
+            })
+        except Exception as error:
+            raise DeletionStepError("storage_provider_verification_unavailable") from error
+        if (not isinstance(listed, list) or len(listed) > page_size
+                or any(not isinstance(item, dict) or not isinstance(item.get("name"), str)
+                       or not item["name"] for item in listed)):
+            raise DeletionStepError("storage_provider_verification_unavailable")
+        if any(item["name"] == filename for item in listed):
+            return True
+        if len(listed) < page_size:
+            return False
+    raise DeletionStepError("storage_provider_verification_incomplete")
+
+
 def _step_verify(request: dict[str, Any], *, client, **_kwargs) -> dict[str, Any]:
     checks: dict[str, str] = {}
     if request["request_type"] == "tenant":
@@ -474,16 +499,7 @@ def _step_verify(request: dict[str, Any], *, client, **_kwargs) -> dict[str, Any
                     break
             elif kind in PROVIDER_RESOURCE_BUCKETS:
                 key = str(resource.get("resource_key") or "")
-                folder, _, filename = key.rpartition("/")
-                try:
-                    listed = client.storage.from_(PROVIDER_RESOURCE_BUCKETS[kind]).list(
-                        folder, {"search": filename, "limit": 100}
-                    )
-                except Exception as error:
-                    raise DeletionStepError("storage_provider_verification_unavailable") from error
-                if not isinstance(listed, list):
-                    raise DeletionStepError("storage_provider_verification_unavailable")
-                if any(str(item.get("name") or "") == filename for item in listed if isinstance(item, dict)):
+                if _provider_object_present(client, PROVIDER_RESOURCE_BUCKETS[kind], key):
                     storage_verified = False
                     break
     checks["storage"] = "verified" if storage_verified else "mismatch"

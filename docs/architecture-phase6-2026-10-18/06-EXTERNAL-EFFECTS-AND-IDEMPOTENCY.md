@@ -27,3 +27,12 @@ reviewed owner-controlled repair; complete operator reconciliation tooling is
 unfinished. A stale in-flight external call cannot be undone by database fencing.
 Old consumers and broad service-role callers must be excluded during cutover;
 this migration does not revoke platform-wide provider grants.
+
+Storage absence verification now traverses substring-search pages in stable name
+order,with100 results/page and a1000-result bound. An existing exact object on a
+later page rejects finalization; malformed or exhausted listings fail closed.
+A new adversarial test failed against a8fac208's single-page verifier and passes
+with the repair. This is an application correction; published migration150 bytes
+and checksum remain unchanged. Concurrent provider mutation is still constrained
+by frozen subject ownership and the maintenance/consumer authority contract; a
+paginated absence read is not a database transaction with object storage.

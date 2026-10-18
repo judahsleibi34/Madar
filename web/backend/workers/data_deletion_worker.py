@@ -106,13 +106,19 @@ def main() -> int:
     if os.getenv("DATA_DELETION_WORKER_ENABLED", "false").strip().lower() not in {"1", "true", "yes", "on"}:
         logger.info("deletion.worker_disabled")
         return 0
-    try:
-        require_deletion_ownership_protocol()
-    except RuntimeError:
-        STATE["healthy"] = False
-        STATE["consuming"] = False
-        logger.error("deletion.ownership_protocol_required")
-        raise
+    from services.provider_recovery import worker_consumption_status
+    allowed, _ = worker_consumption_status()
+    if allowed:
+        try:
+            require_deletion_ownership_protocol()
+        except RuntimeError:
+            STATE["healthy"] = False
+            STATE["consuming"] = False
+            logger.error("deletion.ownership_protocol_required")
+            raise
+    # A valid READ_ONLY standby starts a non-consuming health endpoint without
+    # issuing a prohibited provider RPC. Every consuming poll still validates
+    # the exact database protocol before claiming, including after a restore.
     for selected in (signal.SIGINT, signal.SIGTERM):
         signal.signal(selected, lambda *_args: STOP_EVENT.set())
     host = os.getenv("DATA_DELETION_WORKER_HEALTH_HOST", "127.0.0.1").strip()

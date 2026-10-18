@@ -262,6 +262,40 @@ class DeletionLifecycleTests(unittest.TestCase):
         lifecycle._fail_step(request, client.tables["data_deletion_steps"][8], raised.exception, client=client)
         self.assertEqual(client.tables["data_deletion_requests"][0]["verification_status"], "mismatch")
 
+    def test_storage_verification_checks_later_search_pages(self):
+        client, request = workflow("user")
+        client.tables["users"] = []
+        client.tables["data_deletion_subjects"][0]["provider_state"] = "absent"
+        client.tables["data_deletion_resources"] = [{"request_id": request["id"],
+            "resource_kind": "supabase_avatar", "resource_key": "users/auth/avatar.png", "state": "deleted"}]
+        listing = MagicMock(side_effect=[
+            [{"name": f"copy-{index}-avatar.png"} for index in range(100)],
+            [{"name": "avatar.png"}],
+        ])
+        with patch.object(StorageBucket, "list", listing):
+            with self.assertRaises(lifecycle.DeletionStepError) as raised:
+                lifecycle._step_verify(request, client=client)
+        self.assertEqual(raised.exception.code, "deletion_verification_mismatch")
+        self.assertEqual(listing.call_args_list[1].args[1]["offset"], 100)
+
+    def test_storage_verification_requires_complete_well_formed_listing(self):
+        client, _ = workflow()
+        for page in (None, [None], [{}], [{"name": ""}], [{"name": 1}]):
+            with self.subTest(page=page), patch.object(StorageBucket, "list", return_value=page):
+                with self.assertRaises(lifecycle.DeletionStepError):
+                    lifecycle._provider_object_present(client, "avatars", "users/auth/avatar.png")
+        with patch.object(StorageBucket, "list", return_value=[{"name": "other"}] * 100) as listing:
+            with self.assertRaises(lifecycle.DeletionStepError) as raised:
+                lifecycle._provider_object_present(client, "avatars", "users/auth/avatar.png")
+            self.assertEqual(raised.exception.code, "storage_provider_verification_incomplete")
+            self.assertEqual(listing.call_count, 10)
+
+    def test_storage_verification_accepts_absence_after_all_pages(self):
+        client, _ = workflow()
+        with patch.object(StorageBucket, "list", side_effect=[[{"name": "other"}] * 100, []]) as listing:
+            self.assertFalse(lifecycle._provider_object_present(client, "avatars", "users/auth/avatar.png"))
+            self.assertEqual(listing.call_args_list[1].args[1]["offset"], 100)
+
     def test_provider_objects_are_tenant_manifest_bound_and_replay_safe(self):
         client, request = workflow("user")
         client.tables["data_deletion_resources"] = [
