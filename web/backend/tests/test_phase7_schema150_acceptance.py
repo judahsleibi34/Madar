@@ -5,6 +5,7 @@ import io
 import json
 import os
 from pathlib import Path
+import shutil
 import sys
 import tarfile
 import tempfile
@@ -15,6 +16,7 @@ from unittest.mock import patch
 WEB = Path(os.getenv('MADAR_TEST_REPOSITORY_ROOT') or Path(__file__).resolve().parents[2])
 sys.path.insert(0,str(WEB/'staging/integration'))
 import phase7_schema150_acceptance as rehearsal
+from deployment.lib import schema150_release as release
 from test_schema150_restore_configuration import valid_plan, PROJECT as OLD_PROJECT, OWNER as OLD_OWNER, IMAGES, SHA
 
 STAMP = '2026-10-18T00:00:00Z'
@@ -148,7 +150,20 @@ class Phase7AcceptanceSafetyTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError,'digest mismatch'):rehearsal.archive_origin()
 
     def test_preparation_translates_only_new_generated_target_and_captures_actual230_ports(self):
-        _,snapshots=rehearsal.acceptance.captured_source(rehearsal.manage.REPOSITORY)
+        # CI exposes WEB components separately, not a complete checkout at the
+        # runtime manage.py location. Build an actual source tree using the same
+        # published SQL/mirror bytes; never substitute fabricated migration SQL.
+        temporary=tempfile.TemporaryDirectory();self.addCleanup(temporary.cleanup)
+        source_root=Path(temporary.name)
+        shutil.copytree(WEB/'deployment/releases',source_root/'web/deployment/releases')
+        for name in release.SQL_NAMES.values():
+            for tree in ('database','supabase'):
+                source=WEB/tree/'migrations'/name
+                if not source.exists():source=Path('/'+tree+'/migrations')/name
+                destination=source_root/'web'/tree/'migrations'/name
+                destination.parent.mkdir(parents=True,exist_ok=True)
+                destination.write_bytes(source.read_bytes())
+        _,snapshots=rehearsal.acceptance.captured_source(source_root)
         captured={'database.dump':b'synthetic dump','roles.sql':b'synthetic roles','objects.tar':b'synthetic objects'}
         credentials={'DATABASE_PASSWORD':'a'*64,'JWT_SECRET':'b'*64}
         with tempfile.TemporaryDirectory() as directory,patch.object(Path,'home',return_value=Path(directory)):
