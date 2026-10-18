@@ -51,6 +51,10 @@ def inspect_maintenance(context):
     barrier_missing=not exists and bool(completed or pending) and not cleared
     barrier_conflict=barrier_missing or (exists and cleared)
     last=next((r['payload'] for r in reversed(rows) if r['event']=='quiescence'),None)
+    if last is not None and (not isinstance(last,dict)
+            or type(last.get('schema')) is not int or last['schema'] not in (146,147,148,149,150)
+            or last.get('system_identifier')!=binding['system_identifier']):
+        raise RuntimeError('schema150_status_recorded_database_invalid')
     return {'capability':'INSPECT','operational_profile_registered':False,
         'authority_issued':False,'mutations_executed':False,
         'journal_verified':True,'completed_steps':completed,'pending_step':pending,

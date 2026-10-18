@@ -81,6 +81,15 @@ class StatusTests(unittest.TestCase):
         self.assertEqual(result['status'],'FAIL')
         self.assertTrue(result['requires_independent_recovery'])
 
+    def test_private_quiescence_payload_cannot_escape_as_an_untyped_schema_value(self):
+        context,_,journal,binding,_=self.fixture()
+        for step in lifecycle.FENCE_STEPS:
+            journal.append('effect_intent',{'step':step});journal.append('effect_complete',{'step':step})
+        journal.append('quiescence',{'schema':{'private':'NEVER-EMIT'},
+            'system_identifier':binding['system_identifier']})
+        with self.assertRaisesRegex(RuntimeError,'recorded_database_invalid'):
+            status.inspect_maintenance(context)
+
     def test_unknown_target_and_arbitrary_path_rejected_before_read(self):
         for target in ('../../etc','production','A'*64,'a'*63,None):
             with self.subTest(target=target),self.assertRaisesRegex(RuntimeError,'exact_context_required'):

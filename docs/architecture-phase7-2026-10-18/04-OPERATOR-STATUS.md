@@ -14,8 +14,12 @@ execution or independent authorization. `last_recorded_schema` is historical;
 it is never labelled the current schema. The capability cannot prepare, execute,
 retry, clear a barrier, issue write authority or register schema150.
 
-Seven temporary-journal tests cover no-effects output, retained pending intent,
+Eight temporary-journal tests cover no-effects output, retained pending intent,
 exact barrier digest, corrupted/out-of-order records, relabelled admission and
 arbitrary-target refusal and a surviving barrier after recorded completion. CLI failures expose exception class only. Deployment
 installation and the complete source-bound operator package remain subject to
 the same unfinished controller integration gates.
+
+Recorded database schema values are typed and restricted to146..150 with exact
+cluster binding before output; an arbitrary private payload cannot be projected
+through the historical-schema field. This remains an observation, not live proof.
