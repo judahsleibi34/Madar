@@ -293,6 +293,8 @@ def authenticate_repair_driver(driver_sha):
     pack = read(Path.home() / BUNDLE / 'source.pack', 256 * 1024**2)
     run(['git', 'init', '--quiet', '--bare', str(repository)])
     run(['git', '-C', str(repository), 'index-pack', '--stdin'], data=pack)
+    if run(['git', '-C', str(repository), 'cat-file', '-t', driver_sha]).strip() != b'commit':
+        raise RuntimeError('phase7_vm_committed_repair_driver_required')
     relative = 'web/staging/integration/phase7_privileged_vm.py'
     committed = run(['git', '-C', str(repository), 'show', driver_sha + ':' + relative])
     if committed != Path(__file__).read_bytes():

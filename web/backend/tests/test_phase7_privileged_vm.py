@@ -180,9 +180,22 @@ class PrivilegedVmSafetyTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             target = Path(directory); bundle = target / vm.BUNDLE; bundle.mkdir(mode=0o700)
             (bundle / 'source.pack').write_bytes(b'fixed pack'); (bundle / 'source.pack').chmod(0o600)
+            def command(args, **kwargs):return b'commit\n' if 'cat-file' in args else b'substituted driver'
             with patch.object(Path, 'home', return_value=target), patch.object(vm, 'root', return_value=target), \
-                    patch.object(vm, 'run', return_value=b'substituted driver'):
+                    patch.object(vm, 'run', side_effect=command):
                 with self.assertRaisesRegex(RuntimeError, 'driver_source_changed'): vm.authenticate_repair_driver('b' * 40)
+
+    def test_repair_driver_rejects_tree_or_blob_even_if_tool_path_could_match(self):
+        for kind in (b'tree\n', b'blob\n', b'tag\n'):
+            with self.subTest(kind=kind), tempfile.TemporaryDirectory() as directory:
+                target = Path(directory); bundle = target / vm.BUNDLE; bundle.mkdir(mode=0o700)
+                (bundle / 'source.pack').write_bytes(b'fixed pack'); (bundle / 'source.pack').chmod(0o600)
+                with patch.object(Path, 'home', return_value=target), patch.object(vm, 'root', return_value=target), \
+                        patch.object(vm, 'run', return_value=kind) as run:
+                    with self.assertRaisesRegex(RuntimeError, 'committed_repair_driver_required'):
+                        vm.authenticate_repair_driver('b' * 40)
+                    self.assertEqual(run.call_args.args[0][-3:], ['cat-file', '-t', 'b' * 40])
+                    self.assertFalse(any('show' in item.args[0] for item in run.call_args_list))
 
     def test_foreground_launcher_starts_new_session_without_weakening_qemu_sandbox(self):
         with tempfile.TemporaryDirectory() as directory:

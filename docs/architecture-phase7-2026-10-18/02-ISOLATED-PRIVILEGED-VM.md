@@ -116,7 +116,7 @@ SSH channel. Do not kill an unverified PID or remove unidentified disks.
 ## Narrow unstarted-launch repair
 
 The first native launch used source
-`1b1dc54d8f19a2b1c83c618da89a42d8758b6993`. Ubuntu's QEMU10.2.1 applies its
+`1b1dc54d8f19a2b1c83c618da89a42d8758b6993`. Ubuntu's QEMU 10.2.1 applies its
 `spawn=deny` seccomp filter before its own `-daemonize` fork. An isolated,
 diskless/networkless paused diagnostic reproduced the failed `clone(...)=EPERM`
 and exit1. The equivalent foreground nonboot diagnostic retained the same
@@ -147,14 +147,83 @@ python3 web/staging/integration/phase7_privileged_vm.py REPAIR \
 The original guest marker/archive retain source1b1dc54d; the repair-driver commit
 is separately reported. Neither is relabelled as the other. Unknown failures,
 changed guest bytes, an existing process or any prior repair require independent
-inspection rather than automatic retry. Native repair/guest proof remains
-NOT TESTED until a committed driver is transferred and explicitly run.
+inspection rather than automatic retry. Native repair subsequently passed using
+committed driver `7ec7a2bb512d881002e2f5d42cd5f5fe69800893`; original guest source
+remains `1b1dc54d8f19a2b1c83c618da89a42d8758b6993`.
 
 ## Evidence scope
 
 The new refusal tests run without QEMU, package installation or service effects.
-Actual guest root/systemd proof remains NOT TESTED until a successful explicit
-attempt produces `rehearsal.json`. Guest root is not production
+Actual guest root/systemd proof passed and produced `rehearsal.json`. Guest root is not production
 authority. Host-root isolation is the normal KVM/QEMU boundary, not a certification
 against hypervisor vulnerabilities. The existing source150 application stays
 active and the retained recovery target stays stopped throughout this bootstrap.
+
+## Native acceptance obtained
+
+The parent authorized provisioning and subsequent operations only within this
+positively identified disposable guest. Private evidence is retained outside Git
+under the staging owner's `phase7-vm-native-20261018/` and fixed VM directory.
+Raw boot IDs, generated keys, cloud-init configuration and full diagnostics are
+not included here.
+
+| Boundary | Result | Actual evidence and limit |
+| --- | --- | --- |
+| Official image and independent disk | PASS | Signed manifest, exact image pin, authenticated snapshot and standalone 8 GiB conversion. |
+| Original boot failure containment | PASS | Consumed attempt preserved; no guest writes; initial disk/seed/archive hashes unchanged. |
+| Explicit repair | PASS | Driver 7ec authenticated from its committed Git blob; guest archive/marker retain 1b; no sandbox restriction removed. |
+| Real root/systemd | PASS | Actual root sudo, PID 1 systemd, cloud-init, source extraction and harmless unit install/start/restart. |
+| Exact controller installer | PASS | Actual unchanged 1b installer dry-run and apply at canonical guest paths; synthetic fixtures only. |
+| Atomic controller replacement | PASS | Second apply used a new private backup and native RENAME_EXCHANGE. 175 installed source files matched exact 1b bytes/ownership. |
+| Effective actual units | PASS | Fourteen actual Madar unit files match source; auto-deploy executes canonical immutable path as madar with NoNewPrivileges=yes. All six timers remain disabled/inactive; proxy and auto-deploy remain inactive. |
+| Supported privilege refusal | PASS | Installed isolated upgrader rejects nonroot; isolated release entry rejects wrong root identity; installed authorization module rejects missing recovery approval. |
+| Full recovery CLI authorization probe | BLOCKED | It stopped earlier at the intentionally root0600 synthetic environment fixture. Module-level refusal does not substitute for that full path. |
+| Persistent test barrier | PASS | Actual systemctl and busctl start calls returned 0 while execution stayed blocked: ActiveState=inactive, ConditionResult=false, Job=(0,"/"). Success exit status alone does not prove activation. |
+| Guest-only reboot | PASS | New private guest boot ID, same staging host boot ID, same QEMU process/disk/command and pinned SSH host key. Persistent barrier/drop-in hashes and execution marker unchanged. |
+| Installed state after reboot | PASS | 175 source files still matched and no bytecode. Actual Madar timers remained disabled/inactive. |
+| New PhaseVII installer source | PASS | Exact bd0c614c source reconstructed separately; actual dry-run/apply and atomic exchange verified 182 root-owned source files, all six schema150 helpers imported from installed paths, and unselected 150 metadata. |
+| Graceful guest poweroff | PASS | Pinned guest-only systemctl poweroff; actual QEMU process exited and loopback 23222 closed. Disk, seed, private backups and consumed receipts retained. |
+| Full provider/controller handoff | NOT TESTED | No Docker/provider stack, accepted release artifacts, approved admission, database migration or write-authority handoff in this guest. |
+
+The initial unsupported raw-root Python release-entry refusal generated one
+root-owned package bytecode file before rejecting the identity. This was
+preserved with its hash in private evidence and the second install's backup,
+rather than hidden. The supported installed upgrader uses `python3 -I -B`;
+subsequent direct diagnostic module probes also used `-I -B`. The authoritative
+tree was verified bytecode-free after replacement, probes and reboot.
+
+After the 1b reboot rehearsal, the parent supplied exact committed candidate
+`bd0c614cfb92417740ce8d8bffacb98f6636e48a`. Its clean source was reconstructed
+under a separate `/opt/madar-phase7/controller-bd0c614c` root. The original1b
+bootstrap source/archive/marker stayed intact. The actual unchanged new installer
+passed dry-run and apply using another private backup. All 182 installed source
+files and fourteen actual unit files matched this newer commit with root
+ownership, and the six schema150 helpers imported successfully from installed
+paths. The 150 release metadata remained unselected.
+
+Four isolated native refusals passed for that newer installation: nonroot
+supported upgrader, wrong release identity, missing recovery authorization in
+the installed module, and a concrete provider adapter call without an owned
+coordinator lock. No fake approval, lock, migration receipt or authority was
+created. The harmless test barrier stayed armed; no provider, worker, proxy or
+auto-deploy operation was started. This is installed-helper/refusal evidence,
+not a full approved provider-maintenance or release-handoff rehearsal.
+
+The harmless persistent barrier is a dedicated negative `ConditionPathExists`
+drop-in for `madar-phase7-ownership-proof.service`, backed by a test-only file
+under `/var/lib/madar-phase7`. It is not an operational approval, deployment
+receipt or provider-maintenance record. Its persistence validates native systemd
+semantics and the guest reboot boundary; it does not prove protected provider
+maintenance integration or completed-NORMAL release acceptance.
+
+Private evidence files include `controller-installation-evidence.json`,
+`barrier-pre-reboot.json`, `barrier-post-reboot.json` and the exact private
+preparation/verification procedures. Newer-source evidence is in
+`controller-bd0c614c-installation-evidence.json`. After the parent-authorized
+guest-only graceful poweroff, `guest-poweroff-evidence.json` confirmed actual
+QEMU exit, closed loopback SSH, retained disk/seed/receipts and unchanged staging
+host boot. Host available memory was 2,868 MiB and free disk 17,345,482,752 bytes
+(about 16.15 GiB) at that observation; no forced kill or disk/container cleanup ran.
+The original source150 eleven-service stack
+remained active and the retained recovery project remained stopped. No shared
+host service, production controller or production workload was changed.
