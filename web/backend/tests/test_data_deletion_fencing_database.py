@@ -7,6 +7,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from types import SimpleNamespace
 import os
+import sys
 import time
 import unittest
 from uuid import uuid4
@@ -151,6 +152,15 @@ class Deletion150OwnershipTests(unittest.TestCase):
     def successor(self):
         old=self.claim(); oldstep=self.transition(old,'begin'); self.expire(); new=self.claim('B'); newstep=self.transition(new,'begin')
         return old,oldstep,new,newstep
+    def test_new150_pending_request_is_not_classified_as_legacy_backlog(self):
+        sys.path.insert(0, os.getenv('MADAR_TEST_REPOSITORY_ROOT') or str(Path(__file__).resolve().parents[2]))
+        from deployment.lib import schema150_release as release
+        identifier=self.db.execute('select system_identifier::text from pg_control_system()').fetchone()[0]
+        with self.db.cursor() as cursor:
+            observed=release.observe_database_quiescence(cursor,{'database':{'system_identifier':identifier}},150)
+        self.assertEqual(observed['legacy_deletion_backlog'],0)
+        self.assertEqual(self.current()['state'],'pending')
+        self.assertEqual(self.current()['claim_generation'],0)
     def test_stale_failure_cannot_clear_successor_request_lease(self):
         a,sa,b,sb=self.successor(); before=self.current(); stepbefore=self.step()
         with self.assertRaisesRegex(psycopg.Error,'deletion_claim_lost'): self.transition(a,'fail',sa,{'code':'synthetic_failure','retryable':True})

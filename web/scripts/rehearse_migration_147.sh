@@ -176,10 +176,14 @@ if [[ "${RUN_DELETION_INTEGRITY:-false}" == true ]]; then
     --env SUPABASE_ANON_KEY=madar-ci-placeholder-anon-not-a-secret \
     --env SUPABASE_SERVICE_KEY=madar-ci-placeholder-service-not-a-secret \
     --env DELETION_FENCING_SYNTHETIC_DATABASE_DSN='host=127.0.0.1 port=55448 dbname=postgres user=postgres connect_timeout=5' \
+    --env SCHEMA150_LEGACY_SYNTHETIC_DATABASE_DSN='host=127.0.0.1 port=55448 dbname=postgres user=postgres connect_timeout=5' \
+    --env MADAR_TEST_REPOSITORY_ROOT=/test-repository \
     --env DELETION_MIGRATION_SQL=/migration150.sql \
     --volume "$WEB_ROOT/backend:/app:ro" \
+    --volume "$WEB_ROOT/deployment:/test-repository/deployment:ro" \
     --volume "$WEB_ROOT/database/migrations/150_fence_data_deletion_ownership.sql:/migration150.sql:ro" \
-    --entrypoint python "$BACKEND_TEST_IMAGE" -m unittest tests.test_data_deletion_fencing_database -v
+    --entrypoint python "$BACKEND_TEST_IMAGE" -m unittest \
+    tests.test_schema150_legacy_admission_database tests.test_data_deletion_fencing_database -v
   # Revalidate retained transaction/tenant/version invariants at the corrected
   # target too;148/149 executions alone do not establish150 compatibility.
   docker run --rm --memory=768m --cpus=1 --pids-limit=256 --network host --read-only \

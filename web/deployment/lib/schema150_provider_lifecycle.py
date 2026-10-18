@@ -24,7 +24,8 @@ PRIVATE_STEPS = ('restore_roles_private', 'resume_providers_private', 'verify_na
 ACTIVATE_STEPS = ('resume_accepted_workers', 'restore_ingress', 'clear_boot_interlock')
 STEPS = FENCE_STEPS + PRIVATE_STEPS + ACTIVATE_STEPS
 COUNTERS = ('prepared_transactions', 'other_client_sessions', 'processing_deliveries',
-            'processing_outbox', 'processing_deletions', 'processing_steps', 'queue_locks', 'unknown_writers')
+            'processing_outbox', 'processing_deletions', 'processing_steps', 'legacy_deletion_backlog',
+            'queue_locks', 'unknown_writers')
 FENCES = ('ingress_fenced', 'supervisors_fenced', 'objects_fenced', 'roles_fenced',
           'boot_interlock_armed', 'candidate_read_only')
 PRE_GRANT_GATES = ('migration_receipts', 'preservation', 'accepted_images', 'backup_restore_replica',

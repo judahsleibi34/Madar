@@ -1639,3 +1639,12 @@ containerd image store. The producer verifies both blobs before publishing the
 receipt. Imported runtime IDs must equal the accepted manifest IDs; a mismatch
 refuses before replacing services. Latest exact-application-source backend and
 frontend workflow success is independently requeried, in addition to artifact CI.
+
+The unregistered schema150 preparation additionally requires an empty NONTERMINAL
+legacy deletion backlog at every pre150boundary,not merely zero processing leases.
+Legacy waiting retries lack150effect evidence and legacy tenant freezes can lack
+original subject status. Explicit separately approved reconciliation must precede
+admission;no automatic retry/reset/cancel/preimage inference is permitted. Terminal
+cancelled history remains preserved;new legitimate150pending work is not legacy.
+This stronger source observation does not change published150SQL or register an
+operational execution path. SeePhaseVI09coordinated release admission evidence.

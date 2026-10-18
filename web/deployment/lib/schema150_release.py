@@ -106,7 +106,8 @@ def admitted_manifest(root, contract):
 
 
 COUNTERS = ('processing_deliveries', 'processing_outbox', 'processing_deletions',
-            'processing_steps', 'other_client_sessions', 'prepared_transactions', 'queue_locks')
+            'processing_steps', 'legacy_deletion_backlog', 'other_client_sessions',
+            'prepared_transactions', 'queue_locks')
 QUIESCENCE_SQL = """
 select json_build_object(
  'system_identifier',(select system_identifier::text from pg_control_system()),
@@ -115,6 +116,11 @@ select json_build_object(
  'processing_outbox',(select count(*) from public.notification_outbox where status='processing'),
  'processing_deletions',(select count(*) from public.data_deletion_requests where state='in_progress'),
  'processing_steps',(select count(*) from public.data_deletion_steps where state='processing'),
+ 'legacy_deletion_backlog',case when
+    (select schema_version from public.application_schema_state where contract_key='core')<150
+    then (select count(*) from public.data_deletion_requests where state not in
+      ('completed','completed_with_retained_records','cancelled_before_execution'))
+    else 0 end,
  'other_client_sessions',(select count(*) from pg_stat_activity where datname=current_database()
     and backend_type='client backend' and pid<>pg_backend_pid()),
  'prepared_transactions',(select count(*) from pg_prepared_xacts where database=current_database()),
