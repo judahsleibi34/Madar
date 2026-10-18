@@ -8,7 +8,7 @@
 | Local step crash | Original intent-free idempotent operation resumes under successor,bounded by request attempts | native PASS |
 | External intent/response loss | Durable uncertainty blocks automatic resend/finalization;manual review | native PASS with synthetic provider |
 | Repeated begin/completion | Begin acknowledges same active step;completion cannot overwrite committed output | native PASS |
-| Before/after147/148/149 | Retained commit/rollback/fencing tests remain mandatory | retained native PASS on drafts;exactCI pending |
+| Before/after147/148/149 | Retained commit/rollback/fencing tests remain mandatory | retained native PASS;exact a8fac208 CI PASS;later source needs fresh CI |
 | Provider fence/private resume/activation crash | Intent survives;fresh observation and authority required;no blind replay | model PASS |
 | Real systemd/host reboot/proxy/grant interruption | Must preserve maintenance and never resurrect old workers | BLOCKED/not executed |
 

@@ -33,3 +33,17 @@ adversarial unit tests and is not relabeled exact-final-source CI acceptance.
 All native databases are synthetic; external Auth/Storage in this native unit
 bridge are simulated. Full real provider/application/worker acceptance is a
 separate staging gate. Private raw logs remain outside Git.
+
+Follow-up working-source rehearsal after the lost-COMMIT-reply test and explicit
+schema150 business/calendar reruns:183native executions PASS,0errors/failures/skips.
+Groups:21,11,5,18,22,2,5,16,22,37,24. The37ownership/upgrade tests include sending
+actual150 COMMIT without reading its acknowledgement,observing committed150 from
+an independent connection,closing the caller,and rejecting repeated SQL. The
+final24 rerun22reservation/inventory/order/payment/isolation cases plus2calendar
+atomic-version cases at150. Prior148/149 success is not substituted for150.
+
+Exact a8fac208 hosted backend CI separately passed3133tests/825conditionalskips,
+plus211native executions across its workflow's retained and successor groups.
+The new183-execution working harness is not added to or relabeled that older
+exact-source receipt. Latest application-focused staging unit run:30PASS,including
+Storage pagination rejection and consuming-readiness tests;no external network.

@@ -111,8 +111,18 @@ class Deletion150UpgradeTests(unittest.TestCase):
         self.db.execute("begin;update public.application_schema_state set schema_version=148 where contract_key='core'")
         with self.assertRaisesRegex(psycopg.Error,'migration_150_expected_schema_149'): self.db.execute(MIGRATION.read_text())
         self.db.execute('rollback'); self.assertEqual(self.version(),149)
-    def test_zz_apply_and_reentry_reject(self):
-        self.db.execute(MIGRATION.read_text())
+    def test_zz_commit_ack_loss_and_reentry_reject(self):
+        # Execute actual150 in a separate transaction. Send COMMIT but never
+        # consume its reply: an independent observer proves the commit happened.
+        # Closing this caller cannot be misreported as a rollback to149.
+        caller=connect();self.addCleanup(caller.close)
+        caller.execute('begin;'+self.body())
+        caller.pgconn.send_query(b'COMMIT')
+        self.assertEqual(caller.pgconn.flush(),0)
+        deadline=time.monotonic()+5
+        while self.version()!=150 and time.monotonic()<deadline:time.sleep(.01)
+        self.assertEqual(self.version(),150)
+        caller.close()
         self.assertEqual(self.version(),150)
         with self.assertRaisesRegex(psycopg.Error,'migration_150_expected_schema_149'): self.db.execute(MIGRATION.read_text())
         self.db.execute('rollback'); self.assertEqual(self.version(),150)

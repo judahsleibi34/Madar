@@ -180,4 +180,15 @@ if [[ "${RUN_DELETION_INTEGRITY:-false}" == true ]]; then
     --volume "$WEB_ROOT/backend:/app:ro" \
     --volume "$WEB_ROOT/database/migrations/150_fence_data_deletion_ownership.sql:/migration150.sql:ro" \
     --entrypoint python "$BACKEND_TEST_IMAGE" -m unittest tests.test_data_deletion_fencing_database -v
+  # Revalidate retained transaction/tenant/version invariants at the corrected
+  # target too;148/149 executions alone do not establish150 compatibility.
+  docker run --rm --memory=768m --cpus=1 --pids-limit=256 --network host --read-only \
+    --tmpfs /tmp:rw,noexec,nosuid,size=64m --env PYTHONPATH=/app --env PYTHONDONTWRITEBYTECODE=1 \
+    --env APP_ENV=test --env SUPABASE_URL=http://127.0.0.1:54321 \
+    --env SUPABASE_ANON_KEY=madar-ci-placeholder-anon-not-a-secret \
+    --env SUPABASE_SERVICE_KEY=madar-ci-placeholder-service-not-a-secret \
+    --env BUSINESS_INTEGRITY_SYNTHETIC_DATABASE_DSN='host=127.0.0.1 port=55448 dbname=postgres user=postgres connect_timeout=5' \
+    --volume "$WEB_ROOT/backend:/app:ro" --entrypoint python "$BACKEND_TEST_IMAGE" \
+    -m unittest tests.test_native_business_integrity_database tests.test_calendar_event_concurrency_database -v
+  echo "Schema150 reservation, stock, order/payment and calendar invariants passed"
 fi
