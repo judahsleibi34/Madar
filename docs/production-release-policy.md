@@ -1,5 +1,31 @@
 # Madar production release acceptance policy
 
+## Phase V explicit146→149 source preparation
+
+A new version6 `completed-normal-schema146-149-coordinated-release` profile and
+checksum-pinned `schema-146-149-coordinated.json` /
+`migrations-147-149-coordinated.json` compose the unchanged147/148/149 SQL.
+The historical version5 profile and active release descriptor remain unchanged.
+Intermediate147/148 are READ_ONLY only; NORMAL requires149 and both notification
+protocols2. Ordinary automatic migration loading still rejects this coordinated
+manifest. SQL execution retains captured checksum-verified bytes and existing
+protected authorization, locks, journals and backup/restore/replica requirements.
+
+This is NOT a completed production adapter. The production coordinator rejects
+version6 before effects while provider lifecycle integration is unavailable;
+write handoff independently refuses activation. Provider barrier state-machine
+and native staging rehearsal evidence cannot create authority or substitute for
+protected installation/boot/current-data acceptance. Exact provider/inventory
+bindings and both queues plus deletion/session/prepared/lock quiescence are
+required. No installed production files or authority records are changed.
+
+Native review also confirmed unfenced inherited deletion request/step mutation.
+The new deletion worker requires a future complete ownership protocol and refuses
+consumption on001–149 rather than using unsafe legacy writes. Full deletion
+compatibility remains release blocking and needs a separate forward successor;
+149's narrower cancellation correction is not declared a complete lifecycle fix.
+See docs/architecture-phase5-2026-10-17/ for evidence, limitations and recovery.
+
 ## Unselected outbox resolver successor148→149
 
 The separate149 candidate fixes a reproduced resolver-ownership defect still

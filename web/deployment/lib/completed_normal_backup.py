@@ -105,8 +105,8 @@ class CompletedNormalBackupContext:
             'backup_manifest_sha256':file_digest(readonly_configuration(backup/'manifest.json',private=False)),
             'backup_checksums_sha256':file_digest(readonly_configuration(backup/'SHA256SUMS',private=False)),
             'restore_execution_sha256':digest(actual['restore']),'replica_execution_sha256':digest(actual['node1'])}
-        from deployment.lib.completed_normal_profile import FENCED
-        if self.profile is FENCED:
+        from deployment.lib.completed_normal_profile import FENCED, OUTBOX
+        if self.profile in (FENCED, OUTBOX):
             # The existing systemd credential transports this nonsecret policy;
             # a deployment child never gains access to root-private history.
             policy=self.document['notification_cutover']
@@ -116,5 +116,8 @@ class CompletedNormalBackupContext:
             if json.loads(receipt.read_text()).get('context_sha256')!=self.context:
                 raise RuntimeError('schema148_quiescence_receipt_changed')
             inputs['notification_cutover']=policy
+        if self.profile is OUTBOX:
+            from deployment.lib.schema149_controller import provider_witness
+            inputs['provider_maintenance']=provider_witness(self.contract, self.root)
         exclusive(self.root/'migration-inputs.json',encoded(inputs))
         return inputs

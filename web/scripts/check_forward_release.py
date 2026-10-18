@@ -489,6 +489,11 @@ def check_schema148_source():
 
 if __name__ == "__main__":
     check_schema148_source()
+    path = Path(__file__).resolve().parents[2] / 'web/deployment/lib/schema149_release.py'
+    spec = importlib.util.spec_from_file_location('schema149_source_gate', path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    module.source_manifest(Path(__file__).resolve().parents[2])
     errors = validate()
 
     for error in errors:

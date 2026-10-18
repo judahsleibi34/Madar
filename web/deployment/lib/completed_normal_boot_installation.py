@@ -15,7 +15,7 @@ import tempfile
 from deployment.lib.completed_normal_admission import ADMISSIONS,OPERATION,digest,encoded,require_fresh_authorization
 from deployment.lib.emergency_routing_repair import exclusive
 from deployment.lib.provider_recovery_runtime import protected,file_digest
-from deployment.lib.completed_normal_profile import profile, LEGACY, MANUAL, APPLICATION, COMMERCIAL, FENCED
+from deployment.lib.completed_normal_profile import profile, LEGACY, MANUAL, APPLICATION, COMMERCIAL, FENCED, OUTBOX
 
 UNITS=Path('/etc/systemd/system')
 PROXY='madar-release-proxy.service'
@@ -83,7 +83,7 @@ class CompletedNormalBootInstallation:
         # A completed136 origin already has a99-compatible-normal drop-in.
         # Its ExecStartPre reset must precede the successor's gate regardless
         # of the two context hashes; lexical hash order is not ownership.
-        prefix=('99zzzz-compatible-normal-' if self.profile is FENCED else
+        prefix=('99zzzzz-compatible-normal-' if self.profile is OUTBOX else '99zzzz-compatible-normal-' if self.profile in (FENCED, OUTBOX) else
             '99zzz-compatible-normal-' if self.profile is COMMERCIAL else
             '99zz-compatible-normal-' if self.profile is APPLICATION else
             '99z-compatible-normal-' if self.profile is MANUAL else '99-compatible-normal-')
@@ -91,7 +91,7 @@ class CompletedNormalBootInstallation:
         baseline=document['boot_resources']
         compatible_origin='madar-compatible-normal-boot-'+Path(contract['source_roles']['completion_root']).name[:12]+'.service'
         compatible_units={compatible_origin}
-        if self.profile in (APPLICATION, COMMERCIAL, FENCED):
+        if self.profile in (APPLICATION, COMMERCIAL, FENCED, OUTBOX):
             # Earlier compatible actors remain historical files. Only actors
             # already measured and superseded by the exact origin receipt may
             # join the currently serving origin in this resource transition.

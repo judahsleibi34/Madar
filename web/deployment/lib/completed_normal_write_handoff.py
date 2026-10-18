@@ -21,7 +21,7 @@ from deployment.lib.emergency_routing_repair import exclusive, verification_wind
 from deployment.lib.provider_recovery_runtime import protected
 from deployment.lib.runtime_authority import runtime_mutation_lock
 from deployment.lib.completed_normal_resources import origin_spec_matches
-from deployment.lib.completed_normal_profile import profile, LEGACY, APPLICATION, expected_origin_grant
+from deployment.lib.completed_normal_profile import profile, LEGACY, APPLICATION, OUTBOX, expected_origin_grant
 
 
 def atomic_public_authority(path: Path, value: dict) -> None:
@@ -136,6 +136,9 @@ class CompletedNormalWriteHandoff:
         if schema is None:schema=self.profile.source
         if self.profile is not LEGACY and schema!=self.profile.target:
             raise RuntimeError('completed_normal_manual_grant_requires_target_schema')
+        if self.profile is OUTBOX:
+            from deployment.lib.schema149_controller import require_activation
+            require_activation(self.contract, self.root)
         self.guard(schema=schema)
         audit=self.root
         if fresh_attempt_root is not None:

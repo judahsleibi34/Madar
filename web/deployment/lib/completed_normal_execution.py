@@ -250,6 +250,10 @@ class CompletedNormalUpgrade:
             raise RuntimeError('completed_upgrade_independent_execution_guards_required')
         self.actor=actor;self.contract=actor.contract;self.document=actor.document
         self.profile=profile(self.contract)
+        from deployment.lib.completed_normal_profile import OUTBOX
+        if self.profile is OUTBOX:
+            from deployment.lib.schema149_controller import require_controller_adapter
+            require_controller_adapter(actor)
         self.ops=actor.ops;self.root=actor.root;self.package=actor.package
         self.artifact_guard=artifact_guard;self.model_loader=model_loader
         self.acceptance_guard=acceptance_guard;self.rehearsal_guard=rehearsal_guard

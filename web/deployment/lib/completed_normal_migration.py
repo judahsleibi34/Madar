@@ -20,7 +20,7 @@ from deployment.lib.completed_normal_admission import (
 from deployment.lib.emergency_routing_repair import exclusive
 from deployment.lib.provider_recovery_runtime import protected,readonly_configuration,file_digest
 from deployment.lib.migration_executor import MigrationManifest,LockedMigrationExecutor
-from deployment.lib.completed_normal_profile import profile, MANUAL, FENCED
+from deployment.lib.completed_normal_profile import profile, MANUAL, FENCED, OUTBOX
 
 def verify_migration_backup(actual,witness,sha,operations, *, expected_schema=115):
     """Verify through the ordinary controller's measured installed CLI.
@@ -139,7 +139,7 @@ def run_migration(contract,release_root,state_root,operations):
     sha=contract['candidate']['source_sha'];release_root=Path(release_root);state_root=Path(state_root)
     witness=credential_witness('migration_inputs','migration_inputs_sha256')
     if (set(witness)!={'intent','backup','backup_manifest_sha256','backup_checksums_sha256',
-            'restore_execution_sha256','replica_execution_sha256'} | ({'notification_cutover'} if selected is FENCED else set()) or witness['intent']!=intent_document(contract)
+            'restore_execution_sha256','replica_execution_sha256'} | ({'notification_cutover'} if selected in (FENCED, OUTBOX) else set()) | ({'provider_maintenance'} if selected is OUTBOX else set()) or witness['intent']!=intent_document(contract)
             or any(not isinstance(witness[k],str) or len(witness[k])!=64 or any(c not in '0123456789abcdef' for c in witness[k])
                 for k in ('backup_manifest_sha256','backup_checksums_sha256','restore_execution_sha256','replica_execution_sha256'))):
         raise RuntimeError('completed_migration_inputs_invalid')
@@ -161,7 +161,10 @@ def run_migration(contract,release_root,state_root,operations):
     path=release_root/'web/deployment/releases'/selected.manifest
     if file_digest(readonly_configuration(path,private=False))!=contract['migration_manifest_sha256']:
         raise RuntimeError('completed_migration_manifest_changed')
-    if selected is FENCED:
+    if selected is OUTBOX:
+        from deployment.lib.schema149_release import admitted_manifest
+        manifest=admitted_manifest(release_root,contract)
+    elif selected is FENCED:
         from deployment.lib.schema148_release import admitted_manifest
         manifest=admitted_manifest(release_root,contract)
     else:
@@ -186,7 +189,7 @@ def run_migration(contract,release_root,state_root,operations):
     # Never overwrite a failed/completed executor record on automatic retry.
     if execution.exists():raise RuntimeError('completed_migration_attempt_already_consumed')
     extra={}
-    if selected is FENCED:
+    if selected in (FENCED, OUTBOX):
         from deployment.lib.schema148_release import migration_guard,consumer_inventory,live_consumer_inventory
         policy=witness['notification_cutover']
         if digest(policy)!=contract['notification_cutover_sha256']:
@@ -200,7 +203,16 @@ def run_migration(contract,release_root,state_root,operations):
             candidates={key for key,row in observed.items() if row['image']==contract['candidate']['images']['backend'] and key not in policy['legacy_consumers']}
             if len(candidates)!=1:raise RuntimeError('schema148_candidate_consumer_ambiguous')
             live_consumer_inventory(runtime,contract,policy,candidates,rows=rows)
-        extra['migration_guard']=lambda cursor,migration:migration_guard(contract,cursor,migration,consumer_guard=consumers)
+        if selected is OUTBOX:
+            from deployment.lib.schema149_release import migration_guard as successor_guard
+            # No implicit legacy fallback: the child only accepts the exact
+            # protected adapter selected by the installed coordinator.
+            from deployment.lib.schema149_controller import migration_provider_guard
+            provider = migration_provider_guard(contract, witness['provider_maintenance'], runtime)
+            extra['migration_guard']=lambda cursor,migration:successor_guard(
+                contract,cursor,migration,consumer_guard=consumers,provider_guard=provider)
+        else:
+            extra['migration_guard']=lambda cursor,migration:migration_guard(contract,cursor,migration,consumer_guard=consumers)
     executor=LockedMigrationExecutor(connection_factory=lambda:connection_factory(contract),manifest=manifest,
         state_file=execution,backup_dir=backup,backup_verifier=verify_backup,
         failure_formatter=lambda error:'completed_migration_error_'+type(error).__name__,**extra)

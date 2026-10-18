@@ -1,0 +1,11 @@
+{
+  "scope": "working-source native component rehearsal; not production controller acceptance",
+  "postgresql": 17,
+  "suite_counts": [21, 11, 5, 18, 22, 2, 5, 16, 22],
+  "passed": 122,
+  "failed": 0,
+  "skipped": 0,
+  "new_coordinated149_cases": 11,
+  "historical_migrations_modified": false,
+  "production_modified": false
+}

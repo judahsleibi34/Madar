@@ -2,7 +2,7 @@
 import json
 from pathlib import Path
 from deployment.lib.completed_normal_admission import digest
-from deployment.lib.completed_normal_profile import profile, LEGACY, APPLICATION, COMMERCIAL, FENCED
+from deployment.lib.completed_normal_profile import profile, LEGACY, APPLICATION, COMMERCIAL, FENCED, OUTBOX
 
 IDENTITY_SQL="BEGIN READ ONLY; SELECT json_build_object('system_identifier',system_identifier::text,'schema',schema_version)::text FROM pg_control_system(),public.application_schema_state WHERE contract_key='core'; COMMIT;"
 
@@ -40,7 +40,7 @@ def database_structure_digest(contract,runtime):
 
 def verify_preparation_baseline(contract,runtime,baseline):
     """Only the explicit new profile uses a protected execution row boundary."""
-    if profile(contract) in (COMMERCIAL,FENCED):
+    if profile(contract) in (COMMERCIAL,FENCED,OUTBOX):
         if database_structure_digest(contract,runtime)!=contract['database_structure_sha256']:
             raise RuntimeError('completed_upgrade_database_structure_changed')
         return
@@ -209,7 +209,7 @@ def migration_customer_snapshot(contract,runtime,*,columns=None):
         return [json.loads(line) for line in raw.splitlines() if line.strip()]
     if columns is None:
         if schema!=profile(contract).source:raise RuntimeError('completed_migration_customer_source_schema_changed')
-        scope=("n.nspname IN ('public','auth','storage')" if profile(contract) is FENCED else
+        scope=("n.nspname IN ('public','auth','storage')" if profile(contract) in (FENCED, OUTBOX) else
             "(n.nspname='public' OR (n.nspname='auth' AND c.relname IN ('users','identities','mfa_factors')) OR "
             "(n.nspname='storage' AND c.relname IN ('objects','buckets')))")
         rows=query("SELECT json_build_object('schema',n.nspname,'table',c.relname,'columns',"
@@ -220,7 +220,7 @@ def migration_customer_snapshot(contract,runtime,*,columns=None):
         columns={row['schema']+'.'+row['table']:row['columns'] for row in rows}
     if (not isinstance(columns,dict) or (len(columns)!=101 if profile(contract) is LEGACY else len(columns)<101)
             or (len([name for name in columns if name.startswith('public.')])!=96 if profile(contract) is LEGACY
-                else profile(contract) is not FENCED and len([name for name in columns if name.startswith('public.')])!=len(columns)-5)
+                else profile(contract) not in (FENCED, OUTBOX) and len([name for name in columns if name.startswith('public.')])!=len(columns)-5)
             or not {'auth.users','auth.identities','auth.mfa_factors','storage.objects','storage.buckets'}.issubset(columns)
             or any(not isinstance(names,list) or not names or len(names)!=len(set(names))
                 or any(not isinstance(n,str) or not n for n in names) for names in columns.values())):
@@ -292,7 +292,7 @@ def verify_migration_customer_preservation(before,after, *, contract=None):
         raise RuntimeError('completed_migration_existing_customer_values_changed')
     public_count=sum(name.startswith('public.') for name in before['roots'])
     return {'operation':'current-data-original-column-migration-comparison','starting_schema':selected.source,'final_schema':selected.target,
-        'original_public_tables':public_count if selected is FENCED else len(before['roots'])-5,
-        'original_identity_storage_tables':len(before['roots'])-public_count if selected is FENCED else 5,
-        **({'full_auth_storage_inventory_verified':True} if selected is FENCED else {}),'only_schema_state_changed':True,
+        'original_public_tables':public_count if selected in (FENCED, OUTBOX) else len(before['roots'])-5,
+        'original_identity_storage_tables':len(before['roots'])-public_count if selected in (FENCED, OUTBOX) else 5,
+        **({'full_auth_storage_inventory_verified':True} if selected in (FENCED, OUTBOX) else {}),'only_schema_state_changed':True,
         'source_snapshot_sha256':digest(before),'target_snapshot_sha256':digest(after),'database_restored':False}
