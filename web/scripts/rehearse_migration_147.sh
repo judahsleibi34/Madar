@@ -167,3 +167,17 @@ if [[ "${RUN_OUTBOX_INTEGRITY:-false}" == true ]]; then
     -m unittest tests.test_native_business_integrity_database -v
   echo "Schema149 reservation, inventory/order and simulated payment invariants passed"
 fi
+
+if [[ "${RUN_DELETION_INTEGRITY:-false}" == true ]]; then
+  docker exec "$CONTAINER_NAME" psql -X -U postgres -v ON_ERROR_STOP=1 -q -c 'alter role service_role bypassrls'
+  docker run --rm --memory=768m --cpus=1 --pids-limit=256 --network host --read-only \
+    --tmpfs /tmp:rw,noexec,nosuid,size=64m --env PYTHONPATH=/app --env PYTHONDONTWRITEBYTECODE=1 \
+    --env APP_ENV=test --env SUPABASE_URL=http://127.0.0.1:54321 \
+    --env SUPABASE_ANON_KEY=madar-ci-placeholder-anon-not-a-secret \
+    --env SUPABASE_SERVICE_KEY=madar-ci-placeholder-service-not-a-secret \
+    --env DELETION_FENCING_SYNTHETIC_DATABASE_DSN='host=127.0.0.1 port=55448 dbname=postgres user=postgres connect_timeout=5' \
+    --env DELETION_MIGRATION_SQL=/migration150.sql \
+    --volume "$WEB_ROOT/backend:/app:ro" \
+    --volume "$WEB_ROOT/database/migrations/150_fence_data_deletion_ownership.sql:/migration150.sql:ro" \
+    --entrypoint python "$BACKEND_TEST_IMAGE" -m unittest tests.test_data_deletion_fencing_database -v
+fi

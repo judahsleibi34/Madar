@@ -1,6 +1,7 @@
 import importlib.util
 import json
 import os
+import shutil
 import tempfile
 import unittest
 from pathlib import Path
@@ -50,7 +51,9 @@ class LocalSupabaseReleaseContractTests(unittest.TestCase):
             for tree in ['database','supabase']:
                 target=WEB_ROOT/tree
                 if not target.exists():target=Path('/workspace')/tree
-                (root/'web'/tree).symlink_to(target,target_is_directory=True)
+                shutil.copytree(target,root/'web'/tree)
+            # The new captured-source gate deliberately rejects mutable path
+            # aliases: use real fixture trees while retaining every assertion.
             self.assertEqual(validator.validate(root),[])
             original=json.loads((release_dir/'schema-115-local.json').read_text())
             for field,value in [('migration_policy','automatic-after-known-good-backup-first-forward-repair'),('migration_manifest','migrations-115-116.json')]:
@@ -68,7 +71,7 @@ class LocalSupabaseReleaseContractTests(unittest.TestCase):
             for tree in ('database','supabase'):
                 source=WEB_ROOT/tree
                 if not source.exists():source=Path('/workspace')/tree
-                (root/'web'/tree).symlink_to(source,target_is_directory=True)
+                shutil.copytree(source,root/'web'/tree)
             bridge=json.loads((release_dir/'schema-115-136-bridge.json').read_text())
             (release_dir/'release.json').write_text(json.dumps(bridge))
             self.assertEqual(validator.validate(root),[])
@@ -109,11 +112,11 @@ class LocalSupabaseReleaseContractTests(unittest.TestCase):
         self.assertEqual(bridge['migration_manifest'], manifest.name)
         with tempfile.TemporaryDirectory() as name:
             root=Path(name);(root/'web').mkdir()
-            (root/'web/deployment').symlink_to(WEB_ROOT/'deployment',target_is_directory=True)
+            shutil.copytree(WEB_ROOT/'deployment',root/'web/deployment')
             for tree in ['database','supabase']:
                 target=WEB_ROOT/tree
                 if not target.exists():target=Path('/workspace')/tree
-                (root/'web'/tree).symlink_to(target,target_is_directory=True)
+                shutil.copytree(target,root/'web'/tree)
             self.assertEqual(validator.validate(root), [])
 
     def test_future_namespace_tampering_is_rejected_by_both_validators(self):

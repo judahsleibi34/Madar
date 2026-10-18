@@ -291,7 +291,7 @@ def disconnect_connection(connection: dict[str, Any], *, http_client=None, clien
 
 
 def disconnect_connection_for_deletion(
-    connection: dict[str, Any], *, http_client=None, client=None
+    connection: dict[str, Any], *, http_client=None, client=None, remove_local: bool = True
 ) -> str:
     """Revoke where supported, then irreversibly remove local credentials.
 
@@ -318,13 +318,14 @@ def disconnect_connection_for_deletion(
                     "The provider grant could not be revoked yet.",
                 )
             outcome = "provider_revoked"
-    database_client.table("calendar_sync_connections").update({
-        "status": "disconnected",
-        "encrypted_credentials": None,
-        "cursor_data": {},
-        "last_error_code": None,
-        "inbound_sync_enabled": False,
-    }).eq("id", connection["id"]).eq("tenant_id", connection["tenant_id"]).execute()
+    if remove_local:
+        database_client.table("calendar_sync_connections").update({
+            "status": "disconnected",
+            "encrypted_credentials": None,
+            "cursor_data": {},
+            "last_error_code": None,
+            "inbound_sync_enabled": False,
+        }).eq("id", connection["id"]).eq("tenant_id", connection["tenant_id"]).execute()
     return outcome
 
 

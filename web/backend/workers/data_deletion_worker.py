@@ -12,6 +12,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from uuid import uuid4
 
 from services.data_deletion_service import (
+    DeletionOwnershipLost,
     claim_deletion_requests,
     get_deletion_metrics,
     process_deletion_request,
@@ -21,15 +22,14 @@ from services.observability_service import configure_structured_logging
 
 logger = logging.getLogger(__name__)
 STOP_EVENT = threading.Event()
-STATE = {"healthy": False, "last_poll_at": None, "processed": 0, "failed": 0}
+STATE = {"healthy": False, "last_poll_at": None, "processed": 0, "failed": 0, "ownership_lost": 0}
 
 
 def require_deletion_ownership_protocol(*, client=None) -> None:
-    """Contain the retained unfenced lifecycle until its successor is reviewed.
+    """Require the exact database-enforced schema150 ownership contract.
 
-    Migrations001..149 do not provide this ownership contract. An enabled
-    successor worker must remain stopped on those schemas. This startup/poll
-    barrier does not repair the service-role mutations in the old lifecycle.
+    Migrations001..149 remain incompatible. Every consuming poll rechecks the
+    marker; service transitions use only original claims and fenced RPCs.
     """
     if client is None:
         from database import service_supabase
@@ -58,6 +58,7 @@ class HealthHandler(BaseHTTPRequestHandler):
             content_type = "application/json"
         else:
             metrics = get_deletion_metrics()
+            metrics["deletion_worker_ownership_lost_total"] = STATE["ownership_lost"]
             body = ("\n".join(f"madar_{key} {int(value)}" for key, value in sorted(metrics.items())) + "\n").encode()
             status = 200
             content_type = "text/plain; version=0.0.4"
@@ -86,6 +87,9 @@ def run_batch(*, worker_id: str, batch_size: int) -> int:
             result = process_deletion_request(request)
             if result.get("state") == "failed_manual_intervention":
                 STATE["failed"] += 1
+        except DeletionOwnershipLost:
+            STATE["ownership_lost"] += 1
+            logger.warning("deletion.worker_ownership_lost")
         except Exception as error:
             STATE["failed"] += 1
             logger.error("deletion.worker_request_failed", extra={"error_type": type(error).__name__})

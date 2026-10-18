@@ -1,5 +1,34 @@
 # Madar production release acceptance policy
 
+## Phase VI schema150 preparation remains non-executable
+
+The separate preparation profile `completed-normal-schema146-150-coordinated-release`
+reserves version7 and exact chain147/148/149/150. Its unselected coordinated
+metadata uses policy `none`, READ_ONLY compatibility146..150 and rollback target150
+only. Published001–149 SQL, historical operation profiles and active `release.json`
+remain unchanged. `schema150_release.py` authenticates metadata and mirrored SQL
+and captures the verified SQL bytes on the same bounded regular-file reads.
+
+This preparation profile is intentionally absent from the operational `profile()`
+registry, and its `admitted_manifest()` rejects unconditionally. A new operation
+must not inherit generic historical execution or bypass149's explicit missing
+adapter refusals. Source validation is not a production migration admission.
+Registering this operation requires reviewed provider, original-role backup,
+maintenance-specific probe, boot, worker and write-handoff integration plus the
+existing fresh protected authorization and independent acceptance. Neither a
+local PASS packet nor a successful database ownership test supplies that authority.
+
+Quiescence accounts separately for processing deletion requests and processing
+steps, in addition to both notification queues, all other client sessions, prepared
+transactions and relevant locks. Target150 requires actual integer delivery,
+outbox and deletion protocol2 results. Function existence alone is insufficient.
+A separate150-only provider lifecycle model implements the private-provider /
+post-grant activation ordering in source, with a protected durable journal and
+exclusive actor lock. It never issues target authority, invokes arbitrary SQL or
+accepts operator effect names. The concrete installed adapter and supervisor/boot
+acceptance remain missing; source-model tests cannot replace those gates.
+No production mutation, controller installation or automatic execution is enabled.
+
 ## Phase V explicit146→149 source preparation
 
 A new version6 `completed-normal-schema146-149-coordinated-release` profile and

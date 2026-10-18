@@ -93,6 +93,18 @@ class DeletionWorkerOwnershipBarrierTests(unittest.TestCase):
         self.assertFalse(worker.STATE['healthy'])
         self.assertFalse(worker.STATE['consuming'])
 
+    def test_ownership_loss_is_observable_without_stale_acknowledgement(self):
+        request = {'id': 'synthetic-request'}
+        with patch('database.service_supabase', self.client), patch.object(
+                provider_recovery, 'worker_consumption_allowed', return_value=True), patch.object(
+                worker, 'claim_deletion_requests', return_value=[request]), patch.object(
+                worker, 'process_deletion_request', side_effect=worker.DeletionOwnershipLost('deletion_claim_lost')):
+            before = worker.STATE.get('ownership_lost', 0)
+            with self.assertLogs(worker.logger, level='WARNING'):
+                self.assertEqual(worker.run_batch(worker_id='synthetic-worker', batch_size=1), 1)
+            self.assertEqual(worker.STATE['ownership_lost'], before + 1)
+        self.client.table.assert_not_called()
+
     def test_disabled_worker_does_not_attempt_protocol_or_claim(self):
         with patch.dict(os.environ, {'DATA_DELETION_WORKER_ENABLED': 'false'}), patch.object(
                 provider_recovery, 'prohibit_worker_start'), patch.object(

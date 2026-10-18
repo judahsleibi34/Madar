@@ -11,6 +11,7 @@ APPLICATION_OPERATION = 'completed-normal-schema144-application-release'
 COMMERCIAL_OPERATION = 'completed-normal-schema144-146-maintenance-release'
 FENCED_OPERATION = 'completed-normal-schema146-148-coordinated-release'
 OUTBOX_OPERATION = 'completed-normal-schema146-149-coordinated-release'
+DELETION_OPERATION = 'completed-normal-schema146-150-coordinated-release'
 
 
 @dataclass(frozen=True)
@@ -34,7 +35,7 @@ class UpgradeProfile:
 
     @property
     def maintenance(self):
-        return self.operation in {MANUAL_OPERATION, COMMERCIAL_OPERATION, FENCED_OPERATION, OUTBOX_OPERATION}
+        return self.operation in {MANUAL_OPERATION, COMMERCIAL_OPERATION, FENCED_OPERATION, OUTBOX_OPERATION, DELETION_OPERATION}
 
 
 LEGACY = UpgradeProfile(LEGACY_OPERATION, 1, 115, 136, (), 'release.json',
@@ -51,6 +52,13 @@ FENCED = UpgradeProfile(FENCED_OPERATION, 5, 146, 148, (),
 
 OUTBOX = UpgradeProfile(OUTBOX_OPERATION, 6, 146, 149, (),
     'schema-146-149-coordinated.json', 'migrations-147-149-coordinated.json', (147, 148, 149))
+
+
+# Preparation-only successor. Do not register in profile() until every protected
+# execution, provider, backup, boot and write-handoff path explicitly supports it.
+# Recognizing it generically would bypass OUTBOX's deliberate fail-closed hooks.
+DELETION = UpgradeProfile(DELETION_OPERATION, 7, 146, 150, (),
+    'schema-146-150-coordinated.json', 'migrations-147-150-coordinated.json', (147, 148, 149, 150))
 
 
 def profile(contract):

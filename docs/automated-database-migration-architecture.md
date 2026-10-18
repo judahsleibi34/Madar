@@ -1,5 +1,23 @@
 # Automated database migration architecture
 
+## Phase VI unselected146→150 preparation
+
+The new exact `migrations-147-150-coordinated.json` composes the unchanged147/148/149
+SQL with separately reviewed150 deletion ownership SQL. It remains coordinated
+with policy `none`; ordinary automatic migration loading must reject it. The new
+version7 preparation constant is not an operational profile registration.
+`schema150_release.admitted_manifest()` refuses until the authoritative protected
+coordinator has complete, reviewed lifecycle integration. No independent SQL
+executor or issuer is added.
+
+The source inspector pins manifest, bridge and all four mirrored SQL hashes;
+read-only evidence captures the checked bytes rather than reopening a mutable
+pathname after verification. Runtime admission must separately retain the existing
+locked executor's captured-byte path, fresh source/operation-bound authority,
+backup/restore/replica gates and append-only commit receipts. Intermediate147/148/149
+are maintenance checkpoints only. Lost responses require observation of committed
+schema and forward repair, never assumed rollback or restored legacy grants.
+
 ## Phase V explicit146→149 source preparation
 
 A new version6 `completed-normal-schema146-149-coordinated-release` profile and

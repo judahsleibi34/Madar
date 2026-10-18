@@ -1,5 +1,46 @@
 # Privileged control-plane upgrade architecture
 
+## Phase VI schema150 integration boundary
+
+A separate source preparation constant describes version7 exact146→150. It is
+intentionally not registered as executable and cannot construct an admitted
+manifest. This avoids implicitly applying historical execution/write paths that
+lack the new provider lifecycle. Existing version6 refusals remain intact.
+
+Completing this path requires a concrete protected adapter, not a caller-supplied
+callback or local readiness receipt. It must authenticate original role/service/
+object/ingress preimages before fencing, persist boot interlocks, observe actual
+sessions and supervisors, use original role state in independent restoration,
+and separate pre-grant native acceptance from post-grant controlled resumption.
+An activation check cannot require authority that the same handoff has yet to
+issue. Healthy READ_ONLY candidate validation must account explicitly for stopped
+providers and workers instead of silently weakening normal-runtime verification.
+Source and fixture tests do not certify privileged installation or host reboot.
+
+The separate `schema150_provider_lifecycle.py` source model now makes that split
+explicit. It reuses the existing root-private append-only journal, adds an
+exclusive directory lock against competing actors, and binds exactly the new
+operation/source/controller/cluster/inventory. Fixed effects fence boot, ingress,
+supervisors, objects, roles and sessions. Original role restoration, private
+provider startup and native acceptance require the target grant to remain absent;
+unknown sessions/writers, prepared transactions or opened ingress/worker/boot
+barriers reject. The existing issuer remains solely responsible for the later
+positive target grant. Only an independently observed exact150/2/2/2 grant permits
+accepted-worker activation, public ingress restoration and final provider boot
+interlock clearance. The coordinator's broader upgrade interlock and completion
+receipts remain its own responsibility.
+
+Each effect has a durable intent before execution, a fresh protected-authority
+check before and after, and an independently measured outcome. Recovery observes
+uncertain effects instead of replaying them; bindings, fixed ordering and original
+preimages survive new process objects. Sixteen source state-machine tests exercise
+real journal/fsync/hash-chain/flock behavior with injected effects. They are not
+production provider/systemd/host-reboot acceptance. No concrete production adapter
+or operational registration is supplied by this model.
+
+No installed controller, production service, protected receipt, write grant or
+production source integration changes as a consequence of this preparation.
+
 ## Phase V explicit146→149 source preparation
 
 A new version6 `completed-normal-schema146-149-coordinated-release` profile and

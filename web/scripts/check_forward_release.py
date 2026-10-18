@@ -66,6 +66,12 @@ _outbox_fencing_spec = importlib.util.spec_from_file_location(
 _outbox_fencing_candidate = importlib.util.module_from_spec(_outbox_fencing_spec)
 _outbox_fencing_spec.loader.exec_module(_outbox_fencing_candidate)
 validated_outbox_fencing_entries = _outbox_fencing_candidate.validated_entries
+_deletion_spec = importlib.util.spec_from_file_location(
+    "madar_deletion_ownership_candidate", Path(__file__).with_name("deletion_ownership_candidate.py"))
+_deletion_candidate = importlib.util.module_from_spec(_deletion_spec)
+_deletion_spec.loader.exec_module(_deletion_candidate)
+validated_deletion_entries = _deletion_candidate.validated_entries
+
 
 
 
@@ -438,10 +444,10 @@ def validate(root: Path = ROOT) -> list[str]:
                 ).glob("*.sql")
             )
 
-            if versions != list(range(1, 150 if learning_contract['status']=='finalized' else 143)):
+            if versions != list(range(1, 151 if learning_contract['status']=='finalized' else 143)):
                 errors.append(
                     "migration namespace must contain exactly "
-                    f"001 through {149 if learning_contract['status']=='finalized' else 142}: {tree}"
+                    f"001 through {150 if learning_contract['status']=='finalized' else 142}: {tree}"
                 )
 
     except (OSError, KeyError, ValueError, TypeError) as error:
@@ -474,6 +480,10 @@ def validate(root: Path = ROOT) -> list[str]:
         validated_outbox_fencing_entries(root)
     except (OSError, ValueError, TypeError, KeyError) as error:
         errors.append(f"outbox fencing candidate invalid: {error}")
+    try:
+        validated_deletion_entries(root)
+    except (OSError, ValueError, TypeError, KeyError) as error:
+        errors.append(f"deletion ownership candidate invalid: {error}")
     return errors
 
 
@@ -491,6 +501,11 @@ if __name__ == "__main__":
     check_schema148_source()
     path = Path(__file__).resolve().parents[2] / 'web/deployment/lib/schema149_release.py'
     spec = importlib.util.spec_from_file_location('schema149_source_gate', path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    module.source_manifest(Path(__file__).resolve().parents[2])
+    path = Path(__file__).resolve().parents[2] / 'web/deployment/lib/schema150_release.py'
+    spec = importlib.util.spec_from_file_location('schema150_source_gate', path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     module.source_manifest(Path(__file__).resolve().parents[2])
