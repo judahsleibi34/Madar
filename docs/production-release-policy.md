@@ -3046,3 +3046,12 @@ backup/candidate/private recovery/handoff/boot integration remains incomplete.
 No generated plan, CI artifact, source-controlled intent or fixture eligibility
 result authorizes production. Main protection, independent review and separate
 protected operational authorization remain required before activation.
+
+Catalog/identity/customer-preservation and disposable ownership observations
+must not inherit an attacker-writable schema before pg_catalog. PhaseVIII native
+reproductions showed forged catalog hashes and redirected ownership-marker
+lookups under that unsafe ordering. Corrected source fixes the transaction or
+connection namespace and qualifies native identity/marker functions. Existing
+SQL migration bytes, grants, single-use authority and historical receipt formats
+remain unchanged. Prior checks do not validate the corrected source: fresh CI,
+controller review and independently approved installation remain separate gates.

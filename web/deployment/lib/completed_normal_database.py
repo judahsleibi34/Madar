@@ -4,9 +4,10 @@ from pathlib import Path
 from deployment.lib.completed_normal_admission import digest
 from deployment.lib.completed_normal_profile import profile, LEGACY, APPLICATION, COMMERCIAL, FENCED, OUTBOX
 
-IDENTITY_SQL="BEGIN READ ONLY; SELECT json_build_object('system_identifier',system_identifier::text,'schema',schema_version)::text FROM pg_control_system(),public.application_schema_state WHERE contract_key='core'; COMMIT;"
+IDENTITY_SQL="BEGIN READ ONLY; SET LOCAL search_path=pg_catalog; SELECT json_build_object('system_identifier',system_identifier::text,'schema',schema_version)::text FROM pg_catalog.pg_control_system(),public.application_schema_state WHERE contract_key='core'; COMMIT;"
 
 STRUCTURE_SQL="""BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY;
+    SET LOCAL search_path=pg_catalog;
     SELECT encode(sha256(convert_to(coalesce(string_agg(v,'' ORDER BY v COLLATE "C"),''),'UTF8')),'hex')
     FROM (
       SELECT 'class:'||(to_jsonb(c)-ARRAY['relpages','reltuples','relallvisible','relallfrozen','relfrozenxid','relminmxid'])::text v FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
@@ -181,7 +182,7 @@ def customer_baseline(contract,runtime):
         statements.append("SELECT json_build_object('table','"+name+"','count',count(*),'sha256',"
             "encode(sha256(convert_to(coalesce(string_agg(h,'' ORDER BY h COLLATE \"C\"),''),'UTF8')),'hex'))::text "
             "FROM (SELECT encode(sha256(convert_to(to_jsonb(t)::text,'UTF8')),'hex') h FROM "+name+" t) rows;")
-    sql="BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY; SET LOCAL statement_timeout='60s'; SET LOCAL TIME ZONE 'UTC';\n"+'\n'.join(statements)+'\nCOMMIT;'
+    sql="BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY; SET LOCAL search_path=pg_catalog,public,extensions; SET LOCAL statement_timeout='60s'; SET LOCAL TIME ZONE 'UTC';\n"+'\n'.join(statements)+'\nCOMMIT;'
     raw=runtime.command(['docker','exec',contract['database']['container_id'],'psql','-XqAt',
         '-v','ON_ERROR_STOP=1','-U','postgres','-d','postgres','-c',sql])
     identities=[json.loads(line) for line in raw.splitlines() if line.strip()]
@@ -204,7 +205,7 @@ def migration_customer_snapshot(contract,runtime,*,columns=None):
     from deployment.lib.active_recovery_reconciliation import identifier
     schema=observe_native(contract,runtime)
     def query(body):
-        sql=("BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY; SET LOCAL statement_timeout='60s'; "
+        sql=("BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY; SET LOCAL search_path=pg_catalog,public,extensions; SET LOCAL statement_timeout='60s'; "
              "SET LOCAL TIME ZONE 'UTC';\n"+body+"\nCOMMIT;")
         raw=runtime.command(['docker','exec',contract['database']['container_id'],'psql','-XqAt',
             '-v','ON_ERROR_STOP=1','-U','postgres','-d','postgres','-c',sql])

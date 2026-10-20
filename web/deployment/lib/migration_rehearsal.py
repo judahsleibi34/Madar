@@ -26,9 +26,10 @@ def connect(dsn):
         if (args.get('host')!='127.0.0.1' or args.get('service') or args.get('hostaddr','127.0.0.1')!='127.0.0.1'
                 or args.get('dbname')!='postgres' or args.get('user')!='postgres'):
             raise RuntimeError('disposable_address_required')
-        connection=psycopg.connect(dsn,hostaddr='127.0.0.1',autocommit=True,connect_timeout=5)
+        connection=psycopg.connect(dsn,hostaddr='127.0.0.1',autocommit=True,connect_timeout=5,
+            options='-c search_path=pg_catalog,public,extensions')
         try:
-            row=connection.execute("select pg_catalog.shobj_description(oid,'pg_database') from pg_catalog.pg_database where datname=current_database()").fetchone()
+            row=connection.execute("select pg_catalog.shobj_description(oid,'pg_database') from pg_catalog.pg_database where datname OPERATOR(pg_catalog.=) pg_catalog.current_database()").fetchone()
             if row!=(MARKER,): raise RuntimeError('disposable_marker_required')
             connection.execute("set statement_timeout='10s'")
             connection.execute("set lock_timeout='1500ms'")

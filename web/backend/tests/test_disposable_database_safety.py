@@ -34,6 +34,8 @@ class DisposableDatabaseSafetyTests(unittest.TestCase):
             actual = connect_disposable_database("host=::1 dbname=synthetic", markers={"synthetic-marker"})
         self.assertIs(actual, connection)
         self.assertEqual(connect.call_args.kwargs["hostaddr"], "::1")
+        self.assertEqual(connect.call_args.kwargs["options"], "-c search_path=pg_catalog,public,extensions")
+        self.assertIn("pg_catalog.current_database()", connection.execute.call_args.args[0])
         connection.close.assert_not_called()
 
     def test_connection_failures_do_not_disclose_credentials(self):

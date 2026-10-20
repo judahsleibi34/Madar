@@ -1699,8 +1699,8 @@ without editing a controller profile. The CI artifacts preserve both the plan
 and native coverage report. Original-role restoration is independently exercised
 with ownership/ACL/password-attribute preservation and an exact42501 denial.
 
-Generic drift inspection reuses the existing catalog/role digest query without
-changing its bytes. It compares independently protected history evidence and
+Generic drift inspection reuses the existing catalog/role aggregation with a fixed transaction-local
+pg_catalog search path, after a native shadow-function reproduction. It compares independently protected history evidence and
 never repairs or auto-learns history. Changed catalog/protocol definitions block
 before a protocol function is executed. No extra database ledger migration or
 new schema151 is introduced for bookkeeping. Full controller dispatch remains

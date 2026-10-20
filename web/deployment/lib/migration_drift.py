@@ -48,13 +48,15 @@ def observe(connection, *, required_protocols, expected_structure_sha256=None):
             cursor.execute('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY')
             cursor.execute("SET LOCAL statement_timeout='5s'")
             cursor.execute("SET LOCAL lock_timeout='1s'")
+            cursor.execute('SET LOCAL search_path=pg_catalog')
             cursor.execute("SELECT system_identifier::text,schema_version FROM pg_catalog.pg_control_system(),public.application_schema_state WHERE contract_key='core'")
             identity=cursor.fetchone()
             if (not identity or len(identity)!=2 or not isinstance(identity[0],str)
                     or not re.fullmatch('[0-9]{1,32}',identity[0]) or type(identity[1]) is not int):
                 raise RuntimeError('migration_drift_database_identity_invalid')
-            # Exact historical structural query inside the same read-only snapshot.
+            # Shared structural aggregation inside a fixed catalog search path.
             query=STRUCTURE_SQL.removeprefix('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY;').removesuffix(' COMMIT;').strip()
+            query=query.removeprefix('SET LOCAL search_path=pg_catalog;').strip()
             cursor.execute(query); structure=cursor.fetchone()[0]
             if not isinstance(structure,str) or not HEX.fullmatch(structure): raise RuntimeError('migration_drift_structure_invalid')
             if expected_structure_sha256 is not None and structure!=expected_structure_sha256:

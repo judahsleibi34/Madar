@@ -32,7 +32,7 @@ class CurrentLocalReconciliation:
         # Every command is explicitly read-only even though the connection uses
         # the already installed postgres operator. Results contain hashes/counts
         # or fixed catalog identifiers, never customer fields or secret values.
-        sql="BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY; SET LOCAL statement_timeout='60s'; SET LOCAL TIME ZONE 'UTC';\n"+body+"\nCOMMIT;"
+        sql="BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY; SET LOCAL search_path=pg_catalog,public,extensions; SET LOCAL statement_timeout='60s'; SET LOCAL TIME ZONE 'UTC';\n"+body+"\nCOMMIT;"
         text=self.candidate.command(['docker','exec',DB,'psql','--username','postgres','--dbname','postgres',
             '--no-psqlrc','--quiet','--tuples-only','--no-align','--set','ON_ERROR_STOP=1','--command',sql])
         return [json.loads(line) for line in text.splitlines() if line.strip()]

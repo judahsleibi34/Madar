@@ -54,7 +54,7 @@ def generate(root, inventory: Inventory, *, origin, target=None):
     protocol_change=bool(intent and (not previous_intent or intent['worker_protocols']!=previous_intent['worker_protocols']))
     # Use the existing control-plane guard's actual protected-path contract.
     from .control_plane_upgrade import PROTECTED_PATHS
-    changed=git.command('diff','--name-only',inventory.history_base_sha,inventory.source_sha,'--',*PROTECTED_PATHS)
+    changed=git.command('diff','--no-ext-diff','--no-textconv','--name-only',inventory.history_base_sha,inventory.source_sha,'--',*PROTECTED_PATHS)
     control_plane_changed=bool(changed.strip())
     rows=[]; previous=origin; classification='A'
     for migration in path:

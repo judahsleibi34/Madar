@@ -181,6 +181,61 @@ class FutureSchemaDatabaseTests(unittest.TestCase):
             self.assertNotEqual(self.db.info.transaction_status,0)
         finally: self.db.execute('rollback')
 
+    def test_catalog_hash_cannot_be_forged_through_search_path_shadow(self):
+        from deployment.lib.migration_drift import observe
+        original=observe(self.db,required_protocols={})
+        expected=original.structure_sha256
+        self.db.execute("create function public.sha256(bytea) returns bytea language sql immutable as $$ select pg_catalog.decode('"+expected+"','hex') $$")
+        self.db.execute('set search_path=public,pg_catalog')
+        try:
+            changed=observe(self.db,required_protocols={})
+            self.assertNotEqual(changed.structure_sha256,expected,'Untrusted public.sha256 forged the original catalog digest')
+        finally:
+            self.db.execute('reset search_path')
+            self.db.execute('drop function public.sha256(bytea)')
+
+    def test_historical_digest_and_identity_sql_pin_catalog_namespace(self):
+        from deployment.lib.completed_normal_database import STRUCTURE_SQL,IDENTITY_SQL
+        def single_result(query):
+            with self.db.cursor() as cursor:
+                cursor.execute(query); result=None
+                while True:
+                    if cursor.description is not None: result=cursor.fetchone()[0]
+                    if not cursor.nextset(): break
+                return result
+        expected=single_result(STRUCTURE_SQL)
+        identifier=self.db.execute('select system_identifier::text from pg_catalog.pg_control_system()').fetchone()[0]
+        self.db.execute("create function public.sha256(bytea) returns bytea language sql immutable as $$ select pg_catalog.decode('"+expected+"','hex') $$")
+        self.db.execute("create function public.pg_control_system() returns table(system_identifier bigint) language sql as $$ select 0::bigint $$")
+        self.db.execute('set search_path=public,pg_catalog')
+        try:
+            self.assertNotEqual(single_result(STRUCTURE_SQL),expected)
+            identity=json.loads(single_result(IDENTITY_SQL))
+            self.assertEqual(identity,{'system_identifier':identifier,'schema':150})
+        finally:
+            self.db.execute('reset search_path')
+            self.db.execute('drop function public.sha256(bytea),public.pg_control_system()')
+
+    def test_database_ownership_marker_cannot_be_redirected_by_search_path(self):
+        import disposable_database_support
+        self.db.execute("comment on database restored_fixture is '"+rehearsal.MARKER+"'")
+        self.db.execute("create function public.current_database() returns name language sql as $$ select 'restored_fixture'::pg_catalog.name $$")
+        self.db.execute("comment on database postgres is 'deliberately-unmarked-negative-fixture'")
+        self.db.execute('alter role postgres set search_path=public,pg_catalog')
+        self.db.execute('set search_path=public,pg_catalog')
+        try:
+            # Prove the original lookup could read a different DB's marker.
+            old=self.db.execute("select pg_catalog.shobj_description(oid,'pg_database') from pg_catalog.pg_database where datname=current_database()").fetchone()
+            self.assertEqual(old,(rehearsal.MARKER,))
+            with self.assertRaisesRegex(RuntimeError,'not_verified'): rehearsal.connect(DSN)
+            with self.assertRaisesRegex(RuntimeError,'ownership'):
+                disposable_database_support.connect_disposable_database(DSN,markers={rehearsal.MARKER})
+        finally:
+            self.db.execute('reset search_path')
+            self.db.execute('alter role postgres reset search_path')
+            self.db.execute('drop function public.current_database()')
+            self.db.execute("comment on database postgres is '"+rehearsal.MARKER+"'")
+
     def test_completed_operation_replay_rejected(self):
         plan,inventory=self.plan(); self.run_plan(plan,inventory)
         with self.assertRaises(FileExistsError): self.run_plan(plan,inventory)

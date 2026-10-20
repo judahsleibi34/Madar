@@ -82,6 +82,14 @@ class ConcreteAdapterTests(unittest.TestCase):
         if stage != 'prepared': actor.barrier.write_text('{}')
         return actor, scope, preimage, journal
 
+    def test_internal_sql_pins_catalog_before_role_or_quiescence_observation(self):
+        actor,_,_,_=self.component()
+        actor.runtime.command.side_effect=None; actor.runtime.command.return_value='synthetic'
+        actor._sql('SELECT 1;')
+        body=actor.runtime.command.call_args.kwargs['input']
+        self.assertTrue(body.startswith('SET search_path=pg_catalog,public,extensions;'))
+        self.assertLess(body.index('SET search_path'),body.index('SELECT 1;'))
+
     def test_initial_fence_guard_precedes_first_persistent_barrier_effect(self):
         actor, scope, _, journal = self.component()
         self.assertEqual([r['event'] for r in journal.read()], ['prepared'])

@@ -84,6 +84,15 @@ class SourceFixture(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, 'commit_object'): self.inventory(self.git('rev-parse', 'HEAD^{tree}'))
         with self.assertRaisesRegex(RuntimeError, 'exact_commit'): self.inventory('HEAD')
 
+    def test_plan_never_runs_repository_diff_helpers(self):
+        from deployment.lib.migration_plan import generate
+        marker=self.root/'external-helper-ran'
+        self.git('config','diff.external','sh -c "touch '+str(marker)+'"')
+        target=self.root/'web/deployment/lib/example.py'; target.parent.mkdir(parents=True)
+        target.write_text('# immutable diff fixture\n'); self.commit()
+        generate(self.root,self.inventory(),origin=1)
+        self.assertFalse(marker.exists())
+
     def test_actions_checkout_official_url_alias(self):
         self.git('remote','set-url','origin','https://github.com/judahsleibi34/Madar')
         self.assertEqual(self.inventory().target,1)

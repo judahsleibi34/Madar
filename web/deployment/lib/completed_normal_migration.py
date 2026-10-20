@@ -114,11 +114,13 @@ def connection_factory(contract):
     connection=None
     try:
         connection=psycopg.connect(host=str(address),port=5432,user='postgres',dbname='postgres',
-            password=lease['password'],sslmode='disable',connect_timeout=5,application_name='madar-governed-schema'+str(profile(contract).target))
+            password=lease['password'],sslmode='disable',connect_timeout=5,application_name='madar-governed-schema'+str(profile(contract).target),
+            options='-c search_path=pg_catalog,public,extensions')
         connection.autocommit=True
         with connection.cursor() as cursor:
             cursor.execute("BEGIN READ ONLY")
-            cursor.execute("SELECT system_identifier::text,schema_version FROM pg_control_system(),public.application_schema_state WHERE contract_key='core'")
+            cursor.execute("SET LOCAL search_path=pg_catalog")
+            cursor.execute("SELECT system_identifier::text,schema_version FROM pg_catalog.pg_control_system(),public.application_schema_state WHERE contract_key='core'")
             row=cursor.fetchone()
             if row is None or str(row[0])!=contract['database']['system_identifier'] or not profile(contract).supports(row[1]):
                 raise RuntimeError('completed_migration_connected_database_changed')

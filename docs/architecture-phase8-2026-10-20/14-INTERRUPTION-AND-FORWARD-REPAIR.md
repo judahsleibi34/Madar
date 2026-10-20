@@ -15,8 +15,9 @@ has not run. The consumed attempt rejects. A separate lost-response test require
 an inspected151→152 remainder plan on a fresh attempt. Neither permits replay of
 production approval or represents full protected forward-repair acceptance.
 
-`migration_drift.py` reuses the existing structural query, whose bytes were
-verified unchanged when extracted to a shared constant. It performs a bounded
+`migration_drift.py` reuses the existing structural aggregation, initially extracted unchanged. Native search-
+path shadowing reproduction then required a transaction-local pg_catalog path
+for both the historical helper and generic observer. It performs a bounded
 read-only snapshot of identity/schema/catalog/roles/grants. Root history evidence
 must be supplied independently; it never learns a missing SQL ledger from the
 live schema number. Missing/mismatched baseline, origin, catalog or hashes

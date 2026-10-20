@@ -286,7 +286,7 @@ class Schema150ProviderAdapter:
         identifier = self.contract['database']['container_id']
         return self.runtime.command(['docker', 'exec', '-i', identifier, 'psql', '-XqAt',
             '-v', 'ON_ERROR_STOP=1', '-U', 'postgres', '-d', 'postgres'],
-            input="SET statement_timeout='10s'; SET lock_timeout='2s';\n" + body)
+            input="SET search_path=pg_catalog,public,extensions; SET statement_timeout='10s'; SET lock_timeout='2s';\n" + body)
 
     def _database_identity(self):
         row = self._row('supabase-db')

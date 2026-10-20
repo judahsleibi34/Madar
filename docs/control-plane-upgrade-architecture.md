@@ -1679,7 +1679,9 @@ refuses before replacing services. Latest exact-application-source backend and
 frontend workflow success is independently requeried, in addition to artifact CI.
 
 PhaseVIII drift observation extracts the existing structural query to a shared
-constant without changing its bytes or historical receipt algorithm. A generic
+constant. A subsequent native shadow-function reproduction required a fixed
+transaction-local pg_catalog search path; the structural aggregation and
+historical receipt formats remain intact. No historical receipt is rewritten. A generic
 read-only observer requires independent baseline/history evidence, refuses an
 existing writer transaction and checks the catalog before executing protocol
 probes. This does not register generic production operations. Native synthetic

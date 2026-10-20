@@ -1,5 +1,7 @@
 """The migration boundary must preserve original columns, Auth and assets."""
 import copy
+import json
+from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 from deployment.lib import completed_normal_database as m
@@ -33,6 +35,20 @@ class CustomerPreservationTests(unittest.TestCase):
             else:changed['roots']['public.application_schema_state']['count']=0
             with self.subTest(kind=kind),self.assertRaises(RuntimeError):
                 m.verify_migration_customer_preservation(self.before,changed)
+
+    def test_customer_snapshot_pins_catalog_namespace_before_aggregation(self):
+        calls=[]
+        def command(arguments):
+            calls.append(arguments[-1])
+            rows=[self.before['roots'][name] for name in sorted(self.before['roots'])]+[{'schema':115}]
+            return '\n'.join(json.dumps(row) for row in rows)
+        contract={'version':1,'operation':'completed-normal-schema115-136-upgrade',
+                  'database':{'container_id':'f'*64}}
+        with patch.object(m,'observe_native',return_value=115):
+            m.migration_customer_snapshot(contract,SimpleNamespace(command=command),columns=self.before['columns'])
+        self.assertEqual(len(calls),1)
+        self.assertIn('SET LOCAL search_path=pg_catalog,public,extensions;',calls[0])
+        self.assertLess(calls[0].index('SET LOCAL search_path'),calls[0].index('SELECT json_build_object'))
 
     def test_changed_snapshot_native_schema_is_rejected_before_sql(self):
         with patch.object(m,'observe_native',return_value=136):

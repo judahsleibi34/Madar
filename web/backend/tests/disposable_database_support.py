@@ -19,10 +19,11 @@ def connect_disposable_database(dsn, *, markers, autocommit=True):
         # Pin the effective address too: ambient PGHOSTADDR must not redirect
         # an apparently loopback host to a different server.
         address = parameters.get("hostaddr") or ("::1" if parameters["host"] == "::1" else "127.0.0.1")
-        connection = psycopg.connect(dsn, hostaddr=address, autocommit=True, connect_timeout=5)
+        connection = psycopg.connect(dsn, hostaddr=address, autocommit=True, connect_timeout=5,
+            options='-c search_path=pg_catalog,public,extensions')
         marker = connection.execute(
             "select pg_catalog.shobj_description(oid,'pg_database') "
-            "from pg_catalog.pg_database where datname=current_database()"
+            "from pg_catalog.pg_database where datname OPERATOR(pg_catalog.=) pg_catalog.current_database()"
         ).fetchone()
         if not marker or marker[0] not in markers:
             raise RuntimeError("Database is not marked for this disposable rehearsal")
