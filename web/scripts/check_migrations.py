@@ -87,7 +87,7 @@ TREE_PATHS = {
     "database": REPO_ROOT / "database" / "migrations",
     "supabase": REPO_ROOT / "supabase" / "migrations",
 }
-FILENAME_PATTERN = re.compile(r"^(?P<number>\d{3})_(?P<description>[a-z0-9][a-z0-9_]*)\.sql$")
+FILENAME_PATTERN = re.compile(r"^(?P<number>\d{3,9})_(?P<description>[a-z0-9][a-z0-9_]*)\.sql$")
 NEXT_MIGRATION_NUMBER = 44
 
 HISTORICAL_COMMON_FILES = {
@@ -196,6 +196,10 @@ def collect_tree(label: str, directory: Path, errors: list[str]) -> dict[str, Pa
                 f"{label}: malformed migration filename {path.name!r}; "
                 "expected NNN_description.sql"
             )
+            continue
+        number = int(path.name.split('_', 1)[0])
+        if number < 1 or path.name.split('_', 1)[0] != f'{number:03d}':
+            errors.append(f"{label}: noncanonical migration version: {path.name!r}")
             continue
         files[path.name] = path
 
@@ -395,6 +399,26 @@ def check_production_lineage(errors: list[str]) -> None:
             path = REPO_ROOT.parent / relative
             if not path.is_file() or digest(path) != checksum:
                 errors.append(f"immutable production migration changed: {relative}")
+        generic_tail = {}
+        known_ceiling = max(retained_future, default=release_target)
+        unknown_future = [path for tree in TREE_PATHS.values() for path in tree.glob('*.sql')
+                          if FILENAME_PATTERN.fullmatch(path.name) and int(path.name.split('_',1)[0]) > known_ceiling]
+        if unknown_future:
+            # Historical contracts remain pinned above. New future versions need
+            # no per-schema candidate module. They must already exist in the
+            # exact committed source; this validates source, never selects a
+            # production release or grants migration authority. Trusted CI also
+            # compares the PR's independent base SHA, preserving later history.
+            sys.path.insert(0, str(REPO_ROOT))
+            from deployment.lib.migration_inventory import GitSource, discover
+            source = GitSource(REPO_ROOT.parent)
+            head = source.command('rev-parse', 'HEAD').decode().strip()
+            inventory = discover(REPO_ROOT.parent, source_sha=head,
+                history_base_sha='23254c786fdfa3731ff63cd004a4160b6d2f60fa')
+            for migration in inventory.migrations:
+                if migration.number > known_ceiling:
+                    generic_tail[migration.path] = migration.sql
+                    generic_tail[migration.mirror_path] = migration.sql
         for tree in TREE_PATHS.values():
             for path in tree.glob("*.sql"):
                 number = int(path.name.split("_", 1)[0])
@@ -407,11 +431,13 @@ def check_production_lineage(errors: list[str]) -> None:
                             or digest(path) != retained["sha256"]):
                         errors.append(f"checksum-pinned migration changed: {relative}")
                     continue
+                if number > known_ceiling and generic_tail.get(relative) == path.read_bytes():
+                    continue
                 if number > release_target:
                     errors.append(
                         f"unexpected migration beyond release target {release_target}: {relative}"
                     )
-    except (OSError, KeyError, ValueError, TypeError) as error:
+    except (OSError, KeyError, ValueError, TypeError, RuntimeError) as error:
         errors.append(f"production lineage manifest invalid: {type(error).__name__}")
 
 def main() -> int:

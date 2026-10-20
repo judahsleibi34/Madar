@@ -18,7 +18,10 @@ def fail(message: str) -> None:
     errors.append(message)
 
 
-for number in range(84, 1000):
+# Discover future versions without a numeric ceiling or per-schema list.
+versions = {int(match[1]) for tree in (DB, SB) for path in tree.glob('*.sql')
+            if (match := re.fullmatch(r'([0-9]{3,9})_[a-z0-9_]+[.]sql', path.name)) and int(match[1]) >= 84}
+for number in sorted(versions):
     database = sorted(DB.glob(f"{number:03d}_*.sql"))
     supabase = sorted(SB.glob(f"{number:03d}_*.sql"))
 

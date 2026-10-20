@@ -46,7 +46,7 @@ class CiSourceIdentityTests(unittest.TestCase):
         for name in ("backend-check.yml", "frontend-check.yml"):
             with self.subTest(workflow=name):
                 source = (WORKFLOWS / name).read_text()
-                self.assertIn("codex/outbox-claim-fencing-20261017", source)
+                self.assertIn("  pull_request: {}", source)
                 self.assertIn("CI_SOURCE_SHA: " + SOURCE, source)
                 self.assertIn("          ref: " + SOURCE, source)
                 self.assertIn("          persist-credentials: false", source)
@@ -54,13 +54,23 @@ class CiSourceIdentityTests(unittest.TestCase):
 
     def test_phase6_base_runs_all_required_source_checks(self):
         for name in ('backend-check.yml', 'frontend-check.yml', 'schema148-artifacts.yml'):
-            self.assertIn('codex/schema149-release-engineering-20261017', (WORKFLOWS/name).read_text())
+            self.assertIn('  pull_request: {}', (WORKFLOWS/name).read_text())
 
     def test_phase7_base_runs_all_required_checks_and_real_inventory(self):
         for name in ('backend-check.yml', 'frontend-check.yml', 'schema148-artifacts.yml'):
-            self.assertIn('codex/schema150-deletion-integrity-20261018', (WORKFLOWS/name).read_text())
+            self.assertIn('  pull_request: {}', (WORKFLOWS/name).read_text())
         self.assertIn('python3 web/scripts/check_privileged_inventory.py',
                       (WORKFLOWS/'backend-check.yml').read_text())
+
+    def test_generic_migration_workflow_is_always_read_only_and_exact_source(self):
+        source=(WORKFLOWS/'migration-safety.yml').read_text()
+        for required in ('  pull_request: {}','contents: read','persist-credentials: false',
+                         'fetch-depth: 0','CI_HISTORY_BASE_SHA:','web/scripts/validate_migration_candidate.py',
+                         'web/scripts/rehearse_generic_migrations.sh', 'timeout-minutes: 30'):
+            self.assertIn(required,source)
+        for forbidden in ('pull_request_target:', 'secrets.', 'self-hosted', 'production-deploy',
+                          'write-all', 'permissions: write', '    paths:', '    paths-ignore:'):
+            self.assertNotIn(forbidden,source)
 
     def test_guard_rejects_a_different_merge_tree(self):
         for name in ("backend-check.yml", "frontend-check.yml"):
@@ -78,9 +88,8 @@ class CiSourceIdentityTests(unittest.TestCase):
 
     def test_candidate_check_covers_main_without_path_condition(self):
         source = (WORKFLOWS / "schema148-artifacts.yml").read_text()
-        self.assertIn("branches: [main,", source)
-        self.assertIn("codex/integration-review-20261017", source)
-        self.assertIn("codex/outbox-claim-fencing-20261017", source)
+        self.assertIn("  pull_request: {}", source)
+        self.assertNotIn("    branches:", source)
         self.assertNotIn("    paths:", source)
         self.assertNotIn("    paths-ignore:", source)
 

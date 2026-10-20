@@ -1239,3 +1239,14 @@ containerd image store. The producer verifies both blobs before publishing the
 receipt. Imported runtime IDs must equal the accepted manifest IDs; a mismatch
 refuses before replacing services. Latest exact-application-source backend and
 frontend workflow success is independently requeried, in addition to artifact CI.
+
+### Phase VIII CI preparation boundary
+
+Backend, frontend and candidate-artifact PR workflows now accept all PR base
+branches, preserving their exact-head guards and existing job names. This
+removes historical per-schema branch lists. The Migration Safety check runs on
+all PRs and main, captures exact Git history, generates a source-bound plan and
+executes isolated synthetic future-schema tests. It has read-only permissions,
+no deployment secret and no production dispatch. This does not enable merge or
+automatic deployment. A main push still requires a separate administrator-
+controlled protected integration and operational policy before production work.
