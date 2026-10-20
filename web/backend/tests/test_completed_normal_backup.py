@@ -104,6 +104,23 @@ class CompletedBackupTests(unittest.TestCase):
         adapter.require_authority.assert_called_with(adapter.binding,purpose='backup')
         with self.assertRaisesRegex(RuntimeError,'profile_invalid'):profile(contract)
 
+    def test_schema150_intent_is_pure_metadata_without_operational_registration(self):
+        from test_schema150_admission import deletion_contract
+        from deployment.lib.completed_normal_migration import intent_document
+        from deployment.lib.completed_normal_profile import profile, DELETION
+        contract=deletion_contract()
+        self.assertEqual(intent_document(contract), {
+            'operation':DELETION.operation,'context_sha256':digest(contract),
+            'source_sha':contract['candidate']['source_sha'],
+            'manifest_sha256':contract['migration_manifest_sha256'],
+            'source_schema':146,'target_schema':150,'database_restored':False})
+        with self.assertRaisesRegex(RuntimeError,'profile_invalid'):profile(contract)
+        for mutate in (lambda c:c.update(version=6),
+                       lambda c:c['candidate'].update(compatible_max=151),
+                       lambda c:c.update(migration_manifest_sha256='0'*64)):
+            changed=copy.deepcopy(contract);mutate(changed)
+            with self.assertRaises(RuntimeError):intent_document(changed)
+
     def test_two_backup_publications_preserve_distinct_exact_latest_preimages(self):
         from deployment.lib.active_recovery_backup import latest_preimage_name
         from deployment.lib.emergency_routing_repair import exclusive

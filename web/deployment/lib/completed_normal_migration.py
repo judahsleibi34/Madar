@@ -10,6 +10,7 @@ import ipaddress
 import json
 import os
 from pathlib import Path
+import re
 import subprocess
 import sys
 import time
@@ -29,23 +30,40 @@ def verify_migration_backup(actual,witness,sha,operations, *, expected_schema=11
     scripts package. Never emit their private output or import mutable source.
     """
     actual=Path(actual)
+    maintenance=witness.get('maintenance_manifest_sha256')
+    if ((expected_schema==150 or 'maintenance_manifest_sha256' in witness)
+            and (not isinstance(maintenance,str) or not re.fullmatch('[0-9a-f]{64}',maintenance))):
+        raise RuntimeError('completed_migration_maintenance_binding_invalid')
     helper=protected(operations.recovery_helper_root()/'backup_support.py')
+    arguments=[sys.executable,'-I','-B',str(helper),'verify',str(actual)]
+    if maintenance is not None:arguments.append(maintenance)
     try:
-        result=subprocess.run([sys.executable,'-I','-B',str(helper),'verify',str(actual)],
-            capture_output=True,timeout=180)
+        result=subprocess.run(arguments,capture_output=True,timeout=180)
     except (OSError,subprocess.TimeoutExpired):
         raise RuntimeError('completed_migration_backup_verification_failed') from None
     if result.returncode:
         raise RuntimeError('completed_migration_backup_verification_failed')
     manifest=readonly_configuration(actual/'manifest.json',private=False)
     observed=json.loads(manifest.read_text())
+    if (observed.get('maintenance_backup') is not None)!=(maintenance is not None):
+        raise RuntimeError('completed_migration_maintenance_binding_invalid')
     if (file_digest(manifest)!=witness['backup_manifest_sha256']
             or file_digest(readonly_configuration(actual/'SHA256SUMS',private=False))!=witness['backup_checksums_sha256']
             or int(observed['database']['schema_version'])!=expected_schema or observed['release']['git_sha']!=sha):
         raise RuntimeError('completed_migration_backup_binding_changed')
 
 def intent_document(contract):
-    selected=profile(contract)
+    # An intent document is also a backup input. Validate the unregistered150
+    # preparation contract without admitting it to any executor/authority path.
+    from deployment.lib.completed_normal_profile import DELETION
+    if isinstance(contract,dict) and contract.get('operation')==DELETION.operation:
+        from deployment.lib.completed_normal_admission import validate_provider_preparation150
+        from deployment.lib.schema150_release import MANIFEST_SHA256
+        validate_provider_preparation150(contract)
+        if contract['migration_manifest_sha256']!=MANIFEST_SHA256:
+            raise RuntimeError('schema150_migration_manifest_changed')
+        selected=DELETION
+    else:selected=profile(contract)
     return {'operation':selected.operation,'context_sha256':digest(contract),'source_sha':contract['candidate']['source_sha'],
         'manifest_sha256':contract['migration_manifest_sha256'],'source_schema':selected.source,'target_schema':selected.target,
         'database_restored':False}

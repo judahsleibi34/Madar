@@ -161,10 +161,18 @@ INSERT INTO storage.objects VALUES('synthetic-object','fixture/asset');''')
                     try:rehearse(backup,IMAGE,maintenance_manifest_sha256=wrong)
                     except (RehearsalError,backup_support.BackupError):pass
                     else:raise AssertionError('unbound maintenance restore accepted')
+                # Exercise the installed-layout verifier interface consumed by
+                # the protected migration boundary, with a real native dump.
+                verifier=[sys.executable,'-I','-B',str(WEB/'scripts/backup_support.py'),'verify',str(backup)]
+                command(verifier+[digest],env=env)
+                for invalid in ('0'*64,'invalid-digest'):
+                    rejected=subprocess.run(verifier+[invalid],env=env,capture_output=True,timeout=30)
+                    if rejected.returncode==0:raise AssertionError('unbound migration backup verification accepted')
                 print(json.dumps({'operation':'native-synthetic-maintenance-backup-restore','status':'PASS',
                     'schema':146,'original_roles_restored':True,'database_owner_acl_data_sequences_verified':True,
                     'native_object_bytes_restored':True,'native_object_metadata_activated':False,
                     'missing_wrong_expected_manifest_rejected':True,'production_authorized':False,
+                    'migration_verifier_expected_digest_enforced':True,
                     'protected_controller_execution':False,'replica_verified':False,
                     'elapsed_seconds':round(time.monotonic()-started,3)}))
             finally:os.environ.clear();os.environ.update(previous_env)

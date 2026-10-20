@@ -172,9 +172,17 @@ def verify_maintenance(root: Path, *, expected_sha256: str | None = None) -> dic
     directory = root/'maintenance'
     real_path(directory)
     path = directory/'manifest.json'
-    if path.stat().st_size > 256*1024 or expected_sha256 is not None and digest(path) != expected_sha256:
+    descriptor=os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
+    with os.fdopen(descriptor,'rb') as source:
+        metadata=os.fstat(source.fileno())
+        if not stat.S_ISREG(metadata.st_mode) or metadata.st_size>256*1024:
+            raise BackupError('maintenance_manifest_changed')
+        body=source.read(256*1024+1)
+    # Hash and parse the same bounded descriptor capture. Published backups may
+    # be runtime-owned; checking a pathname and reopening it is not custody.
+    if len(body)>256*1024 or expected_sha256 is not None and hashlib.sha256(body).hexdigest()!=expected_sha256:
         raise BackupError('maintenance_manifest_changed')
-    value = json.loads(path.read_bytes())
+    value = json.loads(body)
     keys = {'version','binding','stage','schema','bootstrap_role','roles_sha256','roles_snapshot_sha256',
             'objects_sha256','objects_measurement','database_fingerprint','recovery','authority_issued'}
     if (not isinstance(value,dict) or set(value)!=keys or type(value['version']) is not int or value['version']!=1
@@ -718,6 +726,10 @@ def main() -> int:
         if args.operation == 'scheduled':
             scheduled(args.path)
         elif args.operation == 'verify':
+            if args.extra is not None:
+                if not re.fullmatch('[0-9a-f]{64}',args.extra):
+                    raise BackupError('maintenance_expected_digest_invalid')
+                verify_maintenance(args.path,expected_sha256=args.extra)
             verify(args.path)
         elif args.operation == 'inventory':
             inventory(args.path)

@@ -1,5 +1,19 @@
 # Privileged control-plane upgrade architecture
 
+## Phase X backup-to-migration evidence boundary
+
+The existing completed-NORMAL backup context can seal the unregistered150
+preparation inputs without operationally admitting that profile. It retains the
+independently protected maintenance-manifest digest and binds original-role,
+owner/ACL, database and object-byte restore evidence, replica evidence and the
+complete fenced provider journal. Pending effects or changed journal state deny
+publication. Maintenance metadata is hashed and parsed from the same bounded
+regular-file capture. The existing migration verifier passes the expected inner digest
+to its measured installed backup helper; archive-local checksums alone cannot
+replace that independent binding. These inputs grant no execution or write
+authority. Schema150 admission and the unfinished full coordinator/private
+provider/handoff/boot gates remain blocked.
+
 ## Phase IX protected maintenance backup staging
 
 The measured installer/frozen source inventory includes maintenance_backup.py.

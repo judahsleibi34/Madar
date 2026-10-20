@@ -115,7 +115,7 @@ class CompletedNormalBackupContext:
         return capture_and_replicate(self.plan,self.root,self.package,self.source_guard,self.kernel,completed_context=self)
 
     def seal_migration_inputs(self,receipt):
-        """Issue only actual verified source115 backup/restore/replica evidence."""
+        """Seal verified backup inputs; this never authorizes SQL execution."""
         from deployment.lib.completed_normal_migration import intent_document
         from deployment.lib.emergency_routing_repair import exclusive
         self.guard()
@@ -135,6 +135,41 @@ class CompletedNormalBackupContext:
             'backup_manifest_sha256':file_digest(readonly_configuration(backup/'manifest.json',private=False)),
             'backup_checksums_sha256':file_digest(readonly_configuration(backup/'SHA256SUMS',private=False)),
             'restore_execution_sha256':digest(actual['restore']),'replica_execution_sha256':digest(actual['node1'])}
+        if self.provider_adapter is not None:
+            # The ordinary archive has moved out of private capture staging.
+            # Its root-private input digest, not the archive's own checksums or
+            # a caller PASS, remains the independent trust anchor after rename.
+            from deployment.lib.schema150_provider_adapter import private_json
+            from deployment.lib.schema150_provider_lifecycle import ProviderMaintenance150,ProtectedProviderJournal,FENCE_STEPS
+            lifecycle=ProviderMaintenance150(self.provider_adapter.binding,
+                ProtectedProviderJournal(self.root/'provider-journal'),self.provider_adapter)
+            with lifecycle._locked():
+                self.guard()
+                records,completed,pending,ready=lifecycle._state()
+                if pending or ready or completed!=list(FENCE_STEPS):
+                    raise RuntimeError('completed_backup_provider_fence_incomplete')
+                captured=private_json(self.root/(self.stage+'-maintenance-backup-input.json'))
+                expected={'version':1,'context_sha256':self.context,'scope':self.scope,'stage':self.stage,
+                    'backup_id':backup.name,'manifest_sha256':actual.get('maintenance_manifest_sha256')}
+                if captured!=expected:
+                    raise RuntimeError('completed_backup_maintenance_capture_changed')
+                expected_digest=captured['manifest_sha256']
+                value=backup_support.verify_maintenance(backup,expected_sha256=expected_digest)
+                if (value['binding']!=self.provider_adapter.binding or value['stage']!=self.stage
+                        or value['schema']!=self.schema
+                        or actual['restore'].get('maintenance_manifest_sha256')!=expected_digest
+                        or actual['node1'].get('maintenance_manifest_sha256')!=expected_digest
+                        or any(actual['restore'].get(k) is not True for k in
+                            ('role_attributes_restored','ownership_and_acls_restored',
+                             'database_fingerprint_verified','native_object_bytes_restored'))
+                        or actual.get('sha256sums_sha256')!=inputs['backup_checksums_sha256']):
+                    raise RuntimeError('completed_backup_maintenance_evidence_changed')
+                self.guard()
+                if lifecycle._state()[0]!=records:
+                    raise RuntimeError('completed_backup_provider_journal_changed')
+                inputs['maintenance_manifest_sha256']=expected_digest
+                inputs['provider_maintenance']={'version':1,'binding':self.provider_adapter.binding,
+                    'journal_sha256':digest(records),'preimage_sha256':digest(records[0]['payload']['preimage'])}
         from deployment.lib.completed_normal_profile import FENCED, OUTBOX
         if self.profile in (FENCED, OUTBOX):
             # The existing systemd credential transports this nonsecret policy;

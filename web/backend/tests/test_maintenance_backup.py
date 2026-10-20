@@ -20,6 +20,7 @@ from deployment.lib.schema150_object_inventory import measure_roots,archive_root
 from deployment.lib.schema150_actor_inventory import REQUIRED_OBJECT_ROOTS
 from deployment.lib import completed_normal_profile as profiles
 from deployment.lib.schema150_release import admitted_manifest
+from deployment.lib.completed_normal_admission import digest as profiles_json_digest
 
 
 class MaintenanceBackupTests(unittest.TestCase):
@@ -70,6 +71,94 @@ class MaintenanceBackupTests(unittest.TestCase):
         with tarfile.open(self.data/'maintenance/objects.tar.gz','r:gz') as archive:
             members=archive.getmembers();self.assertFalse(any(m.name.startswith('database/') for m in members))
             self.assertTrue(any('madar.xattrs.base64' in m.pax_headers for m in members))
+
+    def migration_context(self):
+        """Actual files/archives/flock, MODEL authority and restore/replica results.
+
+        This exercises the existing backup-to-credential boundary, not an SQL
+        executor or a privileged controller acceptance claim.
+        """
+        from unittest.mock import Mock
+        from test_schema150_admission import deletion_contract
+        from deployment.lib import completed_normal_backup as context_module
+        from deployment.lib import schema150_provider_lifecycle as lifecycle
+        from deployment.lib import schema149_provider_lifecycle as journal_module
+        contract=deletion_contract()
+        contract['candidate'].update(source_sha=self.binding['source_sha'],controller_sha=self.binding['controller_sha'])
+        contract['writer_inventory_sha256']=self.binding['inventory_sha256']
+        self.binding['context_sha256']=context_module.digest(contract)
+        expected=self.seal()
+        context=context_module.CompletedNormalBackupContext.__new__(context_module.CompletedNormalBackupContext)
+        context.contract=contract;context.profile=profiles.DELETION;context.root=self.root
+        context.context=self.binding['context_sha256'];context.stage='pre-migration';context.schema=146
+        context.scope=context_module.digest({'operation':profiles.DELETION.operation,'context_sha256':context.context,'backup_stage':context.stage})
+        context.receipt_name='pre-migration-backup.json';context.guard=Mock()
+        context.plan=SimpleNamespace(source_sha=self.binding['source_sha'],candidate_images={'backend':'synthetic','frontend':'synthetic'})
+        context.provider_adapter=SimpleNamespace(binding=self.binding)
+        context.document={}
+        self.enterContext(patch.object(context_module,'protected',lambda p,**kw:Path(p)))
+        self.enterContext(patch.object(context_module,'readonly_configuration',lambda p,**kw:Path(p)))
+        self.enterContext(patch('deployment.lib.schema150_provider_adapter.protected',lambda p,**kw:Path(p)))
+        self.enterContext(patch.object(journal_module,'protected',lambda p,**kw:Path(p)))
+        self.enterContext(patch.object(journal_module,'require_root_directory',lambda p:None))
+        journal_root=self.root/'provider-journal';journal_root.mkdir(mode=0o700)
+        journal=lifecycle.ProtectedProviderJournal(journal_root)
+        journal.append('prepared',{'binding':self.binding,'preimage':{'synthetic':'MODEL ONLY'}})
+        for step in lifecycle.FENCE_STEPS:
+            journal.append('effect_intent',{'step':step});journal.append('effect_complete',{'step':step})
+        restored={'status':'logical_database_and_file_restore_passed','backup_schema':146,
+            'maintenance_manifest_sha256':expected,**{k:True for k in
+                ('role_attributes_restored','ownership_and_acls_restored','database_fingerprint_verified','native_object_bytes_restored')}}
+        receipt={'schema':146,'context_sha256':context.context,'plan_sha256':context.scope,
+            'source_sha':context.plan.source_sha,'images':context.plan.candidate_images,'restore':restored,
+            'node1':{'checksum_exit_code':0,'maintenance_manifest_sha256':expected},'local_path':str(self.data),
+            'maintenance_manifest_sha256':expected,'sha256sums_sha256':backup.digest(self.data/'SHA256SUMS')}
+        def publish():
+            (self.root/context.receipt_name).write_text(json.dumps(receipt))
+            (self.root/'pre-migration-maintenance-backup-input.json').write_text(json.dumps({
+                'version':1,'context_sha256':context.context,'scope':context.scope,'stage':context.stage,
+                'backup_id':self.data.name,'manifest_sha256':expected}))
+        publish()
+        return context,receipt,journal,publish
+
+    def test_existing_backup_context_seals_original_role_digest_and_fenced_provider_witness(self):
+        context,receipt,journal,_=self.migration_context()
+        value=context.seal_migration_inputs(receipt)
+        self.assertEqual(value['intent']['target_schema'],150)
+        self.assertEqual(value['maintenance_manifest_sha256'],receipt['maintenance_manifest_sha256'])
+        self.assertEqual(value['provider_maintenance']['binding'],self.binding)
+        self.assertEqual(value['provider_maintenance']['journal_sha256'],profiles_json_digest(journal.read()))
+        self.assertEqual(json.loads((self.root/'migration-inputs.json').read_bytes()),value)
+        self.assertEqual(context.guard.call_count,3)
+        with self.assertRaises(FileExistsError):context.seal_migration_inputs(receipt)
+
+    def test_migration_input_seal_refuses_missing_modified_or_incomplete_maintenance_proof(self):
+        context,receipt,_,publish=self.migration_context()
+        original=copy.deepcopy(receipt)
+        mutations=[lambda r:r.pop('maintenance_manifest_sha256'),
+            lambda r:r['restore'].update(maintenance_manifest_sha256='0'*64),
+            lambda r:r['node1'].update(maintenance_manifest_sha256='0'*64),
+            lambda r:r.update(sha256sums_sha256='0'*64)]
+        mutations.extend(lambda r,key=key:r['restore'].update({key:False}) for key in
+            ('role_attributes_restored','ownership_and_acls_restored','database_fingerprint_verified','native_object_bytes_restored'))
+        for mutate in mutations:
+            receipt.clear();receipt.update(copy.deepcopy(original));mutate(receipt);publish()
+            with self.subTest(receipt=receipt),self.assertRaises(RuntimeError):context.seal_migration_inputs(receipt)
+            self.assertFalse((self.root/'migration-inputs.json').exists())
+
+    def test_pending_provider_effect_prevents_migration_credential_publication(self):
+        context,receipt,journal,_=self.migration_context()
+        journal.append('effect_intent',{'step':'restore_roles_private'})
+        with self.assertRaisesRegex(RuntimeError,'provider_fence_incomplete'):context.seal_migration_inputs(receipt)
+        self.assertFalse((self.root/'migration-inputs.json').exists())
+
+    def test_changed_journal_during_backup_verification_prevents_publication(self):
+        context,receipt,journal,_=self.migration_context()
+        def guard():
+            if context.guard.call_count==3:journal.append('quiescence',{'synthetic':'MODEL ONLY'})
+        context.guard.side_effect=guard
+        with self.assertRaisesRegex(RuntimeError,'provider_journal_changed'):context.seal_migration_inputs(receipt)
+        self.assertFalse((self.root/'migration-inputs.json').exists())
     def test_changed_source_origin_stage_or_output_cannot_be_resealed(self):
         for changes in ({'binding':dict(self.binding,source_sha='c'*40)}, {'stage':'post-migration'}):
             with self.subTest(changes=changes),self.assertRaisesRegex(RuntimeError,'binding_invalid'):
@@ -84,6 +173,20 @@ class MaintenanceBackupTests(unittest.TestCase):
             with self.assertRaises(backup.BackupError):backup.verify_maintenance(self.data,expected_sha256=digest)
         with self.assertRaisesRegex(backup.BackupError,'manifest_changed'):
             backup.verify_maintenance(self.data,expected_sha256='0'*64)
+
+    def test_expected_inner_digest_and_parsed_metadata_use_the_same_bytes(self):
+        expected=self.seal();target=self.data/'maintenance/manifest.json'
+        original=backup.digest
+        def substitute(path):
+            value=original(path)
+            if Path(path)==target:
+                changed=json.loads(target.read_bytes());changed['database_fingerprint']='0'*64
+                target.write_text(json.dumps(changed))
+            return value
+        with patch.object(backup,'digest',side_effect=substitute):
+            observed=backup.verify_maintenance(self.data,expected_sha256=expected)
+        self.assertEqual(observed['database_fingerprint'],'f'*64,
+                         'Authenticated metadata must not be reopened after checksum validation')
     def test_missing_or_changed_native_object_bytes_refuse(self):
         digest=self.seal();path=self.data/'maintenance/objects.tar.gz'
         body=path.read_bytes();path.write_bytes(body[:-15])
