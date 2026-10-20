@@ -180,6 +180,21 @@ class PlanTests(unittest.TestCase):
         _,obs=self.accepted_context(changed)
         self.assertIn('automation_trust_root_changed',assess(changed,policy,obs,now=1000)['reasons'])
 
+    def test_new_imported_helper_cannot_be_enrolled_by_advancing_the_base(self):
+        self.write(2);self.commit();accepted,_=self.plan();policy,_=self.accepted_context(accepted)
+        paths=('web/deployment/lib/new_recovery_helper.py','web/scripts/new_backup_helper.py',
+               'web/staging/integration/new_native_acceptance.py')
+        for relative in paths:
+            path=self.root/relative;path.parent.mkdir(parents=True,exist_ok=True)
+            path.write_text('# newly introduced executable dependency\n')
+        self.base=self.commit();self.write(3);self.commit();changed,_=self.plan(origin=2)
+        self.assertFalse(changed.document()['protected_control_plane_changed'])
+        for relative in paths:self.assertIn(relative,changed.document()['automation_inputs']['files'])
+        _,obs=self.accepted_context(changed)
+        result=assess(changed,policy,obs,now=1000)
+        self.assertIn('automation_trust_root_changed',result['reasons'])
+        self.assertFalse(result['production_execution_allowed'])
+
     def test_missing_automation_input_blocks_routine_policy(self):
         (self.root/'web/backend/requirements-migration-tools.txt').unlink()
         self.write(2); self.commit(); plan,_=self.plan()

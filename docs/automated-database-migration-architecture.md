@@ -2,6 +2,13 @@
 
 ## Phase IX maintenance recovery evidence
 
+Automation input identity includes the complete deployment,script and staging
+integration dependency trees as well as all workflows/local actions. A newly
+introduced imported helper cannot escape policy pinning just because the fixed
+entrypoint/workflow did not change. Advancing the PR/main base cannot enroll that
+helper;the independently protected policy must be reviewed and renewed. This is
+a trust-boundary change,not per-schema profile plumbing or production activation.
+
 Migration Safety also executes a networkless synthetic ordinary-backup and
 independent restore drill. It checks original role state, ownership/ACLs,
 database-specific role settings, data/sequences and native object bytes. The

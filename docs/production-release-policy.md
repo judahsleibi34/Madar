@@ -2,6 +2,10 @@
 
 ## Phase IX maintenance recovery integration
 
+Root-policy automation identity pins the complete deployment/scripts/staging
+integration dependency trees,including newly added helpers. Repository base
+advancement cannot enroll new privileged preparation code into an old policy.
+
 The existing ordinary backup pipeline has an explicit maintenance extension.
 Only the concrete provider adapter, with its original authority, held locks,
 persistent journal and live quiescence, may select protected capture. Provider
