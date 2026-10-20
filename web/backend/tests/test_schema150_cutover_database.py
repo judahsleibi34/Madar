@@ -266,4 +266,35 @@ class Schema150CutoverDatabaseTests(unittest.TestCase):
         self.assertEqual(json.loads((fixture.state/'state.json').read_bytes()),fixture.initial)
         self.assertFalse(fixture.driver.ops.authorization_file.exists())
 
+    def test_two_native_processes_cannot_overwrite_the_same_coordinated_attempt(self):
+        context=multiprocessing.get_context('fork');barrier=context.Barrier(2)
+        children=[];readers=[];path=self.directory/'concurrent-execution.json'
+        def attempt(writer):
+            try:
+                result=LockedMigrationExecutor(connection_factory=self.connect,manifest=self.manifest,
+                    state_file=path,backup_dir=self.directory,backup_verifier=lambda _:barrier.wait(10),
+                    migration_guard=self.actor.migration_guard,failure_formatter=lambda error:type(error).__name__).run()
+                writer.send(('completed',result['observed_schema']))
+            except RuntimeError as error:writer.send(('refused',str(error)))
+            finally:writer.close()
+        try:
+            for _ in range(2):
+                reader,writer=context.Pipe(duplex=False)
+                child=context.Process(target=attempt,args=(writer,));child.start();writer.close()
+                readers.append(reader);children.append(child)
+            results=[]
+            for reader in readers:
+                self.assertTrue(reader.poll(30),'Owned native executor did not finish')
+                results.append(reader.recv())
+            self.assertCountEqual(results,[('completed',150),('refused','coordinated_migration_attempt_consumed')])
+            receipt=json.loads(path.read_bytes())
+            self.assertEqual((receipt['status'],receipt['observed_schema']),('completed',150))
+            self.assertEqual([r['number'] for r in receipt['migrations']],[147,148,149,150])
+            with self.connect() as db:self.assertEqual(self.preserved(db),self.original)
+        finally:
+            for child in children:
+                child.join(2)
+                if child.is_alive():child.kill();child.join(2)
+            for reader in readers:reader.close()
+
 if __name__=='__main__':unittest.main()

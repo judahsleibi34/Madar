@@ -1,5 +1,15 @@
 # Privileged control-plane upgrade architecture
 
+## Final continuation: exclusive durable migration receipts
+
+A coordinated migration claims its attempt through atomic no-replace publication
+of a fully written, fsynced inode before opening a database connection. A racing
+process cannot overwrite the winner's receipt. Existing noncoordinated retry
+semantics remain unchanged. New attempt-directory links and receipt replacement
+are followed by directory fsyncs; file fsync alone does not make those entries
+durable. These checks preserve the existing JSON journal format and executor.
+They do not grant authority, replay consumed SQL or establish full reboot proof.
+
 ## Final continuation: guarded private recovery and recovery locks
 
 Private recovery may start only the native provider trio and the exact sealed

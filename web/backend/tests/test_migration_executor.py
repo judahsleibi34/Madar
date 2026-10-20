@@ -4,6 +4,8 @@ import os
 import sys
 import tempfile
 import unittest
+import multiprocessing
+import stat
 from pathlib import Path
 from dataclasses import replace
 from unittest.mock import Mock, patch
@@ -12,6 +14,7 @@ WEB_ROOT = Path(os.getenv("MADAR_TEST_REPOSITORY_ROOT") or Path(__file__).resolv
 sys.path.insert(0, str(WEB_ROOT))
 
 from deployment.lib.migration_executor import LockedMigrationExecutor, MigrationManifest
+from deployment.lib import migration_executor as migration_module
 
 
 class FakeCursor:
@@ -132,6 +135,50 @@ class MigrationExecutorTests(unittest.TestCase):
             self.assertEqual((state['status'],state['observed_schema']),('failed',83))
             self.assertEqual(connection.schema,83);self.assertTrue(connection.closed)
             with self.assertRaisesRegex(RuntimeError,'attempt_consumed'):executor.run()
+
+    def test_coordinated_processes_cannot_both_claim_the_same_attempt(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root=Path(temporary);repository,path,backup=self.fixture(root)
+            manifest=replace(MigrationManifest.load(path,repository),coordinated=True)
+            context=multiprocessing.get_context('fork');barrier=context.Barrier(2)
+            children=[];readers=[]
+            def attempt(writer):
+                try:
+                    result=LockedMigrationExecutor(connection_factory=FakeConnection,manifest=manifest,
+                        state_file=root/'execution.json',backup_dir=backup,backup_verifier=lambda _:barrier.wait(10),
+                        migration_guard=lambda *args:None).run()
+                    writer.send(result['status'])
+                except RuntimeError as error:writer.send(str(error))
+                finally:writer.close()
+            try:
+                for _ in range(2):
+                    reader,writer=context.Pipe(duplex=False)
+                    child=context.Process(target=attempt,args=(writer,));child.start();writer.close()
+                    children.append(child);readers.append(reader)
+                outcomes=[]
+                for reader in readers:
+                    self.assertTrue(reader.poll(15),'Owned executor process did not finish')
+                    outcomes.append(reader.recv())
+                self.assertEqual(sorted(outcomes),['completed','coordinated_migration_attempt_consumed'])
+                self.assertEqual(json.loads((root/'execution.json').read_bytes())['status'],'completed')
+            finally:
+                for child in children:
+                    child.join(2)
+                    if child.is_alive():child.kill();child.join(2)
+                for reader in readers:reader.close()
+
+    def test_atomic_receipt_syncs_file_then_replacement_and_parent_directory(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            target=Path(temporary)/'new-parent'/'new-attempt'/'execution.json';events=[]
+            original_sync=migration_module.os.fsync;original_replace=migration_module.os.replace
+            def sync(descriptor):
+                events.append('directory_sync' if stat.S_ISDIR(os.fstat(descriptor).st_mode) else 'file_sync')
+                return original_sync(descriptor)
+            def replace_file(*args):events.append('replace');return original_replace(*args)
+            with patch.object(migration_module.os,'fsync',side_effect=sync),patch.object(migration_module.os,'replace',side_effect=replace_file):
+                migration_module.atomic_json(target,{'synthetic':'durable receipt'})
+            self.assertEqual(events[-3:],['file_sync','replace','directory_sync'])
+            self.assertGreaterEqual(events.count('directory_sync'),3)
 
     def test_schema_105_bridge_requires_backup_then_applies_only_106_through_108(self):
         with tempfile.TemporaryDirectory() as temporary:

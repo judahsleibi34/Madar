@@ -28,8 +28,20 @@ def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def atomic_json(path: Path, payload: dict[str, Any]) -> None:
+def _sync_directory(path: Path) -> None:
+    descriptor=os.open(path,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW|os.O_CLOEXEC)
+    try:os.fsync(descriptor)
+    finally:os.close(descriptor)
+
+
+def atomic_json(path: Path, payload: dict[str, Any], *, exclusive: bool=False) -> None:
+    # Persist newly created directory entries as well as the final receipt.
+    # fsync(file) alone cannot preserve a rename or a new attempt directory.
+    missing=[];parent=path.parent
+    while not parent.exists():
+        missing.append(parent);parent=parent.parent
     path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    for directory in reversed(missing):_sync_directory(directory.parent)
     descriptor, temporary = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
     try:
         with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
@@ -38,7 +50,15 @@ def atomic_json(path: Path, payload: dict[str, Any]) -> None:
             handle.flush()
             os.fsync(handle.fileno())
         os.chmod(temporary, 0o600)
-        os.replace(temporary, path)
+        if exclusive:
+            # Atomic no-replace publication of a fully written/fsynced inode.
+            # The early exists() check is only a fast refusal, not a claim.
+            try:os.link(temporary,path,follow_symlinks=False)
+            except FileExistsError:
+                raise RuntimeError('coordinated_migration_attempt_consumed') from None
+            os.unlink(temporary)
+        else:os.replace(temporary, path)
+        _sync_directory(path.parent)
     finally:
         if os.path.exists(temporary):
             os.unlink(temporary)
@@ -206,7 +226,7 @@ class LockedMigrationExecutor:
             "status": "running",
             "migrations": [],
         }
-        atomic_json(self.state_file, state)
+        atomic_json(self.state_file, state,exclusive=self.manifest.coordinated)
         connection = self.connection_factory()
         connection.autocommit = True
         lock_acquired = False
