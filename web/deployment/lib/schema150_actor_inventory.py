@@ -19,6 +19,10 @@ from deployment.lib.schema150_provider_lifecycle import digest, validate_binding
 PHASES = ('prepared', 'fenced', 'private', 'active')
 ATTEST_PHASES = PHASES + ('fencing-boundary', 'private-boundary', 'active-boundary')
 PRIVATE_PROVIDER_ROLES = frozenset({'native:auth', 'native:rest', 'native:storage'})
+# The private application is distinct from every queue/maintenance worker.
+# Concrete effects additionally require the independently sealed candidate.
+PRIVATE_CANDIDATE_ROLES = ('candidate:redis','candidate:backend','candidate:frontend')
+PRIVATE_RUNTIME_ROLES = PRIVATE_PROVIDER_ROLES | frozenset(PRIVATE_CANDIDATE_ROLES)
 NATIVE_NAMES = {
     'native:db': 'supabase-db', 'native:auth': 'supabase-auth', 'native:rest': 'supabase-rest',
     'native:storage': 'supabase-storage', 'native:realtime': 'realtime-dev.supabase-realtime',
@@ -175,15 +179,15 @@ def _validate(inventory, binding=None):
                 _require(not state['running'])
             if logical.startswith('candidate:') and phase != 'prepared': _require(state['restart'] == 'no')
         # Admit only states reachable by the fixed concrete adapter. It stops
-        # all non-DB actors with restart=no, starts the private provider trio,
-        # then only starts (never silently stops) accepted active actors.
+        # all non-DB actors with restart=no, starts the private provider trio
+        # and independently sealed private application, then accepted workers.
         prepared, fenced, private, active=(actor['states'][p] for p in PHASES)
         if logical == 'native:db':
             _require(all(state['restart']==prepared['restart'] for state in (fenced,private,active)),
                      'schema150_database_restart_preimage_changed')
         else:
             _require(active['restart']=='no','schema150_active_restart_not_reachable')
-        if logical in PRIVATE_PROVIDER_ROLES:
+        if logical in PRIVATE_RUNTIME_ROLES:
             _require(private['running'] and active['running'],'schema150_private_provider_state_not_reachable')
         if logical=='proxy' or actor['generation']=='candidate':
             _require(active['running'],'schema150_normal_actor_not_active')
@@ -320,10 +324,11 @@ def attest_containers(inventory, rows, *, phase):
         if phase == 'fencing-boundary':
             expected = actor['states']['prepared'] if matches(actor['states']['prepared']) else actor['states']['fenced']
         elif phase == 'private-boundary':
-            # Initial inventory cannot authorize a future context-derived
-            # candidate. A separately sealed extension is still required.
+            # This pure observation permits only the planned fixed private
+            # roles. The concrete adapter separately verifies the root-sealed
+            # stage and its credential witness before accepting candidates.
             expected = actor['states']['fenced']
-            if logical in PRIVATE_PROVIDER_ROLES and matches(actor['states']['private']):
+            if logical in PRIVATE_RUNTIME_ROLES and matches(actor['states']['private']):
                 expected = actor['states']['private']
         elif phase == 'active-boundary':
             expected = actor['states']['private'] if matches(actor['states']['private']) else actor['states']['active']

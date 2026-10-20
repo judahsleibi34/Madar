@@ -229,15 +229,15 @@ class ActorInventoryTests(unittest.TestCase):
         bad, scope = repin(bad)
         with self.assertRaises(RuntimeError): inventory.validate_inventory(bad, scope)
 
-    def test_private_boundary_accepts_only_exact_three_provider_state_alternatives(self):
+    def test_private_boundary_accepts_only_fixed_provider_and_private_application_roles(self):
         (data, _), rows = fixture(candidates=True)
         fenced = phase_rows(data, rows, 'fenced')
         inventory.attest_containers(data, fenced, phase='private-boundary')
         by_id = {actual['Id']: actual for actual in fenced}
-        for logical in inventory.PRIVATE_PROVIDER_ROLES:
+        for logical in inventory.PRIVATE_RUNTIME_ROLES:
             by_id[data['containers'][logical]['id']]['State']['Running'] = data['containers'][logical]['states']['private']['running']
             inventory.attest_containers(data, fenced, phase='private-boundary')
-        for logical in ('native:gateway', 'native:realtime', 'candidate:backend', 'candidate:data-deletion-worker'):
+        for logical in ('native:gateway', 'native:realtime', 'proxy','candidate:parser-worker','candidate:data-deletion-worker'):
             bad = copy.deepcopy(fenced)
             next(actual for actual in bad if actual['Id'] == data['containers'][logical]['id'])['State']['Running'] = True
             with self.subTest(logical=logical), self.assertRaisesRegex(RuntimeError, 'state_changed'):

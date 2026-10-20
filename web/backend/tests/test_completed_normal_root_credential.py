@@ -66,6 +66,44 @@ class RootCredentialLockTests(unittest.TestCase):
         self.assertEqual(self.ops.deploy_lock_descriptor,descriptor);self.probe_lock(True)
         self.ops.release_deployment_lock.assert_not_called()
 
+    def test_forward_credential_borrows_its_actual_held_upgrade_lock_and_requests_fresh_resumption(self):
+        from deployment.lib.completed_normal_forward import CompletedNormalForwardResumption
+        forward=CompletedNormalForwardResumption.__new__(CompletedNormalForwardResumption)
+        forward.actor=SimpleNamespace(ops=self.ops,contract=self.driver.contract)
+        forward.plan={'controller_sha':self.driver.controller,'synthetic':'fresh resumption MODEL ONLY'}
+        forward.lock=self.driver.lock
+        with forward.credential():
+            provider.require_owned_lock(forward.lock,self.ops.upgrade_root/'upgrade.lock')
+            self.probe_lock(True)
+            self.assertTrue((Path(os.environ['CREDENTIALS_DIRECTORY'])/'madar-control-plane-upgrade').is_file())
+        self.ops.write_authorization.assert_called_once_with(self.driver.controller,
+            completed_normal_contract=self.driver.contract,migration_resumption=forward.plan)
+        self.assertIsNone(self.ops.deploy_lock_descriptor);self.probe_lock(False)
+        provider.require_owned_lock(forward.lock,self.ops.upgrade_root/'upgrade.lock')
+
+    def test_forward_credential_without_parent_lock_refuses_before_issuer(self):
+        from deployment.lib.completed_normal_forward import CompletedNormalForwardResumption
+        forward=CompletedNormalForwardResumption.__new__(CompletedNormalForwardResumption)
+        forward.actor=SimpleNamespace(ops=self.ops,contract=self.driver.contract)
+        forward.plan={'controller_sha':self.driver.controller};forward.lock=None
+        with self.assertRaisesRegex(RuntimeError,'coordinator_lock_required'):
+            with forward.credential():self.fail('Missing lock cannot issue recovery authority')
+        self.ops.write_authorization.assert_not_called()
+
+    def test_forward_preflight_failure_releases_upgrade_lock_even_when_cleanup_fails(self):
+        from deployment.lib.completed_normal_forward import CompletedNormalForwardResumption
+        os.close(self.driver.lock);self.driver.lock=None
+        forward=CompletedNormalForwardResumption.__new__(CompletedNormalForwardResumption)
+        forward.actor=SimpleNamespace(ops=self.ops,contract=self.driver.contract)
+        forward.plan={'controller_sha':self.driver.controller};forward.lock=None;forward.root=self.root/'unused-attempt'
+        forward.preflight=Mock(side_effect=[None,RuntimeError('synthetic_preflight_failure')])
+        self.ops.clear_authorization.side_effect=OSError('synthetic_clear_failure')
+        self.ops.close_locks=Mock(side_effect=OSError('synthetic_close_failure'))
+        with patch.object(execution.os,'geteuid',return_value=0),self.assertRaises(OSError):forward.execute()
+        self.assertIsNone(forward.lock);self.ops.close_locks.assert_called_once_with()
+        descriptor=acquire_lock(self.ops.upgrade_root/'upgrade.lock',create=False)
+        os.close(descriptor)
+
     def test_contention_refuses_before_issuance(self):
         descriptor=acquire_lock(self.ops.state_root/'deploy.lock',create=False)
         try:

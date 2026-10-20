@@ -57,6 +57,7 @@ class ParentMigrationTests(unittest.TestCase):
             'source_sha':self.sha,'controller_sha':self.driver.controller,'inventory_sha256':'4'*64,
             'system_identifier':self.contract['database']['system_identifier'],'source_schema':146,'target_schema':150}
         self.actor.require_authority=Mock();self.actor.observe_quiescence=Mock();self.actor.migration_guard=Mock()
+        self.actor.migration_completion_guard=Mock()
         self.journal_root=self.root/'provider-journal';self.journal_root.mkdir(mode=0o700)
         self.enterContext(patch.object(journal_module,'require_root_directory',lambda p:None))
         self.enterContext(patch.object(journal_module,'protected',lambda p,**kw:Path(p)))
@@ -111,6 +112,7 @@ class ParentMigrationTests(unittest.TestCase):
         self.driver.root_credential.assert_called_once_with()
         self.executor.assert_called_once()
         self.assertIs(self.executor.call_args.kwargs['migration_guard'],self.actor.migration_guard)
+        self.assertIs(self.executor.call_args.kwargs['completion_guard'],self.actor.migration_completion_guard)
         self.model.assert_called_once_with(self.contract,{},self.actor.runtime,phase='fenced')
         self.runtime.return_value.json_http.assert_not_called()
         self.assertEqual((self.state/'state.json').read_bytes(),original)

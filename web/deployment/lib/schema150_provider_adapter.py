@@ -307,11 +307,53 @@ class Schema150ProviderAdapter:
     def _attest(self, phase):
         from deployment.lib.schema150_actor_inventory import attest_containers
         rows=self._rows()
+        if phase in ('private','private-boundary','active','active-boundary') and any(
+                key.startswith('candidate:') for key in self.inventory['containers']):
+            self.verify_candidate_stage(rows=rows)
         proof=attest_containers(self.inventory, rows, phase=phase)
         if phase in ('private','private-boundary'):
             for row in rows:
                 if row.get('Name','').lstrip('/') in PROVIDER_NAMES:self._private_ports(row)
         return proof
+
+    def verify_candidate_stage(self,*,rows=None):
+        """Require independently sealed model identities, not inventory promises.
+
+        The coordinator's stage is root private and also carried by the existing
+        fresh credential. No image, container, configuration or alias can be
+        substituted when private recovery starts the application. This does not
+        grant authority, accept health, or permit any worker to consume.
+        """
+        from deployment.lib.completed_normal_admission import credential_witness
+        from deployment.lib.completed_normal_resources import ROLES,measured_spec_matches
+        path=self.root/'candidate-staged-runtime.json'
+        if not path.exists() or path.is_symlink():
+            raise RuntimeError('schema150_private_candidate_stage_required')
+        stage=private_json(path)
+        if (stage!=credential_witness('candidate_stage','candidate_stage_sha256')
+                or set(stage)!={'operation','context_sha256','source_sha','images','runtimes',
+                    'networks','worker_generation','origin_workers'}
+                or stage['operation']!=self.binding['operation']
+                or stage['context_sha256']!=self.binding['context_sha256']
+                or stage['source_sha']!=self.binding['source_sha']
+                or stage['images']!=self.contract['candidate']['images']
+                or not isinstance(stage['runtimes'],dict) or set(stage['runtimes'])!=set(ROLES)):
+            raise RuntimeError('schema150_private_candidate_stage_changed')
+        actual={row['Id']:row for row in (self._rows() if rows is None else rows)}
+        for role in ROLES:
+            record=self.inventory['containers'].get('candidate:'+role)
+            sealed=stage['runtimes'][role]
+            if (record is None or not isinstance(sealed,dict)
+                    or set(sealed)!={'id','image','spec_sha256','networks','network_aliases'}
+                    or any(sealed[k]!=record[k] for k in ('id','image','spec_sha256','networks'))):
+                raise RuntimeError('schema150_private_candidate_identity_changed')
+            row=actual.get(record['id'])
+            if (row is None or row.get('Image')!=sealed['image']
+                    or not measured_spec_matches(row,sealed['spec_sha256'],started_worker=role.endswith('-worker'))
+                    or {k:sorted(v.get('Aliases') or []) for k,v in row['NetworkSettings']['Networks'].items()}
+                        !={k:sorted(v) for k,v in sealed['network_aliases'].items()}):
+                raise RuntimeError('schema150_private_candidate_identity_changed')
+        return stage
 
     @staticmethod
     def _private_ports(row):
@@ -563,7 +605,7 @@ class Schema150ProviderAdapter:
         writer. No PID/name whitelist or extra migration executor is introduced.
         Operational profile registration remains a separate controller gate.
         """
-        from deployment.lib.migration_executor import Migration,LockedMigrationExecutor
+        from deployment.lib.migration_executor import Migration
         from deployment.lib.schema150_release import SQL_SHA256
         if (type(migration) is not Migration or type(migration.number) is not int
                 or migration.number not in SQL_SHA256
@@ -572,6 +614,14 @@ class Schema150ProviderAdapter:
                 or migration.compatibility!=('forward-compatible' if migration.number==148 else 'coordinated')):
             raise RuntimeError('schema150_provider_migration_contract_changed')
         self.require_authority(self.binding,purpose='observe_quiescence')
+        self._require_migration_session_lock(cursor)
+        from deployment.lib.schema150_provider_lifecycle import ProviderMaintenance150,ProtectedProviderJournal
+        lifecycle=ProviderMaintenance150(self.binding,ProtectedProviderJournal(self.root/'provider-journal'),self)
+        return lifecycle.migration_entry(migration.from_schema,migration.to_schema,cursor=cursor)
+
+    @staticmethod
+    def _require_migration_session_lock(cursor):
+        from deployment.lib.migration_executor import LockedMigrationExecutor
         key=LockedMigrationExecutor.LOCK_KEY
         cursor.execute("""select exists(select 1 from pg_catalog.pg_locks
             where locktype='advisory' and pid=pg_catalog.pg_backend_pid()
@@ -580,9 +630,13 @@ class Schema150ProviderAdapter:
             ((key>>32)&0xffffffff,key&0xffffffff))
         if cursor.fetchone()!=(True,):
             raise RuntimeError('schema150_provider_migration_lock_required')
+
+    def migration_completion_guard(self,cursor):
+        self.require_authority(self.binding,purpose='observe_quiescence')
+        self._require_migration_session_lock(cursor)
         from deployment.lib.schema150_provider_lifecycle import ProviderMaintenance150,ProtectedProviderJournal
         lifecycle=ProviderMaintenance150(self.binding,ProtectedProviderJournal(self.root/'provider-journal'),self)
-        return lifecycle.migration_entry(migration.from_schema,migration.to_schema,cursor=cursor)
+        return lifecycle.migration_complete(cursor=cursor)
 
     def observe_quiescence(self,binding,*,cursor=None):
         self.require_authority(binding,purpose='observe_quiescence');self._attest('fenced')
@@ -669,6 +723,11 @@ class Schema150ProviderAdapter:
             row=self._row(name)
             self._private_ports(row)
             self.runtime.command(['docker','start',row['Id']])
+        from deployment.lib.schema150_actor_inventory import PRIVATE_CANDIDATE_ROLES
+        if any(key.startswith('candidate:') for key in self.inventory['containers']):
+            self.verify_candidate_stage()
+            for logical in PRIVATE_CANDIDATE_ROLES:
+                self.runtime.command(['docker','start',self.inventory['containers'][logical]['id']])
 
     def verify_native_acceptance(self,binding,preimage):
         self.require_authority(binding,purpose='verify_native_acceptance')
@@ -681,16 +740,21 @@ class Schema150ProviderAdapter:
         # Existing accepted authority is verified, not created/replayed here.
         evidence=self.activation_guard(binding,private=False)
         if evidence.get('target_write_authority') is not True:raise RuntimeError('schema150_provider_target_authority_required')
-        for record in self.inventory['containers'].values():
-            if record['states']['active']['running'] and record['generation']=='candidate':
+        from deployment.lib.schema150_actor_inventory import WORKER_ROLES
+        for logical,record in self.inventory['containers'].items():
+            if logical.startswith('candidate:') and logical.split(':',1)[1] in WORKER_ROLES:
                 self.runtime.command(['docker','start',record['id']])
 
     def restore_ingress(self,binding,preimage):
         self.require_authority(binding,purpose='restore_ingress')
         if self.activation_guard(binding,private=False).get('target_write_authority') is not True:
             raise RuntimeError('schema150_provider_target_authority_required')
-        for record in self.inventory['containers'].values():
+        # The accepted private application and workers must already be running.
+        # Restore approved native supporting actors before exposing the proxy.
+        records=list(self.inventory['containers'].items())
+        for logical,record in sorted(records,key=lambda item:item[0]=='proxy'):
             if record['states']['active']['running'] and record['generation'] not in ('origin','fallback','canonical'):
+                if logical.startswith('candidate:'):continue
                 self.runtime.command(['docker','start',record['id']])
 
     def clear_boot_interlock(self,binding,preimage):

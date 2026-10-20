@@ -1,5 +1,22 @@
 # Madar production release acceptance policy
 
+## Final continuation: guarded private recovery and recovery locks
+
+Private recovery may start only the native provider trio and the exact sealed
+candidate Redis/backend/frontend. Every private candidate requires the existing
+fresh credential's stage witness plus root-private staged identities, images,
+configuration specs, networks and aliases. Queue workers and the proxy remain
+stopped. After independent target authority, only accepted workers start; the
+proxy is restored last. Inventory state alternatives alone cannot authorize a
+candidate. The existing SQL executor can additionally observe target protocols
+and quiescence on its still advisory-locked connection before completing its
+receipt. A failed final observation preserves committed SQL as forward repair.
+
+Forward resumption passes its actual held upgrade descriptor into the existing
+root credential window. Credential/lock cleanup failures still close the parent
+lock. These changes do not register150, authorize replay, implement a complete
+maintenance-first coordinator or certify a full privileged-system rehearsal.
+
 ## Final continuation: parent-owned maintenance SQL
 
 The existing coordinator now has a maintenance migration dispatch that borrows

@@ -191,7 +191,7 @@ class Schema150CutoverDatabaseTests(unittest.TestCase):
         fixture.driver.ops.release_deployment_lock.assert_not_called()
         self.assertFalse(fixture.driver.ops.authorization_file.exists())
         from deployment.lib.schema150_provider_lifecycle import ProtectedProviderJournal
-        self.assertEqual([r['payload']['schema'] for r in ProtectedProviderJournal(fixture.journal_root).read() if r['event']=='quiescence'],[146,147,148,149])
+        self.assertEqual([r['payload']['schema'] for r in ProtectedProviderJournal(fixture.journal_root).read() if r['event']=='quiescence'],[146,147,148,149,150])
 
     def test_forked_child_cannot_borrow_parent_lock_ownership_to_run_migration(self):
         fixture=self.parent_context()
@@ -245,5 +245,25 @@ class Schema150CutoverDatabaseTests(unittest.TestCase):
         state=json.loads((fixture.state/'migrations'/fixture.sha/'execution.json').read_bytes())
         self.assertEqual(state['status'],'failed')
         with self.assertRaisesRegex(RuntimeError,'provider_witness_changed'):fixture.run_parent()
+
+    def test_late_session_after150_commit_prevents_completed_receipt_and_activation(self):
+        fixture=self.parent_context();actor=fixture.actor
+        original=actor.migration_completion_guard
+        foreign=[]
+        def late_writer(cursor):
+            foreign.append(self.connect())
+            return original(cursor)
+        actor.migration_completion_guard=late_writer
+        try:
+            with self.assertRaisesRegex(RuntimeError,'completed_migration_error_RuntimeError'):fixture.run_parent()
+        finally:
+            for connection in foreign:connection.close()
+        with self.connect() as db:
+            self.assertEqual(db.execute("select schema_version from public.application_schema_state where contract_key='core'").fetchone()[0],150)
+            self.assertEqual(self.preserved(db),self.original)
+        state=json.loads((fixture.state/'migrations'/fixture.sha/'execution.json').read_bytes())
+        self.assertEqual((state['status'],state['observed_schema']),('failed',150))
+        self.assertEqual(json.loads((fixture.state/'state.json').read_bytes()),fixture.initial)
+        self.assertFalse(fixture.driver.ops.authorization_file.exists())
 
 if __name__=='__main__':unittest.main()

@@ -106,6 +106,33 @@ class MigrationExecutorTests(unittest.TestCase):
         self.assertEqual([row["status"] for row in persisted["migrations"]], ["applied", "applied"])
         self.assertTrue(connection.closed)
 
+    def test_completion_guard_observes_target_on_the_same_session_before_completed_receipt(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root=Path(temporary);repository,path,backup=self.fixture(root)
+            connection=FakeConnection();state_file=root/'execution.json';observed=[]
+            def complete(cursor):
+                observed.append(cursor.connection)
+                self.assertEqual(cursor.connection.schema,83)
+                self.assertFalse(cursor.connection.closed)
+                self.assertEqual(json.loads(state_file.read_bytes())['status'],'running')
+            result=LockedMigrationExecutor(connection_factory=lambda:connection,manifest=MigrationManifest.load(path,repository),
+                state_file=state_file,backup_dir=backup,backup_verifier=lambda _:None,completion_guard=complete).run()
+            self.assertEqual(observed,[connection]);self.assertEqual(result['status'],'completed')
+
+    def test_completion_guard_failure_preserves_committed_schema_and_consumes_attempt(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root=Path(temporary);repository,path,backup=self.fixture(root)
+            connection=FakeConnection();state_file=root/'execution.json'
+            executor=LockedMigrationExecutor(connection_factory=lambda:connection,
+                manifest=replace(MigrationManifest.load(path,repository),coordinated=True),
+                state_file=state_file,backup_dir=backup,backup_verifier=lambda _:None,migration_guard=lambda *args:None,
+                completion_guard=Mock(side_effect=RuntimeError('synthetic_target_boundary_changed')))
+            with self.assertRaisesRegex(RuntimeError,'target_boundary_changed'):executor.run()
+            state=json.loads(state_file.read_bytes())
+            self.assertEqual((state['status'],state['observed_schema']),('failed',83))
+            self.assertEqual(connection.schema,83);self.assertTrue(connection.closed)
+            with self.assertRaisesRegex(RuntimeError,'attempt_consumed'):executor.run()
+
     def test_schema_105_bridge_requires_backup_then_applies_only_106_through_108(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

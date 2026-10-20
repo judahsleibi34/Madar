@@ -672,8 +672,13 @@ class CompletedNormalUpgrade:
             self.failure(error)
             raise
         finally:
-            self.ops.clear_authorization();self.ops.close_locks()
-            if self.lock is not None:os.close(self.lock);self.lock=None
+            try:self.ops.clear_authorization()
+            finally:
+                try:self.ops.close_locks()
+                finally:
+                    try:
+                        if self.lock is not None:os.close(self.lock)
+                    finally:self.lock=None
 
     def complete_application(self, handoff, kernel):
         """The existing handoff at144, with no migration intent or SQL child.

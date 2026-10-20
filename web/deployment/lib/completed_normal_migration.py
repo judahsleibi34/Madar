@@ -287,7 +287,9 @@ def run_migration(contract,release_root,state_root,operations,*,parent=None,prov
     # Never overwrite a failed/completed executor record on automatic retry.
     if execution.exists():raise RuntimeError('completed_migration_attempt_already_consumed')
     extra={}
-    if private:extra['migration_guard']=provider_adapter.migration_guard
+    if private:
+        extra.update(migration_guard=provider_adapter.migration_guard,
+            completion_guard=provider_adapter.migration_completion_guard)
     if selected in (FENCED, OUTBOX):
         from deployment.lib.schema148_release import migration_guard,consumer_inventory,live_consumer_inventory
         policy=witness['notification_cutover']

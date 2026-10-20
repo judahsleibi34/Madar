@@ -229,6 +229,11 @@ class ProviderMaintenance150:
                 raise RuntimeError('schema150_provider_migration_order')
             return self._quiescence(source,cursor=cursor)
 
+    def migration_complete(self,*,cursor):
+        """Observe committed150 while the existing executor still owns its lock."""
+        with self._locked():
+            return self._quiescence(150,cursor=cursor)
+
     def prepare_private_activation(self):
         """Restore original roles/private providers while target grant is absent.
 

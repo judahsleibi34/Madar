@@ -39,6 +39,7 @@ class ConcreteAdapterTests(unittest.TestCase):
         actor.binding, actor.inventory, actor.root = scope, data, root
         actor.contract = {'rehearsal_sha256': '8'*64, 'database': {'container_id': data['containers']['native:db']['id'],
                           'image': data['containers']['native:db']['image']}}
+        actor.contract['candidate']={'images':{'backend':'sha256:'+'e'*64,'frontend':'sha256:'+'e'*64}}
         actor.barrier = root/'provider-barrier.json'
         actor.dropin_name = '99zzzzzz-schema150-'+scope['context_sha256'][:12]+'.conf'
         actor.runtime = Mock(); actor.runtime.command.side_effect = AssertionError('synthetic transport not configured')
@@ -80,6 +81,17 @@ class ConcreteAdapterTests(unittest.TestCase):
         actor._verify_barrier = Mock(side_effect=lambda: None if actor.barrier.exists() else
                                      (_ for _ in ()).throw(RuntimeError('fixture_persistent_barrier_missing')))
         if stage != 'prepared': actor.barrier.write_text('{}')
+        if candidates:
+            candidate_stage={'operation':scope['operation'],'context_sha256':scope['context_sha256'],
+                'source_sha':scope['source_sha'],'images':actor.contract['candidate']['images'],
+                'runtimes':{role:{**{k:data['containers']['candidate:'+role][k] for k in
+                    ('id','image','spec_sha256','networks')},'network_aliases':{
+                        k:v.get('Aliases') or [] for k,v in next(r for r in observed
+                            if r['Id']==data['containers']['candidate:'+role]['id'])['NetworkSettings']['Networks'].items()}}
+                    for role in inventory.APP_ROLES},
+                'networks':{},'worker_generation':'f'*64,'origin_workers':[]}
+            (root/'candidate-staged-runtime.json').write_text(json.dumps(candidate_stage))
+            stack.enter_context(patch('deployment.lib.completed_normal_admission.credential_witness',return_value=copy.deepcopy(candidate_stage)))
         return actor, scope, preimage, journal
 
     def test_internal_sql_pins_catalog_before_role_or_quiescence_observation(self):
@@ -453,16 +465,62 @@ class ConcreteAdapterTests(unittest.TestCase):
                 actor.require_authority(scope,purpose=purpose)
         actor.runtime.command.assert_not_called()
 
-    def test_private_provider_boundary_allows_exact_private_providers_but_no_candidate_extension(self):
+    def test_private_provider_boundary_requires_independent_stage_for_candidate_extension(self):
         actor,scope,_,_=self.component(stage='private')
         actor.require_authority(scope,purpose='prepare_private_activation')
         candidate,other_scope,_,_=self.component(stage='private',candidates=True)
-        # The optional initial inventory is not an independently sealed future
-        # candidate extension; private candidate activation remains deliberately
-        # blocked rather than borrowing caller PASS evidence.
-        with self.assertRaisesRegex(RuntimeError,'actor_state_changed'):
+        candidate.require_authority(other_scope,purpose='prepare_private_activation')
+        (candidate.root/'candidate-staged-runtime.json').unlink()
+        with self.assertRaisesRegex(RuntimeError,'private_candidate_stage_required'):
             candidate.require_authority(other_scope,purpose='prepare_private_activation')
         actor.runtime.command.assert_not_called();candidate.runtime.command.assert_not_called()
+
+    def test_private_candidate_stage_rejects_substituted_source_container_spec_or_alias(self):
+        actor,scope,_,_=self.component(stage='private',candidates=True)
+        original=copy.deepcopy(actor._rows.return_value)
+        candidate=next(r for r in actor._rows.return_value if r['Id']==actor.inventory['containers']['candidate:backend']['id'])
+        for mutate in (lambda:candidate.update(Id='f'*64),lambda:candidate['Config']['Env'].append('SUBSTITUTED=1'),
+                lambda:next(iter(candidate['NetworkSettings']['Networks'].values())).update(Aliases=['foreign'])):
+            mutate()
+            with self.assertRaisesRegex(RuntimeError,'private_candidate_identity_changed'):
+                actor.require_authority(scope,purpose='prepare_private_activation')
+            actor._rows.return_value=copy.deepcopy(original)
+            candidate=next(r for r in actor._rows.return_value if r['Id']==actor.inventory['containers']['candidate:backend']['id'])
+
+    def test_private_resume_starts_only_provider_trio_then_sealed_app_without_workers_or_proxy(self):
+        actor,scope,preimage,_=self.component(stage='fenced',candidates=True)
+        actor._roles=Mock(return_value={});actor._expected_roles=Mock(return_value={})
+        by_id={r['Id']:r for r in actor._rows.return_value}
+        def start(arguments):
+            self.assertEqual(arguments[:2],['docker','start']);by_id[arguments[2]]['State']['Running']=True
+        actor.runtime.command.side_effect=start
+        actor.resume_providers_private(scope,preimage)
+        expected=['native:auth','native:rest','native:storage','candidate:redis','candidate:backend','candidate:frontend']
+        self.assertEqual([c.args[0][2] for c in actor.runtime.command.call_args_list],
+            [actor.inventory['containers'][key]['id'] for key in expected])
+        actor._attest('private')
+        self.assertTrue(all(not by_id[record['id']]['State']['Running'] for logical,record in actor.inventory['containers'].items()
+            if logical=='proxy' or logical.startswith('candidate:') and logical.split(':',1)[1] in inventory.WORKER_ROLES))
+
+    def test_private_start_failure_does_not_continue_to_application_or_ingress(self):
+        actor,scope,preimage,_=self.component(stage='fenced',candidates=True)
+        actor._roles=Mock(return_value={});actor._expected_roles=Mock(return_value={})
+        actor.runtime.command.side_effect=RuntimeError('synthetic_provider_start_failed')
+        with self.assertRaisesRegex(RuntimeError,'provider_start_failed'):actor.resume_providers_private(scope,preimage)
+        self.assertEqual(actor.runtime.command.call_count,1)
+
+    def test_activation_starts_only_workers_then_supporting_native_actors_and_proxy_last(self):
+        actor,scope,preimage,_=self.component(stage='private',candidates=True)
+        actor.require_authority=Mock();actor.activation_guard.return_value={'target_write_authority':True}
+        actor.runtime.command.side_effect=None
+        actor.resume_accepted_workers(scope,preimage)
+        workers={record['id'] for logical,record in actor.inventory['containers'].items()
+            if logical.startswith('candidate:') and logical.split(':',1)[1] in inventory.WORKER_ROLES}
+        self.assertEqual({c.args[0][2] for c in actor.runtime.command.call_args_list},workers)
+        actor.runtime.command.reset_mock();actor.restore_ingress(scope,preimage)
+        started=[c.args[0][2] for c in actor.runtime.command.call_args_list]
+        self.assertEqual(started[-1],actor.inventory['containers']['proxy']['id'])
+        self.assertFalse(set(started)&{r['id'] for r in actor.inventory['containers'].values() if r['generation']=='candidate'})
 
     def test_provider_resume_refuses_published_ports_even_with_injected_original_roles(self):
         actor,scope,preimage,_=self.component(stage='fenced')

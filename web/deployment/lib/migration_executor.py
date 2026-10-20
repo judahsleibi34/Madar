@@ -129,6 +129,7 @@ class LockedMigrationExecutor:
         backup_verifier: Callable[[Path], None],
         failure_formatter: Callable[[Exception], str] | None = None,
         migration_guard: Callable[[Any, Migration], None] | None = None,
+        completion_guard: Callable[[Any], None] | None = None,
     ):
         self.connection_factory = connection_factory
         self.manifest = manifest
@@ -139,6 +140,9 @@ class LockedMigrationExecutor:
         if manifest.coordinated and not callable(migration_guard):
             raise RuntimeError('coordinated_migration_guard_required')
         self.migration_guard = migration_guard
+        if completion_guard is not None and not callable(completion_guard):
+            raise RuntimeError('migration_completion_guard_invalid')
+        self.completion_guard = completion_guard
 
     @staticmethod
     def _schema(cursor: Any) -> int:
@@ -253,6 +257,12 @@ class LockedMigrationExecutor:
                     atomic_json(self.state_file, state)
                 if current != target:
                     raise RuntimeError(f"target_schema_not_reached:{current}")
+                # Final live protocols/quiescence must be observed on the same
+                # advisory-locked session before a completed receipt is sealed.
+                # Failure after a SQL COMMIT is a forward-repair state, never
+                # permission to replay the already advanced database.
+                if self.completion_guard is not None:
+                    self.completion_guard(cursor)
                 state.update(status="completed", phase="complete", completed_at=utc_now())
                 atomic_json(self.state_file, state)
                 return state
