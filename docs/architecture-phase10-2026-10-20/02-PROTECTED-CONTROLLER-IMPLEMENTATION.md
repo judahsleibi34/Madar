@@ -28,3 +28,17 @@ existing locked executor over full published146-origin SQL fixtures. Seven cases
 verify selected original rows, grants/protocols, four lost commit acknowledgements
 and actual process exits after147/150. Authorization and host/backup/activation
 remain MODEL boundaries; this does not satisfy the full privileged release gate.
+
+## Runtime lock ownership mismatch
+
+Source review and four real-filesystem staging cases confirmed that the old
+provider verifier demanded root ownership for the deployment lock and its entire
+ancestry, while the existing deployment service runs asmadar and creates/opens
+that private runtime lock underUMask0077. Only the fixed deployment-lock path now
+uses the existing readonly_configuration operator-owned runtime-file rule. All
+other lock paths remain root-private. Regular-file, inode and actual process
+flock checks remain mandatory. The tests reject unsafe modes, symlinks, replaced
+inodes and an unlocked descriptor; four cases passed under actual staging file
+metadata. The operator-name mapping is a test fixture, not an installed account
+or production authority. The new native CI step exercises these four cases on
+the disposable runner. Container tests lacking an owned home skip them explicitly.

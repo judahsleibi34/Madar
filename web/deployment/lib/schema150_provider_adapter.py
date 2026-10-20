@@ -12,6 +12,7 @@ import json
 import os
 from pathlib import Path
 import re
+import stat
 import time
 from urllib.parse import urlsplit, unquote, parse_qs
 from urllib.error import HTTPError
@@ -22,7 +23,7 @@ from deployment.lib.completed_normal_admission import (ADMISSIONS, digest as con
 from deployment.lib.completed_normal_profile import DELETION
 from deployment.lib.control_plane_upgrade_authorization import require_upgrade_authorization, UPGRADE_INTERLOCK
 from deployment.lib.emergency_routing_repair import exclusive
-from deployment.lib.provider_recovery_runtime import protected
+from deployment.lib.provider_recovery_runtime import protected,readonly_configuration
 from deployment.lib.schema150_provider_lifecycle import (validate_binding, digest, encoded, STEPS,
     FENCE_STEPS, PRIVATE_STEPS, ACTIVATE_STEPS)
 from deployment.lib.schema150_release import QUIESCENCE_SQL, BACKGROUND_WRITER_SQL, require_target_protocols
@@ -57,9 +58,14 @@ def require_owned_lock(descriptor, path):
     """Observe an already owned flock; never acquire a missing coordinator lock."""
     if type(descriptor) is not int or descriptor < 0:
         raise RuntimeError('schema150_provider_coordinator_lock_required')
-    source = protected(path, private=True)
+    # deploy.lock is the existing User=madar release service's private runtime
+    # file, not a root credential/journal. Only this fixed role uses the existing
+    # operator-owned runtime-file trust contract. The upgrade lock and every
+    # other path retain root-private ownership and ancestry requirements.
+    source = (readonly_configuration(path,private=True) if Path(path)==LOCKS[1]
+              else protected(path,private=True))
     current, expected = os.fstat(descriptor), source.stat()
-    if (current.st_dev, current.st_ino) != (expected.st_dev, expected.st_ino):
+    if not stat.S_ISREG(current.st_mode) or (current.st_dev, current.st_ino) != (expected.st_dev, expected.st_ino):
         raise RuntimeError('schema150_provider_coordinator_lock_changed')
     records = Path('/proc/self/fdinfo/' + str(descriptor)).read_text().splitlines()
     if not any(re.search(r'\bFLOCK\s+ADVISORY\s+WRITE\s+' + str(os.getpid()) + r'\s+', row)

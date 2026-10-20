@@ -59,6 +59,10 @@ jobs:
         run: timeout 2m bash web/scripts/rehearse_migration_policy.sh
       - name: Native maintenance backup and independent owner/ACL restore
         run: timeout 5m python3 web/staging/integration/phase9_maintenance_backup.py REHEARSE
+      - name: Native runtime lock ownership and inode checks
+        env:
+          PYTHONPATH: web:web/backend/tests
+        run: timeout 1m python3 -m unittest test_schema150_lock_ownership -v
       - name: Preserve preparation evidence without deployment authority
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:

@@ -2,6 +2,15 @@
 
 ## Phase X backup-to-migration evidence boundary
 
+The fixed deployment lock is a private operator-owned runtime file used by the
+existing User=madar service (UMask0077). Its verifier uses the established
+operator-owned runtime-file ownership/ancestry rule only for that exact fixed
+path. It still requires a regular file, the same live inode and an exclusive
+flock held by the current process. Upgrade locks, credentials, journals and
+executable paths retain root protection. Unknown paths, replaced inodes, unsafe
+modes, symlinks and unheld locks reject. Native CI tests real file metadata under
+an explicitly synthetic operator-name fixture; no operational file is changed.
+
 Root credential windows must own both the existing upgrade lock and deployment
 lock before requesting authority. After a deployment service returns, root
 reacquires deploy.lock for its provider/backup/runtime stage and releases only
