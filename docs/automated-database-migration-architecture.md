@@ -1,5 +1,18 @@
 # Automated database migration architecture
 
+## Final continuation: parent-owned maintenance SQL
+
+The existing coordinator now has a maintenance migration dispatch that borrows
+its actually owned upgrade/deployment locks and calls the existing migration
+executor on the same process/session as the concrete provider guard. Historical
+bridge operations retain their User=madar service path. No runtime-mutating CLI
+is invoked as root. The maintenance SQL path verifies the root-sealed stopped
+candidate against the measured model and fresh credential, binds the fenced
+provider journal to the existing backup witness, and leaves ordinary active-slot,
+worker and proxy state unchanged. Errors never replay SQL or imply activation.
+Operational150 profile/manifest admission remains blocked; this integration edge
+alone is not a complete maintenance-first operation or independent authorization.
+
 ## Phase X backup-to-migration evidence boundary
 
 The fixed deployment lock is a private operator-owned runtime file used by the

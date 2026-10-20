@@ -102,6 +102,49 @@ class RuntimeModelTests(unittest.TestCase):
         endpoint=next(iter(row['NetworkSettings']['Networks'].values()));endpoint['NetworkID']='unexpected'
         with self.assertRaisesRegex(RuntimeError,'network_role_changed'):
             m.validate_model(self.contract,self.model,self.runtime,phase='staged')
+
+    def fenced(self):
+        for role in ROLES:
+            row=self.rows[self.selected['containers'][role]]
+            row['State']={'Running':False,'Restarting':False,'Status':'created' if role in m.BUSINESS else 'exited'}
+            for endpoint in row['NetworkSettings']['Networks'].values():
+                endpoint.update(IPAddress='',EndpointID='')
+        return m.validate_model(self.contract,self.model,self.runtime,phase='fenced')
+
+    def test_fenced_model_validates_every_stopped_role_without_probing_public_health(self):
+        bindings,_=self.fenced()
+        self.assertEqual(set(bindings),set(ROLES))
+        with self.assertRaisesRegex(RuntimeError,'not_running'):self.validate()
+
+    def test_fenced_candidate_rejects_any_running_restarting_or_ambiguous_role(self):
+        self.fenced()
+        for role in ROLES:
+            row=self.rows[self.selected['containers'][role]];original=copy.deepcopy(row['State'])
+            for change in ({'Running':True},{'Restarting':True},{'Status':'paused'},
+                    {'Status':'removing'},{'Running':None},{'Restarting':None}):
+                row['State'].update(change)
+                with self.subTest(role=role,change=change),self.assertRaisesRegex(RuntimeError,'fenced_candidate_started'):
+                    m.validate_model(self.contract,self.model,self.runtime,phase='fenced')
+                row['State']=copy.deepcopy(original)
+
+    def test_fenced_candidate_retains_full_image_configuration_and_security_validation(self):
+        self.fenced();row=self.rows[self.selected['containers']['backend']];original=copy.deepcopy(row)
+        for change in (lambda:row.update(Image='sha256:'+'f'*64),
+                lambda:row['Config']['Env'].append('UNAPPROVED=1'),
+                lambda:row['HostConfig'].update(Privileged=True),
+                lambda:row['HostConfig']['RestartPolicy'].update(Name='always')):
+            change()
+            with self.assertRaises(RuntimeError):m.validate_model(self.contract,self.model,self.runtime,phase='fenced')
+            row.clear();row.update(copy.deepcopy(original))
+
+    def test_fenced_candidate_rejects_live_or_substituted_network_endpoints(self):
+        self.fenced();row=self.rows[self.selected['containers']['backend']]
+        endpoint=next(iter(row['NetworkSettings']['Networks'].values()));original=copy.deepcopy(endpoint)
+        for change in ({'IPAddress':'10.249.4.2'},{'EndpointID':'live-endpoint'},{'NetworkID':'substituted'}):
+            endpoint.update(change)
+            with self.assertRaisesRegex(RuntimeError,'network_role_changed'):
+                m.validate_model(self.contract,self.model,self.runtime,phase='fenced')
+            endpoint.clear();endpoint.update(original)
     def test_unapproved_environment_command_user_or_mount_never_becomes_trusted_hash(self):
         row=self.rows[self.selected['containers']['backend']];original=copy.deepcopy(row)
         for mutate in (lambda r:r['Config']['Env'].append('UNAPPROVED=1'),lambda r:r['Config'].update(User='0:0'),

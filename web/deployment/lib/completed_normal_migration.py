@@ -151,37 +151,115 @@ def connection_factory(contract):
         if isinstance(error,RuntimeError):raise
         raise RuntimeError('completed_migration_database_connection_failed_'+type(error).__name__) from None
 
-def run_migration(contract,release_root,state_root,operations):
-    """Actual madar deployment child; called only by explicit migrate stage."""
+def _parent_migration_binding(parent,provider,contract,release_root,state_root):
+    """Bind the existing executor to its root coordinator, never a child packet.
+
+    Operational admission is still required by run_migration. This check does
+    not register150, supply authority, or accept a replacement SQL/backup path.
+    The parent executes only the governed SQL; runtime promotion remains in the
+    existing madar service. In particular, this path never adopts a candidate.
+    """
+    from deployment.lib.completed_normal_execution import CompletedNormalUpgrade
+    from deployment.lib.completed_normal_profile import DELETION
+    from deployment.lib.schema150_provider_adapter import Schema150ProviderAdapter,require_owned_lock
+    if (os.geteuid()!=0 or type(parent) is not CompletedNormalUpgrade
+            or type(provider) is not Schema150ProviderAdapter
+            or parent.profile is not DELETION or parent.contract!=contract
+            or provider.contract!=contract or provider.runtime is not parent.actor.runtime
+            or parent.root!=provider.root or parent.root!=ADMISSIONS/digest(contract)
+            or Path(state_root)!=parent.ops.state_root
+            or Path(release_root)!=Path(state_root)/'releases'/contract['candidate']['source_sha']
+            or provider.lock_descriptors!=(parent.lock,parent.ops.deploy_lock_descriptor)):
+        raise RuntimeError('completed_migration_parent_binding_invalid')
+    require_owned_lock(parent.lock,parent.ops.upgrade_root/'upgrade.lock')
+    require_owned_lock(parent.ops.deploy_lock_descriptor,Path(state_root)/'deploy.lock')
+    parent.actor.guard();parent.artifact_guard()
+    provider.require_authority(provider.binding,purpose='observe_quiescence')
+
+
+def _private_migration_candidate(parent,provider,contract,state_root,witness):
+    """Reobserve exact stopped containers against the independently sealed model."""
+    from deployment.lib.completed_normal_runtime import validate_model
+    from deployment.lib.schema150_provider_lifecycle import (ProviderMaintenance150,
+        ProtectedProviderJournal,FENCE_STEPS)
+    from deployment.lib.completed_normal_resources import ROLES
+    parent.actor.guard()
+    require_candidate_authority(contract,mode='READ_ONLY')
+    provider.require_authority(provider.binding,purpose='observe_quiescence')
+    lifecycle=ProviderMaintenance150(provider.binding,ProtectedProviderJournal(provider.root/'provider-journal'),provider)
+    with lifecycle._locked():
+        records,completed,pending,ready=lifecycle._state()
+        # These are completed_normal_backup's credential witness hashes, not
+        # the provider journal's distinct compact hash-chain encoding.
+        expected={'version':1,'binding':provider.binding,'journal_sha256':digest(records),
+            'preimage_sha256':digest(records[0]['payload']['preimage'])} if records else None
+        if pending or ready or completed!=list(FENCE_STEPS) or witness.get('provider_maintenance')!=expected:
+            raise RuntimeError('completed_migration_provider_witness_changed')
+    stage=json.loads(protected(parent.root/'candidate-staged-runtime.json',private=True).read_bytes())
+    credential=credential_witness('candidate_stage','candidate_stage_sha256')
+    if (stage!=credential or set(stage)!={'operation','context_sha256','source_sha','images','runtimes',
+            'networks','worker_generation','origin_workers'}
+            or stage['operation']!=parent.profile.operation or stage['context_sha256']!=digest(contract)
+            or stage['source_sha']!=contract['candidate']['source_sha'] or stage['images']!=contract['candidate']['images']
+            or not isinstance(stage['runtimes'],dict) or set(stage['runtimes'])!=set(ROLES)):
+        raise RuntimeError('completed_migration_private_stage_changed')
+    runtimes,networks=validate_model(contract,parent.model_loader(),provider.runtime,phase='fenced')
+    if stage['runtimes']!=runtimes or stage['networks']!=networks:
+        raise RuntimeError('completed_migration_private_candidate_changed')
+    provider.observe_quiescence(provider.binding)
+    parent.actor.guard()
+
+
+def run_migration(contract,release_root,state_root,operations,*,parent=None,provider_adapter=None):
+    """Existing SQL executor, from the madar child or the protected150 parent.
+
+    A maintenance parent owns both coordinator locks for the entire SQL window.
+    It validates a sealed stopped candidate instead of making it public NORMAL
+    or known-good. No caller flag, preparation profile or fake receipt admits150.
+    """
     require_fresh_authorization(contract)
     selected=profile(contract)
+    from deployment.lib.completed_normal_profile import DELETION
+    private=parent is not None or provider_adapter is not None
+    if private:
+        _parent_migration_binding(parent,provider_adapter,contract,release_root,state_root)
+    elif selected is DELETION:
+        raise RuntimeError('completed_migration_maintenance_parent_required')
     require_candidate_authority(contract,mode='READ_ONLY')
     sha=contract['candidate']['source_sha'];release_root=Path(release_root);state_root=Path(state_root)
     witness=credential_witness('migration_inputs','migration_inputs_sha256')
     if (set(witness)!={'intent','backup','backup_manifest_sha256','backup_checksums_sha256',
-            'restore_execution_sha256','replica_execution_sha256'} | ({'notification_cutover'} if selected in (FENCED, OUTBOX) else set()) | ({'provider_maintenance'} if selected is OUTBOX else set()) or witness['intent']!=intent_document(contract)
+            'restore_execution_sha256','replica_execution_sha256'} | ({'notification_cutover'} if selected in (FENCED, OUTBOX) else set()) | ({'provider_maintenance'} if selected is OUTBOX else set()) | ({'provider_maintenance','maintenance_manifest_sha256'} if private else set()) or witness['intent']!=intent_document(contract)
             or any(not isinstance(witness[k],str) or len(witness[k])!=64 or any(c not in '0123456789abcdef' for c in witness[k])
                 for k in ('backup_manifest_sha256','backup_checksums_sha256','restore_execution_sha256','replica_execution_sha256'))):
         raise RuntimeError('completed_migration_inputs_invalid')
     state=json.loads(readonly_configuration(state_root/'state.json',private=True).read_text())
     known=state.get('known_good_release') or {}
-    if (state.get('active_slot')!=contract['candidate']['slot'] or known.get('slot')!=state['active_slot']
-            or known.get('sha')!=sha or state.get('in_progress_release') or state.get('rollback_failure')):
+    expected_slot=contract['origin']['slot'] if private else contract['candidate']['slot']
+    expected_sha=contract['source_roles']['application_sha'] if private else sha
+    if (state.get('active_slot')!=expected_slot or known.get('slot')!=state['active_slot']
+            or known.get('sha')!=expected_sha or state.get('in_progress_release') or state.get('rollback_failure')):
         raise RuntimeError('completed_migration_bridge_not_known_good')
     if not selected.supports(operations.schema_version()):raise RuntimeError('completed_migration_native_schema_invalid')
     from deployment.lib.emergency_routing_repair import Runtime
     runtime=Runtime();base='http://127.0.0.1:'+('8201' if state['active_slot']=='green' else '8101')
-    version=runtime.json_http(base+'/health/version')
-    if (version.get('release_sha')!=sha or version.get('release_slot')!=state['active_slot']
+    if private:
+        _private_migration_candidate(parent,provider_adapter,contract,state_root,witness)
+    else:
+        version=runtime.json_http(base+'/health/version')
+        if (version.get('release_sha')!=sha or version.get('release_slot')!=state['active_slot']
             or version.get('schema_compatible_min')!=selected.source or version.get('schema_compatible_max')!=selected.target
             or tuple(version.get('schema_excluded_versions',[]))!=selected.excluded
             or runtime.json_http(base+'/health/recovery')!={'restricted':True,'business_writes_enabled':False}):
-        raise RuntimeError('completed_migration_actual_bridge_fence_changed')
-    operations.validate_candidate_core(sha,state['active_slot'])
+            raise RuntimeError('completed_migration_actual_bridge_fence_changed')
+        operations.validate_candidate_core(sha,state['active_slot'])
     path=release_root/'web/deployment/releases'/selected.manifest
     if file_digest(readonly_configuration(path,private=False))!=contract['migration_manifest_sha256']:
         raise RuntimeError('completed_migration_manifest_changed')
-    if selected is OUTBOX:
+    if private:
+        from deployment.lib.schema150_release import admitted_manifest
+        manifest=admitted_manifest(release_root,contract)
+    elif selected is OUTBOX:
         from deployment.lib.schema149_release import admitted_manifest
         manifest=admitted_manifest(release_root,contract)
     elif selected is FENCED:
@@ -209,6 +287,7 @@ def run_migration(contract,release_root,state_root,operations):
     # Never overwrite a failed/completed executor record on automatic retry.
     if execution.exists():raise RuntimeError('completed_migration_attempt_already_consumed')
     extra={}
+    if private:extra['migration_guard']=provider_adapter.migration_guard
     if selected in (FENCED, OUTBOX):
         from deployment.lib.schema148_release import migration_guard,consumer_inventory,live_consumer_inventory
         policy=witness['notification_cutover']
@@ -242,6 +321,15 @@ def run_migration(contract,release_root,state_root,operations):
         # phase/checksum in the durable executor; emit only the exception type.
         raise RuntimeError('completed_migration_error_'+type(error).__name__) from None
     if operations.schema_version()!=selected.target:raise RuntimeError('completed_migration_target_not_observed')
+    if private:
+        # The old runtime is still the recorded active slot, but is fenced and
+        # incompatible. Never relabel it as schema150, start providers, publish
+        # a route, consume queues or grant writes here. The root coordinator
+        # must perform private recovery and its independent handoff separately.
+        _parent_migration_binding(parent,provider_adapter,contract,release_root,state_root)
+        if json.loads(readonly_configuration(state_root/'state.json',private=True).read_text())!=state:
+            raise RuntimeError('completed_migration_release_changed_during_execution')
+        return result
     if selected.maintenance:
         #144 must become visible to the already-running native PostgREST too.
         # This cache notification changes no customer rows or SQL checksums.

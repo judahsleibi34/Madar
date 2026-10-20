@@ -45,7 +45,7 @@ def _duration(value):
     return round(sum(float(n)*units[u] for n,u in parts))
 
 def validate_model(contract,model,runtime, *, phase='running'):
-    if phase not in {'staged','running'}:
+    if phase not in {'staged','running','fenced'}:
         raise RuntimeError('completed_runtime_lifecycle_invalid')
     validate_contract(contract)
     release=profile(contract)
@@ -88,14 +88,18 @@ def validate_model(contract,model,runtime, *, phase='running'):
         image=contract['candidate']['redis_image'] if role=='redis' else contract['candidate']['images']['frontend' if role=='frontend' else 'backend']
         if row is not None:
             state=row['State']
-            if phase=='staged' and role in BUSINESS:
+            if phase=='fenced':
+                if (state.get('Running') is not False or state.get('Restarting') is not False
+                        or state.get('Status') not in {'created','exited'}):
+                    raise RuntimeError('completed_runtime_fenced_candidate_started')
+            elif phase=='staged' and role in BUSINESS:
                 if state.get('Running') or state.get('Status')!='created':
                     raise RuntimeError('completed_runtime_standby_started')
             elif not state.get('Running'):
                 raise RuntimeError('completed_runtime_service_not_running')
         if row is None or row['Image']!=image:
             raise RuntimeError('completed_runtime_running_identity_changed')
-        if not (phase=='staged' and role in BUSINESS):
+        if phase!='fenced' and not (phase=='staged' and role in BUSINESS):
             health=row['State'].get('Health',{}).get('Status')
             if health not in {'healthy','starting'}:
                 raise RuntimeError('completed_runtime_running_identity_changed')
@@ -176,7 +180,7 @@ def validate_model(contract,model,runtime, *, phase='running'):
             net=model['networks'][key]['name'];definition=definition or {}
             aliases=sorted({name,role,*definition.get('aliases',[])})
             endpoint=attached[net]
-            declared_only=phase=='staged' and role in BUSINESS
+            declared_only=phase=='fenced' or (phase=='staged' and role in BUSINESS)
             attachment_ok=(endpoint.get('NetworkID')==network_ids[net] and bool(endpoint.get('IPAddress')))
             if declared_only:
                 attachment_ok=(endpoint.get('NetworkID') in {'',network_ids[net]}

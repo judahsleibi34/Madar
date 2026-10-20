@@ -419,6 +419,34 @@ class CompletedNormalUpgrade:
             completed_normal_contract=self.contract,completed_normal_mode=mode)
         self.event('service_'+mode+'_completed')
 
+    def migrate(self,*,provider_adapter=None):
+        """Keep governed150 SQL in the coordinator's real lock/credential window.
+
+        Historical bridge releases retain their madar service path.150 is still
+        unregistered: neither this method nor an adapter can admit the operation.
+        Its maintenance-first caller must supply the concrete, already fenced
+        actor. Runtime activation/state mutation never runs in this root stage.
+        """
+        from deployment.lib.completed_normal_profile import DELETION
+        from deployment.lib.schema150_provider_adapter import Schema150ProviderAdapter
+        if self.profile is not DELETION:
+            if provider_adapter is not None:
+                raise RuntimeError('completed_migration_parent_profile_invalid')
+            return self.service('migrate')
+        if (type(provider_adapter) is not Schema150ProviderAdapter
+                or provider_adapter.contract!=self.contract or provider_adapter.runtime is not self.actor.runtime):
+            raise RuntimeError('completed_migration_concrete_provider_required')
+        from types import SimpleNamespace
+        from deployment.lib.completed_normal_migration import run_migration
+        with self.root_credential():
+            self.event('parent_migration_pending')
+            operations=SimpleNamespace(schema_version=self.actor.native,
+                recovery_helper_root=lambda:self.ops.control_root/'scripts')
+            result=run_migration(self.contract,self.ops.state_root/'releases'/self.contract['candidate']['source_sha'],
+                self.ops.state_root,operations,parent=self,provider_adapter=provider_adapter)
+            self.event('parent_migration_completed',schema=self.actor.native())
+            return result
+
     def install_controller(self):
         self.actor.source();self.actor.installation.installed()
         selection=self.document.get('immutable_release_selection')
@@ -604,7 +632,7 @@ class CompletedNormalUpgrade:
                 exclusive(self.root/'pre-migration-customer-snapshot.json',encoded(customers))
                 seal_intent(self.contract,source_guard=self.actor.guard,runtime_guard=self.actor.native,
                     backup_guard=lambda:backup.guard())
-            self.service('migrate')
+            self.migrate()
             with self.root_credential():
                 self.event('migration_customer_preservation_pending')
                 original=json.loads(protected(self.root/'pre-migration-customer-snapshot.json',private=True).read_text())
