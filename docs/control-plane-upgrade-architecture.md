@@ -1,5 +1,22 @@
 # Privileged control-plane upgrade architecture
 
+## Phase VIII original-role backup input
+
+The maintenance role input adapter captures the existing concrete provider
+actor's original role archive only under its fresh authority, held locks, exact
+source/inventory/cluster and complete fenced-journal checks. It serializes with
+the existing provider journal. It publishes one root-private append-only input
+under the same admission, with a last-written completion marker; interrupted
+partial publication is retained and refuses automatic replay. Authenticated reads
+return captured bytes, never a pathname to reopen for SQL execution.
+
+This is not backup completion, restore authority or operational registration.
+The ordinary backup currently uses live Storage HTTP and a role-name-only logical
+restore. A maintenance-aware database/object capture, full original-role/grant
+restore, replica and candidate/handoff/boot integration remain necessary. The
+schema150 profile remains unregistered. Historical backups and receipts are not
+rewritten, and no production installation or automation activation is authorized.
+
 ## Phase VI schema150 integration boundary
 
 A separate source preparation constant describes version7 exact146→150. It is

@@ -1,5 +1,15 @@
 # Madar production release acceptance policy
 
+## Phase VIII maintenance backup inputs
+
+Original role state must come from the authenticated pre-fence provider journal,
+not a new dump of temporary NOLOGIN attributes. The new original-role input
+adapter is subordinate to the existing protected operation and cannot publish a
+backup success, LATEST marker, replica result or write authority. It must be part
+of the measured installed/frozen source inventory. Partial input publication is
+not replayable automatically. Actual full original-role/database/object restore
+and replica proof remain mandatory; input generation does not admit schema150.
+
 ## Phase VII reviewed source and isolated privileged acceptance
 
 The exact privileged-client inventory check is mandatory in backend CI on the
