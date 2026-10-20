@@ -125,20 +125,22 @@ class DeletionAdmissionPreparationTests(unittest.TestCase):
 
     def test_actual_protocol_results_not_just_function_presence_are_checked(self):
         class Cursor:
-            def __init__(self, observation, protocols):
+            def __init__(self, observation, protocols, isolation='read committed'):
                 self.observation, self.protocols, self.calls = observation, protocols, []
+                self.isolation = isolation
             def execute(self, sql, args=None):
                 self.calls.append((sql, args))
-                if sql=='select pg_catalog.pg_stat_clear_snapshot()':self.value=None
+                if sql=='show transaction_isolation':self.value=self.isolation
+                elif sql=='select pg_catalog.pg_stat_clear_snapshot()':self.value=None
                 else:self.value = self.observation if sql == release.QUIESCENCE_SQL else self.protocols.pop(0)
             def fetchone(self): return (self.value,)
         base = self.observation(150)
         for key in ('delivery_protocol', 'outbox_protocol', 'deletion_protocol'): base.pop(key)
         good = Cursor(dict(base), [2, 2, 2])
         release.observe_database_quiescence(good, deletion_contract(), 150)
-        self.assertEqual([row[0] for row in good.calls[:2]], [
-            'select pg_catalog.pg_stat_clear_snapshot()',release.QUIESCENCE_SQL])
-        self.assertEqual([row[0] for row in good.calls[2:]], [
+        self.assertEqual([row[0] for row in good.calls[:3]], [
+            'show transaction_isolation','select pg_catalog.pg_stat_clear_snapshot()',release.QUIESCENCE_SQL])
+        self.assertEqual([row[0] for row in good.calls[3:]], [
             'select public.notification_delivery_protocol()', 'select public.notification_outbox_protocol()',
             'select public.data_deletion_ownership_protocol()'])
         for values in ([2, 2, 1], [2, 1, 2], [True, 2, 2]):
@@ -148,3 +150,9 @@ class DeletionAdmissionPreparationTests(unittest.TestCase):
         for key in ('delivery_protocol', 'outbox_protocol', 'deletion_protocol'): old.pop(key)
         with self.assertRaisesRegex(RuntimeError, 'unexpected_protocol'):
             release.observe_database_quiescence(Cursor(old, [2, 2, 'unexpected-present-function']), deletion_contract(), 149)
+        for isolation in ('repeatable read','serializable',None,True,'READ COMMITTED',''):
+            cursor=Cursor(dict(base),[2,2,2],isolation)
+            with self.subTest(isolation=isolation),self.assertRaisesRegex(RuntimeError,'fresh_statement_snapshot_required'):
+                release.observe_database_quiescence(cursor,deletion_contract(),150)
+            self.assertEqual(cursor.calls,[('show transaction_isolation',None)])
+        release.observe_database_quiescence(Cursor(dict(base),[2,2,2],'read uncommitted'),deletion_contract(),150)

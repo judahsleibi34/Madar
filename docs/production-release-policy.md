@@ -52,6 +52,13 @@ Quiescence accounts separately for processing deletion requests and processing
 steps, in addition to both notification queues, all other client sessions, prepared
 transactions and relevant locks. Target150 requires actual integer delivery,
 outbox and deletion protocol2 results. Function existence alone is insufficient.
+Cursor-based schema150 observations require PostgreSQL READ COMMITTED or READ
+UNCOMMITTED isolation and refresh the current session's statistics snapshot before
+every observation. REPEATABLE READ/SERIALIZABLE can retain obsolete queue rows
+despite refreshed activity statistics and must fail closed. Do not commit or
+change a caller's transaction to bypass this refusal. The concrete adapter uses
+fresh internal read-only transactions; this requirement does not admit a new
+executor or enable the unregistered profile.
 A separate150-only provider lifecycle model implements the private-provider /
 post-grant activation ordering in source, with a protected durable journal and
 exclusive actor lock. It never issues target authority, invokes arbitrary SQL or

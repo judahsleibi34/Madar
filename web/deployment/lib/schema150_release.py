@@ -151,6 +151,14 @@ def observe_database_quiescence(cursor, contract, expected_schema):
     """Call actual protocol functions; their presence alone is insufficient."""
     if type(expected_schema) is not int or expected_schema not in (146, 147, 148, 149, 150):
         raise RuntimeError('schema150_database_not_quiescent')
+    # Clearing statistics cannot refresh an MVCC transaction snapshot. A prior
+    # REPEATABLE READ/SERIALIZABLE snapshot can hide queue work committed by a
+    # writer that has already disconnected. PostgreSQL gives READ UNCOMMITTED
+    # the same fresh statement snapshots as READ COMMITTED. Never alter the
+    # caller's isolation level or commit its transaction to obtain freshness.
+    cursor.execute('show transaction_isolation')
+    if cursor.fetchone()[0] not in ('read committed', 'read uncommitted'):
+        raise RuntimeError('schema150_fresh_statement_snapshot_required')
     # PostgreSQL retains activity/statistics snapshots inside a transaction.
     # Refresh before EVERY admission observation: cached zero can miss a newly
     # connected writer, and cached one can retain an already closed backend.

@@ -135,6 +135,16 @@ class LegacyDeletionAdmissionDatabaseTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, 'not_quiescent'):
             self.observation()
 
+    def test_repeatable_read_queue_snapshot_cannot_be_used_for_admission(self):
+        self.db.execute('set transaction isolation level repeatable read')
+        with self.assertRaisesRegex(RuntimeError,'fresh_statement_snapshot_required'):
+            self.observation()
+
+    def test_serializable_queue_snapshot_cannot_be_used_for_admission(self):
+        self.db.execute('set transaction isolation level serializable')
+        with self.assertRaisesRegex(RuntimeError,'fresh_statement_snapshot_required'):
+            self.observation()
+
     def test_server_confirmed_client_exit_cannot_leave_cached_one_session_snapshot(self):
         # Observe the same verified disposable cluster through another database
         # so the read-only monitor cannot inflate the tested database's count.
