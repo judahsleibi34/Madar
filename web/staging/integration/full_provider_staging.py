@@ -45,8 +45,15 @@ def progress(phase,**fields):
 
 def failure_facts(error,phase,raw=b''):
     # Never publish exception messages, provider bodies, SQL or private logs.
+    text=raw[:65536].lower();category=None
+    for marker,label in ((b'unknown flag','unsupported_cli_option'),(b'is not running','dependency_not_running'),
+            (b'unhealthy','unhealthy_service'),(b'timed out','wait_timeout'),(b'timeout','wait_timeout'),
+            (b'no such image','missing_image'),(b'no such container','missing_container'),
+            (b'permission denied','permission_denied')):
+        if marker in text:category=label;break
     return {'status':'FAIL','exception_type':type(error).__name__,'phase':phase,
         'private_diagnostic_sha256':hashlib.sha256(raw).hexdigest() if raw else None,
+        'last_command_category':category,
         'protected_controller_execution':False,'production_authorized':False}
 
 
@@ -144,7 +151,8 @@ def actors(images,*,complete):
                 or not 0<host.get('PidsLimit',0)<=256 or any(m.get('Destination','').startswith('/app') for m in row.get('Mounts',[]))):
             raise RuntimeError('full_staging_runtime_identity_or_bounds')
         result[name]={'id':row['Id'],'image':row['Image'],'running':row['State']['Running'],
-            'health':row['State'].get('Health',{}).get('Status','not-configured')}
+            'health':row['State'].get('Health',{}).get('Status','not-configured'),
+            'exit_code':row['State'].get('ExitCode'),'oom_killed':row['State'].get('OOMKilled',False)}
     if complete and set(result)!=SERVICES:raise RuntimeError('full_staging_missing_actor')
     return result
 
@@ -276,7 +284,8 @@ def main(mode,directory,source,baseline):
             browser=browser_acceptance(source)
             code=application.runtime_identity(images,source)
             runtime_rows=actors(images,complete=True)
-            if not all(row['running'] for row in runtime_rows.values()):raise RuntimeError('full_staging_component_not_running')
+            if not all(row['running'] and row['health'] in ('healthy','not-configured') for row in runtime_rows.values()):
+                raise RuntimeError('full_staging_component_not_healthy')
             report={'version':1,'status':'PASS','scope':'fresh-synthetic-genesis-full-provider-application-acceptance',
                 'source_sha':source,'history_base_sha':baseline,'project':project,'schema':schema,
                 'origin_schema':value['origin_schema'],'plan_sha256':plan.sha256,'risk_class':value['risk_class'],
@@ -308,7 +317,9 @@ def main(mode,directory,source,baseline):
             try:raw=configuration.regular(diagnostic) if diagnostic.is_file() else b''
             except Exception:raw=b''
             failure=failure_facts(error,phase,raw)
-            try:actors(images,complete=False);manage.compose('stop','--timeout','15')
+            try:
+                failure['runtime']=actors(images,complete=False)
+                manage.compose('stop','--timeout','15')
             except Exception as cleanup:failure['cleanup_exception_type']=type(cleanup).__name__
             manage.private_write('full-provider-failure.json',json.dumps(failure,sort_keys=True)+'\n')
             raise

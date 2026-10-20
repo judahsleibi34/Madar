@@ -155,6 +155,49 @@ def worker_health():
     return value
 
 
+def restart_deletion_worker(*,expected_schema=150):
+    """Use the actual supervisor start, then independently observe one owner.
+
+    Compose project-wide --wait behavior is not a worker consumption proof.
+    Only a starting healthcheck is transient; changed identity/protocol, an
+    exited/unhealthy process or a healthy nonconsuming worker fails immediately.
+    """
+    if type(expected_schema) is not int or not 1<=expected_schema<10**9:
+        raise RuntimeError('Deletion restart requires exact target schema')
+    args=('--file',str(manage.RUNTIME/'acceptance-compose.json'))
+    source=manage.state()['source_sha']
+    identifier=manage.compose(*args,'ps','--all','-q','deletion-worker').decode().strip()
+    if not re.fullmatch('[0-9a-f]{64}',identifier):raise RuntimeError('Deletion restart requires one owned worker')
+    def observed():
+        manage.require_database_marker()
+        if manage.sql(PROTOCOL_SQL)!=str(expected_schema)+':2:2:2':
+            raise RuntimeError('Deletion restart database protocol changed')
+        row=json.loads(manage.docker('inspect',identifier))[0]
+        labels=row['Config'].get('Labels',{})
+        if (row['Id']!=identifier or labels.get('com.docker.compose.project')!=manage.PROJECT
+                or labels.get('com.docker.compose.service')!='deletion-worker'
+                or labels.get('com.madar.staging.owner')!=manage.OWNER
+                or labels.get('org.opencontainers.image.revision')!=source
+                or labels.get('com.madar.release.sha')!=source
+                or labels.get('com.madar.build.mode')!='fresh-locked-ci'
+                or row['HostConfig']['RestartPolicy']['Name']!='no'):
+            raise RuntimeError('Deletion restart worker ownership changed')
+        return row
+    before=observed()
+    if before['State']['Running']:raise RuntimeError('Deletion restart requires an observed stopped worker')
+    manage.compose(*args,'start','deletion-worker')
+    deadline=time.monotonic()+60
+    while True:
+        row=observed()
+        if row['Image']!=before['Image'] or not row['State']['Running']:
+            raise RuntimeError('Deletion restart worker identity or running state changed')
+        health=row['State'].get('Health',{}).get('Status')
+        if health=='healthy':return worker_health()
+        if health!='starting' or time.monotonic()>=deadline:
+            raise RuntimeError('Deletion restart health not accepted')
+        time.sleep(.5)
+
+
 def service_values():
     return dict(line.split('=', 1) for line in previous.regular(manage.RUNTIME / 'application.env').decode().splitlines() if line)
 
@@ -242,8 +285,7 @@ def deletion_workflow(*, expected_schema=150):
         raise RuntimeError('Deletion changed unrelated tenant object bytes')
     args = ('--file', str(manage.RUNTIME / 'acceptance-compose.json'))
     manage.compose(*args, 'stop', '--timeout', '15', 'deletion-worker')
-    manage.compose(*args, 'start', '--wait', '--wait-timeout', '60', 'deletion-worker')
-    worker_health()
+    restart_deletion_worker(expected_schema=expected_schema)
     return {'user': results['user'], 'tenant': results['tenant'], 'foreign_tenant_preserved': True,
             'live_worker_processed_both_requests': True, 'worker_restart_consumption_verified': True,
             'integration_revocation_tested': False, 'host_file_deletion_tested': False,

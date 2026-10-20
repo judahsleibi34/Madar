@@ -3083,67 +3083,37 @@ SQL migration bytes, grants, single-use authority and historical receipt formats
 remain unchanged. Prior checks do not validate the corrected source: fresh CI,
 controller review and independently approved installation remain separate gates.
 
-Schema150 maintenance quiescence counts clients and prepared transactions across
-the verified cluster,not only the application database:role/privilege state is
-global. Cross-database activity cannot be excluded by its database name. Unknown
-clients and unresolved prepared work block;no automatic termination or guessed
-transaction reconciliation is introduced. Historical148/149 contracts are unchanged.
 
+## Phase IX validation and staging integration
 
-PhaseIX candidate capture retains API-authenticated CI archive bytes privately in
-the existing admission before candidate prepare, under the existing fresh root
-authority and both deployment locks. OCI manifest/config identity and source/build
-labels are checked before immutable seal publication; subsequent artifact guards
-requery CI and use the retained bytes. Partial capture cannot fall back to mutable
-operator input. No image import, public activation or write authority is issued.
-Historical receipts are preserved and schema150 remains operationally blocked.
-See [candidate capture evidence](architecture-phase9-2026-10-20/04-SEALED-CANDIDATE-PREPARATION.md).
+Schema150 and generic protected execution remain unregistered/blocked;CI,root
+policy matches and staging results issue no authority. SQL001–150 and historical
+receipts are unchanged. No production automation or descriptor is activated.
 
-PhaseIX also reproduces and closes a checksum/read race in operator evidence:
-the read-only evidence loader now hashes and parses one bounded regular-file
-byte capture, with no-follow/nonblocking descriptor opening. Changed paths,
-same-inode replacement after capture, FIFO/symlink and oversized inputs cannot
-substitute parsed admission data. This strengthens existing evidence validation;
-it creates no approval and leaves all operational blockers intact.
+The existing coordinator seals authenticated candidate bytes before prepare under
+fresh authority and both locks;partial capture has no mutable-input fallback.
+Evidence JSON hashes and deserializes one bounded no-follow capture. See
+[candidate evidence](architecture-phase9-2026-10-20/04-SEALED-CANDIDATE-PREPARATION.md).
 
+Cluster-wide clients/prepared transactions and actual background/replication-mode
+writers block unknown activity. Preimage capture and private recovery measure
+that background count;unknown_writers is not invented as zero. Only attested
+core housekeeping and PID-bound observer parallel workers are excluded. Positive
+replica contracts and dormant host/manual/extension inventories remain separate
+gates. Published150's protocol0 at151 remains a blocker. The root policy pins
+nested backend/frontend tooling,verification runners,bundler config,release
+helpers,workflows and executable modes independently of a moving source base.
+Remote Actions are immutable. See [security findings](architecture-phase9-2026-10-20/15-SECURITY-AND-SUPPLY-CHAIN.md).
 
-PhaseIX adds secret-free automatic full-provider staging on PR/main events. It
-waits for exact-source independent CI/artifacts,builds a fresh owned synthetic
-provider database from captured Git migration bytes,and verifies actual protocol
-markers before starting business workers. Source-derived namespaces,private
-leases,loopback-only ports,resource limits and consumed-attempt refusal remain
-mandatory. Its results grant no protected authority and cannot satisfy the still
-blocked combined schema150 operation. See [staging scope and limitations](architecture-phase9-2026-10-20/10-AUTOMATIC-FULL-STAGING.md).
-
-
-PhaseIX full-provider CI requires the accepted native OCI manifest identities;
-it never substitutes build-host configuration IDs after import. A reproduced
-classic-store refusal led to explicit empty-daemon containerd-store preparation
-only on disposable GitHub runners,with a root-private original configuration
-preimage and failure restoration. Physical nodes and the shared staging VM
-refuse that preparation. Remaining mutable checkout/setup-node Actions are
-pinned to their officially observed commit IDs. Selected native browser checks
-use locked dependencies,a synthetic private fixture and verified loopback/source
-identity. Bounded progress and sanitized failure reports contain no credentials,
-exception messages or raw provider logs;completed evidence follows observed
-owned-service shutdown. These CI privileges are not release authority.
-
-
-PhaseIX native testing reproduced a replication-mode PostgreSQL connection that
-could UPDATE an owned fixture while reporting backend_type=walsender;the prior
-client-only admission check accepted it. Schema150 now measures unknown database
-workers,including replication senders,at migration and private recovery boundaries
-instead of asserting unknown_writers=0. Only pinned core housekeeping and the
-observer's PID-bound parallel workers are excluded;NULL/unclassified types deny.
-Streaming senders require a separate positive replica/consumer contract;none is
-exempted to manufacture readiness. Dormant host/extension/supervisor inventory
-and full protected controller acceptance remain independent unmet gates.
-
-
-PhaseIX extends the independently pinned automation inventory to nested backend
-and frontend script trees,and requires the network-blocking test runner,installed
-constraint verifier and frontend bundler configuration. A real temporary-Git
-regression reproduced an omitted nested runner after the base advanced;the same
-assertion now passes and the old policy digest refuses it. This pin covers build
-and verification tooling,not every ordinary business test or UI source file.
-It does not install/enable a root policy or convert staging PASS into authority.
+Secret-free full-provider CI uses owned synthetic genesis,captured Git SQL and
+authenticated images,private leases,loopback-only ports,resource bounds and
+consumed-attempt refusal. Native OCI store preparation requires an empty owned
+GitHub runner,private config preimages and failure restoration;physical nodes and
+shared staging refuse it. No image-ID substitution is allowed. Live protocols
+precede workers. Restart uses the real supervisor plus bounded source/image/
+health/consumption checks;all required components must be healthy. Locked browser
+checks use private synthetic fixtures. Public diagnostics omit credentials and
+raw provider logs. Completion follows observed owned-service shutdown. None of
+this is protected handoff,boot/reboot or production acceptance. See
+[staging scope](architecture-phase9-2026-10-20/10-AUTOMATIC-FULL-STAGING.md) and
+[maintenance backup limits](architecture-phase9-2026-10-20/03-MAINTENANCE-BACKUP-AND-REPLICA.md).

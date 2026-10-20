@@ -402,6 +402,8 @@ class Schema150ProviderAdapter:
         allowed = set(self.inventory['session_scope']['writer_roles']) | {'postgres'}
         if any(r['rolcanlogin'] and name not in allowed and not name.startswith('pg_') for name,r in roles['roles'].items()):
             raise RuntimeError('schema150_provider_unknown_login_role')
+        if int(self._sql('BEGIN READ ONLY;'+BACKGROUND_WRITER_SQL+';COMMIT;'))!=0:
+            raise RuntimeError('schema150_provider_unknown_background_writer')
         units = {name:self._unit(name) for name in self.inventory['supervisors']}
         rows = self._rows();known={r['id'] for r in self.inventory['containers'].values()}
         states={r['Id']:{'running':r['State']['Running'],'restart':r['HostConfig']['RestartPolicy']['Name']}

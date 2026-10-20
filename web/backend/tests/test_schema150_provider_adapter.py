@@ -259,6 +259,7 @@ class ConcreteAdapterTests(unittest.TestCase):
         actor.inventory['roles']=adapter.role_measurements(roles)
         actor._roles=Mock(return_value=copy.deepcopy(roles));actor._sessions=Mock(return_value=[])
         actor._unit=Mock(return_value={'fixture':'effective-unit'});actor._known_sessions=Mock(return_value=True)
+        actor._sql=Mock(return_value='0')
         # This role-capture component test has synthetic paths. Real read-only
         # filesystem measurements are independently exercised in object tests.
         actor._object_measurement=Mock(return_value={'version':1,'phase':'identity','roots':{}})
@@ -273,6 +274,9 @@ class ConcreteAdapterTests(unittest.TestCase):
         actor.runtime.command.assert_not_called()
         actor._roles.return_value=roles;actor._known_sessions.return_value=False
         with self.assertRaisesRegex(RuntimeError,'unknown_session'):actor.capture_preimage(scope)
+        actor._known_sessions.return_value=True;actor._sql.return_value='1'
+        with self.assertRaisesRegex(RuntimeError,'unknown_background_writer'):actor.capture_preimage(scope)
+        actor.runtime.command.assert_not_called()
 
     def test_backup_uses_preserved_original_full_role_archive_not_current_nologin(self):
         actor, scope, _, _ = self.component(stage='fenced')

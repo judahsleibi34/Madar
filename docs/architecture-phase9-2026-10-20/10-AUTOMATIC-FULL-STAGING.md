@@ -61,3 +61,13 @@ use locked dependencies,a synthetic private fixture and verified loopback/source
 identity. Bounded progress and sanitized failure reports contain no credentials,
 exception messages or raw provider logs;completed evidence follows observed
 owned-service shutdown. These CI privileges are not release authority.
+
+A native019b attempt completed Auth/MFA/Storage/notifications/tenant checks and
+the authoritative user/tenant deletion assertions,but failed at the supervisor's
+project-wide restart wait. That FAIL is retained. Restart now uses the same
+supervisor's plain start,then independently binds the stopped/current container,
+source labels,image,live database protocols,starting-only bounded health and
+consumption. Changed,exited,unhealthy or nonconsuming workers fail immediately.
+Final acceptance additionally rejects any unhealthy required component. This
+does not infer an unsupported Compose flag without evidence;see the official
+[Compose start semantics](https://docs.docker.com/reference/cli/docker/compose/start/).

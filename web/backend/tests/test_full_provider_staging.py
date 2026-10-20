@@ -38,6 +38,8 @@ class FullStagingSafetyTests(unittest.TestCase):
         result=staging.failure_facts(RuntimeError(secret),{'phase':'native_provider_bootstrap'},secret.encode())
         self.assertNotIn(secret,json.dumps(result));self.assertEqual(result['exception_type'],'RuntimeError')
         self.assertFalse(result['production_authorized']);self.assertFalse(result['protected_controller_execution'])
+        result=staging.failure_facts(RuntimeError(secret),{'phase':'restart'},b'unknown flag: --wait '+secret.encode())
+        self.assertEqual(result['last_command_category'],'unsupported_cli_option');self.assertNotIn(secret,json.dumps(result))
 
     def test_browser_child_receives_only_fixed_synthetic_scope_and_no_ambient_secret(self):
         value={'status':'PASS','checks':['case']*9,'pageErrors':0}
@@ -165,3 +167,66 @@ class CandidateFetchTests(unittest.TestCase):
             for source,directory in (('main',Path.home()/'unknown'),(SHA,Path('/tmp')/'unknown')):
                 with self.assertRaises(RuntimeError):fetch.fetch(source,directory)
             api.assert_not_called()
+
+
+class WorkerRestartObservationTests(unittest.TestCase):
+    """MODEL supervisor/transport; exact native acceptance runs separately."""
+    def setUp(self):
+        self.application=staging.application;self.identifier='d'*64
+        self.before={'Id':self.identifier,'Image':'sha256:'+'e'*64,'State':{'Running':False},
+            'HostConfig':{'RestartPolicy':{'Name':'no'}},'Config':{'Labels':{
+                'com.docker.compose.project':'owned','com.docker.compose.service':'deletion-worker',
+                'com.madar.staging.owner':'owned','org.opencontainers.image.revision':SHA,
+                'com.madar.release.sha':SHA,'com.madar.build.mode':'fresh-locked-ci'}}}
+        for p in (patch.object(staging.manage,'PROJECT','owned'),patch.object(staging.manage,'OWNER','owned'),
+                patch.object(staging.manage,'state',return_value={'source_sha':SHA}),
+                patch.object(staging.manage,'require_database_marker'),
+                patch.object(staging.manage,'sql',return_value='150:2:2:2'),
+                patch.object(staging.application.time,'sleep')):
+            p.start();self.addCleanup(p.stop)
+        self.compose=self.enterContext(patch.object(staging.manage,'compose',side_effect=lambda *a,**kw:self.identifier.encode() if 'ps' in a else b''))
+        self.health=self.enterContext(patch.object(staging.application,'worker_health',return_value={'status':'ok','consuming':True}))
+
+    def row(self,status='healthy',**updates):
+        value=copy.deepcopy(self.before);value['State']={'Running':True,'Health':{'Status':status}}
+        value.update(updates);return value
+
+    def inspect(self,rows):
+        return patch.object(staging.manage,'docker',side_effect=[json.dumps([row]).encode() for row in rows])
+
+    def test_actual_start_precedes_observed_starting_healthy_and_consuming(self):
+        with self.inspect([self.before,self.row('starting'),self.row()]):
+            self.assertTrue(self.application.restart_deletion_worker()['consuming'])
+        starts=[call for call in self.compose.call_args_list if 'start' in call.args]
+        self.assertEqual(len(starts),1);self.assertEqual(starts[0].args[-2:],('start','deletion-worker'))
+        self.health.assert_called_once()
+
+    def test_wrong_source_or_owner_refuses_before_start(self):
+        for key,value in (('com.madar.release.sha','b'*40),('com.docker.compose.project','foreign')):
+            row=copy.deepcopy(self.before);row['Config']['Labels'][key]=value
+            with self.subTest(key=key),self.inspect([row]),self.assertRaisesRegex(RuntimeError,'ownership changed'):
+                self.application.restart_deletion_worker()
+        self.assertTrue(all('start' not in c.args for c in self.compose.call_args_list))
+
+    def test_changed_image_or_unhealthy_or_exited_worker_is_not_retried(self):
+        for row in (self.row(Image='sha256:'+'f'*64),self.row('unhealthy'),self.row(State={'Running':False})):
+            with self.subTest(row=row),self.inspect([self.before,row]),self.assertRaises(RuntimeError):
+                self.application.restart_deletion_worker()
+        self.health.assert_not_called()
+
+    def test_healthy_but_nonconsuming_worker_is_not_accepted(self):
+        self.health.side_effect=RuntimeError('healthy but blocked')
+        with self.inspect([self.before,self.row()]),self.assertRaisesRegex(RuntimeError,'healthy but blocked'):
+            self.application.restart_deletion_worker()
+        self.health.assert_called_once()
+
+    def test_protocol_changes_while_restarting_fail_without_another_start(self):
+        with patch.object(staging.manage,'sql',side_effect=['150:2:2:2','151:2:2:0']),self.inspect([self.before]),self.assertRaisesRegex(RuntimeError,'protocol changed'):
+            self.application.restart_deletion_worker()
+        self.assertEqual(sum('start' in c.args for c in self.compose.call_args_list),1)
+        self.health.assert_not_called()
+
+    def test_starting_health_has_a_hard_deadline(self):
+        with patch.object(self.application.time,'monotonic',side_effect=[0,61]),self.inspect([self.before,self.row('starting')]),self.assertRaisesRegex(RuntimeError,'health not accepted'):
+            self.application.restart_deletion_worker()
+        self.health.assert_not_called()
