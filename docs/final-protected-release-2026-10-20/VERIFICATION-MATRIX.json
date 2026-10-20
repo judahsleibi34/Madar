@@ -1,0 +1,141 @@
+{
+  "version": 1,
+  "implementation_sha": "1aeed83105723caadc79396c0a29d9d24841d8cc",
+  "baseline_pr": 219,
+  "engineering_complete": false,
+  "full_protected_upgrade_executed": false,
+  "production_authorized": false,
+  "readiness": "NOT READY",
+  "gates": [
+    {
+      "gate": "protected_coordinator",
+      "status": "BLOCKED",
+      "evidence": "Maintenance-first complete caller is absent; _execute is bridge-first."
+    },
+    {
+      "gate": "privileged_environment",
+      "status": "PARTIAL",
+      "evidence": "Owned retained KVM inspected; no current-source full controller installation/reboot."
+    },
+    {
+      "gate": "source_provenance",
+      "status": "PARTIAL",
+      "evidence": "Exact committed source/archive verified; publication-head CI/artifacts reported separately."
+    },
+    {
+      "gate": "artifacts",
+      "status": "NOT TESTED",
+      "evidence": "Publication-head fresh build/runtime identities require their own CI receipts."
+    },
+    {
+      "gate": "independent_test_authority",
+      "status": "NOT TESTED",
+      "evidence": "Native fixture issuer is MODEL, no independent operational test handoff."
+    },
+    {
+      "gate": "maintenance",
+      "status": "PARTIAL",
+      "evidence": "Concrete source effects and model order tested; full native operation absent."
+    },
+    {
+      "gate": "database_quiescence",
+      "status": "PASS",
+      "evidence": "Native foreign/late sessions and actual advisory-lock ownership reject; limited SQL fixture."
+    },
+    {
+      "gate": "backup",
+      "status": "PARTIAL",
+      "evidence": "Retained real component restore and journal binding; not full same-operation backup."
+    },
+    {
+      "gate": "replica_receiver",
+      "status": "NOT TESTED",
+      "evidence": "No independently provisioned real receiver for this operation."
+    },
+    {
+      "gate": "sealed_candidate",
+      "status": "PARTIAL",
+      "evidence": "Root+credential model/stage/identity checks; creation/admission binding remains incomplete."
+    },
+    {
+      "gate": "migration_chain",
+      "status": "PASS",
+      "evidence": "Immutable147\u2013150 executed through parent method/existing executor; outer gates MODEL."
+    },
+    {
+      "gate": "intermediate_states",
+      "status": "PARTIAL",
+      "evidence": "Fenced SQL tests; full supervisor/boot NORMAL refusal not demonstrated."
+    },
+    {
+      "gate": "preservation",
+      "status": "PARTIAL",
+      "evidence": "Selected Auth/Storage metadata/application rows; full original MFA/object/provider state unproven."
+    },
+    {
+      "gate": "private_recovery",
+      "status": "PARTIAL",
+      "evidence": "Fixed guarded startup and stage checks; no native same-database full acceptance."
+    },
+    {
+      "gate": "write_handoff",
+      "status": "BLOCKED",
+      "evidence": "Existing independent handoff remains unwired to private stopped-worker candidate."
+    },
+    {
+      "gate": "workers",
+      "status": "PARTIAL",
+      "evidence": "Source order/identity and retained business tests; no full target authority activation."
+    },
+    {
+      "gate": "proxy",
+      "status": "PARTIAL",
+      "evidence": "Premature start denied in component test; actual full release routing absent."
+    },
+    {
+      "gate": "normal_operation",
+      "status": "BLOCKED",
+      "evidence": "No complete upgrade/authority/activation receipt."
+    },
+    {
+      "gate": "interruption",
+      "status": "PARTIAL",
+      "evidence": "Native SQL/process/flock/credential failures; full controller recovery unproven."
+    },
+    {
+      "gate": "boot",
+      "status": "NOT TESTED",
+      "evidence": "No current-source guest boot/reboot lifecycle."
+    },
+    {
+      "gate": "source_ci",
+      "status": "NOT TESTED",
+      "evidence": "Publication-head CI is required; final PR/session must report its exact receipts."
+    },
+    {
+      "gate": "security",
+      "status": "PARTIAL",
+      "evidence": "No gate bypass or historical SQL/grant broadening; actual authority/isolation acceptance incomplete."
+    },
+    {
+      "gate": "independent_review",
+      "status": "BLOCKED",
+      "evidence": "Independent reviewer required."
+    },
+    {
+      "gate": "main_protection",
+      "status": "FAIL",
+      "evidence": "Refreshed GitHub main protected=false, rulesets=[], credential admin=false."
+    },
+    {
+      "gate": "production_recovery",
+      "status": "BLOCKED",
+      "evidence": "Current production recovery/replica evidence independently required."
+    },
+    {
+      "gate": "production_authorization",
+      "status": "BLOCKED",
+      "evidence": "Explicitly not authorized; no production effects or policy activation."
+    }
+  ]
+}
