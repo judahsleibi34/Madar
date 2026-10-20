@@ -371,24 +371,43 @@ class CompletedNormalUpgrade:
 
     @contextmanager
     def root_credential(self, *, migration_resumption=None):
-        """New root-issued credential, never reconstruction of expired tokens."""
-        extra={} if migration_resumption is None else {'migration_resumption':migration_resumption}
-        self.ops.write_authorization(self.controller,completed_normal_contract=self.contract,**extra)
-        # Use the existing systemd credential name without making the token
-        # public or copying it into protected historical transaction records.
-        directory=self.ops.runtime_root/('root-credentials-'+digest(self.contract)[:16])
-        directory.mkdir(mode=0o700,exist_ok=True)
-        path=directory/'madar-control-plane-upgrade'
-        if path.exists() or path.is_symlink():raise RuntimeError('completed_upgrade_root_credential_collision')
+        """Fresh authority inside an actually owned coordinator lock window.
+
+        The User=madar service acquires deploy.lock itself. After that service
+        exits, root must reacquire it before provider/backup/runtime effects.
+        Borrow an existing coordinator lock; release only a lock acquired here.
+        Neither the durable upgrade interlock nor a credential replaces flock.
+        """
+        from deployment.lib.schema150_provider_adapter import require_owned_lock
+        owned=False;attempted=False;created=False;path=None
         previous=os.environ.get('CREDENTIALS_DIRECTORY')
         try:
+            require_owned_lock(self.lock,self.ops.upgrade_root/'upgrade.lock')
+            if self.ops.deploy_lock_descriptor is None:
+                self.ops.deploy_lock_descriptor=acquire_lock(self.ops.state_root/'deploy.lock',create=False)
+                owned=True
+            require_owned_lock(self.ops.deploy_lock_descriptor,self.ops.state_root/'deploy.lock')
+            directory=self.ops.runtime_root/('root-credentials-'+digest(self.contract)[:16])
+            directory.mkdir(mode=0o700,exist_ok=True)
+            path=directory/'madar-control-plane-upgrade'
+            if path.exists() or path.is_symlink():raise RuntimeError('completed_upgrade_root_credential_collision')
+            extra={} if migration_resumption is None else {'migration_resumption':migration_resumption}
+            attempted=True
+            self.ops.write_authorization(self.controller,completed_normal_contract=self.contract,**extra)
             exclusive(path,protected(self.ops.authorization_file,private=True).read_bytes())
+            created=True
             os.environ['CREDENTIALS_DIRECTORY']=str(directory)
             yield
         finally:
             if previous is None:os.environ.pop('CREDENTIALS_DIRECTORY',None)
             else:os.environ['CREDENTIALS_DIRECTORY']=previous
-            path.unlink(missing_ok=True);self.ops.clear_authorization()
+            try:
+                try:
+                    if created:path.unlink(missing_ok=True)
+                finally:
+                    if attempted:self.ops.clear_authorization()
+            finally:
+                if owned:self.ops.release_deployment_lock()
 
     def event(self,phase,**fields):
         self.phase=phase

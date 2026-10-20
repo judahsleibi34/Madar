@@ -5,11 +5,14 @@ All DDL is rolled back. The separate marked restore DB is mutated only inside
 one explicitly owned prepared transaction, which is rolled back in cleanup.
 """
 import hashlib
+from contextlib import ExitStack
 import os
 from pathlib import Path
 import sys
 import time
+import tempfile
 import unittest
+from unittest.mock import Mock,patch
 from uuid import uuid4
 import psycopg
 from psycopg import sql
@@ -101,5 +104,74 @@ class QuiescenceScopeDatabaseTests(unittest.TestCase):
                 ('parallel worker',own,0),('checkpointer',None,0),('client backend',None,0)):
             with self.subTest(kind=kind,leader=leader):
                 self.assertEqual(self.db.execute(statement,(own+100000,kind,leader)).fetchone()[0],expected)
+
+    def migration_hook_fixture(self,*,preserve_origin=False):
+        """Native SQL/locks, real journal/flock, MODEL host/authority boundaries.
+
+        This is not a privileged controller or provider-fencing acceptance test.
+        """
+        from deployment.lib import schema150_provider_adapter as adapter
+        from deployment.lib import schema150_provider_lifecycle as lifecycle
+        from deployment.lib import schema149_provider_lifecycle as retained
+        from deployment.lib.completed_normal_profile import DELETION
+        from deployment.lib.migration_executor import Migration
+        temporary=tempfile.TemporaryDirectory();self.addCleanup(temporary.cleanup)
+        root=Path(temporary.name);root.chmod(0o700);(root/'provider-journal').mkdir(mode=0o700)
+        stack=ExitStack();self.addCleanup(stack.close)
+        stack.enter_context(patch.object(retained,'require_root_directory',lambda p:None))
+        stack.enter_context(patch.object(retained,'protected',lambda p,**kw:Path(p)))
+        stack.enter_context(patch.object(adapter,'private_json',lambda p:__import__('json').loads(Path(p).read_bytes())))
+        stack.enter_context(patch('deployment.lib.schema149_consumers.verify_host_processes'))
+        binding={'operation':DELETION.operation,'context_sha256':'a'*64,'source_sha':'b'*40,'controller_sha':'c'*40,
+            'inventory_sha256':'d'*64,'system_identifier':self.identifier,'source_schema':146,'target_schema':150}
+        actor=adapter.Schema150ProviderAdapter.__new__(adapter.Schema150ProviderAdapter)
+        actor.binding=binding;actor.root=root;actor.contract=self.contract
+        actor.require_authority=Mock();actor._attest=Mock();actor._supervisors_stopped=Mock()
+        actor.runtime=Mock();actor.inventory={'containers':{'native:db':{'id':'e'*64}}}
+        actor._row=Mock(return_value={'State':{'Pid':os.getpid()}})
+        actor._roles=Mock(return_value={});actor._expected_roles=Mock(return_value={})
+        actor._object_preservation=Mock();actor.activation_guard=Mock(return_value={'candidate_read_only':True})
+        actor.barrier=root/'provider-barrier.json';actor.barrier.write_text('{}')
+        actor._sql=Mock(side_effect=AssertionError('Migration must observe its existing cursor, not another database session'))
+        journal=lifecycle.ProtectedProviderJournal(root/'provider-journal')
+        journal.append('prepared',{'binding':binding,'preimage':{'synthetic':'MODEL ONLY'}})
+        for step in lifecycle.FENCE_STEPS:
+            journal.append('effect_intent',{'step':step});journal.append('effect_complete',{'step':step})
+        if not preserve_origin:
+            self.db.execute("update public.application_schema_state set schema_version=149 where contract_key='core'")
+            self.db.execute('drop function public.data_deletion_ownership_protocol()')
+        return actor,journal,Migration(150,WEB/'database/migrations'/release.SQL_NAMES[150],release.SQL_SHA256[150],149,150,'coordinated')
+
+    def acquire_migration_lock(self):
+        from deployment.lib.migration_executor import LockedMigrationExecutor
+        self.assertIs(self.db.execute('select pg_try_advisory_lock(%s)',(LockedMigrationExecutor.LOCK_KEY,)).fetchone()[0],True)
+
+    def test_migration_callback_uses_its_own_real_advisory_locked_session(self):
+        actor,journal,migration=self.migration_hook_fixture();self.acquire_migration_lock()
+        with self.db.cursor() as cursor:observed=actor.migration_guard(cursor,migration)
+        self.assertEqual(observed['schema'],149);self.assertEqual(observed['other_client_sessions'],0)
+        self.assertEqual(journal.read()[-1]['event'],'quiescence')
+        actor._sql.assert_not_called()
+
+    def test_migration_callback_without_real_advisory_lock_refuses(self):
+        actor,journal,migration=self.migration_hook_fixture();before=journal.read()
+        with self.db.cursor() as cursor,self.assertRaisesRegex(RuntimeError,'migration_lock_required'):
+            actor.migration_guard(cursor,migration)
+        self.assertEqual(journal.read(),before)
+
+    def test_migration_callback_does_not_exempt_another_client(self):
+        actor,journal,migration=self.migration_hook_fixture();self.acquire_migration_lock();self.other_database()
+        before=journal.read()
+        with self.db.cursor() as cursor,self.assertRaisesRegex(RuntimeError,'not_quiescent'):
+            actor.migration_guard(cursor,migration)
+        self.assertEqual(journal.read(),before)
+
+    def test_migration_callback_checks_actual_protocol_before_accepting_boundary(self):
+        actor,journal,migration=self.migration_hook_fixture();self.acquire_migration_lock()
+        self.db.execute("create or replace function public.notification_outbox_protocol() returns integer language sql stable as 'select 1'")
+        before=journal.read()
+        with self.db.cursor() as cursor,self.assertRaisesRegex(RuntimeError,'not_quiescent'):
+            actor.migration_guard(cursor,migration)
+        self.assertEqual(journal.read(),before)
 
 if __name__=='__main__':unittest.main()

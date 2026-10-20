@@ -90,6 +90,38 @@ class ConcreteAdapterTests(unittest.TestCase):
         self.assertTrue(body.startswith('SET search_path=pg_catalog,public,extensions;'))
         self.assertLess(body.index('SET search_path'),body.index('SELECT 1;'))
 
+    def test_existing_executor_cursor_reaches_the_fenced_lifecycle_guard(self):
+        from deployment.lib.migration_executor import Migration
+        from deployment.lib.schema150_release import SQL_SHA256
+        actor,scope,_,journal=self.component(stage='fenced')
+        cursor=Mock();cursor.fetchone.return_value=(True,)
+        observed={'system_identifier':scope['system_identifier'],'schema':149,
+                  **{name:0 for name in lifecycle.COUNTERS},**{name:True for name in lifecycle.FENCES}}
+        actor.observe_quiescence=Mock(return_value=observed)
+        migration=Migration(150,Path('/unused-source-path'),SQL_SHA256[150],149,150,'coordinated')
+        result=actor.migration_guard(cursor,migration)
+        self.assertEqual(result,observed)
+        actor.observe_quiescence.assert_called_once_with(scope,cursor=cursor)
+        self.assertEqual(journal.read()[-1]['event'],'quiescence')
+        self.assertIn('pg_catalog.pg_locks',cursor.execute.call_args.args[0])
+
+    def test_migration_hook_refuses_wrong_contract_or_unowned_database_lock(self):
+        from deployment.lib.migration_executor import Migration
+        from deployment.lib.schema150_release import SQL_SHA256
+        actor,_,_,journal=self.component(stage='fenced')
+        cursor=Mock();cursor.fetchone.return_value=(False,)
+        before=journal.read()
+        valid=Migration(150,Path('/unused-source-path'),SQL_SHA256[150],149,150,'coordinated')
+        with self.assertRaisesRegex(RuntimeError,'migration_lock_required'):actor.migration_guard(cursor,valid)
+        cursor.reset_mock()
+        for wrong in (object(),Migration(150,valid.path,'0'*64,149,150,'coordinated'),
+                      Migration(151,valid.path,'0'*64,150,151,'coordinated'),
+                      Migration(150,valid.path,valid.sha256,148,150,'coordinated')):
+            with self.subTest(wrong=wrong),self.assertRaisesRegex(RuntimeError,'migration_contract_changed'):
+                actor.migration_guard(cursor,wrong)
+        cursor.execute.assert_not_called()
+        self.assertEqual(journal.read(),before)
+
     def test_initial_fence_guard_precedes_first_persistent_barrier_effect(self):
         actor, scope, _, journal = self.component()
         self.assertEqual([r['event'] for r in journal.read()], ['prepared'])

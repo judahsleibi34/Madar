@@ -2,6 +2,17 @@
 
 ## Phase X backup-to-migration evidence boundary
 
+Root credential windows must own both the existing upgrade lock and deployment
+lock before requesting authority. After a deployment service returns, root
+reacquires deploy.lock for its provider/backup/runtime stage and releases only
+that newly acquired window. Existing borrowed locks remain owned by the parent.
+Contention and credential collisions refuse before issuance; cleanup failures
+still revoke the authorization and release the new lock. Failed flock acquisition
+closes its descriptor. The concrete provider's existing-executor callback checks
+the same PostgreSQL session's real advisory lock, live cluster/schema/protocols
+and quiescence; no connection-name/PID whitelist replaces that proof. All host
+and authority gates remain required, and this does not register schema150.
+
 The existing completed-NORMAL backup context can seal the unregistered150
 preparation inputs without operationally admitting that profile. It retains the
 independently protected maintenance-manifest digest and binds original-role,

@@ -88,6 +88,14 @@ if [[ "${RUN_SCHEMA148_ADMISSION:-false}" == true ]]; then
       --volume "$WEB_ROOT/backend:/app:ro" --volume "$WEB_ROOT/..:/release:ro" \
       --entrypoint python "$BACKEND_TEST_IMAGE" -m unittest tests.test_schema149_cutover_database -v
   fi
+  if [[ "${RUN_DELETION_INTEGRITY:-false}" == true ]]; then
+    docker run --rm --memory=768m --cpus=1 --pids-limit=256 --network host --read-only \
+      --tmpfs /tmp:rw,noexec,nosuid,size=128m --env PYTHONPATH=/app:/release/web --env PYTHONDONTWRITEBYTECODE=1 \
+      --env SCHEMA148_SYNTHETIC_DATABASE_DSN='host=127.0.0.1 port=55448 dbname=postgres user=postgres connect_timeout=5' \
+      --env SCHEMA148_SOURCE_ROOT=/release \
+      --volume "$WEB_ROOT/backend:/app:ro" --volume "$WEB_ROOT/..:/release:ro" \
+      --entrypoint python "$BACKEND_TEST_IMAGE" -m unittest tests.test_schema150_cutover_database -v
+  fi
 fi
 
 docker run --rm --memory=1g --cpus=1 --pids-limit=256 --network host --read-only \

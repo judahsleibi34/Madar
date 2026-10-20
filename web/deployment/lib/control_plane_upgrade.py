@@ -3411,10 +3411,13 @@ def acquire_lock(path: Path, *, create: bool) -> int:
     flags = os.O_RDWR | os.O_CLOEXEC | os.O_NOFOLLOW
     if create:
         flags |= os.O_CREAT
+    descriptor = None
     try:
         descriptor = os.open(path, flags, 0o600)
         fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
     except (OSError, BlockingIOError) as error:
+        if descriptor is not None:
+            os.close(descriptor)
         raise UpgradeError(f"exclusive_lock_unavailable:{path.name}") from error
     return descriptor
 

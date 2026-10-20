@@ -194,14 +194,15 @@ class ProviderMaintenance150:
         if step in PRIVATE_STEPS: self._private_boundary()
         self.journal.append('effect_complete', {'step': step})
 
-    def _quiescence(self, schema):
+    def _quiescence(self, schema, *, cursor=None):
         self._guard('observe_quiescence')
         if type(schema) is not int or schema not in (146, 147, 148, 149, 150):
             raise RuntimeError('schema150_provider_schema_invalid')
         _, completed, pending, _ = self._state()
         if pending or completed != list(FENCE_STEPS):
             raise RuntimeError('schema150_provider_fence_incomplete')
-        observed = self.actor.observe_quiescence(validate_binding(self.binding))
+        observed = (self.actor.observe_quiescence(validate_binding(self.binding)) if cursor is None else
+                    self.actor.observe_quiescence(validate_binding(self.binding),cursor=cursor))
         if (not isinstance(observed, dict) or set(observed) != {'system_identifier', 'schema', *COUNTERS, *FENCES}
                 or observed['system_identifier'] != self.binding['system_identifier']
                 or type(observed['schema']) is not int or observed['schema'] != schema
@@ -222,11 +223,11 @@ class ProviderMaintenance150:
             for step in FENCE_STEPS[len(completed):]: self._effect(step)
             return self._quiescence(146)
 
-    def migration_entry(self, source, target):
+    def migration_entry(self, source, target, *, cursor=None):
         with self._locked():
             if type(source) is not int or type(target) is not int or (source, target) not in ((146,147), (147,148), (148,149), (149,150)):
                 raise RuntimeError('schema150_provider_migration_order')
-            return self._quiescence(source)
+            return self._quiescence(source,cursor=cursor)
 
     def prepare_private_activation(self):
         """Restore original roles/private providers while target grant is absent.

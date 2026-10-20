@@ -549,7 +549,36 @@ class Schema150ProviderAdapter:
         if step=='clear_boot_interlock':return not self.barrier.exists()
         return False
 
-    def observe_quiescence(self,binding):
+    def migration_guard(self,cursor,migration):
+        """Existing LockedMigrationExecutor hook, under the parent's real locks.
+
+        Observe SQL on the very session holding the migration advisory lock.
+        A second psql observer would count that authorized session as a foreign
+        writer. No PID/name whitelist or extra migration executor is introduced.
+        Operational profile registration remains a separate controller gate.
+        """
+        from deployment.lib.migration_executor import Migration,LockedMigrationExecutor
+        from deployment.lib.schema150_release import SQL_SHA256
+        if (type(migration) is not Migration or type(migration.number) is not int
+                or migration.number not in SQL_SHA256
+                or migration.from_schema!=migration.number-1 or migration.to_schema!=migration.number
+                or migration.sha256!=SQL_SHA256[migration.number]
+                or migration.compatibility!=('forward-compatible' if migration.number==148 else 'coordinated')):
+            raise RuntimeError('schema150_provider_migration_contract_changed')
+        self.require_authority(self.binding,purpose='observe_quiescence')
+        key=LockedMigrationExecutor.LOCK_KEY
+        cursor.execute("""select exists(select 1 from pg_catalog.pg_locks
+            where locktype='advisory' and pid=pg_catalog.pg_backend_pid()
+            and database=(select oid from pg_catalog.pg_database where datname=current_database())
+            and classid=%s and objid=%s and objsubid=1 and mode='ExclusiveLock' and granted)""",
+            ((key>>32)&0xffffffff,key&0xffffffff))
+        if cursor.fetchone()!=(True,):
+            raise RuntimeError('schema150_provider_migration_lock_required')
+        from deployment.lib.schema150_provider_lifecycle import ProviderMaintenance150,ProtectedProviderJournal
+        lifecycle=ProviderMaintenance150(self.binding,ProtectedProviderJournal(self.root/'provider-journal'),self)
+        return lifecycle.migration_entry(migration.from_schema,migration.to_schema,cursor=cursor)
+
+    def observe_quiescence(self,binding,*,cursor=None):
         self.require_authority(binding,purpose='observe_quiescence');self._attest('fenced')
         self._supervisors_stopped()
         # Native /proc visibility with a positive live PostgreSQL container PID.
@@ -558,7 +587,17 @@ class Schema150ProviderAdapter:
         from deployment.lib.schema149_consumers import verify_host_processes
         verify_host_processes(self.runtime,{r['id'] for r in self.inventory['containers'].values()},
             positive_pid=self._row('supabase-db')['State'].get('Pid'))
-        value=json.loads(self._sql('BEGIN READ ONLY;'+QUIESCENCE_SQL+';COMMIT;'))
+        if cursor is None:
+            value=json.loads(self._sql('BEGIN READ ONLY;'+QUIESCENCE_SQL+';COMMIT;'))
+        else:
+            from deployment.lib.schema150_release import observe_database_quiescence
+            # Fresh statistics/MVCC and real protocols are checked by the
+            # existing native observer, without committing the caller's work.
+            cursor.execute("select schema_version from public.application_schema_state where contract_key='core'")
+            current=cursor.fetchone()
+            if current is None:raise RuntimeError('schema150_provider_database_not_quiescent')
+            value=observe_database_quiescence(cursor,self.contract,current[0])
+            for key in ('delivery_protocol','outbox_protocol','deletion_protocol'):value.pop(key)
         records=private_json(self.root/'provider-journal'/'0000.json')
         preimage=records['payload']['preimage']
         if self._roles()!=self._expected_roles(preimage,fenced=True):raise RuntimeError('schema150_provider_roles_not_fenced')
