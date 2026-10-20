@@ -44,14 +44,19 @@ class FutureSchemaDatabaseTests(unittest.TestCase):
         return generate(self.root,inventory,origin=first),inventory
 
     def backup(self,directory):
-        path=Path(directory)/'database.dump'; meta=json.loads((Path(directory)/'manifest.json').read_bytes())
-        self.assertEqual(hashlib.sha256(path.read_bytes()).hexdigest(),meta['sha256'])
-        self.assertEqual(path.read_bytes()[:5],b'PGDMP')
-        self.assertEqual(meta['system_identifier'],self.db.execute('select system_identifier::text from pg_control_system()').fetchone()[0])
+        path=Path(directory)/'database.dump'
+        try:
+            meta=json.loads((Path(directory)/'manifest.json').read_bytes()); body=path.read_bytes()
+        except FileNotFoundError:
+            raise RuntimeError('backup_missing') from None
+        if hashlib.sha256(body).hexdigest()!=meta['sha256'] or body[:5]!=b'PGDMP':
+            raise RuntimeError('backup_integrity_mismatch')
+        if meta['system_identifier']!=self.db.execute('select system_identifier::text from pg_control_system()').fetchone()[0]:
+            raise RuntimeError('backup_cluster_mismatch')
 
-    def run_plan(self,plan,inventory,verifier=None):
+    def run_plan(self,plan,inventory,verifier=None,backup_dir=None):
         return rehearsal.run(self.root,inventory,plan,dsn=DSN,state_file=self.state,
-            backup_dir=BACKUP,backup_verifier=verifier or self.backup)
+            backup_dir=backup_dir or BACKUP,backup_verifier=verifier or self.backup)
 
     def schema(self):
         return self.db.execute("select schema_version from public.application_schema_state where contract_key='core'").fetchone()[0]
@@ -248,8 +253,29 @@ class FutureSchemaDatabaseTests(unittest.TestCase):
 
     def test_missing_backup_rejected_before_migration(self):
         plan,inventory=self.plan()
-        def reject(_): raise RuntimeError('backup_missing')
-        with self.assertRaisesRegex(RuntimeError,'backup_missing'): self.run_plan(plan,inventory,reject)
+        with self.assertRaisesRegex(RuntimeError,'backup_missing'):
+            self.run_plan(plan,inventory,backup_dir=self.root/'missing-backup')
+        self.assertEqual(self.schema(),150)
+        self.assertIsNone(self.db.execute("select to_regclass('public.future_one')").fetchone()[0])
+
+    def test_corrupted_actual_dump_rejected_before_migration(self):
+        import shutil
+        plan,inventory=self.plan(); backup=self.root/'corrupt-backup'
+        shutil.copytree(BACKUP,backup)
+        dump=backup/'database.dump'; dump.write_bytes(dump.read_bytes()[:-64])
+        with self.assertRaisesRegex(RuntimeError,'backup_integrity_mismatch'):
+            self.run_plan(plan,inventory,backup_dir=backup)
+        self.assertEqual(self.schema(),150)
+        self.assertIsNone(self.db.execute("select to_regclass('public.future_one')").fetchone()[0])
+
+    def test_wrong_backup_cluster_rejected_before_migration(self):
+        import shutil
+        plan,inventory=self.plan(); backup=self.root/'wrong-cluster-backup'
+        shutil.copytree(BACKUP,backup)
+        metadata=json.loads((backup/'manifest.json').read_bytes()); metadata['system_identifier']='0'
+        (backup/'manifest.json').write_text(json.dumps(metadata))
+        with self.assertRaisesRegex(RuntimeError,'backup_cluster_mismatch'):
+            self.run_plan(plan,inventory,backup_dir=backup)
         self.assertEqual(self.schema(),150)
         self.assertIsNone(self.db.execute("select to_regclass('public.future_one')").fetchone()[0])
 

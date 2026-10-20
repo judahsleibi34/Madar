@@ -31,3 +31,19 @@ validators (`check_migrations.py` and `check_migration_transitions.py`) passed
 with151 files per tree, without a schema151 dispatcher/candidate/profile. The
 temporary clone was removed and no real migration151 was published. This proves
 generic source acceptance, not runtime compatibility or production eligibility.
+
+Subsequent native expansions passed52 cases,then57 cases in90.236s. The latest
+run is38 source/AST/plan/policy cases plus19 native PostgreSQL cases,zero skips.
+Missing backup now uses a physically absent directory rather than an injected
+verifier failure. Corrupted pg_dump bytes and wrong-cluster metadata are also
+refused before SQL;schema150 and the absence of the new table remain asserted.
+Both namespace-spoofing regressions are retained;see the security report for the
+one deliberately failing pre-fix diagnostic and corrected refusal evidence.
+
+Actual candidate-path evidence used an unpublished temporary Git source with
+baseline150 and new151/152 SQL,verified source hashes,matching mirrors and
+compatibility intent. The shared candidate script reported PASS,observed150→152,
+and production_authorized=false. Its first attempt refused unreadable synthetic
+source-directory permissions;only that owned public-source directory's mode was
+corrected,then the full actual candidate plus44-case run passed. No authority,
+SQL or ownership gate was weakened. The fixture is not real Madar151/152 source.
