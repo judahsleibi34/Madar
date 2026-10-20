@@ -71,9 +71,69 @@ and explicitly carries `production_authorized=false`.
   safety21PASS: **52 tests total**, including the12 new cases.
 - Compilation and `git diff --check` pass.
 
-No `REHEARSE`, image import, container start, restore, migration, provider request
-or mutation of a retained project was executed while adding this wrapper. A
-native final-image run and artifact verification remain pending. Process-global
-contexts are CLI-local and intended for a single operation per process; this is
-not a concurrent server API. These component tests do not certify the privileged
+At wrapper implementation, no `REHEARSE`, import or provider operation had run.
+The subsequent native results below supersede that pending status. Process-global
+contexts remain CLI-local and intended for a single operation per process; this
+is not a concurrent server API. Component tests do not certify the privileged
 controller installation, host reboot, production replica or operational approval.
+
+## Completed native acceptance
+
+Exact source:`b9d826ee70e87a7f3eda89c14a78004b79fd6dab`.
+Fresh workflow39137752593,attempt1,artifact12140153655;
+archive462,755,903bytes,SHA256
+`412bf1f1349c0e0f9ba72bfb3c7b25a5399f339d53ab7378d782bfd92b137e36`.
+The historical artifact name is not interpreted as a schema admission.
+
+| Role | Verified image configuration identity |
+|---|---|
+| Backend and business workers | `sha256:5ced98fb5175125debf6a459d14aefcc5fba38ea8e34bcecd4f3df47f654c8a2` |
+| Accepted frontend | `sha256:f0c304c718759d17db0bf6c16fbe0dab41537017c3d73c477c81ed5629454cc1` |
+
+The archive/run/receipt/input hashes and actual imported image IDs/labels were
+verified. No source overlay, old-run receipt substitution or image relabeling was
+used. The exact clean staging checkout and all retained checkouts were preserved.
+
+`REHEARSE` started2026-10-18T14:59:27Z and exited0 at15:04:42Z. Wall time315.157s;
+the application report measured311.042s inside its narrower acceptance scope.
+Do not call either time a production RTO or throughput measurement.
+
+Native results:
+
+- Independent148 database, original roles/passwords/memberships and eight object
+  files restored; row/sequence and owner/grant/RLS/definer fingerprints matched.
+- Captured149/150 SQL committed in order. Preserved business/Auth/Storage rows,
+  sequences and prior outbox state matched. Schema/protocols were exactly150/2/2/2.
+- Original password/auth identity/TOTP and private Storage bytes remained usable;
+  anonymous private-object access was denied. New native Auth/MFA/Storage,
+  notifications and application readiness probes passed.
+- A real consuming deletion worker completed all ten steps for both a synthetic
+  user and tenant, each in one claim attempt, with state
+  `completed_with_retained_records`. The actual GoTrue identity and Storage object
+  were absent; each request had two confirmed external intents. The foreign
+  tenant was preserved. Worker restart retained successful consumption.
+- All eleven fixed project services ran. Real external integration revocation,
+  host-file deletion and lost external responses were not exercised by this
+  runtime probe; native/model failure cases remain distinct evidence.
+
+On2026-10-20, the exact-source browser smoke passed nine groups using Chrome
+151.0.7922.34 over a verified loopback-only tunnel:password→restricted MFA, native
+TOTP, privileged page/API, secure HttpOnly/SameSite cookies, pending-cookie
+removal, script-denied access cookie, authenticated refresh, anonymous admin
+denial, and mobile login labels/keyboard/width. No page errors or blocked external
+hosts were observed. This is selected browser acceptance, not complete productE2E.
+
+The resumed VM was swapping with1,468MiBavailable. After preserving the results,
+only the eleven positively attested PhaseVII services were stopped onOctober20.
+Their volumes/configuration/receipts remain. The22 retained source/recovery
+containers kept their IDs, images and running/stopped states. Available memory
+rose to2,316MiB; the browser tunnel was closed. The new stack is deliberately
+**stopped**, not currently advertised as a running release. No production resource
+was stopped or modified.
+
+The later MVCC controller-helper correction in58dd5c47 is separate source
+evidence. The b9 application/runtime identity above is unchanged and must never
+be relabeled as a later commit's full-stack acceptance. This native restored
+application result does not establish complete protected146→150 admission,
+maintenance journals, write-handoff, real reboot during migrations, off-host
+recovery or object-aware full application PITR.

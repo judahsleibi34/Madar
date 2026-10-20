@@ -61,7 +61,11 @@ observations in the positively marked disposable database. It cannot terminate
 sessions, reset queues, retry a privileged operation or weaken the production
 gate. Unexpected positive-fixture failures now retain the exact observed numeric
 schema/protocol/counter projection as an exception note; credentials, cluster
-identity and resource records are excluded. Fresh hosted execution is required.
+identity and resource records are excluded. Fresh hosted execution at
+`b9d826ee70e87a7f3eda89c14a78004b79fd6dab` subsequently passed all243 native
+executions, including these five cases, in
+[backend run39137752654](https://github.com/judahsleibi34/Madar/actions/runs/39137752654).
+This successful run does not establish the cause of the earlier4bd failure.
 
 The sole owned investigation PostgreSQL was removed. Source150's eleven retained
 services remain running, recovery remains stopped, and the disposable guest
