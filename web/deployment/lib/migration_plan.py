@@ -9,9 +9,33 @@ from dataclasses import dataclass
 import json
 from .migration_inventory import GitSource, Inventory, canonical, digest, strict_json
 from .migration_risk import RANK, analyze
+from .schema148_artifacts import INPUTS as ARTIFACT_INPUTS
 
 INTENT_PATH = 'web/database/migration-intent.json'
 PROTOCOLS = {'delivery', 'outbox', 'deletion'}
+# Root policy pins this preparation/build trust root independently of the PR's
+# moving base. Source-controlled CI success cannot approve its own verifier.
+AUTOMATION_INPUTS=tuple(dict.fromkeys((*ARTIFACT_INPUTS,
+    '.github/workflows/backend-check.yml','.github/workflows/frontend-check.yml',
+    '.github/workflows/schema148-artifacts.yml','.github/workflows/migration-safety.yml',
+    'web/backend/Dockerfile','web/frontend/Dockerfile','web/backend/requirements-migration-tools.txt',
+    'web/scripts/build_schema148_artifacts.py','web/scripts/check_dependency_locks.py',
+    'web/scripts/check_migrations.py','web/scripts/check_migration_transitions.py',
+    'web/scripts/check_forward_release.py','web/scripts/validate_migration_candidate.py',
+    'web/scripts/rehearse_generic_migrations.sh','web/scripts/rehearse_migration_candidate.py',
+    'web/deployment/lib/migration_inventory.py','web/deployment/lib/migration_risk.py',
+    'web/deployment/lib/migration_plan.py','web/deployment/lib/migration_policy.py',
+    'web/deployment/lib/migration_executor.py','web/deployment/lib/migration_drift.py',
+    'web/deployment/lib/schema148_artifacts.py')))
+
+
+def automation_inputs(git,source):
+    import hashlib
+    files=git.files(source,*AUTOMATION_INPUTS,'.github/workflows/','.github/actions/')
+    missing=sorted(set(AUTOMATION_INPUTS)-set(files))
+    hashes={path:hashlib.sha256(body).hexdigest() for path,body in sorted(files.items())}
+    return {'files':hashes,'missing':missing,'sha256':digest({'files':hashes,'missing':missing})}
+
 
 
 def compatibility_intent(git, source):
@@ -50,6 +74,7 @@ def generate(root, inventory: Inventory, *, origin, target=None):
     target=origin if not path else path[-1].number
     git=GitSource(root)
     intent=compatibility_intent(git,inventory.source_sha)
+    automation=automation_inputs(git,inventory.source_sha)
     previous_intent=compatibility_intent(git,inventory.history_base_sha)
     protocol_change=bool(intent and (not previous_intent or intent['worker_protocols']!=previous_intent['worker_protocols']))
     # Use the existing control-plane guard's actual protected-path contract.
@@ -68,7 +93,7 @@ def generate(root, inventory: Inventory, *, origin, target=None):
     compatible=bool(intent and intent['compatible_min']<=origin<=target<=intent['compatible_max'])
     gates=['exact_source','protected_integration','authenticated_images','staging_acceptance',
            'application_compatibility','worker_compatibility','database_identity','schema_and_history_drift',
-           'controller_identity','deployment_lock','fresh_independent_authority']
+           'controller_identity','deployment_lock','trusted_automation_inputs','fresh_independent_authority']
     if path: gates+=['native_migration_rehearsal','backup_integrity','restore_acceptance','resource_and_lock_budget']
     if classification=='B': gates+=['live_size_and_lock_review']
     if classification=='C': gates+=['protected_maintenance','provider_and_worker_quiescence','private_acceptance','forward_repair']
@@ -78,6 +103,7 @@ def generate(root, inventory: Inventory, *, origin, target=None):
         'repository':'judahsleibi34/Madar','source_sha':inventory.source_sha,
         'history_base_sha':inventory.history_base_sha,'inventory_sha256':digest(inventory.document()),
         'origin_schema':origin,'target_schema':target,'migrations':rows,'risk_class':classification,
+        'automation_inputs':automation,
         'compatibility_intent':intent,'compatibility_covers_path':compatible,'worker_protocol_change':protocol_change,
         'protected_control_plane_changed':control_plane_changed,
         'execution_class':'transactional' if all(row['risk']['transactional'] for row in rows) else 'unsupported',

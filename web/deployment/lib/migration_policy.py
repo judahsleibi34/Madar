@@ -14,7 +14,7 @@ from .migration_inventory import strict_json
 
 POLICY_PATH=Path('/etc/madar/migration-policy.json')
 FIELDS={'version','policy_id','environment_id','database_system_identifier','controller_sha',
-        'repository','branch','enabled','expires_at','max_migrations','risk_classes'}
+        'repository','branch','enabled','expires_at','max_migrations','risk_classes','automation_inputs_sha256'}
 
 
 def validate_policy(value):
@@ -28,6 +28,8 @@ def validate_policy(value):
                 for k in ('policy_id','environment_id','database_system_identifier'))
             or not isinstance(value['controller_sha'],str) or not re.fullmatch('[a-f0-9]{40}',value['controller_sha'])):
         raise RuntimeError('migration_policy_identity_invalid')
+    if not isinstance(value['automation_inputs_sha256'],str) or not re.fullmatch('[a-f0-9]{64}',value['automation_inputs_sha256']):
+        raise RuntimeError('migration_policy_automation_identity_invalid')
     return value
 
 
@@ -62,6 +64,8 @@ def assess(plan, policy, observation, *, now=None):
     reasons=[]
     def require(condition,reason):
         if not condition: reasons.append(reason)
+    require(not value['automation_inputs']['missing'],'automation_inputs_incomplete')
+    require(value['automation_inputs']['sha256']==policy['automation_inputs_sha256'],'automation_trust_root_changed')
     require(policy['enabled'] and policy['expires_at']>now,'policy_disabled_or_expired')
     require(value['risk_class']=='A','risk_requires_independent_review')
     require(value['compatibility_covers_path'],'compatibility_intent_missing_or_incomplete')

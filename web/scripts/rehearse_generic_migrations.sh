@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
+# Pin one local daemon for creation/inspection/cleanup; ignore ambient contexts.
+docker() { /usr/bin/docker --host unix:///var/run/docker.sock "$@"; }
 # REHEARSE only. No published ports, persistent DB volume or production target.
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 WEB_ROOT="$(cd -- "$SCRIPT_DIR/.." && pwd)"

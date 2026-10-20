@@ -1705,3 +1705,11 @@ never repairs or auto-learns history. Changed catalog/protocol definitions block
 before a protocol function is executed. No extra database ledger migration or
 new schema151 is introduced for bookkeeping. Full controller dispatch remains
 blocked despite these preparation and native database improvements.
+
+A routine policy additionally pins the exact automation/build input digest in
+root-private configuration. It includes the artifact builder's input inventory,
+parser/planning/evaluation code, migration verification/rehearsal scripts and all
+workflow/local-action files captured from Git. Moving the PR/main base cannot
+silently adopt changed checks. Missing inputs or a different digest require
+independent trust-root review/renewal, even if CI reports success. This is
+read-only eligibility; dispatch remains blocked and no policy is installed.

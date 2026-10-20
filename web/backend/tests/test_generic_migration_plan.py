@@ -8,7 +8,7 @@ import unittest
 sys.path.insert(0,os.getenv('MADAR_TEST_REPOSITORY_ROOT') or str(Path(__file__).resolve().parents[2]))
 import test_generic_migration_source as source_fixture
 from deployment.lib.migration_inventory import discover, canonical
-from deployment.lib.migration_plan import generate, verify, INTENT_PATH
+from deployment.lib.migration_plan import generate, verify, INTENT_PATH, AUTOMATION_INPUTS
 from deployment.lib.migration_risk import scaffold
 from deployment.lib.migration_policy import assess, validate_policy
 
@@ -16,7 +16,11 @@ from deployment.lib.migration_policy import assess, validate_policy
 class PlanTests(unittest.TestCase):
     def setUp(self):
         source_fixture.SourceFixture.setUp(self)
-        self.intent(); self.base=self.commit()
+        self.intent()
+        for relative in AUTOMATION_INPUTS:
+            path=self.root/relative; path.parent.mkdir(parents=True,exist_ok=True)
+            path.write_text('# synthetic reviewed automation input\n')
+        self.base=self.commit()
     git=source_fixture.SourceFixture.git
     write=source_fixture.SourceFixture.write
     commit=source_fixture.SourceFixture.commit
@@ -39,7 +43,8 @@ class PlanTests(unittest.TestCase):
         policy={'version':1,'policy_id':'fixture-only','environment_id':'synthetic-isolated',
             'database_system_identifier':'syntheticcluster','controller_sha':'c'*40,
             'repository':'judahsleibi34/Madar','branch':'refs/heads/main','enabled':True,
-            'expires_at':2000,'max_migrations':10,'risk_classes':['A']}
+            'expires_at':2000,'max_migrations':10,'risk_classes':['A'],
+            'automation_inputs_sha256':value['automation_inputs']['sha256']}
         observation={key:policy[key] for key in ('environment_id','database_system_identifier','controller_sha','repository','branch')}
         observation.update({key:value[key] for key in ('source_sha','origin_schema','target_schema','operation_id')})
         observation.update(plan_sha256=plan.sha256,evidence_expires_at=2000,operation_consumed=False,
@@ -104,7 +109,7 @@ class PlanTests(unittest.TestCase):
 
     def test_protected_controller_change_requires_independent_upgrade(self):
         self.intent(); self.write(2)
-        path=self.root/'web/deployment/lib/example.py'; path.parent.mkdir(parents=True); path.write_text('# controller change\n')
+        path=self.root/'web/deployment/lib/example.py'; path.parent.mkdir(parents=True,exist_ok=True); path.write_text('# controller change\n')
         self.commit(); plan,_=self.plan()
         self.assertTrue(plan.document()['protected_control_plane_changed'])
         self.assertIn('protected_control_plane_upgrade',plan.document()['required_gates'])
@@ -152,6 +157,25 @@ class PlanTests(unittest.TestCase):
         intent.write_text('{"version":1,"version":1}')
         self.write(2); self.commit()
         with self.assertRaisesRegex(RuntimeError,'duplicate_key'): self.plan()
+
+    def test_ci_cannot_approve_changed_workflow_even_after_base_advances(self):
+        self.write(2); self.commit(); accepted,_=self.plan()
+        policy,_=self.accepted_context(accepted)
+        (self.root/'.github/workflows/migration-safety.yml').write_text('# changed verification workflow\n')
+        self.base=self.commit()  # moving PR/main base must not renew root policy
+        self.write(3); self.commit(); changed,_=self.plan(origin=2)
+        self.assertFalse(changed.document()['protected_control_plane_changed'])
+        _,obs=self.accepted_context(changed)
+        result=assess(changed,policy,obs,now=1000)
+        self.assertFalse(result['policy_match'])
+        self.assertIn('automation_trust_root_changed',result['reasons'])
+        self.assertFalse(result['production_execution_allowed'])
+
+    def test_missing_automation_input_blocks_routine_policy(self):
+        (self.root/'web/backend/requirements-migration-tools.txt').unlink()
+        self.write(2); self.commit(); plan,_=self.plan()
+        policy,obs=self.accepted_context(plan)
+        self.assertIn('automation_inputs_incomplete',assess(plan,policy,obs,now=1000)['reasons'])
 
     def test_malformed_intent_blocks_generation(self):
         self.intent(worker_protocols={'delivery':True}); self.write(2); self.commit()
