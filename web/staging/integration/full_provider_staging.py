@@ -169,6 +169,8 @@ def main(mode,directory,source,baseline):
     project=identity(source);runtime=Path.home()/project
     require_host(runtime)
     inventory,plan=source_plan(source,baseline);value=plan.document();schema=value['target_schema']
+    if mode=='REHEARSE' and value['risk_class']=='D':
+        raise RuntimeError('full_staging_exceptional_sql_requires_separate_review')
     directory=Path(directory)
     if directory.is_symlink() or directory.parent!=Path.home():raise RuntimeError('full_staging_artifact_directory_scope')
     metadata=directory.stat()
@@ -188,7 +190,6 @@ def main(mode,directory,source,baseline):
         verify_archive(directory/'candidate.zip',artifact,run,source_sha=source,images=images,expected_inputs=inputs)
         return {'mode':mode,'source_sha':source,'project':project,'plan_sha256':plan.sha256,
             'origin_schema':value['origin_schema'],'target_schema':schema,'mutations_executed':False,'production_authorized':False}
-    if value['risk_class']=='D':raise RuntimeError('full_staging_exceptional_sql_requires_separate_review')
     started=time.monotonic()
     with lease(),target(source,schema):
         admission_headroom(runtime,project)
