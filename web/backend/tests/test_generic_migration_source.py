@@ -84,6 +84,16 @@ class SourceFixture(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, 'commit_object'): self.inventory(self.git('rev-parse', 'HEAD^{tree}'))
         with self.assertRaisesRegex(RuntimeError, 'exact_commit'): self.inventory('HEAD')
 
+    def test_actions_checkout_official_url_alias(self):
+        self.git('remote','set-url','origin','https://github.com/judahsleibi34/Madar')
+        self.assertEqual(self.inventory().target,1)
+
+    def test_executable_sql_rejected(self):
+        self.write(2)
+        (self.root/'web/database/migrations/002_example.sql').chmod(0o755)
+        self.commit()
+        with self.assertRaisesRegex(RuntimeError,'regular_nonexecutable'): self.inventory()
+
     def test_untrusted_remote_rejected(self):
         self.git('remote', 'set-url', 'origin', 'https://example.invalid/Madar.git')
         with self.assertRaisesRegex(RuntimeError, 'repository_invalid'): self.inventory()

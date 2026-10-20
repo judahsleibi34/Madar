@@ -18,7 +18,8 @@ import selectors
 import time
 
 REPOSITORY = 'judahsleibi34/Madar'
-ORIGINS = {'git@github.com:judahsleibi34/Madar.git', 'https://github.com/judahsleibi34/Madar.git'}
+ORIGINS = {'git@github.com:judahsleibi34/Madar.git', 'https://github.com/judahsleibi34/Madar.git',
+           'https://github.com/judahsleibi34/Madar'}
 TREES = ('web/database/migrations/', 'web/supabase/migrations/')
 NAME = re.compile(r'([0-9]{3,})_([a-z0-9][a-z0-9_]*)\.sql')
 SHA = re.compile('[0-9a-f]{40}')
