@@ -1762,3 +1762,12 @@ byte capture, with no-follow/nonblocking descriptor opening. Changed paths,
 same-inode replacement after capture, FIFO/symlink and oversized inputs cannot
 substitute parsed admission data. This strengthens existing evidence validation;
 it creates no approval and leaves all operational blockers intact.
+
+
+PhaseIX adds secret-free automatic full-provider staging on PR/main events. It
+waits for exact-source independent CI/artifacts,builds a fresh owned synthetic
+provider database from captured Git migration bytes,and verifies actual protocol
+markers before starting business workers. Source-derived namespaces,private
+leases,loopback-only ports,resource limits and consumed-attempt refusal remain
+mandatory. Its results grant no protected authority and cannot satisfy the still
+blocked combined schema150 operation. See [staging scope and limitations](architecture-phase9-2026-10-20/10-AUTOMATIC-FULL-STAGING.md).

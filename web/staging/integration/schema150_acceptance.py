@@ -164,14 +164,14 @@ def rpc(name, arguments, token):
     return value[0] if isinstance(value, list) and len(value) == 1 else value
 
 
-def deletion_workflow():
+def deletion_workflow(*, expected_schema=150):
     """Real GoTrue identities/Storage and service-role requests; real worker only.
 
     No provider mock, synthetic protocol marker, direct lifecycle state update,
     manual step completion or fake acknowledgement can satisfy this probe.
     """
     manage.require_database_marker()
-    if manage.sql(PROTOCOL_SQL) != '150:2:2:2':
+    if type(expected_schema) is not int or not 1<=expected_schema<10**9 or manage.sql(PROTOCOL_SQL) != str(expected_schema)+':2:2:2':
         raise RuntimeError('Deletion workflow requires exact compatible database')
     values = service_values(); token = values['SUPABASE_SERVICE_KEY']
     fixture = json.loads(previous.regular(manage.RUNTIME / 'smoke-fixture.json'))

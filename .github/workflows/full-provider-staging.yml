@@ -1,0 +1,53 @@
+name: Full Provider Staging
+
+on:
+  pull_request: {}
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: full-provider-staging
+  cancel-in-progress: false
+
+jobs:
+  full-provider-staging:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CI_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      CI_HISTORY_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+    steps:
+      - name: Checkout exact source without persistent credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install locked PostgreSQL parser
+        run: python3 -m pip install --require-hashes -r web/backend/requirements-migration-tools.txt
+      - name: Download authenticated exact-source candidate after independent CI
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$CI_SOURCE_SHA"
+          test -z "$(git status --porcelain)"
+          python3 web/scripts/fetch_full_provider_artifacts.py \
+            --source-sha "$CI_SOURCE_SHA" \
+            --directory "$HOME/madar-provider-artifacts-${CI_SOURCE_SHA:0:12}"
+      - name: Native full-provider acceptance without deployment authority
+        run: |
+          timeout 15m python3 web/staging/integration/full_provider_staging.py REHEARSE \
+            --source-sha "$CI_SOURCE_SHA" --history-base-sha "$CI_HISTORY_BASE_SHA" \
+            --artifacts "$HOME/madar-provider-artifacts-${CI_SOURCE_SHA:0:12}"
+          cp "$HOME/madar-full-provider-${CI_SOURCE_SHA:0:12}/full-provider-acceptance.json" full-provider-acceptance.json
+      - name: Retain sanitized acceptance only
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: full-provider-${{ env.CI_SOURCE_SHA }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: full-provider-acceptance.json
+          if-no-files-found: error
+          retention-days: 7

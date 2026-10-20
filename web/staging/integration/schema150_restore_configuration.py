@@ -106,19 +106,27 @@ def live_credentials(rows):
     return {'DATABASE_PASSWORD': password, 'JWT_SECRET': jwt}
 
 
-def generate(runtime, source_sha, images, receipt, credentials, project, owner):
+def generate(runtime, source_sha, images, receipt, credentials, project, owner, *, target_schema=150, fresh_database=False):
     """Regenerate from pinned source templates; origin YAML/env are never read."""
     trusted = templates()  # Capture and authenticate before any directory effect.
+    if type(target_schema) is not int or not 1<=target_schema<10**9 or type(fresh_database) is not bool:
+        raise RuntimeError('restore150_schema_configuration_invalid')
     if set(credentials) != {'DATABASE_PASSWORD', 'JWT_SECRET'} or any(
             not re.fullmatch('[0-9a-f]{64}', value) for value in credentials.values()):
         raise RuntimeError('restore150_live_credential_syntax_invalid')
     schema = manage.TARGET_SCHEMA
     try:
-        manage.TARGET_SCHEMA = 150
+        manage.TARGET_SCHEMA = target_schema
         manage.prepare(source_sha)
     finally:
         manage.TARGET_SCHEMA = schema
     signing = credentials['JWT_SECRET']
+    # A fresh-provider fixture uses the reviewed bootstrap produced above,
+    # bound to the same newly generated synthetic credential as its services.
+    # The historical restore path continues to start with no inherited roles.
+    bootstrap=regular(runtime/'bootstrap.sql').decode()
+    original=dict(line.split('=',1) for line in regular(runtime/'compose.env').decode().splitlines())
+    bootstrap=bootstrap.replace(original['DATABASE_PASSWORD'],credentials['DATABASE_PASSWORD'])
     anon, service = manage.jwt(signing, 'anon'), manage.jwt(signing, 'service_role')
     values = {'HARDENING_ROOT': str(runtime), 'SOURCE_SHA': source_sha, **credentials,
               'ANON_KEY': anon, 'SERVICE_KEY': service}
@@ -133,7 +141,7 @@ def generate(runtime, source_sha, images, receipt, credentials, project, owner):
                 'DATA_DELETION_WORKER_POLL_SECONDS': '2', 'DATA_DELETION_WORKER_REQUIRED': 'true',
                 'DATA_DELETION_WORKER_HEALTH_URL': 'http://deletion-worker:8094/health'})
     manage.private_write('application.env', ''.join(key + '=' + value + '\n' for key, value in app.items()))
-    manage.private_write('bootstrap.sql', '-- Independent150 restore: no inherited provider roles.\n', mounted=True)
+    manage.private_write('bootstrap.sql', bootstrap if fresh_database else '-- Independent restore: no inherited provider roles.\n', mounted=True)
     manage.private_write('trusted-gateway.conf', trusted['gateway.conf'], mounted=True)
     text = trusted['compose.yaml'].replace('architecture-hardening-20261016', owner)
     text = text.replace('image: madar-hardening-application:${SOURCE_SHA:?}', 'image: ' + images['backend'])
@@ -174,17 +182,18 @@ http { access_log off; client_body_temp_path /tmp/client; proxy_temp_path /tmp/p
         '--file', str(runtime / 'compose.yaml'), '--file', str(runtime / 'acceptance-compose.json'), 'config', '--format', 'json')
     plan = json.loads(rendered)
     plan.pop('x-service', None); plan.pop('x-application', None)
-    validate(plan, runtime, source_sha, images, project, owner, receipt['build_timestamp'])
+    validate(plan, runtime, source_sha, images, project, owner, receipt['build_timestamp'],target_schema=target_schema)
     body = json.dumps(plan, sort_keys=True).encode()
     manage.private_write('verified-compose.json', body.decode())
     manage.private_write('configuration-receipt.json', json.dumps({'source_sha': source_sha, 'images': images,
         'sha256': hashlib.sha256(body).hexdigest(), 'template_sha256': TEMPLATES,
-        'build_timestamp': receipt['build_timestamp']}) + '\n')
+        'build_timestamp': receipt['build_timestamp'],'target_schema':target_schema}) + '\n')
 
 
-def validate(plan, runtime, source_sha, images, project, owner, build_timestamp=None):
+def validate(plan, runtime, source_sha, images, project, owner, build_timestamp=None, *, target_schema=150):
     """Validate the fully resolved, self-contained Docker Compose data plane."""
     def reject(): raise RuntimeError('restore150_unsafe_resolved_configuration')
+    if type(target_schema) is not int or not 1<=target_schema<10**9:reject()
     if (not isinstance(plan, dict) or set(plan) - {'name', 'services', 'networks', 'volumes', 'x-service', 'x-application'}
             or plan.get('name') != project or set(plan.get('services', {})) != set(BOUNDS)
             or set(plan.get('networks', {})) != {'isolated', 'ingress'}
@@ -233,7 +242,7 @@ def validate(plan, runtime, source_sha, images, project, owner, build_timestamp=
         env = row.get('environment') or {}
         if name in ('backend', 'notification-worker', 'deletion-worker'):
             for key, value in {'APP_ENV': 'staging', 'SUPABASE_URL': 'http://gateway:8081', 'REDIS_URL': 'redis://redis:6379/0',
-                'SCHEMA_COMPATIBLE_MIN': '150', 'SCHEMA_COMPATIBLE_MAX': '150', 'MADAR_RELEASE_SHA': source_sha,
+                'SCHEMA_COMPATIBLE_MIN': str(target_schema), 'SCHEMA_COMPATIBLE_MAX': str(target_schema), 'MADAR_RELEASE_SHA': source_sha,
                 'EMAIL_CHANNEL_ENABLED': 'false', 'WEB_PUSH_ENABLED': 'false', 'AI_ALLOW_LOCAL_EXEC': 'false', 'ALLOW_REMOTE_DATASET_URLS': 'false'}.items():
                 if env.get(key) != value: reject()
             stamp = env.get('MADAR_BUILD_TIMESTAMP', '')
@@ -260,7 +269,7 @@ def validate(plan, runtime, source_sha, images, project, owner, build_timestamp=
     if any(envs[name].get(key) != value for name, fields in required.items() for key, value in fields.items()): reject()
 
 
-def invoke(runtime, args, project, owner, *, timeout=180):
+def invoke(runtime, args, project, owner, *, timeout=180,target_schema=150):
     args = list(args)
     while '--file' in args:
         index = args.index('--file')
@@ -274,9 +283,9 @@ def invoke(runtime, args, project, owner, *, timeout=180):
     manage.state()
     body = regular(runtime / 'verified-compose.json')
     receipt = json.loads(regular(runtime / 'configuration-receipt.json'))
-    if hashlib.sha256(body).hexdigest() != receipt['sha256']:
+    if hashlib.sha256(body).hexdigest() != receipt['sha256'] or receipt.get('target_schema',150)!=target_schema:
         raise RuntimeError('restore150_verified_configuration_changed')
-    validate(json.loads(body), runtime, receipt['source_sha'], receipt['images'], project, owner, receipt['build_timestamp'])
+    validate(json.loads(body), runtime, receipt['source_sha'], receipt['images'], project, owner, receipt['build_timestamp'],target_schema=target_schema)
     # Consume these captured resolved bytes over stdin. Docker never reopens the
     # origin/configuration/env paths verified by an earlier operation.
     return manage.docker('compose', '--project-name', project, '--file', '-', *args, data=body, timeout=timeout)
