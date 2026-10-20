@@ -1713,3 +1713,10 @@ workflow/local-action files captured from Git. Moving the PR/main base cannot
 silently adopt changed checks. Missing inputs or a different digest require
 independent trust-root review/renewal, even if CI reports success. This is
 read-only eligibility; dispatch remains blocked and no policy is installed.
+
+Ten native policy filesystem cases run in a networkless read-only container
+with only a fresh root-private tmpfs policy directory. Root inspection,nonroot/
+owner/mode/ancestry/symlink/missing-file/JSON/scope refusal are actual OS behavior.
+No host policy,controller state,daemon socket or database is mounted. This proves
+the reader's file boundary,not operational authorization or privileged controller
+installation. The workflow and input inventory include the independent drill.

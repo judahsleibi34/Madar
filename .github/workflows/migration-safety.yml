@@ -53,6 +53,10 @@ jobs:
         env:
           BACKEND_TEST_IMAGE: madar-backend-test
         run: timeout 5m bash web/scripts/rehearse_maintenance_role_restore.sh
+      - name: Native root-private policy permission checks
+        env:
+          BACKEND_TEST_IMAGE: madar-backend-test
+        run: timeout 2m bash web/scripts/rehearse_migration_policy.sh
       - name: Preserve preparation evidence without deployment authority
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:

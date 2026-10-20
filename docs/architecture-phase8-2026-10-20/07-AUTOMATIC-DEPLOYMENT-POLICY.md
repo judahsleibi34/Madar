@@ -45,3 +45,11 @@ only. A real-source plan exposed the original overstrict shared mode check;
 it now permits executability only for the fixed automation input capture, with
 regressions retaining executable-SQL refusal and detecting tool-mode changes.
 The actual source inventory has no missing required automation inputs.
+
+Ten actual file/UID permission cases also passed in a networkless read-only
+container,with only a fresh root-owned tmpfs at /etc/madar. Native tests cover
+root inspection of a disabled fixture policy,nonroot refusal,wrong owner/mode,
+writable ancestry,symlink/missing file,duplicate JSON,broadened class scope and
+caller-supplied authority fields. No host /etc,daemon socket,DB or credential is
+mounted in that container. This is NATIVE FILE/PERMISSION proof,not privileged
+controller installation or release execution. The CI workflow retains the drill.

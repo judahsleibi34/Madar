@@ -57,3 +57,14 @@ its test transaction. No production counter,assertion,isolation check or guard
 is weakened;no session/queue reset is introduced. The root cause of that specific
 lock owner was not retained by the failed runner,so it is not claimed as a
 confirmed autovacuum event. The corrected exact-head native suite must pass.
+
+The bounded setup wait alone did not eliminate the CI race:a lock can begin
+after the baseline poll. The exact committed61bcbe1c native150 suite passed on
+staging,but the hosted live-client case again saw one queue lock. The two
+activity-cache cases now hold a bounded observer-owned SHARE barrier on the
+queue tables while measuring client-cache freshness. This prevents unrelated
+background queue activity from invalidating their zero-lock premise. Their
+new/closed-client assertions and all production counters remain unchanged;the
+barrier releases on rollback and is not used by the isolation/backlog cases.
+Unexpected failures now retain bounded synthetic lock-owner/type metadata,no
+query text or customer data. The specific prior lock owner is still unknown.

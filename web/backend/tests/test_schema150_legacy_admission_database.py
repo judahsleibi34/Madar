@@ -75,6 +75,16 @@ class LegacyDeletionAdmissionDatabaseTests(unittest.TestCase):
                 keys=('schema','delivery_protocol','outbox_protocol','deletion_protocol',*release.COUNTERS)
                 safe={k:observed.get(k) if type(observed.get(k)) is int else 'invalid' for k in keys}
                 error.add_note('Synthetic fixture observed counters: '+json.dumps(safe,sort_keys=True))
+                # Bounded metadata only. These are positively marked synthetic
+                # resources; never log query text,customer rows or credentials.
+                details=self.db.execute("select coalesce(json_agg(x),'[]'::json) from ("
+                    "select l.locktype,l.mode,l.granted,l.pid,a.backend_type,a.state,a.datname,"
+                    "c.relname from pg_catalog.pg_locks l left join pg_catalog.pg_stat_activity a on a.pid=l.pid "
+                    "left join pg_catalog.pg_class c on c.oid=l.relation where l.relation=any(array["
+                    "'public.notification_deliveries'::regclass,'public.notification_outbox'::regclass,"
+                    "'public.data_deletion_requests'::regclass,'public.data_deletion_steps'::regclass]) "
+                    "and l.pid is distinct from pg_backend_pid() limit 16) x").fetchone()[0]
+                error.add_note('Synthetic lock metadata after refusal: '+json.dumps(details,sort_keys=True))
                 raise
         with self.db.cursor() as cursor,patch.object(release,'require_database_quiescence',side_effect=diagnosed):
             return release.observe_database_quiescence(cursor, self.contract, 149)
@@ -133,7 +143,16 @@ class LegacyDeletionAdmissionDatabaseTests(unittest.TestCase):
             "select count(*) from public.data_deletion_steps where request_id=%s and state='pending'",
             (self.key,)).fetchone()[0], 10)
 
+    def hold_fixture_queue_barrier(self):
+        # These two cases isolate activity-cache freshness,not queue writers.
+        # Keep background vacuum/DDL out of their initial zero-lock premise.
+        # The bounded lock belongs to this fixture's observer PID (which the
+        # unchanged production query excludes),and rollback releases it.
+        self.db.execute('lock table public.notification_deliveries,public.notification_outbox,'
+                        'public.data_deletion_requests,public.data_deletion_steps in share mode')
+
     def test_new_live_client_cannot_hide_behind_cached_zero_session_snapshot(self):
+        self.hold_fixture_queue_barrier()
         self.assertEqual(self.observation()['other_client_sessions'], 0)
         other = connect_disposable_database(DSN, markers={'madar-notification-synthetic-rehearsal'})
         self.addCleanup(other.close)
@@ -153,6 +172,7 @@ class LegacyDeletionAdmissionDatabaseTests(unittest.TestCase):
             self.observation()
 
     def test_server_confirmed_client_exit_cannot_leave_cached_one_session_snapshot(self):
+        self.hold_fixture_queue_barrier()
         # Observe the same verified disposable cluster through another database
         # so the read-only monitor cannot inflate the tested database's count.
         monitor = psycopg.connect(self.db.info.dsn, dbname='template1',
