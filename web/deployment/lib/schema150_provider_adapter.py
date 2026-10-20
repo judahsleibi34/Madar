@@ -740,6 +740,7 @@ class Schema150ProviderAdapter:
         # Existing accepted authority is verified, not created/replayed here.
         evidence=self.activation_guard(binding,private=False)
         if evidence.get('target_write_authority') is not True:raise RuntimeError('schema150_provider_target_authority_required')
+        self.verify_candidate_stage()
         from deployment.lib.schema150_actor_inventory import WORKER_ROLES
         for logical,record in self.inventory['containers'].items():
             if logical.startswith('candidate:') and logical.split(':',1)[1] in WORKER_ROLES:
@@ -749,6 +750,12 @@ class Schema150ProviderAdapter:
         self.require_authority(binding,purpose='restore_ingress')
         if self.activation_guard(binding,private=False).get('target_write_authority') is not True:
             raise RuntimeError('schema150_provider_target_authority_required')
+        stage=self.verify_candidate_stage()
+        rows={row['Id']:row for row in self._rows()}
+        if any(rows[record['id']]['State'].get('Running') is not True
+                or rows[record['id']]['State'].get('Restarting') is not False
+                for record in stage['runtimes'].values()):
+            raise RuntimeError('schema150_provider_candidate_activation_incomplete')
         # The accepted private application and workers must already be running.
         # Restore approved native supporting actors before exposing the proxy.
         records=list(self.inventory['containers'].items())

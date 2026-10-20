@@ -512,7 +512,9 @@ class ConcreteAdapterTests(unittest.TestCase):
     def test_activation_starts_only_workers_then_supporting_native_actors_and_proxy_last(self):
         actor,scope,preimage,_=self.component(stage='private',candidates=True)
         actor.require_authority=Mock();actor.activation_guard.return_value={'target_write_authority':True}
-        actor.runtime.command.side_effect=None
+        by_id={r['Id']:r for r in actor._rows.return_value}
+        def start(arguments):by_id[arguments[2]]['State']['Running']=True
+        actor.runtime.command.side_effect=start
         actor.resume_accepted_workers(scope,preimage)
         workers={record['id'] for logical,record in actor.inventory['containers'].items()
             if logical.startswith('candidate:') and logical.split(':',1)[1] in inventory.WORKER_ROLES}
@@ -521,6 +523,12 @@ class ConcreteAdapterTests(unittest.TestCase):
         started=[c.args[0][2] for c in actor.runtime.command.call_args_list]
         self.assertEqual(started[-1],actor.inventory['containers']['proxy']['id'])
         self.assertFalse(set(started)&{r['id'] for r in actor.inventory['containers'].values() if r['generation']=='candidate'})
+
+    def test_target_authority_alone_cannot_open_ingress_before_workers_are_running(self):
+        actor,scope,preimage,_=self.component(stage='private',candidates=True)
+        actor.require_authority=Mock();actor.activation_guard.return_value={'target_write_authority':True}
+        with self.assertRaisesRegex(RuntimeError,'candidate_activation_incomplete'):actor.restore_ingress(scope,preimage)
+        actor.runtime.command.assert_not_called()
 
     def test_provider_resume_refuses_published_ports_even_with_injected_original_roles(self):
         actor,scope,preimage,_=self.component(stage='fenced')

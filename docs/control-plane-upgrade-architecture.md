@@ -7,8 +7,9 @@ candidate Redis/backend/frontend. Every private candidate requires the existing
 fresh credential's stage witness plus root-private staged identities, images,
 configuration specs, networks and aliases. Queue workers and the proxy remain
 stopped. After independent target authority, only accepted workers start; the
-proxy is restored last. Inventory state alternatives alone cannot authorize a
-candidate. The existing SQL executor can additionally observe target protocols
+proxy is restored last. Ingress additionally reobserves every sealed candidate
+role as running and non-restarting; target authority alone cannot skip worker
+activation. Inventory state alternatives alone cannot authorize a candidate. The existing SQL executor can additionally observe target protocols
 and quiescence on its still advisory-locked connection before completing its
 receipt. A failed final observation preserves committed SQL as forward repair.
 
