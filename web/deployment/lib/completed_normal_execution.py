@@ -523,6 +523,15 @@ class CompletedNormalUpgrade:
             with self.root_credential():
                 self.event('boot_supersession_pending');self.actor.installation.install();self.actor.guard()
                 self.event('controller_installation_pending');self.install_controller()
+                from deployment.lib.completed_normal_profile import FENCED,OUTBOX
+                if self.profile in (FENCED,OUTBOX):
+                    from deployment.lib.completed_normal_evidence import measured_record
+                    from deployment.lib.schema148_artifacts import seal_candidate_provenance
+                    from deployment.lib.schema150_provider_adapter import LOCKS,require_owned_lock
+                    for descriptor,path in zip((self.lock,self.ops.deploy_lock_descriptor),LOCKS):
+                        require_owned_lock(descriptor,path)
+                    self.event('candidate_artifact_capture_pending')
+                    seal_candidate_provenance(self.actor,measured_record(self.document['application_evidence']['provenance']))
             # Existing deploy.lock must be released before the User=madar
             # service obtains it. The protected upgrade interlock stays armed.
             self.ops.release_deployment_lock()

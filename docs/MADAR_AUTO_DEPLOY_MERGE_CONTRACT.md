@@ -1257,3 +1257,20 @@ build-only event, with read-only workflow credentials and no deployment command.
 It does not activate production automation or satisfy protected integration while
 main remains unprotected. Preserve the legacy artifact workflow identity for
 existing verifiers/receipts; generic migration preparation is a separate check.
+
+
+PhaseIX candidate capture retains API-authenticated CI archive bytes privately in
+the existing admission before candidate prepare, under the existing fresh root
+authority and both deployment locks. OCI manifest/config identity and source/build
+labels are checked before immutable seal publication; subsequent artifact guards
+requery CI and use the retained bytes. Partial capture cannot fall back to mutable
+operator input. No image import, public activation or write authority is issued.
+Historical receipts are preserved and schema150 remains operationally blocked.
+See [candidate capture evidence](architecture-phase9-2026-10-20/04-SEALED-CANDIDATE-PREPARATION.md).
+
+PhaseIX also reproduces and closes a checksum/read race in operator evidence:
+the read-only evidence loader now hashes and parses one bounded regular-file
+byte capture, with no-follow/nonblocking descriptor opening. Changed paths,
+same-inode replacement after capture, FIFO/symlink and oversized inputs cannot
+substitute parsed admission data. This strengthens existing evidence validation;
+it creates no approval and leaves all operational blockers intact.

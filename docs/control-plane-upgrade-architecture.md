@@ -1703,3 +1703,20 @@ role/ownership/ACL restoration, actual future-SQL execution and process-kill
 recovery are distinct from the still-missing combined privileged controller
 operation. Source inventories include the generic read-only helpers; the
 protected installed controller is unchanged by this engineering session.
+
+
+PhaseIX candidate capture retains API-authenticated CI archive bytes privately in
+the existing admission before candidate prepare, under the existing fresh root
+authority and both deployment locks. OCI manifest/config identity and source/build
+labels are checked before immutable seal publication; subsequent artifact guards
+requery CI and use the retained bytes. Partial capture cannot fall back to mutable
+operator input. No image import, public activation or write authority is issued.
+Historical receipts are preserved and schema150 remains operationally blocked.
+See [candidate capture evidence](architecture-phase9-2026-10-20/04-SEALED-CANDIDATE-PREPARATION.md).
+
+PhaseIX also reproduces and closes a checksum/read race in operator evidence:
+the read-only evidence loader now hashes and parses one bounded regular-file
+byte capture, with no-follow/nonblocking descriptor opening. Changed paths,
+same-inode replacement after capture, FIFO/symlink and oversized inputs cannot
+substitute parsed admission data. This strengthens existing evidence validation;
+it creates no approval and leaves all operational blockers intact.

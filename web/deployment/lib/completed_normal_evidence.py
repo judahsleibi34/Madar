@@ -4,7 +4,10 @@ The approved plan pins the original files and their actual execution wrapper.
 Changed image/source/input/runner identities fail; controller-only changes do
 not relabel the accepted application as a new application build.
 """
+import hashlib
 import json
+import os
+import stat
 from pathlib import Path
 import re
 
@@ -21,9 +24,20 @@ def measured_record(binding):
             or not re.fullmatch('[0-9a-f]{64}',str(binding['sha256']))):
         raise RuntimeError('completed_upgrade_evidence_binding_invalid')
     path=readonly_configuration(Path(binding['path']),private=True)
-    if file_digest(path)!=binding['sha256']:
+    # Operator-owned evidence is mutable input, never a protected receipt.
+    # Hash and deserialize exactly the same bounded capture; do not reopen a
+    # pathname after authenticating its earlier contents.
+    try:
+        descriptor=os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
+        with os.fdopen(descriptor,'rb') as source:
+            measured=os.fstat(source.fileno())
+            if not stat.S_ISREG(measured.st_mode) or not 0<measured.st_size<=2*1024**2:
+                raise RuntimeError('completed_upgrade_evidence_size_invalid')
+            body=source.read(measured.st_size+1)
+    except OSError:raise RuntimeError('completed_upgrade_evidence_unavailable') from None
+    if len(body)!=measured.st_size or hashlib.sha256(body).hexdigest()!=binding['sha256']:
         raise RuntimeError('completed_upgrade_evidence_bytes_changed')
-    try:return json.loads(path.read_text())
+    try:return json.loads(body)
     except (ValueError,TypeError):raise RuntimeError('completed_upgrade_evidence_invalid') from None
 
 def verify_application_evidence(actor):

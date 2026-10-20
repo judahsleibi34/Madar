@@ -1745,3 +1745,20 @@ classification and a minimal151 fixture cannot prove full-worker compatibility.
 A separately reviewed forward protocol contract is required before claiming a
 real routine future release;do not relabel that privileged change as ClassA or
 silently alter historical SQL to satisfy a synthetic demonstration.
+
+
+PhaseIX candidate capture retains API-authenticated CI archive bytes privately in
+the existing admission before candidate prepare, under the existing fresh root
+authority and both deployment locks. OCI manifest/config identity and source/build
+labels are checked before immutable seal publication; subsequent artifact guards
+requery CI and use the retained bytes. Partial capture cannot fall back to mutable
+operator input. No image import, public activation or write authority is issued.
+Historical receipts are preserved and schema150 remains operationally blocked.
+See [candidate capture evidence](architecture-phase9-2026-10-20/04-SEALED-CANDIDATE-PREPARATION.md).
+
+PhaseIX also reproduces and closes a checksum/read race in operator evidence:
+the read-only evidence loader now hashes and parses one bounded regular-file
+byte capture, with no-follow/nonblocking descriptor opening. Changed paths,
+same-inode replacement after capture, FIFO/symlink and oversized inputs cannot
+substitute parsed admission data. This strengthens existing evidence validation;
+it creates no approval and leaves all operational blockers intact.

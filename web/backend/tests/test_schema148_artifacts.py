@@ -10,9 +10,11 @@ import tempfile
 import tarfile
 import unittest
 from unittest.mock import patch
+from types import SimpleNamespace
 import zipfile
 sys.path.insert(0,os.getenv('MADAR_TEST_REPOSITORY_ROOT') or str(Path(__file__).resolve().parents[2]))
-from deployment.lib.schema148_artifacts import archive_runtime_identity,verify_archive,verify_required_ci,INPUTS,WORKFLOW
+from deployment.lib.schema148_artifacts import archive_runtime_identity,verify_archive,verify_required_ci,INPUTS,WORKFLOW,capture_candidate_archive
+from deployment.lib import schema148_artifacts as artifacts
 
 class ArtifactTests(unittest.TestCase):
     def setUp(self):
@@ -134,3 +136,121 @@ class ArtifactTests(unittest.TestCase):
         with self.assertRaises(RuntimeError):archive_runtime_identity(path,config_id)
         write(manifests=[{'digest':identity},{'digest':identity}])
         with self.assertRaises(RuntimeError):archive_runtime_identity(path,config_id)
+
+    def oci_fixture(self,changed=None):
+        self.receipt['build_timestamp']='2026-10-20T10:00:00Z';payloads={}
+        self.receipt['build_host_image_ids']={}
+        for role in self.images:
+            labels={'org.opencontainers.image.revision':self.sha,'com.madar.release.sha':self.sha,
+                'com.madar.release.built_at':self.receipt['build_timestamp'],'com.madar.build.mode':'fresh-locked-ci'}
+            if role=='frontend':labels['com.madar.frontend.api_origin']='/api'
+            if changed and changed[0]==role:labels.update(changed[1])
+            config=json.dumps({'architecture':'amd64','os':'linux','config':{'Labels':labels}}).encode()
+            config_id='sha256:'+hashlib.sha256(config).hexdigest()
+            manifest=json.dumps({'schemaVersion':2,'config':{'digest':config_id}}).encode()
+            identity='sha256:'+hashlib.sha256(manifest).hexdigest()
+            files={'index.json':json.dumps({'manifests':[{'digest':identity}]}).encode(),
+                'manifest.json':json.dumps([{'Config':'blobs/sha256/'+config_id.split(':')[1]}]).encode(),
+                'blobs/sha256/'+identity.split(':')[1]:manifest,'blobs/sha256/'+config_id.split(':')[1]:config}
+            result=io.BytesIO()
+            with tarfile.open(fileobj=result,mode='w:gz') as archive:
+                for name,data in files.items():
+                    member=tarfile.TarInfo(name);member.size=len(data);archive.addfile(member,io.BytesIO(data))
+            payloads[role]=result.getvalue();self.images[role]=identity
+            self.receipt['build_host_image_ids'][role]=config_id
+            self.receipt['archives'][role].update(bytes=len(payloads[role]),sha256=hashlib.sha256(payloads[role]).hexdigest())
+        self.write(payloads=payloads)
+
+    def capture(self,name='captured'):
+        return capture_candidate_archive(self.path,self.path.parent/name,self.artifact,self.run,
+            source_sha=self.sha,images=self.images,expected_inputs=self.inputs)
+
+    def test_capture_preserves_authenticated_bytes_and_actual_oci_provenance(self):
+        self.oci_fixture();original=self.path.read_bytes()
+        receipt=self.capture();self.assertEqual(receipt,self.receipt)
+        retained=self.path.parent/'captured'/'archive.zip'
+        self.assertEqual(retained.read_bytes(),original);self.assertEqual(retained.stat().st_mode&0o777,0o600)
+        self.path.write_bytes(b'operator input changed')
+        self.assertEqual(retained.read_bytes(),original);self.assertFalse(receipt['production_authorized'])
+
+    def test_capture_rejects_actual_wrong_source_overlay_origin_and_build_labels(self):
+        for index,(role,labels) in enumerate((('backend',{'org.opencontainers.image.revision':'e'*40}),
+                ('backend',{'com.madar.release.sha':'e'*40}),('backend',{'com.madar.build.mode':'overlay'}),
+                ('backend',{'com.madar.staging.build_mode':'offline-overlay'}),
+                ('frontend',{'com.madar.frontend.api_origin':'http://foreign.invalid'}),
+                ('frontend',{'com.madar.release.built_at':'changed'}))):
+            self.oci_fixture((role,labels))
+            with self.subTest(labels=labels),self.assertRaisesRegex(RuntimeError,'captured_image_incompatible'):
+                self.capture(str(index))
+
+    def test_capture_rejects_receipt_relabeling_of_actual_oci_identity(self):
+        self.oci_fixture();self.images['backend']='sha256:'+'0'*64
+        payloads={}
+        with zipfile.ZipFile(self.path) as archive:
+            for role in self.images:payloads[role]=archive.read(role+'.tar.gz')
+        self.write(payloads=payloads)
+        with self.assertRaisesRegex(RuntimeError,'captured_image_incompatible'):self.capture()
+
+    def test_failed_capture_cannot_overwrite_or_reuse_partial_directory(self):
+        self.path.write_bytes(b'changed')
+        with self.assertRaisesRegex(RuntimeError,'archive_digest_changed'):self.capture()
+        self.assertTrue((self.path.parent/'captured').is_dir())
+        self.oci_fixture()
+        with self.assertRaises(FileExistsError):self.capture()
+
+    def test_capture_refuses_symlink_destination_without_touching_target(self):
+        self.oci_fixture();target=self.path.parent/'other';target.mkdir()
+        (self.path.parent/'captured').symlink_to(target,target_is_directory=True)
+        with self.assertRaises(FileExistsError):self.capture()
+        self.assertEqual(list(target.iterdir()),[])
+
+
+class CandidateSealTests(unittest.TestCase):
+    """MODEL transport/ownership only; never a root installation acceptance."""
+    def setUp(self):
+        self.fixture=ArtifactTests();self.fixture.setUp();self.addCleanup(self.fixture.doCleanups)
+        f=self.fixture;f.oci_fixture()
+        self.root=f.path.parent/'attempt';self.root.mkdir()
+        from test_completed_normal_admission import fixture_contract
+        contract=fixture_contract();contract['candidate'].update(source_sha=f.sha,images=f.images)
+        self.actor=SimpleNamespace(root=self.root,contract=contract)
+        self.binding={'archive':str(f.path),'artifact_id':22,'run_id':11}
+        receipt=capture_candidate_archive(f.path,self.root/'candidate-artifacts',f.artifact,f.run,
+            source_sha=f.sha,images=f.images,expected_inputs=f.inputs)
+        self.record=artifacts.candidate_seal_binding(self.actor,self.binding,f.artifact,f.run,receipt)
+        self.write()
+        for p in (patch.object(artifacts,'provenance_inputs',return_value=(f.artifact,f.run,f.inputs)),
+                patch('deployment.lib.provider_recovery_runtime.protected',lambda p,**kw:Path(p)),
+                patch('deployment.lib.provider_recovery_runtime.readonly_configuration',side_effect=AssertionError('mutable fallback'))):
+            p.start();self.addCleanup(p.stop)
+
+    def write(self):
+        (self.root/'candidate-artifact-seal.json').write_text(json.dumps(self.record))
+
+    def test_reverification_uses_retained_archive_after_original_disappears(self):
+        self.fixture.path.unlink()
+        self.assertEqual(artifacts.verify_provenance(self.actor,self.binding),self.fixture.receipt)
+
+    def test_seal_drift_in_source_controller_database_plan_or_images_rejects(self):
+        for key in ('context_sha256','plan_sha256','source_sha','controller_sha','database','images','migration_manifest_sha256','run_attempt','authority_issued'):
+            original=self.record[key];self.record[key]='changed';self.write()
+            with self.subTest(key=key),self.assertRaisesRegex(RuntimeError,'candidate_seal_changed'):
+                artifacts.verify_provenance(self.actor,self.binding)
+            self.record[key]=original;self.write()
+
+    def test_partial_capture_never_falls_back_to_original_archive(self):
+        (self.root/'candidate-artifact-seal.json').unlink()
+        with self.assertRaises(FileNotFoundError):artifacts.verify_provenance(self.actor,self.binding)
+
+    def test_modified_retained_archive_and_expired_api_evidence_reject(self):
+        archive=self.root/'candidate-artifacts'/'archive.zip';original=archive.read_bytes()
+        archive.write_bytes(original+b'changed')
+        with self.assertRaisesRegex(RuntimeError,'archive_digest_changed'):
+            artifacts.verify_provenance(self.actor,self.binding)
+        archive.write_bytes(original);self.fixture.artifact['expired']=True
+        with self.assertRaisesRegex(RuntimeError,'artifact_identity_invalid'):
+            artifacts.verify_provenance(self.actor,self.binding)
+
+    def test_capture_wrapper_rejects_nonroot_before_api_or_any_file_effect(self):
+        with patch.object(artifacts.os,'geteuid',return_value=1000),self.assertRaisesRegex(RuntimeError,'protected_capture_required'):
+            artifacts.seal_candidate_provenance(self.actor,self.binding)

@@ -136,12 +136,28 @@ class FencedExecutionTests(execution_fixture.ManualExecutionTests):
         super().setUp()
         patcher=patch.object(release,'seal_quiescence',lambda actor:self.effect('quiescence'))
         patcher.start();self.addCleanup(patcher.stop)
+        self.document['application_evidence']={'provenance':{'synthetic':'binding'}}
+        self.ops.deploy_lock_descriptor=1
+        for patcher in (patch('deployment.lib.completed_normal_evidence.measured_record',lambda value:value),
+                patch('deployment.lib.schema150_provider_adapter.require_owned_lock',lambda *args:self.effect('held_lock')),
+                patch('deployment.lib.schema148_artifacts.seal_candidate_provenance',lambda *args:self.effect('capture_artifacts'))):
+            patcher.start();self.addCleanup(patcher.stop)
 
     def test_target_grant_requires_quiescence_backup_sql_preservation_and_acceptance(self):
         result=self.driver.execute();self.assertEqual((result['schema'],result['mode']),(148,'NORMAL'))
         for earlier,later in (('quiescence','backup_pre-migration'),('backup_pre-migration','service_migrate'),('customer_preservation','grant_148'),('seal_sql_completion','grant_148')):
             self.assertLess(self.calls.index(earlier),self.calls.index(later))
         self.assertNotIn('grant_146',self.calls)
+        self.assertLess(self.calls.index('capture_artifacts'),self.calls.index('release_lock'))
+        self.assertLess(self.calls.index('capture_artifacts'),self.calls.index('service_prepare'))
+        self.assertEqual(self.calls.count('held_lock'),2)
+
+    def test_candidate_capture_failure_stops_before_prepare_or_database_migration(self):
+        self.failure='capture_artifacts'
+        with self.assertRaises(RuntimeError):self.driver.execute()
+        self.assertNotIn('release_lock',self.calls);self.assertNotIn('service_prepare',self.calls)
+        self.assertNotIn('service_migrate',self.calls);self.assertEqual(self.schema,146)
+        self.assertFalse((self.root/'normal-completion.json').exists())
 
     def test_every_interrupted_effect_revokes_or_keeps_read_only_without_database_restore(self):
         for failure in ('quiescence','backup_pre-migration','service_migrate','customer_preservation','seal_sql_completion','backup_post-migration'):
