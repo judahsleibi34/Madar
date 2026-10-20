@@ -1677,3 +1677,13 @@ containerd image store. The producer verifies both blobs before publishing the
 receipt. Imported runtime IDs must equal the accepted manifest IDs; a mismatch
 refuses before replacing services. Latest exact-application-source backend and
 frontend workflow success is independently requeried, in addition to artifact CI.
+
+PhaseVIII drift observation extracts the existing structural query to a shared
+constant without changing its bytes or historical receipt algorithm. A generic
+read-only observer requires independent baseline/history evidence, refuses an
+existing writer transaction and checks the catalog before executing protocol
+probes. This does not register generic production operations. Native synthetic
+role/ownership/ACL restoration, actual future-SQL execution and process-kill
+recovery are distinct from the still-missing combined privileged controller
+operation. Source inventories include the generic read-only helpers; the
+protected installed controller is unchanged by this engineering session.

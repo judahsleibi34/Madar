@@ -30,6 +30,17 @@ LEGACY_MIRRORS = {'004_enable_rls_policies.sql': '005_enable_rls_policies.sql',
                   '005_create_get_tables_function.sql': '004_create_get_tables_function.sql'}
 
 
+def strict_json(value):
+    def object_pairs(pairs):
+        result={}
+        for key,item in pairs:
+            if key in result: raise RuntimeError('migration_json_duplicate_key')
+            result[key]=item
+        return result
+    def invalid_constant(_): raise RuntimeError('migration_json_nonfinite_number')
+    return json.loads(value,object_pairs_hook=object_pairs,parse_constant=invalid_constant)
+
+
 def canonical(value):
     return (json.dumps(value, sort_keys=True, separators=(',', ':'), ensure_ascii=True) + '\n').encode()
 
@@ -211,7 +222,7 @@ def discover(root, *, source_sha, history_base_sha):
         body = contract_files.get(CONTRACT_PATH, b'')
         if hashlib.sha256(body).hexdigest() != CONTRACT_SHA256:
             raise RuntimeError('migration_historical_branch_contract_changed')
-        contract = json.loads(body)
+        contract = strict_json(body)
         if (contract.get('status') != 'finalized' or contract.get('source_schema') != 141
                 or contract.get('target_schema') != 143 or contract.get('excluded_schemas') != [142]
                 or contract.get('sql_sha256') != hashlib.sha256(current[legacy_path]).hexdigest()):

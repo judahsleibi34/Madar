@@ -7,7 +7,7 @@ recovery and independently protected admission remain mandatory.
 from __future__ import annotations
 from dataclasses import dataclass
 import json
-from .migration_inventory import GitSource, Inventory, canonical, digest
+from .migration_inventory import GitSource, Inventory, canonical, digest, strict_json
 from .migration_risk import RANK, analyze
 
 INTENT_PATH = 'web/database/migration-intent.json'
@@ -19,7 +19,7 @@ def compatibility_intent(git, source):
     if not files: return None
     body=files[INTENT_PATH]
     if len(body)>32768: raise RuntimeError('migration_intent_size_limit')
-    value=json.loads(body)
+    value=strict_json(body)
     required={'version','compatible_min','compatible_max','rolling_compatible','worker_protocols','declared_class'}
     if (not isinstance(value,dict) or set(value)!=required or type(value['version']) is not int or value['version']!=1
             or type(value['compatible_min']) is not int or type(value['compatible_max']) is not int
@@ -40,7 +40,7 @@ class ReleasePlan:
         import hashlib
         return hashlib.sha256(self.encoded).hexdigest()
 
-    def document(self): return json.loads(self.encoded)
+    def document(self): return strict_json(self.encoded)
 
 
 def generate(root, inventory: Inventory, *, origin, target=None):
@@ -91,7 +91,7 @@ def generate(root, inventory: Inventory, *, origin, target=None):
 
 def verify(root, inventory, *, encoded):
     if type(encoded) is not bytes or len(encoded)>4*1024*1024: raise RuntimeError('migration_plan_size_or_type_invalid')
-    value=json.loads(encoded)
+    value=strict_json(encoded)
     expected=generate(root,inventory,origin=value['origin_schema'],target=value['target_schema'])
     if encoded!=expected.encoded: raise RuntimeError('migration_plan_source_or_metadata_substitution')
     return expected

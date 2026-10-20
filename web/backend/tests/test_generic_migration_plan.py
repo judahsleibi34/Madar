@@ -144,6 +144,15 @@ class PlanTests(unittest.TestCase):
         for updates in ({'enabled':False},{'expires_at':999}):
             self.assertFalse(assess(plan,dict(policy,**updates),obs,now=1000)['policy_match'])
 
+    def test_duplicate_json_keys_and_nonfinite_constants_rejected(self):
+        from deployment.lib.migration_inventory import strict_json
+        for body in ('{"enabled":false,"enabled":true}','{"x":NaN}','{"x":Infinity}'):
+            with self.assertRaises(RuntimeError): strict_json(body)
+        intent=self.root/INTENT_PATH
+        intent.write_text('{"version":1,"version":1}')
+        self.write(2); self.commit()
+        with self.assertRaisesRegex(RuntimeError,'duplicate_key'): self.plan()
+
     def test_malformed_intent_blocks_generation(self):
         self.intent(worker_protocols={'delivery':True}); self.write(2); self.commit()
         with self.assertRaisesRegex(RuntimeError,'intent_invalid'): self.plan()

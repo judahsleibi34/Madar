@@ -31,7 +31,7 @@ class FutureSchemaDatabaseTests(unittest.TestCase):
     def setUp(self):
         plan_fixture.PlanTests.setUp(self)
         self.db=rehearsal.connect(DSN); self.addCleanup(self.db.close)
-        self.db.execute('drop table if exists public.future_one,public.future_two')
+        self.db.execute('drop table if exists public.future_one,public.future_two,public.future_three')
         self.db.execute("update public.application_schema_state set schema_version=150 where contract_key='core'")
         for number in range(2,151): self.write(number,b'-- synthetic historical SQL\n')
         self.base=self.commit()
@@ -62,6 +62,124 @@ class FutureSchemaDatabaseTests(unittest.TestCase):
         self.assertEqual(result['observed_schema'],152)
         self.assertEqual(self.db.execute('select payload from public.synthetic_preserved').fetchone()[0],'retained')
         self.assertEqual([row['status'] for row in result['migrations']],['applied','applied'])
+
+    def test_three_sequential_future_migrations(self):
+        plan,inventory=self.plan(second=True)
+        self.write(153,scaffold(152,153,'CREATE TABLE public.future_three (id pg_catalog.int8);'))
+        head=self.commit(); inventory=discover(self.root,source_sha=head,history_base_sha=self.base)
+        plan=generate(self.root,inventory,origin=150)
+        self.run_plan(plan,inventory)
+        self.assertEqual(self.schema(),153)
+        self.assertEqual([row['number'] for row in plan.document()['migrations']],[151,152,153])
+
+    def test_schema_row_lock_wait_is_bounded_and_rolls_back(self):
+        plan,inventory=self.plan()
+        with rehearsal.connect(DSN) as holder:
+            holder.execute('begin')
+            holder.execute("select schema_version from public.application_schema_state where contract_key='core' for update")
+            with self.assertRaises(Exception): self.run_plan(plan,inventory)
+            holder.execute('rollback')
+        self.assertEqual(self.schema(),150)
+        self.assertIsNone(self.db.execute("select to_regclass('public.future_one')").fetchone()[0])
+
+    def test_real_child_process_killed_after_commit_keeps_consumed_attempt(self):
+        import select,signal
+        plan,inventory=self.plan(second=True)
+        cluster=self.db.execute('select system_identifier::text from pg_control_system()').fetchone()[0]
+        original_connect=rehearsal.connect
+        read_fd,write_fd=os.pipe()
+        pid=os.fork()
+        if pid==0:
+            os.close(read_fd)
+            class Cursor:
+                def __init__(self,database): self.real=database.cursor()
+                def __enter__(self): self.real.__enter__(); return self
+                def __exit__(self,*args): return self.real.__exit__(*args)
+                def execute(self,sql,*args):
+                    self.real.execute(sql,*args)
+                    if isinstance(sql,str) and 'CREATE TABLE public.future_one' in sql:
+                        os.write(write_fd,b'committed'); signal.pause()
+                def fetchone(self): return self.real.fetchone()
+            class Connection:
+                def __init__(self): self.real=original_connect(DSN)
+                @property
+                def autocommit(self): return self.real.autocommit
+                @autocommit.setter
+                def autocommit(self,value): self.real.autocommit=value
+                def cursor(self): return Cursor(self.real)
+                def rollback(self): self.real.rollback()
+                def close(self): self.real.close()
+                def __enter__(self): return self.real.__enter__()
+                def __exit__(self,*args): return self.real.__exit__(*args)
+            def backup(directory):
+                path=Path(directory); meta=json.loads((path/'manifest.json').read_bytes())
+                assert hashlib.sha256((path/'database.dump').read_bytes()).hexdigest()==meta['sha256']
+                assert meta['system_identifier']==cluster
+            try:
+                with patch.object(rehearsal,'connect',lambda _:Connection()): self.run_plan(plan,inventory,backup)
+            except BaseException:
+                os.write(write_fd,b'failed')
+            os._exit(1)
+        os.close(write_fd)
+        try:
+            ready=select.select([read_fd],[],[],25)[0]
+            self.assertTrue(ready,'owned child did not reach the real commit boundary')
+            self.assertEqual(os.read(read_fd,32),b'committed')
+        finally:
+            os.close(read_fd)
+            try: os.kill(pid,signal.SIGKILL)
+            except ProcessLookupError: pass
+            os.waitpid(pid,0)
+        self.assertEqual(self.schema(),151)
+        journal=json.loads(self.state.read_bytes())
+        self.assertEqual(journal['status'],'running')
+        self.assertEqual(journal['migrations'][0]['status'],'applying')
+        with self.assertRaises(FileExistsError): self.run_plan(plan,inventory)
+        self.assertIsNone(self.db.execute("select to_regclass('public.future_two')").fetchone()[0])
+
+    def test_readonly_catalog_drift_detects_schema_grants_and_never_repairs(self):
+        from deployment.lib.migration_drift import observe,compare,history_digest
+        _,inventory=self.plan()
+        first=observe(self.db,required_protocols={})
+        baseline={'version':1,**{k:v for k,v in first.document().items() if k!='read_only'},
+                  'history_sha256':history_digest(inventory,150)}
+        self.assertEqual(compare(inventory,first,expected=baseline)['status'],'PASS')
+        self.db.execute('alter table public.synthetic_preserved add column extra integer')
+        try:
+            changed=observe(self.db,required_protocols={})
+            with self.assertRaisesRegex(RuntimeError,'drift_detected'): compare(inventory,changed,expected=baseline)
+        finally: self.db.execute('alter table public.synthetic_preserved drop column extra')
+        acl_origin=observe(self.db,required_protocols={})
+        acl_baseline={**baseline,**{k:v for k,v in acl_origin.document().items() if k!='read_only'}}
+        self.db.execute('grant select on public.synthetic_preserved to public')
+        try:
+            changed=observe(self.db,required_protocols={})
+            with self.assertRaisesRegex(RuntimeError,'drift_detected'): compare(inventory,changed,expected=acl_baseline)
+        finally: self.db.execute('revoke select on public.synthetic_preserved from public')
+        # Missing hash history is not learned from the current schema number.
+        bad=dict(baseline); bad.pop('history_sha256')
+        with self.assertRaisesRegex(RuntimeError,'protected_baseline'): compare(inventory,first,expected=bad)
+        self.assertEqual(self.schema(),150)
+
+    def test_changed_protocol_function_is_not_executed_before_catalog_check(self):
+        from deployment.lib.migration_drift import observe
+        first=observe(self.db,required_protocols={})
+        with self.assertRaisesRegex(RuntimeError,'catalog_baseline'):
+            observe(self.db,required_protocols={'delivery':2})
+        self.db.execute("create function public.notification_delivery_protocol() returns integer language plpgsql as $$ begin raise exception 'untrusted_protocol_must_not_run'; end $$")
+        try:
+            with self.assertRaisesRegex(RuntimeError,'before_protocol_execution'):
+                observe(self.db,required_protocols={'delivery':2},expected_structure_sha256=first.structure_sha256)
+        finally: self.db.execute('drop function public.notification_delivery_protocol()')
+        self.assertEqual(self.schema(),150)
+
+    def test_catalog_observer_refuses_existing_writer_transaction(self):
+        from deployment.lib.migration_drift import observe
+        self.db.execute('begin')
+        try:
+            with self.assertRaisesRegex(RuntimeError,'existing_transaction'): observe(self.db,required_protocols={})
+            self.assertNotEqual(self.db.info.transaction_status,0)
+        finally: self.db.execute('rollback')
 
     def test_completed_operation_replay_rejected(self):
         plan,inventory=self.plan(); self.run_plan(plan,inventory)

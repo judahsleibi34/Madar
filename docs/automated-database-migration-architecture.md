@@ -1686,3 +1686,22 @@ schema observation and a new inspected attempt. Historical specialized
 rehearsals are retained. The generic Migration Safety workflow always runs on
 PRs/main with read-only credentials and no production secrets; post-merge work
 prepares evidence only. Full automatic actual-candidate staging is still pending.
+
+The generic CI rehearsal also consumes actual newly discovered routine SQL,
+not just framework fixtures. It captures the source/base commits and runs the
+complete compatible tail from the observed minimal fixture origin through the
+same existing executor. Unknown/coordinated SQL or insufficient compatibility
+produces an explicit BLOCKED coverage report. A successful analysis workflow is
+not a successful full-application rehearsal or production admission. The report
+records that limitation and cannot be substituted for native provider acceptance.
+An unpublished synthetic Git candidate demonstrated actual150→151→152 execution
+without editing a controller profile. The CI artifacts preserve both the plan
+and native coverage report. Original-role restoration is independently exercised
+with ownership/ACL/password-attribute preservation and an exact42501 denial.
+
+Generic drift inspection reuses the existing catalog/role digest query without
+changing its bytes. It compares independently protected history evidence and
+never repairs or auto-learns history. Changed catalog/protocol definitions block
+before a protocol function is executed. No extra database ledger migration or
+new schema151 is introduced for bookkeeping. Full controller dispatch remains
+blocked despite these preparation and native database improvements.

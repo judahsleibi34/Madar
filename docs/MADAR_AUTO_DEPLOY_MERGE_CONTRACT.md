@@ -1250,3 +1250,10 @@ executes isolated synthetic future-schema tests. It has read-only permissions,
 no deployment secret and no production dispatch. This does not enable merge or
 automatic deployment. A main push still requires a separate administrator-
 controlled protected integration and operational policy before production work.
+
+Candidate artifacts now also build for exact main pushes, so a future integrated
+SHA can receive fresh provenance instead of reusing a PR-head image. This is a
+build-only event, with read-only workflow credentials and no deployment command.
+It does not activate production automation or satisfy protected integration while
+main remains unprotected. Preserve the legacy artifact workflow identity for
+existing verifiers/receipts; generic migration preparation is a separate check.

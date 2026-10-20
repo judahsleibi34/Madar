@@ -57,6 +57,19 @@ parser_args=()
 if [[ -n "${MIGRATION_REHEARSAL_PARSER_DIR:-}" ]]; then
   parser_args=(--volume "$MIGRATION_REHEARSAL_PARSER_DIR:/parser:ro")
 fi
+if [[ -n "${CI_SOURCE_SHA:-}" && -n "${CI_HISTORY_BASE_SHA:-}" ]]; then
+  # Test actual newly discovered routine SQL, not only synthetic framework cases.
+  # Non-routine SQL produces an explicit BLOCKED coverage report, never a PASS.
+  docker run --rm --network "container:$CONTAINER_NAME" --memory=384m --cpus=0.75 --pids-limit=96 --read-only \
+    --tmpfs /tmp:rw,exec,nosuid,nodev,size=128m,mode=1777 \
+    --env CI_SOURCE_SHA --env CI_HISTORY_BASE_SHA \
+    --env PYTHONPATH=/parser:/repository/web \
+    --env GENERIC_MIGRATION_SYNTHETIC_DATABASE_DSN='host=127.0.0.1 port=5432 dbname=postgres user=postgres' \
+    --env GENERIC_MIGRATION_SYNTHETIC_BACKUP=/verified-backup \
+    --volume "$backup_dir:/verified-backup:ro" --volume "$WEB_ROOT/..:/repository:ro" \
+    "${parser_args[@]}" --entrypoint python "$BACKEND_TEST_IMAGE" \
+    /repository/web/scripts/rehearse_migration_candidate.py > "$WEB_ROOT/../migration-native.json"
+fi
 docker run --rm --network "container:$CONTAINER_NAME" --memory=384m --cpus=0.75 --pids-limit=96 --read-only \
   --tmpfs /tmp:rw,exec,nosuid,nodev,size=128m,mode=1777 \
   --env PYTHONPATH=/parser:/test-repository:/test-repository/backend/tests \

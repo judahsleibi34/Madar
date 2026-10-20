@@ -89,7 +89,7 @@ class CiSourceIdentityTests(unittest.TestCase):
     def test_candidate_check_covers_main_without_path_condition(self):
         source = (WORKFLOWS / "schema148-artifacts.yml").read_text()
         self.assertIn("  pull_request: {}", source)
-        self.assertNotIn("    branches:", source)
+        self.assertIn("  push:\n    branches: [main]", source)
         self.assertNotIn("    paths:", source)
         self.assertNotIn("    paths-ignore:", source)
 

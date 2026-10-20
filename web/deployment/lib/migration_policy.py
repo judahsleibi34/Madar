@@ -10,6 +10,7 @@ import os
 from pathlib import Path
 import stat
 import time
+from .migration_inventory import strict_json
 
 POLICY_PATH=Path('/etc/madar/migration-policy.json')
 FIELDS={'version','policy_id','environment_id','database_system_identifier','controller_sha',
@@ -44,7 +45,7 @@ def load_policy():
             raise RuntimeError('migration_policy_file_unprotected')
         raw=stream.read(32769)
     if len(raw)>32768: raise RuntimeError('migration_policy_size_limit')
-    return validate_policy(json.loads(raw))
+    return validate_policy(strict_json(raw))
 
 
 def assess(plan, policy, observation, *, now=None):
@@ -54,6 +55,10 @@ def assess(plan, policy, observation, *, now=None):
     records production_execution_allowed=False until that integration exists.
     """
     validate_policy(policy); value=plan.document(); now=int(time.time()) if now is None else now
+    if not isinstance(observation,dict) or not isinstance(observation.get('gates'),dict):
+        return {'version':1,'policy_match':False,'decision':'BLOCKED','reasons':['observation_invalid'],
+                'plan_sha256':plan.sha256,'authority_issued':False,'production_execution_allowed':False,
+                'protected_dispatch':'BLOCKED_INTEGRATION_INCOMPLETE'}
     reasons=[]
     def require(condition,reason):
         if not condition: reasons.append(reason)
