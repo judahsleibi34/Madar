@@ -107,7 +107,21 @@ def admitted_manifest(root, contract):
 
 COUNTERS = ('processing_deliveries', 'processing_outbox', 'processing_deletions',
             'processing_steps', 'legacy_deletion_backlog', 'other_client_sessions',
-            'prepared_transactions', 'queue_locks')
+            'prepared_transactions', 'queue_locks', 'unknown_writers')
+# Pinned PostgreSQL core housekeeping is not an application SQL actor. Reject
+# replication senders (database-mode senders can execute ordinary SQL), apply/
+# extension workers and unclassified types. An observer's own parallel workers
+# are bound to its actual leader PID, never accepted merely by a process name.
+# Streaming replicas need a separate positively bound admission contract; do not
+# silently exempt an unknown sender just to satisfy a replica requirement.
+BACKGROUND_WRITER_SQL = """select count(*) from pg_catalog.pg_stat_activity
+ where pid<>pg_catalog.pg_backend_pid()
+ and backend_type is distinct from 'client backend'
+ and (backend_type is null or backend_type not in
+   ('autovacuum launcher','autovacuum worker','background writer','checkpointer',
+    'archiver','walwriter','logical replication launcher'))
+ and (backend_type is distinct from 'parallel worker'
+      or leader_pid is distinct from pg_catalog.pg_backend_pid())"""
 QUIESCENCE_SQL = """
 select json_build_object(
  'system_identifier',(select system_identifier::text from pg_control_system()),
@@ -126,6 +140,7 @@ select json_build_object(
  'other_client_sessions',(select count(*) from pg_stat_activity where
     backend_type='client backend' and pid<>pg_backend_pid()),
  'prepared_transactions',(select count(*) from pg_prepared_xacts),
+ 'unknown_writers',("""+BACKGROUND_WRITER_SQL+"""),
  'queue_locks',(select count(*) from pg_locks where relation=any(array[
     'public.notification_deliveries'::regclass,'public.notification_outbox'::regclass,
     'public.data_deletion_requests'::regclass,'public.data_deletion_steps'::regclass])

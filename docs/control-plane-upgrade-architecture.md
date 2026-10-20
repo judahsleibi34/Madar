@@ -1742,3 +1742,14 @@ use locked dependencies,a synthetic private fixture and verified loopback/source
 identity. Bounded progress and sanitized failure reports contain no credentials,
 exception messages or raw provider logs;completed evidence follows observed
 owned-service shutdown. These CI privileges are not release authority.
+
+
+PhaseIX native testing reproduced a replication-mode PostgreSQL connection that
+could UPDATE an owned fixture while reporting backend_type=walsender;the prior
+client-only admission check accepted it. Schema150 now measures unknown database
+workers,including replication senders,at migration and private recovery boundaries
+instead of asserting unknown_writers=0. Only pinned core housekeeping and the
+observer's PID-bound parallel workers are excluded;NULL/unclassified types deny.
+Streaming senders require a separate positive replica/consumer contract;none is
+exempted to manufacture readiness. Dormant host/extension/supervisor inventory
+and full protected controller acceptance remain independent unmet gates.

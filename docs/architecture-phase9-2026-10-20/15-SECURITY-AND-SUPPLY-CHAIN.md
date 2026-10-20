@@ -86,3 +86,29 @@ use locked dependencies,a synthetic private fixture and verified loopback/source
 identity. Bounded progress and sanitized failure reports contain no credentials,
 exception messages or raw provider logs;completed evidence follows observed
 owned-service shutdown. These CI privileges are not release authority.
+
+## Unclassified replication-mode SQL writer — confirmed conditional admission defect
+
+A real database-mode replication connection in the marked PostgreSQL17 fixture
+reported `walsender`,executed and observed an owned UPDATE,and rolled it back.
+The unchanged assertion requiring admission refusal failed against the prior
+client-only guard. No customer data or production session was involved.
+
+
+
+PhaseIX native testing reproduced a replication-mode PostgreSQL connection that
+could UPDATE an owned fixture while reporting backend_type=walsender;the prior
+client-only admission check accepted it. Schema150 now measures unknown database
+workers,including replication senders,at migration and private recovery boundaries
+instead of asserting unknown_writers=0. Only pinned core housekeeping and the
+observer's PID-bound parallel workers are excluded;NULL/unclassified types deny.
+Streaming senders require a separate positive replica/consumer contract;none is
+exempted to manufacture readiness. Dormant host/extension/supervisor inventory
+and full protected controller acceptance remain independent unmet gates.
+
+The same native suite now passes5cases:actual replication-writer refusal,
+foreign-database client refusal,foreign prepared-transaction refusal,published150
+protocol horizon,and NULL/parallel-leader classification. A transport-isolated
+component test also proves private recovery measures the writer count rather
+than inventing zero. These are native/component results,not a complete writer
+inventory or an installed production controller acceptance.

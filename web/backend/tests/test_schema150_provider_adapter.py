@@ -106,6 +106,19 @@ class ConcreteAdapterTests(unittest.TestCase):
         actor.activation_guard.assert_called_once_with(scope, private=True)
         actor.runtime.command.assert_not_called()
 
+    def test_private_boundary_measures_background_writers_instead_of_assuming_zero(self):
+        actor,scope,_,_=self.component(stage='private')
+        actor._supervisors_stopped=Mock();actor._sessions=Mock(return_value=[])
+        actor.activation_guard.return_value={'target_write_authority':False}
+        def query(body):
+            if adapter.BACKGROUND_WRITER_SQL in body:return '1'
+            if 'pg_prepared_xacts' in body:return '0'
+            raise AssertionError('Unexpected SQL')
+        actor._sql=Mock(side_effect=query)
+        observed=actor.observe_private_boundary(scope)
+        self.assertEqual(observed['unknown_writers'],1)
+        self.assertEqual(observed['unknown_client_sessions'],0)
+
 
     def test_default_fresh_credential_validator_refuses_before_transport(self):
         from deployment.lib import control_plane_upgrade_authorization as authorization

@@ -25,7 +25,7 @@ from deployment.lib.emergency_routing_repair import exclusive
 from deployment.lib.provider_recovery_runtime import protected
 from deployment.lib.schema150_provider_lifecycle import (validate_binding, digest, encoded, STEPS,
     FENCE_STEPS, PRIVATE_STEPS, ACTIVATE_STEPS)
-from deployment.lib.schema150_release import QUIESCENCE_SQL, require_target_protocols
+from deployment.lib.schema150_release import QUIESCENCE_SQL, BACKGROUND_WRITER_SQL, require_target_protocols
 
 LOCKS = (Path('/var/lib/madar-control-plane/upgrades/upgrade.lock'),
          Path('/var/lib/madar/releases/deploy.lock'))
@@ -565,7 +565,7 @@ class Schema150ProviderAdapter:
                 or any(type(value.get(k)) is not int or value[k]!=0 for k in DATABASE_COUNTERS)):
             raise RuntimeError('schema150_provider_database_not_quiescent')
         self._object_preservation(binding,preimage,capture=True)
-        value.update(unknown_writers=0,ingress_fenced=True,supervisors_fenced=True,objects_fenced=True,
+        value.update(ingress_fenced=True,supervisors_fenced=True,objects_fenced=True,
             roles_fenced=True,boot_interlock_armed=self.barrier.exists(),candidate_read_only=self.activation_guard(binding,private=True).get('candidate_read_only') is True)
         return value
 
@@ -602,7 +602,8 @@ class Schema150ProviderAdapter:
         sessions=self._sessions()
         return {'binding_sha256':digest(binding),'ingress_fenced':True,'workers_fenced':True,
             'boot_interlock_armed':self.barrier.exists(),'candidate_read_only':self.activation_guard(binding,private=True).get('target_write_authority') is False,
-            'unknown_writers':0,'unknown_client_sessions':0 if self._known_sessions(sessions) else len(sessions),
+            'unknown_writers':int(self._sql('BEGIN READ ONLY;'+BACKGROUND_WRITER_SQL+';COMMIT;')),
+            'unknown_client_sessions':0 if self._known_sessions(sessions) else len(sessions),
             'prepared_transactions':int(self._sql('SELECT count(*) FROM pg_prepared_xacts;'))}
 
     def restore_roles_private(self,binding,preimage):

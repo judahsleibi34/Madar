@@ -42,9 +42,9 @@ class QuiescenceScopeDatabaseTests(unittest.TestCase):
         self.assertEqual(hashlib.sha256(body).hexdigest(),release.SQL_SHA256[150])
         statement=next(line for line in body.decode().splitlines() if line.startswith('create function public.data_deletion_ownership_protocol()'))
         self.db.execute(statement)
-    def other_database(self):
+    def other_database(self,**options):
         db=psycopg.connect(self.db.info.dsn,dbname='restored_fixture',hostaddr=self.db.info.hostaddr,
-                           autocommit=True,connect_timeout=5)
+                           autocommit=True,connect_timeout=5,**options)
         self.addCleanup(db.close)
         actual=db.execute("select (select system_identifier::text from pg_control_system()),"
             "pg_catalog.shobj_description(oid,'pg_database') from pg_catalog.pg_database where datname=pg_catalog.current_database()"
@@ -77,5 +77,29 @@ class QuiescenceScopeDatabaseTests(unittest.TestCase):
         # no ownership RPC is bypassed and cleanup restores the original state.
         self.db.execute("update public.application_schema_state set schema_version=151 where contract_key='core'")
         self.assertEqual(self.db.execute('select public.data_deletion_ownership_protocol()').fetchone()[0],0)
+
+    def test_database_replication_connection_can_write_and_must_block_admission(self):
+        # PostgreSQL database-mode replication connections accept ordinary SQL
+        # but report backend_type=walsender, rather than client backend.
+        other=self.other_database(replication='database')
+        self.assertEqual(other.execute('select backend_type from pg_stat_activity where pid=pg_backend_pid()').fetchone(),('walsender',))
+        other.execute('begin')
+        try:
+            other.execute("update public.synthetic_preserved set payload='owned replication-mode writer'")
+            self.assertEqual(other.execute('select payload from public.synthetic_preserved').fetchone(),('owned replication-mode writer',))
+        finally:other.execute('rollback')
+        self.assertEqual(other.execute('select payload from public.synthetic_preserved').fetchone(),('retained',))
+        with self.assertRaisesRegex(RuntimeError,'not_quiescent'):self.observation()
+
+    def test_background_classification_is_null_safe_and_binds_parallel_leader(self):
+        own=self.db.execute('select pg_backend_pid()').fetchone()[0]
+        statement=release.BACKGROUND_WRITER_SQL.replace('pg_catalog.pg_stat_activity',
+            '(select %s::integer as pid,%s::text as backend_type,%s::integer as leader_pid) as actors')
+        for kind,leader,expected in ((None,None,1),('unknown extension worker',None,1),
+                ('logical replication worker',None,1),('walsender',None,1),
+                ('parallel worker',None,1),('parallel worker',own+1,1),
+                ('parallel worker',own,0),('checkpointer',None,0),('client backend',None,0)):
+            with self.subTest(kind=kind,leader=leader):
+                self.assertEqual(self.db.execute(statement,(own+100000,kind,leader)).fetchone()[0],expected)
 
 if __name__=='__main__':unittest.main()
