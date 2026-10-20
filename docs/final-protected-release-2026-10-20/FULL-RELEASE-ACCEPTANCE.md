@@ -33,6 +33,6 @@ issuer. It is never installed as operational authority. Auth/MFA provider behavi
 object bytes, actual private services, worker ownership, proxy promotion and NORMAL
 writes are not exercised by these SQL cases.
 
-Fresh-provider CI is a separate genesis150 application test. Its receipt explicitly
+All five6e58workflows passed. Fresh-provider CI is a separate genesis150 application test. Its receipt explicitly
 reports `protected_controller_execution=false`, `production_authorized=false`.
 It cannot satisfy this preserved146 application acceptance gate.

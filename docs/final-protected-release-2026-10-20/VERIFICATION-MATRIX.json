@@ -19,13 +19,13 @@
     },
     {
       "gate": "source_provenance",
-      "status": "PARTIAL",
-      "evidence": "Exact committed source/archive verified; publication-head CI/artifacts reported separately."
+      "status": "PASS",
+      "evidence": "Exact6e58checkout, immutable authenticated candidate archive and runtime source identity verified by five CI workflows; no production acceptance implied."
     },
     {
       "gate": "artifacts",
-      "status": "NOT TESTED",
-      "evidence": "Publication-head fresh build/runtime identities require their own CI receipts."
+      "status": "PASS",
+      "evidence": "6e58artifact12293308601 authenticated; provider artifact12294645733 downloaded/digest verified, exact source/image identities and no overlay. Scope fresh genesis only."
     },
     {
       "gate": "independent_test_authority",
@@ -109,8 +109,8 @@
     },
     {
       "gate": "source_ci",
-      "status": "NOT TESTED",
-      "evidence": "Publication-head CI is required; final PR/session must report its exact receipts."
+      "status": "PASS",
+      "evidence": "All five6e58workflows passed; final publication requires its own receipts, reported separately."
     },
     {
       "gate": "security",
@@ -136,6 +136,35 @@
       "gate": "production_authorization",
       "status": "BLOCKED",
       "evidence": "Explicitly not authorized; no production effects or policy activation."
+    },
+    {
+      "gate": "git_identity",
+      "status": "PASS",
+      "evidence": "All four6e58-history commits mapped to Saliba-codes author/committer through GitHub; final publication separately verified."
+    },
+    {
+      "gate": "historical_sql",
+      "status": "PASS",
+      "evidence": "001\u2013150 mirrors/history unchanged from PR219; no active descriptor or151migration changes."
+    },
+    {
+      "gate": "production_nonmutation",
+      "status": "PASS",
+      "evidence": "Continuation mutations limited to development, owned synthetic staging and draft PR; no production authority or activation. Not a global live-production attestation."
+    },
+    {
+      "gate": "generic_protected_execution",
+      "status": "BLOCKED",
+      "evidence": "No generic dispatch added ahead of incomplete explicit150controller; actual151 compatibility blocker retained."
     }
-  ]
+  ],
+  "ci_evidence_source_sha": "6e58dcbe03b806f1868e02b166397e581da481a4",
+  "ci_runs": {
+    "Backend": "https://github.com/judahsleibi34/Madar/actions/runs/39485964196",
+    "Frontend": "https://github.com/judahsleibi34/Madar/actions/runs/39485964202",
+    "Migration safety": "https://github.com/judahsleibi34/Madar/actions/runs/39485964203",
+    "Candidate artifacts": "https://github.com/judahsleibi34/Madar/actions/runs/39485964299",
+    "Full provider": "https://github.com/judahsleibi34/Madar/actions/runs/39485964286"
+  },
+  "publication_head_receipts": "Resolve PR220 head; its own fresh CI/artifacts are reported separately by GitHub and the final session."
 }

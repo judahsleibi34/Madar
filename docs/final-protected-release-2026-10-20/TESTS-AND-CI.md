@@ -46,3 +46,49 @@ Always-running jobs: `test-backend`, `build-frontend`, `migration-safety`,
 `build-candidate`, `full-provider-staging`. Workflow tokens remain read-only,
 Actions pinned, checkout exact-head with no persisted credential. No production
 workflow, root automation policy or protected dispatcher was enabled.
+
+## Accepted source6e58dcbe
+
+All five workflows passed for `6e58dcbe03b806f1868e02b166397e581da481a4`:
+
+- [Backend](https://github.com/judahsleibi34/Madar/actions/runs/39485964196).
+- [Frontend](https://github.com/judahsleibi34/Madar/actions/runs/39485964202).
+- [Migration safety](https://github.com/judahsleibi34/Madar/actions/runs/39485964203).
+- [Candidate artifacts](https://github.com/judahsleibi34/Madar/actions/runs/39485964299).
+- [Full provider](https://github.com/judahsleibi34/Madar/actions/runs/39485964286).
+
+Backend:4,375collected,3,486passed,889conditional skips,0failures. Separately,
+257native PostgreSQL executions passed; these overlap specialized suites and are
+not added as unique unit coverage. Frontend:1,713passed,1skipped,233files;
+lint/build/dependency checks and audit passed. Migration safety68passed;
+root-policy filesystem10passed; native runtime lock ownership4passed. Native
+maintenance component restore passed9.328s,including original roles/owner/ACL/
+data/sequences and object bytes; metadata activation and replica remainedfalse.
+
+The committed implementation archive's staging controller suite collected345,
+335passed/10skipped. Its native150 script passed205executions,including12cutover
+cases. A small isolated Docker observation also confirmed declared aliases remain
+stable and live endpoints disappear after stop. This is not full candidate or
+privileged-controller acceptance. Owned dummy containers/networks were removed
+only after exact ID/label checks; retained stacks and guest were unchanged.
+
+Authenticated provider report:artifact12294645733,run39485964286attempt1,
+SHA256 `a19e3be8db0c01eb47d9a0879424bc1b978c1797822ecaeea30801a967e24523`.
+Its actual downloaded ZIP was hashed before the single bounded JSON was read.
+Candidate artifact12293308601,run39485964299attempt1,archive SHA256
+`ba1438dc4463f18ee6df69c4a62eb00d8597212e894e2317b1129f005f5d30f3`.
+The report binds that authenticated candidate and these actual runtime images:
+
+- Backend:`sha256:a142a5e47cd2650df9a6adf46fc0f5acf5125ce2bc8f7752b816fd718832fa8c`.
+- Frontend:`sha256:4a4154c64567af8231fdd28a4f3afbd03cf2475559e4cb4e771ca4c0e18dc7fa`.
+
+All11components accepted; schema150/protocols2/2/2; Auth/MFA/refresh/CSRF/private
+Storage/notifications/tenant isolation, both10step real user/tenant deletion
+workflows and consuming-worker restart passed. Browser9groups passed,0pageerrors.
+Elapsed255.861s,source_overlay_used=false,stopped_after_acceptance=true.
+Origin is150, migration_boundaries=[], protected_controller_execution=false,
+production_authorized=false. This is fresh genesis, not a protected146upgrade.
+
+This evidence belongs to6e58. The documentation publication is a different SHA
+and requires its own fresh CI/images/receipt. The PR/session reports those final
+head results separately; no6e58receipt is reused to certify a changed source.

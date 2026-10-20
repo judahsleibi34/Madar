@@ -15,8 +15,10 @@ lock corrections. Three focused implementation commits preserve all prior work:
 Baseline PR219 is `caa5a31484e4c3145163f95381a5fabaf958ba7e`.
 Branch `codex/final-protected-release-completion-20261020` targets219.
 Git identity is Saliba Rishmawi with the specified Saliba-codes noreply email;
-post-push author/committer mappings and final publication SHA are reported by the
-successor PR/session receipt. No published history or historical SQL is changed.
+all four then-published commits were verified through GitHub as Saliba-codes
+for author and committer. Successor: [draft PR220](https://github.com/judahsleibi34/Madar/pull/220),
+base219. The final documentation commit receives the same post-push verification;
+its SHA is reported in the PR/session. No published history or historical SQL is changed.
 
 Native PostgreSQL tests invoke the actual coordinator migration method and
 credential cleanup around the existing executor. Selected synthetic original
@@ -25,10 +27,15 @@ late sessions and lost COMMIT replies reject unsafe completion. Issuer, backup,
 source ownership and container observations remain MODEL boundaries in that
 fixture. No full-controller or independent test write handoff PASS is claimed.
 
-Focused tests162passed; source guards passed; the working-source native150 script
-passed205 overlapping executions. Final-head backend/frontend/native SQL, fresh
-images/full-provider/browser CI must be read from that head's own receipts. It is
-fresh genesis acceptance, not the complete preserved application upgrade.
+Focused tests162passed; source guards passed; committed-source staging native150
+passed205overlapping executions and the host controller suite335passed/10skipped.
+At6e58all five workflows passed:backend3,486passed/889conditional skips;
+257native PostgreSQL executions;68migration-safety cases;10root-policy filesystem;
+4native runtime-lock cases. Frontend1,713passed/1skipped. Fresh11component provider
+acceptance and9browser groups passed. These are fresh-genesis receipts, not the
+complete preserved application upgrade. See TESTS-AND-CI for exact links/digests.
+The later documentation publication requires its own fresh CI/receipt, reported
+separately in the PR/session.
 
 The exact unfinished functions/interfaces are documented in
 [INTEGRATION-IMPLEMENTATION](INTEGRATION-IMPLEMENTATION.md). The existing `_execute`
