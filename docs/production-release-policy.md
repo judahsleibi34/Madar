@@ -1,5 +1,28 @@
 # Madar production release acceptance policy
 
+## Phase IX maintenance recovery integration
+
+The existing ordinary backup pipeline has an explicit maintenance extension.
+Only the concrete provider adapter, with its original authority, held locks,
+persistent journal and live quiescence, may select protected capture. Provider
+HTTP probes are not attempted after their services have been fenced. Current
+NOLOGIN role state is not substituted for the authenticated original role SQL.
+
+Runtime-owned dump output is copied through descriptors into new root-private
+operation staging before privileged recovery material is added. The inner
+manifest digest is persisted separately in protected state. Independent restore
+and the append-only replica receiver require that exact expected digest. Role
+attributes, memberships/settings, database owners/ACLs, data/sequences and native
+object bytes are measured separately from full restored-application acceptance.
+Original object metadata is retained but is not activated by the byte drill.
+Configuration hashes identify separately required escrow; they do not include or
+manufacture configuration secrets. A synthetic receiver/restore result is not
+current-production backup/replica evidence or release/write authority.
+
+The schema150 profile remains unregistered and operational admission stays
+blocked. Backup integration alone does not complete candidate, private-provider,
+handoff, supervisor/boot, full staging or privileged interrupted release gates.
+
 ## Phase VIII maintenance backup inputs
 
 Original role state must come from the authenticated pre-fence provider journal,

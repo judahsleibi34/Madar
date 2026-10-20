@@ -1,5 +1,16 @@
 # Automated database migration architecture
 
+## Phase IX maintenance recovery evidence
+
+Migration Safety also executes a networkless synthetic ordinary-backup and
+independent restore drill. It checks original role state, ownership/ACLs,
+database-specific role settings, data/sequences and native object bytes. The
+maintenance manifest must be independently pinned by its protected consumer;
+neither its contents nor a successful rehearsal authorizes SQL. Actual production
+replica readiness, escrowed configuration, full application restoration and the
+complete protected coordinator remain separate gates. No future schema number,
+historical SQL, automatic production policy or schema150 registration is changed.
+
 ## Phase VI unselected146→150 preparation
 
 The new exact `migrations-147-150-coordinated.json` composes the unchanged147/148/149

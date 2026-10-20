@@ -16,11 +16,23 @@ from deployment.lib.completed_normal_profile import profile
 
 
 class CompletedNormalBackupContext:
-    def __init__(self,contract,document,package,kernel,*,stage,source_guard,artifact_guard):
+    def __init__(self,contract,document,package,kernel,*,stage,source_guard,artifact_guard,provider_adapter=None):
         if stage not in {'pre-migration','post-migration'} or not all(callable(f) for f in (source_guard,artifact_guard)):
             raise RuntimeError('completed_backup_independent_guards_required')
         self.contract,self.document,self.package,self.kernel=contract,document,Path(package),kernel
-        self.profile=profile(contract)
+        self.provider_adapter=provider_adapter
+        if provider_adapter is None:
+            self.profile=profile(contract)
+        else:
+            from deployment.lib.schema150_provider_adapter import Schema150ProviderAdapter
+            from deployment.lib.completed_normal_admission import validate_provider_preparation150
+            from deployment.lib.completed_normal_profile import DELETION
+            validate_provider_preparation150(contract)
+            if type(provider_adapter) is not Schema150ProviderAdapter or provider_adapter.contract!=contract:
+                raise RuntimeError('completed_backup_concrete_provider_required')
+            # Backup preparation is not operational profile registration. The
+            # concrete actor independently checks existing fresh authority/locks.
+            self.profile=DELETION
         self.context=digest(contract);self.root=ADMISSIONS/self.context
         self.stage=stage;self.schema=self.profile.source if stage=='pre-migration' else self.profile.target
         self.source_guard,self.artifact_guard=source_guard,artifact_guard
@@ -34,7 +46,7 @@ class CompletedNormalBackupContext:
 
     def validate(self,plan,root,package):
         if os.geteuid()!=0:raise RuntimeError('completed_backup_root_required')
-        self.source_guard();require_fresh_authorization(self.contract)
+        self.source_guard();self.authority()
         if (Path(root)!=self.root or Path(package)!=self.package or plan.digest!=self.scope
                 or plan.source_sha!=self.plan.source_sha or plan.candidate_images!=self.plan.candidate_images
                 or file_digest(protected(self.package/'source-bundle.json',private=True))!=self.document['source_bundle_sha256']):
@@ -60,9 +72,27 @@ class CompletedNormalBackupContext:
         return report
 
     def guard(self):
-        self.source_guard();require_fresh_authorization(self.contract)
+        self.source_guard();self.authority()
+        if self.provider_adapter is not None:
+            observed=self.provider_adapter.observe_quiescence(self.provider_adapter.binding)
+            if observed['schema']!=self.schema:raise RuntimeError('completed_backup_schema_changed')
+            return
         if self.kernel.native_verifier()!=self.schema:raise RuntimeError('completed_backup_schema_changed')
         self.kernel.round(normal=self.stage=='post-migration')
+
+    def authority(self):
+        if self.provider_adapter is None:require_fresh_authorization(self.contract)
+        else:self.provider_adapter.require_authority(self.provider_adapter.binding,purpose='backup')
+
+    def capture_fenced(self,env,descriptor,identity):
+        if self.provider_adapter is None:raise RuntimeError('completed_backup_maintenance_context_required')
+        from deployment.lib.maintenance_backup import capture
+        return capture(self,env,descriptor,identity)
+
+    def maintenance_manifest(self,backup):
+        if self.provider_adapter is None:return None
+        from deployment.lib.maintenance_backup import expected_manifest
+        return expected_manifest(self,backup)
 
     def role_names(self):
         # Read role NAMES from the current native database. Passwords,

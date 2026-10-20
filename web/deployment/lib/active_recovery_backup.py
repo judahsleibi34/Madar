@@ -108,8 +108,11 @@ print(json.dumps({'uid':os.getuid(),'gid':os.getgid(),'supplementary_groups':os.
     return result
 
 
-def remote_receiver(package,plan,backup,sums,filesystem_uuid,*,expected_schema=115,namespace='normal-local-production'):
-    if type(expected_schema) is not int or expected_schema not in {115,136,144,146,148} or namespace not in {'normal-local-production','private-schema136-rehearsal'}:
+def remote_receiver(package,plan,backup,sums,filesystem_uuid,*,expected_schema=115,namespace='normal-local-production',maintenance_manifest_sha256=None):
+    if (type(expected_schema) is not int or expected_schema not in {115,136,144,146,148,150}
+            or namespace not in {'normal-local-production','private-schema136-rehearsal'}
+            or expected_schema==150 and maintenance_manifest_sha256 is None
+            or maintenance_manifest_sha256 is not None and not re.fullmatch('[0-9a-f]{64}',str(maintenance_manifest_sha256))):
         raise RuntimeError('normal_backup_replica_scope_invalid')
     # Freeze only reviewed non-secret code at a NEW append-only Node 1 path.
     # SSH uses the operator's existing alias/host-key/key policy; no private key
@@ -139,6 +142,7 @@ runpy.run_path(sys.argv[0],run_name='__main__')
 """
     args=['/usr/bin/python3','-I','-B','-c',code,base64.b64encode(json.dumps(payload).encode()).decode(),
         plan.digest,backup.name,sums,filesystem_uuid,str(expected_schema),namespace]
+    if maintenance_manifest_sha256 is not None:args.append(maintenance_manifest_sha256)
     return ['/usr/sbin/runuser','-u','madar','--','/usr/bin/ssh','-o','BatchMode=yes',
         '-o','StrictHostKeyChecking=yes','-o','UpdateHostKeys=no','-o','ControlMaster=no',
         '-o','ControlPath=none','-o','ConnectTimeout=10','madar-node1-lan',shlex.join(args)]
@@ -209,11 +213,14 @@ def capture_and_replicate(plan,root,package,source_guard,kernel, *, recovery_con
         expected=package/'source/web/scripts'/name
         if file_digest(protected(actual))!=file_digest(protected(expected,private=True)):
             raise RuntimeError('normal_backup_installed_helper_changed')
+    maintenance_capture=None
     descriptor = backup_support.sealed_local_database_binding()
     try:
         address = json.loads(os.pread(descriptor,4096,0))['address']
         env[backup_support.LOCAL_DATABASE_FD] = str(descriptor)
-        if recovery_context is None:
+        if completed_context is not None and getattr(completed_context,'provider_adapter',None) is not None:
+            maintenance_capture=completed_context.capture_fenced(env,descriptor,identity)
+        elif recovery_context is None:
             checked(['/usr/bin/python3','-I','-B','/usr/local/lib/madar/backup_support.py','scheduled',
                 '/usr/local/lib/madar/backup_madar.sh'],env=env,user=identity.pw_uid,pass_fds=(descriptor,))
         else:
@@ -224,9 +231,11 @@ def capture_and_replicate(plan,root,package,source_guard,kernel, *, recovery_con
     if backup_support.direct_local_database_address() != address:
         raise RuntimeError('normal_backup_database_address_changed')
 
-    backups=list(scope.glob('madar-*'))
-    if len(backups)!=1 or not backups[0].is_dir():raise RuntimeError('normal_backup_output_invalid')
-    backup=backups[0]
+    if maintenance_capture is None:
+        backups=list(scope.glob('madar-*'))
+        if len(backups)!=1 or not backups[0].is_dir():raise RuntimeError('normal_backup_output_invalid')
+        backup=backups[0]
+    else:backup=Path(maintenance_capture['path'])
     from scripts import backup_support
     manifest=backup_support.verify(backup)
     expected_source=plan.source_sha if recovery_context is None else recovery_context.release_sha
@@ -241,7 +250,13 @@ def capture_and_replicate(plan,root,package,source_guard,kernel, *, recovery_con
     # The exact independently restored checkpoint supplies only role NAMES
     # required by native policy definitions. NOLOGIN prerequisites do not
     # restore historical credentials, owners, memberships or authorization.
-    if completed_context is not None:
+    maintenance_digest=(completed_context.maintenance_manifest(backup)
+        if completed_context is not None and getattr(completed_context,'provider_adapter',None) is not None else None)
+    if maintenance_capture is not None and maintenance_capture['manifest_sha256']!=maintenance_digest:
+        raise RuntimeError('normal_backup_maintenance_capture_changed')
+    if maintenance_digest is not None:
+        role_names=()
+    elif completed_context is not None:
         role_names=completed_context.role_names()
     else:
         from deployment.lib.active_recovery_execution import CHECKPOINT
@@ -251,11 +266,16 @@ def capture_and_replicate(plan,root,package,source_guard,kernel, *, recovery_con
         if len(entries)!=1 or file_digest(roles)!=entries[0]['sha256']:
             raise RuntimeError('normal_backup_restore_role_inventory_changed')
         role_names=tuple(sorted(set(re.findall(r'^CREATE ROLE ([a-zA-Z_][a-zA-Z0-9_]*);$',roles.read_text(),re.MULTILINE))))
-    if not {'anon','authenticated','service_role'}.issubset(role_names):
+    if maintenance_digest is None and not {'anon','authenticated','service_role'}.issubset(role_names):
         raise RuntimeError('normal_backup_restore_role_inventory_missing')
-    restore=rehearse(backup,digests[0],postgres_preload=('pg_cron','pg_net'),additional_roles=role_names)
+    restore=rehearse(backup,digests[0],postgres_preload=('pg_cron','pg_net'),additional_roles=role_names,
+        **({'maintenance_manifest_sha256':maintenance_digest} if maintenance_digest is not None else {}))
     if restore.get('status')!='logical_database_and_file_restore_passed' or restore.get('backup_schema')!=expected_schema:
         raise RuntimeError('normal_backup_actual_restore_incomplete')
+    if maintenance_digest is not None and (restore.get('maintenance_manifest_sha256')!=maintenance_digest
+            or any(restore.get(k) is not True for k in ('role_attributes_restored','ownership_and_acls_restored',
+                'database_fingerprint_verified','native_object_bytes_restored'))):
+        raise RuntimeError('normal_backup_maintenance_restore_incomplete')
     sums=backup_support.digest(backup/'SHA256SUMS')
     # Stream only this verified scoped backup. A failed receiver is retained;
     # no second attempt silently overwrites it.
@@ -268,7 +288,7 @@ def capture_and_replicate(plan,root,package,source_guard,kernel, *, recovery_con
             from types import SimpleNamespace
             replica_plan=SimpleNamespace(digest=scope_digest)
         output=checked(remote_receiver(package,replica_plan,backup,sums,replica['filesystem_uuid'],expected_schema=expected_schema,
-            namespace=replica_namespace),stdin=archive)
+            namespace=replica_namespace,maintenance_manifest_sha256=maintenance_digest),stdin=archive)
     remote=json.loads(output)
     if (remote.get('operation')!='actual-append-only-normal-backup-replica' or remote.get('plan_sha256')!=replica_plan.digest
             or remote.get('backup_id')!=backup.name or remote.get('sha256sums_sha256')!=sums
@@ -276,6 +296,8 @@ def capture_and_replicate(plan,root,package,source_guard,kernel, *, recovery_con
             or type(remote.get('checksum_exit_code')) is not int or remote['checksum_exit_code']!=0
             or remote.get('historical_backups_modified') is not False):
         raise RuntimeError('normal_backup_replica_verification_failed')
+    if maintenance_digest is not None and remote.get('maintenance_manifest_sha256')!=maintenance_digest:
+        raise RuntimeError('normal_backup_maintenance_replica_changed')
     if backup_support.digest(backup/'SHA256SUMS')!=sums:raise RuntimeError('normal_backup_changed_during_replication')
     backup_support.verify(backup);source_guard()
     if completed_context is not None:completed_context.guard()
@@ -289,6 +311,9 @@ def capture_and_replicate(plan,root,package,source_guard,kernel, *, recovery_con
     latest=canonical/'LATEST'
     exclusive(root/latest_preimage_name(completed_context),readonly_configuration(latest,private=False).read_bytes())
     final=canonical/backup.name
+    if maintenance_digest is not None:
+        from deployment.lib.maintenance_backup import release_ownership
+        release_ownership(completed_context,backup,identity)
     libc=ctypes.CDLL(None,use_errno=True)
     rename=libc.renameat2;rename.argtypes=(ctypes.c_int,ctypes.c_char_p,ctypes.c_int,ctypes.c_char_p,ctypes.c_uint)
     if rename(-100,os.fsencode(backup),-100,os.fsencode(final),1)!=0:
@@ -309,6 +334,7 @@ def capture_and_replicate(plan,root,package,source_guard,kernel, *, recovery_con
     if completed_context is not None:
         receipt.update(operation='actual-completed-normal-backup-restore-replica',context_sha256=completed_context.context,
             stage=completed_context.stage,authorizing_plan_sha256=completed_context.contract['plan_sha256'])
+        if maintenance_digest is not None:receipt['maintenance_manifest_sha256']=maintenance_digest
     if authorizing_context is not None:
         receipt.update(runtime_plan_sha256=plan.digest,authorizing_context=authorizing_context)
     exclusive(root/receipt_name,encoded(receipt))

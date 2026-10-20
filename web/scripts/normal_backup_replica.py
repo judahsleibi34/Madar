@@ -19,10 +19,12 @@ import backup_support as backup
 
 BASE=Path('/srv/data2/madar-backups')
 
-def receive(plan_sha,backup_id,sums_sha,filesystem_uuid,expected_schema=115,namespace='normal-local-production'):
+def receive(plan_sha,backup_id,sums_sha,filesystem_uuid,expected_schema=115,namespace='normal-local-production',maintenance_manifest_sha256=None):
     if (not re.fullmatch(r'[0-9a-f]{64}',plan_sha) or not backup.BACKUP_ID.fullmatch(backup_id)
             or not re.fullmatch(r'[0-9a-f]{64}',sums_sha) or not re.fullmatch(r'[0-9a-f-]{36}',filesystem_uuid)
-            or type(expected_schema) is not int or expected_schema not in {115,136,144,146,148}
+            or type(expected_schema) is not int or expected_schema not in {115,136,144,146,148,150}
+            or expected_schema==150 and maintenance_manifest_sha256 is None
+            or maintenance_manifest_sha256 is not None and not re.fullmatch('[0-9a-f]{64}',str(maintenance_manifest_sha256))
             or namespace not in {'normal-local-production','private-schema136-rehearsal'}):
         raise RuntimeError('normal_replica_binding_invalid')
     for path in (BASE,*BASE.parents):
@@ -62,6 +64,12 @@ def receive(plan_sha,backup_id,sums_sha,filesystem_uuid,expected_schema=115,name
     manifest=backup.verify(staging,dump=False)
     if manifest.get('backup_id')!=backup_id or int(manifest.get('database',{}).get('schema_version',0))!=expected_schema:
         raise RuntimeError('normal_replica_backup_identity_changed')
+    if maintenance_manifest_sha256 is not None:
+        maintenance=backup.verify_maintenance(staging,expected_sha256=maintenance_manifest_sha256)
+        if maintenance['schema']!=expected_schema or manifest.get('maintenance_backup')!='maintenance/manifest.json':
+            raise RuntimeError('normal_replica_maintenance_binding_changed')
+    elif manifest.get('maintenance_backup') is not None:
+        raise RuntimeError('normal_replica_maintenance_expected_digest_required')
     final=scope/backup_id;os.rename(staging,final)
     for path in final.rglob('*'):path.chmod(0o400 if path.is_file() else 0o500)
     final.chmod(0o500);scope.chmod(0o500)
@@ -69,10 +77,12 @@ def receive(plan_sha,backup_id,sums_sha,filesystem_uuid,expected_schema=115,name
     try:os.fsync(descriptor)
     finally:os.close(descriptor)
     # backup.verify has independently checked the complete received inventory.
-    return {'operation':'actual-append-only-normal-backup-replica','plan_sha256':plan_sha,
+    result={'operation':'actual-append-only-normal-backup-replica','plan_sha256':plan_sha,
         'backup_id':backup_id,'destination':str(final),'sha256sums_sha256':sums_sha,
         'archive_entries':count,'files':sum(path.is_file() for path in final.rglob('*')),'bytes':size,'checksum_exit_code':0,'historical_backups_modified':False,
         'latest_modified':False,'retention_performed':False,'schema':expected_schema,'namespace':namespace}
+    if maintenance_manifest_sha256 is not None:result['maintenance_manifest_sha256']=maintenance_manifest_sha256
+    return result
 
 if __name__=='__main__':
     try:

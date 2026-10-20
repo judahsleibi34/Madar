@@ -1,5 +1,19 @@
 # Privileged control-plane upgrade architecture
 
+## Phase IX protected maintenance backup staging
+
+The measured installer/frozen source inventory includes maintenance_backup.py.
+Its concrete-provider path retains the existing independent authority and locks;
+it is not another root entrypoint, migration runner or issuer. Ordinary dump
+output is descriptor-copied beneath the root-private admission before original
+role SQL and object recovery archives are added. A protected, append-only digest
+record binds later restore/replica consumers. Backup ownership may be released
+only behind that protected parent before atomic ordinary publication. No recursive
+privileged ownership change walks the runtime-owned published backup directory.
+Partial staging and digest records are retained and refuse silent replacement.
+Schema150 registration and the remaining full coordinator/handoff/boot lifecycle
+remain blocked; a component recovery drill is not privileged release acceptance.
+
 ## Phase VIII original-role backup input
 
 The maintenance role input adapter captures the existing concrete provider

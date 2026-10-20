@@ -85,6 +85,25 @@ class CompletedBackupTests(unittest.TestCase):
         self.assertNotIn('authorizing_context',call.call_args.kwargs)
         self.assertNotIn('recovery_context',call.call_args.kwargs)
 
+    def test_maintenance_preparation_needs_concrete_adapter_and_never_probes_stopped_http(self):
+        from test_schema150_admission import deletion_contract
+        from deployment.lib.schema150_provider_adapter import Schema150ProviderAdapter
+        from deployment.lib.completed_normal_profile import profile,DELETION
+        from unittest.mock import Mock
+        contract=deletion_contract();contract['plan_sha256']=digest(self.document)
+        kernel=SimpleNamespace(contract=contract,root=self.root/digest(contract),round=Mock())
+        with self.assertRaisesRegex(RuntimeError,'concrete_provider_required'):
+            m.CompletedNormalBackupContext(contract,self.document,self.root/'package',kernel,stage='pre-migration',
+                source_guard=lambda:None,artifact_guard=lambda:{},provider_adapter=object())
+        adapter=Schema150ProviderAdapter.__new__(Schema150ProviderAdapter)
+        adapter.contract=contract;adapter.binding={'synthetic':'MODEL ONLY'}
+        adapter.require_authority=Mock();adapter.observe_quiescence=Mock(return_value={'schema':146})
+        context=m.CompletedNormalBackupContext(contract,self.document,self.root/'package',kernel,stage='pre-migration',
+            source_guard=lambda:None,artifact_guard=lambda:{},provider_adapter=adapter)
+        self.assertIs(context.profile,DELETION);context.guard();kernel.round.assert_not_called()
+        adapter.require_authority.assert_called_with(adapter.binding,purpose='backup')
+        with self.assertRaisesRegex(RuntimeError,'profile_invalid'):profile(contract)
+
     def test_two_backup_publications_preserve_distinct_exact_latest_preimages(self):
         from deployment.lib.active_recovery_backup import latest_preimage_name
         from deployment.lib.emergency_routing_repair import exclusive

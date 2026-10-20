@@ -65,6 +65,7 @@ declare -a tracked_files=(
   lib/schema150_provider_adapter.py
   lib/schema150_status.py
   lib/maintenance_backup_roles.py
+  lib/maintenance_backup.py
   lib/migration_inventory.py
   lib/migration_plan.py
   lib/migration_policy.py

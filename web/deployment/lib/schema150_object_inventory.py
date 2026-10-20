@@ -23,6 +23,8 @@ import os
 from pathlib import PurePosixPath
 import re
 import stat
+import tarfile
+import base64
 import time
 
 from deployment.lib.schema150_actor_inventory import REQUIRED_OBJECT_ROOTS, OBJECT_ROOT_ROLES
@@ -245,3 +247,83 @@ def measure_roots(roots, *, phase='identity', previous=None):
     finally:
         for descriptor in descriptors.values(): os.close(descriptor)
     return result
+
+
+def archive_roots(roots, destination, *, previous):
+    """Capture the measured non-database forest, never a live database volume.
+
+    The protected caller must retain the writer barrier. The archive includes
+    original metadata and xattrs, but restoring it grants no execution authority.
+    Descriptor-relative opens reject links and substitutions during capture; two
+    independent forest measurements bracket it. Publication belongs to backup.
+    """
+    before = measure_roots(roots, phase='fenced', previous=previous)
+    budget = {'deadline': time.monotonic()+MAX_SECONDS, 'read_bytes': 0}
+    count = total = 0
+    with open(destination, 'xb') as output:
+        os.fchmod(output.fileno(), 0o600)
+        with tarfile.open(fileobj=output, mode='w|gz', format=tarfile.PAX_FORMAT) as archive:
+            def walk(descriptor, logical, prefix, depth):
+                nonlocal count, total
+                _tick(budget); _require(depth <= MAX_DEPTH, 'schema150_object_depth_limit')
+                original = os.fstat(descriptor)
+                identity = before['roots'][logical]['identity']
+                _require(original.st_dev == identity['device'] and _mount_id(descriptor) == identity['mount_id'],
+                         'schema150_object_nested_mount')
+                names = sorted(os.listdir(descriptor))
+                for name in names:
+                    _tick(budget); count += 1
+                    _require(count <= MAX_ENTRIES*len(roots), 'schema150_object_entry_limit')
+                    info = os.stat(name, dir_fd=descriptor, follow_symlinks=False)
+                    relative = prefix+'/'+name if prefix else name
+                    is_directory = stat.S_ISDIR(info.st_mode)
+                    _require(is_directory or stat.S_ISREG(info.st_mode) and info.st_nlink == 1,
+                             'schema150_object_special_or_linked_file')
+                    child = os.open(name, _DIR_FLAGS if is_directory else _FILE_FLAGS, dir_fd=descriptor)
+                    try:
+                        _require(_signature(info) == _signature(os.fstat(child))
+                                 and _mount_id(child) == identity['mount_id'], 'schema150_object_file_changed')
+                        header = tarfile.TarInfo(logical+'/'+relative)
+                        header.mode = stat.S_IMODE(info.st_mode); header.uid = info.st_uid; header.gid = info.st_gid
+                        header.mtime = info.st_mtime_ns/10**9
+                        header.type = tarfile.DIRTYPE if is_directory else tarfile.REGTYPE
+                        header.size = 0 if is_directory else info.st_size
+                        attributes = {key:base64.b64encode(os.getxattr(child,key)).decode('ascii')
+                                      for key in sorted(os.listxattr(child))}
+                        raw = json.dumps(attributes, sort_keys=True, separators=(',', ':'))
+                        _require(len(raw.encode()) <= 65536, 'schema150_object_xattr_limit')
+                        header.pax_headers['madar.xattrs.base64'] = raw
+                        if is_directory:
+                            archive.addfile(header); walk(child, logical, relative, depth+1)
+                        else:
+                            total += info.st_size
+                            _require(info.st_size <= MAX_FILE_BYTES and total <= MAX_CONTENT_BYTES*len(roots),
+                                     'schema150_object_content_limit')
+                            # Duplicate owns only this read position, not a mutable pathname.
+                            with os.fdopen(os.dup(child), 'rb') as stream: archive.addfile(header, stream)
+                        _require(_signature(info) == _signature(os.fstat(child)), 'schema150_object_file_changed')
+                    finally: os.close(child)
+                    _require(_signature(info) == _signature(os.stat(name, dir_fd=descriptor, follow_symlinks=False)),
+                             'schema150_object_path_changed')
+                _require(names == sorted(os.listdir(descriptor)) and _signature(original) == _signature(os.fstat(descriptor)),
+                         'schema150_object_directory_changed')
+            for logical in sorted(roots):
+                if logical == 'database': continue
+                descriptor = _open_root(roots[logical]['source'])
+                try:
+                    _require(_identity(descriptor) == before['roots'][logical]['identity'],
+                             'schema150_object_root_identity_changed')
+                    info=os.fstat(descriptor);header=tarfile.TarInfo(logical)
+                    header.type=tarfile.DIRTYPE;header.mode=stat.S_IMODE(info.st_mode)
+                    header.uid=info.st_uid;header.gid=info.st_gid;header.mtime=info.st_mtime_ns/10**9
+                    attributes={key:base64.b64encode(os.getxattr(descriptor,key)).decode('ascii')
+                                for key in sorted(os.listxattr(descriptor))}
+                    raw=json.dumps(attributes,sort_keys=True,separators=(',',':'))
+                    _require(len(raw.encode())<=65536,'schema150_object_xattr_limit')
+                    header.pax_headers['madar.xattrs.base64']=raw;archive.addfile(header)
+                    walk(descriptor, logical, '', 0)
+                finally: os.close(descriptor)
+        output.flush(); os.fsync(output.fileno())
+    after = measure_roots(roots, phase='fenced', previous=before)
+    _require(after == before, 'schema150_object_preservation_changed')
+    return before
