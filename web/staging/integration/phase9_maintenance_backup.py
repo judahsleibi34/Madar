@@ -76,7 +76,7 @@ os.execv('/usr/bin/docker',docker+['exec','-i','-e','PGHOST=127.0.0.1','-e','PGP
                 '-e','POSTGRES_HOST_AUTH_METHOD=trust',IMAGE]);created=True
             command(DOCKER+['start',name])
             for _ in range(60):
-                ready=subprocess.run(DOCKER+['exec',name,'pg_isready','-U','postgres'],capture_output=True,timeout=5)
+                ready=subprocess.run(DOCKER+['exec',name,'pg_isready','-h','127.0.0.1','-U','postgres'],capture_output=True,timeout=5)
                 if ready.returncode==0:break
                 time.sleep(.5)
             else:raise RuntimeError('native_maintenance_database_start_timeout')

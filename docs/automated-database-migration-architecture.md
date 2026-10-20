@@ -1738,3 +1738,10 @@ owner/mode/ancestry/symlink/missing-file/JSON/scope refusal are actual OS behavi
 No host policy,controller state,daemon socket or database is mounted. This proves
 the reader's file boundary,not operational authorization or privileged controller
 installation. The workflow and input inventory include the independent drill.
+
+Published migration150's deletion protocol has an exact150 horizon. Native
+future-state inspection must preserve its zero/refusal above150. Additive SQL
+classification and a minimal151 fixture cannot prove full-worker compatibility.
+A separately reviewed forward protocol contract is required before claiming a
+real routine future release;do not relabel that privileged change as ClassA or
+silently alter historical SQL to satisfy a synthetic demonstration.

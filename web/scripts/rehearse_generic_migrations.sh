@@ -23,7 +23,7 @@ trap cleanup EXIT
 docker create --name "$CONTAINER_NAME" --network none --memory=384m --cpus=0.5 --pids-limit=96 \
   --label madar.rehearsal=generic-migration-future-fixtures \
   --tmpfs /var/lib/postgresql/data:rw,noexec,nosuid,size=384m \
-  -e POSTGRES_HOST_AUTH_METHOD=trust "$POSTGRES_IMAGE" >/dev/null
+  -e POSTGRES_HOST_AUTH_METHOD=trust "$POSTGRES_IMAGE" postgres -c max_prepared_transactions=10 >/dev/null
 owned=true
 docker start "$CONTAINER_NAME" >/dev/null
 for attempt in $(seq 1 60); do
@@ -47,6 +47,8 @@ root=Path(sys.argv[1]); body=(root/'database.dump').read_bytes()
 PY
 # Confirm the archive can actually be restored independently, not just hashed.
 docker exec "$CONTAINER_NAME" createdb -U postgres restored_fixture
+docker exec "$CONTAINER_NAME" psql -X -U postgres -v ON_ERROR_STOP=1 -q -c \
+  "comment on database restored_fixture is 'madar-generic-migration-synthetic-rehearsal'"
 docker exec -i "$CONTAINER_NAME" pg_restore -U postgres --exit-on-error -d restored_fixture < "$backup_dir/database.dump"
 restored="$(docker exec "$CONTAINER_NAME" psql -X -U postgres -d restored_fixture -Atc 'select payload from public.synthetic_preserved')"
 test "$restored" = retained
@@ -80,4 +82,4 @@ docker run --rm --network "container:$CONTAINER_NAME" --memory=384m --cpus=0.75 
   --env GENERIC_MIGRATION_SYNTHETIC_BACKUP=/verified-backup \
   --volume "$backup_dir:/verified-backup:ro" --volume "$WEB_ROOT:/test-repository:ro" \
   "${parser_args[@]}" --entrypoint python "$BACKEND_TEST_IMAGE" \
-  -m unittest test_generic_migration_source test_generic_migration_plan test_generic_migrations_database -v
+  -m unittest test_generic_migration_source test_generic_migration_plan test_generic_migrations_database test_schema150_quiescence_scope_database -v

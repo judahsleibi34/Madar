@@ -3082,3 +3082,9 @@ connection namespace and qualifies native identity/marker functions. Existing
 SQL migration bytes, grants, single-use authority and historical receipt formats
 remain unchanged. Prior checks do not validate the corrected source: fresh CI,
 controller review and independently approved installation remain separate gates.
+
+Schema150 maintenance quiescence counts clients and prepared transactions across
+the verified cluster,not only the application database:role/privilege state is
+global. Cross-database activity cannot be excluded by its database name. Unknown
+clients and unresolved prepared work block;no automatic termination or guessed
+transaction reconciliation is introduced. Historical148/149 contracts are unchanged.

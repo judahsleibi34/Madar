@@ -173,8 +173,8 @@ class LegacyDeletionAdmissionDatabaseTests(unittest.TestCase):
 
     def test_server_confirmed_client_exit_cannot_leave_cached_one_session_snapshot(self):
         self.hold_fixture_queue_barrier()
-        # Observe the same verified disposable cluster through another database
-        # so the read-only monitor cannot inflate the tested database's count.
+        # An independent read-only monitor verifies the first client's exit.
+        # It is itself a cluster client and must close before final admission.
         monitor = psycopg.connect(self.db.info.dsn, dbname='template1',
                                   hostaddr=self.db.info.hostaddr, autocommit=True, connect_timeout=5)
         self.addCleanup(monitor.close)
@@ -193,9 +193,22 @@ class LegacyDeletionAdmissionDatabaseTests(unittest.TestCase):
             if time.monotonic() >= deadline:
                 self.fail('Known disposable client backend did not exit after close')
             time.sleep(.01)
+        monitor.close()
         # No fixture-side pg_stat_clear_snapshot() here: this must exercise the
         # actual guard after independent server confirmation, in the SAME txn.
-        self.assertEqual(self.observation()['other_client_sessions'], 0)
+        # The monitor's own Terminate is asynchronous too. Without the actual
+        # guard's snapshot refresh this bounded loop retains the stale count
+        # forever and fails; no unknown backend is killed or excluded.
+        deadline=time.monotonic()+5
+        while True:
+            try:observed=self.observation()
+            except RuntimeError as error:
+                if str(error)!='schema150_database_not_quiescent':raise
+                if time.monotonic()>=deadline:raise
+                time.sleep(.01)
+            else:
+                self.assertEqual(observed['other_client_sessions'],0)
+                break
 
 
 if __name__ == '__main__':
