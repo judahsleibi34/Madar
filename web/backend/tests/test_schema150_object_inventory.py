@@ -19,6 +19,10 @@ class ObjectInventoryTests(unittest.TestCase):
         roots={}
         for role in sorted(objects.REQUIRED_OBJECT_ROOTS):
             root=base/role;root.mkdir()
+            # A private shell umask may already create0700. Give the fixture an
+            # explicit preimage so the chmod0700 regression actually changes it.
+            # The enclosing TemporaryDirectory remains private in either case.
+            root.chmod(0o750)
             roots[role]={'type':'volume' if role in ('database','provider_storage') else 'bind',
                          'source':str(root),'content_sha256':'a'*64}
         return roots,base
