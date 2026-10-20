@@ -112,3 +112,12 @@ protocol horizon,and NULL/parallel-leader classification. A transport-isolated
 component test also proves private recovery measures the writer count rather
 than inventing zero. These are native/component results,not a complete writer
 inventory or an installed production controller acceptance.
+
+
+PhaseIX extends the independently pinned automation inventory to nested backend
+and frontend script trees,and requires the network-blocking test runner,installed
+constraint verifier and frontend bundler configuration. A real temporary-Git
+regression reproduced an omitted nested runner after the base advanced;the same
+assertion now passes and the old policy digest refuses it. This pin covers build
+and verification tooling,not every ordinary business test or UI source file.
+It does not install/enable a root policy or convert staging PASS into authority.

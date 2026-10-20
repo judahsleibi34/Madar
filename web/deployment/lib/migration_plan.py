@@ -19,6 +19,8 @@ AUTOMATION_INPUTS=tuple(dict.fromkeys((*ARTIFACT_INPUTS,
     '.github/workflows/backend-check.yml','.github/workflows/frontend-check.yml',
     '.github/workflows/schema148-artifacts.yml','.github/workflows/migration-safety.yml',
     'web/backend/Dockerfile','web/frontend/Dockerfile','web/backend/requirements-migration-tools.txt',
+    'web/backend/scripts/run_tests_no_external_network.py','web/backend/scripts/verify_installed_constraints.py',
+    'web/frontend/vite.config.js',
     'web/scripts/build_schema148_artifacts.py','web/scripts/check_dependency_locks.py',
     'web/scripts/check_migrations.py','web/scripts/check_migration_transitions.py',
     'web/scripts/check_forward_release.py','web/scripts/validate_migration_candidate.py',
@@ -36,7 +38,8 @@ def automation_inputs(git,source):
     # may import a newly introduced helper without changing its own bytes. A
     # moving Git base cannot enroll that helper into an independent root policy.
     files=git.files(source,*AUTOMATION_INPUTS,'.github/workflows/','.github/actions/',
-        'web/deployment/','web/scripts/','web/staging/integration/',allow_executable=True)
+        'web/deployment/','web/scripts/','web/staging/integration/',
+        'web/backend/scripts/','web/frontend/scripts/',allow_executable=True)
     missing=sorted(set(AUTOMATION_INPUTS)-set(files))
     hashes={path:{'sha256':hashlib.sha256(body).hexdigest(),'mode':git.modes[(source,path)]}
             for path,body in sorted(files.items())}

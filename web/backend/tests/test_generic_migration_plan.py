@@ -195,6 +195,17 @@ class PlanTests(unittest.TestCase):
         self.assertIn('automation_trust_root_changed',result['reasons'])
         self.assertFalse(result['production_execution_allowed'])
 
+    def test_nested_application_build_and_test_tools_are_also_pinned(self):
+        accepted,_=self.plan();policy,_=self.accepted_context(accepted)
+        paths=('web/backend/scripts/new_test_runner.py','web/frontend/scripts/new_build_helper.mjs')
+        for relative in paths:
+            path=self.root/relative;path.parent.mkdir(parents=True,exist_ok=True)
+            path.write_text('# new build or CI execution dependency\n')
+        self.base=self.commit();changed,_=self.plan()
+        for relative in paths:self.assertIn(relative,changed.document()['automation_inputs']['files'])
+        _,obs=self.accepted_context(changed)
+        self.assertIn('automation_trust_root_changed',assess(changed,policy,obs,now=1000)['reasons'])
+
     def test_missing_automation_input_blocks_routine_policy(self):
         (self.root/'web/backend/requirements-migration-tools.txt').unlink()
         self.write(2); self.commit(); plan,_=self.plan()
