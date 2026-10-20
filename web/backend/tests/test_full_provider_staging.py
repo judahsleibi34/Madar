@@ -57,6 +57,8 @@ class FullStagingSafetyTests(unittest.TestCase):
         # Native test image mounts workflows at the web fixture root.
         if not workflows.exists():workflows=WEB.parent/'.github/workflows'
         for path in workflows.glob('*.yml'):
+            self.assertIn('contents: read',path.read_text(),str(path))
+            self.assertIn('persist-credentials: false',path.read_text(),str(path))
             for action in re.findall(r'uses:\s*([^\s#]+)',path.read_text()):
                 if not action.startswith('./'):
                     self.assertRegex(action,r'^[A-Za-z0-9_./-]+@[0-9a-f]{40}$',str(path))

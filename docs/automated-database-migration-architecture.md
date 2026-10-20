@@ -1759,7 +1759,9 @@ replica contracts and dormant host/manual/extension inventories remain separate
 gates. Published150's protocol0 at151 remains a blocker. The root policy pins
 nested backend/frontend tooling,verification runners,bundler config,release
 helpers,workflows and executable modes independently of a moving source base.
-Remote Actions are immutable. See [security findings](architecture-phase9-2026-10-20/15-SECURITY-AND-SUPPLY-CHAIN.md).
+Remote Actions are immutable. Workflow tokens explicitly retain contents-read
+permissions and checkouts do not persist credentials,including the conditional
+mobile workflow,which now also selects/verifies the exact source. See [security findings](architecture-phase9-2026-10-20/15-SECURITY-AND-SUPPLY-CHAIN.md).
 
 Secret-free full-provider CI uses owned synthetic genesis,captured Git SQL and
 authenticated images,private leases,loopback-only ports,resource bounds and
