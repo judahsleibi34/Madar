@@ -150,6 +150,7 @@ class LockedMigrationExecutor:
         failure_formatter: Callable[[Exception], str] | None = None,
         migration_guard: Callable[[Any, Migration], None] | None = None,
         completion_guard: Callable[[Any], None] | None = None,
+        expected_origin: int | None = None,
     ):
         self.connection_factory = connection_factory
         self.manifest = manifest
@@ -163,6 +164,9 @@ class LockedMigrationExecutor:
         if completion_guard is not None and not callable(completion_guard):
             raise RuntimeError('migration_completion_guard_invalid')
         self.completion_guard = completion_guard
+        if expected_origin is not None and (type(expected_origin) is not int or not manifest.accepts_schema(expected_origin)):
+            raise RuntimeError('migration_expected_origin_invalid')
+        self.expected_origin = expected_origin
 
     @staticmethod
     def _schema(cursor: Any) -> int:
@@ -243,6 +247,8 @@ class LockedMigrationExecutor:
                 target = self.manifest.migrations[-1].to_schema
                 if not self.manifest.accepts_schema(current):
                     raise RuntimeError(f"unexpected_schema:{current}")
+                if self.expected_origin is not None and current!=self.expected_origin:
+                    raise RuntimeError('migration_origin_changed')
                 for migration, statement in zip(self.manifest.migrations, statements):
                     if current >= migration.to_schema:
                         state["migrations"].append({

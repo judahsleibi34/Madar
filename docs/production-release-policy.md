@@ -1,5 +1,14 @@
 # Madar production release acceptance policy
 
+## Final continuation: exact locked migration origin
+
+The maintenance parent supplies the exact approved origin to the existing SQL
+executor. It is compared on the advisory-locked connection before any migration
+can be skipped or applied. Initial admission uses the contract source; a fresh
+authorized resumption uses its independently bound observed schema. Intermediate
+versions in a compatibility range are not automatic permission to adopt drift.
+Historical callers retain their explicit range/retry behavior unless opting in.
+
 ## Final continuation: exclusive durable migration receipts
 
 A coordinated migration claims its attempt through atomic no-replace publication

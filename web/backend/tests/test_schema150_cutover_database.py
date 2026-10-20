@@ -297,4 +297,25 @@ class Schema150CutoverDatabaseTests(unittest.TestCase):
                 if child.is_alive():child.kill();child.join(2)
             for reader in readers:reader.close()
 
+    def test_origin_advancement_after_parent_checks_is_not_silently_adopted(self):
+        fixture=self.parent_context()
+        from deployment.lib import completed_normal_migration as migration
+        def drift(_):
+            connection=self.connect()
+            # Fault injection in this owned clone: an external actor advanced
+            # immutable147 after prechecks but before our advisory lock. This
+            # is not a controller execution or a valid recovery authorization.
+            connection.execute(self.manifest.migrations[0].path.read_text())
+            return connection
+        with patch.object(migration,'connection_factory',side_effect=drift):
+            with self.assertRaisesRegex(RuntimeError,'completed_migration_error_RuntimeError'):fixture.run_parent()
+        with self.connect() as db:
+            self.assertEqual(db.execute("select schema_version from public.application_schema_state where contract_key='core'").fetchone()[0],147)
+            self.assertEqual(self.preserved(db),self.original)
+        state=json.loads((fixture.state/'migrations'/fixture.sha/'execution.json').read_bytes())
+        self.assertEqual(state['status'],'failed');self.assertEqual(state['observed_schema'],147)
+        self.assertEqual(state['failure_code'],'completed_migration_error_RuntimeError')
+        self.assertEqual(state['migrations'],[])
+        self.assertEqual(json.loads((fixture.state/'state.json').read_bytes()),fixture.initial)
+
 if __name__=='__main__':unittest.main()

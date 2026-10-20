@@ -180,6 +180,28 @@ class MigrationExecutorTests(unittest.TestCase):
             self.assertEqual(events[-3:],['file_sync','replace','directory_sync'])
             self.assertGreaterEqual(events.count('directory_sync'),3)
 
+    def test_exact_origin_is_checked_under_advisory_lock_before_skipping_sql(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root=Path(temporary);repository,path,backup=self.fixture(root)
+            connection=FakeConnection(schema=82);state_file=root/'execution.json'
+            executor=LockedMigrationExecutor(connection_factory=lambda:connection,
+                manifest=replace(MigrationManifest.load(path,repository),coordinated=True),
+                state_file=state_file,backup_dir=backup,backup_verifier=lambda _:None,
+                migration_guard=lambda *args:None,expected_origin=81)
+            with self.assertRaisesRegex(RuntimeError,'migration_origin_changed'):executor.run()
+            self.assertEqual(connection.applied,[]);self.assertTrue(connection.closed)
+            state=json.loads(state_file.read_bytes())
+            self.assertEqual((state['status'],state['observed_schema']),('failed',82))
+
+    def test_invalid_expected_origin_cannot_open_connection(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root=Path(temporary);repository,path,backup=self.fixture(root)
+            for value in (True,80,84,'81'):
+                with self.subTest(value=value),self.assertRaisesRegex(RuntimeError,'expected_origin_invalid'):
+                    LockedMigrationExecutor(connection_factory=lambda:self.fail('No connection'),
+                        manifest=MigrationManifest.load(path,repository),state_file=root/'state.json',
+                        backup_dir=backup,backup_verifier=lambda _:None,expected_origin=value)
+
     def test_schema_105_bridge_requires_backup_then_applies_only_106_through_108(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

@@ -161,6 +161,11 @@
       "gate": "coordinated_journal_custody",
       "status": "PASS",
       "evidence": "Before-fix real-process duplicate claim reproduced; after-fix one exclusive claimant,one refusal and native PostgreSQL150winner preserved. Directory fsync observed; outer authority/backup MODEL,no full power-loss proof."
+    },
+    {
+      "gate": "locked_origin_admission",
+      "status": "PASS",
+      "evidence": "Native fault advanced147 after parent prechecks; unchanged assertion now refuses at locked147, no further SQL/promotion. Outer authority/backup/host boundaries MODEL; full operation not certified."
     }
   ],
   "ci_evidence_source_sha": "6e58dcbe03b806f1868e02b166397e581da481a4",
@@ -172,5 +177,6 @@
     "Full provider": "https://github.com/judahsleibi34/Madar/actions/runs/39485964286"
   },
   "publication_head_receipts": "Resolve PR220 head; its own fresh CI/artifacts are reported separately by GitHub and the final session.",
-  "ci_scope_note": "6e58receipts predate the later journal correction; final publication requires separate fresh exact-head CI/images."
+  "ci_scope_note": "6e58receipts predate the later journal correction; final publication requires separate fresh exact-head CI/images.",
+  "implementation_revision_note": "This publication adds locked-origin admission after7bfb; exact source is PR220 head with its own final CI/artifact receipts."
 }

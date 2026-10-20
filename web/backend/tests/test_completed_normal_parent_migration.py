@@ -113,6 +113,7 @@ class ParentMigrationTests(unittest.TestCase):
         self.executor.assert_called_once()
         self.assertIs(self.executor.call_args.kwargs['migration_guard'],self.actor.migration_guard)
         self.assertIs(self.executor.call_args.kwargs['completion_guard'],self.actor.migration_completion_guard)
+        self.assertEqual(self.executor.call_args.kwargs['expected_origin'],146)
         self.model.assert_called_once_with(self.contract,{},self.actor.runtime,phase='fenced')
         self.runtime.return_value.json_http.assert_not_called()
         self.assertEqual((self.state/'state.json').read_bytes(),original)

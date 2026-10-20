@@ -1,6 +1,6 @@
 # Tests and provenance
 
-Implementation source: `7bfb222a8c4c7731df3160454c9ffe87fa96eb50`.
+Implementation through7bfb plus the locked-origin correction in this publication; exact source is the PR220 head.
 Publication head is later; resolve it from the successor PR. Its own CI/artifact
 receipts are required and reported in the PR/final response; earlier source
 acceptance is not relabeled as publication-head acceptance.
@@ -15,7 +15,7 @@ python3 web/scripts/check_secret_hygiene.py
 python3 web/scripts/check_privileged_inventory.py
 ```
 
-Focused tests:164 passed at implementation source. Six source checks pass;
+Focused tests:166 passed at implementation source. Six source checks pass;
 150 mirrored migrations,0errors,2historical duplicate-content warnings;
 78 privileged paths classified. These tests overlap broader suites.
 
@@ -111,3 +111,20 @@ not a host power-loss or full-controller recovery test. The overlay digest is
 `a26552b6f578e868b9cd1792532d5fe66c6e162ddcc8016f7a318d65f79f2072`.
 The subsequent publication requires fresh final-head CI and images. Any superseded
 87d9checks canceled for this source change are not reported as successful checks.
+
+## Exact-origin admission correction
+
+A native owned-clone fault advanced147 after the parent checks but before its
+SQL advisory lock. The pre-fix branch silently skipped/adopted that advancement
+and continued. The unchanged assertion now passes:the parent observes147,
+records a failed attempt with no migration records,applies no further SQL,and
+leaves ordinary runtime state unchanged. The existing executor's optional exact
+origin is supplied only by the protected parent or bound resumption; existing
+historical range-based callers retain their behavior.
+
+All16executor component cases and166focused cases pass. The final working-code
+native rehearsal passed207executions/14cutover cases. Its authenticated overlay
+SHA256 is `4cd3dc41cf4f3feb505f2cf46b28848876c97a37b03a875891850f8d36d8277f`.
+Authority/backup/host effects in this SQL fixture remain MODEL. Earlier6e58and
+4ccaCI do not certify this later source. Fresh publication-head CI and exact
+images/receipt are required and reported separately in the final PR/session.

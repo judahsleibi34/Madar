@@ -6,7 +6,7 @@
 This continuation implements the parent SQL invocation in the existing
 coordinator, sealed private candidate verification/startup, final same-session
 protocol/quiescence observation, ordered worker/ingress effects and two recovery
-lock corrections. Four focused implementation commits preserve all prior work:
+lock corrections. Four earlier focused implementation commits preserve all prior work:
 
 - `1968b13ecabdf6a6b298691bcdfa8003886bbeae` — parent-owned SQL/private model branch.
 - `b41ea3d198127e25202b70427f6696ab4b0ff8e0` — private candidate/target guards and forward recovery locks.
@@ -28,7 +28,7 @@ late sessions and lost COMMIT replies reject unsafe completion. Issuer, backup,
 source ownership and container observations remain MODEL boundaries in that
 fixture. No full-controller or independent test write handoff PASS is claimed.
 
-Focused tests164passed; source guards passed; committed-source staging native150
+Focused tests166passed; source guards passed; committed-source staging native150
 passed205overlapping executions and the host controller suite335passed/10skipped.
 At6e58all five workflows passed:backend3,486passed/889conditional skips;
 257native PostgreSQL executions;68migration-safety cases;10root-policy filesystem;
@@ -64,3 +64,11 @@ DB connection and preserves the winner's record. Native working-source rehearsal
 passed206executions/13cutover cases.6e58results are historical accepted-source
 receipts; final publication uses new CI/images and is reported separately. This
 fix does not change the unexecuted full-operation conclusion above.
+
+This publication additionally fixes an origin-admission race:after prechecks,an
+external actor advancing the owned clone to147 was previously silently adopted.
+The maintenance executor now requires the exact approved origin under its SQL
+advisory lock. The unchanged native assertion passes at failed147 with no further
+SQL/promotion; the full working native suite passed207executions/14cutover cases.
+The actual protected operation remains unexecuted. Final source/CI/images are
+resolved from PR220 and its independently authenticated exact-head receipts.

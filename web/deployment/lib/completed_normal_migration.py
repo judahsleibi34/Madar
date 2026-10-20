@@ -278,10 +278,12 @@ def run_migration(contract,release_root,state_root,operations,*,parent=None,prov
         verify_migration_backup(actual,witness,sha,operations,expected_schema=selected.source)
     root=state_root/'migrations'/sha
     execution=root/'execution.json'
+    expected_origin=selected.source
     from deployment.lib.control_plane_upgrade_authorization import UPGRADE_INTERLOCK
     if json.loads(protected(UPGRADE_INTERLOCK).read_text()).get('migration_resumption_sha256') is not None:
         from deployment.lib.completed_normal_forward import authorized_executor
         resumption,execution=authorized_executor(contract,state_root)
+        expected_origin=resumption['observed_schema']
         if operations.schema_version()!=resumption['observed_schema']:
             raise RuntimeError('completed_forward_source_schema_changed')
     # Never overwrite a failed/completed executor record on automatic retry.
@@ -289,7 +291,7 @@ def run_migration(contract,release_root,state_root,operations,*,parent=None,prov
     extra={}
     if private:
         extra.update(migration_guard=provider_adapter.migration_guard,
-            completion_guard=provider_adapter.migration_completion_guard)
+            completion_guard=provider_adapter.migration_completion_guard,expected_origin=expected_origin)
     if selected in (FENCED, OUTBOX):
         from deployment.lib.schema148_release import migration_guard,consumer_inventory,live_consumer_inventory
         policy=witness['notification_cutover']
