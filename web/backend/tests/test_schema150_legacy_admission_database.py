@@ -35,14 +35,21 @@ class LegacyDeletionAdmissionDatabaseTests(unittest.TestCase):
         # weaken the production quiescence gate to accommodate fixture timing.
         deadline = time.monotonic() + 5
         while True:
-            others = self.db.execute(
-                "select count(*) from pg_stat_activity where datname=current_database() "
-                "and backend_type='client backend' and pid<>pg_backend_pid()"
-            ).fetchone()[0]
-            if others == 0:
+            # Backend exit and internal vacuum cleanup are separate from the
+            # pg_stat_activity client count. Production correctly rejects a
+            # surviving queue relation lock; establish BOTH fixture premises.
+            others, queue_locks = self.db.execute(
+                "select (select count(*) from pg_stat_activity where datname=current_database() "
+                "and backend_type='client backend' and pid<>pg_backend_pid()),"
+                "(select count(*) from pg_locks where relation=any(array["
+                "'public.notification_deliveries'::regclass,'public.notification_outbox'::regclass,"
+                "'public.data_deletion_requests'::regclass,'public.data_deletion_steps'::regclass]) "
+                "and pid is distinct from pg_backend_pid())"
+            ).fetchone()
+            if (others, queue_locks) == (0, 0):
                 break
             if time.monotonic() >= deadline:
-                self.fail('Disposable admission fixture still has other client sessions')
+                self.fail(f'Disposable fixture not quiescent: sessions={others},queue_locks={queue_locks}')
             time.sleep(.01)
         self.assertEqual(self.db.execute(
             "select schema_version from public.application_schema_state where contract_key='core'"

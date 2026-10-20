@@ -47,3 +47,13 @@ and production_authorized=false. Its first attempt refused unreadable synthetic
 source-directory permissions;only that owned public-source directory's mode was
 corrected,then the full actual candidate plus44-case run passed. No authority,
 SQL or ownership gate was weakened. The fixture is not real Madar151/152 source.
+
+A later backend native CI run failed in the retained149 live-client diagnostic:
+its initial supposedly quiescent fixture had queue_locks=1 and other sessions=0.
+The production guard correctly rejected it. The retained setup waited only for
+client sessions to disappear,which does not establish absence of queue locks.
+Setup now waits boundedly for both exact counters to reach zero before opening
+its test transaction. No production counter,assertion,isolation check or guard
+is weakened;no session/queue reset is introduced. The root cause of that specific
+lock owner was not retained by the failed runner,so it is not claimed as a
+confirmed autovacuum event. The corrected exact-head native suite must pass.
