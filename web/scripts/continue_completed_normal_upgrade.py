@@ -25,6 +25,7 @@ REQUIRED_FILES={'web/scripts/continue_completed_normal_upgrade.py',*(
         'completed_normal_model','completed_normal_evidence','completed_normal_forward','completed_normal_profile','schema148_release','schema148_artifacts','schema148_consumers','schema149_release','schema149_consumers','schema149_provider_lifecycle','schema149_controller','schema150_release','schema150_provider_lifecycle','schema150_actor_inventory','schema150_object_inventory','schema150_provider_adapter','schema150_status'))}
 REQUIRED_FILES.update({
     'web/deployment/lib/maintenance_backup_roles.py',
+    *{'web/deployment/lib/'+name+'.py' for name in ('migration_inventory','migration_plan','migration_policy','migration_risk')},
     'web/backend/Dockerfile','web/backend/requirements.txt','web/backend/constraints.txt',
     'web/frontend/Dockerfile','web/frontend/package.json','web/frontend/package-lock.json',
     '.github/workflows/schema148-artifacts.yml','web/scripts/build_schema148_artifacts.py',

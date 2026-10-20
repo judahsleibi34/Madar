@@ -1648,3 +1648,41 @@ admission;no automatic retry/reset/cancel/preimage inference is permitted. Termi
 cancelled history remains preserved;new legitimate150pending work is not legacy.
 This stronger source observation does not change published150SQL or register an
 operational execution path. SeePhaseVI09coordinated release admission evidence.
+
+## Phase VIII generic preparation boundary (2026-10-20)
+
+`migration_inventory.py` captures migration bytes from exact Git commit objects,
+checks an independently selected ancestor, mirrors and contiguous history, and
+preserves the reviewed141→143 exception. The existing pinned001–150 contracts
+remain intact. Future committed versions above the retained candidate ceiling
+can pass source discovery without another schema-specific candidate module.
+Trusted CI additionally compares the PR's actual base SHA; the historical floor
+alone is not proof that a later published migration remained immutable.
+
+`migration_risk.py` uses hash-locked pglast7.21/PostgreSQL17 ASTs. Only an explicit
+locked schema envelope plus a narrow isolated new-table grammar can yield A.
+Unknown SQL is D; developer intent cannot lower the result. Class A does not
+prove old/new application compatibility, runtime grants, lock cost or safety on
+production data. `migration_plan.py` generates deterministic source-bound plans,
+including application-only releases, future sequences, protocol changes,
+protected-controller changes and outstanding acceptance gates. Plans grant no
+authority. Compatibility intent is bounded source data in the fixed
+`web/database/migration-intent.json` path; it is not production policy.
+
+`migration_policy.py` reads only the fixed root-private policy location and
+provides a read-only preparation assessment. It never issues approval or calls
+an executor. Even a matching isolated fixture policy returns
+`production_execution_allowed=false`. The concrete maintenance backup,
+candidate, private acceptance, protected handoff and boot integrations remain
+incomplete; schema150 remains unregistered. Automatic production dispatch and
+policy activation remain prohibited. No existing release descriptor is changed.
+
+`rehearse_generic_migrations.sh` creates a labeled, networkless, memory-bounded
+PostgreSQL17 fixture and verifies an actual pg_dump/independent database restore.
+Synthetic future151/152 SQL is temporary and runs through the existing captured-
+byte/session-lock executor. It is not a full-provider or privileged-controller
+release proof. Consumed attempts reject; lost COMMIT replies require independent
+schema observation and a new inspected attempt. Historical specialized
+rehearsals are retained. The generic Migration Safety workflow always runs on
+PRs/main with read-only credentials and no production secrets; post-merge work
+prepares evidence only. Full automatic actual-candidate staging is still pending.

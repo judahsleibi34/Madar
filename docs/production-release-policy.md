@@ -3033,3 +3033,16 @@ private configuration runtime and verifies unchanged database/object ownership
 before provider activation. Fixed-project directory locks serialize all candidate
 SHAs and source resumption (SOURCE→TARGET ordering). This staging-only same-database
 image refresh neither admits production migration nor issues write authority.
+
+### Phase VIII generic migration preparation
+
+Future source discovery and deterministic plans do not expand production
+admission. Only a narrow PostgreSQL17 AST subset can be classified routine;
+unknown/destructive SQL cannot use that path. Required compatibility, source,
+artifact, recovery, live drift, locking and independent authority gates remain.
+The root-policy reader/evaluator is read-only and does not issue authority.
+Production dispatch is explicitly unavailable while protected maintenance
+backup/candidate/private recovery/handoff/boot integration remains incomplete.
+No generated plan, CI artifact, source-controlled intent or fixture eligibility
+result authorizes production. Main protection, independent review and separate
+protected operational authorization remain required before activation.

@@ -1,0 +1,5 @@
+# CI/rehearsal only. PostgreSQL 17 parser, Python 3.12/3.14 Linux x86_64 wheels.
+# Do not install an unverified source distribution or substitute PostgreSQL 18.
+pglast==7.21 \
+    --hash=sha256:2006f89ab517700e33c9f81d3dee6ae2ce0888b91e2e0be59d008fb37e8cc2a0 \
+    --hash=sha256:c2570105213438a76216a98e38f7b42f70531cf1bc14eec360ce0d152f951548

@@ -36,7 +36,10 @@ FROM application AS test
 USER root
 RUN apt-get update \
     && apt-get install --yes --no-install-recommends git \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && pip install --no-cache-dir --only-binary=:all: --require-hashes -r requirements-migration-tools.txt -c constraints.txt \
+    && python scripts/verify_installed_constraints.py \
+    && python -m pip check
 
 USER 65534:65534
 
