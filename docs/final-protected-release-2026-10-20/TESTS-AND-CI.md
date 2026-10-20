@@ -1,6 +1,6 @@
 # Tests and provenance
 
-Implementation source: `1aeed83105723caadc79396c0a29d9d24841d8cc`.
+Implementation source: `7bfb222a8c4c7731df3160454c9ffe87fa96eb50`.
 Publication head is later; resolve it from the successor PR. Its own CI/artifact
 receipts are required and reported in the PR/final response; earlier source
 acceptance is not relabeled as publication-head acceptance.
@@ -15,7 +15,7 @@ python3 web/scripts/check_secret_hygiene.py
 python3 web/scripts/check_privileged_inventory.py
 ```
 
-Focused tests:162 passed at implementation source. Six source checks pass;
+Focused tests:164 passed at implementation source. Six source checks pass;
 150 mirrored migrations,0errors,2historical duplicate-content warnings;
 78 privileged paths classified. These tests overlap broader suites.
 
@@ -36,7 +36,7 @@ private recovery omitted candidate; premature ingress attempted a Docker start;
 initial staging source-read and helper-import fixture setup failures. Corrected
 fixtures/assertions are retained. Raw logs and source overlays are private.
 
-Exact implementation archive SHA256:
+Earlier1aeed831 committed implementation archive SHA256:
 `3600fedda664525edbbfc786bacb2dc8cc449405f67adfd2f7ffc836da138c62`.
 This is a verified committed source archive, not an authenticated release image.
 The earlier working snapshot/overlay are separately identified and never labeled
@@ -92,3 +92,22 @@ production_authorized=false. This is fresh genesis, not a protected146upgrade.
 This evidence belongs to6e58. The documentation publication is a different SHA
 and requires its own fresh CI/images/receipt. The PR/session reports those final
 head results separately; no6e58receipt is reused to certify a changed source.
+
+## Subsequent journal integrity correction
+
+The6e58CI receipts above predate `7bfb222a8c4c7731df3160454c9ffe87fa96eb50`.
+A deterministic real-process/filesystem regression showed both coordinated
+processes could claim the same attempt before the fix. A separate regression
+showed receipt renames and newly created parent links lacked directory fsync.
+The existing executor now publishes its first coordinated record without replace
+before any database connection, preserves the winner against a racing process,
+and fsyncs file/directory entries. Noncoordinated retry semantics stay unchanged.
+
+All14executor component cases passed. A working overlay of the same runtime code
+also passed206native executions,including13cutover cases and a two-process actual
+PostgreSQL race:one claimant executed147–150,the other was refused,and the winner's
+completion/data survived. Outer authority/backup/host fields remain MODEL. This is
+not a host power-loss or full-controller recovery test. The overlay digest is
+`a26552b6f578e868b9cd1792532d5fe66c6e162ddcc8016f7a318d65f79f2072`.
+The subsequent publication requires fresh final-head CI and images. Any superseded
+87d9checks canceled for this source change are not reported as successful checks.

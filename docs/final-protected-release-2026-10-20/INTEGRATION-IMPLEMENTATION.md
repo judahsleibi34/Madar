@@ -1,7 +1,7 @@
 # Implemented integration and exact remaining edges
 
 Baseline: PR219, `caa5a31484e4c3145163f95381a5fabaf958ba7e`.
-Implementation source: `1aeed83105723caadc79396c0a29d9d24841d8cc`.
+Implementation source: `7bfb222a8c4c7731df3160454c9ffe87fa96eb50`.
 Branch: `codex/final-protected-release-completion-20261020`, based directly on219.
 Main remains `876b65e73ea8ceaf398145d8677019184798a95c`.
 Existing worktrees, published history, migrations001–150 and active descriptor are preserved.
@@ -11,7 +11,7 @@ Existing worktrees, published history, migrations001–150 and active descriptor
 | `CompletedNormalUpgrade.migrate` | Historical profiles retain the madar service; the maintenance parent borrows both real locks and invokes the existing `run_migration` with the concrete provider |
 | `completed_normal_migration.run_migration` | Exact parent/source/root/runtime/lock binding; private sealed candidate replaces public known-good-candidate prerequisite; backup/provider journal witness retained; ordinary runtime state is never relabeled/promoted by this branch |
 | `completed_normal_runtime.validate_model` | Fenced phase requires all eight roles stopped, non-restarting, with no live endpoints; retains image/configuration/mount/capability/resource/authority checks |
-| `LockedMigrationExecutor` | Optional final callback on the same advisory-locked cursor, before durable completion; failure retains committed schema and a failed attempt |
+| `LockedMigrationExecutor` | Exclusive durable coordinated attempt claim; file/new-directory/rename fsync; optional final callback on the same advisory-locked cursor, before durable completion; failure retains committed schema and a failed attempt |
 | Concrete provider/lifecycle | Strict committed150 protocols/quiescence; root+credential sealed private candidate; provider trio then private Redis/backend/frontend; workers require target authority; ingress requires all sealed roles running, proxy last |
 | `CompletedNormalForwardResumption.credential` | Passes the actual parent upgrade descriptor into existing root credential logic; previously omitted it and raised AttributeError |
 | Main/forward cleanup | Parent descriptor closes even when credential cleanup or subordinate lock cleanup fails |

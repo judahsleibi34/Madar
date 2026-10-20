@@ -6,11 +6,12 @@
 This continuation implements the parent SQL invocation in the existing
 coordinator, sealed private candidate verification/startup, final same-session
 protocol/quiescence observation, ordered worker/ingress effects and two recovery
-lock corrections. Three focused implementation commits preserve all prior work:
+lock corrections. Four focused implementation commits preserve all prior work:
 
 - `1968b13ecabdf6a6b298691bcdfa8003886bbeae` — parent-owned SQL/private model branch.
 - `b41ea3d198127e25202b70427f6696ab4b0ff8e0` — private candidate/target guards and forward recovery locks.
 - `1aeed83105723caadc79396c0a29d9d24841d8cc` — ingress refuses incomplete activation.
+- `7bfb222a8c4c7731df3160454c9ffe87fa96eb50` — exclusive coordinated attempt claims and crash-consistent directory publication.
 
 Baseline PR219 is `caa5a31484e4c3145163f95381a5fabaf958ba7e`.
 Branch `codex/final-protected-release-completion-20261020` targets219.
@@ -27,7 +28,7 @@ late sessions and lost COMMIT replies reject unsafe completion. Issuer, backup,
 source ownership and container observations remain MODEL boundaries in that
 fixture. No full-controller or independent test write handoff PASS is claimed.
 
-Focused tests162passed; source guards passed; committed-source staging native150
+Focused tests164passed; source guards passed; committed-source staging native150
 passed205overlapping executions and the host controller suite335passed/10skipped.
 At6e58all five workflows passed:backend3,486passed/889conditional skips;
 257native PostgreSQL executions;68migration-safety cases;10root-policy filesystem;
@@ -56,3 +57,10 @@ maintenance-first caller and its native privileged operation. Do not substitute
 another genesis stack or model suite for that gate. Overall **NOT READY**.
 Production/main/controller/roles/ingress/backups/policies remain untouched by this
 continuation; no production authority was issued or deployment authorized.
+
+The later journal correction reproduced a same-attempt process race and missing
+directory fsyncs. The existing executor now denies the losing claimant before a
+DB connection and preserves the winner's record. Native working-source rehearsal
+passed206executions/13cutover cases.6e58results are historical accepted-source
+receipts; final publication uses new CI/images and is reported separately. This
+fix does not change the unexecuted full-operation conclusion above.

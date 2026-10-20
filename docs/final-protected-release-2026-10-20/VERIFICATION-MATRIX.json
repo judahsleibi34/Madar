@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "implementation_sha": "1aeed83105723caadc79396c0a29d9d24841d8cc",
+  "implementation_sha": "7bfb222a8c4c7731df3160454c9ffe87fa96eb50",
   "baseline_pr": 219,
   "engineering_complete": false,
   "full_protected_upgrade_executed": false,
@@ -156,6 +156,11 @@
       "gate": "generic_protected_execution",
       "status": "BLOCKED",
       "evidence": "No generic dispatch added ahead of incomplete explicit150controller; actual151 compatibility blocker retained."
+    },
+    {
+      "gate": "coordinated_journal_custody",
+      "status": "PASS",
+      "evidence": "Before-fix real-process duplicate claim reproduced; after-fix one exclusive claimant,one refusal and native PostgreSQL150winner preserved. Directory fsync observed; outer authority/backup MODEL,no full power-loss proof."
     }
   ],
   "ci_evidence_source_sha": "6e58dcbe03b806f1868e02b166397e581da481a4",
@@ -166,5 +171,6 @@
     "Candidate artifacts": "https://github.com/judahsleibi34/Madar/actions/runs/39485964299",
     "Full provider": "https://github.com/judahsleibi34/Madar/actions/runs/39485964286"
   },
-  "publication_head_receipts": "Resolve PR220 head; its own fresh CI/artifacts are reported separately by GitHub and the final session."
+  "publication_head_receipts": "Resolve PR220 head; its own fresh CI/artifacts are reported separately by GitHub and the final session.",
+  "ci_scope_note": "6e58receipts predate the later journal correction; final publication requires separate fresh exact-head CI/images."
 }

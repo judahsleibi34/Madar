@@ -10,6 +10,8 @@
 | Late session after150 COMMIT | Final same-session guard rejects completion; durable failed record says observed150; no promotion | New native database test |
 | Forward credential wrapper | Old code omitted held lock and raised AttributeError; corrected wrapper borrows real descriptor and requests fresh resumption witness | Native filesystem/flock, MODEL issuer |
 | Clear/close cleanup errors | Remaining cleanup executes and parent upgrade descriptor closes | Native filesystem + controller MODEL failures |
+| Same-attempt process race | Before:both filesystem claimants completed; after:one atomically claims,another refuses before DB; native PostgreSQL winner retains completed150receipt/data | Native process/filesystem/SQL, MODEL outer gates |
+| Directory durability | File fsync,exclusive claim/rename,and new directory entries fsync observed; no host power-loss acceptance claimed | Native filesystem |
 | Provider start failure | Fixed private sequence stops before candidate/proxy; no continued activation | MODEL transport |
 | Missing worker activation | Target-authority flag alone cannot start ingress | MODEL transport and stage witness |
 
