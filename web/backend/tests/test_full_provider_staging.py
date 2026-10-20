@@ -2,6 +2,7 @@
 import copy
 import json
 import os
+import re
 from pathlib import Path
 import sys
 import tempfile
@@ -31,6 +32,36 @@ class FullStagingSafetyTests(unittest.TestCase):
             with self.assertRaises(RuntimeError):staging.require_host(Path.home()/staging.identity(SHA))
         with patch.object(staging.socket,'gethostname',return_value='madar-staging'):
             with self.assertRaises(RuntimeError):staging.require_host(Path('/tmp')/staging.identity(SHA))
+
+    def test_failure_report_excludes_provider_credentials_exception_text_and_sql(self):
+        secret='SYNTHETIC-SECRET-MUST-NOT-APPEAR'
+        result=staging.failure_facts(RuntimeError(secret),{'phase':'native_provider_bootstrap'},secret.encode())
+        self.assertNotIn(secret,json.dumps(result));self.assertEqual(result['exception_type'],'RuntimeError')
+        self.assertFalse(result['production_authorized']);self.assertFalse(result['protected_controller_execution'])
+
+    def test_browser_child_receives_only_fixed_synthetic_scope_and_no_ambient_secret(self):
+        value={'status':'PASS','checks':['case']*9,'pageErrors':0}
+        result=SimpleNamespace(returncode=0,stdout=json.dumps(value).encode())
+        with patch.dict(os.environ,{'GH_TOKEN':'SYNTHETIC-SECRET','NODE_OPTIONS':'untrusted','GITHUB_ACTIONS':'true','RUNNER_ENVIRONMENT':'github-hosted','GITHUB_REPOSITORY':'judahsleibi34/Madar'}),patch.object(staging.shutil,'which',return_value='/verified/node'),patch.object(staging.socket,'gethostname',return_value='disposable-runner'),patch.object(staging.subprocess,'run',return_value=result) as command:
+            self.assertEqual(staging.browser_acceptance(SHA),value)
+            environment=command.call_args.kwargs['env']
+            self.assertNotIn('GH_TOKEN',environment);self.assertNotIn('NODE_OPTIONS',environment)
+            self.assertNotIn('MADAR_STAGING_BROWSER_HOST',environment)
+            self.assertEqual(environment['MADAR_STAGING_BROWSER_PORT'],'22443')
+            self.assertEqual(command.call_args.args[0][0],'/verified/node')
+
+    def test_all_remote_actions_are_immutable_and_staging_has_no_write_permission(self):
+        workflows=WEB/'.github/workflows'
+        # Native test image mounts workflows at the web fixture root.
+        if not workflows.exists():workflows=WEB.parent/'.github/workflows'
+        for path in workflows.glob('*.yml'):
+            for action in re.findall(r'uses:\s*([^\s#]+)',path.read_text()):
+                if not action.startswith('./'):
+                    self.assertRegex(action,r'^[A-Za-z0-9_./-]+@[0-9a-f]{40}$',str(path))
+        body=(workflows/'full-provider-staging.yml').read_text()
+        self.assertIn('actions: read',body);self.assertIn('contents: read',body)
+        self.assertNotIn('contents: write',body);self.assertNotIn('id-token: write',body)
+        self.assertIn('persist-credentials: false',body)
 
     def test_target_context_restores_existing_global_bindings_after_failure(self):
         keys=('PROJECT','OWNER','MARKER','RUNTIME','HERE','require_staging_host','compose')

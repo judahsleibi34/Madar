@@ -62,3 +62,27 @@ refusal,foreign prepared-transaction refusal,and the unchanged exact150 deletion
 protocol horizon. The first post-fix fixture attempt raced PostgreSQL readiness;
 the fixture now waits for final TCP readiness rather than the image's transient
 initialization socket. Private startup logs are retained before owned cleanup.
+
+## Operator evidence checksum/read race — conditional admission defect
+
+The previous evidence loader hashed an operator-owned pathname,then reopened it
+to parse JSON. A deterministic replacement between those operations returned
+unreviewed replacement data. The preserved assertion failed against the old
+implementation. The correction hashes and deserializes one bounded no-follow
+regular-file byte capture. The original race,same-inode rewrite after capture,
+symlink,FIFO,empty and oversized cases now refuse substitution. No protected
+authorization was created or production controller changed.
+
+
+
+PhaseIX full-provider CI requires the accepted native OCI manifest identities;
+it never substitutes build-host configuration IDs after import. A reproduced
+classic-store refusal led to explicit empty-daemon containerd-store preparation
+only on disposable GitHub runners,with a root-private original configuration
+preimage and failure restoration. Physical nodes and the shared staging VM
+refuse that preparation. Remaining mutable checkout/setup-node Actions are
+pinned to their officially observed commit IDs. Selected native browser checks
+use locked dependencies,a synthetic private fixture and verified loopback/source
+identity. Bounded progress and sanitized failure reports contain no credentials,
+exception messages or raw provider logs;completed evidence follows observed
+owned-service shutdown. These CI privileges are not release authority.

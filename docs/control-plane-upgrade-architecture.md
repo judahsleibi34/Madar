@@ -1729,3 +1729,16 @@ markers before starting business workers. Source-derived namespaces,private
 leases,loopback-only ports,resource limits and consumed-attempt refusal remain
 mandatory. Its results grant no protected authority and cannot satisfy the still
 blocked combined schema150 operation. See [staging scope and limitations](architecture-phase9-2026-10-20/10-AUTOMATIC-FULL-STAGING.md).
+
+
+PhaseIX full-provider CI requires the accepted native OCI manifest identities;
+it never substitutes build-host configuration IDs after import. A reproduced
+classic-store refusal led to explicit empty-daemon containerd-store preparation
+only on disposable GitHub runners,with a root-private original configuration
+preimage and failure restoration. Physical nodes and the shared staging VM
+refuse that preparation. Remaining mutable checkout/setup-node Actions are
+pinned to their officially observed commit IDs. Selected native browser checks
+use locked dependencies,a synthetic private fixture and verified loopback/source
+identity. Bounded progress and sanitized failure reports contain no credentials,
+exception messages or raw provider logs;completed evidence follows observed
+owned-service shutdown. These CI privileges are not release authority.

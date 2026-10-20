@@ -48,3 +48,16 @@ exact-source CI links are recorded in the final report after the workflow runs.
 The runner issues no authority and leaves schema150 protected admission and
 production automation blocked. Browser/product coverage,independent restore,
 privileged handoff/reboot and object-aware PITR remain separate gates.
+
+
+PhaseIX full-provider CI requires the accepted native OCI manifest identities;
+it never substitutes build-host configuration IDs after import. A reproduced
+classic-store refusal led to explicit empty-daemon containerd-store preparation
+only on disposable GitHub runners,with a root-private original configuration
+preimage and failure restoration. Physical nodes and the shared staging VM
+refuse that preparation. Remaining mutable checkout/setup-node Actions are
+pinned to their officially observed commit IDs. Selected native browser checks
+use locked dependencies,a synthetic private fixture and verified loopback/source
+identity. Bounded progress and sanitized failure reports contain no credentials,
+exception messages or raw provider logs;completed evidence follows observed
+owned-service shutdown. These CI privileges are not release authority.

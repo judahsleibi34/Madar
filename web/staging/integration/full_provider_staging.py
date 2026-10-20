@@ -16,6 +16,7 @@ import secrets
 import shutil
 import socket
 import stat
+import subprocess
 import sys
 import time
 
@@ -33,6 +34,20 @@ from fresh_artifact_acceptance import import_authenticated_image
 
 PORTS={22080,22443,22081}
 SERVICES=set(configuration.BOUNDS)
+
+
+def progress(phase,**fields):
+    if set(fields)-{'number','sql_sha256'}:raise RuntimeError('full_staging_progress_fields_invalid')
+    record={'phase':phase,**fields}
+    manage.private_write('staging-progress.json',json.dumps(record)+'\n')
+    print(json.dumps(record),flush=True)
+
+
+def failure_facts(error,phase,raw=b''):
+    # Never publish exception messages, provider bodies, SQL or private logs.
+    return {'status':'FAIL','exception_type':type(error).__name__,'phase':phase,
+        'private_diagnostic_sha256':hashlib.sha256(raw).hexdigest() if raw else None,
+        'protected_controller_execution':False,'production_authorized':False}
 
 
 def identity(source):
@@ -136,6 +151,7 @@ def actors(images,*,complete):
 
 def initialize(inventory,origin):
     """Fresh genesis only: no live database origin inference or history repair."""
+    progress('native_provider_bootstrap')
     manage.compose('up','--detach','--wait','--wait-timeout','90','postgres','redis','auth','rest','storage','gateway')
     manage.require_database_marker()
     if manage.sql("select to_regclass('public.application_schema_state') is null;")!='t':
@@ -153,6 +169,7 @@ def initialize(inventory,origin):
     # Discover, authenticate and capture once from Git; never reopen SQL paths.
     for migration in inventory.migrations:
         if migration.number in inventory.excluded_versions or migration.number>origin:continue
+        progress('synthetic_genesis_sql',number=migration.number,sql_sha256=migration.sha256)
         manage.require_database_marker()
         manage.sql("set lock_timeout='5s';set statement_timeout='45s';"+migration.sql.decode())
     if manage.sql("select schema_version from public.application_schema_state where contract_key='core';")!=str(origin):
@@ -162,6 +179,25 @@ def initialize(inventory,origin):
 def require_protocols(schema):
     if type(schema) is not int or not 1<=schema<10**9 or manage.sql(application.PROTOCOL_SQL)!=str(schema)+':2:2:2':
         raise RuntimeError('full_staging_native_worker_protocol_mismatch')
+
+
+def browser_acceptance(source):
+    node=shutil.which('node')
+    if node is None:raise RuntimeError('full_staging_browser_tools_missing')
+    environment={'PATH':os.defpath,'HOME':str(Path.home()),
+        'MADAR_STAGING_BROWSER_PORT':'22443','MADAR_STAGING_BROWSER_SHA':source,'MADAR_STAGING_FRESH_TOTP':'true'}
+    if socket.gethostname()=='madar-staging':environment['MADAR_STAGING_BROWSER_HOST']='madar-staging'
+    for key in ('GITHUB_ACTIONS','RUNNER_ENVIRONMENT','GITHUB_REPOSITORY'):
+        if key in os.environ:environment[key]=os.environ[key]
+    result=subprocess.run([node,str(manage.REPOSITORY/'web/staging/integration/browser-smoke.mjs'),
+        str(manage.RUNTIME/'smoke-fixture.json')],env=environment,capture_output=True,timeout=180)
+    if result.returncode:
+        manage.private_write('browser-error.log',(result.stdout+result.stderr).decode(errors='replace'))
+        raise RuntimeError('full_staging_browser_acceptance_failed')
+    value=json.loads(result.stdout)
+    if value.get('status')!='PASS' or len(value.get('checks',[]))!=9 or value.get('pageErrors')!=0:
+        raise RuntimeError('full_staging_browser_acceptance_incomplete')
+    return value
 
 
 def main(mode,directory,source,baseline):
@@ -204,6 +240,7 @@ def main(mode,directory,source,baseline):
         manage.private_write('release-plan.json',plan.encoded.decode())
         manage.private_write('migration-inventory.json',canonical(inventory.document()).decode())
         try:
+            progress('authenticated_image_import')
             with authenticated_archive(capture/'archive.zip',artifact['digest']) as archive:
                 for role in ('backend','frontend'):
                     import_authenticated_image(archive,role,receipt['archives'][role],capture/(role+'.tar.gz'))
@@ -220,17 +257,23 @@ def main(mode,directory,source,baseline):
                 migration=migrations[step['number']]
                 if migration.sha256!=step['sha256']:raise RuntimeError('full_staging_captured_sql_changed')
                 boundary=time.monotonic()
+                progress('planned_migration_sql',number=migration.number,sql_sha256=migration.sha256)
                 manage.sql("set lock_timeout='5s';set statement_timeout='45s';"+migration.sql.decode())
                 observed=manage.sql("select schema_version from public.application_schema_state where contract_key='core';")
                 if observed!=str(step['to_schema']):raise RuntimeError('full_staging_migration_commit_not_observed')
                 checkpoints.append({'schema':int(observed),'sql_sha256':migration.sha256,'elapsed_seconds':round(time.monotonic()-boundary,3)})
                 manage.private_write('migration-boundaries.json',json.dumps(checkpoints)+'\n')
             require_protocols(schema)
+            progress('compatible_application_start')
             manage.compose('up','--detach','--wait','--wait-timeout','180',*sorted(SERVICES))
             actors(images,complete=True);manage.require_database_marker()
+            progress('native_application_acceptance')
             smoke.main();tenant_smoke.main()
             application.worker_health()
+            progress('native_user_and_tenant_deletion')
             deletion=application.deletion_workflow(expected_schema=schema)
+            progress('native_browser_acceptance')
+            browser=browser_acceptance(source)
             code=application.runtime_identity(images,source)
             runtime_rows=actors(images,complete=True)
             if not all(row['running'] for row in runtime_rows.values()):raise RuntimeError('full_staging_component_not_running')
@@ -243,19 +286,31 @@ def main(mode,directory,source,baseline):
                 'configuration_sha256':hashlib.sha256(configuration.regular(runtime/'verified-compose.json')).hexdigest(),
                 'native_auth_mfa_refresh_csrf_storage_notifications_readiness':True,'native_tenant_read_write_isolation':True,
                 'deletion_workflow':deletion,'runtime_code_sha256':code,'source_overlay_used':False,
+                'browser':browser,
                 'elapsed_seconds':round(time.monotonic()-started,3),'stopped_after_acceptance':True,
                 'protected_controller_execution':False,'production_authorized':False,
                 'limitations':['synthetic genesis is not current-data preservation or independent restoration',
                     'no protected write handoff or privileged controller/reboot acceptance',
-                    'not complete product browser, object-aware PITR or off-host recovery',
+                    'selected login/MFA/admin/mobile browser cases, not complete product E2E',
+                    'not object-aware PITR or off-host recovery',
                     'schema151 native deletion protocol remains incompatible until separately coordinated correction']}
-            manage.private_write('full-provider-acceptance.json',json.dumps(report,sort_keys=True,indent=2)+'\n')
             actors(images,complete=True);manage.compose('stop','--timeout','15')
+            if any(row['running'] for row in actors(images,complete=True).values()):
+                raise RuntimeError('full_staging_stop_not_observed')
+            manage.private_write('full-provider-acceptance.json',json.dumps(report,sort_keys=True,indent=2)+'\n')
             return report
-        except BaseException:
+        except BaseException as error:
             # A partial/unknown inventory refuses cleanup rather than touching
             # another project. Preserve failed data, queues and private logs.
-            actors(images,complete=False);manage.compose('stop','--timeout','15')
+            try:phase=json.loads(configuration.regular(runtime/'staging-progress.json'))
+            except Exception:phase={'phase':'unavailable'}
+            diagnostic=runtime/'last-command-error.log'
+            try:raw=configuration.regular(diagnostic) if diagnostic.is_file() else b''
+            except Exception:raw=b''
+            failure=failure_facts(error,phase,raw)
+            try:actors(images,complete=False);manage.compose('stop','--timeout','15')
+            except Exception as cleanup:failure['cleanup_exception_type']=type(cleanup).__name__
+            manage.private_write('full-provider-failure.json',json.dumps(failure,sort_keys=True)+'\n')
             raise
 
 

@@ -3,11 +3,20 @@ import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
 import { readFileSync, statSync } from "node:fs";
 import { createRequire } from "node:module";
+import { hostname, homedir } from "node:os";
 
 const require = createRequire(new URL("../../frontend/package.json", import.meta.url));
 const { chromium } = require("@playwright/test");
-assert.equal(process.env.MADAR_STAGING_BROWSER_HOST, "madar-staging", "Verify the SSH tunnel destination first");
+const hosted = process.env.GITHUB_ACTIONS === "true" && process.env.RUNNER_ENVIRONMENT === "github-hosted"
+  && process.env.GITHUB_REPOSITORY === "judahsleibi34/Madar"
+  && !["madar-gpu", "madar-node1"].includes(hostname());
+assert.ok(hosted || process.env.MADAR_STAGING_BROWSER_HOST === "madar-staging", "Verify the isolated browser destination first");
 const path = process.argv[2];
+if (hosted) {
+  assert.match(process.env.MADAR_STAGING_BROWSER_SHA || "", /^[a-f0-9]{40}$/);
+  assert.equal(path, homedir() + "/madar-full-provider-" + process.env.MADAR_STAGING_BROWSER_SHA.slice(0, 12) + "/smoke-fixture.json");
+  assert.equal(process.env.MADAR_STAGING_BROWSER_PORT, "22443");
+}
 assert.equal(statSync(path).mode & 0o777, 0o600, "Synthetic fixture must be private");
 const fixture = JSON.parse(readFileSync(path, "utf8"));
 assert.match(fixture.admin_email, /^hardening-[a-f0-9]{16}@example\.com$/);
