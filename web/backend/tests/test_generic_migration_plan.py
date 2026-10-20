@@ -171,6 +171,15 @@ class PlanTests(unittest.TestCase):
         self.assertIn('automation_trust_root_changed',result['reasons'])
         self.assertFalse(result['production_execution_allowed'])
 
+    def test_executable_build_tools_are_captured_and_mode_is_pinned(self):
+        self.write(2); self.commit(); old,_=self.plan()
+        policy,_=self.accepted_context(old)
+        tool='web/scripts/rehearse_generic_migrations.sh'
+        (self.root/tool).chmod(0o755); self.commit(); changed,_=self.plan()
+        self.assertEqual(changed.document()['automation_inputs']['files'][tool]['mode'],'100755')
+        _,obs=self.accepted_context(changed)
+        self.assertIn('automation_trust_root_changed',assess(changed,policy,obs,now=1000)['reasons'])
+
     def test_missing_automation_input_blocks_routine_policy(self):
         (self.root/'web/backend/requirements-migration-tools.txt').unlink()
         self.write(2); self.commit(); plan,_=self.plan()

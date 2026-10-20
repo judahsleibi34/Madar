@@ -31,9 +31,10 @@ AUTOMATION_INPUTS=tuple(dict.fromkeys((*ARTIFACT_INPUTS,
 
 def automation_inputs(git,source):
     import hashlib
-    files=git.files(source,*AUTOMATION_INPUTS,'.github/workflows/','.github/actions/')
+    files=git.files(source,*AUTOMATION_INPUTS,'.github/workflows/','.github/actions/',allow_executable=True)
     missing=sorted(set(AUTOMATION_INPUTS)-set(files))
-    hashes={path:hashlib.sha256(body).hexdigest() for path,body in sorted(files.items())}
+    hashes={path:{'sha256':hashlib.sha256(body).hexdigest(),'mode':git.modes[(source,path)]}
+            for path,body in sorted(files.items())}
     return {'files':hashes,'missing':missing,'sha256':digest({'files':hashes,'missing':missing})}
 
 

@@ -51,6 +51,7 @@ def digest(value):
 
 class GitSource:
     def __init__(self, root):
+        self.modes = {}
         self.deadline = time.monotonic() + 90
         self.root = Path(root).resolve(strict=True)
         self.environment = {'PATH': os.defpath, 'HOME': str(self.root),
@@ -109,7 +110,7 @@ class GitSource:
         except UnicodeDecodeError: raise RuntimeError('migration_source_utf8_required') from None
         return body
 
-    def files(self, sha, *paths):
+    def files(self, sha, *paths, allow_executable=False):
         self.commit(sha)
         records = self.command('ls-tree', '-rz', sha, '--', *paths).split(b'\0')
         result = {}; total = 0
@@ -117,11 +118,13 @@ class GitSource:
             if not record: continue
             head, rawpath = record.split(b'\t', 1)
             mode, kind, oid = head.decode().split()
-            if mode != '100644' or kind != 'blob':
+            allowed = {'100644','100755'} if allow_executable else {'100644'}
+            if mode not in allowed or kind != 'blob':
                 raise RuntimeError('migration_source_regular_nonexecutable_blob_required')
             path = rawpath.decode('utf-8')
             if path in result or len(result) >= MAX_ENTRIES:
                 raise RuntimeError('migration_source_inventory_limit')
+            self.modes[(sha,path)] = mode
             result[path] = self.blob(oid); total += len(result[path])
             if total > MAX_TOTAL: raise RuntimeError('migration_source_inventory_bytes_limit')
         return result

@@ -38,3 +38,10 @@ routine SQL receives a bounded minimal PostgreSQL rehearsal; stronger SQL emits
 BLOCKED coverage. Synthetic future and original-role restore cases always run.
 Full-provider candidate staging/compatibility and protected post-merge dispatch
 are not yet automatic. These required coverage gaps prevent production admission.
+
+Trusted build inputs include regular executable shell tools, so their Git mode
+is explicitly captured alongside SHA256. SQL discovery remains nonexecutable-
+only. A real-source plan exposed the original overstrict shared mode check;
+it now permits executability only for the fixed automation input capture, with
+regressions retaining executable-SQL refusal and detecting tool-mode changes.
+The actual source inventory has no missing required automation inputs.
