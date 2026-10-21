@@ -13,6 +13,7 @@ from deployment.lib import completed_normal_runtime as m
 from deployment.lib.completed_normal_admission import digest
 from deployment.lib.completed_normal_resources import allocation,ROLES
 from test_completed_normal_admission import fixture_contract
+from test_completed_normal_manual_profile import manual_contract
 
 class RuntimeModelTests(unittest.TestCase):
     def setUp(self):
@@ -57,6 +58,63 @@ class RuntimeModelTests(unittest.TestCase):
                 raise AssertionError(args)
         self.runtime=Runtime()
     def validate(self):return m.validate_model(self.contract,self.model,self.runtime)
+    def use_manual_contract(self):
+        previous=self.selected
+        self.contract=manual_contract();self.selected=allocation(self.contract,'green')
+        old_network=previous['networks']['default'];network=self.selected['networks']['default']
+        self.model['networks']['default']['name']=network
+        rows={}
+        for role,service in self.model['services'].items():
+            old_name=previous['containers'][role];name=self.selected['containers'][role]
+            row=self.rows[old_name];service['container_name']=name
+            row.update(Name='/'+name)
+            row['Config']['Labels']['com.docker.compose.project']=self.selected['project']
+            row['HostConfig']['NetworkMode']=network
+            endpoint=row['NetworkSettings']['Networks'].pop(old_network)
+            endpoint['Aliases']=[name,role];row['NetworkSettings']['Networks'][network]=endpoint
+            if role in {'backend',*m.BUSINESS}:
+                service['environment'].update(MADAR_BUSINESS_WRITE_CONTRACT=digest(self.contract),
+                    SCHEMA_COMPATIBLE_MIN='136',SCHEMA_COMPATIBLE_MAX='144',SCHEMA_EXCLUDED_VERSIONS='142')
+                source=str(m.ADMISSIONS/digest(self.contract)/'write-authority')
+                service['volumes'][0]['source']=source;row['Mounts'][0]['Source']=source
+                row['Config']['Env']=['PATH=/fixture',*(k+'='+v for k,v in service['environment'].items())]
+            rows[name]=row
+        self.rows=rows
+
+    def test_manual_profile_accepts_exact_136_144_excluding_142(self):
+        self.use_manual_contract();self.validate()
+        for role in m.BUSINESS:
+            row=self.rows[self.selected['containers'][role]]
+            row['State']={'Running':False,'Status':'created'}
+            for endpoint in row['NetworkSettings']['Networks'].values():
+                endpoint.update(NetworkID='',IPAddress='',EndpointID='')
+        m.validate_model(self.contract,self.model,self.runtime,phase='staged')
+
+    def test_manual_environment_cannot_supply_arbitrary_authority_bounds(self):
+        for key,value in [('SCHEMA_COMPATIBLE_MIN','115'),('SCHEMA_COMPATIBLE_MAX','136'),
+                ('SCHEMA_COMPATIBLE_MAX','145'),('SCHEMA_EXCLUDED_VERSIONS',''),('SCHEMA_EXCLUDED_VERSIONS','143')]:
+            self.setUp();self.use_manual_contract()
+            service=self.model['services']['backend'];service['environment'][key]=value
+            self.rows[self.selected['containers']['backend']]['Config']['Env']=[
+                'PATH=/fixture',*(k+'='+v for k,v in service['environment'].items())]
+            with self.subTest(key=key,value=value),self.assertRaisesRegex(RuntimeError,'authority_mount_changed'):
+                self.validate()
+
+    def test_manual_profile_preserves_exact_authority_mount_guards(self):
+        for change in ('source','writable','create_host_path'):
+            self.setUp();self.use_manual_contract()
+            volume=self.model['services']['backend']['volumes'][0]
+            actual=self.rows[self.selected['containers']['backend']]['Mounts'][0]
+            if change=='source':volume['source']=actual['Source']='/unapproved/authority'
+            elif change=='writable':volume['read_only']=False;actual['RW']=True
+            else:volume['bind']['create_host_path']=True
+            with self.subTest(change=change),self.assertRaisesRegex(RuntimeError,'authority_mount_changed'):
+                self.validate()
+
+    def test_unapproved_contract_range_is_rejected_before_runtime_inspection(self):
+        self.use_manual_contract();self.contract['candidate']['compatible_max']=145
+        with self.assertRaisesRegex(RuntimeError,'admission_runtime_invalid'):self.validate()
+
     def test_exact_model_seals_all_role_specs_and_actual_network_objects(self):
         bindings,networks=self.validate()
         self.assertEqual(set(bindings),set(ROLES));self.assertEqual(len(networks),1)

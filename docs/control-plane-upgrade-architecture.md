@@ -1,5 +1,16 @@
 # Privileged control-plane upgrade architecture
 
+## Historical retained-maintenance source reconciliation
+
+PR195's profile-aware runtime/dispatch fixes are retained by the newer controller;
+its missing manual manifest-marker binding is carried forward without changing
+the issuer, executor, profile registry, locks or recovery journals. Its four
+one-shot routing/continuation/live-probe tools remain historical source and
+private evidence, outside active execution and installation. Their frozen
+identities cannot authorize new source or a schema150 operation. See the
+[file and document reconciliation](history/production-release-2026-10/README.md).
+Synthetic archived-model tests are not privileged-system or production acceptance.
+
 ## Final continuation: exact locked migration origin
 
 The maintenance parent supplies the exact approved origin to the existing SQL

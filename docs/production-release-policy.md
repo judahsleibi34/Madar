@@ -1,5 +1,18 @@
 # Madar production release acceptance policy
 
+## Historical manual manifest reconciliation
+
+The immutable schema136→144 manual manifest retains its `STAGING` marker.
+Only the existing validated manual profile may bind that marker to the fresh
+candidate SHA, with the exact seven-migration chain and exclusion142. The caller
+still authenticates manifest/SQL checksums, independent current authority,
+backup evidence, READ_ONLY state, locks and consumed-attempt rules. Legacy and
+coordinated successors do not gain this placeholder permission; schema150 remains
+unregistered. Historical routing/continuation tools are archived, not activated.
+See the [October historical reconciliation](history/production-release-2026-10/README.md)
+for per-file decisions and safe summaries of the private historical documents.
+Neither their reported results nor this source correction provides deployment approval.
+
 ## Final continuation: exact locked migration origin
 
 The maintenance parent supplies the exact approved origin to the existing SQL

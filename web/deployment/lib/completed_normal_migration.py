@@ -151,6 +151,23 @@ def connection_factory(contract):
         if isinstance(error,RuntimeError):raise
         raise RuntimeError('completed_migration_database_connection_failed_'+type(error).__name__) from None
 
+def bind_manifest(manifest,contract):
+    """Bind reviewed metadata, never issue migration or write authority.
+
+    The caller still authenticates the manifest digest, SQL, current operation,
+    backup, fresh credentials and locks. Only the historical manual profile uses
+    the immutable STAGING marker; other profiles retain their existing markers.
+    """
+    selected=profile(contract);sha=contract['candidate']['source_sha']
+    allowed_releases={'CURRENT',sha}
+    if selected is MANUAL:allowed_releases.add('STAGING')
+    if (manifest.release_sha not in allowed_releases
+            or [m.number for m in manifest.migrations]!=list(selected.migrations)
+            or (manifest.release_sha=='STAGING' and manifest.excluded_schemas!=MANUAL.excluded)):
+        raise RuntimeError('completed_migration_chain_invalid')
+    return replace(manifest,release_sha=sha)
+
+
 def _parent_migration_binding(parent,provider,contract,release_root,state_root):
     """Bind the existing executor to its root coordinator, never a child packet.
 
@@ -267,9 +284,7 @@ def run_migration(contract,release_root,state_root,operations,*,parent=None,prov
         manifest=admitted_manifest(release_root,contract)
     else:
         manifest=MigrationManifest.load(path,release_root)
-    if manifest.release_sha not in {'CURRENT',sha} or [m.number for m in manifest.migrations]!=list(selected.migrations):
-        raise RuntimeError('completed_migration_chain_invalid')
-    manifest=replace(manifest,release_sha=sha)
+    manifest=bind_manifest(manifest,contract)
     backup=Path(witness['backup'])
     if not backup.is_absolute() or not backup.name.startswith('madar-'):
         raise RuntimeError('completed_migration_backup_path_invalid')
