@@ -22,7 +22,7 @@ from deployment.lib import schema150_provider_lifecycle as lifecycle
 from deployment.lib import schema149_provider_lifecycle as journal_module
 from deployment.lib import schema150_release as release
 from deployment.lib.completed_normal_profile import DELETION,LEGACY
-from deployment.lib.completed_normal_resources import ROLES
+from deployment.lib.completed_normal_resources import ROLES,allocation
 from test_schema150_admission import deletion_contract
 
 class ParentMigrationTests(unittest.TestCase):
@@ -67,8 +67,11 @@ class ParentMigrationTests(unittest.TestCase):
             self.journal.append('effect_intent',{'step':step});self.journal.append('effect_complete',{'step':step})
         self.bindings={role:{'id':migration.digest({'role':role}),'image':'sha256:'+'1'*64,
             'spec_sha256':'2'*64,'networks':{},'network_aliases':{}} for role in ROLES}
+        names=allocation(self.contract,self.contract['candidate']['slot'],preparation150=True)['containers']
         self.stage={'operation':DELETION.operation,'context_sha256':migration.digest(self.contract),
-            'source_sha':self.sha,'images':self.contract['candidate']['images'],'runtimes':self.bindings,
+            'source_sha':self.sha,'images':self.contract['candidate']['images'],
+            'runtimes':{role:dict(record,name=names[role]) for role,record in self.bindings.items()},
+            'preparation_mode':'created-fenced',
             'networks':{},'worker_generation':'3'*64,'origin_workers':[]}
         self.write_stage()
         self.witness={'intent':migration.intent_document(self.contract),'backup':str(self.directory/'madar-synthetic'),
@@ -114,7 +117,7 @@ class ParentMigrationTests(unittest.TestCase):
         self.assertIs(self.executor.call_args.kwargs['migration_guard'],self.actor.migration_guard)
         self.assertIs(self.executor.call_args.kwargs['completion_guard'],self.actor.migration_completion_guard)
         self.assertEqual(self.executor.call_args.kwargs['expected_origin'],146)
-        self.model.assert_called_once_with(self.contract,{},self.actor.runtime,phase='fenced')
+        self.model.assert_called_once_with(self.contract,{},self.actor.runtime,phase='provisional')
         self.runtime.return_value.json_http.assert_not_called()
         self.assertEqual((self.state/'state.json').read_bytes(),original)
         self.assertEqual(self.driver.actor.event.call_args.args,('parent_migration_completed',))

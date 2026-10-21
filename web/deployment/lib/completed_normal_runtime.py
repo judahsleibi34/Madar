@@ -45,11 +45,18 @@ def _duration(value):
     return round(sum(float(n)*units[u] for n,u in parts))
 
 def validate_model(contract,model,runtime, *, phase='running'):
-    if phase not in {'staged','running','fenced'}:
+    if phase not in {'staged','running','fenced','provisional'}:
         raise RuntimeError('completed_runtime_lifecycle_invalid')
-    validate_contract(contract)
-    release=profile(contract)
-    selected=allocation(contract,contract['candidate']['slot'])
+    from deployment.lib.completed_normal_profile import DELETION
+    preparation150=phase=='provisional' and contract.get('operation')==DELETION.operation
+    if preparation150:
+        from deployment.lib.completed_normal_admission import validate_provider_preparation150
+        validate_provider_preparation150(contract)
+        release=DELETION
+    else:
+        validate_contract(contract)
+        release=profile(contract)
+    selected=allocation(contract,contract['candidate']['slot'],preparation150=preparation150)
     services=model.get('services',{})
     if set(services)!=set(ROLES):raise RuntimeError('completed_runtime_service_inventory_changed')
     images={};rows=runtime.inspect(list(selected['containers'].values()))
@@ -88,9 +95,9 @@ def validate_model(contract,model,runtime, *, phase='running'):
         image=contract['candidate']['redis_image'] if role=='redis' else contract['candidate']['images']['frontend' if role=='frontend' else 'backend']
         if row is not None:
             state=row['State']
-            if phase=='fenced':
+            if phase in {'fenced','provisional'}:
                 if (state.get('Running') is not False or state.get('Restarting') is not False
-                        or state.get('Status') not in {'created','exited'}):
+                        or state.get('Status') not in ({'created'} if phase=='provisional' else {'created','exited'})):
                     raise RuntimeError('completed_runtime_fenced_candidate_started')
             elif phase=='staged' and role in BUSINESS:
                 if state.get('Running') or state.get('Status')!='created':
@@ -99,7 +106,7 @@ def validate_model(contract,model,runtime, *, phase='running'):
                 raise RuntimeError('completed_runtime_service_not_running')
         if row is None or row['Image']!=image:
             raise RuntimeError('completed_runtime_running_identity_changed')
-        if phase!='fenced' and not (phase=='staged' and role in BUSINESS):
+        if phase not in {'fenced','provisional'} and not (phase=='staged' and role in BUSINESS):
             health=row['State'].get('Health',{}).get('Status')
             if health not in {'healthy','starting'}:
                 raise RuntimeError('completed_runtime_running_identity_changed')
@@ -180,7 +187,7 @@ def validate_model(contract,model,runtime, *, phase='running'):
             net=model['networks'][key]['name'];definition=definition or {}
             aliases=sorted({name,role,*definition.get('aliases',[])})
             endpoint=attached[net]
-            declared_only=phase=='fenced' or (phase=='staged' and role in BUSINESS)
+            declared_only=phase in {'fenced','provisional'} or (phase=='staged' and role in BUSINESS)
             attachment_ok=(endpoint.get('NetworkID')==network_ids[net] and bool(endpoint.get('IPAddress')))
             if declared_only:
                 attachment_ok=(endpoint.get('NetworkID') in {'',network_ids[net]}
@@ -248,6 +255,11 @@ def seal_candidate_stage(contract, *, source_guard,model_loader,runtime,state_ro
     """
     from deployment.lib.completed_normal_admission import require_candidate_authority
     from deployment.lib.provider_recovery_runtime import readonly_configuration
+    from deployment.lib.completed_normal_profile import DELETION
+    maintenance=contract.get('operation')==DELETION.operation
+    if maintenance:
+        from deployment.lib.completed_normal_admission import validate_provider_preparation150
+        validate_provider_preparation150(contract)
     if os.geteuid()!=0:raise RuntimeError('completed_runtime_root_required')
     if not callable(source_guard) or not callable(model_loader):raise RuntimeError('completed_runtime_independent_guards_required')
     root=Path(admissions)/digest(contract)
@@ -255,27 +267,32 @@ def seal_candidate_stage(contract, *, source_guard,model_loader,runtime,state_ro
     require_candidate_authority(contract,mode='READ_ONLY',admissions=admissions)
     with runtime_mutation_lock(Path(state_root)):
         source_guard();require_fresh_authorization(contract)
-        runtimes,networks=validate_model(contract,model_loader(),runtime,phase='staged')
+        runtimes,networks=validate_model(contract,model_loader(),runtime,phase='provisional' if maintenance else 'staged')
         from deployment.lib.completed_normal_admission import prepared_path
-        prepared=json.loads(readonly_configuration(prepared_path(contract,state_root),private=True).read_text())
+        prepared=json.loads(readonly_configuration(prepared_path(contract,state_root,preparation150=maintenance),private=True).read_text())
         if (prepared.get('release_sha')!=contract['candidate']['source_sha']
                 or prepared.get('candidate_slot')!=contract['candidate']['slot']
-                or prepared.get('status')!='candidate_validated_workers_inactive'
+                or prepared.get('status')!=('candidate_created_fenced' if maintenance else 'candidate_validated_workers_inactive')
                 or not isinstance(prepared.get('prepared_at'),str) or not prepared['prepared_at']):
             raise RuntimeError('completed_runtime_stage_record_changed')
         owner=load_worker_authority(Path(state_root))
         if (owner is None or owner['owner']!='CANDIDATE' or owner['generation']!=contract['origin']['worker_generation']
                 or owner['candidate']!={'sha':contract['source_roles']['application_sha'],'slot':contract['origin']['slot']}):
             raise RuntimeError('completed_runtime_origin_owner_changed')
-        legacy=profile(contract) is LEGACY
+        selected=DELETION if maintenance else profile(contract)
+        legacy=selected is LEGACY
         original=json.loads(protected(Path(contract['source_roles']['completion_root'])/
             ('candidate-identities.json' if legacy else 'candidate-runtime.json'),private=True).read_text())
         origin_workers=[original['runtimes'][role]['id'] for role in
             (('notification','calendar-sync','data-deletion') if legacy else BUSINESS)]
-        publication={'operation':profile(contract).operation,'context_sha256':digest(contract),'source_sha':contract['candidate']['source_sha'],
+        publication={'operation':selected.operation,'context_sha256':digest(contract),'source_sha':contract['candidate']['source_sha'],
             'images':contract['candidate']['images'],'runtimes':runtimes,'networks':networks,
             'worker_generation':hashlib.sha256(f"bootstrap:{prepared['release_sha']}:{prepared['candidate_slot']}:{prepared['prepared_at']}".encode()).hexdigest(),
             'origin_workers':origin_workers}
+        if maintenance:
+            publication['preparation_mode']='created-fenced'
+            selected_names=allocation(contract,contract['candidate']['slot'],preparation150=True)['containers']
+            for role,record in publication['runtimes'].items():record['name']=selected_names[role]
         source_guard()
         exclusive(root/'candidate-staged-runtime.json',encoded(publication))
     return publication

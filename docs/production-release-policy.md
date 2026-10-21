@@ -1,5 +1,27 @@
 # Madar production release acceptance policy
 
+## Maintenance candidate preparation and original inventory
+
+The existing release child's schema150 preparation branch creates all eight
+candidate containers without starting them. Its `candidate_created_fenced`
+receipt is creation evidence, not health acceptance or worker activation;
+ordinary activation rejects that state. The root stage independently checks the
+complete rendered model in `provisional` mode: every role must be CREATED,
+stopped, non-restarting and correctly configured. It seals deterministic names
+as well as IDs, role images, specifications, network IDs and aliases with
+`preparation_mode=created-fenced`. Existing fresh authority and READ_ONLY grant
+checks remain mandatory; pure preparation validation does not admit execution.
+
+The provider retains the original admitted inventory/hash and derives an
+effective view only from that root-private stage plus the existing fresh issuer
+witness. It verifies the complete Docker snapshot against this view, including
+unknown actors, collisions and every original actor. It never enrolls candidates
+by discovered names. Restart reconstruction requires the same authenticated
+stage. The existing parent migration guard independently rechecks the provisional
+model and sealed names before SQL. This closes preparation/binding interfaces;
+the maintenance-first coordinator, private acceptance, authority/worker handoff
+and boot integration are still incomplete. Schema150 remains unregistered.
+
 ## Candidate role image identity
 
 The concrete schema150 provider independently compares every staged runtime

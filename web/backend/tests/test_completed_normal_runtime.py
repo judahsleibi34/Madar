@@ -4,8 +4,10 @@ import json
 import os
 from pathlib import Path
 import sys
+import tempfile
 import unittest
 from unittest.mock import Mock,patch
+from contextlib import ExitStack, nullcontext
 
 WEB=Path(os.getenv('MADAR_TEST_REPOSITORY_ROOT') or Path(__file__).resolve().parents[2])
 sys.path.insert(0,str(WEB))
@@ -58,9 +60,10 @@ class RuntimeModelTests(unittest.TestCase):
                 raise AssertionError(args)
         self.runtime=Runtime()
     def validate(self):return m.validate_model(self.contract,self.model,self.runtime)
-    def use_manual_contract(self):
+    def use_manual_contract(self, contract=None, *, preparation150=False):
         previous=self.selected
-        self.contract=manual_contract();self.selected=allocation(self.contract,'green')
+        self.contract=manual_contract() if contract is None else contract
+        self.selected=allocation(self.contract,'green',preparation150=preparation150)
         old_network=previous['networks']['default'];network=self.selected['networks']['default']
         self.model['networks']['default']['name']=network
         rows={}
@@ -74,7 +77,9 @@ class RuntimeModelTests(unittest.TestCase):
             endpoint['Aliases']=[name,role];row['NetworkSettings']['Networks'][network]=endpoint
             if role in {'backend',*m.BUSINESS}:
                 service['environment'].update(MADAR_BUSINESS_WRITE_CONTRACT=digest(self.contract),
-                    SCHEMA_COMPATIBLE_MIN='136',SCHEMA_COMPATIBLE_MAX='144',SCHEMA_EXCLUDED_VERSIONS='142')
+                    SCHEMA_COMPATIBLE_MIN=str(self.contract['candidate']['compatible_min']),
+                    SCHEMA_COMPATIBLE_MAX=str(self.contract['candidate']['compatible_max']),
+                    SCHEMA_EXCLUDED_VERSIONS='142' if not preparation150 else '')
                 source=str(m.ADMISSIONS/digest(self.contract)/'write-authority')
                 service['volumes'][0]['source']=source;row['Mounts'][0]['Source']=source
                 row['Config']['Env']=['PATH=/fixture',*(k+'='+v for k,v in service['environment'].items())]
@@ -173,6 +178,94 @@ class RuntimeModelTests(unittest.TestCase):
         bindings,_=self.fenced()
         self.assertEqual(set(bindings),set(ROLES))
         with self.assertRaisesRegex(RuntimeError,'not_running'):self.validate()
+
+    def test_provisional_150_model_has_no_operational_admission_or_live_process(self):
+        from test_schema150_admission import deletion_contract
+        from deployment.lib.completed_normal_profile import profile
+        self.use_manual_contract(deletion_contract(),preparation150=True)
+        for row in self.rows.values():
+            row['State']={'Running':False,'Restarting':False,'Status':'created'}
+            for endpoint in row['NetworkSettings']['Networks'].values():
+                endpoint.update(NetworkID='',IPAddress='',EndpointID='')
+        bindings,_=m.validate_model(self.contract,self.model,self.runtime,phase='provisional')
+        self.assertEqual(set(bindings),set(ROLES))
+        with self.assertRaisesRegex(RuntimeError,'operation_profile_invalid'):profile(self.contract)
+        for phase in ('staged','running','fenced'):
+            with self.subTest(phase=phase),self.assertRaisesRegex(RuntimeError,'operation_profile_invalid'):
+                m.validate_model(self.contract,self.model,self.runtime,phase=phase)
+        for role in ROLES:
+            row=self.rows[self.selected['containers'][role]]
+            row['State']['Status']='exited'
+            with self.subTest(role=role),self.assertRaisesRegex(RuntimeError,'fenced_candidate_started'):
+                m.validate_model(self.contract,self.model,self.runtime,phase='provisional')
+            row['State']['Status']='created'
+
+    def test_provisional_150_model_does_not_adopt_changed_runtime_or_contract(self):
+        from test_schema150_admission import deletion_contract
+        self.use_manual_contract(deletion_contract(),preparation150=True)
+        for row in self.rows.values():
+            row['State']={'Running':False,'Restarting':False,'Status':'created'}
+            for endpoint in row['NetworkSettings']['Networks'].values():
+                endpoint.update(NetworkID='',IPAddress='',EndpointID='')
+        target=self.rows[self.selected['containers']['backend']];original=copy.deepcopy(target)
+        for change in (lambda:target.update(Image='sha256:'+'f'*64),
+                lambda:target['Config']['Env'].append('UNAPPROVED=1'),
+                lambda:target['HostConfig'].update(Privileged=True),
+                lambda:target['State'].update(Running=True),
+                lambda:target['State'].update(Restarting=True)):
+            change()
+            with self.assertRaises(RuntimeError):m.validate_model(self.contract,self.model,self.runtime,phase='provisional')
+            target.clear();target.update(copy.deepcopy(original))
+        self.contract['candidate']['compatible_max']=151
+        with self.assertRaises(RuntimeError):m.validate_model(self.contract,self.model,self.runtime,phase='provisional')
+
+    def test_maintenance_stage_seals_only_created_fenced_identities_without_starting_workers(self):
+        """Real exclusive publication, modeled authority/source transports."""
+        from test_schema150_admission import deletion_contract
+        from deployment.lib.completed_normal_admission import prepared_path
+        self.use_manual_contract(deletion_contract(),preparation150=True)
+        for row in self.rows.values():
+            row['State']={'Running':False,'Restarting':False,'Status':'created'}
+            for endpoint in row['NetworkSettings']['Networks'].values():endpoint.update(NetworkID='',IPAddress='',EndpointID='')
+        with tempfile.TemporaryDirectory() as directory,ExitStack() as stack:
+            root=Path(directory);admissions=root/'admissions';context=admissions/digest(self.contract)
+            context.mkdir(parents=True,mode=0o700)
+            prepared=prepared_path(self.contract,root,preparation150=True)
+            record={'release_sha':self.contract['candidate']['source_sha'],'candidate_slot':'green',
+                'status':'candidate_created_fenced','prepared_at':'2026-10-21T00:00:00Z'}
+            prepared.write_text(json.dumps(record))
+            original=root/'origin-runtime.json'
+            original.write_text(json.dumps({'runtimes':{role:{'id':str(i)*64} for i,role in enumerate(m.BUSINESS,1)}}))
+            owner={'owner':'CANDIDATE','generation':self.contract['origin']['worker_generation'],
+                'candidate':{'sha':self.contract['source_roles']['application_sha'],'slot':self.contract['origin']['slot']}}
+            authority=stack.enter_context(patch.object(m,'require_fresh_authorization'))
+            stack.enter_context(patch('deployment.lib.completed_normal_admission.require_candidate_authority'))
+            stack.enter_context(patch('deployment.lib.provider_recovery_runtime.readonly_configuration',side_effect=lambda path,**kw:Path(path)))
+            stack.enter_context(patch.object(m,'protected',return_value=original))
+            stack.enter_context(patch.object(m.os,'geteuid',return_value=0))
+            stack.enter_context(patch.object(m,'runtime_mutation_lock',return_value=nullcontext()))
+            stack.enter_context(patch.object(m,'load_worker_authority',return_value=owner))
+            proof=m.seal_candidate_stage(self.contract,source_guard=lambda:None,model_loader=lambda:self.model,
+                runtime=self.runtime,state_root=root,admissions=admissions)
+            self.assertEqual(proof['preparation_mode'],'created-fenced')
+            self.assertEqual(set(proof['runtimes']),set(ROLES))
+            self.assertEqual(json.loads((context/'candidate-staged-runtime.json').read_text()),proof)
+            authority.assert_called()
+            with self.assertRaises(FileExistsError):
+                m.seal_candidate_stage(self.contract,source_guard=lambda:None,model_loader=lambda:self.model,
+                    runtime=self.runtime,state_root=root,admissions=admissions)
+
+    def test_preparation_validation_does_not_allow_sealing_without_existing_fresh_authority(self):
+        from test_schema150_admission import deletion_contract
+        contract=deletion_contract()
+        with tempfile.TemporaryDirectory() as directory,patch.object(m.os,'geteuid',return_value=0),\
+                patch.object(m,'require_fresh_authorization',side_effect=RuntimeError('independent_authority_missing')),\
+                patch.object(m,'runtime_mutation_lock') as lock:
+            with self.assertRaisesRegex(RuntimeError,'independent_authority_missing'):
+                m.seal_candidate_stage(contract,source_guard=lambda:None,model_loader=Mock(),runtime=Mock(),
+                    state_root=directory,admissions=Path(directory))
+            self.assertEqual(list(Path(directory).iterdir()),[])
+            lock.assert_not_called()
 
     def test_fenced_candidate_rejects_any_running_restarting_or_ambiguous_role(self):
         self.fenced()

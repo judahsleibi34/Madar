@@ -65,7 +65,13 @@ class NativeCandidateRedisTests(unittest.TestCase):
         stage=json.loads((actor.root/'candidate-staged-runtime.json').read_text())
         stage['runtimes']['redis']={**{k:record[k] for k in ('id','image','spec_sha256','networks')},
             'network_aliases':{k:v.get('Aliases') or [] for k,v in actual['NetworkSettings']['Networks'].items()}}
+        stage['preparation_mode']='created-fenced'
+        for role,sealed in stage['runtimes'].items():sealed['name']=actor.inventory['containers']['candidate:'+role]['name']
         (actor.root/'candidate-staged-runtime.json').write_text(json.dumps(stage))
+        for key in list(actor.inventory['containers']):
+            if key.startswith('candidate:'):del actor.inventory['containers'][key]
+        actor.inventory,actor.binding=repin(actor.inventory,actor.binding)
+        actor.original_inventory=copy.deepcopy(actor.inventory)
         with patch('deployment.lib.completed_normal_admission.credential_witness',return_value=stage):
             actor.verify_candidate_stage()
             actor._attest('fenced')
@@ -87,6 +93,7 @@ class ConcreteAdapterTests(unittest.TestCase):
         (data, scope), rows = fixture(candidates=candidates)
         actor = adapter.Schema150ProviderAdapter.__new__(adapter.Schema150ProviderAdapter)
         actor.binding, actor.inventory, actor.root = scope, data, root
+        actor.original_inventory=data
         actor.contract = {'rehearsal_sha256': '8'*64, 'database': {'container_id': data['containers']['native:db']['id'],
                           'image': data['containers']['native:db']['image']}}
         actor.contract['candidate']={'images':{'backend':'sha256:'+'e'*64,'frontend':'sha256:'+'e'*64}}
@@ -144,6 +151,89 @@ class ConcreteAdapterTests(unittest.TestCase):
             (root/'candidate-staged-runtime.json').write_text(json.dumps(candidate_stage))
             stack.enter_context(patch('deployment.lib.completed_normal_admission.credential_witness',return_value=copy.deepcopy(candidate_stage)))
         return actor, scope, preimage, journal
+
+    def candidate_extension(self, *, phase='fenced'):
+        actor,scope,preimage,journal=self.component(stage='fenced',candidates=True)
+        stage_path=actor.root/'candidate-staged-runtime.json'
+        stage=json.loads(stage_path.read_text())
+        stage['preparation_mode']='created-fenced'
+        for role,sealed in stage['runtimes'].items():sealed['name']=actor.inventory['containers']['candidate:'+role]['name']
+        stage_path.write_text(json.dumps(stage))
+        original=copy.deepcopy(actor.inventory)
+        full=copy.deepcopy(original)
+        for key in list(original['containers']):
+            if key.startswith('candidate:'):del original['containers'][key]
+        original,scope=repin(original,scope)
+        actor.inventory.clear();actor.inventory.update(original)
+        actor.original_inventory=copy.deepcopy(original)
+        actor.binding=scope
+        actor._rows.return_value=phase_rows(full,actor._rows.return_value,phase)
+        witness=patch('deployment.lib.completed_normal_admission.credential_witness',return_value=copy.deepcopy(stage))
+        witness.start();self.addCleanup(witness.stop)
+        return actor,scope,stage,preimage,journal
+
+    def test_candidate_extension_keeps_original_admission_hash_and_covers_every_actor(self):
+        actor,scope,stage,_,_=self.candidate_extension()
+        original=copy.deepcopy(actor.original_inventory)
+        actor.require_authority(scope,purpose='observe_quiescence')
+        self.assertEqual(actor.original_inventory,original)
+        self.assertEqual(inventory.inventory_digest(original),scope['inventory_sha256'])
+        self.assertEqual(len(actor.inventory['containers']),len(original['containers'])+8)
+        self.assertEqual(actor.verify_candidate_stage(),stage)
+        actor._attest('fenced')
+        self.assertEqual(actor._row(actor.inventory['containers']['candidate:backend']['name'])['Id'],stage['runtimes']['backend']['id'])
+
+    def test_candidate_extension_survives_adapter_restart_using_issuer_bound_stage(self):
+        actor,scope,stage,_,_=self.candidate_extension(phase='private')
+        actor._attest('private-boundary')
+        identities=copy.deepcopy(actor.inventory['containers'])
+        actor.inventory=copy.deepcopy(actor.original_inventory)
+        actor._attest('private-boundary')
+        self.assertEqual(actor.inventory['containers'],identities)
+        actor.verify_candidate_stage()
+        actor.runtime.command.assert_not_called()
+
+    def test_candidate_extension_rejects_missing_stale_or_unmarked_stage(self):
+        for fault in ('missing','stale','unmarked'):
+            with self.subTest(fault=fault):
+                actor,_,stage,_,_=self.candidate_extension()
+                if fault=='missing':(actor.root/'candidate-staged-runtime.json').unlink()
+                elif fault=='stale':
+                    stage['source_sha']='0'*40
+                    (actor.root/'candidate-staged-runtime.json').write_text(json.dumps(stage))
+                else:
+                    del stage['preparation_mode']
+                    (actor.root/'candidate-staged-runtime.json').write_text(json.dumps(stage))
+                    with patch('deployment.lib.completed_normal_admission.credential_witness',return_value=stage):
+                        with self.assertRaises(RuntimeError):actor._attest('fenced')
+                    continue
+                with self.assertRaises(RuntimeError):actor._attest('fenced')
+                actor.runtime.command.assert_not_called()
+
+    def test_candidate_extension_cannot_adopt_unknown_partial_or_premature_actors(self):
+        for fault in ('extra','partial','running_worker','mount','network','duplicate_id','rename','prepared_boundary'):
+            with self.subTest(fault=fault):
+                actor,_,stage,_,_=self.candidate_extension()
+                candidate=next(r for r in actor._rows.return_value if r['Id']==stage['runtimes']['notification-worker']['id'])
+                if fault=='extra':actor._rows.return_value.append(row('f'*64,'madar-unknown-late-worker'))
+                elif fault=='partial':actor._rows.return_value.remove(candidate)
+                elif fault=='running_worker':candidate['State']['Running']=True
+                elif fault=='mount':candidate['Mounts'].append({'Type':'bind','Source':'/unapproved','Destination':'/unapproved','RW':True})
+                elif fault=='network':next(iter(candidate['NetworkSettings']['Networks'].values()))['NetworkID']='f'*64
+                elif fault=='duplicate_id':actor._rows.return_value.append(copy.deepcopy(candidate))
+                elif fault=='rename':candidate['Name']='/madar-unapproved-renamed-worker'
+                with self.assertRaises(RuntimeError):actor._attest('prepared' if fault=='prepared_boundary' else 'fenced')
+                self.assertEqual(actor.inventory,actor.original_inventory)
+                actor.runtime.command.assert_not_called()
+
+    def test_candidate_name_cannot_change_after_restart_from_a_valid_stage(self):
+        actor,_,stage,_,_=self.candidate_extension(phase='private')
+        actor._attest('private-boundary')
+        actor.inventory=copy.deepcopy(actor.original_inventory)
+        candidate=next(r for r in actor._rows.return_value if r['Id']==stage['runtimes']['backend']['id'])
+        candidate['Name']='/madar-unapproved-after-restart'
+        with self.assertRaises(RuntimeError):actor._attest('private-boundary')
+        actor.runtime.command.assert_not_called()
 
     def test_stage_inventory_agreement_cannot_substitute_an_unapproved_role_image(self):
         from deployment.lib.completed_normal_resources import measured_spec

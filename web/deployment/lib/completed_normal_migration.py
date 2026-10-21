@@ -199,7 +199,7 @@ def _private_migration_candidate(parent,provider,contract,state_root,witness):
     from deployment.lib.completed_normal_runtime import validate_model
     from deployment.lib.schema150_provider_lifecycle import (ProviderMaintenance150,
         ProtectedProviderJournal,FENCE_STEPS)
-    from deployment.lib.completed_normal_resources import ROLES
+    from deployment.lib.completed_normal_resources import ROLES,allocation
     parent.actor.guard()
     require_candidate_authority(contract,mode='READ_ONLY')
     provider.require_authority(provider.binding,purpose='observe_quiescence')
@@ -215,12 +215,15 @@ def _private_migration_candidate(parent,provider,contract,state_root,witness):
     stage=json.loads(protected(parent.root/'candidate-staged-runtime.json',private=True).read_bytes())
     credential=credential_witness('candidate_stage','candidate_stage_sha256')
     if (stage!=credential or set(stage)!={'operation','context_sha256','source_sha','images','runtimes',
-            'networks','worker_generation','origin_workers'}
+            'networks','worker_generation','origin_workers','preparation_mode'}
+            or stage.get('preparation_mode')!='created-fenced'
             or stage['operation']!=parent.profile.operation or stage['context_sha256']!=digest(contract)
             or stage['source_sha']!=contract['candidate']['source_sha'] or stage['images']!=contract['candidate']['images']
             or not isinstance(stage['runtimes'],dict) or set(stage['runtimes'])!=set(ROLES)):
         raise RuntimeError('completed_migration_private_stage_changed')
-    runtimes,networks=validate_model(contract,parent.model_loader(),provider.runtime,phase='fenced')
+    runtimes,networks=validate_model(contract,parent.model_loader(),provider.runtime,phase='provisional')
+    names=allocation(contract,contract['candidate']['slot'],preparation150=True)['containers']
+    runtimes={role:dict(record,name=names[role]) for role,record in runtimes.items()}
     if stage['runtimes']!=runtimes or stage['networks']!=networks:
         raise RuntimeError('completed_migration_private_candidate_changed')
     provider.observe_quiescence(provider.binding)

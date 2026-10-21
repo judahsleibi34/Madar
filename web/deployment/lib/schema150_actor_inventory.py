@@ -237,6 +237,44 @@ def validate_inventory(inventory, binding):
     return _validate(inventory, binding)
 
 
+def bind_staged_candidates(inventory, binding, stage, rows, *, phase):
+    """Derive a measured view; never replace the admitted original inventory.
+
+    The concrete caller must authenticate the root stage and its fresh issuer
+    witness before calling. This pure function grants no authority. Its fixed
+    lifecycle states cannot be supplied by the stage or discovered by name.
+    """
+    value=validate_inventory(inventory,binding)
+    _require(phase in set(ATTEST_PHASES)-{'prepared'},'schema150_candidate_binding_boundary_invalid')
+    _require(not any(k.startswith('candidate:') for k in value['containers']),
+        'schema150_candidate_already_in_original_inventory')
+    stage=_detached(stage)
+    _require(stage.get('preparation_mode')=='created-fenced'
+        and isinstance(stage.get('runtimes'),dict) and set(stage['runtimes'])==set(APP_ROLES),
+        'schema150_candidate_fenced_preparation_required')
+    _require(isinstance(rows,list) and len(rows)<=2048,'schema150_container_snapshot_invalid')
+    observed={}
+    for row in rows:
+        _require(isinstance(row,dict) and _hex(row.get('Id')) and row['Id'] not in observed,
+            'schema150_container_snapshot_invalid')
+        observed[row['Id']]=row
+    for role,sealed in stage['runtimes'].items():
+        _require(isinstance(sealed,dict) and set(sealed)=={'id','image','spec_sha256','networks','network_aliases','name'},
+            'schema150_private_candidate_identity_changed')
+        actual=observed.get(sealed['id'])
+        _require(actual is not None,'schema150_private_candidate_identity_changed')
+        value['containers']['candidate:'+role]={
+            'name':sealed['name'],'id':sealed['id'],'image':sealed['image'],
+            'generation':'candidate','source_sha':binding['source_sha'],'spec_sha256':sealed['spec_sha256'],
+            'mounts':_actual_mounts(actual),'networks':sealed['networks'],
+            'states':{p:{'running':p=='active' or p=='private' and role not in WORKER_ROLES,
+                         'restarting':False,'restart':'no'} for p in PHASES}}
+    # Includes duplicate base/candidate IDs and names, mounts, source labels,
+    # complete all-daemon snapshot, network IDs, and fixed phase restrictions.
+    attest_containers(value,rows,phase=phase)
+    return value
+
+
 def _overlaps(left, right):
     a, b = PurePosixPath(left), PurePosixPath(right)
     return a == b or a in b.parents or b in a.parents

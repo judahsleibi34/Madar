@@ -1,5 +1,17 @@
 # Madar Auto-Deploy Merge Contract
 
+## Maintenance creation is not release acceptance
+
+Schema150 candidate preparation uses the existing service child in create-only
+mode and produces `candidate_created_fenced`. The parent must independently seal
+every CREATED, stopped runtime against the rendered immutable model. The provider
+combines that credential-bound seal with the unchanged original inventory and
+rejects unknown or substituted actors. Ordinary worker activation refuses this
+creation-only status. No HTTP health, migration authorization, write grant or
+promotion is implied. The maintenance-first coordinator and privileged full
+146→150 acceptance remain incomplete; operational admission and automatic
+dispatch stay blocked, and the main-to-candidate Class D refusal is unchanged.
+
 ## Migration connection setup failures
 
 An exclusively claimed coordinated attempt remains consumed when database

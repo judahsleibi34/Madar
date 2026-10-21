@@ -51,9 +51,10 @@ def digest(value: dict) -> str:
     return hashlib.sha256(encoded(value)).hexdigest()
 
 
-def prepared_path(contract, state_root):
+def prepared_path(contract, state_root, *, preparation150=False):
     """Fresh admission cannot adopt an earlier candidate's mutable record."""
-    validate_contract(contract)
+    if preparation150:validate_provider_preparation150(contract)
+    else:validate_contract(contract)
     return Path(state_root)/('prepared-completed-normal-'+digest(contract)+'.json')
 
 

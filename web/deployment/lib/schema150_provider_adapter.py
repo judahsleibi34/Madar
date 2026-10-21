@@ -195,6 +195,7 @@ class Schema150ProviderAdapter:
         self.root = ADMISSIONS / self.binding['context_sha256']
         from deployment.lib.schema150_actor_inventory import validate_inventory
         self.inventory = validate_inventory(private_json(self.root / 'provider-inventory.json'), self.binding)
+        self.original_inventory = json.loads(json.dumps(self.inventory))
         if self.inventory['exclusions']:
             raise RuntimeError('schema150_provider_live_exclusion_proofs_required')
         self.barrier = self.root / 'provider-barrier.json'
@@ -214,7 +215,7 @@ class Schema150ProviderAdapter:
             raise RuntimeError('schema150_provider_fresh_authority_required')
         for descriptor, path in zip(self.lock_descriptors, LOCKS): require_owned_lock(descriptor, path)
         from deployment.lib.schema150_actor_inventory import validate_inventory
-        if validate_inventory(private_json(self.root / 'provider-inventory.json'), binding) != self.inventory:
+        if validate_inventory(private_json(self.root / 'provider-inventory.json'), binding) != self.original_inventory:
             raise RuntimeError('schema150_provider_inventory_changed')
         self._database_identity()
         from deployment.lib.schema150_provider_lifecycle import ProtectedProviderJournal
@@ -307,16 +308,21 @@ class Schema150ProviderAdapter:
     def _attest(self, phase):
         from deployment.lib.schema150_actor_inventory import attest_containers
         rows=self._rows()
+        if not any(k.startswith('candidate:') for k in self.original_inventory['containers']):
+            if (self.root/'candidate-staged-runtime.json').exists():
+                self.verify_candidate_stage(rows=rows,phase=phase)
+            elif self.inventory!=self.original_inventory:
+                raise RuntimeError('schema150_private_candidate_stage_required')
         if phase in ('private','private-boundary','active','active-boundary') and any(
                 key.startswith('candidate:') for key in self.inventory['containers']):
-            self.verify_candidate_stage(rows=rows)
+            self.verify_candidate_stage(rows=rows,phase=phase)
         proof=attest_containers(self.inventory, rows, phase=phase)
         if phase in ('private','private-boundary'):
             for row in rows:
                 if row.get('Name','').lstrip('/') in PROVIDER_NAMES:self._private_ports(row)
         return proof
 
-    def verify_candidate_stage(self,*,rows=None):
+    def verify_candidate_stage(self,*,rows=None,phase='fencing-boundary'):
         """Require independently sealed model identities, not inventory promises.
 
         The coordinator's stage is root private and also carried by the existing
@@ -330,32 +336,44 @@ class Schema150ProviderAdapter:
         if not path.exists() or path.is_symlink():
             raise RuntimeError('schema150_private_candidate_stage_required')
         stage=private_json(path)
-        if (stage!=credential_witness('candidate_stage','candidate_stage_sha256')
-                or set(stage)!={'operation','context_sha256','source_sha','images','runtimes',
+        keys={'operation','context_sha256','source_sha','images','runtimes',
                     'networks','worker_generation','origin_workers'}
+        if (stage!=credential_witness('candidate_stage','candidate_stage_sha256')
+                or set(stage) not in (keys,keys|{'preparation_mode'})
+                or 'preparation_mode' in stage and stage['preparation_mode']!='created-fenced'
                 or stage['operation']!=self.binding['operation']
                 or stage['context_sha256']!=self.binding['context_sha256']
                 or stage['source_sha']!=self.binding['source_sha']
                 or stage['images']!=self.contract['candidate']['images']
                 or not isinstance(stage['runtimes'],dict) or set(stage['runtimes'])!=set(ROLES)):
             raise RuntimeError('schema150_private_candidate_stage_changed')
-        actual={row['Id']:row for row in (self._rows() if rows is None else rows)}
+        rows=self._rows() if rows is None else rows
+        inventory=self.inventory
+        if not any(k.startswith('candidate:') for k in inventory['containers']):
+            from deployment.lib.schema150_actor_inventory import bind_staged_candidates
+            inventory=bind_staged_candidates(inventory,self.binding,stage,rows,phase=phase)
+        actual={row['Id']:row for row in rows}
         for role in ROLES:
-            record=self.inventory['containers'].get('candidate:'+role)
+            record=inventory['containers'].get('candidate:'+role)
             sealed=stage['runtimes'][role]
             expected_image=(self.contract['candidate']['redis_image'] if role=='redis'
                 else self.contract['candidate']['images']['frontend' if role=='frontend' else 'backend'])
+            runtime_keys={'id','image','spec_sha256','networks','network_aliases'}
+            if stage.get('preparation_mode')=='created-fenced':runtime_keys.add('name')
             if (record is None or not isinstance(sealed,dict)
-                    or set(sealed)!={'id','image','spec_sha256','networks','network_aliases'}
+                    or set(sealed)!=runtime_keys
+                    or 'name' in sealed and sealed['name']!=record['name']
                     or sealed['image']!=expected_image
                     or any(sealed[k]!=record[k] for k in ('id','image','spec_sha256','networks'))):
                 raise RuntimeError('schema150_private_candidate_identity_changed')
             row=actual.get(record['id'])
             if (row is None or row.get('Image')!=sealed['image']
+                    or 'name' in sealed and row.get('Name')!='/'+sealed['name']
                     or not measured_spec_matches(row,sealed['spec_sha256'],started_worker=role.endswith('-worker'))
                     or {k:sorted(v.get('Aliases') or []) for k,v in row['NetworkSettings']['Networks'].items()}
                         !={k:sorted(v) for k,v in sealed['network_aliases'].items()}):
                 raise RuntimeError('schema150_private_candidate_identity_changed')
+        self.inventory=inventory
         return stage
 
     @staticmethod
