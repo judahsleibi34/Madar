@@ -185,7 +185,7 @@
       "environment": "owned synthetic development fixtures; source inspection; bounded read-only GitHub/systemd observations",
       "commands_reference": "08-CI-AND-ARTIFACTS.md",
       "evidence": "06-SECURITY-REVIEW.md",
-      "remaining_issue": "Focused checks pass; broad adversarial review and privileged lifecycle incomplete",
+      "remaining_issue": "Fixed setup cleanup, unrelated-ancestor refusal, CI plan substitution and native origin race; broad adversarial/privileged lifecycle review incomplete",
       "responsible_party": "engineering",
       "blocks": [
         "review-readiness",
@@ -253,7 +253,7 @@
       "environment": "owned synthetic development fixtures; source inspection; bounded read-only GitHub/systemd observations",
       "commands_reference": "08-CI-AND-ARTIFACTS.md",
       "evidence": "08-CI-AND-ARTIFACTS.md",
-      "remaining_issue": "10native filesystem cases pass; protected_dispatch remains BLOCKED_INTEGRATION_INCOMPLETE",
+      "remaining_issue": "74generic source/native cases and10policy filesystem cases pass; protected dispatch remains blocked; no unattended privileged execution",
       "responsible_party": "engineering",
       "blocks": [
         "review-readiness",
@@ -433,5 +433,12 @@
         "deployment"
       ]
     }
-  ]
+  ],
+  "ci_integrity_implementation_sha": "48df165cd8767a92e02ca6b098da5f28c1915f1e",
+  "additional_verified_scope": {
+    "generic_cases": 74,
+    "generic_source_model": 45,
+    "generic_native_postgresql": 29,
+    "full_protected_controller_execution": false
+  }
 }

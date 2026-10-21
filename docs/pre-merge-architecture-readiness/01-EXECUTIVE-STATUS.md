@@ -11,6 +11,11 @@ migration-connection failure handling and an object-measurement refusal caused
 by unrelated ancestor-directory activity. It does not complete the coordinator.
 Published SQL, classification, workflow gates and protected authority remain intact.
 
+Commit `48df165cd8767a92e02ca6b098da5f28c1915f1e` additionally fixes CI evidence
+that regenerated a safer tail from an advanced fixture, and binds the generic
+rehearsal's exact origin under the existing executor lock. Its74-case suite
+passed (45source/model,29native PostgreSQL); this is not protected acceptance.
+
 The decisive missing connections are listed in
 [protected acceptance](04-PROTECTED-RELEASE-ACCEPTANCE.md). Native SQL and
 component restoration passed within their stated scope. They do not substitute

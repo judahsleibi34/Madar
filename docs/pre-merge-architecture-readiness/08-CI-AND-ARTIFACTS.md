@@ -3,6 +3,15 @@
 Baseline:1113c43364df632cc3376821cc6223a44af07822. Implementation:
 83dce3da2204980d5d89fc071cf1fc9fbe0b5cd0. Local tests exercised the resulting
 implementation bytes; the review-document commit must receive fresh CI.
+
+The later CI-integrity correction is48df165cd8767a92e02ca6b098da5f28c1915f1e.
+The old3db1c9eb CI artifacts are preserved separately: its native report was
+BLOCKED but mislabeled A despite the actual Class D plan. The correction retains
+the exact original plan and checks origin again under the executor lock.
+`rehearse_generic_migrations.sh` passed74cases with the locked parser, including
+45source/model cases and29native PostgreSQL cases. The five report tests and
+the native advancement-during-backup test reproduce pre-fix failures.
+
 Resolve publication HEAD with `git rev-parse HEAD` and use only workflow runs
 whose `head_sha` equals it. This document is not a later-source CI attestation.
 

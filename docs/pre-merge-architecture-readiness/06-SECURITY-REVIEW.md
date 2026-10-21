@@ -9,6 +9,10 @@ Focused executor/provider/inventory/staging tests:146passed. Controller suite:
 361collected,351passed,10conditional skips. Root-policy filesystem:10passed.
 Counts overlap with backend CI and are not combined as unique coverage.
 
+The48df165c generic regression suite passed74cases:45source/model and29native
+PostgreSQL. It fixes source-plan evidence substitution and a native origin race;
+neither establishes privileged authority or full application acceptance.
+
 Native SQL regression exercises notification/outbox/deletion ownership,
 reservation, inventory/order/payment and calendar invariants. It does not prove
 that every application authorization path is safe or that real provider effects

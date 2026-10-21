@@ -46,3 +46,8 @@ Native SQL rehearsal:208component executions passed, including actual SQL/proces
 The existing CI `full_staging_exceptional_sql_requires_separate_review` refusal is correct. Ordinary application staging cannot substitute for exceptional preserved-data controller acceptance. A legitimate exceptional path must authenticate the exact plan, artifacts, disposable environment, independently controlled test authority, real controller receipts, preserved data and final protocols. This path is not yet implemented; no approval packet or green exceptional check is fabricated.
 
 Independent semantic/release review and later production authorization remain pending. This dossier and a passing CI fixture cannot issue either authority.
+
+The subsequent48df165c correction keeps the minimal native report bound to this
+source/base operation instead of a fixture-relative tail. The earlier report
+was BLOCKED but mislabeled A; it must not be used as Class D acceptance. Fresh
+publication artifacts must agree on source, plan digest, origin and Class D.

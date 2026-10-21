@@ -23,6 +23,10 @@ interruptions, lost acknowledgements, selected original-row preservation and
 fresh database observations. Its issuer/backup/provider-supervisor boundaries
 remain fixtures. No SQL replay or database rollback is authorized by these tests.
 
+The74-case generic suite at48df165c additionally rejects actual150→151
+advancement during backup before applying152. It retains committed151, records
+the failed locked-origin check and refuses reuse of the consumed attempt.
+
 An independent operational receiver, complete restored application, current-head
 privileged boot/reboot, WAL/object-aware PITR, off-host recovery and current
 production recovery acceptance remain unproven. No RPO/RTO is certified.

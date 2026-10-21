@@ -23,3 +23,19 @@ original selected rows, and cannot reopen its consumed attempt.
 
 These corrections are supporting reliability work. The missing maintenance-first
 ordering, two-stage candidate binding and private handoff remain unfinished.
+
+## CI plan/origin correction
+
+Inspection of the first publication's authenticated CI artifacts found a Class D
+source plan paired with a BLOCKED native report labeled A. The harness had
+regenerated its plan from the fixture's150 origin, rather than the requested146
+origin. No underlying risk classification was lowered and the full-provider gate
+still refused execution. The report now retains the original plan/risk and
+refuses nonroutine plans before database access; a different fixture origin
+blocks instead of redefining the operation.
+
+A native regression also reproduced advancement during backup causing the
+generic executor to skip part of its path. Passing `expected_origin` into the
+existing locked executor now rejects that race before further SQL, preserves
+the observed151, leaves the next table absent and refuses consumed-attempt replay.
+The new report-contract suite and that native race test reproduced pre-fix failures.
