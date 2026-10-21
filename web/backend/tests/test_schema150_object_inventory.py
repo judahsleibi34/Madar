@@ -13,6 +13,61 @@ from deployment.lib import schema150_object_inventory as objects
 
 
 class ObjectInventoryTests(unittest.TestCase):
+    def test_unrelated_ancestor_sibling_change_does_not_invalidate_root_identity(self):
+        roots, base = self.roots()
+        target = Path(roots['avatars']['source'])
+        actual_open = os.open
+        changed = []
+        def open_with_sibling(path, flags, *args, **kwargs):
+            if path == base.name and not changed:
+                changed.append(True)
+                (base / 'unrelated-sibling').mkdir()
+            return actual_open(path, flags, *args, **kwargs)
+        with patch.object(objects.os, 'open', side_effect=open_with_sibling):
+            descriptor = objects._open_root(str(target))
+        try:
+            self.assertEqual(os.fstat(descriptor).st_ino, target.stat().st_ino)
+        finally: os.close(descriptor)
+        self.assertEqual(changed, [True])
+
+    def test_ancestor_permission_change_during_open_still_refuses(self):
+        roots, base = self.roots()
+        actual_open = os.open
+        def open_changed(path, flags, *args, **kwargs):
+            if path == base.name: base.chmod(0o750)
+            return actual_open(path, flags, *args, **kwargs)
+        with patch.object(objects.os, 'open', side_effect=open_changed):
+            with self.assertRaisesRegex(RuntimeError, 'object_path_changed'):
+                objects._open_root(roots['avatars']['source'])
+
+    def test_measured_root_content_change_during_open_still_refuses(self):
+        roots, base = self.roots()
+        target = Path(roots['avatars']['source'])
+        actual_open = os.open
+        def open_changed(path, flags, *args, **kwargs):
+            if path == target.name: (target / 'late-object').write_bytes(b'synthetic')
+            return actual_open(path, flags, *args, **kwargs)
+        with patch.object(objects.os, 'open', side_effect=open_changed):
+            with self.assertRaisesRegex(RuntimeError, 'object_path_changed'):
+                objects._open_root(str(target))
+
+    def test_replaced_ancestor_with_same_permissions_still_refuses(self):
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory) / 'ancestor'
+            target = base / 'objects'
+            target.mkdir(parents=True)
+            original_mode = base.stat().st_mode & 0o777
+            actual_open = os.open
+            def open_replaced(path, flags, *args, **kwargs):
+                if path == base.name:
+                    base.rename(base.with_name('original'))
+                    base.mkdir(mode=original_mode)
+                    (base / 'objects').mkdir()
+                return actual_open(path, flags, *args, **kwargs)
+            with patch.object(objects.os, 'open', side_effect=open_replaced):
+                with self.assertRaisesRegex(RuntimeError, 'object_path_changed'):
+                    objects._open_root(str(target))
+
     def roots(self):
         temporary=tempfile.TemporaryDirectory();self.addCleanup(temporary.cleanup)
         base=Path(temporary.name)

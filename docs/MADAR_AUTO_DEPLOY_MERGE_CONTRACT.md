@@ -1,5 +1,14 @@
 # Madar Auto-Deploy Merge Contract
 
+## Migration connection setup failures
+
+An exclusively claimed coordinated attempt remains consumed when database
+connection creation or autocommit setup fails. The existing executor records
+that failure at `connecting` and closes any returned connection. Cleanup must
+preserve the primary error; a close error after successful execution still
+fails the caller. No retry, write authority, or application promotion follows
+from this receipt. Schema150 admission remains blocked.
+
 ## Final continuation: exact locked migration origin
 
 The maintenance parent supplies the exact approved origin to the existing SQL

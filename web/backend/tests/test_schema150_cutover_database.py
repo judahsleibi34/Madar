@@ -63,6 +63,35 @@ class Schema150CutoverDatabaseTests(unittest.TestCase):
             state_file=self.directory/name,backup_dir=self.directory,backup_verifier=lambda _:None,
             migration_guard=self.actor.migration_guard,failure_formatter=lambda e:type(e).__name__)
 
+    def test_failed_connection_setup_closes_native_session_without_sql_or_replay(self):
+        parent = self
+        opened = []
+        class SetupFailure:
+            def __init__(self):
+                self.inner = parent.connect()
+                opened.append((self.inner, self.inner.info.backend_pid))
+            @property
+            def autocommit(self): return self.inner.autocommit
+            @autocommit.setter
+            def autocommit(self, value):
+                raise RuntimeError('synthetic_connection_setup_failure')
+            def rollback(self): self.inner.rollback()
+            def close(self): self.inner.close()
+        before = self.journal.read()
+        executor = self.executor(factory=SetupFailure)
+        with self.assertRaisesRegex(RuntimeError, 'connection_setup_failure'): executor.run()
+        self.assertTrue(opened[0][0].closed)
+        state = json.loads(executor.state_file.read_bytes())
+        self.assertEqual((state['status'], state['phase']), ('failed', 'connecting'))
+        self.assertEqual(state['migrations'], [])
+        self.assertEqual(self.journal.read(), before)
+        with self.connect() as db:
+            self.assertEqual(db.execute("select schema_version from public.application_schema_state where contract_key='core'").fetchone()[0], 146)
+            self.assertEqual(self.preserved(db), self.original)
+            self.assertEqual(db.execute('select count(*) from pg_stat_activity where pid=%s', (opened[0][1],)).fetchone()[0], 0)
+        with self.assertRaisesRegex(RuntimeError, 'attempt_consumed'): executor.run()
+        self.assertEqual(len(opened), 1)
+
     def test_full_published_chain_records_each_boundary_and_preserves_original_rows(self):
         result=self.executor().run()
         self.assertEqual(result['observed_schema'],150)

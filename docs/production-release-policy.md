@@ -1,5 +1,27 @@
 # Madar production release acceptance policy
 
+## Object-root path identity versus unrelated ancestor activity
+
+Object capture pins each ancestor's device, inode, type/mode and ownership
+through descriptor-relative non-symlink opens. Unrelated sibling creation in
+an ancestor is outside the measured object forest and does not invalidate its
+identity. The measured root itself retains its full mutation signature;
+mount identity, two complete forest scans, file metadata/content signatures,
+hardlink/special-file refusals and preservation comparisons remain required.
+Permission changes, replaced ancestors, changed roots and changed object bytes
+still refuse. This distinction grants no provider recovery or write authority.
+
+## Connection failure at the migration boundary
+
+After the existing coordinated attempt is exclusively claimed, connection
+creation and autocommit setup are part of the executor's failure handling.
+Setup failure records a failed `connecting` phase, closes any returned
+connection, and leaves the attempt consumed. It does not imply SQL execution,
+grant retry permission, or authorize promotion. Connection-close failures do
+not replace an existing migration/setup exception; a close failure after an
+otherwise successful run still propagates and stops the caller's activation.
+This correction does not register schema150 or establish protected acceptance.
+
 ## Historical manual manifest reconciliation
 
 The immutable schema136→144 manual manifest retains its `STAGING` marker.

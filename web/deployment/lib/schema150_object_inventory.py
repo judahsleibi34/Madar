@@ -76,13 +76,24 @@ def _identity(descriptor):
 def _open_root(path):
     """Walk all ancestors through directory descriptors; no symlink traversal."""
     descriptor = os.open('/', _DIR_FLAGS)
+    components = PurePosixPath(path).parts[1:]
     try:
-        for component in PurePosixPath(path).parts[1:]:
+        for index, component in enumerate(components):
             before = os.stat(component, dir_fd=descriptor, follow_symlinks=False)
             _require(stat.S_ISDIR(before.st_mode), 'schema150_object_path_untrusted')
             child = os.open(component, _DIR_FLAGS, dir_fd=descriptor)
             try:
-                _require(_signature(before) == _signature(os.fstat(child)), 'schema150_object_path_changed')
+                after = os.fstat(child)
+                if index == len(components) - 1:
+                    # The measured root retains the full mutation signature.
+                    same = _signature(before) == _signature(after)
+                else:
+                    # Ancestors route to the root; their unrelated children
+                    # are outside the protected object forest. Pin identity
+                    # and permissions, not sibling count/size/timestamps.
+                    same = ((before.st_dev, before.st_ino, before.st_mode, before.st_uid, before.st_gid)
+                            == (after.st_dev, after.st_ino, after.st_mode, after.st_uid, after.st_gid))
+                _require(same, 'schema150_object_path_changed')
             except BaseException:
                 os.close(child); raise
             os.close(descriptor); descriptor = child

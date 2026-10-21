@@ -12,6 +12,7 @@ import hashlib
 import json
 import os
 import stat
+import sys
 import tempfile
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -226,15 +227,18 @@ class LockedMigrationExecutor:
             "release_sha": self.manifest.release_sha,
             "backup": {"path": str(self.backup_dir), "verified": True},
             "started_at": utc_now(),
-            "phase": "acquiring_lock",
+            "phase": "connecting",
             "status": "running",
             "migrations": [],
         }
         atomic_json(self.state_file, state,exclusive=self.manifest.coordinated)
-        connection = self.connection_factory()
-        connection.autocommit = True
+        connection = None
         lock_acquired = False
         try:
+            connection = self.connection_factory()
+            connection.autocommit = True
+            state['phase'] = 'acquiring_lock'
+            atomic_json(self.state_file, state)
             with connection.cursor() as cursor:
                 cursor.execute("select pg_try_advisory_lock(%s)", (self.LOCK_KEY,))
                 if not bool(cursor.fetchone()[0]):
@@ -295,10 +299,11 @@ class LockedMigrationExecutor:
         except Exception as error:
             rollback_error = None
 
-            try:
-                connection.rollback()
-            except Exception as failure:
-                rollback_error = failure
+            if connection is not None:
+                try:
+                    connection.rollback()
+                except Exception as failure:
+                    rollback_error = failure
 
             state.update(
                 status="failed",
@@ -313,6 +318,10 @@ class LockedMigrationExecutor:
             raise
 
         finally:
+            # A close error must not replace a migration/setup exception (or a
+            # process interruption). A close error after successful SQL still
+            # propagates, so the caller cannot silently proceed to activation.
+            unwinding = sys.exc_info()[0] is not None
             try:
                 if lock_acquired:
                     # A failed explicit migration transaction may leave the
@@ -334,4 +343,9 @@ class LockedMigrationExecutor:
                     except Exception:
                         pass
             finally:
-                connection.close()
+                if connection is not None:
+                    try:
+                        connection.close()
+                    except Exception:
+                        if not unwinding:
+                            raise
