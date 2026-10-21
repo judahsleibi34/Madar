@@ -82,4 +82,4 @@ docker run --rm --network "container:$CONTAINER_NAME" --memory=384m --cpus=0.75 
   --env GENERIC_MIGRATION_SYNTHETIC_BACKUP=/verified-backup \
   --volume "$backup_dir:/verified-backup:ro" --volume "$WEB_ROOT:/test-repository:ro" \
   "${parser_args[@]}" --entrypoint python "$BACKEND_TEST_IMAGE" \
-  -m unittest test_generic_migration_source test_generic_migration_plan test_generic_migrations_database test_schema150_quiescence_scope_database -v
+  -m unittest test_generic_migration_source test_generic_migration_plan test_migration_candidate_rehearsal test_generic_migrations_database test_schema150_quiescence_scope_database -v

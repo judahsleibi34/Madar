@@ -1,5 +1,17 @@
 # Automated database migration architecture
 
+## CI rehearsal plan and origin binding
+
+The native candidate report retains the risk class, origin and digest of the
+exact source/base plan. A fixture already at a newer schema cannot replace that
+plan with a shorter or empty Class A tail. Nonroutine/incompatible plans produce
+BLOCKED without opening the database; otherwise the observed fixture origin
+must equal the planned origin. The same original plan reaches execution.
+The existing executor additionally rechecks that exact origin under its session
+advisory lock, after backup verification, so advancement during capture cannot
+silently skip migrations. Native origin drift consumes the attempt and leaves
+committed foreign changes intact; it grants no replay or production authority.
+
 ## Final continuation: exact locked migration origin
 
 The maintenance parent supplies the exact approved origin to the existing SQL
@@ -1791,8 +1803,9 @@ prepares evidence only. Full automatic actual-candidate staging is still pending
 
 The generic CI rehearsal also consumes actual newly discovered routine SQL,
 not just framework fixtures. It captures the source/base commits and runs the
-complete compatible tail from the observed minimal fixture origin through the
-same existing executor. Unknown/coordinated SQL or insufficient compatibility
+complete compatible path from the source/base plan's exact origin through the
+same existing executor. A different fixture origin blocks instead of redefining
+the operation. Unknown/coordinated SQL or insufficient compatibility
 produces an explicit BLOCKED coverage report. A successful analysis workflow is
 not a successful full-application rehearsal or production admission. The report
 records that limitation and cannot be substituted for native provider acceptance.

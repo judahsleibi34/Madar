@@ -68,6 +68,21 @@ class FutureSchemaDatabaseTests(unittest.TestCase):
         self.assertEqual(self.db.execute('select payload from public.synthetic_preserved').fetchone()[0],'retained')
         self.assertEqual([row['status'] for row in result['migrations']],['applied','applied'])
 
+    def test_origin_advancement_during_backup_cannot_skip_unreviewed_sql(self):
+        plan, inventory = self.plan(second=True)
+        first = inventory.forward(150,152)[0].sql.decode()
+        def backup_and_advance(directory):
+            self.backup(directory)
+            self.db.execute(first)
+        with self.assertRaisesRegex(RuntimeError, 'migration_origin_changed'):
+            self.run_plan(plan, inventory, backup_and_advance)
+        self.assertEqual(self.schema(), 151)
+        self.assertIsNone(self.db.execute("select to_regclass('public.future_two')").fetchone()[0])
+        state = json.loads(self.state.read_bytes())
+        self.assertEqual((state['status'], state['observed_schema']), ('failed',151))
+        self.assertEqual(state['migrations'], [])
+        with self.assertRaises(FileExistsError): self.run_plan(plan, inventory)
+
     def test_three_sequential_future_migrations(self):
         plan,inventory=self.plan(second=True)
         self.write(153,scaffold(152,153,'CREATE TABLE public.future_three (id pg_catalog.int8);'))

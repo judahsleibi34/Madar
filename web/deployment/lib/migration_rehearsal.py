@@ -76,5 +76,6 @@ def run(root, inventory, plan, *, dsn, state_file, backup_dir, backup_verifier):
             migrations.append(Migration(migration.number,path,migration.sha256,row['from_schema'],row['to_schema'],'expand-only'))
         executor=LockedMigrationExecutor(connection_factory=lambda:connect(dsn),
             manifest=MigrationManifest(value['source_sha'],tuple(migrations)),
-            state_file=state_file,backup_dir=Path(backup_dir),backup_verifier=backup_verifier)
+            state_file=state_file,backup_dir=Path(backup_dir),backup_verifier=backup_verifier,
+            expected_origin=value['origin_schema'])
         return executor.run()

@@ -1,5 +1,14 @@
 # Madar production release acceptance policy
 
+## CI evidence cannot replace a migration plan
+
+Candidate rehearsal reports retain the actual source/base plan's risk and digest.
+An advanced synthetic fixture cannot turn Class D146→150 into a Class A empty
+tail. Routine execution requires the exact planned origin both before execution
+and under the existing executor's advisory lock after backup verification.
+Mismatch blocks; it does not repair history, skip required SQL, or authorize
+retry. BLOCKED minimal-fixture coverage is not protected release acceptance.
+
 ## Object-root path identity versus unrelated ancestor activity
 
 Object capture pins each ancestor's device, inode, type/mode and ownership
