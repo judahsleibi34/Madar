@@ -1,5 +1,17 @@
 # Madar production release acceptance policy
 
+## Candidate role image identity
+
+The concrete schema150 provider independently compares every staged runtime
+image with its approved role image: backend for application workers, frontend
+for the frontend, and the separately pinned third-party Redis image for Redis.
+Agreement between a stage and inventory is insufficient when both name the
+wrong image. Application and worker revision labels remain mandatory. Redis
+has an operation source association through the protected stage, not a fabricated
+Madar image revision label; its exact ID/image/specification/mount/network checks
+remain mandatory. Pure inventory attestation grants no authority or artifact
+acceptance. These checks do not register schema150 or complete its coordinator.
+
 ## CI evidence cannot replace a migration plan
 
 Candidate rehearsal reports retain the actual source/base plan's risk and digest.

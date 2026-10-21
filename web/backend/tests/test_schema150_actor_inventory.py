@@ -91,6 +91,30 @@ def phase_rows(data, rows, phase):
 
 
 class ActorInventoryTests(unittest.TestCase):
+    def test_pinned_third_party_redis_does_not_claim_madar_image_provenance(self):
+        (data,scope),rows=fixture(candidates=True)
+        redis=data['containers']['candidate:redis']
+        actual=next(r for r in rows if r['Id']==redis['id'])
+        actual['Config']['Labels'].pop('org.opencontainers.image.revision')
+        redis['spec_sha256']=measured_spec(actual)
+        data,scope=repin(data,scope)
+        inventory.validate_inventory(data,scope)
+        inventory.attest_containers(data,phase_rows(data,rows,'fenced'),phase='fenced')
+
+    def test_every_application_and_worker_still_requires_exact_source_label(self):
+        for role in inventory.APP_ROLES:
+            if role=='redis':continue
+            for source in (None,'0'*40):
+                with self.subTest(role=role,source=source):
+                    (data,scope),rows=fixture(candidates=True)
+                    record=data['containers']['candidate:'+role]
+                    actual=next(r for r in rows if r['Id']==record['id'])
+                    actual['Config']['Labels']={} if source is None else {'org.opencontainers.image.revision':source}
+                    record['spec_sha256']=measured_spec(actual)
+                    data,scope=repin(data,scope)
+                    with self.assertRaisesRegex(RuntimeError,'actor_source_changed'):
+                        inventory.attest_containers(data,phase_rows(data,rows,'fenced'),phase='fenced')
+
     def test_fixed_effects_reject_unreachable_private_and_active_states_before_execution(self):
         for logical,phase,key,value in (
                 ('native:auth','private','running',False),

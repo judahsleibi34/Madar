@@ -12,6 +12,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -23,6 +24,55 @@ from deployment.lib import schema150_provider_lifecycle as lifecycle
 from deployment.lib import schema149_provider_lifecycle as retained
 from deployment.lib import schema150_actor_inventory as inventory
 from test_schema150_actor_inventory import fixture, phase_rows, repin, row
+
+
+@unittest.skipUnless(os.getenv('MADAR_NATIVE_CANDIDATE_REDIS_ID'), 'owned native Redis fixture required')
+class NativeCandidateRedisTests(unittest.TestCase):
+    """Native Docker identity; other actors/credentials remain explicit models.
+
+    The harness creates/removes its own networkless, never-started Redis. This
+    test only inspects it; it never selects a runtime by production service name.
+    It is not protected controller, issuer or application acceptance.
+    """
+    def test_native_created_redis_without_madar_label_remains_exactly_bound(self):
+        from deployment.lib.completed_normal_resources import measured_spec
+        identifier=os.environ['MADAR_NATIVE_CANDIDATE_REDIS_ID']
+        self.assertRegex(identifier,r'^[0-9a-f]{64}$')
+        rows=json.loads(subprocess.check_output(['docker','inspect',identifier],text=True))
+        self.assertEqual(len(rows),1)
+        actual=rows[0]
+        self.assertEqual(actual['Id'],identifier)
+        self.assertRegex(actual['Name'],r'^/madar-schema150-binding-[0-9a-f]+$')
+        self.assertEqual(actual['Config']['Labels'].get('madar.test.scope'),'schema150-candidate-binding')
+        self.assertEqual(actual['HostConfig']['NetworkMode'],'none')
+        self.assertEqual(actual['State']['Status'],'created')
+        self.assertNotIn('org.opencontainers.image.revision',actual['Config']['Labels'])
+        actor,_,_,_=ConcreteAdapterTests.component(self,stage='fenced',candidates=True)
+        # Docker has not allocated endpoints for a CREATED container. Preserve
+        # the measured declared network object's identity, as the real model
+        # validator does, instead of treating its empty endpoint ID as a hash.
+        declared=json.loads(subprocess.check_output(['docker','network','inspect','none'],text=True))
+        self.assertEqual(len(declared),1)
+        self.assertEqual(set(actual['NetworkSettings']['Networks']),{'none'})
+        old=actor.inventory['containers']['candidate:redis']
+        observed=actor._rows.return_value
+        observed[:]=[actual if r['Id']==old['id'] else r for r in observed]
+        record=dict(old,name=actual['Name'].lstrip('/'),id=identifier,image=actual['Image'],
+            spec_sha256=measured_spec(actual),mounts=inventory._actual_mounts(actual),
+            networks={'none':declared[0]['Id']})
+        actor.inventory['containers']['candidate:redis']=record
+        actor.contract['candidate']['redis_image']=actual['Image']
+        stage=json.loads((actor.root/'candidate-staged-runtime.json').read_text())
+        stage['runtimes']['redis']={**{k:record[k] for k in ('id','image','spec_sha256','networks')},
+            'network_aliases':{k:v.get('Aliases') or [] for k,v in actual['NetworkSettings']['Networks'].items()}}
+        (actor.root/'candidate-staged-runtime.json').write_text(json.dumps(stage))
+        with patch('deployment.lib.completed_normal_admission.credential_witness',return_value=stage):
+            actor.verify_candidate_stage()
+            actor._attest('fenced')
+            actual['Image']='sha256:'+'0'*64
+            with self.assertRaisesRegex(RuntimeError,'candidate_identity_changed'):
+                actor.verify_candidate_stage()
+        actor.runtime.command.assert_not_called()
 
 
 class ConcreteAdapterTests(unittest.TestCase):
@@ -40,6 +90,7 @@ class ConcreteAdapterTests(unittest.TestCase):
         actor.contract = {'rehearsal_sha256': '8'*64, 'database': {'container_id': data['containers']['native:db']['id'],
                           'image': data['containers']['native:db']['image']}}
         actor.contract['candidate']={'images':{'backend':'sha256:'+'e'*64,'frontend':'sha256:'+'e'*64}}
+        actor.contract['candidate']['redis_image']='sha256:'+'e'*64
         actor.barrier = root/'provider-barrier.json'
         actor.dropin_name = '99zzzzzz-schema150-'+scope['context_sha256'][:12]+'.conf'
         actor.runtime = Mock(); actor.runtime.command.side_effect = AssertionError('synthetic transport not configured')
@@ -93,6 +144,47 @@ class ConcreteAdapterTests(unittest.TestCase):
             (root/'candidate-staged-runtime.json').write_text(json.dumps(candidate_stage))
             stack.enter_context(patch('deployment.lib.completed_normal_admission.credential_witness',return_value=copy.deepcopy(candidate_stage)))
         return actor, scope, preimage, journal
+
+    def test_stage_inventory_agreement_cannot_substitute_an_unapproved_role_image(self):
+        from deployment.lib.completed_normal_resources import measured_spec
+        for role in inventory.APP_ROLES:
+            with self.subTest(role=role):
+                actor,_,_,_=self.component(stage='fenced',candidates=True)
+                stage=json.loads((actor.root/'candidate-staged-runtime.json').read_text())
+                record=actor.inventory['containers']['candidate:'+role]
+                actual=next(r for r in actor._rows.return_value if r['Id']==record['id'])
+                actual['Image']='sha256:'+'9'*64
+                record.update(image=actual['Image'],spec_sha256=measured_spec(actual))
+                stage['runtimes'][role].update(image=record['image'],spec_sha256=record['spec_sha256'])
+                (actor.root/'candidate-staged-runtime.json').write_text(json.dumps(stage))
+                with patch('deployment.lib.completed_normal_admission.credential_witness',return_value=stage):
+                    with self.assertRaisesRegex(RuntimeError,'candidate_identity_changed'):
+                        actor.verify_candidate_stage()
+                actor.runtime.command.assert_not_called()
+
+    def test_stage_does_not_swap_approved_backend_frontend_or_redis_images(self):
+        from deployment.lib.completed_normal_resources import measured_spec
+        for role in inventory.APP_ROLES:
+            with self.subTest(role=role):
+                actor,_,_,_=self.component(stage='fenced',candidates=True)
+                approved={'backend':'sha256:'+'1'*64,'frontend':'sha256:'+'2'*64}
+                actor.contract['candidate']['images']=approved
+                actor.contract['candidate']['redis_image']='sha256:'+'3'*64
+                stage=json.loads((actor.root/'candidate-staged-runtime.json').read_text())
+                stage['images']=approved
+                for kind,sealed in stage['runtimes'].items():
+                    record=actor.inventory['containers']['candidate:'+kind]
+                    actual=next(r for r in actor._rows.return_value if r['Id']==record['id'])
+                    actual['Image']=actor.contract['candidate']['redis_image'] if kind=='redis' else approved['frontend' if kind=='frontend' else 'backend']
+                    if kind==role:
+                        actual['Image']=approved['backend' if kind in ('frontend','redis') else 'frontend']
+                    record.update(image=actual['Image'],spec_sha256=measured_spec(actual))
+                    sealed.update(image=record['image'],spec_sha256=record['spec_sha256'])
+                (actor.root/'candidate-staged-runtime.json').write_text(json.dumps(stage))
+                with patch('deployment.lib.completed_normal_admission.credential_witness',return_value=stage):
+                    with self.assertRaisesRegex(RuntimeError,'candidate_identity_changed'):
+                        actor.verify_candidate_stage()
+                actor.runtime.command.assert_not_called()
 
     def test_internal_sql_pins_catalog_before_role_or_quiescence_observation(self):
         actor,_,_,_=self.component()

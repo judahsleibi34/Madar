@@ -343,8 +343,11 @@ class Schema150ProviderAdapter:
         for role in ROLES:
             record=self.inventory['containers'].get('candidate:'+role)
             sealed=stage['runtimes'][role]
+            expected_image=(self.contract['candidate']['redis_image'] if role=='redis'
+                else self.contract['candidate']['images']['frontend' if role=='frontend' else 'backend'])
             if (record is None or not isinstance(sealed,dict)
                     or set(sealed)!={'id','image','spec_sha256','networks','network_aliases'}
+                    or sealed['image']!=expected_image
                     or any(sealed[k]!=record[k] for k in ('id','image','spec_sha256','networks'))):
                 raise RuntimeError('schema150_private_candidate_identity_changed')
             row=actual.get(record['id'])

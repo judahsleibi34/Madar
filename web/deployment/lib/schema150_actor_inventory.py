@@ -347,7 +347,11 @@ def attest_containers(inventory, rows, *, phase):
             declared_only = not expected['running'] and network_id == ''
             _require(network_id == actor['networks'][name] or (declared_only and not endpoint.get('EndpointID') and not endpoint.get('IPAddress')),
                      'schema150_actor_network_identity_changed')
-        if actor['source_sha'] is not None:
+        # candidate:redis is an immutable third-party dependency, associated
+        # with this source through the sealed runtime rather than a fabricated
+        # Madar image label. ID/image/spec/mount/network checks above still
+        # apply; the concrete adapter also requires the approved Redis digest.
+        if actor['source_sha'] is not None and logical != 'candidate:redis':
             _require(row.get('Config', {}).get('Labels', {}).get('org.opencontainers.image.revision') == actor['source_sha'], 'schema150_actor_source_changed')
     return {'inventory_sha256': inventory_digest(value), 'phase': phase, 'containers': len(actors),
             'exclusion_proof_references': len(value['exclusions']), 'unknown_target_actors': 0,
