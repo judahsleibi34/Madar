@@ -22,6 +22,26 @@ and delete endpoints retain their existing behavior.
 
 ## Maintenance candidate preparation and original inventory
 
+The existing coordinator dispatches the exact DELETION profile into a separate
+maintenance-first branch. Historical profiles retain bridge-first ordering.
+The branch captures original provider preimages, fences origin/providers and
+quiesces writers before maintenance-aware backup, then creates/seals stopped
+candidates through the existing preparation interfaces. It passes the same
+concrete provider adapter and reacquired deployment descriptors into the parent
+migration path. Private provider acceptance precedes the existing protected
+handoff. Worker/ingress activation retains the boot barrier until public
+acceptance and post-migration backup; failure uses maintenance compensation,
+including staged identities, without restarting an old bridge.
+
+This is an implementation branch, not operational registration. The measured
+entrypoint must still supply independent private acceptance/activation guards
+and publish the authenticated original provider inventory. The existing handoff
+kernel/authority range and service-child ownership transition still need their
+maintenance-compatible integration. Missing guards fail before effects; old
+activation refuses creation-only receipts. The complete preserved running
+schema146→150 application test has not passed. Profile registration, manifest
+admission, Class D review and automatic dispatch therefore remain blocked.
+
 The existing release child's schema150 preparation branch creates all eight
 candidate containers without starting them. Its `candidate_created_fenced`
 receipt is creation evidence, not health acceptance or worker activation;
@@ -39,8 +59,9 @@ unknown actors, collisions and every original actor. It never enrolls candidates
 by discovered names. Restart reconstruction requires the same authenticated
 stage. The existing parent migration guard independently rechecks the provisional
 model and sealed names before SQL. This closes preparation/binding interfaces;
-the maintenance-first coordinator, private acceptance, authority/worker handoff
-and boot integration are still incomplete. Schema150 remains unregistered.
+the maintenance-first ordering is implemented, while private acceptance,
+authority/worker handoff and complete boot acceptance remain incomplete.
+Schema150 remains unregistered.
 
 ## Candidate role image identity
 

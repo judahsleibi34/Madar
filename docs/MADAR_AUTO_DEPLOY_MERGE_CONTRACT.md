@@ -2,13 +2,24 @@
 
 ## Maintenance creation is not release acceptance
 
+The coordinator now contains a maintenance-first DELETION branch using the
+existing provider adapter, backup context, stopped-candidate binding and
+parent-owned SQL executor. It retains the boot barrier through worker/proxy
+activation and final public acceptance. Historical operations keep their
+existing ordering. Models and native SQL regressions verify ordering/refusal,
+not full privileged application acceptance. The measured private guards,
+original inventory producer, maintenance-compatible handoff kernel and child
+worker-ownership transition remain unresolved. Registration/admission and
+Class D/automatic execution guards are unchanged; merge, deployment and
+automation activation remain unauthorized.
+
 Schema150 candidate preparation uses the existing service child in create-only
 mode and produces `candidate_created_fenced`. The parent must independently seal
 every CREATED, stopped runtime against the rendered immutable model. The provider
 combines that credential-bound seal with the unchanged original inventory and
 rejects unknown or substituted actors. Ordinary worker activation refuses this
 creation-only status. No HTTP health, migration authorization, write grant or
-promotion is implied. The maintenance-first coordinator and privileged full
+promotion is implied. The complete protected operation and privileged full
 146→150 acceptance remain incomplete; operational admission and automatic
 dispatch stay blocked, and the main-to-candidate Class D refusal is unchanged.
 

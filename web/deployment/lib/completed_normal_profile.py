@@ -84,6 +84,6 @@ def expected_origin_grant(contract, mode):
         value.update(compatible_min=115, compatible_max=136)
     elif selected in (APPLICATION, COMMERCIAL):
         value.update(compatible_min=136, compatible_max=144)
-    elif selected in (FENCED, OUTBOX):
+    elif selected in (FENCED, OUTBOX, DELETION):
         value.update(compatible_min=144, compatible_max=146)
     return value

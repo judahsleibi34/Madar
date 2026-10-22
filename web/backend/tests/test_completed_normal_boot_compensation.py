@@ -51,6 +51,32 @@ class BootCompensationTests(unittest.TestCase):
         self.actor.maintenance()
         self.assertIn(['verified-maintenance'],self.actor.runtime.commands)
         self.assertNotIn(['docker','stop','proxy'],self.actor.runtime.commands)
+    def test_maintenance_stops_staged_candidates_before_runtime_publication(self):
+        from deployment.lib.completed_normal_profile import DELETION
+        self.actor.profile=DELETION
+        (self.root/'candidate-runtime.json').rename(self.root/'candidate-staged-runtime.json')
+        self.actor.maintenance()
+        for role in (*m.WORKERS,'backend'):
+            self.assertIn(['docker','stop',role],self.actor.runtime.commands)
+        self.assertIn(['verified-maintenance'],self.actor.runtime.commands)
+
+    def test_maintenance_compensation_never_restarts_a_legacy_read_only_bridge(self):
+        from deployment.lib.completed_normal_profile import DELETION
+        from unittest.mock import Mock
+        self.actor.profile=DELETION
+        self.actor.candidate=Mock(side_effect=AssertionError('maintenance cannot restart bridge'))
+        self.actor.publish_restricted_bridge=Mock(side_effect=AssertionError('maintenance cannot publish bridge'))
+        origin=self.root/'original/write-authority';origin.mkdir(parents=True)
+        (origin/'authority.json').write_text(json.dumps({'mode':'NORMAL','schema':146}))
+        with patch.object(m,'require_candidate_authority',return_value={'mode':'NORMAL','schema':150}),\
+                patch.object(m,'expected_origin_grant',return_value={'mode':'READ_ONLY','schema':146}),\
+                patch.object(m,'atomic_public_authority') as publish:
+            self.actor.compensate()
+        self.assertEqual(publish.call_count,2)
+        self.assertTrue(all(call.args[1]['mode']=='READ_ONLY' for call in publish.call_args_list))
+        self.actor.candidate.assert_not_called()
+        self.actor.publish_restricted_bridge.assert_not_called()
+        self.assertIn(['verified-maintenance'],self.actor.runtime.commands)
     def test_failed_worker_stop_still_stops_only_bound_proxy_and_reports_failure(self):
         self.actor.runtime.fail_stop=m.WORKERS[0]
         with self.assertRaisesRegex(RuntimeError,'compensation_worker_stop_failed'):self.actor.maintenance()

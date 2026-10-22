@@ -178,6 +178,24 @@ class Provider150LifecycleTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, 'private_acceptance_required'): driver.activate_after_grant()
         self.assertFalse(any(step in actor.effects for step in lifecycle.PRIVATE_STEPS + lifecycle.ACTIVATE_STEPS))
 
+    def test_worker_and_ingress_activation_keeps_boot_barrier_until_separate_completion(self):
+        driver, actor, journal = self.private_ready(); actor.observe_existing_grant()
+        result=driver.activate_after_grant(clear_boot=False)
+        self.assertFalse(result['provider_lifecycle_complete'])
+        self.assertEqual(driver._state()[1],list(lifecycle.STEPS[:-1]))
+        self.assertNotIn('clear_boot_interlock',actor.effects)
+        actor.authorized=False
+        with self.assertRaisesRegex(RuntimeError,'fresh_protected_authority_missing'):
+            driver.activate_after_grant()
+        self.assertNotIn('clear_boot_interlock',actor.effects)
+        actor.authorized=True
+        restarted=lifecycle.ProviderMaintenance150(binding(),journal,actor)
+        self.assertTrue(restarted.activate_after_grant()['provider_lifecycle_complete'])
+        for step in lifecycle.ACTIVATE_STEPS:
+            self.assertEqual(actor.calls.count(('effect',step)),1)
+        with self.assertRaisesRegex(RuntimeError,'boot_completion_invalid'):
+            restarted.activate_after_grant(clear_boot=1)
+
     def test_private_boundary_rejects_unknown_sessions_prepared_transactions_and_public_open(self):
         for key in ('unknown_writers', 'unknown_client_sessions', 'prepared_transactions',
                     'ingress_fenced', 'workers_fenced', 'boot_interlock_armed', 'candidate_read_only'):

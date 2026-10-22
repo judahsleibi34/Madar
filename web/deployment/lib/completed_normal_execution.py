@@ -1,4 +1,7 @@
-"""One exact completed-NORMAL bridge-first operation, using installed services.
+"""Protected completed-NORMAL operations, using installed services.
+
+Historical profiles retain bridge-first ordering. The unregistered schema150
+branch is maintenance-first and refuses missing independent private verifiers.
 
 No automatic replay or database rollback. Durable boot is a READ_ONLY forward
 repair mechanism after SQL intent; it cannot finish this operation unattended.
@@ -245,7 +248,8 @@ class CompletedNormalUpgrade:
     Artifact/model verifiers are supplied by the measured entrypoint. A caller
     summary or an old acceptance grant cannot substitute for these verifiers.
     """
-    def __init__(self,actor,*,artifact_guard,model_loader,acceptance_guard,rehearsal_guard):
+    def __init__(self,actor,*,artifact_guard,model_loader,acceptance_guard,rehearsal_guard,
+                 maintenance_acceptance_guard=None,maintenance_activation_guard=None):
         if not all(callable(f) for f in (artifact_guard,model_loader,acceptance_guard,rehearsal_guard)):
             raise RuntimeError('completed_upgrade_independent_execution_guards_required')
         self.actor=actor;self.contract=actor.contract;self.document=actor.document
@@ -260,6 +264,8 @@ class CompletedNormalUpgrade:
         self.controller=self.contract['candidate']['controller_sha']
         self.phase='preflight';self.quiesced=False;self.admitted=False;self.fenced=False
         self.controller_installed=False;self.lock=None
+        self.maintenance_acceptance_guard=maintenance_acceptance_guard
+        self.maintenance_activation_guard=maintenance_activation_guard
 
     def preparation_source(self):
         measured,_=self.actor.measure()
@@ -532,6 +538,8 @@ class CompletedNormalUpgrade:
             return self._execute()
 
     def _execute(self):
+        from deployment.lib.completed_normal_profile import DELETION
+        if self.profile is DELETION:return self._execute_maintenance()
         self.preflight()
         self.lock=acquire_lock(self.ops.upgrade_root/'upgrade.lock',create=False)
         try:
@@ -666,6 +674,147 @@ class CompletedNormalUpgrade:
                 exclusive(self.root/'normal-completion.json',encoded(result))
                 from deployment.lib.completed_normal_baseline import seal_compatible_release
                 seal_compatible_release(self.contract,self.root,self.ops.state_root)
+            self.ops.clear_interlock()
+            return result
+        except Exception as error:
+            self.failure(error)
+            raise
+        finally:
+            try:self.ops.clear_authorization()
+            finally:
+                try:self.ops.close_locks()
+                finally:
+                    try:
+                        if self.lock is not None:os.close(self.lock)
+                    finally:self.lock=None
+
+    def _execute_maintenance(self):
+        """Maintenance first; never publish a schema146 candidate bridge.
+
+        The registry/admission/issuer remain authoritative and fail closed.
+        Private acceptance and activation delegates must come from the measured
+        installed entrypoint; a status packet or default public smoke probe is
+        insufficient. This method neither registers150 nor issues authority.
+        """
+        from deployment.lib.completed_normal_profile import DELETION
+        from deployment.lib.schema150_provider_adapter import Schema150ProviderAdapter,private_json,require_owned_lock,LOCKS
+        from deployment.lib.schema150_provider_lifecycle import ProviderMaintenance150,ProtectedProviderJournal
+        from deployment.lib.schema150_actor_inventory import validate_inventory
+        if (self.profile is not DELETION or not callable(self.maintenance_acceptance_guard)
+                or not callable(self.maintenance_activation_guard)):
+            raise RuntimeError('schema150_independent_private_verifiers_required')
+        self.preflight()
+        self.lock=acquire_lock(self.ops.upgrade_root/'upgrade.lock',create=False)
+        try:
+            self.preflight(locked=True)
+            self.reconcile_failed_interlock()
+            self.quiesced=True;self.ops.quiesce(self.controller)
+            # Retain this lock across root credential windows. Release it only
+            # for the existing User=madar child, then rebind the actual new fd.
+            if self.ops.deploy_lock_descriptor is None:
+                self.ops.deploy_lock_descriptor=acquire_lock(self.ops.state_root/'deploy.lock',create=False)
+            with self.root_credential():
+                publish_admission(self.contract,self.ops,self.ops.state_root)
+            self.admitted=True
+            exclusive(self.root/'operator-authorization.json',encoded({
+                'operation':self.profile.operation,'context_sha256':digest(self.contract),'plan_sha256':digest(self.document),
+                'source_bundle_sha256':self.document['source_bundle_sha256'],'controller_sha':self.controller,
+                'application_sha':self.contract['candidate']['source_sha']}))
+            exclusive(self.root/'backup-timer-preimages.json',encoded(self.document['backup_timer_states']))
+            with self.root_credential():
+                self.event('boot_supersession_pending');self.actor.installation.install();self.actor.guard()
+                self.event('controller_installation_pending');self.install_controller()
+                from deployment.lib.completed_normal_evidence import measured_record
+                from deployment.lib.schema148_artifacts import seal_candidate_provenance
+                seal_candidate_provenance(self.actor,measured_record(self.document['application_evidence']['provenance']))
+                binding={'operation':self.profile.operation,'context_sha256':digest(self.contract),
+                    'source_sha':self.contract['candidate']['source_sha'],'controller_sha':self.controller,
+                    'inventory_sha256':self.contract['writer_inventory_sha256'],
+                    'system_identifier':self.contract['database']['system_identifier'],'source_schema':146,'target_schema':150}
+                self.actor.guard()
+                inventory=validate_inventory(private_json(self.package/'provider-inventory.json'),binding)
+                if any(k.startswith('candidate:') for k in inventory['containers']):
+                    raise RuntimeError('schema150_original_inventory_must_precede_candidate')
+                exclusive(self.root/'provider-inventory.json',encoded(inventory))
+                require_root_directory(self.root/'provider-journal',create=True)
+                provider=Schema150ProviderAdapter(self.contract,binding,self.actor.runtime,
+                    source_guard=self.actor.guard,lock_descriptors=(self.lock,self.ops.deploy_lock_descriptor),
+                    acceptance_guard=self.maintenance_acceptance_guard,activation_guard=self.maintenance_activation_guard)
+                lifecycle=ProviderMaintenance150(binding,ProtectedProviderJournal(self.root/'provider-journal'),provider)
+                kernel=self.actor.candidate()
+                handoff=CompletedNormalWriteHandoff(self.contract,kernel,source_guard=self.actor.source,
+                    boot_guard=self.actor.installation.installed,artifact_guard=self.artifact_guard)
+                self.event('original_provider_preimage_pending');lifecycle.prepare()
+                self.event('origin_write_fence_pending');self.fenced=True;handoff.fence_origin()
+                self.event('provider_maintenance_fence_pending');lifecycle.fence()
+                self.event('pre_migration_backup_pending')
+                backup=CompletedNormalBackupContext(self.contract,self.document,self.package,kernel,
+                    stage='pre-migration',source_guard=self.actor.guard,artifact_guard=self.artifact_guard,provider_adapter=provider)
+                receipt=backup.capture();backup.seal_migration_inputs(receipt)
+                self.event('pre_migration_customer_snapshot_pending')
+                original=migration_customer_snapshot(self.contract,self.actor.runtime)
+                exclusive(self.root/'pre-migration-customer-snapshot.json',encoded(original))
+            self.ops.release_deployment_lock()
+            self.service('prepare')
+            self.ops.deploy_lock_descriptor=acquire_lock(self.ops.state_root/'deploy.lock',create=False)
+            # A stale descriptor from before the child can never authorize SQL.
+            for fd,path in zip((self.lock,self.ops.deploy_lock_descriptor),LOCKS):require_owned_lock(fd,path)
+            provider.lock_descriptors=(self.lock,self.ops.deploy_lock_descriptor)
+            with self.root_credential():
+                self.event('fenced_candidate_seal_pending')
+                seal_candidate_stage(self.contract,source_guard=self.actor.guard,model_loader=self.model_loader,
+                    runtime=self.actor.runtime,state_root=self.ops.state_root)
+            # Fresh issuer witness now includes the exclusively published stage.
+            with self.root_credential():
+                provider.require_authority(binding,purpose='observe_quiescence')
+                provider.verify_candidate_stage()
+                provider.observe_quiescence(binding)
+                seal_intent(self.contract,source_guard=self.actor.guard,runtime_guard=self.actor.native,
+                    backup_guard=backup.guard)
+            self.migrate(provider_adapter=provider)
+            with self.root_credential():
+                self.event('migration_customer_preservation_pending')
+                after=migration_customer_snapshot(self.contract,self.actor.runtime,columns=original['columns'])
+                exclusive(self.root/'post-migration-customer-snapshot.json',encoded(after))
+                preservation=verify_migration_customer_preservation(original,after,contract=self.contract)
+                exclusive(self.root/'migration-customer-preservation.json',encoded(preservation))
+                seal_completion(self.contract,self.ops.state_root/'releases'/self.contract['candidate']['source_sha'],
+                    self.ops.state_root,source_guard=self.actor.guard,runtime_guard=self.actor.native)
+                self.event('private_provider_recovery_pending');lifecycle.prepare_private_activation()
+                self.event('target_normal_grant_pending');handoff.grant(schema=150)
+            # Existing child owns the worker-generation transfer. Its historical
+            # guard may not accept a creation-only receipt; do not bypass it.
+            self.ops.release_deployment_lock()
+            self.service('activate')
+            self.ops.deploy_lock_descriptor=acquire_lock(self.ops.state_root/'deploy.lock',create=False)
+            for fd,path in zip((self.lock,self.ops.deploy_lock_descriptor),LOCKS):require_owned_lock(fd,path)
+            provider.lock_descriptors=(self.lock,self.ops.deploy_lock_descriptor)
+            with self.root_credential():
+                seal_candidate_runtime(self.contract,source_guard=self.actor.guard,model_loader=self.model_loader,
+                    runtime=self.actor.runtime,state_root=self.ops.state_root)
+                self.event('accepted_workers_and_ingress_pending');lifecycle.activate_after_grant(clear_boot=False)
+            self.ops.release_deployment_lock();self.service('adopt')
+            self.ops.deploy_lock_descriptor=acquire_lock(self.ops.state_root/'deploy.lock',create=False)
+            for fd,path in zip((self.lock,self.ops.deploy_lock_descriptor),LOCKS):require_owned_lock(fd,path)
+            provider.lock_descriptors=(self.lock,self.ops.deploy_lock_descriptor)
+            with self.root_credential():
+                self.acceptance_guard(schema=150,normal=True)
+                self.event('post_migration_backup_pending')
+                final=CompletedNormalBackupContext(self.contract,self.document,self.package,kernel,
+                    stage='post-migration',source_guard=self.actor.guard,artifact_guard=self.artifact_guard).capture()
+                kernel.round(normal=True)
+                result={'operation':self.profile.operation,'context_sha256':digest(self.contract),'schema':150,'mode':'NORMAL',
+                    'application_sha':self.contract['candidate']['source_sha'],'controller_sha':self.controller,
+                    'images':self.contract['candidate']['images'],'backup':final,'customer_database_restored':False}
+                exclusive(self.root/'normal-acceptance.json',encoded(result))
+                # Public acceptance precedes boot release; final completion is
+                # published only after that independently observed effect.
+                lifecycle.activate_after_grant()
+                self.ops.restore_backup_timers()
+                exclusive(self.root/'normal-completion.json',encoded(result))
+                from deployment.lib.completed_normal_baseline import seal_compatible_release
+                seal_compatible_release(self.contract,self.root,self.ops.state_root)
+                self.event('normal_completed',schema=150,mode='NORMAL')
             self.ops.clear_interlock()
             return result
         except Exception as error:

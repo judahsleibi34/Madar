@@ -260,8 +260,9 @@ class ProviderMaintenance150:
             return {'schema': 150, 'private_provider_acceptance_complete': True,
                     'production_authorization_issued': False}
 
-    def activate_after_grant(self):
+    def activate_after_grant(self,*,clear_boot=True):
         """Observe existing protected target authority; never issue or replay it."""
+        if type(clear_boot) is not bool:raise RuntimeError('schema150_provider_boot_completion_invalid')
         with self._locked():
             self._guard('activate_after_grant')
             _, completed, pending, ready = self._state()
@@ -272,8 +273,9 @@ class ProviderMaintenance150:
             if completed == list(STEPS):
                 raise RuntimeError('schema150_provider_activation_already_completed')
             self._activation_evidence(granted=True)
-            for step in STEPS[len(completed):]: self._effect(step)
-            return {'schema': 150, 'provider_lifecycle_complete': True,
+            sequence=STEPS if clear_boot else STEPS[:-1]
+            for step in sequence[len(completed):]: self._effect(step)
+            return {'schema': 150, 'provider_lifecycle_complete': clear_boot,
                     'production_authorization_issued': False, 'customer_database_restored': False}
 
     def reconcile_pending(self):
