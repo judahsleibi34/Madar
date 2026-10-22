@@ -1,5 +1,10 @@
 # Automated database migration architecture
 
+Native disposable rehearsals wait for PostgreSQL's final TCP listener inside the
+owned container. Initdb's temporary Unix-socket server is not readiness: it
+exits before the final server starts. A delayed-init reproduction verifies the
+Unix-only false-positive window and TCP refusal; no host port is published.
+
 ## Canonical160 engineering and owner decision (2026-10-23)
 
 `BRANCH_PROTECTION: DEFERRED_BY_PROJECT_OWNER`. The owner explicitly waived

@@ -32,10 +32,12 @@ CONTAINER_ID="$(docker run -d --name "${CONTAINER_NAME}" --network none \
   --tmpfs /var/lib/postgresql/data:rw,noexec,nosuid,size=2g \
   -e POSTGRES_HOST_AUTH_METHOD=trust "${POSTGRES_IMAGE}")"
 for _ in $(seq 1 60); do
-  docker exec "${CONTAINER_NAME}" pg_isready -U postgres >/dev/null 2>&1 && break
+  # initdb's temporary server accepts Unix-socket connections, then exits.
+  # Only the final server listens on TCP; do not admit that temporary window.
+  docker exec "${CONTAINER_ID}" pg_isready -h 127.0.0.1 -U postgres >/dev/null 2>&1 && break
   sleep 1
 done
-docker exec "${CONTAINER_NAME}" pg_isready -U postgres >/dev/null
+docker exec "${CONTAINER_ID}" pg_isready -h 127.0.0.1 -U postgres >/dev/null
 
 docker exec -i "${CONTAINER_NAME}" psql -X -v ON_ERROR_STOP=1 -U postgres <<'SQL'
 create role anon nologin;
