@@ -51,5 +51,16 @@
         "sha256": "63d4d0c7af93bd3c3e93158a2e281b41eed23b83bfafd4b3f1ba22313533b722"
       }
     }
-  ]
+  ],
+  "required_worker_protocols": {
+    "notification_delivery": 2,
+    "notification_outbox": 2,
+    "data_deletion": 2
+  },
+  "schema_contract": {
+    "origin": 156,
+    "target": 160,
+    "normal_target_only": true,
+    "operational_admission": "BLOCKED"
+  }
 }

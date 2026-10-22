@@ -26,9 +26,9 @@ STATE = {"healthy": False, "last_poll_at": None, "processed": 0, "failed": 0, "o
 
 
 def require_deletion_ownership_protocol(*, client=None) -> None:
-    """Require the exact database-enforced schema150 ownership contract.
+    """Require the exact database-enforced ownership protocol2 contract.
 
-    Migrations001..149 remain incompatible. Every consuming poll rechecks the
+    Canonical schemas through159 remain incompatible. Every consuming poll rechecks the
     marker; service transitions use only original claims and fenced RPCs.
     """
     if client is None:

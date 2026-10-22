@@ -1,7 +1,6 @@
 {
   "authoritative_main": "cf444303e55a2c6a214ab53f683442cf2fac15fe",
   "architecture_origin": "4360a4ab2eba6013483dc2755558668245936b4c",
-  "active_target": 160,
   "controller_execution": "BLOCKED",
   "published_main": {
     "web/database/migrations/147_add_project_datasets.sql": "3abf6867a6fb41049334690423ac0375af39fdfd8b91196874e6e1857c2aa8fb",
@@ -35,5 +34,6 @@
     "web/supabase/historical-architecture-146-150/150_fence_data_deletion_ownership.sql": "63d4d0c7af93bd3c3e93158a2e281b41eed23b83bfafd4b3f1ba22313533b722",
     "web/supabase/historical-architecture-146-150/147_fence_notification_delivery_claims.sql": "bc76737e03ddf3dc369e444f34435dbded600ab1cae3209555b5bde6647d60f3"
   },
-  "forward_manifest_sha256": "929be5d2056dcd31d3949f8f548d8e212c66840a86533d080350c7995f10b2b9"
+  "forward_manifest_sha256": "14c618d91f2431c405921ec8f521add6c8545fba8c2412b376494b819f1c58f5",
+  "reconciled_target": 160
 }

@@ -152,7 +152,7 @@ def validate_outbox_generation(value: Any) -> int:
 def require_outbox_fencing(*, client=None) -> None:
     response = (client or service_supabase).rpc("notification_outbox_protocol", {}).execute()
     if getattr(response, "data", None) != 2:
-        raise RuntimeError("notification outbox protocol 2/schema149 is required")
+        raise RuntimeError("notification outbox protocol 2 is required")
 
 
 def mark_notification_result(

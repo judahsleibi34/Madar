@@ -5,19 +5,27 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 WEB_ROOT="${ROOT_DIR}/web"
 POSTGRES_IMAGE="postgres:17-alpine@sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73"
 CONTAINER_NAME="madar-staging-chain-${RANDOM}-$$"
+CONTAINER_ID=''
 BACKUP_FILE="$(mktemp /tmp/madar-schema136-XXXXXX.dump)"
 
 cleanup() {
-  docker rm -f "${CONTAINER_NAME}" >/dev/null 2>&1 || true
+  if [[ -n "${CONTAINER_ID}" ]]; then
+    if [[ "$(docker inspect --format '{{ index .Config.Labels "madar.rehearsal" }}' "${CONTAINER_ID}")" != 'data-source-chain' ]]; then
+      echo 'Refusing cleanup of an unverified rehearsal container' >&2
+      return 1
+    fi
+    docker rm -f "${CONTAINER_ID}" >/dev/null
+  fi
   rm -f "${BACKUP_FILE}"
 }
 trap cleanup EXIT
 
 python3 "${WEB_ROOT}/scripts/check_data_sources_staging_chain.py"
 
-docker run -d --name "${CONTAINER_NAME}" --network none \
+CONTAINER_ID="$(docker run -d --name "${CONTAINER_NAME}" --network none \
+  --label madar.rehearsal=data-source-chain --memory=2g --cpus=1 --pids-limit=256 \
   --tmpfs /var/lib/postgresql/data:rw,noexec,nosuid,size=2g \
-  -e POSTGRES_HOST_AUTH_METHOD=trust "${POSTGRES_IMAGE}" >/dev/null
+  -e POSTGRES_HOST_AUTH_METHOD=trust "${POSTGRES_IMAGE}")"
 for _ in $(seq 1 60); do
   docker exec "${CONTAINER_NAME}" pg_isready -U postgres >/dev/null 2>&1 && break
   sleep 1

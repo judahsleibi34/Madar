@@ -102,7 +102,7 @@ def validate_claim_generation(value: Any) -> int:
 def require_delivery_fencing(*, client=None) -> None:
     response = (client or service_supabase).rpc("notification_delivery_protocol", {}).execute()
     if getattr(response, "data", None) != 2:
-        raise RuntimeError("notification delivery protocol 2/schema147 is required")
+        raise RuntimeError("notification delivery protocol 2 is required")
 
 
 def claim_deliveries(*, limit: int = 25, lease_seconds: int = 900, client=None) -> list[dict[str, Any]]:
