@@ -4,7 +4,10 @@ import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-
 import RouteSuspense from "../components/common/RouteSuspense";
 import { ELearningRouteSkeleton } from "../components/ELearning/ELearningSkeleton";
 import EcommerceRouteSkeleton from "../components/DashboardBuilder/EcommerceRouteSkeleton";
-import { getBuilderProjectIdFromPath } from "../components/PageBuilder/core/PageBuilder.workspaceRouting";
+import {
+  getBuilderProjectIdFromPath,
+  getBuilderWorkspacePath,
+} from "../components/PageBuilder/core/PageBuilder.workspaceRouting";
 import { appShellContent } from "../content";
 import { DASHBOARD_ROUTES } from "../config/routes";
 import { DashboardLoadingElement, DashboardShell, RestrictedAccessWindow } from "./shared";
@@ -46,24 +49,61 @@ const TenantSiteRuntime = lazy(() =>
 );
 const AcademyLandingPageEntry = lazy(() => import("../components/ELearning/AcademyLandingPageEntry"));
 const PageBuilder = lazy(() => import("../components/PageBuilder"));
+const DataProjectsPage = lazy(() => import("../components/DataProjects/DataProjectsPage"));
 const BuilderProjectChooser = lazy(() =>
   import("../components/PageBuilder/workspace/BuilderProjectChooser")
 );
 
+const getDataProjectSelectionKey = (user) =>
+  `madar:selected-data-project:${user?.tenant_id || user?.tenantId || "tenant"}:${user?.id || user?.auth_id || "user"}`;
+
+const readSelectedDataProject = (storageKey) => {
+  try {
+    return window.sessionStorage.getItem(storageKey) || "";
+  } catch {
+    return "";
+  }
+};
+
 function BuilderWorkspaceEntry({ workspace = "page-builder", ...pageBuilderProps }) {
   const location = useLocation();
   const projectId = getBuilderProjectIdFromPath(location.pathname);
-  if (!projectId) {
+  const isDataProjectWorkspace = workspace === "builder-data" || workspace === "data-sources";
+  const dataProjectSelectionKey = getDataProjectSelectionKey(pageBuilderProps.user);
+  const selectedDataProjectId = isDataProjectWorkspace
+    ? readSelectedDataProject(dataProjectSelectionKey)
+    : "";
+  if (isDataProjectWorkspace && !projectId && selectedDataProjectId) {
+    return (
+      <Navigate
+        replace
+        to={getBuilderWorkspacePath(selectedDataProjectId, "data", workspace)}
+        state={{ dataProjectConfirmed: true }}
+      />
+    );
+  }
+  const requiresDataProjectConfirmation =
+    isDataProjectWorkspace &&
+    location.state?.dataProjectConfirmed !== true &&
+    selectedDataProjectId !== projectId;
+  if (!projectId || requiresDataProjectConfirmation) {
     return (
       <BuilderProjectChooser
         workspace={workspace}
         autoEnterProject={workspace === "page-builder"}
-        autoOpenSingleProject
+        autoOpenSingleProject={!isDataProjectWorkspace}
+        dataProjectSelectionKey={dataProjectSelectionKey}
         usageProfile="website"
       />
     );
   }
-  return <PageBuilder key={`${workspace}:${projectId}`} {...pageBuilderProps} />;
+  return (
+    <PageBuilder
+      key={`${workspace}:${projectId}`}
+      {...pageBuilderProps}
+      dataProjectSelectionKey={dataProjectSelectionKey}
+    />
+  );
 }
 
 export default function UserWorkspaceRoutes({
@@ -80,6 +120,8 @@ export default function UserWorkspaceRoutes({
   const isBuilderLoadingPath =
     location.pathname.startsWith("/page-builder") ||
     location.pathname.startsWith("/builder-responses") ||
+    location.pathname.startsWith("/data-projects") ||
+    location.pathname.startsWith("/data-sources") ||
     location.pathname.startsWith("/builder-data") ||
     location.pathname.startsWith("/calendar") ||
     location.pathname.startsWith("/agenda") ||
@@ -118,6 +160,8 @@ export default function UserWorkspaceRoutes({
               {
                 compactSidebar:
                   location.pathname.startsWith("/builder-responses") ||
+                  location.pathname.startsWith("/data-projects") ||
+                  location.pathname.startsWith("/data-sources") ||
                   location.pathname.startsWith("/builder-data") ||
                   location.pathname.startsWith("/archive"),
                 isPageBuilderShell: location.pathname.startsWith("/page-builder"),
@@ -189,6 +233,33 @@ export default function UserWorkspaceRoutes({
             initialTab="responses"
             visibleTabIds={["responses"]}
             hideWorkspaceTabs={true}
+            lang={lang}
+            templateLang={lang}
+            appThemeMode={themeMode}
+            onAppThemeModeChange={shellProps.onThemeModeChange}
+          />,
+          { compactSidebar: true }
+        )}
+      />
+
+      <Route
+        path="/data-projects/*"
+        element={renderShell(
+          <DataProjectsPage dataProjectSelectionKey={getDataProjectSelectionKey(user)} />,
+          { compactSidebar: true }
+        )}
+      />
+
+      <Route
+        path="/data-sources/*"
+        element={renderShell(
+          <BuilderWorkspaceEntry
+            workspace="data-sources"
+            user={user}
+            initialTab="data"
+            visibleTabIds={["data"]}
+            hideWorkspaceTabs={true}
+            dataSourceOnly={true}
             lang={lang}
             templateLang={lang}
             appThemeMode={themeMode}

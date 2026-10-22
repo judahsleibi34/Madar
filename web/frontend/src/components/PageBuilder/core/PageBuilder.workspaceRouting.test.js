@@ -25,6 +25,13 @@ describe("explicit builder project routes", () => {
     expect(getBuilderProjectIdFromPath("/page-builder/pages")).toBe("");
   });
 
+  it("keeps Data Sources in its own project namespace", () => {
+    const path = getBuilderWorkspacePath("source-project", "data", "data-sources");
+    expect(path).toBe("/data-sources/projects/source-project/data");
+    expect(getBuilderProjectIdFromPath(path)).toBe("source-project");
+    expect(getBuilderWorkspaceFromPath(path)).toBe("data-sources");
+  });
+
   it("keeps Academy workspaces in the dedicated E-Learning namespace", () => {
     const workspace = "e-learning/landing-page";
     const path = getBuilderWorkspacePath("academy-owner", "publish", workspace);

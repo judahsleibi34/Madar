@@ -1,0 +1,21 @@
+[Unit]
+Description=Madar bounded automatic Data Source synchronization batch
+After=network-online.target
+OnFailure=madar-ops-alert@%n.service
+
+[Service]
+Type=oneshot
+User=madar
+Group=madar
+UMask=0077
+EnvironmentFile=/etc/madar/runtime.env
+WorkingDirectory=/srv/madar/production/web/backend
+ExecStart=/usr/bin/flock --nonblock /run/lock/madar-automatic-source-sync.lock /usr/bin/python3 scripts/run_automatic_source_sync.py --limit 5 --lease-seconds 900 --tenant-limit 2 --provider-limit 4
+TimeoutStartSec=30m
+MemoryMax=1536M
+TasksMax=32
+NoNewPrivileges=true
+PrivateTmp=false
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/run/lock /var/lib/madar/checkpoint-scratch

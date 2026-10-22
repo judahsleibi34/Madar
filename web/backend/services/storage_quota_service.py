@@ -8,6 +8,7 @@ from typing import Any
 
 from database import service_supabase
 from services.entitlement_service import get_storage_quota_bytes
+from services.immutable_object_storage import ImmutableObject
 from fastapi import HTTPException
 
 DEFAULT_TENANT_QUOTA_BYTES = 5 * 1024 * 1024 * 1024
@@ -97,6 +98,43 @@ def finish_storage(*, reservation_id: str, succeeded: bool, storage_key: str | N
     data = getattr(response, "data", None)
     result = data[0] if isinstance(data, list) and data else data
     return str(result) if result else None
+
+
+def prepare_immutable_storage(*, reservation_id: str, descriptor: ImmutableObject,
+                              client=None) -> None:
+    (client or service_supabase).rpc("prepare_immutable_storage154", {
+        "p_reservation_id": reservation_id,
+        "p_storage_bucket": descriptor.bucket,
+        "p_provider_object_key": descriptor.object_key,
+        "p_expected_size_bytes": descriptor.size_bytes,
+        "p_expected_sha256": descriptor.sha256,
+    }).execute()
+
+
+def verify_immutable_storage(*, reservation_id: str, client=None) -> None:
+    (client or service_supabase).rpc("verify_immutable_storage154", {
+        "p_reservation_id": reservation_id,
+    }).execute()
+
+
+def mark_immutable_storage_ambiguous(*, reservation_id: str, client=None) -> None:
+    (client or service_supabase).rpc("mark_immutable_storage_ambiguous154", {
+        "p_reservation_id": reservation_id,
+    }).execute()
+
+
+def finish_immutable_storage(*, reservation_id: str, storage_key: str,
+                             retention_until: str | None = None, client=None) -> str:
+    response = (client or service_supabase).rpc("finish_immutable_storage154", {
+        "p_reservation_id": reservation_id,
+        "p_storage_key": storage_key,
+        "p_retention_until": retention_until,
+    }).execute()
+    data = getattr(response, "data", None)
+    result = data[0] if isinstance(data, list) and data else data
+    if not result:
+        raise StorageSafetyError("storage_accounting_unavailable")
+    return str(result)
 
 
 def sha256_file(path: Path) -> str:

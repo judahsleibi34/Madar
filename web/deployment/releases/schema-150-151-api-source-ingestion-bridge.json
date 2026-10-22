@@ -1,0 +1,15 @@
+{
+  "release_metadata_version": 1,
+  "deployment_profile": "api-source-ingestion150-151",
+  "schema": {
+    "compatible_min": 150,
+    "compatible_max": 151,
+    "target": 151,
+    "migration_class": "expand-only",
+    "rollback_compatible_min": 150,
+    "rollback_compatible_max": 150
+  },
+  "migration_policy": "automatic-after-known-good-backup-first-forward-repair",
+  "migration_manifest": "migrations-150-151-api-source-ingestion.json",
+  "notes": "Unselected schema150 to schema151 candidate. Adds allow-listed API source identity metadata and fenced atomic completion for one-shot provider snapshots. The only implementation is a deterministic non-production synthetic fixture; no OAuth, credentials, webhooks, scheduler, arbitrary URL fetching, or production authority is added."
+}

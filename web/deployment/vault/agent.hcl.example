@@ -1,0 +1,29 @@
+# Vault Agent owns AppRole login and renewal. Madar reads only the resulting token
+# sink. role-id and the response-wrapped SecretID are provisioned out of band.
+vault {
+  address = "https://127.0.0.1:8200"
+  ca_cert = "/etc/madar-vault/tls/ca.crt"
+}
+
+auto_auth {
+  method "approle" {
+    mount_path = "auth/approle"
+    config = {
+      role_id_file_path                   = "/run/madar-vault-bootstrap/role-id"
+      secret_id_file_path                 = "/run/madar-vault-bootstrap/wrapped-secret-id"
+      secret_id_response_wrapping_path    = "auth/approle/role/madar-data-sources/secret-id"
+      remove_secret_id_file_after_reading = true
+    }
+  }
+
+  sink "file" {
+    config = {
+      path = "/run/madar-vault-agent/token"
+      mode = 0400
+    }
+  }
+}
+
+cache {
+  use_auto_auth_token = "force"
+}

@@ -58,9 +58,649 @@
   gap: 16px;
 }
 
+.page-builder .daw-project-datasets {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--daw-card-border);
+  border-radius: 12px;
+  background: var(--daw-soft-bg);
+}
+
+.page-builder .daw-project-datasets h4,
+.page-builder .daw-project-datasets p {
+  margin: 0;
+}
+
+.page-builder .daw-project-dataset-list {
+  display: grid;
+  gap: 8px;
+}
+
+.page-builder .daw-project-dataset-list article {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--daw-card-border);
+  border-radius: 10px;
+  background: var(--daw-card-bg);
+}
+
+.page-builder .daw-project-dataset-list article > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.page-builder .daw-project-dataset-list strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.page-builder .daw-project-dataset-list span {
+  color: var(--daw-muted);
+  font-size: 0.8rem;
+}
+
+.page-builder .daw-project-dataset-list button {
+  min-height: 34px;
+  padding: 0 14px;
+  border: 1px solid var(--daw-secondary-border);
+  border-radius: 10px;
+  background: var(--daw-secondary-bg);
+  color: var(--daw-secondary-text);
+  font-size: 12px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.page-builder .daw-project-dataset-list button:hover:not(:disabled) {
+  border-color: var(--daw-tab-active-border);
+  background: var(--daw-secondary-bg-hover);
+  color: var(--daw-red);
+}
+
 .page-builder .daw-source-body h4 {
   margin: 0;
   color: var(--daw-text);
   font-size: 17px;
   font-weight: 950;
+}
+.page-builder .daw-source-registry {
+  display: grid;
+  gap: 20px;
+  margin-bottom: 18px;
+}
+
+.page-builder .daw-source-overview,
+.page-builder .daw-source-add {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid var(--daw-card-border);
+  border-radius: 14px;
+  background: var(--daw-card-bg);
+}
+
+.page-builder .daw-source-subheading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.page-builder .daw-source-subheading > div {
+  display: grid;
+  gap: 3px;
+}
+
+.page-builder .daw-source-subheading span:first-child {
+  color: var(--daw-red);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.page-builder .daw-source-subheading h4,
+.page-builder .daw-source-empty p,
+.page-builder .daw-source-state p {
+  margin: 0;
+}
+
+.page-builder .daw-source-count {
+  display: inline-grid;
+  min-width: 32px;
+  min-height: 28px;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--daw-soft-bg);
+  color: var(--daw-text);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.page-builder .daw-source-state,
+.page-builder .daw-source-empty {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 15px 16px;
+  border-radius: 12px;
+  background: var(--daw-soft-bg);
+  color: var(--daw-muted);
+}
+
+.page-builder .daw-source-state.is-error {
+  background: color-mix(in srgb, var(--daw-red) 7%, var(--daw-card-bg));
+  color: var(--daw-text);
+}
+
+.page-builder .daw-source-state > div,
+.page-builder .daw-source-empty > div {
+  display: grid;
+  gap: 4px;
+}
+
+.page-builder .daw-source-state strong,
+.page-builder .daw-source-empty strong {
+  color: var(--daw-text);
+}
+
+.page-builder .daw-source-loading {
+  display: grid;
+  gap: 9px;
+}
+
+.page-builder .daw-source-loading span {
+  min-height: 54px;
+  border-radius: 11px;
+  background: linear-gradient(90deg, var(--daw-soft-bg), var(--daw-card-bg), var(--daw-soft-bg));
+  background-size: 200% 100%;
+  animation: daw-source-loading 1.2s ease-in-out infinite;
+}
+
+@keyframes daw-source-loading {
+  to { background-position: -200% 0; }
+}
+
+.page-builder .daw-source-type-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.page-builder .daw-source-type-grid button {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  min-height: 76px;
+  padding: 13px 14px;
+  border: 1px solid var(--daw-secondary-border);
+  border-radius: 12px;
+  background: var(--daw-secondary-bg);
+  color: var(--daw-text);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.page-builder .daw-source-type-grid button.is-active {
+  border-color: var(--daw-tab-active-border);
+  background: var(--daw-tab-active-bg);
+}
+
+.page-builder .daw-source-type-grid button:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.page-builder .daw-source-type-grid button > span {
+  display: grid;
+  gap: 4px;
+}
+
+.page-builder .daw-source-type-grid small,
+.page-builder .daw-source-registry-form small,
+.page-builder .daw-source-control-help {
+  color: var(--daw-muted);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.45;
+}
+
+.page-builder .daw-source-registry-form {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.4fr) repeat(2, minmax(160px, 0.8fr)) auto;
+  gap: 12px;
+  align-items: end;
+}
+
+.page-builder .daw-source-registry-form label {
+  display: grid;
+  gap: 7px;
+  color: var(--daw-text, #172033);
+  font-weight: 700;
+}
+
+.page-builder .daw-source-registry-form input,
+.page-builder .daw-source-registry-form select {
+  width: 100%;
+}
+
+.page-builder .daw-source-registry-list {
+  display: grid;
+  gap: 10px;
+}
+
+.page-builder .daw-source-registry-list article {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  gap: 12px;
+  align-items: center;
+  padding: 13px 14px;
+  border: 1px solid var(--daw-border, #d8d1c6);
+  border-radius: 12px;
+  background: var(--daw-surface, #fffdfa);
+}
+
+.page-builder .daw-source-registry-list article.is-selected {
+  border-color: var(--daw-tab-active-border);
+  background: var(--daw-tab-active-bg);
+  box-shadow: 0 6px 16px rgba(var(--theme-primary-rgb), 0.08);
+}
+
+.page-builder .daw-source-registry-list article > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.page-builder .daw-source-card-copy strong,
+.page-builder .daw-source-card-copy span,
+.page-builder .daw-source-card-copy small {
+  overflow-wrap: anywhere;
+}
+
+.page-builder .daw-source-card-copy small {
+  color: var(--daw-muted);
+  font-size: 12px;
+}
+
+.page-builder .daw-source-registry-list span,
+.page-builder .daw-source-registry-empty,
+.page-builder .daw-source-registry-notice {
+  color: var(--daw-muted, #59637a);
+}
+
+.page-builder .daw-source-registry-error {
+  color: #992f25;
+  font-weight: 700;
+}
+
+.page-builder .daw-source-ingestion {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--daw-border, #d8d1c6);
+  border-radius: 12px;
+  background: var(--daw-subtle-surface, #f7f3ed);
+}
+
+.page-builder .daw-source-ingestion > div:first-child {
+  display: grid;
+  gap: 4px;
+}
+
+.page-builder .daw-source-ingestion > div:first-child > span {
+  color: var(--daw-red, #9c2f25);
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.page-builder .daw-source-ingestion h4,
+.page-builder .daw-source-ingestion p {
+  margin: 0;
+}
+
+.page-builder .daw-source-ingestion-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 12px;
+}
+
+.page-builder .daw-source-ingestion-form label {
+  display: grid;
+  gap: 7px;
+  font-weight: 700;
+}
+
+.page-builder .daw-source-ingestion-form input {
+  width: 100%;
+}
+
+.page-builder .daw-source-ingestion-success {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #24613d;
+  font-weight: 700;
+}
+
+.page-builder .daw-source-credential-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 12px;
+  padding-top: 2px;
+}
+
+.page-builder .daw-source-credential-form label {
+  display: grid;
+  gap: 6px;
+  font-weight: 700;
+}
+
+.page-builder .daw-source-credential-form small {
+  color: var(--daw-muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.page-builder .daw-source-credential-form input {
+  width: 100%;
+}
+
+.page-builder .daw-source-credential-revoke,
+.page-builder .daw-source-open-dataset {
+  justify-self: start;
+}
+
+.page-builder .daw-source-connection-setup {
+  display: grid;
+  justify-items: start;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--daw-border);
+  border-radius: 12px;
+  background: var(--daw-subtle-surface, #f7f3ed);
+}
+
+.page-builder .daw-source-connection-setup > p {
+  margin: 0;
+}
+
+@media (max-width: 900px) {
+  .page-builder .daw-source-registry-form {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .page-builder .daw-source-registry-form > button {
+    width: 100%;
+  }
+}
+
+@media (max-width: 620px) {
+  .page-builder .daw-source-overview,
+  .page-builder .daw-source-add {
+    padding: 14px;
+  }
+
+  .page-builder .daw-source-type-grid,
+  .page-builder .daw-source-registry-form,
+  .page-builder .daw-source-credential-form {
+    grid-template-columns: 1fr;
+  }
+
+  .page-builder .daw-source-registry-list article {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .page-builder .daw-source-registry-list article .daw-secondary {
+    grid-column: 2;
+    justify-self: start;
+  }
+
+  .page-builder .daw-source-state {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .page-builder .daw-source-state > button {
+    grid-column: 2;
+    justify-self: start;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-builder .daw-source-loading span {
+    animation: none;
+  }
+}
+
+.page-builder .daw-source-ingestion-open {
+  justify-self: start;
+}
+
+.page-builder .daw-source-ingestion-history {
+  display: grid;
+  gap: 8px;
+}
+
+.page-builder .daw-source-ingestion-history > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-block: 7px;
+  border-top: 1px solid var(--daw-border, #d8d1c6);
+}
+
+.page-builder .daw-source-ingestion-history button {
+  border: 0;
+  background: transparent;
+  color: var(--daw-red, #9c2f25);
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.page-builder .daw-api-source-management {
+  display: grid;
+  gap: 14px;
+}
+
+.page-builder .daw-api-source-summary,
+.page-builder .daw-source-resource {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--daw-border, #d8d1c6);
+  border-radius: 12px;
+  background: var(--daw-surface, #fffdfa);
+}
+
+.page-builder .daw-api-source-summary > div:first-child {
+  display: grid;
+  gap: 3px;
+}
+
+.page-builder .daw-api-source-summary > div:first-child > span {
+  color: var(--daw-red, #9c2f25);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.page-builder .daw-api-source-summary h5,
+.page-builder .daw-source-resource h5 {
+  margin: 0;
+  color: var(--daw-text, #172033);
+  font-size: 15px;
+}
+
+.page-builder .daw-api-source-summary dl,
+.page-builder .daw-source-freshness-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin: 0;
+}
+
+.page-builder .daw-api-source-summary dl > div,
+.page-builder .daw-source-freshness-grid > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 11px 12px;
+  border-radius: 9px;
+  background: var(--daw-subtle-surface, #f7f3ed);
+}
+
+.page-builder .daw-api-source-summary dt,
+.page-builder .daw-source-freshness-grid dt {
+  color: var(--daw-muted, #59637a);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.page-builder .daw-api-source-summary dd,
+.page-builder .daw-source-freshness-grid dd {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: var(--daw-text, #172033);
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.page-builder .daw-api-source-summary dd.is-ready {
+  color: #24613d;
+}
+
+.page-builder .daw-api-source-summary dd.is-missing,
+.page-builder .daw-api-source-summary dd.is-expired,
+.page-builder .daw-api-source-summary dd.is-revoked {
+  color: #992f25;
+}
+
+.page-builder .daw-source-resource > header {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.page-builder .daw-source-resource > header > div {
+  display: grid;
+  gap: 2px;
+}
+
+.page-builder .daw-source-resource > header span {
+  color: var(--daw-muted, #59637a);
+  font-size: 12px;
+}
+
+.page-builder .daw-source-job-state {
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: var(--daw-subtle-surface, #f7f3ed);
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.page-builder .daw-source-job-state.is-idle {
+  background: color-mix(in srgb, var(--theme-success) 12%, var(--daw-surface, #fffdfa));
+  color: #24613d;
+}
+
+.page-builder .daw-source-job-state.is-leased {
+  background: color-mix(in srgb, var(--theme-info) 12%, var(--daw-surface, #fffdfa));
+  color: #2c4f80;
+}
+
+.page-builder .daw-source-job-state.is-backoff,
+.page-builder .daw-source-job-state.is-credential_attention,
+.page-builder .daw-source-job-state.is-permanent_failure {
+  background: color-mix(in srgb, var(--theme-danger) 11%, var(--daw-surface, #fffdfa));
+  color: #992f25;
+}
+
+.page-builder .daw-source-sync-attention {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  color: #992f25;
+  font-weight: 700;
+}
+
+.page-builder .daw-source-schedule-controls {
+  display: grid;
+  grid-template-columns: minmax(190px, 1fr) minmax(190px, 1fr) auto;
+  gap: 12px;
+  align-items: end;
+}
+
+.page-builder .daw-source-schedule-controls > label {
+  display: grid;
+  gap: 7px;
+  color: var(--daw-text, #172033);
+  font-weight: 700;
+}
+
+.page-builder .daw-source-schedule-controls select {
+  width: 100%;
+  min-height: 42px;
+}
+
+.page-builder .daw-source-sync-toggle {
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  align-self: center;
+}
+
+.page-builder .daw-source-sync-toggle input {
+  inline-size: 18px;
+  block-size: 18px;
+  accent-color: var(--daw-red, #9c2f25);
+}
+
+.page-builder .daw-source-sync-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.page-builder .daw-source-sync-error p {
+  color: #992f25;
+  font-weight: 700;
+}
+
+.page-builder .daw-source-sync-reload {
+  justify-self: start;
+}
+
+@media (max-width: 680px) {
+  .page-builder .daw-source-registry-form {
+    grid-template-columns: 1fr;
+  }
+
+  .page-builder .daw-source-registry-list article,
+  .page-builder .daw-source-ingestion-form,
+  .page-builder .daw-source-resource > header,
+  .page-builder .daw-source-schedule-controls {
+    grid-template-columns: 1fr;
+  }
 }

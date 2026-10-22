@@ -1,0 +1,14 @@
+{
+  "manifest_version": 1,
+  "release_sha": "STAGING",
+  "migrations": [
+    {
+      "number": 156,
+      "from_schema": 155,
+      "to_schema": 156,
+      "path": "web/database/migrations/156_add_automatic_source_synchronization.sql",
+      "sha256": "b09b23c2e968cc2ad1f3d4a89a6f060e9038e1d3c70687405c9d54a4eee6111b",
+      "compatibility": "expand-only"
+    }
+  ]
+}

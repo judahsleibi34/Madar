@@ -58,6 +58,7 @@ CONFIG_CLASSIFICATION.update({name: "secret" for name in (
     "OPENAI_API_KEY", "PENDING_VERIFICATION_SECRET", "RESERVATION_TOKEN_SECRET",
     "SECRET_KEY", "SESSION_ACTIVITY_SECRET", "VERIFICATION_HASH_SECRET",
     "WEB_PUSH_VAPID_PRIVATE_KEY", "WEB_PUSH_VAPID_PUBLIC_KEY",
+    "DATA_SOURCE_VAULT_TOKEN",
 )})
 CONFIG_CLASSIFICATION.update({name: "production-only" for name in (
     "AI_ALLOW_LOCAL_EXEC", "AI_ISOLATED_WORKER_ENABLED", "ALLOW_REMOTE_DATASET_URLS",
@@ -65,6 +66,7 @@ CONFIG_CLASSIFICATION.update({name: "production-only" for name in (
     "NOTIFICATION_WORKER_ENABLED", "PARSER_ISOLATED_WORKER_ENABLED",
     "PUBLIC_SITE_DOMAIN", "PYGWALKER_TELEMETRY_ENABLED", "STRUCTURED_LOGS",
     "TRUSTED_PROXY_IPS", "WEB_PUSH_VAPID_SUBJECT",
+    "DATA_SOURCE_CREDENTIAL_VAULT_ENABLED",
 )})
 CONFIG_CLASSIFICATION.update({name: "development-only" for name in (
     "COMMERCIAL_ENTITLEMENT_TEST_LOOKUPS", "MADAR_TEST_REPOSITORY_ROOT",
@@ -77,7 +79,13 @@ CONFIG_CLASSIFICATION.update({name: "deprecated" for name in (
 CONFIG_CLASSIFICATION.update({name: "optional" for name in (
     "BACKUP_MAX_AGE_SECONDS", "BUILDER_ASSET_BUCKET", "BUILDER_ASSET_MAX_BYTES",
     "BUILDER_DOCUMENT_MAX_BYTES", "BUILDER_VIDEO_MAX_BYTES",
-    "CSRF_TOKEN_MAX_AGE_SECONDS", "CSRF_TRUSTED_ORIGINS", "DATA_UPLOAD_DIR",
+    "CSRF_TOKEN_MAX_AGE_SECONDS", "CSRF_TRUSTED_ORIGINS",
+    "DATA_CHECKPOINT_SCRATCH_DIR", "DATA_CHECKPOINT_SCRATCH_MAX_BYTES",
+    "DATA_IMMUTABLE_STORAGE_BACKEND", "DATA_UPLOAD_DIR",
+    "DATA_SOURCE_CREDENTIAL_ENVIRONMENT", "DATA_SOURCE_VAULT_ADDR",
+    "DATA_SOURCE_VAULT_CA_CERT", "DATA_SOURCE_VAULT_NAMESPACE",
+    "DATA_SOURCE_VAULT_TIMEOUT_SECONDS", "DATA_SOURCE_VAULT_TOKEN_FILE",
+    "DATA_SOURCE_VAULT_TRANSIT_KEY", "DATA_SOURCE_VAULT_TRANSIT_MOUNT",
     "LOG_LEVEL", "MADAR_ALERT_HOOK", "MADAR_MIGRATIONS_DIR",
     "MADAR_UPLOAD_WORKSPACE_DIR", "MAX_DATASET_UPLOAD_BYTES", "MAX_REMOTE_DATA_BYTES",
     "MAX_UPLOAD_BYTES", "NOTIFICATION_EMAIL_MAX_DEAD",
@@ -258,6 +266,16 @@ def validate_runtime_configuration() -> RuntimeConfiguration:
                 raise RuntimeError("enabled calendar integration is missing credential encryption")
             if not env_bool("CALENDAR_SYNC_WORKER_ENABLED", False):
                 raise RuntimeError("enabled calendar integration is missing its worker")
+        if os.getenv("DATA_SOURCE_VAULT_TOKEN", "").strip():
+            raise RuntimeError("Data Sources Vault tokens must be provided by a private token file")
+        if env_bool("DATA_SOURCE_CREDENTIAL_VAULT_ENABLED", False):
+            from services.vault_transit import VaultTransitConfig, VaultTransitError
+            try:
+                VaultTransitConfig.from_environment()
+            except VaultTransitError as error:
+                raise RuntimeError(
+                    "enabled Data Sources credential vault configuration is invalid"
+                ) from error
     return RuntimeConfiguration(environment, release_sha, schema_min, schema_max, email_enabled, excluded_schemas)
 
 

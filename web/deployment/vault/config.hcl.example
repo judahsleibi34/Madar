@@ -1,0 +1,23 @@
+# REVIEWED TEMPLATE ONLY. Do not install or start this configuration automatically.
+ui = false
+disable_mlock = false
+api_addr = "https://127.0.0.1:8200"
+cluster_addr = "https://127.0.0.1:8201"
+
+storage "raft" {
+  path    = "/var/lib/madar-vault/raft"
+  node_id = "madar-vault-1"
+}
+
+listener "tcp" {
+  address                  = "127.0.0.1:8200"
+  cluster_address          = "127.0.0.1:8201"
+  tls_disable              = false
+  tls_cert_file            = "/etc/madar-vault/tls/server.crt"
+  tls_key_file             = "/etc/madar-vault/tls/server.key"
+  tls_client_ca_file       = "/etc/madar-vault/tls/ca.crt"
+  tls_require_and_verify_client_cert = false
+}
+
+# Shamir sealing is intentional for the initial self-hosted design. Recovery/unseal
+# shares must remain offline and separated. Never add a file-based auto-unseal key.

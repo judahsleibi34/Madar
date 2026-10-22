@@ -1,0 +1,21 @@
+[Unit]
+Description=Madar stale checkpoint scratch cleanup
+After=local-fs.target
+OnFailure=madar-ops-alert@%n.service
+
+[Service]
+Type=oneshot
+User=madar
+Group=madar
+UMask=0077
+EnvironmentFile=/etc/madar/runtime.env
+WorkingDirectory=/srv/madar/production/web/backend
+ExecStart=/usr/bin/flock --nonblock /run/lock/madar-checkpoint-scratch-cleanup.lock /usr/bin/python3 scripts/cleanup_dataset_checkpoint_scratch.py
+TimeoutStartSec=5m
+MemoryMax=128M
+TasksMax=16
+NoNewPrivileges=true
+PrivateTmp=false
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/run/lock /var/lib/madar/checkpoint-scratch

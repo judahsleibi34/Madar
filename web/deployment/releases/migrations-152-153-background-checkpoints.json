@@ -1,0 +1,14 @@
+{
+  "manifest_version": 1,
+  "release_sha": "STAGING",
+  "migrations": [
+    {
+      "number": 153,
+      "from_schema": 152,
+      "to_schema": 153,
+      "path": "web/database/migrations/153_add_background_dataset_checkpoints.sql",
+      "sha256": "02e2f6b866d4f8ea1807ab5d181e6a327040f035e2e06aa8c13e74cad872f9c8",
+      "compatibility": "expand-only"
+    }
+  ]
+}

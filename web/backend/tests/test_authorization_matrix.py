@@ -201,9 +201,32 @@ class DataRouteAuthorizationMatrixTests(unittest.TestCase):
     def test_upload_export_cleaning_analysis_visualization_and_ai_reject_wrong_user(self):
         route_cases = [
             ("post", "/users/2/data/export", {"input_path": "dataset.csv"}),
+            (
+                "post",
+                "/users/2/data/projects/11111111-1111-4111-8111-111111111111/sources",
+                {"source_type": "spreadsheet_upload", "display_name": "Sales"},
+            ),
+            (
+                "get",
+                "/users/2/data/projects/11111111-1111-4111-8111-111111111111/sources",
+                None,
+            ),
+            (
+                "patch",
+                "/users/2/data/projects/11111111-1111-4111-8111-111111111111/"
+                "sources/33333333-3333-4333-8333-333333333333",
+                {"status": "archived"},
+            ),
             ("post", "/users/2/cleaning/export", {"input_path": "dataset.csv", "actions": []}),
             ("post", "/users/2/analysis/run", {"input_path": "dataset.csv", "analysis_requests": []}),
             ("post", "/users/2/analysis/assist", {"input_path": "dataset.csv", "question": "summary"}),
+            (
+                "post",
+                "/users/2/analysis/projects/11111111-1111-4111-8111-111111111111/"
+                "datasets/33333333-3333-4333-8333-333333333333/"
+                "versions/44444444-4444-4444-8444-444444444444/assist",
+                {"question": "summary"},
+            ),
             ("post", "/users/2/analysis/ai", {"input_path": "dataset.csv", "user_message": "summary"}),
             ("post", "/users/2/visualization/create", {"input_path": "dataset.csv", "chart_config": {"chart_type": "bar"}}),
             ("post", "/users/2/visualization/columns/profile", {"input_path": "dataset.csv", "columns": ["a"]}),
@@ -213,7 +236,8 @@ class DataRouteAuthorizationMatrixTests(unittest.TestCase):
         with patches[0], patches[1], patches[2], patches[3], patches[4], patches[5], patches[6]:
             for method, path, payload in route_cases:
                 with self.subTest(path=path):
-                    response = getattr(self.client, method)(path, json=payload)
+                    request_kwargs = {"json": payload} if payload is not None else {}
+                    response = getattr(self.client, method)(path, **request_kwargs)
                     self.assertEqual(response.status_code, 403)
                     assert_no_private_path(self, response)
 

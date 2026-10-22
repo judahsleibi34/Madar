@@ -2055,8 +2055,8 @@ export default function EcommerceStorefront({ subdomain: suppliedSubdomain = "",
             <div className="live-store-results">
               <div className="live-store-toolbar"><select value={filters.sort} onChange={(event) => setFilter("sort", event.target.value)} aria-label={c("catalog.title")}><option value="latest">{c("catalog.latest")}</option><option value="price_low">{c("catalog.priceLow")}</option><option value="price_high">{c("catalog.priceHigh")}</option><option value="name">{c("catalog.name")}</option></select></div>
               {catalog.products.length > 0 ? <div className="live-store-grid">{catalog.products.map((product, index) => <ProductCard key={product.id} product={product} category={categoryById.get(product.category_id)} locale={locale} productPath={`${homePath}/product/${encodeURIComponent(product.slug)}`} onAdd={addToCart} eager={index < 3} />)}</div> : <div className="live-store-empty"><ShoppingBag size={38} /><h2>{c("catalog.emptyTitle")}</h2><p>{c("catalog.emptyBody")}</p></div>}
-              {catalog.pagination.pages > 1 && <nav className="live-store-pagination" aria-label={c("catalog.pages")}>{Array.from({ length: catalog.pagination.pages }, (_, index) => index + 1).map((page) => <button type="button" key={page} className={Number(filters.page) === page ? "is-active" : ""} onClick={() => setFilter("page", String(page), false)}>{page}</button>)}</nav>}
               </div>
+              {catalog.pagination.pages > 1 && <nav className="live-store-pagination" aria-label={c("catalog.pages")}>{Array.from({ length: catalog.pagination.pages }, (_, index) => index + 1).map((page) => <button type="button" key={page} className={Number(filters.page) === page ? "is-active" : ""} onClick={() => setFilter("page", String(page), false)}>{page}</button>)}</nav>}
             </div>
           </section>
         )}

@@ -211,6 +211,13 @@ export function getTenantUserArchiveScope(user) {
   return `archive:v2:tenant:${tenantId}:user:${userId}`;
 }
 
+export function getProjectArchiveScope(user, projectId) {
+  const userScope = getTenantUserArchiveScope(user);
+  const normalizedProjectId = String(projectId || "").trim();
+  if (!userScope || !normalizedProjectId) return "";
+  return `${userScope}:project:${encodeURIComponent(normalizedProjectId)}`;
+}
+
 export async function listArchiveItems(options = {}) {
   const scope = String(options.scope || "").trim();
   if (!scope) return [];

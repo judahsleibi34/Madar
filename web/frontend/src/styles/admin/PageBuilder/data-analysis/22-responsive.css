@@ -66,6 +66,10 @@
     width: 100%;
   }
 
+  .page-builder .daw-project-switch {
+    width: 100%;
+  }
+
   .page-builder .daw-stepper {
     grid-template-columns: 1fr 1fr;
   }

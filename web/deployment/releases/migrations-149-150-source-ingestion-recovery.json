@@ -1,0 +1,14 @@
+{
+  "manifest_version": 1,
+  "release_sha": "STAGING",
+  "migrations": [
+    {
+      "number": 150,
+      "from_schema": 149,
+      "to_schema": 150,
+      "path": "web/database/migrations/150_add_source_ingestion_recovery.sql",
+      "sha256": "cc0489553fcbf34475aa5d208039305da1180d0118cf4d77ab3c9575c1b1dddb",
+      "compatibility": "expand-only"
+    }
+  ]
+}
