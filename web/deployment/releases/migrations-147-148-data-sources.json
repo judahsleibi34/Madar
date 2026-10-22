@@ -1,0 +1,14 @@
+{
+  "manifest_version": 1,
+  "release_sha": "STAGING",
+  "migrations": [
+    {
+      "number": 148,
+      "from_schema": 147,
+      "to_schema": 148,
+      "path": "web/database/migrations/148_add_project_data_sources.sql",
+      "sha256": "c145733bde3ae4a67a07159e0574247146bbe3fcc0ba670eee4207c5fa67e6da",
+      "compatibility": "expand-only"
+    }
+  ]
+}

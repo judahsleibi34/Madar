@@ -74,9 +74,15 @@ def main() -> int:
     application_root = str(Path(__file__).resolve().parents[1])
     if application_root not in sys.path:
         sys.path.insert(0, application_root)
+    tests_path = str(Path(application_root) / "tests")
+    if tests_path not in sys.path:
+        sys.path.insert(0, tests_path)
     socket.socket.connect = _guarded_connect
     socket.getaddrinfo = _guarded_getaddrinfo
-    suite = unittest.defaultTestLoader.discover("tests")
+    suite = unittest.defaultTestLoader.discover(
+        start_dir=tests_path,
+        pattern="test*.py",
+    )
     result = unittest.TextTestRunner(verbosity=2, resultclass=GuardedResult).run(suite)
     print(f"EXTERNAL_ATTEMPTS {sorted(set(EXTERNAL_ATTEMPTS))}")
     print(f"EXTERNAL_SITES {sorted(set(EXTERNAL_SITES))}")

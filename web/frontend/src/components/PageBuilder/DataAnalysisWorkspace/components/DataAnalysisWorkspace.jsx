@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, ArrowRight, Check, ChevronDown, Download, Eye, Plus, Trash2, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, ChevronDown, Download, Eye, FolderOpen, Plus, Trash2, X } from "lucide-react";
 
 import { uiText } from "../constants/uiText";
 import { API_URL, getFriendlyExternalError, readApiResponse } from "../utils/api";
@@ -7,18 +7,20 @@ import { downloadCsv, downloadXlsxFromCsv, sanitizeSpreadsheetCell } from "../ut
 import { cleanObject, escapeCsvValue } from "../utils/formatters";
 import {
   archiveItem,
-  getTenantUserArchiveScope,
+  getProjectArchiveScope,
   loadDataset as loadSavedDataset,
   saveDataset as saveDatasetLocally,
 } from "../utils/datasetStorage";
 import { apiFetch } from "../../../../utils/apiClient";
+import { getAssistedAnalysisRequest } from "../utils/versionAwareAnalysis";
 
 import Stepper from "./Stepper";
 import DataSourceStep from "./DataSourceStep";
+import DataSourceRegistryPanel from "./DataSourceRegistryPanel";
 import DatasetReviewStep from "./DatasetReviewStep";
 import PrepareDataStep from "./PrepareDataStep";
 import ReportBuilderStep from "./ReportBuilderStep";
-import AssistantPanel from "./AssistantPanel";
+import DataWorkspaceChatbot from "./DataWorkspaceChatbot";
 import PageVerticalSlider from "./PageVerticalSlider";
 import Field from "./Field";
 import {
@@ -90,6 +92,9 @@ const createDefaultCleaning = () => ({
 export default function DataAnalysisWorkspace({
   lang = "en",
   project,
+  workspaceProjectId = "",
+  onSelectProject,
+  sourceOnly = false,
   user = null,
   getFormFields = () => [],
   selectForm,
@@ -98,20 +103,22 @@ export default function DataAnalysisWorkspace({
   const activeLang = lang === "ar" ? "ar" : "en";
   const isArabic = activeLang === "ar";
   const t = uiText[activeLang];
-  const dataWorkspaceCacheKey = getDataWorkspaceCacheKey(user, project);
-  const archiveScope = getTenantUserArchiveScope(user);
+  const projectId = workspaceProjectId || project?.id || project?.slug || project?.name || "";
+  const persistentProjectId = workspaceProjectId || project?.id || "";
+  const dataWorkspaceCacheKey = getDataWorkspaceCacheKey(user, { id: projectId });
+  const archiveScope = getProjectArchiveScope(user, projectId);
   const cachedWorkspace = useMemo(
     () => safeReadDataWorkspaceCache(dataWorkspaceCacheKey),
     [dataWorkspaceCacheKey]
   );
 
-  const userApiPath = (path) => {
+  const userApiPath = useCallback((path) => {
     if (!user?.id) {
       throw new Error(t.sessionExpired || "Your session has expired.");
     }
 
     return `${API_URL}/users/${encodeURIComponent(user.id)}${path}`;
-  };
+  }, [t.sessionExpired, user?.id]);
 
   const availableForms = project?.forms || [];
   const firstFormWithResponses =
@@ -127,7 +134,12 @@ export default function DataAnalysisWorkspace({
     () => cachedWorkspace?.selectedFormId || firstFormWithResponses?.id || ""
   );
   const [dataset, setDataset] = useState(null);
-  const [isDatasetStorageReady, setIsDatasetStorageReady] = useState(false);
+  const [projectDatasets, setProjectDatasets] = useState([]);
+  const [projectDatasetsStatus, setProjectDatasetsStatus] = useState("idle");
+  const [projectDatasetsAvailable, setProjectDatasetsAvailable] = useState(false);
+  const [isDatasetStorageReady, setIsDatasetStorageReady] = useState(
+    () => Boolean(persistentProjectId)
+  );
   const [selectedFile, setSelectedFile] = useState(null);
   const [externalUrl, setExternalUrl] = useState(
     () => cachedWorkspace?.externalUrl || ""
@@ -135,8 +147,6 @@ export default function DataAnalysisWorkspace({
   const [inspection, setInspection] = useState(null);
   const [inspectionCache, setInspectionCache] = useState({});
   const [analysisResult, setAnalysisResult] = useState(null);
-  const [assistQuestion, setAssistQuestion] = useState("");
-  const [assistResult, setAssistResult] = useState(null);
   const [, setAnalysisError] = useState("");
   const [flowToast, setFlowToast] = useState("");
   const [visualizationError, setVisualizationError] = useState("");
@@ -246,6 +256,9 @@ export default function DataAnalysisWorkspace({
   }, [currentStep]);
 
   useEffect(() => {
+    if (persistentProjectId) {
+      return undefined;
+    }
     let cancelled = false;
 
     loadSavedDataset({ scope: dataWorkspaceCacheKey })
@@ -260,7 +273,9 @@ export default function DataAnalysisWorkspace({
         setSavedDataframeExport(saved.cleanedDataframe || null);
         setSelectedFile(saved.file instanceof File ? saved.file : null);
         setCurrentStep(
-          !restoredDataframesSaved && ["visualization", "report"].includes(restoredStep)
+          sourceOnly
+            ? "source"
+            : !restoredDataframesSaved && ["visualization", "report"].includes(restoredStep)
             ? "prepare"
             : restoredStep
         );
@@ -275,7 +290,35 @@ export default function DataAnalysisWorkspace({
     return () => {
       cancelled = true;
     };
-  }, [cachedWorkspace?.currentStep, cachedWorkspace?.dataframesSaved, dataWorkspaceCacheKey]);
+  }, [cachedWorkspace?.currentStep, cachedWorkspace?.dataframesSaved, dataWorkspaceCacheKey, persistentProjectId, sourceOnly]);
+
+  const loadProjectDatasets = useCallback(async () => {
+    await Promise.resolve();
+    if (!persistentProjectId || !user?.id) {
+      setProjectDatasets([]);
+      setProjectDatasetsStatus("idle");
+      return;
+    }
+    setProjectDatasetsStatus("loading");
+    try {
+      const response = await apiFetch(
+        userApiPath(`/data/projects/${encodeURIComponent(persistentProjectId)}/datasets?limit=100`),
+        { credentials: "include" }
+      );
+      const body = await readApiResponse(response);
+      if (!response.ok) throw new Error(body.detail || t.loadDatasetsFailed);
+      setProjectDatasetsAvailable(body.available !== false);
+      setProjectDatasets(Array.isArray(body.items) ? body.items : []);
+      setProjectDatasetsStatus("ready");
+    } catch (error) {
+      setProjectDatasetsStatus("error");
+      setFlowToast(error.message || t.loadDatasetsFailed);
+    }
+  }, [persistentProjectId, t.loadDatasetsFailed, user?.id, userApiPath]);
+
+  useEffect(() => {
+    void Promise.resolve().then(loadProjectDatasets);
+  }, [loadProjectDatasets]);
 
   useEffect(() => {
     if (!isDatasetStorageReady) return;
@@ -1194,11 +1237,10 @@ export default function DataAnalysisWorkspace({
     setAnalysisResult(null);
     setVisualizationResultsByPlot({});
     setVisualizationPreview(null);
-    setAssistResult(null);
     setCleaning(createDefaultCleaning());
     setDataframesSaved(false);
     setSavedDataframeExport(null);
-    setCurrentStep("review");
+    setCurrentStep(sourceOnly ? "source" : "review");
   };
 
   const getDatasetArchiveTitle = (data, fallback = "Dataset") =>
@@ -1372,7 +1414,11 @@ export default function DataAnalysisWorkspace({
     setAnalysisError("");
 
     try {
-      const response = await apiFetch(userApiPath("/data/upload"), {
+      const usePersistentUpload = Boolean(persistentProjectId && projectDatasetsAvailable);
+      const uploadPath = usePersistentUpload
+        ? `/data/projects/${encodeURIComponent(persistentProjectId)}/datasets/upload`
+        : "/data/upload";
+      const response = await apiFetch(userApiPath(uploadPath), {
         method: "POST",
         credentials: "include",
         body: payload,
@@ -1384,26 +1430,53 @@ export default function DataAnalysisWorkspace({
         throw new Error(data.detail || t.loadDataFailed || uiText.en.loadDataFailed);
       }
 
-      await saveDatasetLocally(
-        {
-          dataset: getCacheableDataset(data),
-          file,
-          sourceMode: sourceContext.sourceMode || "upload",
-          savedAt: Date.now(),
-        },
-        { scope: dataWorkspaceCacheKey }
-      );
+      if (!usePersistentUpload) {
+        await saveDatasetLocally(
+          {
+            dataset: getCacheableDataset(data),
+            file,
+            sourceMode: sourceContext.sourceMode || "upload",
+            savedAt: Date.now(),
+          },
+          { scope: dataWorkspaceCacheKey }
+        );
+      }
 
       setLoadedDataset(data, {
         sourceMode: sourceContext.sourceMode || "upload",
         selectedFormId: sourceContext.selectedFormId,
       });
-      await archiveLoadedDataset(data, {
-        sourceMode: sourceContext.sourceMode || "upload",
-        selectedFormId: sourceContext.selectedFormId,
-      });
+      if (usePersistentUpload) {
+        await loadProjectDatasets();
+      } else {
+        await archiveLoadedDataset(data, {
+          sourceMode: sourceContext.sourceMode || "upload",
+          selectedFormId: sourceContext.selectedFormId,
+        });
+      }
     } catch (error) {
       showFlowError(error.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const reopenProjectDataset = async (datasetId) => {
+    if (!persistentProjectId || !datasetId) return;
+    setIsLoading(true);
+    setAnalysisError("");
+    try {
+      const response = await apiFetch(
+        userApiPath(
+          `/data/projects/${encodeURIComponent(persistentProjectId)}/datasets/${encodeURIComponent(datasetId)}`
+        ),
+        { credentials: "include" }
+      );
+      const data = await readApiResponse(response);
+      if (!response.ok) throw new Error(data.detail || t.reopenDatasetFailed);
+      setLoadedDataset(data, { sourceMode: "upload" });
+    } catch (error) {
+      showFlowError(error.message || t.reopenDatasetFailed);
     } finally {
       setIsLoading(false);
     }
@@ -1558,14 +1631,14 @@ export default function DataAnalysisWorkspace({
 
   useEffect(() => {
     const filePath = dataset?.file_path;
-    if (!filePath || autoOverviewInspectionPathRef.current === filePath) return;
+    if (sourceOnly || !filePath || autoOverviewInspectionPathRef.current === filePath) return;
 
     autoOverviewInspectionPathRef.current = filePath;
     setCurrentStep("review");
     runInspection("overview");
     // Auto-inspection should run once per dataset file; runInspection also depends on mutable cache state.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dataset?.file_path]);
+  }, [dataset?.file_path, sourceOnly]);
 
   const runVisualization = async (plot = activeVisualizationPlot) => {
     if (isVisualizationChecking) {
@@ -1708,58 +1781,6 @@ export default function DataAnalysisWorkspace({
     });
   };
 
-  const runAssistedQuestion = async () => {
-    const question = assistQuestion.trim();
-
-    if (!dataset?.file_path) {
-      showFlowError(t.loadDataBeforeAnalysis);
-      return;
-    }
-
-    if (!question) {
-      showFlowError(t.writeQuestionFirst);
-      return;
-    }
-
-    setIsLoading(true);
-    setAnalysisError("");
-
-    try {
-      const response = await apiFetch(userApiPath("/analysis/assist"), {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          input_path: dataset.file_path,
-          cleaning_actions: cleaningActions,
-          question,
-          language: activeLang,
-          symbols: {
-            currency: activeLang === "ar" ? "د.إ" : "$",
-            percent: activeLang === "ar" ? "٪" : "%",
-            decimal_separator: activeLang === "ar" ? "," : ".",
-            thousands_separator: activeLang === "ar" ? "." : ",",
-          },
-        }),
-      });
-
-      const data = await readApiResponse(response);
-
-      if (!response.ok) {
-        throw new Error(
-          data.detail || "The assisted analysis could not be completed."
-        );
-      }
-
-      setAssistResult(data.result || data);
-      setAssistQuestion("");
-    } catch (error) {
-      showFlowError(error.message);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const analysisPayload = useMemo(() => {
     if (!analysisResult?.results) return analysisResult;
 
@@ -1783,12 +1804,44 @@ export default function DataAnalysisWorkspace({
     };
   }, [analysisResult]);
 
+  const askDataAssistant = async (question) => {
+    if (!dataset?.file_path) {
+      throw new Error(t.loadDataBeforeAnalysis);
+    }
+
+    const request = getAssistedAnalysisRequest({
+      dataset,
+      projectId: persistentProjectId,
+      body: {
+        cleaning_actions: cleaningActions,
+        question,
+        language: activeLang,
+        symbols: {
+          currency: activeLang === "ar" ? "د.إ" : "$",
+          percent: activeLang === "ar" ? "٪" : "%",
+          decimal_separator: activeLang === "ar" ? "," : ".",
+          thousands_separator: activeLang === "ar" ? "." : ",",
+        },
+      },
+    });
+    const response = await apiFetch(userApiPath(request.path), {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(request.body),
+    });
+    const data = await readApiResponse(response);
+
+    if (!response.ok) {
+      throw new Error(data.detail || t.chatbotError);
+    }
+
+    return data.result || data;
+  };
+
   const reportMetrics = useMemo(() => {
     const backendMetrics = Array.isArray(analysisPayload?.kpis)
       ? analysisPayload.kpis
-      : [];
-    const assistedMetrics = Array.isArray(assistResult?.kpis)
-      ? assistResult.kpis
       : [];
 
     return [
@@ -1796,12 +1849,6 @@ export default function DataAnalysisWorkspace({
         ...metric,
         id: `backend-metric-${index}`,
         sourceGroup: friendlyAnalysisTitle(metric.analysisTitle),
-        displayLabel: metric.label,
-      })),
-      ...assistedMetrics.map((metric, index) => ({
-        ...metric,
-        id: `assisted-metric-${index}`,
-        sourceGroup: "Question results",
         displayLabel: metric.label,
       })),
     ].map((metric) => {
@@ -1814,14 +1861,11 @@ export default function DataAnalysisWorkspace({
         displayLabel: metric.label.slice(separatorIndex + 3),
       };
     });
-  }, [analysisPayload, assistResult]);
+  }, [analysisPayload]);
 
   const reportTables = useMemo(() => {
     const backendTables = Array.isArray(analysisPayload?.tables)
       ? analysisPayload.tables
-      : [];
-    const assistedTables = Array.isArray(assistResult?.tables)
-      ? assistResult.tables
       : [];
 
     return [
@@ -1831,14 +1875,8 @@ export default function DataAnalysisWorkspace({
         sourceGroup: friendlyAnalysisTitle(table.analysisTitle),
         displayLabel: table.title,
       })),
-      ...assistedTables.map((table, index) => ({
-        ...table,
-        id: `assisted-table-${index}`,
-        sourceGroup: "Question results",
-        displayLabel: table.title,
-      })),
     ];
-  }, [analysisPayload, assistResult]);
+  }, [analysisPayload]);
 
   const reportGeneratedPlots = useMemo(
     () =>
@@ -2596,24 +2634,38 @@ export default function DataAnalysisWorkspace({
   const renderCurrentStep = () => {
     if (currentStep === "source") {
       return (
-        <DataSourceStep
-          sourceMode={sourceMode}
-          setSourceMode={setSourceMode}
-          availableForms={availableForms}
-          selectedForm={selectedForm}
-          setSelectedFormId={setSelectedFormId}
-          selectedFile={selectedFile}
-          setSelectedFile={setSelectedFile}
-          externalUrl={externalUrl}
-          setExternalUrl={setExternalUrl}
-          importFormResponses={importFormResponses}
-          uploadFile={uploadFile}
-          loadExternalSource={loadExternalSource}
-          selectForm={selectForm}
-          setActiveTab={setActiveTab}
-          isLoading={isLoading}
-          t={t}
-        />
+        <>
+          {sourceOnly ? (
+            <DataSourceRegistryPanel
+              projectId={persistentProjectId}
+              user={user}
+              t={t}
+              onDatasetImported={loadProjectDatasets}
+              onReopenDataset={persistentProjectId && projectDatasetsAvailable ? reopenProjectDataset : undefined}
+            />
+          ) : null}
+          <DataSourceStep
+            sourceMode={sourceMode}
+            setSourceMode={setSourceMode}
+            availableForms={availableForms}
+            selectedForm={selectedForm}
+            setSelectedFormId={setSelectedFormId}
+            selectedFile={selectedFile}
+            setSelectedFile={setSelectedFile}
+            externalUrl={externalUrl}
+            setExternalUrl={setExternalUrl}
+            importFormResponses={importFormResponses}
+            uploadFile={uploadFile}
+            loadExternalSource={loadExternalSource}
+            projectDatasets={projectDatasets}
+            projectDatasetsStatus={projectDatasetsStatus}
+            reopenProjectDataset={persistentProjectId && projectDatasetsAvailable ? reopenProjectDataset : undefined}
+            selectForm={selectForm}
+            setActiveTab={setActiveTab}
+            isLoading={isLoading}
+            t={t}
+          />
+        </>
       );
     }
 
@@ -2845,15 +2897,6 @@ export default function DataAnalysisWorkspace({
             "Current dataset"
           }
         />
-        <AssistantPanel
-          dataset={dataset}
-          assistQuestion={assistQuestion}
-          setAssistQuestion={setAssistQuestion}
-          runAssistedQuestion={runAssistedQuestion}
-          assistResult={assistResult}
-          isLoading={isLoading}
-          t={t}
-        />
       </>
     );
   };
@@ -2862,19 +2905,31 @@ export default function DataAnalysisWorkspace({
     <div className="daw-page" dir={isArabic ? "rtl" : "ltr"}>
       <header className="daw-header app-page-intro" id="daw-top">
         <div>
-          <h1>{t.title}</h1>
-          <p>{t.subtitle}</p>
+          <h1>{sourceOnly ? t.dataSourcesTitle : t.title}</h1>
+          <p>{sourceOnly ? t.dataSourcesSubtitle : t.subtitle}</p>
+          <div className="daw-project-name">
+            <span>{t.projectRoot}:</span>
+            <strong>{project?.name || t.untitledProject}</strong>
+          </div>
         </div>
+        {typeof onSelectProject === "function" ? (
+          <button className="daw-project-switch" type="button" onClick={onSelectProject}>
+            <FolderOpen size={16} aria-hidden="true" />
+            {t.switchProject}
+          </button>
+        ) : null}
       </header>
 
-      <Stepper
-        currentStep={currentStep}
-        setCurrentStep={setCurrentStep}
-        dataset={dataset}
-        dataframesSaved={dataframesSaved}
-        onLockedStep={showSavedDataRequiredWarning}
-        t={t}
-      />
+      {!sourceOnly && (
+        <Stepper
+          currentStep={currentStep}
+          setCurrentStep={setCurrentStep}
+          dataset={dataset}
+          dataframesSaved={dataframesSaved}
+          onLockedStep={showSavedDataRequiredWarning}
+          t={t}
+        />
+      )}
 
       <DataAnalysisFlowToast
         message={flowToast}
@@ -2895,21 +2950,7 @@ export default function DataAnalysisWorkspace({
 
           </div>
 
-          {currentStep !== "source" && currentStep !== "report" && currentStep !== "visualization" ? (
-            <div id="daw-assistant">
-              <AssistantPanel
-                dataset={dataset}
-                assistQuestion={assistQuestion}
-                setAssistQuestion={setAssistQuestion}
-                runAssistedQuestion={runAssistedQuestion}
-                assistResult={assistResult}
-                isLoading={isLoading}
-                t={t}
-              />
-            </div>
-          ) : null}
-
-          {dataset ? (
+          {dataset && !sourceOnly ? (
             <div
               id="daw-flow-actions"
               className={`daw-flow-actions ${
@@ -2951,6 +2992,14 @@ export default function DataAnalysisWorkspace({
       </section>
 
       <PageVerticalSlider />
+      <DataWorkspaceChatbot
+        dataset={dataset}
+        onAsk={askDataAssistant}
+        t={t}
+        isArabic={isArabic}
+        projectId={projectId}
+        user={user}
+      />
     </div>
   );
 }

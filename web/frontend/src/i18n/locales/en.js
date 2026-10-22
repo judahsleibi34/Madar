@@ -32,6 +32,8 @@ const en = {
     dashboard: "Dashboard",
     pageBuilder: "Page Builder",
     submissions: "Submissions",
+    dataProjects: "Projects",
+    dataSources: "Data Sources",
     dataLogs: "Data Logs",
     myPlan: "My Plan",
     settings: "Settings",

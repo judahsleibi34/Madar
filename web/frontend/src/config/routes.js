@@ -18,6 +18,8 @@ export const DASHBOARD_ROUTES = {
   dashboard: "/dashboard",
   pageBuilder: "/page-builder",
   builderResponses: "/builder-responses",
+  dataProjects: "/data-projects",
+  dataSources: "/data-sources",
   builderData: "/builder-data",
   calendar: "/calendar",
   agenda: "/agenda",

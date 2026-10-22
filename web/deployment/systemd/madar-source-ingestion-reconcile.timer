@@ -1,0 +1,12 @@
+[Unit]
+Description=Schedule Madar source-ingestion reconciliation
+
+[Timer]
+OnBootSec=5m
+OnUnitInactiveSec=5m
+RandomizedDelaySec=30s
+Persistent=true
+Unit=madar-source-ingestion-reconcile.service
+
+[Install]
+WantedBy=timers.target

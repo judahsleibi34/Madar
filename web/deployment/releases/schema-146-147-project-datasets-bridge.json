@@ -1,0 +1,15 @@
+{
+  "release_metadata_version": 1,
+  "deployment_profile": "project-datasets146-147",
+  "schema": {
+    "compatible_min": 146,
+    "compatible_max": 147,
+    "target": 147,
+    "migration_class": "expand-only",
+    "rollback_compatible_min": 146,
+    "rollback_compatible_max": 146
+  },
+  "migration_policy": "automatic-after-known-good-backup-first-forward-repair",
+  "migration_manifest": "migrations-146-147-project-datasets.json",
+  "notes": "Unselected schema146 to schema147 candidate. Adds tenant/project-bound dataset and immutable dataset-version metadata over existing private storage accounting. It changes no active release selection and grants no production migration or deployment authority."
+}

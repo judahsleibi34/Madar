@@ -1,5 +1,224 @@
 # Automated database migration architecture
 
+## Unselected schema156 automatic synchronization transition
+
+Migration156 remains outside the active schema146 release. It locks the exact core
+schema155 state before additive DDL, creates disabled-by-default resource schedules,
+and exposes only service-role operational RPCs. Dispatcher claims are serialized for
+bounded concurrency accounting, then row-fenced with `FOR UPDATE SKIP LOCKED`; each
+resource also has at most one processing incremental ingestion. Completion requires
+the exact schedule fence, successful ingestion run, and unchanged credential revision.
+Candidate manifests and bridges validate this transition but do not select it.
+
+## Schema154→155 credential-vault expansion
+
+The unselected migration155 locks the typed `core` schema-state row, requires exact154,
+and advances only after its additive DDL succeeds. It creates immutable encrypted
+credential versions and append-only lifecycle events, adds a source credential CAS
+revision, and grants secret operations only to `service_role`. Final incremental
+commit locks and revalidates credential identity/version/revision before delegating to
+the existing152 atomic commit. Rewrap uses a Vault/database CAS and changes only the
+wrapped DEK metadata; Vault installation and unsealing stay outside migration automation.
+
+## Schema146→155 staging composition
+
+The Data Sources staging audit composes existing reviewed manifests; it does not add a
+new migration manifest or alter active selection. The exact route is
+146→147→148→149→150→151→152→153→154→155. The separately retained full-history
+rehearsal may start at schema136, but the active release gate begins at146.
+`check_data_sources_staging_chain.py` fails closed if the active target, transition
+list, SQL mirror, checksum, or candidate descriptor changes. The disposable rehearsal
+proves backup/restore, sequential application, and transactional rollback at154/155;
+it is evidence for review, never migration authority.
+
+## C1.8.1 locked schema154 transition
+
+The unselected153→154 candidate uses the standard typed schema-state guard. It locks
+the `core` row before any expansion DDL, rejects a missing row or predecessor other
+than153, and advances schema state only after all business DDL succeeds. Its
+disposable rehearsal injects a pre-commit failure to prove atomic rollback and runs
+two competing complete migration sessions behind a held schema-state lock; exactly
+one may commit. The validator checks these constructs within one executable block
+rather than accepting comments or unrelated operational locks.
+
+## C1.8 application-only bounded reconstruction
+
+C1.8 requires no schema155 transition. It replaces whole-object checkpoint reads
+with a direct bounded HTTP stream over the already-established server-only Supabase
+Storage credential boundary. Bytes are written to private scratch while size and
+SHA-256 are verified, then history is decoded one row at a time. Exact state is held
+in a worker-local SQLite file rather than an unbounded Python dictionary; canonical
+state hashing, deterministic record ordering, and checkpoint CSV generation are
+incremental.
+
+The database continues to provide immutable target-revision history in 1,000-row
+pages, and schemas153/154 remain authoritative for claim, lease, fence, accounting,
+artifact verification and publication. Interrupted scratch is non-authoritative and
+age-cleaned beneath a fixed private root; durable recovery continues from database
+and provider evidence. C1.8.1 corrects only the undeployed migration154 transition
+guard and its integrity pins; candidate selection remains unchanged.
+
+## Unselected transition 153→154
+
+Candidate154 additively records immutable-provider preparation and verification on
+`storage_reservations`, and provider identity, verified size, verified SHA-256, and
+verification time on `storage_objects`. Existing rows default to `local_private`;
+there is no rewrite or provider copy. Service-role-only prepare, verify, ambiguity,
+and idempotent finish RPCs keep the existing quota ledger authoritative.
+
+Database triggers require verified private shared storage for new incremental change
+history and checkpoint dataset versions, and prevent release of storage referenced by
+published versions. Candidate execution requires exact schema153 and advances only to
+154. Its manifest and compatibility bridge remain absent from the active release
+selection. Storage bucket provisioning and worker scheduling are deliberately outside
+the migration transaction and require separate reviewed operational changes.
+
+## Unselected background-checkpoint transition152→153
+
+`migrations-152-153-background-checkpoints.json` contains exactly mirrored
+migration153 and is paired with `schema-152-153-background-checkpoints-bridge.json`.
+The expand-only transition requires exact schema152, advances core schema state last,
+and remains absent from the active release descriptor.
+
+Checkpoint requests become durable pending jobs keyed by dataset and exact revision.
+Service-only claim RPCs use `FOR UPDATE SKIP LOCKED`, bounded leases, opaque fencing
+tokens, three-attempt retry limits, and explicit ambiguous settlement. The worker
+reconstructs immutable history through the pinned target revision, durably attaches
+quota reservation and storage-object evidence, and publishes an immutable version
+only while holding the current lease. Ready publication is idempotent for response
+loss. Expired jobs with complete accounted artifacts are published by reconciliation;
+incomplete reservations are released before retry, while contradictory evidence is
+preserved as ambiguous.
+
+The application remains compatible with schema152's synchronous checkpoint path.
+Migration153 adds only a one-shot internal command; it does not install or authorize
+a scheduler, external provider, production worker, deployment, or production data
+mutation.
+
+## Unselected incremental-ingestion transition151→152
+
+`migrations-151-152-incremental-ingestion.json` contains exactly mirrored migration152
+and is paired with `schema-151-152-incremental-ingestion-bridge.json`. The expand-only
+transition requires exact schema151, advances core schema state last, and remains absent
+from the active release descriptor.
+
+The transition retains all snapshot RPCs and introduces separate service-only RPCs for
+stable source-resource reservation, bounded staging, fenced atomic incremental commit,
+and exact-revision checkpoint publication. Run constraints continue to require both a
+dataset and version for legacy snapshot success, while incremental success requires a
+stable dataset and committed revision and may legitimately have no checkpoint version.
+The source's legacy latest pointers advance only when the default resource publishes a
+ready checkpoint; per-resource revision, cursor, dataset and checkpoint pointers are
+authoritative for incremental resources.
+
+External change chunks remain outside the PostgreSQL transaction but reuse schema150
+reservation/object attachment and reconciliation evidence. Staged rows are invisible
+and are removed on failed settlement; successful history prevents referenced storage
+release. Checkpoints replay immutable accepted changes through a fixed revision and
+publish metadata only after the new storage object is validated. No automatic worker,
+scheduler, provider network access or production execution is introduced.
+
+## Unselected API-source ingestion transition150→151
+
+`migrations-150-151-api-source-ingestion.json` contains exactly mirrored migration151
+and is paired with `schema-150-151-api-source-ingestion-bridge.json`. The transition
+requires exact schema150, is expand-only, advances core schema state last, and is
+absent from the active release descriptor.
+
+Migration151 adds nullable provider/resource identity fields whose constraint keeps
+all existing spreadsheet rows null and requires both fields for `api_provider` rows.
+New 151 reservation and completion functions preserve the schema150 lease token,
+storage attachment, fencing, tenant/project/user checks, and atomic source/dataset/
+version/run lineage. Existing 149/150 functions are neither replaced nor broadened.
+The application chooses 151 only after observing schema151 and otherwise preserves
+the spreadsheet fallback. No automatic worker, scheduler, credential store, webhook,
+network connector, or production execution is introduced.
+
+## Unselected source-ingestion recovery transition149→150
+
+`migrations-149-150-source-ingestion-recovery.json` contains exactly mirrored
+migration150 and is paired with
+`schema-149-150-source-ingestion-recovery-bridge.json`. The expand-only transition
+requires exact schema149, advances core schema state last, and remains absent from
+the active release descriptor.
+
+New manual uploads receive a renewable lease and opaque fencing token. The run
+durably attaches its quota reservation before parsing and its accounted storage
+object before metadata completion. Completion and ordinary failure require the
+current token. A bounded service-role claim uses `FOR UPDATE SKIP LOCKED`, rotates
+the token, and investigates only expired processing leases. It never derives
+failure from elapsed time alone: committed run lineage confirms success, confirmed
+reservation/accounting release permits failure, and missing or contradictory
+evidence becomes an explicitly revisitable ambiguous state.
+
+The application continues to support schema149 without recovery callbacks. The
+candidate adds neither an automatic scheduler nor a public endpoint, and authorizes
+no production execution.
+
+## Unselected source-ingestion transition148→149
+
+`migrations-148-149-source-ingestions.json` contains exactly mirrored
+migration149 and is paired with `schema-148-149-source-ingestions-bridge.json`.
+The transition requires exact schema148, is expand-only, updates core schema
+state last, and is not selected by the active release descriptor.
+
+The reservation RPC validates the active manual spreadsheet source and uses a
+tenant/source/idempotency uniqueness constraint to serialize duplicate requests.
+New runs move from pending to processing in the reservation transaction. The
+completion RPC locks the run, source, and accounted storage object before
+creating one source-linked dataset and immutable version, advancing the source's
+latest pointers, and marking the run succeeded in one transaction. A separate
+failure RPC stores a bounded code; raw records and exceptions are excluded.
+
+Private file storage cannot join this database transaction. The application
+therefore retains the existing policy: after metadata failure, release storage
+accounting first and delete the private file only if release succeeds. A process
+crash may leave a processing run for future reconciliation; schema149 does not
+add a queue, worker, lease reclaimer, webhook, connector, or schedule. These
+artifacts authorize no production execution.
+
+## Unselected project data-sources transition147→148
+
+`migrations-147-148-data-sources.json` contains exactly mirrored migration148
+and is paired with `schema-147-148-data-sources-bridge.json`. The candidate
+validator pins both descriptors and the SQL checksum. The transition requires
+exact schema147, uses migration class `expand-only`, advances schema state only
+after every table, index, and foreign key is installed, and remains absent from
+the active release descriptor.
+
+The migration creates the project-bound source identity separately from datasets,
+versions, credentials, and future ingestion jobs. Existing datasets receive a
+nullable source reference; source rows may later point to a verified latest
+dataset/version pair. Composite constraints preserve tenant/project/dataset
+lineage. The source table is RLS-enabled with no authenticated policies and is
+available only to the service role, while application routes must perform explicit
+authenticated tenant, project, and creator checks.
+
+No connector configuration or secret is stored, no queue or worker is started,
+and existing uploads remain compatible. Future durable ingestion should reuse the
+database-backed claim/finish worker pattern rather than making source registration
+perform remote I/O. Rollback compatibility is schema147 before an application
+requiring the source registry is activated. These artifacts authorize no
+production execution.
+
+## Unselected project-datasets transition146→147
+
+`migrations-146-147-project-datasets.json` contains exactly mirrored migration147
+and is paired with `schema-146-147-project-datasets-bridge.json`. The candidate
+validator pins both descriptors and the SQL checksum. The transition requires
+exact schema146, uses migration class `expand-only`, updates the core schema state
+only after all new objects are installed, and remains absent from the active
+release descriptor.
+
+The migration creates additive dataset and immutable version metadata. The
+atomic creation function locks and validates the existing active storage object,
+its tenant, uploader, category, byte count, and hash before creating both rows in
+one transaction. Tables are RLS-enabled, have no authenticated policies, and are
+available only through the service role; application routes must still perform
+explicit authenticated tenant, project, and dataset checks. Rollback
+compatibility is schema146 before an application requiring persistent project
+datasets is activated. No production execution is authorized by these source
+artifacts.
 ## Manual commercial144→146 release
 
 The exact completed-NORMAL maintenance coordinator may select

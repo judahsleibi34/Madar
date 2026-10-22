@@ -22,12 +22,25 @@ from data_analysis.io.data_reading import DataReadingNormal, RemoteDatasetUrlsDi
 from data_analysis.router import AnalysisRouter
 from data_analysis.visualization.visualization import DataVisualization
 from services.spreadsheet_security import sanitize_spreadsheet_dataframe
+from services.immutable_object_storage import (
+    IMMUTABLE_BUCKET,
+    ImmutableObject,
+    ImmutableObjectError,
+    ObjectErrorCategory,
+    configured_store,
+    generated_object_key,
+)
 from services.storage_quota_service import (
     StorageSafetyError,
     ensure_disk_capacity,
     finish_storage,
+    finish_immutable_storage,
+    mark_immutable_storage_ambiguous,
+    prepare_immutable_storage,
+    release_storage,
     reserve_storage,
     sha256_file,
+    verify_immutable_storage,
 )
 from services.upload_config import (
     assert_path_within_root,
@@ -236,8 +249,9 @@ def validate_upload_content_type(content_type: str | None) -> None:
         )
 
 
-async def stream_upload_to_private_file(file: UploadFile, target_path: Path) -> int:
+async def stream_upload_to_private_file(file: UploadFile, target_path: Path, *, progress_callback=None) -> int:
     bytes_written = 0
+    chunks_since_progress = 0
     max_upload_bytes = min(MAX_DATASET_UPLOAD_BYTES, MAX_UPLOAD_BYTES)
 
     try:
@@ -249,6 +263,7 @@ async def stream_upload_to_private_file(file: UploadFile, target_path: Path) -> 
                     break
 
                 bytes_written += len(chunk)
+                chunks_since_progress += 1
 
                 if bytes_written > max_upload_bytes:
                     raise HTTPException(
@@ -257,6 +272,9 @@ async def stream_upload_to_private_file(file: UploadFile, target_path: Path) -> 
                     )
 
                 output.write(chunk)
+                if progress_callback is not None and chunks_since_progress >= 16:
+                    progress_callback()
+                    chunks_since_progress = 0
     except Exception:
         target_path.unlink(missing_ok=True)
         raise
@@ -303,7 +321,8 @@ def _exact_duplicate_count_from_hashes(
     return duplicates, limited
 
 
-def extract_csv_metadata(file_path: Path, *, original_filename: str | None = None) -> dict:
+def extract_csv_metadata(file_path: Path, *, original_filename: str | None = None,
+                         progress_callback=None) -> dict:
     file_size = file_path.stat().st_size
     preview_frames: list[pd.DataFrame] = []
     row_count = 0
@@ -314,6 +333,7 @@ def extract_csv_metadata(file_path: Path, *, original_filename: str | None = Non
     duplicate_count_limited = False
     seen_hashes: set[tuple] = set()
     last_error: Exception | None = None
+    chunks_since_progress = 0
     try:
         with file_path.open("rb") as csv_file:
             DataReadingNormal(str(file_path))._reject_binary_csv(csv_file.read(4096))
@@ -330,6 +350,10 @@ def extract_csv_metadata(file_path: Path, *, original_filename: str | None = Non
             )
 
             for chunk in chunks:
+                chunks_since_progress += 1
+                if progress_callback is not None and chunks_since_progress >= 32:
+                    progress_callback()
+                    chunks_since_progress = 0
                 if not columns:
                     columns = [str(column) for column in chunk.columns]
                     missing_counts = {column: 0 for column in columns}
@@ -426,7 +450,22 @@ def read_dataset(input_path: str, *, tenant_id: str, user_id: str):
     return reader.read()
 
 
-async def process_upload(file: UploadFile, *, tenant_id: str, user_id: str):
+async def process_upload(
+    file: UploadFile,
+    *,
+    tenant_id: str,
+    user_id: str,
+    metadata_persister=None,
+    metadata_failure_resolver=None,
+    storage_reservation_persister=None,
+    storage_object_persister=None,
+    storage_object_failure_resolver=None,
+    lifecycle_heartbeat=None,
+    shared_immutable: bool = False,
+    immutable_store=None,
+    cancelled=lambda: False,
+    prevalidated_csv_shape: tuple[int, tuple[str, ...]] | None = None,
+):
     filename = file.filename or ""
     file_extension = validate_upload_filename(filename)
     validate_upload_content_type(file.content_type)
@@ -438,7 +477,11 @@ async def process_upload(file: UploadFile, *, tenant_id: str, user_id: str):
     except StorageSafetyError as error:
         raise HTTPException(status_code=507, detail={"code": error.code, "message": "Storage capacity is unavailable."}) from error
     file_path = upload_dir / unique_filename
-    file_size = await stream_upload_to_private_file(file, file_path)
+    file_size = await stream_upload_to_private_file(
+        file, file_path, progress_callback=lifecycle_heartbeat
+    )
+    if lifecycle_heartbeat is not None:
+        lifecycle_heartbeat()
 
     try:
         storage_reservation_id = reserve_storage(
@@ -452,6 +495,29 @@ async def process_upload(file: UploadFile, *, tenant_id: str, user_id: str):
         file_path.unlink(missing_ok=True)
         raise HTTPException(status_code=507, detail={"code": error.code, "message": "Storage quota is unavailable."}) from error
 
+    if storage_reservation_persister is not None:
+        try:
+            storage_reservation_persister(storage_reservation_id)
+        except Exception as error:
+            accounting_released = False
+            try:
+                finish_storage(reservation_id=storage_reservation_id, succeeded=False)
+                accounting_released = True
+            except Exception:
+                logger.exception(
+                    "data.upload.reservation_attachment_compensation_failed",
+                    extra={"tenant_id": tenant_id, "user_id": user_id},
+                )
+            if accounting_released:
+                file_path.unlink(missing_ok=True)
+            raise HTTPException(
+                status_code=503,
+                detail={
+                    "code": "ingestion_reservation_attachment_failed",
+                    "message": "The import could not safely start. Retry with a new request key.",
+                },
+            ) from error
+
     if file_extension in {".xls", ".xlsx"} and file_size > MAX_EXCEL_UPLOAD_BYTES:
         file_path.unlink(missing_ok=True)
         finish_storage(reservation_id=storage_reservation_id, succeeded=False)
@@ -464,8 +530,36 @@ async def process_upload(file: UploadFile, *, tenant_id: str, user_id: str):
         )
 
     try:
-        if file_extension == ".csv" and not DataReadingNormal._isolated_parser_enabled():
-            response = extract_csv_metadata(file_path, original_filename=filename)
+        if lifecycle_heartbeat is not None:
+            lifecycle_heartbeat()
+        if prevalidated_csv_shape is not None:
+            if file_extension != ".csv":
+                raise RuntimeError("prevalidated_csv_shape_requires_csv")
+            row_count, columns = prevalidated_csv_shape
+            if row_count < 0 or row_count > 100_000 or not columns \
+                    or len(columns) > DataReadingNormal.MAX_COLUMNS \
+                    or any(not isinstance(column, str) or not column for column in columns):
+                raise RuntimeError("prevalidated_csv_shape_invalid")
+            response = {
+                "dataset_id": file_path.name,
+                "file_path": file_path.name,
+                "original_filename": filename,
+                "storage": "private",
+                "file_size": int(file_size),
+                "processing_mode": _processing_mode(file_size),
+                "format": "csv",
+                "rows": int(row_count),
+                "columns": [sanitize_for_json(column) for column in columns],
+                "column_count": len(columns),
+                "preview": [],
+                "preview_rows": 0,
+                "preview_is_partial": bool(row_count),
+            }
+        elif file_extension == ".csv" and not DataReadingNormal._isolated_parser_enabled():
+            response = extract_csv_metadata(
+                file_path, original_filename=filename,
+                progress_callback=lifecycle_heartbeat,
+            )
         else:
             _raise_if_full_dataframe_blocked(file_path, operation="dataset preview")
             reader = DataCleaning(str(file_path), tenant_id=tenant_id, user_id=user_id)
@@ -480,17 +574,220 @@ async def process_upload(file: UploadFile, *, tenant_id: str, user_id: str):
         finish_storage(reservation_id=storage_reservation_id, succeeded=False)
         raise
 
-    try:
-        finish_storage(
-            reservation_id=storage_reservation_id,
-            succeeded=True,
-            storage_key=f"tenant_{tenant_id}/user_{user_id}/{unique_filename}",
-            sha256_hex=sha256_file(file_path),
+    storage_key = f"tenant_{tenant_id}/user_{user_id}/{unique_filename}"
+    content_hash = sha256_file(file_path)
+    shared_descriptor = None
+    shared_store = None
+    if shared_immutable:
+        # Shared objects use a reservation-derived logical key so reconciliation
+        # can finish an interrupted transfer without relying on process-local state.
+        storage_key = f"tenant_{tenant_id}/user_{user_id}/{storage_reservation_id}{file_extension}"
+        shared_store = immutable_store or configured_store()
+        shared_descriptor = ImmutableObject(
+            backend=getattr(shared_store, "backend", "supabase_private"),
+            bucket=IMMUTABLE_BUCKET,
+            object_key=generated_object_key(
+                tenant_id=int(tenant_id), reservation_id=storage_reservation_id,
+                sha256=content_hash, suffix=file_extension,
+            ),
+            size_bytes=file_size,
+            sha256=content_hash,
         )
+        try:
+            prepare_immutable_storage(
+                reservation_id=storage_reservation_id, descriptor=shared_descriptor,
+            )
+            written = shared_store.write(
+                tenant_id=int(tenant_id), reservation_id=storage_reservation_id,
+                source_path=file_path, suffix=file_extension, cancelled=cancelled,
+            )
+            if written != shared_descriptor:
+                raise ImmutableObjectError(
+                    ObjectErrorCategory.CORRUPT, "immutable_object_descriptor_mismatch",
+                )
+            verify_immutable_storage(reservation_id=storage_reservation_id)
+        except ImmutableObjectError as error:
+            if error.category in {ObjectErrorCategory.TIMEOUT, ObjectErrorCategory.UNAVAILABLE}:
+                try:
+                    mark_immutable_storage_ambiguous(reservation_id=storage_reservation_id)
+                except Exception:
+                    logger.exception("data.upload.immutable_ambiguity_record_failed")
+                file_path.unlink(missing_ok=True)
+                raise HTTPException(status_code=503, detail={
+                    "code": "immutable_storage_outcome_unknown",
+                    "message": "The private object transfer outcome is being reconciled.",
+                }) from error
+            try:
+                finish_storage(reservation_id=storage_reservation_id, succeeded=False)
+            finally:
+                file_path.unlink(missing_ok=True)
+            raise HTTPException(status_code=503, detail={
+                "code": error.code,
+                "message": "Private immutable storage is temporarily unavailable.",
+            }) from error
+        except Exception as error:
+            try:
+                mark_immutable_storage_ambiguous(reservation_id=storage_reservation_id)
+            except Exception:
+                logger.exception("data.upload.immutable_ambiguity_record_failed")
+            file_path.unlink(missing_ok=True)
+            raise HTTPException(status_code=503, detail={
+                "code": "immutable_storage_outcome_unknown",
+                "message": "The private object transfer outcome is being reconciled.",
+            }) from error
+    try:
+        if shared_descriptor is not None:
+            storage_object_id = finish_immutable_storage(
+                reservation_id=storage_reservation_id, storage_key=storage_key,
+            )
+        else:
+            storage_object_id = finish_storage(
+                reservation_id=storage_reservation_id,
+                succeeded=True,
+                storage_key=storage_key,
+                sha256_hex=content_hash,
+            )
+        if metadata_persister is not None and not storage_object_id:
+            raise RuntimeError("Storage object identity was not returned")
     except Exception as error:
-        file_path.unlink(missing_ok=True)
+        if shared_descriptor is None:
+            file_path.unlink(missing_ok=True)
         logger.error("data.upload.accounting_failed", extra={"tenant_id": tenant_id, "user_id": user_id, "error_type": type(error).__name__})
-        raise HTTPException(status_code=503, detail="Storage accounting is temporarily unavailable.") from error
+        raise HTTPException(status_code=503, detail={
+            "code": "metadata_outcome_unknown" if shared_descriptor is not None else "storage_accounting_unavailable",
+            "message": "Storage accounting is temporarily unavailable.",
+        }) from error
+
+    if storage_object_persister is not None:
+        try:
+            storage_object_persister(storage_object_id)
+        except Exception as error:
+            attached = None
+            if storage_object_failure_resolver is not None:
+                try:
+                    attached = storage_object_failure_resolver(storage_object_id)
+                except Exception:
+                    attached = None
+            if attached is not True:
+                if attached is False:
+                    try:
+                        if release_storage(
+                            tenant_id=int(tenant_id), category="dataset", storage_key=storage_key
+                        ):
+                            if shared_descriptor is not None:
+                                shared_store.delete(
+                                    tenant_id=int(tenant_id), descriptor=shared_descriptor,
+                                )
+                            file_path.unlink(missing_ok=True)
+                    except Exception:
+                        logger.exception(
+                            "data.upload.storage_attachment_compensation_failed",
+                            extra={"tenant_id": tenant_id, "user_id": user_id},
+                        )
+                raise HTTPException(
+                    status_code=503,
+                    detail={
+                        "code": "metadata_outcome_unknown",
+                        "message": "The import outcome is being reconciled. Retry with the same request key.",
+                    },
+                ) from error
+
+    if lifecycle_heartbeat is not None:
+        lifecycle_heartbeat()
+
+    if metadata_persister is not None:
+        try:
+            persisted = metadata_persister(
+                {
+                    "storage_object_id": storage_object_id,
+                    "storage_key": storage_key,
+                    "sha256": content_hash,
+                    "original_filename": filename,
+                    "content_type": file.content_type,
+                    "file_extension": file_extension,
+                    "file_size": file_size,
+                    "response": response,
+                }
+            )
+            if persisted:
+                response = {**response, **persisted}
+        except Exception as error:
+            recovered = False
+            if metadata_failure_resolver is not None:
+                try:
+                    recovered = metadata_failure_resolver(error)
+                except Exception:
+                    recovered = None
+                    logger.exception(
+                        "data.upload.metadata_recovery_failed",
+                        extra={"tenant_id": tenant_id, "user_id": user_id},
+                    )
+            if isinstance(recovered, dict):
+                response = {**response, **recovered}
+                logger.warning(
+                    "data.upload.metadata_response_recovered",
+                    extra={"tenant_id": tenant_id, "user_id": user_id},
+                )
+                recovered = True
+            if recovered is True:
+                error = None
+            elif recovered is None:
+                logger.error(
+                    "data.upload.metadata_outcome_unknown",
+                    extra={
+                        "tenant_id": tenant_id,
+                        "user_id": user_id,
+                        "error_type": type(error).__name__,
+                    },
+                )
+                raise HTTPException(
+                    status_code=503,
+                    detail={
+                        "code": "metadata_outcome_unknown",
+                        "message": "The import outcome is being reconciled. Retry with the same request key.",
+                    },
+                ) from error
+            else:
+                compensation_complete = False
+                try:
+                    compensation_complete = release_storage(
+                        tenant_id=int(tenant_id),
+                        category="dataset",
+                        storage_key=storage_key,
+                    )
+                except Exception:
+                    logger.exception(
+                        "data.upload.metadata_compensation_failed",
+                        extra={"tenant_id": tenant_id, "user_id": user_id},
+                    )
+                if compensation_complete:
+                    if shared_descriptor is not None:
+                        try:
+                            shared_store.delete(
+                                tenant_id=int(tenant_id), descriptor=shared_descriptor,
+                            )
+                        except Exception:
+                            logger.exception(
+                                "data.upload.immutable_delete_failed_after_release",
+                                extra={"tenant_id": tenant_id, "user_id": user_id},
+                            )
+                    file_path.unlink(missing_ok=True)
+                logger.error(
+                    "data.upload.metadata_failed",
+                    extra={
+                        "tenant_id": tenant_id,
+                        "user_id": user_id,
+                        "compensation_complete": compensation_complete,
+                        "error_type": type(error).__name__,
+                    },
+                )
+                raise HTTPException(
+                    status_code=503,
+                    detail="Dataset metadata is temporarily unavailable.",
+                ) from error
+
+    if shared_descriptor is not None:
+        file_path.unlink(missing_ok=True)
 
     logger.info(
         "data.upload.accepted",

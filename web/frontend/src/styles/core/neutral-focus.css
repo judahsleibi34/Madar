@@ -1,0 +1,15 @@
+/* Keep focus visible without applying the Madar red as a control boundary. */
+body :is(
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),
+  select,
+  textarea
+):not(.builder-canvas *):not(.builder-form-preview-page *):not(.tenant-site-runtime *):is(:focus, :focus-visible) {
+  border-color: var(--color-border-control) !important;
+  outline: none !important;
+  box-shadow: 0 0 0 2px var(--color-border-strong) !important;
+}
+
+body :is(a, button, summary, [tabindex]):not(.builder-canvas *):not(.builder-form-preview-page *):not(.tenant-site-runtime *):focus-visible {
+  outline-color: var(--color-border-strong) !important;
+  box-shadow: none !important;
+}

@@ -59,6 +59,8 @@ const labels = {
   "sidebar.store": "Store",
   "sidebar.pageBuilder": "Page Builder",
   "sidebar.submissions": "Submissions",
+  "sidebar.dataProjects": "Projects",
+  "sidebar.dataSources": "Data Sources",
   "sidebar.dataLogs": "Data Logs",
   "sidebar.calendar": "Calendar",
   "sidebar.archive": "Archive",
@@ -136,6 +138,8 @@ describe("DashboardSidebar navigation hierarchy", () => {
     fireEvent.click(workspace);
     expect(workspace.getAttribute("aria-expanded")).toBe("true");
     expect(screen.getByRole("button", { name: "Page Builder" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Projects" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Data Sources" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Calendar" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Archive" })).toBeTruthy();
   });
@@ -245,6 +249,28 @@ describe("DashboardSidebar navigation hierarchy", () => {
     expect(
       screen.getByRole("button", { name: "Collapse sidebar" }),
     ).toBeTruthy();
+  });
+
+  it("opens the project-first Data Logs flow from Projects", () => {
+    renderSidebar("/data-projects");
+
+    const projects = screen.getByRole("button", { name: "Projects" });
+    expect(projects.getAttribute("aria-current")).toBe("page");
+    expect(screen.getByRole("button", { name: "Workspace" }).getAttribute("aria-expanded"))
+      .toBe("true");
+    expect(screen.getByRole("button", { name: "Data Logs" }).hasAttribute("aria-current"))
+      .toBe(false);
+  });
+
+  it("highlights Data Sources as a separate workspace feature", () => {
+    renderSidebar("/data-sources");
+
+    expect(screen.getByRole("button", { name: "Data Sources" }).getAttribute("aria-current"))
+      .toBe("page");
+    expect(screen.getByRole("button", { name: "Projects" }).hasAttribute("aria-current"))
+      .toBe(false);
+    expect(screen.getByRole("button", { name: "Data Logs" }).hasAttribute("aria-current"))
+      .toBe(false);
   });
 
   it("keeps Agenda compact and marks Calendar as active", () => {

@@ -1,0 +1,12 @@
+[Unit]
+Description=Schedule bounded Madar automatic Data Source synchronization batches
+
+[Timer]
+OnBootSec=2m
+OnUnitInactiveSec=1m
+RandomizedDelaySec=10s
+Persistent=false
+Unit=madar-automatic-source-sync.service
+
+[Install]
+WantedBy=timers.target

@@ -11,6 +11,7 @@ describe("getRouteErrorSurface", () => {
     ["/dashboard", { isAdminUser: true }, "admin"],
     ["/page-builder/projects/one", {}, "page-builder"],
     ["/builder-data/projects/one", {}, "data-analysis"],
+    ["/data-sources/projects/one/data", {}, "data-analysis"],
   ])("maps %s to %s", (pathname, options, expected) => {
     expect(getRouteErrorSurface(pathname, options)).toBe(expected);
   });

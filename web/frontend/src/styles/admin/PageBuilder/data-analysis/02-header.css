@@ -5,7 +5,7 @@
 .page-builder .daw-header {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: center;
   gap: 24px;
   margin-bottom: 22px;
 }
@@ -46,4 +46,61 @@
   color: var(--daw-muted);
   font-size: 15px;
   line-height: 1.65;
+}
+
+.page-builder .daw-project-name {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+  margin-top: var(--space-2);
+  color: var(--theme-text-soft);
+  font-size: var(--type-small-size);
+  line-height: var(--type-small-line);
+}
+
+.page-builder .daw-project-name > span {
+  color: var(--theme-text-muted);
+  font-weight: var(--weight-regular);
+}
+
+.page-builder .daw-project-name > strong {
+  overflow: hidden;
+  color: var(--color-accent-text);
+  font-weight: var(--weight-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.page-builder .daw-project-switch {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  width: fit-content;
+  min-height: var(--control-height);
+  margin: 0;
+  padding: 0 var(--space-4);
+  border: 0;
+  border-radius: var(--radius-default);
+  background: var(--theme-primary);
+  color: var(--theme-text-inverse);
+  font-family: var(--font-family-base);
+  font-size: var(--type-small-size);
+  font-weight: var(--weight-semibold);
+  line-height: var(--type-small-line);
+  white-space: nowrap;
+  box-shadow: none;
+  cursor: pointer;
+}
+
+.page-builder .daw-project-switch:hover {
+  background: var(--theme-primary-hover);
+  color: var(--theme-text-inverse);
+}
+
+.page-builder .daw-project-switch:focus-visible {
+  outline: 2px solid var(--color-focus-indicator);
+  outline-offset: 2px;
 }

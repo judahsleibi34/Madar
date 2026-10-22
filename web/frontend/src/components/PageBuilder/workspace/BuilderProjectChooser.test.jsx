@@ -10,7 +10,10 @@ vi.mock("../services/PageBuilder.api", () => ({
   listBuilderProjects: vi.fn(),
 }));
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  window.sessionStorage.clear();
+});
 
 function LocationProbe() {
   const location = useLocation();
@@ -116,6 +119,133 @@ describe("BuilderProjectChooser", () => {
     await waitFor(() => expect(screen.getByTestId("location").textContent).toBe("/page-builder/projects/website/pages"));
     expect(listBuilderProjects).toHaveBeenCalledWith({ limit: 20, offset: 0, usageProfile: "website" });
     expect(createBuilderProject).not.toHaveBeenCalled();
+  });
+
+  it("lets the data workspace create a project root before entering its data leaf", async () => {
+    listBuilderProjects.mockResolvedValue({
+      projects: [],
+      pagination: { limit: 20, offset: 0, count: 0, has_more: false },
+    });
+    createBuilderProject.mockResolvedValue({ id: "data-project-1" });
+
+    render(
+      <MemoryRouter initialEntries={["/builder-data"]}>
+        <BuilderProjectChooser workspace="builder-data" usageProfile="website" />
+        <LocationProbe />
+      </MemoryRouter>
+    );
+
+    expect(await screen.findByRole("dialog", { name: "Choose a data project" })).toBeTruthy();
+    fireEvent.click(await screen.findByRole("button", { name: /Create new project/i }));
+
+    await waitFor(() => expect(screen.getByTestId("location").textContent)
+      .toBe("/builder-data/projects/data-project-1/data"));
+    expect(createBuilderProject).toHaveBeenCalledWith(expect.objectContaining({
+      name: "My data project",
+      draft_schema: expect.objectContaining({
+        name: "My data project",
+        workspaceKind: "data",
+      }),
+    }));
+  });
+
+  it("shows only projects created for the data workspace", async () => {
+    listBuilderProjects.mockResolvedValue({
+      projects: [
+        { id: "form-project", name: "Form & Flow", slug: "form-and-flow", status: "published" },
+        { id: "data-project", name: "Untitled data project", slug: "data-project-1729", status: "draft" },
+        {
+          id: "marked-data-project",
+          name: "Customer research",
+          slug: "customer-research",
+          draft_schema: { workspaceKind: "data" },
+        },
+      ],
+      pagination: { limit: 20, offset: 0, count: 3, has_more: false },
+    });
+
+    render(
+      <MemoryRouter initialEntries={["/builder-data"]}>
+        <BuilderProjectChooser workspace="builder-data" usageProfile="website" />
+      </MemoryRouter>
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: "My Projects" }));
+    expect(await screen.findByText("My data project 1")).toBeTruthy();
+    expect(screen.getByText("Customer research")).toBeTruthy();
+    expect(screen.queryByText("Form & Flow")).toBeNull();
+    expect(screen.queryByText("published")).toBeNull();
+    expect(screen.queryByText("Data project")).toBeNull();
+  });
+
+  it("keeps data projects out of Submissions and opens the only form project", async () => {
+    listBuilderProjects.mockResolvedValue({
+      projects: [
+        { id: "data-project", name: "Untitled data project", slug: "data-project-1729" },
+        { id: "form-project", name: "Form & Flow", slug: "form-and-flow", status: "published" },
+      ],
+      pagination: { limit: 20, offset: 0, count: 2, has_more: false },
+    });
+
+    render(
+      <MemoryRouter initialEntries={["/builder-responses"]}>
+        <BuilderProjectChooser
+          workspace="builder-responses"
+          autoOpenSingleProject
+          usageProfile="website"
+        />
+        <LocationProbe />
+      </MemoryRouter>
+    );
+
+    await waitFor(() => expect(screen.getByTestId("location").textContent)
+      .toBe("/builder-responses/projects/form-project/responses"));
+    expect(screen.queryByText("Untitled data project")).toBeNull();
+  });
+
+  it("lets the user return to the dashboard from the data project popup", async () => {
+    listBuilderProjects.mockResolvedValue({
+      projects: [],
+      pagination: { limit: 20, offset: 0, count: 0, has_more: false },
+    });
+    render(
+      <MemoryRouter initialEntries={["/builder-data"]}>
+        <BuilderProjectChooser workspace="builder-data" usageProfile="website" />
+        <LocationProbe />
+      </MemoryRouter>
+    );
+
+    const closeButton = await screen.findByRole("button", { name: "Back to dashboard" });
+    const closeIcon = closeButton.querySelector("svg");
+    expect(closeIcon?.getAttribute("width")).toBe("20");
+    expect(closeIcon?.getAttribute("height")).toBe("20");
+    expect(closeIcon?.getAttribute("stroke-width")).toBe("2");
+
+    fireEvent.click(closeButton);
+    expect(screen.getByTestId("location").textContent).toBe("/dashboard");
+  });
+
+  it("opens a selected project inside the separate Data Sources endpoint", async () => {
+    listBuilderProjects.mockResolvedValue({
+      projects: [{ id: "source-project", name: "Research", slug: "data-project-research" }],
+      pagination: { limit: 20, offset: 0, count: 1, has_more: false },
+    });
+    render(
+      <MemoryRouter initialEntries={["/data-sources"]}>
+        <BuilderProjectChooser
+          workspace="data-sources"
+          usageProfile="website"
+          dataProjectSelectionKey="selected-data-project"
+        />
+        <LocationProbe />
+      </MemoryRouter>
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: "My Projects" }));
+    fireEvent.click((await screen.findByText("Research")).closest("button"));
+    expect(screen.getByTestId("location").textContent)
+      .toBe("/data-sources/projects/source-project/data");
+    expect(window.sessionStorage.getItem("selected-data-project")).toBe("source-project");
   });
 
   it("creates and enters a project automatically when none exists", async () => {

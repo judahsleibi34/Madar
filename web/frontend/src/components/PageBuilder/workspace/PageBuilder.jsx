@@ -717,6 +717,8 @@ export default function PageBuilder({
   templateLang = lang,
   appThemeMode = "light",
   user = null,
+  dataSourceOnly = false,
+  dataProjectSelectionKey = "",
 } = {}) {
   const location = useLocation();
   const navigate = useNavigate();
@@ -7586,6 +7588,18 @@ export default function PageBuilder({
   const renderDataTab = () => (
   <DataTab
     project={project}
+    workspaceProjectId={routeProjectId}
+    sourceOnly={dataSourceOnly}
+    onSelectProject={() => {
+      if (dataProjectSelectionKey) {
+        try {
+          window.sessionStorage.removeItem(dataProjectSelectionKey);
+        } catch {
+          // The chooser can still be opened when session storage is unavailable.
+        }
+      }
+      navigate(dataSourceOnly ? "/data-sources" : "/data-projects");
+    }}
     lang={lang}
     user={user}
     selectForm={selectForm}

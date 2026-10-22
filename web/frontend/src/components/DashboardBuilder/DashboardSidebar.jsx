@@ -11,6 +11,8 @@ import {
   ClipboardList,
   CalendarDays,
   Database,
+  FolderOpen,
+  Upload,
   CreditCard,
   Gift,
   Badge,
@@ -148,6 +150,8 @@ export default function DashboardSidebar({
   const workspaceRouteActive = [
     DASHBOARD_ROUTES.pageBuilder,
     DASHBOARD_ROUTES.builderResponses,
+    DASHBOARD_ROUTES.dataProjects,
+    DASHBOARD_ROUTES.dataSources,
     DASHBOARD_ROUTES.builderData,
     DASHBOARD_ROUTES.calendar,
     DASHBOARD_ROUTES.agenda,
@@ -255,6 +259,16 @@ export default function DashboardSidebar({
       label: t("sidebar.submissions"),
       path: DASHBOARD_ROUTES.builderResponses,
       icon: ClipboardList,
+    },
+    {
+      label: t("sidebar.dataProjects", { defaultValue: "Projects" }),
+      path: DASHBOARD_ROUTES.dataProjects,
+      icon: FolderOpen,
+    },
+    {
+      label: t("sidebar.dataSources", { defaultValue: "Data Sources" }),
+      path: DASHBOARD_ROUTES.dataSources,
+      icon: Upload,
     },
     {
       label: t("sidebar.dataLogs"),

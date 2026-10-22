@@ -1,0 +1,12 @@
+[Unit]
+Description=Schedule Madar stale checkpoint scratch cleanup
+
+[Timer]
+OnBootSec=10m
+OnUnitInactiveSec=1h
+RandomizedDelaySec=5m
+Persistent=true
+Unit=madar-checkpoint-scratch-cleanup.service
+
+[Install]
+WantedBy=timers.target
