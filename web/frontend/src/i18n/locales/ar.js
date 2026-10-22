@@ -32,6 +32,8 @@ const ar = {
     dashboard: "لوحة التحكم",
     pageBuilder: "منشئ الصفحات",
     submissions: "الردود",
+    dataProjects: "المشاريع",
+    dataSources: "مصادر البيانات",
     dataLogs: "سجلات البيانات",
     myPlan: "خطتي",
     settings: "الإعدادات",

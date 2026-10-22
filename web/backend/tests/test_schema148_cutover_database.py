@@ -7,6 +7,7 @@ from dataclasses import replace
 import json
 import os
 from pathlib import Path
+from tests.historical_architecture import manifest as historical_manifest
 import tempfile
 import subprocess
 import sys
@@ -33,7 +34,7 @@ def crash_executor_child(dsn,root,state_file,point):
         'database':{'system_identifier':identifier},'migration_manifest_sha256':release.MANIFEST_SHA256,
         'candidate':{'source_sha':'a'*40}}
     with patch('deployment.lib.completed_normal_admission.require_fresh_authorization'):
-        manifest=release.admitted_manifest(root,contract);first=manifest.migrations[0].path.read_text()
+        manifest=historical_manifest(release,root,contract);first=manifest.migrations[0].path.read_text()
         class Cursor:
             def __init__(self,inner):self.inner=inner
             def __getattr__(self,name):return getattr(self.inner,name)
@@ -74,7 +75,7 @@ class CoordinatedCutoverDatabaseTests(unittest.TestCase):
             'database':{'system_identifier':self.db.execute('select system_identifier::text from pg_control_system()').fetchone()[0]},
             'migration_manifest_sha256':release.MANIFEST_SHA256,'candidate':{'source_sha':'a'*40}}
         item=patch('deployment.lib.completed_normal_admission.require_fresh_authorization');self.authorization=item.start();self.addCleanup(item.stop)
-        self.manifest=release.admitted_manifest(ROOT,self.contract)
+        self.manifest=historical_manifest(release,ROOT,self.contract)
         self.consumer_state='stopped'
 
     def drop_owned(self):

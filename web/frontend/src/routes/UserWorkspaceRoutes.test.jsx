@@ -49,15 +49,42 @@ vi.mock("../components/DashboardBuilder/ReservationCalendarPage", async () => {
   };
 });
 vi.mock("../components/PageBuilder", () => ({
-  default: () => <div>Explicit project editor</div>,
+  default: ({ dataSourceOnly }) => (
+    <div>
+      {dataSourceOnly ? "Source-only project editor" : "Explicit project editor"}
+      {dataSourceOnly
+        ? <span>Source registry and synchronization enabled</span>
+        : <span>Data Logs five-step workflow</span>}
+    </div>
+  ),
 }));
+vi.mock("../components/DataProjects/DataProjectsPage", () => ({
+  default: () => <div>Data projects page</div>,
+}));
+vi.mock("../components/ELearning/ELearningWorkspace", async () => {
+  const { useLocation } = await import("react-router-dom");
+  return {
+    default: function ELearningWorkspaceMock() {
+      const pathname = useLocation().pathname;
+      const heading = pathname.includes("/settings")
+        ? "E-Learning Settings"
+        : pathname.includes("/groups")
+        ? "Groups"
+        : pathname.includes("/instructors") ? "Instructors" : "Courses";
+      return <h1>{heading}</h1>;
+    },
+  };
+});
 vi.mock("../components/PageBuilder/workspace/BuilderProjectChooser", () => ({
   default: () => <div>Project chooser</div>,
 }));
 
 import UserWorkspaceRoutes from "./UserWorkspaceRoutes";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  window.sessionStorage.clear();
+});
 
 const routeProps = {
   lang: "en",
@@ -129,6 +156,81 @@ describe("workspace settings routes", () => {
     );
     expect(await screen.findByText("Explicit project editor")).toBeTruthy();
     expect(screen.queryByText("Project chooser")).toBeNull();
+  });
+
+  it("requires an explicit project confirmation when entering a data project URL", async () => {
+    render(
+      <MemoryRouter initialEntries={["/builder-data/projects/project-7/data"]}>
+        <UserWorkspaceRoutes {...routeProps} />
+      </MemoryRouter>
+    );
+    expect(await screen.findByText("Project chooser")).toBeTruthy();
+    expect(screen.queryByText("Explicit project editor")).toBeNull();
+  });
+
+  it("opens Projects as its own standalone workspace page", async () => {
+    render(
+      <MemoryRouter initialEntries={["/data-projects"]}>
+        <UserWorkspaceRoutes {...routeProps} />
+      </MemoryRouter>
+    );
+    expect(await screen.findByText("Data projects page")).toBeTruthy();
+    expect(screen.queryByText("Project chooser")).toBeNull();
+    expect(screen.queryByText("Explicit project editor")).toBeNull();
+  });
+
+  it("opens the data project after the chooser confirms the selection", async () => {
+    render(
+      <MemoryRouter initialEntries={[{
+        pathname: "/builder-data/projects/project-7/data",
+        state: { dataProjectConfirmed: true },
+      }]}>
+        <UserWorkspaceRoutes {...routeProps} />
+      </MemoryRouter>
+    );
+    expect(await screen.findByText("Explicit project editor")).toBeTruthy();
+    expect(screen.queryByText("Project chooser")).toBeNull();
+    expect(screen.queryByText("Source registry and synchronization enabled")).toBeNull();
+    expect(screen.getByText("Data Logs five-step workflow")).toBeTruthy();
+  });
+
+  it("requires project selection before opening the separate Data Sources feature", async () => {
+    render(
+      <MemoryRouter initialEntries={["/data-sources"]}>
+        <UserWorkspaceRoutes {...routeProps} />
+      </MemoryRouter>
+    );
+    expect(await screen.findByText("Project chooser")).toBeTruthy();
+    expect(screen.queryByText("Source-only project editor")).toBeNull();
+  });
+
+  it("reopens the remembered data project without asking again", async () => {
+    window.sessionStorage.setItem(
+      "madar:selected-data-project:tenant:3",
+      "project-7"
+    );
+    render(
+      <MemoryRouter initialEntries={["/data-sources"]}>
+        <UserWorkspaceRoutes {...routeProps} />
+      </MemoryRouter>
+    );
+    expect(await screen.findByText("Source-only project editor")).toBeTruthy();
+    expect(screen.queryByText("Project chooser")).toBeNull();
+  });
+
+  it("opens only the source feature after a data project is selected", async () => {
+    render(
+      <MemoryRouter initialEntries={[{
+        pathname: "/data-sources/projects/project-7/data",
+        state: { dataProjectConfirmed: true },
+      }]}>
+        <UserWorkspaceRoutes {...routeProps} />
+      </MemoryRouter>
+    );
+    expect(await screen.findByText("Source-only project editor")).toBeTruthy();
+    expect(screen.getByText("Source registry and synchronization enabled")).toBeTruthy();
+    expect(screen.queryByText("Data Logs five-step workflow")).toBeNull();
+    expect(screen.queryByText("Explicit project editor")).toBeNull();
   });
 
   it("remounts the calendar before rendering after the authenticated tenant changes", async () => {

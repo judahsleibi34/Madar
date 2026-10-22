@@ -20,8 +20,8 @@ def validated_entries(root):
                 "path":"web/database/migrations/148_guard_reservation_reactivation_capacity.sql"}
     if len(entries) != 1 or {key:entries[0].get(key) for key in expected} != expected:
         raise ValueError("Reservation capacity transition invalid")
-    original = root / expected["path"]
-    mirror = root / "web/supabase/migrations" / original.name
+    original = root / 'web/database/historical-architecture-146-150' / Path(expected['path']).name
+    mirror = root / "web/supabase/historical-architecture-146-150" / original.name
     if (original.read_bytes() != mirror.read_bytes()
             or hashlib.sha256(original.read_bytes()).hexdigest() != entries[0]["sha256"]):
         raise ValueError("Reservation capacity SQL mirror/checksum invalid")

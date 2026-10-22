@@ -108,7 +108,7 @@ docker run --rm --memory=1g --cpus=1 --pids-limit=256 --network host --read-only
   --env NOTIFICATION_SYNTHETIC_DATABASE_DSN='host=127.0.0.1 port=55448 dbname=postgres user=postgres connect_timeout=5' \
   --env NOTIFICATION_MIGRATION_SQL=/migration147.sql \
   --volume "$WEB_ROOT/backend:/app:ro" \
-  --volume "$WEB_ROOT/database/migrations/147_fence_notification_delivery_claims.sql:/migration147.sql:ro" \
+  --volume "$WEB_ROOT/database/historical-architecture-146-150/147_fence_notification_delivery_claims.sql:/migration147.sql:ro" \
   --entrypoint python "$BACKEND_TEST_IMAGE" tests/test_notification_fencing_database.py
 echo "Migration147 coordinated rollback/upgrade and native claim ownership suite passed"
 if [[ "${RUN_BUSINESS_INTEGRITY:-false}" == true ]]; then
@@ -118,14 +118,14 @@ if [[ "${RUN_BUSINESS_INTEGRITY:-false}" == true ]]; then
   before_status_function="$(docker exec "$CONTAINER_NAME" psql -X -U postgres -Atc "select md5(pg_get_functiondef('public.update_builder_reservation_status_notified_safe(uuid,integer,text,timestamptz)'::regprocedure))")"
   {
     printf 'begin;\n'
-    sed -e '/^begin;$/Id' -e '/^commit;$/Id' "$WEB_ROOT/database/migrations/148_guard_reservation_reactivation_capacity.sql"
+    sed -e '/^begin;$/Id' -e '/^commit;$/Id' "$WEB_ROOT/database/historical-architecture-146-150/148_guard_reservation_reactivation_capacity.sql"
     printf '\nrollback;\n'
   } | docker exec -i "$CONTAINER_NAME" psql -X -U postgres -v ON_ERROR_STOP=1 -q
   docker exec "$CONTAINER_NAME" psql -X -U postgres -Atc \
     "select schema_version=147 and has_table_privilege('service_role','public.builder_reservations','UPDATE') from public.application_schema_state where contract_key='core'" | grep -qx t
   test "$before_status_function" = "$(docker exec "$CONTAINER_NAME" psql -X -U postgres -Atc "select md5(pg_get_functiondef('public.update_builder_reservation_status_notified_safe(uuid,integer,text,timestamptz)'::regprocedure))")"
   docker exec -i "$CONTAINER_NAME" psql -X -U postgres -v ON_ERROR_STOP=1 -q \
-    < "$WEB_ROOT/database/migrations/148_guard_reservation_reactivation_capacity.sql"
+    < "$WEB_ROOT/database/historical-architecture-146-150/148_guard_reservation_reactivation_capacity.sql"
   docker exec "$CONTAINER_NAME" psql -X -U postgres -Atc \
     "select schema_version=148 from public.application_schema_state where contract_key='core'" | grep -qx t
 
@@ -143,7 +143,7 @@ if [[ "${RUN_BUSINESS_INTEGRITY:-false}" == true ]]; then
     --volume "$WEB_ROOT/backend:/app:ro" --entrypoint python "$BACKEND_TEST_IMAGE" \
     -m unittest tests.test_calendar_event_concurrency_database -v
   if replay_output="$(docker exec -i "$CONTAINER_NAME" psql -X -U postgres -v ON_ERROR_STOP=1 -q \
-      < "$WEB_ROOT/database/migrations/148_guard_reservation_reactivation_capacity.sql" 2>&1)"; then
+      < "$WEB_ROOT/database/historical-architecture-146-150/148_guard_reservation_reactivation_capacity.sql" 2>&1)"; then
     echo "Migration148 unexpectedly accepted re-entry" >&2
     exit 1
   fi
@@ -163,7 +163,7 @@ if [[ "${RUN_OUTBOX_INTEGRITY:-false}" == true ]]; then
     --env OUTBOX_SYNTHETIC_DATABASE_DSN='host=127.0.0.1 port=55448 dbname=postgres user=postgres connect_timeout=5' \
     --env OUTBOX_MIGRATION_SQL=/migration149.sql \
     --volume "$WEB_ROOT/backend:/app:ro" \
-    --volume "$WEB_ROOT/database/migrations/149_fence_notification_outbox_claims.sql:/migration149.sql:ro" \
+    --volume "$WEB_ROOT/database/historical-architecture-146-150/149_fence_notification_outbox_claims.sql:/migration149.sql:ro" \
     --entrypoint python "$BACKEND_TEST_IMAGE" tests/test_notification_outbox_fencing_database.py
   echo "Migration149 coordinated rollback/upgrade and native outbox ownership suite passed"
   # New queue ACLs must preserve transactional business notification enqueuers.
@@ -189,7 +189,7 @@ if [[ "${RUN_DELETION_INTEGRITY:-false}" == true ]]; then
     --env DELETION_MIGRATION_SQL=/migration150.sql \
     --volume "$WEB_ROOT/backend:/app:ro" \
     --volume "$WEB_ROOT/deployment:/test-repository/deployment:ro" \
-    --volume "$WEB_ROOT/database/migrations/150_fence_data_deletion_ownership.sql:/migration150.sql:ro" \
+    --volume "$WEB_ROOT/database/historical-architecture-146-150/150_fence_data_deletion_ownership.sql:/migration150.sql:ro" \
     --entrypoint python "$BACKEND_TEST_IMAGE" -m unittest \
     tests.test_schema150_legacy_admission_database tests.test_data_deletion_fencing_database -v
   # Revalidate retained transaction/tenant/version invariants at the corrected

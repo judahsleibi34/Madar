@@ -31,7 +31,7 @@ def source_manifest(root):
     if raw['migrations']!=original or [row['number'] for row in original]!=[147,148]:
         raise RuntimeError('schema148_migration_order_changed')
     for row in original:
-        path=root/row['path'];mirror=root/'web/supabase/migrations'/path.name
+        path=root/'web/database/historical-architecture-146-150'/Path(row['path']).name;mirror=root/'web/supabase/historical-architecture-146-150'/path.name
         if (root not in path.resolve().parents or path.is_symlink() or mirror.is_symlink()
                 or path.read_bytes()!=mirror.read_bytes() or sha(path.read_bytes())!=row['sha256']
                 or row['sha256']!=SQL_SHA256[row['number']]):
@@ -39,18 +39,9 @@ def source_manifest(root):
     return raw
 
 
-def admitted_manifest(root,contract):
-    """Only the fresh protected maintenance caller may select coordinated SQL."""
-    from deployment.lib.completed_normal_profile import profile,FENCED
-    from deployment.lib.completed_normal_admission import require_fresh_authorization
-    from deployment.lib.migration_executor import MigrationManifest,Migration
-    if profile(contract) is not FENCED or contract['migration_manifest_sha256']!=MANIFEST_SHA256:
-        raise RuntimeError('schema148_operation_required')
-    require_fresh_authorization(contract)
-    raw=source_manifest(root)
-    return MigrationManifest(contract['candidate']['source_sha'],tuple(Migration(
-        row['number'],Path(root)/row['path'],row['sha256'],row['from_schema'],row['to_schema'],row['compatibility'])
-        for row in raw['migrations']),coordinated=True)
+def admitted_manifest(root, contract):
+    """This divergent historical contract cannot authorize canonical SQL."""
+    raise RuntimeError('architecture_history_superseded_non_executable')
 
 
 QUIESCENCE_SQL="""

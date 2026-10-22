@@ -39,7 +39,7 @@ class Schema150CutoverDatabaseTests(unittest.TestCase):
         self.original=self.preserved(self.db)
         self.actor,self.journal,_=self.migration_hook_fixture(preserve_origin=True)
         raw,_=release.captured_source(native.ROOT)
-        self.manifest=MigrationManifest('a'*40,tuple(Migration(row['number'],native.ROOT/row['path'],
+        self.manifest=MigrationManifest('a'*40,tuple(Migration(row['number'],native.ROOT/'web/database/historical-architecture-146-150'/Path(row['path']).name,
             row['sha256'],row['from_schema'],row['to_schema'],row['compatibility']) for row in raw['migrations']),coordinated=True)
         # Cluster-wide quiescence must not exempt this fixture's idle admin or
         # setup connection. Only the executor connection may remain at entry.

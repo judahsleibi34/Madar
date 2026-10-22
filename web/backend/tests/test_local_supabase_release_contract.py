@@ -124,10 +124,11 @@ class LocalSupabaseReleaseContractTests(unittest.TestCase):
         from unittest.mock import patch
         with tempfile.TemporaryDirectory() as name:
             root = Path(name)
-            for subtree in ['deployment/releases', 'database/migrations', 'supabase/migrations']:
+            for subtree in ['deployment/releases', 'database/migrations', 'supabase/migrations', 'database/historical-architecture-146-150', 'supabase/historical-architecture-146-150']:
                 source = WEB_ROOT / subtree
                 if not source.exists(): source = Path('/workspace') / subtree
                 shutil.copytree(source, root / 'web' / subtree)
+            shutil.copyfile(WEB_ROOT/'deployment/migration-history-reconciliation.json',root/'web/deployment/migration-history-reconciliation.json')
             spec = importlib.util.spec_from_file_location('namespace_validator', WEB_ROOT / 'scripts/check_migrations.py')
             namespace = importlib.util.module_from_spec(spec); spec.loader.exec_module(namespace)
             trees = {label:root / 'web' / label / 'migrations' for label in ['database', 'supabase']}

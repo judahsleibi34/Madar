@@ -1,0 +1,39 @@
+{
+  "authoritative_main": "cf444303e55a2c6a214ab53f683442cf2fac15fe",
+  "architecture_origin": "4360a4ab2eba6013483dc2755558668245936b4c",
+  "active_target": 160,
+  "controller_execution": "BLOCKED",
+  "published_main": {
+    "web/database/migrations/147_add_project_datasets.sql": "3abf6867a6fb41049334690423ac0375af39fdfd8b91196874e6e1857c2aa8fb",
+    "web/database/migrations/148_add_project_data_sources.sql": "c145733bde3ae4a67a07159e0574247146bbe3fcc0ba670eee4207c5fa67e6da",
+    "web/database/migrations/149_add_source_ingestion_runs.sql": "8be053ce38ab3ac25a5874976a54ec1446d6e8ee5838c8e69fe4d835dd7ec370",
+    "web/database/migrations/150_add_source_ingestion_recovery.sql": "cc0489553fcbf34475aa5d208039305da1180d0118cf4d77ab3c9575c1b1dddb",
+    "web/database/migrations/151_add_api_source_ingestion.sql": "8fca93aed099388b94ec9a3073d00bf435a717259141e9fa6450ca7513952c14",
+    "web/database/migrations/152_add_incremental_source_ingestion.sql": "60f98341ef12098a924deea208528e853020cb188509356a6ede32b322bce04f",
+    "web/database/migrations/153_add_background_dataset_checkpoints.sql": "02e2f6b866d4f8ea1807ab5d181e6a327040f035e2e06aa8c13e74cad872f9c8",
+    "web/database/migrations/154_add_shared_immutable_storage.sql": "3ef4c0417bf5bed8898a58eceb877b4be32bc3c29c675dd6baee43a2834e0d33",
+    "web/database/migrations/155_add_data_source_credential_vault.sql": "451df6fd773155f43c6db456987b222df33d70a20300776cf7fee4f8c586372e",
+    "web/database/migrations/156_add_automatic_source_synchronization.sql": "b09b23c2e968cc2ad1f3d4a89a6f060e9038e1d3c70687405c9d54a4eee6111b",
+    "web/supabase/migrations/147_add_project_datasets.sql": "3abf6867a6fb41049334690423ac0375af39fdfd8b91196874e6e1857c2aa8fb",
+    "web/supabase/migrations/148_add_project_data_sources.sql": "c145733bde3ae4a67a07159e0574247146bbe3fcc0ba670eee4207c5fa67e6da",
+    "web/supabase/migrations/149_add_source_ingestion_runs.sql": "8be053ce38ab3ac25a5874976a54ec1446d6e8ee5838c8e69fe4d835dd7ec370",
+    "web/supabase/migrations/150_add_source_ingestion_recovery.sql": "cc0489553fcbf34475aa5d208039305da1180d0118cf4d77ab3c9575c1b1dddb",
+    "web/supabase/migrations/151_add_api_source_ingestion.sql": "8fca93aed099388b94ec9a3073d00bf435a717259141e9fa6450ca7513952c14",
+    "web/supabase/migrations/152_add_incremental_source_ingestion.sql": "60f98341ef12098a924deea208528e853020cb188509356a6ede32b322bce04f",
+    "web/supabase/migrations/153_add_background_dataset_checkpoints.sql": "02e2f6b866d4f8ea1807ab5d181e6a327040f035e2e06aa8c13e74cad872f9c8",
+    "web/supabase/migrations/154_add_shared_immutable_storage.sql": "3ef4c0417bf5bed8898a58eceb877b4be32bc3c29c675dd6baee43a2834e0d33",
+    "web/supabase/migrations/155_add_data_source_credential_vault.sql": "451df6fd773155f43c6db456987b222df33d70a20300776cf7fee4f8c586372e",
+    "web/supabase/migrations/156_add_automatic_source_synchronization.sql": "b09b23c2e968cc2ad1f3d4a89a6f060e9038e1d3c70687405c9d54a4eee6111b"
+  },
+  "historical": {
+    "web/database/historical-architecture-146-150/148_guard_reservation_reactivation_capacity.sql": "a6788acfbe91129fcc55cbcd9c42440bbb91a785518afb99830c6137ed3c3096",
+    "web/database/historical-architecture-146-150/149_fence_notification_outbox_claims.sql": "8ed767df57f5c02be50d83621fe45d314b3d1fdb42d2b7a470170519bdf1f869",
+    "web/database/historical-architecture-146-150/150_fence_data_deletion_ownership.sql": "63d4d0c7af93bd3c3e93158a2e281b41eed23b83bfafd4b3f1ba22313533b722",
+    "web/database/historical-architecture-146-150/147_fence_notification_delivery_claims.sql": "bc76737e03ddf3dc369e444f34435dbded600ab1cae3209555b5bde6647d60f3",
+    "web/supabase/historical-architecture-146-150/148_guard_reservation_reactivation_capacity.sql": "a6788acfbe91129fcc55cbcd9c42440bbb91a785518afb99830c6137ed3c3096",
+    "web/supabase/historical-architecture-146-150/149_fence_notification_outbox_claims.sql": "8ed767df57f5c02be50d83621fe45d314b3d1fdb42d2b7a470170519bdf1f869",
+    "web/supabase/historical-architecture-146-150/150_fence_data_deletion_ownership.sql": "63d4d0c7af93bd3c3e93158a2e281b41eed23b83bfafd4b3f1ba22313533b722",
+    "web/supabase/historical-architecture-146-150/147_fence_notification_delivery_claims.sql": "bc76737e03ddf3dc369e444f34435dbded600ab1cae3209555b5bde6647d60f3"
+  },
+  "forward_manifest_sha256": "929be5d2056dcd31d3949f8f548d8e212c66840a86533d080350c7995f10b2b9"
+}

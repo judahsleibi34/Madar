@@ -109,7 +109,7 @@ class OutboxFencingDatabaseTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         with connect() as db:
-            if db.execute("select schema_version from public.application_schema_state where contract_key='core'").fetchone()[0] != 149:
+            if db.execute("select schema_version from public.application_schema_state where contract_key='core'").fetchone()[0] != int(os.getenv('OUTBOX_TEST_SCHEMA','149')):
                 raise AssertionError('The successor149 rehearsal must execute first')
             # Earlier native business cases intentionally enqueue synthetic
             # notifications. This suite exclusively owns these two queues in

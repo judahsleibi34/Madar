@@ -85,6 +85,14 @@ class MigrationManifest:
     @classmethod
     def load(cls, path: Path, repository_root: Path) -> "MigrationManifest":
         raw = json.loads(path.read_text(encoding="utf-8"))
+        if (path.name == 'migrations-157-160-reconciled.json'
+                or raw.get('execution_status') == 'blocked_pending_protected_controller_reconciliation'):
+            raise ValueError('reconciled migration contract is not executable')
+        historical_names = {'147_fence_notification_delivery_claims.sql',
+            '148_guard_reservation_reactivation_capacity.sql',
+            '149_fence_notification_outbox_claims.sql','150_fence_data_deletion_ownership.sql'}
+        if any(Path(str(row.get('path',''))).name in historical_names for row in raw.get('migrations',[])):
+            raise ValueError('superseded divergent architecture migration history is not executable')
         release_sha = str(raw.get("release_sha") or "").strip()
         if release_sha not in {"CURRENT", "STAGING"} and (
             len(release_sha) != 40 or any(char not in "0123456789abcdef" for char in release_sha)

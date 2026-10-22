@@ -1073,6 +1073,41 @@
     {
       "path": "web/backend/services/calendar_mutation_service.py",
       "boundary": "Configured authenticator application SQL connection with fixed service_role transaction; exact cluster pin; locked active tenant/member/user and calendar ACL checks, version CAS, fixed domain SQL only, aggregate children/change/audit rollback; no root credentials or REST fallback."
+    },
+    {
+      "path": "web/backend/services/automatic_source_sync_service.py",
+      "boundary": "tenant/project/source-bound156 scheduling, claiming and lease-fenced completion RPCs; background execution uses privileged service client. Requires current authorization/revalidation.",
+      "review_scope": "Integration classification of published main cf444303; not independent production security approval."
+    },
+    {
+      "path": "web/backend/services/data_source_credential_service.py",
+      "boundary": "tenant/project/source/credential-version-bound Vault lifecycle through155 guarded RPCs; service role bypasses RLS; plaintext never enters metadata/logs.",
+      "review_scope": "Integration classification of published main cf444303; not independent production security approval."
+    },
+    {
+      "path": "web/backend/services/immutable_object_storage.py",
+      "boundary": "fixed private immutable Storage bucket with server-generated tenant/reservation/digest object keys; privileged Storage headers; caller and DB quota/ownership checks required.",
+      "review_scope": "Integration classification of published main cf444303; not independent production security approval."
+    },
+    {
+      "path": "web/backend/services/project_data_source_service.py",
+      "boundary": "tenant/project/source-filtered metadata and source capability/revision checks through privileged Supabase client.",
+      "review_scope": "Integration classification of published main cf444303; not independent production security approval."
+    },
+    {
+      "path": "web/backend/services/project_dataset_checkpoint_service.py",
+      "boundary": "tenant/project/dataset-scoped153 checkpoints and ownership-fenced worker RPCs; immutable manifests and source revisions must be revalidated.",
+      "review_scope": "Integration classification of published main cf444303; not independent production security approval."
+    },
+    {
+      "path": "web/backend/services/project_dataset_service.py",
+      "boundary": "tenant/project-filtered147 dataset reads and guarded binding/promotion RPCs; service role requires authorized caller context.",
+      "review_scope": "Integration classification of published main cf444303; not independent production security approval."
+    },
+    {
+      "path": "web/backend/services/project_source_ingestion_service.py",
+      "boundary": "tenant/project/source/resource/operation-scoped149\u2013152 ingestion and reconciliation RPCs, lease/token/version checks; no blind replay of uncertain storage/provider effects.",
+      "review_scope": "Integration classification of published main cf444303; not independent production security approval."
     }
   ],
   "related_privileged_paths": [

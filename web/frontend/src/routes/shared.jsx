@@ -293,6 +293,7 @@ const builderSkeletonPathTabs = {
 
 const getBuilderSkeletonTab = (pathname = "") => {
   if (pathname.startsWith("/builder-responses")) return "responses";
+  if (pathname.startsWith("/data-sources")) return "data";
   if (pathname.startsWith("/builder-data")) return "data";
 
   const match = pathname.match(/^\/page-builder\/([^/?#]+)/);
@@ -507,6 +508,8 @@ export function DashboardLoadingElement({ pathname, labels, lang }) {
 
   if (pathname.startsWith("/page-builder")) label = safeLabels.pageBuilder || label;
   if (pathname.startsWith("/builder-responses")) label = safeLabels.submissions || label;
+  if (pathname.startsWith("/data-projects")) label = safeLabels.dataProjects || safeLabels.dataLogs || label;
+  if (pathname.startsWith("/data-sources")) label = safeLabels.dataSources || safeLabels.dataLogs || label;
   if (pathname.startsWith("/builder-data")) label = safeLabels.dataLogs || label;
   if (pathname.startsWith("/archive")) label = safeLabels.archive || "Loading archive";
   if (pathname.startsWith("/my-plan")) label = safeLabels.myPlan || label;

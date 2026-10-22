@@ -54,6 +54,21 @@ describe("Agenda route classification", () => {
   });
 });
 
+describe("Data project route classification", () => {
+  it("treats Projects as the authenticated root of the Data Logs flow", () => {
+    expect(isDashboardRoutePath("/data-projects")).toBe(true);
+    expect(
+      getSafePostLoginPath({ user_type: "user" }, "/data-projects"),
+    ).toBe("/data-projects");
+  });
+
+  it("keeps Data Sources as its own authenticated feature route", () => {
+    expect(isDashboardRoutePath("/data-sources")).toBe(true);
+    expect(getSafePostLoginPath({ user_type: "user" }, "/data-sources"))
+      .toBe("/data-sources");
+  });
+});
+
 
 describe("Platform commercial route", () => {
   it("uses the dashboard shell and rejects tenant post-login context", () => {

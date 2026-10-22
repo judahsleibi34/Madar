@@ -624,6 +624,8 @@ export default function App() {
     dashboard: t("dashboard:loading.dashboard"),
     pageBuilder: t("dashboard:loading.pageBuilder"),
     submissions: t("dashboard:loading.submissions"),
+    dataProjects: t("dashboard:loading.dataProjects", { defaultValue: "Loading data projects" }),
+    dataSources: t("dashboard:loading.dataSources", { defaultValue: "Loading data sources" }),
     dataLogs: t("dashboard:loading.dataLogs"),
     myPlan: t("dashboard:loading.myPlan"),
     userManagement: t("dashboard:loading.userManagement"),

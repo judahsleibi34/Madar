@@ -20,8 +20,8 @@ class NotificationFencingReleaseContractTests(unittest.TestCase):
         root=Path(directory)
         for relative in ('deployment/releases/migrations-146-147-notification-fencing.json',
                          'deployment/releases/schema-146-147-notification-fencing.json',
-                         'database/migrations/147_fence_notification_delivery_claims.sql',
-                         'supabase/migrations/147_fence_notification_delivery_claims.sql'):
+                         'database/historical-architecture-146-150/147_fence_notification_delivery_claims.sql',
+                         'supabase/historical-architecture-146-150/147_fence_notification_delivery_claims.sql'):
             source=WEB/relative
             if not source.exists():source=Path('/workspace')/relative
             target=root/'web'/relative;target.parent.mkdir(parents=True,exist_ok=True)
@@ -41,14 +41,14 @@ class NotificationFencingReleaseContractTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root=self.fixture(directory)
             manifest=root/'web/deployment/releases/migrations-146-147-notification-fencing.json'
-            with self.assertRaisesRegex(ValueError,'automatic executor accepts expand/forward-compatible'):
+            with self.assertRaisesRegex(ValueError,'not executable'):
                 MigrationManifest.load(manifest,root)
 
     def test_sql_mirror_and_descriptor_tampering_rejected(self):
         for path in ('web/deployment/releases/migrations-146-147-notification-fencing.json',
                      'web/deployment/releases/schema-146-147-notification-fencing.json',
-                     'web/database/migrations/147_fence_notification_delivery_claims.sql',
-                     'web/supabase/migrations/147_fence_notification_delivery_claims.sql'):
+                     'web/database/historical-architecture-146-150/147_fence_notification_delivery_claims.sql',
+                     'web/supabase/historical-architecture-146-150/147_fence_notification_delivery_claims.sql'):
             with self.subTest(path=path),tempfile.TemporaryDirectory() as directory:
                 root=self.fixture(directory);target=root/path
                 target.write_bytes(target.read_bytes()+b'\n')

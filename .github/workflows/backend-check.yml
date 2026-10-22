@@ -91,4 +91,5 @@ jobs:
           timeout 10m bash web/scripts/rehearse_migration_115.sh
           timeout 10m bash web/scripts/rehearse_migration_145.sh
           timeout 10m bash web/scripts/rehearse_migration_146.sh
-          timeout 10m bash web/scripts/rehearse_migration_150.sh
+          timeout 10m bash web/scripts/rehearse_architecture_150.sh
+          MADAR_RECONCILED_INTEGRITY_TESTS=true timeout 10m bash web/scripts/rehearse_migration_150.sh

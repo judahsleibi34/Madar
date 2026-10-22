@@ -75,6 +75,76 @@ validated_deletion_entries = _deletion_candidate.validated_entries
 
 
 
+_project_datasets_spec = importlib.util.spec_from_file_location(
+    "madar_project_datasets_candidate",
+    Path(__file__).with_name("project_datasets_candidate.py"),
+)
+_project_datasets_candidate = importlib.util.module_from_spec(_project_datasets_spec)
+_project_datasets_spec.loader.exec_module(_project_datasets_candidate)
+validated_project_datasets_entries = _project_datasets_candidate.validated_entries
+_data_sources_spec = importlib.util.spec_from_file_location(
+    "madar_data_sources_candidate",
+    Path(__file__).with_name("data_sources_candidate.py"),
+)
+_data_sources_candidate = importlib.util.module_from_spec(_data_sources_spec)
+_data_sources_spec.loader.exec_module(_data_sources_candidate)
+validated_data_sources_entries = _data_sources_candidate.validated_entries
+_source_ingestions_spec = importlib.util.spec_from_file_location(
+    "madar_source_ingestions_candidate",
+    Path(__file__).with_name("source_ingestions_candidate.py"),
+)
+_source_ingestions_candidate = importlib.util.module_from_spec(_source_ingestions_spec)
+_source_ingestions_spec.loader.exec_module(_source_ingestions_candidate)
+validated_source_ingestions_entries = _source_ingestions_candidate.validated_entries
+_source_ingestion_recovery_spec = importlib.util.spec_from_file_location(
+    "madar_source_ingestion_recovery_candidate",
+    Path(__file__).with_name("source_ingestion_recovery_candidate.py"),
+)
+_source_ingestion_recovery_candidate = importlib.util.module_from_spec(_source_ingestion_recovery_spec)
+_source_ingestion_recovery_spec.loader.exec_module(_source_ingestion_recovery_candidate)
+validated_source_ingestion_recovery_entries = _source_ingestion_recovery_candidate.validated_entries
+_api_source_ingestion_spec = importlib.util.spec_from_file_location(
+    "madar_api_source_ingestion_candidate",
+    Path(__file__).with_name("api_source_ingestion_candidate.py"),
+)
+_api_source_ingestion_candidate = importlib.util.module_from_spec(_api_source_ingestion_spec)
+_api_source_ingestion_spec.loader.exec_module(_api_source_ingestion_candidate)
+validated_api_source_ingestion_entries = _api_source_ingestion_candidate.validated_entries
+_incremental_ingestion_spec = importlib.util.spec_from_file_location(
+    "madar_incremental_ingestion_candidate",
+    Path(__file__).with_name("incremental_ingestion_candidate.py"),
+)
+_incremental_ingestion_candidate = importlib.util.module_from_spec(_incremental_ingestion_spec)
+_incremental_ingestion_spec.loader.exec_module(_incremental_ingestion_candidate)
+validated_incremental_ingestion_entries = _incremental_ingestion_candidate.validated_entries
+_background_checkpoints_spec = importlib.util.spec_from_file_location(
+    "madar_background_checkpoints_candidate",
+    Path(__file__).with_name("background_checkpoints_candidate.py"),
+)
+_background_checkpoints_candidate = importlib.util.module_from_spec(_background_checkpoints_spec)
+_background_checkpoints_spec.loader.exec_module(_background_checkpoints_candidate)
+validated_background_checkpoints_entries = _background_checkpoints_candidate.validated_entries
+_shared_immutable_storage_spec = importlib.util.spec_from_file_location(
+    "madar_shared_immutable_storage_candidate",
+    Path(__file__).with_name("shared_immutable_storage_candidate.py"),
+)
+_shared_immutable_storage_candidate = importlib.util.module_from_spec(_shared_immutable_storage_spec)
+_shared_immutable_storage_spec.loader.exec_module(_shared_immutable_storage_candidate)
+validated_shared_immutable_storage_entries = _shared_immutable_storage_candidate.validated_entries
+_credential_vault_spec = importlib.util.spec_from_file_location(
+    "madar_credential_vault_candidate",
+    Path(__file__).with_name("credential_vault_candidate.py"),
+)
+_credential_vault_candidate = importlib.util.module_from_spec(_credential_vault_spec)
+_credential_vault_spec.loader.exec_module(_credential_vault_candidate)
+validated_credential_vault_entries = _credential_vault_candidate.validated_entries
+_automatic_source_sync_spec = importlib.util.spec_from_file_location(
+    "madar_automatic_source_sync_candidate",
+    Path(__file__).with_name("automatic_source_sync_candidate.py"),
+)
+_automatic_source_sync_candidate = importlib.util.module_from_spec(_automatic_source_sync_spec)
+_automatic_source_sync_spec.loader.exec_module(_automatic_source_sync_candidate)
+validated_automatic_source_sync_entries = _automatic_source_sync_candidate.validated_entries
 import re
 
 
@@ -444,10 +514,10 @@ def validate(root: Path = ROOT) -> list[str]:
                 ).glob("*.sql")
             )
 
-            if versions != list(range(1, 151 if learning_contract['status']=='finalized' else 143)):
+            if versions != list(range(1, 161 if learning_contract['status']=='finalized' else 143)):
                 errors.append(
                     "migration namespace must contain exactly "
-                    f"001 through {150 if learning_contract['status']=='finalized' else 142}: {tree}"
+                    f"001 through {160 if learning_contract['status']=='finalized' else 142}: {tree}"
                 )
 
     except (OSError, KeyError, ValueError, TypeError) as error:
@@ -484,6 +554,40 @@ def validate(root: Path = ROOT) -> list[str]:
         validated_deletion_entries(root)
     except (OSError, ValueError, TypeError, KeyError) as error:
         errors.append(f"deletion ownership candidate invalid: {error}")
+    try:
+        validated_project_datasets_entries(root)
+    except (OSError, ValueError, TypeError, KeyError) as error:
+        errors.append(f"project-datasets candidate invalid: {error}")
+    try:
+        validated_data_sources_entries(root)
+    except (OSError, ValueError, TypeError, KeyError) as error:
+        errors.append(f"project data-sources candidate invalid: {error}")
+    try:
+        validated_source_ingestions_entries(root)
+    except (OSError, ValueError, TypeError, KeyError) as error:
+        errors.append(f"source-ingestion candidate invalid: {error}")
+    try:
+        validated_source_ingestion_recovery_entries(root)
+    except (OSError, ValueError, TypeError, KeyError) as error:
+        errors.append(f"source-ingestion recovery candidate invalid: {error}")
+    try:
+        validated_api_source_ingestion_entries(root)
+    except (OSError, ValueError, TypeError, KeyError) as error:
+        errors.append(f"API-source ingestion candidate invalid: {error}")
+    try:
+        validated_incremental_ingestion_entries(root)
+    except (OSError, ValueError, TypeError, KeyError) as error:
+        errors.append(f"incremental-ingestion candidate invalid: {error}")
+    try:
+        validated_background_checkpoints_entries(root)
+    except (OSError, ValueError, TypeError, KeyError) as error:
+        errors.append(f"background-checkpoint candidate invalid: {error}")
+    try:
+        validated_shared_immutable_storage_entries(root)
+        validated_credential_vault_entries(root)
+        validated_automatic_source_sync_entries(root)
+    except (OSError, ValueError, TypeError, KeyError) as error:
+        errors.append(f"shared immutable-storage candidate invalid: {error}")
     return errors
 
 

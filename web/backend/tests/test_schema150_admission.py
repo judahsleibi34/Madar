@@ -35,10 +35,10 @@ class DeletionAdmissionPreparationTests(unittest.TestCase):
         shutil.copytree(web/'deployment/releases', self.root/'web/deployment/releases')
         for name in release.SQL_NAMES.values():
             for tree in ('database', 'supabase'):
-                source = web/tree/'migrations'/name
+                source = web/tree/'historical-architecture-146-150'/name
                 if not source.exists():
-                    source = Path('/'+tree+'/migrations')/name
-                target = self.root/'web'/tree/'migrations'/name
+                    source = Path('/'+tree+'/historical-architecture-146-150')/name
+                target = self.root/'web'/tree/'historical-architecture-146-150'/name
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_bytes(source.read_bytes())
 
@@ -70,14 +70,14 @@ class DeletionAdmissionPreparationTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, 'operation_profile_invalid'):
             CompletedNormalUpgrade(actor, artifact_guard=lambda: None, model_loader=lambda: None,
                                    acceptance_guard=lambda: None, rehearsal_guard=lambda: None)
-        with self.assertRaisesRegex(ValueError, 'automatic executor'):
+        with self.assertRaisesRegex(ValueError, 'not executable'):
             MigrationManifest.load(self.root/'web/deployment/releases'/release.MANIFEST, self.root)
 
     def test_exact_captured_manifest_and_sql_bytes(self):
         raw, snapshots = release.captured_source(self.root)
         self.assertEqual([row['number'] for row in raw['migrations']], [147, 148, 149, 150])
         self.assertEqual(set(snapshots), {147, 148, 149, 150})
-        path = self.root/'web/database/migrations'/release.SQL_NAMES[150]
+        path = self.root/'web/database/historical-architecture-146-150'/release.SQL_NAMES[150]
         original = snapshots[150]
         path.write_bytes(original+b'\n')
         self.assertEqual(snapshots[150], original)
@@ -86,18 +86,18 @@ class DeletionAdmissionPreparationTests(unittest.TestCase):
     def test_every_sql_mirror_metadata_and_symlink_tamper_rejected(self):
         paths = [self.root/'web/deployment/releases'/release.MANIFEST,
                  self.root/'web/deployment/releases'/release.BRIDGE,
-                 *self.root.glob('web/database/migrations/*.sql'),
-                 *self.root.glob('web/supabase/migrations/*.sql')]
+                 *self.root.glob('web/database/historical-architecture-146-150/*.sql'),
+                 *self.root.glob('web/supabase/historical-architecture-146-150/*.sql')]
         for path in paths:
             original = path.read_bytes(); path.write_bytes(original+b'\n')
             with self.subTest(path=path), self.assertRaises(RuntimeError): release.source_manifest(self.root)
             path.write_bytes(original)
-        for path in (paths[0], self.root/'web/database/migrations'/release.SQL_NAMES[150]):
+        for path in (paths[0], self.root/'web/database/historical-architecture-146-150'/release.SQL_NAMES[150]):
             original = path.read_bytes(); alias = self.root/'alias'; alias.write_bytes(original)
             path.unlink(); path.symlink_to(alias)
             with self.subTest(path=path), self.assertRaises(OSError): release.source_manifest(self.root)
             path.unlink(); path.write_bytes(original); alias.unlink()
-        parent = self.root/'web/database/migrations'
+        parent = self.root/'web/database/historical-architecture-146-150'
         parent.rename(self.root/'relocated-sql'); parent.symlink_to(self.root/'relocated-sql', target_is_directory=True)
         with self.assertRaisesRegex(RuntimeError, 'path_invalid'): release.source_manifest(self.root)
 

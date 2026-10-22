@@ -3,7 +3,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request, Response
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from data_analysis import services as data_services
 from data_analysis.ai import service as ai_service
@@ -11,6 +11,7 @@ from data_analysis.ai import usage as ai_usage
 from data_analysis.ai.settings import get_model_config_for_plan, normalize_plan_name
 from data_analysis.ai import token_metering
 from data_analysis.routes.data_routes import get_storage_scope
+from services import project_dataset_service
 from services.auth_service import require_regular_user_id
 from services.entitlement_service import require_entitlement
 from services.rate_limit_service import enforce_data_workspace_rate_limit
@@ -38,6 +39,14 @@ class AssistedAnalysisRequest(BaseModel):
     metric: dict[str, Any] | None = None
     language: str = "en"
     symbols: dict[str, Any] = {}
+
+
+class VersionAssistedAnalysisRequest(BaseModel):
+    cleaning_actions: list[dict[str, Any]] = Field(default_factory=list)
+    question: str | None = None
+    metric: dict[str, Any] | None = None
+    language: str = "en"
+    symbols: dict[str, Any] = Field(default_factory=dict)
 
 
 class AIAnalysisRequest(BaseModel):
@@ -179,6 +188,68 @@ def assisted_analysis(user_id: int, request: AssistedAnalysisRequest, fastapi_re
 
     except Exception as error:
         logger.warning("data.analysis.assist_failed", extra={"user_id": user_id, "error_type": type(error).__name__})
+        raise HTTPException(status_code=400, detail="Could not run assisted analysis.")
+
+
+@router.post("/projects/{project_id}/datasets/{dataset_id}/versions/{version_id}/assist")
+def assisted_analysis_for_dataset_version(
+    user_id: int,
+    project_id: str,
+    dataset_id: str,
+    version_id: str,
+    request: VersionAssistedAnalysisRequest,
+    fastapi_request: Request,
+    response: Response,
+):
+    try:
+        tenant_id, scoped_user_id = get_storage_scope(fastapi_request, response, user_id)
+        require_entitlement(tenant_id, "standard_data_analysis")
+        enforce_data_workspace_rate_limit(
+            fastapi_request,
+            scoped_user_id,
+            "analysis_assist",
+            tenant_id=tenant_id,
+        )
+        project_dataset_service.require_project_datasets_schema()
+        persistent = project_dataset_service.resolve_project_dataset_version(
+            tenant_id=int(tenant_id),
+            project_id=project_id,
+            user_id=int(scoped_user_id),
+            dataset_id=dataset_id,
+            version_id=version_id,
+        )
+        result = data_services.run_assisted_analysis(
+            input_path=persistent["storage_identifier"],
+            cleaning_actions=request.cleaning_actions,
+            question=request.question,
+            metric=request.metric,
+            language=request.language,
+            symbols=request.symbols,
+            tenant_id=tenant_id,
+            user_id=scoped_user_id,
+        )
+        version = persistent["version"]
+        dataset = persistent["dataset"]
+        return {
+            **result,
+            "provenance": {
+                "project_id": dataset["project_id"],
+                "dataset_id": dataset["id"],
+                "dataset_version_id": version["id"],
+                "version_number": version["version_number"],
+                "version_kind": version["version_kind"],
+                "content_hash": version.get("content_hash"),
+            },
+        }
+
+    except HTTPException:
+        raise
+
+    except Exception as error:
+        logger.warning(
+            "data.analysis.version_assist_failed",
+            extra={"user_id": user_id, "error_type": type(error).__name__},
+        )
         raise HTTPException(status_code=400, detail="Could not run assisted analysis.")
 
 

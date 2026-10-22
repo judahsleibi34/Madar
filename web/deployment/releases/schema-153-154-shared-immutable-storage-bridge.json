@@ -1,0 +1,15 @@
+{
+  "release_metadata_version": 1,
+  "deployment_profile": "shared-immutable-storage153-154",
+  "schema": {
+    "compatible_min": 153,
+    "compatible_max": 154,
+    "target": 154,
+    "migration_class": "expand-only",
+    "rollback_compatible_min": 153,
+    "rollback_compatible_max": 153
+  },
+  "migration_policy": "automatic-after-known-good-backup-first-forward-repair",
+  "migration_manifest": "migrations-153-154-shared-immutable-storage.json",
+  "notes": "Unselected schema153 to schema154 candidate. Adds durable private-provider identity and integrity evidence for Data Sources incremental history and checkpoints while preserving legacy local objects. Requires a pre-provisioned private madar-data-immutable bucket and separately reviewed worker/runtime activation. Grants no deployment, bucket mutation, customer-file migration, provider-network, production-data, or active-release authority."
+}

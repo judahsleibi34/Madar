@@ -82,8 +82,8 @@ def captured_source(root):
                 or row['sha256'] != SQL_SHA256[number]
                 or row['compatibility'] != ('forward-compatible' if number == 148 else 'coordinated')):
             raise RuntimeError('schema150_chain_invalid')
-        path = root / row['path']
-        mirror = root / 'web/supabase/migrations' / SQL_NAMES[number]
+        path = root / 'web/database/historical-architecture-146-150' / Path(row['path']).name
+        mirror = root / 'web/supabase/historical-architecture-146-150' / SQL_NAMES[number]
         if any(parent.is_symlink() for parent in (path.parent, mirror.parent,
                 path.parent.parent, mirror.parent.parent)):
             raise RuntimeError('schema150_sql_path_invalid')

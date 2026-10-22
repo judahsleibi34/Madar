@@ -1,0 +1,12 @@
+[Unit]
+Description=Schedule Madar dataset-checkpoint worker batches
+
+[Timer]
+OnBootSec=2m
+OnUnitInactiveSec=1m
+RandomizedDelaySec=10s
+Persistent=true
+Unit=madar-dataset-checkpoint-worker.service
+
+[Install]
+WantedBy=timers.target

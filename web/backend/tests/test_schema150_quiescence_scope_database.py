@@ -41,7 +41,7 @@ class QuiescenceScopeDatabaseTests(unittest.TestCase):
             self.db.execute(sql.SQL('create table public.{}({} text)').format(sql.Identifier(table),sql.Identifier(column)))
         for name in ('notification_delivery_protocol','notification_outbox_protocol'):
             self.db.execute(sql.SQL("create function public.{}() returns integer language sql stable as 'select 2'").format(sql.Identifier(name)))
-        body=(WEB/'database/migrations'/release.SQL_NAMES[150]).read_bytes()
+        body=(WEB/'database/historical-architecture-146-150'/release.SQL_NAMES[150]).read_bytes()
         self.assertEqual(hashlib.sha256(body).hexdigest(),release.SQL_SHA256[150])
         statement=next(line for line in body.decode().splitlines() if line.startswith('create function public.data_deletion_ownership_protocol()'))
         self.db.execute(statement)
@@ -140,7 +140,7 @@ class QuiescenceScopeDatabaseTests(unittest.TestCase):
         if not preserve_origin:
             self.db.execute("update public.application_schema_state set schema_version=149 where contract_key='core'")
             self.db.execute('drop function public.data_deletion_ownership_protocol()')
-        return actor,journal,Migration(150,WEB/'database/migrations'/release.SQL_NAMES[150],release.SQL_SHA256[150],149,150,'coordinated')
+        return actor,journal,Migration(150,WEB/'database/historical-architecture-146-150'/release.SQL_NAMES[150],release.SQL_SHA256[150],149,150,'coordinated')
 
     def acquire_migration_lock(self):
         from deployment.lib.migration_executor import LockedMigrationExecutor

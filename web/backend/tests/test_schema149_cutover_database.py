@@ -5,6 +5,7 @@ commits, row locks, protocol definitions, ACLs and durable journals are native.
 """
 from dataclasses import replace
 from pathlib import Path
+from tests.historical_architecture import manifest as historical_manifest
 import unittest
 
 from deployment.lib import schema149_release as release
@@ -21,7 +22,7 @@ class Schema149CutoverDatabaseTests(unittest.TestCase):
         native.CoordinatedCutoverDatabaseTests.setUp(self)
         self.contract.update(version=6,operation='completed-normal-schema146-149-coordinated-release',
                              migration_manifest_sha256=release.MANIFEST_SHA256)
-        self.manifest=release.admitted_manifest(native.ROOT,self.contract)
+        self.manifest=historical_manifest(release,native.ROOT,self.contract)
         self.db.close()  # An idle client is itself an invalid provider barrier.
         self.providers='fenced'
 

@@ -158,9 +158,9 @@ class Phase7AcceptanceSafetyTests(unittest.TestCase):
         shutil.copytree(WEB/'deployment/releases',source_root/'web/deployment/releases')
         for name in release.SQL_NAMES.values():
             for tree in ('database','supabase'):
-                source=WEB/tree/'migrations'/name
-                if not source.exists():source=Path('/'+tree+'/migrations')/name
-                destination=source_root/'web'/tree/'migrations'/name
+                source=WEB/tree/'historical-architecture-146-150'/name
+                if not source.exists():source=Path('/'+tree+'/historical-architecture-146-150')/name
+                destination=source_root/'web'/tree/'historical-architecture-146-150'/name
                 destination.parent.mkdir(parents=True,exist_ok=True)
                 destination.write_bytes(source.read_bytes())
         _,snapshots=rehearsal.acceptance.captured_source(source_root)

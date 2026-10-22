@@ -43,8 +43,8 @@ def source_manifest(root):
         raise RuntimeError('schema149_chain_invalid')
     for row in raw['migrations']:
         number = row['number']
-        path = root / row['path']
-        mirror = root / 'web/supabase/migrations' / path.name
+        path = root / 'web/database/historical-architecture-146-150' / Path(row['path']).name
+        mirror = root / 'web/supabase/historical-architecture-146-150' / path.name
         if (row['from_schema'] != number-1 or row['to_schema'] != number
                 or row['sha256'] != SQL_SHA256[number]
                 or root not in path.resolve().parents or path.is_symlink() or mirror.is_symlink()
@@ -57,16 +57,8 @@ def source_manifest(root):
 
 
 def admitted_manifest(root, contract):
-    from deployment.lib.completed_normal_profile import profile, OUTBOX
-    from deployment.lib.completed_normal_admission import require_fresh_authorization
-    from deployment.lib.migration_executor import MigrationManifest, Migration
-    if profile(contract) is not OUTBOX or contract['migration_manifest_sha256'] != MANIFEST_SHA256:
-        raise RuntimeError('schema149_operation_required')
-    require_fresh_authorization(contract)
-    rows = source_manifest(root)['migrations']
-    return MigrationManifest(contract['candidate']['source_sha'], tuple(Migration(
-        row['number'], Path(root)/row['path'], row['sha256'], row['from_schema'], row['to_schema'], row['compatibility'])
-        for row in rows), coordinated=True)
+    """This divergent historical contract cannot authorize canonical SQL."""
+    raise RuntimeError('architecture_history_superseded_non_executable')
 
 
 QUIESCENCE_SQL = """

@@ -1,0 +1,14 @@
+{
+  "manifest_version": 1,
+  "release_sha": "STAGING",
+  "migrations": [
+    {
+      "number": 154,
+      "from_schema": 153,
+      "to_schema": 154,
+      "path": "web/database/migrations/154_add_shared_immutable_storage.sql",
+      "sha256": "3ef4c0417bf5bed8898a58eceb877b4be32bc3c29c675dd6baee43a2834e0d33",
+      "compatibility": "expand-only"
+    }
+  ]
+}

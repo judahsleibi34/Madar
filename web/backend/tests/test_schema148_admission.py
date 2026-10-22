@@ -36,9 +36,9 @@ class FencedAdmissionTests(unittest.TestCase):
         shutil.copytree(WEB/'deployment/releases',self.source_root/'web/deployment/releases')
         for tree in ('database','supabase'):
             for number,name in ((147,'147_fence_notification_delivery_claims.sql'),(148,'148_guard_reservation_reactivation_capacity.sql')):
-                source=WEB/tree/'migrations'/name
-                if not source.exists():source=Path('/'+tree+'/migrations')/name
-                target=self.source_root/'web'/tree/'migrations'/name
+                source=WEB/tree/'historical-architecture-146-150'/name
+                if not source.exists():source=Path('/'+tree+'/historical-architecture-146-150')/name
+                target=self.source_root/'web'/tree/'historical-architecture-146-150'/name
                 target.parent.mkdir(parents=True,exist_ok=True);target.write_bytes(source.read_bytes())
 
     def test_new_profile_is_exact_and_historical_profiles_stay_fixed(self):
@@ -55,18 +55,14 @@ class FencedAdmissionTests(unittest.TestCase):
             with self.subTest(schema=source),self.assertRaises(RuntimeError):admission.validate_contract(bad)
 
     def test_ordinary_manifest_loader_still_rejects_coordinated_sql(self):
-        with self.assertRaisesRegex(ValueError,'automatic executor'):
+        with self.assertRaisesRegex(ValueError,'not executable'):
             MigrationManifest.load(WEB/'deployment/releases'/release.MANIFEST,WEB.parent)
 
-    def test_source_and_fresh_authorization_required_before_manifest_admission(self):
-        with patch.object(admission,'require_fresh_authorization',side_effect=RuntimeError('unapproved')):
-            with self.assertRaisesRegex(RuntimeError,'unapproved'):release.admitted_manifest(self.source_root,fenced_contract())
+    def test_superseded_history_cannot_be_admitted_even_with_fresh_authorization(self):
         with patch.object(admission,'require_fresh_authorization') as authorized:
-            manifest=release.admitted_manifest(self.source_root,fenced_contract())
-            self.assertTrue(manifest.coordinated)
-            self.assertEqual(tuple(m.number for m in manifest.migrations),(147,148));authorized.assert_called_once()
-            with self.assertRaisesRegex(RuntimeError,'guard_required'):
-                LockedMigrationExecutor(connection_factory=lambda:None,manifest=manifest,state_file=Path('/unused'),backup_dir=Path('/unused'),backup_verifier=lambda _:None)
+            with self.assertRaisesRegex(RuntimeError,'superseded_non_executable'):
+                release.admitted_manifest(self.source_root,fenced_contract())
+            authorized.assert_not_called()
 
     def test_manifest_order_bridge_sql_mirror_and_checksum_tamper_refuse(self):
         import shutil
@@ -75,12 +71,12 @@ class FencedAdmissionTests(unittest.TestCase):
             shutil.copytree(WEB/'deployment/releases',root/'web/deployment/releases')
             for row in release.source_manifest(self.source_root)['migrations']:
                 for tree in ('database','supabase'):
-                    source=WEB/tree/'migrations'/Path(row['path']).name
-                    if not source.exists():source=Path('/'+tree+'/migrations')/source.name
-                    target=root/'web'/tree/'migrations'/source.name;target.parent.mkdir(parents=True,exist_ok=True);target.write_bytes(source.read_bytes())
+                    source=WEB/tree/'historical-architecture-146-150'/Path(row['path']).name
+                    if not source.exists():source=Path('/'+tree+'/historical-architecture-146-150')/source.name
+                    target=root/'web'/tree/'historical-architecture-146-150'/source.name;target.parent.mkdir(parents=True,exist_ok=True);target.write_bytes(source.read_bytes())
             release.source_manifest(root)
             paths=[root/'web/deployment/releases'/release.MANIFEST,root/'web/deployment/releases'/release.BRIDGE,
-                   root/'web/database/migrations/147_fence_notification_delivery_claims.sql',root/'web/supabase/migrations/148_guard_reservation_reactivation_capacity.sql']
+                   root/'web/database/historical-architecture-146-150/147_fence_notification_delivery_claims.sql',root/'web/supabase/historical-architecture-146-150/148_guard_reservation_reactivation_capacity.sql']
             for path in paths:
                 original=path.read_bytes();path.write_bytes(original+b'\n')
                 with self.subTest(path=path.name),self.assertRaises(RuntimeError):release.source_manifest(root)

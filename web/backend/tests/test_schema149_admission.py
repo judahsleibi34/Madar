@@ -37,9 +37,9 @@ class SuccessorAdmissionTests(unittest.TestCase):
         shutil.copytree(web/'deployment/releases', self.root/'web/deployment/releases')
         for row in json.loads((self.root/'web/deployment/releases'/release.MANIFEST).read_text())['migrations']:
             for tree in ('database','supabase'):
-                source = web/tree/'migrations'/Path(row['path']).name
-                if not source.exists(): source = Path('/'+tree+'/migrations')/source.name
-                target = self.root/'web'/tree/'migrations'/source.name
+                source = web/tree/'historical-architecture-146-150'/Path(row['path']).name
+                if not source.exists(): source = Path('/'+tree+'/historical-architecture-146-150')/source.name
+                target = self.root/'web'/tree/'historical-architecture-146-150'/source.name
                 target.parent.mkdir(parents=True,exist_ok=True); target.write_bytes(source.read_bytes())
 
     def test_profile_and_all_historical_bounds_are_exact(self):
@@ -56,23 +56,18 @@ class SuccessorAdmissionTests(unittest.TestCase):
             bad=copy.deepcopy(value);bad['version']=version
             with self.subTest(version=version),self.assertRaises(RuntimeError): admission.validate_contract(bad)
 
-    def test_coordinated_source_requires_fresh_authority_and_executor_guard(self):
-        with patch.object(admission,'require_fresh_authorization',side_effect=RuntimeError('fresh_required')):
-            with self.assertRaisesRegex(RuntimeError,'fresh_required'):release.admitted_manifest(self.root,successor_contract())
-        with patch.object(admission,'require_fresh_authorization'):
-            result=release.admitted_manifest(self.root,successor_contract())
-            self.assertEqual([row.number for row in result.migrations],[147,148,149])
-            self.assertTrue(result.coordinated)
-            with self.assertRaisesRegex(RuntimeError,'guard_required'):
-                LockedMigrationExecutor(connection_factory=lambda:None,manifest=result,state_file=self.root/'state',backup_dir=self.root,backup_verifier=lambda _:None)
-            with self.assertRaisesRegex(RuntimeError,'operation_required'):release.admitted_manifest(self.root,fenced_contract())
-        with self.assertRaisesRegex(ValueError,'automatic executor'):
+    def test_superseded_coordinated_source_refuses_even_fresh_authority(self):
+        with patch.object(admission,'require_fresh_authorization') as authorized:
+            with self.assertRaisesRegex(RuntimeError,'superseded_non_executable'):
+                release.admitted_manifest(self.root,successor_contract())
+            authorized.assert_not_called()
+        with self.assertRaisesRegex(ValueError,'not executable'):
             MigrationManifest.load(self.root/'web/deployment/releases'/release.MANIFEST,self.root)
 
     def test_published_sql_mirrors_metadata_and_order_cannot_change(self):
         release.source_manifest(self.root)
         for path in [self.root/'web/deployment/releases'/release.MANIFEST,self.root/'web/deployment/releases'/release.BRIDGE,
-                     *self.root.glob('web/database/migrations/*.sql'),*self.root.glob('web/supabase/migrations/*.sql')]:
+                     *self.root.glob('web/database/historical-architecture-146-150/*.sql'),*self.root.glob('web/supabase/historical-architecture-146-150/*.sql')]:
             before=path.read_bytes();path.write_bytes(before+b'\n')
             with self.subTest(path=path.name),self.assertRaises(RuntimeError):release.source_manifest(self.root)
             path.write_bytes(before)

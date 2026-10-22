@@ -21,8 +21,8 @@ def validated_entries(root):
                 "path":"web/database/migrations/149_fence_notification_outbox_claims.sql"}
     if len(entries) != 1 or {key:entries[0].get(key) for key in expected} != expected:
         raise ValueError("Outbox fencing transition invalid")
-    original = root / expected["path"]
-    mirror = root / "web/supabase/migrations" / original.name
+    original = root / 'web/database/historical-architecture-146-150' / Path(expected['path']).name
+    mirror = root / "web/supabase/historical-architecture-146-150" / original.name
     original_bytes = original.read_bytes()
     if (original_bytes != mirror.read_bytes()
             or hashlib.sha256(original_bytes).hexdigest() != entries[0]["sha256"]):

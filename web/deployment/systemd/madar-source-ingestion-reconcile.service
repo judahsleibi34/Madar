@@ -1,0 +1,21 @@
+[Unit]
+Description=Madar bounded abandoned source-ingestion reconciliation
+After=network-online.target
+OnFailure=madar-ops-alert@%n.service
+
+[Service]
+Type=oneshot
+User=madar
+Group=madar
+UMask=0077
+EnvironmentFile=/etc/madar/runtime.env
+WorkingDirectory=/srv/madar/production/web/backend
+ExecStart=/usr/bin/flock --nonblock /run/lock/madar-source-ingestion-reconcile.lock /usr/bin/python3 scripts/reconcile_source_ingestions.py --limit 20 --lease-seconds 900
+TimeoutStartSec=15m
+MemoryMax=512M
+TasksMax=32
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/run/lock

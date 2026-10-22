@@ -120,7 +120,7 @@ class NotificationFencingDatabaseTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         with connect() as db:
-            if db.execute("select schema_version from public.application_schema_state where contract_key='core'").fetchone()[0]!=147:
+            if db.execute("select schema_version from public.application_schema_state where contract_key='core'").fetchone()[0]!=int(os.getenv('DELIVERY_TEST_SCHEMA','147')):
                 raise AssertionError('The coordinated147 rehearsal must execute before fencing tests')
             db.execute('create table if not exists public.notification_fencing_test_receipts(id bigserial primary key,delivery_id uuid,generation bigint,external_key text unique)')
 

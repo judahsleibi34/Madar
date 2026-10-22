@@ -1,0 +1,15 @@
+{
+  "release_metadata_version": 1,
+  "deployment_profile": "automatic-source-sync155-156",
+  "schema": {
+    "compatible_min": 155,
+    "compatible_max": 156,
+    "target": 156,
+    "migration_class": "expand-only",
+    "rollback_compatible_min": 155,
+    "rollback_compatible_max": 155
+  },
+  "migration_policy": "automatic-after-known-good-backup-first-forward-repair",
+  "migration_manifest": "migrations-155-156-automatic-source-sync.json",
+  "notes": "Unselected schema155 to schema156 candidate. Adds disabled-by-default resource schedules, service-only database claims, leases, fencing, bounded retries, redacted status, concurrency limits, and automatic execution through the existing incremental ingestion and checkpoint pipeline. The timer templates remain disabled. Grants no release selection, deployment, real provider, credential, external traffic, or production-data authority."
+}

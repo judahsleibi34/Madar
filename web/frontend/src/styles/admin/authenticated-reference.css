@@ -911,6 +911,43 @@
     margin-block-end: 10px !important;
   }
 
+  /* Keep every control on one vertical center line in the collapsed rail.
+     Nested groups previously inherited the wider sidebar content width, which
+     allowed their icon buttons to sit a few pixels away from the header. */
+  .admin-sidebar.is-workspace-collapsed :is(
+    .admin-sidebar-top,
+    .admin-sidebar-nav,
+    .admin-sidebar-bottom,
+    .admin-sidebar-group,
+    .admin-sidebar-settings-group
+  ) {
+    box-sizing: border-box;
+    width: 44px !important;
+    min-width: 44px !important;
+    max-width: 44px !important;
+    margin-inline: auto !important;
+  }
+
+  .admin-sidebar.is-workspace-collapsed :is(
+    .admin-sidebar-brand,
+    .admin-sidebar-workspace-collapse,
+    .admin-sidebar-row,
+    .notification-bell-button
+  ) {
+    box-sizing: border-box !important;
+    margin-inline: 0 !important;
+  }
+
+  .admin-sidebar.is-workspace-collapsed :is(
+    .admin-sidebar-brand,
+    .admin-sidebar-workspace-collapse,
+    .admin-sidebar-row,
+    .notification-bell-button
+  ) > svg,
+  .admin-sidebar.is-workspace-collapsed .admin-sidebar-brand > .admin-sidebar-icon {
+    margin-inline: auto !important;
+  }
+
   .admin-sidebar.is-workspace-collapsed
     .admin-sidebar-brand-row
     > .admin-sidebar-brand,

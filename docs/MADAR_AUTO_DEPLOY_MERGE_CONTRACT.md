@@ -1,5 +1,34 @@
 # Madar Auto-Deploy Merge Contract
 
+## Reconciled migration history (2026-10-22)
+
+Main cf444303 owns migrations147–156 unchanged. The four original PR220 integrity
+SQL files are archived byte-for-byte outside active migration trees; canonical
+forward transitions are156→157 delivery fencing,157→158 reservation capacity,
+158→159 outbox fencing and159→160 deletion ownership. Existing protocol2 APIs and
+private helper names/lock keys are retained. Deletion compatibility is exactly160,
+not a permissive future range. The new mirrored SQL changes only origin/target
+version checks/messages, schema-state assignments and that protocol horizon.
+
+The source hash inventory and unselected new manifest are under
+`web/deployment/migration-history-reconciliation.json` and
+`web/deployment/releases/migrations-157-160-reconciled.json`. The latter explicitly
+blocks execution pending a separately validated protected controller. Original
+146→148/149 admission now refuses the superseded history;146→150 remains blocked.
+The ordinary manifest loader rejects original architecture and new unapproved
+contracts. No active release descriptor, write authority, Class D classification
+or production policy is retargeted. Controller adaptation to160 is outside this
+reconciliation. Source validation of archived bytes is never execution admission.
+
+Historical native tests explicitly use immutable archived fixtures. Canonical
+native acceptance first exercises main's data-source transition and functional
+checks through156, then applies157–160 with rollback/reentry/concurrency tests,
+main-data/ACL preservation and the retained protocol2 worker assertions at160.
+A persistent schema150 architecture database is divergent, not a canonical
+schema150 data-source database. No persistent database may be reset or advanced
+without a separately reviewed exact-history plan.
+
+
 ## Maintenance creation is not release acceptance
 
 The coordinator now contains a maintenance-first DELETION branch using the
@@ -284,6 +313,189 @@ can remove that external ambiguity. Synthetic provider restart tests cover both
 idempotent and non-idempotent boundaries without real email, push or billing.
 
 
+## Schema156 source-candidate boundary
+
+The automatic Data Source synchronization migration, worker, and systemd templates
+are unselected candidate artifacts. Merging source must not select schema156, enable
+its timer, provision a provider, create a credential, or cause outbound traffic.
+Promotion requires the release-policy rehearsals and an explicit reviewed release
+descriptor change in a later deployment-authorized change.
+
+## Unselected schema155 Data Sources credential-vault candidate
+
+Migration155 is an additive, unselected candidate requiring exact schema154 under the
+locked `core` schema-state row. It adds encrypted credential versions, append-only
+secret-free lifecycle events, source credential revisions, CAS activation/revocation/
+rewrap RPCs, and a credential-fenced wrapper around the existing atomic incremental
+commit. Both migration trees, the candidate manifest, compatibility bridge, and
+candidate validator are checksum-bound. The active release remains schema146.
+
+Automatic deployment must not install, initialize, unseal, configure, or bootstrap
+Vault, and must not apply/select155 without separate exact-source approval. Root
+tokens, unseal shares, AppRole SecretIDs, application tokens, and Transit root key
+material are prohibited from source, manifests, Compose environment, and PostgreSQL.
+
+## C1.8.1 migration154 transition correction
+
+The still-unselected migration154 candidate begins its transaction before all other
+statements, locks the `core` schema-state row through a typed version variable before
+DDL, requires exact schema153, and advances to154 only after the expansion succeeds.
+Its mirrored SQL and candidate manifest checksum are pinned together. The transition
+validator removes comments, requires the declaration, core query, row lock, and guard
+inside one executable `DO` block, and requires that block to precede DDL for the
+guard-first migration series117 onward. Immutable migrations084–116 retain their
+historical statement ordering but must still contain the live same-block contract.
+
+## Unselected C1.8 bounded reconstruction refinement
+
+C1.8 changes application processing only and creates no schema155 candidate. The
+active release and candidate147–154 selection remain unchanged. Private immutable
+downloads use the existing server-only Supabase URL/service-role boundary with
+redirects disabled, identity encoding, bounded retry, incremental size/SHA-256
+verification, and atomic publication to private worker scratch.
+
+Exact historical replay uses a mode-0700 worker workspace and disk-backed SQLite
+state, pages history metadata, streams one verified chunk at a time, and emits the
+checkpoint CSV and hashes incrementally. Scratch cleanup is restricted to expired
+`checkpoint-*` directories below the configured fixed root. Existing lease/fence,
+quota, object-verification, publication, compensation, record/event limits, legacy
+local fallback, and Data Logs boundaries remain mandatory. These source changes do
+not authorize migration, bucket access, worker scheduling, deployment, or production
+data processing.
+
+## Unselected schema154 shared immutable-storage candidate
+
+The additive153→154 shared immutable-storage candidate is not selected by the
+active release. It reuses the existing private Supabase Storage provider and the
+authoritative storage reservation/object ledger; it does not authorize bucket
+creation, production network access, customer-file copying, worker activation, or
+deployment. The private `madar-data-immutable` bucket must be separately provisioned
+and verified before any later activation.
+
+The mirrored SQL, manifest, compatibility bridge, checksum validator, disposable
+rehearsal, and two-process loopback fixture are protected release artifacts. New
+schema154 incremental history and checkpoint versions fail closed unless provider
+identity, byte size, SHA-256, and verification time are durable. Existing local
+objects remain readable and unchanged. Accounting release must succeed before an
+unreferenced provider object may be physically removed; referenced history and
+published versions remain protected.
+
+## Unselected schema153 background-checkpoint candidate
+
+The additive152→153 background-checkpoint candidate is not selected by the active
+release and grants no automatic deployment or worker-start authority. Its manifest,
+bridge, mirrored SQL, validator, exact152 precondition, lease/fencing RPCs, bounded
+retry behavior, and disposable rehearsal are part of the protected release contract.
+The provided worker is one-shot only; any scheduler, service unit, Compose process,
+or production activation requires a separately reviewed release change. Do not
+bypass ambiguous storage evidence or publish a checkpoint without the current lease.
+
+## Unselected incremental-ingestion candidate151→152
+
+The mirrored schema152 candidate, `migrations-151-152-incremental-ingestion.json`
+and `schema-151-152-incremental-ingestion-bridge.json`, is checksum-pinned by
+`web/scripts/incremental_ingestion_candidate.py`. It requires exact schema151 and
+additively introduces stable source resources, bounded durable staging, immutable
+quota-accounted change chunks, an atomic current/history/cursor commit, and sparse
+analytical checkpoints bound to exact committed revisions.
+
+Legacy spreadsheet uploads and schema151 snapshot completion remain unchanged.
+Incremental reconciliation retains the schema150 lease/fence and storage-evidence
+rules; referenced history objects fail closed against release. Checkpoints reconstruct
+from accepted immutable history rather than mutable current rows, so later commits
+cannot contaminate an older target revision. The active release descriptor is
+unchanged, and this candidate grants no deployment, migration, production-data,
+provider-network, OAuth, webhook, scheduler, or worker authority.
+
+## Unselected API-source ingestion candidate150→151
+
+The mirrored schema151 candidate, `migrations-150-151-api-source-ingestion.json`
+and `schema-150-151-api-source-ingestion-bridge.json`, is checksum-pinned by
+`web/scripts/api_source_ingestion_candidate.py`. It requires exact schema150,
+additively admits an `api_provider` source identity with bounded provider/resource
+metadata, and adds service-role-only 151 reservation and atomic completion RPCs.
+
+Runtime code retains the schema148–150 spreadsheet behavior. The only API adapter
+in this milestone is a deterministic synthetic-orders fixture, enabled only in
+development/test and absent from the user-facing connector UI. It accepts no URL,
+headers, credentials, OAuth material, webhook, schedule, or arbitrary network
+instruction. The active release descriptor is unchanged; the candidate grants no
+deployment, migration, production-data, worker, traffic, or real-provider authority.
+
+## Unselected source-ingestion recovery candidate149→150
+
+The mirrored schema150 candidate, `migrations-149-150-source-ingestion-recovery.json`
+and `schema-149-150-source-ingestion-recovery-bridge.json`, is checksum-pinned by
+`web/scripts/source_ingestion_recovery_candidate.py`. It requires exact schema149
+and additively introduces renewable upload leases, fencing tokens, durable storage
+reservation/object attachment, and service-role-only bounded reconciliation.
+
+Lease expiry is only an investigation signal. A claimant rotates the fence before
+examining authoritative run and storage-accounting records; it marks failure only
+after reservation/accounting compensation is confirmed, and records unverifiable
+outcomes as ambiguous for later inspection. Late upload requests cannot complete
+after fencing, and successful dataset/version/source lineage remains atomic.
+
+The one-shot backend command is not an HTTP endpoint and is not automatically
+scheduled. This candidate remains absent from `release.json`, cannot skip schemas
+147–149, and grants no deployment, migration, production-data, worker, or traffic
+authority.
+
+## Unselected source-ingestion candidate148→149
+
+The mirrored schema149 candidate, `migrations-148-149-source-ingestions.json`
+and `schema-148-149-source-ingestions-bridge.json`, is checksum-pinned by
+`web/scripts/source_ingestions_candidate.py`. It requires exact source
+schema148 and adds durable manual-upload ingestion runs plus service-only RPCs
+that reserve an idempotent attempt and atomically complete source, dataset,
+version, and run lineage.
+
+The application continues to use the existing upload parser, quota accounting,
+and private storage path. Filesystem writes remain outside PostgreSQL; a failed
+metadata completion therefore uses the existing accounting release before file
+deletion, while the run stores only a bounded failure code. No connector,
+credential, webhook, scheduler, queue, or worker is introduced.
+
+This candidate is source preparation only. It is absent from `release.json`,
+cannot skip schemas147 or148, and grants no deployment, migration,
+production-data, worker, or traffic authority.
+
+## Unselected project data-sources candidate147→148
+
+The mirrored schema148 candidate, `migrations-147-148-data-sources.json`
+and `schema-147-148-data-sources-bridge.json`, is checksum-pinned by
+`web/scripts/data_sources_candidate.py`. It requires exact source schema147,
+adds tenant/project-bound source identities and nullable source lineage on the
+existing dataset registry, and advances schema state only after all additive
+objects and constraints are installed.
+
+The first supported identity type is manual `spreadsheet_upload`. The candidate
+does not store credentials or general-purpose connector configuration, and it
+adds no OAuth flow, API connector, webhook, polling schedule, ingestion worker,
+or customer-data mutation. Existing datasets remain valid with a null source.
+
+This candidate is source preparation only. It is not selected by `release.json`,
+cannot skip the governed path through schema147, and grants no deployment,
+migration, production-data, worker, or traffic authority. Runtime access remains
+authenticated and explicitly tenant-, project-, and creator-scoped; service-role
+database access is never treated as user authorization.
+
+## Unselected project-datasets candidate146→147
+
+The mirrored schema147 candidate, `migrations-146-147-project-datasets.json`
+and `schema-146-147-project-datasets-bridge.json`, is checksum-pinned by
+`web/scripts/project_datasets_candidate.py`. It requires exact source schema146,
+adds tenant/project-bound dataset identities and immutable dataset-version
+metadata over the existing private storage-accounting objects, and advances the
+schema state only after those additive objects and service-only creation RPC are
+installed. It adds no connector, worker, scheduler, webhook, collaboration, or
+customer-data mutation.
+
+This candidate is source preparation only. It is not selected by `release.json`,
+cannot skip the governed path to schema146, and grants no deployment, migration,
+production-data, or traffic authority. Runtime access remains authenticated and
+explicitly tenant-, project-, and uploader-scoped; the service-role client is not
+treated as authorization.
 ## Manual commercial144→146 release
 
 The exact completed-NORMAL maintenance coordinator may select
@@ -803,8 +1015,13 @@ The migration must:
 - use the typed `v_schema_version` variable
 - contain exactly one source-schema guard
 - contain exactly one transition to schema `N`
+- keep the typed declaration, core schema-state query, row lock, and predecessor
+  guard together in one executable `DO` block
+- for the guard-first series from migration117 onward, place that block before any
+  schema-changing DDL
 
-Do not add fake strings/comments merely to satisfy validators.
+Comments are removed before validation. Do not add fake strings, comments, or
+unrelated `FOR UPDATE` statements merely to satisfy validators.
 
 ## When adding a new production schema transition
 

@@ -13,6 +13,9 @@ export default function DataSourceStep({
   importFormResponses,
   uploadFile,
   loadExternalSource,
+  projectDatasets = [],
+  projectDatasetsStatus = "idle",
+  reopenProjectDataset,
   selectForm,
   setActiveTab,
   isLoading,
@@ -51,6 +54,42 @@ export default function DataSourceStep({
           {t.external}
         </button>
       </div>
+
+      {typeof reopenProjectDataset === "function" ? (
+        <section className="daw-project-datasets" aria-labelledby="daw-project-datasets-title">
+          <div>
+            <h4 id="daw-project-datasets-title">{t.projectDatasets}</h4>
+            <p>{t.projectDatasetsHint}</p>
+          </div>
+          {projectDatasetsStatus === "loading" ? (
+            <p role="status">{t.loadingDatasets}</p>
+          ) : projectDatasets.length ? (
+            <div className="daw-project-dataset-list">
+              {projectDatasets.map((item) => (
+                <article key={item.id}>
+                  <div>
+                    <strong>{item.display_name}</strong>
+                    <span>
+                      {item.latest_version?.size_bytes
+                        ? `${Math.max(1, Math.round(item.latest_version.size_bytes / 1024))} KB`
+                        : t.datasetReady}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={isLoading}
+                    onClick={() => reopenProjectDataset(item.id)}
+                  >
+                    {t.openDataset}
+                  </button>
+                </article>
+              ))}
+            </div>
+          ) : projectDatasetsStatus === "ready" ? (
+            <p>{t.noProjectDatasets}</p>
+          ) : null}
+        </section>
+      ) : null}
 
       {sourceMode === "forms" ? (
         <div className="daw-source-body">

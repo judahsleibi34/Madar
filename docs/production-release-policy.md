@@ -1,5 +1,34 @@
 # Madar production release acceptance policy
 
+## Reconciled migration history (2026-10-22)
+
+Main cf444303 owns migrations147–156 unchanged. The four original PR220 integrity
+SQL files are archived byte-for-byte outside active migration trees; canonical
+forward transitions are156→157 delivery fencing,157→158 reservation capacity,
+158→159 outbox fencing and159→160 deletion ownership. Existing protocol2 APIs and
+private helper names/lock keys are retained. Deletion compatibility is exactly160,
+not a permissive future range. The new mirrored SQL changes only origin/target
+version checks/messages, schema-state assignments and that protocol horizon.
+
+The source hash inventory and unselected new manifest are under
+`web/deployment/migration-history-reconciliation.json` and
+`web/deployment/releases/migrations-157-160-reconciled.json`. The latter explicitly
+blocks execution pending a separately validated protected controller. Original
+146→148/149 admission now refuses the superseded history;146→150 remains blocked.
+The ordinary manifest loader rejects original architecture and new unapproved
+contracts. No active release descriptor, write authority, Class D classification
+or production policy is retargeted. Controller adaptation to160 is outside this
+reconciliation. Source validation of archived bytes is never execution admission.
+
+Historical native tests explicitly use immutable archived fixtures. Canonical
+native acceptance first exercises main's data-source transition and functional
+checks through156, then applies157–160 with rollback/reentry/concurrency tests,
+main-data/ACL preservation and the retained protocol2 worker assertions at160.
+A persistent schema150 architecture database is divergent, not a canonical
+schema150 data-source database. No persistent database may be reset or advanced
+without a separately reviewed exact-history plan.
+
+
 ## Atomic calendar edits
 
 Calendar event/series edits and occurrence/future splits use one PostgreSQL
@@ -514,6 +543,217 @@ can remove that external ambiguity. Synthetic provider restart tests cover both
 idempotent and non-idempotent boundaries without real email, push or billing.
 
 
+## C3 Step 1 unselected automatic synchronization candidate
+
+Schema156 and its one-shot automatic Data Source synchronization worker are source
+candidates only. Schedules default disabled; the checked-in systemd timer is a template
+and must not be installed or enabled by this change. PostgreSQL owns due selection,
+leases, fencing, bounded retry state, cursor-safe ingestion lineage, and redacted
+status. The worker must reuse the schema152–155 incremental ingestion, credential,
+immutable-history, and checkpoint paths. It may not create a second data pipeline.
+
+Activation requires exact155→156 and full136→156 disposable rehearsals, the combined
+Vault/PostgreSQL/loopback-provider/checkpoint workflow, multi-process claim and stale
+lease evidence, capacity-derived global/provider/tenant limits, monitoring, and an
+explicit staging enablement review. Migration156 grants no release selection, real
+provider, external traffic, persistent worker, credential, or production mutation.
+
+## C2 Step 2 unselected local credential-vault candidate
+
+Schema155 and its HashiCorp Vault Transit integration are source candidates only.
+They authorize no migration selection, persistent Vault installation, service start,
+real credential, external provider, or production mutation. The application uses a
+dedicated derived Transit key for per-version AES-256-GCM envelopes and reads only a
+short-lived token from a private Vault Agent sink. Operator/root, unseal, AppRole
+bootstrap, audit, Raft, and backup authority remain outside the application.
+
+Activation requires exact154→155 and full136→155 disposable rehearsals, a reviewed
+TLS/identity/filesystem installation, manual-unseal and recovery custody runbooks,
+coordinated encrypted PostgreSQL/Raft restore proof, token renewal/revocation proof,
+and the synthetic lifecycle/failure matrix. Vault and Madar on one host do not protect
+against whole-host/root compromise; staging must explicitly accept that residual risk.
+
+## C2 provider-independent API transport source candidate
+
+C2 Step1 adds no migration and does not select schemas147–155. Its only configured HTTP
+provider is an exact-`APP_ENV=test` loopback fixture. Production has no registered
+destination or credential and must fail closed. Any real provider requires a separate
+reviewed operator registry entry, dedicated encrypted source-credential architecture,
+HTTPS public-address-only DNS validation, pinned TLS connection, egress controls,
+bounded retry/rate/pagination/body/elapsed behavior, secret-free audit evidence, and
+staging failure rehearsal. Data Source rows and public requests must never supply
+URLs, headers, credentials, or storage identities. See
+`docs/data-sources-api-connectivity.md`.
+
+The transport reuses the schema151/152 fenced ingestion lifecycle. It grants no
+external traffic, worker activation, deployment, migration, production credential,
+or customer-data authority. Data Logs, authentication, memberships, uploads, and the
+active schema146 release remain unchanged.
+
+## C1.9 Data Sources staging-readiness candidate
+
+The source-only C1.9 gate composes the selected schema146 contract through Data
+Sources candidates147–154. `check_data_sources_staging_chain.py` and the
+disposable full-chain rehearsal grant no release selection or deployment authority.
+The reconciliation, checkpoint, and scratch-cleanup systemd units must remain disabled
+until a staging-specific review confirms schema154, the private shared bucket, encrypted
+bounded scratch storage, credentials, alerts, and rollback procedure. Production still
+requires separate exact-source authorization and real staging evidence.
+
+## C1.8.1 corrected migration154 release gate
+
+Migration154 remains undeployed and unselected. Its candidate SQL now acquires a
+typed `FOR UPDATE` lock on the `core` schema-state row before DDL and rejects every
+source other than exact schema153. Candidate checksum metadata is updated as one
+integrity unit; the unchanged compatibility bridge grants no selection authority.
+Disposable acceptance must prove rollback without partial DDL and must run two
+competing migration sessions, permitting exactly one153→154 transition.
+
+## C1.8 bounded reconstruction source candidate
+
+C1.8 adds no migration and does not select candidate schemas147–154. The checkpoint
+worker now requires a private scratch root with sufficient bounded capacity and mode
+0700 ownership. Provider reads use the existing Supabase service credential only on
+the server, disallow redirects and compressed transfer, and must verify exact bytes
+and SHA-256 before history decoding or publication. The official storage SDK's
+buffered `download()` is not accepted for this path.
+
+Staging must verify scratch lifecycle cleanup, filesystem-at-rest controls, actual
+Supabase streaming behavior, provider timeout/retry behavior, and memory at the
+100,000-record/1,000,000-event limits. The existing shared bucket, migration154,
+lease fencing, quota accounting, and legacy compatibility gates remain unchanged.
+This source work authorizes no production worker or migration activation.
+
+## Candidate schema154 private immutable storage
+
+Schema154 remains an unselected source candidate. Activation requires the exact
+153→154 manifest and bridge, a known-good backup, successful disposable rehearsal,
+and a pre-provisioned non-public `madar-data-immutable` bucket reachable from every
+application and checkpoint-worker instance. Service-role credentials remain server
+only; neither bucket nor provider object keys may be accepted from or returned to
+Data Sources clients.
+
+Do not activate schema154 unless all participating processes use the shared provider.
+The database rejects new incremental-history and checkpoint publication backed only
+by local storage after schema154. Legacy local spreadsheet and snapshot artifacts
+remain supported and require no in-place migration. Any later legacy-object migration
+requires its own inventory, copy/verify, rollback, and customer-data approval.
+
+## Unselected schema153 background checkpoints
+
+Candidate migration153 and its mirrored SQL, manifest, bridge, validator, disposable
+rehearsal, and one-shot internal worker are source-only. The active release remains
+unchanged. Migration153 may be considered only after exact schema152 backup-first
+admission and the normal migration gates. A scheduler or continuously running worker
+requires a separate supervised deployment review; this candidate grants no such
+authority. Lease fencing, bounded retries, ambiguous storage preservation, exact
+revision reconstruction, and post-publication replay checks must remain passing.
+
+## Unselected schema152 incremental ingestion
+
+Schema152 is an unselected expand-only candidate on exact schema151. Its mirrored,
+checksum-pinned migration preserves migrations001–151 and the active release
+descriptor. Stable `(tenant, project, source, resource)` identities own one logical
+incremental dataset; service-only RPCs stage bounded normalized changes and atomically
+advance current records, immutable history, the dataset revision, the resource cursor,
+and terminal run lineage under the existing lease fence.
+
+Change chunks use existing private dataset storage reservations and accounting.
+History references prevent a committed chunk from being released. Analytical versions
+are created only by explicit sparse checkpoint materialization and are bound to a
+specific committed revision. Legacy file-backed versions, spreadsheet ingestion,
+schema151 snapshot RPCs, Data Logs, authentication and tenant memberships are not
+weakened. Adding these source artifacts authorizes no deployment or production change.
+
+## Unselected schema151 API-source ingestion
+
+Schema151 is an unselected expand-only candidate on exact schema150. It widens the
+Data Sources identity constraint only to the reviewed `api_provider` type and adds
+new fenced reserve/complete functions; migrations147–150 remain immutable. The
+existing spreadsheet flow keeps its older-schema compatibility path.
+
+The synthetic-orders adapter is a test/development fixture and must fail closed in
+production. Enabling a real provider requires separate review of provider allow
+listing, isolated egress and SSRF controls, scoped encrypted credentials, rate
+limits, bounded response handling, revocation, and audit behavior. No active release
+selection or production configuration changes here, and these artifacts authorize
+no deployment or production mutation.
+
+## Unselected schema150 source-ingestion recovery
+
+Schema150 is an unselected, expand-only candidate on exact schema149. Its guarded
+upload lease and internal reconciliation RPCs are service-role-only; no public
+recovery endpoint or scheduler is added. Recovery must treat expiry as suspicion,
+rotate the database fence before cleanup, release quota accounting before deleting
+private bytes, and preserve unknown outcomes as `ambiguous` rather than inferring
+failure. Schema149 application behavior remains the compatibility fallback.
+
+The active release descriptor is unchanged. Production use requires the ordinary
+reviewed bridge selection, verified backup, exact image/schema compatibility,
+full 146→150 rehearsal, and explicit deployment approval. These source artifacts
+authorize no production mutation.
+
+## Unselected source-ingestion candidate (schema149)
+
+The checksum-pinned `migrations-148-149-source-ingestions.json` /
+`schema-148-149-source-ingestions-bridge.json` pair contains mirrored
+migration149 only. `source_ingestions_candidate.py`, `check_migrations.py`, and
+`check_forward_release.py` accept it only with the exact descriptor, SQL mirror,
+and checksums. Migrations147 and148 remain unchanged prerequisites.
+
+Migration149 adds tenant/project/source/user-scoped ingestion history,
+idempotency uniqueness, constrained `pending → processing → succeeded/failed`
+transitions, exact result lineage, and transactional reserve/complete/fail RPCs.
+It creates no worker or remote synchronization facility and rewrites no customer
+dataset. The active release descriptor does not select schema149.
+
+Production use requires separately accepted schema147 and148 transitions, a
+verified schema148 backup, compatible images, populated-data and concurrency
+rehearsals, ordinary governed approval, and all existing acceptance gates.
+
+## Unselected project data-sources candidate (schema148)
+
+The exact checksum-pinned `migrations-147-148-data-sources.json` /
+`schema-147-148-data-sources-bridge.json` pair extends the retained schema147
+candidate with mirrored migration148 only. `data_sources_candidate.py`,
+`check_migrations.py`, and `check_forward_release.py` accept this namespace entry
+only when the descriptor, SQL mirror, and checksums match. Historical
+migrations001–147 and their retained manifests remain unchanged.
+
+Migration148 adds service-only `data_sources` identities scoped by tenant, Data
+Project, and creator. It adds nullable `source_id` lineage to existing datasets
+and optional latest dataset/version pointers with composite foreign keys. Existing
+dataset rows are not rewritten. Only manual spreadsheet-upload identities are
+accepted; credentials, connector settings, ingestion jobs, webhooks, OAuth, and
+automatic synchronization are absent.
+
+The candidate is not selected by the active `release.json`. Development and
+static validation do not authorize applying schema148 to production or any
+customer database. Production use requires an accepted schema147 source, verified
+backup, compatible application images, isolated populated-data rehearsal, ordinary
+governed migration approval, and all existing acceptance gates.
+
+## Unselected project-datasets candidate (schema147)
+
+The exact checksum-pinned `migrations-146-147-project-datasets.json` /
+`schema-146-147-project-datasets-bridge.json` pair extends the retained schema146
+candidate with mirrored migration147 only. `project_datasets_candidate.py`,
+`check_migrations.py`, and `check_forward_release.py` accept this additional
+namespace entry only when the descriptor, SQL mirror, and checksums match.
+Historical migrations001–146 and their retained manifests remain unchanged.
+
+Migration147 adds `data_datasets` and `data_dataset_versions`, composite
+tenant/project and tenant/dataset constraints, service-role-only table access,
+and one atomic service-only RPC for the initial upload version. Dataset metadata
+references existing private `storage_objects`; no second storage engine or raw
+data copy is introduced. User IDs remain creator/storage audit references and do
+not introduce project collaboration or sharing semantics.
+
+The candidate is not selected by the active `release.json`. Development and
+static validation do not authorize applying schema147 to production or any
+customer database. Production use still requires the accepted schema146 source,
+a verified backup, compatible application images, the ordinary governed
+migration path, isolated current-data rehearsal, and explicit approval.
 ## Manual commercial144→146 release
 
 A post-SQL backup failure requires a separate backup-only completion. It binds
@@ -1548,10 +1788,16 @@ from 084 onward. For migration `N` it requires:
 - exactly one guard equivalent to `v_schema_version <> N-1`;
 - exactly one `SET schema_version = N` transition;
 - a `FOR UPDATE` lock on schema state;
-- explicit `contract_key = 'core'` targeting.
+- explicit `contract_key = 'core'` targeting;
+- the typed declaration, core query, lock, and predecessor guard in one executable
+  `DO` block;
+- for migrations117 onward, that guard block before schema-changing DDL.
 
-The constructs must be live migration logic, not comments or dead text. A valid
-skeleton, based on neighboring migrations, is:
+Comments are removed before inspection, harmless whitespace differences are
+accepted, and an unrelated function cannot supply the required lock. Migrations
+084–116 retain their immutable historical statement placement while still requiring
+the same executable guard block. A valid skeleton, based on neighboring migrations,
+is:
 
 ```sql
 begin;
