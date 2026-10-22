@@ -91,6 +91,7 @@ class ReconciledOutboxTests(outbox.OutboxFencingDatabaseTests):
             self.db.execute((ROOT/'web/database/migrations/159_fence_notification_outbox_claims.sql').read_text())
         self.db.execute('rollback')
         self.assertEqual(self.db.execute('select notification_outbox_protocol()').fetchone()[0],2)
+        self.assertFalse(self.db.execute("select has_table_privilege('service_role','public.notification_outbox','UPDATE')").fetchone()[0])
 
 
 class ReconciledDeletionTests(deletion.Deletion150OwnershipTests):
@@ -98,5 +99,11 @@ class ReconciledDeletionTests(deletion.Deletion150OwnershipTests):
         if not DSN:self.skipTest('Requires owned reconciled fixture')
         self.assertEqual(self.db.execute("select schema_version from public.application_schema_state where contract_key='core'").fetchone()[0],160)
         self.assertEqual(self.db.execute('select data_deletion_ownership_protocol()').fetchone()[0],2)
+        # Observe the diagnostic SQL directly: the historical150 admission
+        # validator must continue rejecting160 rather than widening its range.
+        from deployment.lib.schema150_release import QUIESCENCE_SQL
+        observed=self.db.execute(QUIESCENCE_SQL).fetchone()[0]
+        self.assertEqual(observed['schema'],160)
+        self.assertEqual(observed['legacy_deletion_backlog'],0)
         self.assertEqual(self.current()['state'],'pending')
         self.assertEqual(self.current()['claim_generation'],0)
