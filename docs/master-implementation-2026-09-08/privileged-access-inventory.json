@@ -1069,6 +1069,10 @@
       ],
       "user_reachability": "Controller-governed cross-tenant worker authority, protocol and original-claim RPC fencing; no individual browser authorization is inferred from the service key.",
       "database_authority": "Privileged SUPABASE_SERVICE_KEY client; treat service_role as RLS-bypassing. Direct filters/caller checks and explicit SECURITY DEFINER RPC guards are required; current live role flags were not inspected in this source review."
+    },
+    {
+      "path": "web/backend/services/calendar_mutation_service.py",
+      "boundary": "Configured authenticator application SQL connection with fixed service_role transaction; exact cluster pin; locked active tenant/member/user and calendar ACL checks, version CAS, fixed domain SQL only, aggregate children/change/audit rollback; no root credentials or REST fallback."
     }
   ],
   "related_privileged_paths": [

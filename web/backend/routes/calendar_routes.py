@@ -45,6 +45,8 @@ from services.calendar_workspace_cache_service import (
 )
 from services.bounded_query_service import submit_db_read
 from services.observability_service import traced_operation
+from services.calendar_mutation_service import mutate_event
+from services.rate_limit_service import get_client_ip
 
 
 router = APIRouter(prefix="/calendar", tags=["Calendar"])
@@ -1397,37 +1399,15 @@ def update_event(event_id: str, payload: EventWrite, request: Request, response:
     conflicts = event_conflicts(context.tenant_id, row["calendar_id"], payload.starts_at, payload.ends_at, event_id)
     if conflicts and not payload.allow_conflicts:
         raise HTTPException(status_code=409, detail={"code": "calendar_event_conflict", "message": "This time overlaps another busy event.", "conflicts": conflicts})
-    if scope in {"occurrence", "future"}:
-        if not before.get("recurrence_rule") or occurrence_start is None:
-            raise HTTPException(status_code=400, detail="A recurring occurrence must be selected for this edit scope")
-        occurrence_start = occurrence_start.astimezone(timezone.utc)
-        if scope == "occurrence":
-            parent = exclude_occurrence(context, before, occurrence_start)
-            row.update({"recurrence_rule": None, "recurrence_parent_id": event_id, "recurrence_original_start": iso(occurrence_start), "version": 1})
-            created = getattr(service_supabase.table("calendar_events").insert(row).execute(), "data", None) or []
-            if not created:
-                raise HTTPException(status_code=500, detail="Recurring occurrence could not be updated")
-            replace_event_children(context, created[0], payload)
-            write_change(context, created[0]["id"], "created", "occurrence", None, created[0])
-            write_change(context, event_id, "updated", "occurrence", before, parent)
-            record_calendar_audit(context, request, "calendar.event_updated", "calendar_event", event_id, {"scope": scope})
-            return {"success": True, "event": created[0], "series": parent, "conflicts": conflicts}
-        parent_rule = truncated_recurrence_rule(before["recurrence_rule"], occurrence_start - timedelta(seconds=1))
-        parent = update_event_versioned(context, before, {"recurrence_rule": parent_rule})
-        row.update({"recurrence_parent_id": None, "recurrence_original_start": None, "version": 1})
-        created = getattr(service_supabase.table("calendar_events").insert(row).execute(), "data", None) or []
-        if not created:
-            raise HTTPException(status_code=500, detail="Future recurring events could not be updated")
-        replace_event_children(context, created[0], payload)
-        write_change(context, event_id, "updated", "future", before, parent)
-        write_change(context, created[0]["id"], "created", "future", None, created[0])
-        record_calendar_audit(context, request, "calendar.event_updated", "calendar_event", event_id, {"scope": scope})
-        return {"success": True, "event": created[0], "series": parent, "conflicts": conflicts}
-    updated = update_event_versioned(context, before, row)
-    replace_event_children(context, updated, payload)
-    write_change(context, event_id, "updated", scope, before, updated)
-    record_calendar_audit(context, request, "calendar.event_updated", "calendar_event", event_id, {"scope": scope})
-    return {"success": True, "event": updated, "conflicts": conflicts}
+    try:
+        result=mutate_event(context,event_id,payload,row,expected_version=int(before.get('version') or 1),
+            scope=scope,occurrence_start=occurrence_start,audit={
+                'ip':get_client_ip(request) if request is not None else None,
+                'user_agent':request.headers.get('user-agent','')[:1000] if request is not None else None})
+    finally:
+        # Includes uncertain COMMIT replies: invalidate, never replay writes.
+        invalidate_calendar_workspace_cache(context.tenant_id)
+    return {'success':True,**result,'conflicts':conflicts}
 
 
 @router.delete("/events/{event_id}")

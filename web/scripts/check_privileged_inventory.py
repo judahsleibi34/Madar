@@ -10,7 +10,7 @@ from pathlib import Path
 
 repo = Path(__file__).resolve().parents[2]
 root = repo / "web/backend"
-client_names = {"service_supabase", "admin_supabase", "supabase_admin"}
+client_names = {"service_supabase", "admin_supabase", "supabase_admin", "psycopg"}
 found = set()
 for path in root.rglob("*.py"):
     if any(part in {"tests", "scripts", "__pycache__"} for part in path.relative_to(root).parts):

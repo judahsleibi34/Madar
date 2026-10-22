@@ -1,5 +1,25 @@
 # Madar production release acceptance policy
 
+## Atomic calendar edits
+
+Calendar event/series edits and occurrence/future splits use one PostgreSQL
+transaction for the parent, replacement, attendees, reminders, change records
+and audit row. The domain service rechecks and locks active tenant membership,
+calendar permissions and the expected event version. It never retries writes
+after an uncertain COMMIT reply or falls back to sequential PostgREST writes.
+
+This transport requires separately configured `MADAR_CALENDAR_DATABASE_DSN`
+(explicit host/database, existing nonadministrative `authenticator` identity)
+and `MADAR_CALENDAR_DATABASE_SYSTEM_IDENTIFIER`. The connection must support
+the established `SET LOCAL ROLE service_role` boundary and cluster-identity
+inspection through `pg_control_system()`. No role grants, credentials or live
+configuration are installed by this change. Missing configuration/privileges
+fails calendar edits closed with503. These are deployment prerequisites, not
+production authorization; the existing broad service-role capability remains.
+Clients should retain their expected version when reconciling an unknown
+commit. Cache invalidation also runs on an uncertain outcome. Calendar create
+and delete endpoints retain their existing behavior.
+
 ## Maintenance candidate preparation and original inventory
 
 The existing release child's schema150 preparation branch creates all eight
