@@ -1,0 +1,21 @@
+{
+  "release_sha": "CURRENT",
+  "migrations": [
+    {
+      "number": 145,
+      "from_schema": 144,
+      "to_schema": 145,
+      "path": "web/database/migrations/145_enforce_paid_commercial_continuity.sql",
+      "sha256": "dc9882fbbe8582c021cfca0f3a97a0621e237dde8c66406516a7d84ca5338288",
+      "compatibility": "forward-compatible"
+    },
+    {
+      "number": 146,
+      "from_schema": 145,
+      "to_schema": 146,
+      "path": "web/database/migrations/146_revise_launch_price_book.sql",
+      "sha256": "0e92310c8c995c1d7a42b2b4f34c525a6bd082af3bcb39194f6776b8a82565af",
+      "compatibility": "forward-compatible"
+    }
+  ]
+}

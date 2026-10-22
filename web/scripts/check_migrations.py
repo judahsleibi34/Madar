@@ -374,13 +374,22 @@ def check_production_lineage(errors: list[str]) -> None:
         # Preserve reviewed main's future namespace without selecting any SQL.
         retained_future = {}
         profile = release.get("deployment_profile")
-        if profile in {"local-supabase-schema115", "local-supabase-schema115-136"}:
+        if profile in {"local-supabase-schema115", "local-supabase-schema115-136", "completed-normal-commercial144-146"}:
             expected_schema = {
                 "compatible_min": 115, "compatible_max": 115, "target": 115,
                 "migration_class": "none", "rollback_compatible_min": 115,
                 "rollback_compatible_max": 115,
             }
-            if profile == "local-supabase-schema115-136":
+            if profile == "completed-normal-commercial144-146":
+                expected_schema = {"compatible_min":144,"compatible_max":146,"target":146,
+                    "migration_class":"forward-compatible","rollback_compatible_min":144,"rollback_compatible_max":144}
+                bridge=json.loads((REPO_ROOT / "deployment/releases/schema-144-146-commercial-bridge.json").read_text())
+                combined=json.loads((REPO_ROOT / "deployment/releases/migrations-145-146-commercial.json").read_text())
+                expected_entries=validated_commercial_continuity_entries(REPO_ROOT.parent)+validated_launch_price_book_entries(REPO_ROOT.parent)
+                valid_policy=(release==bridge and combined=={"release_sha":"CURRENT","migrations":expected_entries}
+                    and release.get("migration_manifest")=="migrations-145-146-commercial.json"
+                    and release.get("migration_policy")=="automatic-after-known-good-backup-first-forward-repair")
+            elif profile == "local-supabase-schema115-136":
                 expected_schema.update(compatible_max=136, target=136,
                                        migration_class="forward-compatible")
                 valid_policy = (release.get("migration_policy") ==

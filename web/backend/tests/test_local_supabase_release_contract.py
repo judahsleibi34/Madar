@@ -37,8 +37,8 @@ class LocalSupabaseReleaseContractTests(unittest.TestCase):
         self.assertNotIn('migration_manifest',release)
         self.assertEqual(release['schema'],{'compatible_min':115,'compatible_max':115,'target':115,'migration_class':'none','rollback_compatible_min':115,'rollback_compatible_max':115})
 
-    def test_active_release_selects_only_the_exact_schema115_to136_contract(self):
-        release=json.loads((WEB_ROOT/'deployment/releases/release.json').read_text())
+    def test_retained_schema115_to136_contract_remains_exact(self):
+        release=json.loads((WEB_ROOT/'deployment/releases/schema-115-136-bridge.json').read_text())
         self.assertTrue(validator.schema115_bridge_valid(release))
         self.assertEqual(release['migration_manifest'],'migrations-116-136.json')
 

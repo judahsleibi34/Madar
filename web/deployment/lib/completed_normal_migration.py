@@ -190,7 +190,7 @@ def run_migration(contract,release_root,state_root,operations):
         # phase/checksum in the durable executor; emit only the exception type.
         raise RuntimeError('completed_migration_error_'+type(error).__name__) from None
     if operations.schema_version()!=selected.target:raise RuntimeError('completed_migration_target_not_observed')
-    if selected is MANUAL:
+    if selected.maintenance:
         #144 must become visible to the already-running native PostgREST too.
         # This cache notification changes no customer rows or SQL checksums.
         connection=connection_factory(contract)

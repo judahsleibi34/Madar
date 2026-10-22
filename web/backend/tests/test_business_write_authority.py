@@ -80,6 +80,21 @@ class BusinessWriteAuthorityTests(unittest.TestCase):
             self.data.update(version=1);self.write()
             with self.assertRaises(RuntimeError):authority.read_authority()
 
+    def test_commercial_grant_fails_closed_until_reviewed_target146(self):
+        self.data.update(version=2,compatible_min=144,compatible_max=146)
+        with patch.dict(os.environ,{"SCHEMA_COMPATIBLE_MIN":"144","SCHEMA_COMPATIBLE_MAX":"146","SCHEMA_EXCLUDED_VERSIONS":""}):
+            for schema in (144,145,146):
+                self.data.update(schema=schema,mode="READ_ONLY");self.write()
+                self.assertTrue(authority.restricted())
+                self.data["mode"]="NORMAL";self.write()
+                if schema==146:self.assertFalse(authority.restricted())
+                else:
+                    with self.assertRaises(RuntimeError):authority.read_authority()
+            for change in ({"compatible_max":147},{"schema":147},{"release_sha":"c"*40},{"contract_digest":"c"*64}):
+                self.data.update(version=2,schema=146,release_sha="b"*40,contract_digest="a"*64,compatible_min=144,compatible_max=146,mode="NORMAL")
+                self.data.update(change);self.write()
+                with self.assertRaises(RuntimeError):authority.read_authority()
+
     def test_modified_binding_denies_every_request(self):
         for field, value in [("mode", "ALLOW"), ("schema", 116), ("release_sha", "c" * 40),
                              ("contract_digest", "d" * 64), ("version", 2)]:

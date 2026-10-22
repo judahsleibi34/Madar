@@ -15,7 +15,7 @@ locked `core` schema-state row. It adds encrypted credential versions, append-on
 secret-free lifecycle events, source credential revisions, CAS activation/revocation/
 rewrap RPCs, and a credential-fenced wrapper around the existing atomic incremental
 commit. Both migration trees, the candidate manifest, compatibility bridge, and
-candidate validator are checksum-bound. The active release remains schema136.
+candidate validator are checksum-bound. The active release remains schema146.
 
 Automatic deployment must not install, initialize, unseal, configure, or bootstrap
 Vault, and must not apply/select155 without separate exact-source approval. Root
@@ -183,6 +183,21 @@ cannot skip the governed path to schema146, and grants no deployment, migration,
 production-data, or traffic authority. Runtime access remains authenticated and
 explicitly tenant-, project-, and uploader-scoped; the service-role client is not
 treated as authorization.
+## Manual commercial144→146 release
+
+The exact completed-NORMAL maintenance coordinator may select
+`schema-144-146-commercial-bridge.json` and its composition of the unchanged
+145 and146 manifests. Historical profiles, receipts, SQL and grants retain their
+original bounds. The candidate is READ_ONLY through144 and145; only verified146
+permits a fresh root-issued144..146 NORMAL grant. Existing customer rows, Auth,
+MFA and storage must remain exact; the only catalog addition is the independently
+verified immutable `launch_2026_v2` row. No sales activation is included.
+
+Source-bound controller CI, exact-image acceptance, private current-data SQL
+rehearsal, backups, independent restore and Node1 replication remain required.
+Manual execution uses the existing locks, boot supersession and forward repair;
+no automatic deployment is enabled. Component checks do not claim host reboot
+acceptance. Explicit operation authorization remains required.
 
 ## Unselected revised launch price-book candidate145→146
 

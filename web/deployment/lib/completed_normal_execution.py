@@ -143,7 +143,7 @@ def manual_maintenance_route(contract):
     Ordinary backup verifies the actual release through the stable proxy. Keep
     that nonmutating endpoint available while customer/Auth traffic is fenced.
     """
-    if profile(contract) is not MANUAL:
+    if not profile(contract).maintenance:
         raise RuntimeError('completed_manual_maintenance_contract_required')
     port=8101 if contract['candidate']['slot']=='blue' else 8201
     return (f'upstream madar_backend_active {{ server 127.0.0.1:29402; }}\n'
@@ -308,9 +308,8 @@ class CompletedNormalUpgrade:
             verify_backup_execution_context(self.package,expected_schema=self.profile.source)
         else:verify_backup_execution_context(self.package)
         baseline=customer_baseline(self.contract,self.actor.runtime)
-        if (baseline['table_roots_sha256']!=self.contract['customer_table_roots_sha256']
-                or baseline['identity_roots_sha256']!=self.contract['customer_identity_roots_sha256']):
-            raise RuntimeError('completed_upgrade_current_customer_data_changed')
+        from deployment.lib.completed_normal_database import verify_preparation_baseline
+        verify_preparation_baseline(self.contract,self.actor.runtime,baseline)
         allocation=verify_allocation(self.contract,self.contract['candidate']['slot'],self.actor.runtime,
             prospective_retirement=self.profile is not LEGACY)
         # Render the exact staging builder before authorization. Its dedicated
@@ -547,12 +546,12 @@ class CompletedNormalUpgrade:
                 return self.complete_application(handoff, kernel)
             with self.root_credential():
                 self.acceptance_guard(schema=self.profile.source,normal=False)
-                if self.profile is not MANUAL:
+                if not self.profile.maintenance:
                     self.event('bridge_normal_grant_pending');handoff.grant(schema=self.profile.source)
             self.service('adopt')
             with self.root_credential():
-                self.acceptance_guard(schema=self.profile.source,normal=self.profile is not MANUAL)
-                if self.profile is MANUAL:
+                self.acceptance_guard(schema=self.profile.source,normal=not self.profile.maintenance)
+                if self.profile.maintenance:
                     self.event('migration_maintenance_pending')
                     receipt=enter_manual_maintenance(self.actor)
                     exclusive(self.root/'migration-maintenance.json',encoded(receipt))
@@ -576,12 +575,12 @@ class CompletedNormalUpgrade:
                 after=migration_customer_snapshot(self.contract,self.actor.runtime,columns=original['columns'])
                 exclusive(self.root/'post-migration-customer-snapshot.json',encoded(after))
                 preservation=(verify_migration_customer_preservation(original,after,contract=self.contract)
-                    if self.profile is MANUAL else verify_migration_customer_preservation(original,after))
+                    if self.profile.maintenance else verify_migration_customer_preservation(original,after))
                 exclusive(self.root/'migration-customer-preservation.json',encoded(preservation))
                 self.event('migration_completion_pending')
                 seal_completion(self.contract,self.ops.state_root/'releases'/self.contract['candidate']['source_sha'],self.ops.state_root,
                     source_guard=self.actor.guard,runtime_guard=self.actor.native)
-                if self.profile is MANUAL:
+                if self.profile.maintenance:
                     self.event('verified_target_read_only_routing_pending')
                     self.actor.publish_restricted_bridge()
             self.service('refresh')

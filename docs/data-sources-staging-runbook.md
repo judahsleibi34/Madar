@@ -6,16 +6,16 @@ a remote bucket, start Vault, or mutate production. Migrations147–155 remain u
 
 ## 1. Proven upgrade route
 
-The selected release descriptor remains `local-supabase-schema115-136`, target
-schema136. The only reviewed route from that target to the Data Sources candidate is:
+The selected release descriptor is `completed-normal-commercial144-146`, target
+schema146. The reviewed route from that target to the Data Sources candidate is:
 
 ```text
-136→137→138→139→140→141→143→144→145→146→147→148→149→150→151→152→153→154→155
+146→147→148→149→150→151→152→153→154→155
 ```
 
-Schema142 is deliberately excluded. The 141→143 transition is accepted only by
-the checksum-pinned learning-path contract; it is not a general permission to skip
-schema versions. Run these source gates before requesting staging authority:
+The retained full-history rehearsal also proves the earlier governed route from136,
+including the deliberate exclusion of schema142. Run these source gates before
+requesting staging authority:
 
 ```bash
 python3 web/scripts/check_migrations.py
@@ -26,8 +26,9 @@ bash web/scripts/rehearse_data_sources_upgrade_136_155.sh
 bash web/scripts/rehearse_vault_transit.sh
 ```
 
-The last command uses only a disposable PostgreSQL container. It proves a schema136
-dump can be restored, applies the entire route, injects a transactional failure in
+The last command uses only a disposable PostgreSQL container. It proves a historical
+schema136 dump can be restored, applies the entire route through the active146 base,
+then the candidate chain, injects a transactional failure in
 migrations154 and155, verifies rollback and locking, then reaches155. The Vault command
 uses only a digest-pinned disposable dev container and synthetic credentials. Neither
 command selects a release or installs a persistent service.
@@ -71,12 +72,12 @@ reopen test, rollback plan, and customer-data approval.
 
 ## 3. Backup, migration, and application order
 
-1. Confirm exact active release and database schema136; reject any excluded or
+1. Confirm exact active release and database schema146; reject any excluded or
    unexpected schema state.
 2. Stop Data Sources writers and all three candidate timers. Data Logs is not part
    of this operation.
 3. Take a fresh coordinated database backup and independently restore it. Record the
-   dump digest and prove the restored `core` contract is136.
+   dump digest and prove the restored `core` contract is146.
 4. Re-run every checksum, mirror, transition, forward-release, and full-chain gate
    against the exact staging source package.
 5. Select a reviewed compatibility bridge only under separate release authorization.

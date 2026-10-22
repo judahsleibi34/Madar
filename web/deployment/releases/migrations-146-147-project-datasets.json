@@ -7,7 +7,7 @@
       "from_schema": 146,
       "to_schema": 147,
       "path": "web/database/migrations/147_add_project_datasets.sql",
-      "sha256": "7affe86edb7b417c502c8e29631f271d420b8b03fa51283e62bc0df6c8985454",
+      "sha256": "3abf6867a6fb41049334690423ac0375af39fdfd8b91196874e6e1857c2aa8fb",
       "compatibility": "expand-only"
     }
   ]

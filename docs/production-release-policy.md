@@ -45,13 +45,12 @@ URLs, headers, credentials, or storage identities. See
 The transport reuses the schema151/152 fenced ingestion lifecycle. It grants no
 external traffic, worker activation, deployment, migration, production credential,
 or customer-data authority. Data Logs, authentication, memberships, uploads, and the
-active schema136 release remain unchanged.
+active schema146 release remain unchanged.
 
 ## C1.9 Data Sources staging-readiness candidate
 
-The source-only C1.9 gate composes the selected schema136 contract through the
-checksum-pinned learning branch (excluding142), commercial candidates145–146, and
-Data Sources candidates147–154. `check_data_sources_staging_chain.py` and the
+The source-only C1.9 gate composes the selected schema146 contract through Data
+Sources candidates147–154. `check_data_sources_staging_chain.py` and the
 disposable full-chain rehearsal grant no release selection or deployment authority.
 The reconciliation, checkpoint, and scratch-cleanup systemd units must remain disabled
 until a staging-specific review confirms schema154, the private shared bucket, encrypted
@@ -212,6 +211,38 @@ static validation do not authorize applying schema147 to production or any
 customer database. Production use still requires the accepted schema146 source,
 a verified backup, compatible application images, the ordinary governed
 migration path, isolated current-data rehearsal, and explicit approval.
+## Manual commercial144→146 release
+
+A post-SQL backup failure requires a separate backup-only completion. It binds
+the sealed146 executor and current rows, keeps earlier attempts immutable, and
+uses a new append-only backup/replica scope. A fresh positive grant requires its
+own protected receipt and systemd credential witness; preflight constructs the
+exact candidate-publication kernel before any positive effect. Prior grant/publication
+files are verified as history and never overwritten or replayed. Schema146 is
+explicitly admitted by the checksum-verifying backup sender and receiver.
+
+A sealed failure before the SQL executor may use the existing credential-delivered
+retained continuation, freshly bound to the exact failed context, current144 rows,
+verified backup, runtime, worker owner and controller tree. The consumed parent
+authorization is preserved. The measured child validates144..146 from the selected
+contract and uses the existing locked executor; no installed executable is edited.
+
+The protected installer inventory includes the selected144→146 bridge metadata;
+all operation profiles must resolve their contracts after installation.
+
+The exact completed-NORMAL maintenance coordinator may select
+`schema-144-146-commercial-bridge.json` and its composition of the unchanged
+145 and146 manifests. Historical profiles, receipts, SQL and grants retain their
+original bounds. The candidate is READ_ONLY through144 and145; only verified146
+permits a fresh root-issued144..146 NORMAL grant. Existing customer rows, Auth,
+MFA and storage must remain exact; the only catalog addition is the independently
+verified immutable `launch_2026_v2` row. No sales activation is included.
+
+Source-bound controller CI, exact-image acceptance, private current-data SQL
+rehearsal, backups, independent restore and Node1 replication remain required.
+Manual execution uses the existing locks, boot supersession and forward repair;
+no automatic deployment is enabled. Component checks do not claim host reboot
+acceptance. Explicit operation authorization remains required.
 
 ## Unselected revised launch price-book candidate145→146
 

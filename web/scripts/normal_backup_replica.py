@@ -22,7 +22,7 @@ BASE=Path('/srv/data2/madar-backups')
 def receive(plan_sha,backup_id,sums_sha,filesystem_uuid,expected_schema=115,namespace='normal-local-production'):
     if (not re.fullmatch(r'[0-9a-f]{64}',plan_sha) or not backup.BACKUP_ID.fullmatch(backup_id)
             or not re.fullmatch(r'[0-9a-f]{64}',sums_sha) or not re.fullmatch(r'[0-9a-f-]{36}',filesystem_uuid)
-            or type(expected_schema) is not int or expected_schema not in {115,136,144}
+            or type(expected_schema) is not int or expected_schema not in {115,136,144,146}
             or namespace not in {'normal-local-production','private-schema136-rehearsal'}):
         raise RuntimeError('normal_replica_binding_invalid')
     for path in (BASE,*BASE.parents):

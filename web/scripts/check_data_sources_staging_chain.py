@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fail-closed audit of the unselected schema136 -> schema156 staging path."""
+"""Fail-closed audit of the unselected schema146 -> schema156 staging path."""
 
 from __future__ import annotations
 
@@ -12,15 +12,6 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 RELEASES = ROOT / "web/deployment/releases"
 EXPECTED = (
-    (136, 137, "migrations-137-144-learning.json"),
-    (137, 138, "migrations-137-144-learning.json"),
-    (138, 139, "migrations-137-144-learning.json"),
-    (139, 140, "migrations-137-144-learning.json"),
-    (140, 141, "migrations-137-144-learning.json"),
-    (141, 143, "migrations-137-144-learning.json"),
-    (143, 144, "migrations-137-144-learning.json"),
-    (144, 145, "migrations-144-145-commercial.json"),
-    (145, 146, "migrations-145-146-price-book.json"),
     (146, 147, "migrations-146-147-project-datasets.json"),
     (147, 148, "migrations-147-148-data-sources.json"),
     (148, 149, "migrations-148-149-source-ingestions.json"),
@@ -45,17 +36,12 @@ def _load_validator(filename: str):
 
 def validate() -> dict:
     active = json.loads((RELEASES / "release.json").read_text(encoding="utf-8"))
-    if active.get("schema", {}).get("target") != 136:
+    if active.get("schema", {}).get("target") != 146:
         raise RuntimeError("active_release_target_changed")
-    if active.get("migration_manifest") != "migrations-116-136.json":
+    if active.get("migration_manifest") != "migrations-145-146-commercial.json":
         raise RuntimeError("active_release_manifest_changed")
 
-    learning = _load_validator("check_learning_migration_path.py")
-    learning.validate(ROOT)
-
     validators = (
-        "commercial_continuity_candidate.py",
-        "launch_price_book_candidate.py",
         "project_datasets_candidate.py",
         "data_sources_candidate.py",
         "source_ingestions_candidate.py",
@@ -91,7 +77,7 @@ def validate() -> dict:
     if any(source == 142 or target == 142 for source, target, _ in observed):
         raise RuntimeError("excluded_schema142_present")
     return {
-        "active_schema": 136,
+        "active_schema": 146,
         "target_schema": 156,
         "excluded_schemas": [142],
         "transitions": [f"{source}->{target}" for source, target, _ in observed],

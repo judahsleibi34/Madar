@@ -2,7 +2,7 @@
 
 ## Unselected schema156 automatic synchronization transition
 
-Migration156 remains outside the active schema136 release. It locks the exact core
+Migration156 remains outside the active schema146 release. It locks the exact core
 schema155 state before additive DDL, creates disabled-by-default resource schedules,
 and exposes only service-role operational RPCs. Dispatcher claims are serialized for
 bounded concurrency accounting, then row-fenced with `FOR UPDATE SKIP LOCKED`; each
@@ -20,16 +20,16 @@ commit locks and revalidates credential identity/version/revision before delegat
 the existing152 atomic commit. Rewrap uses a Vault/database CAS and changes only the
 wrapped DEK metadata; Vault installation and unsealing stay outside migration automation.
 
-## Schema136→155 staging composition
+## Schema146→155 staging composition
 
 The Data Sources staging audit composes existing reviewed manifests; it does not add a
 new migration manifest or alter active selection. The exact route is
-136→137→138→139→140→141→143→144→145→146→147→148→149→150→151→152→153→154→155.
-Schema142 remains excluded and only the pinned learning-path authorization may accept
-141→143. `check_data_sources_staging_chain.py` fails closed if the active target,
-transition list, SQL mirror, checksum, or candidate descriptor changes. The disposable
-rehearsal proves schema136 backup/restore, full sequential application, and transactional
-rollback at154/155; it is evidence for review, never migration authority.
+146→147→148→149→150→151→152→153→154→155. The separately retained full-history
+rehearsal may start at schema136, but the active release gate begins at146.
+`check_data_sources_staging_chain.py` fails closed if the active target, transition
+list, SQL mirror, checksum, or candidate descriptor changes. The disposable rehearsal
+proves backup/restore, sequential application, and transactional rollback at154/155;
+it is evidence for review, never migration authority.
 
 ## C1.8.1 locked schema154 transition
 
@@ -219,6 +219,21 @@ explicit authenticated tenant, project, and dataset checks. Rollback
 compatibility is schema146 before an application requiring persistent project
 datasets is activated. No production execution is authorized by these source
 artifacts.
+## Manual commercial144→146 release
+
+The exact completed-NORMAL maintenance coordinator may select
+`schema-144-146-commercial-bridge.json` and its composition of the unchanged
+145 and146 manifests. Historical profiles, receipts, SQL and grants retain their
+original bounds. The candidate is READ_ONLY through144 and145; only verified146
+permits a fresh root-issued144..146 NORMAL grant. Existing customer rows, Auth,
+MFA and storage must remain exact; the only catalog addition is the independently
+verified immutable `launch_2026_v2` row. No sales activation is included.
+
+Source-bound controller CI, exact-image acceptance, private current-data SQL
+rehearsal, backups, independent restore and Node1 replication remain required.
+Manual execution uses the existing locks, boot supersession and forward repair;
+no automatic deployment is enabled. Component checks do not claim host reboot
+acceptance. Explicit operation authorization remains required.
 
 ## Unselected revised launch price-book transition145→146
 

@@ -132,11 +132,45 @@ class CompletedNormalWriteHandoff:
         atomic_public_authority(self.root/'write-authority/authority.json',dict(value,mode='READ_ONLY'))
         require_candidate_authority(self.contract,mode='READ_ONLY',admissions=self.admissions)
 
-    def grant(self, *, schema=None):
+    def grant(self, *, schema=None, fresh_attempt_root=None):
         if schema is None:schema=self.profile.source
         if self.profile is not LEGACY and schema!=self.profile.target:
             raise RuntimeError('completed_normal_manual_grant_requires_target_schema')
         self.guard(schema=schema)
+        audit=self.root
+        if fresh_attempt_root is not None:
+            from deployment.lib.completed_normal_admission import credential_witness
+            from deployment.lib.provider_recovery_runtime import file_digest
+            import re
+            audit=Path(fresh_attempt_root)
+            witness=credential_witness('completed_continuation','completed_continuation_sha256')
+            if (audit.parent!=self.root/'continuations' or not re.fullmatch('[0-9a-f]{64}',audit.name)
+                    or witness.get('plan_sha256')!=audit.name or witness.get('parent_context_sha256')!=self.root.name
+                    or witness.get('application_sha')!=self.contract['candidate']['source_sha']
+                    or file_digest(protected(audit/'plan.json',private=True))!=audit.name):
+                raise RuntimeError('completed_normal_fresh_grant_scope_invalid')
+            fresh=json.loads(protected(audit/'plan.json',private=True).read_text())
+            if (fresh.get('operation')!=witness.get('operation')
+                    or fresh.get('source_sha256')!=witness.get('source_sha256')
+                    or not re.fullmatch('[0-9a-f]{64}',str(witness.get('source_sha256')))
+                    or fresh.get('parent_context_sha256')!=self.root.name
+                    or fresh.get('target_schema')!=schema or fresh.get('migrations')!=[]
+                    or fresh.get('restore_old_customer_database') is not False
+                    or fresh.get('automatic_retry') is not False):
+                raise RuntimeError('completed_normal_fresh_grant_plan_invalid')
+            receipt=json.loads(protected(audit/'operator-authorization.json',private=True).read_text())
+            if receipt!={'operation':witness.get('operation'),'plan_sha256':audit.name,
+                    'source_sha256':witness.get('source_sha256'),'parent_context_sha256':self.root.name,
+                    'historical_authorization_reused':False}:
+                raise RuntimeError('completed_normal_fresh_grant_authorization_invalid')
+            # The earlier positive publication is historical evidence. Never
+            # overwrite it or treat it as permission to repeat that boundary.
+            actual=protected(self.root/'candidate-runtime.json',private=True).read_bytes()
+            if (protected(self.root/'normal-publication.json',private=True).read_bytes()!=actual
+                    or json.loads(protected(self.root/'target-normal-publication.json',private=True).read_text())!={
+                        'operation':self.profile.operation,'context_sha256':digest(self.contract),
+                        'schema':self.profile.target,'mode':'NORMAL','database_restored':False}):
+                raise RuntimeError('completed_normal_fresh_grant_previous_publication_changed')
         effect_started=False
         try:
             with runtime_mutation_lock(self.state_root):
@@ -144,8 +178,8 @@ class CompletedNormalWriteHandoff:
                 path=self.root/'write-authority/authority.json'
                 value=require_candidate_authority(self.contract,mode='READ_ONLY',admissions=self.admissions)
                 suffix='' if schema==self.profile.source else '-'+str(self.profile.target)
-                exclusive(self.root/('pre-grant-authority'+suffix+'.json'),protected(path).read_bytes())
-                exclusive(self.root/('write-boundary'+suffix+'.json'),encoded({'operation':self.profile.operation,'context_sha256':digest(self.contract),
+                exclusive(audit/('pre-grant-authority'+suffix+'.json'),protected(path).read_bytes())
+                exclusive(audit/('write-boundary'+suffix+'.json'),encoded({'operation':self.profile.operation,'context_sha256':digest(self.contract),
                     'normal_writes_may_have_occurred':True,'restore_customer_database':False}))
                 effect_started=True
                 # The original115 grant remains historical data. The target
@@ -167,12 +201,12 @@ class CompletedNormalWriteHandoff:
                 # and sustained checks. A READ_ONLY stage is not NORMAL evidence.
                 self.authorization(schema=schema)
                 actual=protected(self.root/'candidate-runtime.json',private=True).read_bytes()
-                if schema==self.profile.source or self.profile is not LEGACY:
-                    exclusive(self.root/'normal-publication.json',actual)
+                if audit!=self.root or schema==self.profile.source or self.profile is not LEGACY:
+                    exclusive(audit/'normal-publication.json',actual)
                 if schema==self.profile.target:
-                    if protected(self.root/'normal-publication.json',private=True).read_bytes()!=actual:
+                    if protected(audit/'normal-publication.json',private=True).read_bytes()!=actual:
                         raise RuntimeError('completed_normal_write_publication_changed')
-                    exclusive(self.root/'target-normal-publication.json',encoded({
+                    exclusive(audit/'target-normal-publication.json',encoded({
                         'operation':self.profile.operation,'context_sha256':digest(self.contract),'schema':self.profile.target,
                         'mode':'NORMAL','database_restored':False}))
         except Exception:

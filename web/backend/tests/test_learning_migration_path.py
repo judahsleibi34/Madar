@@ -68,7 +68,7 @@ class LearningMigrationPathTests(unittest.TestCase):
             manifest=MigrationManifest.load(root/route.MANIFEST_PATH,root)
             self.assertEqual([item.number for item in manifest.migrations],[143])
             self.assertEqual(manifest.excluded_schemas,(142,))
-        active=json.loads((WEB_ROOT/'deployment/releases/release.json').read_text())
+        active=json.loads((WEB_ROOT/'deployment/releases/schema-115-136-bridge.json').read_text())
         # Main's independently reviewed bridge must remain selected; learning
         # finalization cannot extend it or implicitly select any learning SQL.
         self.assertEqual(active['deployment_profile'],'local-supabase-schema115-136')

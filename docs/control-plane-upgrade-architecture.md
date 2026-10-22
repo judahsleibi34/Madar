@@ -1,5 +1,37 @@
 # Privileged control-plane upgrade architecture
 
+## Manual commercial144→146 release
+
+A post-SQL backup failure requires a separate backup-only completion. It binds
+the sealed146 executor and current rows, keeps earlier attempts immutable, and
+uses a new append-only backup/replica scope. A fresh positive grant requires its
+own protected receipt and systemd credential witness; prior grant/publication
+files are verified as history and never overwritten or replayed. Schema146 is
+explicitly admitted by the checksum-verifying backup sender and receiver.
+
+A sealed failure before the SQL executor may use the existing credential-delivered
+retained continuation, freshly bound to the exact failed context, current144 rows,
+verified backup, runtime, worker owner and controller tree. The consumed parent
+authorization is preserved. The measured child validates144..146 from the selected
+contract and uses the existing locked executor; no installed executable is edited.
+
+The protected installer inventory includes the selected144→146 bridge metadata;
+all operation profiles must resolve their contracts after installation.
+
+The exact completed-NORMAL maintenance coordinator may select
+`schema-144-146-commercial-bridge.json` and its composition of the unchanged
+145 and146 manifests. Historical profiles, receipts, SQL and grants retain their
+original bounds. The candidate is READ_ONLY through144 and145; only verified146
+permits a fresh root-issued144..146 NORMAL grant. Existing customer rows, Auth,
+MFA and storage must remain exact; the only catalog addition is the independently
+verified immutable `launch_2026_v2` row. No sales activation is included.
+
+Source-bound controller CI, exact-image acceptance, private current-data SQL
+rehearsal, backups, independent restore and Node1 replication remain required.
+Manual execution uses the existing locks, boot supersession and forward repair;
+no automatic deployment is enabled. Component checks do not claim host reboot
+acceptance. Explicit operation authorization remains required.
+
 ## Explicit schema136→144 maintenance operation
 
 The manual successor may bind one exact consumed boot-installation failure and
