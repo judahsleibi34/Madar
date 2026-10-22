@@ -125,7 +125,10 @@ class QuiescenceScopeDatabaseTests(unittest.TestCase):
         binding={'operation':DELETION.operation,'context_sha256':'a'*64,'source_sha':'b'*40,'controller_sha':'c'*40,
             'inventory_sha256':'d'*64,'system_identifier':self.identifier,'source_schema':146,'target_schema':150}
         actor=adapter.Schema150ProviderAdapter.__new__(adapter.Schema150ProviderAdapter)
-        actor.binding=binding;actor.root=root;actor.contract=self.contract
+        actor.binding=binding;actor.root=root
+        # This adapter fixture tests the exact historical150 operation, even
+        # when its enclosing SQL scaffold originated from the148 test class.
+        actor.contract={**self.contract,'operation':DELETION.operation,'version':DELETION.version}
         actor.require_authority=Mock();actor._attest=Mock();actor._supervisors_stopped=Mock()
         actor.runtime=Mock();actor.inventory={'containers':{'native:db':{'id':'e'*64}}}
         actor._row=Mock(return_value={'State':{'Pid':os.getpid()}})

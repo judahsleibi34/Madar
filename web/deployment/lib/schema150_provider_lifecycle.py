@@ -13,8 +13,7 @@ import os
 import re
 
 from deployment.lib import schema149_provider_lifecycle as retained
-from deployment.lib.completed_normal_profile import DELETION
-from deployment.lib.schema150_release import require_target_protocols
+from deployment.lib.completed_normal_profile import DELETION, RECONCILED
 
 ProtectedProviderJournal = retained.ProtectedProviderJournal
 encoded, digest = retained.encoded, retained.digest
@@ -36,7 +35,7 @@ def validate_binding(binding):
     keys = {'operation', 'context_sha256', 'source_sha', 'controller_sha',
             'inventory_sha256', 'system_identifier', 'source_schema', 'target_schema'}
     if (not isinstance(binding, dict) or set(binding) != keys
-            or binding['operation'] != DELETION.operation
+            or binding['operation'] not in {DELETION.operation, RECONCILED.operation}
             or any(not isinstance(binding[key], str) or not re.fullmatch('[0-9a-f]{64}', binding[key])
                    for key in ('context_sha256', 'inventory_sha256'))
             or any(not isinstance(binding[key], str) or not re.fullmatch('[0-9a-f]{40}', binding[key])
@@ -44,10 +43,25 @@ def validate_binding(binding):
             or not isinstance(binding['system_identifier'], str)
             or not re.fullmatch('[1-9][0-9]{0,19}', binding['system_identifier'])
             or type(binding['source_schema']) is not int or binding['source_schema'] != 146
-            or type(binding['target_schema']) is not int or binding['target_schema'] != 150):
+            or type(binding['target_schema']) is not int
+            or binding['target_schema'] != (150 if binding['operation'] == DELETION.operation else 160)):
         raise RuntimeError('schema150_provider_binding_invalid')
     import json
     return json.loads(encoded(binding))
+
+
+def binding_profile(binding):
+    value = validate_binding(binding)
+    return DELETION if value['operation'] == DELETION.operation else RECONCILED
+
+
+def release_contract(binding):
+    """Fixed code-owned dispatch; numbers or caller packets select no module."""
+    if binding_profile(binding) is RECONCILED:
+        from deployment.lib import schema160_release
+        return schema160_release
+    from deployment.lib import schema150_release
+    return schema150_release
 
 
 class ProviderMaintenance150:
@@ -151,7 +165,7 @@ class ProviderMaintenance150:
                     'target_write_authority', 'write_authority_sha256', *PRE_GRANT_GATES}
         if not isinstance(value, dict) or set(value) != expected:
             raise RuntimeError('schema150_provider_activation_evidence_invalid')
-        require_target_protocols(value['schema'], value['delivery_protocol'], value['outbox_protocol'], value['deletion_protocol'])
+        release_contract(self.binding).require_target_protocols(value['schema'], value['delivery_protocol'], value['outbox_protocol'], value['deletion_protocol'])
         if (value['binding_sha256'] != digest(self.binding)
                 or any(value[key] is not True for key in PRE_GRANT_GATES)
                 or value['target_write_authority'] is not granted
@@ -196,7 +210,7 @@ class ProviderMaintenance150:
 
     def _quiescence(self, schema, *, cursor=None):
         self._guard('observe_quiescence')
-        if type(schema) is not int or schema not in (146, 147, 148, 149, 150):
+        if not binding_profile(self.binding).supports(schema):
             raise RuntimeError('schema150_provider_schema_invalid')
         _, completed, pending, _ = self._state()
         if pending or completed != list(FENCE_STEPS):
@@ -221,18 +235,20 @@ class ProviderMaintenance150:
             if completed != list(FENCE_STEPS[:len(completed)]):
                 raise RuntimeError('schema150_provider_fence_sequence')
             for step in FENCE_STEPS[len(completed):]: self._effect(step)
-            return self._quiescence(146)
+            return self._quiescence(self.binding['source_schema'])
 
     def migration_entry(self, source, target, *, cursor=None):
         with self._locked():
-            if type(source) is not int or type(target) is not int or (source, target) not in ((146,147), (147,148), (148,149), (149,150)):
+            selected = binding_profile(self.binding)
+            if (type(source) is not int or type(target) is not int
+                    or (source, target) not in tuple((n-1, n) for n in selected.migrations)):
                 raise RuntimeError('schema150_provider_migration_order')
             return self._quiescence(source,cursor=cursor)
 
     def migration_complete(self,*,cursor):
         """Observe committed150 while the existing executor still owns its lock."""
         with self._locked():
-            return self._quiescence(150,cursor=cursor)
+            return self._quiescence(self.binding['target_schema'],cursor=cursor)
 
     def prepare_private_activation(self):
         """Restore original roles/private providers while target grant is absent.
@@ -251,13 +267,13 @@ class ProviderMaintenance150:
                 raise RuntimeError('schema150_provider_private_acceptance_already_completed')
             if completed != sequence[:len(completed)] or len(completed) < len(FENCE_STEPS):
                 raise RuntimeError('schema150_provider_private_sequence')
-            if completed == list(FENCE_STEPS): self._quiescence(150)
+            if completed == list(FENCE_STEPS): self._quiescence(self.binding['target_schema'])
             for step in sequence[len(completed):]: self._effect(step)
             self._guard('seal_private_acceptance')
             self._activation_evidence(granted=False)
             self._private_boundary()
             self.journal.append('private_ready', {'binding_sha256': digest(self.binding)})
-            return {'schema': 150, 'private_provider_acceptance_complete': True,
+            return {'schema': self.binding['target_schema'], 'private_provider_acceptance_complete': True,
                     'production_authorization_issued': False}
 
     def activate_after_grant(self,*,clear_boot=True):
@@ -275,7 +291,7 @@ class ProviderMaintenance150:
             self._activation_evidence(granted=True)
             sequence=STEPS if clear_boot else STEPS[:-1]
             for step in sequence[len(completed):]: self._effect(step)
-            return {'schema': 150, 'provider_lifecycle_complete': clear_boot,
+            return {'schema': self.binding['target_schema'], 'provider_lifecycle_complete': clear_boot,
                     'production_authorization_issued': False, 'customer_database_restored': False}
 
     def reconcile_pending(self):

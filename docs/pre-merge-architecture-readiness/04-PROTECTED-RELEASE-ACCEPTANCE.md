@@ -1,38 +1,65 @@
 # Protected release acceptance: BLOCKED
 
-**Complete preserved running application upgrade: NO.** No completion receipt,
-protected handoff, activated candidate or current-source privileged installation
-is claimed.
+**Complete protected preserved running146→160 application upgrade: NOT TESTED.**
+There is no completion receipt, protected handoff, accepted privileged reboot,
+original Auth/MFA/Storage acceptance or public activation for this operation.
+The obsolete architecture146→150 operation remains non-executable.
 
-The exact missing connections remain:
+The distinct version8 preparation pins canonical main147–156 and integrity157–160
+in `migrations-147-160-coordinated.json`. Published SQL and mirrors are unchanged.
+The existing maintenance-first coordinator, concrete provider lifecycle, stopped
+candidate sealer, backup context, service-child creation guard and parent-owned
+migration dispatcher now carry that exact operation and target. Source and
+protocol bindings reject mixtures of the historical and canonical histories.
+Delivery2 begins at157, outbox2 at159 and deletion2 only at160; legacy deletion
+backlog must be empty through159. Intermediate versions remain READ_ONLY.
 
-1. `CompletedNormalUpgrade._execute` prepares/activates/publishes a bridge before
-   entering maintenance. It lacks the maintenance-first150 branch retaining a
-   concrete `Schema150ProviderAdapter` across the operation.
-2. Candidate inventory pins IDs/specs while candidate configuration contains
-   the admission digest that hashes that inventory. Provisional preparation
-   and final immutable actual-runtime binding are not connected.
-3. `_execute` omits `provider_adapter` from `CompletedNormalBackupContext` and
-   from its `migrate` call. A same-operation independent receiver is unproven.
-4. Entrypoint acceptance delegates to public serving checks. Preserved original
-   private Auth/MFA/Storage acceptance is not wired into the coordinator.
-5. `CompletedNormalWriteHandoff.guard/grant` requires a running worker kernel.
-   Private acceptance → protected handoff → worker ownership/start → proxy
-   activation needs a coherent, authenticated ordering.
-6. Maintenance-specific forward resumption/boot completion is not connected to
-   those private states and fresh authorization boundaries.
-
-The existing parent-owned `migrate(provider_adapter=...)` integration uses the
-actual advisory-locked executor connection. Its native SQL tests passed; this
-method alone cannot perform the full operation.
-
-Shortest executable demonstration of the blocker (a passing refusal test):
+Supporting tests (not privileged application acceptance):
 
 ```bash
 PYTHONPATH=web:web/backend/tests python3 -m unittest \
-  test_schema150_admission.DeletionAdmissionPreparationTests.test_no_approval_or_caller_adapter_can_enable_preparation -v
+  test_schema160_release test_completed_normal_maintenance_execution -v
+MADAR_CANONICAL_EXECUTOR_TESTS=true BACKEND_TEST_IMAGE=madar-backend-test \
+  bash web/scripts/rehearse_data_sources_upgrade_136_156.sh
 ```
 
-It verifies `schema150_protected_controller_integration_incomplete`, rejection
-by `profile`, and refusal before authority or controller effects. Do not delete
-those refusals in anticipation of implementation.
+The native mode positively observes146, then uses the existing
+`LockedMigrationExecutor` for fourteen real transitions to160 under its actual
+advisory lock. It tests foreign-session refusal, lost committed replies at147,
+156,157,158,159,160, consumed-attempt refusal, fresh wrong-origin refusal and
+all eleven native calendar concurrency/rollback/authorization tests at160.
+The backup callback is a test fixture; no protected backup or authority is
+claimed. Controller-ordering tests model host/provider/issuer effects.
+
+Remaining executable integration blockers:
+
+1. `schema160_release.admitted_manifest()` and the operational `profile()`
+   registry deliberately refuse until full lifecycle acceptance exists.
+2. `continue_completed_normal_upgrade.py` supplies public acceptance only;
+   measured private preservation and activation guards are still missing.
+3. The source-package producer does not publish the original candidate-free
+   measured provider inventory; the coordinator's consumer is implemented.
+4. The backup context still needs an actual isolated independent receiver,
+   authenticated restore evidence and private original-provider acceptance.
+5. `CompletedNormalWriteHandoff.guard/grant` assumes running bridge workers;
+   it cannot yet verify a stopped/private maintenance candidate and activate
+   authority before compatible workers. Backend authority also lacks the exact
+   reviewed160 contract. No broad146..160 grant is allowed as a workaround.
+6. The child's activate/adopt path still rejects a creation-only receipt and
+   assumes READ_ONLY running bridge acceptance. Maintenance worker ownership,
+   proxy publication, source-bound boot and forward recovery remain incomplete.
+
+The calendar transaction transport additionally needs securely configured
+`MADAR_CALENDAR_DATABASE_DSN` and `MADAR_CALENDAR_DATABASE_SYSTEM_IDENTIFIER`,
+validated role scope and connection limits before a real deployment. Native
+fixtures exercise the existing Supabase service-role capability; they do not
+prove narrow worker credential isolation.
+
+Ordinary Full Provider Staging must continue refusing the Class D plan.
+Exceptional protected acceptance is not supplied by the native SQL mode.
+Automatic dispatch remains blocked; no production descriptor, authority,
+controller, timer, service or routing has been changed.
+
+`BRANCH_PROTECTION: DEFERRED_BY_PROJECT_OWNER`. This owner exception removes
+branch protection alone as a gate; it does not satisfy any blocker above or
+replace protected production authorization.

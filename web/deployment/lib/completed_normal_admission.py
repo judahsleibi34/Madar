@@ -16,7 +16,7 @@ from pathlib import Path
 import re
 
 from deployment.lib.control_plane_upgrade_authorization import require_upgrade_authorization
-from deployment.lib.completed_normal_profile import profile, LEGACY, MANUAL, APPLICATION, COMMERCIAL, FENCED, OUTBOX, DELETION
+from deployment.lib.completed_normal_profile import profile, LEGACY, MANUAL, APPLICATION, COMMERCIAL, FENCED, OUTBOX, DELETION, RECONCILED
 
 OPERATION = "completed-normal-schema115-136-upgrade"
 ADMISSIONS = Path("/var/lib/madar-control-plane/upgrades/completed-normal-admissions")
@@ -53,7 +53,7 @@ def digest(value: dict) -> str:
 
 def prepared_path(contract, state_root, *, preparation150=False):
     """Fresh admission cannot adopt an earlier candidate's mutable record."""
-    if preparation150:validate_provider_preparation150(contract)
+    if preparation150:validate_provider_preparation(contract)
     else:validate_contract(contract)
     return Path(state_root)/('prepared-completed-normal-'+digest(contract)+'.json')
 
@@ -73,6 +73,18 @@ def validate_provider_preparation150(value: dict) -> None:
     _validate_contract(value, DELETION)
 
 
+def validate_provider_preparation(contract):
+    """Validate either exact maintenance preparation; never admit execution."""
+    from deployment.lib.completed_normal_profile import provider_preparation_profile
+    selected = provider_preparation_profile(contract)
+    _validate_contract(contract, selected)
+    if selected is RECONCILED:
+        from deployment.lib.schema160_release import MANIFEST_SHA256
+        if contract['migration_manifest_sha256'] != MANIFEST_SHA256:
+            raise RuntimeError('schema160_migration_manifest_changed')
+    return selected
+
+
 def _validate_contract(value: dict, selected) -> None:
     if not isinstance(value, dict):
         raise RuntimeError("completed_normal_admission_contract_invalid")
@@ -81,11 +93,11 @@ def _validate_contract(value: dict, selected) -> None:
         "historical_files", "database", "migration_manifest_sha256",
         "rehearsal_sha256", "plan_sha256", "provider_record_sha256", "resources",
         "customer_table_roots_sha256", "customer_identity_roots_sha256",
-    } | ({"provider_maintenance_sha256", "writer_inventory_sha256"} if selected in (OUTBOX, DELETION) else set()) | ({"notification_cutover_sha256"} if selected in (FENCED, OUTBOX, DELETION) else set()) | ({"database_structure_sha256"} if selected in (COMMERCIAL,FENCED,OUTBOX,DELETION) else set()):
+    } | ({"provider_maintenance_sha256", "writer_inventory_sha256"} if selected in (OUTBOX, DELETION, RECONCILED) else set()) | ({"notification_cutover_sha256"} if selected in (FENCED, OUTBOX, DELETION, RECONCILED) else set()) | ({"database_structure_sha256"} if selected in (COMMERCIAL,FENCED,OUTBOX,DELETION,RECONCILED) else set()):
         raise RuntimeError("completed_normal_admission_contract_invalid")
-    if selected in (FENCED, OUTBOX, DELETION) and not re.fullmatch("[0-9a-f]{64}",str(value.get("notification_cutover_sha256"))):
+    if selected in (FENCED, OUTBOX, DELETION, RECONCILED) and not re.fullmatch("[0-9a-f]{64}",str(value.get("notification_cutover_sha256"))):
         raise RuntimeError("schema148_cutover_binding_invalid")
-    if selected in (OUTBOX, DELETION) and any(not re.fullmatch('[0-9a-f]{64}', str(value.get(key)))
+    if selected in (OUTBOX, DELETION, RECONCILED) and any(not re.fullmatch('[0-9a-f]{64}', str(value.get(key)))
             for key in ('provider_maintenance_sha256','writer_inventory_sha256')):
         raise RuntimeError('schema149_provider_binding_invalid')
     roles = value["source_roles"]
@@ -140,9 +152,9 @@ def _validate_contract(value: dict, selected) -> None:
     # These are historical protected records only, never arbitrary executable or
     # operator-selected paths. The retained provider record is checked separately.
     application_required = {str(origin_root / name) for name in APPLICATION_HISTORICAL_NAMES}
-    if set(files) != required and not (selected in (APPLICATION, COMMERCIAL, FENCED, OUTBOX, DELETION) and set(files) == application_required):
+    if set(files) != required and not (selected in (APPLICATION, COMMERCIAL, FENCED, OUTBOX, DELETION, RECONCILED) and set(files) == application_required):
         raise RuntimeError("completed_normal_admission_history_invalid")
-    if selected in (COMMERCIAL,FENCED,OUTBOX,DELETION):hashes.append(value["database_structure_sha256"])
+    if selected in (COMMERCIAL,FENCED,OUTBOX,DELETION,RECONCILED):hashes.append(value["database_structure_sha256"])
     hashes.extend(files.values())
     if any(not re.fullmatch(r"[0-9a-f]{64}", str(v)) for v in hashes):
         raise RuntimeError("completed_normal_admission_digest_invalid")

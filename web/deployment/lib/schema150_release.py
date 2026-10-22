@@ -168,6 +168,19 @@ def observe_database_quiescence(cursor, contract, expected_schema):
     """Call actual protocol functions; their presence alone is insufficient."""
     if type(expected_schema) is not int or expected_schema not in (146, 147, 148, 149, 150):
         raise RuntimeError('schema150_database_not_quiescent')
+    observed = _observe_database_quiescence(cursor, QUIESCENCE_SQL, (
+        ('delivery_protocol', 'notification_delivery_protocol', expected_schema >= 147),
+        ('outbox_protocol', 'notification_outbox_protocol', expected_schema >= 149),
+        ('deletion_protocol', 'data_deletion_ownership_protocol', expected_schema == 150)))
+    return require_database_quiescence(observed, contract, expected_schema)
+
+
+def _observe_database_quiescence(cursor, query, functions):
+    """Shared observation transport; fixed release contracts supply semantics.
+
+    This helper observes only. It cannot select a release or issue authority.
+    The historical150 entrypoint retains its exact schema/protocol validation.
+    """
     # Clearing statistics cannot refresh an MVCC transaction snapshot. A prior
     # REPEATABLE READ/SERIALIZABLE snapshot can hide queue work committed by a
     # writer that has already disconnected. PostgreSQL gives READ UNCOMMITTED
@@ -181,12 +194,9 @@ def observe_database_quiescence(cursor, contract, expected_schema):
     # connected writer, and cached one can retain an already closed backend.
     # This clears only this session's statistics cache, not business state.
     cursor.execute('select pg_catalog.pg_stat_clear_snapshot()')
-    cursor.execute(QUIESCENCE_SQL)
+    cursor.execute(query)
     observed = cursor.fetchone()[0]
-    for key, function, available in (
-            ('delivery_protocol', 'notification_delivery_protocol', expected_schema >= 147),
-            ('outbox_protocol', 'notification_outbox_protocol', expected_schema >= 149),
-            ('deletion_protocol', 'data_deletion_ownership_protocol', expected_schema == 150)):
+    for key, function, available in functions:
         if available:
             # Fixed module-owned identifiers only; no operator SQL interpolation.
             cursor.execute('select public.' + function + '()')
@@ -196,7 +206,7 @@ def observe_database_quiescence(cursor, contract, expected_schema):
             if cursor.fetchone()[0] is not None:
                 raise RuntimeError('schema150_unexpected_protocol_before_migration')
             observed[key] = 0 if key == 'deletion_protocol' else 1
-    return require_database_quiescence(observed, contract, expected_schema)
+    return observed
 
 
 def require_target_protocols(schema, delivery, outbox, deletion):

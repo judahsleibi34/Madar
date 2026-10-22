@@ -71,9 +71,8 @@ def allocation(contract,slot, *, preparation150=False):
     if preparation150:
         # Pure deterministic names only. This does not enroll the operation in
         # the execution registry or permit any resource effect.
-        from deployment.lib.completed_normal_admission import validate_provider_preparation150
-        validate_provider_preparation150(contract)
-        selected=DELETION
+        from deployment.lib.completed_normal_admission import validate_provider_preparation
+        selected=validate_provider_preparation(contract)
     else:selected=profile(contract)
     prefix='madar-schema'+str(selected.target)+'-'+digest(contract)[:16]
     resource=contract['resources'][slot]

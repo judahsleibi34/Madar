@@ -255,6 +255,13 @@ class RuntimeModelTests(unittest.TestCase):
                 m.seal_candidate_stage(self.contract,source_guard=lambda:None,model_loader=lambda:self.model,
                     runtime=self.runtime,state_root=root,admissions=admissions)
 
+    def test_reconciled160_creation_stage_retains_identical_image_configuration_and_worker_fences(self):
+        from test_schema160_release import reconciled_contract
+        with patch('test_schema150_admission.deletion_contract',reconciled_contract):
+            self.test_maintenance_stage_seals_only_created_fenced_identities_without_starting_workers()
+        self.assertEqual(self.contract['candidate']['compatible_max'],160)
+        self.assertIn('schema160',self.selected['prefix'])
+
     def test_preparation_validation_does_not_allow_sealing_without_existing_fresh_authority(self):
         from test_schema150_admission import deletion_contract
         contract=deletion_contract()

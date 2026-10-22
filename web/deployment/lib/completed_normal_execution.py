@@ -433,9 +433,9 @@ class CompletedNormalUpgrade:
         Its maintenance-first caller must supply the concrete, already fenced
         actor. Runtime activation/state mutation never runs in this root stage.
         """
-        from deployment.lib.completed_normal_profile import DELETION
+        from deployment.lib.completed_normal_profile import DELETION, RECONCILED
         from deployment.lib.schema150_provider_adapter import Schema150ProviderAdapter
-        if self.profile is not DELETION:
+        if self.profile not in (DELETION, RECONCILED):
             if provider_adapter is not None:
                 raise RuntimeError('completed_migration_parent_profile_invalid')
             return self.service('migrate')
@@ -538,8 +538,8 @@ class CompletedNormalUpgrade:
             return self._execute()
 
     def _execute(self):
-        from deployment.lib.completed_normal_profile import DELETION
-        if self.profile is DELETION:return self._execute_maintenance()
+        from deployment.lib.completed_normal_profile import DELETION, RECONCILED
+        if self.profile in (DELETION, RECONCILED):return self._execute_maintenance()
         self.preflight()
         self.lock=acquire_lock(self.ops.upgrade_root/'upgrade.lock',create=False)
         try:
@@ -696,11 +696,11 @@ class CompletedNormalUpgrade:
         installed entrypoint; a status packet or default public smoke probe is
         insufficient. This method neither registers150 nor issues authority.
         """
-        from deployment.lib.completed_normal_profile import DELETION
+        from deployment.lib.completed_normal_profile import DELETION, RECONCILED
         from deployment.lib.schema150_provider_adapter import Schema150ProviderAdapter,private_json,require_owned_lock,LOCKS
         from deployment.lib.schema150_provider_lifecycle import ProviderMaintenance150,ProtectedProviderJournal
         from deployment.lib.schema150_actor_inventory import validate_inventory
-        if (self.profile is not DELETION or not callable(self.maintenance_acceptance_guard)
+        if (self.profile not in (DELETION, RECONCILED) or not callable(self.maintenance_acceptance_guard)
                 or not callable(self.maintenance_activation_guard)):
             raise RuntimeError('schema150_independent_private_verifiers_required')
         self.preflight()
@@ -730,7 +730,7 @@ class CompletedNormalUpgrade:
                 binding={'operation':self.profile.operation,'context_sha256':digest(self.contract),
                     'source_sha':self.contract['candidate']['source_sha'],'controller_sha':self.controller,
                     'inventory_sha256':self.contract['writer_inventory_sha256'],
-                    'system_identifier':self.contract['database']['system_identifier'],'source_schema':146,'target_schema':150}
+                    'system_identifier':self.contract['database']['system_identifier'],'source_schema':self.profile.source,'target_schema':self.profile.target}
                 self.actor.guard()
                 inventory=validate_inventory(private_json(self.package/'provider-inventory.json'),binding)
                 if any(k.startswith('candidate:') for k in inventory['containers']):
@@ -781,7 +781,7 @@ class CompletedNormalUpgrade:
                 seal_completion(self.contract,self.ops.state_root/'releases'/self.contract['candidate']['source_sha'],
                     self.ops.state_root,source_guard=self.actor.guard,runtime_guard=self.actor.native)
                 self.event('private_provider_recovery_pending');lifecycle.prepare_private_activation()
-                self.event('target_normal_grant_pending');handoff.grant(schema=150)
+                self.event('target_normal_grant_pending');handoff.grant(schema=self.profile.target)
             # Existing child owns the worker-generation transfer. Its historical
             # guard may not accept a creation-only receipt; do not bypass it.
             self.ops.release_deployment_lock()
@@ -798,12 +798,12 @@ class CompletedNormalUpgrade:
             for fd,path in zip((self.lock,self.ops.deploy_lock_descriptor),LOCKS):require_owned_lock(fd,path)
             provider.lock_descriptors=(self.lock,self.ops.deploy_lock_descriptor)
             with self.root_credential():
-                self.acceptance_guard(schema=150,normal=True)
+                self.acceptance_guard(schema=self.profile.target,normal=True)
                 self.event('post_migration_backup_pending')
                 final=CompletedNormalBackupContext(self.contract,self.document,self.package,kernel,
                     stage='post-migration',source_guard=self.actor.guard,artifact_guard=self.artifact_guard).capture()
                 kernel.round(normal=True)
-                result={'operation':self.profile.operation,'context_sha256':digest(self.contract),'schema':150,'mode':'NORMAL',
+                result={'operation':self.profile.operation,'context_sha256':digest(self.contract),'schema':self.profile.target,'mode':'NORMAL',
                     'application_sha':self.contract['candidate']['source_sha'],'controller_sha':self.controller,
                     'images':self.contract['candidate']['images'],'backup':final,'customer_database_restored':False}
                 exclusive(self.root/'normal-acceptance.json',encoded(result))
@@ -814,7 +814,7 @@ class CompletedNormalUpgrade:
                 exclusive(self.root/'normal-completion.json',encoded(result))
                 from deployment.lib.completed_normal_baseline import seal_compatible_release
                 seal_compatible_release(self.contract,self.root,self.ops.state_root)
-                self.event('normal_completed',schema=150,mode='NORMAL')
+                self.event('normal_completed',schema=self.profile.target,mode='NORMAL')
             self.ops.clear_interlock()
             return result
         except Exception as error:

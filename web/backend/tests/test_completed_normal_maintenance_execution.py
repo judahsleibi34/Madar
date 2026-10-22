@@ -13,25 +13,30 @@ from deployment.lib import completed_normal_execution as execution
 from deployment.lib import schema150_provider_adapter as adapter
 from deployment.lib import schema150_provider_lifecycle as lifecycle
 from deployment.lib.completed_normal_admission import digest,encoded
-from deployment.lib.completed_normal_profile import DELETION
+from deployment.lib.completed_normal_profile import DELETION, RECONCILED
 import test_completed_normal_execution as historical
 from test_schema150_admission import deletion_contract
 from test_schema150_actor_inventory import fixture,repin
 
 
-def maintenance_fixture(test):
+def maintenance_fixture(test, selected=DELETION):
     f=historical.ExecutionTests();f.setUp();test.addCleanup(f.doCleanups)
-    f.source_schema=146;f.target_schema=150;f.schema=146
-    f.contract=deletion_contract();f.driver.contract=f.contract;f.driver.actor.contract=f.contract
-    f.driver.profile=DELETION
+    f.source_schema=146;f.target_schema=selected.target;f.schema=146
+    f.contract=deletion_contract()
+    if selected is RECONCILED:
+        from deployment.lib.schema160_release import MANIFEST_SHA256
+        f.contract.update(version=selected.version,operation=selected.operation,migration_manifest_sha256=MANIFEST_SHA256)
+        f.contract['candidate']['compatible_max']=selected.target
+    f.driver.contract=f.contract;f.driver.actor.contract=f.contract
+    f.driver.profile=selected
     f.driver.actor.candidate().contract=f.contract
     f.document['application_evidence']={'provenance':{'synthetic':'only'}}
     f.driver.maintenance_acceptance_guard=Mock(return_value=True)
     f.driver.maintenance_activation_guard=Mock(return_value={'synthetic':'only'})
     (inventory,_),_=fixture()
-    scope={'operation':DELETION.operation,'context_sha256':'0'*64,'source_sha':f.contract['candidate']['source_sha'],
+    scope={'operation':selected.operation,'context_sha256':'0'*64,'source_sha':f.contract['candidate']['source_sha'],
         'controller_sha':f.driver.controller,'inventory_sha256':'0'*64,
-        'system_identifier':f.contract['database']['system_identifier'],'source_schema':146,'target_schema':150}
+        'system_identifier':f.contract['database']['system_identifier'],'source_schema':146,'target_schema':selected.target}
     inventory,scope=repin(inventory,scope)
     f.contract['writer_inventory_sha256']=scope['inventory_sha256']
     f.driver.package.mkdir()
@@ -64,10 +69,10 @@ def maintenance_fixture(test):
             if f.origin!='READ_ONLY' or any(x=='service_prepare' for x in f.calls):raise AssertionError('bridge first')
             f.effect('provider_fence')
         def prepare_private_activation(self):
-            if f.schema!=150 or f.mode!='READ_ONLY':raise AssertionError('private boundary')
+            if f.schema!=selected.target or f.mode!='READ_ONLY':raise AssertionError('private boundary')
             f.effect('private_acceptance')
         def activate_after_grant(self,*,clear_boot=True):
-            if f.schema!=150 or f.mode!='NORMAL':raise AssertionError('premature activation')
+            if f.schema!=selected.target or f.mode!='NORMAL':raise AssertionError('premature activation')
             if clear_boot and not (f.root/'normal-acceptance.json').exists():raise AssertionError('premature boot')
             f.effect('clear_provider_boot' if clear_boot else 'workers_proxy_activate')
     def migrate(*,provider_adapter):
@@ -75,7 +80,7 @@ def maintenance_fixture(test):
         if provider_adapter.lock_descriptors!=(f.driver.lock,f.ops.deploy_lock_descriptor):raise AssertionError('stale descriptors')
         if 'seal_stage' not in f.calls or f.mode!='READ_ONLY':raise AssertionError('SQL before sealed maintenance')
         f.effect('parent_sql')
-        for schema in (147,148,149,150):
+        for schema in selected.migrations:
             f.schema=schema;f.effect('committed_'+str(schema))
     f.driver.migrate=migrate
     patches=[patch.object(adapter,'Schema150ProviderAdapter',Provider),
@@ -113,6 +118,21 @@ class MaintenanceExecutionTests(unittest.TestCase):
         self.assertFalse(any(x in f.calls for x in ('service_publish','service_refresh','retained_blue_retirement_pending')))
         self.assertTrue((f.root/'normal-completion.json').exists())
         self.assertIsNone(f.driver.lock);self.assertIsNone(f.ops.deploy_lock_descriptor)
+
+    def test_reconciled_operation_uses_all_fourteen_boundaries_and_exact_target(self):
+        f=maintenance_fixture(self, RECONCILED)
+        result=f.driver._execute()
+        self.assertEqual(result['schema'],160)
+        sequence=['provider_preimage','fence_origin','provider_fence','backup_pre-migration','service_prepare',
+            'seal_stage','candidate_reobserved','parent_sql',
+            *('committed_'+str(n) for n in range(147,161)),
+            'customer_preservation','private_acceptance','grant_160','service_activate',
+            'workers_proxy_activate','service_adopt','backup_post-migration','clear_provider_boot','clear_interlock']
+        self.assertEqual([f.calls.index(s) for s in sequence],sorted(f.calls.index(s) for s in sequence))
+        self.assertNotIn('grant_150',f.calls)
+        self.assertNotIn('service_publish',f.calls)
+        self.assertEqual(f.provider.binding['target_schema'],160)
+        self.assertEqual(f.provider.binding['operation'],RECONCILED.operation)
 
     def test_each_irreversible_failure_preserves_fence_and_never_runs_later_effects(self):
         for fault,forbidden in [('provider_fence','parent_sql'),('backup_pre-migration','service_prepare'),

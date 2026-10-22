@@ -19,14 +19,14 @@ from urllib.error import HTTPError
 from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
 
 from deployment.lib.completed_normal_admission import (ADMISSIONS, digest as contract_digest,
-    validate_provider_preparation150)
-from deployment.lib.completed_normal_profile import DELETION
+    validate_provider_preparation)
+from deployment.lib.completed_normal_profile import DELETION, RECONCILED, provider_preparation_profile
 from deployment.lib.control_plane_upgrade_authorization import require_upgrade_authorization, UPGRADE_INTERLOCK
 from deployment.lib.emergency_routing_repair import exclusive
 from deployment.lib.provider_recovery_runtime import protected,readonly_configuration
 from deployment.lib.schema150_provider_lifecycle import (validate_binding, digest, encoded, STEPS,
-    FENCE_STEPS, PRIVATE_STEPS, ACTIVATE_STEPS)
-from deployment.lib.schema150_release import QUIESCENCE_SQL, BACKGROUND_WRITER_SQL, require_target_protocols
+    FENCE_STEPS, PRIVATE_STEPS, ACTIVATE_STEPS, release_contract)
+from deployment.lib.schema150_release import QUIESCENCE_SQL, BACKGROUND_WRITER_SQL
 
 LOCKS = (Path('/var/lib/madar-control-plane/upgrades/upgrade.lock'),
          Path('/var/lib/madar/releases/deploy.lock'))
@@ -178,10 +178,11 @@ class Schema150ProviderAdapter:
     """
     def __init__(self, contract, binding, runtime, *, source_guard, lock_descriptors,
                  acceptance_guard, activation_guard):
-        validate_provider_preparation150(contract)
+        selected = validate_provider_preparation(contract)
         self.contract = json.loads(json.dumps(contract))
         self.binding = validate_binding(binding)
-        if (self.binding['context_sha256'] != contract_digest(contract)
+        if (self.binding['operation'] != selected.operation
+                or self.binding['context_sha256'] != contract_digest(contract)
                 or self.binding['source_sha'] != contract['candidate']['source_sha']
                 or self.binding['controller_sha'] != contract['candidate']['controller_sha']
                 or self.binding['inventory_sha256'] != contract['writer_inventory_sha256']
@@ -199,7 +200,7 @@ class Schema150ProviderAdapter:
         if self.inventory['exclusions']:
             raise RuntimeError('schema150_provider_live_exclusion_proofs_required')
         self.barrier = self.root / 'provider-barrier.json'
-        self.dropin_name = '99zzzzzz-schema150-' + self.binding['context_sha256'][:12] + '.conf'
+        self.dropin_name = '99zzzzzz-schema'+str(selected.target)+'-' + self.binding['context_sha256'][:12] + '.conf'
 
     def require_authority(self, binding, *, purpose):
         if (binding != self.binding or purpose not in {*STEPS, 'prepare', 'fence', 'observe_quiescence',
@@ -207,8 +208,9 @@ class Schema150ProviderAdapter:
                 or os.geteuid() != 0):
             raise RuntimeError('schema150_provider_effect_scope_invalid')
         self.source_guard()
-        require_upgrade_authorization(self.binding['controller_sha'], required_operation=DELETION.operation,
-            required_schema=146, required_context_digest=self.binding['context_sha256'], require_rehearsal=True)
+        selected = provider_preparation_profile(self.contract)
+        require_upgrade_authorization(self.binding['controller_sha'], required_operation=selected.operation,
+            required_schema=selected.source, required_context_digest=self.binding['context_sha256'], require_rehearsal=True)
         authority = private_json(UPGRADE_INTERLOCK)
         if (authority.get('status') != 'authorized_cycle'
                 or authority.get('rehearsal_sha256') != self.contract['rehearsal_sha256']):
@@ -301,7 +303,7 @@ class Schema150ProviderAdapter:
             raise RuntimeError('schema150_provider_database_substitution')
         raw = json.loads(self._sql("BEGIN READ ONLY; SELECT json_build_array((SELECT system_identifier::text FROM pg_control_system()),"
             "(SELECT schema_version FROM public.application_schema_state WHERE contract_key='core')); COMMIT;"))
-        if raw[0] != self.binding['system_identifier'] or type(raw[1]) is not int or raw[1] not in (146,147,148,149,150):
+        if raw[0] != self.binding['system_identifier'] or not provider_preparation_profile(self.contract).supports(raw[1]):
             raise RuntimeError('schema150_provider_database_identity_changed')
         return raw[1]
 
@@ -628,11 +630,15 @@ class Schema150ProviderAdapter:
         """
         from deployment.lib.migration_executor import Migration
         from deployment.lib.schema150_release import SQL_SHA256
+        selected = provider_preparation_profile(self.contract)
+        expected = {number: (checksum, 'forward-compatible' if number == 148 else 'coordinated')
+                    for number, checksum in SQL_SHA256.items()}
+        if selected is RECONCILED:
+            expected = release_contract(self.binding).SQL_CONTRACT
         if (type(migration) is not Migration or type(migration.number) is not int
-                or migration.number not in SQL_SHA256
+                or migration.number not in expected
                 or migration.from_schema!=migration.number-1 or migration.to_schema!=migration.number
-                or migration.sha256!=SQL_SHA256[migration.number]
-                or migration.compatibility!=('forward-compatible' if migration.number==148 else 'coordinated')):
+                or (migration.sha256, migration.compatibility)!=expected[migration.number]):
             raise RuntimeError('schema150_provider_migration_contract_changed')
         self.require_authority(self.binding,purpose='observe_quiescence')
         self._require_migration_session_lock(cursor)
@@ -669,15 +675,23 @@ class Schema150ProviderAdapter:
         verify_host_processes(self.runtime,{r['id'] for r in self.inventory['containers'].values()},
             positive_pid=self._row('supabase-db')['State'].get('Pid'))
         if cursor is None:
-            value=json.loads(self._sql('BEGIN READ ONLY;'+QUIESCENCE_SQL+';COMMIT;'))
+            # Canonical150 is data-source recovery, not deletion ownership.
+            # Never reuse the archived150 backlog cutoff for canonical schemas.
+            module = release_contract(binding)
+            if provider_preparation_profile(self.contract) is RECONCILED:
+                current = self._database_identity()
+                value = json.loads(self._sql('BEGIN READ ONLY;'+module.observation_sql(current)+';COMMIT;'))
+                module.require_database_quiescence(value, self.contract, current)
+                for key in ('delivery_protocol','outbox_protocol','deletion_protocol'):value.pop(key)
+            else:
+                value=json.loads(self._sql('BEGIN READ ONLY;'+QUIESCENCE_SQL+';COMMIT;'))
         else:
-            from deployment.lib.schema150_release import observe_database_quiescence
             # Fresh statistics/MVCC and real protocols are checked by the
             # existing native observer, without committing the caller's work.
             cursor.execute("select schema_version from public.application_schema_state where contract_key='core'")
             current=cursor.fetchone()
             if current is None:raise RuntimeError('schema150_provider_database_not_quiescent')
-            value=observe_database_quiescence(cursor,self.contract,current[0])
+            value=release_contract(binding).observe_database_quiescence(cursor,self.contract,current[0])
             for key in ('delivery_protocol','outbox_protocol','deletion_protocol'):value.pop(key)
         records=private_json(self.root/'provider-journal'/'0000.json')
         preimage=records['payload']['preimage']
@@ -730,7 +744,7 @@ class Schema150ProviderAdapter:
 
     def restore_roles_private(self,binding,preimage):
         self.require_authority(binding,purpose='restore_roles_private');self._attest('fenced')
-        if self._database_identity()!=150 or self._sessions() or self._roles()!=self._expected_roles(preimage,fenced=True):
+        if self._database_identity()!=self.binding['target_schema'] or self._sessions() or self._roles()!=self._expected_roles(preimage,fenced=True):
             raise RuntimeError('schema150_provider_private_restore_boundary_changed')
         self._object_preservation(binding,preimage)
         roles=preimage['roles']['original']['roles']
@@ -752,7 +766,7 @@ class Schema150ProviderAdapter:
 
     def verify_native_acceptance(self,binding,preimage):
         self.require_authority(binding,purpose='verify_native_acceptance')
-        require_target_protocols(150,*json.loads(self._sql('SELECT json_build_array(public.notification_delivery_protocol(),'
+        release_contract(binding).require_target_protocols(self._database_identity(),*json.loads(self._sql('SELECT json_build_array(public.notification_delivery_protocol(),'
             'public.notification_outbox_protocol(),public.data_deletion_ownership_protocol());')))
         if self.acceptance_guard(binding,private=True) is not True:raise RuntimeError('schema150_provider_native_acceptance_failed')
 

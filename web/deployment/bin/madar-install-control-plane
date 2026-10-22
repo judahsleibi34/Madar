@@ -59,6 +59,7 @@ declare -a tracked_files=(
   lib/schema149_provider_lifecycle.py
   lib/schema149_controller.py
   lib/schema150_release.py
+  lib/schema160_release.py
   lib/schema150_provider_lifecycle.py
   lib/schema150_actor_inventory.py
   lib/schema150_object_inventory.py

@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+if [[ "${MADAR_CANONICAL_EXECUTOR_TESTS:-false}" == true && "${MADAR_RECONCILED_INTEGRITY_TESTS:-false}" == true ]]; then
+  echo 'Choose either canonical executor acceptance or data-source/integrity acceptance; neither replaces the other' >&2
+  exit 2
+fi
+
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 WEB_ROOT="${ROOT_DIR}/web"
 POSTGRES_IMAGE="postgres:17-alpine@sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73"
@@ -82,6 +87,26 @@ docker exec "${CONTAINER_NAME}" dropdb -U postgres schema136_restore
 apply_range 137 146
  test "$(docker exec "${CONTAINER_NAME}" psql -X -U postgres -Atc "select schema_version from public.application_schema_state where contract_key='core'")" = "146"
  echo 'Authoritative schema146 origin positively observed before main147–156'
+# An explicit SQL-executor-only mode starts at the positively observed146.
+# It does not certify the root controller, backup, providers or write issuer.
+if [[ "${MADAR_CANONICAL_EXECUTOR_TESTS:-false}" == true ]]; then
+  docker exec "${CONTAINER_NAME}" psql -X -U postgres -v ON_ERROR_STOP=1 -q -c \
+    "comment on database postgres is 'madar-notification-synthetic-rehearsal'"
+  docker run --rm --read-only --memory=2g --cpus=1 --pids-limit=256 \
+    --network "container:${CONTAINER_NAME}" --tmpfs /tmp:rw,noexec,nosuid,size=256m \
+    --volume "${WEB_ROOT}/backend:/app:ro" --volume "${ROOT_DIR}:/release:ro" \
+    --env PYTHONPATH=/app:/release/web --env PYTHONDONTWRITEBYTECODE=1 \
+    --env SUPABASE_URL=http://127.0.0.1:54321 \
+    --env APP_ENV=test --env SUPABASE_ANON_KEY=synthetic-placeholder-anon --env SUPABASE_SERVICE_KEY=synthetic-placeholder-service \
+    --env CANONICAL_EXECUTOR_SYNTHETIC_DATABASE_DSN='host=127.0.0.1 port=5432 dbname=postgres user=postgres' \
+    --env BUSINESS_INTEGRITY_SYNTHETIC_DATABASE_DSN='host=127.0.0.1 port=5432 dbname=postgres user=postgres' \
+    --env RECONCILED_SOURCE_ROOT=/release \
+    --entrypoint python "${BACKEND_TEST_IMAGE:-madar-backend-test}" -m unittest \
+      tests.test_schema160_executor_database -v
+  echo 'Canonical SQL executor and calendar transaction acceptance only; full protected application upgrade NOT TESTED'
+  exit 0
+fi
+
 apply_range 147 153
 test "$(docker exec "${CONTAINER_NAME}" psql -X -U postgres -Atc \
   "select schema_version from public.application_schema_state where contract_key='core'")" = "153"

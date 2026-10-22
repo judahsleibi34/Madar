@@ -25,14 +25,13 @@ class CompletedNormalBackupContext:
             self.profile=profile(contract)
         else:
             from deployment.lib.schema150_provider_adapter import Schema150ProviderAdapter
-            from deployment.lib.completed_normal_admission import validate_provider_preparation150
-            from deployment.lib.completed_normal_profile import DELETION
-            validate_provider_preparation150(contract)
+            from deployment.lib.completed_normal_admission import validate_provider_preparation
+            selected=validate_provider_preparation(contract)
             if type(provider_adapter) is not Schema150ProviderAdapter or provider_adapter.contract!=contract:
                 raise RuntimeError('completed_backup_concrete_provider_required')
             # Backup preparation is not operational profile registration. The
             # concrete actor independently checks existing fresh authority/locks.
-            self.profile=DELETION
+            self.profile=selected
         self.context=digest(contract);self.root=ADMISSIONS/self.context
         self.stage=stage;self.schema=self.profile.source if stage=='pre-migration' else self.profile.target
         self.source_guard,self.artifact_guard=source_guard,artifact_guard

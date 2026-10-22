@@ -7,6 +7,7 @@ import hashlib
 import json
 from pathlib import Path
 import importlib.util
+import sys
 
 _candidate_spec = importlib.util.spec_from_file_location("madar_eduhope_candidate", Path(__file__).with_name("eduhope_candidate.py"))
 _candidate = importlib.util.module_from_spec(_candidate_spec)
@@ -613,6 +614,9 @@ if __name__ == "__main__":
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     module.source_manifest(Path(__file__).resolve().parents[2])
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'web'))
+    from deployment.lib.schema160_release import captured_source
+    captured_source(Path(__file__).resolve().parents[2])
     errors = validate()
 
     for error in errors:

@@ -805,7 +805,9 @@ class DockerGitOperations:
         if not maintenance_preparation(self):raise RuntimeError('maintenance_preparation_contract_required')
         from deployment.lib.completed_normal_admission import require_candidate_authority,credential_witness,digest
         from deployment.lib.completed_normal_migration import intent_document
+        from deployment.lib.completed_normal_admission import validate_provider_preparation
         contract=self.completed_normal_admission
+        selected=validate_provider_preparation(contract)
         require_candidate_authority(contract,mode='READ_ONLY')
         if sha!=contract['candidate']['source_sha'] or slot!=contract['candidate']['slot']:
             raise RuntimeError('maintenance_preparation_identity_changed')
@@ -814,7 +816,7 @@ class DockerGitOperations:
         expected={'operation':contract['operation'],'context_sha256':digest(contract),
             'source_sha':sha,'controller_sha':contract['candidate']['controller_sha'],
             'inventory_sha256':contract['writer_inventory_sha256'],
-            'system_identifier':contract['database']['system_identifier'],'source_schema':146,'target_schema':150}
+            'system_identifier':contract['database']['system_identifier'],'source_schema':selected.source,'target_schema':selected.target}
         if (witness.get('intent')!=intent_document(contract) or not isinstance(provider,dict)
                 or set(provider)!={'version','binding','journal_sha256','preimage_sha256'}
                 or type(provider['version']) is not int or provider['version']!=1 or provider['binding']!=expected
@@ -824,7 +826,7 @@ class DockerGitOperations:
         known=state.get('known_good_release') or {}
         if (state.get('active_slot')!=contract['origin']['slot'] or known.get('slot')!=contract['origin']['slot']
                 or known.get('sha')!=contract['source_roles']['application_sha']
-                or known.get('schema')!=146 or state.get('in_progress_release') or state.get('rollback_failure')):
+                or known.get('schema')!=selected.source or state.get('in_progress_release') or state.get('rollback_failure')):
             raise RuntimeError('maintenance_preparation_origin_changed')
         return contract
 
@@ -1532,11 +1534,11 @@ class DockerGitOperations:
 
 
 def maintenance_preparation(operations) -> bool:
-    from deployment.lib.completed_normal_profile import DELETION
+    from deployment.lib.completed_normal_profile import DELETION, RECONCILED
     contract=getattr(operations,'completed_normal_admission',None)
-    if not isinstance(contract,dict) or contract.get('operation')!=DELETION.operation:return False
-    from deployment.lib.completed_normal_admission import validate_provider_preparation150
-    validate_provider_preparation150(contract)
+    if not isinstance(contract,dict) or contract.get('operation') not in {DELETION.operation,RECONCILED.operation}:return False
+    from deployment.lib.completed_normal_admission import validate_provider_preparation
+    validate_provider_preparation(contract)
     return True
 
 

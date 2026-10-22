@@ -31,7 +31,7 @@ def verify_migration_backup(actual,witness,sha,operations, *, expected_schema=11
     """
     actual=Path(actual)
     maintenance=witness.get('maintenance_manifest_sha256')
-    if ((expected_schema==150 or 'maintenance_manifest_sha256' in witness)
+    if ((expected_schema in (150,160) or 'maintenance_manifest_sha256' in witness)
             and (not isinstance(maintenance,str) or not re.fullmatch('[0-9a-f]{64}',maintenance))):
         raise RuntimeError('completed_migration_maintenance_binding_invalid')
     helper=protected(operations.recovery_helper_root()/'backup_support.py')
@@ -53,16 +53,15 @@ def verify_migration_backup(actual,witness,sha,operations, *, expected_schema=11
         raise RuntimeError('completed_migration_backup_binding_changed')
 
 def intent_document(contract):
-    # An intent document is also a backup input. Validate the unregistered150
-    # preparation contract without admitting it to any executor/authority path.
-    from deployment.lib.completed_normal_profile import DELETION
-    if isinstance(contract,dict) and contract.get('operation')==DELETION.operation:
-        from deployment.lib.completed_normal_admission import validate_provider_preparation150
-        from deployment.lib.schema150_release import MANIFEST_SHA256
-        validate_provider_preparation150(contract)
-        if contract['migration_manifest_sha256']!=MANIFEST_SHA256:
-            raise RuntimeError('schema150_migration_manifest_changed')
-        selected=DELETION
+    # Pure preparation validation creates no executor or operational admission.
+    from deployment.lib.completed_normal_profile import DELETION, RECONCILED
+    if isinstance(contract,dict) and contract.get('operation') in {DELETION.operation, RECONCILED.operation}:
+        from deployment.lib.completed_normal_admission import validate_provider_preparation
+        from deployment.lib import schema150_release, schema160_release
+        selected=validate_provider_preparation(contract)
+        module=schema150_release if selected is DELETION else schema160_release
+        if contract['migration_manifest_sha256']!=module.MANIFEST_SHA256:
+            raise RuntimeError('completed_migration_manifest_changed')
     else:selected=profile(contract)
     return {'operation':selected.operation,'context_sha256':digest(contract),'source_sha':contract['candidate']['source_sha'],
         'manifest_sha256':contract['migration_manifest_sha256'],'source_schema':selected.source,'target_schema':selected.target,
@@ -177,11 +176,11 @@ def _parent_migration_binding(parent,provider,contract,release_root,state_root):
     existing madar service. In particular, this path never adopts a candidate.
     """
     from deployment.lib.completed_normal_execution import CompletedNormalUpgrade
-    from deployment.lib.completed_normal_profile import DELETION
+    from deployment.lib.completed_normal_profile import DELETION, RECONCILED
     from deployment.lib.schema150_provider_adapter import Schema150ProviderAdapter,require_owned_lock
     if (os.geteuid()!=0 or type(parent) is not CompletedNormalUpgrade
             or type(provider) is not Schema150ProviderAdapter
-            or parent.profile is not DELETION or parent.contract!=contract
+            or parent.profile not in (DELETION, RECONCILED) or parent.contract!=contract
             or provider.contract!=contract or provider.runtime is not parent.actor.runtime
             or parent.root!=provider.root or parent.root!=ADMISSIONS/digest(contract)
             or Path(state_root)!=parent.ops.state_root
@@ -239,11 +238,11 @@ def run_migration(contract,release_root,state_root,operations,*,parent=None,prov
     """
     require_fresh_authorization(contract)
     selected=profile(contract)
-    from deployment.lib.completed_normal_profile import DELETION
+    from deployment.lib.completed_normal_profile import DELETION, RECONCILED
     private=parent is not None or provider_adapter is not None
     if private:
         _parent_migration_binding(parent,provider_adapter,contract,release_root,state_root)
-    elif selected is DELETION:
+    elif selected in (DELETION, RECONCILED):
         raise RuntimeError('completed_migration_maintenance_parent_required')
     require_candidate_authority(contract,mode='READ_ONLY')
     sha=contract['candidate']['source_sha'];release_root=Path(release_root);state_root=Path(state_root)
@@ -277,8 +276,8 @@ def run_migration(contract,release_root,state_root,operations,*,parent=None,prov
     if file_digest(readonly_configuration(path,private=False))!=contract['migration_manifest_sha256']:
         raise RuntimeError('completed_migration_manifest_changed')
     if private:
-        from deployment.lib.schema150_release import admitted_manifest
-        manifest=admitted_manifest(release_root,contract)
+        from deployment.lib.schema150_provider_lifecycle import release_contract
+        manifest=release_contract(provider_adapter.binding).admitted_manifest(release_root,contract)
     elif selected is OUTBOX:
         from deployment.lib.schema149_release import admitted_manifest
         manifest=admitted_manifest(release_root,contract)

@@ -94,7 +94,7 @@ class ConcreteAdapterTests(unittest.TestCase):
         actor = adapter.Schema150ProviderAdapter.__new__(adapter.Schema150ProviderAdapter)
         actor.binding, actor.inventory, actor.root = scope, data, root
         actor.original_inventory=data
-        actor.contract = {'rehearsal_sha256': '8'*64, 'database': {'container_id': data['containers']['native:db']['id'],
+        actor.contract = {'operation': scope['operation'], 'version': 7, 'rehearsal_sha256': '8'*64, 'database': {'container_id': data['containers']['native:db']['id'],
                           'image': data['containers']['native:db']['image']}}
         actor.contract['candidate']={'images':{'backend':'sha256:'+'e'*64,'frontend':'sha256:'+'e'*64}}
         actor.contract['candidate']['redis_image']='sha256:'+'e'*64

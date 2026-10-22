@@ -1,5 +1,29 @@
 # Privileged control-plane upgrade architecture
 
+## Canonical160 engineering and owner decision (2026-10-23)
+
+`BRANCH_PROTECTION: DEFERRED_BY_PROJECT_OWNER`. The owner explicitly waived
+GitHub branch protection for this release. It is not a merge/deployment blocker
+by itself; exact source, CI, artifacts, runtime identity, independent authority
+and all applicable acceptance gates remain required. This exception grants no
+Class D production authority.
+
+The distinct version8 `completed-normal-schema146-160-coordinated-release`
+preparation binds the canonical fourteen SQL transitions, not archived147–150.
+The existing maintenance coordinator, candidate sealer, provider lifecycle,
+backup context and parent executor now carry that exact preparation contract.
+Its protocol observations expect delivery2 at157, outbox2 at159 and deletion2
+only at160. Legacy deletion backlog blocks through159. Historical behavior and
+all published SQL/metadata remain intact. Intermediate schemas cannot be NORMAL.
+
+The operation is still **unregistered and non-executable**: private guard wiring,
+original inventory publication, independently verified backup/receiver, private
+write handoff and child activation remain incomplete. Native executor/calendar
+and modeled lifecycle tests do not prove a privileged preserved-application
+upgrade, Auth/MFA/Storage acceptance, reboot, or complete restoration. Ordinary
+Class D staging and automatic dispatch remain blocked. No active descriptor,
+production controller, grant, service, timer, database or routing is changed.
+
 ## Historical retained-maintenance source reconciliation
 
 PR195's profile-aware runtime/dispatch fixes are retained by the newer controller;

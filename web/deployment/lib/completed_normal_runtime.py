@@ -47,12 +47,11 @@ def _duration(value):
 def validate_model(contract,model,runtime, *, phase='running'):
     if phase not in {'staged','running','fenced','provisional'}:
         raise RuntimeError('completed_runtime_lifecycle_invalid')
-    from deployment.lib.completed_normal_profile import DELETION
-    preparation150=phase=='provisional' and contract.get('operation')==DELETION.operation
+    from deployment.lib.completed_normal_profile import DELETION, RECONCILED
+    preparation150=phase=='provisional' and contract.get('operation') in {DELETION.operation, RECONCILED.operation}
     if preparation150:
-        from deployment.lib.completed_normal_admission import validate_provider_preparation150
-        validate_provider_preparation150(contract)
-        release=DELETION
+        from deployment.lib.completed_normal_admission import validate_provider_preparation
+        release=validate_provider_preparation(contract)
     else:
         validate_contract(contract)
         release=profile(contract)
@@ -255,11 +254,11 @@ def seal_candidate_stage(contract, *, source_guard,model_loader,runtime,state_ro
     """
     from deployment.lib.completed_normal_admission import require_candidate_authority
     from deployment.lib.provider_recovery_runtime import readonly_configuration
-    from deployment.lib.completed_normal_profile import DELETION
-    maintenance=contract.get('operation')==DELETION.operation
+    from deployment.lib.completed_normal_profile import DELETION, RECONCILED
+    maintenance=contract.get('operation') in {DELETION.operation, RECONCILED.operation}
     if maintenance:
-        from deployment.lib.completed_normal_admission import validate_provider_preparation150
-        validate_provider_preparation150(contract)
+        from deployment.lib.completed_normal_admission import validate_provider_preparation
+        maintenance_profile=validate_provider_preparation(contract)
     if os.geteuid()!=0:raise RuntimeError('completed_runtime_root_required')
     if not callable(source_guard) or not callable(model_loader):raise RuntimeError('completed_runtime_independent_guards_required')
     root=Path(admissions)/digest(contract)
@@ -279,7 +278,7 @@ def seal_candidate_stage(contract, *, source_guard,model_loader,runtime,state_ro
         if (owner is None or owner['owner']!='CANDIDATE' or owner['generation']!=contract['origin']['worker_generation']
                 or owner['candidate']!={'sha':contract['source_roles']['application_sha'],'slot':contract['origin']['slot']}):
             raise RuntimeError('completed_runtime_origin_owner_changed')
-        selected=DELETION if maintenance else profile(contract)
+        selected=maintenance_profile if maintenance else profile(contract)
         legacy=selected is LEGACY
         original=json.loads(protected(Path(contract['source_roles']['completion_root'])/
             ('candidate-identities.json' if legacy else 'candidate-runtime.json'),private=True).read_text())

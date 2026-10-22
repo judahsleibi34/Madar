@@ -94,3 +94,9 @@ jobs:
           timeout 10m bash web/scripts/rehearse_architecture_150.sh
           timeout 10m bash web/scripts/rehearse_migration_150.sh
           MADAR_RECONCILED_INTEGRITY_TESTS=true timeout 10m bash web/scripts/rehearse_data_sources_upgrade_136_156.sh
+
+      - name: Rehearse canonical SQL executor and schema160 calendar transactions
+        env:
+          BACKEND_TEST_IMAGE: madar-backend-test
+          MADAR_CANONICAL_EXECUTOR_TESTS: 'true'
+        run: timeout 10m bash web/scripts/rehearse_data_sources_upgrade_136_156.sh

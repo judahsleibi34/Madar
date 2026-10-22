@@ -85,8 +85,9 @@ class MigrationManifest:
     @classmethod
     def load(cls, path: Path, repository_root: Path) -> "MigrationManifest":
         raw = json.loads(path.read_text(encoding="utf-8"))
-        if (path.name == 'migrations-157-160-reconciled.json'
-                or raw.get('execution_status') == 'blocked_pending_protected_controller_reconciliation'):
+        if (path.name in {'migrations-157-160-reconciled.json', 'migrations-147-160-coordinated.json'}
+                or raw.get('execution_status') in {'blocked_pending_protected_controller_reconciliation',
+                                                 'blocked_pending_protected_controller_acceptance'}):
             raise ValueError('reconciled migration contract is not executable')
         historical_names = {'147_fence_notification_delivery_claims.sql',
             '148_guard_reservation_reactivation_capacity.sql',

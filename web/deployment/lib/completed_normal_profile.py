@@ -12,6 +12,7 @@ COMMERCIAL_OPERATION = 'completed-normal-schema144-146-maintenance-release'
 FENCED_OPERATION = 'completed-normal-schema146-148-coordinated-release'
 OUTBOX_OPERATION = 'completed-normal-schema146-149-coordinated-release'
 DELETION_OPERATION = 'completed-normal-schema146-150-coordinated-release'
+RECONCILED_OPERATION = 'completed-normal-schema146-160-coordinated-release'
 
 
 @dataclass(frozen=True)
@@ -35,7 +36,7 @@ class UpgradeProfile:
 
     @property
     def maintenance(self):
-        return self.operation in {MANUAL_OPERATION, COMMERCIAL_OPERATION, FENCED_OPERATION, OUTBOX_OPERATION, DELETION_OPERATION}
+        return self.operation in {MANUAL_OPERATION, COMMERCIAL_OPERATION, FENCED_OPERATION, OUTBOX_OPERATION, DELETION_OPERATION, RECONCILED_OPERATION}
 
 
 LEGACY = UpgradeProfile(LEGACY_OPERATION, 1, 115, 136, (), 'release.json',
@@ -59,6 +60,22 @@ OUTBOX = UpgradeProfile(OUTBOX_OPERATION, 6, 146, 149, (),
 # Recognizing it generically would bypass OUTBOX's deliberate fail-closed hooks.
 DELETION = UpgradeProfile(DELETION_OPERATION, 7, 146, 150, (),
     'schema-146-150-coordinated.json', 'migrations-147-150-coordinated.json', (147, 148, 149, 150))
+
+# Distinct reconciled contract: preparation only until the complete privileged
+# preserved-application lifecycle passes. Never reinterpret DELETION authority.
+RECONCILED = UpgradeProfile(RECONCILED_OPERATION, 8, 146, 160, (),
+    'schema-146-160-coordinated.json', 'migrations-147-160-coordinated.json', tuple(range(147, 161)))
+
+
+def provider_preparation_profile(contract):
+    """Select an exact preparation contract without registering execution."""
+    if isinstance(contract, dict):
+        for selected in (DELETION, RECONCILED):
+            if (contract.get('operation') == selected.operation
+                    and type(contract.get('version')) is int
+                    and contract['version'] == selected.version):
+                return selected
+    raise RuntimeError('completed_normal_provider_preparation_profile_invalid')
 
 
 def profile(contract):
@@ -84,6 +101,6 @@ def expected_origin_grant(contract, mode):
         value.update(compatible_min=115, compatible_max=136)
     elif selected in (APPLICATION, COMMERCIAL):
         value.update(compatible_min=136, compatible_max=144)
-    elif selected in (FENCED, OUTBOX, DELETION):
+    elif selected in (FENCED, OUTBOX, DELETION, RECONCILED):
         value.update(compatible_min=144, compatible_max=146)
     return value
