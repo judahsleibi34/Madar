@@ -179,4 +179,91 @@ class CompletedNormalWriteTests(unittest.TestCase):
         self.assertNotEqual(preimage['contract_digest'],self.contract['source_roles']['original_plan_sha256'])
         self.assertEqual(len(self.kernel.denials),1)
 
+class MaintenancePrivateWriteTests(unittest.TestCase):
+    """Real root grant/preimage writes, explicitly modeled live observations."""
+    def setUp(self):
+        CompletedNormalWriteTests.setUp(self)
+        from test_schema160_release import reconciled_contract
+        from deployment.lib.completed_normal_profile import RECONCILED
+        from deployment.lib.schema150_provider_adapter import Schema150ProviderAdapter
+        self.contract=reconciled_contract()
+        previous=self.root;self.root=self.path/admission.digest(self.contract)
+        previous.rename(self.root)
+        self.grant_path=self.root/'write-authority/authority.json'
+        self.candidate={'version':3,'schema':146,'release_sha':self.contract['candidate']['source_sha'],
+            'contract_digest':admission.digest(self.contract),'mode':'READ_ONLY','compatible_min':146,'compatible_max':160,
+            'operation':RECONCILED.operation,'origin_schema':146,'controller_sha':self.contract['candidate']['controller_sha'],
+            'migration_manifest_sha256':self.contract['migration_manifest_sha256']}
+        self.grant_path.write_bytes(admission.encoded(self.candidate))
+        from deployment.lib.completed_normal_profile import expected_origin_grant
+        patches=(patch.object(m,'profile',return_value=RECONCILED),
+                 patch.object(admission,'profile',return_value=RECONCILED),
+                 patch('deployment.lib.completed_normal_profile.profile',return_value=RECONCILED),
+                 patch('deployment.lib.completed_normal_database.require_normal_migration_boundary'))
+        for p in patches:p.start();self.addCleanup(p.stop)
+        self.old_path.write_bytes(admission.encoded(expected_origin_grant(self.contract,'READ_ONLY')))
+        (self.root/'admission.json').write_bytes(admission.encoded({'operation':RECONCILED.operation,'contract':self.contract}))
+        (self.root/'candidate-runtime.json').unlink()
+        self.kernel=Kernel(self.contract,self.root);self.kernel.schema=160
+        self.kernel.round=lambda **kw:(_ for _ in ()).throw(AssertionError('historical running kernel used'))
+        self.provider=Schema150ProviderAdapter.__new__(Schema150ProviderAdapter)
+        self.provider.contract=self.contract;self.provider.root=self.root;self.provider.runtime=self.kernel.runtime
+        def private_round(*,normal):
+            value=json.loads(self.grant_path.read_text())
+            self.assertEqual(value['mode'],'NORMAL' if normal else 'READ_ONLY')
+            return {'operation':RECONCILED.operation,'context_sha256':admission.digest(self.contract),
+                'schema':160,'mode':value['mode'],'candidate_stage_sha256':'a'*64,'provider_journal_sha256':'b'*64,
+                'write_authority_sha256':admission.digest(value),'workers_started':False,'ingress_restored':False}
+        from unittest.mock import Mock
+        self.provider.verify_private_handoff=Mock(side_effect=private_round)
+        self.private_observation=private_round
+        self.boundary=m.CompletedNormalWriteHandoff(self.contract,self.kernel,source_guard=lambda:None,
+            boot_guard=lambda:None,artifact_guard=lambda:None,admissions=self.path,state_root=self.path,
+            provider_adapter=self.provider)
+
+    def test_actual_private_grant_does_not_claim_running_or_public_acceptance(self):
+        result=self.boundary.grant(schema=160)
+        self.assertEqual(json.loads(self.grant_path.read_text())['mode'],'NORMAL')
+        self.assertFalse(result['workers_started']);self.assertFalse(result['ingress_restored'])
+        self.assertGreaterEqual(self.clock.value,5)
+        receipt=json.loads((self.root/'maintenance-write-handoff.json').read_text())
+        self.assertEqual(receipt['schema'],160)
+        self.assertEqual(receipt['write_authority_sha256'],admission.digest(json.loads(self.grant_path.read_text())))
+        self.assertTrue((self.root/'write-boundary-160.json').exists())
+        for name in ('candidate-runtime.json','normal-publication.json','target-normal-publication.json'):
+            self.assertFalse((self.root/name).exists())
+        self.boundary.revoke()
+        with self.assertRaises(FileExistsError):self.boundary.grant(schema=160)
+
+    def test_failed_private_acceptance_never_grants_and_lost_publication_revokes(self):
+        self.provider.verify_private_handoff.side_effect=RuntimeError('private_acceptance_failed')
+        with self.assertRaisesRegex(RuntimeError,'private_acceptance_failed'):self.boundary.grant(schema=160)
+        self.assertEqual(json.loads(self.grant_path.read_text())['mode'],'READ_ONLY')
+        self.assertFalse((self.root/'write-boundary-160.json').exists())
+        self.provider.verify_private_handoff.side_effect=self.private_observation
+        original=m.exclusive
+        def fail(path,data):
+            if path.name=='maintenance-write-handoff.json':raise OSError('synthetic_receipt_failure')
+            original(path,data)
+        with patch.object(m,'exclusive',side_effect=fail),self.assertRaises(OSError):self.boundary.grant(schema=160)
+        self.assertEqual(json.loads(self.grant_path.read_text())['mode'],'READ_ONLY')
+        self.assertIn(('compensate_without_database_restore',),self.kernel.calls)
+
+    def test_status_packet_and_old_continuation_cannot_replace_private_observation(self):
+        self.provider.verify_private_handoff.side_effect=None
+        self.provider.verify_private_handoff.return_value={'approved':True}
+        with self.assertRaisesRegex(RuntimeError,'private_observation_invalid'):self.boundary.grant(schema=160)
+        self.assertEqual(json.loads(self.grant_path.read_text())['mode'],'READ_ONLY')
+        with self.assertRaisesRegex(RuntimeError,'separate_contract'):
+            self.boundary.grant(schema=160,fresh_attempt_root=self.root/'continuations'/('a'*64))
+        self.assertFalse((self.root/'write-boundary-160.json').exists())
+
+    def test_private_provider_is_mandatory_and_cannot_be_a_callback_packet(self):
+        for provider in (None,{'approved':True},object()):
+            with self.subTest(provider=type(provider).__name__),self.assertRaisesRegex(RuntimeError,'concrete_private_provider_required'):
+                m.CompletedNormalWriteHandoff(self.contract,self.kernel,source_guard=lambda:None,
+                    boot_guard=lambda:None,artifact_guard=lambda:None,admissions=self.path,state_root=self.path,
+                    provider_adapter=provider)
+
+
 if __name__=='__main__':unittest.main()

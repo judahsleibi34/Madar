@@ -82,7 +82,80 @@ class NativeCandidateRedisTests(unittest.TestCase):
 
 
 class ConcreteAdapterTests(unittest.TestCase):
-    def component(self, *, stage='prepared', candidates=False):
+    def private_handoff_component(self, *, normal=False, target=160):
+        """Real guard/journal/inventory; native providers are explicit models."""
+        actor,scope,preimage,journal=self.component(stage='private',candidates=True,target=target)
+        actor.contract['candidate']['slot']='green'
+        stage=json.loads((actor.root/'candidate-staged-runtime.json').read_text())
+        stage['preparation_mode']='created-fenced'
+        for role,sealed in stage['runtimes'].items():sealed['name']=actor.inventory['containers']['candidate:'+role]['name']
+        (actor.root/'candidate-staged-runtime.json').write_text(json.dumps(stage))
+        patcher=patch('deployment.lib.completed_normal_admission.credential_witness',return_value=stage)
+        patcher.start();self.addCleanup(patcher.stop)
+        actor._roles=Mock(return_value={'original':'synthetic'})
+        actor._expected_roles=Mock(return_value={'original':'synthetic'})
+        actor._sessions=Mock(return_value=[]);actor._known_sessions=Mock(return_value=True)
+        actor._supervisors_stopped=Mock(return_value=True);actor._object_preservation=Mock()
+        actor._sql=Mock(side_effect=lambda sql: '[2,2,2]' if 'json_build_array' in sql else '0')
+        grant={'mode':'NORMAL' if normal else 'READ_ONLY','schema':target if normal else 146}
+        patcher=patch('deployment.lib.completed_normal_admission.require_candidate_authority',return_value=grant)
+        patcher.start();self.addCleanup(patcher.stop)
+        actor.activation_guard=Mock(return_value={'binding_sha256':lifecycle.digest(scope),'schema':target,
+            'delivery_protocol':2,'outbox_protocol':2,'deletion_protocol':2,
+            'target_write_authority':normal,'write_authority_sha256':lifecycle.digest(grant) if normal else None,
+            **{k:True for k in lifecycle.PRE_GRANT_GATES}})
+        version={'release_sha':scope['source_sha'],'release_slot':'green',
+            'schema_compatible_min':146,'schema_compatible_max':target,'schema_excluded_versions':[]}
+        recovery={'restricted':not normal,'business_writes_enabled':normal}
+        actor.runtime.json_http.side_effect=lambda url:version if url.endswith('/health/version') else recovery
+        components={key:'ok' for key in ('database','auth','schema','storage','redis','environment',
+            'admin_mfa_policy','parser_isolation','calendar_configuration')}
+        components['notification_worker']='unavailable'
+        actor.runtime.fetch.return_value=(503,json.dumps({'ready':False,'components':components}).encode())
+        return actor,scope,stage,preimage,journal,grant,version,components
+
+    def test_private_handoff_observes_application_without_starting_or_claiming_workers(self):
+        for target,normal in ((150,False),(150,True),(160,False),(160,True)):
+            with self.subTest(target=target,normal=normal):
+                actor,scope,stage,_,journal,grant,_,_=self.private_handoff_component(normal=normal,target=target)
+                result=actor.verify_private_handoff(normal=normal)
+                self.assertEqual(result['mode'],grant['mode'])
+                self.assertEqual(result['candidate_stage_sha256'],lifecycle.digest(stage))
+                self.assertEqual(result['provider_journal_sha256'],lifecycle.digest(journal.read()))
+                self.assertFalse(result['workers_started']);self.assertFalse(result['ingress_restored'])
+                self.assertEqual(actor.runtime.denied.call_count,0 if normal else 2)
+                actor.runtime.command.assert_not_called()
+                self.assertFalse((actor.root/'normal-publication.json').exists())
+
+    def test_private_handoff_rejects_pending_journal_missing_acceptance_and_started_consumer(self):
+        for fault in ('pending','missing_private_acceptance','started_worker','role','session','protocol','object'):
+            with self.subTest(fault=fault):
+                actor,_,stage,_,journal,_,_,_=self.private_handoff_component()
+                if fault=='pending':journal.append('effect_intent',{'step':'resume_accepted_workers'})
+                elif fault=='missing_private_acceptance':(journal.root/'0019.json').unlink()
+                elif fault=='started_worker':
+                    next(r for r in actor._rows.return_value if r['Id']==stage['runtimes']['notification-worker']['id'])['State']['Running']=True
+                elif fault=='role':actor._roles.return_value={'wrong':'roles'}
+                elif fault=='session':actor._known_sessions.return_value=False
+                elif fault=='protocol':actor._sql.side_effect=lambda sql:'[2,1,2]' if 'json_build_array' in sql else '0'
+                else:actor._object_preservation.side_effect=RuntimeError('synthetic_object_changed')
+                with self.assertRaises((RuntimeError,FileNotFoundError)):actor.verify_private_handoff(normal=False)
+                actor.runtime.command.assert_not_called()
+
+    def test_private_handoff_rejects_changed_source_missing_core_and_unready_parser(self):
+        for fault in ('source','missing_core','parser','calendar','premature_normal'):
+            with self.subTest(fault=fault):
+                actor,_,_,_,_,_,version,components=self.private_handoff_component()
+                if fault=='source':version['release_sha']='0'*40
+                elif fault=='missing_core':del components['auth']
+                elif fault=='parser':components['parser_isolation']='unavailable'
+                elif fault=='calendar':components['calendar_configuration']='unavailable'
+                else:actor.activation_guard.return_value['target_write_authority']=True
+                actor.runtime.fetch.return_value=(503,json.dumps({'components':components}).encode())
+                with self.assertRaises(RuntimeError):actor.verify_private_handoff(normal=False)
+                actor.runtime.command.assert_not_called()
+
+    def component(self, *, stage='prepared', candidates=False, target=150):
         """Real adapter methods, synthetic transport and explicit guard injection."""
         temporary = tempfile.TemporaryDirectory(); self.addCleanup(temporary.cleanup)
         root = Path(temporary.name); root.chmod(0o700)
@@ -91,10 +164,14 @@ class ConcreteAdapterTests(unittest.TestCase):
         stack.enter_context(patch.object(retained, 'protected', lambda path, **kwargs: Path(path)))
         stack.enter_context(patch.object(retained, 'require_root_directory', lambda path: None))
         (data, scope), rows = fixture(candidates=candidates)
+        if target==160:
+            from deployment.lib.completed_normal_profile import RECONCILED
+            scope=dict(scope,operation=RECONCILED.operation,target_schema=160)
+            data,scope=repin(data,scope)
         actor = adapter.Schema150ProviderAdapter.__new__(adapter.Schema150ProviderAdapter)
         actor.binding, actor.inventory, actor.root = scope, data, root
         actor.original_inventory=data
-        actor.contract = {'operation': scope['operation'], 'version': 7, 'rehearsal_sha256': '8'*64, 'database': {'container_id': data['containers']['native:db']['id'],
+        actor.contract = {'operation': scope['operation'], 'version': 8 if target==160 else 7, 'rehearsal_sha256': '8'*64, 'database': {'container_id': data['containers']['native:db']['id'],
                           'image': data['containers']['native:db']['image']}}
         actor.contract['candidate']={'images':{'backend':'sha256:'+'e'*64,'frontend':'sha256:'+'e'*64}}
         actor.contract['candidate']['redis_image']='sha256:'+'e'*64
@@ -105,7 +182,7 @@ class ConcreteAdapterTests(unittest.TestCase):
         actor.lock_descriptors = (101, 102)
         actor.acceptance_guard = Mock(return_value=True)
         actor.activation_guard = Mock(return_value={'target_write_authority': True})
-        actor._database_identity = Mock(return_value=150)
+        actor._database_identity = Mock(return_value=target)
         journal = lifecycle.ProtectedProviderJournal(journal_root)
         preimage = {'ingress': {'fixture': True}, 'supervisors': {'sessions': []},
                     'objects': {'roots': data['object_roots']}, 'roles': {'fixture': True}}
@@ -694,6 +771,7 @@ class ConcreteAdapterTests(unittest.TestCase):
     def test_activation_starts_only_workers_then_supporting_native_actors_and_proxy_last(self):
         actor,scope,preimage,_=self.component(stage='private',candidates=True)
         actor.require_authority=Mock();actor.activation_guard.return_value={'target_write_authority':True}
+        self.route_transport(actor)
         by_id={r['Id']:r for r in actor._rows.return_value}
         def start(arguments):by_id[arguments[2]]['State']['Running']=True
         actor.runtime.command.side_effect=start
@@ -705,6 +783,99 @@ class ConcreteAdapterTests(unittest.TestCase):
         started=[c.args[0][2] for c in actor.runtime.command.call_args_list]
         self.assertEqual(started[-1],actor.inventory['containers']['proxy']['id'])
         self.assertFalse(set(started)&{r['id'] for r in actor.inventory['containers'].values() if r['generation']=='candidate'})
+        self.assertEqual(actor.route_file.read_bytes(),actor.target_route())
+        actor.verify_target_route()
+
+    def route_transport(self, actor):
+        """Real private route/receipt/fsync/flock; explicit modeled Nginx/HTTP."""
+        from deployment.lib import emergency_routing_repair as routing
+        actor.route_file=actor.root/'active-upstreams.conf'
+        actor.route_file.write_bytes(b'synthetic obsolete origin route\n')
+        actor.contract['candidate']['slot']='green'
+        patcher=patch.object(routing,'UPSTREAM',actor.route_file);patcher.start();self.addCleanup(patcher.stop)
+        patcher=patch.object(adapter,'LOCKS',(actor.root/'upgrade.lock',actor.root/'deploy.lock'))
+        patcher.start();self.addCleanup(patcher.stop)
+        patcher=patch.object(adapter,'readonly_configuration',lambda p,**kw:Path(p))
+        patcher.start();self.addCleanup(patcher.stop)
+        patcher=patch('deployment.lib.completed_normal_admission.require_candidate_authority',
+            return_value={'schema':actor.binding['target_schema'],'mode':'NORMAL'})
+        patcher.start();self.addCleanup(patcher.stop)
+        actor.runtime.publish.side_effect=lambda body:routing.atomic(actor.route_file,body,0o644)
+        actor.runtime.verify_maintenance.side_effect=lambda:self.assertEqual(actor.route_file.read_bytes(),routing.MAINTENANCE)
+        version={'release_sha':actor.binding['source_sha'],'release_slot':'green','schema_compatible_min':146,
+            'schema_compatible_max':actor.binding['target_schema'],'schema_excluded_versions':[]}
+        actor.public_version=version
+        actor.runtime.json_http.side_effect=lambda url:(version if url.endswith('/health/version') else
+            {'ready':True} if url.endswith('/health/ready') else {'restricted':False,'business_writes_enabled':True})
+        return actor.route_file
+
+    def route_component(self):
+        actor,scope,preimage,journal=self.component(stage='private',candidates=True,target=160)
+        actor.require_authority=Mock();actor.activation_guard.return_value={'target_write_authority':True,'public_acceptance':True}
+        by_id={r['Id']:r for r in actor._rows.return_value}
+        for logical,record in actor.inventory['containers'].items():
+            if logical.startswith('candidate:'):by_id[record['id']]['State']['Running']=True
+        def command(args):
+            self.assertIn(args[0:2],(['docker','start'],['docker','stop']))
+            by_id[args[2]]['State']['Running']=args[1]=='start'
+        actor.runtime.command.side_effect=command
+        path=self.route_transport(actor)
+        return actor,scope,preimage,journal,path
+
+    def test_proxy_starts_in_maintenance_before_exact_target_publication(self):
+        from deployment.lib.emergency_routing_repair import MAINTENANCE
+        actor,scope,preimage,_,path=self.route_component()
+        proxy=actor.inventory['containers']['proxy']['id'];command=actor.runtime.command.side_effect
+        def observe(args):
+            if args==['docker','start',proxy]:self.assertEqual(path.read_bytes(),MAINTENANCE)
+            command(args)
+        actor.runtime.command.side_effect=observe
+        actor.restore_ingress(scope,preimage)
+        self.assertEqual((actor.root/'target-route-preimage.conf').read_bytes(),b'synthetic obsolete origin route\n')
+        self.assertEqual(path.read_bytes(),actor.target_route())
+        actor.verify_target_route()
+        actor.runtime.nginx_preflight.assert_called_once_with(actor.target_route(),actor.root)
+        original=(actor.root/'target-route-publication.json').read_bytes()
+        with self.assertRaises(FileExistsError):actor.restore_ingress(scope,preimage)
+        self.assertEqual((actor.root/'target-route-publication.json').read_bytes(),original)
+
+    def test_route_preflight_observation_and_receipt_failure_keep_maintenance(self):
+        from deployment.lib.emergency_routing_repair import MAINTENANCE
+        for fault in ('preflight','wrong_public_source','receipt'):
+            with self.subTest(fault=fault):
+                actor,scope,preimage,_,path=self.route_component()
+                if fault=='preflight':actor.runtime.nginx_preflight.side_effect=RuntimeError('synthetic_preflight_failed')
+                elif fault=='wrong_public_source':actor.public_version['release_sha']='0'*40
+                original=adapter.exclusive
+                def write(destination,body):
+                    if fault=='receipt' and destination.name=='target-route-publication.json':
+                        raise OSError('synthetic_receipt_failed')
+                    original(destination,body)
+                with patch.object(adapter,'exclusive',side_effect=write),self.assertRaises((RuntimeError,OSError)):
+                    actor.restore_ingress(scope,preimage)
+                self.assertEqual(path.read_bytes(),MAINTENANCE)
+                self.assertFalse((actor.root/'target-route-publication.json').exists())
+                self.assertTrue((actor.root/'target-route-preimage.conf').exists())
+
+    def test_failed_maintenance_reload_stops_only_the_exact_ingress_actors(self):
+        actor,scope,preimage,_,_=self.route_component()
+        actor.runtime.reload.side_effect=RuntimeError('synthetic_reload_failed')
+        with self.assertRaisesRegex(RuntimeError,'synthetic_reload_failed'):actor.restore_ingress(scope,preimage)
+        stops=[c.args[0] for c in actor.runtime.command.call_args_list if c.args[0][1]=='stop']
+        self.assertEqual(stops,[['docker','stop',actor.inventory['containers']['native:gateway']['id']],
+            ['docker','stop',actor.inventory['containers']['proxy']['id']]])
+        self.assertFalse((actor.root/'target-route-publication.json').exists())
+
+    def test_changed_target_route_or_publication_blocks_boot_release(self):
+        actor,scope,preimage,_,path=self.route_component();actor.restore_ingress(scope,preimage)
+        original=path.read_bytes();path.write_bytes(b'synthetic substituted route')
+        with self.assertRaisesRegex(RuntimeError,'target_route_changed'):actor.verify_target_route()
+        path.write_bytes(original)
+        record=actor.root/'target-route-publication.json'
+        value=json.loads(record.read_bytes());value['candidate_stage_sha256']='0'*64
+        record.write_text(json.dumps(value))
+        with self.assertRaisesRegex(RuntimeError,'publication_changed'):actor.clear_boot_interlock(scope,preimage)
+        self.assertTrue(actor.barrier.exists())
 
     def test_target_authority_alone_cannot_open_ingress_before_workers_are_running(self):
         actor,scope,preimage,_=self.component(stage='private',candidates=True)
@@ -786,11 +957,15 @@ class ConcreteAdapterTests(unittest.TestCase):
         actor.runtime.command.assert_not_called();actor.source_guard.assert_not_called()
 
     def test_lost_clear_acknowledgement_can_be_observed_without_recreating_barrier(self):
-        actor,scope,_,journal=self.component(stage='private')
+        actor,scope,preimage,journal=self.component(stage='private',candidates=True,target=160)
+        self.route_transport(actor)
+        actor._rows.return_value=phase_rows(actor.inventory,actor._rows.return_value,'active')
+        actor.runtime.command.side_effect=None
+        actor.restore_ingress(scope,preimage)
+        actor.runtime.command.reset_mock();actor._verify_barrier.reset_mock()
         for step in lifecycle.ACTIVATE_STEPS:
             journal.append('effect_intent',{'step':step})
             if step!='clear_boot_interlock':journal.append('effect_complete',{'step':step})
-        actor._rows.return_value=phase_rows(actor.inventory,actor._rows.return_value,'active')
         actor.barrier.unlink()
         # Observe already committed clear; never replay creation or invoke an
         # issuer. No blanket missing-barrier exception exists for earlier steps.

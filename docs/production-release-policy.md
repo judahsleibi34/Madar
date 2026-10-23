@@ -1,5 +1,36 @@
 # Madar production release acceptance policy
 
+## Maintenance private handoff observation
+
+The existing handoff accepts the concrete provider adapter for maintenance
+profiles. Its private round requires the protected completed private-provider
+journal, independently sealed candidate, unchanged restored roles/objects,
+known sessions, no prepared/background writer, exact target protocols and fresh
+root authority. Actual private backend/frontend identity and recovery probes
+must agree; core readiness remains mandatory, including parser and calendar
+configuration. Every consumer and ingress stay fenced. Historical profiles
+continue using their existing full running-worker kernel.
+
+After sustained private NORMAL observations, the handoff writes a distinct
+`maintenance-write-handoff.json`; it does not claim a full running runtime or
+public NORMAL publication. Failed observation/publication revokes authority and
+compensates without restoring customer data. Reentry cannot reuse that boundary;
+maintenance continuation still requires a separately reviewed recovery contract.
+Component tests exercise actual root-grant/preimage/journal writes with explicit
+modeled provider observations. They are not a privileged application rehearsal.
+Schema160 admission remains closed: concrete entrypoint guards, private provider
+connectivity/parser preparation, worker ownership/start, final runtime sealing,
+NORMAL adoption and full privileged routing/recovery acceptance are unfinished.
+
+The adapter's existing `restore_ingress` effect now stages the fixed maintenance
+route before restarting the proxy. It preflights and publishes only the exact
+accepted slot route, checks both stable identities/readiness/NORMAL fences and
+seals its stage/grant/route hashes. A failed effect refences provider ingress and
+keeps maintenance or stops the exact proxy; it never restores an obsolete route
+over committed SQL. Boot release/reconciliation verifies the route receipt and
+live target again. Tests use actual temporary route/receipt writes and flock,
+with modeled Nginx/Docker/HTTP; no installed proxy or reboot is certified.
+
 ## Exact schema160 authority preparation
 
 The backend and the existing root admission publisher/parser support a distinct
@@ -105,8 +136,8 @@ configuration are installed by this change. Missing configuration/privileges
 fails calendar edits closed with503. These are deployment prerequisites, not
 production authorization; the existing broad service-role capability remains.
 Clients should retain their expected version when reconciling an unknown
-commit. Cache invalidation also runs on an uncertain outcome. Calendar create
-and delete endpoints retain their existing behavior.
+commit. Cache invalidation also runs on an uncertain outcome. Creation and
+deletion use the same aggregate transaction as described above.
 
 ## Maintenance candidate preparation and original inventory
 

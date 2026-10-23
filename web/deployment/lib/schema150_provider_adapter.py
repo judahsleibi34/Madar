@@ -616,8 +616,12 @@ class Schema150ProviderAdapter:
                 for r in self.inventory['containers'].values() if r['generation']=='candidate')
         if step=='restore_ingress':
             self._attest('active')
+            self.verify_target_route()
             return self.activation_guard(binding,private=False).get('public_acceptance') is True
-        if step=='clear_boot_interlock':return not self.barrier.exists()
+        if step=='clear_boot_interlock':
+            if self.barrier.exists():return False
+            self.verify_target_route()
+            return True
         return False
 
     def migration_guard(self,cursor,migration):
@@ -731,6 +735,81 @@ class Schema150ProviderAdapter:
         # the existing issuer. A returned flag alone is never an issuer here.
         return self.activation_guard(binding,private=True)
 
+    def verify_private_handoff(self, *, normal):
+        """Observe the sealed private application with every consumer stopped.
+
+        This is the maintenance counterpart of the historical running-worker
+        kernel, not a grant issuer or a substitute for native provider acceptance.
+        Fresh authority, real locks, the protected journal and independently
+        supplied acceptance guards are required on every observation. The
+        returned projection contains no original role archive or credentials.
+        """
+        if type(normal) is not bool:
+            raise RuntimeError('schema150_private_handoff_mode_invalid')
+        from deployment.lib.completed_normal_admission import require_candidate_authority
+        from deployment.lib.schema150_provider_lifecycle import ProviderMaintenance150,ProtectedProviderJournal
+        from deployment.lib.emergency_routing_repair import AvailabilityFailure
+        self.require_authority(self.binding,purpose='observe_activation')
+        lifecycle=ProviderMaintenance150(self.binding,ProtectedProviderJournal(self.root/'provider-journal'),self)
+        records,completed,pending,ready=lifecycle._state()
+        if pending or not ready or completed!=list(FENCE_STEPS+PRIVATE_STEPS):
+            raise RuntimeError('schema150_private_handoff_acceptance_required')
+        stage=self.verify_candidate_stage(phase='private')
+        if stage.get('preparation_mode')!='created-fenced':
+            raise RuntimeError('schema150_private_handoff_stage_required')
+        self._attest('private')
+        self._supervisors_stopped()
+        preimage=lifecycle._preimage()
+        if self._roles()!=self._expected_roles(preimage,fenced=False):
+            raise RuntimeError('schema150_private_handoff_original_roles_changed')
+        sessions=self._sessions()
+        if (not self._known_sessions(sessions)
+                or int(self._sql('SELECT count(*) FROM pg_prepared_xacts;'))!=0
+                or int(self._sql('BEGIN READ ONLY;'+BACKGROUND_WRITER_SQL+';COMMIT;'))!=0):
+            raise RuntimeError('schema150_private_handoff_foreign_writer')
+        self._object_preservation(self.binding,preimage)
+        release_contract(self.binding).require_target_protocols(self._database_identity(),*json.loads(self._sql(
+            'SELECT json_build_array(public.notification_delivery_protocol(),'
+            'public.notification_outbox_protocol(),public.data_deletion_ownership_protocol());')))
+        evidence=lifecycle._activation_evidence(granted=normal)
+        grant=require_candidate_authority(self.contract,mode='NORMAL' if normal else 'READ_ONLY')
+        if normal and (grant['schema']!=self.binding['target_schema'] or evidence['write_authority_sha256']!=digest(grant)):
+            raise RuntimeError('schema150_private_handoff_target_grant_required')
+        slot=self.contract['candidate']['slot']
+        backend=8101 if slot=='blue' else 8201
+        frontend=3100 if slot=='blue' else 3200
+        for base in (f'http://127.0.0.1:{backend}',f'http://127.0.0.1:{frontend}/api'):
+            version=self.runtime.json_http(base+'/health/version')
+            if (version.get('release_sha')!=self.binding['source_sha'] or version.get('release_slot')!=slot
+                    or version.get('schema_compatible_min')!=self.binding['source_schema']
+                    or version.get('schema_compatible_max')!=self.binding['target_schema']
+                    or version.get('schema_excluded_versions')!=[]
+                    or self.runtime.json_http(base+'/health/recovery')!=
+                        {'restricted':not normal,'business_writes_enabled':normal}):
+                raise RuntimeError('schema150_private_handoff_serving_identity_changed')
+            if not normal:self.runtime.denied(base)
+        status,body=self.runtime.fetch(f'http://127.0.0.1:{backend}/health/ready')
+        value=json.loads(body);components=value.get('components',{})
+        core={'database','auth','schema','storage','redis','environment','admin_mfa_policy','parser_isolation'}
+        permitted={'notification_worker','calendar_sync_worker','calendar_sync_queue','data_deletion_worker'}
+        if (status not in (200,503) or not isinstance(components,dict) or not core.issubset(components)
+                or any(components[k]!='ok' for k in core)
+                or any(v not in {'ok','disabled','configured','not_required','development'}
+                       for k,v in components.items() if k not in permitted)):
+            raise AvailabilityFailure('schema150_private_handoff_core_unready')
+        self.runtime.http_status(f'http://127.0.0.1:{frontend}/')
+        # Re-observe authority and exact stopped/private resources after HTTP.
+        self.require_authority(self.binding,purpose='observe_activation')
+        self._attest('private')
+        if require_candidate_authority(self.contract,mode=grant['mode'])!=grant:
+            raise RuntimeError('schema150_private_handoff_grant_changed')
+        if lifecycle._state()[0]!=records:
+            raise RuntimeError('schema150_private_handoff_journal_changed')
+        return {'operation':self.binding['operation'],'context_sha256':self.binding['context_sha256'],
+            'schema':self.binding['target_schema'],'mode':grant['mode'],
+            'candidate_stage_sha256':digest(stage),'provider_journal_sha256':digest(records),
+            'write_authority_sha256':digest(grant),'workers_started':False,'ingress_restored':False}
+
     def observe_private_boundary(self,binding):
         self.require_authority(binding,purpose='prepare_private_activation')
         self._attest('private-boundary')
@@ -791,16 +870,97 @@ class Schema150ProviderAdapter:
                 or rows[record['id']]['State'].get('Restarting') is not False
                 for record in stage['runtimes'].values()):
             raise RuntimeError('schema150_provider_candidate_activation_incomplete')
-        # The accepted private application and workers must already be running.
-        # Restore approved native supporting actors before exposing the proxy.
-        records=list(self.inventory['containers'].items())
-        for logical,record in sorted(records,key=lambda item:item[0]=='proxy'):
-            if record['states']['active']['running'] and record['generation'] not in ('origin','fallback','canonical'):
-                if logical.startswith('candidate:'):continue
-                self.runtime.command(['docker','start',record['id']])
+        # Starting the proxy against its original configuration can expose an
+        # obsolete application. Load maintenance BEFORE starting it, then use
+        # the existing preflight/publish/reload primitives for the exact target.
+        # The lifecycle has already durably recorded restore_ingress intent.
+        from deployment.lib.emergency_routing_repair import UPSTREAM,MAINTENANCE
+        from deployment.lib.runtime_authority import runtime_mutation_lock
+        with runtime_mutation_lock(LOCKS[1].parent):
+            self.require_authority(binding,purpose='restore_ingress')
+            original=readonly_configuration(UPSTREAM,private=False).read_bytes()
+            exclusive(self.root/'target-route-preimage.conf',original)
+            proxy=self.inventory['containers']['proxy']
+            try:
+                self.runtime.publish(MAINTENANCE)
+                if readonly_configuration(UPSTREAM,private=False).read_bytes()!=MAINTENANCE:
+                    raise RuntimeError('schema150_provider_maintenance_route_changed')
+                records=list(self.inventory['containers'].items())
+                for logical,record in sorted(records,key=lambda item:item[0]=='proxy'):
+                    if record['states']['active']['running'] and record['generation'] not in ('origin','fallback','canonical'):
+                        if logical.startswith('candidate:'):continue
+                        self.runtime.command(['docker','start',record['id']])
+                self.runtime.reload();self.runtime.verify_maintenance()
+                self.require_authority(binding,purpose='restore_ingress')
+                route=self.target_route()
+                self.runtime.nginx_preflight(route,self.root)
+                self.require_authority(binding,purpose='restore_ingress')
+                self.runtime.publish(route);self.runtime.reload()
+                self._public_target_round()
+                if readonly_configuration(UPSTREAM,private=False).read_bytes()!=route:
+                    raise RuntimeError('schema150_provider_target_route_changed')
+                from deployment.lib.completed_normal_admission import require_candidate_authority
+                grant=require_candidate_authority(self.contract,mode='NORMAL')
+                exclusive(self.root/'target-route-publication.json',encoded({
+                    'binding_sha256':digest(binding),'route_sha256':hashlib.sha256(route).hexdigest(),
+                    'candidate_stage_sha256':digest(stage),'write_authority_sha256':digest(grant)}))
+            except Exception:
+                # Never restore the old route over a committed schema. A failed
+                # reload must still leave a persistent fence or stopped proxy.
+                try:
+                    # Provider ingress is independent of the application proxy.
+                    # Do not leave its restored gateway exposed if proxy
+                    # publication/acceptance fails partway through this effect.
+                    self.runtime.command(['docker','stop',self.inventory['containers']['native:gateway']['id']])
+                finally:
+                    try:
+                        self.runtime.publish(MAINTENANCE);self.runtime.reload();self.runtime.verify_maintenance()
+                    except Exception:
+                        self.runtime.command(['docker','stop',proxy['id']])
+                raise
+
+    def target_route(self):
+        slot=self.contract['candidate']['slot']
+        if slot not in {'blue','green'}:raise RuntimeError('schema150_provider_target_slot_invalid')
+        return (f'upstream madar_backend_active {{ server 127.0.0.1:{8101 if slot=="blue" else 8201}; }}\n'
+            f'upstream madar_frontend_active {{ server 127.0.0.1:{3100 if slot=="blue" else 3200}; }}\n').encode()
+
+    def _public_target_round(self):
+        """Observe both stable routes, including the actual NORMAL readiness."""
+        self.require_authority(self.binding,purpose='restore_ingress')
+        from deployment.lib.completed_normal_admission import require_candidate_authority
+        grant=require_candidate_authority(self.contract,mode='NORMAL')
+        if grant['schema']!=self.binding['target_schema']:
+            raise RuntimeError('schema150_provider_target_authority_required')
+        for base in ('http://127.0.0.1:8001','http://127.0.0.1:3000/api'):
+            identity=self.runtime.json_http(base+'/health/version')
+            ready=self.runtime.json_http(base+'/health/ready')
+            if (identity.get('release_sha')!=self.binding['source_sha']
+                    or identity.get('release_slot')!=self.contract['candidate']['slot']
+                    or identity.get('schema_compatible_min')!=self.binding['source_schema']
+                    or identity.get('schema_compatible_max')!=self.binding['target_schema']
+                    or identity.get('schema_excluded_versions')!=[] or ready.get('ready') is not True
+                    or self.runtime.json_http(base+'/health/recovery')!=
+                        {'restricted':False,'business_writes_enabled':True}):
+                raise RuntimeError('schema150_provider_public_target_not_accepted')
+        self.runtime.http_status('http://127.0.0.1:3000/')
+
+    def verify_target_route(self):
+        from deployment.lib.emergency_routing_repair import UPSTREAM
+        from deployment.lib.completed_normal_admission import require_candidate_authority
+        route=self.target_route();stage=self.verify_candidate_stage(phase='active')
+        grant=require_candidate_authority(self.contract,mode='NORMAL')
+        if private_json(self.root/'target-route-publication.json')!={
+                'binding_sha256':digest(self.binding),'route_sha256':hashlib.sha256(route).hexdigest(),
+                'candidate_stage_sha256':digest(stage),'write_authority_sha256':digest(grant)}:
+            raise RuntimeError('schema150_provider_target_publication_changed')
+        if readonly_configuration(UPSTREAM,private=False).read_bytes()!=route:
+            raise RuntimeError('schema150_provider_target_route_changed')
+        self._public_target_round()
 
     def clear_boot_interlock(self,binding,preimage):
         self.require_authority(binding,purpose='clear_boot_interlock');self._attest('active')
+        self.verify_target_route()
         if self.activation_guard(binding,private=False).get('public_acceptance') is not True:
             raise RuntimeError('schema150_provider_public_acceptance_required')
         if private_json(self.barrier)!={'binding':binding,'preimage_sha256':digest(preimage)}:

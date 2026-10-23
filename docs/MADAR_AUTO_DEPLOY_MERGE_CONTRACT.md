@@ -1,5 +1,15 @@
 # Madar Auto-Deploy Merge Contract
 
+Maintenance handoff now uses the existing concrete provider adapter's private
+observation instead of the historical running-worker kernel. It binds protected
+private acceptance and actual nonconsuming runtime probes before/after target
+authority, recording only a private handoff receipt. This does not register160,
+complete child activation/adoption or permit automatic dispatch. Target routing
+now uses the existing adapter effect: maintenance before proxy startup, exact
+route preflight/publication and live verification, with failure refencing.
+Its installed privileged acceptance remains outstanding. Component tests
+with modeled providers do not certify a preserved-application protected upgrade.
+
 Exact schema160 authority now has a distinct v3 format shared by the existing
 root admission publisher/parser and backend. It binds the operation, origin,
 controller, source/context and migration manifest; NORMAL is target160 only.

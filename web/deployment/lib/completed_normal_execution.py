@@ -743,7 +743,7 @@ class CompletedNormalUpgrade:
                 lifecycle=ProviderMaintenance150(binding,ProtectedProviderJournal(self.root/'provider-journal'),provider)
                 kernel=self.actor.candidate()
                 handoff=CompletedNormalWriteHandoff(self.contract,kernel,source_guard=self.actor.source,
-                    boot_guard=self.actor.installation.installed,artifact_guard=self.artifact_guard)
+                    boot_guard=self.actor.installation.installed,artifact_guard=self.artifact_guard,provider_adapter=provider)
                 self.event('original_provider_preimage_pending');lifecycle.prepare()
                 self.event('origin_write_fence_pending');self.fenced=True;handoff.fence_origin()
                 self.event('provider_maintenance_fence_pending');lifecycle.fence()
