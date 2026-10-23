@@ -27,3 +27,15 @@ effects to overcome them.
 
 No production credential, role archive, private journal, customer record or
 synthetic private authority is included in this package.
+
+## Audit remediation: credential scanning
+
+The tracked-file check now scans file contents for private-key headers, GitHub
+and AWS credential formats and JWT-shaped tokens, including tests and documents.
+Failures report only path, line and type; chunk boundaries cannot hide a token.
+It does not follow tracked symlinks into operator files. This is current-tree
+prevention, not certification of arbitrary opaque passwords, binary formats or
+historical credential activity. The separate bounded history scanner retains
+candidate references privately under the canonical development evidence roots;
+it no longer requires a home-directory workspace. Historical pattern candidates
+still require classification rather than being counted as confirmed leaks.

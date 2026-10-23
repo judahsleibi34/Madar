@@ -10,6 +10,7 @@ import json
 import os
 from pathlib import Path
 import re
+import stat
 import subprocess
 
 PATTERNS = {
@@ -21,6 +22,9 @@ PATTERNS = {
     'credential_assignment': re.compile(rb'(?i)\b(?:password|api[_-]?key|jwt[_-]?secret|service[_-]?role[_-]?key|supabase_service_key)\s*[=:]\s*["\x27]?[A-Za-z0-9_/+=.!:-]{12,500}'),
     'private_network_metadata': re.compile(rb'\b(?:10\.(?:\d{1,3}\.){2}\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|172\.(?:1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3})\b'),
 }
+EVIDENCE_ROOTS = (Path('/opt/madar-development/evidence/integration'),
+                  Path('/opt/madar-development/evidence/historical'))
+
 TEXT_SUFFIXES = {'.py', '.js', '.ts', '.jsx', '.tsx', '.md', '.json', '.yml', '.yaml', '.sql', '.sh', '.conf', '.toml', '.ini', '.txt', '.env', '.pem', '.key'}
 
 
@@ -72,9 +76,14 @@ def scan(root, refs, *, byte_limit=512 * 1024 * 1024):
 
 def write_private(directory, report):
     directory = Path(directory)
-    # Only a new direct child of the current user's home; no replacement.
-    if directory.parent.resolve() != Path.home().resolve() or directory.exists() or directory.is_symlink():
-        raise ValueError('A new private directory directly beneath HOME is required')
+    # A fixed workspace trust root, never another scattered home workspace.
+    if (directory.parent not in EVIDENCE_ROOTS or directory.exists() or directory.is_symlink()
+            or directory.parent.resolve()!=directory.parent):
+        raise ValueError('A new private directory beneath the development evidence root is required')
+    parent=directory.parent.stat()
+    if (not stat.S_ISDIR(parent.st_mode) or parent.st_uid not in (0,os.getuid())
+            or parent.st_mode & 0o022):
+        raise ValueError('Development evidence root is untrusted')
     directory.mkdir(mode=0o700)
     descriptor = os.open(directory / 'report.json', os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
     with os.fdopen(descriptor, 'w') as handle:

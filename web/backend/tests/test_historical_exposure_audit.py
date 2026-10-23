@@ -37,7 +37,7 @@ class HistoricalExposureAuditTests(unittest.TestCase):
             self.assertEqual(limited['scanned_bytes'], 0)
 
     def test_private_report_never_replaces_existing_or_follows_symlink(self):
-        with tempfile.TemporaryDirectory() as temporary, patch.object(audit.Path, 'home', return_value=Path(temporary)):
+        with tempfile.TemporaryDirectory() as temporary, patch.object(audit, 'EVIDENCE_ROOTS', (Path(temporary),)):
             path = Path(temporary) / 'new-audit'
             audit.write_private(path, {'findings': []})
             self.assertEqual(path.stat().st_mode & 0o777, 0o700)
