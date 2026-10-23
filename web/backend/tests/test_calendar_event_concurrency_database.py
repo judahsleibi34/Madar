@@ -188,6 +188,9 @@ class CalendarEventConcurrencyDatabaseTests(unittest.TestCase):
             self.db.execute('revoke insert on calendar_event_changes from service_role')
             try:self.assertEqual(mutations.transport_status(),'misconfigured')
             finally:self.db.execute('grant insert on calendar_event_changes to service_role')
+            self.db.execute('revoke update on tenant_memberships from service_role')
+            try:self.assertEqual(mutations.transport_status(),'misconfigured')
+            finally:self.db.execute('grant update on tenant_memberships to service_role')
             self.assertEqual(self.mutation('series')['event']['version'],2)
             with patch.dict(os.environ,{'MADAR_CALENDAR_DATABASE_SYSTEM_IDENTIFIER':'0'}):
                 self.assertEqual(mutations.transport_status(),'unavailable')

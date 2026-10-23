@@ -90,6 +90,11 @@ def transport_status():
                     if not all(db.execute('select has_table_privilege(current_user,%s,%s)',
                             ('public.'+table,privilege)).fetchone()[0] for privilege in privileges):
                         return 'misconfigured'
+                # SELECT FOR SHARE/UPDATE also needs an UPDATE privilege on
+                # at least one column. A SELECT-only connection is not ready.
+                for table in ('users','tenants','tenant_memberships','calendars','calendar_memberships','builder_projects'):
+                    if not db.execute('select has_any_column_privilege(current_user,%s,%s)',
+                            ('public.'+table,'UPDATE')).fetchone()[0]:return 'misconfigured'
                 sequence=db.execute("select pg_get_serial_sequence('public.audit_logs','id')").fetchone()[0]
                 if sequence and not db.execute('select has_sequence_privilege(current_user,%s,%s)',
                         (sequence,'USAGE')).fetchone()[0]:return 'misconfigured'
