@@ -90,6 +90,13 @@ fi
 # selects its reviewed --no-owner/--no-acl policy; native coordinated recovery
 # needs the original managed-schema role permissions to restore exactly.
 dump_options=(--format=custom)
+# A maintenance restore must preserve database ownership/ACLs and database-role
+# settings as well as objects. This affects archive contents, never source SQL.
+if [[ "${MADAR_BACKUP_CREATE_DATABASE:-false}" == true ]]; then
+  dump_options+=(--create)
+elif [[ "${MADAR_BACKUP_CREATE_DATABASE:-false}" != false ]]; then
+  die "invalid create-database backup policy"
+fi
 if [[ -n "${MADAR_BACKUP_SNAPSHOT:-}" ]]; then
   [[ "$MADAR_BACKUP_SNAPSHOT" =~ ^[0-9A-Fa-f]+-[0-9A-Fa-f]+-[0-9]+$ ]] || die "invalid exported snapshot"
   dump_options+=("--snapshot=$MADAR_BACKUP_SNAPSHOT")

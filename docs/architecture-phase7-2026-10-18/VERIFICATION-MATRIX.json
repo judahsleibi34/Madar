@@ -1,0 +1,264 @@
+{
+  "version": 1,
+  "baseline_sha": "86b022f208579341b2a9171255df4df14a9e4348",
+  "assessment": "NOT READY",
+  "production_authorized": false,
+  "evidence_scope": [
+    "SOURCE",
+    "MODEL",
+    "NATIVE DATABASE",
+    "NATIVE FILESYSTEM",
+    "PRIVILEGED ISOLATED SYSTEM",
+    "PRODUCTION READ-ONLY OBSERVATION",
+    "NATIVE SERVICE"
+  ],
+  "gates": [
+    {
+      "gate": "git_identity",
+      "status": "PASS",
+      "evidence": "Every published PhaseVII commit checked by exact SHA; author and committer Saliba-codes.",
+      "limitation": "Repository and GitHub API; not a signature attestation."
+    },
+    {
+      "gate": "source_ancestry",
+      "status": "PASS",
+      "evidence": "Continuation starts at PR21586b022f2; corrected212\u2192213\u2192214\u2192215 history retained.",
+      "limitation": "No main merge or history rewrite."
+    },
+    {
+      "gate": "historical_sql",
+      "status": "PASS",
+      "evidence": "150 mirrored migrations validate; no SQL001\u2013150 diff from86b022f2.",
+      "limitation": "Two known013/014 duplicate-content warnings retained."
+    },
+    {
+      "gate": "release_metadata",
+      "status": "PASS",
+      "evidence": "Exact source150 manifest/SQL pins pass; selected release.json unchanged.",
+      "limitation": "Operational profile deliberately unregistered."
+    },
+    {
+      "gate": "source_provenance",
+      "status": "PASS",
+      "evidence": "Exact3fde3ef1 clean CI checkout/input provenance; b9d826ee authenticated runtime images and separate installed/reboot identities retained.",
+      "limitation": "No source identities relabeled; no operational acceptance or production authority."
+    },
+    {
+      "gate": "fresh_images",
+      "status": "PASS",
+      "evidence": "Exact3fde3ef1 fresh artifact12246633018 authenticated and actual staging INSPECT passed; config/image identities verified.",
+      "limitation": "No latest-head image import/runtime or production acceptance. Native application remains distinct b9d826ee evidence."
+    },
+    {
+      "gate": "writer_inventory",
+      "status": "PARTIAL",
+      "evidence": "Strict measured container/network/role/unit/object schema and complete-container comparison.",
+      "limitation": "Dormant host writers, alternate supervisors and live exclusions remain unresolved."
+    },
+    {
+      "gate": "privileged_inventory",
+      "status": "PASS",
+      "evidence": "Unchanged checker passes78 paths after eleven reviewed classifications.",
+      "limitation": "Completeness is not platform-wide authorization certification."
+    },
+    {
+      "gate": "provider_positive_probes",
+      "status": "PARTIAL",
+      "evidence": "Concrete positive/negative HTTP code and URI/cluster/role/alias/resolver checks;17 binding tests.",
+      "limitation": "New adapter positive probes not yet run against native providers."
+    },
+    {
+      "gate": "preimages",
+      "status": "PARTIAL",
+      "evidence": "Durable private journal, role archive, root identity and fenced object preservation implemented.",
+      "limitation": "Concrete full native preimage lifecycle not accepted."
+    },
+    {
+      "gate": "ingress_fencing",
+      "status": "PARTIAL",
+      "evidence": "Fixed measured Docker effects; native guest persistent systemd barrier tested.",
+      "limitation": "Harmless native test unit is not actual application ingress fencing."
+    },
+    {
+      "gate": "supervisor_fencing",
+      "status": "PARTIAL",
+      "evidence": "Exact effective condition + inactive/dead/no-job/no-PID checks; native barrier reboot proof.",
+      "limitation": "Complete production supervisor inventory and actual Docker fencing not accepted."
+    },
+    {
+      "gate": "object_fencing",
+      "status": "PARTIAL",
+      "evidence": "Fixed provider stop effects and12 real filesystem measurement tests.",
+      "limitation": "Writer shutdown is not proven by filesystem hashing."
+    },
+    {
+      "gate": "role_fencing",
+      "status": "PARTIAL",
+      "evidence": "Original role snapshots and transactional NOLOGIN/restore effects implemented.",
+      "limitation": "Concrete adapter native roles/session lifecycle not accepted."
+    },
+    {
+      "gate": "session_draining",
+      "status": "PARTIAL",
+      "evidence": "Bounded exact session observation, unknown/new session refusal and surviving-session block.",
+      "limitation": "No PID-only termination; full native drain not accepted."
+    },
+    {
+      "gate": "queue_quiescence",
+      "status": "PARTIAL",
+      "evidence": "Actual PostgreSQL activity-cache and MVCC queue-snapshot defects reproduced/fixed; seven full-schema native cases pass in CI245-execution harness.",
+      "limitation": "Complete protected provider execution/current-production reconciliation absent; no queue reset."
+    },
+    {
+      "gate": "migration_chain",
+      "status": "PARTIAL",
+      "evidence": "Exact3fde3ef1 CI rehearses146\u2192150; fresh b9 native application independently restores148 and executes captured149/150.",
+      "limitation": "Whole protected146\u2192150 controller operation has not run natively."
+    },
+    {
+      "gate": "intermediate_read_only",
+      "status": "PARTIAL",
+      "evidence": "Unregistered operation and protocol/read-only guards retained; source tests pass.",
+      "limitation": "Full privileged between-COMMIT crash/boot acceptance pending."
+    },
+    {
+      "gate": "candidate_preparation",
+      "status": "BLOCKED",
+      "evidence": "Source/image identity guards preserved.",
+      "limitation": "No sealed future candidate inventory publication or maintenance-aware kernel preparation."
+    },
+    {
+      "gate": "private_provider_recovery",
+      "status": "PARTIAL",
+      "evidence": "Original roles restored only at150; providers private; host ports/auto-publication rejected.",
+      "limitation": "Private native acceptance delegates and ordinary coordinator wiring incomplete."
+    },
+    {
+      "gate": "protected_handoff",
+      "status": "PARTIAL",
+      "evidence": "Existing issuer unchanged; adapter can only verify existing target authority.",
+      "limitation": "No native150 handoff, replay/expiry/cluster lifecycle acceptance."
+    },
+    {
+      "gate": "worker_activation",
+      "status": "PARTIAL",
+      "evidence": "b9 native delivery/outbox/deletion protocols2; real user+tenant deletion completed; consuming worker restart passed.",
+      "limitation": "No whole-controller activation or scoped deletion credential cutover."
+    },
+    {
+      "gate": "boot_recovery",
+      "status": "PARTIAL",
+      "evidence": "Actual guest reboot retained test barrier and disabled installed timers.",
+      "limitation": "150 boot/proxy forward-repair actor not wired; no complete release reboot."
+    },
+    {
+      "gate": "privileged_installation",
+      "status": "PARTIAL",
+      "evidence": "Actual root-owned source1b installation/reboot; subsequent bd0c614c atomic replacement verified182 exact files and effective units.",
+      "limitation": "No complete provider/controller operation; latest source not reinstalled/rebooted."
+    },
+    {
+      "gate": "interruption_recovery",
+      "status": "PARTIAL",
+      "evidence": "Consumed launch retained/repaired only with unchanged bytes; journal intent and replay tests.",
+      "limitation": "Actual interrupted installer/migration/handoff matrix incomplete."
+    },
+    {
+      "gate": "backup",
+      "status": "BLOCKED",
+      "evidence": "Adapter preserves original roles-only bytes separately from temporary NOLOGIN.",
+      "limitation": "Ordinary backup/replica pipeline not wired to maintenance preimage."
+    },
+    {
+      "gate": "restore",
+      "status": "PARTIAL",
+      "evidence": "Fresh b9 independent148 roles/database/eight objects restored; preserved identity/TOTP/private bytes and150 application operated.",
+      "limitation": "Not an interrupted150 maintenance-journal restore or complete object-aware PITR/off-host drill."
+    },
+    {
+      "gate": "pitr",
+      "status": "NOT TESTED",
+      "evidence": "Earlier component WAL/PITR evidence referenced only.",
+      "limitation": "No new whole-application/object-aware PITR or interrupted150 recovery."
+    },
+    {
+      "gate": "tenant_isolation",
+      "status": "PARTIAL",
+      "evidence": "Existing scoped request/SQL boundaries retained; native upload diagnostics use service-role metadata.",
+      "limitation": "No platform-wide new tenant acceptance claim."
+    },
+    {
+      "gate": "deletion_credentials",
+      "status": "BLOCKED",
+      "evidence": "Ownership RPC fencing remains; worker broad credential risk documented.",
+      "limitation": "Dedicated narrow identity/broker cutover not implemented."
+    },
+    {
+      "gate": "external_reconciliation",
+      "status": "PARTIAL",
+      "evidence": "Durable uncertain intent contract retained; upload lost-ack data-loss repair validated.",
+      "limitation": "No complete authorized provider-evidence resolution framework."
+    },
+    {
+      "gate": "ci",
+      "status": "PASS",
+      "evidence": "Exact3fde3ef1 backend3338 PASS/835 skipped,native245 PASS,frontend1713 PASS/1 skipped,and freshartifact check PASS.",
+      "limitation": "Source/model,native database,application and privileged-system evidence remain distinct; reporting head checks are separate."
+    },
+    {
+      "gate": "main_protection",
+      "status": "FAIL",
+      "evidence": "October20 GitHub check:main unprotected,rulesets0,credential admin:false.",
+      "limitation": "Administrator-only rules and human review required; no settings changed."
+    },
+    {
+      "gate": "human_review",
+      "status": "BLOCKED",
+      "evidence": "Independent automated code reviews exposed and corrected draft issues.",
+      "limitation": "Automated review does not satisfy independent human approval."
+    },
+    {
+      "gate": "current_production_backup",
+      "status": "BLOCKED",
+      "evidence": "No production backup mutation/export performed.",
+      "limitation": "Fresh operator-controlled current-data restore/replica evidence required."
+    },
+    {
+      "gate": "production_authorization",
+      "status": "BLOCKED",
+      "evidence": "No approval credential or target write authority issued.",
+      "limitation": "Fresh independent protected authorization required; production unchanged."
+    },
+    {
+      "gate": "fresh_full_stack",
+      "status": "PARTIAL",
+      "evidence": "Exact b9d826ee fresh native150/2/2/2 restored-application and nine browser groups passed; both synthetic deletions completed.",
+      "limitation": "Corrected controller head3fde3ef1 has no new full-stack runtime acceptance. Eleven owned b9 services deliberately stopped; data/evidence retained."
+    },
+    {
+      "gate": "performance",
+      "status": "NOT TESTED",
+      "evidence": "No speculative optimization retained.",
+      "limitation": "No new representative paired benchmark; no capacity/speedup claim."
+    },
+    {
+      "gate": "off_host_recovery",
+      "status": "NOT TESTED",
+      "evidence": "Disposable guest is independent VM storage but same staging physical host.",
+      "limitation": "No off-host recovery or certified RPO/RTO."
+    }
+  ],
+  "validated_source_sha": "3fde3ef15ffb463ff9fad83d83514aa3a2cd048f",
+  "protected_installation_source_sha": "bd0c614cfb92417740ce8d8bffacb98f6636e48a",
+  "native_reboot_installation_source_sha": "1b1dc54d8f19a2b1c83c618da89a42d8758b6993",
+  "counts": {
+    "PASS": 8,
+    "PARTIAL": 21,
+    "BLOCKED": 6,
+    "NOT TESTED": 3,
+    "FAIL": 1
+  },
+  "assessment_date": "2026-10-20",
+  "application_runtime_source_sha": "b9d826ee70e87a7f3eda89c14a78004b79fd6dab",
+  "staging_runtime_current_state": "stopped_after_successful_acceptance"
+}

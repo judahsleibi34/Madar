@@ -39,17 +39,49 @@ class AcademyOwnerApiTests(AcademyCapabilityTests):
         with self.assertRaises(HTTPException):service.application_access(self.actor,uuid4(),True)
         query.select.return_value.eq.assert_called_with('tenant_id',1)
 
-    def test_upload_validates_bytes_and_cleans_failed_metadata(self):
+    def test_upload_validates_bytes_and_retains_uncertain_metadata(self):
         actor=SimpleNamespace(tenant_id=1,user_id=9,role='learner');application=uuid4()
-        with patch.object(service,'application_access'),patch.object(service,'require_private_storage'),patch.object(service,'reserve_storage',return_value='reservation'),patch.object(service,'finish_storage'),patch.object(service,'release_storage'),patch.object(service,'store_builder_asset') as store,patch.object(service,'delete_builder_asset') as remove:
+        with patch.object(service,'application_access'),patch.object(service,'require_private_storage'),patch.object(service,'reserve_storage',return_value='reservation'),patch.object(service,'finish_storage') as finish,patch.object(service,'release_storage') as release,patch.object(service,'store_builder_asset') as store,patch.object(service,'delete_builder_asset') as remove:
             invalid=UploadFile(io.BytesIO(b'<script>'),filename='../../unsafe.pdf',headers=Headers({'content-type':'application/pdf'}))
             with self.assertRaises(HTTPException) as error:asyncio.run(service.upload_document(actor,application,invalid))
             self.assertEqual(error.exception.status_code,415);store.assert_not_called()
             self.db.rpc.return_value.execute.side_effect=RuntimeError('database unavailable')
             valid=UploadFile(io.BytesIO(b'%PDF-1.4\n%%EOF\n'),filename='../../unsafe.pdf',headers=Headers({'content-type':'application/pdf'}))
-            with self.assertRaises(RuntimeError):asyncio.run(service.upload_document(actor,application,valid))
+            with self.assertRaises(HTTPException) as uncertain:asyncio.run(service.upload_document(actor,application,valid))
+            self.assertEqual(uncertain.exception.status_code,503)
+            self.assertEqual(uncertain.exception.detail['code'],'private_upload_outcome_unknown')
             self.assertTrue(store.call_args.kwargs['storage_key'].startswith('academy-private/tenant_1/'))
-            self.assertNotIn('..',store.call_args.kwargs['storage_key']);remove.assert_called_once()
+            self.assertNotIn('..',store.call_args.kwargs['storage_key']);remove.assert_not_called();release.assert_not_called()
+            finish.assert_called_once();self.assertTrue(finish.call_args.kwargs['succeeded'])
+            self.db.rpc.assert_called_once()
+
+    def test_upload_before_metadata_attempt_cleans_only_staged_bytes(self):
+        actor=SimpleNamespace(tenant_id=1,user_id=9,role='learner')
+        file=UploadFile(io.BytesIO(b'%PDF-1.4\n%%EOF\n'),headers=Headers({'content-type':'application/pdf'}))
+        with patch.object(service,'application_access'),patch.object(service,'require_private_storage'),patch.object(service,'reserve_storage',return_value='r'),patch.object(service,'finish_storage') as finish,patch.object(service,'release_storage') as release,patch.object(service,'store_builder_asset',side_effect=RuntimeError('upload interrupted')),patch.object(service,'delete_builder_asset') as remove:
+            with self.assertRaises(RuntimeError):asyncio.run(service.upload_document(actor,uuid4(),file))
+            self.db.rpc.assert_not_called();remove.assert_called_once();release.assert_called_once()
+            finish.assert_called_once_with(reservation_id='r',succeeded=False)
+
+    def test_upload_malformed_acknowledgement_preserves_bytes_and_quota(self):
+        actor=SimpleNamespace(tenant_id=1,user_id=9,role='learner')
+        for result in (None,{}, {'id':str(uuid4())}):
+            with self.subTest(result=result),patch.object(service,'application_access'),patch.object(service,'require_private_storage'),patch.object(service,'reserve_storage',return_value='r'),patch.object(service,'finish_storage'),patch.object(service,'release_storage') as release,patch.object(service,'store_builder_asset'),patch.object(service,'delete_builder_asset') as remove:
+                self.db.rpc.return_value.execute.return_value.data=result
+                file=UploadFile(io.BytesIO(b'%PDF-1.4\n%%EOF\n'),headers=Headers({'content-type':'application/pdf'}))
+                with self.assertRaises(HTTPException) as uncertain:asyncio.run(service.upload_document(actor,uuid4(),file))
+                self.assertEqual(uncertain.exception.detail['code'],'private_upload_outcome_unknown')
+                remove.assert_not_called();release.assert_not_called()
+
+    def test_acknowledged_document_returns_only_public_metadata(self):
+        actor=SimpleNamespace(tenant_id=1,user_id=9,role='learner')
+        self.db.rpc.side_effect=lambda _name,body:SimpleNamespace(execute=lambda:SimpleNamespace(data={
+            'id':body['p_id'],**body['p_data'],'created_at':'2026-10-18T00:00:00Z'}))
+        file=UploadFile(io.BytesIO(b'%PDF-1.4\n%%EOF\n'),headers=Headers({'content-type':'application/pdf'}))
+        with patch.object(service,'application_access'),patch.object(service,'require_private_storage'),patch.object(service,'reserve_storage',return_value='r'),patch.object(service,'finish_storage'),patch.object(service,'release_storage') as release,patch.object(service,'store_builder_asset'),patch.object(service,'delete_builder_asset') as remove:
+            result=asyncio.run(service.upload_document(actor,uuid4(),file))
+            self.assertEqual(set(result),{'id','filename','mime_type','size_bytes','created_at'})
+            remove.assert_not_called();release.assert_not_called()
 
     def test_public_bucket_cannot_store_private_documents(self):
         with patch.object(service, 'ensure_builder_asset_bucket'):

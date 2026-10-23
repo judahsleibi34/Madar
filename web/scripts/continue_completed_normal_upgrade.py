@@ -22,7 +22,15 @@ REQUIRED_FILES={'web/scripts/continue_completed_normal_upgrade.py',*(
         'completed_normal_runtime','completed_normal_migration','completed_normal_database',
         'completed_normal_resources','compatible_normal_boot','completed_normal_boot_installation',
         'completed_normal_write_handoff','completed_normal_backup','completed_normal_execution',
-        'completed_normal_model','completed_normal_evidence','completed_normal_forward','completed_normal_profile'))}
+        'completed_normal_model','completed_normal_evidence','completed_normal_forward','completed_normal_profile','schema148_release','schema148_artifacts','schema148_consumers','schema149_release','schema149_consumers','schema149_provider_lifecycle','schema149_controller','schema150_release','schema150_provider_lifecycle','schema150_actor_inventory','schema150_object_inventory','schema150_provider_adapter','schema150_status','schema160_release'))}
+REQUIRED_FILES.update({
+    'web/deployment/lib/maintenance_backup_roles.py',
+    'web/deployment/lib/maintenance_backup.py',
+    *{'web/deployment/lib/'+name+'.py' for name in ('migration_inventory','migration_plan','migration_policy','migration_risk','migration_drift')},
+    'web/backend/Dockerfile','web/backend/requirements.txt','web/backend/constraints.txt',
+    'web/frontend/Dockerfile','web/frontend/package.json','web/frontend/package-lock.json',
+    '.github/workflows/schema148-artifacts.yml','web/scripts/build_schema148_artifacts.py',
+})
 def secured(path, *, directory=False):
     for part in (path,*path.parents):
         st=part.lstat()

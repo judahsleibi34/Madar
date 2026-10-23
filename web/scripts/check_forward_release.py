@@ -7,6 +7,7 @@ import hashlib
 import json
 from pathlib import Path
 import importlib.util
+import sys
 
 _candidate_spec = importlib.util.spec_from_file_location("madar_eduhope_candidate", Path(__file__).with_name("eduhope_candidate.py"))
 _candidate = importlib.util.module_from_spec(_candidate_spec)
@@ -51,6 +52,30 @@ _launch_price_book_spec = importlib.util.spec_from_file_location(
 _launch_price_book_candidate = importlib.util.module_from_spec(_launch_price_book_spec)
 _launch_price_book_spec.loader.exec_module(_launch_price_book_candidate)
 validated_launch_price_book_entries = _launch_price_book_candidate.validated_entries
+_notification_fencing_spec = importlib.util.spec_from_file_location(
+    "madar_notification_fencing_candidate", Path(__file__).with_name("notification_fencing_candidate.py"))
+_notification_fencing_candidate = importlib.util.module_from_spec(_notification_fencing_spec)
+_notification_fencing_spec.loader.exec_module(_notification_fencing_candidate)
+validated_notification_fencing_entries = _notification_fencing_candidate.validated_entries
+_reservation_integrity_spec = importlib.util.spec_from_file_location(
+    "madar_reservation_integrity_candidate", Path(__file__).with_name("reservation_integrity_candidate.py"))
+_reservation_integrity_candidate = importlib.util.module_from_spec(_reservation_integrity_spec)
+_reservation_integrity_spec.loader.exec_module(_reservation_integrity_candidate)
+validated_reservation_integrity_entries = _reservation_integrity_candidate.validated_entries
+_outbox_fencing_spec = importlib.util.spec_from_file_location(
+    "madar_outbox_fencing_candidate", Path(__file__).with_name("outbox_fencing_candidate.py"))
+_outbox_fencing_candidate = importlib.util.module_from_spec(_outbox_fencing_spec)
+_outbox_fencing_spec.loader.exec_module(_outbox_fencing_candidate)
+validated_outbox_fencing_entries = _outbox_fencing_candidate.validated_entries
+_deletion_spec = importlib.util.spec_from_file_location(
+    "madar_deletion_ownership_candidate", Path(__file__).with_name("deletion_ownership_candidate.py"))
+_deletion_candidate = importlib.util.module_from_spec(_deletion_spec)
+_deletion_spec.loader.exec_module(_deletion_candidate)
+validated_deletion_entries = _deletion_candidate.validated_entries
+
+
+
+
 _project_datasets_spec = importlib.util.spec_from_file_location(
     "madar_project_datasets_candidate",
     Path(__file__).with_name("project_datasets_candidate.py"),
@@ -490,10 +515,10 @@ def validate(root: Path = ROOT) -> list[str]:
                 ).glob("*.sql")
             )
 
-            if versions != list(range(1, 157 if learning_contract['status']=='finalized' else 143)):
+            if versions != list(range(1, 161 if learning_contract['status']=='finalized' else 143)):
                 errors.append(
                     "migration namespace must contain exactly "
-                    f"001 through {156 if learning_contract['status']=='finalized' else 142}: {tree}"
+                    f"001 through {160 if learning_contract['status']=='finalized' else 142}: {tree}"
                 )
 
     except (OSError, KeyError, ValueError, TypeError) as error:
@@ -514,6 +539,22 @@ def validate(root: Path = ROOT) -> list[str]:
         validated_launch_price_book_entries(root)
     except (OSError, ValueError, TypeError, KeyError) as error:
         errors.append(f"launch price-book candidate invalid: {error}")
+    try:
+        validated_notification_fencing_entries(root)
+    except (OSError, ValueError, TypeError, KeyError) as error:
+        errors.append(f"notification fencing candidate invalid: {error}")
+    try:
+        validated_reservation_integrity_entries(root)
+    except (OSError, ValueError, TypeError, KeyError) as error:
+        errors.append(f"reservation integrity candidate invalid: {error}")
+    try:
+        validated_outbox_fencing_entries(root)
+    except (OSError, ValueError, TypeError, KeyError) as error:
+        errors.append(f"outbox fencing candidate invalid: {error}")
+    try:
+        validated_deletion_entries(root)
+    except (OSError, ValueError, TypeError, KeyError) as error:
+        errors.append(f"deletion ownership candidate invalid: {error}")
     try:
         validated_project_datasets_entries(root)
     except (OSError, ValueError, TypeError, KeyError) as error:
@@ -551,7 +592,31 @@ def validate(root: Path = ROOT) -> list[str]:
     return errors
 
 
+def check_schema148_source():
+    import importlib.util
+    root = Path(__file__).resolve().parents[2]
+    path = root / 'web/deployment/lib/schema148_release.py'
+    spec = importlib.util.spec_from_file_location('schema148_source_gate', path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    module.source_manifest(root)
+
+
 if __name__ == "__main__":
+    check_schema148_source()
+    path = Path(__file__).resolve().parents[2] / 'web/deployment/lib/schema149_release.py'
+    spec = importlib.util.spec_from_file_location('schema149_source_gate', path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    module.source_manifest(Path(__file__).resolve().parents[2])
+    path = Path(__file__).resolve().parents[2] / 'web/deployment/lib/schema150_release.py'
+    spec = importlib.util.spec_from_file_location('schema150_source_gate', path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    module.source_manifest(Path(__file__).resolve().parents[2])
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'web'))
+    from deployment.lib.schema160_release import captured_source
+    captured_source(Path(__file__).resolve().parents[2])
     errors = validate()
 
     for error in errors:

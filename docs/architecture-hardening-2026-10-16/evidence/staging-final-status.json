@@ -1,0 +1,69 @@
+{
+  "source_sha": "0c591b8fc790246936df6d370ebe455f46a17cd2",
+  "application_code_unchanged_since": "27860bf2d9174fb315acbb64b0bd26b3b9bc87a5",
+  "ready": true,
+  "image_id": "sha256:4d617ccf0e7e02a12d12612aee615012d46fe0f008682fa2b908e1d043d06a0a",
+  "provenance": {
+    "com.madar.release.sha": "0c591b8fc790246936df6d370ebe455f46a17cd2",
+    "com.madar.release.built_at": "2026-10-16T04:18:40.202510Z",
+    "com.madar.staging.base_revision": "b0fdfe049510724c06a04706390cd174ea57a1d1",
+    "com.madar.staging.build_mode": "offline-source-overlay",
+    "org.opencontainers.image.revision": "0c591b8fc790246936df6d370ebe455f46a17cd2"
+  },
+  "services": [
+    {
+      "Service": "auth",
+      "State": "running",
+      "Health": "healthy",
+      "Image": "supabase/gotrue:v2.196.0@sha256:c0c25187a6b835e65a6f6e6c6b39d090e832d40e6de5186f2c038e0411944232"
+    },
+    {
+      "Service": "backend",
+      "State": "running",
+      "Health": "healthy",
+      "Image": "madar-hardening-application:0c591b8fc790246936df6d370ebe455f46a17cd2"
+    },
+    {
+      "Service": "frontend",
+      "State": "running",
+      "Health": "",
+      "Image": "madar-frontend:b0fdfe049510724c06a04706390cd174ea57a1d1"
+    },
+    {
+      "Service": "gateway",
+      "State": "running",
+      "Health": "",
+      "Image": "madar-frontend:b0fdfe049510724c06a04706390cd174ea57a1d1"
+    },
+    {
+      "Service": "notification-worker",
+      "State": "running",
+      "Health": "healthy",
+      "Image": "madar-hardening-application:0c591b8fc790246936df6d370ebe455f46a17cd2"
+    },
+    {
+      "Service": "postgres",
+      "State": "running",
+      "Health": "healthy",
+      "Image": "postgres:17-alpine@sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73"
+    },
+    {
+      "Service": "redis",
+      "State": "running",
+      "Health": "healthy",
+      "Image": "redis@sha256:6ab0b6e7381779332f97b8ca76193e45b0756f38d4c0dcda72dbb3c32061ab99"
+    },
+    {
+      "Service": "rest",
+      "State": "running",
+      "Health": "",
+      "Image": "postgrest/postgrest:v14.17@sha256:c9dc201e555f5d8e37e7f39cdd4df0229774996e213bfd7de8d10ac609030f2c"
+    },
+    {
+      "Service": "storage",
+      "State": "running",
+      "Health": "",
+      "Image": "supabase/storage-api:v1.74.0@sha256:f1546fac6d1c7e345428ac904bfaa7be7cecd50a1f549fe1cf38c628a7b15c85"
+    }
+  ]
+}

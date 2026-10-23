@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
+import re
 import tempfile
 import time
 
@@ -21,7 +22,7 @@ from deployment.lib.emergency_routing_repair import exclusive, verification_wind
 from deployment.lib.provider_recovery_runtime import protected
 from deployment.lib.runtime_authority import runtime_mutation_lock
 from deployment.lib.completed_normal_resources import origin_spec_matches
-from deployment.lib.completed_normal_profile import profile, LEGACY, APPLICATION, expected_origin_grant
+from deployment.lib.completed_normal_profile import profile, LEGACY, APPLICATION, OUTBOX, DELETION, RECONCILED, expected_origin_grant
 
 
 def atomic_public_authority(path: Path, value: dict) -> None:
@@ -42,11 +43,20 @@ def atomic_public_authority(path: Path, value: dict) -> None:
 
 class CompletedNormalWriteHandoff:
     def __init__(self,contract,kernel,*,source_guard,boot_guard,artifact_guard,
-                 admissions=ADMISSIONS,state_root=Path('/var/lib/madar/releases')):
+                 admissions=ADMISSIONS,state_root=Path('/var/lib/madar/releases'),provider_adapter=None):
         if not all(callable(f) for f in (source_guard,boot_guard,artifact_guard)):
             raise RuntimeError('completed_normal_write_independent_guards_required')
         self.contract,self.kernel=contract,kernel
         self.profile=profile(contract)
+        self.provider_adapter=provider_adapter
+        if self.profile in (DELETION,RECONCILED):
+            from deployment.lib.schema150_provider_adapter import Schema150ProviderAdapter
+            if (type(provider_adapter) is not Schema150ProviderAdapter
+                    or provider_adapter.contract!=contract or provider_adapter.runtime is not kernel.runtime
+                    or provider_adapter.root!=kernel.root):
+                raise RuntimeError('completed_normal_write_concrete_private_provider_required')
+        elif provider_adapter is not None:
+            raise RuntimeError('completed_normal_write_private_provider_profile_invalid')
         self.admissions,self.state_root=Path(admissions),Path(state_root)
         self.root=self.admissions/digest(contract)
         self.source_guard,self.boot_guard,self.artifact_guard=source_guard,boot_guard,artifact_guard
@@ -79,8 +89,23 @@ class CompletedNormalWriteHandoff:
         origin=json.loads(protected(Path(roles['completion_root'])/'write-authority/authority.json').read_text())
         if origin!=expected_origin_grant(self.contract,'READ_ONLY'):
             raise RuntimeError('completed_normal_write_origin_not_fenced')
-        self.kernel.round(normal=False)
+        if self.provider_adapter is None:self.kernel.round(normal=False)
+        else:self.private_round(normal=False)
         self.source_guard()
+
+    def private_round(self, *, normal):
+        """Consume only the concrete adapter's exact nonsecret observation."""
+        value=self.provider_adapter.verify_private_handoff(normal=normal)
+        fields={'operation','context_sha256','schema','mode','candidate_stage_sha256',
+                'provider_journal_sha256','write_authority_sha256','workers_started','ingress_restored'}
+        if (not isinstance(value,dict) or set(value)!=fields or value['operation']!=self.profile.operation
+                or value['context_sha256']!=digest(self.contract) or type(value['schema']) is not int
+                or value['schema']!=self.profile.target or value['mode']!=('NORMAL' if normal else 'READ_ONLY')
+                or value['workers_started'] is not False or value['ingress_restored'] is not False
+                or any(not isinstance(value[k],str) or not re.fullmatch('[0-9a-f]{64}',value[k])
+                       for k in ('candidate_stage_sha256','provider_journal_sha256','write_authority_sha256'))):
+            raise RuntimeError('completed_normal_write_private_observation_invalid')
+        return value
 
     def fence_origin(self):
         """Revoke the verified old grant before the madar worker handoff.
@@ -132,10 +157,51 @@ class CompletedNormalWriteHandoff:
         atomic_public_authority(self.root/'write-authority/authority.json',dict(value,mode='READ_ONLY'))
         require_candidate_authority(self.contract,mode='READ_ONLY',admissions=self.admissions)
 
+    def seal_maintenance_runtime(self):
+        """Publish full-running acceptance after private grant and worker start.
+
+        This does not reissue authority. A failed full-running observation
+        revokes the earlier private grant and retains the maintenance fence.
+        """
+        if self.profile is not RECONCILED or self.provider_adapter is None:
+            raise RuntimeError('completed_normal_maintenance_runtime_profile_invalid')
+        from deployment.lib.completed_normal_admission import require_maintenance_handoff
+        try:
+            self.authorization(schema=self.profile.target)
+            require_maintenance_handoff(self.contract,admissions=self.admissions)
+            with runtime_mutation_lock(self.state_root):
+                require_candidate_authority(self.contract,mode='NORMAL',admissions=self.admissions)
+                with verification_window(self.kernel.runtime,180):
+                    first=None;successes=0
+                    while True:
+                        self.kernel.runtime.budget(1)
+                        try:self.kernel.round(normal=True)
+                        except AvailabilityFailure:first=None;successes=0
+                        else:
+                            successes+=1
+                            if first is None:first=time.monotonic()
+                            if successes>=3 and time.monotonic()-first>=5:break
+                        time.sleep(self.kernel.runtime.budget(1))
+                self.authorization(schema=self.profile.target)
+                actual=protected(self.root/'candidate-runtime.json',private=True).read_bytes()
+                exclusive(self.root/'normal-publication.json',actual)
+                exclusive(self.root/'target-normal-publication.json',encoded({
+                    'operation':self.profile.operation,'context_sha256':digest(self.contract),
+                    'schema':self.profile.target,'mode':'NORMAL','database_restored':False}))
+        except Exception:
+            try:self.revoke()
+            finally:self.kernel.compensate_current_data()
+            raise
+
     def grant(self, *, schema=None, fresh_attempt_root=None):
         if schema is None:schema=self.profile.source
         if self.profile is not LEGACY and schema!=self.profile.target:
             raise RuntimeError('completed_normal_manual_grant_requires_target_schema')
+        if self.profile is OUTBOX:
+            from deployment.lib.schema149_controller import require_activation
+            require_activation(self.contract, self.root)
+        if self.provider_adapter is not None and fresh_attempt_root is not None:
+            raise RuntimeError('completed_normal_maintenance_continuation_requires_separate_contract')
         self.guard(schema=schema)
         audit=self.root
         if fresh_attempt_root is not None:
@@ -190,7 +256,9 @@ class CompletedNormalWriteHandoff:
                     first=None;successes=0
                     while True:
                         self.kernel.runtime.budget(1)
-                        try:self.kernel.round(normal=True)
+                        try:
+                            if self.provider_adapter is None:self.kernel.round(normal=True)
+                            else:private_proof=self.private_round(normal=True)
                         except AvailabilityFailure:first=None;successes=0
                         else:
                             successes+=1
@@ -200,6 +268,13 @@ class CompletedNormalWriteHandoff:
                 # Seal real runtime publication only after the positive boundary
                 # and sustained checks. A READ_ONLY stage is not NORMAL evidence.
                 self.authorization(schema=schema)
+                if self.provider_adapter is not None:
+                    # The private application has authority but consumers and
+                    # ingress remain stopped. Do not fabricate the historical
+                    # full-running runtime/publication at this earlier boundary.
+                    exclusive(audit/'maintenance-write-handoff.json',encoded(private_proof))
+                    return {'operation':self.profile.operation,'context_sha256':digest(self.contract),'mode':'NORMAL',
+                        'schema':schema,'customer_database_restored':False,'workers_started':False,'ingress_restored':False}
                 actual=protected(self.root/'candidate-runtime.json',private=True).read_bytes()
                 if audit!=self.root or schema==self.profile.source or self.profile is not LEGACY:
                     exclusive(audit/'normal-publication.json',actual)

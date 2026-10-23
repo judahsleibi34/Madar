@@ -1,0 +1,15 @@
+{
+  "release_metadata_version": 1,
+  "deployment_profile": "reservation-reactivation-capacity147-148",
+  "schema": {
+    "compatible_min": 147,
+    "compatible_max": 148,
+    "target": 148,
+    "migration_class": "forward-compatible",
+    "rollback_compatible_min": 147,
+    "rollback_compatible_max": 147
+  },
+  "migration_policy": "none",
+  "migration_manifest": "migrations-147-148-reservation-capacity.json",
+  "notes": "Unselected reservation capacity guard, requiring existing147 worker cutover first. Serializes status reactivation with public create and removes direct runtime status UPDATE. No active release selection or production authority. Committed database repair is retained during application rollback."
+}

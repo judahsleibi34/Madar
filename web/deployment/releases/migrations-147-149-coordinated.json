@@ -1,0 +1,30 @@
+{
+  "manifest_version": 1,
+  "release_sha": "CURRENT",
+  "migrations": [
+    {
+      "number": 147,
+      "from_schema": 146,
+      "to_schema": 147,
+      "path": "web/database/migrations/147_fence_notification_delivery_claims.sql",
+      "sha256": "bc76737e03ddf3dc369e444f34435dbded600ab1cae3209555b5bde6647d60f3",
+      "compatibility": "coordinated"
+    },
+    {
+      "number": 148,
+      "from_schema": 147,
+      "to_schema": 148,
+      "path": "web/database/migrations/148_guard_reservation_reactivation_capacity.sql",
+      "sha256": "a6788acfbe91129fcc55cbcd9c42440bbb91a785518afb99830c6137ed3c3096",
+      "compatibility": "forward-compatible"
+    },
+    {
+      "number": 149,
+      "from_schema": 148,
+      "to_schema": 149,
+      "path": "web/database/migrations/149_fence_notification_outbox_claims.sql",
+      "sha256": "8ed767df57f5c02be50d83621fe45d314b3d1fdb42d2b7a470170519bdf1f869",
+      "compatibility": "coordinated"
+    }
+  ]
+}

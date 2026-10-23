@@ -254,7 +254,7 @@ class ReadinessServiceTests(unittest.TestCase):
             "FRONTEND_PRIMARY_URL": "https://app.example.test",
             "GOOGLE_CALENDAR_CLIENT_ID": "test-client",
             "GOOGLE_CALENDAR_CLIENT_SECRET": "test-secret",
-        }, clear=False):
+        }, clear=False), patch("services.calendar_mutation_service.transport_status",return_value="ok"):
             self.assertEqual(readiness_service.check_calendar_configuration(), "ok")
 
     def test_calendar_task_sync_worker_and_queue_fail_closed(self):

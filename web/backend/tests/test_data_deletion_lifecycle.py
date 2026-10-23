@@ -81,10 +81,68 @@ class Client:
         self.storage = Storage(self)
         self.auth = SimpleNamespace(admin=SimpleNamespace(
             delete_user=self.delete_auth,
-            get_user_by_id=lambda _auth_id: (_ for _ in ()).throw(Exception("not found")),
+            get_user_by_id=lambda _auth_id: (_ for _ in ()).throw(type("SyntheticAbsent", (Exception,), {"status_code": 404})()),
         ))
 
     def table(self, name): return Query(self, name)
+    def rpc(self, name, parameters):
+        # Application contract fixture only. Ownership, clocks, locks and grants
+        # are verified separately against real PostgreSQL in the native suite.
+        def execute():
+            request = self.tables["data_deletion_requests"][0]
+            steps = self.tables["data_deletion_steps"]
+            if name == "cancel_data_deletion_request_v2":
+                if request['state'] not in {'pending', 'waiting_retention'} or any(x['state'] != 'pending' for x in steps):
+                    raise RuntimeError('deletion_cannot_be_cancelled')
+                request['state'] = 'cancelled_before_execution'
+                for user in self.tables['users']:
+                    user['account_status'] = request.get('freeze_snapshot', {}).get('account_status', 'active')
+                return Response(dict(request))
+            if name == "transition_data_deletion_v2":
+                action = parameters['p_action']
+                if action == 'renew': return Response(dict(request))
+                if action == 'begin':
+                    step = next(x for x in steps if x['state'] not in {'completed', 'skipped'})
+                    step.update(state='processing', attempts=step['attempts']+1, claim_generation=request['claim_generation'])
+                    request['current_phase'] = step['step_key']
+                    return Response(dict(step))
+                step = next(x for x in steps if x['id'] == parameters['p_step_id'])
+                data = parameters['p_data']
+                if action == 'complete':
+                    step.update(state='completed', output_safe=data)
+                    if step['step_key'] == 'verify':
+                        request.update(verification_status='verified_with_retained_records',retained_classes=data['retained_classes'],completion_report=data)
+                    elif step['step_key'] == 'finalize':
+                        if request['verification_status'] not in {'verified','verified_with_retained_records'}: raise RuntimeError('deletion_verification_required')
+                        request.update(state='completed_with_retained_records',current_phase='completed',lease_owner=None,lease_until=None)
+                elif action == 'fail':
+                    terminal = not data['retryable'] or step['attempts'] >= step['max_attempts']
+                    step.update(state='manual_intervention' if terminal else 'waiting_retry',last_error_code=data['code'])
+                    request.update(state='failed_manual_intervention' if terminal else 'waiting_retry',last_error_code=data['code'],retry_after=None if terminal else 'synthetic-db-retry-time')
+                    if data['code']=='deletion_verification_mismatch': request['verification_status']='mismatch'
+                return Response({'accepted':True})
+            if name == 'run_data_deletion_local_step_v2':
+                step = next(x for x in steps if x['id']==parameters['p_step_id'])
+                if step['step_key']=='delete_application_data':
+                    Query(self,'users').delete().eq('id',9).execute()
+                    if request['request_type']=='tenant': Query(self,'tenants').delete().eq('tenant_id',7).execute()
+                elif step['step_key']=='stop_queued_work':
+                    self.notification_stop_parameters={'p_request_id':request['id'],'p_lease_owner':parameters['p_owner'],'p_claim_attempt':parameters['p_attempt']}
+                    ids={x['id'] for x in self.tables['calendar_sync_connections'] if x.get('user_id')==9}
+                    for key in ('calendar_task_sync_jobs','calendar_connection_sync_jobs'):
+                        for job in self.tables[key]:
+                            if job['connection_id'] in ids: job['status']='failed'
+                return Response({'applied':True})
+            if name == 'data_deletion_effect_v2':
+                kind, target = parameters['p_kind'], parameters['p_target']
+                table, key = {'resource':('data_deletion_resources','id'),'subject':('data_deletion_subjects','user_id_snapshot'),'connection':('calendar_sync_connections','id')}[kind]
+                row=next(x for x in self.tables[table] if str(x[key])==target)
+                if parameters['p_action']=='intent': return Response({'target':dict(row),'idempotency_key':'synthetic-stable-key'})
+                if kind=='subject': row['provider_state']=parameters['p_outcome']
+                elif kind=='resource': row.update(state=parameters['p_outcome'],attempts=row.get('attempts',0)+1)
+                return Response({'accepted':True})
+            raise AssertionError('Unexpected deletion RPC')
+        return SimpleNamespace(execute=execute)
     def delete_auth(self, auth_id): self.deleted_auth.append(auth_id)
 
 
@@ -99,6 +157,7 @@ def workflow(request_type="user"):
     request = {
         "id": "request-1", "request_type": request_type, "state": "in_progress",
         "current_phase": "freeze", "attempt_count": 1, "max_attempts": 12,
+        "lease_owner": "synthetic-deletion-worker", "claim_generation": 1,
         "target_user_id_snapshot": 9 if request_type == "user" else None,
         "target_tenant_id_snapshot": 7,
         "verification_status": "pending", "retained_classes": [], "completion_report": {},
@@ -167,13 +226,14 @@ class DeletionLifecycleTests(unittest.TestCase):
         self.assertEqual(result["last_error_code"], "auth_provider_unavailable")
         self.assertIsNotNone(result["retry_after"])
 
-    def test_auth_provider_timeout_resumes_after_irreversible_database_step(self):
+    def test_auth_provider_timeout_requires_reconciliation_after_irreversible_database_step(self):
         client, request = workflow("user")
         client.auth.admin.delete_user = MagicMock(side_effect=TimeoutError("provider timeout"))
         first = lifecycle.process_deletion_request(request, client=client)
-        self.assertEqual(first["state"], "waiting_retry")
+        self.assertEqual(first["state"], "failed_manual_intervention")
         self.assertEqual(first["phase"], "delete_auth_identities")
         self.assertEqual(client.tables["users"], [])
+        # Explicit synthetic operator reconciliation, not a worker retry.
         client.tables["data_deletion_requests"][0]["state"] = "in_progress"
         client.auth.admin.delete_user = client.delete_auth
         forbidden = MagicMock(side_effect=AssertionError("database deletion replayed"))
@@ -197,13 +257,51 @@ class DeletionLifecycleTests(unittest.TestCase):
         with self.assertRaises(lifecycle.DeletionStepError) as raised:
             lifecycle._step_verify(request, client=client)
         self.assertEqual(raised.exception.code, "deletion_verification_mismatch")
+        # Mismatch persistence belongs to the atomic failure RPC, not a
+        # separate unfenced write inside the provider-read handler.
+        lifecycle._fail_step(request, client.tables["data_deletion_steps"][8], raised.exception, client=client)
         self.assertEqual(client.tables["data_deletion_requests"][0]["verification_status"], "mismatch")
+
+    def test_storage_verification_checks_later_search_pages(self):
+        client, request = workflow("user")
+        client.tables["users"] = []
+        client.tables["data_deletion_subjects"][0]["provider_state"] = "absent"
+        client.tables["data_deletion_resources"] = [{"request_id": request["id"],
+            "resource_kind": "supabase_avatar", "resource_key": "users/auth/avatar.png", "state": "deleted"}]
+        listing = MagicMock(side_effect=[
+            [{"name": f"copy-{index}-avatar.png"} for index in range(100)],
+            [{"name": "avatar.png"}],
+        ])
+        with patch.object(StorageBucket, "list", listing):
+            with self.assertRaises(lifecycle.DeletionStepError) as raised:
+                lifecycle._step_verify(request, client=client)
+        self.assertEqual(raised.exception.code, "deletion_verification_mismatch")
+        self.assertEqual(listing.call_args_list[1].args[1]["offset"], 100)
+
+    def test_storage_verification_requires_complete_well_formed_listing(self):
+        client, _ = workflow()
+        for page in (None, [None], [{}], [{"name": ""}], [{"name": 1}]):
+            with self.subTest(page=page), patch.object(StorageBucket, "list", return_value=page):
+                with self.assertRaises(lifecycle.DeletionStepError):
+                    lifecycle._provider_object_present(client, "avatars", "users/auth/avatar.png")
+        with patch.object(StorageBucket, "list", return_value=[{"name": "other"}] * 100) as listing:
+            with self.assertRaises(lifecycle.DeletionStepError) as raised:
+                lifecycle._provider_object_present(client, "avatars", "users/auth/avatar.png")
+            self.assertEqual(raised.exception.code, "storage_provider_verification_incomplete")
+            self.assertEqual(listing.call_count, 10)
+
+    def test_storage_verification_accepts_absence_after_all_pages(self):
+        client, _ = workflow()
+        with patch.object(StorageBucket, "list", side_effect=[[{"name": "other"}] * 100, []]) as listing:
+            self.assertFalse(lifecycle._provider_object_present(client, "avatars", "users/auth/avatar.png"))
+            self.assertEqual(listing.call_args_list[1].args[1]["offset"], 100)
 
     def test_provider_objects_are_tenant_manifest_bound_and_replay_safe(self):
         client, request = workflow("user")
         client.tables["data_deletion_resources"] = [
             {"id": 1, "request_id": "request-1", "resource_kind": "supabase_avatar", "resource_key": "users/auth/avatar.png", "state": "pending", "attempts": 0}
         ]
+        request["_step"] = client.tables["data_deletion_steps"][4]
         first = lifecycle._step_delete_provider_objects(request, client=client)
         second = lifecycle._step_delete_provider_objects(request, client=client)
         self.assertEqual(first["deleted"], 1)
@@ -223,6 +321,28 @@ class DeletionLifecycleTests(unittest.TestCase):
                 client.tables["data_deletion_resources"] = [{"id": 1, "request_id": "request-1", "resource_kind": "host_dataset", "resource_key": "tenant_7/user_9/file.csv", "state": "pending", "attempts": 0}]
                 with self.assertRaises(lifecycle.DeletionStepError):
                     lifecycle._step_delete_host_files(request, client=client)
+
+    def test_provider_absence_requires_structured_evidence(self):
+        self.assertFalse(lifecycle._provider_absent(TimeoutError('object not found while request timed out')))
+        self.assertFalse(lifecycle._provider_absent(type('Failure',(Exception,),{'status_code':500})('not found')))
+        self.assertTrue(lifecycle._provider_absent(type('Absent',(Exception,),{'status_code':404})()))
+        self.assertTrue(lifecycle._provider_absent(type('Absent',(Exception,),{'code':'user_not_found'})()))
+
+    def test_host_parent_swap_cannot_unlink_a_foreign_file(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);parent=root/'tenant_7'/'user_9';parent.mkdir(parents=True)
+            (parent/'file.csv').write_text('owned')
+            outside=root/'outside';outside.mkdir();foreign=outside/'file.csv';foreign.write_text('foreign')
+            resource={'resource_kind':'host_dataset','resource_key':'tenant_7/user_9/file.csv'}
+            original=lifecycle._safe_host_path
+            def checked_then_swapped(value):
+                checked=original(value)
+                parent.rename(parent.with_name('old_user_9'));parent.symlink_to(outside,target_is_directory=True)
+                return checked
+            with patch.dict(lifecycle.HOST_RESOURCE_ROOTS,{'host_dataset':lambda:root}), patch.object(
+                    lifecycle,'_safe_host_path',side_effect=checked_then_swapped):
+                with self.assertRaises(OSError):lifecycle._unlink_host_resource(resource)
+            self.assertEqual(foreign.read_text(),'foreign')
 
     def test_unknown_storage_policy_requires_manual_intervention(self):
         client, request = workflow("user")
@@ -245,7 +365,12 @@ class DeletionLifecycleTests(unittest.TestCase):
             {"id": "job-other", "connection_id": "other", "status": "pending"},
         ]
         client.tables["calendar_connection_sync_jobs"] = []
-        lifecycle._step_stop_queued_work(request, client=client)
+        request["_step"] = client.tables["data_deletion_steps"][3]
+        lifecycle._step_stop_queued_work(request, client=client,
+            worker_lease_owner=request['lease_owner'], worker_claim_attempt=request['attempt_count'])
+        self.assertEqual(client.notification_stop_parameters, {
+            'p_request_id': request['id'], 'p_lease_owner': request['lease_owner'],
+            'p_claim_attempt': request['attempt_count']})
         jobs = {row["id"]: row for row in client.tables["calendar_task_sync_jobs"]}
         self.assertEqual(jobs["job-own"]["status"], "failed")
         self.assertEqual(jobs["job-other"]["status"], "pending")

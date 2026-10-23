@@ -1,0 +1,261 @@
+{
+  "baseline_sha": "4f2c31aea7a10e33d337f506763258afa7e4419c",
+  "candidate_sha": "32c77afd01a012c7d21240316d4a46e52c3cbf14",
+  "schema": 148,
+  "endpoints": {
+    "/admin/users": [
+      {
+        "baseline": {
+          "errors": 0,
+          "p50_ms": 197.322,
+          "p95_ms": 302.855,
+          "requests": 120,
+          "throughput_rps": 9.455
+        },
+        "candidate": {
+          "errors": 0,
+          "p50_ms": 203.345,
+          "p95_ms": 306.429,
+          "requests": 120,
+          "throughput_rps": 9.254
+        },
+        "order": [
+          "baseline",
+          "candidate"
+        ],
+        "pair": 0
+      },
+      {
+        "baseline": {
+          "errors": 0,
+          "p50_ms": 203.353,
+          "p95_ms": 311.65,
+          "requests": 120,
+          "throughput_rps": 9.354
+        },
+        "candidate": {
+          "errors": 0,
+          "p50_ms": 195.774,
+          "p95_ms": 312.566,
+          "requests": 120,
+          "throughput_rps": 9.558
+        },
+        "order": [
+          "candidate",
+          "baseline"
+        ],
+        "pair": 1
+      },
+      {
+        "baseline": {
+          "errors": 0,
+          "p50_ms": 203.671,
+          "p95_ms": 309.465,
+          "requests": 120,
+          "throughput_rps": 9.254
+        },
+        "candidate": {
+          "errors": 0,
+          "p50_ms": 197.707,
+          "p95_ms": 290.355,
+          "requests": 120,
+          "throughput_rps": 9.808
+        },
+        "order": [
+          "baseline",
+          "candidate"
+        ],
+        "pair": 2
+      }
+    ],
+    "/auth/user_status": [
+      {
+        "baseline": {
+          "errors": 0,
+          "p50_ms": 97.525,
+          "p95_ms": 177.873,
+          "requests": 120,
+          "throughput_rps": 19.356
+        },
+        "candidate": {
+          "errors": 0,
+          "p50_ms": 92.847,
+          "p95_ms": 179.461,
+          "requests": 120,
+          "throughput_rps": 20.201
+        },
+        "order": [
+          "baseline",
+          "candidate"
+        ],
+        "pair": 0
+      },
+      {
+        "baseline": {
+          "errors": 0,
+          "p50_ms": 96.119,
+          "p95_ms": 153.216,
+          "requests": 120,
+          "throughput_rps": 20.011
+        },
+        "candidate": {
+          "errors": 0,
+          "p50_ms": 98.455,
+          "p95_ms": 186.166,
+          "requests": 120,
+          "throughput_rps": 19.327
+        },
+        "order": [
+          "candidate",
+          "baseline"
+        ],
+        "pair": 1
+      },
+      {
+        "baseline": {
+          "errors": 0,
+          "p50_ms": 98.279,
+          "p95_ms": 194.271,
+          "requests": 120,
+          "throughput_rps": 18.395
+        },
+        "candidate": {
+          "errors": 0,
+          "p50_ms": 97.632,
+          "p95_ms": 184.371,
+          "requests": 120,
+          "throughput_rps": 18.964
+        },
+        "order": [
+          "baseline",
+          "candidate"
+        ],
+        "pair": 2
+      }
+    ],
+    "/health/live": [
+      {
+        "baseline": {
+          "errors": 0,
+          "p50_ms": 1.616,
+          "p95_ms": 2.626,
+          "requests": 120,
+          "throughput_rps": 1063.985
+        },
+        "candidate": {
+          "errors": 0,
+          "p50_ms": 1.85,
+          "p95_ms": 4.37,
+          "requests": 120,
+          "throughput_rps": 591.741
+        },
+        "order": [
+          "baseline",
+          "candidate"
+        ],
+        "pair": 0
+      },
+      {
+        "baseline": {
+          "errors": 0,
+          "p50_ms": 1.648,
+          "p95_ms": 2.375,
+          "requests": 120,
+          "throughput_rps": 1144.66
+        },
+        "candidate": {
+          "errors": 0,
+          "p50_ms": 1.75,
+          "p95_ms": 2.781,
+          "requests": 120,
+          "throughput_rps": 969.718
+        },
+        "order": [
+          "candidate",
+          "baseline"
+        ],
+        "pair": 1
+      },
+      {
+        "baseline": {
+          "errors": 0,
+          "p50_ms": 1.582,
+          "p95_ms": 1.918,
+          "requests": 120,
+          "throughput_rps": 1156.432
+        },
+        "candidate": {
+          "errors": 0,
+          "p50_ms": 1.533,
+          "p95_ms": 1.924,
+          "requests": 120,
+          "throughput_rps": 1151.595
+        },
+        "order": [
+          "baseline",
+          "candidate"
+        ],
+        "pair": 2
+      }
+    ]
+  },
+  "baseline_image_id": "sha256:2058032f83364ba2d7a0d2eb11271ef6ccfc9599d38e47f305cae010bcf02c75",
+  "candidate_image_id": "sha256:e9a5e0924547e28b39ed7348a6998d5397b5688bebb030f46847e50a26091399",
+  "dataset_before": {
+    "users": 49,
+    "tenants": 41,
+    "projects": 32,
+    "deliveries": 41
+  },
+  "dataset_after": {
+    "users": 49,
+    "tenants": 41,
+    "projects": 32,
+    "deliveries": 41
+  },
+  "conditions": {
+    "warmups_per_run": 10,
+    "requests_per_run": 120,
+    "clients": 2,
+    "randomized_pairs": 3,
+    "seed": 148,
+    "api_memory_mib": 768,
+    "api_cpus": 1.5,
+    "client_cpus": 0.5,
+    "same_cluster_network_and_direct_hops": true
+  },
+  "cpu_stat_delta": {
+    "postgres": {
+      "usage_usec": 119137139,
+      "nr_periods": 1243,
+      "nr_throttled": 1065,
+      "throttled_usec": 72819682
+    },
+    "auth": {
+      "usage_usec": 30810275,
+      "nr_periods": 1229,
+      "nr_throttled": 1,
+      "throttled_usec": 264610
+    },
+    "backend": {
+      "usage_usec": 12145736,
+      "nr_periods": 849,
+      "nr_throttled": 0,
+      "throttled_usec": 0
+    },
+    "baseline-api": {
+      "usage_usec": 13908426,
+      "nr_periods": 871,
+      "nr_throttled": 0,
+      "throttled_usec": 0
+    }
+  },
+  "production_modified": false,
+  "limitations": [
+    "small synthetic read workload",
+    "no p99 or production capacity claim",
+    "three pairs cannot establish a general speedup",
+    "no application optimization in this continuation",
+    "baseline overlay versus fresh build"
+  ]
+}

@@ -65,10 +65,16 @@ def origin_spec_matches(row, expected, *, started_worker=False):
             return True
     return False
 
-def allocation(contract,slot):
+def allocation(contract,slot, *, preparation150=False):
     if slot not in PORTS: raise RuntimeError('completed_normal_allocation_slot_invalid')
-    from deployment.lib.completed_normal_profile import profile
-    prefix='madar-schema'+str(profile(contract).target)+'-'+digest(contract)[:16]
+    from deployment.lib.completed_normal_profile import profile,DELETION
+    if preparation150:
+        # Pure deterministic names only. This does not enroll the operation in
+        # the execution registry or permit any resource effect.
+        from deployment.lib.completed_normal_admission import validate_provider_preparation
+        selected=validate_provider_preparation(contract)
+    else:selected=profile(contract)
+    prefix='madar-schema'+str(selected.target)+'-'+digest(contract)[:16]
     resource=contract['resources'][slot]
     return {'prefix':prefix,'project':prefix+'-'+slot,
             'containers':{r:prefix+'-'+slot+'-'+r for r in ROLES},

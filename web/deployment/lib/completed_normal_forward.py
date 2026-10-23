@@ -145,7 +145,7 @@ class CompletedNormalForwardResumption:
         if not all(callable(x) for x in (artifact_guard,rehearsal_guard)):
             raise RuntimeError('completed_forward_independent_guards_required')
         self.actor,self.plan=actor,plan;self.artifact_guard,self.rehearsal_guard=artifact_guard,rehearsal_guard
-        validate_scope(actor.contract,plan);self.root=scope_root(actor.contract,plan);self.phase='preflight'
+        validate_scope(actor.contract,plan);self.root=scope_root(actor.contract,plan);self.phase='preflight';self.lock=None
     def preflight(self):
         self.artifact_guard();self.rehearsal_guard()
         if self.root.parent.exists() or self.root.parent.is_symlink():
@@ -161,7 +161,8 @@ class CompletedNormalForwardResumption:
         # Reuse the existing root credential lifecycle; its optional witness
         # binds this fresh operation, not a reconstructed historical token.
         from types import SimpleNamespace
-        binding=SimpleNamespace(ops=self.actor.ops,controller=self.plan['controller_sha'],contract=self.actor.contract)
+        binding=SimpleNamespace(ops=self.actor.ops,controller=self.plan['controller_sha'],
+            contract=self.actor.contract,lock=self.lock)
         with CompletedNormalUpgrade.root_credential(binding,migration_resumption=self.plan):yield
     def execute(self):
         from deployment.lib.control_plane_upgrade import acquire_lock
@@ -169,7 +170,8 @@ class CompletedNormalForwardResumption:
         from deployment.lib.completed_normal_migration import seal_completion
         from deployment.lib.completed_normal_execution import protected_creation_mode,verify_serving
         if os.geteuid()!=0:raise RuntimeError('completed_forward_root_required')
-        self.preflight();lock=acquire_lock(self.actor.ops.upgrade_root/'upgrade.lock',create=False)
+        if self.lock is not None:raise RuntimeError('completed_forward_actor_already_active')
+        self.preflight();self.lock=acquire_lock(self.actor.ops.upgrade_root/'upgrade.lock',create=False)
         try:
             with protected_creation_mode():
                 self.preflight();self.root.parent.mkdir(mode=0o700,exist_ok=True)
@@ -183,7 +185,7 @@ class CompletedNormalForwardResumption:
                 with self.credential():
                     original=json.loads(protected(self.actor.root/'pre-migration-customer-snapshot.json',private=True).read_text())
                     current=migration_customer_snapshot(self.actor.contract,self.actor.runtime,columns=original['columns'])
-                    preservation=verify_migration_customer_preservation(original,current)
+                    preservation=verify_migration_customer_preservation(original,current,contract=self.actor.contract)
                     exclusive(self.root/'customer-preservation.json',encoded(preservation))
                     path=executor_path(self.actor.ops.state_root,self.plan['application_sha'],'resumptions/'+digest(self.plan)+'/execution.json')
                     seal_completion(self.actor.contract,self.actor.ops.state_root/'releases'/self.plan['application_sha'],self.actor.ops.state_root,
@@ -204,4 +206,11 @@ class CompletedNormalForwardResumption:
                         'frames':[{'source':Path(f.filename).name,'line':f.lineno,'function':f.name} for f in traceback.extract_tb(error.__traceback__)[-16:]],
                         'database_restored':False}))
             raise
-        finally:self.actor.ops.clear_authorization();self.actor.ops.close_locks();os.close(lock)
+        finally:
+            try:self.actor.ops.clear_authorization()
+            finally:
+                try:self.actor.ops.close_locks()
+                finally:
+                    try:
+                        if self.lock is not None:os.close(self.lock)
+                    finally:self.lock=None

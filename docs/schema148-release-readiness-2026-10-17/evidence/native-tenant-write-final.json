@@ -1,0 +1,17 @@
+{
+  "source_sha": "32c77afd01a012c7d21240316d4a46e52c3cbf14",
+  "scope": "independent restored148 native Auth/PostgREST/FastAPI with synthetic tenants",
+  "own_project_read_and_archive": true,
+  "bidirectional_cross_tenant_read_and_delete_denied": true,
+  "foreign_row_unchanged_after_delete_attempt": true,
+  "path_user_spoof_denied": true,
+  "client_tenant_query_rejected": true,
+  "regular_user_admin_denied": true,
+  "disabled_membership_immediately_denies_read_write_with_valid_jwt": true,
+  "real_application_csrf_cookie_and_header_used": true,
+  "production_modified": false,
+  "limitations": [
+    "selected builder resource only",
+    "paid editing entitlement paths not exercised"
+  ]
+}

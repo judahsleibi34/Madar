@@ -1,0 +1,15 @@
+{
+  "release_metadata_version": 1,
+  "deployment_profile": "completed-normal-reconciled146-160",
+  "schema": {
+    "compatible_min": 146,
+    "compatible_max": 160,
+    "target": 160,
+    "migration_class": "coordinated",
+    "rollback_compatible_min": 160,
+    "rollback_compatible_max": 160
+  },
+  "migration_policy": "none",
+  "migration_manifest": "migrations-147-160-coordinated.json",
+  "notes": "Distinct reconciled preparation contract. Canonical main147-156 and integrity157-160; intermediate schemas READ_ONLY. Not executable until the actual protected lifecycle and preserved-application acceptance are complete. Historical146-150 authority cannot select this contract."
+}

@@ -25,6 +25,7 @@ class ReconciliationTests(unittest.TestCase):
         self.assertFalse(packet['customer_data_modified']);self.assertFalse(packet['migration_executed'])
         body=self.sql[1]
         self.assertTrue(body.startswith('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY;'))
+        self.assertIn('SET LOCAL search_path=pg_catalog,public,extensions;',body)
         self.assertIn('public.application_schema_state',body);self.assertIn('sha256',body)
         self.assertNotIn('INSERT ',body);self.assertNotIn('UPDATE ',body)
     def test_changed_catalog_aborts(self):

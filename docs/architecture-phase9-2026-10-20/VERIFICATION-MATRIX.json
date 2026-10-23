@@ -1,0 +1,358 @@
+{
+  "version": 1,
+  "phase": "IX",
+  "date": "2026-10-20",
+  "evidence_source_sha": "91a1ebf6597e2ddfaa2c569f9f1dd8ef2f1a4fb1",
+  "parent_pr": 217,
+  "draft_pr": 218,
+  "readiness": "NOT READY",
+  "protected_release_complete": false,
+  "production_authorized": false,
+  "authority_issued": false,
+  "publication_note": "Evidence is explicitly91a,not relabeled. Publication/CI-only successor heads need fresh CI and native artifacts;see PR218 checks and the final session report.",
+  "counts": {
+    "PASS": 21,
+    "PARTIAL": 14,
+    "BLOCKED": 8,
+    "NOT TESTED": 4,
+    "FAIL": 1
+  },
+  "gates": [
+    {
+      "gate": "Git identity",
+      "status": "PASS",
+      "environment": "GITHUB API / GIT",
+      "evidence": "Published implementation author/committer mappings through91a are Saliba-codes;local identity is explicitly configured",
+      "limitations": "Publication commits require their own mapping check;report is not authority"
+    },
+    {
+      "gate": "Source ancestry",
+      "status": "PASS",
+      "environment": "REAL GIT / GITHUB API",
+      "evidence": "209\u2192210\u2192211 histories retained in212;212\u2192213\u2192214\u2192215\u2192216\u2192217\u2192218 verified",
+      "limitations": "No merge or history rewrite"
+    },
+    {
+      "gate": "Current-production controller/descriptor identity",
+      "status": "PARTIAL",
+      "environment": "BOUNDED PRODUCTION READ-ONLY OBSERVATION",
+      "evidence": "Initial schema146 and installed source marker observed;auto-deploy timer inactive/disabled",
+      "limitations": "Current descriptor/configuration/installed-tree and complete actor ownership not re-attested;additional metadata query refused before SQL"
+    },
+    {
+      "gate": "Historical SQL",
+      "status": "PASS",
+      "environment": "GIT DIFF / CHECKSUM",
+      "evidence": "001\u2013150 unchanged from217;both150 copies SHA25663d4d0c7af93bd3c3e93158a2e281b41eed23b83bfafd4b3f1ba22313533b722",
+      "limitations": "No real151 successor introduced"
+    },
+    {
+      "gate": "Migration discovery and ordering",
+      "status": "PASS",
+      "environment": "REAL GIT / NATIVE DATABASE",
+      "evidence": "Generic discovery,mirror/history/142 exception and sequential future fixtures validated",
+      "limitations": "Root executor must independently choose live origin"
+    },
+    {
+      "gate": "Deterministic manifests",
+      "status": "PASS",
+      "environment": "REAL GIT / AST / CI",
+      "evidence": "Canonical exact-source plans,checksums,operation/source binding and substitution refusals",
+      "limitations": "Manifest grants no authority"
+    },
+    {
+      "gate": "Risk classification",
+      "status": "PASS",
+      "environment": "PG17 PARSER / SOURCE",
+      "evidence": "Unknown/destructive/nontransactional SQL restrictive;metadata cannot lower independent classification",
+      "limitations": "A is not live compatibility certification"
+    },
+    {
+      "gate": "Trusted tooling and CI source",
+      "status": "PASS",
+      "environment": "REAL GIT / POLICY MODEL / CI",
+      "evidence": "Complete release/nested script/mode pins;moving-base helper substitution reproductions corrected;remote Actions immutable",
+      "limitations": "Actual production policy installation/dispatch absent"
+    },
+    {
+      "gate": "Backend final-code suite",
+      "status": "PASS",
+      "environment": "CI91a",
+      "evidence": "4305 discovered:3436passed,869conditional skips;zero failures",
+      "limitations": "Skips excluded;publication head needs fresh CI"
+    },
+    {
+      "gate": "Retained native integrity",
+      "status": "PASS",
+      "environment": "NATIVE DATABASE / CI91a",
+      "evidence": "245 retained executions across migration115/145/146/147/148/149/150,business/ownership/security cases",
+      "limitations": "Executions not unique platform-wide coverage"
+    },
+    {
+      "gate": "Dynamic generic/native rehearsal",
+      "status": "PASS",
+      "environment": "REAL GIT / AST / POLICY MODEL / NATIVE DATABASE",
+      "evidence": "64cases:40source/parser/policy and24native database;zero failures",
+      "limitations": "Minimal catalog fixtures are separate from full providers"
+    },
+    {
+      "gate": "Frontend validation",
+      "status": "PASS",
+      "environment": "CI91a",
+      "evidence": "1713passed,1skipped;233test files;lint/build and shipped dependency audit pass",
+      "limitations": "Selected frontend suite is not complete product E2E"
+    },
+    {
+      "gate": "Root policy filesystem",
+      "status": "PASS",
+      "environment": "NATIVE FILE/PERMISSION / CI91a",
+      "evidence": "10 actual UID/path/mode/symlink refusal cases",
+      "limitations": "This does not install a production policy or issue authority"
+    },
+    {
+      "gate": "Privileged client inventory",
+      "status": "PASS",
+      "environment": "SOURCE CHECKER",
+      "evidence": "78 application client files classified;no unexplained checker omissions",
+      "limitations": "Does not prove route authorization or full runtime/manual writer inventory"
+    },
+    {
+      "gate": "Runtime writer/consumer inventory",
+      "status": "PARTIAL",
+      "environment": "SOURCE / NATIVE DATABASE",
+      "evidence": "Cluster clients,prepared work,replication-mode writers and fixed provider/container/supervisor identities checked",
+      "limitations": "Dormant host/manual/extension/replica actors remain incomplete"
+    },
+    {
+      "gate": "Original preimages",
+      "status": "PARTIAL",
+      "environment": "SOURCE / NATIVE BACKUP COMPONENT",
+      "evidence": "Original role attrs/memberships/settings and object metadata are bound/captured privately",
+      "limitations": "Whole current-operation service/ingress/boot preimage lifecycle not proven"
+    },
+    {
+      "gate": "Maintenance backup",
+      "status": "PARTIAL",
+      "environment": "SOURCE / NATIVE DATABASE / NATIVE FILESYSTEM",
+      "evidence": "Ordinary pipeline integration;native independent original-role/owner/ACL/data/sequence/object-byte restore passed",
+      "limitations": "No combined protected operation,current-production backup or native object metadata activation"
+    },
+    {
+      "gate": "Replica acceptance",
+      "status": "PARTIAL",
+      "environment": "SOURCE / COMPONENT",
+      "evidence": "Expected maintenance manifest digest required by append-only receiver",
+      "limitations": "Legitimate current receiver/streaming sender contract and actual replica not accepted in this phase"
+    },
+    {
+      "gate": "Sealed candidate",
+      "status": "PARTIAL",
+      "environment": "SOURCE / FILESYSTEM / NATIVE CI ARCHIVE",
+      "evidence": "Durable authenticated archive/OCI capture connected before candidate prepare;tamper/replay/partial inputs deny",
+      "limitations": "Full150 sealed runtime/configuration/preparation connection remains incomplete"
+    },
+    {
+      "gate": "Automatic full-provider staging",
+      "status": "PASS",
+      "environment": "NATIVE SERVICE / CI91a",
+      "evidence": "Authenticated fresh images,synthetic genesis150,all11native components,protocols2/2/2,owned stop observed;291.322s",
+      "limitations": "Fresh genesis is not current-data146\u2192150 protected execution"
+    },
+    {
+      "gate": "Auth/MFA/CSRF/refresh",
+      "status": "PASS",
+      "environment": "NATIVE SERVICE / CI91a",
+      "evidence": "Real password rejection/login,TOTP/AAL1/AAL2,CSRF,single-use MFA and refresh rotation",
+      "limitations": "Preservation through protected current-data maintenance remains separate"
+    },
+    {
+      "gate": "Private Storage and tenant checks",
+      "status": "PASS",
+      "environment": "NATIVE SERVICE / CI91a",
+      "evidence": "Private byte upload/download,anonymous denial,mediated avatar,foreign tenant read/write/membership denial",
+      "limitations": "Selected scopes,not platform-wide isolation or object-aware PITR"
+    },
+    {
+      "gate": "Notification/outbox protocols",
+      "status": "PASS",
+      "environment": "NATIVE SERVICE / NATIVE DATABASE",
+      "evidence": "Actual2/2,intent replay/materialization/delivery;retained generation/lease ownership regressions",
+      "limitations": "Whole production worker cutover not executed"
+    },
+    {
+      "gate": "Deletion request/step ownership",
+      "status": "PASS",
+      "environment": "NATIVE DATABASE / NATIVE SERVICE",
+      "evidence": "Retained ownership tests plus real user/tenant ten-step completion and foreign tenant/object preservation",
+      "limitations": "Broader service-role credential and uncertain external effects remain"
+    },
+    {
+      "gate": "Deletion worker consumption/restart",
+      "status": "PASS",
+      "environment": "NATIVE SERVICE / CI91a",
+      "evidence": "Consuming worker completed both requests,all effects confirmed,and exact-owner restart consumption observed",
+      "limitations": "Not controller interruption,host reboot or ambiguous external-side-effect recovery"
+    },
+    {
+      "gate": "Selected browser acceptance",
+      "status": "PASS",
+      "environment": "NATIVE BROWSER / CI91a",
+      "evidence": "Nine Chromium151.0.7922.34 groups;zero page errors,zero blocked external hosts",
+      "limitations": "Login/MFA/admin/mobile cases,not full product E2E"
+    },
+    {
+      "gate": "Cluster quiescence refusals",
+      "status": "PASS",
+      "environment": "NATIVE DATABASE",
+      "evidence": "Preserved failing idle/foreign prepared/walsender write tests now reject;NULL/parallel-leader cases verified",
+      "limitations": "Snapshot checks alone do not prove every dormant writer is fenced"
+    },
+    {
+      "gate": "Provider/ingress/supervisor fencing",
+      "status": "PARTIAL",
+      "environment": "SOURCE / RETAINED NATIVE / COMPONENT",
+      "evidence": "Concrete fixed-effect adapter,boot barrier and positive identity primitives retained/strengthened",
+      "limitations": "Combined exact150 privileged lifecycle not executed"
+    },
+    {
+      "gate": "Intermediate READ_ONLY state",
+      "status": "PARTIAL",
+      "environment": "SOURCE / NATIVE MIGRATION COMPONENT",
+      "evidence": "Intermediate schema contracts/refusals retained;no ordinary writable intermediate profile activated",
+      "limitations": "No full protected146\u2192150 operational proof"
+    },
+    {
+      "gate": "Protected146\u2192150 coordinator",
+      "status": "BLOCKED",
+      "environment": "SOURCE",
+      "evidence": "profile() and admitted_manifest intentionally refuse150",
+      "limitations": "Maintenance order,backup/candidate/private recovery/handoff/boot connections still unfinished engineering"
+    },
+    {
+      "gate": "Private provider recovery",
+      "status": "PARTIAL",
+      "environment": "SOURCE / COMPONENT",
+      "evidence": "Original-role/private-boundary primitives and measured unknown writers retained",
+      "limitations": "Full protected native Auth/MFA/Storage preservation/private acceptance not proven"
+    },
+    {
+      "gate": "Protected write handoff",
+      "status": "BLOCKED",
+      "environment": "SOURCE / MODEL",
+      "evidence": "Existing independent issuer contract preserved;new adapters do not grant authority",
+      "limitations": "No complete150 handoff or separate test-domain issuer execution demonstrated"
+    },
+    {
+      "gate": "Boot/proxy/privileged recovery",
+      "status": "NOT TESTED",
+      "environment": "NO CURRENT-SOURCE COMBINED SYSTEM RUN",
+      "evidence": "Historical PhaseVII installation/reboot evidence remains historical",
+      "limitations": "No current combined installation/interrupted release/reboot acceptance"
+    },
+    {
+      "gate": "Generic protected execution",
+      "status": "BLOCKED",
+      "environment": "SOURCE",
+      "evidence": "Generic plans remain preparation;protected dispatch explicitly blocked",
+      "limitations": "Same completed controller/policy/issuer integration remains unfinished"
+    },
+    {
+      "gate": "Routine isolated automatic release",
+      "status": "BLOCKED",
+      "environment": "MODEL / NATIVE SQL COMPONENT",
+      "evidence": "Policy preparation match and native routine SQL work separately",
+      "limitations": "No complete protected automatically authorized execution"
+    },
+    {
+      "gate": "Future151 full application",
+      "status": "BLOCKED",
+      "environment": "NATIVE DATABASE / SOURCE",
+      "evidence": "Published150 deletion protocol returns0 at151;strict refusal retained",
+      "limitations": "User selected150;requires separately reviewed coordinated compatibility successor"
+    },
+    {
+      "gate": "Coordinated/destructive routine refusal",
+      "status": "PARTIAL",
+      "environment": "AST / MODEL / NATIVE DATABASE",
+      "evidence": "C/D policy refusal,ClassD staging denial before artifacts and native negative cases",
+      "limitations": "Actual generic privileged dispatcher is not connected,so full demonstration incomplete"
+    },
+    {
+      "gate": "Lost commit/process recovery",
+      "status": "PARTIAL",
+      "environment": "NATIVE DATABASE / SOURCE / MODEL",
+      "evidence": "Generic native lost-acknowledgement/process-kill observation and replay refusals retained",
+      "limitations": "No full provider/controller activation/handoff interruption matrix"
+    },
+    {
+      "gate": "Independent full-application restore",
+      "status": "NOT TESTED",
+      "environment": "NO CURRENT-SOURCE FULL RESTORE",
+      "evidence": "Independent database/object-byte component restore passed",
+      "limitations": "Full provider/worker/journal/maintenance recovery remains unexecuted at this source"
+    },
+    {
+      "gate": "PITR and object consistency",
+      "status": "NOT TESTED",
+      "environment": "NO NEW WAL/OBJECT RECOVERY RUN",
+      "evidence": "No new claim from component restores or fresh genesis",
+      "limitations": "Missing/corrupt WAL,DB/object recovery-point reconciliation and RPO/RTO uncertified"
+    },
+    {
+      "gate": "Off-host disaster recovery",
+      "status": "NOT TESTED",
+      "environment": "NO NEW OFF-HOST RESTORE",
+      "evidence": "GitHub fresh genesis is not off-host recovery of the application",
+      "limitations": "Requires owned independent restore target and complete consistency acceptance"
+    },
+    {
+      "gate": "Scoped deletion credentials",
+      "status": "PARTIAL",
+      "environment": "SOURCE / RETAINED NATIVE GRANTS",
+      "evidence": "Lifecycle ownership RPCs/grants preserved",
+      "limitations": "Worker still has broader provider/service-role capabilities outside reviewed lifecycle"
+    },
+    {
+      "gate": "Uncertain external-effect reconciliation",
+      "status": "PARTIAL",
+      "environment": "SOURCE / RETAINED NATIVE",
+      "evidence": "Durable intent and stale-owner protection retained;native happy-path effects confirmed",
+      "limitations": "Read-only reconciliation/authorized retry tooling and lost-reply full-provider recovery incomplete"
+    },
+    {
+      "gate": "Merge-trigger safety inventory",
+      "status": "PARTIAL",
+      "environment": "SOURCE / BOUNDED PRODUCTION READ-ONLY OBSERVATION",
+      "evidence": "New workflows prepare/test only;observed auto-deploy timer inactive/disabled",
+      "limitations": "Not exhaustive webhook/timer/boot-actor evidence;source integration remains gated"
+    },
+    {
+      "gate": "Main protection",
+      "status": "FAIL",
+      "environment": "GITHUB API",
+      "evidence": "protected=false,rulesets=[];credential admin=false,maintain=false",
+      "limitations": "Administrator-controlled protection required;no source file can satisfy it"
+    },
+    {
+      "gate": "Independent human review",
+      "status": "BLOCKED",
+      "environment": "INDEPENDENT CONTROL",
+      "evidence": "PR218 remains draft;no self-review gate satisfaction",
+      "limitations": "Separate qualified review required"
+    },
+    {
+      "gate": "Current-production recovery evidence",
+      "status": "BLOCKED",
+      "environment": "INDEPENDENT OPERATIONAL CONTROL",
+      "evidence": "Initial bounded observation schema146;additional writer query stopped before SQL on ownership mismatch",
+      "limitations": "Current approved backup/replica/configuration/restore evidence not established"
+    },
+    {
+      "gate": "Production authorization",
+      "status": "BLOCKED",
+      "environment": "INDEPENDENT CONTROL",
+      "evidence": "Not granted;no new issuer,write authority,production policy or deployment",
+      "limitations": "A test/CI/source report cannot grant this gate"
+    }
+  ]
+}

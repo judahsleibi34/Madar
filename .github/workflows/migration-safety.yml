@@ -1,0 +1,74 @@
+name: Migration Safety
+
+on:
+  pull_request: {}
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: migration-safety-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  migration-safety:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CI_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      CI_HISTORY_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+    steps:
+      - name: Checkout exact source and immutable ancestry
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify exact source and existing contracts
+        run: |
+          test "$(git rev-parse HEAD)" = "$CI_SOURCE_SHA"
+          test -z "$(git status --porcelain)"
+          python3 web/scripts/check_dependency_locks.py
+          python3 web/scripts/check_migrations.py
+          python3 web/scripts/check_migration_transitions.py
+          python3 web/scripts/check_forward_release.py
+      - name: Build locked PostgreSQL17 parser and test tools
+        run: docker build --target test -t madar-backend-test web/backend
+      - name: Discover, classify and generate immutable source plan
+        run: |
+          docker run --rm --network none --memory 768m --cpus 2 --pids-limit 128 \
+            --env CI_SOURCE_SHA --env CI_HISTORY_BASE_SHA \
+            --volume "$PWD:/repository:ro" --workdir /repository \
+            --tmpfs /output:rw,nosuid,nodev,size=16m,mode=1777 \
+            --entrypoint python madar-backend-test \
+            web/scripts/validate_migration_candidate.py \
+            > migration-plan.json
+      - name: Native future-schema and failure rehearsal
+        env:
+          BACKEND_TEST_IMAGE: madar-backend-test
+        run: timeout 10m bash web/scripts/rehearse_generic_migrations.sh
+      - name: Native original-role and ownership restoration
+        env:
+          BACKEND_TEST_IMAGE: madar-backend-test
+        run: timeout 5m bash web/scripts/rehearse_maintenance_role_restore.sh
+      - name: Native root-private policy permission checks
+        env:
+          BACKEND_TEST_IMAGE: madar-backend-test
+        run: timeout 2m bash web/scripts/rehearse_migration_policy.sh
+      - name: Native maintenance backup and independent owner/ACL restore
+        run: timeout 5m python3 web/staging/integration/phase9_maintenance_backup.py REHEARSE
+      - name: Native runtime lock ownership and inode checks
+        env:
+          PYTHONPATH: web:web/backend/tests
+        run: timeout 1m python3 -m unittest test_schema150_lock_ownership -v
+      - name: Preserve preparation evidence without deployment authority
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: migration-plan-${{ env.CI_SOURCE_SHA }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            migration-plan.json
+            migration-native.json
+          if-no-files-found: error
+          retention-days: 7

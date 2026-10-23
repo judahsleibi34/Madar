@@ -86,6 +86,63 @@ class _Connection:
 
 
 class MigrationExecutorFailureCleanupTests(TestCase):
+    def setup_executor(self, root, factory):
+        path = root / '084.sql'
+        path.write_text('BROKEN MIGRATION')
+        manifest = MigrationManifest('a' * 40, (Migration(
+            84, path, hashlib.sha256(path.read_bytes()).hexdigest(), 83, 84,
+            'expand-only'),), coordinated=True)
+        return LockedMigrationExecutor(connection_factory=factory, manifest=manifest,
+            state_file=root / 'execution.json', backup_dir=root,
+            backup_verifier=lambda _: None, migration_guard=lambda *_: None,
+            failure_formatter=lambda error: type(error).__name__)
+
+    def test_connection_failure_is_durable_and_does_not_reopen_consumed_attempt(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            calls = []
+            def connect():
+                calls.append('connect')
+                raise ConnectionError('synthetic_private_connection_details')
+            executor = self.setup_executor(root, connect)
+            with self.assertRaises(ConnectionError): executor.run()
+            state = json.loads(executor.state_file.read_bytes())
+            self.assertEqual((state['status'], state['phase']), ('failed', 'connecting'))
+            self.assertEqual(state['failure_code'], 'ConnectionError')
+            self.assertNotIn('rollback_failure_code', state)
+            self.assertNotIn('synthetic_private', executor.state_file.read_text())
+            with self.assertRaisesRegex(RuntimeError, 'attempt_consumed'): executor.run()
+            self.assertEqual(calls, ['connect'])
+
+    def test_autocommit_setup_failure_closes_connection_and_records_failure(self):
+        class SetupFailure(_Connection):
+            @property
+            def autocommit(self): return False
+            @autocommit.setter
+            def autocommit(self, value):
+                if value: raise RuntimeError('synthetic_setup_failure')
+        with TemporaryDirectory() as directory:
+            connection = SetupFailure()
+            executor = self.setup_executor(Path(directory), lambda: connection)
+            with self.assertRaisesRegex(RuntimeError, 'synthetic_setup_failure'): executor.run()
+            self.assertTrue(connection.closed)
+            self.assertEqual(connection.unlock_attempts, 0)
+            state = json.loads(executor.state_file.read_bytes())
+            self.assertEqual((state['status'], state['phase']), ('failed', 'connecting'))
+            self.assertEqual(state['migrations'], [])
+
+    def test_close_failure_does_not_replace_primary_migration_failure(self):
+        class CloseFailure(_Connection):
+            def close(self):
+                super().close()
+                raise OSError('synthetic_cleanup_failure')
+        with TemporaryDirectory() as directory:
+            connection = CloseFailure()
+            executor = self.setup_executor(Path(directory), lambda: connection)
+            with self.assertRaisesRegex(RuntimeError, 'primary_migration_failure'): executor.run()
+            self.assertTrue(connection.closed)
+            self.assertEqual(json.loads(executor.state_file.read_bytes())['status'], 'failed')
+
     def test_admitted_formatter_preserves_stage_without_private_sql_details(self):
         with TemporaryDirectory() as directory:
             root=Path(directory);sql=root/'084.sql';sql.write_text('BROKEN MIGRATION')

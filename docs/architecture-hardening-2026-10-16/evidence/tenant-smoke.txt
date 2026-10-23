@@ -1,0 +1,1 @@
+PASS native authenticated own-project access, bidirectional cross-tenant IDOR denial, path-user spoofing denial, client tenant-query rejection and regular-user admin denial

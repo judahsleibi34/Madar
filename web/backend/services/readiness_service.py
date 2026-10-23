@@ -224,8 +224,11 @@ def check_data_deletion_worker() -> str:
         return "misconfigured"
     try:
         response = requests.get(url, timeout=READINESS_TIMEOUT_SECONDS, allow_redirects=False)
-        return "ok" if response.status_code == 200 else "unavailable"
-    except requests.RequestException:
+        if response.status_code != 200:
+            return "unavailable"
+        payload = response.json()
+        return "ok" if isinstance(payload, dict) and payload.get("status") == "ok" and payload.get("consuming") is True else "unavailable"
+    except (requests.RequestException, ValueError):
         return "unavailable"
 
 
@@ -413,6 +416,9 @@ def check_remote_ingestion_guard() -> str:
 def check_calendar_configuration() -> str:
     if not _env_bool("CALENDAR_FEATURE_ENABLED", False):
         return "disabled"
+    from services.calendar_mutation_service import transport_status
+    status=transport_status()
+    if status!='ok':return status
     if not _env_bool("CALENDAR_SYNC_REQUIRED", False):
         return "ok"
     if not _env_bool("CALENDAR_SYNC_WORKER_ENABLED", False):

@@ -61,6 +61,10 @@ class TransitionWorkerFenceTests(unittest.TestCase):
                 stack.enter_context(patch.object(worker, server))
                 stack.enter_context(patch('signal.signal'))
                 stack.enter_context(patch('threading.Thread'))
+                if worker is data_deletion_worker:
+                    # This standby test assumes a separately accepted future
+                    # ownership protocol; schemas001..149 must refuse startup.
+                    stack.enter_context(patch.object(worker, 'require_deletion_ownership_protocol'))
                 probes = [stack.enter_context(patch.object(worker, name)) for name in mutations]
                 self.assertEqual(worker.main(), 0)
                 self.assertFalse(worker.STATE['consuming'])

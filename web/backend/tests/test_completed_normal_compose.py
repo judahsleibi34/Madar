@@ -129,6 +129,31 @@ class CompletedNormalComposeTests(unittest.TestCase):
             and v['target']=='/var/lib/madar/backup-state' and v['read_only'] for v in mounts))
         self.assertFalse(any(v.get('target')=='/run/madar/business-write-authority' for v in services['parser-worker']['volumes']))
 
+    def test_real_compose_passes_private_calendar_transport_only_to_backend(self):
+        if not shutil.which('docker'):self.skipTest('Docker Compose render exercised on development host')
+        version=subprocess.run(['docker','compose','version'],capture_output=True,text=True)
+        if version.returncode:self.skipTest('Docker Compose unavailable')
+        self.ops.completed_normal_admission=None
+        dsn='postgresql://authenticator:synthetic_calendar_password@synthetic-db:5432/postgres'
+        with self.envfile.open('a') as stream:
+            stream.write('CALENDAR_FEATURE_ENABLED=true\nMADAR_CALENDAR_DATABASE_DSN='+dsn+
+                '\nMADAR_CALENDAR_DATABASE_SYSTEM_IDENTIFIER=123456789\n')
+        captured=[]
+        def run(command,*,cwd=None,env=None,**kwargs):
+            result=subprocess.run(command,cwd=cwd,env=env,capture_output=True,text=True,timeout=30)
+            self.assertEqual(result.returncode,0,'Synthetic Compose configuration failed')
+            captured.append(json.loads(result.stdout));return result.stdout
+        self.ops.run=run
+        self.ops._compose('c'*40,'green',self.images,'config','--format','json',workers_active=True)
+        services=captured[0]['services'];backend=services['backend']['environment']
+        self.assertEqual(str(backend['CALENDAR_FEATURE_ENABLED']).lower(),'true')
+        self.assertEqual(backend.get('MADAR_CALENDAR_DATABASE_DSN'),dsn)
+        self.assertEqual(str(backend.get('MADAR_CALENDAR_DATABASE_SYSTEM_IDENTIFIER')),'123456789')
+        for role,service in services.items():
+            if role=='backend':continue
+            self.assertFalse(service.get('environment',{}).get('MADAR_CALENDAR_DATABASE_DSN'))
+            self.assertFalse(service.get('environment',{}).get('MADAR_CALENDAR_DATABASE_SYSTEM_IDENTIFIER'))
+
 
     def selected_144_environment(self):
         from deployment.lib import learning_migration_path as route

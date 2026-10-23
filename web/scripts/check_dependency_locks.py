@@ -42,6 +42,18 @@ def validate_python(requirements: Path, constraints: Path) -> list[str]:
     return errors
 
 
+def validate_migration_tools(requirements: Path, constraints: Path) -> list[str]:
+    text = requirements.read_text(encoding='utf-8')
+    logical = text.replace('\\\n', ' ')
+    lines = [line.strip() for line in logical.splitlines() if line.strip() and not line.startswith('#')]
+    locked, errors = pinned(constraints)
+    if len(lines) != 1 or not re.fullmatch(r'pglast==7[.]21(?:\s+--hash=sha256:[a-f0-9]{64}){2}', lines[0]):
+        errors.append('requirements-migration-tools.txt: exact parser and wheel hashes required')
+    if locked.get('pglast') != '7.21':
+        errors.append('constraints.txt: PostgreSQL17 parser pin must match migration tools')
+    return errors
+
+
 def validate_node(package_json: Path, package_lock: Path) -> list[str]:
     package = json.loads(package_json.read_text(encoding="utf-8"))
     lock = json.loads(package_lock.read_text(encoding="utf-8"))
@@ -57,6 +69,8 @@ def validate_node(package_json: Path, package_lock: Path) -> list[str]:
 
 def main() -> int:
     errors = validate_python(ROOT / "backend" / "requirements.txt", ROOT / "backend" / "constraints.txt")
+    errors.extend(validate_migration_tools(ROOT / "backend" / "requirements-migration-tools.txt",
+                                           ROOT / "backend" / "constraints.txt"))
     errors.extend(validate_node(ROOT / "frontend" / "package.json", ROOT / "frontend" / "package-lock.json"))
     dockerfile = (ROOT / "frontend" / "Dockerfile").read_text(encoding="utf-8")
     if "RUN npm ci" not in dockerfile:

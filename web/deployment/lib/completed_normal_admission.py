@@ -16,7 +16,7 @@ from pathlib import Path
 import re
 
 from deployment.lib.control_plane_upgrade_authorization import require_upgrade_authorization
-from deployment.lib.completed_normal_profile import profile, LEGACY, MANUAL, APPLICATION, COMMERCIAL
+from deployment.lib.completed_normal_profile import profile, LEGACY, MANUAL, APPLICATION, COMMERCIAL, FENCED, OUTBOX, DELETION, RECONCILED
 
 OPERATION = "completed-normal-schema115-136-upgrade"
 ADMISSIONS = Path("/var/lib/madar-control-plane/upgrades/completed-normal-admissions")
@@ -51,24 +51,55 @@ def digest(value: dict) -> str:
     return hashlib.sha256(encoded(value)).hexdigest()
 
 
-def prepared_path(contract, state_root):
+def prepared_path(contract, state_root, *, preparation150=False):
     """Fresh admission cannot adopt an earlier candidate's mutable record."""
-    validate_contract(contract)
+    if preparation150:validate_provider_preparation(contract)
+    else:validate_contract(contract)
     return Path(state_root)/('prepared-completed-normal-'+digest(contract)+'.json')
 
 
 def validate_contract(value: dict) -> None:
     if not isinstance(value, dict):
         raise RuntimeError("completed_normal_admission_contract_invalid")
-    selected = profile(value)
+    _validate_contract(value, profile(value))
+
+
+def validate_provider_preparation150(value: dict) -> None:
+    """Pure validation only; does not register or admit the150 operation."""
+    from deployment.lib.completed_normal_profile import DELETION
+    if (not isinstance(value, dict) or value.get("operation") != DELETION.operation
+            or type(value.get("version")) is not int or value["version"] != DELETION.version):
+        raise RuntimeError("schema150_provider_contract_invalid")
+    _validate_contract(value, DELETION)
+
+
+def validate_provider_preparation(contract):
+    """Validate either exact maintenance preparation; never admit execution."""
+    from deployment.lib.completed_normal_profile import provider_preparation_profile
+    selected = provider_preparation_profile(contract)
+    _validate_contract(contract, selected)
+    if selected is RECONCILED:
+        from deployment.lib.schema160_release import MANIFEST_SHA256
+        if contract['migration_manifest_sha256'] != MANIFEST_SHA256:
+            raise RuntimeError('schema160_migration_manifest_changed')
+    return selected
+
+
+def _validate_contract(value: dict, selected) -> None:
+    if not isinstance(value, dict):
+        raise RuntimeError("completed_normal_admission_contract_invalid")
     if set(value) != {
         "version", "operation", "source_roles", "origin", "candidate",
         "historical_files", "database", "migration_manifest_sha256",
         "rehearsal_sha256", "plan_sha256", "provider_record_sha256", "resources",
         "customer_table_roots_sha256", "customer_identity_roots_sha256",
-    } | ({"database_structure_sha256"} if selected is COMMERCIAL else set()):
+    } | ({"provider_maintenance_sha256", "writer_inventory_sha256"} if selected in (OUTBOX, DELETION, RECONCILED) else set()) | ({"notification_cutover_sha256"} if selected in (FENCED, OUTBOX, DELETION, RECONCILED) else set()) | ({"database_structure_sha256"} if selected in (COMMERCIAL,FENCED,OUTBOX,DELETION,RECONCILED) else set()):
         raise RuntimeError("completed_normal_admission_contract_invalid")
-    selected = profile(value)
+    if selected in (FENCED, OUTBOX, DELETION, RECONCILED) and not re.fullmatch("[0-9a-f]{64}",str(value.get("notification_cutover_sha256"))):
+        raise RuntimeError("schema148_cutover_binding_invalid")
+    if selected in (OUTBOX, DELETION, RECONCILED) and any(not re.fullmatch('[0-9a-f]{64}', str(value.get(key)))
+            for key in ('provider_maintenance_sha256','writer_inventory_sha256')):
+        raise RuntimeError('schema149_provider_binding_invalid')
     roles = value["source_roles"]
     role_keys = ({'application_sha', 'controller_sha', 'completion_root', 'original_plan_sha256', 'completion_sha256'}
         if selected is LEGACY else {'application_sha', 'controller_sha', 'completion_root', 'completion_sha256', 'completed_compatible_upgrade', 'schema'})
@@ -121,9 +152,9 @@ def validate_contract(value: dict) -> None:
     # These are historical protected records only, never arbitrary executable or
     # operator-selected paths. The retained provider record is checked separately.
     application_required = {str(origin_root / name) for name in APPLICATION_HISTORICAL_NAMES}
-    if set(files) != required and not (selected in (APPLICATION, COMMERCIAL) and set(files) == application_required):
+    if set(files) != required and not (selected in (APPLICATION, COMMERCIAL, FENCED, OUTBOX, DELETION, RECONCILED) and set(files) == application_required):
         raise RuntimeError("completed_normal_admission_history_invalid")
-    if selected is COMMERCIAL:hashes.append(value["database_structure_sha256"])
+    if selected in (COMMERCIAL,FENCED,OUTBOX,DELETION,RECONCILED):hashes.append(value["database_structure_sha256"])
     hashes.extend(files.values())
     if any(not re.fullmatch(r"[0-9a-f]{64}", str(v)) for v in hashes):
         raise RuntimeError("completed_normal_admission_digest_invalid")
@@ -202,7 +233,7 @@ def verify_history(contract: dict, *, _visited=frozenset()) -> None:
         if file_digest(protected(Path(name), private=not nonsecret_admission)) != expected:
             raise RuntimeError("completed_normal_admission_historical_evidence_changed")
     root = Path(contract['source_roles']['completion_root'])
-    if (profile(contract) in (APPLICATION, COMMERCIAL) and set(contract['historical_files']) ==
+    if (profile(contract) in (APPLICATION, COMMERCIAL, FENCED, OUTBOX) and set(contract['historical_files']) ==
             {str(root / name) for name in APPLICATION_HISTORICAL_NAMES}):
         # A no-SQL receipt set is valid only for an actually completed no-SQL
         # origin. It cannot hide missing migration evidence from another profile.
@@ -261,7 +292,7 @@ def measure_provider_record(state_root: Path, expected_sha256: str) -> dict:
 
 
 def require_candidate_authority(contract: dict, *, mode: str | None = None, admissions: Path = ADMISSIONS) -> dict:
-    """Read the root-issued v2 grant; no caller/environment can issue one."""
+    """Read the exact root-issued grant; no caller/environment can issue one."""
     from deployment.lib.provider_recovery_runtime import protected
     validate_contract(contract)
     selected = profile(contract)
@@ -270,9 +301,16 @@ def require_candidate_authority(contract: dict, *, mode: str | None = None, admi
     else:
         require_fresh_authorization(contract)
         value=credential_witness('candidate_authority','candidate_authority_sha256')
-    if (not isinstance(value, dict) or set(value) != {
-            "version", "schema", "release_sha", "contract_digest", "mode", "compatible_min", "compatible_max"}
-            or type(value["version"]) is not int or value["version"] != 2
+    fields={"version","schema","release_sha","contract_digest","mode","compatible_min","compatible_max"}
+    if selected is RECONCILED:
+        fields |= {'operation','origin_schema','controller_sha','migration_manifest_sha256'}
+        if (not isinstance(value,dict) or value.get('operation')!=selected.operation
+                or type(value.get('origin_schema')) is not int or value['origin_schema']!=selected.source
+                or value.get('controller_sha')!=contract['candidate']['controller_sha']
+                or value.get('migration_manifest_sha256')!=contract['migration_manifest_sha256']):
+            raise RuntimeError('completed_normal_candidate_authority_changed')
+    if (not isinstance(value, dict) or set(value) != fields
+            or type(value["version"]) is not int or value["version"] != (3 if selected is RECONCILED else 2)
             or not selected.supports(value["schema"])
             or type(value["compatible_min"]) is not int or value["compatible_min"] != selected.minimum
             or type(value["compatible_max"]) is not int or value["compatible_max"] != selected.target
@@ -281,6 +319,61 @@ def require_candidate_authority(contract: dict, *, mode: str | None = None, admi
             or selected.maintenance and value.get('mode')=='NORMAL' and value['schema']!=selected.target
             or value["mode"] not in {"READ_ONLY", "NORMAL"} or mode is not None and value["mode"] != mode):
         raise RuntimeError("completed_normal_candidate_authority_changed")
+    return value
+
+
+def require_maintenance_handoff(contract, *, admissions=ADMISSIONS):
+    """Existing issuer projection: private acceptance without role secrets.
+
+    Root observes protected files and the complete validated journal. The
+    service child can consume only the fresh credential's nonsecret projection;
+    it cannot read original role archives or substitute a local PASS packet.
+    """
+    from deployment.lib.provider_recovery_runtime import protected
+    from deployment.lib.completed_normal_profile import expected_origin_grant
+    validate_contract(contract)
+    if profile(contract) is not RECONCILED:
+        raise RuntimeError('completed_normal_maintenance_handoff_profile_invalid')
+    grant=require_candidate_authority(contract,mode='NORMAL',admissions=admissions)
+    expected_origin=expected_origin_grant(contract,'READ_ONLY')
+    if os.geteuid()==0:
+        root=Path(admissions)/digest(contract)
+        record=json.loads(protected(root/'maintenance-write-handoff.json',private=True).read_bytes())
+        stage=json.loads(protected(root/'candidate-staged-runtime.json',private=True).read_bytes())
+        origin=json.loads(protected(Path(contract['source_roles']['completion_root'])/'write-authority/authority.json').read_bytes())
+        if origin!=expected_origin:
+            raise RuntimeError('completed_normal_maintenance_origin_not_fenced')
+        from deployment.lib.schema150_provider_lifecycle import ProviderMaintenance150,ProtectedProviderJournal
+        binding={'operation':RECONCILED.operation,'context_sha256':digest(contract),
+            'source_sha':contract['candidate']['source_sha'],'controller_sha':contract['candidate']['controller_sha'],
+            'inventory_sha256':contract['writer_inventory_sha256'],'system_identifier':contract['database']['system_identifier'],
+            'source_schema':146,'target_schema':160}
+        rows,_,pending,ready=ProviderMaintenance150(binding,ProtectedProviderJournal(root/'provider-journal'),None)._state()
+        if pending or not ready:
+            raise RuntimeError('completed_normal_maintenance_private_acceptance_required')
+        boundary=next(i for i,row in enumerate(rows) if row['event']=='private_ready')+1
+        if not isinstance(record,dict) or record.get('provider_journal_sha256')!=digest(rows[:boundary]):
+            raise RuntimeError('completed_normal_maintenance_private_journal_changed')
+        value={'handoff':record,'origin_authority_sha256':digest(origin)}
+    else:
+        require_fresh_authorization(contract)
+        value=credential_witness('maintenance_handoff','maintenance_handoff_sha256')
+        stage=credential_witness('candidate_stage','candidate_stage_sha256')
+        record=value.get('handoff') if isinstance(value,dict) else None
+    if (not isinstance(value,dict) or set(value)!={'handoff','origin_authority_sha256'}
+            or value['origin_authority_sha256']!=digest(expected_origin)
+            or not isinstance(record,dict) or set(record)!={'operation','context_sha256','schema','mode',
+                'candidate_stage_sha256','provider_journal_sha256','write_authority_sha256','workers_started','ingress_restored'}
+            or record['operation']!=RECONCILED.operation or record['context_sha256']!=digest(contract)
+            or type(record['schema']) is not int or record['schema']!=160 or record['mode']!='NORMAL'
+            or record['workers_started'] is not False or record['ingress_restored'] is not False
+            or not isinstance(stage,dict) or stage.get('preparation_mode')!='created-fenced'
+            or stage.get('context_sha256')!=digest(contract) or stage.get('source_sha')!=contract['candidate']['source_sha']
+            or stage.get('images')!=contract['candidate']['images']
+            or record['candidate_stage_sha256']!=digest(stage) or record['write_authority_sha256']!=digest(grant)
+            or not isinstance(record['provider_journal_sha256'],str)
+            or not re.fullmatch('[0-9a-f]{64}',record['provider_journal_sha256'])):
+        raise RuntimeError('completed_normal_maintenance_handoff_changed')
     return value
 
 
@@ -366,10 +459,14 @@ def publish_admission(contract: dict, operations, state_root: Path, *, admission
     # The root coordinator runs with UMask=0077. Set the nonsecret mounted
     # directory explicitly; mkdir(mode=0755) alone produces unreadable0700.
     authority.chmod(0o755)
-    exclusive(authority / "authority.json", encoded({
-        "version": 2, "schema": selected.source, "release_sha": contract["candidate"]["source_sha"],
+    grant={
+        "version": 3 if selected is RECONCILED else 2, "schema": selected.source, "release_sha": contract["candidate"]["source_sha"],
         "contract_digest": digest(contract), "mode": "READ_ONLY", "compatible_min": selected.minimum, "compatible_max": selected.target,
-    }))
+    }
+    if selected is RECONCILED:
+        grant.update(operation=selected.operation,origin_schema=selected.source,
+            controller_sha=contract['candidate']['controller_sha'],migration_manifest_sha256=contract['migration_manifest_sha256'])
+    exclusive(authority / "authority.json",encoded(grant))
     os.chmod(authority / "authority.json", 0o644)
     return root
 
@@ -382,7 +479,7 @@ def require_admission(state_root: Path, application_sha: str | None, *, admissio
         raise RuntimeError("provider_recovery_requires_separate_operator_exit")
     interlock = json.loads(protected(UPGRADE_INTERLOCK).read_text())
     context = str(interlock.get("context_sha256", ""))
-    if interlock.get("operation") not in {LEGACY.operation, MANUAL.operation, APPLICATION.operation, COMMERCIAL.operation} or not re.fullmatch(r"[0-9a-f]{64}", context):
+    if interlock.get("operation") not in {LEGACY.operation, MANUAL.operation, APPLICATION.operation, COMMERCIAL.operation, FENCED.operation, OUTBOX.operation} or not re.fullmatch(r"[0-9a-f]{64}", context):
         raise RuntimeError("provider_recovery_requires_separate_operator_exit")
     receipt = credential_witness('completed_normal_admission','admission_sha256')
     contract = receipt.get("contract")

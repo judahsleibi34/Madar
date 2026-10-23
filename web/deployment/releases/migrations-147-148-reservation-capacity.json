@@ -1,0 +1,14 @@
+{
+  "manifest_version": 1,
+  "release_sha": "STAGING",
+  "migrations": [
+    {
+      "number": 148,
+      "from_schema": 147,
+      "to_schema": 148,
+      "path": "web/database/migrations/148_guard_reservation_reactivation_capacity.sql",
+      "sha256": "a6788acfbe91129fcc55cbcd9c42440bbb91a785518afb99830c6137ed3c3096",
+      "compatibility": "forward-compatible"
+    }
+  ]
+}

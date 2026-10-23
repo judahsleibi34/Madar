@@ -66,12 +66,12 @@ def run(command: list[str], *, phase: str, timeout: int = 180, input: str | None
     return result.stdout
 
 
-def psql_command(container: str, *, attach_stdin: bool) -> list[str]:
+def psql_command(container: str, *, attach_stdin: bool, user: str = 'postgres') -> list[str]:
     command = ["docker", "exec"]
     if attach_stdin:
         command.append("-i")
     return command + [
-        container, "psql", "-X", "-h", "/tmp", "-U", "postgres",
+        container, "psql", "-X", "-h", "/tmp", "-U", user,
         "-d", "postgres", "-v", "ON_ERROR_STOP=1", "-At",
     ]
 
@@ -121,7 +121,7 @@ def logical_role_prerequisites(backup: Path, manifest: dict, *, additional_roles
     return "".join(f'CREATE ROLE "{name}" NOLOGIN;\n' for name in sorted(names))
 
 
-def rehearse(backup: Path, image: str, migration: Path | None = None, *, target_schema: int | None = None, new_tables: tuple[str, ...] = (), postgres_preload: tuple[str, ...] = (), additional_roles: tuple[str, ...] = ()) -> dict:
+def rehearse(backup: Path, image: str, migration: Path | None = None, *, target_schema: int | None = None, new_tables: tuple[str, ...] = (), postgres_preload: tuple[str, ...] = (), additional_roles: tuple[str, ...] = (), maintenance_manifest_sha256: str | None = None) -> dict:
     if not re.fullmatch(r"[a-zA-Z0-9./:_-]+@sha256:[0-9a-f]{64}", image):
         raise RehearsalError("postgres_image_must_be_digest_pinned")
     if migration is not None and (type(target_schema) is not int or target_schema <= 0):
@@ -138,6 +138,29 @@ def rehearse(backup: Path, image: str, migration: Path | None = None, *, target_
     manifest = json.loads((backup / "manifest.json").read_text())
     verify = Path(__file__).resolve().with_name("verify_backup.sh")
     run(["bash", str(verify), str(backup)], phase="backup_verification")
+    maintenance = None; bootstrap = 'postgres'
+    if manifest.get('maintenance_backup') is not None:
+        if (not re.fullmatch('[0-9a-f]{64}',str(maintenance_manifest_sha256))
+                or migration is not None or additional_roles):
+            raise RehearsalError('maintenance_expected_manifest_required')
+        try:
+            from scripts import backup_support
+        except ImportError:
+            import backup_support
+        maintenance=backup_support.verify_maintenance(backup,expected_sha256=maintenance_manifest_sha256)
+        if maintenance['schema']!=int(manifest['database']['schema_version']) or manifest['database'].get('create_database') is not True:
+            raise RehearsalError('maintenance_database_contract_invalid')
+        bootstrap=maintenance['bootstrap_role']
+        role_bytes=(backup/'maintenance/roles.sql').read_bytes()
+        snapshot_bytes=(backup/'maintenance/roles-snapshot.json').read_bytes()
+        if (hashlib.sha256(role_bytes).hexdigest()!=maintenance['roles_sha256']
+                or hashlib.sha256(snapshot_bytes).hexdigest()!=maintenance['roles_snapshot_sha256']):
+            raise RehearsalError('maintenance_role_input_changed')
+        create='CREATE ROLE '+bootstrap+';\n'
+        role_sql=role_bytes.decode().replace(create,'',1)
+        original_roles=json.loads(snapshot_bytes)
+    elif maintenance_manifest_sha256 is not None:
+        raise RehearsalError('maintenance_backup_missing')
     with (backup / "database.dump").open("rb") as handle:
         dump_hash = hashlib.file_digest(handle, "sha256").hexdigest()
     name = "madar-restore-rehearsal-" + uuid.uuid4().hex[:12]
@@ -176,7 +199,7 @@ def rehearse(backup: Path, image: str, migration: Path | None = None, *, target_
         # restored database or drain copied HTTP requests. No such DB exists.
         preload += " -c pg_net.database_name=madar_restore_disabled"
     command += ["--entrypoint", "sh", image, "-ec",
-                "initdb -D /restore-data/pgdata -U postgres --auth=trust >/dev/null; "
+                "initdb -D /restore-data/pgdata -U "+bootstrap+" --auth=trust >/dev/null; "
                 "exec postgres -D /restore-data/pgdata -k /tmp -c listen_addresses='' "
                 "-c log_statement=none -c log_min_error_statement=panic" + preload]
     created = False
@@ -191,7 +214,7 @@ def rehearse(backup: Path, image: str, migration: Path | None = None, *, target_
             time.sleep(0.5)
         else:
             raise RehearsalError("database_start_timeout")
-        psql = psql_command(name, attach_stdin=True)
+        psql = psql_command(name, attach_stdin=True,user=bootstrap)
         checks = []
         if "pg_cron" in postgres_preload:
             checks.append("SELECT current_setting('cron.launch_active_jobs') = 'off';")
@@ -205,10 +228,33 @@ def rehearse(backup: Path, image: str, migration: Path | None = None, *, target_
         result["background_job_settings_verified"] = True
         # Logical dumps exclude cluster roles. NOLOGIN prerequisites only; this
         # rehearsal must never be mistaken for a live authorization bootstrap.
-        run(psql, phase="role_prerequisites", input=logical_role_prerequisites(backup, manifest, additional_roles=additional_roles))
+        if maintenance is None:
+            run(psql, phase="role_prerequisites", input=logical_role_prerequisites(backup, manifest, additional_roles=additional_roles))
+        else:
+            run(psql,phase='original_role_restore',input=role_sql)
         restore_started = time.monotonic()
-        run(["docker", "exec", name, "pg_restore", "--exit-on-error", "--single-transaction",
-             "--no-owner", "--no-acl", "-h", "/tmp", "-U", "postgres", "-d", "postgres", "/backup.dump"], phase="full_database_restore")
+        if maintenance is None:
+            run(["docker", "exec", name, "pg_restore", "--exit-on-error", "--single-transaction",
+                 "--no-owner", "--no-acl", "-h", "/tmp", "-U", "postgres", "-d", "postgres", "/backup.dump"], phase="full_database_restore")
+        else:
+            # Only this newly created networkless tmpfs cluster is affected.
+            # Recreate the database from archive so its owner/ACL/settings also
+            # survive; never drop or restore the live source database.
+            template=list(psql);template[template.index('-d')+1]='template1'
+            run(template,phase='isolated_database_reset',input='DROP DATABASE postgres;')
+            run(['docker','exec',name,'pg_restore','--exit-on-error','--create','-h','/tmp','-U',bootstrap,
+                '-d','template1','/backup.dump'],phase='full_database_restore')
+            def query(body):
+                return run(psql,phase='maintenance_restore_observation',input='BEGIN READ ONLY; SET LOCAL search_path=pg_catalog; '
+                    "SET LOCAL statement_timeout='60s'; SET LOCAL TIME ZONE 'UTC';\n"+body+'\nCOMMIT;')
+            # psql -At emits command tags. A quiet observer returns only rows.
+            psql.insert(psql.index('-At'),'-q')
+            if json.loads(query(backup_support.ROLE_SNAPSHOT_SQL))!=original_roles:
+                raise RehearsalError('maintenance_original_role_state_mismatch')
+            if backup_support.database_fingerprint(query)!=maintenance['database_fingerprint']:
+                raise RehearsalError('maintenance_database_fingerprint_mismatch')
+            result.update(role_attributes_restored=True,ownership_and_acls_restored=True,
+                database_fingerprint_verified=True,maintenance_manifest_sha256=maintenance_manifest_sha256)
         result["restore_seconds"] = round(time.monotonic() - restore_started, 3)
         schema = int(run(psql, phase="restored_schema", input="SELECT schema_version FROM public.application_schema_state WHERE contract_key='core';"))
         if schema != result["backup_schema"]:
@@ -294,6 +340,14 @@ WHERE table_schema='public' AND table_name='ecommerce_order_items'
                     raise RehearsalError("file_restore_checksum_mismatch")
                 file_sets[name_set] = {"files": len(before), "checksums_match": True}
         result["file_sets"] = file_sets
+        if maintenance is not None:
+            from deployment.lib.coordinated_archive_restore import restore_archive
+            with tempfile.TemporaryDirectory(prefix='madar-native-object-restore-') as scratch:
+                report=restore_archive(backup/'maintenance/objects.tar.gz',Path(scratch)/'native',
+                    max_bytes=1536*1024**2,max_members=131072)
+            if report['restored_bytes_verified'] is not True:raise RehearsalError('maintenance_native_restore_failed')
+            # Metadata is authenticated and retained, not activated on this host.
+            result.update(native_object_bytes_restored=True,native_object_metadata_activated=False)
         if manifest.get('recovery', {}).get('provider_objects_required'):
             source = backup / 'provider'
             before = file_inventory(source)

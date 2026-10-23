@@ -1,0 +1,100 @@
+{
+  "version": 1,
+  "phase": 10,
+  "date": "2026-10-20",
+  "parent_pr": 218,
+  "draft_pr": 219,
+  "baseline_sha": "cc1b97a3cc031f3104f3c8d1d018f41a8f08ce7b",
+  "evidence_source_sha": "4e86d57c2b0d7564dce06cd2d757ce669ed1c5a8",
+  "publication_note": "Source evidence is explicitly bound to this SHA. A later documentation publication needs its own fresh CI/receipt, reported in the session response and PR checks.",
+  "readiness": "NOT READY",
+  "protected_release_executable": false,
+  "production_authorized": false,
+  "production_automation_enabled": false,
+  "administrator_observations": {
+    "main_protection": "FAIL",
+    "protected": false,
+    "rulesets": [],
+    "credential_admin": false
+  },
+  "gates": [
+    {
+      "id": 1,
+      "gate": "Real protected controller",
+      "status": "BLOCKED",
+      "evidence": "Existing150 profile/admission reject; complete root orchestration not executed."
+    },
+    {
+      "id": 2,
+      "gate": "Full146\u2192150 upgrade",
+      "status": "PARTIAL",
+      "evidence": "Published SQL through existing executor/provider callback passes; host/authority/activation are MODEL."
+    },
+    {
+      "id": 3,
+      "gate": "Backup and original roles",
+      "status": "PARTIAL",
+      "evidence": "Real independent original-role/owner/ACL/data/sequence/object-byte restore; no complete operation/replica/configuration escrow."
+    },
+    {
+      "id": 4,
+      "gate": "Private provider recovery",
+      "status": "NOT TESTED",
+      "evidence": "Current-data GoTrue/MFA/Storage private acceptance before handoff is not wired/executed."
+    },
+    {
+      "id": 5,
+      "gate": "Independent test write handoff",
+      "status": "NOT TESTED",
+      "evidence": "No new test issuer or independent protected handoff was executed."
+    },
+    {
+      "id": 6,
+      "gate": "Workers and proxy activation",
+      "status": "PARTIAL",
+      "evidence": "Fresh native providers/workers/browser accepted separately; not post-upgrade protected activation."
+    },
+    {
+      "id": 7,
+      "gate": "Interruption recovery",
+      "status": "PARTIAL",
+      "evidence": "Real SQL lost replies/process exits and filesystem lock cleanup; no full privileged supervisor/boot/reboot recovery."
+    },
+    {
+      "id": 8,
+      "gate": "Generic protected execution",
+      "status": "BLOCKED",
+      "evidence": "Planner retained; complete protected executor/generic dispatch not connected."
+    },
+    {
+      "id": 9,
+      "gate": "Automatic routine policy",
+      "status": "BLOCKED",
+      "evidence": "Root policy remains preparation-only; no independent compatible automatic test operation executed."
+    },
+    {
+      "id": 10,
+      "gate": "Exact-source acceptance",
+      "status": "PASS",
+      "evidence": "All five exact4e source workflows pass; native receipt/image/source digests independently verified. Documentation publication requires its own fresh receipt."
+    },
+    {
+      "id": 11,
+      "gate": "Production safety",
+      "status": "PASS",
+      "evidence": "All mutations confined to development, owned synthetic staging and CI; no production authority/policy/merge/deploy."
+    },
+    {
+      "id": 12,
+      "gate": "Independent review/administration",
+      "status": "BLOCKED",
+      "evidence": "Main protected=false; rulesets=[]; credential admin=false; independent review/production approval absent."
+    }
+  ],
+  "counts": {
+    "BLOCKED": 4,
+    "PARTIAL": 4,
+    "NOT TESTED": 2,
+    "PASS": 2
+  }
+}

@@ -42,6 +42,7 @@ from services.account_lifecycle_service import synchronize_verified_account
 from services.bounded_query_service import submit_db_read
 from services.observability_service import traced_operation
 from services.ecommerce_cache_service import (
+    capture_ecommerce_cache_generation,
     ecommerce_cache_key,
     get_or_create_ecommerce_cache,
     read_ecommerce_cache,
@@ -2108,6 +2109,7 @@ def resolve_public_store_settings(site_identifier: str, *, request: Request) -> 
             return cached
 
         def resolve() -> dict:
+            generation = capture_ecommerce_cache_generation()
             settings = resolve_website_settings(
                 resolved_identifier,
                 request=request,
@@ -2120,6 +2122,7 @@ def resolve_public_store_settings(site_identifier: str, *, request: Request) -> 
                 tenant_id,
                 settings,
                 ttl_seconds=30,
+                expected_generation=generation,
             )
             return settings
 
@@ -2889,6 +2892,7 @@ def _query_public_catalog_page(
     featured products and price bounds are independent reads."""
     unfiltered = filters["category_ids"] is None and not filters["tag_id"] and not filters["brand_id"]
     bounds_key = ecommerce_cache_key(tenant_id, "public-catalog-bounds-v1") if unfiltered else None
+    generation = capture_ecommerce_cache_generation()
     cached_bounds = read_ecommerce_cache(bounds_key, tenant_id) if bounds_key else None
     first_row_bound = _BOUND_FROM_FIRST_ROW[sort] if start == 0 and min_price is None and max_price is None else None
 
@@ -2944,7 +2948,7 @@ def _query_public_catalog_page(
             bounds[first_row_bound] = page_rows[0] if page_rows else None
         price_bounds = _price_bounds_from(bounds["cheapest"], bounds["dearest"], bounds["newest"])
         if bounds_key:
-            write_ecommerce_cache(bounds_key, tenant_id, price_bounds)
+            write_ecommerce_cache(bounds_key, tenant_id, price_bounds, expected_generation=generation)
     featured_by_id = {str(row.get("id")): row for row in reads.get("featured", [])}
     return (
         page_rows,

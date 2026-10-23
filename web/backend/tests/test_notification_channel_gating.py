@@ -63,11 +63,11 @@ class NotificationChannelGatingTests(unittest.TestCase):
             clear=False,
         ):
             notification_delivery_queue_service.resolve_outbox_notification(
-                {"id": "00000000-0000-0000-0000-000000000001"},
+                {"id": "00000000-0000-0000-0000-000000000001", "claim_generation": 1},
                 client=client,
             )
 
-        self.assertEqual(client.calls[0][0], "resolve_notification_outbox_v2")
+        self.assertEqual(client.calls[0][0], "resolve_notification_outbox_v3")
         payload = client.calls[0][1]
         self.assertFalse(payload["p_email_enabled"])
         self.assertTrue(payload["p_web_push_enabled"])

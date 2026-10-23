@@ -1,7 +1,7 @@
 {
   "inventory_version": 1,
-  "review_date": "2026-10-06",
-  "scope": "entries exactly classify direct privileged Supabase references in application Python according to the unchanged checker. Related credential consumers and operational paths are separately listed below. Services often rely on authorized caller identity/tenant; service-role access bypasses RLS. This inventory records actual access paths and is not proof that every operation is independently authorized. No credential values are included.",
+  "review_date": "2026-10-18",
+  "scope": "entries exactly classify direct privileged Supabase references in application Python according to the unchanged checker. Related credential consumers and operational paths are separately listed below. Services often rely on authorized caller identity/tenant; service-role access bypasses RLS. This inventory records actual access paths and is not proof that every operation is independently authorized. No credential values are included. Phase VII retains the67 prior classifications and adds11 source-reviewed omissions at86b022f2; the unchanged checker now covers78 direct-reference application files. This continuation does not independently recertify every historical entry or deployed configuration.",
   "provenance": {
     "canonical_added_commit": "1ea26a7c2cb23ba2e2941c096be59bf09d275a18",
     "restored_from_commit": "28c659aac61edd61bbb9077b3ac1b1c217a8feea",
@@ -68,6 +68,56 @@
       "reviewed_functions": []
     },
     {
+      "path": "web/backend/routes/academy_owner_routes.py",
+      "boundary": "Owner workspace contacts use owner() -> require_elearning_access and contact capability; direct SELECT/UPDATE always filters actor.tenant_id. The intentionally anonymous contact POST resolves a published academy project and tenant server-side, rate-limits, validates capability/settings/published academyContact, and inserts only that bound tenant/project. Applicant document and payment reconciliation routes derive an active member actor before scoped services.",
+      "reviewed_functions": [
+        "contacts",
+        "contact_read",
+        "contact",
+        "documents",
+        "upload_document",
+        "download_document",
+        "remove_document",
+        "reconcile",
+        "exchange_submit"
+      ],
+      "caller_evidence": [
+        "web/backend/routes/elearning_assessments_routes.py:owner",
+        "web/backend/routes/elearning_player_routes.py:member",
+        "web/backend/services/academy_owner_service.py:application_access",
+        "web/backend/services/learning_payment_provider.py:reconcile_checkout"
+      ],
+      "user_reachability": "Mixed owner-only, active member and explicitly public published-contact ingress; no caller-supplied tenant controls direct queries.",
+      "database_authority": "Privileged SUPABASE_SERVICE_KEY client; treat service_role as RLS-bypassing. Direct filters/caller checks and explicit SECURITY DEFINER RPC guards are required; current live role flags were not inspected in this source review.",
+      "candidate_schema_limitation": "Exchange142 is an alternate source candidate excluded by the selected141-to143 learning branch. Its RPC/column presence is not established by numeric settings_available(142); this inventory does not certify Exchange runtime availability on schema150."
+    },
+    {
+      "path": "web/backend/routes/academy_programme_routes.py",
+      "boundary": "member() authenticates self-service programme views and applications; owner() gates management, reports, CEFR and finance. Direct privileged CEFR/application reads filter actor.tenant_id plus resource/user IDs. Owner RPCs receive only actor-derived tenant/admin IDs and SQL commerce_assert_member(...,true) rechecks membership/role. Literal entity/kind parameters choose fixed service tables.",
+      "reviewed_functions": [
+        "capabilities",
+        "account",
+        "submit",
+        "withdraw",
+        "records",
+        "review",
+        "reports",
+        "cefr_configuration",
+        "configure_cefr",
+        "finance",
+        "member_profile"
+      ],
+      "caller_evidence": [
+        "web/backend/routes/elearning_assessments_routes.py:owner",
+        "web/backend/routes/elearning_player_routes.py:member",
+        "web/backend/services/academy_programme_service.py:records",
+        "web/backend/services/academy_programme_service.py:review",
+        "web/backend/services/academy_programme_service.py:report"
+      ],
+      "user_reachability": "Active member self-service; tenant owner/admin management, with tenant-filtered direct reads and guarded SQL mutations.",
+      "database_authority": "Privileged SUPABASE_SERVICE_KEY client; treat service_role as RLS-bypassing. Direct filters/caller checks and explicit SECURITY DEFINER RPC guards are required; current live role flags were not inspected in this source review."
+    },
+    {
       "path": "web/backend/routes/admin_billing_routes.py",
       "boundary": "platform_admin_request_aal2",
       "reviewed_functions": [
@@ -101,6 +151,29 @@
         "recover_or_remove_orphaned_auth_user",
         "signup"
       ]
+    },
+    {
+      "path": "web/backend/routes/billing_routes.py",
+      "boundary": "The anonymous catalog reads only an explicit public price-book projection for the server-selected catalog ID. Quotes, usage and manual plan/add-on requests derive tenant/user from require_active_tenant_member; quote_commercial_modules uses that tenant. Legacy path user IDs must match context. The test webhook is secret-authenticated and refuses APP_ENV prod/production; it is not a live signed-provider implementation or billing activation authority.",
+      "reviewed_functions": [
+        "billing_catalog",
+        "_commercial_context",
+        "customer_module_quote",
+        "create_plan_request",
+        "create_addon_request",
+        "assert_context_user",
+        "create_canonical_checkout",
+        "create_checkout",
+        "billing_webhook"
+      ],
+      "caller_evidence": [
+        "web/backend/services/tenant_service.py:require_active_tenant_member",
+        "web/backend/services/billing_service.py:apply_billing_webhook_event",
+        "web/backend/services/commercial_billing_service.py:request_plan",
+        "web/backend/services/commercial_billing_service.py:request_addon"
+      ],
+      "user_reachability": "Public catalog projection; active staff tenant members for request-only commercial operations; separate development-only webhook credential boundary.",
+      "database_authority": "Privileged SUPABASE_SERVICE_KEY client; treat service_role as RLS-bypassing. Direct filters/caller checks and explicit SECURITY DEFINER RPC guards are required; current live role flags were not inspected in this source review."
     },
     {
       "path": "web/backend/routes/builder_routes.py",
@@ -265,6 +338,34 @@
       ]
     },
     {
+      "path": "web/backend/routes/elearning_forms_routes.py",
+      "boundary": "Owner routes use owner() before privileged Forms services. Applicant history uses an active same-tenant member including learners. Public context resolves the academy tenant, publishing entitlement and published project reference before reading an active form; an authenticated actor is retained only if its tenant matches. Public submissions are rate-limited and service.public_access/guarded SQL enforce the configured guest, member, enrollment and programme policy.",
+      "reviewed_functions": [
+        "forms",
+        "create",
+        "responses",
+        "response_detail",
+        "mark",
+        "decision",
+        "download",
+        "applicant_responses",
+        "applicant_response",
+        "context",
+        "render",
+        "submit",
+        "response_payload"
+      ],
+      "caller_evidence": [
+        "web/backend/services/elearning_access_service.py:require_elearning_access",
+        "web/backend/services/tenant_service.py:require_active_tenant_member",
+        "web/backend/services/elearning_forms_service.py:public_access",
+        "web/backend/services/elearning_forms_service.py:submit"
+      ],
+      "user_reachability": "Owner/admin response management, applicant-only projection, or explicitly published anonymous form ingress; project and tenant binding precede public persistence.",
+      "database_authority": "Privileged SUPABASE_SERVICE_KEY client; treat service_role as RLS-bypassing. Direct filters/caller checks and explicit SECURITY DEFINER RPC guards are required; current live role flags were not inspected in this source review.",
+      "candidate_schema_limitation": "Exchange142 is an alternate source candidate excluded by the selected141-to143 learning branch. Its RPC/column presence is not established by numeric settings_available(142); this inventory does not certify Exchange runtime availability on schema150."
+    },
+    {
       "path": "web/backend/routes/mfa_routes.py",
       "boundary": "verified_auth_or_pending_auth_protocol",
       "reviewed_functions": [
@@ -347,6 +448,77 @@
       "reviewed_functions": [
         "management_profile"
       ]
+    },
+    {
+      "path": "web/backend/services/academy_exchange_service.py",
+      "boundary": "Called from active-member opportunity/detail/submission and owner decision routes. opportunity/detail scope opportunity, response, decision and history reads by actor.tenant_id; personal response lookup also filters actor.user_id. gate combines schema, Exchange availability and Forms entitlement. Availability and review RPCs receive actor IDs; SQL assert_exchange_submission and academy_assert_enabled enforce enrollment/capacity or owner permission. This service does not itself authenticate a Request.",
+      "reviewed_functions": [
+        "gate",
+        "opportunity",
+        "detail",
+        "review",
+        "review_context"
+      ],
+      "caller_evidence": [
+        "web/backend/routes/academy_owner_routes.py:exchange_detail",
+        "web/backend/routes/academy_owner_routes.py:exchange_submit",
+        "web/backend/routes/academy_owner_routes.py:exchange_review",
+        "web/backend/services/elearning_forms_service.py:response_detail"
+      ],
+      "user_reachability": "Authorized actor is supplied by routes or already-authorized response management; direct reads use tenant and, for personal applications, user filters.",
+      "database_authority": "Privileged SUPABASE_SERVICE_KEY client; treat service_role as RLS-bypassing. Direct filters/caller checks and explicit SECURITY DEFINER RPC guards are required; current live role flags were not inspected in this source review.",
+      "candidate_schema_limitation": "Exchange142 is an alternate source candidate excluded by the selected141-to143 learning branch. Its RPC/column presence is not established by numeric settings_available(142); this inventory does not certify Exchange runtime availability on schema150."
+    },
+    {
+      "path": "web/backend/services/academy_owner_service.py",
+      "boundary": "Owner routes authorize management projections; applicant document routes first use application_access, requiring a tenant-matching tuition application and either its applicant or owner/admin for reads, applicant-only plus unreviewed state for writes. Document lookup filters tenant/application/document IDs and private bucket metadata must be public=false before bytes are accessed. Generated tenant/application keys, quotas and download hashes constrain storage. SQL document/opportunity/dashboard/student RPCs recheck member/admin scope.",
+      "reviewed_functions": [
+        "opportunities",
+        "save_opportunity",
+        "application_access",
+        "documents",
+        "upload_document",
+        "document_row",
+        "download_document",
+        "remove_document",
+        "require_private_storage",
+        "dashboard",
+        "classified_students"
+      ],
+      "caller_evidence": [
+        "web/backend/routes/academy_owner_routes.py:dashboard",
+        "web/backend/routes/academy_owner_routes.py:upload_document",
+        "web/backend/routes/academy_owner_routes.py:download_document",
+        "web/backend/services/academy_programme_service.py:available"
+      ],
+      "user_reachability": "Caller-authorized tenant owner tools or application-specific applicant/private-document access; storage service credentials do not supply authorization themselves.",
+      "database_authority": "Privileged SUPABASE_SERVICE_KEY client; treat service_role as RLS-bypassing. Direct filters/caller checks and explicit SECURITY DEFINER RPC guards are required; current live role flags were not inspected in this source review.",
+      "candidate_schema_limitation": "Exchange142 is an alternate source candidate excluded by the selected141-to143 learning branch. Its RPC/column presence is not established by numeric settings_available(142); this inventory does not certify Exchange runtime availability on schema150.",
+      "known_integrity_finding": "Confirmed native schema150 metadata-commit/lost-response diagnostic initially removed already-referenced private bytes. Separate source repair now retains bytes/quota and returns explicit unknown-outcome HTTP503; both original native byte-survival assertions pass. Authorization classification is independent; conservative orphan reconciliation remains required. See docs/architecture-phase7-2026-10-18/private-upload-integrity.md. External storage in the diagnostic was an owned temporary filesystem."
+    },
+    {
+      "path": "web/backend/services/academy_programme_service.py",
+      "boundary": "Routes supply active member actors; read_access/available enforce schema/capability and programme state. records scopes all reads by tenant and self-service reads additionally by user; admin=True requires owner/admin and table names come from fixed route/service call sites. Review/report/configure_cefr require owner/admin and their SQL RPCs revalidate active membership. Wallet/application/withdrawal RPCs receive actor tenant/user, not browser-supplied actor IDs.",
+      "reviewed_functions": [
+        "read_access",
+        "available",
+        "programme_rpc",
+        "records",
+        "account",
+        "submit",
+        "withdraw",
+        "review",
+        "report",
+        "configure_cefr"
+      ],
+      "caller_evidence": [
+        "web/backend/routes/academy_programme_routes.py:account",
+        "web/backend/routes/academy_programme_routes.py:records",
+        "web/backend/routes/academy_programme_routes.py:review",
+        "web/backend/routes/academy_owner_routes.py:students"
+      ],
+      "user_reachability": "Active member personal programme/wallet data; explicit owner/admin management; service functions rely on authenticated caller context plus SQL actor assertions.",
+      "database_authority": "Privileged SUPABASE_SERVICE_KEY client; treat service_role as RLS-bypassing. Direct filters/caller checks and explicit SECURITY DEFINER RPC guards are required; current live role flags were not inspected in this source review."
     },
     {
       "path": "web/backend/services/academy_referral_service.py",
@@ -597,6 +769,35 @@
       ]
     },
     {
+      "path": "web/backend/services/elearning_forms_service.py",
+      "boundary": "Owner route authorization protects definitions, exports, all-response reads and private downloads; those reads explicitly filter actor tenant and relevant response/file IDs. Applicant APIs use tenant+user filters and a guarded SQL projection excluding internal notes/reviewers. Public submit uses server-bound tenant/form, active publication and public_access policy, generated response/file identities, private-bucket validation and guarded submit_elearning_form. Generic rpc() and definition() are internal privileged helpers, not independently authenticated APIs.",
+      "reviewed_functions": [
+        "definition",
+        "save",
+        "forms",
+        "public_access",
+        "responses",
+        "response_detail",
+        "review_response",
+        "applicant_responses",
+        "applicant_response",
+        "export_csv",
+        "submit",
+        "cleanup_files",
+        "download"
+      ],
+      "caller_evidence": [
+        "web/backend/routes/elearning_forms_routes.py:context",
+        "web/backend/routes/elearning_forms_routes.py:responses",
+        "web/backend/routes/elearning_forms_routes.py:applicant_response",
+        "web/backend/routes/academy_owner_routes.py:exchange_submit"
+      ],
+      "user_reachability": "Distinct owner, applicant and explicitly published public boundaries; RLS is not relied on to repair missing service-level tenant filters.",
+      "database_authority": "Privileged SUPABASE_SERVICE_KEY client; treat service_role as RLS-bypassing. Direct filters/caller checks and explicit SECURITY DEFINER RPC guards are required; current live role flags were not inspected in this source review.",
+      "candidate_schema_limitation": "Exchange142 is an alternate source candidate excluded by the selected141-to143 learning branch. Its RPC/column presence is not established by numeric settings_available(142); this inventory does not certify Exchange runtime availability on schema150.",
+      "known_integrity_finding": "Confirmed native schema150 metadata-commit/lost-response diagnostic initially removed already-referenced private bytes. Separate source repair now retains bytes/quota and returns explicit unknown-outcome HTTP503; both original native byte-survival assertions pass. Authorization classification is independent; conservative orphan reconciliation remains required. See docs/architecture-phase7-2026-10-18/private-upload-integrity.md. External storage in the diagnostic was an owned temporary filesystem."
+    },
+    {
       "path": "web/backend/services/elearning_participation_service.py",
       "boundary": "Trusted owner/admin caller supplies tenant/user; learner rows constrain tenant and id, changes use revision guards, and participation/enrollment RPCs validate course/actor with schema121/123+ gates.",
       "reviewed_functions": [
@@ -616,6 +817,25 @@
         "call",
         "media_access"
       ]
+    },
+    {
+      "path": "web/backend/services/elearning_recording_service.py",
+      "boundary": "Member recording routes supply actor tenant/user. Admission, registration and download RPCs bind attempt/question/recording to that actor; SQL checks enrollment/placement and reviewer ownership. The private recording bucket must report public=false, canonical WAV bytes are bounded, uploads do not upsert and downloads validate size/hash. cleanup is a separate operator CLI, not an HTTP member action: its global bounded service-role RPCs select unreferenced old recordings, serialize against registration, and retain protected answer evidence.",
+      "reviewed_functions": [
+        "private_bucket",
+        "upload",
+        "store",
+        "download",
+        "cleanup",
+        "inspect_wav"
+      ],
+      "caller_evidence": [
+        "web/backend/routes/elearning_assessments_routes.py:upload_recording",
+        "web/backend/routes/elearning_assessments_routes.py:download_recording",
+        "web/backend/scripts/cleanup_elearning_recordings.py"
+      ],
+      "user_reachability": "Authenticated attempt owner or SQL-authorized reviewer for bytes; intentionally cross-tenant operator cleanup with explicit apply flag and SQL eligibility checks.",
+      "database_authority": "Privileged SUPABASE_SERVICE_KEY client; treat service_role as RLS-bypassing. Direct filters/caller checks and explicit SECURITY DEFINER RPC guards are required; current live role flags were not inspected in this source review."
     },
     {
       "path": "web/backend/services/elearning_relationships_service.py",
@@ -682,6 +902,25 @@
         "revoke_installation_push_bindings",
         "revoke_user_installation"
       ]
+    },
+    {
+      "path": "web/backend/services/learning_payment_provider.py",
+      "boundary": "Checkout and reconciliation are reached through member-authenticated commerce/academy routes. reconcile_checkout filters tenant+checkout then requires buyer or tenant owner/admin and rejects provider events for another tenant/checkout. start_checkout consumes server-owned SQL price snapshots. apply_verified_event is internal privileged authority reached only after a configured code-registered adapter verifies raw webhook signatures or authenticated provider lookup; SQL validates tenant/checkout/provider, amount/currency, event identity/order and atomic effects. A browser success redirect is not authority.",
+      "reviewed_functions": [
+        "configured_provider",
+        "apply_verified_event",
+        "checkout",
+        "reconcile_checkout",
+        "test_mode"
+      ],
+      "caller_evidence": [
+        "web/backend/routes/elearning_commerce_routes.py:checkout",
+        "web/backend/routes/elearning_commerce_routes.py:reconcile",
+        "web/backend/routes/elearning_commerce_routes.py:payment_webhook",
+        "web/backend/routes/academy_owner_routes.py:reconcile"
+      ],
+      "user_reachability": "Buyer/tenant management requests plus distinct signature-verified provider ingress; configured adapters and service credential remain trusted privileged boundaries.",
+      "database_authority": "Privileged SUPABASE_SERVICE_KEY client; treat service_role as RLS-bypassing. Direct filters/caller checks and explicit SECURITY DEFINER RPC guards are required; current live role flags were not inspected in this source review."
     },
     {
       "path": "web/backend/services/notification_delivery_queue_service.py",
@@ -811,6 +1050,64 @@
         "_set_task_failure",
         "process_job"
       ]
+    },
+    {
+      "path": "web/backend/workers/data_deletion_worker.py",
+      "boundary": "Not an end-user route. main checks provider-recovery startup/consumption authority and enabled configuration; valid READ_ONLY standbys expose non-consuming health without a protocol RPC. Enabled startup and every consuming poll require exact integer deletion protocol2; request processing uses original fenced claims and schema150 RPCs. Global metrics expose aggregate counts through the configured worker health interface, not tenant records. The worker retains a broad service credential; schema150 lifecycle ACLs do not revoke all business-table authority, so legacy actor exclusion remains required.",
+      "reviewed_functions": [
+        "require_deletion_ownership_protocol",
+        "run_batch",
+        "main",
+        "do_GET"
+      ],
+      "caller_evidence": [
+        "web/backend/services/provider_recovery.py:prohibit_worker_start",
+        "web/backend/services/provider_recovery.py:worker_consumption_status",
+        "web/backend/services/data_deletion_service.py:claim_deletion_requests",
+        "web/backend/services/data_deletion_service.py:process_deletion_request",
+        "web/backend/routes/data_deletion_routes.py:close_current_tenant"
+      ],
+      "user_reachability": "Controller-governed cross-tenant worker authority, protocol and original-claim RPC fencing; no individual browser authorization is inferred from the service key.",
+      "database_authority": "Privileged SUPABASE_SERVICE_KEY client; treat service_role as RLS-bypassing. Direct filters/caller checks and explicit SECURITY DEFINER RPC guards are required; current live role flags were not inspected in this source review."
+    },
+    {
+      "path": "web/backend/services/calendar_mutation_service.py",
+      "boundary": "Configured authenticator application SQL connection with fixed service_role transaction; exact cluster pin; locked active tenant/member/user and calendar ACL checks, version CAS, fixed domain SQL only, aggregate children/change/audit rollback; no root credentials or REST fallback."
+    },
+    {
+      "path": "web/backend/services/automatic_source_sync_service.py",
+      "boundary": "tenant/project/source-bound156 scheduling, claiming and lease-fenced completion RPCs; background execution uses privileged service client. Requires current authorization/revalidation.",
+      "review_scope": "Integration classification of published main cf444303; not independent production security approval."
+    },
+    {
+      "path": "web/backend/services/data_source_credential_service.py",
+      "boundary": "tenant/project/source/credential-version-bound Vault lifecycle through155 guarded RPCs; service role bypasses RLS; plaintext never enters metadata/logs.",
+      "review_scope": "Integration classification of published main cf444303; not independent production security approval."
+    },
+    {
+      "path": "web/backend/services/immutable_object_storage.py",
+      "boundary": "fixed private immutable Storage bucket with server-generated tenant/reservation/digest object keys; privileged Storage headers; caller and DB quota/ownership checks required.",
+      "review_scope": "Integration classification of published main cf444303; not independent production security approval."
+    },
+    {
+      "path": "web/backend/services/project_data_source_service.py",
+      "boundary": "tenant/project/source-filtered metadata and source capability/revision checks through privileged Supabase client.",
+      "review_scope": "Integration classification of published main cf444303; not independent production security approval."
+    },
+    {
+      "path": "web/backend/services/project_dataset_checkpoint_service.py",
+      "boundary": "tenant/project/dataset-scoped153 checkpoints and ownership-fenced worker RPCs; immutable manifests and source revisions must be revalidated.",
+      "review_scope": "Integration classification of published main cf444303; not independent production security approval."
+    },
+    {
+      "path": "web/backend/services/project_dataset_service.py",
+      "boundary": "tenant/project-filtered147 dataset reads and guarded binding/promotion RPCs; service role requires authorized caller context.",
+      "review_scope": "Integration classification of published main cf444303; not independent production security approval."
+    },
+    {
+      "path": "web/backend/services/project_source_ingestion_service.py",
+      "boundary": "tenant/project/source/resource/operation-scoped149\u2013152 ingestion and reconciliation RPCs, lease/token/version checks; no blind replay of uncertain storage/provider effects.",
+      "review_scope": "Integration classification of published main cf444303; not independent production security approval."
     }
   ],
   "related_privileged_paths": [
@@ -1037,6 +1334,20 @@
     "direct_database_configuration": "SUPABASE_DB_URL is explicitly blanked in those production Compose services; direct PostgreSQL authority belongs to approved operator tools/controller paths.",
     "frontend_and_isolated_processing": "Frontend, parser-worker and remote-ingestion-worker receive no Supabase service key in their explicit environment declarations.",
     "local_supabase": "Prepared external network is an internal bridge, with gateway alias madar-supabase; published host ports remain loopback.",
-    "authorization_gate": "Schema115, migration policy none, no selected manifest. Inventory restoration never enables a migration or grants database privileges."
-  }
+    "authorization_gate": "The historical inventory-restoration review recorded a schema115 none-policy preparation. That is not evidence of the current deployed schema or authority. Phase VII inventory closure changes no active release descriptor, selects no migration and issues no worker/deployment/write authority; current source profiles and independently approved operations remain authoritative."
+  },
+  "continuation_reviews": [
+    {
+      "phase": 7,
+      "review_date": "2026-10-18",
+      "source_base": "86b022f208579341b2a9171255df4df14a9e4348",
+      "prior_entries": 67,
+      "added_entries": 11,
+      "resulting_entries": 78,
+      "checker_changed": false,
+      "evidence": "docs/architecture-phase7-2026-10-18/privileged-inventory-review.md",
+      "live_database_role_inspection": false,
+      "production_mutations": false
+    }
+  ]
 }

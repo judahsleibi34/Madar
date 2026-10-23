@@ -2702,7 +2702,10 @@ class SystemOperations:
         schema: int | None = None, rehearsal_sha256: str | None = None,
         completed_normal_contract: dict | None = None,
         migration_resumption: dict | None = None,
+        completed_normal_mode: str | None = None,
     ) -> None:
+        if completed_normal_mode is not None and completed_normal_contract is None:
+            raise UpgradeError('completed_normal_deploy_contract_required')
         require_root_directory(self.runtime_root, mode=0o711)
         document = self.interlock_document(approved_sha)
         operation = "schema_recovery" if recovery else "release"
@@ -2721,6 +2724,10 @@ class SystemOperations:
             verify_history(completed_normal_contract)
             from deployment.lib.completed_normal_profile import profile
             selected_profile = profile(completed_normal_contract)
+            from deployment.lib.completed_normal_profile import RECONCILED
+            if completed_normal_mode is not None and (selected_profile is not RECONCILED
+                    or completed_normal_mode not in {'prepare','activate','adopt'}):
+                raise UpgradeError('completed_maintenance_child_scope_invalid')
             operation, schema = selected_profile.operation, selected_profile.source
             rehearsal_sha256 = completed_normal_contract['rehearsal_sha256']
             context = digest(completed_normal_contract)
@@ -2756,15 +2763,24 @@ class SystemOperations:
                 if stage_record.exists():
                     witnesses['candidate_stage']=json.loads(protected(stage_record,private=True).read_text())
                     witness_hashes['candidate_stage_sha256']=digest(witnesses['candidate_stage'])
+                from deployment.lib.completed_normal_profile import RECONCILED
+                if selected_profile is RECONCILED and (admission_path.parent/'maintenance-write-handoff.json').exists():
+                    from deployment.lib.completed_normal_admission import require_maintenance_handoff
+                    witnesses['maintenance_handoff']=require_maintenance_handoff(completed_normal_contract)
+                    witness_hashes['maintenance_handoff_sha256']=digest(witnesses['maintenance_handoff'])
                 migration_record=admission_path.parent/'migration-inputs.json'
                 if migration_record.exists():
                     from deployment.lib.completed_normal_migration import issue_database_lease, intent_document
                     witnesses['migration_inputs']=json.loads(protected(migration_record,private=True).read_text())
                     if witnesses['migration_inputs'].get('intent')!=intent_document(completed_normal_contract):
                         raise UpgradeError('completed_normal_migration_inputs_changed')
-                    witnesses['migration_database']=issue_database_lease(completed_normal_contract)
-                    witness_hashes.update(migration_inputs_sha256=digest(witnesses['migration_inputs']),
-                        migration_database_sha256=digest(witnesses['migration_database']))
+                    witness_hashes['migration_inputs_sha256']=digest(witnesses['migration_inputs'])
+                    # Canonical maintenance SQL belongs to the root parent.
+                    # The preparation/owner/adoption child needs nonsecret
+                    # bound inputs, never a PostgreSQL superuser lease.
+                    if completed_normal_mode is None:
+                        witnesses['migration_database']=issue_database_lease(completed_normal_contract)
+                        witness_hashes['migration_database_sha256']=digest(witnesses['migration_database'])
         if migration_resumption is not None:
             if completed_normal_contract is None:
                 raise UpgradeError('completed_forward_parent_contract_required')
@@ -2838,7 +2854,7 @@ class SystemOperations:
         if completed_normal_contract is not None:
             from deployment.lib.completed_normal_admission import validate_contract
             validate_contract(completed_normal_contract)
-            from deployment.lib.completed_normal_profile import profile, APPLICATION
+            from deployment.lib.completed_normal_profile import profile, APPLICATION, RECONCILED
             if profile(completed_normal_contract) is APPLICATION and completed_normal_mode in {'migrate','refresh'}:
                 raise UpgradeError('application_only_migration_operation_denied')
             if (recovery or migration_repair or completed_normal_mode not in modes
@@ -2847,6 +2863,10 @@ class SystemOperations:
             extra={} if migration_resumption is None else {'migration_resumption':migration_resumption}
             if migration_resumption is not None and completed_normal_mode not in {'migrate','refresh'}:
                 raise UpgradeError('completed_forward_stage_invalid')
+            if profile(completed_normal_contract) is RECONCILED:
+                if completed_normal_mode not in {'prepare','activate','adopt'}:
+                    raise UpgradeError('completed_maintenance_parent_execution_required')
+                extra['completed_normal_mode']=completed_normal_mode
             self.write_authorization(approved_sha,completed_normal_contract=completed_normal_contract,**extra)
         else:
             if completed_normal_mode is not None or migration_resumption is not None:
@@ -3411,10 +3431,13 @@ def acquire_lock(path: Path, *, create: bool) -> int:
     flags = os.O_RDWR | os.O_CLOEXEC | os.O_NOFOLLOW
     if create:
         flags |= os.O_CREAT
+    descriptor = None
     try:
         descriptor = os.open(path, flags, 0o600)
         fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
     except (OSError, BlockingIOError) as error:
+        if descriptor is not None:
+            os.close(descriptor)
         raise UpgradeError(f"exclusive_lock_unavailable:{path.name}") from error
     return descriptor
 

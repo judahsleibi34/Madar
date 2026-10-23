@@ -1,5 +1,330 @@
 # Privileged control-plane upgrade architecture
 
+Canonical160 child ownership transfer is now explicitly separated from worker
+startup. The existing issuer projects protected private acceptance without role
+archives or a child PostgreSQL superuser lease. Pending transfer refuses replay;
+the parent verifies the accepted owner before consumers, seals the same runtime
+in NORMAL, then restores target routing and adopts NORMAL. Historical bridges
+retain their READ_ONLY behavior. These component-tested connections leave160
+registration, actual preserved-application acceptance and Class D dispatch closed.
+
+Maintenance handoff now uses the existing concrete provider adapter's private
+observation instead of the historical running-worker kernel. It binds protected
+private acceptance and actual nonconsuming runtime probes before/after target
+authority, recording only a private handoff receipt. This does not register160,
+complete child activation/adoption or permit automatic dispatch. Target routing
+now uses the existing adapter effect: maintenance before proxy startup, exact
+route preflight/publication and live verification, with failure refencing.
+Its installed privileged acceptance remains outstanding. Component tests
+with modeled providers do not certify a preserved-application protected upgrade.
+
+Exact schema160 authority now has a distinct v3 format shared by the existing
+root admission publisher/parser and backend. It binds the operation, origin,
+controller, source/context and migration manifest; NORMAL is target160 only.
+Candidate Compose and measured runtime checks carry the identity pins. This
+format support registers no operation and issues no authority:160 admission,
+Class D staging and automatic dispatch remain blocked pending full acceptance.
+See the exact schema160 authority section of `production-release-policy.md`.
+
+## Canonical160 engineering and owner decision (2026-10-23)
+
+`BRANCH_PROTECTION: DEFERRED_BY_PROJECT_OWNER`. The owner explicitly waived
+GitHub branch protection for this release. It is not a merge/deployment blocker
+by itself; exact source, CI, artifacts, runtime identity, independent authority
+and all applicable acceptance gates remain required. This exception grants no
+Class D production authority.
+
+The distinct version8 `completed-normal-schema146-160-coordinated-release`
+preparation binds the canonical fourteen SQL transitions, not archived147–150.
+The existing maintenance coordinator, candidate sealer, provider lifecycle,
+backup context and parent executor now carry that exact preparation contract.
+Its protocol observations expect delivery2 at157, outbox2 at159 and deletion2
+only at160. Legacy deletion backlog blocks through159. Historical behavior and
+all published SQL/metadata remain intact. Intermediate schemas cannot be NORMAL.
+
+The operation is still **unregistered and non-executable**: private guard wiring,
+original inventory publication, independently verified backup/receiver, private
+write handoff and child activation remain incomplete. Native executor/calendar
+and modeled lifecycle tests do not prove a privileged preserved-application
+upgrade, Auth/MFA/Storage acceptance, reboot, or complete restoration. Ordinary
+Class D staging and automatic dispatch remain blocked. No active descriptor,
+production controller, grant, service, timer, database or routing is changed.
+
+## Historical retained-maintenance source reconciliation
+
+PR195's profile-aware runtime/dispatch fixes are retained by the newer controller;
+its missing manual manifest-marker binding is carried forward without changing
+the issuer, executor, profile registry, locks or recovery journals. Its four
+one-shot routing/continuation/live-probe tools remain historical source and
+private evidence, outside active execution and installation. Their frozen
+identities cannot authorize new source or a schema150 operation. See the
+[file and document reconciliation](history/production-release-2026-10/README.md).
+Synthetic archived-model tests are not privileged-system or production acceptance.
+
+## Final continuation: exact locked migration origin
+
+The maintenance parent supplies the exact approved origin to the existing SQL
+executor. It is compared on the advisory-locked connection before any migration
+can be skipped or applied. Initial admission uses the contract source; a fresh
+authorized resumption uses its independently bound observed schema. Intermediate
+versions in a compatibility range are not automatic permission to adopt drift.
+Historical callers retain their explicit range/retry behavior unless opting in.
+
+## Final continuation: exclusive durable migration receipts
+
+A coordinated migration claims its attempt through atomic no-replace publication
+of a fully written, fsynced inode before opening a database connection. A racing
+process cannot overwrite the winner's receipt. Existing noncoordinated retry
+semantics remain unchanged. New attempt-directory links and receipt replacement
+are followed by directory fsyncs; file fsync alone does not make those entries
+durable. These checks preserve the existing JSON journal format and executor.
+They do not grant authority, replay consumed SQL or establish full reboot proof.
+
+## Final continuation: guarded private recovery and recovery locks
+
+Private recovery may start only the native provider trio and the exact sealed
+candidate Redis/backend/frontend. Every private candidate requires the existing
+fresh credential's stage witness plus root-private staged identities, images,
+configuration specs, networks and aliases. Queue workers and the proxy remain
+stopped. After independent target authority, only accepted workers start; the
+proxy is restored last. Ingress additionally reobserves every sealed candidate
+role as running and non-restarting; target authority alone cannot skip worker
+activation. Inventory state alternatives alone cannot authorize a candidate. The existing SQL executor can additionally observe target protocols
+and quiescence on its still advisory-locked connection before completing its
+receipt. A failed final observation preserves committed SQL as forward repair.
+
+Forward resumption passes its actual held upgrade descriptor into the existing
+root credential window. Credential/lock cleanup failures still close the parent
+lock. These changes do not register150, authorize replay, implement a complete
+maintenance-first coordinator or certify a full privileged-system rehearsal.
+
+## Final continuation: parent-owned maintenance SQL
+
+The existing coordinator now has a maintenance migration dispatch that borrows
+its actually owned upgrade/deployment locks and calls the existing migration
+executor on the same process/session as the concrete provider guard. Historical
+bridge operations retain their User=madar service path. No runtime-mutating CLI
+is invoked as root. The maintenance SQL path verifies the root-sealed stopped
+candidate against the measured model and fresh credential, binds the fenced
+provider journal to the existing backup witness, and leaves ordinary active-slot,
+worker and proxy state unchanged. Errors never replay SQL or imply activation.
+Operational150 profile/manifest admission remains blocked; this integration edge
+alone is not a complete maintenance-first operation or independent authorization.
+
+## Phase X backup-to-migration evidence boundary
+
+The fixed deployment lock is a private operator-owned runtime file used by the
+existing User=madar service (UMask0077). Its verifier uses the established
+operator-owned runtime-file ownership/ancestry rule only for that exact fixed
+path. It still requires a regular file, the same live inode and an exclusive
+flock held by the current process. Upgrade locks, credentials, journals and
+executable paths retain root protection. Unknown paths, replaced inodes, unsafe
+modes, symlinks and unheld locks reject. Native CI tests real file metadata under
+an explicitly synthetic operator-name fixture; no operational file is changed.
+
+Root credential windows must own both the existing upgrade lock and deployment
+lock before requesting authority. After a deployment service returns, root
+reacquires deploy.lock for its provider/backup/runtime stage and releases only
+that newly acquired window. Existing borrowed locks remain owned by the parent.
+Contention and credential collisions refuse before issuance; cleanup failures
+still revoke the authorization and release the new lock. Failed flock acquisition
+closes its descriptor. The concrete provider's existing-executor callback checks
+the same PostgreSQL session's real advisory lock, live cluster/schema/protocols
+and quiescence; no connection-name/PID whitelist replaces that proof. All host
+and authority gates remain required, and this does not register schema150.
+
+The existing completed-NORMAL backup context can seal the unregistered150
+preparation inputs without operationally admitting that profile. It retains the
+independently protected maintenance-manifest digest and binds original-role,
+owner/ACL, database and object-byte restore evidence, replica evidence and the
+complete fenced provider journal. Pending effects or changed journal state deny
+publication. Maintenance metadata is hashed and parsed from the same bounded
+regular-file capture. The existing migration verifier passes the expected inner digest
+to its measured installed backup helper; archive-local checksums alone cannot
+replace that independent binding. These inputs grant no execution or write
+authority. Schema150 admission and the unfinished full coordinator/private
+provider/handoff/boot gates remain blocked.
+
+## Phase IX protected maintenance backup staging
+
+The measured installer/frozen source inventory includes maintenance_backup.py.
+Its concrete-provider path retains the existing independent authority and locks;
+it is not another root entrypoint, migration runner or issuer. Ordinary dump
+output is descriptor-copied beneath the root-private admission before original
+role SQL and object recovery archives are added. A protected, append-only digest
+record binds later restore/replica consumers. Backup ownership may be released
+only behind that protected parent before atomic ordinary publication. No recursive
+privileged ownership change walks the runtime-owned published backup directory.
+Partial staging and digest records are retained and refuse silent replacement.
+Schema150 registration and the remaining full coordinator/handoff/boot lifecycle
+remain blocked; a component recovery drill is not privileged release acceptance.
+
+## Phase VIII original-role backup input
+
+The maintenance role input adapter captures the existing concrete provider
+actor's original role archive only under its fresh authority, held locks, exact
+source/inventory/cluster and complete fenced-journal checks. It serializes with
+the existing provider journal. It publishes one root-private append-only input
+under the same admission, with a last-written completion marker; interrupted
+partial publication is retained and refuses automatic replay. Authenticated reads
+return captured bytes, never a pathname to reopen for SQL execution.
+
+This is not backup completion, restore authority or operational registration.
+The ordinary backup currently uses live Storage HTTP and a role-name-only logical
+restore. A maintenance-aware database/object capture, full original-role/grant
+restore, replica and candidate/handoff/boot integration remain necessary. The
+schema150 profile remains unregistered. Historical backups and receipts are not
+rewritten, and no production installation or automation activation is authorized.
+
+## Phase VI schema150 integration boundary
+
+A separate source preparation constant describes version7 exact146→150. It is
+intentionally not registered as executable and cannot construct an admitted
+manifest. This avoids implicitly applying historical execution/write paths that
+lack the new provider lifecycle. Existing version6 refusals remain intact.
+
+Completing this path requires a concrete protected adapter, not a caller-supplied
+callback or local readiness receipt. It must authenticate original role/service/
+object/ingress preimages before fencing, persist boot interlocks, observe actual
+sessions and supervisors, use original role state in independent restoration,
+and separate pre-grant native acceptance from post-grant controlled resumption.
+An activation check cannot require authority that the same handoff has yet to
+issue. Healthy READ_ONLY candidate validation must account explicitly for stopped
+providers and workers instead of silently weakening normal-runtime verification.
+Source and fixture tests do not certify privileged installation or host reboot.
+
+The separate `schema150_provider_lifecycle.py` source model now makes that split
+explicit. It reuses the existing root-private append-only journal, adds an
+exclusive directory lock against competing actors, and binds exactly the new
+operation/source/controller/cluster/inventory. Fixed effects fence boot, ingress,
+supervisors, objects, roles and sessions. Original role restoration, private
+provider startup and native acceptance require the target grant to remain absent;
+unknown sessions/writers, prepared transactions or opened ingress/worker/boot
+barriers reject. The existing issuer remains solely responsible for the later
+positive target grant. Only an independently observed exact150/2/2/2 grant permits
+accepted-worker activation, public ingress restoration and final provider boot
+interlock clearance. The coordinator's broader upgrade interlock and completion
+receipts remain its own responsibility.
+
+Each effect has a durable intent before execution, a fresh protected-authority
+check before and after, and an independently measured outcome. Recovery observes
+uncertain effects instead of replaying them; bindings, fixed ordering and original
+preimages survive new process objects. Sixteen source state-machine tests exercise
+real journal/fsync/hash-chain/flock behavior with injected effects. They are not
+production provider/systemd/host-reboot acceptance. No concrete production adapter
+or operational registration is supplied by this model.
+
+No installed controller, production service, protected receipt, write grant or
+production source integration changes as a consequence of this preparation.
+
+## Phase V explicit146→149 source preparation
+
+A new version6 `completed-normal-schema146-149-coordinated-release` profile and
+checksum-pinned `schema-146-149-coordinated.json` /
+`migrations-147-149-coordinated.json` compose the unchanged147/148/149 SQL.
+The historical version5 profile and active release descriptor remain unchanged.
+Intermediate147/148 are READ_ONLY only; NORMAL requires149 and both notification
+protocols2. Ordinary automatic migration loading still rejects this coordinated
+manifest. SQL execution retains captured checksum-verified bytes and existing
+protected authorization, locks, journals and backup/restore/replica requirements.
+
+This is NOT a completed production adapter. The production coordinator rejects
+version6 before effects while provider lifecycle integration is unavailable;
+write handoff independently refuses activation. Provider barrier state-machine
+and native staging rehearsal evidence cannot create authority or substitute for
+protected installation/boot/current-data acceptance. Exact provider/inventory
+bindings and both queues plus deletion/session/prepared/lock quiescence are
+required. No installed production files or authority records are changed.
+
+Native review also confirmed unfenced inherited deletion request/step mutation.
+The new deletion worker requires a future complete ownership protocol and refuses
+consumption on001–149 rather than using unsafe legacy writes. Full deletion
+compatibility remains release blocking and needs a separate forward successor;
+149's narrower cancellation correction is not declared a complete lifecycle fix.
+See docs/architecture-phase5-2026-10-17/ for evidence, limitations and recovery.
+
+## Phase-IV verified migration byte snapshots
+
+The migration executor captures checksum-verified regular UTF-8 SQL files once
+before backup verification or database access. It executes those captured bytes
+after live admission callbacks, never a reopened operator-owned pathname.
+Symlinks/nonregular files, invalid encoding, more than16MiB per migration or
+64MiB per batch fail before effects. Existing manifest hashes, SQL history,
+ordering, locks, backup gates and single-use coordinated journals are unchanged.
+
+## Phase-IV provider-writer readiness
+
+The readiness accounting model now requires separate `database.provider_quiescence`
+evidence. Stopping notification consumers or observing an instant with zero
+transactions cannot supply this gate. The isolated native provider drill proves
+that NOLOGIN survives a crash/restart but does not drain existing sessions, and
+that exact explicit recovery must follow preserved roots and role preimages.
+It is not a production coordinator adapter. Provider stop/restart ownership,
+backup role preimages, maintenance health/probes and controlled recovery remain
+release blockers; no provider lifecycle or privilege mutation is authorized by
+this source. Historical operation contracts and migration hashes are unchanged.
+
+## Phase-IV exact-source and artifact consumption
+
+Application CI checks out and verifies the exact PR head used by fresh artifact
+builds. Integration previews targeting main also run the candidate-image check;
+no path filter may leave this required check permanently pending. Artifact ZIP
+verification hashes and parses one bounded private snapshot. Staging import
+re-authenticates that snapshot and loads verified members through private file
+descriptors, so rename or in-place edits cannot substitute bytes after hashing.
+These checks issue no deployment or production authority.
+
+## Phase-IV forward-repair preservation
+
+Fresh forward completion passes the selected operation contract to customer
+preservation validation. Each retained profile keeps its own source/target and
+Auth/Storage rules; successful SQL never permits legacy-default validation or
+a NORMAL grant from this READ_ONLY recovery path.
+
+## Unselected governed schema146→148 maintenance admission
+
+The version5 profile additionally requires authenticated fresh-CI provenance:
+exact repository/workflow/source/run/attempt, immutable GitHub artifact digest,
+archive/image/lockfile hashes and actual fresh-image labels. Offline overlays,
+expired artifacts, forged local PASS packets and wrong-source runs reject. The
+read-only verifier loads no images and issues no authority. New official checkout
+and upload actions are immutable pins; artifact retention is7 days. Existing
+profiles retain their acceptance contracts. Full Auth/Storage tables now enter
+only the version5 preservation snapshot; historical five-table snapshots remain
+unchanged. Active/manual native worker processes are checked through host cgroups
+with a visible candidate PID as positive control. A separately digest-bound
+unrelated native SDK worker can be excluded only after immutable specification,
+different signing authority AND live PostgREST cryptographic-denial proofs; shared
+keys, direct DB credentials, unknown schemes or hidden processes remain blocked.
+No unrelated workload is stopped by these inspectors.
+
+The new version-5 `completed-normal-schema146-148-coordinated-release` profile
+composes unchanged147/148 SQL with `schema-146-148-coordinated.json` and
+`migrations-147-148-coordinated.json`. Active release146 and historical profiles,
+manifests, grants and receipts remain unchanged. Automatic policy is none and
+ordinary automatic manifest loading still rejects coordinated SQL. Only the
+existing protected coordinator's fresh source/context-bound authorization may
+select this exact manifest. No installation or production operation is authorized.
+
+READ_ONLY compatibility is146..148; NORMAL requires148 plus existing sealed SQL,
+preservation, artifact, backup/restore/replica and boot gates. Old workers must
+be stopped with restart policy no after existing exclusive worker/boot/write
+handoff. A digest-bound complete consumer inventory and live database quiescence
+must verify before backup and before each SQL step. Unknown consumers, processing
+deliveries (including expired), active transactions, prepared transactions or
+queue locks refuse. No queue reconciliation mutation or uncertain-send retry is
+performed automatically. Missing protocol authority never falls back to legacy.
+
+Before147 commit, SQL rollback preserves146; after147 commit, no protocol1 or
+old NORMAL grant can be restored.147 interruption recovers READ_ONLY/maintenance
+and requires separately authorized forward repair;148 completion alone is not
+NORMAL authority. A new boot drop-in sorts after the measured146 predecessor;
+unknown later drop-ins reject. Existing root installation, deploy/upgrade locks,
+single-use credentials, source/image verification and append-only backup scopes
+remain mandatory. Component/native synthetic tests do not satisfy current-data,
+exact accepted-image, independent review, production approval or real reboot gates.
+See docs/schema148-release-readiness-2026-10-17/ for scoped evidence and runbook.
+
 ## Manual commercial144→146 release
 
 A post-SQL backup failure requires a separate backup-only completion. It binds
@@ -1504,3 +1829,59 @@ complete private coordinator evidence; fixture packages are rejected before
 privileged imports. Execute still requires separate exact-package operator
 authorization. Stable-route verification uses three complete rounds spanning
 five seconds within 180 seconds and makes no unsupported live-login claim.
+
+Schema148 fresh artifact identities explicitly distinguish the build-host image
+configuration ID from the single OCI archive manifest ID used by the target
+containerd image store. The producer verifies both blobs before publishing the
+receipt. Imported runtime IDs must equal the accepted manifest IDs; a mismatch
+refuses before replacing services. Latest exact-application-source backend and
+frontend workflow success is independently requeried, in addition to artifact CI.
+
+PhaseVIII drift observation extracts the existing structural query to a shared
+constant. A subsequent native shadow-function reproduction required a fixed
+transaction-local pg_catalog search path; the structural aggregation and
+historical receipt formats remain intact. No historical receipt is rewritten. A generic
+read-only observer requires independent baseline/history evidence, refuses an
+existing writer transaction and checks the catalog before executing protocol
+probes. This does not register generic production operations. Native synthetic
+role/ownership/ACL restoration, actual future-SQL execution and process-kill
+recovery are distinct from the still-missing combined privileged controller
+operation. Source inventories include the generic read-only helpers; the
+protected installed controller is unchanged by this engineering session.
+
+
+## Phase IX validation and staging integration
+
+Schema150 and generic protected execution remain unregistered/blocked;CI,root
+policy matches and staging results issue no authority. SQL001–150 and historical
+receipts are unchanged. No production automation or descriptor is activated.
+
+The existing coordinator seals authenticated candidate bytes before prepare under
+fresh authority and both locks;partial capture has no mutable-input fallback.
+Evidence JSON hashes and deserializes one bounded no-follow capture. See
+[candidate evidence](architecture-phase9-2026-10-20/04-SEALED-CANDIDATE-PREPARATION.md).
+
+Cluster-wide clients/prepared transactions and actual background/replication-mode
+writers block unknown activity. Preimage capture and private recovery measure
+that background count;unknown_writers is not invented as zero. Only attested
+core housekeeping and PID-bound observer parallel workers are excluded. Positive
+replica contracts and dormant host/manual/extension inventories remain separate
+gates. Published150's protocol0 at151 remains a blocker. The root policy pins
+nested backend/frontend tooling,verification runners,bundler config,release
+helpers,workflows and executable modes independently of a moving source base.
+Remote Actions are immutable. Workflow tokens explicitly retain contents-read
+permissions and checkouts do not persist credentials,including the conditional
+mobile workflow,which now also selects/verifies the exact source. See [security findings](architecture-phase9-2026-10-20/15-SECURITY-AND-SUPPLY-CHAIN.md).
+
+Secret-free full-provider CI uses owned synthetic genesis,captured Git SQL and
+authenticated images,private leases,loopback-only ports,resource bounds and
+consumed-attempt refusal. Native OCI store preparation requires an empty owned
+GitHub runner,private config preimages and failure restoration;physical nodes and
+shared staging refuse it. No image-ID substitution is allowed. Live protocols
+precede workers. Restart uses the real supervisor plus bounded source/image/
+health/consumption checks;all required components must be healthy. Locked browser
+checks use private synthetic fixtures. Public diagnostics omit credentials and
+raw provider logs. Completion follows observed owned-service shutdown. None of
+this is protected handoff,boot/reboot or production acceptance. See
+[staging scope](architecture-phase9-2026-10-20/10-AUTOMATIC-FULL-STAGING.md) and
+[maintenance backup limits](architecture-phase9-2026-10-20/03-MAINTENANCE-BACKUP-AND-REPLICA.md).
