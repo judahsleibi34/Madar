@@ -33,6 +33,9 @@ same candidate IDs in NORMAL mode, observes sustained full-running health,
 publishes the existing NORMAL runtime receipts, restores target ingress and
 adopts the accepted NORMAL release. Historical profiles retain READ_ONLY bridge
 behavior; the obsolete architecture150 branch explicitly refuses execution.
+Adoption rechecks the credential-bound full runtime/worker owner and actual
+running, non-restarting healthy containers; green HTTP alone cannot substitute
+for that binding. The regression reproduces the previously omitted check.
 These connections have component/regression evidence, not a completed real
 privileged upgrade or authorization to register the schema160 operation.
 

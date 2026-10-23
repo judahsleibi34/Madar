@@ -18,6 +18,8 @@ class Operations:
     def verify_source(self,sha):self.calls.append(('source',sha))
     def validate_candidate(self,sha,slot):self.calls.append(('normal_validate',sha,slot))
     def validate_candidate_core(self,sha,slot):self.calls.append(('core_validate',sha,slot))
+    def verify_completed_normal_runtime(self,slot):
+        return {'component-model':{'State':{'Running':self.new_active,'Restarting':False,'Health':{'Status':'healthy'}}}}
     def schema_version(self):return 115
     def worker_ownership(self,old,new):
         if self.old_active and self.new_active:return 'overlap'
@@ -219,6 +221,25 @@ class MaintenanceWorkerOwnerTests(unittest.TestCase):
         self.assertEqual(result['schema']['observed'],160)
         self.assertEqual(json.loads((self.path/'state.json').read_bytes())['known_good_release']['schema'],160)
         self.assertIn(('normal_validate',self.sha,self.slot),self.ops.calls)
+
+    def test_changed_sealed_runtime_cannot_be_adopted_from_green_http_alone(self):
+        from unittest.mock import Mock
+        from deployment.lib.completed_normal_profile import RECONCILED
+        self.activate();self.ops.new_active=True;self.ops.route=self.slot
+        self.ops._json=lambda url:{'release_sha':self.sha,'ready':True}
+        self.ops.verify_completed_normal_runtime=Mock(side_effect=RuntimeError('changed_sealed_runtime'))
+        original=(self.path/'state.json').read_bytes()
+        class Response:
+            status=200
+            def __enter__(self):return self
+            def __exit__(self,*args):pass
+        with patch.object(admission,'require_candidate_authority',return_value={'mode':'NORMAL'}),\
+                patch('deployment.lib.completed_normal_profile.profile',return_value=RECONCILED),\
+                patch.object(cli.urllib.request,'urlopen',return_value=Response()):
+            with self.assertRaisesRegex(RuntimeError,'changed_sealed_runtime'):
+                cli.adopt_prepared_release(sha=self.sha,slot=self.slot,state_root=self.path,
+                    compatibility=cli.Compatibility(146,160,160,'coordinated',160,160),operations=self.ops)
+        self.assertEqual((self.path/'state.json').read_bytes(),original)
 
 
 if __name__=='__main__':unittest.main()

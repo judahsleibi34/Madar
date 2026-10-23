@@ -1892,6 +1892,11 @@ def adopt_prepared_release(
     elif existing.get("known_good_release") or existing.get("in_progress_release"):
         raise RuntimeError("immutable_release_state_already_initialized")
     operations.verify_source(sha)
+    if maintenance:
+        runtimes=operations.verify_completed_normal_runtime(slot)
+        if not runtimes or any(row['State'].get('Running') is not True or row['State'].get('Restarting') is not False
+                or row['State'].get('Health',{}).get('Status')!='healthy' for row in runtimes.values()):
+            raise RuntimeError('completed_maintenance_adoption_runtime_not_running')
     if admission is not None and manual:
         operations.validate_candidate_core(sha,slot)
         operations.validate_completed_normal_read_only_serving(sha,slot)

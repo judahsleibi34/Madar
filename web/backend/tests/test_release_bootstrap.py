@@ -146,7 +146,10 @@ class ReleaseBootstrapTests(unittest.TestCase):
                         compatibility=compatibility,operations=operations)
                     self.assertEqual(record['status'],'candidate_created_fenced')
                     self.assertFalse(any(c[0] in {'validate_candidate','activate_workers'} for c in operations.calls))
-                    with self.assertRaisesRegex(RuntimeError,'state_invalid'):
+                    # Preparation now has a distinct owner-only path, but the
+                    # operational registry still rejects either unaccepted
+                    # profile before any worker/runtime activation effect.
+                    with self.assertRaisesRegex(RuntimeError,'operation_profile_invalid'):
                         release_cli.activate_prepared_release(sha=SHA,slot='green',state_root=root,operations=operations)
                     second=release_cli.prepare_release(sha=SHA,slot='green',state_root=root,
                         compatibility=compatibility,operations=operations)
