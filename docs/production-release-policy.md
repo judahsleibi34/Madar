@@ -136,6 +136,11 @@ pass. Missing/wrong credentials, wrong cluster and missing privileges fail close
 The disposable canonical fixture verifies real SCRAM password authentication,
 wrong-password refusal and real permission/cluster mismatches; this is not
 production credential provisioning or full protected-release acceptance.
+Compose passes this domain transport only to the backend and explicitly empties
+both calendar transport variables on notification, calendar-sync and deletion
+workers, overriding inherited shared env-file values. A real synthetic Compose
+render verifies this containment without starting services. Shared Supabase
+service-role/provider capability remains separate residual work.
 
 
 Calendar event/series edits and occurrence/future splits use one PostgreSQL
