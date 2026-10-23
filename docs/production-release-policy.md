@@ -1,5 +1,18 @@
 # Madar production release acceptance policy
 
+## Exact schema160 authority preparation
+
+The backend and the existing root admission publisher/parser support a distinct
+version3 grant shape for `completed-normal-schema146-160-coordinated-release`.
+It additionally binds origin146, exact controller SHA and the pinned fourteen-
+migration manifest. Candidate configuration carries both identity pins; runtime
+sealing rejects substitutions. READ_ONLY observations may cover146–160; NORMAL
+is valid only at exactly160. Historical v1/v2 grants and their ranges are unchanged.
+This implements a format/validation edge, not an issuer or an active operation:
+RECONCILED remains unregistered, its manifest admission still refuses, and no
+grant is issued by adding backend support. Full maintenance handoff, activation,
+private acceptance and privileged preserved-application proof remain prerequisites.
+
 ## Canonical160 engineering and owner decision (2026-10-23)
 
 `BRANCH_PROTECTION: DEFERRED_BY_PROJECT_OWNER`. The owner explicitly waived

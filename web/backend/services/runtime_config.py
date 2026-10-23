@@ -42,6 +42,8 @@ CONFIG_CLASSIFICATION: dict[str, ConfigClass] = {
     "SMTP_FROM_EMAIL": "optional",
     "VAPID_PRIVATE_KEY": "secret",
     "MADAR_RELEASE_SHA": "required",
+    "MADAR_RELEASE_CONTROLLER_SHA": "production-only",
+    "MADAR_RELEASE_MIGRATION_MANIFEST_SHA256": "production-only",
     "MADAR_BUILD_TIMESTAMP": "required",
     "SCHEMA_COMPATIBLE_MIN": "required",
     "SCHEMA_COMPATIBLE_MAX": "required",

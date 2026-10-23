@@ -61,6 +61,37 @@ class Schema160ReleaseTests(unittest.TestCase):
         raw['execution_status']='approved';manifest.write_text(json.dumps(raw))
         with self.assertRaisesRegex(ValueError,'not executable'):MigrationManifest.load(manifest,self.root)
 
+    def test_root_authority_parser_binds_v3_without_registering_preparation(self):
+        from deployment.lib import completed_normal_admission as admission
+        contract=reconciled_contract();root=self.root/admission.digest(contract)
+        (root/'write-authority').mkdir(parents=True)
+        grant={'version':3,'schema':160,'release_sha':contract['candidate']['source_sha'],
+            'contract_digest':admission.digest(contract),'mode':'NORMAL','compatible_min':146,'compatible_max':160,
+            'operation':RECONCILED.operation,'origin_schema':146,'controller_sha':contract['candidate']['controller_sha'],
+            'migration_manifest_sha256':contract['migration_manifest_sha256']}
+        path=root/'write-authority/authority.json'
+        # Model-only file ownership and registry; the actual registry stays shut.
+        with patch.object(admission,'profile',return_value=RECONCILED),patch.object(admission.os,'geteuid',return_value=0),\
+                patch('deployment.lib.provider_recovery_runtime.protected',side_effect=lambda p,**kw:Path(p)):
+            path.write_text(json.dumps(grant))
+            self.assertEqual(admission.require_candidate_authority(contract,mode='NORMAL',admissions=self.root),grant)
+            from services import business_write_authority as backend
+            from types import SimpleNamespace
+            with patch.object(backend,'AUTHORITY_PATH',path),patch.dict(os.environ,{
+                    'MADAR_BUSINESS_WRITE_AUTHORITY':str(path),'MADAR_BUSINESS_WRITE_CONTRACT':grant['contract_digest'],
+                    'MADAR_RELEASE_SHA':grant['release_sha'],'SCHEMA_COMPATIBLE_MIN':'146','SCHEMA_COMPATIBLE_MAX':'160',
+                    'SCHEMA_EXCLUDED_VERSIONS':'','MADAR_RELEASE_CONTROLLER_SHA':grant['controller_sha'],
+                    'MADAR_RELEASE_MIGRATION_MANIFEST_SHA256':grant['migration_manifest_sha256']}),\
+                    patch.object(Path,'lstat',return_value=SimpleNamespace(st_uid=0,st_mode=0o100644)),\
+                    patch.object(Path,'is_symlink',return_value=False):
+                self.assertEqual(backend.read_authority(),grant)
+            for field,value in (('version',2),('controller_sha','f'*40),('origin_schema',150),
+                    ('operation',DELETION.operation),('migration_manifest_sha256','f'*64),('schema',159)):
+                path.write_text(json.dumps(dict(grant,**{field:value})))
+                with self.subTest(field=field),self.assertRaises(RuntimeError):
+                    admission.require_candidate_authority(contract,admissions=self.root)
+        with self.assertRaises(RuntimeError):profile(contract)
+
     def test_changed_sql_mirror_manifest_and_parent_symlink_refuse(self):
         raw,snapshots=release.captured_source(self.root)
         paths=[self.root/'web/deployment/releases'/release.MANIFEST,

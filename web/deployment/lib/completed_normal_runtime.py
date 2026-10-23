@@ -169,6 +169,11 @@ def validate_model(contract,model,runtime, *, phase='running'):
                     or actual['RW']!=(not bool(expected.get('read_only',False)))):
                 raise RuntimeError('completed_runtime_mount_changed')
         if role in {'backend',*BUSINESS}:
+            from deployment.lib.completed_normal_profile import RECONCILED
+            if release is RECONCILED and (
+                    expected_env.get('MADAR_RELEASE_CONTROLLER_SHA')!=contract['candidate']['controller_sha']
+                    or expected_env.get('MADAR_RELEASE_MIGRATION_MANIFEST_SHA256')!=contract['migration_manifest_sha256']):
+                raise RuntimeError('completed_runtime_exact_maintenance_authority_changed')
             authority=declared.get('/run/madar/business-write-authority')
             if (authority is None or authority['source']!=str(ADMISSIONS/digest(contract)/'write-authority')
                     or not authority.get('read_only') or authority.get('bind',{}).get('create_host_path') is not False

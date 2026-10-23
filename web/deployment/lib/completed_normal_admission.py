@@ -292,7 +292,7 @@ def measure_provider_record(state_root: Path, expected_sha256: str) -> dict:
 
 
 def require_candidate_authority(contract: dict, *, mode: str | None = None, admissions: Path = ADMISSIONS) -> dict:
-    """Read the root-issued v2 grant; no caller/environment can issue one."""
+    """Read the exact root-issued grant; no caller/environment can issue one."""
     from deployment.lib.provider_recovery_runtime import protected
     validate_contract(contract)
     selected = profile(contract)
@@ -301,9 +301,16 @@ def require_candidate_authority(contract: dict, *, mode: str | None = None, admi
     else:
         require_fresh_authorization(contract)
         value=credential_witness('candidate_authority','candidate_authority_sha256')
-    if (not isinstance(value, dict) or set(value) != {
-            "version", "schema", "release_sha", "contract_digest", "mode", "compatible_min", "compatible_max"}
-            or type(value["version"]) is not int or value["version"] != 2
+    fields={"version","schema","release_sha","contract_digest","mode","compatible_min","compatible_max"}
+    if selected is RECONCILED:
+        fields |= {'operation','origin_schema','controller_sha','migration_manifest_sha256'}
+        if (not isinstance(value,dict) or value.get('operation')!=selected.operation
+                or type(value.get('origin_schema')) is not int or value['origin_schema']!=selected.source
+                or value.get('controller_sha')!=contract['candidate']['controller_sha']
+                or value.get('migration_manifest_sha256')!=contract['migration_manifest_sha256']):
+            raise RuntimeError('completed_normal_candidate_authority_changed')
+    if (not isinstance(value, dict) or set(value) != fields
+            or type(value["version"]) is not int or value["version"] != (3 if selected is RECONCILED else 2)
             or not selected.supports(value["schema"])
             or type(value["compatible_min"]) is not int or value["compatible_min"] != selected.minimum
             or type(value["compatible_max"]) is not int or value["compatible_max"] != selected.target
@@ -397,10 +404,14 @@ def publish_admission(contract: dict, operations, state_root: Path, *, admission
     # The root coordinator runs with UMask=0077. Set the nonsecret mounted
     # directory explicitly; mkdir(mode=0755) alone produces unreadable0700.
     authority.chmod(0o755)
-    exclusive(authority / "authority.json", encoded({
-        "version": 2, "schema": selected.source, "release_sha": contract["candidate"]["source_sha"],
+    grant={
+        "version": 3 if selected is RECONCILED else 2, "schema": selected.source, "release_sha": contract["candidate"]["source_sha"],
         "contract_digest": digest(contract), "mode": "READ_ONLY", "compatible_min": selected.minimum, "compatible_max": selected.target,
-    }))
+    }
+    if selected is RECONCILED:
+        grant.update(operation=selected.operation,origin_schema=selected.source,
+            controller_sha=contract['candidate']['controller_sha'],migration_manifest_sha256=contract['migration_manifest_sha256'])
+    exclusive(authority / "authority.json",encoded(grant))
     os.chmod(authority / "authority.json", 0o644)
     return root
 

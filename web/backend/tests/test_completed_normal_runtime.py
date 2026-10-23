@@ -80,6 +80,9 @@ class RuntimeModelTests(unittest.TestCase):
                     SCHEMA_COMPATIBLE_MIN=str(self.contract['candidate']['compatible_min']),
                     SCHEMA_COMPATIBLE_MAX=str(self.contract['candidate']['compatible_max']),
                     SCHEMA_EXCLUDED_VERSIONS='142' if not preparation150 else '')
+                if self.contract.get('operation')=='completed-normal-schema146-160-coordinated-release':
+                    service['environment'].update(MADAR_RELEASE_CONTROLLER_SHA=self.contract['candidate']['controller_sha'],
+                        MADAR_RELEASE_MIGRATION_MANIFEST_SHA256=self.contract['migration_manifest_sha256'])
                 source=str(m.ADMISSIONS/digest(self.contract)/'write-authority')
                 service['volumes'][0]['source']=source;row['Mounts'][0]['Source']=source
                 row['Config']['Env']=['PATH=/fixture',*(k+'='+v for k,v in service['environment'].items())]
@@ -261,6 +264,23 @@ class RuntimeModelTests(unittest.TestCase):
             self.test_maintenance_stage_seals_only_created_fenced_identities_without_starting_workers()
         self.assertEqual(self.contract['candidate']['compatible_max'],160)
         self.assertIn('schema160',self.selected['prefix'])
+
+    def test_canonical_authority_pins_cannot_be_substituted_in_both_model_and_runtime(self):
+        from test_schema160_release import reconciled_contract
+        self.use_manual_contract(reconciled_contract(),preparation150=True)
+        for row in self.rows.values():
+            row['State']={'Running':False,'Restarting':False,'Status':'created'}
+            for endpoint in row['NetworkSettings']['Networks'].values():endpoint.update(NetworkID='',IPAddress='',EndpointID='')
+        m.validate_model(self.contract,self.model,self.runtime,phase='provisional')
+        for role in {'backend',*m.BUSINESS}:
+            service=self.model['services'][role];row=self.rows[self.selected['containers'][role]]
+            for key in ('MADAR_RELEASE_CONTROLLER_SHA','MADAR_RELEASE_MIGRATION_MANIFEST_SHA256'):
+                before=service['environment'][key];service['environment'][key]='f'*len(before)
+                row['Config']['Env']=['PATH=/fixture',*(k+'='+v for k,v in service['environment'].items())]
+                with self.subTest(role=role,key=key),self.assertRaisesRegex(RuntimeError,'exact_maintenance_authority_changed'):
+                    m.validate_model(self.contract,self.model,self.runtime,phase='provisional')
+                service['environment'][key]=before
+                row['Config']['Env']=['PATH=/fixture',*(k+'='+v for k,v in service['environment'].items())]
 
     def test_preparation_validation_does_not_allow_sealing_without_existing_fresh_authority(self):
         from test_schema150_admission import deletion_contract

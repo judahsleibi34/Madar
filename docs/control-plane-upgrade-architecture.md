@@ -1,5 +1,13 @@
 # Privileged control-plane upgrade architecture
 
+Exact schema160 authority now has a distinct v3 format shared by the existing
+root admission publisher/parser and backend. It binds the operation, origin,
+controller, source/context and migration manifest; NORMAL is target160 only.
+Candidate Compose and measured runtime checks carry the identity pins. This
+format support registers no operation and issues no authority:160 admission,
+Class D staging and automatic dispatch remain blocked pending full acceptance.
+See the exact schema160 authority section of `production-release-policy.md`.
+
 ## Canonical160 engineering and owner decision (2026-10-23)
 
 `BRANCH_PROTECTION: DEFERRED_BY_PROJECT_OWNER`. The owner explicitly waived

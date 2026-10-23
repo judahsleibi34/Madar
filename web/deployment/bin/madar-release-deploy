@@ -630,6 +630,10 @@ class DockerGitOperations:
                            for key in ("backend", "frontend"))
                     or str(images.get("worker", "")).split("@", 1)[-1] != admission["candidate"]["images"]["backend"]):
                 raise RuntimeError("completed_normal_accepted_artifact_changed")
+            from deployment.lib.completed_normal_profile import RECONCILED
+            if profile(admission) is RECONCILED:
+                env['MADAR_RELEASE_CONTROLLER_SHA']=admission['candidate']['controller_sha']
+                env['MADAR_RELEASE_MIGRATION_MANIFEST_SHA256']=admission['migration_manifest_sha256']
             context = digest(admission)
             if rendering is None:require_candidate_authority(admission)
             from deployment.lib.completed_normal_resources import allocation
