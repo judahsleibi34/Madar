@@ -38,6 +38,13 @@ running, non-restarting healthy containers; green HTTP alone cannot substitute
 for that binding. The regression reproduces the previously omitted check.
 These connections have component/regression evidence, not a completed real
 privileged upgrade or authorization to register the schema160 operation.
+The native coordinator SQL/refusal regression now runs the canonical fourteen
+transitions146→160, preserving synthetic Auth/Storage/application rows and
+stopping at deliberately unaccepted private handoff. Authority, provider effects
+and backup remain explicit models. Archived146→150 SQL assertions remain in
+their disposable historical suite, while the obsolete controller refuses them.
+Native harnesses bind their readonly source root explicitly rather than rely on
+test import order. None of this certifies a running original provider upgrade.
 
 The adapter's existing `restore_ingress` effect now stages the fixed maintenance
 route before restarting the proxy. It preflights and publishes only the exact

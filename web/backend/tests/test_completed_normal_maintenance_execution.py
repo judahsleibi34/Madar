@@ -19,7 +19,7 @@ from test_schema150_admission import deletion_contract
 from test_schema150_actor_inventory import fixture,repin
 
 
-def maintenance_fixture(test, selected=RECONCILED):
+def maintenance_fixture(test, selected=RECONCILED, *, system_identifier=None):
     f=historical.ExecutionTests();f.setUp();test.addCleanup(f.doCleanups)
     f.source_schema=146;f.target_schema=selected.target;f.schema=146
     f.contract=deletion_contract()
@@ -27,6 +27,7 @@ def maintenance_fixture(test, selected=RECONCILED):
         from deployment.lib.schema160_release import MANIFEST_SHA256
         f.contract.update(version=selected.version,operation=selected.operation,migration_manifest_sha256=MANIFEST_SHA256)
         f.contract['candidate']['compatible_max']=selected.target
+    if system_identifier is not None:f.contract['database']['system_identifier']=system_identifier
     f.driver.contract=f.contract;f.driver.actor.contract=f.contract
     f.driver.profile=selected
     f.driver.actor.candidate().contract=f.contract

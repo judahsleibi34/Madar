@@ -103,6 +103,7 @@ if [[ "${MADAR_CANONICAL_EXECUTOR_TESTS:-false}" == true ]]; then
     --network "container:${CONTAINER_NAME}" --tmpfs /tmp:rw,noexec,nosuid,size=256m \
     --volume "${WEB_ROOT}/backend:/app:ro" --volume "${ROOT_DIR}:/release:ro" \
     --env PYTHONPATH=/app:/release/web --env PYTHONDONTWRITEBYTECODE=1 \
+    --env MADAR_TEST_REPOSITORY_ROOT=/release/web \
     --env SUPABASE_URL=http://127.0.0.1:54321 \
     --env APP_ENV=test --env SUPABASE_ANON_KEY=synthetic-placeholder-anon --env SUPABASE_SERVICE_KEY=synthetic-placeholder-service \
     --env CANONICAL_EXECUTOR_SYNTHETIC_DATABASE_DSN='host=127.0.0.1 port=5432 dbname=postgres user=postgres' \

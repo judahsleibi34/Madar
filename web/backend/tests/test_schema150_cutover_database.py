@@ -63,35 +63,24 @@ class Schema150CutoverDatabaseTests(unittest.TestCase):
             state_file=self.directory/name,backup_dir=self.directory,backup_verifier=lambda _:None,
             migration_guard=self.actor.migration_guard,failure_formatter=lambda e:type(e).__name__)
 
-    def test_maintenance_branch_native_sql_preserves_data_and_stops_before_unaccepted_handoff(self):
-        """Actual coordinator ordering + SQL; other operational gates MODEL.
-
-        This deliberately fails private acceptance. It is not a full protected
-        operation, application/provider preservation or authority acceptance.
-        """
+    def test_superseded_controller_refuses_and_archived_sql_remains_rehearsable(self):
+        """150 is historical SQL only; canonical parent coverage moved to160."""
         from deployment.lib import schema150_provider_lifecycle as provider_lifecycle
         real_lifecycle=provider_lifecycle.ProviderMaintenance150
         real_journal=provider_lifecycle.ProtectedProviderJournal
         sys.path.insert(0,str(Path(__file__).parent))
         from test_completed_normal_maintenance_execution import maintenance_fixture
-        f=maintenance_fixture(self)
-        f.failure='private_acceptance'
-        def migrate(*,provider_adapter):
-            self.assertIs(provider_adapter,f.provider)
-            self.assertIn('provider_fence',f.calls)
-            self.assertIn('backup_pre-migration',f.calls)
-            self.assertIn('seal_stage',f.calls)
-            self.assertNotIn('grant_150',f.calls)
-            with patch.object(provider_lifecycle,'ProviderMaintenance150',real_lifecycle),\
-                    patch.object(provider_lifecycle,'ProtectedProviderJournal',real_journal):
-                result=self.executor(name='ordered-maintenance-execution.json').run()
-            with self.connect() as db:
-                f.schema=db.execute("select schema_version from public.application_schema_state where contract_key='core'").fetchone()[0]
-            self.assertEqual(f.schema,150)
-            return result
-        f.driver.migrate=migrate
-        with self.assertRaisesRegex(RuntimeError,'PRIVATE VALUE MUST NOT APPEAR'):f.driver._execute()
-        self.assertIn('private_acceptance',f.calls)
+        from deployment.lib.completed_normal_profile import DELETION
+        f=maintenance_fixture(self,DELETION)
+        with self.assertRaisesRegex(RuntimeError,'superseded_release_contract_not_executable'):f.driver._execute()
+        self.assertEqual(f.calls,[])
+        with self.connect() as db:
+            self.assertEqual(db.execute("select schema_version from public.application_schema_state where contract_key='core'").fetchone()[0],146)
+        # Preserve the immutable historical SQL/row/protocol assertions as an
+        # explicitly standalone disposable rehearsal, never controller admission.
+        with patch.object(provider_lifecycle,'ProviderMaintenance150',real_lifecycle),\
+                patch.object(provider_lifecycle,'ProtectedProviderJournal',real_journal):
+            self.executor(name='ordered-maintenance-execution.json').run()
         self.assertNotIn('grant_150',f.calls)
         self.assertNotIn('service_activate',f.calls)
         self.assertFalse((f.root/'normal-completion.json').exists())

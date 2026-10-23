@@ -78,6 +78,7 @@ if [[ "${RUN_SCHEMA148_ADMISSION:-false}" == true ]]; then
     --tmpfs /tmp:rw,noexec,nosuid,size=128m --env PYTHONPATH=/app:/release/web --env PYTHONDONTWRITEBYTECODE=1 \
     --env SCHEMA148_SYNTHETIC_DATABASE_DSN='host=127.0.0.1 port=55448 dbname=postgres user=postgres connect_timeout=5' \
     --env SCHEMA148_SOURCE_ROOT=/release \
+    --env MADAR_TEST_REPOSITORY_ROOT=/release/web \
     --volume "$WEB_ROOT/backend:/app:ro" --volume "$WEB_ROOT/..:/release:ro" \
     --entrypoint python "$BACKEND_TEST_IMAGE" -m unittest tests.test_schema148_cutover_database -v
   if [[ "${RUN_SCHEMA149_ADMISSION:-false}" == true ]]; then
@@ -85,6 +86,7 @@ if [[ "${RUN_SCHEMA148_ADMISSION:-false}" == true ]]; then
       --tmpfs /tmp:rw,noexec,nosuid,size=128m --env PYTHONPATH=/app:/release/web --env PYTHONDONTWRITEBYTECODE=1 \
       --env SCHEMA148_SYNTHETIC_DATABASE_DSN='host=127.0.0.1 port=55448 dbname=postgres user=postgres connect_timeout=5' \
       --env SCHEMA148_SOURCE_ROOT=/release \
+      --env MADAR_TEST_REPOSITORY_ROOT=/release/web \
       --volume "$WEB_ROOT/backend:/app:ro" --volume "$WEB_ROOT/..:/release:ro" \
       --entrypoint python "$BACKEND_TEST_IMAGE" -m unittest tests.test_schema149_cutover_database -v
   fi
@@ -93,6 +95,7 @@ if [[ "${RUN_SCHEMA148_ADMISSION:-false}" == true ]]; then
       --tmpfs /tmp:rw,noexec,nosuid,size=128m --env PYTHONPATH=/app:/release/web --env PYTHONDONTWRITEBYTECODE=1 \
       --env SCHEMA148_SYNTHETIC_DATABASE_DSN='host=127.0.0.1 port=55448 dbname=postgres user=postgres connect_timeout=5' \
       --env SCHEMA148_SOURCE_ROOT=/release \
+      --env MADAR_TEST_REPOSITORY_ROOT=/release/web \
       --volume "$WEB_ROOT/backend:/app:ro" --volume "$WEB_ROOT/..:/release:ro" \
       --entrypoint python "$BACKEND_TEST_IMAGE" -m unittest tests.test_schema150_cutover_database -v
   fi

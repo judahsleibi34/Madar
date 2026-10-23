@@ -6,6 +6,7 @@ Backup/authority/provider/host acceptance are not supplied by these fixtures.
 import json
 import os
 from pathlib import Path
+import sys
 import tempfile
 import unittest
 from uuid import uuid4
@@ -182,6 +183,56 @@ class CanonicalExecutorDatabaseTests(unittest.TestCase):
         with connect(dsn) as foreign:
             with self.assertRaisesRegex(RuntimeError,'not_quiescent'):self.executor(dsn).run()
             self.assertEqual(foreign.execute("select schema_version from application_schema_state where contract_key='core'").fetchone()[0],146)
+
+    def test_05_actual_coordinator_runs_native_canonical_sql_and_refuses_unaccepted_private_handoff(self):
+        """Real coordinator method + SQL; authority/providers/backup are MODEL.
+
+        Carries the retained150 native parent assertions to all14 canonical
+        boundaries. This is not full protected or real-provider acceptance.
+        """
+        dsn=self.fault_dsn();user=uuid4();bucket='canonical-'+uuid4().hex;obj=uuid4()
+        def preserved(db):
+            return [db.execute(query,parameters).fetchone()[0] for query,parameters in (
+                ('select to_jsonb(t) from auth.users t where id=%s',(user,)),
+                ('select to_jsonb(t) from storage.buckets t where id=%s',(bucket,)),
+                ('select to_jsonb(t) from storage.objects t where id=%s',(obj,)),
+                ('select to_jsonb(t) from public.synthetic_canonical_preserved t where id=1',()))]
+        with connect(dsn) as db:
+            db.execute("insert into auth.users(id,email) values(%s,'synthetic-canonical@example.invalid')",(user,))
+            db.execute('insert into storage.buckets(id,name) values(%s,%s)',(bucket,bucket))
+            db.execute("insert into storage.objects(id,bucket_id,name) values(%s,%s,'original-private-object')",(obj,bucket))
+            db.execute('create table public.synthetic_canonical_preserved(id integer primary key,payload jsonb)')
+            db.execute("insert into public.synthetic_canonical_preserved values(1,'{\"retained\":true}')")
+            original=preserved(db)
+        executor=self.executor(dsn)
+        sys.path.insert(0,str(Path(__file__).parent))
+        from test_completed_normal_maintenance_execution import maintenance_fixture
+        from deployment.lib.completed_normal_profile import RECONCILED
+        fixture=maintenance_fixture(self,RECONCILED,system_identifier=self.identifier)
+        fixture.failure='private_acceptance'
+        def migrate(*,provider_adapter):
+            self.assertIs(provider_adapter,fixture.provider)
+            self.assertEqual(provider_adapter.binding['system_identifier'],self.identifier)
+            for step in ('provider_fence','backup_pre-migration','seal_stage'):self.assertIn(step,fixture.calls)
+            self.assertNotIn('grant_160',fixture.calls)
+            result=executor.run()
+            with connect(dsn) as db:
+                fixture.schema=db.execute("select schema_version from application_schema_state where contract_key='core'").fetchone()[0]
+            self.assertEqual(fixture.schema,160)
+            return result
+        fixture.driver.migrate=migrate
+        with self.assertRaisesRegex(RuntimeError,'PRIVATE VALUE MUST NOT APPEAR'):fixture.driver._execute()
+        self.assertIn('private_acceptance',fixture.calls)
+        self.assertNotIn('grant_160',fixture.calls);self.assertNotIn('service_activate',fixture.calls)
+        self.assertFalse((fixture.root/'normal-completion.json').exists());self.assertEqual(fixture.mode,'READ_ONLY')
+        with connect(dsn) as db:
+            self.assertEqual(preserved(db),original)
+            self.assertEqual(db.execute('select public.notification_delivery_protocol(),public.notification_outbox_protocol(),public.data_deletion_ownership_protocol()').fetchone(),(2,2,2))
+            self.assertIsNotNone(db.execute("select to_regclass('public.data_datasets')").fetchone()[0])
+        receipt=json.loads((self.root/'execution.json').read_bytes())
+        self.assertEqual(receipt['status'],'completed');self.assertEqual(receipt['observed_schema'],160)
+        self.assertEqual([r['number'] for r in receipt['migrations']],list(range(147,161)))
+        self.assertEqual(self.boundaries,[(n-1,n) for n in range(147,161)])
 
     def test_99_complete_canonical_chain_observes_all_fourteen_boundaries(self):
         executor=self.executor(DSN)
