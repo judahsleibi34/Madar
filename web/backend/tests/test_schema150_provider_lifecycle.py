@@ -196,6 +196,21 @@ class Provider150LifecycleTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError,'boot_completion_invalid'):
             restarted.activate_after_grant(clear_boot=1)
 
+    def test_worker_only_checkpoint_does_not_restore_ingress_or_replay_worker_effect(self):
+        driver,actor,journal=self.private_ready();actor.observe_existing_grant()
+        result=driver.activate_after_grant(clear_boot=False,workers_only=True)
+        self.assertFalse(result['provider_lifecycle_complete'])
+        self.assertIn('resume_accepted_workers',actor.effects)
+        self.assertNotIn('restore_ingress',actor.effects);self.assertNotIn('clear_boot_interlock',actor.effects)
+        restarted=lifecycle.ProviderMaintenance150(binding(),journal,actor)
+        restarted.activate_after_grant(clear_boot=False)
+        self.assertEqual(actor.calls.count(('effect','resume_accepted_workers')),1)
+        self.assertIn('restore_ingress',actor.effects);self.assertNotIn('clear_boot_interlock',actor.effects)
+        with self.assertRaisesRegex(RuntimeError,'activation_sequence'):
+            restarted.activate_after_grant(clear_boot=False,workers_only=True)
+        with self.assertRaisesRegex(RuntimeError,'boot_completion_invalid'):
+            restarted.activate_after_grant(workers_only=True)
+
     def test_private_boundary_rejects_unknown_sessions_prepared_transactions_and_public_open(self):
         for key in ('unknown_writers', 'unknown_client_sessions', 'prepared_transactions',
                     'ingress_fenced', 'workers_fenced', 'boot_interlock_armed', 'candidate_read_only'):

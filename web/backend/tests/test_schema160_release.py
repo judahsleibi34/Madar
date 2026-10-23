@@ -107,6 +107,64 @@ class Schema160ReleaseTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError,'path_invalid'):release.captured_source(self.root)
         self.assertEqual(snapshots[160],(self.root/'renamed'/Path(raw['migrations'][-1]['path']).name).read_bytes())
 
+    def test_existing_issuer_projection_binds_private_prefix_without_exposing_role_archive(self):
+        from deployment.lib import completed_normal_admission as admission
+        from deployment.lib import schema149_provider_lifecycle as journal_module
+        from deployment.lib.completed_normal_profile import expected_origin_grant
+        contract=reconciled_contract();root=self.root/admission.digest(contract)
+        (root/'write-authority').mkdir(parents=True);(root/'provider-journal').mkdir(mode=0o700)
+        original=self.root/'original';(original/'write-authority').mkdir(parents=True)
+        old=Path(contract['source_roles']['completion_root'])
+        def protected(path,**kw):
+            path=Path(path)
+            return original/path.relative_to(old) if path.is_relative_to(old) else path
+        grant={'version':3,'schema':160,'release_sha':contract['candidate']['source_sha'],
+            'contract_digest':admission.digest(contract),'mode':'NORMAL','compatible_min':146,'compatible_max':160,
+            'operation':RECONCILED.operation,'origin_schema':146,'controller_sha':contract['candidate']['controller_sha'],
+            'migration_manifest_sha256':contract['migration_manifest_sha256']}
+        stage={'preparation_mode':'created-fenced','context_sha256':admission.digest(contract),
+            'source_sha':contract['candidate']['source_sha'],'images':contract['candidate']['images']}
+        (root/'write-authority/authority.json').write_bytes(admission.encoded(grant))
+        (root/'candidate-staged-runtime.json').write_bytes(admission.encoded(stage))
+        binding={'operation':RECONCILED.operation,'context_sha256':admission.digest(contract),
+            'source_sha':contract['candidate']['source_sha'],'controller_sha':contract['candidate']['controller_sha'],
+            'inventory_sha256':contract['writer_inventory_sha256'],'system_identifier':contract['database']['system_identifier'],
+            'source_schema':146,'target_schema':160}
+        with patch.object(admission,'profile',return_value=RECONCILED),\
+                patch('deployment.lib.completed_normal_profile.profile',return_value=RECONCILED),\
+                patch.object(admission.os,'geteuid',return_value=0),\
+                patch('deployment.lib.provider_recovery_runtime.protected',side_effect=protected),\
+                patch.object(journal_module,'protected',side_effect=protected),\
+                patch.object(journal_module,'require_root_directory'):
+            (original/'write-authority/authority.json').write_bytes(admission.encoded(expected_origin_grant(contract,'READ_ONLY')))
+            journal=lifecycle.ProtectedProviderJournal(root/'provider-journal')
+            journal.append('prepared',{'binding':binding,'preimage':{'roles':'SYNTHETIC_ROLE_ARCHIVE_DO_NOT_PROJECT'}})
+            for step in lifecycle.FENCE_STEPS+lifecycle.PRIVATE_STEPS:
+                journal.append('effect_intent',{'step':step});journal.append('effect_complete',{'step':step})
+            journal.append('private_ready',{'binding_sha256':lifecycle.digest(binding)})
+            receipt={'operation':RECONCILED.operation,'context_sha256':admission.digest(contract),'schema':160,'mode':'NORMAL',
+                'candidate_stage_sha256':admission.digest(stage),'provider_journal_sha256':admission.digest(journal.read()),
+                'write_authority_sha256':admission.digest(grant),'workers_started':False,'ingress_restored':False}
+            (root/'maintenance-write-handoff.json').write_bytes(admission.encoded(receipt))
+            projection=admission.require_maintenance_handoff(contract,admissions=self.root)
+            self.assertNotIn('SYNTHETIC_ROLE_ARCHIVE',json.dumps(projection))
+            self.assertEqual(projection['handoff'],receipt)
+            # Child receives only the existing authenticated credential witness.
+            def witness(name,key):
+                return {'candidate_authority':grant,'candidate_stage':stage,'maintenance_handoff':projection}[name]
+            with patch.object(admission.os,'geteuid',return_value=1000),\
+                    patch.object(admission,'require_fresh_authorization'),\
+                    patch.object(admission,'credential_witness',side_effect=witness),\
+                    patch('deployment.lib.provider_recovery_runtime.protected',side_effect=AssertionError('child read root-private files')):
+                self.assertEqual(admission.require_maintenance_handoff(contract),projection)
+            (root/'candidate-staged-runtime.json').write_bytes(admission.encoded(dict(stage,source_sha='0'*40)))
+            with self.assertRaisesRegex(RuntimeError,'handoff_changed'):admission.require_maintenance_handoff(contract,admissions=self.root)
+            (root/'candidate-staged-runtime.json').write_bytes(admission.encoded(stage))
+            journal.append('effect_intent',{'step':'resume_accepted_workers'})
+            with self.assertRaisesRegex(RuntimeError,'private_acceptance_required'):admission.require_maintenance_handoff(contract,admissions=self.root)
+            journal.append('effect_complete',{'step':'resume_accepted_workers'})
+            self.assertEqual(admission.require_maintenance_handoff(contract,admissions=self.root),projection)
+
     def test_preparation_rejects_old_manifest_and_numeric_or_operation_widening(self):
         for field,value in (('version',7),('operation',DELETION.operation),
                             ('migration_manifest_sha256',historical.MANIFEST_SHA256)):

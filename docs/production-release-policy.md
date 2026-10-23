@@ -18,9 +18,23 @@ compensates without restoring customer data. Reentry cannot reuse that boundary;
 maintenance continuation still requires a separately reviewed recovery contract.
 Component tests exercise actual root-grant/preimage/journal writes with explicit
 modeled provider observations. They are not a privileged application rehearsal.
-Schema160 admission remains closed: concrete entrypoint guards, private provider
-connectivity/parser preparation, worker ownership/start, final runtime sealing,
-NORMAL adoption and full privileged routing/recovery acceptance are unfinished.
+Schema160 admission remains closed: concrete entrypoint guards, original
+inventory publication, private provider connectivity/parser preparation,
+independent recovery and full privileged application acceptance are unfinished.
+
+The existing root issuer now projects the authenticated private handoff and
+original READ_ONLY grant without exposing the journal's original role archive.
+Its schema160 prepare/activate/adopt children receive no PostgreSQL superuser
+lease; SQL remains parent-owned. The child records a durable ownership-transfer
+intent before writing NONE/CANDIDATE and starts no workers. A lost transfer reply
+leaves a pending record that refuses blind replay. The adapter requires that
+positive owner before starting accepted consumers. The parent then seals the
+same candidate IDs in NORMAL mode, observes sustained full-running health,
+publishes the existing NORMAL runtime receipts, restores target ingress and
+adopts the accepted NORMAL release. Historical profiles retain READ_ONLY bridge
+behavior; the obsolete architecture150 branch explicitly refuses execution.
+These connections have component/regression evidence, not a completed real
+privileged upgrade or authorization to register the schema160 operation.
 
 The adapter's existing `restore_ingress` effect now stages the fixed maintenance
 route before restarting the proxy. It preflights and publishes only the exact

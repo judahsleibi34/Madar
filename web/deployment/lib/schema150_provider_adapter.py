@@ -854,7 +854,13 @@ class Schema150ProviderAdapter:
         # Existing accepted authority is verified, not created/replayed here.
         evidence=self.activation_guard(binding,private=False)
         if evidence.get('target_write_authority') is not True:raise RuntimeError('schema150_provider_target_authority_required')
-        self.verify_candidate_stage()
+        stage=self.verify_candidate_stage(phase='active-boundary')
+        from deployment.lib.runtime_authority import load_worker_authority
+        owner=load_worker_authority(LOCKS[1].parent)
+        if (owner is None or owner['owner']!='CANDIDATE' or owner['generation']!=stage['worker_generation']
+                or owner['old']!={'sha':self.contract['source_roles']['application_sha'],'slot':self.contract['origin']['slot']}
+                or owner['candidate']!={'sha':self.binding['source_sha'],'slot':self.contract['candidate']['slot']}):
+            raise RuntimeError('schema150_provider_accepted_worker_owner_required')
         from deployment.lib.schema150_actor_inventory import WORKER_ROLES
         for logical,record in self.inventory['containers'].items():
             if logical.startswith('candidate:') and logical.split(':',1)[1] in WORKER_ROLES:

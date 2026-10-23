@@ -208,32 +208,45 @@ def validate_model(contract,model,runtime, *, phase='running'):
     return bindings,network_ids
 
 
-def converge_running_model(contract,model_loader,runtime,source_guard,*,admissions=ADMISSIONS):
+def converge_running_model(contract,model_loader,runtime,source_guard,*,admissions=ADMISSIONS,mode='READ_ONLY'):
     """One bounded deadline; unchanged starting health alone may converge."""
     with verification_window(runtime,180):
         while True:
             runtime.budget(1)
             source_guard();require_fresh_authorization(contract)
             from deployment.lib.completed_normal_admission import require_candidate_authority
-            require_candidate_authority(contract,mode='READ_ONLY',admissions=admissions)
+            require_candidate_authority(contract,mode=mode,admissions=admissions)
             try:return validate_model(contract,model_loader(),runtime)
             except AvailabilityFailure:time.sleep(runtime.budget(1))
 
-def seal_candidate_runtime(contract, *, source_guard,model_loader,runtime,state_root,admissions=ADMISSIONS):
+def seal_candidate_runtime(contract, *, source_guard,model_loader,runtime,state_root,admissions=ADMISSIONS,mode='READ_ONLY'):
     """The model loader must render frozen source against measured private env.
 
     The final frozen coordinator, not a child-written summary, supplies it.
-    All candidate workers must already be running READ_ONLY under one owner.
+    Historical workers run READ_ONLY. Exact160 maintenance seals only after its
+    independently witnessed private NORMAL handoff and consumer-owner transfer.
     """
     if os.geteuid()!=0:raise RuntimeError('completed_runtime_root_required')
     if not callable(source_guard) or not callable(model_loader):raise RuntimeError('completed_runtime_independent_guards_required')
-    from deployment.lib.completed_normal_admission import require_candidate_authority
+    from deployment.lib.completed_normal_admission import require_candidate_authority,require_maintenance_handoff
+    from deployment.lib.completed_normal_profile import RECONCILED
+    if mode not in {'READ_ONLY','NORMAL'} or mode=='NORMAL' and profile(contract) is not RECONCILED:
+        raise RuntimeError('completed_runtime_sealing_mode_invalid')
+    if mode=='NORMAL':require_maintenance_handoff(contract,admissions=admissions)
     source_guard();require_fresh_authorization(contract)
-    require_candidate_authority(contract,mode='READ_ONLY',admissions=admissions)
+    require_candidate_authority(contract,mode=mode,admissions=admissions)
     root=Path(admissions)/digest(contract)
     with runtime_mutation_lock(Path(state_root)):
         source_guard();require_fresh_authorization(contract)
-        runtimes,networks=converge_running_model(contract,model_loader,runtime,source_guard,admissions=admissions)
+        runtimes,networks=converge_running_model(contract,model_loader,runtime,source_guard,admissions=admissions,mode=mode)
+        if mode=='NORMAL':
+            # A fresh container with identical image/configuration is still not
+            # the candidate whose original application was privately accepted.
+            stage=json.loads(protected(root/'candidate-staged-runtime.json',private=True).read_bytes())
+            if any(runtimes[k]['id']!=stage['runtimes'][k]['id'] or runtimes[k]['image']!=stage['runtimes'][k]['image']
+                    or runtimes[k]['networks']!=stage['runtimes'][k]['networks']
+                    or runtimes[k]['network_aliases']!=stage['runtimes'][k]['network_aliases'] for k in ROLES):
+                raise RuntimeError('completed_runtime_private_candidate_substituted')
         owner=load_worker_authority(Path(state_root))
         legacy=profile(contract) is LEGACY
         original=json.loads(protected(Path(contract['source_roles']['completion_root'])/
@@ -244,7 +257,7 @@ def seal_candidate_runtime(contract, *, source_guard,model_loader,runtime,state_
             'images':contract['candidate']['images'],'runtimes':runtimes,'networks':networks,
             'worker_generation':owner['generation'] if owner else '', 'origin_workers':origin_workers}
         verify_runtime_binding(contract,publication,runtime,Path(state_root))
-        require_candidate_authority(contract,mode='READ_ONLY',admissions=admissions)
+        require_candidate_authority(contract,mode=mode,admissions=admissions)
         source_guard()
         exclusive(root/'candidate-runtime.json',encoded(publication))
     return publication

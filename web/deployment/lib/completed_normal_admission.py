@@ -322,6 +322,61 @@ def require_candidate_authority(contract: dict, *, mode: str | None = None, admi
     return value
 
 
+def require_maintenance_handoff(contract, *, admissions=ADMISSIONS):
+    """Existing issuer projection: private acceptance without role secrets.
+
+    Root observes protected files and the complete validated journal. The
+    service child can consume only the fresh credential's nonsecret projection;
+    it cannot read original role archives or substitute a local PASS packet.
+    """
+    from deployment.lib.provider_recovery_runtime import protected
+    from deployment.lib.completed_normal_profile import expected_origin_grant
+    validate_contract(contract)
+    if profile(contract) is not RECONCILED:
+        raise RuntimeError('completed_normal_maintenance_handoff_profile_invalid')
+    grant=require_candidate_authority(contract,mode='NORMAL',admissions=admissions)
+    expected_origin=expected_origin_grant(contract,'READ_ONLY')
+    if os.geteuid()==0:
+        root=Path(admissions)/digest(contract)
+        record=json.loads(protected(root/'maintenance-write-handoff.json',private=True).read_bytes())
+        stage=json.loads(protected(root/'candidate-staged-runtime.json',private=True).read_bytes())
+        origin=json.loads(protected(Path(contract['source_roles']['completion_root'])/'write-authority/authority.json').read_bytes())
+        if origin!=expected_origin:
+            raise RuntimeError('completed_normal_maintenance_origin_not_fenced')
+        from deployment.lib.schema150_provider_lifecycle import ProviderMaintenance150,ProtectedProviderJournal
+        binding={'operation':RECONCILED.operation,'context_sha256':digest(contract),
+            'source_sha':contract['candidate']['source_sha'],'controller_sha':contract['candidate']['controller_sha'],
+            'inventory_sha256':contract['writer_inventory_sha256'],'system_identifier':contract['database']['system_identifier'],
+            'source_schema':146,'target_schema':160}
+        rows,_,pending,ready=ProviderMaintenance150(binding,ProtectedProviderJournal(root/'provider-journal'),None)._state()
+        if pending or not ready:
+            raise RuntimeError('completed_normal_maintenance_private_acceptance_required')
+        boundary=next(i for i,row in enumerate(rows) if row['event']=='private_ready')+1
+        if not isinstance(record,dict) or record.get('provider_journal_sha256')!=digest(rows[:boundary]):
+            raise RuntimeError('completed_normal_maintenance_private_journal_changed')
+        value={'handoff':record,'origin_authority_sha256':digest(origin)}
+    else:
+        require_fresh_authorization(contract)
+        value=credential_witness('maintenance_handoff','maintenance_handoff_sha256')
+        stage=credential_witness('candidate_stage','candidate_stage_sha256')
+        record=value.get('handoff') if isinstance(value,dict) else None
+    if (not isinstance(value,dict) or set(value)!={'handoff','origin_authority_sha256'}
+            or value['origin_authority_sha256']!=digest(expected_origin)
+            or not isinstance(record,dict) or set(record)!={'operation','context_sha256','schema','mode',
+                'candidate_stage_sha256','provider_journal_sha256','write_authority_sha256','workers_started','ingress_restored'}
+            or record['operation']!=RECONCILED.operation or record['context_sha256']!=digest(contract)
+            or type(record['schema']) is not int or record['schema']!=160 or record['mode']!='NORMAL'
+            or record['workers_started'] is not False or record['ingress_restored'] is not False
+            or not isinstance(stage,dict) or stage.get('preparation_mode')!='created-fenced'
+            or stage.get('context_sha256')!=digest(contract) or stage.get('source_sha')!=contract['candidate']['source_sha']
+            or stage.get('images')!=contract['candidate']['images']
+            or record['candidate_stage_sha256']!=digest(stage) or record['write_authority_sha256']!=digest(grant)
+            or not isinstance(record['provider_journal_sha256'],str)
+            or not re.fullmatch('[0-9a-f]{64}',record['provider_journal_sha256'])):
+        raise RuntimeError('completed_normal_maintenance_handoff_changed')
+    return value
+
+
 def publish_admission(contract: dict, operations, state_root: Path, *, admissions: Path = ADMISSIONS) -> Path:
     """Root effect for a *freshly* authorized driver, before controller changes.
 

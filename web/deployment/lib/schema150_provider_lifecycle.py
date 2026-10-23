@@ -276,9 +276,10 @@ class ProviderMaintenance150:
             return {'schema': self.binding['target_schema'], 'private_provider_acceptance_complete': True,
                     'production_authorization_issued': False}
 
-    def activate_after_grant(self,*,clear_boot=True):
+    def activate_after_grant(self,*,clear_boot=True,workers_only=False):
         """Observe existing protected target authority; never issue or replay it."""
-        if type(clear_boot) is not bool:raise RuntimeError('schema150_provider_boot_completion_invalid')
+        if (type(clear_boot) is not bool or type(workers_only) is not bool or workers_only and clear_boot):
+            raise RuntimeError('schema150_provider_boot_completion_invalid')
         with self._locked():
             self._guard('activate_after_grant')
             _, completed, pending, ready = self._state()
@@ -289,7 +290,8 @@ class ProviderMaintenance150:
             if completed == list(STEPS):
                 raise RuntimeError('schema150_provider_activation_already_completed')
             self._activation_evidence(granted=True)
-            sequence=STEPS if clear_boot else STEPS[:-1]
+            sequence=STEPS[:len(FENCE_STEPS+PRIVATE_STEPS)+1] if workers_only else STEPS if clear_boot else STEPS[:-1]
+            if len(completed)>len(sequence):raise RuntimeError('schema150_provider_activation_sequence')
             for step in sequence[len(completed):]: self._effect(step)
             return {'schema': self.binding['target_schema'], 'provider_lifecycle_complete': clear_boot,
                     'production_authorization_issued': False, 'customer_database_restored': False}

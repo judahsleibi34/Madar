@@ -157,6 +157,42 @@ class CompletedNormalWriteHandoff:
         atomic_public_authority(self.root/'write-authority/authority.json',dict(value,mode='READ_ONLY'))
         require_candidate_authority(self.contract,mode='READ_ONLY',admissions=self.admissions)
 
+    def seal_maintenance_runtime(self):
+        """Publish full-running acceptance after private grant and worker start.
+
+        This does not reissue authority. A failed full-running observation
+        revokes the earlier private grant and retains the maintenance fence.
+        """
+        if self.profile is not RECONCILED or self.provider_adapter is None:
+            raise RuntimeError('completed_normal_maintenance_runtime_profile_invalid')
+        from deployment.lib.completed_normal_admission import require_maintenance_handoff
+        try:
+            self.authorization(schema=self.profile.target)
+            require_maintenance_handoff(self.contract,admissions=self.admissions)
+            with runtime_mutation_lock(self.state_root):
+                require_candidate_authority(self.contract,mode='NORMAL',admissions=self.admissions)
+                with verification_window(self.kernel.runtime,180):
+                    first=None;successes=0
+                    while True:
+                        self.kernel.runtime.budget(1)
+                        try:self.kernel.round(normal=True)
+                        except AvailabilityFailure:first=None;successes=0
+                        else:
+                            successes+=1
+                            if first is None:first=time.monotonic()
+                            if successes>=3 and time.monotonic()-first>=5:break
+                        time.sleep(self.kernel.runtime.budget(1))
+                self.authorization(schema=self.profile.target)
+                actual=protected(self.root/'candidate-runtime.json',private=True).read_bytes()
+                exclusive(self.root/'normal-publication.json',actual)
+                exclusive(self.root/'target-normal-publication.json',encoded({
+                    'operation':self.profile.operation,'context_sha256':digest(self.contract),
+                    'schema':self.profile.target,'mode':'NORMAL','database_restored':False}))
+        except Exception:
+            try:self.revoke()
+            finally:self.kernel.compensate_current_data()
+            raise
+
     def grant(self, *, schema=None, fresh_attempt_root=None):
         if schema is None:schema=self.profile.source
         if self.profile is not LEGACY and schema!=self.profile.target:

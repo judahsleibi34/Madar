@@ -64,6 +64,7 @@ class ExecutionTests(unittest.TestCase):
         test=self
         class Handoff:
             def __init__(self,*a,**kw):pass
+            def seal_maintenance_runtime(self):effect('seal_normal_runtime')
             def fence_origin(self):test.origin='READ_ONLY';effect('fence_origin')
             def revoke(self):test.mode='READ_ONLY';effect('revoke')
             def grant(self,*,schema):

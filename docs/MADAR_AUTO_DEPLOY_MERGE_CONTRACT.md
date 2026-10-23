@@ -1,5 +1,13 @@
 # Madar Auto-Deploy Merge Contract
 
+Canonical160 child ownership transfer is now explicitly separated from worker
+startup. The existing issuer projects protected private acceptance without role
+archives or a child PostgreSQL superuser lease. Pending transfer refuses replay;
+the parent verifies the accepted owner before consumers, seals the same runtime
+in NORMAL, then restores target routing and adopts NORMAL. Historical bridges
+retain their READ_ONLY behavior. These component-tested connections leave160
+registration, actual preserved-application acceptance and Class D dispatch closed.
+
 Maintenance handoff now uses the existing concrete provider adapter's private
 observation instead of the historical running-worker kernel. It binds protected
 private acceptance and actual nonconsuming runtime probes before/after target

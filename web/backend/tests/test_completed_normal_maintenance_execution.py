@@ -19,7 +19,7 @@ from test_schema150_admission import deletion_contract
 from test_schema150_actor_inventory import fixture,repin
 
 
-def maintenance_fixture(test, selected=DELETION):
+def maintenance_fixture(test, selected=RECONCILED):
     f=historical.ExecutionTests();f.setUp();test.addCleanup(f.doCleanups)
     f.source_schema=146;f.target_schema=selected.target;f.schema=146
     f.contract=deletion_contract()
@@ -71,10 +71,10 @@ def maintenance_fixture(test, selected=DELETION):
         def prepare_private_activation(self):
             if f.schema!=selected.target or f.mode!='READ_ONLY':raise AssertionError('private boundary')
             f.effect('private_acceptance')
-        def activate_after_grant(self,*,clear_boot=True):
+        def activate_after_grant(self,*,clear_boot=True,workers_only=False):
             if f.schema!=selected.target or f.mode!='NORMAL':raise AssertionError('premature activation')
             if clear_boot and not (f.root/'normal-acceptance.json').exists():raise AssertionError('premature boot')
-            f.effect('clear_provider_boot' if clear_boot else 'workers_proxy_activate')
+            f.effect('clear_provider_boot' if clear_boot else 'accepted_workers_start' if workers_only else 'workers_proxy_activate')
     def migrate(*,provider_adapter):
         if provider_adapter is not f.provider:raise AssertionError('different provider')
         if provider_adapter.lock_descriptors!=(f.driver.lock,f.ops.deploy_lock_descriptor):raise AssertionError('stale descriptors')
@@ -108,10 +108,11 @@ class MaintenanceExecutionTests(unittest.TestCase):
     def test_order_is_maintenance_backup_creation_sql_private_handoff_workers_proxy_boot(self):
         f=maintenance_fixture(self)
         result=f.driver._execute()
-        self.assertEqual(result['schema'],150)
+        self.assertEqual(result['schema'],160)
         sequence=['provider_preimage','fence_origin','provider_fence','backup_pre-migration','service_prepare',
-            'seal_stage','candidate_reobserved','parent_sql','committed_147','committed_148','committed_149',
-            'committed_150','customer_preservation','private_acceptance','grant_150','service_activate',
+            'seal_stage','candidate_reobserved','parent_sql',*('committed_'+str(n) for n in range(147,161)),
+            'customer_preservation','private_acceptance','grant_160','service_activate',
+            'accepted_workers_start','seal_runtime','seal_normal_runtime',
             'workers_proxy_activate','service_adopt','backup_post-migration','clear_provider_boot','restore_timers','clear_interlock']
         indices=[f.calls.index(item) for item in sequence]
         self.assertEqual(indices,sorted(indices))
@@ -127,6 +128,7 @@ class MaintenanceExecutionTests(unittest.TestCase):
             'seal_stage','candidate_reobserved','parent_sql',
             *('committed_'+str(n) for n in range(147,161)),
             'customer_preservation','private_acceptance','grant_160','service_activate',
+            'accepted_workers_start','seal_runtime','seal_normal_runtime',
             'workers_proxy_activate','service_adopt','backup_post-migration','clear_provider_boot','clear_interlock']
         self.assertEqual([f.calls.index(s) for s in sequence],sorted(f.calls.index(s) for s in sequence))
         self.assertNotIn('grant_150',f.calls)
@@ -137,8 +139,9 @@ class MaintenanceExecutionTests(unittest.TestCase):
     def test_each_irreversible_failure_preserves_fence_and_never_runs_later_effects(self):
         for fault,forbidden in [('provider_fence','parent_sql'),('backup_pre-migration','service_prepare'),
                 ('seal_stage','parent_sql'),('committed_147','private_acceptance'),
-                ('committed_150','grant_150'),('private_acceptance','grant_150'),
+                ('committed_160','grant_160'),('private_acceptance','grant_160'),
                 ('service_activate','workers_proxy_activate'),('workers_proxy_activate','clear_provider_boot'),
+                ('accepted_workers_start','seal_normal_runtime'),('seal_normal_runtime','workers_proxy_activate'),
                 ('clear_provider_boot','restore_timers')]:
             with self.subTest(fault=fault):
                 nested=unittest.TestCase();f=maintenance_fixture(nested)
@@ -159,3 +162,8 @@ class MaintenanceExecutionTests(unittest.TestCase):
     def test_guarded_profile_is_still_unregistered_even_with_private_callbacks(self):
         from deployment.lib.completed_normal_profile import profile
         with self.assertRaisesRegex(RuntimeError,'operation_profile_invalid'):profile(deletion_contract())
+
+    def test_obsolete_architecture150_cannot_use_the_reconciled_activation_path(self):
+        f=maintenance_fixture(self,DELETION)
+        with self.assertRaisesRegex(RuntimeError,'superseded_release_contract_not_executable'):f.driver._execute()
+        self.assertEqual(f.calls,[])

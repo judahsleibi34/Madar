@@ -52,6 +52,7 @@ class RuntimeModelTests(unittest.TestCase):
             self.rows[name]=row
         fixture=self
         class Runtime:
+            def budget(_,maximum):return maximum
             def inspect(_,names):return {name:fixture.rows[name] for name in names if name in fixture.rows}
             def command(_,args):
                 if args[:3]==['docker','image','inspect']:return json.dumps([fixture.images[args[3]]])
@@ -293,6 +294,48 @@ class RuntimeModelTests(unittest.TestCase):
                     state_root=directory,admissions=Path(directory))
             self.assertEqual(list(Path(directory).iterdir()),[])
             lock.assert_not_called()
+
+    def test_exact160_normal_seal_requires_handoff_and_retains_accepted_container_ids(self):
+        """Actual model comparison/publication; authority and ownership modeled."""
+        from test_schema160_release import reconciled_contract
+        from deployment.lib.completed_normal_profile import RECONCILED
+        from deployment.lib import completed_normal_admission as admission
+        self.use_manual_contract(reconciled_contract(),preparation150=True)
+        with tempfile.TemporaryDirectory() as directory,ExitStack() as stack:
+            root=Path(directory);context=root/digest(self.contract);context.mkdir()
+            original=root/'original.json';original.write_text(json.dumps({'runtimes':{k:{'id':str(i)*64}
+                for i,k in enumerate(m.BUSINESS,1)}}))
+            stack.enter_context(patch.object(m,'profile',return_value=RECONCILED))
+            stack.enter_context(patch.object(admission,'profile',return_value=RECONCILED))
+            stack.enter_context(patch('deployment.lib.completed_normal_profile.profile',return_value=RECONCILED))
+            stack.enter_context(patch.object(m.os,'geteuid',return_value=0))
+            stack.enter_context(patch.object(m,'require_fresh_authorization'))
+            grant=stack.enter_context(patch.object(admission,'require_candidate_authority',return_value={'mode':'NORMAL'}))
+            witness=stack.enter_context(patch.object(admission,'require_maintenance_handoff'))
+            stack.enter_context(patch.object(m,'protected',side_effect=lambda p,**kw:
+                original if Path(p).name=='candidate-runtime.json' and Path(p).parent!=context else Path(p)))
+            stack.enter_context(patch.object(m,'load_worker_authority',return_value={'generation':'a'*64}))
+            owner=stack.enter_context(patch.object(m,'verify_runtime_binding'))
+            runtimes,networks=m.validate_model(self.contract,self.model,self.runtime)
+            stage=context/'candidate-staged-runtime.json';stage.write_text(json.dumps({'runtimes':runtimes}))
+            row=self.rows[self.selected['containers']['backend']];saved=row['Id'];row['Id']='f'*64
+            with self.assertRaisesRegex(RuntimeError,'private_candidate_substituted'):
+                m.seal_candidate_runtime(self.contract,source_guard=lambda:None,model_loader=lambda:self.model,
+                    runtime=self.runtime,state_root=root,admissions=root,mode='NORMAL')
+            owner.assert_not_called();self.assertFalse((context/'candidate-runtime.json').exists())
+            row['Id']=saved
+            result=m.seal_candidate_runtime(self.contract,source_guard=lambda:None,model_loader=lambda:self.model,
+                runtime=self.runtime,state_root=root,admissions=root,mode='NORMAL')
+            self.assertEqual(result['runtimes'],runtimes);self.assertEqual(result['networks'],networks)
+            self.assertEqual(json.loads((context/'candidate-runtime.json').read_bytes()),result)
+            witness.assert_called_with(self.contract,admissions=root)
+            self.assertTrue(all(c.kwargs.get('mode')=='NORMAL' for c in grant.call_args_list))
+
+    def test_historical_profile_cannot_opt_into_maintenance_normal_sealing(self):
+        with patch.object(m.os,'geteuid',return_value=0):
+            with self.assertRaisesRegex(RuntimeError,'sealing_mode_invalid'):
+                m.seal_candidate_runtime(self.contract,source_guard=lambda:None,model_loader=Mock(),runtime=Mock(),
+                    state_root=Path('/never-used'),mode='NORMAL')
 
     def test_fenced_candidate_rejects_any_running_restarting_or_ambiguous_role(self):
         self.fenced()

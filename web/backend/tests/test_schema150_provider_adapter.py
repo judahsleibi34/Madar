@@ -772,6 +772,12 @@ class ConcreteAdapterTests(unittest.TestCase):
         actor,scope,preimage,_=self.component(stage='private',candidates=True)
         actor.require_authority=Mock();actor.activation_guard.return_value={'target_write_authority':True}
         self.route_transport(actor)
+        stage=json.loads((actor.root/'candidate-staged-runtime.json').read_text())
+        actor.contract.update(source_roles={'application_sha':'a'*40},origin={'slot':'blue'})
+        owner={'owner':'CANDIDATE','generation':stage['worker_generation'],
+            'old':{'sha':'a'*40,'slot':'blue'},'candidate':{'sha':scope['source_sha'],'slot':'green'}}
+        patcher=patch('deployment.lib.runtime_authority.load_worker_authority',return_value=owner)
+        patcher.start();self.addCleanup(patcher.stop)
         by_id={r['Id']:r for r in actor._rows.return_value}
         def start(arguments):by_id[arguments[2]]['State']['Running']=True
         actor.runtime.command.side_effect=start
@@ -881,6 +887,13 @@ class ConcreteAdapterTests(unittest.TestCase):
         actor,scope,preimage,_=self.component(stage='private',candidates=True)
         actor.require_authority=Mock();actor.activation_guard.return_value={'target_write_authority':True}
         with self.assertRaisesRegex(RuntimeError,'candidate_activation_incomplete'):actor.restore_ingress(scope,preimage)
+        actor.runtime.command.assert_not_called()
+
+    def test_target_grant_without_the_childs_positive_owner_cannot_start_workers(self):
+        actor,scope,preimage,_=self.component(stage='private',candidates=True,target=160)
+        with patch('deployment.lib.runtime_authority.load_worker_authority',return_value=None):
+            with self.assertRaisesRegex(RuntimeError,'accepted_worker_owner_required'):
+                actor.resume_accepted_workers(scope,preimage)
         actor.runtime.command.assert_not_called()
 
     def test_provider_resume_refuses_published_ports_even_with_injected_original_roles(self):

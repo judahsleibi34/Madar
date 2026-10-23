@@ -258,6 +258,27 @@ class MaintenancePrivateWriteTests(unittest.TestCase):
             self.boundary.grant(schema=160,fresh_attempt_root=self.root/'continuations'/('a'*64))
         self.assertFalse((self.root/'write-boundary-160.json').exists())
 
+    def test_full_running_publication_is_separate_from_private_grant(self):
+        from unittest.mock import Mock
+        self.boundary.grant(schema=160)
+        actual=admission.encoded({'full_runtime':'explicit-model-only'})
+        (self.root/'candidate-runtime.json').write_bytes(actual)
+        self.kernel.round=Mock()
+        with patch.object(admission,'require_maintenance_handoff') as proof:
+            self.boundary.seal_maintenance_runtime()
+        proof.assert_called_once_with(self.contract,admissions=self.path)
+        self.assertTrue(all(c.kwargs=={'normal':True} for c in self.kernel.round.call_args_list))
+        self.assertEqual((self.root/'normal-publication.json').read_bytes(),actual)
+        self.assertTrue((self.root/'target-normal-publication.json').exists())
+        self.assertEqual(json.loads(self.grant_path.read_text())['mode'],'NORMAL')
+
+    def test_missing_handoff_witness_revokes_the_existing_private_grant(self):
+        self.boundary.grant(schema=160)
+        with patch.object(admission,'require_maintenance_handoff',side_effect=RuntimeError('missing_fresh_handoff')):
+            with self.assertRaisesRegex(RuntimeError,'missing_fresh_handoff'):self.boundary.seal_maintenance_runtime()
+        self.assertEqual(json.loads(self.grant_path.read_text())['mode'],'READ_ONLY')
+        self.assertFalse((self.root/'normal-publication.json').exists())
+
     def test_private_provider_is_mandatory_and_cannot_be_a_callback_packet(self):
         for provider in (None,{'approved':True},object()):
             with self.subTest(provider=type(provider).__name__),self.assertRaisesRegex(RuntimeError,'concrete_private_provider_required'):

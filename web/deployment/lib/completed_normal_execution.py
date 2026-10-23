@@ -700,6 +700,8 @@ class CompletedNormalUpgrade:
         from deployment.lib.schema150_provider_adapter import Schema150ProviderAdapter,private_json,require_owned_lock,LOCKS
         from deployment.lib.schema150_provider_lifecycle import ProviderMaintenance150,ProtectedProviderJournal
         from deployment.lib.schema150_actor_inventory import validate_inventory
+        if self.profile is DELETION:
+            raise RuntimeError('schema150_superseded_release_contract_not_executable')
         if (self.profile not in (DELETION, RECONCILED) or not callable(self.maintenance_acceptance_guard)
                 or not callable(self.maintenance_activation_guard)):
             raise RuntimeError('schema150_independent_private_verifiers_required')
@@ -790,8 +792,10 @@ class CompletedNormalUpgrade:
             for fd,path in zip((self.lock,self.ops.deploy_lock_descriptor),LOCKS):require_owned_lock(fd,path)
             provider.lock_descriptors=(self.lock,self.ops.deploy_lock_descriptor)
             with self.root_credential():
+                self.event('accepted_workers_pending');lifecycle.activate_after_grant(clear_boot=False,workers_only=True)
                 seal_candidate_runtime(self.contract,source_guard=self.actor.guard,model_loader=self.model_loader,
-                    runtime=self.actor.runtime,state_root=self.ops.state_root)
+                    runtime=self.actor.runtime,state_root=self.ops.state_root,mode='NORMAL')
+                handoff.seal_maintenance_runtime()
                 self.event('accepted_workers_and_ingress_pending');lifecycle.activate_after_grant(clear_boot=False)
             self.ops.release_deployment_lock();self.service('adopt')
             self.ops.deploy_lock_descriptor=acquire_lock(self.ops.state_root/'deploy.lock',create=False)
