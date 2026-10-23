@@ -1,4 +1,4 @@
-name: Full Provider Staging
+name: Fresh Application Staging
 
 on:
   pull_request: {}
@@ -29,6 +29,24 @@ jobs:
           persist-credentials: false
       - name: Install locked PostgreSQL parser
         run: python3 -m pip install --require-hashes -r web/backend/requirements-migration-tools.txt
+      - name: Verify ordinary Class D admission still refuses before effects
+        run: |
+          PYTHONPATH=web/staging/integration:web python3 - <<'PYCODE'
+          import os
+          from pathlib import Path
+          import full_provider_staging as staging
+          source,base=os.environ['CI_SOURCE_SHA'],os.environ['CI_HISTORY_BASE_SHA']
+          _,plan=staging.source_plan(source,base)
+          if plan.document()['risk_class']=='D':
+              try:
+                  staging.main('REHEARSE',Path.home()/'unused-no-authority',source,base)
+              except RuntimeError as error:
+                  if str(error)!='full_staging_exceptional_sql_requires_separate_review': raise
+              else: raise RuntimeError('ordinary_class_d_admission_did_not_refuse')
+              print('Ordinary Class D dispatch REFUSED; protected upgrade NOT ACCEPTED')
+          else:
+              print('No Class D plan in this comparison; no protected upgrade accepted')
+          PYCODE
       - name: Select the native OCI image store on the owned disposable runner
         run: |
           test "$GITHUB_ACTIONS" = true
@@ -100,9 +118,9 @@ jobs:
           python3 web/scripts/fetch_full_provider_artifacts.py \
             --source-sha "$CI_SOURCE_SHA" \
             --directory "$HOME/madar-provider-artifacts-${CI_SOURCE_SHA:0:12}"
-      - name: Native full-provider acceptance without deployment authority
+      - name: Fresh synthetic application acceptance; protected Class D upgrade remains blocked
         run: |
-          timeout 15m python3 web/staging/integration/full_provider_staging.py REHEARSE \
+          timeout 15m python3 web/staging/integration/full_provider_staging.py FRESH_APPLICATION \
             --source-sha "$CI_SOURCE_SHA" --history-base-sha "$CI_HISTORY_BASE_SHA" \
             --artifacts "$HOME/madar-provider-artifacts-${CI_SOURCE_SHA:0:12}"
           cp "$HOME/madar-full-provider-${CI_SOURCE_SHA:0:12}/full-provider-acceptance.json" full-provider-acceptance.json

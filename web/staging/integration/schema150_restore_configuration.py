@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 import re
+import secrets
 import stat
 
 import manage
@@ -25,6 +26,12 @@ BOUNDS = {'postgres': (512, 1), 'redis': (128, .25), 'auth': (192, 1), 'rest': (
           'storage': (256, .5), 'gateway': (64, .25), 'backend': (1280, 1.5),
           'notification-worker': (256, .5), 'deletion-worker': (256, .5),
           'frontend': (64, .25), 'accepted-frontend': (128, .5)}
+
+
+APPLICATION_SERVICES = {'backend', 'notification-worker', 'deletion-worker', 'calendar-sync-worker'}
+
+def service_bounds(calendar=False):
+    return {**BOUNDS, **({'calendar-sync-worker': (256, .5)} if calendar else {})}
 
 
 @contextmanager
@@ -106,7 +113,7 @@ def live_credentials(rows):
     return {'DATABASE_PASSWORD': password, 'JWT_SECRET': jwt}
 
 
-def generate(runtime, source_sha, images, receipt, credentials, project, owner, *, target_schema=150, fresh_database=False):
+def generate(runtime, source_sha, images, receipt, credentials, project, owner, *, target_schema=150, fresh_database=False, calendar=False):
     """Regenerate from pinned source templates; origin YAML/env are never read."""
     trusted = templates()  # Capture and authenticate before any directory effect.
     if type(target_schema) is not int or not 1<=target_schema<10**9 or type(fresh_database) is not bool:
@@ -114,6 +121,8 @@ def generate(runtime, source_sha, images, receipt, credentials, project, owner, 
     if set(credentials) != {'DATABASE_PASSWORD', 'JWT_SECRET'} or any(
             not re.fullmatch('[0-9a-f]{64}', value) for value in credentials.values()):
         raise RuntimeError('restore150_live_credential_syntax_invalid')
+    if type(calendar) is not bool or calendar and (not fresh_database or target_schema != 160):
+        raise RuntimeError('fresh_calendar160_fixture_required')
     schema = manage.TARGET_SCHEMA
     try:
         manage.TARGET_SCHEMA = target_schema
@@ -140,6 +149,9 @@ def generate(runtime, source_sha, images, receipt, credentials, project, owner, 
                 'DATA_DELETION_WORKER_ENABLED': 'true', 'DATA_DELETION_WORKER_HEALTH_HOST': '0.0.0.0',
                 'DATA_DELETION_WORKER_POLL_SECONDS': '2', 'DATA_DELETION_WORKER_REQUIRED': 'true',
                 'DATA_DELETION_WORKER_HEALTH_URL': 'http://deletion-worker:8094/health'})
+    if calendar:
+        app.update({'CALENDAR_FEATURE_ENABLED': 'true', 'CALENDAR_SYNC_WORKER_ENABLED': 'true',
+            'CALENDAR_SYNC_REQUIRED': 'false', 'CALENDAR_CREDENTIALS_SECRET': secrets.token_hex(32)})
     manage.private_write('application.env', ''.join(key + '=' + value + '\n' for key, value in app.items()))
     manage.private_write('bootstrap.sql', bootstrap if fresh_database else '-- Independent restore: no inherited provider roles.\n', mounted=True)
     manage.private_write('trusted-gateway.conf', trusted['gateway.conf'], mounted=True)
@@ -177,25 +189,43 @@ http { access_log off; client_body_temp_path /tmp/client; proxy_temp_path /tmp/p
             'depends_on': {'backend': {'condition': 'service_healthy'}},
             'healthcheck': {'test': ['CMD', 'python', '-c', "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8094/health',timeout=2)"], 'interval': '3s', 'timeout': '3s', 'retries': 30}},
     }}
+    if calendar:
+        # Only the backend receives the SQL domain transport; consumers do not.
+        overlay['services']['backend'] = {'environment': {
+            'MADAR_CALENDAR_DATABASE_DSN': 'host=postgres dbname=madar_hardening user=authenticator password=' + credentials['DATABASE_PASSWORD'],
+            'MADAR_CALENDAR_DATABASE_SYSTEM_IDENTIFIER': '0'}}
+        for name in ('notification-worker', 'deletion-worker'):
+            overlay['services'].setdefault(name, {}).setdefault('environment', {}).update({
+                'MADAR_CALENDAR_DATABASE_DSN': '', 'MADAR_CALENDAR_DATABASE_SYSTEM_IDENTIFIER': ''})
+        overlay['services']['calendar-sync-worker'] = {**common, 'image': images['backend'], 'pull_policy': 'never',
+            'user': '65534:65534', 'command': ['python', '-m', 'workers.calendar_sync_worker'],
+            'env_file': [str(runtime / 'application.env')], 'mem_limit': '256m',
+            'tmpfs': ['/tmp:rw,nosuid,nodev,size=128m,mode=1777'],
+            'environment': {'MADAR_CALENDAR_DATABASE_DSN': '', 'MADAR_CALENDAR_DATABASE_SYSTEM_IDENTIFIER': '',
+                'CALENDAR_SYNC_WORKER_HEALTH_HOST': '0.0.0.0'},
+            'depends_on': {'backend': {'condition': 'service_healthy'}},
+            'healthcheck': {'test': ['CMD', 'python', '-c', "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8091/health',timeout=2)"],
+                'interval': '3s', 'timeout': '3s', 'retries': 30}}
     manage.private_write('acceptance-compose.json', json.dumps(overlay))
     rendered = manage.docker('compose', '--project-name', project, '--env-file', str(runtime / 'compose.env'),
         '--file', str(runtime / 'compose.yaml'), '--file', str(runtime / 'acceptance-compose.json'), 'config', '--format', 'json')
     plan = json.loads(rendered)
     plan.pop('x-service', None); plan.pop('x-application', None)
-    validate(plan, runtime, source_sha, images, project, owner, receipt['build_timestamp'],target_schema=target_schema)
+    validate(plan, runtime, source_sha, images, project, owner, receipt['build_timestamp'],target_schema=target_schema, calendar=calendar)
     body = json.dumps(plan, sort_keys=True).encode()
     manage.private_write('verified-compose.json', body.decode())
     manage.private_write('configuration-receipt.json', json.dumps({'source_sha': source_sha, 'images': images,
-        'sha256': hashlib.sha256(body).hexdigest(), 'template_sha256': TEMPLATES,
-        'build_timestamp': receipt['build_timestamp'],'target_schema':target_schema}) + '\n')
+        'sha256': hashlib.sha256(body).hexdigest(), 'template_sha256': TEMPLATES, 'project': project, 'owner': owner,
+        'build_timestamp': receipt['build_timestamp'],'target_schema':target_schema,'calendar':calendar}) + '\n')
 
 
-def validate(plan, runtime, source_sha, images, project, owner, build_timestamp=None, *, target_schema=150):
+def validate(plan, runtime, source_sha, images, project, owner, build_timestamp=None, *, target_schema=150, calendar=False):
     """Validate the fully resolved, self-contained Docker Compose data plane."""
     def reject(): raise RuntimeError('restore150_unsafe_resolved_configuration')
-    if type(target_schema) is not int or not 1<=target_schema<10**9:reject()
+    if type(target_schema) is not int or not 1<=target_schema<10**9 or type(calendar) is not bool or calendar and target_schema != 160:reject()
+    bounds = service_bounds(calendar)
     if (not isinstance(plan, dict) or set(plan) - {'name', 'services', 'networks', 'volumes', 'x-service', 'x-application'}
-            or plan.get('name') != project or set(plan.get('services', {})) != set(BOUNDS)
+            or plan.get('name') != project or set(plan.get('services', {})) != set(bounds)
             or set(plan.get('networks', {})) != {'isolated', 'ingress'}
             or set(plan.get('volumes', {})) != {'database', 'objects'}): reject()
     for name, network in plan['networks'].items():
@@ -216,8 +246,8 @@ def validate(plan, runtime, source_sha, images, project, owner, build_timestamp=
     expected_ports = {'frontend': {('127.0.0.1', '22080', 8080), ('127.0.0.1', '22443', 8443)},
                       'gateway': {('127.0.0.1', '22081', 8081)}}
     for name, row in plan['services'].items():
-        image = INFRA_IMAGES.get(name, images['backend' if name in ('backend', 'notification-worker', 'deletion-worker') else 'frontend'])
-        limit, cpu = BOUNDS[name]
+        image = INFRA_IMAGES.get(name, images['backend' if name in APPLICATION_SERVICES else 'frontend'])
+        limit, cpu = bounds[name]
         if (row.get('image') != image or row.get('restart') != 'no' or row.get('privileged')
                 or any(row.get(key) for key in ('network_mode', 'pid', 'ipc', 'devices', 'device_cgroup_rules', 'volumes_from', 'cap_add', 'env_file', 'extends', 'build', 'external_links', 'extra_hosts'))
                 or not 0 < int(row.get('mem_limit', 0)) <= limit * 1024**2
@@ -240,7 +270,7 @@ def validate(plan, runtime, source_sha, images, project, owner, build_timestamp=
             if len(volume_mounts) != 1 or volume_mounts[0].get('source') not in (expected_volume[0], project + '_' + expected_volume[0]) or volume_mounts[0].get('target') != expected_volume[1]: reject()
         elif volume_mounts: reject()
         env = row.get('environment') or {}
-        if name in ('backend', 'notification-worker', 'deletion-worker'):
+        if name in APPLICATION_SERVICES:
             for key, value in {'APP_ENV': 'staging', 'SUPABASE_URL': 'http://gateway:8081', 'REDIS_URL': 'redis://redis:6379/0',
                 'SCHEMA_COMPATIBLE_MIN': str(target_schema), 'SCHEMA_COMPATIBLE_MAX': str(target_schema), 'MADAR_RELEASE_SHA': source_sha,
                 'EMAIL_CHANNEL_ENABLED': 'false', 'WEB_PUSH_ENABLED': 'false', 'AI_ALLOW_LOCAL_EXEC': 'false', 'ALLOW_REMOTE_DATASET_URLS': 'false'}.items():
@@ -256,6 +286,15 @@ def validate(plan, runtime, source_sha, images, project, owner, build_timestamp=
     envs = {name: row.get('environment', {}) for name, row in plan['services'].items()}
     password, jwt = envs['postgres'].get('POSTGRES_PASSWORD', ''), envs['auth'].get('GOTRUE_JWT_SECRET', '')
     if not all(re.fullmatch('[0-9a-f]{64}', value) for value in (password, jwt)): reject()
+    if calendar:
+        backend = envs['backend']
+        if (backend.get('MADAR_CALENDAR_DATABASE_DSN') != 'host=postgres dbname=madar_hardening user=authenticator password=' + password
+                or not re.fullmatch('[0-9]{1,20}', backend.get('MADAR_CALENDAR_DATABASE_SYSTEM_IDENTIFIER', ''))
+                or len(backend.get('CALENDAR_CREDENTIALS_SECRET', '')) != 64): reject()
+        for name in APPLICATION_SERVICES:
+            env = envs[name]
+            if env.get('CALENDAR_FEATURE_ENABLED') != 'true' or env.get('CALENDAR_SYNC_WORKER_ENABLED') != 'true': reject()
+            if name != 'backend' and any(env.get(key) for key in ('MADAR_CALENDAR_DATABASE_DSN', 'MADAR_CALENDAR_DATABASE_SYSTEM_IDENTIFIER')): reject()
     required = {
         'postgres': {'POSTGRES_DB': 'madar_hardening', 'POSTGRES_USER': 'postgres'},
         'auth': {'GOTRUE_DB_DATABASE_URL': 'postgres://supabase_auth_admin:' + password + '@postgres:5432/madar_hardening',
@@ -269,7 +308,7 @@ def validate(plan, runtime, source_sha, images, project, owner, build_timestamp=
     if any(envs[name].get(key) != value for name, fields in required.items() for key, value in fields.items()): reject()
 
 
-def invoke(runtime, args, project, owner, *, timeout=180,target_schema=150):
+def invoke(runtime, args, project, owner, *, timeout=180,target_schema=150,calendar=False):
     args = list(args)
     while '--file' in args:
         index = args.index('--file')
@@ -285,7 +324,30 @@ def invoke(runtime, args, project, owner, *, timeout=180,target_schema=150):
     receipt = json.loads(regular(runtime / 'configuration-receipt.json'))
     if hashlib.sha256(body).hexdigest() != receipt['sha256'] or receipt.get('target_schema',150)!=target_schema:
         raise RuntimeError('restore150_verified_configuration_changed')
-    validate(json.loads(body), runtime, receipt['source_sha'], receipt['images'], project, owner, receipt['build_timestamp'],target_schema=target_schema)
+    validate(json.loads(body), runtime, receipt['source_sha'], receipt['images'], project, owner, receipt['build_timestamp'],target_schema=target_schema,calendar=calendar)
+    if calendar and 'up' in args and json.loads(body)['services']['backend']['environment']['MADAR_CALENDAR_DATABASE_SYSTEM_IDENTIFIER'] == '0' and ('backend' in args or not any(name in args for name in ('postgres','redis','auth','rest','storage','gateway'))):
+        raise RuntimeError('fresh_calendar_cluster_not_bound')
     # Consume these captured resolved bytes over stdin. Docker never reopens the
     # origin/configuration/env paths verified by an earlier operation.
     return manage.docker('compose', '--project-name', project, '--file', '-', *args, data=body, timeout=timeout)
+
+
+def bind_calendar_transport(runtime, system_identifier):
+    """Bind the observed, owned fresh cluster before application startup."""
+    if not re.fullmatch('[1-9][0-9]{0,19}', str(system_identifier)):
+        raise RuntimeError('fresh_calendar_cluster_identity_invalid')
+    receipt = json.loads(regular(runtime / 'configuration-receipt.json'))
+    body = regular(runtime / 'verified-compose.json')
+    if receipt.get('calendar') is not True or hashlib.sha256(body).hexdigest() != receipt['sha256']:
+        raise RuntimeError('fresh_calendar_configuration_changed')
+    plan = json.loads(body)
+    validate(plan, runtime, receipt['source_sha'], receipt['images'], receipt['project'], receipt['owner'],
+        receipt['build_timestamp'], target_schema=receipt['target_schema'], calendar=True)
+    env = plan['services']['backend']['environment']
+    if env['MADAR_CALENDAR_DATABASE_SYSTEM_IDENTIFIER'] != '0':
+        raise RuntimeError('fresh_calendar_cluster_already_bound')
+    env['MADAR_CALENDAR_DATABASE_SYSTEM_IDENTIFIER'] = str(system_identifier)
+    body = json.dumps(plan, sort_keys=True).encode()
+    receipt['sha256'] = hashlib.sha256(body).hexdigest()
+    manage.private_write('verified-compose.json', body.decode())
+    manage.private_write('configuration-receipt.json', json.dumps(receipt) + '\n')

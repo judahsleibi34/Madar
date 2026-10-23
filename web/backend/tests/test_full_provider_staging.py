@@ -232,3 +232,36 @@ class WorkerRestartObservationTests(unittest.TestCase):
         with patch.object(self.application.time,'monotonic',side_effect=[0,61]),self.inspect([self.before,self.row('starting')]),self.assertRaisesRegex(RuntimeError,'health not accepted'):
             self.application.restart_deletion_worker()
         self.health.assert_not_called()
+
+
+class FreshApplicationScopeTests(unittest.TestCase):
+    def test_rehearse_still_refuses_actual_class_d_target160_before_effects(self):
+        plan=SimpleNamespace(document=lambda:{'target_schema':160,'risk_class':'D'},sha256='a'*64)
+        with patch.object(staging,'require_host'),patch.object(staging,'source_plan',return_value=(None,plan)),patch.object(staging,'lease') as lease:
+            with self.assertRaisesRegex(RuntimeError,'exceptional_sql_requires_separate_review'):
+                staging.main('REHEARSE',Path.home()/'unused',SHA,'b'*40)
+            lease.assert_not_called()
+
+    def test_fresh_mode_cannot_initialize_historical_target_or_keep_hosted_runner_running(self):
+        for schema,keep,error in ((150,False,'canonical160_required'),(160,True,'review_host_required')):
+            plan=SimpleNamespace(document=lambda:{'target_schema':schema,'risk_class':'D'},sha256='a'*64)
+            with patch.object(staging,'require_host'),patch.object(staging,'source_plan',return_value=(None,plan)),patch.object(staging.socket,'gethostname',return_value='ephemeral-ci'),patch.object(staging,'lease') as lease:
+                with self.assertRaisesRegex(RuntimeError,error):
+                    staging.main('FRESH_APPLICATION',Path.home()/'unused',SHA,'b'*40,keep_running=keep)
+                lease.assert_not_called()
+
+    def test_initialize_refuses_existing_database_before_any_genesis_sql(self):
+        with patch.object(staging.manage,'compose'),patch.object(staging.manage,'require_database_marker'),patch.object(staging.manage,'sql',return_value='f') as sql,patch.object(staging,'progress'):
+            with self.assertRaisesRegex(RuntimeError,'fresh_database_required'):
+                staging.initialize(SimpleNamespace(migrations=[]),160)
+            self.assertEqual(sql.call_count,1)
+
+    def test_calendar_inventory_restores_after_target_failure(self):
+        original=staging.SERVICES
+        with patch.object(staging,'require_host'):
+            with self.assertRaisesRegex(RuntimeError,'injected'):
+                with staging.target(SHA,160,calendar=True):
+                    self.assertEqual(len(staging.SERVICES),12)
+                    self.assertIn('calendar-sync-worker',staging.SERVICES)
+                    raise RuntimeError('injected')
+        self.assertIs(staging.SERVICES,original)

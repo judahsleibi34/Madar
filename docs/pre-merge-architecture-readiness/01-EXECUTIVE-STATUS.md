@@ -1,3 +1,12 @@
+# PR220 reduced-scope acceptance
+
+The owner approved application architecture, integrity, security regression,
+current-source staging and production isolation as the fixed acceptance scope.
+See `ACCEPTANCE-SCOPE.json` for the measurable gates. Fresh synthetic staging
+is separate from the unaccepted protected146→160 production operation.
+Production controller completion and automation are deferred; existing source
+and historical reports below are not claims of operational acceptance.
+
 # Pre-merge engineering status — 2026-10-21
 
 **ENGINEERING NOT READY FOR HUMAN CODE REVIEW.**

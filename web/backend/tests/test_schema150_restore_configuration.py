@@ -70,7 +70,7 @@ class RestoreConfigurationTests(unittest.TestCase):
 
     def test_project_lock_rejects_shared_mode_symlink_wrong_owner_or_replacement(self):
         with tempfile.TemporaryDirectory() as directory:
-            parent = Path(directory); root = parent / 'project'; root.mkdir(mode=0o755)
+            parent = Path(directory); root = parent / 'project'; root.mkdir(mode=0o755); root.chmod(0o755)
             with self.assertRaisesRegex(RuntimeError, 'identity_invalid'):
                 with configuration.private_directory_lock(root): self.fail('Shared directory accepted')
             root.chmod(0o700)
@@ -197,5 +197,52 @@ class RestoreConfigurationTests(unittest.TestCase):
                     configuration.invoke(Path('/private'), (argument, 'up'), PROJECT, OWNER)
                 state.assert_not_called(); docker.assert_not_called()
 
+
+
+
+class FreshCalendarConfigurationTests(unittest.TestCase):
+    def plan(self,root):
+        plan=valid_plan(root)
+        worker=copy.deepcopy(plan['services']['notification-worker'])
+        plan['services']['calendar-sync-worker']=worker
+        for name in configuration.APPLICATION_SERVICES:
+            plan['services'][name]['environment'].update({'SCHEMA_COMPATIBLE_MIN':'160','SCHEMA_COMPATIBLE_MAX':'160',
+                'CALENDAR_FEATURE_ENABLED':'true','CALENDAR_SYNC_WORKER_ENABLED':'true',
+                'MADAR_CALENDAR_DATABASE_DSN':'','MADAR_CALENDAR_DATABASE_SYSTEM_IDENTIFIER':''})
+        plan['services']['backend']['environment'].update({
+            'CALENDAR_CREDENTIALS_SECRET':'c'*64,
+            'MADAR_CALENDAR_DATABASE_DSN':'host=postgres dbname=madar_hardening user=authenticator password='+'a'*64,
+            'MADAR_CALENDAR_DATABASE_SYSTEM_IDENTIFIER':'0'})
+        return plan
+
+    def test_transport_scope_identity_and_provider_substitution_refuse(self):
+        root=Path('/private/fresh');plan=self.plan(root)
+        configuration.validate(plan,root,SHA,IMAGES,PROJECT,OWNER,target_schema=160,calendar=True)
+        for name,key,value in (
+            ('backend','MADAR_CALENDAR_DATABASE_DSN','host=production dbname=live user=postgres'),
+            ('backend','MADAR_CALENDAR_DATABASE_SYSTEM_IDENTIFIER','not-a-cluster'),
+            ('backend','CALENDAR_FEATURE_ENABLED','false'),
+            ('calendar-sync-worker','MADAR_CALENDAR_DATABASE_DSN','synthetic-leak'),
+            ('notification-worker','MADAR_CALENDAR_DATABASE_SYSTEM_IDENTIFIER','123')):
+            changed=copy.deepcopy(plan);changed['services'][name]['environment'][key]=value
+            with self.subTest(name=name,key=key),self.assertRaises(RuntimeError):
+                configuration.validate(changed,root,SHA,IMAGES,PROJECT,OWNER,target_schema=160,calendar=True)
+
+    def test_actual_file_binding_consumes_provisional_cluster_once(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);plan=self.plan(root);body=json.dumps(plan,sort_keys=True)
+            receipt={'source_sha':SHA,'images':IMAGES,'project':PROJECT,'owner':OWNER,'calendar':True,
+                'target_schema':160,'build_timestamp':'2026-10-18T00:00:00Z','sha256':hashlib.sha256(body.encode()).hexdigest()}
+            (root/'verified-compose.json').write_text(body)
+            (root/'configuration-receipt.json').write_text(json.dumps(receipt))
+            with patch.object(configuration.manage,'RUNTIME',root):
+                configuration.bind_calendar_transport(root,'123456789')
+                result=json.loads((root/'verified-compose.json').read_bytes())
+                self.assertEqual(result['services']['backend']['environment']['MADAR_CALENDAR_DATABASE_SYSTEM_IDENTIFIER'],'123456789')
+                with self.assertRaisesRegex(RuntimeError,'already_bound'):
+                    configuration.bind_calendar_transport(root,'987654321')
+                (root/'verified-compose.json').write_text('{}')
+                with self.assertRaisesRegex(RuntimeError,'configuration_changed'):
+                    configuration.bind_calendar_transport(root,'123456789')
 
 if __name__ == '__main__': unittest.main()

@@ -1,5 +1,28 @@
 # Madar Auto-Deploy Merge Contract
 
+## Approved reduced PR220 scope (2026-10-23)
+
+PR220 acceptance is frozen to application architecture, database integrity,
+security regression, current-source fresh-application staging and production
+isolation. Migrations157–160 and protocol2 application clients stay together.
+All published SQL, active release selection, Class D classification, admission
+refusals and automatic-dispatch restrictions remain unchanged.
+
+Protected existing-database146→160 execution, independent production write
+handoff, installed maintenance/reboot recovery and production automation are
+DEFERRED to a subsequent PR. Inert implementation and shared validators remain
+where removal would break checksum, compatibility, credential or historical
+profile safeguards. Their component tests do not establish operational acceptance.
+
+`FRESH_APPLICATION` creates only a newly owned synthetic schema160 application;
+it is not approval to upgrade an existing database. `REHEARSE` continues refusing
+Class D. Fresh staging must report protected upgrade BLOCKED_DEFERRED and no
+production authority. The staging CI name reflects this narrower acceptance.
+External main-push/merge triggers still require administrator verification before
+merge: disabled local timers cannot establish webhook/App/Vercel safety.
+No merge, production deployment or automation activation is authorized here.
+
+
 Canonical160 child ownership transfer is now explicitly separated from worker
 startup. The existing issuer projects protected private acceptance without role
 archives or a child PostgreSQL superuser lease. Pending transfer refuses replay;
