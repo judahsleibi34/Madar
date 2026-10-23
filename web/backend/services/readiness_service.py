@@ -416,6 +416,9 @@ def check_remote_ingestion_guard() -> str:
 def check_calendar_configuration() -> str:
     if not _env_bool("CALENDAR_FEATURE_ENABLED", False):
         return "disabled"
+    from services.calendar_mutation_service import transport_status
+    status=transport_status()
+    if status!='ok':return status
     if not _env_bool("CALENDAR_SYNC_REQUIRED", False):
         return "ok"
     if not _env_bool("CALENDAR_SYNC_WORKER_ENABLED", False):

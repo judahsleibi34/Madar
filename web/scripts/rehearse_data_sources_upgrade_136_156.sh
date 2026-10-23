@@ -92,6 +92,11 @@ apply_range 137 146
 # An explicit SQL-executor-only mode starts at the positively observed146.
 # It does not certify the root controller, backup, providers or write issuer.
 if [[ "${MADAR_CANONICAL_EXECUTOR_TESTS:-false}" == true ]]; then
+  # Exercise the real application login with SCRAM, not the harness's admin
+  # trust connection. The cluster is owned, network-isolated and disposable.
+  docker exec -u postgres "${CONTAINER_ID}" sh -ec \
+    'sed -i "1i host all authenticator 127.0.0.1/32 scram-sha-256" "$PGDATA/pg_hba.conf"'
+  docker exec "${CONTAINER_ID}" psql -X -U postgres -v ON_ERROR_STOP=1 -q -c 'select pg_reload_conf()'
   docker exec "${CONTAINER_NAME}" psql -X -U postgres -v ON_ERROR_STOP=1 -q -c \
     "comment on database postgres is 'madar-notification-synthetic-rehearsal'"
   docker run --rm --read-only --memory=2g --cpus=1 --pids-limit=256 \

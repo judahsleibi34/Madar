@@ -23,6 +23,8 @@ CONFIG_CLASSIFICATION: dict[str, ConfigClass] = {
     "SUPABASE_ANON_KEY": "secret",
     "SUPABASE_SERVICE_KEY": "secret",
     "CSRF_SECRET": "secret",
+    "MADAR_CALENDAR_DATABASE_DSN": "secret",
+    "MADAR_CALENDAR_DATABASE_SYSTEM_IDENTIFIER": "production-only",
     "COOKIE_SECURE": "production-only",
     "COOKIE_SAMESITE": "required",
     "FRONTEND_URLS": "required",
@@ -209,6 +211,9 @@ def validate_runtime_configuration() -> RuntimeConfiguration:
         raise RuntimeError("schema branch compatibility configuration is invalid") from error
     email_enabled = env_bool("EMAIL_CHANNEL_ENABLED", False)
     if production_like:
+        if env_bool('CALENDAR_FEATURE_ENABLED',False):
+            from services.calendar_mutation_service import configuration
+            configuration()
         required = ("SUPABASE_URL", "SUPABASE_ANON_KEY", "SUPABASE_SERVICE_KEY", "CSRF_SECRET", "FRONTEND_URLS", "REDIS_URL")
         missing = [name for name in required if not os.getenv(name, "").strip()]
         if missing:

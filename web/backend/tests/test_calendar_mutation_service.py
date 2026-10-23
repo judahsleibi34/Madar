@@ -15,7 +15,8 @@ class CalendarTransactionBoundaryTests(TestCase):
     def test_missing_or_privileged_connection_configuration_never_opens_database(self):
         for dsn,identifier in (('',''),('host=localhost dbname=synthetic user=postgres','123'),
                 ('host=localhost dbname=synthetic user=authenticator',''),
-                ('dbname=synthetic user=authenticator','123')):
+                ('dbname=synthetic user=authenticator','123'),
+                ('host=localhost dbname=synthetic user=authenticator','123')):
             with self.subTest(dsn=dsn),patch.dict(os.environ,{'MADAR_CALENDAR_DATABASE_DSN':dsn,
                     'MADAR_CALENDAR_DATABASE_SYSTEM_IDENTIFIER':identifier}),patch.object(service.psycopg,'connect') as connect:
                 with self.assertRaises(HTTPException) as failure:service.connect()
@@ -46,3 +47,21 @@ class CalendarTransactionBoundaryTests(TestCase):
             self.assertEqual(mutate.call_args.kwargs['expected_version'],3)
             rest.table.assert_not_called()
             cache.assert_called_once_with(7)
+
+    def test_calendar_enabled_startup_requires_transport_and_redacts_the_dsn(self):
+        from services.runtime_config import validate_runtime_configuration,redacted_configuration_inventory
+        with patch.dict(os.environ,{'APP_ENV':'production','CALENDAR_FEATURE_ENABLED':'true'},clear=True):
+            with self.assertRaisesRegex(RuntimeError,'calendar_transaction_configuration_invalid'):
+                validate_runtime_configuration()
+        with patch.dict(os.environ,{'MADAR_CALENDAR_DATABASE_DSN':'private-calendar-dsn'},clear=True):
+            inventory=redacted_configuration_inventory({'MADAR_CALENDAR_DATABASE_DSN'})
+            self.assertNotIn('private-calendar-dsn',str(inventory))
+            self.assertEqual(next(row for row in inventory if row['name']=='MADAR_CALENDAR_DATABASE_DSN')['classification'],'secret')
+
+    def test_calendar_readiness_requires_actual_transport_even_without_provider_sync(self):
+        from services.readiness_service import check_calendar_configuration
+        with patch.dict(os.environ,{'CALENDAR_FEATURE_ENABLED':'true','CALENDAR_SYNC_REQUIRED':'false'}):
+            for state in ('misconfigured','unavailable','ok'):
+                with self.subTest(state=state),patch.object(service,'transport_status',return_value=state) as probe:
+                    self.assertEqual(check_calendar_configuration(),state)
+                    probe.assert_called_once_with()

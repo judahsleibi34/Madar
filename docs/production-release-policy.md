@@ -55,6 +55,28 @@ without a separately reviewed exact-history plan.
 
 ## Atomic calendar edits
 
+Calendar creation and deletion now use that same domain transaction, including
+children for creation and mandatory change/audit publication. A failed child,
+change or audit insert rolls back the entire mutation. Deletion still requires
+the current expected version and locked tenant/calendar authorization. No
+published SQL is changed, and no failed/uncertain write is replayed automatically.
+
+When `CALENDAR_FEATURE_ENABLED=true`, production/staging startup requires
+`MADAR_CALENDAR_DATABASE_DSN` and `MADAR_CALENDAR_DATABASE_SYSTEM_IDENTIFIER`.
+The DSN requires an explicit password, is classified secret and is supplied through the existing private env
+file; never put its value in Compose source, logs or Git. Readiness opens the
+actual configured transport in a READ ONLY transaction and verifies the login
+role, cluster identifier, required table privileges and audit sequence access.
+It performs no automatic CREATE/ALTER ROLE or GRANT. Operators must provision
+the reviewed nonadministrative authenticator connection, existing service-role
+membership, identity-function permission and a connection budget before calendar
+activation. Do not change the shared production provider role to make a probe
+pass. Missing/wrong credentials, wrong cluster and missing privileges fail closed.
+The disposable canonical fixture verifies real SCRAM password authentication,
+wrong-password refusal and real permission/cluster mismatches; this is not
+production credential provisioning or full protected-release acceptance.
+
+
 Calendar event/series edits and occurrence/future splits use one PostgreSQL
 transaction for the parent, replacement, attendees, reminders, change records
 and audit row. The domain service rechecks and locks active tenant membership,

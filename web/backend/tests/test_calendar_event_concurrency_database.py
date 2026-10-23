@@ -22,6 +22,7 @@ import os
 from uuid import UUID, uuid4
 
 DSN, connect = native.DSN, native.connect
+REAL_CALENDAR_CONNECT = mutations.connect
 
 
 class NativeEventUpdate:
@@ -169,6 +170,95 @@ class CalendarEventConcurrencyDatabaseTests(unittest.TestCase):
             self.db.execute(sql.SQL('drop trigger {} on public.{}').format(sql.Identifier(name),sql.Identifier(table)))
             self.db.execute(sql.SQL('drop function public.{}()').format(sql.Identifier(name)))
         return cleanup
+
+    def test_actual_configured_scram_transport_accepts_cluster_and_rejects_bad_credentials(self):
+        # The canonical harness pins a SCRAM HBA rule for this disposable actor.
+        # No patched session authorization or administrator connection is used.
+        if not os.getenv('CANONICAL_EXECUTOR_SYNTHETIC_DATABASE_DSN'):
+            self.skipTest('Requires canonical harness SCRAM rule')
+        import secrets
+        password=secrets.token_urlsafe(32)
+        self.db.execute(sql.SQL('alter role authenticator login password {}').format(sql.Literal(password)))
+        self.addCleanup(lambda:self.db.execute('alter role authenticator nologin password null'))
+        parameters=dict(self.db.info.get_parameters(),user='authenticator',password=password)
+        dsn=psycopg.conninfo.make_conninfo(**parameters)
+        with patch.dict(os.environ,{'MADAR_CALENDAR_DATABASE_DSN':dsn}),\
+                patch.object(mutations,'connect',side_effect=REAL_CALENDAR_CONNECT):
+            self.assertEqual(mutations.transport_status(),'ok')
+            self.db.execute('revoke insert on calendar_event_changes from service_role')
+            try:self.assertEqual(mutations.transport_status(),'misconfigured')
+            finally:self.db.execute('grant insert on calendar_event_changes to service_role')
+            self.assertEqual(self.mutation('series')['event']['version'],2)
+            with patch.dict(os.environ,{'MADAR_CALENDAR_DATABASE_SYSTEM_IDENTIFIER':'0'}):
+                self.assertEqual(mutations.transport_status(),'unavailable')
+            bad=psycopg.conninfo.make_conninfo(**dict(parameters,password='incorrect-synthetic-password'))
+            with patch.dict(os.environ,{'MADAR_CALENDAR_DATABASE_DSN':bad}):
+                self.assertEqual(mutations.transport_status(),'unavailable')
+                with self.assertRaises(HTTPException):REAL_CALENDAR_CONNECT()
+
+    def test_create_route_rolls_back_parent_when_reminder_insert_fails(self):
+        payload=routes.EventWrite(calendar_id=self.calendar,title='New aggregate',starts_at=self.start,
+            ends_at=self.end,attendees=[{'email':'new@example.invalid'}],
+            reminders=[{'channel':'in_app','minutes_before':5}])
+        row={'tenant_id':self.tenant,'created_by':self.user,'calendar_id':str(self.calendar),
+            'title':payload.title,'starts_at':self.start.isoformat(),'ends_at':self.end.isoformat()}
+        owner=self
+        class Insert:
+            def insert(inner,values):inner.values=values;return inner
+            def execute(inner):return SimpleNamespace(data=[mutations._write(owner.db,inner.values)])
+        before=self.snapshot()
+        for table in ('calendar_events','calendar_event_attendees','calendar_event_reminders','calendar_event_changes','audit_logs'):
+            with self.subTest(table=table):
+                cleanup=self.inject_failure(table)
+                try:
+                    with patch.object(routes,'require_calendar_feature'),patch.object(routes,'require_active_tenant_member',return_value=self.context),\
+                            patch.object(routes,'normalized_event_row',return_value=row),patch.object(routes,'event_conflicts',return_value=[]),\
+                            patch.object(routes,'service_supabase',SimpleNamespace(table=lambda name:Insert())),\
+                            patch.object(routes,'replace_event_children',side_effect=lambda c,e,p:mutations._children(self.db,c,e,p)):
+                        try:routes.create_event(payload,None,None)
+                        except HTTPException as failure:
+                            self.assertEqual(failure.status_code,503)
+                            self.assertEqual(failure.__context__.diag.message_primary,'synthetic calendar effect failure')
+                        else:self.fail('Injected aggregate failure was ignored')
+                    self.assertEqual(self.snapshot(),before,'Creation must not commit any partial aggregate')
+                finally:cleanup()
+
+    def test_delete_route_rolls_back_recurrence_when_change_insert_fails(self):
+        self.recurring()
+        for scope in ('event','occurrence','future'):
+            for table in ('calendar_event_changes','audit_logs'):
+                with self.subTest(scope=scope,table=table):
+                    before=self.snapshot();cleanup=self.inject_failure(table)
+                    try:
+                        with patch.object(routes,'require_calendar_feature'),patch.object(routes,'require_active_tenant_member',return_value=self.context),\
+                                patch.object(routes,'tenant_event',side_effect=lambda *a:self.db.execute(
+                                    'select to_jsonb(e) from calendar_events e where id=%s',(self.event,)).fetchone()[0]),\
+                                patch.object(routes,'require_calendar_access'),\
+                                patch.object(routes,'service_supabase',SimpleNamespace(table=lambda name:NativeEventUpdate(self.db))),\
+                                patch.object(routes,'write_change',side_effect=lambda c,e,a,s,b,n:mutations._change(self.db,c,e,a,s,b,n)):
+                            try:routes.delete_event(self.event,None,None,expected_version=1,scope=scope,occurrence_start=self.start+timedelta(days=1))
+                            except HTTPException as failure:
+                                self.assertEqual(failure.status_code,503)
+                                self.assertEqual(failure.__context__.diag.message_primary,'synthetic calendar effect failure')
+                            else:self.fail('Injected change failure was ignored')
+                        self.assertEqual(self.snapshot(),before,'Deletion and its change record must commit together')
+                    finally:cleanup()
+
+    def test_create_and_delete_success_publish_atomic_audit_and_refuse_stale_retry(self):
+        payload=routes.EventWrite(calendar_id=self.calendar,title='Created',starts_at=self.start,ends_at=self.end,
+            attendees=[{'email':'created@example.invalid'}],reminders=[{'channel':'in_app','minutes_before':5}])
+        row={'tenant_id':self.tenant,'created_by':self.user,'calendar_id':str(self.calendar),
+            'title':payload.title,'starts_at':self.start.isoformat(),'ends_at':self.end.isoformat()}
+        event=mutations.create_event(self.context,payload,row,audit={})
+        self.assertEqual(self.db.execute('select count(*) from calendar_event_reminders where event_id=%s',(event['id'],)).fetchone()[0],1)
+        mutations.delete_event(self.context,event['id'],expected_version=1,scope='event',occurrence_start=None,audit={})
+        self.assertEqual(self.db.execute('select count(*) from calendar_event_changes where event_id=%s',(event['id'],)).fetchone()[0],2)
+        self.assertEqual(self.db.execute('select count(*) from audit_logs where target_id=%s',(event['id'],)).fetchone()[0],2)
+        before=self.snapshot()
+        with self.assertRaises(HTTPException) as stale:
+            mutations.delete_event(self.context,event['id'],expected_version=1,scope='event',occurrence_start=None,audit={})
+        self.assertEqual(stale.exception.status_code,409)
+        self.assertEqual(self.snapshot(),before)
 
     def test_every_recurring_effect_rolls_back_parent_replacement_and_children(self):
         self.recurring();before=self.snapshot()

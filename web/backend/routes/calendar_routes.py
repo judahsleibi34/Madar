@@ -45,7 +45,9 @@ from services.calendar_workspace_cache_service import (
 )
 from services.bounded_query_service import submit_db_read
 from services.observability_service import traced_operation
-from services.calendar_mutation_service import mutate_event
+from services.calendar_mutation_service import (
+    mutate_event, create_event as create_calendar_event, delete_event as delete_calendar_event,
+)
 from services.rate_limit_service import get_client_ip
 
 
@@ -1377,13 +1379,16 @@ def create_event(payload: EventWrite, request: Request, response: Response):
     conflicts = event_conflicts(context.tenant_id, row["calendar_id"], payload.starts_at, payload.ends_at)
     if conflicts and not payload.allow_conflicts:
         raise HTTPException(status_code=409, detail={"code": "calendar_event_conflict", "message": "This time overlaps another busy event.", "conflicts": conflicts})
-    created = getattr(service_supabase.table("calendar_events").insert(row).execute(), "data", None) or []
-    if not created:
-        raise HTTPException(status_code=500, detail="Event could not be created")
-    replace_event_children(context, created[0], payload)
-    write_change(context, created[0]["id"], "created", "event", None, created[0])
-    record_calendar_audit(context, request, "calendar.event_created", "calendar_event", created[0]["id"], {"calendar_id": row["calendar_id"]})
-    return {"success": True, "event": created[0], "conflicts": conflicts}
+    try:
+        created=create_calendar_event(context,payload,row,audit=_mutation_audit(request))
+    finally:invalidate_calendar_workspace_cache(context.tenant_id)
+    return {"success":True,"event":created,"conflicts":conflicts}
+
+
+def _mutation_audit(request):
+    return {'ip':get_client_ip(request) if request is not None else None,
+        'user_agent':request.headers.get('user-agent','')[:1000] if request is not None else None}
+
 
 
 @router.put("/events/{event_id}")
@@ -1418,23 +1423,12 @@ def delete_event(event_id: str, request: Request, response: Response, expected_v
     require_calendar_access(context, str(before.get("calendar_id")), "delete_event")
     if int(before.get("version") or 1) != expected_version:
         raise HTTPException(status_code=409, detail={"code": "calendar_version_conflict", "current": before})
-    if scope in {"occurrence", "future"}:
-        if not before.get("recurrence_rule") or occurrence_start is None:
-            raise HTTPException(status_code=400, detail="A recurring occurrence must be selected for this delete scope")
-        if scope == "occurrence":
-            updated = exclude_occurrence(context, before, occurrence_start)
-        else:
-            updated = update_event_versioned(context, before, {
-                "recurrence_rule": truncated_recurrence_rule(before["recurrence_rule"], occurrence_start - timedelta(seconds=1)),
-            })
-        write_change(context, event_id, "cancelled", scope, before, updated)
-        record_calendar_audit(context, request, "calendar.event_deleted", "calendar_event", event_id, {"scope": scope})
-        return {"success": True, "event": updated}
-    deleted_at = iso(utc_now())
-    updated = update_event_versioned(context, before, {"deleted_at": deleted_at})
-    write_change(context, event_id, "deleted", scope, before, updated)
-    record_calendar_audit(context, request, "calendar.event_deleted", "calendar_event", event_id, {"scope": scope})
-    return {"success": True}
+    try:
+        event=delete_calendar_event(context,event_id,expected_version=expected_version,scope=scope,
+            occurrence_start=occurrence_start,audit=_mutation_audit(request))
+    finally:invalidate_calendar_workspace_cache(context.tenant_id)
+    return {"success":True,**({'event':event} if scope in {'occurrence','future'} else {})}
+
 
 
 @router.get("/events/{event_id}/history")
