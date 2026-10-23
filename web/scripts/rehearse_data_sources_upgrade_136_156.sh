@@ -294,6 +294,7 @@ if [[ "${MADAR_RECONCILED_INTEGRITY_TESTS:-false}" == true ]]; then
     --env DELIVERY_TEST_SCHEMA=160 --env OUTBOX_TEST_SCHEMA=160 \
     --entrypoint python "${BACKEND_TEST_IMAGE:-madar-backend-test}" -m unittest \
       tests.test_reconciled_history_database.TransitionTests \
+      tests.test_reconciled_history_database.FreshCalendarEntitlementTests \
       tests.test_reconciled_history_database.ReconciledDeliveryTests \
       tests.test_reconciled_history_database.ReconciledOutboxTests \
       tests.test_reconciled_history_database.ReconciledDeletionTests \

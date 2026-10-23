@@ -107,3 +107,32 @@ class ReconciledDeletionTests(deletion.Deletion150OwnershipTests):
         self.assertEqual(observed['legacy_deletion_backlog'],0)
         self.assertEqual(self.current()['state'],'pending')
         self.assertEqual(self.current()['claim_generation'],0)
+
+
+@unittest.skipUnless(DSN,'Requires owned disposable reconciled PostgreSQL')
+class FreshCalendarEntitlementTests(unittest.TestCase):
+    def test_real_commercial_commands_grant_only_the_dated_synthetic_calendar_fixture(self):
+        import sys,tempfile
+        from uuid import uuid4
+        from unittest.mock import patch
+        sys.path.insert(0,str(ROOT/'web/staging/integration'))
+        import calendar_acceptance as fixture
+        with connect() as db,tempfile.TemporaryDirectory() as directory:
+            tenant=db.execute("insert into tenants(brand_name,owner_name) values('Synthetic calendar grant','Fixture') returning tenant_id").fetchone()[0]
+            auth=uuid4()
+            db.execute('insert into auth.users(id,email_confirmed_at) values(%s,now())',(auth,))
+            actor=db.execute("insert into users(auth_id,first_name,last_name,email,user_type,account_status,email_verified,email_verified_at) values(%s,'Synthetic','Admin',%s,'admin','active',true,now()) returning id",(auth,str(auth)+'@example.invalid')).fetchone()[0]
+            root=Path(directory);(root/'smoke-fixture.json').write_text(json.dumps({'admin_user_id':actor}))
+            before=db.execute('select public.resolve_commercial_access(%s)',(tenant,)).fetchone()[0]
+            self.assertIsNone(before['period'])
+            def query(sql):
+                cursor=db.execute(sql)
+                return str(cursor.fetchone()[0]) if cursor.description else ''
+            with patch.object(fixture.manage,'RUNTIME',root),patch.object(fixture.manage,'require_database_marker',side_effect=lambda:connect().close()),patch.object(fixture.manage,'sql',side_effect=query):
+                fixture.seed_calendar_entitlement(tenant,uuid4().hex[:16])
+            state=db.execute('select public.resolve_commercial_access(%s)',(tenant,)).fetchone()[0]
+            self.assertEqual(state['review_state'],'reviewed')
+            self.assertEqual(state['period']['module_ids'],['website'])
+            self.assertIsNone(state['period']['plan_id'])
+            self.assertEqual(set(state['subscriptions'][0]['module_basis']),{'website'})
+            self.assertIsNone(db.execute("select sales_start_at from commercial_price_books where id='launch_2026_v2'").fetchone()[0])

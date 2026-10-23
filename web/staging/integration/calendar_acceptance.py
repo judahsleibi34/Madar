@@ -2,7 +2,7 @@
 from datetime import datetime, timedelta, timezone
 import json
 import secrets
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import manage
 from smoke import http, literal, cookie_header, cookies, application_origin
@@ -25,6 +25,10 @@ def main():
     status, response_headers = http('GET', '/auth/user_status', application=True, headers=cookie_header(jar))
     jar.update(cookies(response_headers))
     headers = {**cookie_header(jar), 'Origin': application_origin(), 'X-CSRF-Token': status['csrf_token']}
+    # Preserve commercial enforcement: deny the unentitled fixture first.
+    http('POST', '/calendar/calendars', application=True, headers=headers,
+        body={'name': 'Unentitled fixture'}, expected=(403,))
+    seed_calendar_entitlement(tenant, suffix)
     calendar, _ = http('POST', '/calendar/calendars', application=True, headers=headers,
         body={'name': 'Synthetic transaction calendar'}, expected=(201,))
     start = datetime.now(timezone.utc) + timedelta(days=3)
@@ -49,3 +53,23 @@ def main():
         'external_provider_sync_tested': False}
     manage.private_write('calendar-acceptance.json', json.dumps(result) + '\n')
     return result
+
+
+def seed_calendar_entitlement(tenant, suffix):
+    """Existing commercial commands, confined to this marked synthetic DB."""
+    manage.require_database_marker()
+    fixture=json.loads((manage.RUNTIME / 'smoke-fixture.json').read_text())
+    actor=int(fixture['admin_user_id'])
+    book='staging_calendar_' + suffix
+    manage.sql("insert into public.commercial_price_books(id,version,effective_from,currency,billing_interval,standalone_minor,bundle_minor,sales_start_at) "
+        f"values({literal(book)},{literal(book)},now()-interval '1 day','USD','month',"
+        "'{\"forms\":1500,\"website\":2000,\"ecommerce\":2500}','{\"2\":3000,\"3\":4000}',now()-interval '1 day')")
+    now=datetime.now(timezone.utc)
+    for operation,request in (
+        ('assign_modules',{'module_ids':['website'],'price_books':{'website':book}}),
+        ('complimentary',{'module_ids':['website'],'valid_from':(now-timedelta(hours=1)).isoformat(),
+            'valid_until':(now+timedelta(days=1)).isoformat()})):
+        revision=int(manage.sql(f"select public.resolve_commercial_access({tenant})->>'revision'"))
+        payload={'request':{'reason':'Synthetic staging calendar acceptance','expected_revision':revision,**request},'quote':{}}
+        manage.sql(f"select public.apply_commercial_access_command({tenant},{actor},'aal2',{literal(operation)},"
+            f"{literal(str(uuid4()))},'fresh-staging',{literal(json.dumps(payload))}::jsonb)")
