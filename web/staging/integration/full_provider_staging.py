@@ -32,6 +32,12 @@ from deployment.lib.migration_plan import generate
 from deployment.lib.schema148_artifacts import INPUTS,capture_candidate_archive,verify_required_ci,authenticated_archive
 from fresh_artifact_acceptance import import_authenticated_image
 
+STAGING_EVIDENCE = Path('/opt/madar-development/evidence/integration')
+
+def runtime_parent():
+    return STAGING_EVIDENCE if socket.gethostname() == 'madar-staging' else Path.home()
+
+
 PORTS={22080,22443,22081}
 SERVICES=set(configuration.BOUNDS)
 
@@ -70,7 +76,7 @@ def require_host(runtime):
         and os.environ.get('GITHUB_REPOSITORY')=='judahsleibi34/Madar')
     if name in ('madar-gpu','madar-node1') or not (name=='madar-staging' or hosted) or os.getuid()==0:
         raise RuntimeError('full_staging_isolated_host_required')
-    if runtime.is_symlink() or runtime.parent!=Path.home() or not runtime.name.startswith('madar-full-provider-'):
+    if runtime.is_symlink() or runtime.parent!=runtime_parent() or not runtime.name.startswith('madar-full-provider-'):
         raise RuntimeError('full_staging_owned_scope_required')
 
 
@@ -92,7 +98,7 @@ def lease():
 def target(source,schema,*,calendar=False):
     global SERVICES
     original_services = SERVICES
-    project=identity(source);runtime=Path.home()/project
+    project=identity(source);runtime=runtime_parent()/project
     require_host(runtime)
     SERVICES = set(configuration.service_bounds(calendar))
     saved={key:getattr(manage,key) for key in ('PROJECT','OWNER','MARKER','RUNTIME','HERE','require_staging_host','compose')}
@@ -214,7 +220,7 @@ def browser_acceptance(source):
 
 def main(mode,directory,source,baseline,*,keep_running=False):
     if mode not in ('INSPECT','REHEARSE','FRESH_APPLICATION'):raise RuntimeError('full_staging_explicit_mode_required')
-    project=identity(source);runtime=Path.home()/project
+    project=identity(source);runtime=runtime_parent()/project
     require_host(runtime)
     inventory,plan=source_plan(source,baseline);value=plan.document();schema=value['target_schema']
     if mode=='REHEARSE' and value['risk_class']=='D':
@@ -225,7 +231,7 @@ def main(mode,directory,source,baseline,*,keep_running=False):
     if keep_running and (not fresh or socket.gethostname() != 'madar-staging'):
         raise RuntimeError('full_staging_review_host_required')
     directory=Path(directory)
-    if directory.is_symlink() or directory.parent!=Path.home():raise RuntimeError('full_staging_artifact_directory_scope')
+    if directory.is_symlink() or directory.parent not in {Path.home(), STAGING_EVIDENCE}:raise RuntimeError('full_staging_artifact_directory_scope')
     metadata=directory.stat()
     if metadata.st_uid!=os.getuid() or stat.S_IMODE(metadata.st_mode)!=0o700:
         raise RuntimeError('full_staging_artifact_directory_ownership')

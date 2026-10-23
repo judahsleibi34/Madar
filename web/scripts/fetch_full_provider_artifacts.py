@@ -48,7 +48,7 @@ def write(path,value):
 def fetch(source,directory):
     if not re.fullmatch('[0-9a-f]{40}',source or ''):raise RuntimeError('full_staging_ci_exact_source_required')
     directory=Path(directory)
-    if directory.parent!=Path.home() or directory.name!='madar-provider-artifacts-'+source[:12]:
+    if directory.parent not in {Path.home(), Path('/opt/madar-development/evidence/integration')} or directory.name!='madar-provider-artifacts-'+source[:12]:
         raise RuntimeError('full_staging_ci_directory_scope')
     directory.mkdir(mode=0o700)
     deadline=time.monotonic()+600
