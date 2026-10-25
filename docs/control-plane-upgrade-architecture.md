@@ -1,5 +1,14 @@
 # Privileged control-plane upgrade architecture
 
+The measured completed-NORMAL source inventory now requires
+`completed_normal_private_acceptance.py`. Its canonical160 observers bind to
+the actual coordinator and concrete provider adapter; original-account probes
+run before fencing and private target probes precede the write handoff. The
+root-private approved credential/object probe input is hash-bound to the plan,
+and results never mint authority. Historical profiles keep their existing
+guards. Schema160 registry/admission remain closed; this wiring does not accept
+a privileged upgrade, independent receiver restore or reboot operation.
+
 The immutable canonical160 private gateway configuration in the accepted
 frontend image is a protected controller input. Candidate creation/sealing and
 inventory attestation bind its ninth role, image, fixed command, privileges and

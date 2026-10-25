@@ -9,6 +9,7 @@ from fresh_artifact_acceptance import import_authenticated_image
 from deployment.lib.schema148_artifacts import verify_archive,authenticated_archive,INPUTS
 from deployment.lib.migration_inventory import discover
 from deployment.lib.completed_normal_private_provider import verify_gateway
+from deployment.lib.completed_normal_private_acceptance import observe_subjects,CompletedNormalMaintenanceGuards
 def require_disposable_guest(guest_uuid):
     """A root-created test marker is not a release credential or approval."""
     if (not __debug__ or not re.fullmatch('[0-9a-f-]{36}',guest_uuid)
@@ -42,7 +43,9 @@ def main(source,guest_uuid,artifacts):
     def interrupted(signum,frame):raise SystemExit(128+signum)
     for signum in (signal.SIGTERM,signal.SIGHUP):signal.signal(signum,interrupted)
     SOURCE,UUID,ART=source,guest_uuid,artifacts
-    result={'scope':'native146 private provider transport only','source_sha':SOURCE,'guest_uuid':UUID,'protected_upgrade':False,'production_modified':False}
+    result={'scope':'native146 private provider transport only','source_sha':SOURCE,'guest_uuid':UUID,'protected_upgrade':False,'production_modified':False,
+        'harness_sha256':hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+        'private_observer_sha256':hashlib.sha256((ROOT/'web/deployment/lib/completed_normal_private_acceptance.py').read_bytes()).hexdigest()}
     with full.target(SOURCE,146) as (runtime,project):
         full.admission_headroom(runtime,project);manage.prepare(SOURCE)
         def compose(*args,timeout=240):return manage.docker('compose','--project-name',project,'--file',str(runtime/'native.json'),*args,timeout=timeout)
@@ -115,6 +118,11 @@ def main(source,guest_uuid,artifacts):
                 if migration.number in inventory.excluded_versions or migration.number>146:continue
                 phase('genesis_'+str(migration.number));sql("set lock_timeout='5s';set statement_timeout='45s';"+migration.sql.decode())
             assert sql("select schema_version from application_schema_state where contract_key='core'")=='146'
+            # Fixture-only RLS for newly created private acceptance objects. This
+            # is initial synthetic test setup, never a release migration/grant.
+            sql("create policy native_owned_fixture on storage.objects for all to authenticated "
+                "using(bucket_id like 'native-owned-%' and owner_id=auth.uid()::text) "
+                "with check(bucket_id like 'native-owned-%' and owner_id=auth.uid()::text and split_part(name,'/',1)=auth.uid()::text);")
             identifier=sql('select system_identifier::text from pg_control_system()')
             sql('alter role authenticator connection limit 32;grant execute on function pg_catalog.pg_control_system() to service_role;')
             env.update({'SUPABASE_URL':'http://'+gateway+':8000','MADAR_BUILD_TIMESTAMP':receipt['build_timestamp'],'MADAR_CALENDAR_DATABASE_DSN':'postgresql://authenticator:'+pw+'@'+gateway+':5432/postgres?sslmode=disable','MADAR_CALENDAR_DATABASE_SYSTEM_IDENTIFIER':identifier,'PARSER_WORKER_ENABLED':'true','PARSER_WORKER_REQUIRED':'true','PARSER_WORKER_URL':'http://'+project+'-parser:8092/parse','PARSER_WORKER_HEALTH_URL':'http://'+project+'-parser:8092/health','CALENDAR_FEATURE_ENABLED':'true','CALENDAR_SYNC_WORKER_ENABLED':'true','CALENDAR_SYNC_REQUIRED':'false','CALENDAR_CREDENTIALS_SECRET':secrets.token_hex(32),'NOTIFICATION_WORKER_REQUIRED':'false'})
@@ -129,6 +137,40 @@ def main(source,guest_uuid,artifacts):
             probe=Path(__file__).with_name('private_provider_probe.py').read_bytes()
             output=manage.docker('exec','-i',names['backend'],'python','-',data=probe,timeout=180)
             observations=json.loads(output);assert observations['calendar_transport']=='ok'
+            subjects=observations.pop('private_subjects')
+            manage.private_write('original-provider-probes.json',json.dumps({'version':1,'system_identifier':identifier,'subjects':subjects}))
+            endpoints={}
+            for role,port in (('auth',9999),('rest',3000),('storage',5000)):
+                row=json.loads(manage.docker('inspect',names[role]))[0]
+                ip=row['NetworkSettings']['Networks']['madar-local-supabase_default']['IPAddress']
+                endpoints[role]='http://'+ip+':'+str(port)
+            from types import SimpleNamespace
+            observer=object.__new__(CompletedNormalMaintenanceGuards);observer.subjects=subjects
+            material=observer.material(SimpleNamespace(_sql=sql))
+            original_accounts=observe_subjects(subjects,endpoints,values['ANON_KEY'])
+            phase('original_provider_restart_acceptance')
+            compose('restart','--timeout','15','auth','rest','storage')
+            compose('up','-d','--wait','--wait-timeout','90','auth','rest','storage')
+            # Real Docker restart may replace endpoint addresses. The installed
+            # observer measures fresh rows every time; this fixture must too.
+            for role,port in (('auth',9999),('rest',3000),('storage',5000)):
+                row=json.loads(manage.docker('inspect',names[role]))[0]
+                ip=row['NetworkSettings']['Networks']['madar-local-supabase_default']['IPAddress']
+                endpoints[role]='http://'+ip+':'+str(port)
+            assert observe_subjects(subjects,endpoints,values['ANON_KEY'])==original_accounts
+            assert observer.material(SimpleNamespace(_sql=sql))==material
+            transport_probe=b'''import json,os,urllib.request
+from services.calendar_mutation_service import transport_status
+opener=urllib.request.build_opener(urllib.request.ProxyHandler({}))
+for path in ('/auth/v1/health','/rest/v1/','/storage/v1/status'):
+    with opener.open(os.environ['SUPABASE_URL']+path,timeout=10) as response:assert response.status==200
+assert transport_status()=='ok'
+print(json.dumps({'private_gateway_after_provider_restart':True,'calendar_after_provider_restart':True}))
+'''
+            observations.update(json.loads(manage.docker('exec','-i',names['backend'],'python','-',data=transport_probe,timeout=30)))
+            observations['original_accounts_across_provider_restart']=original_accounts
+            observations['original_password_mfa_tenant_material_sha256']=material['sha256']
+
             result.update(status='PASS',schema=146,system_identifier=identifier,services={k:manage.docker('inspect','--format','{{.Id}}',v).decode().strip() for k,v in {**names,'gateway':gateway,'parser':project+'-parser'}.items()},observations=observations,images=images,artifact_id=artifact['id'])
         except Exception as error:
             result.update(status='FAIL',exception_type=type(error).__name__,failure_code=str(error) if isinstance(error,RuntimeError) and str(error).replace('_','').isalnum() else 'private_diagnostic_required',frames=[{'file':Path(f.filename).name,'line':f.lineno,'function':f.name} for f in traceback.extract_tb(error.__traceback__)[-8:]])

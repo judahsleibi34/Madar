@@ -42,4 +42,36 @@ assert transport_status()=='ok'
 try:socket.getaddrinfo('supabase-db',5432)
 except socket.gaierror:pass
 else:raise RuntimeError('backend_direct_native_database_dns_exposed')
-print(json.dumps({'password_login_and_wrong_password_refusal':True,'mfa_aal2':True,'refresh_rotation':True,'private_storage_bytes_sha256':hashlib.sha256(data).hexdigest(),'anonymous_storage_denial':True,'postgrest_query':True,'calendar_transport':calendar,'wrong_system_identifier_refused':True,'backend_direct_native_dns_isolated':True,'gateway_host':base.split('//')[1],'original_schema':146}))
+# Designated original-account fixtures for the actual source-owned observer.
+# This process runs only under the empty, root-marked disposable VM fixture.
+from services.calendar_mutation_service import connect,_verify_connection
+subjects=[]
+for index in range(2):
+    if index==0:
+        person,person_email,person_password,person_factor,person_secret,person_token=user,email,password,factor,secret,elevated['access_token']
+    else:
+        person_email='original-'+secrets.token_hex(8)+'@example.invalid';person_password=secrets.token_urlsafe(32)
+        person=call('POST','/auth/v1/admin/users',{'email':person_email,'password':person_password,'email_confirm':True},service)
+        person_session=call('POST','/auth/v1/token?grant_type=password',{'email':person_email,'password':person_password})
+        person_factor=call('POST','/auth/v1/factors',{'factor_type':'totp','friendly_name':'Preserved original fixture'},person_session['access_token'])
+        person_secret=person_factor['totp']['secret']
+        person_challenge=call('POST','/auth/v1/factors/'+person_factor['id']+'/challenge',{},person_session['access_token'])
+        person_key=base64.b32decode(person_secret+'='*(-len(person_secret)%8))
+        person_digest=hmac.new(person_key,struct.pack('>Q',int(time.time())//30),hashlib.sha1).digest();person_offset=person_digest[-1]&15
+        person_code=f'{(struct.unpack(">I",person_digest[person_offset:person_offset+4])[0]&0x7fffffff)%1000000:06d}'
+        person_verified=call('POST','/auth/v1/factors/'+person_factor['id']+'/verify',{'challenge_id':person_challenge['id'],'code':person_code},person_session['access_token'])
+        person_token=person_verified['access_token']
+    with connect() as db:
+        with db.transaction():
+            _verify_connection(db)
+            tenant=db.execute("insert into public.tenants(brand_name,owner_name) values('Native original fixture','Synthetic owner') returning tenant_id").fetchone()[0]
+            person_id=db.execute("insert into public.users(auth_id,first_name,last_name,email,tenant_id,account_status,email_verified,email_verified_at) values(%s,'Native','Owner',%s,%s,'active',true,now()) returning id",(person['id'],person_email,tenant)).fetchone()[0]
+            db.execute("insert into public.tenant_memberships(tenant_id,user_id,auth_id,role,status) values(%s,%s,%s,'owner','active')",(tenant,person_id,person['id']))
+    person_bucket='native-owned-'+secrets.token_hex(8)
+    call('POST','/storage/v1/bucket',{'id':person_bucket,'name':person_bucket,'public':False},service)
+    person_object=person['id']+'/original.bin';person_bytes=secrets.token_bytes(257)
+    call('POST','/storage/v1/object/'+person_bucket+'/'+person_object,person_bytes,person_token,content='application/octet-stream')
+    subjects.append({'auth_id':person['id'],'user_id':person_id,'tenant_id':tenant,'email':person_email,
+        'password':person_password,'factor_id':person_factor['id'],'totp_secret':person_secret,
+        'bucket':person_bucket,'object':person_object,'object_sha256':hashlib.sha256(person_bytes).hexdigest()})
+print(json.dumps({'password_login_and_wrong_password_refusal':True,'mfa_aal2':True,'refresh_rotation':True,'private_storage_bytes_sha256':hashlib.sha256(data).hexdigest(),'anonymous_storage_denial':True,'postgrest_query':True,'calendar_transport':calendar,'wrong_system_identifier_refused':True,'backend_direct_native_dns_isolated':True,'gateway_host':base.split('//')[1],'original_schema':146,'private_subjects':subjects}))

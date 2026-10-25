@@ -22,7 +22,7 @@ REQUIRED_FILES={'web/scripts/continue_completed_normal_upgrade.py',*(
         'completed_normal_runtime','completed_normal_migration','completed_normal_database',
         'completed_normal_resources','compatible_normal_boot','completed_normal_boot_installation',
         'completed_normal_write_handoff','completed_normal_backup','completed_normal_execution',
-        'completed_normal_model','completed_normal_evidence','completed_normal_forward','completed_normal_profile','schema148_release','schema148_artifacts','schema148_consumers','schema149_release','schema149_consumers','schema149_provider_lifecycle','schema149_controller','schema150_release','schema150_provider_lifecycle','schema150_actor_inventory','schema150_object_inventory','schema150_provider_adapter','schema150_status','schema160_release'))}
+        'completed_normal_model','completed_normal_evidence','completed_normal_forward','completed_normal_profile','completed_normal_private_acceptance','schema148_release','schema148_artifacts','schema148_consumers','schema149_release','schema149_consumers','schema149_provider_lifecycle','schema149_controller','schema150_release','schema150_provider_lifecycle','schema150_actor_inventory','schema150_object_inventory','schema150_provider_adapter','schema150_status','schema160_release'))}
 REQUIRED_FILES.update({
     'web/deployment/lib/maintenance_backup_roles.py',
     'web/deployment/lib/maintenance_backup.py',
@@ -133,11 +133,19 @@ def main():
         from deployment.lib.completed_normal_execution import CompletedNormalUpgrade,verify_serving
         from deployment.lib.completed_normal_evidence import verify_application_evidence,verify_complete_rehearsal
         from deployment.lib.completed_normal_model import render_candidate_model
+        from deployment.lib.completed_normal_profile import RECONCILED
+        maintenance={};observer=None
+        if actor.contract.get('operation')==RECONCILED.operation:
+            from deployment.lib.completed_normal_private_acceptance import CompletedNormalMaintenanceGuards
+            observer=CompletedNormalMaintenanceGuards(actor)
+            maintenance={'maintenance_original_guard':observer.capture_original,
+                'maintenance_acceptance_guard':observer.acceptance,'maintenance_activation_guard':observer.activation}
         driver=CompletedNormalUpgrade(actor,
             artifact_guard=lambda:verify_application_evidence(actor),
             model_loader=lambda:render_candidate_model(actor),
             acceptance_guard=lambda **kw:verify_serving(actor,**kw),
-            rehearsal_guard=lambda:verify_complete_rehearsal(actor))
+            rehearsal_guard=lambda:verify_complete_rehearsal(actor),**maintenance)
+        if observer is not None:observer.bind(driver)
         try:result=driver.preflight() if args.mode=='preflight' else driver.execute()
         finally:actor.ops.close_locks()
     else:result=actor.resume() if args.mode=='boot' else actor.proxy_gate()

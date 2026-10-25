@@ -34,6 +34,7 @@ def maintenance_fixture(test, selected=RECONCILED, *, system_identifier=None):
     f.document['application_evidence']={'provenance':{'synthetic':'only'}}
     f.driver.maintenance_acceptance_guard=Mock(return_value=True)
     f.driver.maintenance_activation_guard=Mock(return_value={'synthetic':'only'})
+    f.driver.maintenance_original_guard=lambda binding:f.effect('original_application_acceptance')
     (inventory,_),_=fixture()
     scope={'operation':selected.operation,'context_sha256':'0'*64,'source_sha':f.contract['candidate']['source_sha'],
         'controller_sha':f.driver.controller,'inventory_sha256':'0'*64,
@@ -110,7 +111,7 @@ class MaintenanceExecutionTests(unittest.TestCase):
         f=maintenance_fixture(self)
         result=f.driver._execute()
         self.assertEqual(result['schema'],160)
-        sequence=['provider_preimage','fence_origin','provider_fence','backup_pre-migration','service_prepare',
+        sequence=['original_application_acceptance','provider_preimage','fence_origin','provider_fence','backup_pre-migration','service_prepare',
             'seal_stage','candidate_reobserved','parent_sql',*('committed_'+str(n) for n in range(147,161)),
             'customer_preservation','private_acceptance','grant_160','service_activate',
             'accepted_workers_start','seal_runtime','seal_normal_runtime',
@@ -125,7 +126,7 @@ class MaintenanceExecutionTests(unittest.TestCase):
         f=maintenance_fixture(self, RECONCILED)
         result=f.driver._execute()
         self.assertEqual(result['schema'],160)
-        sequence=['provider_preimage','fence_origin','provider_fence','backup_pre-migration','service_prepare',
+        sequence=['original_application_acceptance','provider_preimage','fence_origin','provider_fence','backup_pre-migration','service_prepare',
             'seal_stage','candidate_reobserved','parent_sql',
             *('committed_'+str(n) for n in range(147,161)),
             'customer_preservation','private_acceptance','grant_160','service_activate',
@@ -159,6 +160,17 @@ class MaintenanceExecutionTests(unittest.TestCase):
         f=maintenance_fixture(self);f.driver.maintenance_activation_guard=None
         with self.assertRaisesRegex(RuntimeError,'independent_private_verifiers_required'):f.driver._execute()
         self.assertEqual(f.calls,[])
+
+    def test_missing_original_account_probe_stops_before_any_effect(self):
+        f=maintenance_fixture(self);f.driver.maintenance_original_guard=None
+        with self.assertRaisesRegex(RuntimeError,'independent_private_verifiers_required'):f.driver._execute()
+        self.assertEqual(f.calls,[])
+
+    def test_original_account_failure_precedes_origin_fencing_and_backup(self):
+        f=maintenance_fixture(self);f.failure='original_application_acceptance'
+        with self.assertRaises(RuntimeError):f.driver._execute()
+        self.assertNotIn('fence_origin',f.calls);self.assertNotIn('provider_preimage',f.calls)
+        self.assertNotIn('backup_pre-migration',f.calls)
 
     def test_guarded_profile_is_still_unregistered_even_with_private_callbacks(self):
         from deployment.lib.completed_normal_profile import profile

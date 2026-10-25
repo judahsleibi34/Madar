@@ -28,6 +28,14 @@ object bytes/anonymous denial, REST, calendar grants and wrong-cluster refusal
 are tested inside the accepted backend image. The actual gateway runtime must
 also pass the controller's strict configuration verifier.
 
+The fixture also creates two designated tenant/account/private-object fixtures,
+then exercises the source-owned installed observer's actual account probes and
+PostgreSQL material digest before and after restarting the native providers.
+The same original passwords, verified factors, relationships and private bytes
+must survive; the backend must regain private gateway/calendar connectivity.
+Native addresses are measured again after restart. Its compact receipt binds
+the harness/observer bytes separately from the accepted application image SHA.
+
 Every exit unwinds owned containers, networks and disposable data volumes,
 including ordinary termination signals. Failure logs are private; compact
 receipts distinguish this connectivity fixture from a protected upgrade.

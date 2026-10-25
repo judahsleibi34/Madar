@@ -1,5 +1,39 @@
 # Madar production release acceptance policy
 
+## Installed original-provider observers
+
+The measured completed-NORMAL entrypoint supplies source-owned original,
+private-acceptance and activation observers for the canonical160 operation.
+The approved plan must pin `original_provider_probe_sha256` for a root-private
+`original-provider-probes.json` in its frozen package. This contains version1,
+the exact system identifier, and two to four designated original accounts in
+distinct tenants: Auth/user/tenant/factor identities, password, existing TOTP
+secret and a small private object path/hash. It contains no PASS flags, URLs,
+SQL or commands. Never publish this input or use customer credentials casually.
+It is not authority: the existing independent issuer and all admission gates
+remain required. Missing input refuses before any maintenance effect.
+
+Before fencing, the observer tests native password authentication, the existing
+verified TOTP factor/AAL2, refresh rotation, user-authorized object bytes,
+anonymous denial and cross-tenant membership isolation. PostgreSQL retains the
+password verifier/factor secret; only a material digest and identity projection
+are journaled privately. After migration the observer repeats those tests on
+the same providers/accounts while the READ_ONLY grant and all private-boundary
+checks hold. Reobserving a source-produced protected completion also requires
+unchanged original material and object preimages; it creates no duplicate MFA
+challenge/session. An operator-supplied PASS cannot produce this receipt.
+
+Activation independently validates committed SQL/manifest receipts, preserved
+row snapshots/material, the actual local backup bytes and root-sealed executed
+restore/receiver evidence, authenticated images, sealed candidate, exact origin
+or accepted worker owner, installed boot barriers and known database sessions.
+It issues no grant and opens no ingress. Installed boot verification is not a
+reboot drill; logical restore/receiver checks do not certify an independent
+full-application restoration. The private gateway re-resolves only its fixed
+Docker DNS upstreams after native provider restarts. Schema160 operational
+registration/admission, Class D and automatic dispatch remain closed until the
+actual full preserved-application protected release and recovery pass.
+
 ## Measured private and public boundaries
 
 Provider quiescence and the private boundary read the exact root-issued

@@ -249,7 +249,7 @@ class CompletedNormalUpgrade:
     summary or an old acceptance grant cannot substitute for these verifiers.
     """
     def __init__(self,actor,*,artifact_guard,model_loader,acceptance_guard,rehearsal_guard,
-                 maintenance_acceptance_guard=None,maintenance_activation_guard=None):
+                 maintenance_acceptance_guard=None,maintenance_activation_guard=None,maintenance_original_guard=None):
         if not all(callable(f) for f in (artifact_guard,model_loader,acceptance_guard,rehearsal_guard)):
             raise RuntimeError('completed_upgrade_independent_execution_guards_required')
         self.actor=actor;self.contract=actor.contract;self.document=actor.document
@@ -266,6 +266,8 @@ class CompletedNormalUpgrade:
         self.controller_installed=False;self.lock=None
         self.maintenance_acceptance_guard=maintenance_acceptance_guard
         self.maintenance_activation_guard=maintenance_activation_guard
+        self.maintenance_original_guard=maintenance_original_guard
+        self.provider_adapter=None
 
     def preparation_source(self):
         measured,_=self.actor.measure()
@@ -703,7 +705,7 @@ class CompletedNormalUpgrade:
         if self.profile is DELETION:
             raise RuntimeError('schema150_superseded_release_contract_not_executable')
         if (self.profile not in (DELETION, RECONCILED) or not callable(self.maintenance_acceptance_guard)
-                or not callable(self.maintenance_activation_guard)):
+                or not callable(self.maintenance_activation_guard) or not callable(self.maintenance_original_guard)):
             raise RuntimeError('schema150_independent_private_verifiers_required')
         self.preflight()
         self.lock=acquire_lock(self.ops.upgrade_root/'upgrade.lock',create=False)
@@ -742,10 +744,12 @@ class CompletedNormalUpgrade:
                 provider=Schema150ProviderAdapter(self.contract,binding,self.actor.runtime,
                     source_guard=self.actor.guard,lock_descriptors=(self.lock,self.ops.deploy_lock_descriptor),
                     acceptance_guard=self.maintenance_acceptance_guard,activation_guard=self.maintenance_activation_guard)
+                self.provider_adapter=provider
                 lifecycle=ProviderMaintenance150(binding,ProtectedProviderJournal(self.root/'provider-journal'),provider)
                 kernel=self.actor.candidate()
                 handoff=CompletedNormalWriteHandoff(self.contract,kernel,source_guard=self.actor.source,
                     boot_guard=self.actor.installation.installed,artifact_guard=self.artifact_guard,provider_adapter=provider)
+                self.event('original_application_acceptance_pending');self.maintenance_original_guard(binding)
                 self.event('original_provider_preimage_pending');lifecycle.prepare()
                 self.event('origin_write_fence_pending');self.fenced=True;handoff.fence_origin()
                 self.event('provider_maintenance_fence_pending');lifecycle.fence()

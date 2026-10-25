@@ -1,5 +1,16 @@
 # Madar Auto-Deploy Merge Contract
 
+The installed canonical160 entrypoint now binds source-owned original-account,
+private-provider and activation observers, including exact plan-bound private
+probe credentials, original material, tenant/user-object access, SQL/preservation
+receipts, root-sealed backup/restore/receiver evidence and worker/boot state.
+These observers cannot register the operation or issue authority. Native account
+probe/transport acceptance is separate from protected-upgrade acceptance. The
+private gateway uses only fixed Docker DNS upstreams with bounded re-resolution
+for provider restart recovery; its configuration remains a protected input.
+Production admission and automation remain blocked pending complete protected
+preserved146-to160 and independent recovery/reboot acceptance.
+
 The maintenance adapter now observes READ_ONLY directly from the existing
 root-issued candidate grant. Public acceptance/boot release require the
 protected route publication and actual NORMAL version/readiness/recovery
