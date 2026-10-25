@@ -63,6 +63,27 @@ class PackageTests(unittest.TestCase):
         target.write_bytes(b'# fixture only\n');(self.package/'source/unreviewed.py').write_bytes(b'new')
         with self.assertRaisesRegex(RuntimeError,'inventory_changed'):self.measure()
 
+    def test_capture_mode_measures_again_without_constructing_an_execution_actor(self):
+        document = dict(self.document, admission_contract={'synthetic': 'preparation-only'})
+        source = self.package/'source'
+        flags=SimpleNamespace(**{name:getattr(module.sys.flags,name) for name in dir(module.sys.flags) if not name.startswith('_')})
+        flags.isolated=1;flags.dont_write_bytecode=1
+        argv=['continue_completed_normal_upgrade.py','capture-inventory','--source-package',str(self.package),
+            '--approved-source',self.source_hash,'--approved-plan','b'*64]
+        from deployment.lib import schema150_provider_adapter as adapter
+        with patch.object(module.sys,'argv',argv),patch.object(module.sys,'flags',flags),\
+                patch.object(module.os,'geteuid',return_value=0),\
+                patch.object(module,'__file__',str(source/'web/scripts/continue_completed_normal_upgrade.py')),\
+                patch.object(module,'measure',return_value=(document,source)) as measure,\
+                patch.object(adapter,'capture_original_inventory',return_value={}) as capture,\
+                patch('deployment.lib.completed_normal_boot_actor.CompletedNormalBootActor') as actor:
+            module.main()
+            actor.assert_not_called()
+            guard=capture.call_args.kwargs['source_guard'];guard()
+            self.assertEqual(measure.call_count,2)
+            measure.return_value=(dict(document,changed=True),source)
+            with self.assertRaisesRegex(RuntimeError,'capture_source_changed'):guard()
+
     def test_fixture_package_cannot_be_used_by_production_preflight_or_execute(self):
         self.document['fixture_only']=True
         (self.package/'plan.json').write_bytes(self.encode(self.document))

@@ -11,7 +11,14 @@ WEB_ROOT="${ROOT_DIR}/web"
 POSTGRES_IMAGE="postgres:17-alpine@sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73"
 CONTAINER_NAME="madar-staging-chain-${RANDOM}-$$"
 CONTAINER_ID=''
-BACKUP_FILE="$(mktemp /tmp/madar-schema136-XXXXXX.dump)"
+RUN_PARENT=/tmp
+if [[ -d /opt/madar-development/scratch/codex-runs ]]; then
+  RUN_PARENT=/opt/madar-development/scratch/codex-runs
+fi
+RUN_ROOT="$(mktemp -d "$RUN_PARENT/codex-native-chain-XXXXXXXX")"
+SOURCE_VIEW="$RUN_ROOT/source"
+BACKUP_FILE="$RUN_ROOT/schema136.dump"
+touch "$BACKUP_FILE"
 
 cleanup() {
   if [[ -n "${CONTAINER_ID}" ]]; then
@@ -22,8 +29,43 @@ cleanup() {
     docker rm -f "${CONTAINER_ID}" >/dev/null
   fi
   rm -f "${BACKUP_FILE}"
+  # This exact new directory contains only this run's public source copies.
+  # Never remove the repository, retained evidence or operational artifacts.
+  if [[ -d "$SOURCE_VIEW" && ! -L "$SOURCE_VIEW" ]]; then
+    python3 - "$SOURCE_VIEW" <<'PYTEARDOWN'
+import shutil,sys
+shutil.rmtree(sys.argv[1])
+PYTEARDOWN
+  fi
+  rmdir "$RUN_ROOT"
 }
 trap cleanup EXIT
+
+# Export indexed public source only, not .git, .env, ignored data, incident
+# response material, dependency trees or untracked historical documents.
+# A readable copy avoids widening permissions on the private host checkout.
+python3 - "$ROOT_DIR" "$SOURCE_VIEW" <<'PYSOURCE'
+import os,stat,subprocess,sys
+from pathlib import Path
+root,target=map(Path,sys.argv[1:]);target.mkdir(mode=0o755)
+prefixes=('web/backend/','web/deployment/','web/scripts/','web/staging/','web/database/','web/supabase/')
+paths=subprocess.check_output(['git','-C',str(root),'ls-files','-z']).split(b'\0')
+total=0
+for raw in paths:
+    if not raw:continue
+    name=raw.decode()
+    if not name.startswith(prefixes):continue
+    path=root/name
+    if path.is_symlink() or not path.is_file():raise RuntimeError('native_source_regular_file_required')
+    body=path.read_bytes();total+=len(body)
+    if len(body)>16*1024**2 or total>256*1024**2:raise RuntimeError('native_source_size_limit')
+    dest=target/name;dest.parent.mkdir(parents=True,exist_ok=True)
+    dest.write_bytes(body);dest.chmod(0o755 if path.stat().st_mode&0o111 else 0o644)
+for folder in target.rglob('*'):
+    if folder.is_dir():folder.chmod(0o755)
+target.chmod(0o755)
+print('Owned bounded public source view prepared; private checkout remains unchanged')
+PYSOURCE
 
 python3 "${WEB_ROOT}/scripts/check_data_sources_staging_chain.py"
 
@@ -101,8 +143,8 @@ if [[ "${MADAR_CANONICAL_EXECUTOR_TESTS:-false}" == true ]]; then
     "comment on database postgres is 'madar-notification-synthetic-rehearsal'"
   docker run --rm --read-only --memory=2g --cpus=1 --pids-limit=256 \
     --network "container:${CONTAINER_NAME}" --tmpfs /tmp:rw,noexec,nosuid,size=256m \
-    --volume "${WEB_ROOT}/backend:/app:ro" --volume "${ROOT_DIR}:/release:ro" \
-    --env PYTHONPATH=/app:/release/web --env PYTHONDONTWRITEBYTECODE=1 \
+    --volume "${SOURCE_VIEW}/web/backend:/app:ro" --volume "${SOURCE_VIEW}:/release:ro" \
+    --env PYTHONPATH=/app:/app/tests:/release/web --env PYTHONDONTWRITEBYTECODE=1 \
     --env MADAR_TEST_REPOSITORY_ROOT=/release/web \
     --env SUPABASE_URL=http://127.0.0.1:54321 \
     --env APP_ENV=test --env SUPABASE_ANON_KEY=synthetic-placeholder-anon --env SUPABASE_SERVICE_KEY=synthetic-placeholder-service \
@@ -281,8 +323,8 @@ if [[ "${MADAR_RECONCILED_INTEGRITY_TESTS:-false}" == true ]]; then
     "comment on database postgres is 'madar-notification-synthetic-rehearsal'"
   docker run --rm --read-only --memory=2g --cpus=1 --pids-limit=256 \
     --network "container:${CONTAINER_NAME}" --tmpfs /tmp:rw,noexec,nosuid,size=256m \
-    --volume "${WEB_ROOT}/backend:/app:ro" --volume "${ROOT_DIR}:/release:ro" \
-    --env PYTHONPATH=/app:/release/web --env PYTHONDONTWRITEBYTECODE=1 \
+    --volume "${SOURCE_VIEW}/web/backend:/app:ro" --volume "${SOURCE_VIEW}:/release:ro" \
+    --env PYTHONPATH=/app:/app/tests:/release/web --env PYTHONDONTWRITEBYTECODE=1 \
     --env SUPABASE_URL=http://127.0.0.1:54321 \
     --env APP_ENV=test --env SUPABASE_ANON_KEY=synthetic-placeholder-anon --env SUPABASE_SERVICE_KEY=synthetic-placeholder-service \
     --env RECONCILED_SYNTHETIC_DATABASE_DSN='host=127.0.0.1 port=5432 dbname=postgres user=postgres' \

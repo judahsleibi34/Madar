@@ -168,6 +168,93 @@ def role_measurements(snapshot):
     return result
 
 
+def capture_original_inventory(package, contract, runtime, *, source_guard):
+    """Publish independently reobserved preparation, never operation authority.
+
+    The expected inventory is root-private and already pinned by the approved
+    contract. Only fixed read-only probes run. No adapter effects, credentials,
+    candidate creation or operation registration occur at this boundary.
+    """
+    from deployment.lib.completed_normal_baseline import BASE
+    from deployment.lib.completed_normal_admission import encoded as admission_encoded
+    from deployment.lib.schema150_actor_inventory import validate_inventory, attest_containers
+    from deployment.lib.schema150_object_inventory import measure_roots
+    selected = validate_provider_preparation(contract)
+    package = Path(package)
+    if (os.geteuid() != 0 or package.parent != BASE
+            or not re.fullmatch('normal-source-[0-9a-f]{64}', package.name)):
+        raise RuntimeError('schema160_inventory_capture_root_package_required')
+    if selected is not RECONCILED:
+        raise RuntimeError('schema160_original_capture_profile_required')
+    destination = package / 'provider-inventory.json'
+    if destination.exists() or destination.is_symlink():
+        raise RuntimeError('schema160_inventory_capture_already_published')
+    source_guard()
+    binding = {'operation': selected.operation, 'context_sha256': contract_digest(contract),
+        'source_sha': contract['candidate']['source_sha'], 'controller_sha': contract['candidate']['controller_sha'],
+        'inventory_sha256': contract['writer_inventory_sha256'],
+        'system_identifier': contract['database']['system_identifier'],
+        'source_schema': selected.source, 'target_schema': selected.target}
+    inventory = validate_inventory(private_json(package / 'provider-inventory-input.json'), binding)
+    if inventory['exclusions'] or any(k.startswith('candidate:') for k in inventory['containers']):
+        raise RuntimeError('schema160_original_inventory_scope_not_proven')
+    database = inventory['containers']['native:db']
+    if (database['id'] != contract['database']['container_id']
+            or database['image'] != contract['database']['image']):
+        raise RuntimeError('schema160_inventory_database_substitution')
+
+    def containers():
+        identifiers = runtime.command(['docker', 'ps', '-aq', '--no-trunc']).split()
+        if (not identifiers or len(identifiers) > 1024 or len(set(identifiers)) != len(identifiers)
+                or any(not re.fullmatch('[0-9a-f]{64}', x) for x in identifiers)):
+            raise RuntimeError('schema160_inventory_snapshot_unbounded')
+        rows = json.loads(runtime.command(['docker', 'inspect', *identifiers]))
+        if {r.get('Id') for r in rows} != set(identifiers):
+            raise RuntimeError('schema160_inventory_snapshot_incomplete')
+        attest_containers(inventory, rows, phase='prepared')
+        return set(identifiers)
+
+    def sql(body):
+        # Database ID is independently bound above; SQL is source-owned only.
+        return runtime.command(['docker', 'exec', '-i', database['id'], 'psql', '-XqAt',
+            '-v', 'ON_ERROR_STOP=1', '-U', 'postgres', '-d', 'postgres'],
+            input="SET search_path=pg_catalog,public,extensions; SET statement_timeout='10s'; "
+                  "BEGIN READ ONLY; " + body + ' COMMIT;')
+
+    def observe():
+        ids = containers()
+        identity = json.loads(sql("SELECT json_build_array((SELECT system_identifier::text FROM pg_control_system()),"
+            "(SELECT schema_version FROM public.application_schema_state WHERE contract_key='core'));"))
+        if identity != [binding['system_identifier'], selected.source]:
+            raise RuntimeError('schema160_inventory_database_origin_changed')
+        if role_measurements(json.loads(sql(ROLE_SQL))) != inventory['roles']:
+            raise RuntimeError('schema160_inventory_original_roles_changed')
+        for name, expected in inventory['supervisors'].items():
+            text = runtime.command(['systemctl', 'show', name,
+                '--property=FragmentPath,DropInPaths,UnitFileState,ActiveState,SubState,Job,ExecMainPID,ControlPID', '--no-pager'])
+            fields = dict(line.split('=', 1) for line in text.splitlines() if '=' in line)
+            fragment = Path(fields.get('FragmentPath', ''))
+            if not fragment.is_absolute():
+                raise RuntimeError('schema160_inventory_supervisor_unmeasurable')
+            dropins = {path: hashlib.sha256(protected(Path(path)).read_bytes()).hexdigest()
+                for path in fields.get('DropInPaths', '').split()}
+            if (hashlib.sha256(protected(fragment).read_bytes()).hexdigest() != expected['fragment_sha256']
+                    or digest(dropins) != expected['dropins_sha256'] or fields.get('UnitFileState') != expected['enabled']
+                    or fields.get('Job') != '' or fields.get('ControlPID') != '0'):
+                raise RuntimeError('schema160_inventory_supervisor_changed_or_pending')
+        return ids, measure_roots(inventory['object_roots'], phase='identity')
+
+    first = observe()
+    source_guard()
+    if observe() != first:
+        raise RuntimeError('schema160_inventory_capture_changed')
+    source_guard()
+    exclusive(destination, admission_encoded(inventory))
+    return {'operation': selected.operation, 'inventory_sha256': binding['inventory_sha256'],
+        'containers': len(inventory['containers']), 'schema': selected.source,
+        'authority_issued': False, 'writers_fenced': False, 'object_bytes_backed_up': False}
+
+
 class Schema150ProviderAdapter:
     """Actual Docker/systemd/PostgreSQL effects using immutable accepted identities.
 

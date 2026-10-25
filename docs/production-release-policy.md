@@ -1,5 +1,26 @@
 # Madar production release acceptance policy
 
+## Protected inventory preparation (2026-10-25)
+
+The measured root entrypoint adds `capture-inventory`. Before constructing an
+operational actor it validates the exact schema160 preparation contract and
+root-private expected `provider-inventory-input.json`, whose digest is already
+bound into the approved plan. It independently reobserves all Docker actors,
+exact146 cluster/schema, role attributes/memberships, protected systemd fragment
+and drop-in hashes, pending jobs and filesystem root identities twice. Changed
+source, late/foreign actors, missing observations and already published output
+refuse. It publishes only the existing `provider-inventory.json` format, with
+exclusive creation and directory fsync, for the maintenance coordinator.
+
+This is read-only preparation plus protected file publication: no authority,
+fencing, SQL mutation, receiver acceptance or operation registration is implied.
+Candidate-bearing inventories and independently unproven exclusions refuse.
+Actual private provider guards, full preserved-application acceptance, receiver/
+restore and privileged reboot proof remain required before schema160 admission.
+Development now uses only `Saliba-Branch` in the repository checkout, preserving
+published SQL and historical authorship. Production stays read-only.
+
+
 ## Approved reduced PR220 scope (2026-10-23)
 
 PR220 acceptance is frozen to application architecture, database integrity,
