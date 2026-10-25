@@ -91,7 +91,7 @@ def digest(stream):
 
 
 @contextmanager
-def authenticated_bytes(path,expected_digest):
+def authenticated_bytes(path,expected_digest,*,max_bytes=6*1024**3):
     """Parse exactly the authenticated bytes, even if an operator changes the path.
 
     The source is operator-owned read-only input, not a protected receipt. A
@@ -99,6 +99,8 @@ def authenticated_bytes(path,expected_digest):
     assuming that either its directory entry or its open inode stays immutable.
     Callers importing archive contents must use this same boundary as well.
     """
+    if type(max_bytes) is not int or not 0<max_bytes<=6*1024**3:
+        raise RuntimeError('schema148_ci_archive_limit_invalid')
     if not re.fullmatch('sha256:[0-9a-f]{64}',str(expected_digest)):
         raise RuntimeError('schema148_ci_archive_digest_invalid')
     path=Path(path)
@@ -108,7 +110,7 @@ def authenticated_bytes(path,expected_digest):
         raise RuntimeError('schema148_ci_archive_invalid') from None
     with os.fdopen(descriptor,'rb') as source:
         measured=os.fstat(source.fileno())
-        if not stat.S_ISREG(measured.st_mode) or not 0<measured.st_size<=6*1024**3:
+        if not stat.S_ISREG(measured.st_mode) or not 0<measured.st_size<=max_bytes:
             raise RuntimeError('schema148_ci_archive_invalid')
         with tempfile.TemporaryFile(mode='w+b') as frozen:
             value=hashlib.sha256();remaining=measured.st_size
@@ -123,8 +125,8 @@ def authenticated_bytes(path,expected_digest):
 
 
 @contextmanager
-def authenticated_archive(path,expected_digest):
-    with authenticated_bytes(path,expected_digest) as frozen:
+def authenticated_archive(path,expected_digest,*,max_bytes=6*1024**3):
+    with authenticated_bytes(path,expected_digest,max_bytes=max_bytes) as frozen:
         with zipfile.ZipFile(frozen) as archive:yield archive
 
 

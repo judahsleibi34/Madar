@@ -3761,3 +3761,20 @@ Filesystem teardown verifies the original device/inode and uses directory
 descriptors, refusing replacement paths. Repeated teardown is safe. This is
 test-resource hygiene, not controller reboot
 or preserved-application recovery acceptance.
+
+### Canonical candidate evidence preparation (2026-10-25)
+
+The measured `continue_completed_normal_upgrade.py verify-candidate` mode checks
+image provenance and authenticated fresh-application CI evidence without creating
+an execution/boot actor, importing images, admitting SQL or issuing credentials.
+It remeasures its root-private source package before and after verification.
+Canonical160 evidence no longer falls through to historical115/136 verification.
+
+The fresh artifact verifier requeries the fixed repository/workflow and exact
+run/attempt, rejects stale/expired/foreign inputs, authenticates a bounded ZIP,
+and binds its observed images/protocols to the candidate. A local PASS file is
+insufficient. The returned result explicitly leaves preserved-upgrade and Node1
+recovery acceptance false. `verify_complete_rehearsal` refuses fresh evidence as
+protected146→160 acceptance; operational registration and admitted_manifest stay
+closed. This connects candidate evidence only, not private original-provider
+acceptance or production authorization.

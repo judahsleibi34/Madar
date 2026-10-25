@@ -76,7 +76,7 @@ def main():
     if os.geteuid()!=0 or not sys.flags.isolated or not sys.flags.dont_write_bytecode:
         raise RuntimeError('completed_upgrade_boot_isolated_root_required')
     parser=argparse.ArgumentParser()
-    parser.add_argument('mode',choices=('capture-inventory','preflight','execute','forward-preflight','forward-resume','boot','proxy-gate'))
+    parser.add_argument('mode',choices=('capture-inventory','verify-candidate','preflight','execute','forward-preflight','forward-resume','boot','proxy-gate'))
     for name in ('source-package','approved-source','approved-plan'):parser.add_argument('--'+name,required=True)
     parser.add_argument('--resumption-plan');parser.add_argument('--approved-resumption')
     args=parser.parse_args();package=Path(args.source_package)
@@ -86,16 +86,28 @@ def main():
     if args.mode in {'preflight','execute','forward-preflight','forward-resume'} and (document.get('fixture_only') or document.get('production_authorization') is False):
         raise RuntimeError('completed_upgrade_fixture_cannot_authorize_production')
     sys.path.insert(0,str(source/'web'))
-    if args.mode == 'capture-inventory':
-        from deployment.lib.schema150_provider_adapter import capture_original_inventory
-        from deployment.lib.emergency_routing_repair import Runtime
-        from deployment.lib.completed_normal_admission import digest
+    if args.mode in {'capture-inventory','verify-candidate'}:
+        from deployment.lib.completed_normal_admission import digest,ADMISSIONS
         contract = dict(document['admission_contract'], plan_sha256=digest(document))
         def source_guard():
             current, measured_source = measure(package,args.approved_source,args.approved_plan)
             if current != document or measured_source != source:
                 raise RuntimeError('completed_upgrade_capture_source_changed')
-        result=capture_original_inventory(package,contract,Runtime(),source_guard=source_guard)
+        if args.mode == 'capture-inventory':
+            from deployment.lib.schema150_provider_adapter import capture_original_inventory
+            from deployment.lib.emergency_routing_repair import Runtime
+            result=capture_original_inventory(package,contract,Runtime(),source_guard=source_guard)
+        else:
+            from types import SimpleNamespace
+            from deployment.lib.completed_normal_evidence import verify_reconciled_application_evidence
+            from deployment.lib.control_plane_upgrade import SystemOperations
+            # Read-only package/API/archive verification. No boot/execution actor,
+            # admission, credential, image import or service mutation is created.
+            source_guard()
+            actor=SimpleNamespace(contract=contract,document=document,package=package,
+                root=ADMISSIONS/digest(contract),ops=SystemOperations())
+            result=verify_reconciled_application_evidence(actor)
+            source_guard()
         print(json.dumps({'operation':args.mode,'result':result},sort_keys=True))
         return
     from deployment.lib.completed_normal_boot_actor import CompletedNormalBootActor

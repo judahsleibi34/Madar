@@ -84,6 +84,25 @@ class PackageTests(unittest.TestCase):
             measure.return_value=(dict(document,changed=True),source)
             with self.assertRaisesRegex(RuntimeError,'capture_source_changed'):guard()
 
+    def test_candidate_verification_is_measured_preparation_without_execution_actor(self):
+        document=dict(self.document,admission_contract={'synthetic':'preparation-only'},fixture_only=True)
+        source=self.package/'source'
+        flags=SimpleNamespace(**{name:getattr(module.sys.flags,name) for name in dir(module.sys.flags) if not name.startswith('_')})
+        flags.isolated=1;flags.dont_write_bytecode=1
+        argv=['continue_completed_normal_upgrade.py','verify-candidate','--source-package',str(self.package),
+            '--approved-source',self.source_hash,'--approved-plan','b'*64]
+        with patch.object(module.sys,'argv',argv),patch.object(module.sys,'flags',flags),\
+                patch.object(module.os,'geteuid',return_value=0),\
+                patch.object(module,'__file__',str(source/'web/scripts/continue_completed_normal_upgrade.py')),\
+                patch.object(module,'measure',return_value=(document,source)) as measure,\
+                patch('deployment.lib.completed_normal_evidence.verify_reconciled_application_evidence',return_value={}) as verify,\
+                patch('deployment.lib.control_plane_upgrade.SystemOperations') as operations,\
+                patch('deployment.lib.completed_normal_boot_actor.CompletedNormalBootActor') as actor:
+            module.main()
+            actor.assert_not_called();verify.assert_called_once()
+            self.assertEqual(measure.call_count,3)
+            self.assertEqual(verify.call_args.args[0].package,self.package)
+
     def test_fixture_package_cannot_be_used_by_production_preflight_or_execute(self):
         self.document['fixture_only']=True
         (self.package/'plan.json').write_bytes(self.encode(self.document))
