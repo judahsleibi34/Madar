@@ -3749,3 +3749,15 @@ reobserves leaks; repeated application is safe. Fresh Application Staging invoke
 `CLEANUP` in an `always()` step after acceptance/failure/timeout. A cleanup refusal
 fails visibly and leaves explicit review evidence. No production controller,
 authority or migration admission is changed by this lifecycle.
+
+The canonical native SQL/calendar harness reserves at least 3 GiB free disk and
+5 GiB available RAM before allocating its bounded source view and two 2 GiB
+containers. It labels both its PostgreSQL container
+and acceptance child with one unique run ID. INT/TERM traps tear down the child
+before the database and remove only the new source view/dump. Failed daemon
+observation is not absence: unknown/unremoved resources get a private
+`cleanup-retained.json` with owner and review condition, and cleanup fails.
+Filesystem teardown verifies the original device/inode and uses directory
+descriptors, refusing replacement paths. Repeated teardown is safe. This is
+test-resource hygiene, not controller reboot
+or preserved-application recovery acceptance.
