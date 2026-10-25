@@ -11,11 +11,14 @@ Context-free and historical150 observations retain the original stopped-parser
 rule. All actual consumers remain stopped until independent target authority.
 The existing child owner-transfer boundary additionally requires a running,
 healthy private parser; it starts no services and publishes no traffic.
-Its identity comparison uses the existing false-to-null Docker default
-normalization for that canonical160 started sidecar only. Configured true and
-changes to any other measured field still reject; historical profiles retain
-their previous comparison. A native created/start fixture reproduced the engine
-transition and verified real HTTP parsing and read-only original object bytes.
+Canonical160 seals every candidate role while CREATED. Its stage, inventory
+and child identity comparisons therefore use the existing false-to-null Docker
+default normalization for those started candidate roles, including private
+Redis/backend/frontend. Configured true and changes to any other measured field
+still reject; historical profiles retain their previous comparisons. A native
+created/start parser fixture reproduced the engine transition and verified real
+HTTP parsing and read-only original object bytes. Role-by-role regressions cover
+the candidate comparisons; they do not claim a full running application upgrade.
 
 These checks do not authenticate private gateway connectivity, calendar database
 transport, original Auth/MFA/Storage acceptance, a full protected upgrade, or

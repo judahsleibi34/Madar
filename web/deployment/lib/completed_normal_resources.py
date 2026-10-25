@@ -184,9 +184,10 @@ def verify_runtime_resources(contract,publication,runtime):
     started_roles={'notification-worker','calendar-sync-worker','data-deletion-worker'}
     if contract.get('operation')==RECONCILED.operation:
         # Native Docker changes only its default OomKillDisable false to null
-        # on start. The canonical private parser now crosses that boundary
-        # before handoff; preserve every other measured field and old profiles.
-        started_roles.add('parser-worker')
+        # on start. Canonical maintenance seals ALL roles while CREATED, unlike
+        # historical bridges whose core services are sealed already running.
+        # Preserve every other measured field and historical profile behavior.
+        started_roles.update(ROLES)
     selected={}
     for kind,expected in publication['runtimes'].items():
         row=next((r for r in rows.values() if r['Id']==expected['id']),None)

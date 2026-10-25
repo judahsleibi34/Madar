@@ -456,9 +456,13 @@ class Schema150ProviderAdapter:
                     or any(sealed[k]!=record[k] for k in ('id','image','spec_sha256','networks'))):
                 raise RuntimeError('schema150_private_candidate_identity_changed')
             row=actual.get(record['id'])
+            canonical_started = (self.binding['target_schema']==160
+                and stage.get('preparation_mode')=='created-fenced' and row is not None
+                and row.get('State',{}).get('Status') in {'running','exited'})
             if (row is None or row.get('Image')!=sealed['image']
                     or 'name' in sealed and row.get('Name')!='/'+sealed['name']
-                    or not measured_spec_matches(row,sealed['spec_sha256'],started_worker=role.endswith('-worker'))
+                    or not measured_spec_matches(row,sealed['spec_sha256'],
+                        started_worker=canonical_started or role.endswith('-worker'))
                     or {k:sorted(v.get('Aliases') or []) for k,v in row['NetworkSettings']['Networks'].items()}
                         !={k:sorted(v) for k,v in sealed['network_aliases'].items()}):
                 raise RuntimeError('schema150_private_candidate_identity_changed')

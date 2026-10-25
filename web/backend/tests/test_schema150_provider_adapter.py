@@ -281,6 +281,30 @@ class ConcreteAdapterTests(unittest.TestCase):
         self.assertEqual(actor.verify_candidate_stage(phase='private'),stage)
         actor.runtime.command.assert_not_called()
 
+    def test_canonical_private_core_keeps_created_seals_after_native_start_defaults_change(self):
+        from deployment.lib.completed_normal_resources import measured_spec
+        actor,scope,_,_=self.component(stage='private',candidates=True,target=160)
+        path=actor.root/'candidate-staged-runtime.json';stage=json.loads(path.read_text())
+        stage['preparation_mode']='created-fenced'
+        for logical,record in actor.inventory['containers'].items():
+            if not logical.startswith('candidate:'):continue
+            role=logical.split(':',1)[1];stage['runtimes'][role]['name']=record['name']
+            row=next(r for r in actor._rows.return_value if r['Id']==record['id'])
+            row['HostConfig']['OomKillDisable']=False
+            record['spec_sha256']=stage['runtimes'][role]['spec_sha256']=measured_spec(row)
+            if row['State']['Running']:
+                row['State']['Status']='running';row['HostConfig']['OomKillDisable']=None
+        actor.inventory,actor.binding=repin(actor.inventory,scope)
+        actor.original_inventory=actor.inventory
+        path.write_text(json.dumps(stage))
+        with patch('deployment.lib.completed_normal_admission.credential_witness',return_value=stage):
+            actor._attest('private')
+            for role in ('redis','backend','frontend','parser-worker'):
+                row=next(r for r in actor._rows.return_value if r['Id']==stage['runtimes'][role]['id'])
+                row['HostConfig']['OomKillDisable']=True
+                with self.subTest(role=role),self.assertRaises(RuntimeError):actor._attest('private')
+                row['HostConfig']['OomKillDisable']=None
+
     def test_candidate_extension_rejects_missing_stale_or_unmarked_stage(self):
         for fault in ('missing','stale','unmarked'):
             with self.subTest(fault=fault):

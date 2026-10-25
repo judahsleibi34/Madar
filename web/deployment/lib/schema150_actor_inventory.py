@@ -404,7 +404,9 @@ def attest_containers(inventory, rows, *, phase, binding=None):
                  and host.get('RestartPolicy', {}).get('Name') == expected['restart'], 'schema150_actor_state_changed')
         normalized = copy.deepcopy(row)
         normalized['HostConfig']['RestartPolicy']['Name'] = actor['states']['prepared']['restart']
-        _require(measured_spec_matches(normalized, actor['spec_sha256'], started_worker=logical.split(':')[-1] in WORKER_ROLES), 'schema150_actor_spec_changed')
+        canonical_created = binding is not None and binding['target_schema']==160 and logical.startswith('candidate:')
+        _require(measured_spec_matches(normalized, actor['spec_sha256'],
+            started_worker=canonical_created or logical.split(':')[-1] in WORKER_ROLES), 'schema150_actor_spec_changed')
         _require(mounts == actor['mounts'], 'schema150_actor_mounts_changed')
         _require(set(networks) == set(actor['networks']), 'schema150_actor_networks_changed')
         for name, endpoint in networks.items():

@@ -345,12 +345,12 @@ class RuntimeModelTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError,'private_parser_network_invalid'):
             m.validate_model(self.contract,self.model,self.runtime,phase='provisional')
 
-    def test_canonical_private_parser_created_seal_survives_native_oom_default_normalization(self):
+    def test_canonical_created_seals_survive_native_oom_defaults_for_all_started_roles(self):
         from test_schema160_release import reconciled_contract
         from deployment.lib.completed_normal_resources import verify_runtime_resources,measured_spec
         self.use_manual_contract(reconciled_contract(),preparation150=True)
-        row=self.rows[self.selected['containers']['parser-worker']]
-        row['State']['Status']='running';row['HostConfig']['OomKillDisable']=False
+        for item in self.rows.values():
+            item['State']['Status']='running';item['HostConfig']['OomKillDisable']=False
         publication={'context_sha256':digest(self.contract),'source_sha':self.contract['candidate']['source_sha'],
             'images':self.contract['candidate']['images'],'runtimes':{},
             'networks':{value['name']:'network-id' for value in self.model['networks'].values()}}
@@ -361,15 +361,16 @@ class RuntimeModelTests(unittest.TestCase):
                 'network_aliases':{k:v['Aliases'] for k,v in networks.items()}}
         # Observed on the real Docker engine: CREATED false becomes running
         # null. No configured true value or other field can be normalized.
-        row['HostConfig']['OomKillDisable']=None
+        for item in self.rows.values():item['HostConfig']['OomKillDisable']=None
         verify_runtime_resources(self.contract,publication,self.runtime)
-        row['HostConfig']['OomKillDisable']=True
-        with self.assertRaisesRegex(RuntimeError,'identity_changed'):
-            verify_runtime_resources(self.contract,publication,self.runtime)
-        row['HostConfig']['OomKillDisable']=None;row['HostConfig']['Memory']+=1
-        with self.assertRaisesRegex(RuntimeError,'identity_changed'):
-            verify_runtime_resources(self.contract,publication,self.runtime)
-        row['HostConfig']['Memory']-=1
+        for row in self.rows.values():
+            row['HostConfig']['OomKillDisable']=True
+            with self.subTest(role=row['Name']),self.assertRaisesRegex(RuntimeError,'identity_changed'):
+                verify_runtime_resources(self.contract,publication,self.runtime)
+            row['HostConfig']['OomKillDisable']=None;row['HostConfig']['Memory']+=1
+            with self.assertRaisesRegex(RuntimeError,'identity_changed'):
+                verify_runtime_resources(self.contract,publication,self.runtime)
+            row['HostConfig']['Memory']-=1
         from deployment.lib.completed_normal_profile import DELETION
         self.contract['operation']=DELETION.operation
         publication['context_sha256']=digest(self.contract)
