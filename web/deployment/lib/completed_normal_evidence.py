@@ -368,6 +368,8 @@ def verify_reconciled_application_evidence(actor):
     from deployment.lib.schema148_artifacts import verify_provenance
     if validate_provider_preparation(actor.contract) is not RECONCILED:
         raise RuntimeError('schema160_application_profile_required')
+    from deployment.lib.schema160_release import captured_source
+    captured_source(actor.package/'source')
     bindings=actor.document['application_evidence']
     if not isinstance(bindings,dict) or set(bindings)!={'provenance','fresh_application'}:
         raise RuntimeError('schema160_application_evidence_inventory_invalid')

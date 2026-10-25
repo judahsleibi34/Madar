@@ -152,17 +152,27 @@ class CanonicalApplicationEvidenceTests(unittest.TestCase):
 
     def test_canonical_dispatch_authenticates_image_bytes_before_fresh_report(self):
         replica={'host':'madar-node1-lan','filesystem_uuid':'1'*8+'-'+'2'*4+'-'+'3'*4+'-'+'4'*4+'-'+'5'*12,'configuration_sha256':'a'*64}
+        self.actor.package=self.root
         self.actor.document.update(application_evidence={},application_artifacts={'build_timestamp':'synthetic-time'},
             node1_replica=replica,live_configuration_sha256={'node1_configuration':'a'*64})
         for name,value in {'provenance':self.image_binding,'fresh_application':self.binding}.items():
             path=self.root/(name+'.json');path.write_text(json.dumps(value))
             self.actor.document['application_evidence'][name]={'path':str(path),'sha256':hashlib.sha256(path.read_bytes()).hexdigest()}
-        with patch.object(artifacts,'verify_provenance',return_value=self.receipt) as images:
+        with patch('deployment.lib.schema160_release.captured_source') as sql,\
+                patch.object(artifacts,'verify_provenance',return_value=self.receipt) as images:
             result=evidence.verify_application_evidence(self.actor)
+            sql.assert_called_once_with(self.root/'source')
             images.assert_called_once_with(self.actor,self.image_binding)
             self.assertTrue(result['fresh_application']['fresh_application_accepted'])
             self.assertFalse(result['complete_upgrade_rehearsal']);self.assertFalse(result['node1_recovery_accepted'])
-        with patch.object(artifacts,'verify_provenance',side_effect=RuntimeError('image_bytes_changed')):
+        with patch('deployment.lib.schema160_release.captured_source'),\
+                patch.object(artifacts,'verify_provenance',side_effect=RuntimeError('image_bytes_changed')):
             self.command.reset_mock()
             with self.assertRaisesRegex(RuntimeError,'image_bytes_changed'):evidence.verify_application_evidence(self.actor)
             self.command.assert_not_called()
+
+    def test_canonical_changed_sql_refuses_before_any_artifact_or_api(self):
+        self.actor.package=self.root
+        with patch('deployment.lib.schema160_release.captured_source',side_effect=RuntimeError('sql_changed')):
+            with self.assertRaisesRegex(RuntimeError,'sql_changed'):evidence.verify_application_evidence(self.actor)
+        self.command.assert_not_called()

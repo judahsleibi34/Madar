@@ -1915,7 +1915,9 @@ an execution/boot actor, importing images, admitting SQL or issuing credentials.
 It remeasures its root-private source package before and after verification.
 Canonical160 evidence no longer falls through to historical115/136 verification.
 
-The fresh artifact verifier requeries the fixed repository/workflow and exact
+Before API verification, preparation checks all fourteen canonical SQL bytes
+and mirrors against the pinned schema160 contract. The fresh artifact verifier
+requeries the fixed repository/workflow and exact
 run/attempt, rejects stale/expired/foreign inputs, authenticates a bounded ZIP,
 and binds its observed images/protocols to the candidate. A local PASS file is
 insufficient. The returned result explicitly leaves preserved-upgrade and Node1
