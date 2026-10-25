@@ -1,5 +1,42 @@
 # Dedicated native integration staging
 
+## Private canonical160 transport on synthetic schema146
+
+`private_provider_transport.py` runs only in an otherwise empty disposable
+guest, not in the accepted staging application. It requires an expiring,
+root-owned mode0600 `/etc/madar-disposable-test.json` matching its measured DMI
+UUID, with `disposable: true`, `production_authority: false`, and `expires_at`
+(UTC ISO8601), plus an active `codex-test-isolation.service`. Provision and
+independently bound the guest lifetime before running it. The marker grants no
+release or write authority. The canonical repository must be at the exact SHA;
+download its authenticated CI artifact package to
+`/opt/madar-development/evidence/integration/artifacts-<first12-of-SHA>`.
+
+```bash
+python3 web/staging/integration/private_provider_transport.py \
+  --source-sha <exact-40-character-commit> \
+  --guest-uuid <owned-disposable-guest-DMI-UUID> \
+  --artifacts /opt/madar-development/evidence/integration/artifacts-<first12-of-SHA>
+```
+
+The fixture initializes only an empty, marked schema146 database from captured
+Git SQL. It never executes migrations147–160. Real Auth/REST/Storage, Redis,
+parser, backend and the accepted frontend image's private gateway have bounded
+resources and no published host ports. PostgreSQL is reachable from the backend
+only through that gateway. Synthetic login, TOTP/AAL2, token rotation, private
+object bytes/anonymous denial, REST, calendar grants and wrong-cluster refusal
+are tested inside the accepted backend image. The actual gateway runtime must
+also pass the controller's strict configuration verifier.
+
+Every exit unwinds owned containers, networks and disposable data volumes,
+including ordinary termination signals. Failure logs are private; compact
+receipts distinguish this connectivity fixture from a protected upgrade.
+Imported/pinned images are explicitly retained only within the expiring guest
+for reuse; the provisioning owner must remove its disk after testing. SIGKILL
+or guest loss relies on that independent host watchdog and teardown. No result
+from this fixture establishes original-state migration preservation, independent
+recovery, write handoff, public activation or schema160 operational admission.
+
 This separate harness runs **only on `madar-staging`** and never reads production
 environment files. It uses native GoTrue, PostgREST and Storage with PostgreSQL17,
 Redis and the candidate API/notification worker. It is distinct from the retained
