@@ -228,8 +228,8 @@ class ConcreteAdapterTests(unittest.TestCase):
             stack.enter_context(patch('deployment.lib.completed_normal_admission.credential_witness',return_value=copy.deepcopy(candidate_stage)))
         return actor, scope, preimage, journal
 
-    def candidate_extension(self, *, phase='fenced'):
-        actor,scope,preimage,journal=self.component(stage='fenced',candidates=True)
+    def candidate_extension(self, *, phase='fenced', target=150):
+        actor,scope,preimage,journal=self.component(stage='fenced',candidates=True,target=target)
         stage_path=actor.root/'candidate-staged-runtime.json'
         stage=json.loads(stage_path.read_text())
         stage['preparation_mode']='created-fenced'
@@ -267,6 +267,18 @@ class ConcreteAdapterTests(unittest.TestCase):
         actor._attest('private-boundary')
         self.assertEqual(actor.inventory['containers'],identities)
         actor.verify_candidate_stage()
+        actor.runtime.command.assert_not_called()
+
+    def test_canonical_created_stage_derives_private_parser_without_mutating_original_inventory(self):
+        actor,scope,stage,_,_=self.candidate_extension(phase='private',target=160)
+        original=copy.deepcopy(actor.original_inventory)
+        actor._attest('private')
+        self.assertTrue(actor.inventory['containers']['candidate:parser-worker']['states']['private']['running'])
+        self.assertEqual(actor.original_inventory,original)
+        self.assertEqual(inventory.inventory_digest(original),scope['inventory_sha256'])
+        actor.inventory=copy.deepcopy(original)
+        actor._attest('private')
+        self.assertEqual(actor.verify_candidate_stage(phase='private'),stage)
         actor.runtime.command.assert_not_called()
 
     def test_candidate_extension_rejects_missing_stale_or_unmarked_stage(self):

@@ -53,7 +53,9 @@ class RuntimeModelTests(unittest.TestCase):
         fixture=self
         class Runtime:
             def budget(_,maximum):return maximum
-            def inspect(_,names):return {name:fixture.rows[name] for name in names if name in fixture.rows}
+            def inspect(_,names):
+                return {row['Name'].lstrip('/'):row for row in fixture.rows.values()
+                    if row['Name'].lstrip('/') in names or row['Id'] in names}
             def command(_,args):
                 if args[:3]==['docker','image','inspect']:return json.dumps([fixture.images[args[3]]])
                 if args[:3]==['docker','network','inspect']:return json.dumps([{'Id':'network-id','Name':args[3],
@@ -342,6 +344,37 @@ class RuntimeModelTests(unittest.TestCase):
         self.runtime.command=command
         with self.assertRaisesRegex(RuntimeError,'private_parser_network_invalid'):
             m.validate_model(self.contract,self.model,self.runtime,phase='provisional')
+
+    def test_canonical_private_parser_created_seal_survives_native_oom_default_normalization(self):
+        from test_schema160_release import reconciled_contract
+        from deployment.lib.completed_normal_resources import verify_runtime_resources,measured_spec
+        self.use_manual_contract(reconciled_contract(),preparation150=True)
+        row=self.rows[self.selected['containers']['parser-worker']]
+        row['State']['Status']='running';row['HostConfig']['OomKillDisable']=False
+        publication={'context_sha256':digest(self.contract),'source_sha':self.contract['candidate']['source_sha'],
+            'images':self.contract['candidate']['images'],'runtimes':{},
+            'networks':{value['name']:'network-id' for value in self.model['networks'].values()}}
+        for role in ROLES:
+            item=self.rows[self.selected['containers'][role]];networks=item['NetworkSettings']['Networks']
+            publication['runtimes'][role]={'id':item['Id'],'image':item['Image'],'spec_sha256':measured_spec(item),
+                'networks':{k:v['NetworkID'] for k,v in networks.items()},
+                'network_aliases':{k:v['Aliases'] for k,v in networks.items()}}
+        # Observed on the real Docker engine: CREATED false becomes running
+        # null. No configured true value or other field can be normalized.
+        row['HostConfig']['OomKillDisable']=None
+        verify_runtime_resources(self.contract,publication,self.runtime)
+        row['HostConfig']['OomKillDisable']=True
+        with self.assertRaisesRegex(RuntimeError,'identity_changed'):
+            verify_runtime_resources(self.contract,publication,self.runtime)
+        row['HostConfig']['OomKillDisable']=None;row['HostConfig']['Memory']+=1
+        with self.assertRaisesRegex(RuntimeError,'identity_changed'):
+            verify_runtime_resources(self.contract,publication,self.runtime)
+        row['HostConfig']['Memory']-=1
+        from deployment.lib.completed_normal_profile import DELETION
+        self.contract['operation']=DELETION.operation
+        publication['context_sha256']=digest(self.contract)
+        with self.assertRaisesRegex(RuntimeError,'identity_changed'):
+            verify_runtime_resources(self.contract,publication,self.runtime)
 
     def test_exact160_normal_seal_requires_handoff_and_retains_accepted_container_ids(self):
         """Actual model comparison/publication; authority and ownership modeled."""

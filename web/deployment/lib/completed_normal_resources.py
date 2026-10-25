@@ -180,11 +180,18 @@ def verify_runtime_resources(contract,publication,runtime):
         raise RuntimeError('compatible_boot_publication_changed')
     rows=runtime.inspect([p['id'] for p in publication['runtimes'].values()])
     if len(rows)!=len(ROLES):raise RuntimeError('compatible_boot_inventory_changed')
+    from deployment.lib.completed_normal_profile import RECONCILED
+    started_roles={'notification-worker','calendar-sync-worker','data-deletion-worker'}
+    if contract.get('operation')==RECONCILED.operation:
+        # Native Docker changes only its default OomKillDisable false to null
+        # on start. The canonical private parser now crosses that boundary
+        # before handoff; preserve every other measured field and old profiles.
+        started_roles.add('parser-worker')
     selected={}
     for kind,expected in publication['runtimes'].items():
         row=next((r for r in rows.values() if r['Id']==expected['id']),None)
         if (row is None or row['Image']!=expected['image'] or not measured_spec_matches(row,expected['spec_sha256'],
-                started_worker=kind in {'notification-worker','calendar-sync-worker','data-deletion-worker'}
+                started_worker=kind in started_roles
                     and row['State'].get('Status') in {'running','exited'})
                 or row['HostConfig']['RestartPolicy']['Name']!='no'):
             raise RuntimeError('compatible_boot_runtime_identity_changed')

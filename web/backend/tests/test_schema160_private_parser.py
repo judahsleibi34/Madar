@@ -8,6 +8,7 @@ import json
 import os
 from pathlib import Path
 import hashlib
+import ipaddress
 import shutil
 import subprocess
 import tempfile
@@ -18,7 +19,7 @@ from unittest.mock import Mock, patch
 
 from deployment.lib import schema150_actor_inventory as inventory
 from deployment.lib import completed_normal_runtime as runtime
-from deployment.lib.completed_normal_resources import measured_spec
+from deployment.lib.completed_normal_resources import measured_spec, measured_spec_matches
 from deployment.lib.completed_normal_profile import RECONCILED
 from test_schema150_actor_inventory import fixture, repin, phase_rows
 
@@ -57,6 +58,21 @@ def canonical_parser(data, scope, rows):
             networks={k:v['NetworkID'] for k,v in actual['NetworkSettings']['Networks'].items()})
         record['states']['private']['running']=True
     return repin(data,scope)
+
+
+def unused_parser_subnet(networks, routes):
+    """Bounded test-only pool; never retire an existing network to make room."""
+    occupied=[]
+    for network in networks:
+        for config in network.get('IPAM',{}).get('Config') or []:
+            if config.get('Subnet'):occupied.append(ipaddress.ip_network(config['Subnet']))
+    for route in routes:
+        if route.get('dst') not in (None,'default'):
+            occupied.append(ipaddress.ip_network(route['dst'],strict=False))
+    for candidate in ipaddress.ip_network('10.254.240.0/20').subnets(new_prefix=28):
+        if not any(candidate.version==other.version and candidate.overlaps(other) for other in occupied):
+            return str(candidate)
+    raise RuntimeError('owned_parser_subnet_unavailable')
 
 
 class PrivateParserInventoryTests(unittest.TestCase):
@@ -127,6 +143,13 @@ class PrivateParserInventoryTests(unittest.TestCase):
             bad=copy.deepcopy(actual);mutate(bad)
             with self.subTest(fault=name),self.assertRaises(RuntimeError):check(bad)
 
+    def test_native_allocation_excludes_existing_networks_and_host_routes(self):
+        networks=[{'IPAM':{'Config':[{'Subnet':'10.254.240.0/28'}]}}]
+        routes=[{'dst':'default'},{'dst':'10.254.240.16/32'}]
+        self.assertEqual(unused_parser_subnet(networks,routes),'10.254.240.32/28')
+        with self.assertRaisesRegex(RuntimeError,'subnet_unavailable'):
+            unused_parser_subnet(networks,[{'dst':'10.254.240.0/20'}])
+
 
 @unittest.skipUnless(os.getenv('MADAR_NATIVE_PRIVATE_PARSER_IMAGE'), 'owned native parser image required')
 class NativePrivateParserTests(unittest.TestCase):
@@ -162,7 +185,12 @@ class NativePrivateParserTests(unittest.TestCase):
             uploads=root/'uploads';uploads.mkdir(mode=0o755)
             content=b'year,value\n2026,42\n';(uploads/'original.csv').write_bytes(content)
             (uploads/'original.csv').chmod(0o444)
-            network_id=command('network','create','--internal','--label',label+'='+run,network)
+            identifiers=command('network','ls','-q').split()
+            if len(identifiers)>1024:raise RuntimeError('owned_parser_network_inventory_limit')
+            networks=json.loads(command('network','inspect',*identifiers)) if identifiers else []
+            routes=json.loads(subprocess.check_output(['ip','-json','route','show','table','all'],text=True,timeout=10))
+            subnet=unused_parser_subnet(networks,routes)
+            network_id=command('network','create','--internal','--subnet',subnet,'--label',label+'='+run,network)
             env={k:v for k,v in runtime._environment(parser_row({'source_sha':source,'context_sha256':context})['Config']['Env']).items()
                 if k not in {'PATH','MADAR_BUILD_TIMESTAMP'}}
             args=['create','--name',name,'--label',label+'='+run,'--network',network,'--network-alias','parser-worker',
@@ -178,7 +206,7 @@ class NativePrivateParserTests(unittest.TestCase):
                 row=inspect()
                 runtime.verify_private_parser(row,source_sha=source,image=image,network_name=network,uploads_root=str(uploads))
                 return row
-            verify();command('start',container_id)
+            created=verify();sealed_spec=measured_spec(created);command('start',container_id)
             deadline=time.monotonic()+90
             while True:
                 row=verify()
@@ -186,6 +214,7 @@ class NativePrivateParserTests(unittest.TestCase):
                 self.assertTrue(row['State']['Running'])
                 if time.monotonic()>=deadline:self.fail('native parser health timeout')
                 time.sleep(.25)
+            self.assertTrue(measured_spec_matches(row,sealed_spec,started_worker=True))
             self.assertTrue(json.loads(command('network','inspect',network))[0]['Internal'])
             # Execute requests from the same isolated namespace; no host port or
             # external credentials. The real child process parses real bytes.
@@ -209,6 +238,12 @@ print(json.dumps({'health':health,'result':result,'write_denied':denied,'uid':os
             web=Path(os.getenv('MADAR_TEST_REPOSITORY_ROOT') or Path(__file__).resolve().parents[2])
             self.assertEqual(result['parser_sha256'],hashlib.sha256((web/'backend/workers/parser_worker.py').read_bytes()).hexdigest())
             self.assertIn('42',json.dumps(result['result']))
+            receipt={'source_sha':source,'image':image,'parser_sha256':result['parser_sha256'],
+                'native_http_parser':'PASS','readonly_original_upload':'PASS','uid':result['uid'],
+                'subnet':subnet,'context_sha256':context,'sealed_spec_sha256':sealed_spec,
+                'created_oom_kill_disable':created['HostConfig'].get('OomKillDisable'),
+                'running_oom_kill_disable':row['HostConfig'].get('OomKillDisable'),
+                'spec_equal_after_start':measured_spec(row)==sealed_spec,'protected_upgrade_accepted':False}
         finally:
             try:
                 if container_id:
@@ -231,4 +266,4 @@ print(json.dumps({'health':health,'result':result,'write_denied':denied,'uid':os
                         'network_id':network_id,'reason':'cleanup requires independent ownership/absence recheck',
                         'review_condition':'Remove only after owned Docker resources are proven absent'}))
                 raise
-
+        print(json.dumps(dict(receipt,owned_resources_removed=True),sort_keys=True))
