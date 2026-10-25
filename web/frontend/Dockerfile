@@ -24,7 +24,7 @@ COPY . .
 
 RUN npm run build
 
-FROM nginx:alpine@sha256:4a73073bd557c65b759505da037898b61f1be6cbcc3c2c3aeac22d2a470c1752
+FROM nginx:alpine@sha256:4a73073bd557c65b759505da037898b61f1be6cbcc3c2c3aeac22d2a470c1752 AS private-provider
 
 ARG MADAR_RELEASE_SHA=development
 ARG MADAR_BUILD_TIMESTAMP=unknown
@@ -33,15 +33,19 @@ RUN rm -f /etc/nginx/conf.d/default.conf \
     && mkdir -p /etc/nginx/templates/includes /etc/nginx/conf.d/includes /var/cache/nginx \
     && sed -i '/^user[[:space:]]/d; s!^pid[[:space:]].*;!pid /tmp/nginx.pid;!' /etc/nginx/nginx.conf \
     && chown -R nginx:nginx /etc/nginx/conf.d /etc/nginx/templates /var/cache/nginx
+COPY --chown=nginx:nginx private-provider160.conf /etc/nginx/private-provider160.conf
+
+LABEL org.opencontainers.image.revision=$MADAR_RELEASE_SHA \
+      org.opencontainers.image.created=$MADAR_BUILD_TIMESTAMP
+USER nginx
+
+FROM private-provider AS runtime
+
 COPY --chown=nginx:nginx --from=build /app/dist /usr/share/nginx/html
 COPY --chown=nginx:nginx nginx.conf.template /etc/nginx/templates/default.conf.template
 COPY --chown=nginx:nginx security_headers.conf.template /etc/nginx/templates/includes/security_headers.conf.template
 COPY --chown=nginx:nginx storefront_frame_headers.conf.template /etc/nginx/templates/includes/storefront_frame_headers.conf.template
 COPY --chown=nginx:nginx admin_preview_frame_headers.conf.template /etc/nginx/templates/includes/admin_preview_frame_headers.conf.template
-
-LABEL org.opencontainers.image.revision=$MADAR_RELEASE_SHA \
-      org.opencontainers.image.created=$MADAR_BUILD_TIMESTAMP
-
 USER nginx
 
 EXPOSE 8080

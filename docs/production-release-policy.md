@@ -1,5 +1,26 @@
 # Madar production release acceptance policy
 
+## Canonical160 private provider transport
+
+The maintenance candidate has nine sealed roles. Its additional portless
+provider gateway uses the accepted frontend image's immutable, separately
+selected Nginx configuration. It receives no credentials, authority or object
+mounts. It connects only the original measured provider bridge and the internal
+client bridge, proxying fixed Auth/REST/Storage paths and PostgreSQL TCP. The
+original public gateway and application ingress stay fenced during acceptance.
+Its configuration is a protected control-plane/automation input; source CI
+cannot independently authorize changes to that proxy contract.
+
+The backend calendar URI must explicitly name this exact gateway, authenticator,
+postgres database,5432 port, TLS mode and approved PostgreSQL system identifier.
+Credentials/grants are protected prerequisites, never discovered or granted by
+candidate preparation. Actual transport readiness independently checks the
+cluster and required role/grants. Unique measured client DNS ownership rejects
+substitution; no host ports or ambient DNS/host overrides are admitted.
+Historical profiles retain their eight-role inventory. Pure preauthorization
+rendering grants no execution rights. Schema160 registry/admission remain closed
+until the complete protected preserved-application operation and recovery pass.
+
 ## Private parser is not consuming authority (2026-10-25)
 
 Only the exact canonical160 preparation uses a live private parser sidecar.

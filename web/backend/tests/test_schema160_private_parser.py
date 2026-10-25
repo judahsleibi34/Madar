@@ -57,7 +57,35 @@ def canonical_parser(data, scope, rows):
         record.update(spec_sha256=measured_spec(actual),mounts=inventory._actual_mounts(actual),
             networks={k:v['NetworkID'] for k,v in actual['NetworkSettings']['Networks'].items()})
         record['states']['private']['running']=True
+        gateway=gateway_row(scope)
+        name=gateway['Name'].lstrip('/')
+        data['containers']['candidate:provider-gateway']={'name':name,'id':gateway['Id'],'image':gateway['Image'],
+            'generation':'candidate','source_sha':scope['source_sha'],'spec_sha256':measured_spec(gateway),
+            'mounts':[],'networks':{k:v['NetworkID'] for k,v in gateway['NetworkSettings']['Networks'].items()},
+            'states':{p:{'running':p in {'private','active'},'restarting':False,'restart':'no'} for p in inventory.PHASES}}
+        rows.append(gateway)
+        backend=next(r for r in rows if r['Id']==data['containers']['candidate:backend']['id'])
+        backend['Config']['Env'] += ['SUPABASE_URL=http://'+name+':8000',
+            'MADAR_CALENDAR_DATABASE_DSN=postgresql://authenticator:synthetic@'+name+':5432/postgres?sslmode=disable',
+            'MADAR_CALENDAR_DATABASE_SYSTEM_IDENTIFIER='+scope['system_identifier']]
+        data['containers']['candidate:backend']['spec_sha256']=measured_spec(backend)
     return repin(data,scope)
+
+
+def gateway_row(scope):
+    name='madar-schema160-'+scope['context_sha256'][:16]+'-green-provider-gateway'
+    return {'Id':hashlib.sha256(name.encode()).hexdigest(),'Name':'/'+name,'Image':'sha256:'+'e'*64,
+        'Config':{'Env':['PATH=/usr/sbin:/usr/bin:/sbin:/bin'],'User':'nginx','Entrypoint':['nginx'],
+            'Cmd':['-c','/etc/nginx/private-provider160.conf','-g','daemon off;'],
+            'Labels':{'org.opencontainers.image.revision':scope['source_sha']}},
+        'HostConfig':{'RestartPolicy':{'Name':'no','MaximumRetryCount':0},'Privileged':False,'ReadonlyRootfs':True,
+            'CapDrop':['ALL'],'SecurityOpt':['no-new-privileges:true'],'Init':True,'Memory':128*1024**2,
+            'NanoCpus':250_000_000,'PidsLimit':64,'NetworkMode':inventory.CLIENT_NETWORK,
+            'Tmpfs':{'/tmp':'rw,noexec,nosuid,size=16m,mode=1777'}},
+        'Mounts':[],'State':{'Running':False,'Restarting':False,'Status':'created','Health':{'Status':'healthy'}},
+        'NetworkSettings':{'Networks':{net:{'NetworkID':identifier,'IPAddress':'','EndpointID':'',
+            'Aliases':[name,'provider-gateway']} for net,identifier in
+            ((inventory.CLIENT_NETWORK,'2'*64),(inventory.DEFAULT_NETWORK,'1'*64))}}}
 
 
 def unused_parser_subnet(networks, routes):

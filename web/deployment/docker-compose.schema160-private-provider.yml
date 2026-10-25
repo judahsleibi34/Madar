@@ -1,0 +1,31 @@
+# Loaded only for the exact canonical160 maintenance candidate. No host ports,
+# credentials, writable objects or application authority are given to this role.
+services:
+  provider-gateway:
+    image: ${MADAR_FRONTEND_IMAGE:?accepted frontend image required}
+    container_name: ${MADAR_CONTAINER_PREFIX:?exact prefix required}-${MADAR_SLOT:?slot required}-provider-gateway
+    restart: "no"
+    init: true
+    user: nginx
+    read_only: true
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 128m
+    cpus: 0.25
+    pids_limit: 64
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=16m,mode=1777"]
+    entrypoint: ["nginx"]
+    command: ["-c", "/etc/nginx/private-provider160.conf", "-g", "daemon off;"]
+    networks: [supabase_client, provider_native]
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "--quiet", "http://127.0.0.1:8000/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    logging:
+      driver: json-file
+      options: {max-size: "2m", max-file: "2"}
+networks:
+  provider_native:
+    external: true
+    name: madar-local-supabase_default

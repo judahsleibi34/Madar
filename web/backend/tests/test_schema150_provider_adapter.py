@@ -222,7 +222,7 @@ class ConcreteAdapterTests(unittest.TestCase):
                     ('id','image','spec_sha256','networks')},'network_aliases':{
                         k:v.get('Aliases') or [] for k,v in next(r for r in observed
                             if r['Id']==data['containers']['candidate:'+role]['id'])['NetworkSettings']['Networks'].items()}}
-                    for role in inventory.APP_ROLES},
+                    for role in (k.split(':',1)[1] for k in data['containers'] if k.startswith('candidate:'))},
                 'networks':{},'worker_generation':'f'*64,'origin_workers':[]}
             (root/'candidate-staged-runtime.json').write_text(json.dumps(candidate_stage))
             stack.enter_context(patch('deployment.lib.completed_normal_admission.credential_witness',return_value=copy.deepcopy(candidate_stage)))
@@ -811,7 +811,7 @@ class ConcreteAdapterTests(unittest.TestCase):
             self.assertEqual(arguments[:2],['docker','start']);by_id[arguments[2]]['State']['Running']=True
         actor.runtime.command.side_effect=start
         actor.resume_providers_private(scope,preimage)
-        expected=['native:auth','native:rest','native:storage','candidate:redis','candidate:parser-worker',
+        expected=['native:auth','native:rest','native:storage','candidate:redis','candidate:parser-worker','candidate:provider-gateway',
             'candidate:backend','candidate:frontend']
         self.assertEqual([c.args[0][2] for c in actor.runtime.command.call_args_list],
             [actor.inventory['containers'][key]['id'] for key in expected])

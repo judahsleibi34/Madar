@@ -88,7 +88,9 @@ class ReleaseBootstrapTests(unittest.TestCase):
                     operations.start_candidate(SHA,'green',{'fixture':'images'})
                 operations._maintenance_creation_guard.assert_called_once_with(SHA,'green')
                 operations._compose.assert_called_once_with(SHA,'green',{'fixture':'images'},
-                    'create','--no-build','--no-recreate',*ROLES,workers_active=True)
+                    'create','--no-build','--no-recreate',*ROLES,
+                    *(('provider-gateway',) if factory is reconciled_contract else ()),
+                    workers_active=True)
                 operations._inhibit_worker_slot.assert_not_called()
                 operations._loaded_serving_slot.assert_not_called()
 

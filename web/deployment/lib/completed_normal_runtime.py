@@ -13,7 +13,7 @@ import hashlib
 import time
 
 from deployment.lib.completed_normal_admission import ADMISSIONS,OPERATION,digest,encoded,require_fresh_authorization,validate_contract
-from deployment.lib.completed_normal_resources import ROLES,allocation,verify_runtime_binding,measured_spec
+from deployment.lib.completed_normal_resources import ROLES,candidate_roles,candidate_image,allocation,verify_runtime_binding,measured_spec
 from deployment.lib.emergency_routing_repair import exclusive,spec,AvailabilityFailure,verification_window
 from deployment.lib.provider_recovery_runtime import protected
 from deployment.lib.runtime_authority import load_worker_authority,runtime_mutation_lock
@@ -103,9 +103,9 @@ def validate_model(contract,model,runtime, *, phase='running'):
         release=profile(contract)
     selected=allocation(contract,contract['candidate']['slot'],preparation150=preparation150)
     services=model.get('services',{})
-    if set(services)!=set(ROLES):raise RuntimeError('completed_runtime_service_inventory_changed')
+    if set(services)!=set(candidate_roles(contract)):raise RuntimeError('completed_runtime_service_inventory_changed')
     images={};rows=runtime.inspect(list(selected['containers'].values()))
-    if len(rows)!=8:raise RuntimeError('completed_runtime_container_inventory_changed')
+    if len(rows)!=len(candidate_roles(contract)):raise RuntimeError('completed_runtime_container_inventory_changed')
     for image in {*contract['candidate']['images'].values(),contract['candidate']['redis_image']}:
         result=json.loads(runtime.command(['docker','image','inspect',image]))
         if len(result)!=1 or result[0]['Id']!=image:raise RuntimeError('completed_runtime_image_changed')
@@ -116,13 +116,14 @@ def validate_model(contract,model,runtime, *, phase='running'):
     network_ids={}
     for declaration in model.get('networks',{}).values():
         name=declaration.get('name')
-        if name not in {*selected['networks'].values(),'madar-supabase-client'}:
+        native=release is RECONCILED and name=='madar-local-supabase_default'
+        if name not in {*selected['networks'].values(),'madar-supabase-client'} and not native:
             raise RuntimeError('completed_runtime_network_declaration_changed')
         observed=json.loads(runtime.command(['docker','network','inspect',name]))
         if len(observed)!=1 or observed[0]['Name']!=name or observed[0]['Driver']!='bridge':
             raise RuntimeError('completed_runtime_network_object_changed')
         net=observed[0]
-        if bool(net.get('Internal'))!=bool(declaration.get('internal',declaration.get('external',False))):
+        if bool(net.get('Internal'))!= (False if native else bool(declaration.get('internal',declaration.get('external',False)))):
             raise RuntimeError('completed_runtime_network_isolation_changed')
         if not declaration.get('external') and (net.get('IPAM',{}).get('Config') or [])!=declaration.get('ipam',{}).get('config',[]):
             # Docker adds the gateway to IPAM serialization. Compare subnets
@@ -139,7 +140,7 @@ def validate_model(contract,model,runtime, *, phase='running'):
         if service.get('container_name')!=name or service.get('restart')!='no':
             raise RuntimeError('completed_runtime_role_declaration_changed')
         row=rows.get(name)
-        image=contract['candidate']['redis_image'] if role=='redis' else contract['candidate']['images']['frontend' if role=='frontend' else 'backend']
+        image=candidate_image(contract,role)
         if row is not None:
             state=row['State']
             if phase in {'fenced','provisional'}:
@@ -220,6 +221,13 @@ def validate_model(contract,model,runtime, *, phase='running'):
             uploads=declared.get('/app/private_uploads',{})
             verify_private_parser(row,source_sha=contract['candidate']['source_sha'],image=image,
                 network_name=selected['networks']['parser'],uploads_root=uploads.get('source'))
+        if release is RECONCILED and role=='provider-gateway':
+            from deployment.lib.completed_normal_private_provider import verify_gateway
+            verify_gateway(row,source_sha=contract['candidate']['source_sha'],image=image)
+        if release is RECONCILED and role=='backend':
+            from deployment.lib.completed_normal_private_provider import require_calendar_environment
+            require_calendar_environment(expected_env,gateway_name=selected['containers']['provider-gateway'],
+                system_identifier=contract['database']['system_identifier'])
         if role in {'backend',*BUSINESS}:
             from deployment.lib.completed_normal_profile import RECONCILED
             if release is RECONCILED and (
@@ -236,6 +244,8 @@ def validate_model(contract,model,runtime, *, phase='running'):
                     or expected_env.get('SCHEMA_EXCLUDED_VERSIONS','')!=','.join(map(str,release.excluded))):
                 raise RuntimeError('completed_runtime_authority_mount_changed')
         expected_networks={model['networks'][key]['name'] for key in service.get('networks',{})}
+        if release is RECONCILED and role=='backend' and 'madar-supabase-client' not in expected_networks:
+            raise RuntimeError('completed_private_calendar_network_missing')
         attached=row['NetworkSettings']['Networks']
         if set(attached)!=expected_networks or host.get('NetworkMode') not in expected_networks:
             raise RuntimeError('completed_runtime_network_attachment_changed')
@@ -297,7 +307,7 @@ def seal_candidate_runtime(contract, *, source_guard,model_loader,runtime,state_
             stage=json.loads(protected(root/'candidate-staged-runtime.json',private=True).read_bytes())
             if any(runtimes[k]['id']!=stage['runtimes'][k]['id'] or runtimes[k]['image']!=stage['runtimes'][k]['image']
                     or runtimes[k]['networks']!=stage['runtimes'][k]['networks']
-                    or runtimes[k]['network_aliases']!=stage['runtimes'][k]['network_aliases'] for k in ROLES):
+                    or runtimes[k]['network_aliases']!=stage['runtimes'][k]['network_aliases'] for k in candidate_roles(contract)):
                 raise RuntimeError('completed_runtime_private_candidate_substituted')
         owner=load_worker_authority(Path(state_root))
         legacy=profile(contract) is LEGACY

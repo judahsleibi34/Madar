@@ -1,5 +1,12 @@
 # Madar Auto-Deploy Merge Contract
 
+Canonical160 candidate creation now includes an immutable portless private
+provider gateway and exact calendar URI/cluster binding. Its frontend image
+configuration is protected from ordinary unreviewed automation. This is not
+operational admission: original provider acceptance, independent recovery and
+full protected146-to160 rehearsal remain mandatory. The existing public
+gateway must not be restarted early as a connectivity workaround.
+
 ## Canonical160 private parser dependency (2026-10-25)
 
 The canonical160 maintenance candidate starts its bounded HTTP parser sidecar

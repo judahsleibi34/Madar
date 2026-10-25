@@ -420,7 +420,7 @@ class Schema150ProviderAdapter:
         grant authority, accept health, or permit any worker to consume.
         """
         from deployment.lib.completed_normal_admission import credential_witness
-        from deployment.lib.completed_normal_resources import ROLES,measured_spec_matches
+        from deployment.lib.completed_normal_resources import candidate_roles,candidate_image,measured_spec_matches
         path=self.root/'candidate-staged-runtime.json'
         if not path.exists() or path.is_symlink():
             raise RuntimeError('schema150_private_candidate_stage_required')
@@ -434,7 +434,7 @@ class Schema150ProviderAdapter:
                 or stage['context_sha256']!=self.binding['context_sha256']
                 or stage['source_sha']!=self.binding['source_sha']
                 or stage['images']!=self.contract['candidate']['images']
-                or not isinstance(stage['runtimes'],dict) or set(stage['runtimes'])!=set(ROLES)):
+                or not isinstance(stage['runtimes'],dict) or set(stage['runtimes'])!=set(candidate_roles(self.contract))):
             raise RuntimeError('schema150_private_candidate_stage_changed')
         rows=self._rows() if rows is None else rows
         inventory=self.inventory
@@ -442,11 +442,10 @@ class Schema150ProviderAdapter:
             from deployment.lib.schema150_actor_inventory import bind_staged_candidates
             inventory=bind_staged_candidates(inventory,self.binding,stage,rows,phase=phase)
         actual={row['Id']:row for row in rows}
-        for role in ROLES:
+        for role in candidate_roles(self.contract):
             record=inventory['containers'].get('candidate:'+role)
             sealed=stage['runtimes'][role]
-            expected_image=(self.contract['candidate']['redis_image'] if role=='redis'
-                else self.contract['candidate']['images']['frontend' if role=='frontend' else 'backend'])
+            expected_image=candidate_image(self.contract,role)
             runtime_keys={'id','image','spec_sha256','networks','network_aliases'}
             if stage.get('preparation_mode')=='created-fenced':runtime_keys.add('name')
             if (record is None or not isinstance(sealed,dict)

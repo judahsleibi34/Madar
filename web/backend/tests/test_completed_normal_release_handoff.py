@@ -130,7 +130,7 @@ class MaintenanceWorkerOwnerTests(unittest.TestCase):
     def setUp(self):
         import hashlib
         from test_schema160_release import reconciled_contract
-        from deployment.lib.completed_normal_resources import ROLES
+        from deployment.lib.completed_normal_resources import candidate_roles
         self.temp=tempfile.TemporaryDirectory();self.addCleanup(self.temp.cleanup)
         self.path=Path(self.temp.name);self.contract=reconciled_contract()
         self.sha=self.contract['candidate']['source_sha'];self.slot=self.contract['candidate']['slot']
@@ -147,8 +147,10 @@ class MaintenanceWorkerOwnerTests(unittest.TestCase):
         self.generation=hashlib.sha256(f"bootstrap:{self.sha}:{self.slot}:{self.prepared['prepared_at']}".encode()).hexdigest()
         self.stage={'worker_generation':self.generation}
         self.rows={role:{'State':{'Running':not role.endswith('-worker'),'Restarting':False,
-            'Status':'created' if role.endswith('-worker') else 'running'}} for role in ROLES}
+            'Status':'created' if role.endswith('-worker') else 'running'}} for role in candidate_roles(self.contract)}
         self.rows['parser-worker']['State']={'Running':True,'Restarting':False,'Status':'running',
+            'Health':{'Status':'healthy'}}
+        self.rows['provider-gateway']['State']={'Running':True,'Restarting':False,'Status':'running',
             'Health':{'Status':'healthy'}}
         write_worker_authority(self.path,generation=self.contract['origin']['worker_generation'],owner='CANDIDATE',
             old={'sha':'f'*40,'slot':self.slot},candidate={'sha':self.contract['source_roles']['application_sha'],

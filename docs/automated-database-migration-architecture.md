@@ -1,5 +1,10 @@
 # Automated database migration architecture
 
+`web/frontend/private-provider160.conf` is now an independently pinned automation
+input because it controls the protected candidate's private HTTP/PG routing.
+It is also a protected control-plane path. This classification only strengthens
+source review; it does not register160, lower SQL risk or allow automatic dispatch.
+
 Native disposable rehearsals wait for PostgreSQL's final TCP listener inside the
 owned container. Initdb's temporary Unix-socket server is not readiness: it
 exits before the final server starts. A delayed-init reproduction verifies the

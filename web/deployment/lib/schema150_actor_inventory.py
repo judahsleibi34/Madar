@@ -111,7 +111,7 @@ def private_candidate_roles(binding=None):
     from deployment.lib.schema150_provider_lifecycle import binding_profile
     from deployment.lib.completed_normal_profile import RECONCILED
     if binding is not None and binding_profile(binding) is RECONCILED:
-        return ('candidate:redis','candidate:parser-worker','candidate:backend','candidate:frontend')
+        return ('candidate:redis','candidate:parser-worker','candidate:provider-gateway','candidate:backend','candidate:frontend')
     return PRIVATE_CANDIDATE_ROLES
 
 
@@ -154,7 +154,10 @@ def _validate(inventory, binding=None, *, original=True):
     _require(isinstance(credentials, dict) and 1 <= len(credentials) <= 64
              and all(_name(name) and _hex(fingerprint) for name, fingerprint in credentials.items()))
     actors = value['containers']
-    _require(isinstance(actors, dict) and REQUIRED_ROLES <= set(actors) <= REQUIRED_ROLES | OPTIONAL_ROLES)
+    canonical = binding is not None and binding['target_schema']==160
+    candidate_app_roles=APP_ROLES+('provider-gateway',) if canonical else APP_ROLES
+    optional=OPTIONAL_ROLES | ({'candidate:provider-gateway'} if canonical else set())
+    _require(isinstance(actors, dict) and REQUIRED_ROLES <= set(actors) <= REQUIRED_ROLES | optional)
     ids, names = [], []
     for logical, actor in actors.items():
         _require(isinstance(actor, dict) and set(actor) == CONTAINER_KEYS)
@@ -218,7 +221,8 @@ def _validate(inventory, binding=None, *, original=True):
     _require(len(ids) == len(set(ids)) and len(names) == len(set(names)))
     for generation in ('origin', 'candidate'):
         selected = {name for name in actors if name.startswith(generation+':')}
-        _require(not selected or selected == {generation+':'+role for role in APP_ROLES})
+        expected=candidate_app_roles if generation=='candidate' else APP_ROLES
+        _require(not selected or selected == {generation+':'+role for role in expected})
     roles = value['roles']
     _require(isinstance(roles, dict) and MINIMUM_ROLES <= set(roles) and len(roles) <= 128)
     for name, role in roles.items():
@@ -271,8 +275,9 @@ def bind_staged_candidates(inventory, binding, stage, rows, *, phase):
     _require(not any(k.startswith('candidate:') for k in value['containers']),
         'schema150_candidate_already_in_original_inventory')
     stage=_detached(stage)
+    roles=APP_ROLES+('provider-gateway',) if binding['target_schema']==160 else APP_ROLES
     _require(stage.get('preparation_mode')=='created-fenced'
-        and isinstance(stage.get('runtimes'),dict) and set(stage['runtimes'])==set(APP_ROLES),
+        and isinstance(stage.get('runtimes'),dict) and set(stage['runtimes'])==set(roles),
         'schema150_candidate_fenced_preparation_required')
     _require(isinstance(rows,list) and len(rows)<=2048,'schema150_container_snapshot_invalid')
     observed={}
@@ -429,6 +434,9 @@ def attest_containers(inventory, rows, *, phase, binding=None):
                      is not None, 'completed_private_parser_network_invalid')
             verify_private_parser(row,source_sha=binding['source_sha'],image=actor['image'],
                 network_name=network,uploads_root=value['object_roots']['private_uploads']['source'])
+    if binding is not None and binding['target_schema']==160:
+        from deployment.lib.completed_normal_private_provider import verify_topology
+        verify_topology(value,binding,rows)
     return {'inventory_sha256': inventory_digest(value), 'phase': phase, 'containers': len(actors),
             'exclusion_proof_references': len(value['exclusions']), 'unknown_target_actors': 0,
             'supervisors_verified': False, 'database_roles_verified': False, 'sessions_verified': False,

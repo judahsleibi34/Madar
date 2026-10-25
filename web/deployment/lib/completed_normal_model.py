@@ -125,7 +125,11 @@ def render_candidate_model(actor, *, read_only=False):
     loader.exec_module(module)
     guard()
     contract=actor.contract;sha=contract['candidate']['source_sha'];slot=contract['candidate']['slot']
-    selected=profile(actor.contract)
+    from deployment.lib.completed_normal_profile import RECONCILED
+    if read_only and contract.get('operation')==RECONCILED.operation:
+        from deployment.lib.completed_normal_admission import validate_provider_preparation
+        selected=validate_provider_preparation(contract)
+    else:selected=profile(actor.contract)
     compatibility=module.Compatibility.load(source/'web/deployment/releases'/selected.metadata)
     if ((compatibility.schema_min,compatibility.schema_max,compatibility.target_schema)!=(selected.minimum,selected.target,selected.target)
             or compatibility.excluded_schemas!=selected.excluded):

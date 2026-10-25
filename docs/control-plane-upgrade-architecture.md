@@ -1,5 +1,12 @@
 # Privileged control-plane upgrade architecture
 
+The immutable canonical160 private gateway configuration in the accepted
+frontend image is a protected controller input. Candidate creation/sealing and
+inventory attestation bind its ninth role, image, fixed command, privileges and
+two measured networks. It has no host listener or write credential. Historical
+profiles retain eight roles. This source connection does not admit the protected
+upgrade, accept recovery or install a production controller.
+
 ## Protected inventory preparation (2026-10-25)
 
 The measured root entrypoint adds `capture-inventory`. Before constructing an

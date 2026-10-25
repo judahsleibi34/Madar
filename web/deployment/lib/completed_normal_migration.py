@@ -198,7 +198,7 @@ def _private_migration_candidate(parent,provider,contract,state_root,witness):
     from deployment.lib.completed_normal_runtime import validate_model
     from deployment.lib.schema150_provider_lifecycle import (ProviderMaintenance150,
         ProtectedProviderJournal,FENCE_STEPS)
-    from deployment.lib.completed_normal_resources import ROLES,allocation
+    from deployment.lib.completed_normal_resources import candidate_roles,allocation
     parent.actor.guard()
     require_candidate_authority(contract,mode='READ_ONLY')
     provider.require_authority(provider.binding,purpose='observe_quiescence')
@@ -218,7 +218,7 @@ def _private_migration_candidate(parent,provider,contract,state_root,witness):
             or stage.get('preparation_mode')!='created-fenced'
             or stage['operation']!=parent.profile.operation or stage['context_sha256']!=digest(contract)
             or stage['source_sha']!=contract['candidate']['source_sha'] or stage['images']!=contract['candidate']['images']
-            or not isinstance(stage['runtimes'],dict) or set(stage['runtimes'])!=set(ROLES)):
+            or not isinstance(stage['runtimes'],dict) or set(stage['runtimes'])!=set(candidate_roles(contract))):
         raise RuntimeError('completed_migration_private_stage_changed')
     runtimes,networks=validate_model(contract,parent.model_loader(),provider.runtime,phase='provisional')
     names=allocation(contract,contract['candidate']['slot'],preparation150=True)['containers']

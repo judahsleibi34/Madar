@@ -91,6 +91,7 @@ REQUIRED_PRODUCTION_READINESS = {
 }
 PROTECTED_PATHS = (
     "web/deployment",
+    "web/frontend/private-provider160.conf",
     "web/scripts/madar_alert_hook.sh",
     "web/scripts/backup_madar.sh",
     "web/scripts/verify_backup.sh",
