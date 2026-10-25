@@ -786,6 +786,9 @@ class ControlPlaneUpgradeTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as root:
             layout = self.filesystem_layout(root)
             layout.state_root.mkdir(mode=0o755)
+            # sitecustomize intentionally sets umask077. Exercise an actual
+            # insecure0755 state directory, not a request masked back to0700.
+            layout.state_root.chmod(0o755)
             with self.assertRaisesRegex(
                 filesystem.FilesystemPreflightError,
                 "root_protected_directory_mode_invalid",

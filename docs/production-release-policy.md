@@ -3731,3 +3731,21 @@ raw provider logs. Completion follows observed owned-service shutdown. None of
 this is protected handoff,boot/reboot or production acceptance. See
 [staging scope](architecture-phase9-2026-10-20/10-AUTOMATIC-FULL-STAGING.md) and
 [maintenance backup limits](architecture-phase9-2026-10-20/03-MAINTENANCE-BACKUP-AND-REPLICA.md).
+
+### Disposable fresh-staging cleanup (2026-10-25)
+
+New fresh-application attempts reserve a private `disposable-run.json` before
+creating services. Successful and failed disposable attempts stop and remove
+only verified run-owned containers, networks and empty/disposable synthetic
+volumes. `--keep-running` records explicit retention and refuses teardown.
+Legacy stacks without that record are never adopted. The accepted fa27b773514b
+review environment remains excluded. Shared images, artifact inputs and private
+evidence are retained; this is not production backup retention or a universal
+historical-resource collector.
+
+`run_cleanup.teardown(..., apply=False)` previews ownership, age, active state,
+protected labels and external references. Applying logs every removal and
+reobserves leaks; repeated application is safe. Fresh Application Staging invokes
+`CLEANUP` in an `always()` step after acceptance/failure/timeout. A cleanup refusal
+fails visibly and leaves explicit review evidence. No production controller,
+authority or migration admission is changed by this lifecycle.

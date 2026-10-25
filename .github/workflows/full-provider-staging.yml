@@ -124,6 +124,14 @@ jobs:
             --source-sha "$CI_SOURCE_SHA" --history-base-sha "$CI_HISTORY_BASE_SHA" \
             --artifacts "$HOME/madar-provider-artifacts-${CI_SOURCE_SHA:0:12}"
           cp "$HOME/madar-full-provider-${CI_SOURCE_SHA:0:12}/full-provider-acceptance.json" full-provider-acceptance.json
+      - name: Teardown this disposable attempt after success, failure or timeout
+        if: always()
+        run: |
+          if test -f "$HOME/madar-full-provider-${CI_SOURCE_SHA:0:12}/disposable-run.json"; then
+            python3 web/staging/integration/full_provider_staging.py CLEANUP \
+              --source-sha "$CI_SOURCE_SHA" --history-base-sha "$CI_HISTORY_BASE_SHA" \
+              --artifacts "$HOME/madar-provider-artifacts-${CI_SOURCE_SHA:0:12}"
+          fi
       - name: Retain sanitized acceptance only
         if: always()
         run: |

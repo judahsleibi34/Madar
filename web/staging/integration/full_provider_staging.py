@@ -21,6 +21,7 @@ import sys
 import time
 
 import manage
+import run_cleanup
 import smoke
 import tenant_smoke
 import schema150_acceptance as application
@@ -219,9 +220,12 @@ def browser_acceptance(source):
 
 
 def main(mode,directory,source,baseline,*,keep_running=False):
-    if mode not in ('INSPECT','REHEARSE','FRESH_APPLICATION'):raise RuntimeError('full_staging_explicit_mode_required')
+    if mode not in ('INSPECT','REHEARSE','FRESH_APPLICATION','CLEANUP'):raise RuntimeError('full_staging_explicit_mode_required')
     project=identity(source);runtime=runtime_parent()/project
     require_host(runtime)
+    if mode == 'CLEANUP':
+        with lease(), target(source,160,calendar=True):
+            return run_cleanup.stop_and_teardown(runtime, services=SERVICES)
     inventory,plan=source_plan(source,baseline);value=plan.document();schema=value['target_schema']
     if mode=='REHEARSE' and value['risk_class']=='D':
         raise RuntimeError('full_staging_exceptional_sql_requires_separate_review')
@@ -260,6 +264,8 @@ def main(mode,directory,source,baseline,*,keep_running=False):
         configuration.generate(runtime,source,images,receipt,
             {'DATABASE_PASSWORD':secrets.token_hex(32),'JWT_SECRET':secrets.token_hex(32)},project,project,
             target_schema=schema,fresh_database=True,calendar=fresh)
+        if fresh:
+            run_cleanup.reserve(runtime, source=source, retain=keep_running)
         manage.private_write('release-plan.json',plan.encoded.decode())
         manage.private_write('migration-inventory.json',canonical(inventory.document()).decode())
         try:
@@ -336,6 +342,8 @@ def main(mode,directory,source,baseline,*,keep_running=False):
                 manage.compose('stop','--timeout','15')
                 if any(row['running'] for row in actors(images,complete=True).values()):
                     raise RuntimeError('full_staging_stop_not_observed')
+            if fresh and not keep_running:
+                report['cleanup'] = run_cleanup.teardown(runtime, services=SERVICES, apply=True)
             manage.private_write('full-provider-acceptance.json',json.dumps(report,sort_keys=True,indent=2)+'\n')
             return report
         except BaseException as error:
@@ -352,12 +360,18 @@ def main(mode,directory,source,baseline,*,keep_running=False):
                 manage.compose('stop','--timeout','15')
             except Exception as cleanup:failure['cleanup_exception_type']=type(cleanup).__name__
             manage.private_write('full-provider-failure.json',json.dumps(failure,sort_keys=True)+'\n')
+            if fresh and not keep_running:
+                try:run_cleanup.stop_and_teardown(runtime, services=SERVICES)
+                except Exception as cleanup:
+                    failure['cleanup_exception_type']=type(cleanup).__name__
+                    failure['resources_retained_for_review']=True
+                    manage.private_write('full-provider-failure.json',json.dumps(failure,sort_keys=True)+'\n')
             raise
 
 
 if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('mode',choices=('INSPECT','REHEARSE','FRESH_APPLICATION'))
+    parser.add_argument('mode',choices=('INSPECT','REHEARSE','FRESH_APPLICATION','CLEANUP'))
     parser.add_argument('--artifacts',type=Path,required=True)
     parser.add_argument('--source-sha',required=True);parser.add_argument('--history-base-sha',required=True)
     parser.add_argument('--keep-running',action='store_true',help='Keep an accepted fresh review stack on madar-staging only')

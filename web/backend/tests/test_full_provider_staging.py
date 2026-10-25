@@ -18,6 +18,18 @@ from test_schema150_restore_configuration import valid_plan,IMAGES,SHA,PROJECT,O
 
 
 class FullStagingSafetyTests(unittest.TestCase):
+    def test_cleanup_is_separate_from_source_planning_and_class_d_admission(self):
+        from contextlib import nullcontext
+        runtime=staging.runtime_parent()/staging.identity(SHA)
+        with patch.object(staging,'require_host'),patch.object(staging,'lease',return_value=nullcontext()),\
+                patch.object(staging,'target',return_value=nullcontext((runtime,staging.identity(SHA)))),\
+                patch.object(staging,'source_plan') as plan,\
+                patch.object(staging.run_cleanup,'stop_and_teardown',return_value={'dry_run':False}) as cleanup:
+            result=staging.main('CLEANUP',Path('/unused'),SHA,'b'*40)
+            self.assertFalse(result['dry_run'])
+            cleanup.assert_called_once_with(runtime,services=staging.SERVICES)
+            plan.assert_not_called()
+
     def test_mutable_source_and_production_host_refuse_before_any_effect(self):
         for source in ('main','../../escape','a'*39,True):
             with self.assertRaises(RuntimeError):staging.identity(source)
