@@ -148,6 +148,8 @@ class MaintenanceWorkerOwnerTests(unittest.TestCase):
         self.stage={'worker_generation':self.generation}
         self.rows={role:{'State':{'Running':not role.endswith('-worker'),'Restarting':False,
             'Status':'created' if role.endswith('-worker') else 'running'}} for role in ROLES}
+        self.rows['parser-worker']['State']={'Running':True,'Restarting':False,'Status':'running',
+            'Health':{'Status':'healthy'}}
         write_worker_authority(self.path,generation=self.contract['origin']['worker_generation'],owner='CANDIDATE',
             old={'sha':'f'*40,'slot':self.slot},candidate={'sha':self.contract['source_roles']['application_sha'],
                 'slot':self.contract['origin']['slot']})
@@ -200,6 +202,16 @@ class MaintenanceWorkerOwnerTests(unittest.TestCase):
         self.assertEqual(json.loads(self.record.read_text())['status'],'maintenance_owner_transfer_pending')
         with self.assertRaisesRegex(RuntimeError,'prepared_release_state_invalid'):self.activate()
         self.assertFalse(self.ops.new_active)
+
+    def test_private_parser_must_remain_running_healthy_before_owner_transfer(self):
+        initial=load_worker_authority(self.path)
+        good=copy.deepcopy(self.rows['parser-worker']['State'])
+        for change in ({'Running':False},{'Restarting':True},{'Status':'exited'},
+                       {'Health':{'Status':'starting'}},{'Health':{'Status':'unhealthy'}}):
+            self.rows['parser-worker']['State']={**good,**change}
+            with self.subTest(change=change),self.assertRaisesRegex(RuntimeError,'parser_unready'):self.activate()
+            self.assertEqual(load_worker_authority(self.path),initial)
+            self.assertEqual(json.loads(self.record.read_text())['status'],'candidate_created_fenced')
 
     def test_normal_adoption_waits_for_running_candidate_without_readonly_bridge(self):
         from deployment.lib.completed_normal_profile import RECONCILED

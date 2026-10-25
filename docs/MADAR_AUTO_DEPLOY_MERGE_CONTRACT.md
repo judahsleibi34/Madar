@@ -1,5 +1,24 @@
 # Madar Auto-Deploy Merge Contract
 
+## Canonical160 private parser dependency (2026-10-25)
+
+The canonical160 maintenance candidate starts its bounded HTTP parser sidecar
+before backend private readiness. This sidecar is not a queue/database consumer:
+its measured command, nonroot UID, read-only upload bind, tmpfs/resource limits,
+credential-free environment and sole internal parser network are mandatory.
+The original source/inventory and independently sealed candidate remain required;
+context-free and historical150 inventory checks retain a stopped private parser.
+Remote ingestion, notification, calendar and deletion consumers remain CREATED
+and stopped until the existing independent target handoff and owner transfer.
+The child additionally refuses ownership transfer if the private parser is not
+running and healthy. It neither starts that sidecar nor grants authority.
+
+This resolves the parser/readiness ordering conflict only. Private gateway and
+calendar transport, measured original-provider acceptance/activation callbacks,
+complete preserved146-to160 acceptance and recovery remain unfinished. Schema160
+registration/admission, ordinary Class D refusal and production automation stay
+closed. Native sidecar HTTP/RO tests are not protected-upgrade acceptance.
+
 ## Approved reduced PR220 scope (2026-10-23)
 
 PR220 acceptance is frozen to application architecture, database integrity,

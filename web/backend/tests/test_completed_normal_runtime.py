@@ -89,6 +89,28 @@ class RuntimeModelTests(unittest.TestCase):
                 row['Config']['Env']=['PATH=/fixture',*(k+'='+v for k,v in service['environment'].items())]
             rows[name]=row
         self.rows=rows
+        if self.contract.get('operation')=='completed-normal-schema146-160-coordinated-release':
+            from test_schema160_private_parser import parser_row
+            scope={'context_sha256':digest(self.contract),'source_sha':self.contract['candidate']['source_sha']}
+            old=self.rows[self.selected['containers']['parser-worker']]
+            row=parser_row(scope,name=old['Name'].lstrip('/'),identifier=old['Id'])
+            row['Image']=old['Image'];row['Config']['Labels'].update(old['Config']['Labels'])
+            row['Config']['Entrypoint']=[]
+            row['Config']['Healthcheck']=old['Config']['Healthcheck']
+            row['State']=old['State'];row['Config']['Env'][3]='PATH=/fixture'
+            self.rows[row['Name'].lstrip('/')]=row
+            network=self.selected['networks']['parser']
+            endpoint=row['NetworkSettings']['Networks'][network]
+            endpoint.update(NetworkID='network-id',IPAddress='10.249.4.2',Aliases=[row['Name'].lstrip('/'),'parser-worker'])
+            self.model['networks']['parser_internal']={'name':network,'internal':True,
+                'ipam':{'config':[{'subnet':'10.249.4.0/24'}]}}
+            service=self.model['services']['parser-worker']
+            service.update(user='65534:65534',working_dir='/app',entrypoint=[],command=row['Config']['Cmd'],
+                environment={k:v for k,v in m._environment(row['Config']['Env']).items() if k!='PATH'},
+                mem_limit=768*1024*1024,cpus=.75,pids_limit=64,
+                tmpfs=['/tmp:rw,noexec,nosuid,size=256m,uid=65534,gid=65534'],networks={'parser_internal':{}},
+                volumes=[{'type':'bind','source':'/synthetic-owned/private_uploads',
+                    'target':'/app/private_uploads','read_only':True}])
 
     def test_manual_profile_accepts_exact_136_144_excluding_142(self):
         self.use_manual_contract();self.validate()
@@ -294,6 +316,32 @@ class RuntimeModelTests(unittest.TestCase):
                     state_root=directory,admissions=Path(directory))
             self.assertEqual(list(Path(directory).iterdir()),[])
             lock.assert_not_called()
+
+    def test_canonical_parser_cannot_be_redefined_as_a_consumer_in_the_approved_model(self):
+        from test_schema160_release import reconciled_contract
+        self.use_manual_contract(reconciled_contract(),preparation150=True)
+        for row in self.rows.values():
+            row['State']={'Running':False,'Restarting':False,'Status':'created'}
+            for endpoint in row['NetworkSettings']['Networks'].values():endpoint.update(NetworkID='',IPAddress='',EndpointID='')
+        service=self.model['services']['parser-worker'];row=self.rows[self.selected['containers']['parser-worker']]
+        service['environment']['SUPABASE_SERVICE_KEY']='synthetic-forbidden'
+        row['Config']['Env'].append('SUPABASE_SERVICE_KEY=synthetic-forbidden')
+        with self.assertRaisesRegex(RuntimeError,'private_parser_configuration_invalid'):
+            m.validate_model(self.contract,self.model,self.runtime,phase='provisional')
+
+    def test_canonical_parser_requires_internal_network_even_if_model_and_daemon_agree_on_egress(self):
+        from test_schema160_release import reconciled_contract
+        self.use_manual_contract(reconciled_contract(),preparation150=True)
+        self.model['networks']['parser_internal']['internal']=False
+        original=self.runtime.command
+        def command(args):
+            result=original(args)
+            if args[:3]==['docker','network','inspect'] and args[3]==self.selected['networks']['parser']:
+                values=json.loads(result);values[0]['Internal']=False;return json.dumps(values)
+            return result
+        self.runtime.command=command
+        with self.assertRaisesRegex(RuntimeError,'private_parser_network_invalid'):
+            m.validate_model(self.contract,self.model,self.runtime,phase='provisional')
 
     def test_exact160_normal_seal_requires_handoff_and_retains_accepted_container_ids(self):
         """Actual model comparison/publication; authority and ownership modeled."""

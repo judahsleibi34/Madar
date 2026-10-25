@@ -30,6 +30,52 @@ def _environment(items):
     return result
 
 
+def verify_private_parser(row, *, source_sha, image, network_name, uploads_root):
+    """Measure the bounded HTTP compute sidecar, never a queue/DB consumer.
+
+    The existing full rendered-model seal remains required. This independent
+    semantic check prevents a source-bound model from giving the pre-handoff
+    parser credentials, writable data, host access or an egress network.
+    No Docker effect, health claim or authority follows from this function.
+    """
+    config=row.get('Config',{});host=row.get('HostConfig',{})
+    env=_environment(config.get('Env'))
+    required={'APP_ENV':'production','MADAR_RELEASE_SHA':source_sha,
+        'DATA_UPLOAD_DIR':'/app/private_uploads','MADAR_UPLOAD_WORKSPACE_DIR':'/tmp/madar_parser',
+        'PARSER_WORKER_PROCESS':'true','PARSER_WORKER_HEALTH_HOST':'0.0.0.0','PARSER_WORKER_PORT':'8092',
+        'ALLOW_REMOTE_DATASET_URLS':'false'}
+    allowed=set(required)|{'MADAR_BUILD_TIMESTAMP','PARSER_JOB_TIMEOUT_SECONDS','STRUCTURED_LOGS',
+        'PATH','LANG','GPG_KEY','PYTHON_VERSION','PYTHON_SHA256','PYTHONUNBUFFERED','PYTHONDONTWRITEBYTECODE'}
+    timeout=env.get('PARSER_JOB_TIMEOUT_SECONDS','')
+    if (not set(env)<=allowed or any(env.get(k)!=v for k,v in required.items())
+            or not timeout.isdecimal() or not 1<=int(timeout)<=295
+            or env.get('STRUCTURED_LOGS') not in {'true','false'}
+            or row.get('Image')!=image or config.get('User')!='65534:65534'
+            or config.get('Cmd')!=['python','-m','workers.parser_worker']
+            or config.get('Entrypoint') not in (None,[]) or config.get('WorkingDir')!='/app'
+            or config.get('Labels',{}).get('org.opencontainers.image.revision')!=source_sha):
+        raise RuntimeError('completed_private_parser_configuration_invalid')
+    if (host.get('Privileged') is not False or host.get('ReadonlyRootfs') is not True
+            or sorted(host.get('CapDrop') or [])!=['ALL'] or host.get('CapAdd')
+            or sorted(host.get('SecurityOpt') or [])!=['no-new-privileges:true']
+            or host.get('Devices') or host.get('DeviceRequests') or host.get('PidMode')
+            or host.get('IpcMode') not in {None,'','private','none'} or host.get('UTSMode')
+            or host.get('Init') is not True or host.get('Memory')!=768*1024*1024
+            or host.get('NanoCpus')!=750_000_000 or host.get('PidsLimit')!=64
+            or host.get('RestartPolicy',{}).get('Name')!='no'
+            or host.get('PublishAllPorts') or host.get('PortBindings')
+            or any(row.get('NetworkSettings',{}).get('Ports',{}).values())
+            or host.get('NetworkMode')!=network_name
+            or set(row.get('NetworkSettings',{}).get('Networks',{}))!={network_name}
+            or host.get('Tmpfs')!={'/tmp':'rw,noexec,nosuid,size=256m,uid=65534,gid=65534'}):
+        raise RuntimeError('completed_private_parser_isolation_invalid')
+    mounts=row.get('Mounts')
+    if (not isinstance(mounts,list) or len(mounts)!=1 or mounts[0].get('Type')!='bind'
+            or mounts[0].get('Source')!=uploads_root or mounts[0].get('Destination')!='/app/private_uploads'
+            or mounts[0].get('RW') is not False):
+        raise RuntimeError('completed_private_parser_mount_invalid')
+
+
 def _image_default(service, key, base, image_key):
     # Compose's explicit null means inherit the image configuration, exactly
     # like an omitted field. An explicit empty value still overrides it.
@@ -85,6 +131,8 @@ def validate_model(contract,model,runtime, *, phase='running'):
             actual=[n.get('Subnet') for n in net.get('IPAM',{}).get('Config',[])]
             if actual!=expected:raise RuntimeError('completed_runtime_network_subnet_changed')
         network_ids[name]=net['Id']
+        if release is RECONCILED and name==selected['networks']['parser'] and net.get('Internal') is not True:
+            raise RuntimeError('completed_private_parser_network_invalid')
     bindings={};health_pending=False
     for role,service in services.items():
         name=selected['containers'][role]
@@ -168,6 +216,10 @@ def validate_model(contract,model,runtime, *, phase='running'):
             if (expected['type']!='bind' or actual['Type']!='bind' or actual['Source']!=expected['source']
                     or actual['RW']!=(not bool(expected.get('read_only',False)))):
                 raise RuntimeError('completed_runtime_mount_changed')
+        if release is RECONCILED and role=='parser-worker':
+            uploads=declared.get('/app/private_uploads',{})
+            verify_private_parser(row,source_sha=contract['candidate']['source_sha'],image=image,
+                network_name=selected['networks']['parser'],uploads_root=uploads.get('source'))
         if role in {'backend',*BUSINESS}:
             from deployment.lib.completed_normal_profile import RECONCILED
             if release is RECONCILED and (

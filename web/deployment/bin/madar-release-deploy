@@ -1769,7 +1769,15 @@ def accept_maintenance_worker_owner(*,sha,slot,state_root,operations,record):
                 or operations.worker_ownership(known,{'sha':sha,'slot':slot})!='none'):
             raise RuntimeError('completed_maintenance_owner_not_quiescent')
         rows=verify_runtime_resources(contract,stage,runtime)
-        consumers=('parser-worker','remote-ingestion-worker','notification-worker','calendar-sync-worker','data-deletion-worker')
+        # Canonical160's parser is an independently sealed, credential-free
+        # private HTTP sidecar. The private handoff already accepted it; do not
+        # demand it be CREATED while backend parser readiness requires it live.
+        # Every actual consuming worker still must be CREATED and stopped.
+        parser=rows['parser-worker']['State']
+        if (parser.get('Running') is not True or parser.get('Restarting') is not False
+                or parser.get('Status')!='running' or parser.get('Health',{}).get('Status')!='healthy'):
+            raise RuntimeError('completed_maintenance_owner_parser_unready')
+        consumers=('remote-ingestion-worker','notification-worker','calendar-sync-worker','data-deletion-worker')
         if any(rows[k]['State'].get('Running') is not False or rows[k]['State'].get('Restarting') is not False
                 or rows[k]['State'].get('Status')!='created' for k in consumers):
             raise RuntimeError('completed_maintenance_owner_consumer_started')

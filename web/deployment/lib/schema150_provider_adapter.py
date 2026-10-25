@@ -211,7 +211,7 @@ def capture_original_inventory(package, contract, runtime, *, source_guard):
         rows = json.loads(runtime.command(['docker', 'inspect', *identifiers]))
         if {r.get('Id') for r in rows} != set(identifiers):
             raise RuntimeError('schema160_inventory_snapshot_incomplete')
-        attest_containers(inventory, rows, phase='prepared')
+        attest_containers(inventory, rows, phase='prepared', binding=binding)
         return set(identifiers)
 
     def sql(body):
@@ -405,7 +405,7 @@ class Schema150ProviderAdapter:
         if phase in ('private','private-boundary','active','active-boundary') and any(
                 key.startswith('candidate:') for key in self.inventory['containers']):
             self.verify_candidate_stage(rows=rows,phase=phase)
-        proof=attest_containers(self.inventory, rows, phase=phase)
+        proof=attest_containers(self.inventory, rows, phase=phase, binding=self.binding)
         if phase in ('private','private-boundary'):
             for row in rows:
                 if row.get('Name','').lstrip('/') in PROVIDER_NAMES:self._private_ports(row)
@@ -924,10 +924,10 @@ class Schema150ProviderAdapter:
             row=self._row(name)
             self._private_ports(row)
             self.runtime.command(['docker','start',row['Id']])
-        from deployment.lib.schema150_actor_inventory import PRIVATE_CANDIDATE_ROLES
+        from deployment.lib.schema150_actor_inventory import private_candidate_roles
         if any(key.startswith('candidate:') for key in self.inventory['containers']):
             self.verify_candidate_stage()
-            for logical in PRIVATE_CANDIDATE_ROLES:
+            for logical in private_candidate_roles(binding):
                 self.runtime.command(['docker','start',self.inventory['containers'][logical]['id']])
 
     def verify_native_acceptance(self,binding,preimage):
@@ -948,9 +948,9 @@ class Schema150ProviderAdapter:
                 or owner['old']!={'sha':self.contract['source_roles']['application_sha'],'slot':self.contract['origin']['slot']}
                 or owner['candidate']!={'sha':self.binding['source_sha'],'slot':self.contract['candidate']['slot']}):
             raise RuntimeError('schema150_provider_accepted_worker_owner_required')
-        from deployment.lib.schema150_actor_inventory import WORKER_ROLES
+        from deployment.lib.schema150_actor_inventory import consuming_worker_roles
         for logical,record in self.inventory['containers'].items():
-            if logical.startswith('candidate:') and logical.split(':',1)[1] in WORKER_ROLES:
+            if logical.startswith('candidate:') and logical.split(':',1)[1] in consuming_worker_roles(binding):
                 self.runtime.command(['docker','start',record['id']])
 
     def restore_ingress(self,binding,preimage):

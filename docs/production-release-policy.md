@@ -1,5 +1,22 @@
 # Madar production release acceptance policy
 
+## Private parser is not consuming authority (2026-10-25)
+
+Only the exact canonical160 preparation uses a live private parser sidecar.
+Before start, the measured original inventory and root/credential-bound stage
+must agree with its nonroot HTTP-only command, no service/DB/queue credentials,
+one internal parser network, read-only original uploads and fixed resource and
+privilege limits. The rendered model cannot redefine it as a consuming worker.
+Context-free and historical150 observations retain the original stopped-parser
+rule. All actual consumers remain stopped until independent target authority.
+The existing child owner-transfer boundary additionally requires a running,
+healthy private parser; it starts no services and publishes no traffic.
+
+These checks do not authenticate private gateway connectivity, calendar database
+transport, original Auth/MFA/Storage acceptance, a full protected upgrade, or
+recovery. Canonical160 registration/admission and ordinary Class D/automatic
+dispatch remain blocked pending those separate engineering acceptance gates.
+
 ## Protected inventory preparation (2026-10-25)
 
 The measured root entrypoint adds `capture-inventory`. Before constructing an

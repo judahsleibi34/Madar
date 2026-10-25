@@ -101,6 +101,25 @@ def binding_scope_digest(binding):
     return digest({key: item for key, item in value.items() if key not in {'context_sha256', 'inventory_sha256'}})
 
 
+def private_candidate_roles(binding=None):
+    """Only the exact canonical contract has a credential-free HTTP parser.
+
+    Names ending in '-worker' do not confer consuming authority. The concrete
+    runtime must additionally pass verify_private_parser before any start.
+    Historical and context-free observations keep the original stopped parser.
+    """
+    from deployment.lib.schema150_provider_lifecycle import binding_profile
+    from deployment.lib.completed_normal_profile import RECONCILED
+    if binding is not None and binding_profile(binding) is RECONCILED:
+        return ('candidate:redis','candidate:parser-worker','candidate:backend','candidate:frontend')
+    return PRIVATE_CANDIDATE_ROLES
+
+
+def consuming_worker_roles(binding=None):
+    private = {role.split(':',1)[1] for role in private_candidate_roles(binding)}
+    return WORKER_ROLES - private
+
+
 def inventory_digest(inventory):
     return digest(_detached(inventory))
 
@@ -117,14 +136,17 @@ def _mounts(rows):
     return sorted(found, key=lambda row: row['destination'])
 
 
-def _validate(inventory, binding=None):
+def _validate(inventory, binding=None, *, original=True):
     value = _detached(inventory)
     _require(isinstance(value, dict) and set(value) == TOP_KEYS and type(value['version']) is int and value['version'] == 1)
     _require(_hex(value['binding_sha256']))
     if binding is not None:
         binding = validate_binding(binding)
         _require(value['binding_sha256'] == binding_scope_digest(binding), 'schema150_actor_scope_changed')
-        _require(inventory_digest(value) == binding['inventory_sha256'], 'schema150_actor_inventory_digest_changed')
+        if original:
+            _require(inventory_digest(value) == binding['inventory_sha256'], 'schema150_actor_inventory_digest_changed')
+    private_runtime_roles = PRIVATE_PROVIDER_ROLES | frozenset(private_candidate_roles(binding))
+    consumers = consuming_worker_roles(binding)
     networks = value['target_networks']
     _require(isinstance(networks, dict) and REQUIRED_TARGET_NETWORKS <= set(networks) and len(networks) <= 32
              and all(_name(name) and _hex(identifier) for name, identifier in networks.items()))
@@ -175,7 +197,7 @@ def _validate(inventory, binding=None):
                 _require(not state['running'])
             if phase in {'private', 'active'} and actor['generation'] in {'canonical', 'origin', 'fallback'}:
                 _require(not state['running'] and state['restart'] == 'no')
-            if phase == 'private' and logical.startswith('candidate:') and logical.split(':', 1)[1] in WORKER_ROLES:
+            if phase == 'private' and logical.startswith('candidate:') and logical.split(':', 1)[1] in consumers:
                 _require(not state['running'])
             if logical.startswith('candidate:') and phase != 'prepared': _require(state['restart'] == 'no')
         # Admit only states reachable by the fixed concrete adapter. It stops
@@ -187,7 +209,7 @@ def _validate(inventory, binding=None):
                      'schema150_database_restart_preimage_changed')
         else:
             _require(active['restart']=='no','schema150_active_restart_not_reachable')
-        if logical in PRIVATE_RUNTIME_ROLES:
+        if logical in private_runtime_roles:
             _require(private['running'] and active['running'],'schema150_private_provider_state_not_reachable')
         if logical=='proxy' or actor['generation']=='candidate':
             _require(active['running'],'schema150_normal_actor_not_active')
@@ -267,11 +289,11 @@ def bind_staged_candidates(inventory, binding, stage, rows, *, phase):
             'name':sealed['name'],'id':sealed['id'],'image':sealed['image'],
             'generation':'candidate','source_sha':binding['source_sha'],'spec_sha256':sealed['spec_sha256'],
             'mounts':_actual_mounts(actual),'networks':sealed['networks'],
-            'states':{p:{'running':p=='active' or p=='private' and role not in WORKER_ROLES,
+            'states':{p:{'running':p=='active' or p=='private' and role not in consuming_worker_roles(binding),
                          'restarting':False,'restart':'no'} for p in PHASES}}
     # Includes duplicate base/candidate IDs and names, mounts, source labels,
     # complete all-daemon snapshot, network IDs, and fixed phase restrictions.
-    attest_containers(value,rows,phase=phase)
+    attest_containers(value,rows,phase=phase,binding=binding)
     return value
 
 
@@ -319,7 +341,7 @@ def _host_authority(row, mounts):
             or any(any(_overlaps(mount['source'], source) for source in sensitive) for mount in mounts))
 
 
-def attest_containers(inventory, rows, *, phase):
+def attest_containers(inventory, rows, *, phase, binding=None):
     """Require a complete all-container snapshot, not filtered target discovery.
 
     The caller must prove snapshot completeness with the Docker daemon and
@@ -327,7 +349,12 @@ def attest_containers(inventory, rows, *, phase):
     cannot authorize target-network, object-root or target-credential access.
     """
     _require(phase in ATTEST_PHASES, 'schema150_actor_phase_invalid')
-    value = _validate(inventory)
+    # Original inventory digest authentication belongs to validate_inventory;
+    # a staged extension has a different digest. Here bind its original scope
+    # and candidate source, then independently measure every actual container.
+    # This observation alone never authenticates a stage or issues authority.
+    value = _validate(inventory,binding,original=False)
+    private_runtime_roles = PRIVATE_PROVIDER_ROLES | frozenset(private_candidate_roles(binding))
     try:
         _require(len(json.dumps(rows, allow_nan=False).encode()) <= 64*1024*1024, 'schema150_container_snapshot_size_limit')
     except (TypeError, ValueError):
@@ -366,7 +393,7 @@ def attest_containers(inventory, rows, *, phase):
             # roles. The concrete adapter separately verifies the root-sealed
             # stage and its credential witness before accepting candidates.
             expected = actor['states']['fenced']
-            if logical in PRIVATE_RUNTIME_ROLES and matches(actor['states']['private']):
+            if logical in private_runtime_roles and matches(actor['states']['private']):
                 expected = actor['states']['private']
         elif phase == 'active-boundary':
             expected = actor['states']['private'] if matches(actor['states']['private']) else actor['states']['active']
@@ -391,6 +418,15 @@ def attest_containers(inventory, rows, *, phase):
         # apply; the concrete adapter also requires the approved Redis digest.
         if actor['source_sha'] is not None and logical != 'candidate:redis':
             _require(row.get('Config', {}).get('Labels', {}).get('org.opencontainers.image.revision') == actor['source_sha'], 'schema150_actor_source_changed')
+        if logical == 'candidate:parser-worker' and logical in private_runtime_roles:
+            from deployment.lib.completed_normal_runtime import verify_private_parser
+            networks = actor['networks']
+            _require(len(networks)==1, 'completed_private_parser_network_invalid')
+            network = next(iter(networks))
+            _require(re.fullmatch('madar-schema160-'+binding['context_sha256'][:16]+'-(blue|green)-parser',network)
+                     is not None, 'completed_private_parser_network_invalid')
+            verify_private_parser(row,source_sha=binding['source_sha'],image=actor['image'],
+                network_name=network,uploads_root=value['object_roots']['private_uploads']['source'])
     return {'inventory_sha256': inventory_digest(value), 'phase': phase, 'containers': len(actors),
             'exclusion_proof_references': len(value['exclusions']), 'unknown_target_actors': 0,
             'supervisors_verified': False, 'database_roles_verified': False, 'sessions_verified': False,

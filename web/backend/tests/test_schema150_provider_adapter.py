@@ -165,9 +165,8 @@ class ConcreteAdapterTests(unittest.TestCase):
         stack.enter_context(patch.object(retained, 'require_root_directory', lambda path: None))
         (data, scope), rows = fixture(candidates=candidates)
         if target==160:
-            from deployment.lib.completed_normal_profile import RECONCILED
-            scope=dict(scope,operation=RECONCILED.operation,target_schema=160)
-            data,scope=repin(data,scope)
+            from test_schema160_private_parser import canonical_parser
+            data,scope=canonical_parser(data,scope,rows)
         actor = adapter.Schema150ProviderAdapter.__new__(adapter.Schema150ProviderAdapter)
         actor.binding, actor.inventory, actor.root = scope, data, root
         actor.original_inventory=data
@@ -767,6 +766,31 @@ class ConcreteAdapterTests(unittest.TestCase):
         actor.runtime.command.side_effect=RuntimeError('synthetic_provider_start_failed')
         with self.assertRaisesRegex(RuntimeError,'provider_start_failed'):actor.resume_providers_private(scope,preimage)
         self.assertEqual(actor.runtime.command.call_count,1)
+
+    def test_canonical_private_resume_starts_bounded_parser_before_backend_and_no_consumers(self):
+        actor,scope,preimage,_=self.component(stage='fenced',candidates=True,target=160)
+        actor._roles=Mock(return_value={});actor._expected_roles=Mock(return_value={})
+        by_id={r['Id']:r for r in actor._rows.return_value}
+        def start(arguments):
+            self.assertEqual(arguments[:2],['docker','start']);by_id[arguments[2]]['State']['Running']=True
+        actor.runtime.command.side_effect=start
+        actor.resume_providers_private(scope,preimage)
+        expected=['native:auth','native:rest','native:storage','candidate:redis','candidate:parser-worker',
+            'candidate:backend','candidate:frontend']
+        self.assertEqual([c.args[0][2] for c in actor.runtime.command.call_args_list],
+            [actor.inventory['containers'][key]['id'] for key in expected])
+        actor._attest('private')
+        for role in inventory.consuming_worker_roles(scope):
+            self.assertFalse(by_id[actor.inventory['containers']['candidate:'+role]['id']]['State']['Running'])
+        self.assertFalse(by_id[actor.inventory['containers']['proxy']['id']]['State']['Running'])
+
+    def test_canonical_private_resume_refuses_credentialed_parser_before_any_provider_start(self):
+        actor,scope,preimage,_=self.component(stage='fenced',candidates=True,target=160)
+        row=next(r for r in actor._rows.return_value
+            if r['Id']==actor.inventory['containers']['candidate:parser-worker']['id'])
+        row['Config']['Env'].append('SUPABASE_SERVICE_KEY=synthetic-forbidden')
+        with self.assertRaises(RuntimeError):actor.resume_providers_private(scope,preimage)
+        actor.runtime.command.assert_not_called()
 
     def test_activation_starts_only_workers_then_supporting_native_actors_and_proxy_last(self):
         actor,scope,preimage,_=self.component(stage='private',candidates=True)
