@@ -1,5 +1,15 @@
 # Privileged control-plane upgrade architecture
 
+The isolated package producer now publishes version2 requests through the
+existing frozen-source entrypoint, with fresh operation/attempt identities and
+measured source, original inventory, private probes and candidate model. It
+does not issue credentials or register160. The existing issuer still requires
+truthful original-release history; disposable running146 enrollment remains an
+integration dependency, never a reason to invent historical completions.
+Environment identity/fencing observation is separate from authority. See
+`production-release-policy.md`, “Immutable isolated operation requests”.
+Both preparation and execution entrypoints are protected control-plane inputs.
+
 The measured completed-NORMAL source inventory now requires
 `completed_normal_private_acceptance.py`. Its canonical160 observers bind to
 the actual coordinator and concrete provider adapter; original-account probes

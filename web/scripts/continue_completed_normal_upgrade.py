@@ -40,9 +40,10 @@ def secured(path, *, directory=False):
         raise RuntimeError('completed_upgrade_boot_source_not_frozen')
     return path
 
-def measure(package,source_hash,plan_hash):
+def measure(package,source_hash,plan_hash,*,base=None):
+    base=BASE if base is None else base
     if (not re.fullmatch('[0-9a-f]{64}',source_hash) or not re.fullmatch('[0-9a-f]{64}',plan_hash)
-            or package!=BASE/('normal-source-'+source_hash)):
+            or package!=base/('normal-source-'+source_hash)):
         raise RuntimeError('completed_upgrade_boot_package_binding_invalid')
     secured(package,directory=True)
     manifest_bytes=secured(package/'source-bundle.json').read_bytes()
@@ -59,6 +60,29 @@ def measure(package,source_hash,plan_hash):
     if (document.get('source_bundle_sha256')!=source_hash
             or document.get('controller_source_sha')!=manifest.get('source_sha')):
         raise RuntimeError('completed_upgrade_boot_source_plan_mismatch')
+    if type(manifest.get('version')) is not int or manifest['version'] not in {1,2}:
+        raise RuntimeError('completed_upgrade_package_version_invalid')
+    if manifest['version']==1 and any(k in document for k in ('operation_id','attempt_id','source_authentication_sha256','candidate_model_sha256','provider_inventory_input_sha256')):
+        raise RuntimeError('completed_upgrade_package_version_invalid')
+    if manifest['version']==2:
+        import uuid
+        for key in ('operation_id','attempt_id'):
+            try:valid=str(uuid.UUID(manifest.get(key,'')))==manifest[key]==document.get(key)
+            except (ValueError,TypeError,KeyError,AttributeError):valid=False
+            if not valid:raise RuntimeError('completed_upgrade_package_attempt_changed')
+        required={'source-authentication.json':'source_authentication_sha256',
+            'provider-inventory-input.json':'provider_inventory_input_sha256',
+            'original-provider-probes.json':'original_provider_probe_sha256',
+            'candidate-model.json':'candidate_model_sha256'}
+        for name,key in required.items():
+            path=secured(package/name)
+            if not 0<path.stat().st_size<=2*1024**2:
+                raise RuntimeError('completed_upgrade_package_input_changed')
+            value=path.read_bytes()
+            if hashlib.sha256(value).hexdigest()!=document.get(key):
+                raise RuntimeError('completed_upgrade_package_input_changed')
+        if manifest.get('source_authentication_sha256')!=document['source_authentication_sha256']:
+            raise RuntimeError('completed_upgrade_package_authentication_changed')
     source=secured(package/'source',directory=True)
     files=manifest.get('files',{})
     actual={p.relative_to(source).as_posix() for p in source.rglob('*') if p.is_file() or p.is_symlink()}

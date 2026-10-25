@@ -91,6 +91,8 @@ REQUIRED_PRODUCTION_READINESS = {
 }
 PROTECTED_PATHS = (
     "web/deployment",
+    "web/scripts/prepare_completed_normal_package.py",
+    "web/scripts/continue_completed_normal_upgrade.py",
     "web/frontend/private-provider160.conf",
     "web/scripts/madar_alert_hook.sh",
     "web/scripts/backup_madar.sh",

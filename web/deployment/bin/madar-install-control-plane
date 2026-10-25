@@ -51,6 +51,8 @@ declare -a tracked_files=(
   lib/control_plane_upgrade.py
   lib/completed_normal_baseline.py
   lib/completed_normal_admission.py
+  lib/completed_normal_package.py
+  lib/isolated_release_environment.py
   lib/schema148_consumers.py
   lib/schema148_artifacts.py
   lib/schema148_release.py
@@ -86,6 +88,7 @@ declare -a tracked_files=(
   lib/completed_normal_execution.py
   lib/completed_normal_model.py
   lib/completed_normal_evidence.py
+  lib/completed_normal_private_acceptance.py
   lib/normal_boot_repair.py
   lib/control_plane_upgrade_authorization.py
   lib/migration_executor.py

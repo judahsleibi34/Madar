@@ -56,6 +56,20 @@ class PackageTests(unittest.TestCase):
     def test_noncanonical_plan_cannot_have_a_second_authorization_digest(self):
         raw=json.dumps(self.document).encode();(self.package/'plan.json').write_bytes(raw)
         with self.assertRaisesRegex(RuntimeError,'noncanonical_package'):self.measure(self.sha(raw))
+    def test_unknown_or_downgraded_manifest_format_cannot_skip_v2_inputs(self):
+        for version in (True,0,3,'2'):
+            manifest=dict(self.manifest,version=version);body=self.encode(manifest);sha=self.sha(body)
+            package=self.base/('normal-source-'+sha)
+            shutil.copytree(self.package,package)
+            (package/'source-bundle.json').write_bytes(body)
+            document=dict(self.document,source_bundle_sha256=sha)
+            (package/'plan.json').write_bytes(self.encode(document))
+            with self.subTest(version=version),self.assertRaisesRegex(RuntimeError,'package_version_invalid'):
+                module.measure(package,sha,self.sha(self.encode(document)))
+            shutil.rmtree(package)
+        self.document['attempt_id']='c01201af-56ee-4444-8888-0123456789ab'
+        (self.package/'plan.json').write_bytes(self.encode(self.document))
+        with self.assertRaisesRegex(RuntimeError,'package_version_invalid'):self.measure()
     def test_source_mutation_missing_inventory_or_wrong_approval_fails(self):
         with self.assertRaisesRegex(RuntimeError,'approved_bytes_changed'):self.measure('b'*64)
         target=self.package/'source'/next(iter(self.files));target.write_bytes(b'changed')

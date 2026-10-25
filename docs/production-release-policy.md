@@ -1,5 +1,39 @@
 # Madar production release acceptance policy
 
+## Immutable isolated operation requests
+
+`prepare_completed_normal_package.py` is root/isolated-Python preparation only.
+Its fixed disposable-KVM policy observes DMI/machine/root-filesystem identities,
+expiry, the actual PostgreSQL system identifier and realm marker, every Docker
+actor, owned bridges/volumes and the measured external-effect firewall. Production
+and accepted staging host identities refuse. Bind mounts are currently refused;
+the complete controller's protected configuration/state mounts still need an
+explicit reviewed test ownership contract. This observer grants no authority.
+
+The publisher authenticates the GitHub commit/tree and hashes the actual Git
+commit, intermediate trees and all blobs, retaining committed binary bytes and
+excluding dirty/untracked files. It independently observes all eight healthy
+compatible144–146 origin roles, existing ownership, protected history and live
+NORMAL readiness before/after original inventory publication. An empty146
+database or a current160 application at146 cannot substitute for that origin.
+
+Version2 packages atomically publish root-frozen source plus a canonical plan,
+fresh operation/attempt identities, designated original-account probes, original
+inventory, provisional candidate model and source-authentication response.
+The existing stdlib-first entrypoint measures those inputs before privileged
+imports; changed source, probes, model or attempt refuses. Candidate runtime
+sealing remains mandatory after actual creation. The command must run as
+`python3 -I -B`; private probe credentials are never repository inputs or logs.
+
+This is not a complete authenticated operational package or test admission.
+Truthful running146-origin enrollment through the existing issuer, exceptional
+test authority, canonical160 backup/receiver/full-application restoration and
+actual preserved-application execution remain unfinished. Do not fabricate old
+completed-upgrade receipts to satisfy the historical origin contract. Fixture
+packages remain ineligible for production preflight/execute. Schema160 admission,
+ordinary Class D refusal, active release selection and automatic dispatch remain
+unchanged and closed.
+
 ## Installed original-provider observers
 
 The measured completed-NORMAL entrypoint supplies source-owned original,
