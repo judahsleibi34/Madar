@@ -453,9 +453,23 @@ class ConcreteAdapterTests(unittest.TestCase):
             if 'pg_prepared_xacts' in body:return '0'
             raise AssertionError('Unexpected SQL')
         actor._sql=Mock(side_effect=query)
-        observed=actor.observe_private_boundary(scope)
+        with patch('deployment.lib.completed_normal_admission.require_candidate_authority',
+                return_value={'mode':'READ_ONLY'}) as grant:
+            observed=actor.observe_private_boundary(scope)
+        grant.assert_called_once_with(actor.contract,mode='READ_ONLY')
+        actor.activation_guard.assert_not_called()
         self.assertEqual(observed['unknown_writers'],1)
         self.assertEqual(observed['unknown_client_sessions'],0)
+
+    def test_private_boundary_cannot_replace_missing_root_grant_with_callback_flags(self):
+        actor,scope,_,_=self.component(stage='private')
+        actor._supervisors_stopped=Mock();actor._sessions=Mock(return_value=[])
+        actor.activation_guard.return_value={'target_write_authority':False,'candidate_read_only':True}
+        with patch('deployment.lib.completed_normal_admission.require_candidate_authority',
+                side_effect=RuntimeError('synthetic_missing_root_grant')):
+            with self.assertRaisesRegex(RuntimeError,'missing_root_grant'):
+                actor.observe_private_boundary(scope)
+        actor.activation_guard.assert_not_called()
 
 
     def test_default_fresh_credential_validator_refuses_before_transport(self):
@@ -941,6 +955,26 @@ class ConcreteAdapterTests(unittest.TestCase):
         value=json.loads(record.read_bytes());value['candidate_stage_sha256']='0'*64
         record.write_text(json.dumps(value))
         with self.assertRaisesRegex(RuntimeError,'publication_changed'):actor.clear_boot_interlock(scope,preimage)
+        self.assertTrue(actor.barrier.exists())
+
+    def test_public_acceptance_is_measured_without_unvalidated_callback_flag(self):
+        actor,scope,preimage,_,_=self.route_component()
+        # Full activation evidence has a strict lifecycle schema that contains
+        # neither public_acceptance nor candidate_read_only. These properties
+        # must come from actual route probes / protected authority instead.
+        actor.activation_guard.return_value={'target_write_authority':True}
+        actor.restore_ingress(scope,preimage)
+        self.assertIs(actor.verify_effect('restore_ingress',scope,preimage),True)
+        actor.barrier.write_text(json.dumps({'binding':scope,'preimage_sha256':lifecycle.digest(preimage)}))
+        actor.clear_boot_interlock(scope,preimage)
+        self.assertFalse(actor.barrier.exists())
+
+    def test_public_pass_flag_cannot_replace_failed_live_readiness(self):
+        actor,scope,preimage,_,_=self.route_component()
+        actor.restore_ingress(scope,preimage)
+        actor.runtime.json_http.side_effect=lambda url:(actor.public_version
+            if url.endswith('/health/version') else {'ready':False})
+        with self.assertRaises(RuntimeError):actor.clear_boot_interlock(scope,preimage)
         self.assertTrue(actor.barrier.exists())
 
     def test_target_authority_alone_cannot_open_ingress_before_workers_are_running(self):

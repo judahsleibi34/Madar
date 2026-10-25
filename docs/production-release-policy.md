@@ -1,5 +1,17 @@
 # Madar production release acceptance policy
 
+## Measured private and public boundaries
+
+Provider quiescence and the private boundary read the exact root-issued
+READ_ONLY candidate grant. They do not infer it from activation callback
+flags. Full activation evidence retains its strict existing schema; it does
+not contain `candidate_read_only` or `public_acceptance`. Public acceptance
+and boot release independently reverify the protected route publication,
+candidate stage, NORMAL grant and live version/readiness/recovery responses
+on both stable routes. A callback PASS cannot replace those observations.
+This corrects the callback contract without registering schema160 or accepting
+the unfinished preserved-application release or recovery rehearsal.
+
 ## Canonical160 private provider transport
 
 The maintenance candidate has nine sealed roles. Its additional portless

@@ -707,7 +707,7 @@ class Schema150ProviderAdapter:
         if step=='restore_ingress':
             self._attest('active')
             self.verify_target_route()
-            return self.activation_guard(binding,private=False).get('public_acceptance') is True
+            return True
         if step=='clear_boot_interlock':
             if self.barrier.exists():return False
             self.verify_target_route()
@@ -795,8 +795,10 @@ class Schema150ProviderAdapter:
                 or any(type(value.get(k)) is not int or value[k]!=0 for k in DATABASE_COUNTERS)):
             raise RuntimeError('schema150_provider_database_not_quiescent')
         self._object_preservation(binding,preimage,capture=True)
+        from deployment.lib.completed_normal_admission import require_candidate_authority
+        grant=require_candidate_authority(self.contract,mode='READ_ONLY')
         value.update(ingress_fenced=True,supervisors_fenced=True,objects_fenced=True,
-            roles_fenced=True,boot_interlock_armed=self.barrier.exists(),candidate_read_only=self.activation_guard(binding,private=True).get('candidate_read_only') is True)
+            roles_fenced=True,boot_interlock_armed=self.barrier.exists(),candidate_read_only=grant['mode']=='READ_ONLY')
         return value
 
     def backup_role_archive(self, binding):
@@ -905,8 +907,10 @@ class Schema150ProviderAdapter:
         self._attest('private-boundary')
         self._supervisors_stopped()
         sessions=self._sessions()
+        from deployment.lib.completed_normal_admission import require_candidate_authority
+        grant=require_candidate_authority(self.contract,mode='READ_ONLY')
         return {'binding_sha256':digest(binding),'ingress_fenced':True,'workers_fenced':True,
-            'boot_interlock_armed':self.barrier.exists(),'candidate_read_only':self.activation_guard(binding,private=True).get('target_write_authority') is False,
+            'boot_interlock_armed':self.barrier.exists(),'candidate_read_only':grant['mode']=='READ_ONLY',
             'unknown_writers':int(self._sql('BEGIN READ ONLY;'+BACKGROUND_WRITER_SQL+';COMMIT;')),
             'unknown_client_sessions':0 if self._known_sessions(sessions) else len(sessions),
             'prepared_transactions':int(self._sql('SELECT count(*) FROM pg_prepared_xacts;'))}
@@ -1057,8 +1061,6 @@ class Schema150ProviderAdapter:
     def clear_boot_interlock(self,binding,preimage):
         self.require_authority(binding,purpose='clear_boot_interlock');self._attest('active')
         self.verify_target_route()
-        if self.activation_guard(binding,private=False).get('public_acceptance') is not True:
-            raise RuntimeError('schema150_provider_public_acceptance_required')
         if private_json(self.barrier)!={'binding':binding,'preimage_sha256':digest(preimage)}:
             raise RuntimeError('schema150_provider_barrier_identity_changed')
         self.barrier.unlink()

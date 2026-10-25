@@ -1,5 +1,12 @@
 # Madar Auto-Deploy Merge Contract
 
+The maintenance adapter now observes READ_ONLY directly from the existing
+root-issued candidate grant. Public acceptance/boot release require the
+protected route publication and actual NORMAL version/readiness/recovery
+probes, rather than flags absent from the strict activation evidence format.
+No callback summary can replace those observations. This is an interface
+correction, not schema160 operational or automatic-deployment admission.
+
 Canonical160 candidate creation now includes an immutable portless private
 provider gateway and exact calendar URI/cluster binding. Its frontend image
 configuration is protected from ordinary unreviewed automation. This is not
