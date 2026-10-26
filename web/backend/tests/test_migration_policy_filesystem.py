@@ -50,6 +50,15 @@ class NativePolicyFilesystemTests(unittest.TestCase):
         self.assertEqual(load_policy(),self.value)
         self.assertIs(load_policy()['enabled'],False)
 
+    def test_root_reads_explicit_bounded_class_b_policy_without_issuing_authority(self):
+        self.value.update(version=2,risk_classes=['A','B'],class_b={
+            'operations':['add_nullable_column','create_btree_index'],'max_table_bytes':1048576,
+            'max_table_rows':100,'max_lock_wait_ms':100,'max_statement_ms':2000,
+            'measurement_max_age_seconds':30})
+        self.write(self.value)
+        self.assertEqual(load_policy(),self.value)
+        self.assertIs(load_policy()['enabled'],False)
+
     def test_nonroot_cannot_read_or_evaluate_protected_file(self):
         os.seteuid(65534)
         try:

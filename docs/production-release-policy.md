@@ -3953,3 +3953,14 @@ lifecycle and real immutable compatible images. Its `bootstrap_adopted` record
 is not a protected-upgrade completion, source-bound issuer enrollment or proof
 of independent recovery. Original-account probes explicitly distinguish those
 results; they never mint credentials or completion history.
+
+### Measured Class B preparation and staging OOM correction (2026-10-26)
+
+A root-owned version2 policy may explicitly describe the audited nullable-column
+or ordinary-btree operation types, table/row thresholds, measurement freshness
+and bounded lock/statement/transaction times. It is not broad Class B approval.
+The existing Class A-only version1 contract remains unchanged. Source-owned
+booleans or a policy match grant no execution authority; generic dispatch stays
+closed until its independent issuer/controller/recovery acceptance is complete.
+Whole-release security, worker, verification and controller changes escalate
+review even without SQL. An administrator cannot approve unsupported execution.

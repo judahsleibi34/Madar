@@ -7,8 +7,9 @@ recovery and independently protected admission remain mandatory.
 from __future__ import annotations
 from dataclasses import dataclass
 import json
+from fnmatch import fnmatchcase
 from .migration_inventory import GitSource, Inventory, canonical, digest, strict_json
-from .migration_risk import RANK, analyze
+from .migration_risk import RANK, analyze, measured_operations
 from .schema148_artifacts import INPUTS as ARTIFACT_INPUTS
 
 INTENT_PATH = 'web/database/migration-intent.json'
@@ -64,6 +65,32 @@ def compatibility_intent(git, source):
     return value
 
 
+def release_change_risk(git,base,source):
+    """Whole-release risk from installed code rules, not candidate declarations.
+
+    App-only is not synonymous with safe: changing authorization, worker
+    ownership, storage contracts or verifiers requires coordinated review even
+    without SQL. Root policy independently pins this analyzer and its imports.
+    """
+    paths=sorted(p.decode('utf-8') for p in git.command('diff','--no-ext-diff','--no-textconv',
+        '--name-only','-z',base,source,'--').split(b'\0') if p)
+    critical_services=('auth','mfa','tenant','identity','access','security','entitlement','billing','payment',
+        'storage','provider_recovery','business_write_authority','notification','outbox','deletion',
+        'external_effect','calendar','reservation','inventory','order','cache','remote_ingestion')
+    from .control_plane_upgrade import PROTECTED_PATHS
+    groups={'control_plane':[],'verification':[],'authorization_and_data_contract':[],'worker_contract':[]}
+    for path in paths:
+        if any(path==root or path.startswith(root+'/') for root in PROTECTED_PATHS):groups['control_plane'].append(path)
+        if path.startswith(('.github/','web/backend/scripts/','web/frontend/scripts/','web/staging/integration/')):
+            groups['verification'].append(path)
+        if (path in {'web/backend/app.py','web/backend/database.py'} or path.startswith('web/backend/routes/')
+                or any(fnmatchcase(path,'web/backend/services/*'+word+'*.py') for word in critical_services)):
+            groups['authorization_and_data_contract'].append(path)
+        if path.startswith('web/backend/workers/'):groups['worker_contract'].append(path)
+    return {'class':'C' if any(groups.values()) else 'A','changed_paths_sha256':digest(paths),
+            'review_sensitive_paths':groups}
+
+
 @dataclass(frozen=True)
 class ReleasePlan:
     encoded: bytes
@@ -90,13 +117,16 @@ def generate(root, inventory: Inventory, *, origin, target=None):
     from .control_plane_upgrade import PROTECTED_PATHS
     changed=git.command('diff','--no-ext-diff','--no-textconv','--name-only',inventory.history_base_sha,inventory.source_sha,'--',*PROTECTED_PATHS)
     control_plane_changed=bool(changed.strip())
+    changes=release_change_risk(git,inventory.history_base_sha,inventory.source_sha)
     rows=[]; previous=origin; classification='A'
     for migration in path:
         risk=analyze(migration.sql,origin=previous,target=migration.number)
         if RANK[risk.classification]>RANK[classification]: classification=risk.classification
-        rows.append({**migration.record(),'from_schema':previous,'to_schema':migration.number,'risk':risk.document()})
+        rows.append({**migration.record(),'from_schema':previous,'to_schema':migration.number,'risk':risk.document(),
+            'measurable_operations':measured_operations(migration.sql,origin=previous,target=migration.number)})
         previous=migration.number
     if intent and RANK[intent['declared_class']]>RANK[classification]: classification=intent['declared_class']
+    if RANK[changes['class']]>RANK[classification]:classification=changes['class']
     if protocol_change and RANK[classification]<RANK['C']: classification='C'
     if intent and not intent['rolling_compatible'] and RANK[classification]<RANK['C']: classification='C'
     compatible=bool(intent and intent['compatible_min']<=origin<=target<=intent['compatible_max'])
@@ -115,6 +145,7 @@ def generate(root, inventory: Inventory, *, origin, target=None):
         'automation_inputs':automation,
         'compatibility_intent':intent,'compatibility_covers_path':compatible,'worker_protocol_change':protocol_change,
         'protected_control_plane_changed':control_plane_changed,
+        'release_change_risk':changes,
         'execution_class':'transactional' if all(row['risk']['transactional'] for row in rows) else 'unsupported',
         'required_gates':sorted(gates),'backup_policy':'verified-current-data-and-original-roles' if path else 'policy-dependent',
         'recovery_policy':'observe-commit-then-protected-forward-repair' if path else 'runtime-compatibility-dependent',

@@ -101,6 +101,24 @@ class PlanTests(unittest.TestCase):
         self.assertEqual(plan.document()['risk_class'],'C')
         self.assertTrue(plan.document()['worker_protocol_change'])
 
+    def test_security_worker_and_ci_changes_escalate_even_without_sql(self):
+        for relative in ('web/backend/routes/auth_routes.py','web/backend/services/tenant_service.py',
+                         'web/backend/workers/notification_worker.py','.github/workflows/backend-check.yml'):
+            with self.subTest(path=relative):
+                path=self.root/relative;path.parent.mkdir(parents=True,exist_ok=True)
+                path.write_text('# changed release-sensitive contract\n');self.commit()
+                plan,_=self.plan()
+                self.assertEqual(plan.document()['kind'],'application-only')
+                self.assertEqual(plan.document()['risk_class'],'C')
+                self.assertIn(relative,sum(plan.document()['release_change_risk']['review_sensitive_paths'].values(),[]))
+                path.unlink();self.commit()
+
+    def test_ordinary_ui_change_retains_routine_class_without_inventing_sql(self):
+        path=self.root/'web/frontend/src/public-title.jsx';path.parent.mkdir(parents=True,exist_ok=True)
+        path.write_text('export default "synthetic presentation change";\n');self.commit()
+        plan,_=self.plan()
+        self.assertEqual(plan.document()['risk_class'],'A');self.assertEqual(plan.document()['migrations'],[])
+
     def test_missing_compatibility_blocks_even_additive_sql(self):
         (self.root/INTENT_PATH).unlink(); self.write(2); self.commit(); plan,_=self.plan()
         self.assertEqual(plan.document()['risk_class'],'A')

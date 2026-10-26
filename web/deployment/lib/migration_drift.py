@@ -7,6 +7,7 @@ existing structural digest and journals; do not invent a parallel SQL ledger.
 from __future__ import annotations
 from dataclasses import dataclass
 import re
+import time
 from .completed_normal_database import STRUCTURE_SQL
 from .migration_inventory import digest
 
@@ -89,3 +90,73 @@ def compare(inventory,observation,*,expected):
         raise RuntimeError('migration_drift_detected')
     return {'status':'PASS','coverage':'catalog-and-protected-history-comparison',
             'schema':observation.schema,'database_repaired':False,'authority_issued':False}
+
+
+def measure_class_b(connection,plan,*,expected_system_identifier,expected_structure_sha256,now=None):
+    """Bounded native measurements, not authorization or a lock-duration claim.
+
+    The controller authenticates the expected catalog baseline independently.
+    This snapshot neither changes data nor takes exclusive table locks. Actual
+    execution must enforce its independently approved lock/statement budgets on
+    the existing executor connection; an idle snapshot cannot promise no future
+    contention. Large/unsupported/changed relations cannot obtain measurements.
+    """
+    value=plan.document()
+    if (value.get('risk_class')!='B' or not value.get('migrations')
+            or not isinstance(expected_system_identifier,str)
+            or not re.fullmatch('[0-9]{1,32}',expected_system_identifier)
+            or not isinstance(expected_structure_sha256,str) or not HEX.fullmatch(expected_structure_sha256)):
+        raise RuntimeError('migration_measurement_scope_invalid')
+    operations=[]
+    for row in value['migrations']:
+        if row['risk']['class']=='A':continue
+        if row['risk']['class']!='B' or not row.get('measurable_operations'):
+            raise RuntimeError('migration_measurement_operation_unsupported')
+        operations.extend((row['number'],op) for op in row['measurable_operations'])
+    from psycopg.pq import TransactionStatus
+    from psycopg import sql
+    if not connection.autocommit or connection.info.transaction_status!=TransactionStatus.IDLE:
+        raise RuntimeError('migration_measurement_existing_transaction_refused')
+    observed=[]
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY')
+            cursor.execute("SET LOCAL statement_timeout='5s'; SET LOCAL lock_timeout='250ms'; SET LOCAL search_path=pg_catalog")
+            cursor.execute("SELECT system_identifier::text,schema_version FROM pg_catalog.pg_control_system(),public.application_schema_state WHERE contract_key='core'")
+            if cursor.fetchone()!=(expected_system_identifier,value['origin_schema']):
+                raise RuntimeError('migration_measurement_database_changed')
+            query=STRUCTURE_SQL.removeprefix('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY;').removesuffix(' COMMIT;').strip()
+            query=query.removeprefix('SET LOCAL search_path=pg_catalog;').strip()
+            cursor.execute(query)
+            if cursor.fetchone()!=(expected_structure_sha256,):raise RuntimeError('migration_measurement_catalog_changed')
+            cursor.execute("SELECT count(*) FROM pg_catalog.pg_event_trigger WHERE evtenabled<>'D'")
+            if cursor.fetchone()!=(0,):raise RuntimeError('migration_measurement_ddl_hooks_unsupported')
+            for number,op in operations:
+                if op.get('kind') not in {'create_btree_index','add_nullable_column'} or op.get('schema')!='public':
+                    raise RuntimeError('migration_measurement_operation_unsupported')
+                cursor.execute("SELECT c.oid,c.relkind,c.relpersistence,c.relispartition,pg_total_relation_size(c.oid) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname=%s AND c.relname=%s",(op['schema'],op['table']))
+                relation=cursor.fetchone()
+                if not relation or relation[1:4]!=('r','p',False):raise RuntimeError('migration_measurement_relation_unsupported')
+                oid=relation[0]
+                cursor.execute("SELECT a.attname,t.typname,n.nspname,t.typtype FROM pg_attribute a JOIN pg_type t ON t.oid=a.atttypid JOIN pg_namespace n ON n.oid=t.typnamespace WHERE a.attrelid=%s AND a.attnum>0 AND NOT a.attisdropped",(oid,))
+                columns={row[0]:row[1:] for row in cursor.fetchall()}
+                if op['kind']=='create_btree_index':
+                    from .migration_risk import BUILTINS
+                    if any(name not in columns or columns[name][0] not in BUILTINS
+                           or columns[name][1:]!=('pg_catalog','b') for name in op['columns']):
+                        raise RuntimeError('migration_measurement_column_type_unsupported')
+                    cursor.execute("SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname=%s AND c.relname=%s",(op['schema'],op['index']))
+                    if cursor.fetchone() is not None:raise RuntimeError('migration_measurement_index_already_exists')
+                elif op['column'] in columns:raise RuntimeError('migration_measurement_column_already_exists')
+                cursor.execute(sql.SQL('SELECT count(*) FROM {}.{}').format(sql.Identifier(op['schema']),sql.Identifier(op['table'])))
+                count=cursor.fetchone()[0]
+                compatible=('AccessShareLock','RowShareLock') if op['kind']=='create_btree_index' else ()
+                cursor.execute("SELECT count(*) FROM pg_locks WHERE relation=%s AND pid<>pg_backend_pid() AND (NOT granted OR NOT (mode=ANY(%s)))",(oid,list(compatible)))
+                conflicts=cursor.fetchone()[0]
+                observed.append({'migration':number,'operation_sha256':digest(op),'table_bytes':relation[4],
+                                 'table_rows':count,'conflicting_locks':conflicts})
+        return {'version':1,'source_sha':value['source_sha'],'plan_sha256':plan.sha256,
+            'system_identifier':expected_system_identifier,'origin_schema':value['origin_schema'],
+            'structure_sha256':expected_structure_sha256,'observed_at':int(time.time()) if now is None else now,
+            'operations':observed,'read_only':True}
+    finally:connection.rollback()

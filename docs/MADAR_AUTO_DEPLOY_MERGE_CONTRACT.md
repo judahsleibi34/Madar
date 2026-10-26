@@ -1755,3 +1755,11 @@ KVM firewall before seeding/probing owned synthetic accounts. Firewall
 observation remains non-authorizing and the full environment policy still
 rejects unapproved mounts/host-network actors. Bootstrap adoption is not a
 protected-upgrade completion and cannot satisfy that historical issuer contract.
+
+Generic plans now include whole-release review-sensitive changes and narrowly
+measurable Class B operations. Root policy v2 can prepare those exact operations
+only after bounded native catalog/size/lock observations; it issues no authority.
+The existing locked executor has matching cluster/schema and execution-budget
+checks. Native component SQL acceptance does not open automatic production
+release dispatch or schema160 admission. The staging PostgREST resource-bound
+correction preserves its data/image and is separate from source acceptance.

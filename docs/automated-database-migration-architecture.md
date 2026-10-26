@@ -2162,3 +2162,40 @@ raw provider logs. Completion follows observed owned-service shutdown. None of
 this is protected handoff,boot/reboot or production acceptance. See
 [staging scope](architecture-phase9-2026-10-20/10-AUTOMATIC-FULL-STAGING.md) and
 [maintenance backup limits](architecture-phase9-2026-10-20/03-MAINTENANCE-BACKUP-AND-REPLICA.md).
+
+## Measured routine eligibility and whole-release risk (2026-10-26)
+
+The immutable generic plan records whole-release review-sensitive changes as
+well as maximum SQL risk. Authorization/data-contract routes/services, workers,
+verification tooling and protected controller changes cannot become an ordinary
+Class A release merely because no SQL changed. Candidate intent cannot lower
+that observed classification. The installed analyzer and all verifier imports
+remain independently pinned by operational policy.
+
+Policy v1 remains Class A preparation only. Optional v2 explicitly enrolls two
+measurable Class B shapes: nullable pg_catalog builtin columns without defaults
+or constraints, and nonunique ordinary btree indexes on plain builtin columns.
+Expressions, predicates, opclasses, rewrites, constraints and other Class B shapes
+are not enrolled by adding the letter B to a policy. Canonical envelopes and
+AST classification remain mandatory; unknown SQL stays Class D/unsupported.
+
+Native measurement binds the source/plan, original schema, system identifier,
+protected catalog root, exact operations, row counts, table bytes and relevant
+live locks in a bounded read-only snapshot. Stale/substituted measurements,
+unsupported relation/type shapes, occupied target names, excessive volume or
+contention refuse routine eligibility. The existing executor's guard verifies
+cluster/schema on its actual locked connection and applies independently
+bounded lock, statement and PostgreSQL17 transaction deadlines. Measurement is
+not a promise that later contention cannot occur: execution must abort safely
+when a late lock prevents timely DDL. Unknown COMMIT outcomes remain consumed.
+
+This increment does not issue operational authority. Generic root dispatch,
+independent CI/staging/recovery observations, administrator approval and actual
+promotion must still be integrated before production_execution_allowed can
+become true. Model policy packets cannot authorize a release. Native SQL and
+same-cluster component restoration are not full-application or independent
+receiver acceptance. Canonical SQL and protected146→160 admission stay unchanged.
+Enabled database DDL event hooks are outside the audited routine contract and
+refuse both measurement and execution-budget setup; otherwise an apparently
+additive command could execute unrelated privileged hook code. This refusal
+cannot be bypassed by a Class B policy string or an approval token.
