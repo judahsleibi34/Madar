@@ -4041,3 +4041,11 @@ An explicit isolated automatic-source retry forwards the existing deployer
 circuit-breaker override. It creates no authority, retires no interlock, changes
 no consumed attempt, and bypasses none of the independent admission gates.
 The completion receipt records any requested override.
+
+
+Validated v3 and v4 grants retain their exact schema bounds during provider
+startup configuration validation. Startup no longer incorrectly assigns them
+the historical v1 schema115 bounds. The authority parser still authenticates
+all source/controller/database/operation pins first. Fixed provider URL/network
+checks and the separately selected schema115 recovery profile remain unchanged.
+This correction does not register schema160 or widen any image compatibility.
