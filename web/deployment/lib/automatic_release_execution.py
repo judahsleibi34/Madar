@@ -237,7 +237,9 @@ def operations_adapter(base,system,value):
             # Same compose implementation, with the existing authority RO mount.
             if os.environ.get('MADAR_COMPOSE_OVERRIDE'):
                 raise RuntimeError('automatic_ambient_compose_override_refused')
-            override=admission.directory(value)/'authority-compose.json'
+            require_root_directory(admission.ROOT,create=True)
+            prepared=admission.directory(value);require_root_directory(prepared,create=True)
+            override=prepared/'authority-compose.json'
             if not override.exists():
                 # Only authority fields; candidate cannot supply host paths.
                 fields={'environment':{'MADAR_BUSINESS_WRITE_AUTHORITY':'${MADAR_BUSINESS_WRITE_AUTHORITY}',

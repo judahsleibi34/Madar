@@ -3688,6 +3688,8 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps(operations.execute_automatic_release(source),sort_keys=True));return 0
         except (RuntimeError,ValueError,OSError,TypeError) as error:
             code=str(error) if isinstance(error,RuntimeError) and re.fullmatch('[a-z0-9_:,]{1,200}',str(error)) else 'automatic_execution_failed'
+            if code=='automatic_execution_failed' and re.fullmatch(r'root_protected_[a-z_]+:[/a-z0-9_.-]{1,200}',str(error)):
+                code=str(error).split(':',1)[0] # actionable code, no private path/values
             print('AUTOMATIC RELEASE: REFUSED; error: '+code,file=sys.stderr);return 1
     if not args.sha:parser.error('an exact SHA is required')
     if args.authenticate_operator:
