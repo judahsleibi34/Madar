@@ -2729,8 +2729,8 @@ print(hashlib.sha256(keys[0].encode()).hexdigest())
         from deployment.lib.automatic_release_admission import execution_policy
         from deployment.lib.environment_file import load_environment_file
         import importlib.machinery,importlib.util
-        execution_policy(self) # Refuse unsupported production BEFORE any effects.
         require_no_pending_operation()
+        execution_policy(self) # Refuse unsupported production BEFORE any effects.
         if self.interlock_file.exists() or self.interlock_file.is_symlink():
             raise UpgradeError('automatic_existing_interlock_requires_recovery')
         self.prepare_upgrade_roots()
@@ -3682,8 +3682,8 @@ def main(argv: list[str] | None = None) -> int:
         try:
             operations=SystemOperations()
             from deployment.lib.automatic_release_admission import execution_policy,require_no_pending_operation
-            execution_policy(operations)
             require_no_pending_operation()
+            execution_policy(operations)
             if args.automatic_poll:
                 if args.sha:parser.error('--automatic-poll does not accept a caller SHA')
                 source=normalize_sha(operations.root_git('automatic_main','rev-parse','refs/remotes/origin/main',cwd=operations.repo).stdout)
