@@ -94,6 +94,25 @@ class NativePolicyFilesystemTests(unittest.TestCase):
         self.value['risk_classes']=['A','C']; self.write(self.value)
         with self.assertRaisesRegex(RuntimeError,'policy_invalid'): load_policy()
 
+    def test_exact_immutable_mount_bytes_inode_owner_and_symlink_are_measured(self):
+        from deployment.lib.isolated_release_environment import measure_bind_source
+        path=ROOT/'migration-policy.json'
+        before=measure_bind_source(str(path))
+        self.assertFalse(before['mutable_data']);self.assertEqual(before['inode'],path.stat().st_ino)
+        self.assertNotIn('native-file-fixture',json.dumps(before))
+        path.write_text('replacement bytes')
+        self.assertNotEqual(measure_bind_source(str(path))['contents_sha256'],before['contents_sha256'])
+        path.rename(ROOT/'reference.json');path.symlink_to('reference.json')
+        with self.assertRaisesRegex(RuntimeError,'source_unprotected'):measure_bind_source(str(path))
+
+    def test_socket_host_root_mutable_file_and_writable_configuration_refuse(self):
+        from deployment.lib.isolated_release_environment import measure_bind_source
+        for path in ('/','/etc/madar','/var/run/docker.sock','/proc/self/environ','/etc/madar/../passwd'):
+            with self.subTest(path=path),self.assertRaises(RuntimeError):measure_bind_source(path)
+        with self.assertRaisesRegex(RuntimeError,'type_invalid'):measure_bind_source(str(POLICY),mutable=True)
+        POLICY.chmod(0o666)
+        with self.assertRaisesRegex(RuntimeError,'source_unprotected'):measure_bind_source(str(POLICY))
+
     def test_caller_authority_field_rejects(self):
         self.value['authority_issued']=True; self.write(self.value)
         with self.assertRaisesRegex(RuntimeError,'policy_invalid'): load_policy()

@@ -3972,3 +3972,16 @@ exact160/protocols2/2/2 and grants no146 compatibility or execution permission.
 Infrastructure operator identity must be independent of business service-role
 credentials and tenant roles. Its new CLI observation is not release approval;
 request-bound approval and protected execution gates remain separate.
+
+Disposable environment observation v2 (2026-10-26) retains the v1 preparation
+contract and adds exact root-enrolled container/image/spec, finite CPU/RAM/PID
+budgets and mount identities. Immutable bind contents are hashed; writable binds
+are restricted to explicitly measured application-data directories. Unknown
+actors, sockets, host roots, substitutions and unowned mounts refuse. Only the
+exact enrolled release proxy may use guest host networking. The v2 firewall
+blocks initiated public/private egress and incoming application traffic on the
+control NIC, permitting SSH requests/replies for parent control. Native nft
+grammar and exact observation run in a fresh network namespace; this is NOT KVM
+controller, receiver or preserved-upgrade acceptance. Receiver transport and
+authenticated lifecycle enrollment still require integration; v2 observation
+issues no credential and does not register schema160 or open dispatch.

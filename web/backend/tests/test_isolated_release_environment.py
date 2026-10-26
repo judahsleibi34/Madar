@@ -95,6 +95,62 @@ class EnvironmentTests(unittest.TestCase):
             with self.subTest(mutate=mutate),self.assertRaises(RuntimeError):self.observe()
             self.actors,self.networks,self.volumes=original
 
+    def enroll_v2_model(self):
+        from deployment.lib.completed_normal_resources import measured_spec
+        self.p['version']=2
+        for row in self.actors:
+            for mount in row['Mounts']:
+                if mount['Type']=='volume':mount.setdefault('Destination','/var/lib/postgresql/data')
+            row['Image']='sha256:'+'e'*64
+            row['HostConfig'].update(Memory=256*1024**2,NanoCpus=500000000,PidsLimit=64)
+        self.p['runtime_scope']={row['Id']:{'name':row['Name'],'image':row['Image'],
+            'spec_sha256':measured_spec(row),'binds':{}} for row in self.actors}
+        wanted=env.required_rules(self.interface,execution=True)
+        self.chains=[{'chain':{'name':name,'hook':name,'type':'filter','prio':200,'policy':'accept'}} for name in wanted]
+        self.rules=[{'rule':{'chain':chain,'expr':expr}} for chain,rows in wanted.items() for expr in rows]
+
+    def test_v2_exact_runtime_uses_stricter_execution_fence_not_preparation_internet_rules(self):
+        self.enroll_v2_model()
+        self.assertEqual(self.observe()['version'],2)
+        self.rules=[{'rule':{'chain':chain,'expr':expr}} for chain,rows in env.required_rules(self.interface).items() for expr in rows]
+        with self.assertRaisesRegex(RuntimeError,'effect_fencing_invalid'):self.observe()
+
+    def test_v2_substitution_unenrolled_actor_and_unbounded_runtime_refuse(self):
+        self.enroll_v2_model();original=copy.deepcopy((self.actors,self.p))
+        changes=[lambda:self.actors[0].update(Image='sha256:'+'f'*64),
+                 lambda:self.actors[0]['Config'].update(Cmd=['substituted']),
+                 lambda:self.actors[0]['HostConfig'].update(Memory=0),
+                 lambda:self.actors[0]['HostConfig'].update(NanoCpus=0),
+                 lambda:self.actors[0]['HostConfig'].update(PidsLimit=0),
+                 lambda:self.actors.append(dict(self.actors[0],Id='d'*64))]
+        for change in changes:
+            change()
+            with self.subTest(change=change),self.assertRaises(RuntimeError):self.observe()
+            self.actors,self.p=copy.deepcopy(original)
+
+    def test_v2_exact_readonly_bind_is_measured_not_enrolled_by_container_label(self):
+        self.actors[0]['Mounts'].append({'Type':'bind','Source':'/etc/madar/test-input',
+            'Destination':'/app/test-input','RW':False,'Propagation':'rprivate'})
+        self.enroll_v2_model()
+        with self.assertRaisesRegex(RuntimeError,'mount_inventory_changed'):self.observe()
+        expected={'source':'/etc/madar/test-input','mutable_data':False,'contents_sha256':'d'*64}
+        self.p['runtime_scope'][self.actors[0]['Id']]['binds']['/app/test-input']=expected
+        with patch.object(env,'measure_bind_source',return_value=expected) as measure:
+            self.assertEqual(self.observe()['version'],2)
+            measure.assert_called_once_with('/etc/madar/test-input',mutable=False)
+        with patch.object(env,'measure_bind_source',return_value=dict(expected,contents_sha256='f'*64)):
+            with self.assertRaisesRegex(RuntimeError,'bind_source_changed'):self.observe()
+
+    def test_v2_host_network_restricted_to_exact_bounded_proxy_and_strict_firewall(self):
+        self.actors[0]['HostConfig']['NetworkMode']='host'
+        self.enroll_v2_model()
+        with self.assertRaisesRegex(RuntimeError,'foreign_or_exposed_actor'):self.observe()
+        # Actual fixture database stays bridged; only proxy may share guest loopback.
+        proxy=copy.deepcopy(self.actors[0]);proxy.update(Id='d'*64,Name='/madar-release-proxy')
+        proxy['Mounts']=[];proxy['NetworkSettings']['Networks']={}
+        self.actors[0]['HostConfig']['NetworkMode']='owned-test';self.actors.append(proxy);self.enroll_v2_model()
+        self.assertEqual(self.observe()['version'],2)
+
     def test_ordinary_user_cannot_activate_environment_observation(self):
         with patch.object(env.os,'geteuid',return_value=1000):
             with self.assertRaisesRegex(RuntimeError,'root_required'):self.observe()
