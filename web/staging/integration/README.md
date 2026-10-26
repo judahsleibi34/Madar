@@ -184,3 +184,11 @@ API/worker. Run smoke.py and worker_recovery.py against the actual native provid
 Restore evidence reads the observed schema instead of a hardcoded146. A fresh
 `prepare`/`schema` initializes to148 directly; production still requires its separate
 reviewed controller admission, maintenance/backup gates and approval.
+
+
+Retained staging repair and PostgREST capacity (2026-10-26): generated fixtures
+reserve256MiB for PostgREST after a retained128MiB instance was OOM-killed.
+A data-preserving repair records the exact container/image, memory/swap preimage
+and original DB/Auth/MFA/storage roots before starting that same instance.
+It neither resets data nor relabels historical source acceptance. Other workers
+should be observed for recovery before considering any restart.
