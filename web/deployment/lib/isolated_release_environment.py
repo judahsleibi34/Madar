@@ -186,7 +186,9 @@ def verify_host_interfaces(control_interface,networks):
 def observe(policy_path=POLICY):
     if os.geteuid()!=0:raise RuntimeError('isolated_release_environment_root_required')
     path=protected(policy_path,private=True)
-    if not 0<path.stat().st_size<=16384:raise RuntimeError('isolated_release_policy_size_invalid')
+    # Exact eight-role origins plus native providers carry independently
+    # measured bind identities. Keep a hard bound without truncating inventory.
+    if not 0<path.stat().st_size<=128*1024:raise RuntimeError('isolated_release_policy_size_invalid')
     body=path.read_bytes();p=strict_json(body)
     keys={'version','realm_id','guest_uuid','machine_id','root_filesystem_uuid','expires_at',
           'database_container_id','database_system_identifier','denied_database_identifiers'}

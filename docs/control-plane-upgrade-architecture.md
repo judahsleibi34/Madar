@@ -2036,3 +2036,11 @@ acceptance, independent recovery and protected146-to160 remain unaccepted until
 their actual integrated scenarios run. Existing schema160 admission and Class D
 refusals are not removed. The historical Phase7 guest profile is unchanged; a
 bounded manifest-owned Node2 guest profile is used for actual release testing.
+
+The routine adapter preserves the existing release network overlay, renders the
+exact final candidate configuration before mutations, refuses elevated/foreign
+host mounts and unbounded resources, and seals CREATED container identities. It
+starts those same identities, rechecks the original actor set and candidate before
+worker/traffic handoff, and advances only the measured disposable-test inventory
+after durable known-good state. This remains isolated-test-only engineering; an
+ordinary bootstrap receipt is never called a protected migration receipt.

@@ -2732,6 +2732,7 @@ print(hashlib.sha256(keys[0].encode()).hexdigest())
         execution_policy(self) # Refuse unsupported production BEFORE any effects.
         if self.interlock_file.exists() or self.interlock_file.is_symlink():
             raise UpgradeError('automatic_existing_interlock_requires_recovery')
+        self.prepare_upgrade_roots()
         load_environment_file(Path('/etc/madar/production.env'))
         for key,name in (('MADAR_PRODUCTION_REPO',self.repo),('MADAR_DEPLOY_STATE_ROOT',self.state_root),
                          ('MADAR_ENV_FILE',Path('/etc/madar/production.env'))):

@@ -14,6 +14,45 @@ from .control_plane_upgrade import acquire_lock,require_root_directory
 from .release_deployer import Compatibility,ReleaseDeployer
 from .migration_executor import atomic_json
 
+ROLES=('backend','frontend','redis','parser-worker','remote-ingestion-worker',
+       'notification-worker','calendar-sync-worker','data-deletion-worker')
+LIMITS_MIB={'backend':1280,'frontend':128,'redis':128,'parser-worker':768,
+    'remote-ingestion-worker':256,'notification-worker':256,'calendar-sync-worker':256,'data-deletion-worker':256}
+
+
+def validate_candidate_model(model,value,source_root):
+    """Reject elevated Compose inputs before Docker creates any candidate."""
+    if not isinstance(model,dict) or set(model.get('services',{}))!=set(ROLES):
+        raise RuntimeError('automatic_candidate_roles_changed')
+    data=Path('/var/lib/madar/storage');authority=grant_directory(value)
+    for role,row in model['services'].items():
+        host=row.get('network_mode','');image=row.get('image','')
+        if (row.get('container_name')!='madar-'+value['candidate']['slot']+'-'+role
+                or row.get('privileged') or host or row.get('pid') or row.get('ipc')=='host'
+                or row.get('cap_add') or row.get('devices') or row.get('device_requests')
+                or row.get('cap_drop')!=['ALL'] or row.get('security_opt')!=['no-new-privileges:true']
+                or row.get('read_only') is not True or row.get('restart')!='no'
+                or str(row.get('mem_limit'))!=str(LIMITS_MIB[role]*1024**2)
+                or not 0<float(row.get('cpus',0))<=2 or row.get('pids_limit')!=128):
+            raise RuntimeError('automatic_candidate_privilege_or_budget_invalid')
+        expected=value['candidate']['images']['frontend' if role=='frontend' else 'backend'].split('@',1)[1]
+        if role=='redis':
+            if not re.fullmatch(r'[^\s]+@sha256:[a-f0-9]{64}',image):raise RuntimeError('automatic_redis_not_pinned')
+        elif image!=expected:raise RuntimeError('automatic_candidate_image_not_admitted')
+        for port in row.get('ports',[]):
+            if port.get('host_ip')!='127.0.0.1':raise RuntimeError('automatic_candidate_public_port_refused')
+        for mount in row.get('volumes',[]):
+            path=Path(mount.get('source',''))
+            if mount.get('type')!='bind' or not path.is_absolute() or '..' in path.parts:
+                raise RuntimeError('automatic_candidate_volume_not_admitted')
+            if path.is_relative_to(data) and path!=data:
+                if mount.get('target') not in {'/app/uploads','/app/avatar_uploads','/app/private_uploads','/app/private_generated_charts'}:
+                    raise RuntimeError('automatic_candidate_data_destination_changed')
+            elif ((path.is_relative_to(source_root) and path!=source_root)
+                    or path==authority or path==Path('/var/lib/madar/backup-state')):
+                if mount.get('read_only') is not True:raise RuntimeError('automatic_candidate_control_mount_writable')
+            else:raise RuntimeError('automatic_candidate_host_mount_not_admitted')
+
 
 def runtime_context(value):
     return digest({k:value[k] for k in ('attempt_id','source_sha','controller_sha')}|{
@@ -52,7 +91,23 @@ def operations_adapter(base,system,value):
                 value['origin']['compatible_min'],value['origin']['compatible_max'])
             super().__init__(system.repo,system.state_root,Path('/etc/madar/production.env'),compatibility)
             self.automatic_release_admission=value;self._issuer=system;self._credential_root=None
-            self._origin_fenced=[];self._model=None
+            self._origin_fenced=[];self._model=None;self._candidate_rows=None
+            self._initial_scope=strict_json(protected(Path('/etc/madar/isolated-release-test.json'),private=True).read_bytes())['runtime_scope']
+
+        def verify_actor_scope(self):
+            from .isolated_release_environment import verify_runtime_scope
+            from .completed_normal_resources import measured_spec_matches
+            ids=self.run(['/usr/bin/docker','ps','-aq','--no-trunc'],capture=True).split()
+            rows=json.loads(self.run(['/usr/bin/docker','inspect',*ids],capture=True))
+            candidate=self._candidate_rows or {}
+            if set(ids)!=set(self._initial_scope)|set(candidate):raise RuntimeError('automatic_unexpected_runtime_actor')
+            verify_runtime_scope(self._initial_scope,[r for r in rows if r['Id'] in self._initial_scope])
+            for row in rows:
+                if row['Id'] not in candidate:continue
+                old=candidate[row['Id']]
+                if row['Name']!=old['Name'] or row['Image']!=old['Image'] or not measured_spec_matches(row,old['spec_sha256'],started_worker=True):
+                    raise RuntimeError('automatic_candidate_runtime_substituted')
+            return rows
 
         def state_published(self):
             import pwd
@@ -83,6 +138,7 @@ def operations_adapter(base,system,value):
             if sha!=value['source_sha']:raise RuntimeError('automatic_execution_source_changed')
             system.deploy_lock_descriptor=descriptor # borrowed, owned by ReleaseDeployer
             admission.reserve(value,system)
+            system.arm_interlock(sha)
             system.write_authorization(sha,automatic_release_admission=value)
             credential_root=system.runtime_root/('automatic-'+value['attempt_id'])
             require_root_directory(credential_root,mode=0o711,create=True)
@@ -146,7 +202,12 @@ def operations_adapter(base,system,value):
         def _environment(self,sha,slot,images,*,workers_active=False):
             env=super()._environment(sha,slot,images,workers_active=workers_active)
             if sha!=value['source_sha'] or slot!=value['candidate']['slot']:return env
-            env.update(MADAR_BACKEND_IMAGE=images['backend'],MADAR_FRONTEND_IMAGE=images['frontend'],
+            # Release receipts use tag@local-image-ID. On Docker's classic
+            # image store that ID is a config digest, not a registry manifest.
+            # Execute the inspected local ID directly; never ask a registry to
+            # resolve an invalid tag@config-digest or fall back to its tag.
+            env.update(MADAR_BACKEND_IMAGE=images['backend'].split('@',1)[1],
+                MADAR_FRONTEND_IMAGE=images['frontend'].split('@',1)[1],
                 MADAR_BUSINESS_WRITE_AUTHORITY='/run/madar/business-write-authority/authority.json',
                 MADAR_BUSINESS_WRITE_CONTRACT=runtime_context(value),MADAR_BUSINESS_WRITE_AUTHORITY_ROOT=str(grant_directory(value)),
                 MADAR_RELEASE_CONTROLLER_SHA=value['controller_sha'],MADAR_RELEASE_DATABASE_SYSTEM_IDENTIFIER=value['database']['system_identifier'])
@@ -164,9 +225,45 @@ def operations_adapter(base,system,value):
                     'MADAR_RELEASE_CONTROLLER_SHA':'${MADAR_RELEASE_CONTROLLER_SHA}',
                     'MADAR_RELEASE_DATABASE_SYSTEM_IDENTIFIER':'${MADAR_RELEASE_DATABASE_SYSTEM_IDENTIFIER}'},
                     'volumes':[{'type':'bind','source':str(grant_directory(value)),'target':'/run/madar/business-write-authority','read_only':True}]}
-                atomic_json(override,{'services':{r:fields for r in ('backend','parser-worker','remote-ingestion-worker','notification-worker','calendar-sync-worker','data-deletion-worker')}},exclusive=True)
+                realm=strict_json(protected(Path('/etc/madar/isolated-release-test.json'),private=True).read_bytes())['realm_id']
+                services={r:{'restart':'no','mem_limit':LIMITS_MIB[r]*1024**2,'pids_limit':128,
+                    'labels':{'com.madar.test.realm':realm}} for r in ROLES}
+                for role in ('backend','parser-worker','remote-ingestion-worker','notification-worker','calendar-sync-worker','data-deletion-worker'):
+                    services[role].update(fields)
+                atomic_json(override,{'services':services,'networks':{name:{'labels':{'com.madar.test.realm':realm}}
+                    for name in ('default','parser_internal','remote_ingestion_internal','remote_ingestion_egress')}},exclusive=True)
                 override.chmod(0o400)
             return (protected(override,private=True),)
+
+        def _compose(self,sha,slot,images,*args,workers_active=False):
+            # Seal the final requirements once; inactive consumers remain
+            # CREATED, rather than changing the backend's requirements later.
+            workers_active=True
+            super()._compose(sha,slot,images,'config','--format','json',workers_active=workers_active)
+            validate_candidate_model(self._model,value,self.release_root)
+            if digest(self._model)!=value['candidate']['configuration_sha256']:
+                raise RuntimeError('automatic_candidate_configuration_substituted')
+            if args!=('config','--format','json'):
+                return super()._compose(sha,slot,images,*args,workers_active=workers_active)
+
+        def start_candidate(self,sha,slot,images):
+            from .runtime_authority import runtime_mutation_lock
+            from .completed_normal_resources import measured_spec
+            self.guard()
+            with runtime_mutation_lock(self.state_root):
+                self.verify_actor_scope()
+                if self._loaded_serving_slot()==slot:raise RuntimeError('runtime_mutation_target_is_serving')
+                self._inhibit_worker_slot(slot)
+                self._compose(sha,slot,images,'create','--no-build','--no-recreate',*ROLES,workers_active=True)
+                rows=json.loads(self.run(['/usr/bin/docker','inspect',*['madar-'+slot+'-'+role for role in ROLES]],capture=True))
+                if len(rows)!=8 or any(r['State']['Running'] or r['State']['Status']!='created' for r in rows):
+                    raise RuntimeError('automatic_candidate_not_newly_created')
+                self._candidate_rows={r['Id']:{'Name':r['Name'],'Image':r['Image'],'spec_sha256':measured_spec(r)} for r in rows}
+                atomic_json(admission.ROOT/'attempts'/value['attempt_id']/'candidate-runtime.json',self._candidate_rows,exclusive=True)
+                self.verify_actor_scope()
+                self._compose(sha,slot,images,'up','-d','--no-build','--no-recreate','--wait','--wait-timeout','180',
+                    'redis','parser-worker','remote-ingestion-worker','backend','frontend',workers_active=True)
+                self.verify_actor_scope()
 
         def preflight(self,sha,slot,images,schema):
             self.guard();self._compose(sha,slot,images,'config','--format','json',workers_active=True)
@@ -195,8 +292,39 @@ def operations_adapter(base,system,value):
         def activate_workers(self,sha,slot,images):
             self.guard()
             if not self._origin_fenced:raise RuntimeError('automatic_origin_writers_not_fenced')
+            self.verify_actor_scope()
             publish_candidate_grant(value,'NORMAL')
-            return super().activate_workers(sha,slot,images)
+            from .runtime_authority import runtime_mutation_lock
+            with runtime_mutation_lock(self.state_root):
+                self._require_worker_authority(sha,slot);self._require_other_worker_slot_inactive(slot)
+                ids=[identity for identity,row in self._candidate_rows.items() if row['Name'].rsplit('-',1)[0] in
+                    {'/madar-'+slot+'-notification','/madar-'+slot+'-calendar-sync','/madar-'+slot+'-data-deletion'}]
+                if len(ids)!=3:raise RuntimeError('automatic_candidate_worker_inventory_invalid')
+                self.run(['/usr/bin/docker','start',*ids]);self.verify_actor_scope()
+
+        def switch_traffic(self,slot):
+            self.guard()
+            if slot==value['candidate']['slot']:self.verify_actor_scope()
+            return super().switch_traffic(slot)
+
+        def accept_runtime_inventory(self):
+            """Advance only measured test inventory after durable known-good.
+
+            Policy permissions, issuer keys, identity and expiry cannot change.
+            The existing positive observer must accept the resulting inventory.
+            This is lifecycle enrollment, never authority for another release.
+            """
+            from .isolated_release_environment import POLICY,measure_bind_source,observe
+            from .completed_normal_resources import measured_spec
+            rows=self.verify_actor_scope()
+            policy=strict_json(protected(POLICY,private=True).read_bytes())
+            if policy['runtime_scope']!=self._initial_scope:raise RuntimeError('automatic_environment_inventory_changed')
+            scope={}
+            for row in rows:
+                binds={m['Destination']:measure_bind_source(m['Source'],mutable=m['RW']) for m in row['Mounts'] if m['Type']=='bind'}
+                scope[row['Id']]={'name':row['Name'],'image':row['Image'],'spec_sha256':measured_spec(row),'binds':binds}
+            atomic_json(POLICY,dict(policy,runtime_scope=scope))
+            observe()
 
         def restore_workers(self,release):
             publish_candidate_grant(value,'READ_ONLY')
@@ -210,7 +338,7 @@ def execute(system,value,base_operations):
     """One exact routine cycle through the EXISTING deployment state machine."""
     if os.geteuid()!=0:raise RuntimeError('automatic_execution_root_required')
     admission.sealed(value)
-    lock=acquire_lock(system.upgrade_root/'upgrade.lock',create=False)
+    lock=acquire_lock(system.upgrade_root/'upgrade.lock',create=True)
     system.automatic_upgrade_lock=lock
     previous=os.environ.get('CREDENTIALS_DIRECTORY');adapter=None;result=None;completed=False
     try:
@@ -220,6 +348,7 @@ def execute(system,value,base_operations):
         if result.get('status')!='known_good':raise RuntimeError('automatic_deployment_not_accepted')
         receipt={'operation':admission.OPERATION,'admission_sha256':digest(value),'attempt_id':value['attempt_id'],
             'source_sha':value['source_sha'],'database':value['database'],'release':result,'completed_at':int(time.time())}
+        adapter.accept_runtime_inventory()
         atomic_json(admission.ROOT/'attempts'/value['attempt_id']/'completion.json',receipt,exclusive=True)
         completed=True
         return receipt

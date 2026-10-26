@@ -256,6 +256,11 @@ def observe_admission(operations,source,*,attempt_id=None,created_at=None,expire
             or origin.get('slot') not in {'blue','green'}):
         raise RuntimeError('automatic_origin_not_stable')
     git=GitSource(operations.repo);git.commit(source)
+    # Reuse protected-package object authentication, including commits and all
+    # intermediate trees. A loose object's filename alone proves no identity.
+    from .completed_normal_package import snapshot
+    authenticated_tree,_=snapshot(operations.repo,source)
+    if authenticated_tree!=proof['tree_sha']:raise RuntimeError('automatic_source_object_identity_changed')
     if git.command('rev-parse','refs/remotes/origin/main').decode().strip()!=source:
         raise RuntimeError('automatic_source_not_current_main')
     if git.command('merge-base','--is-ancestor',origin['sha'],source)!=b'':

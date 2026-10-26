@@ -445,7 +445,9 @@ class AutomaticReleaseGuest:
         self.directory=parent/'guest';self.directory.mkdir(mode=0o700)
         self.evidence=Path(value['evidence']);private_directory(self.evidence)
         self.uuid=str(uuid.uuid4());self.process=None;self.pid=None
-        self.memory=3072;self.cpus=2;self.disk_gib=24
+        # Two live application slots plus native providers need the same bounded
+        # budget as the accepted historical running-application rehearsal.
+        self.memory=8192;self.cpus=4;self.disk_gib=32
         self.mac='52:54:'+':'.join(self.uuid.replace('-','')[i:i+2] for i in (0,2,4,6))
         with socket.socket() as port:port.bind(('127.0.0.1',0));self.port=port.getsockname()[1]
         self.record={'run_id':self.run_id,'guest_uuid':self.uuid,'directory':str(self.directory),
@@ -470,10 +472,10 @@ class AutomaticReleaseGuest:
             out.write(body.encode() if isinstance(body,str) else body);out.flush();os.fsync(out.fileno())
 
     def prepare(self):
-        if shutil.disk_usage(self.directory).free<12*1024**3:
+        if shutil.disk_usage(self.directory).free<20*1024**3:
             raise RuntimeError('automatic_guest_disk_headroom_insufficient')
         available=int(next(v.split()[1] for v in Path('/proc/meminfo').read_text().splitlines() if v.startswith('MemAvailable:')))*1024
-        if available<6*1024**3:raise RuntimeError('automatic_guest_memory_headroom_insufficient')
+        if available<12*1024**3:raise RuntimeError('automatic_guest_memory_headroom_insufficient')
         bundle=Path('/opt/madar-development/evidence/historical/madar-phase7-official-cloudimage-20261018')
         checksums=read(bundle/'SHA256SUMS');signature=read(bundle/'SHA256SUMS.gpg')
         self.write('SHA256SUMS',checksums);self.write('SHA256SUMS.gpg',signature)
