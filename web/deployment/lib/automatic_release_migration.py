@@ -31,10 +31,10 @@ def proof_scope(value,proof):
         raise RuntimeError('automatic_migration_native_acceptance_required')
     import re
     for boundary,row in zip(record['boundaries'],rows):
-        if (set(boundary)!={'schema','sql_sha256','structure_sha256','protocols'}
+        if (set(boundary)!={'schema','sql_sha256','semantic_sha256','protocols'}
                 or type(boundary['schema']) is not int or boundary['schema']!=row['to_schema']
                 or boundary['sql_sha256']!=row['sha256']
-                or not re.fullmatch('[a-f0-9]{64}',str(boundary['structure_sha256']))
+                or not re.fullmatch('[a-f0-9]{64}',str(boundary['semantic_sha256']))
                 or boundary['protocols']!=plan['compatibility_intent']['worker_protocols']):
             raise RuntimeError('automatic_migration_boundary_acceptance_changed')
     for name,item in record['backup_files'].items():
@@ -109,6 +109,7 @@ def execute(value,system,guard):
         'schema':document['origin_schema'],'structure_sha256':value['database']['structure_sha256'],
         'history_sha256':history_digest(inventory,document['origin_schema'])}
     if original!=expected_original:raise RuntimeError('automatic_migration_origin_history_changed')
+    local_boundaries={document['origin_schema']:value['database']['structure_sha256']}
     def before(cursor,migration):
         guard()
         cursor.execute("SELECT system_identifier::text,schema_version FROM pg_catalog.pg_control_system(),public.application_schema_state WHERE contract_key='core'")
@@ -116,7 +117,7 @@ def execute(value,system,guard):
             raise RuntimeError('automatic_migration_executor_database_changed')
         cursor.execute("SELECT 1 FROM pg_catalog.pg_locks WHERE pid=pg_backend_pid() AND locktype='advisory' AND granted AND ((classid::bigint<<32)|objid::bigint)=%s",(LockedMigrationExecutor.LOCK_KEY,))
         if cursor.fetchone()!=(1,):raise RuntimeError('automatic_migration_executor_lock_missing')
-        structure=value['database']['structure_sha256'] if migration.from_schema==document['origin_schema'] else boundaries[migration.from_schema]['structure_sha256']
+        structure=local_boundaries[migration.from_schema]
         observed=observe(cursor.connection,required_protocols=document['compatibility_intent']['worker_protocols'],expected_structure_sha256=structure)
         if observed.system_identifier!=value['database']['system_identifier']:raise RuntimeError('automatic_migration_executor_database_changed')
         # Conservative A budgets use the same independently protected ceilings.
@@ -142,17 +143,28 @@ def execute(value,system,guard):
             atomic_json(directory/'locked-measurements.json',{'measurements':live_measurements})
             if size>limits['max_table_bytes'] or count>limits['max_table_rows']:
                 raise RuntimeError('automatic_class_b_live_budget_exceeded')
+    def accepted_boundary(cursor,migration):
+        guard()
+        boundary=boundaries[migration.to_schema]
+        observation=observe(cursor.connection,required_protocols=boundary['protocols'],
+            expected_semantic_sha256=boundary['semantic_sha256'])
+        if (observation.system_identifier,observation.schema)!=(value['database']['system_identifier'],migration.to_schema):
+            raise RuntimeError('automatic_migration_target_changed')
+        local_boundaries[migration.to_schema]=observation.structure_sha256
+        atomic_json(directory/'migration-boundaries.json',{'operation_id':value['operation_id'],
+            'attempt_id':value['attempt_id'],'local_physical_boundaries':local_boundaries})
     def complete(cursor):
         guard()
         boundary=boundaries[document['target_schema']]
-        observation=observe(cursor.connection,required_protocols=boundary['protocols'],expected_structure_sha256=boundary['structure_sha256'])
+        observation=observe(cursor.connection,required_protocols=boundary['protocols'],
+            expected_structure_sha256=local_boundaries[document['target_schema']])
         if (observation.system_identifier,observation.schema)!=(value['database']['system_identifier'],document['target_schema']):
             raise RuntimeError('automatic_migration_target_changed')
     executor=LockedMigrationExecutor(connection_factory=admission.connect_database,
         manifest=MigrationManifest(value['source_sha'],tuple(migrations),coordinated=True),
         state_file=directory/'migration-execution.json',backup_dir=backup,
         backup_verifier=lambda _:verify_backup(value,None,proof),migration_guard=before,
-        transaction_guard=transaction,completion_guard=complete,expected_origin=document['origin_schema'],
+        transaction_guard=transaction,boundary_guard=accepted_boundary,completion_guard=complete,expected_origin=document['origin_schema'],
         failure_formatter=lambda e:type(e).__name__)
     try:result=executor.run()
     except Exception as error:
@@ -162,7 +174,7 @@ def execute(value,system,guard):
     # A lost COMMIT never reaches this publication. Durable pending state then
     # requires independent observation/recovery rather than replaying this SQL.
     history={'version':1,'system_identifier':value['database']['system_identifier'],'schema':document['target_schema'],
-        'structure_sha256':target['structure_sha256'],'history_sha256':history_digest(inventory,document['target_schema'])}
+        'structure_sha256':local_boundaries[document['target_schema']],'history_sha256':history_digest(inventory,document['target_schema'])}
     atomic_json(HISTORY,history)
     receipt={'admission_sha256':digest(value),'operation_id':value['operation_id'],'attempt_id':value['attempt_id'],
         'source_sha':value['source_sha'],'database':value['database'],'plan_sha256':plan.sha256,

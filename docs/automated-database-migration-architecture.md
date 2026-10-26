@@ -2357,3 +2357,14 @@ select production SQL, open schema160 coordinated admission or authorize product
 The exact fixture manifest must be independently pinned in the root selection and
 pass positive KVM/isolation admission. Full application A/B promotion and recovery
 remain unaccepted until the actual installed entrypoint completes those tests.
+
+Cross-cluster migration acceptance uses a separate semantic catalog fingerprint.
+The historical physical/OID-sensitive local drift digest is preserved. Semantic
+comparison retains schema, database configuration, role/default ACLs, RLS, columns
+and order, constraints, function definitions/ownership/search paths and trigger
+enablement. Only physical OIDs, dropped-column gaps and generated internal FK
+trigger names are normalized. Protocol functions are invoked only after the
+expected semantic catalog matches in the same read-only snapshot. Each committed
+boundary then seals its actual LOCAL physical digest under the executor's existing
+advisory lock. A semantic mismatch after COMMIT remains fenced and cannot replay
+the consumed SQL attempt.

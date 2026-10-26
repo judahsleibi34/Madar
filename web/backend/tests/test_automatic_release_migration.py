@@ -11,7 +11,7 @@ class MigrationProofTests(unittest.TestCase):
             'compatibility_intent':{'worker_protocols':{'delivery':2,'outbox':2,'deletion':2}}}
         self.value={'plan':self.plan,'source_sha':'b'*40}
         self.record={'plan_sha256':digest(self.plan),'origin_schema':900160,'target_schema':900161,
-            'native_exit_codes':[0], 'boundaries':[{'schema':900161,'sql_sha256':'a'*64,'structure_sha256':'c'*64,'protocols':{'delivery':2,'outbox':2,'deletion':2}}],
+            'native_exit_codes':[0], 'boundaries':[{'schema':900161,'sql_sha256':'a'*64,'semantic_sha256':'c'*64,'protocols':{'delivery':2,'outbox':2,'deletion':2}}],
             'backup_files':{n:{'sha256':hashlib.sha256(n.encode()).hexdigest(),'bytes':len(n)} for n in ('database.dump','roles.sql','objects.tar')}}
         self.proof={'migration':self.record,'gates':{'recovery':{'backup_sha256':self.record['backup_files']['database.dump']['sha256'],'objects_sha256':self.record['backup_files']['objects.tar']['sha256']}}}
     def test_exact_native_boundaries_and_original_bytes_are_required(self):

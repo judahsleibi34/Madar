@@ -162,6 +162,7 @@ class LockedMigrationExecutor:
         completion_guard: Callable[[Any], None] | None = None,
         expected_origin: int | None = None,
         transaction_guard: Callable[[Any, Migration], None] | None = None,
+        boundary_guard: Callable[[Any, Migration], None] | None = None,
     ):
         self.connection_factory = connection_factory
         self.manifest = manifest
@@ -181,6 +182,9 @@ class LockedMigrationExecutor:
         if transaction_guard is not None and not callable(transaction_guard):
             raise RuntimeError('migration_transaction_guard_invalid')
         self.transaction_guard = transaction_guard
+        if boundary_guard is not None and not callable(boundary_guard):
+            raise RuntimeError('migration_boundary_guard_invalid')
+        self.boundary_guard = boundary_guard
 
     @staticmethod
     def _schema(cursor: Any) -> int:
@@ -312,6 +316,8 @@ class LockedMigrationExecutor:
                     current = self._schema(cursor)
                     if current != migration.to_schema:
                         raise RuntimeError(f"migration_schema_not_advanced:{migration.number}")
+                    if self.boundary_guard is not None:
+                        self.boundary_guard(cursor,migration)
                     record.update(status="applied", completed_at=utc_now())
                     state["observed_schema"] = current
                     atomic_json(self.state_file, state)
