@@ -2080,3 +2080,35 @@ same live attempt with a genuine bound known-good completion may retire it,
 followed by directory fsync. Failed/interrupted scopes require independently
 observed recovery; expiry and missing /run never authorize retry. Production
 execution remains disabled and historical profile interlocks are unchanged.
+
+## Root-selected automatic SQL integration (2026-10-26)
+
+Publication does not select a target. The installed automatic observer defaults
+an unselected release to its current schema. A nonempty plan requires a fixed
+root-private per-source selection binding source/controller/database/origin/target,
+plan, images and the independent routine policy. Canonical SQL and mirrors remain
+immutable. Published161–164 remain unselected and Class D under the conservative
+AST analyzer; their permission/RLS/provider/worker contracts are not routine A/B.
+
+The existing ReleaseDeployer invokes selected SQL after preflight and before
+candidate startup. The parent owns the sole LockedMigrationExecutor connection,
+both operational locks and its advisory lock. Exact Git bytes, real original
+backup bytes, signed native migration/restore acceptance and each target catalog
+and protocol boundary are required. The candidate stays READ_ONLY until existing
+worker/traffic handoff. History advances only after observed committed target;
+unknown replies preserve the consumed attempt and durable recovery fence.
+
+An optional executor transaction guard uses PostgreSQL AST byte boundaries to
+enter the original BEGIN before measuring/locking. Class B locks its exact plain
+table, remeasures bytes/rows under that lock and keeps it through authenticated
+COMMIT, with independent lock/statement/transaction deadlines on that same session.
+Class A uses the same finite ceilings without acquiring Class B permissions.
+Historical execution without this hook is unchanged.
+
+Separately enrolled isolated fixtures live under web/staging/fixtures/automatic-migrations,
+use schema identifiers900160 and above, and record their explicit initialization
+and canonical160 data-prefix digest. They cannot replace canonical migration161,
+select production SQL, open schema160 coordinated admission or authorize production.
+The exact fixture manifest must be independently pinned in the root selection and
+pass positive KVM/isolation admission. Full application A/B promotion and recovery
+remain unaccepted until the actual installed entrypoint completes those tests.

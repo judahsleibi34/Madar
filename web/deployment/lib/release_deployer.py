@@ -460,6 +460,24 @@ class ReleaseDeployer:
                 release["phase"] = "preflight"
                 self._checkpoint(state, release)
                 self.operations.preflight(sha, candidate_slot, images, schema)
+                selected_migration = getattr(self.operations, "apply_selected_migrations", None)
+                if callable(selected_migration):
+                    release["phase"] = "database_migration"
+                    self._checkpoint(state, release)
+                    migration_receipt = selected_migration(sha)
+                    if migration_receipt is not None:
+                        release["migration"] = migration_receipt
+                        schema = self.operations.schema_version()
+                        if schema != self.compatibility.target_schema:
+                            raise RuntimeError("migration_target_not_observed")
+                        release["schema"]["observed"] = schema
+                        if known_good:
+                            self.operations.validate_rollback_target(known_good, schema)
+                            # Retain the operation's origin preimage; current
+                            # serving state must describe the committed schema.
+                            known_good = dict(known_good, schema=schema)
+                            state["known_good_release"] = known_good
+                        self._checkpoint(state, release)
                 release["phase"] = "candidate_start"
                 self._checkpoint(state, release)
                 self.operations.start_candidate(sha, candidate_slot, images)

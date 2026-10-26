@@ -390,3 +390,37 @@ class MigrationExecutorTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+class TransactionGuardTests(unittest.TestCase):
+    def test_guard_is_inside_original_transaction_and_dollar_quoted_sql_is_not_split(self):
+        from deployment.lib.migration_executor import Migration
+        from deployment.lib.migration_risk import scaffold
+        import importlib.util
+        if importlib.util.find_spec('pglast') is None:self.skipTest('locked PostgreSQL parser required')
+        calls=[]
+        class Cursor:
+            def __enter__(self):return self
+            def __exit__(self,*args):pass
+            def execute(self,query,params=None):
+                calls.append(str(query))
+                self.query=str(query)
+            def fetchone(self):
+                if 'pg_try_advisory' in self.query:return (True,)
+                if 'schema_version from' in self.query:return (2 if any('CREATE TABLE' in q for q in calls) else 1,)
+                return (True,)
+        class Connection:
+            autocommit=True
+            def cursor(self):return Cursor()
+            def rollback(self):pass
+            def close(self):pass
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);body=scaffold(1,2,'CREATE TABLE public.test_table (id pg_catalog.int8);')
+            path=root/'migration.sql';path.write_bytes(body)
+            m=Migration(2,path,hashlib.sha256(body).hexdigest(),1,2,'expand-only')
+            def guard(cursor,migration):
+                self.assertEqual(calls[-1],'BEGIN');calls.append('GUARDED')
+            result=LockedMigrationExecutor(connection_factory=Connection,
+                manifest=MigrationManifest('a'*40,(m,)),state_file=root/'state.json',backup_dir=root,
+                backup_verifier=lambda _:None,transaction_guard=guard).run()
+            self.assertEqual(result['status'],'completed')
+            self.assertLess(calls.index('GUARDED'),next(i for i,q in enumerate(calls) if 'DO $madar_guard$' in q))

@@ -150,6 +150,13 @@ def apply_class_b_limits(cursor,policy,*,expected_schema):
     validate_policy(policy)
     if policy['version']!=2 or 'B' not in policy['risk_classes']:
         raise RuntimeError('migration_policy_class_b_not_approved')
+    return apply_transaction_limits(cursor,policy,expected_schema=expected_schema)
+
+
+def apply_transaction_limits(cursor,policy,*,expected_schema):
+    """Bound routine A/B work without granting permission for Class B."""
+    validate_policy(policy)
+    if policy['version']!=2:raise RuntimeError('migration_policy_execution_budget_required')
     if type(expected_schema) is not int or not 0<expected_schema<10**9:
         raise RuntimeError('migration_policy_execution_origin_invalid')
     cursor.execute("SELECT system_identifier::text,schema_version FROM pg_catalog.pg_control_system(),public.application_schema_state WHERE contract_key='core'")

@@ -280,3 +280,34 @@ class ReleaseDeployerTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+class SelectedMigrationLifecycleTests(unittest.TestCase):
+    def test_sql_is_between_preflight_and_candidate_and_target_is_recorded(self):
+        class Operations(FakeOperations):
+            def apply_selected_migrations(self,sha):
+                self._call('selected_migration',sha);self.schema=83
+                return {'execution':{'status':'completed','observed_schema':83}}
+        with tempfile.TemporaryDirectory() as directory:
+            ops=Operations(schema=82)
+            result=ReleaseDeployer(state_root=Path(directory),compatibility=Compatibility(81,83,83,'expand-only',81,83),operations=ops).deploy(SHA)
+            names=[c[0] for c in ops.calls]
+            self.assertLess(names.index('preflight'),names.index('selected_migration'))
+            self.assertLess(names.index('selected_migration'),names.index('start_candidate'))
+            self.assertEqual(result['schema']['observed'],83)
+            self.assertEqual(result['migration']['execution']['observed_schema'],83)
+            self.assertEqual(json.loads((Path(directory)/'state.json').read_text())['known_good_release']['schema'],83)
+    def test_failed_sql_never_starts_or_promotes_candidate(self):
+        class Operations(FakeOperations):
+            def apply_selected_migrations(self,sha):raise RuntimeError('native_sql_failed')
+        with tempfile.TemporaryDirectory() as directory:
+            ops=Operations()
+            with self.assertRaisesRegex(RuntimeError,'native_sql_failed'):
+                ReleaseDeployer(state_root=Path(directory),compatibility=Compatibility(81,83,83,'expand-only',81,83),operations=ops).deploy(SHA)
+            self.assertFalse(any(c[0] in {'start_candidate','activate_workers','switch_traffic'} for c in ops.calls))
+    def test_empty_selected_plan_preserves_application_only_deployment(self):
+        class Operations(FakeOperations):
+            def apply_selected_migrations(self,sha):return None
+        with tempfile.TemporaryDirectory() as directory:
+            ops=Operations()
+            result=ReleaseDeployer(state_root=Path(directory),compatibility=Compatibility(81,82,82,'none',81,82),operations=ops).deploy(SHA)
+            self.assertEqual(result['status'],'known_good');self.assertNotIn('migration',result)

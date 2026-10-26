@@ -118,7 +118,7 @@ def operations_adapter(base,system,value):
                 value['origin']['compatible_min'],value['origin']['compatible_max'])
             super().__init__(system.repo,system.state_root,Path('/etc/madar/production.env'),compatibility)
             self.automatic_release_admission=value;self._issuer=system;self._credential_root=None
-            self._origin_fenced=[];self._model=None;self._candidate_rows=None;self._expected_route=value['origin']['slot']
+            self._origin_fenced=[];self._model=None;self._candidate_rows=None;self._expected_route=value['origin']['slot'];self._migration_completed=False
             self._initial_scope=strict_json(protected(Path('/etc/madar/isolated-release-test.json'),private=True).read_bytes())['runtime_scope']
 
         def verify_actor_scope(self):
@@ -166,15 +166,31 @@ def operations_adapter(base,system,value):
                 if identifier!=value['database']['system_identifier']:raise RuntimeError('automatic_execution_database_substituted')
                 return schema
 
-        def guard(self):
+        def authority_guard(self):
             admission.sealed(value);admission.require_reserved(value)
             from .control_plane_upgrade_authorization import require_upgrade_authorization
             require_upgrade_authorization(value['source_sha'],required_operation=admission.OPERATION,
                 required_schema=value['database']['origin_schema'],required_context_digest=digest(value))
+
+        def guard(self):
+            self.authority_guard()
+            expected=value['database']['target_schema'] if self._migration_completed or not value['plan']['migrations'] else value['database']['origin_schema']
             with admission.connect_database() as db:
                 observed=db.execute("SELECT system_identifier::text,schema_version FROM pg_catalog.pg_control_system(),public.application_schema_state WHERE contract_key='core'").fetchone()
-                if observed!=(value['database']['system_identifier'],value['database']['target_schema']):
+                if observed!=(value['database']['system_identifier'],expected):
                     raise RuntimeError('automatic_live_execution_database_changed')
+
+        def apply_selected_migrations(self,sha):
+            self.guard();self.verify_actor_scope()
+            if sha!=value['source_sha']:raise RuntimeError('automatic_migration_source_changed')
+            if not value['plan']['migrations']:return None
+            from .automatic_release_migration import execute as apply_sql
+            def parent_guard():
+                self.authority_guard();self.verify_actor_scope()
+            receipt=apply_sql(value,system,parent_guard)
+            self._migration_completed=True
+            self.guard()
+            return receipt
 
         def admit_deployment(self,sha,state,descriptor):
             if sha!=value['source_sha']:raise RuntimeError('automatic_execution_source_changed')

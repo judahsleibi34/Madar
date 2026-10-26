@@ -63,7 +63,7 @@ def validate(value,*,now=None):
     if value['candidate']['slot']==value['origin']['slot'] or value['candidate']['source_sha']!=value['source_sha']:
         raise RuntimeError('automatic_admission_slot_or_source_invalid')
     evidence=value['evidence']
-    if (not isinstance(evidence,dict) or set(evidence)!=GATES
+    if (not isinstance(evidence,dict) or set(evidence)!=(GATES|({'migration'} if plan.get('migrations') else set()))
             or any(not re.fullmatch('[a-f0-9]{64}',str(v)) for v in evidence.values())):
         raise RuntimeError('automatic_admission_independent_evidence_required')
     return value
@@ -105,11 +105,13 @@ def require_issue(value,operations):
     from .schema150_provider_adapter import require_owned_lock
     if os.geteuid()!=0:raise RuntimeError('automatic_admission_root_issuer_required')
     sealed(value)
-    if value['plan'].get('migrations'):raise RuntimeError('automatic_migration_executor_connection_required')
     require_owned_lock(operations.automatic_upgrade_lock,operations.upgrade_root/'upgrade.lock')
     require_owned_lock(operations.deploy_lock_descriptor,operations.state_root/'deploy.lock')
     observed=operations.reobserve_automatic_admission(value)
     if observed!=value:raise RuntimeError('automatic_admission_observations_changed')
+    if value['plan'].get('migrations'):
+        from .automatic_release_migration import prepared
+        prepared(value,operations)
     # Production remains closed until the complete original cutover and its
     # resulting compatible origin can be independently attested. Test scope
     # cannot be promoted into production simply by changing its environment.
@@ -185,7 +187,8 @@ def independent_evidence(source,policy,*,now=None):
     value=packet['payload']
     fields={'version','kind','environment_id','source_sha','history_base_sha','tree_sha','images','candidate_configuration_sha256',
         'origin_configuration_sha256','attempt_id','observed_at','expires_at','gates'}
-    if (not isinstance(value,dict) or set(value)!=fields or type(value['version']) is not int or value['version']!=1
+    if (not isinstance(value,dict) or type(value.get('version')) is not int or value['version'] not in {1,2}
+            or set(value)!=fields|({'migration'} if value['version']==2 else set())
             or value['kind']!='isolated-parent-executed-acceptance'
             or policy['environment']!='isolated-test' or value['environment_id']!=policy['environment_id']
             or value['source_sha']!=source or any(not re.fullmatch('[a-f0-9]{40}',str(value[k])) for k in ('history_base_sha','tree_sha'))
@@ -286,15 +289,23 @@ def observe_admission(operations,source,*,attempt_id=None,created_at=None,expire
         marker=db.execute("SELECT shobj_description(oid,'pg_database') FROM pg_database WHERE datname=current_database()").fetchone()[0]
         if catalog.system_identifier!=environment['database_system_identifier'] or marker!='madar-isolated-'+environment['realm_id']:
             raise RuntimeError('automatic_live_database_changed')
-        inventory=discover(operations.repo,source_sha=source,history_base_sha=origin['sha'])
+        from .automatic_release_selection import select
+        inventory,target,selection=select(operations,source,proof,policy,routine,catalog.schema)
         history=strict_json(protected(Path('/var/lib/madar-control-plane/automatic-history.json'),private=True).read_bytes())
         if history!={'version':1,'system_identifier':catalog.system_identifier,'schema':catalog.schema,
                       'structure_sha256':catalog.structure_sha256,'history_sha256':history_digest(inventory,catalog.schema)}:
             raise RuntimeError('automatic_applied_history_or_catalog_drift')
-        plan=generate(operations.repo,inventory,origin=catalog.schema)
+        plan=generate(operations.repo,inventory,origin=catalog.schema,target=target)
+        if selection is not None and selection['plan_sha256']!=plan.sha256:
+            raise RuntimeError('automatic_selected_plan_changed')
         value=plan.document()
         measurements=measure_class_b(db,plan,expected_system_identifier=catalog.system_identifier,
             expected_structure_sha256=catalog.structure_sha256) if value['risk_class']=='B' else None
+    if value['migrations']:
+        from .automatic_release_migration import proof_scope
+        proof_scope({'plan':value},proof)
+    elif proof['version']!=1:
+        raise RuntimeError('automatic_application_only_evidence_scope_changed')
     compat=proof['gates']['compatibility'];stage=proof['gates']['staging']
     expected_ranges=[value['origin_compatibility_intent'],value['compatibility_intent']]
     if any(not isinstance(intent,dict) for intent in expected_ranges):raise RuntimeError('automatic_compatibility_intent_missing')
@@ -365,6 +376,7 @@ def observe_admission(operations,source,*,attempt_id=None,created_at=None,expire
             'compatible_min':compat['candidate_range'][0],'compatible_max':compat['candidate_range'][1],
             'configuration_sha256':proof['candidate_configuration_sha256']},
         'evidence':{gate:digest(proof['gates'][gate]) for gate in GATES},'created_at':start,'expires_at':end}
+    if value['migrations']:output['evidence']['migration']=digest(proof['migration'])
     return validate(output,now=now)
 
 
