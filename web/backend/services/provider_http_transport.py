@@ -8,7 +8,9 @@ Security contract:
   ``validate_target`` (DNS resolution, public-address-only answers, port 443) and the
   connection is pinned to the validated address for the whole session, so a DNS
   rebinding between validation and connect cannot redirect traffic.
-* Only idempotent GET requests exist. Redirects are never followed.
+* Provider data reads are idempotent GET requests. A separate server-only form
+  POST primitive exists solely for fixed OAuth token endpoints. Redirects are
+  never followed.
 * Response bytes, decompressed bytes, JSON depth and elapsed time are bounded.
 * Retries apply only to rate limits (bounded Retry-After), 5xx and transport errors,
   with exponential backoff and jitter, inside the run deadline.
@@ -308,8 +310,39 @@ class ProviderHttpSession:
 
     def get_json(self, path: str, params: dict[str, str], *, deadline: float) -> object:
         target = build_target(self.destination, path, params)
+        return self._request_json("GET", target, None, deadline=deadline)
+
+    def post_form_json(
+        self, path: str, fields: dict[str, str], *, deadline: float,
+        allowed_fields: frozenset[str],
+    ) -> object:
+        """POST an operator-built OAuth form to this already-pinned destination.
+
+        Callers must supply the exact allow-list for their fixed token contract.
+        Field names, redirects, target paths, response sizes and elapsed time stay
+        under the same transport bounds as provider reads.
+        """
+        if not fields or set(fields) != set(allowed_fields):
+            raise TransportError("request_invalid")
+        if any(
+            not isinstance(key, str) or not isinstance(value, str)
+            or not value or len(value) > 4096
+            or any(ord(character) < 32 or ord(character) == 127 for character in value)
+            for key, value in fields.items()
+        ):
+            raise TransportError("request_invalid")
+        target = build_target(self.destination, path, {})
+        body = urlencode(fields).encode("ascii")
+        if len(body) > 16 * 1024:
+            raise TransportError("request_invalid")
+        return self._request_json("POST", target, body, deadline=deadline, max_attempts=1)
+
+    def _request_json(
+        self, method: str, target: str, body: bytes | None, *, deadline: float,
+        max_attempts: int = MAX_ATTEMPTS,
+    ) -> object:
         last: TransportError | None = None
-        for attempt in range(MAX_ATTEMPTS):
+        for attempt in range(max_attempts):
             if self.cancelled():
                 raise TransportError("cancelled")
             if self.heartbeat is not None:
@@ -328,7 +361,8 @@ class ProviderHttpSession:
                 self.attempts += 1
                 started = self.clock()
                 value, status, response_bytes = self._once(
-                    target, min(REQUEST_TIMEOUT_SECONDS, remaining), deadline=deadline,
+                    method, target, body, min(REQUEST_TIMEOUT_SECONDS, remaining),
+                    deadline=deadline,
                 )
                 self._audit({
                     "event": "provider_http_request",
@@ -353,7 +387,7 @@ class ProviderHttpSession:
                     raise
                 last = error
                 self.close()
-                if attempt == MAX_ATTEMPTS - 1:
+                if attempt == max_attempts - 1:
                     break
                 delay = error.retry_after if error.retry_after is not None else (
                     0.2 * (2 ** attempt) * (1 + self.rng.random()))
@@ -370,10 +404,19 @@ class ProviderHttpSession:
             # included in transport audit events.
             self.audit(metadata)
 
-    def _once(self, target: str, timeout: float, *, deadline: float) -> tuple[object, int, int]:
+    def _once(
+        self, method: str, target: str, body: bytes | None, timeout: float,
+        *, deadline: float,
+    ) -> tuple[object, int, int]:
         try:
             connection = self._open(timeout)
-            connection.request("GET", target, headers=self._headers())
+            headers = self._headers()
+            if method == "POST":
+                headers["Content-Type"] = "application/x-www-form-urlencoded"
+                headers["Content-Length"] = str(len(body or b""))
+            elif method != "GET" or body is not None:
+                raise TransportError("request_invalid")
+            connection.request(method, target, body=body, headers=headers)
             response = connection.getresponse()
             status = response.status
             headers = {name.lower(): value.strip() for name, value in response.getheaders()}

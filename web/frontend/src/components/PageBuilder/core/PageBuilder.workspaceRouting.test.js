@@ -32,6 +32,13 @@ describe("explicit builder project routes", () => {
     expect(getBuilderWorkspaceFromPath(path)).toBe("data-sources");
   });
 
+  it("keeps Business Intelligence in its own project namespace", () => {
+    const path = getBuilderWorkspacePath("bi-project", "data", "business-intelligence");
+    expect(path).toBe("/business-intelligence/projects/bi-project/data");
+    expect(getBuilderProjectIdFromPath(path)).toBe("bi-project");
+    expect(getBuilderWorkspaceFromPath(path)).toBe("business-intelligence");
+  });
+
   it("keeps Academy workspaces in the dedicated E-Learning namespace", () => {
     const workspace = "e-learning/landing-page";
     const path = getBuilderWorkspacePath("academy-owner", "publish", workspace);

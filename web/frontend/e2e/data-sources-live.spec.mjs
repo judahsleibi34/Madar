@@ -12,14 +12,22 @@ const screenshotDir = process.env.MADAR_E2E_SCREENSHOT_DIR;
 const userId = 7001;
 
 async function control(endpoint, payload) {
-  const response = await fetch(`${controlUrl}${endpoint}`, {
-    method: payload === undefined ? "GET" : "POST",
-    headers: {
-      "X-Madar-E2E-Control": controlToken,
-      ...(payload === undefined ? {} : { "Content-Type": "application/json" }),
-    },
-    body: payload === undefined ? undefined : JSON.stringify(payload),
-  });
+  let response;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      response = await fetch(`${controlUrl}${endpoint}`, {
+        method: payload === undefined ? "GET" : "POST",
+        headers: {
+          "X-Madar-E2E-Control": controlToken,
+          ...(payload === undefined ? {} : { "Content-Type": "application/json" }),
+        },
+        body: payload === undefined ? undefined : JSON.stringify(payload),
+      });
+      break;
+    } catch (error) {
+      if (attempt === 1) throw error;
+    }
+  }
   const body = await response.json();
   expect(response.ok, JSON.stringify(body)).toBe(true);
   expect(JSON.stringify(body)).not.toContain(providerToken);
@@ -131,6 +139,43 @@ test("authorized browser API onboarding, automatic sync, freshness, and revocati
   await page.getByRole("button", { name: "Open latest dataset" }).click();
   expect((await reopenResponse).status()).toBe(200);
 
+  await page.goto(`/business-intelligence/projects/${projectId}/data`);
+  await expect(page.getByRole("heading", { name: "Business Intelligence", exact: true })).toBeVisible();
+  await expect(page.getByLabel("Dataset")).toHaveValue(/.+/);
+  await expect(page.getByLabel("Immutable version")).toBeEnabled();
+  await expect(page.getByText("Business meaning, unit, currency, row grain, relationship validity, confidence, and approval status are not declared.", { exact: false })).toBeVisible();
+
+  await page.getByRole("tab", { name: "Explore" }).click();
+  await expect(page.getByRole("heading", { name: "Bounded record preview" })).toBeVisible();
+  await expect(page.getByText("The server applies allowlisted filters", { exact: false })).toBeVisible();
+  await expect(page.getByRole("columnheader", { name: "value", exact: true }).first()).toBeVisible();
+
+  await page.getByRole("tab", { name: "Metrics" }).click();
+  await page.getByLabel("Operation").selectOption("sum");
+  await page.getByLabel("Numeric column").selectOption("value");
+  await page.getByLabel("Group by (optional)").selectOption("name");
+  const metricResponse = page.waitForResponse(response => (
+    response.request().method() === "POST" && response.url().includes("/versions/") && response.url().endsWith("/assist")
+  ));
+  await page.getByRole("button", { name: "Run calculation" }).click();
+  expect((await metricResponse).status()).toBe(200);
+  await expect(page.getByRole("heading", { name: "Sum of selected column" })).toBeVisible();
+  await page.locator(".bi-result details").getByText("Result provenance", { exact: true }).click();
+  await expect(page.getByText(projectId, { exact: true })).toBeVisible();
+
+  await page.getByRole("tab", { name: "Visualizations" }).click();
+  await expect(page.getByRole("img", { name: "Sum of selected column" })).toBeVisible();
+  await page.screenshot({ path: path.join(screenshotDir, "05-business-intelligence.png"), fullPage: true });
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Business Intelligence", exact: true })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
+  await page.screenshot({ path: path.join(screenshotDir, "06-business-intelligence-mobile.png"), fullPage: true });
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto(`/data-sources/projects/${projectId}/data`);
+  await expect(page.getByRole("heading", { name: "Data sources", exact: true })).toBeVisible();
+
   const evidence = await control("/control/evidence");
   expect(evidence.resources).toHaveLength(1);
   expect(evidence.resources[0]).toMatchObject({ committed_revision: 3, committed_cursor: "cursor-3" });
@@ -165,13 +210,13 @@ test("authorized browser API onboarding, automatic sync, freshness, and revocati
   expect(revokedRun.outcomes[0]).toMatchObject({ outcome: "failed", credential_attention: true });
   await page.reload();
   await expect(page.getByText(/provider_credentials_revoked/)).toBeVisible();
-  await page.screenshot({ path: path.join(screenshotDir, "05-credential-attention.png"), fullPage: true });
+  await page.screenshot({ path: path.join(screenshotDir, "07-credential-attention.png"), fullPage: true });
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.reload();
   await expect(page.getByRole("heading", { name: "Data sources", exact: true })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
-  await page.screenshot({ path: path.join(screenshotDir, "06-mobile.png"), fullPage: true });
+  await page.screenshot({ path: path.join(screenshotDir, "08-mobile.png"), fullPage: true });
 
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto(`/builder-data/projects/${projectId}/data`);

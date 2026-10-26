@@ -403,6 +403,23 @@ and a duplicate-aware policy; only providers with a stable idempotency contract
 can remove that external ambiguity. Synthetic provider restart tests cover both
 idempotent and non-idempotent boundaries without real email, push or billing.
 
+## Unselected160→161 Google Sheets expansion
+
+The candidate migration161 follows the ordinary guarded expansion contract after
+the immutable official157–160 worker-protocol chain: it begins a transaction,
+locks the `core` schema-state row, requires exact160 before
+DDL, installs only service-role OAuth transaction and source-mapping state plus a
+credential-fenced no-change completion RPC, advances to161 after successful DDL,
+and asserts the result. Its mirrored SQL, candidate manifest, compatibility
+bridge, and validator are checksum-bound. It is not referenced by the active
+schema146 release and cannot be discovered as authority to skip candidates147–156.
+
+The no-change RPC may settle only an already fenced incremental run for the exact
+tenant/project/source/user/resource and current active credential revision. It
+updates the diagnostic snapshot cursor without advancing the dataset revision or
+creating a checkpoint. This preserves the existing scheduler's terminal-run
+contract while avoiding empty immutable history. It does not add a scheduler,
+timer, provider activation, or database-originated network access.
 
 ## Unselected schema156 automatic synchronization transition
 
@@ -1898,6 +1915,17 @@ Earlier applied migrations/manifests remain immutable. Bridge-first promotion,
 verified backup, protected-controller upgrade and forward-repair rules still apply.
 Local feature verification does not authorize production mutation or deployment.
 
+### Candidate 161→162 webhook transition
+
+The unselected schema 162 candidate follows the same schema-state row-lock and
+exact-predecessor transition contract as schema 161. Its manifest selects only
+`162_add_secure_webhook_ingestion.sql`, the database and Supabase trees must be
+byte-identical, and its bridge permits rollback only to schema 161 while the
+expand-only objects remain unused. The active release still targets schema 146;
+therefore automatic migration orchestration must not discover or apply 162 from
+the candidate metadata alone. Runtime and worker feature flags remain separate
+from schema compatibility and default to disabled in persistent environments.
+
 
 ### Formal-completion credentials (schema 130)
 
@@ -2262,3 +2290,27 @@ Isolated routine evidence keeps backup creation, actual restoration and fresh
 application verification times separate. Reverification cannot redate a backup
 or restoration. The independently protected test policy bounds recovery age;
 live verification still expires within the short evidence window.
+
+## Unselected versioned BI dashboard candidate (schema 163)
+
+The retained 162→163 bridge is expand-only and unselected. Migration 163 adds
+service-role-only dashboard/widget persistence with composite scope constraints,
+immutable dataset-version references, and row-locked optimistic revisions. The
+candidate is checksum-pinned and rehearsed transactionally from schema 162; the
+active release remains schema 146. Automatic orchestration must not infer
+selection from the SQL or metadata being present. No persistent migration,
+deployment, or production mutation is authorized.
+
+## Unselected automated reporting candidate (schema 164)
+
+The retained 163→164 bridge is expand-only and unselected. Migration 164 locks
+the exact schema-163 state before DDL, adds disabled-by-default refresh policy,
+private schedule/run tables, and service-role-only transactional RPCs. Enqueue
+captures the dashboard definition and resolved immutable dataset-version vector;
+claiming uses `FOR UPDATE SKIP LOCKED`, per-tenant concurrency bounds, expiring
+leases, and monotonic fencing. Completion is accepted only from the current
+unexpired lease. Schedule dispatch is idempotent per due slot, and expired work
+is retryable only within the bounded attempt policy. Mirrored SQL and release
+metadata are checksum-pinned and must pass a disposable rollback/concurrency/RLS
+rehearsal. Candidate discovery never constitutes authority to migrate or start
+the one-shot scheduler/worker; the active release remains schema 146.

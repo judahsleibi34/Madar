@@ -34,6 +34,8 @@ from routes.calendar_routes import router as calendar_router
 from routes.ecommerce_routes import router as ecommerce_router
 from routes.builder_routes import router as builder_router
 from routes.health_routes import router as health_router
+from routes.google_sheets_routes import router as google_sheets_router
+from routes.webhook_routes import router as webhook_router
 from routes.installation_routes import router as installation_router
 from routes.mfa_routes import router as mfa_router
 from routes.notification_routes import router as notification_router
@@ -549,6 +551,8 @@ app.include_router(server_status_router)
 app.include_router(billing_router)
 app.include_router(data_deletion_router)
 app.include_router(calendar_router)
+app.include_router(google_sheets_router)
+app.include_router(webhook_router)
 app.include_router(ecommerce_router)
 app.include_router(admin_account_access_router)
 app.include_router(admin_billing_router)

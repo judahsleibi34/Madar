@@ -61,6 +61,7 @@ const labels = {
   "sidebar.submissions": "Submissions",
   "sidebar.dataProjects": "Projects",
   "sidebar.dataSources": "Data Sources",
+  "sidebar.businessIntelligence": "Business Intelligence",
   "sidebar.dataLogs": "Data Logs",
   "sidebar.calendar": "Calendar",
   "sidebar.archive": "Archive",
@@ -140,6 +141,7 @@ describe("DashboardSidebar navigation hierarchy", () => {
     expect(screen.getByRole("button", { name: "Page Builder" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Projects" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Data Sources" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Business Intelligence" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Calendar" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Archive" })).toBeTruthy();
   });
@@ -268,6 +270,19 @@ describe("DashboardSidebar navigation hierarchy", () => {
     expect(screen.getByRole("button", { name: "Data Sources" }).getAttribute("aria-current"))
       .toBe("page");
     expect(screen.getByRole("button", { name: "Projects" }).hasAttribute("aria-current"))
+      .toBe(false);
+    expect(screen.getByRole("button", { name: "Data Logs" }).hasAttribute("aria-current"))
+      .toBe(false);
+  });
+
+  it("highlights Business Intelligence independently from Data Sources and Data Logs", () => {
+    renderSidebar("/business-intelligence/projects/project-7/data");
+
+    expect(screen.getByRole("button", { name: "Workspace" }).getAttribute("aria-expanded"))
+      .toBe("true");
+    expect(screen.getByRole("button", { name: "Business Intelligence" }).getAttribute("aria-current"))
+      .toBe("page");
+    expect(screen.getByRole("button", { name: "Data Sources" }).hasAttribute("aria-current"))
       .toBe(false);
     expect(screen.getByRole("button", { name: "Data Logs" }).hasAttribute("aria-current"))
       .toBe(false);

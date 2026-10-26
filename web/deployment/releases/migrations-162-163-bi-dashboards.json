@@ -1,0 +1,14 @@
+{
+  "manifest_version": 1,
+  "release_sha": "STAGING",
+  "migrations": [
+    {
+      "number": 163,
+      "from_schema": 162,
+      "to_schema": 163,
+      "path": "web/database/migrations/163_add_bi_dashboards.sql",
+      "sha256": "ce1e1f2c80ca70f018d7663d51ce84f5423a51de00ce747e10b238b7c43ab837",
+      "compatibility": "expand-only"
+    }
+  ]
+}

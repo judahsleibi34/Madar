@@ -1,0 +1,14 @@
+{
+  "manifest_version": 1,
+  "release_sha": "STAGING",
+  "migrations": [
+    {
+      "number": 162,
+      "from_schema": 161,
+      "to_schema": 162,
+      "path": "web/database/migrations/162_add_secure_webhook_ingestion.sql",
+      "sha256": "aa6e9b76a23183463a210e6727e181395657b49a1cb4d5dcfd7fd43e2b1cb124",
+      "compatibility": "expand-only"
+    }
+  ]
+}

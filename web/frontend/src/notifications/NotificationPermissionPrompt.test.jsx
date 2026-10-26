@@ -71,4 +71,31 @@ describe("NotificationPermissionPrompt", () => {
     expect(screen.queryByRole("button", { name: "Enable notifications" })).toBeNull();
     expect(getPushPublicKey).not.toHaveBeenCalled();
   });
+
+  it("focuses the primary action, dismisses with Escape, and restores focus", async () => {
+    const launcher = document.createElement("button");
+    launcher.textContent = "Open account";
+    document.body.appendChild(launcher);
+    launcher.focus();
+
+    render(<NotificationPermissionPrompt user={user} lang="en" />);
+
+    const primaryAction = await screen.findByRole("button", { name: "Enable notifications" });
+    await waitFor(() => expect(document.activeElement).toBe(primaryAction));
+    fireEvent.keyDown(document, { key: "Escape" });
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(document.activeElement).toBe(launcher);
+    launcher.remove();
+  });
+
+  it("preserves the Arabic direction and localized close-button name", async () => {
+    render(<NotificationPermissionPrompt user={user} lang="ar" />);
+
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog.parentElement?.getAttribute("dir")).toBe("rtl");
+    fireEvent.click(screen.getByRole("button", { name: "إغلاق نافذة الإشعارات" }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  });
 });

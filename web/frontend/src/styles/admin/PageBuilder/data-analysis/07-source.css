@@ -692,6 +692,121 @@
   justify-self: start;
 }
 
+.page-builder .daw-google-sheets-setup {
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+  border-radius: var(--daw-radius-md, 12px);
+  background: var(--daw-surface, #fffdfa);
+  box-shadow: var(--daw-card-shadow, 0 10px 30px rgb(27 35 54 / 7%));
+}
+
+.page-builder .daw-webhook-setup {
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+  border-radius: var(--daw-radius-md, 12px);
+  background: var(--daw-surface, #fffdfa);
+  box-shadow: var(--daw-card-shadow, 0 10px 30px rgb(27 35 54 / 7%));
+}
+
+.page-builder .daw-webhook-setup > header {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.page-builder .daw-webhook-setup h5,
+.page-builder .daw-webhook-setup p {
+  margin: 0;
+}
+
+.page-builder .daw-webhook-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.page-builder .daw-webhook-secret {
+  display: grid;
+  gap: 7px;
+  padding: 12px;
+  border-radius: 10px;
+  background: var(--daw-subtle-surface, #f7f3ed);
+}
+
+.page-builder .daw-webhook-secret code {
+  overflow-wrap: anywhere;
+  color: var(--daw-text, #172033);
+}
+
+.page-builder .daw-google-sheets-setup > header {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.page-builder .daw-google-sheets-setup h5,
+.page-builder .daw-google-sheets-setup p {
+  margin: 0;
+}
+
+.page-builder .daw-google-sheets-form,
+.page-builder .daw-google-sheets-mapping {
+  display: grid;
+  gap: 12px;
+}
+
+.page-builder .daw-google-sheets-form > label,
+.page-builder .daw-google-sheets-mapping > label {
+  display: grid;
+  gap: 6px;
+  font-weight: 700;
+}
+
+.page-builder .daw-google-sheets-form input,
+.page-builder .daw-google-sheets-form select {
+  width: 100%;
+  min-height: 42px;
+}
+
+.page-builder .daw-google-sheets-mapping fieldset {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  margin: 0;
+  padding: 12px;
+  border: 1px solid var(--daw-border, #d6cfc4);
+  border-radius: 10px;
+}
+
+.page-builder .daw-google-column-option {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.page-builder .daw-google-preview-table {
+  max-width: 100%;
+  overflow: auto;
+  border: 1px solid var(--daw-border, #d6cfc4);
+  border-radius: 10px;
+}
+
+.page-builder .daw-google-preview-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.page-builder .daw-google-preview-table th,
+.page-builder .daw-google-preview-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--daw-border, #d6cfc4);
+  text-align: start;
+  white-space: nowrap;
+}
+
 @media (max-width: 680px) {
   .page-builder .daw-source-registry-form {
     grid-template-columns: 1fr;

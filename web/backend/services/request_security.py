@@ -33,6 +33,8 @@ CSRF_EXEMPT_PATHS = {
     ("POST", "/public/contact"),
 }
 CSRF_EXEMPT_PATTERNS = (
+    # Signed machine-to-machine webhooks are authenticated on exact raw bytes.
+    re.compile(r"^/data/webhooks/[0-9a-fA-F-]{36}$"),
     re.compile(r"^/public/sites/[^/]+/forms/[^/]+/submissions$"),
     re.compile(r"^/public/sites/[^/]+/auth/(?:register|login|logout)$"),
     re.compile(r"^/public/academies/[^/]+/auth/(?:register|login)$"),

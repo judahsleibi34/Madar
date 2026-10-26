@@ -150,6 +150,30 @@ _automatic_source_sync_spec = importlib.util.spec_from_file_location(
 _automatic_source_sync_candidate = importlib.util.module_from_spec(_automatic_source_sync_spec)
 _automatic_source_sync_spec.loader.exec_module(_automatic_source_sync_candidate)
 validated_automatic_source_sync_entries = _automatic_source_sync_candidate.validated_entries
+_google_sheets_spec = importlib.util.spec_from_file_location(
+    "madar_google_sheets_candidate", Path(__file__).with_name("google_sheets_candidate.py"),
+)
+_google_sheets_candidate = importlib.util.module_from_spec(_google_sheets_spec)
+_google_sheets_spec.loader.exec_module(_google_sheets_candidate)
+validated_google_sheets_entries = _google_sheets_candidate.validated_entries
+_webhook_spec = importlib.util.spec_from_file_location(
+    "madar_webhook_candidate", Path(__file__).with_name("webhook_candidate.py"),
+)
+_webhook_candidate = importlib.util.module_from_spec(_webhook_spec)
+_webhook_spec.loader.exec_module(_webhook_candidate)
+validated_webhook_entries = _webhook_candidate.validated_entries
+_bi_dashboard_spec = importlib.util.spec_from_file_location(
+    "madar_bi_dashboard_candidate", Path(__file__).with_name("bi_dashboard_candidate.py"),
+)
+_bi_dashboard_candidate = importlib.util.module_from_spec(_bi_dashboard_spec)
+_bi_dashboard_spec.loader.exec_module(_bi_dashboard_candidate)
+validated_bi_dashboard_entries = _bi_dashboard_candidate.validated_entries
+_automated_reporting_spec = importlib.util.spec_from_file_location(
+    "madar_automated_reporting_candidate", Path(__file__).with_name("automated_reporting_candidate.py"),
+)
+_automated_reporting_candidate = importlib.util.module_from_spec(_automated_reporting_spec)
+_automated_reporting_spec.loader.exec_module(_automated_reporting_candidate)
+validated_automated_reporting_entries = _automated_reporting_candidate.validated_entries
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -471,6 +495,10 @@ def check_production_lineage(errors: list[str]) -> None:
             retained_future.update({entry["number"]: entry for entry in validated_automatic_source_sync_entries(REPO_ROOT.parent)})
             from check_reconciled_history import validated_entries as reconciled_entries
             retained_future.update({row['number']:row for row in reconciled_entries(REPO_ROOT.parent)})
+            retained_future.update({entry["number"]: entry for entry in validated_google_sheets_entries(REPO_ROOT.parent)})
+            retained_future.update({entry["number"]: entry for entry in validated_webhook_entries(REPO_ROOT.parent)})
+            retained_future.update({entry["number"]: entry for entry in validated_bi_dashboard_entries(REPO_ROOT.parent)})
+            retained_future.update({entry["number"]: entry for entry in validated_automated_reporting_entries(REPO_ROOT.parent)})
             learning=validate_learning_path(REPO_ROOT.parent)
             if learning['status']=='finalized':
                 learning_manifest=json.loads((REPO_ROOT.parent / learning['manifest_path']).read_text())
