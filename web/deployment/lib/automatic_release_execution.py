@@ -180,6 +180,7 @@ def operations_adapter(base,system,value):
             if sha!=value['source_sha']:raise RuntimeError('automatic_execution_source_changed')
             system.deploy_lock_descriptor=descriptor # borrowed, owned by ReleaseDeployer
             admission.reserve(value,system)
+            admission.arm_operation(value)
             system.arm_interlock(sha)
             system.write_authorization(sha,automatic_release_admission=value)
             credential_root=system.runtime_root/('automatic-'+value['attempt_id'])
@@ -470,7 +471,9 @@ def execute(system,value,base_operations,*,manual_retry=False):
         finally:
             try:
                 system.clear_authorization()
-                if completed:system.clear_interlock()
+                if completed:
+                    admission.finish_operation(value)
+                    system.clear_interlock()
             finally:
                 try:
                     if adapter is not None and adapter._credential_root is not None:

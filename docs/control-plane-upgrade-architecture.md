@@ -2070,3 +2070,13 @@ After restoring retained workers under OLD ownership, the existing deployer
 publishes that verified handoff generation in current known-good state. The
 previous-known-good journal preimage remains unchanged. A successful restore
 must not leave current state referring to the obsolete pre-failure epoch.
+
+
+The isolated automatic issuer publishes a root-private, no-replace persistent
+in-progress pointer after durable attempt consumption and before any credential.
+It binds the exact scope/attempt/source/plan/database. Both polling and explicit
+execution refuse a pending pointer, even after reboot removes /run. Only the
+same live attempt with a genuine bound known-good completion may retire it,
+followed by directory fsync. Failed/interrupted scopes require independently
+observed recovery; expiry and missing /run never authorize retry. Production
+execution remains disabled and historical profile interlocks are unchanged.

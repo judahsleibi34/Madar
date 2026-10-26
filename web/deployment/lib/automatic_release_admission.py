@@ -408,3 +408,43 @@ def require_reserved(value,*,allow_completed=False):
     if record!=expected or (not allow_completed and (ROOT/'attempts'/value['attempt_id']/'completion.json').exists()):
         raise RuntimeError('automatic_attempt_foreign_consumed_or_completed')
     return record
+
+
+def require_no_pending_operation():
+    """A lost /run interlock must never permit a second operation after boot."""
+    path=ROOT/'in-progress.json'
+    if path.exists() or path.is_symlink():
+        # Even a corrupt/unreadable pointer blocks. Recovery must observe the
+        # consumed journal and actual serving state; absence of /run proves none.
+        protected(path,private=True)
+        raise RuntimeError('automatic_durable_operation_requires_recovery')
+
+
+def arm_operation(value):
+    from .migration_executor import atomic_json
+    require_reserved(value)
+    require_no_pending_operation()
+    record={'version':1,'operation':OPERATION,'attempt_id':value['attempt_id'],
+        'admission_sha256':digest(value),'source_sha':value['source_sha'],
+        'operation_id':value['operation_id'],'database_system_identifier':value['database']['system_identifier']}
+    atomic_json(ROOT/'in-progress.json',record,exclusive=True)
+    return record
+
+
+def finish_operation(value):
+    """Only this live consumed attempt and its genuine completion may retire it."""
+    require_reserved(value,allow_completed=True)
+    path=ROOT/'in-progress.json'
+    record=strict_json(protected(path,private=True).read_bytes())
+    expected={'version':1,'operation':OPERATION,'attempt_id':value['attempt_id'],
+        'admission_sha256':digest(value),'source_sha':value['source_sha'],
+        'operation_id':value['operation_id'],'database_system_identifier':value['database']['system_identifier']}
+    completion=strict_json(protected(ROOT/'attempts'/value['attempt_id']/'completion.json',private=True).read_bytes())
+    if (record!=expected or completion.get('admission_sha256')!=digest(value)
+            or completion.get('attempt_id')!=value['attempt_id'] or completion.get('source_sha')!=value['source_sha']
+            or completion.get('release',{}).get('status')!='known_good'):
+        raise RuntimeError('automatic_durable_completion_binding_invalid')
+    path.unlink()
+    fd=os.open(ROOT,os.O_RDONLY|os.O_DIRECTORY)
+    try:os.fsync(fd)
+    finally:os.close(fd)

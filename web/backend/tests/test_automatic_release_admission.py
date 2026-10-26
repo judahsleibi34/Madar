@@ -125,3 +125,32 @@ class IndependentEvidenceTests(unittest.TestCase):
 
 
 if __name__=='__main__':unittest.main()
+
+
+class DurableAutomaticOperationTests(unittest.TestCase):
+    def test_pending_scope_survives_runtime_interlock_loss_and_cannot_be_overwritten(self):
+        with tempfile.TemporaryDirectory() as directory,patch.object(admission,'ROOT',Path(directory)),patch.object(admission,'require_reserved'),patch.object(admission,'protected',side_effect=lambda p,**_:p):
+            value=sample();admission.arm_operation(value)
+            pointer=Path(directory)/'in-progress.json';original=pointer.read_bytes()
+            self.assertEqual(pointer.stat().st_mode&0o777,0o600)
+            self.assertEqual(json.loads(original)['database_system_identifier'],value['database']['system_identifier'])
+            # No volatile /run file exists in this fixture; persistent state is decisive.
+            with self.assertRaisesRegex(RuntimeError,'durable_operation_requires_recovery'):
+                admission.require_no_pending_operation()
+            with self.assertRaisesRegex(RuntimeError,'durable_operation_requires_recovery'):
+                admission.arm_operation(sample())
+            self.assertEqual(pointer.read_bytes(),original)
+
+    def test_only_exact_genuine_completion_can_retire_pending_scope(self):
+        with tempfile.TemporaryDirectory() as directory,patch.object(admission,'ROOT',Path(directory)),patch.object(admission,'require_reserved'),patch.object(admission,'protected',side_effect=lambda p,**_:p):
+            value=sample();admission.arm_operation(value);root=Path(directory)
+            completion=root/'attempts'/value['attempt_id']/'completion.json';completion.parent.mkdir(parents=True)
+            record={'admission_sha256':digest(value),'attempt_id':value['attempt_id'],'source_sha':value['source_sha'],'release':{'status':'failed'}}
+            completion.write_bytes(canonical(record))
+            with self.assertRaisesRegex(RuntimeError,'completion_binding_invalid'):admission.finish_operation(value)
+            self.assertTrue((root/'in-progress.json').exists())
+            record['release']['status']='known_good';record['source_sha']='e'*40;completion.write_bytes(canonical(record))
+            with self.assertRaisesRegex(RuntimeError,'completion_binding_invalid'):admission.finish_operation(value)
+            self.assertTrue((root/'in-progress.json').exists())
+            record['source_sha']=value['source_sha'];completion.write_bytes(canonical(record));admission.finish_operation(value)
+            self.assertFalse((root/'in-progress.json').exists());admission.require_no_pending_operation()
