@@ -200,6 +200,17 @@ class ReleaseDeployer:
         release["worker_owner"] = owner.lower()
         self._checkpoint(state, release)
 
+    def _restore_retained_workers(self, state, release, known_good):
+        """Publish the actually restored epoch without changing its preimage."""
+        self.operations.restore_workers(known_good)
+        self._require_worker_authority(release, "OLD")
+        # Recovery owns the same release under the current handoff generation.
+        # Keep the historical previous-known-good object/receipt immutable.
+        state["known_good_release"] = dict(
+            known_good, worker_generation=self._worker_generation(release),
+        )
+        self._checkpoint(state, release)
+
     def _require_worker_authority(
         self, release: dict[str, Any], owner: str,
     ) -> None:
@@ -357,7 +368,7 @@ class ReleaseDeployer:
                     state, interrupted, "NONE", expected={recorded_owner},
                 )
             self._set_worker_authority(state, interrupted, "OLD", expected={"NONE"})
-            self.operations.restore_workers(known_good)
+            self._restore_retained_workers(state, interrupted, known_good)
             ownership = self.operations.worker_ownership(known_good, candidate)
         if ownership != "old":
             raise RuntimeError(
@@ -488,7 +499,7 @@ class ReleaseDeployer:
                         if self.operations.worker_ownership(known_good, candidate_identity) != "none":
                             raise RuntimeError("candidate_worker_shutdown_unverified")
                         self._set_worker_authority(state, release, "OLD", expected={"NONE"})
-                        self.operations.restore_workers(known_good)
+                        self._restore_retained_workers(state, release, known_good)
                     raise
                 release["phase"] = "traffic_switch"
                 release["rollback_required"] = True
@@ -536,7 +547,7 @@ class ReleaseDeployer:
                         if self.operations.worker_ownership(known_good, candidate_identity) != "none":
                             raise RuntimeError("candidate_worker_shutdown_unverified")
                         self._set_worker_authority(state, release, "OLD", expected={"NONE"})
-                        self.operations.restore_workers(known_good)
+                        self._restore_retained_workers(state, release, known_good)
                     try:
                         self.operations.switch_traffic(previous_slot)
                     except Exception as rollback_error:
@@ -575,7 +586,7 @@ class ReleaseDeployer:
                             if self.operations.worker_ownership(known_good, candidate_identity) != "none":
                                 raise RuntimeError("candidate_worker_shutdown_unverified")
                             self._set_worker_authority(state, release, "OLD", expected={"NONE"})
-                            self.operations.restore_workers(known_good)
+                            self._restore_retained_workers(state, release, known_good)
                 self.operations.stop_candidate(
                     candidate_slot,
                     expected_serving={

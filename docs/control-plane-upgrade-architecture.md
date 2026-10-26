@@ -2064,3 +2064,9 @@ the historical restore helper, which changes restart policy to unless-stopped.
 Its sealed origin retains restart=no, exact image/configuration and bounded
 health verification; the opposite consumer slot must remain inactive. This
 changes no historical profiles and is not privileged reboot acceptance.
+
+
+After restoring retained workers under OLD ownership, the existing deployer
+publishes that verified handoff generation in current known-good state. The
+previous-known-good journal preimage remains unchanged. A successful restore
+must not leave current state referring to the obsolete pre-failure epoch.

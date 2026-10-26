@@ -206,9 +206,15 @@ class ReleaseDeployerTests(unittest.TestCase):
             operations = FakeOperations(fail_at="activate_workers")
             with self.assertRaisesRegex(RuntimeError, "injected_activate_workers_failure"):
                 self.deployer(root, operations).deploy("b" * 40)
+            from deployment.lib.runtime_authority import load_worker_authority
+            state=json.loads((Path(root)/"state.json").read_text())
+            authority=load_worker_authority(Path(root))
         self.assertFalse(any(call[0] == "switch_traffic" for call in operations.calls))
         self.assertIn(("deactivate_workers", "green"), operations.calls)
         self.assertIn(("restore_workers", "green"), operations.calls)
+
+        self.assertEqual(state["known_good_release"]["worker_generation"],authority["generation"])
+        self.assertNotEqual(state["history"][-1]["previous_known_good_release"]["worker_generation"],authority["generation"])
 
     def test_db_redis_worker_storage_and_frontend_faults_are_preflight_or_validation_failures(self):
         # The operations layer maps these dependency injections into one of the
