@@ -69,6 +69,8 @@ def publish_candidate_grant(value,mode):
         admission.sealed(value,allow_expired=True);admission.require_reserved(value,allow_completed=True)
     else:admission.require_reserved(value)
     if mode not in {'READ_ONLY','NORMAL'}:raise RuntimeError('automatic_grant_mode_invalid')
+    runtime=admission.ROOT/'runtime';require_root_directory(runtime,create=True)
+    require_root_directory(runtime/value['attempt_id'],create=True)
     path=grant_directory(value);require_root_directory(path,mode=0o755,create=True)
     candidate=value['candidate'];plan=value['plan']
     record={'version':4,'operation':admission.OPERATION,'operation_id':value['operation_id'],
