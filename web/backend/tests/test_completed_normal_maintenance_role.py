@@ -107,5 +107,22 @@ class MaintenanceRoleTests(unittest.TestCase):
                     self.assertEqual(fcntl.fcntl(fd,fcntl.F_GET_SEALS),backup.DATABASE_SEALS)
             finally:os.close(fd)
 
+    @unittest.skipUnless(os.geteuid()==0,'actual restricted child consumes root-issued v2 lease')
+    def test_restricted_child_consumes_administrator_binding_without_docker_access(self):
+        with patch.object(backup,'direct_local_database_address',return_value='172.19.0.2'):
+            fd=backup.sealed_local_database_binding(maintenance_role='supabase_admin')
+        try:
+            code=("import sys,os,json;sys.path.insert(0,"+repr(str(Path(backup.__file__).resolve().parents[1]))+
+                ");from scripts import backup_support as s;print(json.dumps({'address':s.direct_local_database_address(),"
+                "'role':s.leased_local_database_role(),'shape':s.direct_local_database_shape(),"
+                "'uid':os.getuid(),'groups':os.getgroups(),'nnp':'NoNewPrivs:\\t1' in open('/proc/self/status').read()}))")
+            env={**recovery.ENVIRONMENT,backup.LOCAL_DATABASE_FD:str(fd),'PGHOST':'supabase-db',
+                 'PGPORT':'5432','PGDATABASE':'postgres','PGUSER':'supabase_admin','PGSSLMODE':'disable'}
+            result=json.loads(recovery.checked(['/usr/bin/python3','-I','-B','-c',code],
+                env=env,user=1000,pass_fds=(fd,)))
+            self.assertEqual(result,{'address':'172.19.0.2','role':'supabase_admin','shape':True,
+                'uid':1000,'groups':[],'nnp':True})
+        finally:os.close(fd)
+
 
 if __name__=='__main__':unittest.main()
