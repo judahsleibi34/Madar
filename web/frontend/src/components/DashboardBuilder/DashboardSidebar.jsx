@@ -11,6 +11,7 @@ import {
   ClipboardList,
   CalendarDays,
   Database,
+  ChartNoAxesCombined,
   FolderOpen,
   Upload,
   CreditCard,
@@ -152,6 +153,7 @@ export default function DashboardSidebar({
     DASHBOARD_ROUTES.builderResponses,
     DASHBOARD_ROUTES.dataProjects,
     DASHBOARD_ROUTES.dataSources,
+    DASHBOARD_ROUTES.businessIntelligence,
     DASHBOARD_ROUTES.builderData,
     DASHBOARD_ROUTES.calendar,
     DASHBOARD_ROUTES.agenda,
@@ -269,6 +271,11 @@ export default function DashboardSidebar({
       label: t("sidebar.dataSources", { defaultValue: "Data Sources" }),
       path: DASHBOARD_ROUTES.dataSources,
       icon: Upload,
+    },
+    {
+      label: t("sidebar.businessIntelligence", { defaultValue: "Business Intelligence" }),
+      path: DASHBOARD_ROUTES.businessIntelligence,
+      icon: ChartNoAxesCombined,
     },
     {
       label: t("sidebar.dataLogs"),

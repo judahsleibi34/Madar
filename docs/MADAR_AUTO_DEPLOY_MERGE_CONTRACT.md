@@ -385,6 +385,30 @@ and a duplicate-aware policy; only providers with a stable idempotency contract
 can remove that external ambiguity. Synthetic provider restart tests cover both
 idempotent and non-idempotent boundaries without real email, push or billing.
 
+## Unselected schema161 Google Sheets connector candidate
+
+Migration161, its OAuth callback, Google Sheets adapter, and provider UI are
+source candidates only. The active release remains schema146; migration161 is
+absent from `release.json` and requires the exact locked candidate chain through
+the official schema160 worker protocols. Merging source must not select or apply161, enable the provider, create
+a Google Cloud client, authorize an account, install credentials, start outbound
+Google traffic, or enable a synchronization schedule.
+
+The connector is operator-disabled unless its complete server configuration is
+valid. It requests only the Sheets read-only scope, stores refresh tokens through
+the existing schema155 Vault envelope, and binds one-time OAuth state, PKCE,
+tenant, project, source, user, provider, and exact redirect URI. It reads only
+fixed Google OAuth/Sheets endpoints and a configured spreadsheet/tab; user input
+can never become a network destination. Snapshot fingerprints are not represented
+as provider event cursors, and missing rows are retained until a separately
+reviewed consistency-safe deletion design exists.
+
+Activation requires the migration161 candidate validator and disposable rehearsal,
+the complete146→161 Data Sources rehearsal, offline OAuth/Sheets/browser fixtures,
+real staging Google authorization using an exact redirect, scope verification,
+Vault refresh/revocation evidence, quota/429 monitoring, worker failure rehearsal,
+and separate explicit release approval. No real Google credential or secret may
+be committed or included in release metadata.
 
 ## Schema156 source-candidate boundary
 
@@ -1526,6 +1550,39 @@ Read-only installer dry run tolerates scheduled backup timers while still refusi
 The control-plane test suite exercises failures before quiescence, before installation, after controller installation, during deployment, after promotion, during same-SHA verification, and during timer restoration.
 
 These are safety contracts, not temporary workarounds.
+
+### Unselected Data Sources webhook candidate
+
+Schema 162 and its 161→162 manifest/bridge are retained candidate artifacts,
+not an active release selection. Merge and deployment automation must preserve
+the schema-146 `release.json` selection unless a separately reviewed change
+explicitly selects a forward path. Presence of the webhook SQL, receiver, or
+worker must never enable ingress, register a production adapter, start a worker,
+or authorize migration execution. The migration mirror, checksum pin, transition
+validator, and complete 146→162 candidate chain are mandatory release checks.
+
+### Unselected Business Intelligence dashboard candidate
+
+Schema 163 and its 162→163 manifest/bridge are retained candidate artifacts,
+not an active release selection. They add service-role-only dashboard and widget
+definitions whose analytics bind to exact immutable dataset versions. The active
+schema-146 `release.json` selection must remain unchanged. Candidate presence must
+not apply migration 163 or activate a persistent environment. Its mirror, checksum,
+predecessor lock, RLS grants, optimistic revision contract, disposable rehearsal,
+and complete 146→163 candidate chain are mandatory release checks.
+
+### Unselected automated reporting candidate
+
+Schema 164 and its 163→164 manifest/bridge are retained candidate artifacts,
+not an active release selection. They add disabled-by-default automatic dashboard
+refresh, recurring report schedules, captured immutable version vectors, durable
+fenced report jobs, and private bounded CSV exports. The active schema-146
+`release.json` selection remains unchanged. Candidate presence must not apply
+migration 164, start a scheduler or worker, publish report files, or access any
+persistent environment. The SQL mirror/checksum, exact predecessor lock, private
+tables, service-role RPC grants, idempotent claims, lease recovery, disposable
+rehearsal, and complete 146→164 chain are mandatory before any later release
+proposal. Activation and deployment remain separately reviewed decisions.
 
 ---
 

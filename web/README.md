@@ -304,19 +304,44 @@ failures after that point still count as attempted usage.
 Build the application images with Docker Compose:
 
 ```bash
-docker compose build backend frontend
+docker compose -f docker-compose.yml -f docker-compose.dev.yml build backend frontend
 ```
 
 Run the backend and frontend containers together:
 
 ```bash
-docker compose up
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up
 ```
+
+Run only the backend and its development dependencies with:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build backend
+```
+
+When using the host Vite server at `http://localhost:5173` with the Compose
+development backend, create the ignored file `frontend/.env.development.local`
+with:
+
+```dotenv
+VITE_DEV_PROXY_TARGET=http://127.0.0.1:8002
+VITE_DEV_PROXY_REQUEST_ORIGIN=http://localhost:5173
+```
+
+Restart Vite after changing this file. Development proxy targets and request
+origins are required to be loopback URLs; the local Vite server intentionally
+refuses production or other remote API targets. When the native
+`backend/run_local.py` launcher is used instead, omit these overrides so Vite
+uses its loopback default at `http://127.0.0.1:8000`.
+
+Run these commands from `web/`. The base Compose file is production-like and
+intentionally rejects startup without an immutable `MADAR_RELEASE_SHA`; local
+development must include `docker-compose.dev.yml` explicitly.
 
 The compose file currently maps:
 
-- backend: `127.0.0.1:8001 -> 8000`
-- frontend: `127.0.0.1:3000 -> 8080`
+- backend: `127.0.0.1:8002 -> 8000`
+- frontend: `127.0.0.1:3001 -> 8080`
 
 Redis is included as a compose service for rate limiting.
 

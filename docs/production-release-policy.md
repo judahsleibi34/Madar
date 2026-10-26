@@ -684,6 +684,24 @@ and a duplicate-aware policy; only providers with a stable idempotency contract
 can remove that external ambiguity. Synthetic provider restart tests cover both
 idempotent and non-idempotent boundaries without real email, push or billing.
 
+## C3 Step 5 unselected Google Sheets candidate (schema161)
+
+Schema161 and the Google Sheets connector remain unselected source artifacts after
+the disabled-by-default schema156 scheduler and immutable official157–160 worker
+protocols. They authorize no migration,
+provider activation, Google Cloud configuration, credential, external request,
+worker start, deployment, or production mutation. The active release is still
+schema146.
+
+Any later activation must verify the exact160→161 locked migration and full
+146→161 rehearsal, one-time OAuth replay protection, current-session and
+tenant/project/source rebinding checks, PKCE S256, exact redirect matching,
+read-only scope validation, Vault-backed refresh-token rotation and revocation,
+final-commit credential fencing, strict Sheets URL parsing, bounded reads,
+429/backoff behavior, stable record IDs, no-op revision behavior, and conservative
+retention of missing rows. It also requires a real staging OAuth test, Google
+quota monitoring and alerts, egress restrictions, secret hygiene, a disconnect
+runbook, and explicit reviewed environment approval.
 
 ## C3 Step 1 unselected automatic synchronization candidate
 
@@ -2808,6 +2826,47 @@ The active checksum manifest is migrations-115-135.json, compatibility 114..135.
 Earlier applied migrations/manifests remain immutable. Bridge-first promotion,
 verified backup, protected-controller upgrade and forward-repair rules still apply.
 Local feature verification does not authorize production mutation or deployment.
+
+### Unselected secure-webhook candidate (schema 162)
+
+Migration 162 is an additive, checksum-pinned candidate after the unselected
+Google Sheets schema 161 candidate. It adds service-role-only webhook endpoint
+and event-inbox persistence with tenant/project/source/resource foreign keys,
+database replay uniqueness, worker leases and fencing, bounded retries,
+dead-letter retention, and reconciliation scheduling. The mirrored SQL and
+161→162 compatibility bridge are validated by `webhook_candidate.py` and the
+Data Sources staging-chain gate. `release.json` remains selected at schema 146.
+The inbound route, adapters, and one-shot worker are disabled in persistent
+environments; production provider registration, public listener activation,
+migration application, and worker activation each require separate approval.
+This candidate grants no deployment or production-mutation authority.
+
+### Unselected Business Intelligence dashboard candidate (schema 163)
+
+Migration 163 is an additive, checksum-pinned candidate after the unselected
+webhook schema 162 candidate. It persists tenant/project/creator-scoped dashboard
+definitions and widgets, exact immutable dataset-version bindings, pinned or
+explicitly refreshed latest-version policies, bounded analysis specifications,
+and optimistic dashboard revisions. Both tables remain private to `service_role`;
+all mutations use scoped transactional RPCs. `bi_dashboard_candidate.py`, the
+disposable 162→163 rehearsal, and the Data Sources staging-chain gate validate the
+candidate. `release.json` remains selected at schema 146. Applying migration 163,
+deploying this candidate, or enabling a persistent environment requires separate
+approval; this work grants no production-mutation authority.
+
+### Unselected automated reporting candidate (schema 164)
+
+Migration 164 is an additive, checksum-pinned candidate after schema 163. It
+keeps dashboard refresh opt-in, preserves pinned widget bindings, snapshots exact
+latest-version choices at enqueue time, and adds creator/project/tenant-scoped
+daily, weekly, and monthly schedules with explicit IANA timezones. Report jobs
+use durable idempotency keys, bounded retries, expiring leases, fencing tokens,
+and private integrity-checked CSV artifacts. Direct client roles retain no table
+or RPC access. `automated_reporting_candidate.py`, the disposable 163→164
+rehearsal, backend/frontend tests, and the complete 146→164 staging-chain gate
+must pass before this can be proposed for release. The active release remains
+schema 146; no scheduler, worker, migration, deployment, or persistent data
+processing is authorized by this candidate.
 
 
 ### Formal-completion credentials (schema 130)

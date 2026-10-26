@@ -146,6 +146,30 @@ _automatic_source_sync_spec = importlib.util.spec_from_file_location(
 _automatic_source_sync_candidate = importlib.util.module_from_spec(_automatic_source_sync_spec)
 _automatic_source_sync_spec.loader.exec_module(_automatic_source_sync_candidate)
 validated_automatic_source_sync_entries = _automatic_source_sync_candidate.validated_entries
+_google_sheets_spec = importlib.util.spec_from_file_location(
+    "madar_google_sheets_candidate", Path(__file__).with_name("google_sheets_candidate.py"),
+)
+_google_sheets_candidate = importlib.util.module_from_spec(_google_sheets_spec)
+_google_sheets_spec.loader.exec_module(_google_sheets_candidate)
+validated_google_sheets_entries = _google_sheets_candidate.validated_entries
+_webhook_spec = importlib.util.spec_from_file_location(
+    "madar_webhook_candidate", Path(__file__).with_name("webhook_candidate.py"),
+)
+_webhook_candidate = importlib.util.module_from_spec(_webhook_spec)
+_webhook_spec.loader.exec_module(_webhook_candidate)
+validated_webhook_entries = _webhook_candidate.validated_entries
+_bi_dashboard_spec = importlib.util.spec_from_file_location(
+    "madar_bi_dashboard_candidate", Path(__file__).with_name("bi_dashboard_candidate.py"),
+)
+_bi_dashboard_candidate = importlib.util.module_from_spec(_bi_dashboard_spec)
+_bi_dashboard_spec.loader.exec_module(_bi_dashboard_candidate)
+validated_bi_dashboard_entries = _bi_dashboard_candidate.validated_entries
+_automated_reporting_spec = importlib.util.spec_from_file_location(
+    "madar_automated_reporting_candidate", Path(__file__).with_name("automated_reporting_candidate.py"),
+)
+_automated_reporting_candidate = importlib.util.module_from_spec(_automated_reporting_spec)
+_automated_reporting_spec.loader.exec_module(_automated_reporting_candidate)
+validated_automated_reporting_entries = _automated_reporting_candidate.validated_entries
 import re
 
 
@@ -515,10 +539,10 @@ def validate(root: Path = ROOT) -> list[str]:
                 ).glob("*.sql")
             )
 
-            if versions != list(range(1, 161 if learning_contract['status']=='finalized' else 143)):
+            if versions != list(range(1, 165 if learning_contract['status']=='finalized' else 143)):
                 errors.append(
                     "migration namespace must contain exactly "
-                    f"001 through {160 if learning_contract['status']=='finalized' else 142}: {tree}"
+                    f"001 through {164 if learning_contract['status']=='finalized' else 142}: {tree}"
                 )
 
     except (OSError, KeyError, ValueError, TypeError) as error:
@@ -587,6 +611,10 @@ def validate(root: Path = ROOT) -> list[str]:
         validated_shared_immutable_storage_entries(root)
         validated_credential_vault_entries(root)
         validated_automatic_source_sync_entries(root)
+        validated_google_sheets_entries(root)
+        validated_webhook_entries(root)
+        validated_bi_dashboard_entries(root)
+        validated_automated_reporting_entries(root)
     except (OSError, ValueError, TypeError, KeyError) as error:
         errors.append(f"shared immutable-storage candidate invalid: {error}")
     return errors

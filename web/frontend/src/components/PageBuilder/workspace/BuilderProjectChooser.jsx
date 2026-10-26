@@ -60,7 +60,7 @@ export default function BuilderProjectChooser({
   dataProjectSelectionKey = "",
   usageProfile,
 }) {
-  const isDataWorkspace = workspace === "builder-data" || workspace === "data-sources";
+  const isDataWorkspace = ["builder-data", "data-sources", "business-intelligence"].includes(workspace);
   const navigate = useNavigate();
   const automaticEntryStartedRef = useRef(false);
   const [projects, setProjects] = useState([]);

@@ -67,6 +67,14 @@ describe("Data project route classification", () => {
     expect(getSafePostLoginPath({ user_type: "user" }, "/data-sources"))
       .toBe("/data-sources");
   });
+
+  it("keeps Business Intelligence as its own authenticated feature route", () => {
+    expect(isDashboardRoutePath("/business-intelligence/projects/project-7/data")).toBe(true);
+    expect(getSafePostLoginPath(
+      { user_type: "user" },
+      "/business-intelligence/projects/project-7/data",
+    )).toBe("/business-intelligence/projects/project-7/data");
+  });
 });
 
 

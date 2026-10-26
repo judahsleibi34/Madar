@@ -33,7 +33,7 @@
   padding: 0;
   color: var(--theme-text-muted);
   background: transparent;
-  border: 1px solid var(--theme-border);
+  border: 1px solid var(--color-border-control);
   border-radius: 999px;
   cursor: pointer;
 }
@@ -42,7 +42,11 @@
 .notification-permission-close:focus-visible {
   color: var(--color-accent-text);
   background: var(--theme-bg-soft);
-  outline: none;
+}
+
+.notification-permission-close:focus-visible {
+  outline: 3px solid var(--color-focus-indicator);
+  outline-offset: 2px;
 }
 
 .notification-permission-icon {
@@ -112,7 +116,7 @@
 .notification-permission-secondary {
   color: var(--theme-text);
   background: var(--theme-surface);
-  border: 1px solid var(--theme-border);
+  border: 1px solid var(--color-border-control);
 }
 
 .notification-permission-secondary:hover:not(:disabled) {
@@ -120,7 +124,7 @@
 }
 
 .notification-permission-actions button:focus-visible {
-  outline: 3px solid rgba(var(--theme-primary-rgb), 0.22);
+  outline: 3px solid var(--color-focus-indicator);
   outline-offset: 2px;
 }
 

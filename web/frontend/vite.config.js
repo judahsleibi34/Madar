@@ -11,10 +11,29 @@ const publicIconModules = new Set([
 ]);
 
 // https://vite.dev/config/
-export default defineConfig(({ mode }) => {
+const requireLoopbackDevelopmentUrl = (value, field) => {
+  let parsed;
+  try {
+    parsed = new URL(value);
+  } catch {
+    throw new Error(`${field} must be an absolute loopback URL for the Vite development server.`);
+  }
+  if (!["localhost", "127.0.0.1", "[::1]"].includes(parsed.hostname)) {
+    throw new Error(`${field} must remain loopback-only for the Vite development server.`);
+  }
+  return value;
+};
+
+export default defineConfig(({ command, mode }) => {
   const env = loadEnv(mode, import.meta.dirname, "");
   const devApiTarget = env.VITE_DEV_PROXY_TARGET || "http://127.0.0.1:8000";
   const devProxyRequestOrigin = env.VITE_DEV_PROXY_REQUEST_ORIGIN?.replace(/\/+$/, "");
+  if (command === "serve") {
+    requireLoopbackDevelopmentUrl(devApiTarget, "VITE_DEV_PROXY_TARGET");
+    if (devProxyRequestOrigin) {
+      requireLoopbackDevelopmentUrl(devProxyRequestOrigin, "VITE_DEV_PROXY_REQUEST_ORIGIN");
+    }
+  }
   const devProxyOptions = {
     target: devApiTarget,
     changeOrigin: true,

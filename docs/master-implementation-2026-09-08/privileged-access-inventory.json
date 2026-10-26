@@ -33,6 +33,36 @@
   ],
   "entries": [
     {
+      "path": "web/backend/data_analysis/routes/data_routes.py",
+      "boundary": "Authenticated Data Project routes derive tenant, project and user scope before invoking privileged Data Sources, dataset, BI dashboard and reporting services; service-role access is never accepted as end-user authorization.",
+      "reviewed_functions": []
+    },
+    {
+      "path": "web/backend/routes/google_sheets_routes.py",
+      "boundary": "OAuth callback consumes one-time state bound to tenant, project, source, actor, provider, PKCE verifier and exact redirect URI before privileged credential or mapping persistence.",
+      "reviewed_functions": []
+    },
+    {
+      "path": "web/backend/services/bi_dashboard_service.py",
+      "boundary": "Every privileged dashboard/table/RPC operation receives previously authorized tenant, project and creator identity and rechecks composite scope; immutable dataset versions remain project-bound.",
+      "reviewed_functions": []
+    },
+    {
+      "path": "web/backend/services/bi_reporting_service.py",
+      "boundary": "Privileged schedule, run and artifact operations are tenant/project/creator scoped; worker RPCs use leases and fencing, and HTTP callers are authorized before entering the service.",
+      "reviewed_functions": []
+    },
+    {
+      "path": "web/backend/services/data_source_api_provider.py",
+      "boundary": "Internal provider ingestion reuses an authorized source identity and fixed operator registry; caller data cannot select network destinations or bypass tenant/project/source fencing.",
+      "reviewed_functions": []
+    },
+    {
+      "path": "web/backend/services/webhook_ingestion_service.py",
+      "boundary": "Public receipt resolves an opaque endpoint through service-only RPCs and verifies the registered adapter and Vault credential; management calls are separately tenant/project/source/user authorized and workers are lease-fenced.",
+      "reviewed_functions": []
+    },
+    {
       "path": "web/backend/app.py",
       "boundary": "public_asset_registry_or_verified_private_preview",
       "reviewed_functions": [
