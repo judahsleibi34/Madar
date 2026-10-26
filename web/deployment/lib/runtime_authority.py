@@ -5,6 +5,7 @@ from __future__ import annotations
 import fcntl
 import json
 import os
+import stat
 import tempfile
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -13,6 +14,22 @@ from typing import Any, Iterator
 
 
 WORKER_OWNERS = {"OLD", "NONE", "CANDIDATE", "RECOVERY"}
+
+
+def open_deployment_lock(path: Path):
+    """Create private lock bytes independent of a shell/systemd umask.
+
+    Existing unsafe files are refused, never silently chmodded or followed.
+    The protected issuer separately verifies owner, ancestry and held flock.
+    """
+    fd=os.open(path,os.O_RDWR|os.O_CREAT|os.O_NOFOLLOW|os.O_CLOEXEC|os.O_NONBLOCK,0o600)
+    try:
+        current=os.fstat(fd)
+        if not stat.S_ISREG(current.st_mode) or current.st_mode&0o077 or current.st_nlink!=1:
+            raise RuntimeError('deployment_lock_unprotected')
+        return os.fdopen(fd,'a+',encoding='utf-8')
+    except BaseException:
+        os.close(fd);raise
 
 
 def _atomic_json(path: Path, payload: dict[str, Any]) -> None:

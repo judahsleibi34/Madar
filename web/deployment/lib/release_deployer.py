@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from deployment.lib.runtime_authority import (
+    open_deployment_lock,
     load_worker_authority,
     write_worker_authority,
 )
@@ -381,7 +382,7 @@ class ReleaseDeployer:
             raise ValueError("candidate must be a full lowercase Git SHA")
         self._requested_sha = sha
         self.state_root.mkdir(parents=True, exist_ok=True, mode=0o700)
-        with self.lock_file.open("a+", encoding="utf-8") as lock:
+        with open_deployment_lock(self.lock_file) as lock:
             try:
                 fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
             except BlockingIOError as error:
@@ -612,7 +613,7 @@ class ReleaseDeployer:
             raise RuntimeError("recovery_candidate_requires_migration")
 
         self.state_root.mkdir(parents=True, exist_ok=True, mode=0o700)
-        with self.lock_file.open("a+", encoding="utf-8") as lock:
+        with open_deployment_lock(self.lock_file) as lock:
             try:
                 fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
             except BlockingIOError as error:

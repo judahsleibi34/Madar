@@ -41,6 +41,7 @@ from deployment.lib.migration_executor import (  # noqa: E402
     MigrationManifest,
 )
 from deployment.lib.runtime_authority import (  # noqa: E402
+    open_deployment_lock,
     load_worker_authority,
     runtime_mutation_lock,
     write_worker_authority,
@@ -1655,7 +1656,7 @@ def plan_release_migrations(
 @contextmanager
 def deployment_lock(state_root: Path):
     state_root.mkdir(parents=True, exist_ok=True, mode=0o700)
-    with (state_root / "deploy.lock").open("a+", encoding="utf-8") as lock:
+    with open_deployment_lock(state_root / "deploy.lock") as lock:
         try:
             fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError as error:

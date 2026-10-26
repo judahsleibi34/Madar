@@ -14,6 +14,27 @@ from deployment.lib.release_deployer import Compatibility, ReleaseDeployer
 SHA = "a" * 40
 
 
+class DeploymentLockPermissionsTests(unittest.TestCase):
+    def test_private_creation_under_permissive_operator_umask(self):
+        from deployment.lib.runtime_authority import open_deployment_lock
+        with tempfile.TemporaryDirectory() as root:
+            path=Path(root)/'deploy.lock';previous=os.umask(0o022)
+            try:
+                with open_deployment_lock(path):self.assertEqual(path.stat().st_mode&0o777,0o600)
+            finally:os.umask(previous)
+
+    def test_unsafe_existing_file_symlink_or_shared_inode_refuses(self):
+        from deployment.lib.runtime_authority import open_deployment_lock
+        with tempfile.TemporaryDirectory() as root:
+            root=Path(root);victim=root/'victim';victim.write_text('preserve');victim.chmod(0o600)
+            symbolic=root/'symbolic';symbolic.symlink_to(victim)
+            shared=root/'shared';os.link(victim,shared)
+            unsafe=root/'unsafe';unsafe.write_text('preserve');unsafe.chmod(0o644)
+            for path in (symbolic,shared,unsafe):
+                with self.subTest(path=path),self.assertRaises((OSError,RuntimeError)):open_deployment_lock(path)
+            self.assertEqual(victim.read_text(),'preserve');self.assertEqual(unsafe.read_text(),'preserve')
+
+
 class FakeOperations:
     def __init__(self, fail_at=None, schema=82):
         self.fail_at = fail_at
