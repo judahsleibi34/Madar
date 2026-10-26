@@ -83,6 +83,10 @@ class PublisherTests(unittest.TestCase):
         for name in names:
             path=WEB/Path(name).relative_to('web') if name.startswith('web/') else WEB/name
             if not name.startswith('web/') and not path.is_file():path=WEB.parent/name
+            if not path.is_file() and name.startswith(('web/database/','web/supabase/')):
+                # The backend workflow mounts SQL at /database and /supabase.
+                # Always read the actual pinned bytes; never stub migrations.
+                path=Path('/')/Path(name).relative_to('web')
             if path.is_file():body=path.read_bytes()
             elif name in inert_build_inputs:
                 # CI mounts executable source/SQL, not all package manifests.
