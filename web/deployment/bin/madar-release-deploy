@@ -723,6 +723,10 @@ class DockerGitOperations:
             files.extend(["-f", str(Path(override).resolve())])
         elif self.compose_file is None:
             files.extend(["-f", str(WEB_ROOT / "deployment" / "docker-compose.release.yml")])
+        # Installed subclasses may add independently sealed operational inputs.
+        # Keep the normal slot/network overlay when adding an authority mount.
+        for additional in self.additional_compose_files():
+            files.extend(["-f", str(additional)])
         files.extend(self._supabase_client_files())
         contract=rendering or getattr(self,'completed_normal_admission',None)
         from deployment.lib.completed_normal_profile import RECONCILED
@@ -744,6 +748,9 @@ class DockerGitOperations:
             "--project-directory", str(web), "--env-file", str(self.env_file),
             *files, *profiles, *args,
         ], cwd=web, env=self._environment(sha, slot, images, workers_active=workers_active))
+
+    def additional_compose_files(self) -> tuple[Path, ...]:
+        return ()
 
     def preflight(self, sha: str, slot: str, images: dict[str, str], schema: int) -> None:
         if self.release_root is None:

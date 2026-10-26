@@ -2724,12 +2724,42 @@ print(hashlib.sha256(keys[0].encode()).hexdigest())
             database_system_identifier=policy['database_system_identifier'],controller_sha=self.installed_sha(),
             business_auth_key_sha256=business_digest)
 
+    def execute_automatic_release(self,sha):
+        from deployment.lib.automatic_release_execution import execute
+        from deployment.lib.automatic_release_admission import execution_policy
+        from deployment.lib.environment_file import load_environment_file
+        import importlib.machinery,importlib.util
+        execution_policy(self) # Refuse unsupported production BEFORE any effects.
+        if self.interlock_file.exists() or self.interlock_file.is_symlink():
+            raise UpgradeError('automatic_existing_interlock_requires_recovery')
+        load_environment_file(Path('/etc/madar/production.env'))
+        for key,name in (('MADAR_PRODUCTION_REPO',self.repo),('MADAR_DEPLOY_STATE_ROOT',self.state_root),
+                         ('MADAR_ENV_FILE',Path('/etc/madar/production.env'))):
+            os.environ[key]=str(name)
+        admitted=self.prepare_automatic_release(sha)
+        entry=self.control_root/'bin/madar-release-deploy'
+        loader=importlib.machinery.SourceFileLoader('madar_trusted_automatic_release',str(entry))
+        module=importlib.util.module_from_spec(importlib.util.spec_from_loader(loader.name,loader));loader.exec_module(module)
+        return execute(self,admitted,module.DockerGitOperations)
+
+    def prepare_automatic_release(self,sha):
+        from deployment.lib.automatic_release_admission import observe_admission,publish
+        admitted=observe_admission(self,sha)
+        publish(admitted)
+        return admitted
+
+    def reobserve_automatic_admission(self, admitted):
+        from deployment.lib.automatic_release_admission import observe_admission
+        return observe_admission(self,admitted['source_sha'],attempt_id=admitted['attempt_id'],
+            created_at=admitted['created_at'],expires_at=admitted['expires_at'])
+
     def write_authorization(
         self, approved_sha: str, *, recovery: bool = False,
         schema: int | None = None, rehearsal_sha256: str | None = None,
         completed_normal_contract: dict | None = None,
         migration_resumption: dict | None = None,
         completed_normal_mode: str | None = None,
+        automatic_release_admission: dict | None = None,
     ) -> None:
         if completed_normal_mode is not None and completed_normal_contract is None:
             raise UpgradeError('completed_normal_deploy_contract_required')
@@ -2808,6 +2838,19 @@ print(hashlib.sha256(keys[0].encode()).hexdigest())
                     if completed_normal_mode is None:
                         witnesses['migration_database']=issue_database_lease(completed_normal_contract)
                         witness_hashes['migration_database_sha256']=digest(witnesses['migration_database'])
+        if automatic_release_admission is not None:
+            if recovery or completed_normal_contract is not None or migration_resumption is not None or completed_normal_mode is not None:
+                raise UpgradeError('automatic_authorization_scope_mixed')
+            from deployment.lib.automatic_release_admission import require_issue,require_reserved,OPERATION
+            from deployment.lib.migration_inventory import digest as automatic_digest
+            from deployment.lib.completed_normal_admission import digest as witness_digest
+            admitted=require_issue(automatic_release_admission,self)
+            require_reserved(admitted)
+            if admitted['source_sha']!=approved_sha:
+                raise UpgradeError('automatic_authorization_source_changed')
+            operation=OPERATION;schema=admitted['database']['origin_schema'];context=automatic_digest(admitted)
+            witnesses['automatic_release_admission']=admitted
+            witness_hashes['automatic_release_admission_sha256']=witness_digest(admitted)
         if migration_resumption is not None:
             if completed_normal_contract is None:
                 raise UpgradeError('completed_forward_parent_contract_required')
@@ -3601,6 +3644,10 @@ def main(argv: list[str] | None = None) -> int:
             "installed controller"
         ),
     )
+    parser.add_argument('--automatic-release',action='store_true',
+        help='Execute an independently admitted routine release through the existing deployer')
+    parser.add_argument('--automatic-poll',action='store_true',
+        help='Discover eligible main source and execute an independently admitted routine release')
     parser.add_argument('--authenticate-operator',action='store_true',
         help='Authenticate independent infrastructure AAL2 from stdin/terminal; does not approve or execute a release')
     parser.add_argument(
@@ -3614,7 +3661,7 @@ def main(argv: list[str] | None = None) -> int:
         "--rehearsal-attestation", type=Path,
         help="Root-owned mode-0600 exact-SHA schema-recovery rehearsal attestation",
     )
-    parser.add_argument("sha", help="Exact 40-character origin/main commit SHA")
+    parser.add_argument("sha", nargs="?", help="Exact 40-character origin/main commit SHA")
     args = parser.parse_args(argv)
     if bool(args.rehearsal_attestation) != bool(args.recover_current_schema):
         parser.error(
@@ -3623,6 +3670,25 @@ def main(argv: list[str] | None = None) -> int:
     if os.geteuid() != 0:
         print("CONTROL-PLANE UPGRADE: FAILED\nerror: effective_root_required", file=sys.stderr)
         return 1
+    if args.automatic_release or args.automatic_poll:
+        if args.automatic_release and args.automatic_poll or args.dry_run or args.recover_current_schema or args.authenticate_operator:
+            parser.error('automatic release modes cannot mix with other operations')
+        try:
+            operations=SystemOperations()
+            from deployment.lib.automatic_release_admission import execution_policy
+            execution_policy(operations)
+            if args.automatic_poll:
+                if args.sha:parser.error('--automatic-poll does not accept a caller SHA')
+                source=normalize_sha(operations.root_git('automatic_main','rev-parse','refs/remotes/origin/main',cwd=operations.repo).stdout)
+                state=json_file(operations.state_root/'state.json','release_state_invalid')
+                if (state.get('known_good_release') or {}).get('sha')==source and not state.get('in_progress_release'):
+                    print(json.dumps({'operation':'automatic-poll','status':'already_deployed','source_sha':source}));return 0
+            else:source=normalize_sha(args.sha)
+            print(json.dumps(operations.execute_automatic_release(source),sort_keys=True));return 0
+        except (RuntimeError,ValueError,OSError,TypeError) as error:
+            code=str(error) if isinstance(error,RuntimeError) and re.fullmatch('[a-z0-9_:,]{1,200}',str(error)) else 'automatic_execution_failed'
+            print('AUTOMATIC RELEASE: REFUSED; error: '+code,file=sys.stderr);return 1
+    if not args.sha:parser.error('an exact SHA is required')
     if args.authenticate_operator:
         if args.dry_run or args.recover_current_schema or args.rehearsal_attestation:
             parser.error('--authenticate-operator is an identity-only operation')

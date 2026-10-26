@@ -49,6 +49,8 @@ declare -a tracked_files=(
   lib/control_plane_filesystem.py
   lib/environment_file.py
   lib/control_plane_upgrade.py
+  lib/automatic_release_admission.py
+  lib/automatic_release_execution.py
   lib/completed_normal_baseline.py
   lib/completed_normal_admission.py
   lib/completed_normal_package.py

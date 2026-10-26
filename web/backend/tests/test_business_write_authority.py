@@ -80,6 +80,29 @@ class BusinessWriteAuthorityTests(unittest.TestCase):
             self.data['version']=2;self.write()
             with self.assertRaises(RuntimeError):authority.read_authority()
 
+    def test_generic_exact_operation_grant_requires_root_pins_and_final_schema(self):
+        import uuid
+        self.data.update(version=4,schema=160,target_schema=160,compatible_min=160,compatible_max=162,
+            operation='policy-governed-automatic-release',operation_id='migration-plan-'+'d'*64,
+            attempt_id=str(uuid.uuid4()),controller_sha='c'*40,database_system_identifier='123456789',plan_sha256='e'*64)
+        env={'SCHEMA_COMPATIBLE_MIN':'160','SCHEMA_COMPATIBLE_MAX':'162','SCHEMA_EXCLUDED_VERSIONS':'',
+            'MADAR_RELEASE_CONTROLLER_SHA':'c'*40,'MADAR_RELEASE_DATABASE_SYSTEM_IDENTIFIER':'123456789'}
+        with patch.dict(os.environ,env):
+            self.write();self.assertTrue(authority.restricted())
+            self.data['mode']='NORMAL';self.write();self.assertFalse(authority.restricted())
+            original=dict(self.data)
+            for key,value in (('schema',161),('target_schema',163),('version',3),('compatible_max',999),
+                    ('controller_sha','f'*40),('database_system_identifier','987654321'),
+                    ('attempt_id','../foreign'),('operation_id','unknown'),('plan_sha256',True),('unexpected',1)):
+                self.data=dict(original,**{key:value});self.write()
+                with self.subTest(key=key),self.assertRaises(RuntimeError):authority.read_authority()
+            self.data=original;self.write()
+            # A separately authorized future operation can refresh a compatible
+            # process through its actual RO root mount, not a widened old grant.
+            self.data.update(schema=161,target_schema=161,plan_sha256='f'*64);self.write()
+            self.assertFalse(authority.restricted())
+            with patch.dict(os.environ,{'SCHEMA_COMPATIBLE_MAX':'160'}),self.assertRaises(RuntimeError):authority.read_authority()
+
     def test_read_only_authority_uses_existing_request_and_provider_fences(self):
         self.assertTrue(authority.restricted() and recovery.restricted())
         response = self.client.post("/auth/signup", json={})

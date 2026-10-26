@@ -134,10 +134,16 @@ class ReleaseDeployer:
         history.append(release)
         state["history"] = history
         atomic_json(self.state_file, state)
+        self._state_published()
+
+    def _state_published(self):
+        callback=getattr(self.operations,'state_published',None)
+        if callable(callback):callback()
 
     def _checkpoint(self, state: dict[str, Any], release: dict[str, Any]) -> None:
         state["in_progress_release"] = dict(release)
         atomic_json(self.state_file, state)
+        self._state_published()
 
     @staticmethod
     def _worker_identity(release: dict[str, Any]) -> dict[str, str]:
@@ -381,6 +387,9 @@ class ReleaseDeployer:
             except BlockingIOError as error:
                 raise RuntimeError("deployment_already_running") from error
             state = self._state()
+            admission = getattr(self.operations, 'admit_deployment', None)
+            if callable(admission):
+                admission(sha, state, lock.fileno())
             self._recover_interrupted(state)
             state = self._state()
             failure = (state.get("failed_releases") or {}).get(sha)

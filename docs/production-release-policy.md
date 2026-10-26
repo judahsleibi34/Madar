@@ -3995,3 +3995,31 @@ session revocation. This verifies identity, not administrator release approval,
 rehearsal completion or execution authority. The harness pins images, bounds
 resources, checks subnet overlap, journals owned IDs, handles interruption and
 removes owned containers/network and temporary credentials on completion/failure.
+
+## Generic automatic execution integration (2026-10-26)
+
+The existing root controller now has an isolated routine-admission adapter to
+ReleaseDeployer. An assessment remains preparation only. Execution separately
+authenticates independent signed test-runner source/CI/artifact/staging/recovery
+evidence, reobserves native database/catalog/applied history, measures the real
+serving eight-role runtime and immutable images, and checks root policy under
+both existing locks. The same SystemOperations issuer projects the sealed scope
+through its existing interlock/credential boundary. Single-use attempt records
+precede credentials/effects. Root state publication preserves the deploy user's
+access while admission/authority records remain independently protected.
+
+Candidate-owned checks run without network, daemon socket, operational credentials
+or writable host mounts. The actual existing Docker operations and traffic driver
+retain candidate validation, singleton ownership, promotion and rollback behavior.
+The new v4 runtime authority format is distinct from all historical grants and
+binds exact source/controller/database/operation/attempt/plan and actual image
+compatibility. NORMAL requires the exact authorized target. No existing160 image
+or historical range is declared compatible with future versions.
+
+This increment enables no production policy or service. Its execution enrollment
+requires a positively identified disposable KVM guest and a separate public key;
+production cannot accept that test evidence. Migration execution, full automatic
+acceptance, independent recovery and protected146-to160 remain unaccepted until
+their actual integrated scenarios run. Existing schema160 admission and Class D
+refusals are not removed. The historical Phase7 guest profile is unchanged; a
+bounded manifest-owned Node2 guest profile is used for actual release testing.
