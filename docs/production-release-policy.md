@@ -4164,3 +4164,11 @@ expected semantic catalog matches in the same read-only snapshot. Each committed
 boundary then seals its actual LOCAL physical digest under the executor's existing
 advisory lock. A semantic mismatch after COMMIT remains fenced and cannot replay
 the consumed SQL attempt.
+
+The automatic parent and canonical unprivileged traffic driver share the existing
+runtime-mutation lock inode. Root creation transfers that private 0600 inode to
+the established runtime-state directory owner while holding its flock; it never
+replaces a live lock or makes it group/world writable. Symlinks, shared inodes,
+unsafe modes and foreign ownership refuse. A real root/traffic-UID test verifies
+mutual exclusion and acquisition after release. This fixes an observed promotion
+refusal after committed SQL, not permission to replay the consumed operation.

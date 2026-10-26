@@ -15,6 +15,35 @@ SHA = "a" * 40
 
 
 class DeploymentLockPermissionsTests(unittest.TestCase):
+    def test_runtime_lock_preserves_inode_and_excludes_competing_process(self):
+        import subprocess
+        from deployment.lib.runtime_authority import runtime_mutation_lock
+        with tempfile.TemporaryDirectory() as root:
+            root=Path(root);path=root/'runtime-mutation.lock'
+            with runtime_mutation_lock(root):
+                identity=path.stat().st_ino
+                result=subprocess.run([sys.executable,'-c',
+                    "import fcntl,sys;f=open(sys.argv[1],'a+');"
+                    "fcntl.flock(f,fcntl.LOCK_EX|fcntl.LOCK_NB)",str(path)],capture_output=True)
+                self.assertNotEqual(result.returncode,0)
+            with runtime_mutation_lock(root):
+                self.assertEqual(path.stat().st_ino,identity)
+                self.assertEqual(path.stat().st_uid,root.stat().st_uid)
+                self.assertEqual(path.stat().st_mode&0o777,0o600)
+
+    def test_runtime_lock_refuses_unsafe_files_without_repairing_them(self):
+        from deployment.lib.runtime_authority import runtime_mutation_lock
+        with tempfile.TemporaryDirectory() as root:
+            root=Path(root);path=root/'runtime-mutation.lock';victim=root/'victim'
+            victim.write_text('preserve');victim.chmod(0o600);path.symlink_to(victim)
+            with self.assertRaises(OSError),runtime_mutation_lock(root):pass
+            path.unlink();os.link(victim,path)
+            with self.assertRaises(RuntimeError),runtime_mutation_lock(root):pass
+            path.unlink();path.write_text('private');path.chmod(0o644)
+            with self.assertRaises(RuntimeError),runtime_mutation_lock(root):pass
+            self.assertEqual(victim.read_text(),'preserve')
+            self.assertEqual(path.stat().st_mode&0o777,0o644)
+
     def test_private_creation_under_permissive_operator_umask(self):
         from deployment.lib.runtime_authority import open_deployment_lock
         with tempfile.TemporaryDirectory() as root:

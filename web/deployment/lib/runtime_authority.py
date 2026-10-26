@@ -126,6 +126,17 @@ def runtime_mutation_lock(state_root: Path) -> Iterator[None]:
 
     state_root = state_root.resolve()
     state_root.mkdir(parents=True, exist_ok=True, mode=0o700)
-    with (state_root / "runtime-mutation.lock").open("a+", encoding="utf-8") as lock:
+    # The privileged parent and the canonical unprivileged traffic driver must
+    # flock the SAME inode. A root-created 0600 file otherwise prevents traffic
+    # promotion after a successful migration. Never replace a live lock or
+    # loosen its mode; transfer only a root-owned regular private inode to the
+    # already established runtime-state owner while holding it exclusively.
+    owner = state_root.stat()
+    with open_deployment_lock(state_root / "runtime-mutation.lock") as lock:
         fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+        current = os.fstat(lock.fileno())
+        if current.st_uid != owner.st_uid:
+            if os.geteuid() != 0 or current.st_uid != 0:
+                raise RuntimeError("runtime_mutation_lock_owner_invalid")
+            os.fchown(lock.fileno(), owner.st_uid, owner.st_gid)
         yield
