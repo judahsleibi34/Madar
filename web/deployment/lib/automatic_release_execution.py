@@ -91,17 +91,32 @@ def operations_adapter(base,system,value):
                 value['origin']['compatible_min'],value['origin']['compatible_max'])
             super().__init__(system.repo,system.state_root,Path('/etc/madar/production.env'),compatibility)
             self.automatic_release_admission=value;self._issuer=system;self._credential_root=None
-            self._origin_fenced=[];self._model=None;self._candidate_rows=None
+            self._origin_fenced=[];self._model=None;self._candidate_rows=None;self._expected_route=value['origin']['slot']
             self._initial_scope=strict_json(protected(Path('/etc/madar/isolated-release-test.json'),private=True).read_bytes())['runtime_scope']
 
         def verify_actor_scope(self):
             from .isolated_release_environment import verify_runtime_scope
             from .completed_normal_resources import measured_spec_matches
+            import copy,hashlib
             ids=self.run(['/usr/bin/docker','ps','-aq','--no-trunc'],capture=True).split()
             rows=json.loads(self.run(['/usr/bin/docker','inspect',*ids],capture=True))
             candidate=self._candidate_rows or {}
             if set(ids)!=set(self._initial_scope)|set(candidate):raise RuntimeError('automatic_unexpected_runtime_actor')
-            verify_runtime_scope(self._initial_scope,[r for r in rows if r['Id'] in self._initial_scope])
+            expected=copy.deepcopy(self._initial_scope)
+            if self._expected_route!=value['origin']['slot']:
+                # The existing traffic driver changes exactly this nonsecret
+                # file. Never ignore an entire proxy directory's drift.
+                proxy=next(r for r in rows if r['Name']=='/madar-release-proxy')
+                binding=expected[proxy['Id']]['binds']['/etc/nginx/madar']
+                path=Path(binding['source'])
+                if path!=Path('/var/lib/madar/proxy') or sorted(p.name for p in path.iterdir())!=['active-upstreams.conf']:
+                    raise RuntimeError('automatic_proxy_input_inventory_changed')
+                ports={'blue':(8101,3100),'green':(8201,3200)}[self._expected_route]
+                body=('upstream madar_backend_active { server 127.0.0.1:'+str(ports[0])+'; }\n'
+                    'upstream madar_frontend_active { server 127.0.0.1:'+str(ports[1])+'; }\n').encode()
+                if (path/'active-upstreams.conf').read_bytes()!=body:raise RuntimeError('automatic_proxy_route_changed')
+                binding['contents_sha256']=digest({'active-upstreams.conf':{'sha256':hashlib.sha256(body).hexdigest(),'uid':1000,'mode':0o644}})
+            verify_runtime_scope(expected,[r for r in rows if r['Id'] in self._initial_scope])
             for row in rows:
                 if row['Id'] not in candidate:continue
                 old=candidate[row['Id']]
@@ -308,7 +323,10 @@ def operations_adapter(base,system,value):
         def switch_traffic(self,slot):
             self.guard()
             if slot==value['candidate']['slot']:self.verify_actor_scope()
-            return super().switch_traffic(slot)
+            result=super().switch_traffic(slot)
+            self._expected_route=slot
+            self.verify_actor_scope()
+            return result
 
         def accept_runtime_inventory(self):
             """Advance only measured test inventory after durable known-good.
