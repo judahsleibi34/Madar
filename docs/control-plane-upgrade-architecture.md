@@ -2139,3 +2139,10 @@ canonical private-directory owner and nonsecret 0644 mode; symlink/shared/foreig
 files refuse rather than being silently repaired. No route publication is used
 as a probe. Disposable bootstrap fixtures must establish these real operating
 permissions before enrollment, not grant privileges after a migration commits.
+
+Admission now reauthenticates its unchanged signed evidence and evaluates policy
+using the clock AFTER live observations finish. In particular, a genuine Class B
+measurement obtained after preparation begins is not compared with an earlier
+start timestamp. Stale/future measurements, expired evidence and changed packets
+still refuse; an earlier start cannot extend authorization validity. This fixes
+an observed pre-effect refusal without relaxing measurement age limits.

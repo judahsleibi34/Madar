@@ -253,9 +253,23 @@ def connect_database():
         options='-c search_path=pg_catalog,public,extensions -c statement_timeout=10000 -c lock_timeout=1500')
 
 
+def assess_current_evidence(plan,routine,observation,source,policy,proof):
+    """Fresh measurements finish AFTER preparation starts, not before it.
+
+    Reauthenticate at the final clock boundary as well: a slow observation must
+    not extend expired staging, recovery or policy evidence. A changed packet
+    cannot silently replace the inputs already measured in this observation.
+    """
+    from .migration_policy import assess
+    now=int(time.time())
+    if independent_evidence(source,policy,now=now)!=proof:
+        raise RuntimeError('automatic_independent_evidence_changed')
+    return now,assess(plan,routine,observation,now=now)
+
+
 def observe_admission(operations,source,*,attempt_id=None,created_at=None,expires_at=None):
     """Concrete root observer used both for preparation AND locked issuance."""
-    from .migration_policy import load_policy,assess
+    from .migration_policy import load_policy
     from .migration_inventory import discover,GitSource
     from .migration_plan import generate
     from .migration_drift import observe,measure_class_b,history_digest
@@ -359,7 +373,7 @@ def observe_admission(operations,source,*,attempt_id=None,created_at=None,expire
     # These booleans are produced ONLY after authenticated independent evidence
     # and direct live observations above; they are never CLI/candidate inputs.
     if measurements is not None:observation['class_b_measurements']=measurements
-    result=assess(plan,routine,observation,now=now)
+    now,result=assess_current_evidence(plan,routine,observation,source,policy,proof)
     if not result['policy_match']:raise RuntimeError('automatic_policy_refused:'+','.join(result['reasons']))
     start=now if created_at is None else created_at
     end=min(start+policy['operation_max_seconds'],proof['expires_at'],routine['expires_at']) if expires_at is None else expires_at

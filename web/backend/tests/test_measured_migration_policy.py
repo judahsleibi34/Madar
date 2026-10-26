@@ -13,8 +13,8 @@ from deployment.lib.migration_risk import scaffold,analyze,measured_operations
 from deployment.lib.migration_policy import assess,validate_policy,apply_class_b_limits
 
 
-def class_b_policy(plan):
-    now=int(time.time())
+def class_b_policy(plan,*,now=None):
+    now=int(time.time()) if now is None else now
     policy={'version':2,'policy_id':'synthetic-model-policy','environment_id':'synthetic-isolated',
         'database_system_identifier':'123456789','controller_sha':'c'*40,
         'repository':'judahsleibi34/Madar','branch':'refs/heads/main','enabled':True,
@@ -49,6 +49,31 @@ class MeasuredPolicyTests(unittest.TestCase):
         self.write(2,scaffold(1,2,body));head=self.commit()
         inventory=discover(self.root,source_sha=head,history_base_sha=self.base)
         return generate(self.root,inventory,origin=1)
+
+    def test_admission_uses_completion_clock_for_measurements_taken_after_start(self):
+        from unittest.mock import patch
+        from deployment.lib import automatic_release_admission as admission
+        plan=self.plan();policy,observation=class_b_policy(plan,now=100)
+        observation['class_b_measurements']['observed_at']=101
+        proof={'authenticated':'exact original packet'}
+        with patch.object(admission.time,'time',return_value=102),\
+                patch.object(admission,'independent_evidence',return_value=proof) as recheck:
+            now,result=admission.assess_current_evidence(plan,policy,observation,plan.document()['source_sha'],{},proof)
+        self.assertEqual(now,102);self.assertTrue(result['policy_match'])
+        self.assertEqual(recheck.call_args.kwargs['now'],102)
+
+    def test_final_clock_cannot_extend_stale_measurements_or_changed_signed_evidence(self):
+        from unittest.mock import patch
+        from deployment.lib import automatic_release_admission as admission
+        plan=self.plan();policy,observation=class_b_policy(plan,now=100);proof={'authenticated':'original'}
+        with patch.object(admission.time,'time',return_value=131),\
+                patch.object(admission,'independent_evidence',return_value=proof):
+            _,result=admission.assess_current_evidence(plan,policy,observation,plan.document()['source_sha'],{},proof)
+            self.assertIn('class_b_measurements_invalid_or_stale',result['reasons'])
+        with patch.object(admission.time,'time',return_value=102),\
+                patch.object(admission,'independent_evidence',return_value={'authenticated':'substituted'}):
+            with self.assertRaisesRegex(RuntimeError,'independent_evidence_changed'):
+                admission.assess_current_evidence(plan,policy,observation,plan.document()['source_sha'],{},proof)
 
     def test_exact_btree_and_nullable_builtin_are_measurable_without_lowering_risk(self):
         for body,kind in (('CREATE INDEX future_one_idx ON public.future_one(id);','create_btree_index'),
