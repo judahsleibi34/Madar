@@ -172,7 +172,10 @@ def operations_adapter(base,system,value):
                     '--entrypoint','python',tool,'-B','/source/'+relative]
                 cwd=None;env={'PATH':os.defpath,'HOME':'/nonexistent'}
             elif command and command[0]=='git':
-                command=['/usr/bin/git','-c','core.hooksPath=/dev/null','-c','core.fsmonitor=false',*command[1:]]
+                location=Path(cwd or self.repo).resolve()
+                if location not in {self.repo.resolve(),(self.state_root/'releases'/value['source_sha']).resolve()}:
+                    raise RuntimeError('automatic_git_location_not_admitted')
+                command=['/usr/bin/git','-c','safe.directory='+str(location),'-c','core.hooksPath=/dev/null','-c','core.fsmonitor=false',*command[1:]]
                 env=dict(env or os.environ,GIT_CONFIG_NOSYSTEM='1',GIT_CONFIG_GLOBAL='/dev/null',GIT_NO_REPLACE_OBJECTS='1')
             if command and command[0]==os.getenv('MADAR_TRAFFIC_SWITCH_COMMAND'):
                 # Preserve the installed traffic driver's canonical mutation UID.
