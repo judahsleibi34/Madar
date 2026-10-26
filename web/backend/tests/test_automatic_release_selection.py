@@ -49,3 +49,13 @@ class SelectionTests(unittest.TestCase):
             self.assertEqual(inventory.target,900161);self.assertTrue(inventory.history_scope)
             files[rows[1]['path']]=b'substitution'
             with self.assertRaisesRegex(RuntimeError,'sql_substituted'):selection.fixture_inventory(git,base,history)
+
+class InstalledSelectionDependenciesTests(unittest.TestCase):
+    def test_existing_installer_carries_both_automatic_sql_dependencies(self):
+        import os
+        web=Path(os.getenv('MADAR_TEST_REPOSITORY_ROOT') or Path(__file__).resolve().parents[2])
+        installer=web/'deployment/bin/madar-install-control-plane'
+        body=installer.read_text()
+        for name in ('automatic_release_selection.py','automatic_release_migration.py'):
+            self.assertIn('  lib/'+name+'\n',body)
+            self.assertTrue((web/'deployment/lib'/name).is_file())
