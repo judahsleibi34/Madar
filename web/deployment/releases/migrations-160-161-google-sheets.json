@@ -1,0 +1,14 @@
+{
+  "manifest_version": 1,
+  "release_sha": "STAGING",
+  "migrations": [
+    {
+      "number": 161,
+      "from_schema": 160,
+      "to_schema": 161,
+      "path": "web/database/migrations/161_add_google_sheets_connector.sql",
+      "sha256": "fc9d373a9e372a07f36f647512ba4cf544b135be9bca36cb0a0f1045977d1e69",
+      "compatibility": "expand-only"
+    }
+  ]
+}

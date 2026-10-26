@@ -24,6 +24,7 @@ export function isDashboardRoutePath(pathname) {
     pathname.startsWith(DASHBOARD_ROUTES.builderResponses) ||
     pathname.startsWith(DASHBOARD_ROUTES.dataProjects) ||
     pathname.startsWith(DASHBOARD_ROUTES.dataSources) ||
+    pathname.startsWith(DASHBOARD_ROUTES.businessIntelligence) ||
     pathname.startsWith(DASHBOARD_ROUTES.builderData) ||
     pathname.startsWith(DASHBOARD_ROUTES.calendar) ||
     pathname.startsWith(DASHBOARD_ROUTES.agenda) ||
@@ -60,6 +61,7 @@ export function getSafePostLoginPath(userInfo, returnTo) {
     DASHBOARD_ROUTES.builderResponses,
     DASHBOARD_ROUTES.dataProjects,
     DASHBOARD_ROUTES.dataSources,
+    DASHBOARD_ROUTES.businessIntelligence,
     DASHBOARD_ROUTES.builderData,
     DASHBOARD_ROUTES.calendar,
     DASHBOARD_ROUTES.agenda,

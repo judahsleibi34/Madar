@@ -20,6 +20,7 @@ export const DASHBOARD_ROUTES = {
   builderResponses: "/builder-responses",
   dataProjects: "/data-projects",
   dataSources: "/data-sources",
+  businessIntelligence: "/business-intelligence",
   builderData: "/builder-data",
   calendar: "/calendar",
   agenda: "/agenda",

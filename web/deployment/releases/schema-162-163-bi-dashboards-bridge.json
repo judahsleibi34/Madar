@@ -1,0 +1,15 @@
+{
+  "release_metadata_version": 1,
+  "deployment_profile": "bi-dashboards162-163",
+  "schema": {
+    "compatible_min": 162,
+    "compatible_max": 163,
+    "target": 163,
+    "migration_class": "expand-only",
+    "rollback_compatible_min": 162,
+    "rollback_compatible_max": 162
+  },
+  "migration_policy": "automatic-after-known-good-backup-first-forward-repair",
+  "migration_manifest": "migrations-162-163-bi-dashboards.json",
+  "notes": "Unselected schema162 to schema163 candidate. Adds service-role-only, project-scoped BI dashboard and widget definitions with exact immutable dataset-version bindings, bounded validated analysis specifications, optimistic dashboard revisions, and transactional widget mutations. The active release remains schema146. Persistent migration, deployment, dashboard activation, and production-data access remain separately controlled and unauthorized."
+}

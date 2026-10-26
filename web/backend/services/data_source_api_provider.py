@@ -42,6 +42,14 @@ class ProviderFetchError(Exception):
         super().__init__(category.value)
 
 
+class ProviderNoChanges(Exception):
+    """A complete provider snapshot matched the committed dataset exactly."""
+
+    def __init__(self, next_cursor: str):
+        self.next_cursor = next_cursor
+        super().__init__("provider_no_changes")
+
+
 Scalar = str | int | float | bool | None
 
 
@@ -275,6 +283,12 @@ def fetch_bounded_records(
         if continuation is not None:
             raise ProviderFetchError(ProviderErrorCategory.PAYLOAD_TOO_LARGE)
 
+    if not rows and getattr(adapter, "no_changes", False):
+        next_cursor_fn = getattr(adapter, "next_cursor", None)
+        next_cursor = next_cursor_fn(resource_type, sync_cursor) if callable(next_cursor_fn) else None
+        if not isinstance(next_cursor, str) or not next_cursor or len(next_cursor) > 1024:
+            raise ProviderFetchError(ProviderErrorCategory.INVALID_RESPONSE)
+        raise ProviderNoChanges(next_cursor)
     if not rows:
         raise ProviderFetchError(ProviderErrorCategory.INVALID_RESPONSE)
     upsert_payloads = [change["payload"] for change in changes if change["operation"] == "upsert"]
@@ -332,6 +346,24 @@ def get_provider(
 ) -> ApiProviderAdapter:
     if provider_key == SyntheticOrdersProvider.provider_key:
         return SyntheticOrdersProvider(fixture_batch)
+    if provider_key == "google_sheets":
+        if source_scope is None:
+            raise ProviderFetchError(ProviderErrorCategory.UNAVAILABLE)
+        try:
+            from database import service_supabase
+            from services.google_sheets_connector import build_adapter
+            return build_adapter(source_scope, database=service_supabase)
+        except ProviderFetchError:
+            raise
+        except Exception as error:
+            code = getattr(error, "code", "")
+            category = (
+                ProviderErrorCategory.UNAUTHORIZED
+                if code in {"google_sheets_authorization_invalid", "provider_credentials_revoked",
+                            "provider_credentials_invalid"}
+                else ProviderErrorCategory.UNAVAILABLE
+            )
+            raise ProviderFetchError(category) from error
     from services.http_provider_adapter import HttpApiProviderAdapter
     from services.provider_credentials import CredentialError, resolve_credential
     from services.provider_http_transport import (
