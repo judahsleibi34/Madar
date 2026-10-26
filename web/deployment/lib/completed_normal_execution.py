@@ -316,7 +316,10 @@ class CompletedNormalUpgrade:
             raise RuntimeError('completed_upgrade_interlock_reconciliation_already_consumed')
         observe_native(self.contract,self.actor.runtime)
         from deployment.lib.active_recovery_backup import verify_backup_execution_context
-        if self.profile is not LEGACY:
+        from deployment.lib.completed_normal_profile import RECONCILED
+        if self.profile is RECONCILED and 'maintenance_role' in self.contract['database']:
+            verify_backup_execution_context(self.package,expected_schema=self.profile.source,maintenance_contract=self.contract)
+        elif self.profile is not LEGACY:
             verify_backup_execution_context(self.package,expected_schema=self.profile.source)
         else:verify_backup_execution_context(self.package)
         baseline=customer_baseline(self.contract,self.actor.runtime)

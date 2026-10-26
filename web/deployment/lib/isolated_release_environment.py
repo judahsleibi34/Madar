@@ -34,6 +34,29 @@ def required_rules(interface):
             [nic,match({'meta':{'key':'nfproto'}},'ipv6'),{'drop':None}]]}
 
 
+def observe_effect_fence():
+    """Measure the existing exact firewall contract; issue no authority."""
+    if os.geteuid()!=0:raise RuntimeError('isolated_release_environment_root_required')
+    route=json.loads(run(['/usr/sbin/ip','-json','route','show','default']))
+    if len(route)!=1 or not re.fullmatch('[a-zA-Z0-9_-]{1,32}',str(route[0].get('dev'))):
+        raise RuntimeError('isolated_release_control_network_invalid')
+    interface=route[0]['dev'];wanted=required_rules(interface)
+    table=json.loads(run(['/usr/sbin/nft','--stateless','--json','list','table','inet',TABLE]))['nftables']
+    chains={};rules={k:[] for k in wanted}
+    for row in table:
+        if 'chain' in row:
+            c=row['chain'];chains[c['name']]=c
+        if 'rule' in row:
+            r=row['rule']
+            if r['chain'] not in rules:raise RuntimeError('isolated_release_unreviewed_firewall_rule')
+            rules[r['chain']].append(r['expr'])
+    if set(chains)!=set(wanted) or rules!=wanted or any(
+            chains[k].get('hook')!=k or chains[k].get('type')!='filter'
+            or chains[k].get('prio')!=200 or chains[k].get('policy')!='accept' for k in wanted):
+        raise RuntimeError('isolated_release_effect_fencing_invalid')
+    return interface
+
+
 def observe(policy_path=POLICY):
     if os.geteuid()!=0:raise RuntimeError('isolated_release_environment_root_required')
     path=protected(policy_path,private=True)
@@ -66,23 +89,7 @@ def observe(policy_path=POLICY):
     fs=run(['/usr/bin/findmnt','-n','-o','SOURCE,FSTYPE,UUID','/']).decode().split()
     if len(fs)!=3 or not fs[0].startswith('/dev/vd') or fs[1]!='ext4' or fs[2]!=p['root_filesystem_uuid']:
         raise RuntimeError('isolated_release_root_filesystem_invalid')
-    route=json.loads(run(['/usr/sbin/ip','-json','route','show','default']))
-    if len(route)!=1 or not re.fullmatch('[a-zA-Z0-9_-]{1,32}',str(route[0].get('dev'))):
-        raise RuntimeError('isolated_release_control_network_invalid')
-    interface=route[0]['dev'];wanted=required_rules(interface)
-    table=json.loads(run(['/usr/sbin/nft','--stateless','--json','list','table','inet',TABLE]))['nftables']
-    chains={};rules={k:[] for k in wanted}
-    for row in table:
-        if 'chain' in row:
-            c=row['chain'];chains[c['name']]=c
-        if 'rule' in row:
-            r=row['rule']
-            if r['chain'] not in rules:raise RuntimeError('isolated_release_unreviewed_firewall_rule')
-            rules[r['chain']].append(r['expr'])
-    if set(chains)!=set(wanted) or rules!=wanted or any(
-            chains[k].get('hook')!=k or chains[k].get('type')!='filter'
-            or chains[k].get('prio')!=200 or chains[k].get('policy')!='accept' for k in wanted):
-        raise RuntimeError('isolated_release_effect_fencing_invalid')
+    interface=observe_effect_fence()
     ids=run(['/usr/bin/docker','ps','-aq','--no-trunc']).decode().split()
     if not ids or len(ids)>128 or p['database_container_id'] not in ids:
         raise RuntimeError('isolated_release_owned_database_required')

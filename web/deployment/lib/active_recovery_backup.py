@@ -22,6 +22,7 @@ from deployment.lib.active_recovery_inputs import INPUTS
 from deployment.lib.environment_file import load_environment_file
 from deployment.lib.provider_recovery_runtime import protected, readonly_configuration, file_digest
 from deployment.lib.emergency_routing_repair import exclusive, encoded
+from deployment.lib.completed_normal_profile import maintenance_role
 
 ENVIRONMENT={'PATH':'/usr/sbin:/usr/bin:/sbin:/bin','LANG':'C.UTF-8','LC_ALL':'C.UTF-8'}
 
@@ -47,7 +48,7 @@ def checked(args, *, env=None, user=None, timeout=1800, stdin=None, pass_fds=())
         raise RuntimeError('normal_backup_command_failed:' + code)
     return result.stdout
 
-def verify_backup_execution_context(package, *, expected_schema=115, completed_context=None):
+def verify_backup_execution_context(package, *, expected_schema=115, completed_context=None, maintenance_contract=None):
     """Read-only gate with the exact uid/gid, empty groups and sealed DB lease.
 
     Recovery's version endpoint deliberately differs from known-good normal
@@ -56,6 +57,15 @@ def verify_backup_execution_context(package, *, expected_schema=115, completed_c
     No dump, freshness publication, retention, service or customer write occurs.
     """
     from scripts import backup_support
+    if completed_context is not None and maintenance_contract is not None:
+        raise RuntimeError('normal_backup_operation_context_conflict')
+    contract=maintenance_contract
+    if maintenance_contract is not None:
+        from deployment.lib.completed_normal_admission import validate_provider_preparation
+        from deployment.lib.completed_normal_profile import RECONCILED
+        if (validate_provider_preparation(maintenance_contract) is not RECONCILED
+                or type(expected_schema) is not int or expected_schema!=146):
+            raise RuntimeError('normal_backup_preflight_contract_invalid')
     if expected_schema==160 and type(expected_schema) is int:
         from deployment.lib.completed_normal_backup import CompletedNormalBackupContext
         from deployment.lib.completed_normal_admission import validate_provider_preparation
@@ -67,21 +77,26 @@ def verify_backup_execution_context(package, *, expected_schema=115, completed_c
             raise RuntimeError('normal_backup_canonical_context_required')
         completed_context.validate(completed_context.plan,completed_context.root,package)
         completed_context.guard()
+        contract=completed_context.contract
     elif completed_context is not None or type(expected_schema) is not int or expected_schema not in {115,136,144,146,148}:
         raise RuntimeError('normal_backup_execution_schema_invalid')
     identity = pwd.getpwnam('madar')
     cfg = {}
-    load_environment_file(readonly_configuration(INPUTS['backup_configuration'], private=True), environ=cfg)
+    configuration=readonly_configuration(INPUTS['backup_configuration'], private=True)
+    if contract is not None and file_digest(configuration)!=contract['database']['backup_configuration_sha256']:
+        raise RuntimeError('normal_backup_preflight_configuration_changed')
+    load_environment_file(configuration, environ=cfg)
     if any(key.startswith(('LD_', 'PYTHON', 'DOCKER_', 'GIT_')) or key in {
             'PATH', 'HOME', 'BASH_ENV', 'ENV', 'SHELL', 'CREDENTIALS_DIRECTORY',
             backup_support.LOCAL_DATABASE_FD} for key in cfg):
         raise RuntimeError('normal_backup_environment_invalid')
     env = {**ENVIRONMENT, **cfg, 'HOME':'/home/madar', 'PGCONNECT_TIMEOUT':'5'}
-    expected = {'PGHOST':'supabase-db', 'PGPORT':'5432', 'PGUSER':'postgres',
+    role=maintenance_role(contract) if contract is not None else 'postgres'
+    expected = {'PGHOST':'supabase-db', 'PGPORT':'5432', 'PGUSER':role,
                 'PGDATABASE':'postgres', 'PGSSLMODE':'disable'}
     if any(env.get(key) != value for key, value in expected.items()):
         raise RuntimeError('normal_backup_database_configuration_mismatch')
-    descriptor = backup_support.sealed_local_database_binding()
+    descriptor = backup_support.sealed_local_database_binding(**({'maintenance_role':role} if role!='postgres' else {}))
     try:
         address = json.loads(os.pread(descriptor,4096,0))['address']
         env['PGHOSTADDR'] = address
@@ -109,7 +124,12 @@ if result.returncode or '115' not in result.stdout.splitlines():raise RuntimeErr
 print(json.dumps({'uid':os.getuid(),'gid':os.getgid(),'supplementary_groups':os.getgroups(),
  'schema':115,'database_read_only':True,'managed_sources_readable':True,'credential_readable':True}))
 """
-        code=code.replace("'115'",repr(str(expected_schema))).replace("'schema':115","'schema':"+str(expected_schema))
+        expected=str(expected_schema)
+        if contract is not None:
+            code=code.replace('SELECT schema_version FROM public.application_schema_state',
+                "SELECT schema_version::text || ':' || (SELECT system_identifier::text FROM pg_control_system()) FROM public.application_schema_state")
+            expected+=':'+contract['database']['system_identifier']
+        code=code.replace("'115'",repr(expected)).replace("'schema':115","'schema':"+str(expected_schema))
         result = json.loads(checked(['/usr/bin/python3','-I','-B','-c',code], env=env,
                                     user=identity.pw_uid, timeout=120))
     finally:
@@ -231,7 +251,10 @@ def capture_and_replicate(plan,root,package,source_guard,kernel, *, recovery_con
         if file_digest(protected(actual))!=file_digest(protected(expected,private=True)):
             raise RuntimeError('normal_backup_installed_helper_changed')
     maintenance_capture=None
-    descriptor = backup_support.sealed_local_database_binding()
+    role=maintenance_role(completed_context.contract) if completed_context is not None else 'postgres'
+    if role!='postgres' and cfg.get('PGUSER')!=role:
+        raise RuntimeError('normal_backup_maintenance_configuration_changed')
+    descriptor = backup_support.sealed_local_database_binding(**({'maintenance_role':role} if role!='postgres' else {}))
     try:
         address = json.loads(os.pread(descriptor,4096,0))['address']
         env[backup_support.LOCAL_DATABASE_FD] = str(descriptor)

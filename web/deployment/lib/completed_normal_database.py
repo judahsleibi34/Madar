@@ -1,6 +1,8 @@
 """Measured native database and customer baseline; all observation is read-only."""
 import json
 from pathlib import Path
+from deployment.lib.completed_normal_profile import maintenance_role
+
 from deployment.lib.completed_normal_admission import digest
 from deployment.lib.completed_normal_profile import profile, LEGACY, APPLICATION, COMMERCIAL, FENCED, OUTBOX
 
@@ -36,7 +38,7 @@ def database_structure_digest(contract,runtime):
     observe_native(contract,runtime)
     sql=STRUCTURE_SQL
     value=runtime.command(['docker','exec',contract['database']['container_id'],'psql','-XqAt',
-        '-v','ON_ERROR_STOP=1','-U','postgres','-d','postgres','-c',sql]).strip()
+        '-v','ON_ERROR_STOP=1','-U',maintenance_role(contract),'-d','postgres','-c',sql]).strip()
     import re
     if not re.fullmatch('[0-9a-f]{64}',value):raise RuntimeError('completed_database_structure_invalid')
     return value
@@ -79,7 +81,7 @@ def observe_native(contract,runtime, *, allow_pending=False):
             raise AvailabilityFailure('completed_normal_native_database_start_pending')
         raise RuntimeError('completed_normal_native_database_unhealthy')
     observed=json.loads(runtime.command(['docker','exec',expected['container_id'],'psql','-XqAt',
-        '-v','ON_ERROR_STOP=1','-U','postgres','-d','postgres','-c',IDENTITY_SQL]))
+        '-v','ON_ERROR_STOP=1','-U',maintenance_role(contract),'-d','postgres','-c',IDENTITY_SQL]))
     if (observed.get('system_identifier')!=expected['system_identifier']
             or not profile(contract).supports(observed.get('schema'))):
         raise RuntimeError('completed_normal_native_database_schema_changed')
@@ -184,7 +186,7 @@ def customer_baseline(contract,runtime):
             "FROM (SELECT encode(sha256(convert_to(to_jsonb(t)::text,'UTF8')),'hex') h FROM "+name+" t) rows;")
     sql="BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY; SET LOCAL search_path=pg_catalog,public,extensions; SET LOCAL statement_timeout='60s'; SET LOCAL TIME ZONE 'UTC';\n"+'\n'.join(statements)+'\nCOMMIT;'
     raw=runtime.command(['docker','exec',contract['database']['container_id'],'psql','-XqAt',
-        '-v','ON_ERROR_STOP=1','-U','postgres','-d','postgres','-c',sql])
+        '-v','ON_ERROR_STOP=1','-U',maintenance_role(contract),'-d','postgres','-c',sql])
     identities=[json.loads(line) for line in raw.splitlines() if line.strip()]
     if len(identities)!=5 or any(r['table']!=name for r,name in zip(identities,('auth.users','auth.identities','auth.mfa_factors','storage.objects','storage.buckets'))):
         raise RuntimeError('completed_normal_customer_identity_inventory_changed')
@@ -208,7 +210,7 @@ def migration_customer_snapshot(contract,runtime,*,columns=None):
         sql=("BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY; SET LOCAL search_path=pg_catalog,public,extensions; SET LOCAL statement_timeout='60s'; "
              "SET LOCAL TIME ZONE 'UTC';\n"+body+"\nCOMMIT;")
         raw=runtime.command(['docker','exec',contract['database']['container_id'],'psql','-XqAt',
-            '-v','ON_ERROR_STOP=1','-U','postgres','-d','postgres','-c',sql])
+            '-v','ON_ERROR_STOP=1','-U',maintenance_role(contract),'-d','postgres','-c',sql])
         return [json.loads(line) for line in raw.splitlines() if line.strip()]
     if columns is None:
         if schema!=profile(contract).source:raise RuntimeError('completed_migration_customer_source_schema_changed')

@@ -18,6 +18,8 @@ from urllib.parse import urlsplit, unquote, parse_qs
 from urllib.error import HTTPError
 from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
 
+from deployment.lib.completed_normal_profile import maintenance_role
+
 from deployment.lib.completed_normal_admission import (ADMISSIONS, digest as contract_digest,
     validate_provider_preparation)
 from deployment.lib.completed_normal_profile import DELETION, RECONCILED, provider_preparation_profile
@@ -196,6 +198,8 @@ def capture_original_inventory(package, contract, runtime, *, source_guard):
         'system_identifier': contract['database']['system_identifier'],
         'source_schema': selected.source, 'target_schema': selected.target}
     inventory = validate_inventory(private_json(package / 'provider-inventory-input.json'), binding)
+    if inventory['session_scope']['maintenance_role']!=maintenance_role(contract):
+        raise RuntimeError('schema160_inventory_maintenance_role_changed')
     if inventory['exclusions'] or any(k.startswith('candidate:') for k in inventory['containers']):
         raise RuntimeError('schema160_original_inventory_scope_not_proven')
     database = inventory['containers']['native:db']
@@ -217,7 +221,7 @@ def capture_original_inventory(package, contract, runtime, *, source_guard):
     def sql(body):
         # Database ID is independently bound above; SQL is source-owned only.
         return runtime.command(['docker', 'exec', '-i', database['id'], 'psql', '-XqAt',
-            '-v', 'ON_ERROR_STOP=1', '-U', 'postgres', '-d', 'postgres'],
+            '-v', 'ON_ERROR_STOP=1', '-U', maintenance_role(contract), '-d', 'postgres'],
             input="SET search_path=pg_catalog,public,extensions; SET statement_timeout='10s'; "
                   "BEGIN READ ONLY; " + body + ' COMMIT;')
 
@@ -283,6 +287,8 @@ class Schema150ProviderAdapter:
         self.root = ADMISSIONS / self.binding['context_sha256']
         from deployment.lib.schema150_actor_inventory import validate_inventory
         self.inventory = validate_inventory(private_json(self.root / 'provider-inventory.json'), self.binding)
+        if self.inventory['session_scope']['maintenance_role']!=maintenance_role(contract):
+            raise RuntimeError('schema160_inventory_maintenance_role_changed')
         self.original_inventory = json.loads(json.dumps(self.inventory))
         if self.inventory['exclusions']:
             raise RuntimeError('schema150_provider_live_exclusion_proofs_required')
@@ -381,7 +387,7 @@ class Schema150ProviderAdapter:
         # Only internal constants and validated original preimages reach this method.
         identifier = self.contract['database']['container_id']
         return self.runtime.command(['docker', 'exec', '-i', identifier, 'psql', '-XqAt',
-            '-v', 'ON_ERROR_STOP=1', '-U', 'postgres', '-d', 'postgres'],
+            '-v', 'ON_ERROR_STOP=1', '-U', maintenance_role(self.contract), '-d', 'postgres'],
             input="SET search_path=pg_catalog,public,extensions; SET statement_timeout='10s'; SET lock_timeout='2s';\n" + body)
 
     def _database_identity(self):
@@ -560,7 +566,7 @@ class Schema150ProviderAdapter:
         if role_measurements(roles) != self.inventory['roles']:
             raise RuntimeError('schema150_provider_measured_role_scope_changed')
         if not self._known_sessions(sessions): raise RuntimeError('schema150_provider_unknown_session')
-        allowed = set(self.inventory['session_scope']['writer_roles']) | {'postgres'}
+        allowed = set(self.inventory['session_scope']['writer_roles']) | {maintenance_role(self.contract)}
         if any(r['rolcanlogin'] and name not in allowed and not name.startswith('pg_') for name,r in roles['roles'].items()):
             raise RuntimeError('schema150_provider_unknown_login_role')
         if int(self._sql('BEGIN READ ONLY;'+BACKGROUND_WRITER_SQL+';COMMIT;'))!=0:
@@ -570,7 +576,7 @@ class Schema150ProviderAdapter:
         states={r['Id']:{'running':r['State']['Running'],'restart':r['HostConfig']['RestartPolicy']['Name']}
                 for r in rows if r['Id'] in known}
         archive = self.runtime.command(['docker','exec',self.contract['database']['container_id'],
-            'pg_dumpall','-U','postgres','--roles-only'])
+            'pg_dumpall','-U',maintenance_role(self.contract),'--roles-only'])
         if not archive.startswith('--') or len(archive.encode())>1024*1024:
             raise RuntimeError('schema150_provider_role_archive_invalid')
         return {'ingress':{'containers':states},'supervisors':{'units':units,'sessions':sessions},

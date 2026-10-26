@@ -1624,7 +1624,7 @@ def plan_release_migrations(
         raise RuntimeError("candidate_migration_manifest_release_mismatch")
     source = manifest.migrations[0].from_schema
     target = manifest.migrations[-1].to_schema
-    if source != schema or target != compatibility.target_schema:
+    if target != compatibility.target_schema or schema not in {source, target}:
         raise RuntimeError("candidate_migration_path_mismatch")
     if not compatibility.schema_min <= source <= target <= compatibility.schema_max:
         raise RuntimeError("candidate_migration_bridge_range_invalid")
@@ -1633,6 +1633,11 @@ def plan_release_migrations(
         state_file=Path("/nonexistent/rehearsal-execution.json"),
         backup_dir=Path("/nonexistent"), backup_verifier=lambda _path: None,
     ).verify_migrations()
+    # A compatible application can be bootstrapped/replaced on an already
+    # migrated database. Authenticate the entire manifest first; never replay
+    # its committed SQL or reinterpret an intermediate schema as complete.
+    if schema == target:
+        return []
     return [[migration.from_schema, migration.to_schema] for migration in manifest.migrations]
 
 

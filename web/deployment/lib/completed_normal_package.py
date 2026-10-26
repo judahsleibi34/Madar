@@ -8,7 +8,7 @@ existing candidate-staged-runtime/issuer witnesses after private creation.
 import ctypes,hashlib,os,re,runpy,shutil,tempfile,uuid
 from pathlib import Path
 from deployment.lib.completed_normal_admission import encoded,digest,validate_provider_preparation
-from deployment.lib.completed_normal_profile import RECONCILED
+from deployment.lib.completed_normal_profile import RECONCILED,maintenance_role
 from deployment.lib.migration_inventory import GitSource,strict_json
 from deployment.lib.provider_recovery_runtime import protected
 
@@ -138,7 +138,7 @@ def observe_origin(contract,runtime,state_root=Path('/var/lib/madar/releases')):
             'contract_digest':origin['write_contract_digest'],'mode':'NORMAL','compatible_min':144,'compatible_max':146}:
         raise RuntimeError('completed_package_origin_authority_changed')
     observed=strict_json(runtime.command(['docker','exec',contract['database']['container_id'],
-        'psql','-XqAt','-v','ON_ERROR_STOP=1','-U','postgres','-d','postgres','-c',
+        'psql','-XqAt','-v','ON_ERROR_STOP=1','-U',maintenance_role(contract),'-d','postgres','-c',
         "BEGIN READ ONLY; SET LOCAL statement_timeout='3s'; SELECT json_build_array("
         "(SELECT system_identifier::text FROM pg_control_system()),schema_version) "
         "FROM public.application_schema_state WHERE contract_key='core'; COMMIT;"]))

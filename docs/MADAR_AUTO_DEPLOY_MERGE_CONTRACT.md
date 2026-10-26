@@ -1744,3 +1744,14 @@ raw provider logs. Completion follows observed owned-service shutdown. None of
 this is protected handoff,boot/reboot or production acceptance. See
 [staging scope](architecture-phase9-2026-10-20/10-AUTOMATIC-FULL-STAGING.md) and
 [maintenance backup limits](architecture-phase9-2026-10-20/03-MAINTENANCE-BACKUP-AND-REPLICA.md).
+
+Canonical160 preparation can bind the native `supabase_admin` maintenance role
+explicitly, with source/configuration, connected identity, inventory and sealed
+backup-lease checks. This never elevates `postgres`, issues authority, registers
+schema160, or changes ordinary Class D dispatch. Historical role contracts stay
+unchanged. See the native maintenance-role section of production-release-policy.
+The historical146 bootstrap harness separately verifies the existing exact
+KVM firewall before seeding/probing owned synthetic accounts. Firewall
+observation remains non-authorizing and the full environment policy still
+rejects unapproved mounts/host-network actors. Bootstrap adoption is not a
+protected-upgrade completion and cannot satisfy that historical issuer contract.

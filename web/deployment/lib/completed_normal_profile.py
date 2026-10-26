@@ -67,6 +67,22 @@ RECONCILED = UpgradeProfile(RECONCILED_OPERATION, 8, 146, 160, (),
     'schema-146-160-coordinated.json', 'migrations-147-160-coordinated.json', tuple(range(147, 161)))
 
 
+def maintenance_role(contract):
+    """An explicit immutable DB identity, never a role elevation or discovery.
+
+    Native Supabase17 keeps postgres NOSUPERUSER and reserves provider roles
+    to supabase_admin. Only the canonical preparation may select that role;
+    historical contracts keep their original transport and serialized bytes.
+    """
+    database=contract.get('database',{}) if isinstance(contract,dict) else {}
+    role=database.get('maintenance_role','postgres')
+    if not isinstance(role,str) or role not in {'postgres','supabase_admin'} or ('maintenance_role' in database and (
+            contract.get('operation')!=RECONCILED.operation or type(contract.get('version')) is not int
+            or contract['version']!=RECONCILED.version or role!='supabase_admin')):
+        raise RuntimeError('completed_normal_maintenance_role_invalid')
+    return role
+
+
 def provider_preparation_profile(contract):
     """Select an exact preparation contract without registering execution."""
     if isinstance(contract, dict):

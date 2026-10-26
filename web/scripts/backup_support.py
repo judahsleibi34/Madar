@@ -530,9 +530,11 @@ LOCAL_DATABASE_FD = 'MADAR_LOCAL_DATABASE_BINDING_FD'
 DATABASE_SEALS = fcntl.F_SEAL_WRITE | fcntl.F_SEAL_GROW | fcntl.F_SEAL_SHRINK | fcntl.F_SEAL_SEAL
 
 
-def sealed_local_database_binding() -> int:
+def sealed_local_database_binding(*, maintenance_role='postgres') -> int:
     if os.geteuid() != 0 or LOCAL_DATABASE_FD in os.environ:
         raise BackupError('local_backup_binding_root_required')
+    if not isinstance(maintenance_role,str) or maintenance_role not in {'postgres','supabase_admin'}:
+        raise BackupError('local_backup_maintenance_role_invalid')
     address = direct_local_database_address()
     fd = os.memfd_create('madar-native-backup-address', os.MFD_ALLOW_SEALING)
     try:
@@ -541,8 +543,9 @@ def sealed_local_database_binding() -> int:
         os.close(fd)
         fd = inherited
         os.fchmod(fd, 0o400)
-        payload = json.dumps({'version': 1, 'address': address,
-                              'expires': time.monotonic() + 7200}).encode()
+        value={'version':1,'address':address,'expires':time.monotonic()+7200}
+        if maintenance_role!='postgres':value.update(version=2,maintenance_role=maintenance_role)
+        payload = json.dumps(value).encode()
         os.write(fd, payload)
         fcntl.fcntl(fd, fcntl.F_ADD_SEALS, DATABASE_SEALS)
         return fd
@@ -551,7 +554,7 @@ def sealed_local_database_binding() -> int:
         raise
 
 
-def leased_local_database_address() -> str:
+def local_database_lease() -> dict:
     try:
         raw = os.environ[LOCAL_DATABASE_FD]
         if not re.fullmatch(r'[0-9]{1,6}', raw):
@@ -565,14 +568,27 @@ def leased_local_database_address() -> str:
         value = json.loads(os.pread(fd, 4096, 0))
         remaining = value['expires'] - time.monotonic()
         address = ipaddress.ip_address(value['address'])
-        if (set(value) != {'version', 'address', 'expires'} or value['version'] != 1
+        version=value.get('version');keys={'version','address','expires'}
+        if type(version) is int and version==2:keys.add('maintenance_role')
+        if (set(value)!=keys or type(version) is not int or version not in {1,2}
+                or version==2 and value['maintenance_role']!='supabase_admin'
                 or not 0 < remaining <= 7200 or address.version != 4
                 or not address.is_private or address.is_loopback or address.is_link_local
                 or address.is_unspecified or address.is_multicast):
             raise ValueError('lease')
-        return str(address)
+        return dict(value,address=str(address))
     except (OSError, ValueError, KeyError, TypeError):
         raise BackupError('local_backup_binding_invalid') from None
+
+
+def leased_local_database_address() -> str:
+    return local_database_lease()['address']
+
+
+def leased_local_database_role() -> str:
+    # A caller-selected PGUSER never enables privileged backup. Only the
+    # existing root-owned sealed descriptor may carry the reviewed role.
+    return local_database_lease().get('maintenance_role','postgres')
 
 
 def direct_local_database_address() -> str:
@@ -603,8 +619,10 @@ def direct_local_database_address() -> str:
 
 
 def direct_local_database_shape() -> bool:
+    role='postgres'
+    if LOCAL_DATABASE_FD in os.environ:role=leased_local_database_role()
     return all(os.environ.get(key) == value for key, value in {
-        'PGHOST': 'supabase-db', 'PGPORT': '5432', 'PGUSER': 'postgres',
+        'PGHOST': 'supabase-db', 'PGPORT': '5432', 'PGUSER': role,
         'PGDATABASE': 'postgres', 'PGSSLMODE': 'disable'}.items())
 
 

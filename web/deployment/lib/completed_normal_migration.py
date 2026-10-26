@@ -15,6 +15,8 @@ import subprocess
 import sys
 import time
 
+from deployment.lib.completed_normal_profile import maintenance_role
+
 from deployment.lib.completed_normal_admission import (
     ADMISSIONS,OPERATION,digest,encoded,require_fresh_authorization,require_candidate_authority,credential_witness,
 )
@@ -90,7 +92,7 @@ def issue_database_lease(contract):
     if file_digest(config_path)!=contract['database']['backup_configuration_sha256']:
         raise RuntimeError('completed_migration_backup_configuration_changed')
     load_environment_file(config_path,environ=configuration)
-    if (any(configuration.get(k)!=v for k,v in {'PGHOST':'supabase-db','PGPORT':'5432','PGUSER':'postgres',
+    if (any(configuration.get(k)!=v for k,v in {'PGHOST':'supabase-db','PGPORT':'5432','PGUSER':maintenance_role(contract),
             'PGDATABASE':'postgres','PGSSLMODE':'disable'}.items()) or not configuration.get('PGPASSWORD')):
         raise RuntimeError('completed_migration_native_credentials_invalid')
     return {'context_sha256':digest(contract),'database':contract['database'],'address':str(address),
@@ -130,7 +132,7 @@ def connection_factory(contract):
     import psycopg
     connection=None
     try:
-        connection=psycopg.connect(host=str(address),port=5432,user='postgres',dbname='postgres',
+        connection=psycopg.connect(host=str(address),port=5432,user=maintenance_role(contract),dbname='postgres',
             password=lease['password'],sslmode='disable',connect_timeout=5,application_name='madar-governed-schema'+str(profile(contract).target),
             options='-c search_path=pg_catalog,public,extensions')
         connection.autocommit=True
@@ -141,6 +143,10 @@ def connection_factory(contract):
             row=cursor.fetchone()
             if row is None or str(row[0])!=contract['database']['system_identifier'] or not profile(contract).supports(row[1]):
                 raise RuntimeError('completed_migration_connected_database_changed')
+            if maintenance_role(contract)=='supabase_admin':
+                cursor.execute("SELECT current_user,session_user,rolsuper FROM pg_catalog.pg_roles WHERE rolname=current_user")
+                if cursor.fetchone()!=('supabase_admin','supabase_admin',True):
+                    raise RuntimeError('completed_migration_maintenance_identity_changed')
         connection.rollback()
         return connection
     except Exception as error:

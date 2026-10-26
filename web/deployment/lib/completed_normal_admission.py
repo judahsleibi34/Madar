@@ -16,7 +16,7 @@ from pathlib import Path
 import re
 
 from deployment.lib.control_plane_upgrade_authorization import require_upgrade_authorization
-from deployment.lib.completed_normal_profile import profile, LEGACY, MANUAL, APPLICATION, COMMERCIAL, FENCED, OUTBOX, DELETION, RECONCILED
+from deployment.lib.completed_normal_profile import profile, maintenance_role, LEGACY, MANUAL, APPLICATION, COMMERCIAL, FENCED, OUTBOX, DELETION, RECONCILED
 
 OPERATION = "completed-normal-schema115-136-upgrade"
 ADMISSIONS = Path("/var/lib/madar-control-plane/upgrades/completed-normal-admissions")
@@ -122,10 +122,11 @@ def _validate_contract(value: dict, selected) -> None:
             or type(candidate["compatible_min"]) is not int or candidate["compatible_min"] != selected.minimum
             or type(candidate["compatible_max"]) is not int or candidate["compatible_max"] != selected.target
             or not isinstance(database, dict) or set(database) != {
-                "container_id", "image", "system_identifier", "schema", "spec_sha256", "network_name", "network_id", "backup_configuration_sha256"}
+                "container_id", "image", "system_identifier", "schema", "spec_sha256", "network_name", "network_id", "backup_configuration_sha256"} | ({'maintenance_role'} if selected is RECONCILED and 'maintenance_role' in database else set())
             or type(database["schema"]) is not int or database["schema"] != selected.source
             or not re.fullmatch(r"[0-9]+", str(database["system_identifier"]))):
         raise RuntimeError("completed_normal_admission_runtime_invalid")
+    maintenance_role(value)
     for images in (origin["images"], candidate["images"]):
         if not isinstance(images, dict) or set(images) != {"backend", "frontend"} or any(
                 not re.fullmatch(r"sha256:[0-9a-f]{64}", str(v)) for v in images.values()):
@@ -423,7 +424,7 @@ def publish_admission(contract: dict, operations, state_root: Path, *, admission
             or not rows[0]["State"]["Running"] or rows[0]["State"].get("Health", {}).get("Status") != "healthy"):
         raise RuntimeError("completed_normal_admission_database_changed")
     result = operations.command("completed_normal_admission_database_schema", [
-        "docker", "exec", db["container_id"], "psql", "-XAt", "-v", "ON_ERROR_STOP=1", "-U", "postgres", "-d", "postgres",
+        "docker", "exec", db["container_id"], "psql", "-XAt", "-v", "ON_ERROR_STOP=1", "-U", maintenance_role(contract), "-d", "postgres",
         "-c", "BEGIN READ ONLY; SELECT system_identifier::text || ':' || schema_version::text FROM pg_control_system(), public.application_schema_state WHERE contract_key='core'; COMMIT;",
     ])
     # -q suppresses transaction tags on some client versions; accept neither

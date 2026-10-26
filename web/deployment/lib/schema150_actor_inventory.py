@@ -229,10 +229,12 @@ def _validate(inventory, binding=None, *, original=True):
         _require(_name(name) and isinstance(role, dict) and set(role) == {'login', 'attributes_sha256', 'memberships_sha256'}
                  and type(role['login']) is bool and _hex(role['attributes_sha256']) and _hex(role['memberships_sha256']))
     sessions = value['session_scope']
+    maintenance = sessions.get('maintenance_role') if isinstance(sessions,dict) else None
+    allowed_maintenance={'postgres','supabase_admin'} if canonical else {'postgres'}
     _require(isinstance(sessions, dict) and set(sessions) == {'maintenance_role', 'writer_roles'}
-             and sessions['maintenance_role'] == 'postgres' and roles['postgres']['login']
+             and isinstance(maintenance,str) and maintenance in allowed_maintenance and maintenance in roles and roles[maintenance]['login']
              and isinstance(sessions['writer_roles'], list) and all(_name(name) for name in sessions['writer_roles']) and len(sessions['writer_roles']) == len(set(sessions['writer_roles']))
-             and set(sessions['writer_roles']) == {name for name, role in roles.items() if role['login'] and name != 'postgres'})
+             and set(sessions['writer_roles']) == {name for name, role in roles.items() if role['login'] and name != maintenance})
     supervisors = value['supervisors']
     _require(isinstance(supervisors, dict) and SUPERVISOR_UNITS <= set(supervisors) and len(supervisors) <= 32)
     for name, supervisor in supervisors.items():

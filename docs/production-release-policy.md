@@ -3925,3 +3925,31 @@ recovery acceptance false. `verify_complete_rehearsal` refuses fresh evidence as
 protected146→160 acceptance; operational registration and admitted_manifest stay
 closed. This connects candidate evidence only, not private original-provider
 acceptance or production authorization.
+
+### Canonical160 native maintenance role (2026-10-26)
+
+The canonical preparation contract may explicitly bind
+`database.maintenance_role = supabase_admin` for native Supabase PostgreSQL,
+whose `postgres` role is not a superuser. Historical contracts retain their
+original `postgres` transport and byte format. Admission, inventory, parent SQL,
+role capture and backup must agree on the selected immutable role. The parent
+executor verifies the connected current/session user and superuser attribute on
+its existing connection; no role is elevated and no second executor is created.
+Every other login role, including `postgres`, belongs to the writer fence.
+
+A restricted backup child may use that identity only through the existing
+root-owned, sealed, expiring database descriptor (v2); environment `PGUSER`
+alone cannot select it. Preflight binds backup configuration and actual database
+system identity. Operational schema160 registration, Class D refusal and
+production automation remain closed. Native bootstrap/provider evidence is not
+protected146-to160 upgrade or independent recovery acceptance.
+
+The ordinary release planner also supports an already committed manifest target:
+it verifies the exact release metadata, complete manifest and every SQL checksum
+before returning a no-SQL application plan. A foreign/intermediate schema,
+foreign source, changed SQL or non-executable Class D manifest still refuses.
+The owned historical146 bootstrap uses the existing prepare/activate/adopt
+lifecycle and real immutable compatible images. Its `bootstrap_adopted` record
+is not a protected-upgrade completion, source-bound issuer enrollment or proof
+of independent recovery. Original-account probes explicitly distinguish those
+results; they never mint credentials or completion history.
