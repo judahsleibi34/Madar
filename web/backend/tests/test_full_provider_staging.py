@@ -247,6 +247,21 @@ class WorkerRestartObservationTests(unittest.TestCase):
 
 
 class FreshApplicationScopeTests(unittest.TestCase):
+    def test_published_future_inventory_does_not_select_future_application_target(self):
+        source=SimpleNamespace(command=lambda *args: SHA.encode() if args==('rev-parse','HEAD') else b'')
+        inventory=SimpleNamespace(target=164)
+        plan=SimpleNamespace(document=lambda:{'execution_class':'transactional'})
+        with patch.object(staging,'GitSource',return_value=source),\
+                patch.object(staging,'discover',return_value=inventory) as discover,\
+                patch.object(staging,'generate',return_value=plan) as generate:
+            self.assertEqual(staging.source_plan(SHA,'b'*40,fresh=True),(inventory,plan))
+            generate.assert_called_once_with(staging.manage.REPOSITORY,inventory,origin=146,target=160)
+            self.assertEqual(discover.call_count,2)
+            self.assertEqual(discover.call_args.kwargs,{'source_sha':SHA,'history_base_sha':'b'*40})
+            generate.reset_mock()
+            staging.source_plan(SHA,'b'*40)
+            generate.assert_called_once_with(staging.manage.REPOSITORY,inventory,origin=164,target=None)
+
     def test_rehearse_still_refuses_actual_class_d_target160_before_effects(self):
         plan=SimpleNamespace(document=lambda:{'target_schema':160,'risk_class':'D'},sha256='a'*64)
         with patch.object(staging,'require_host'),patch.object(staging,'source_plan',return_value=(None,plan)),patch.object(staging,'lease') as lease:

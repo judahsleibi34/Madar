@@ -2314,3 +2314,14 @@ is retryable only within the bounded attempt policy. Mirrored SQL and release
 metadata are checksum-pinned and must pass a disposable rollback/concurrency/RLS
 rehearsal. Candidate discovery never constitutes authority to migrate or start
 the one-shot scheduler/worker; the active release remains schema 146.
+
+### Fresh staging target selection after published candidates (2026-10-26)
+
+Fresh application staging authenticates the complete canonical migration inventory,
+including unselected161–164, but explicitly selects the reviewed schema160 runtime.
+Its diagnostic canonical146→160 plan retains Class D classification; only a new,
+owned synthetic database is initialized through160. Later published SQL is listed
+as unselected in the receipt and is not applied. This changes neither ordinary
+Class D refusal nor schema160 protected admission, production release selection,
+worker compatibility or authorization. Existing-database upgrade and new candidate
+activation still require their separate accepted operation contracts.

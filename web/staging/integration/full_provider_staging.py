@@ -117,13 +117,19 @@ def target(source,schema,*,calendar=False):
         SERVICES=original_services
 
 
-def source_plan(source,baseline):
+def source_plan(source,baseline,*,fresh=False):
     git=GitSource(manage.REPOSITORY)
     if git.command('rev-parse','HEAD').strip().decode()!=source or git.command('status','--porcelain','--untracked-files=normal').strip():
         raise RuntimeError('full_staging_clean_exact_source_required')
-    origin=discover(manage.REPOSITORY,source_sha=baseline,history_base_sha=baseline).target
+    baseline_inventory=discover(manage.REPOSITORY,source_sha=baseline,history_base_sha=baseline)
     inventory=discover(manage.REPOSITORY,source_sha=source,history_base_sha=baseline)
-    plan=generate(manage.REPOSITORY,inventory,origin=origin)
+    # Publication is not target selection. Fresh acceptance still exercises the
+    # reviewed schema160 application, even when main publishes later unselected
+    # candidates. Authenticate their bytes too, but never apply them implicitly.
+    # The 146->160 plan describes the canonical exceptional path; fresh genesis
+    # is not acceptance or authorization of that existing-database upgrade.
+    plan=generate(manage.REPOSITORY,inventory,origin=146 if fresh else baseline_inventory.target,
+        target=160 if fresh else None)
     if plan.document()['execution_class']!='transactional':raise RuntimeError('full_staging_transactional_path_required')
     return inventory,plan
 
@@ -226,10 +232,10 @@ def main(mode,directory,source,baseline,*,keep_running=False):
     if mode == 'CLEANUP':
         with lease(), target(source,160,calendar=True):
             return run_cleanup.stop_and_teardown(runtime, services=SERVICES)
-    inventory,plan=source_plan(source,baseline);value=plan.document();schema=value['target_schema']
+    fresh = mode == 'FRESH_APPLICATION'
+    inventory,plan=source_plan(source,baseline,fresh=fresh);value=plan.document();schema=value['target_schema']
     if mode=='REHEARSE' and value['risk_class']=='D':
         raise RuntimeError('full_staging_exceptional_sql_requires_separate_review')
-    fresh = mode == 'FRESH_APPLICATION'
     if fresh and schema != 160:
         raise RuntimeError('full_staging_fresh_canonical160_required')
     if keep_running and (not fresh or socket.gethostname() != 'madar-staging'):
@@ -317,6 +323,8 @@ def main(mode,directory,source,baseline,*,keep_running=False):
                 raise RuntimeError('full_staging_component_not_healthy')
             report={'version':1,'status':'PASS','scope':'fresh-synthetic-genesis-full-provider-application-acceptance',
                 'source_sha':source,'history_base_sha':baseline,'project':project,'schema':schema,
+                'authenticated_inventory_target':inventory.target,
+                'unselected_migrations':[m.record() for m in inventory.migrations if m.number>schema],
                 'origin_schema':None if fresh else value['origin_schema'],'plan_sha256':plan.sha256,'risk_class':value['risk_class'],
                 'acceptance_kind':'fresh_application' if fresh else 'ordinary_migration_rehearsal',
                 'existing_database_upgrade_accepted':False,

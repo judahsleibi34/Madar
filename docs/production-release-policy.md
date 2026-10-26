@@ -4108,3 +4108,14 @@ the historical v1 schema115 bounds. The authority parser still authenticates
 all source/controller/database/operation pins first. Fixed provider URL/network
 checks and the separately selected schema115 recovery profile remain unchanged.
 This correction does not register schema160 or widen any image compatibility.
+
+### Fresh staging target selection after published candidates (2026-10-26)
+
+Fresh application staging authenticates the complete canonical migration inventory,
+including unselected161–164, but explicitly selects the reviewed schema160 runtime.
+Its diagnostic canonical146→160 plan retains Class D classification; only a new,
+owned synthetic database is initialized through160. Later published SQL is listed
+as unselected in the receipt and is not applied. This changes neither ordinary
+Class D refusal nor schema160 protected admission, production release selection,
+worker compatibility or authorization. Existing-database upgrade and new candidate
+activation still require their separate accepted operation contracts.
