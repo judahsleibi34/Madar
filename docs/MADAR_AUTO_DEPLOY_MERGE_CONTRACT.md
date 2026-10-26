@@ -1763,3 +1763,7 @@ The existing locked executor has matching cluster/schema and execution-budget
 checks. Native component SQL acceptance does not open automatic production
 release dispatch or schema160 admission. The staging PostgREST resource-bound
 correction preserves its data/image and is separate from source acceptance.
+Generic rolling compatibility now includes the predecessor, not only the new
+candidate. Exact160 intent/protocol metadata is descriptive and cannot activate
+the initial Class D cutover. The existing issuer's operator-authentication CLI
+is identity-only, with independent infrastructure trust and no release approval.

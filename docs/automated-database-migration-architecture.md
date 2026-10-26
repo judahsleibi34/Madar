@@ -2199,3 +2199,16 @@ Enabled database DDL event hooks are outside the audited routine contract and
 refuse both measurement and execution-budget setup; otherwise an apparently
 additive command could execute unrelated privileged hook code. This refusal
 cannot be bypassed by a Class B policy string or an approval token.
+
+Generic rolling eligibility now requires BOTH source-bound origin and candidate
+compatibility ranges to cover the exact complete path. A candidate cannot widen
+its predecessor's contract; a missing/narrow old contract escalates coordinated
+review. Separate origin-at-origin and candidate-at-target facts permit a future
+maintenance coordinator to handle nonrolling paths without calling them online.
+
+`web/database/migration-intent.json` describes the current application's exact160
+and protocols2/2/2. Its Class A intent does not lower observed SQL or whole-release
+risk: the initial146→160 remains Class D and cannot roll the old146 image forward.
+The selected historical `release.json` and all operational guards stay unchanged.
+Future source may declare new compatibility only with independent old/new runtime
+and migration acceptance for the actual plan; metadata alone is not proof.

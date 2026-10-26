@@ -119,6 +119,16 @@ class PlanTests(unittest.TestCase):
         plan,_=self.plan()
         self.assertEqual(plan.document()['risk_class'],'A');self.assertEqual(plan.document()['migrations'],[])
 
+    def test_candidate_cannot_declare_origin_application_compatible_with_new_schema(self):
+        self.intent(compatible_max=1);self.base=self.commit()
+        self.intent(compatible_max=1000);self.write(2);self.commit()
+        plan,_=self.plan();value=plan.document()
+        self.assertTrue(value['candidate_compatibility_covers_path'])
+        self.assertFalse(value['origin_compatibility_covers_path'])
+        self.assertFalse(value['compatibility_covers_path']);self.assertEqual(value['risk_class'],'C')
+        policy,observation=self.accepted_context(plan)
+        self.assertFalse(assess(plan,policy,observation,now=1000)['policy_match'])
+
     def test_missing_compatibility_blocks_even_additive_sql(self):
         (self.root/INTENT_PATH).unlink(); self.write(2); self.commit(); plan,_=self.plan()
         self.assertEqual(plan.document()['risk_class'],'A')

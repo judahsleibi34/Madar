@@ -2700,6 +2700,30 @@ class SystemOperations:
             cwd=backup,
         )
 
+    def authenticate_operator(self, token: str) -> dict:
+        """Identity observation for the existing issuer; never release approval.
+
+        Project only the business signing-key digest in a fixed trusted child
+        so the command audit cannot retain its raw Docker environment. A
+        tenant/business auth key must never be the infrastructure trust root.
+        """
+        from deployment.lib.migration_policy import load_policy
+        from deployment.lib.control_plane_upgrade_authorization import authenticate_release_operator
+        policy=load_policy()
+        code="""import hashlib,json,subprocess
+rows=json.loads(subprocess.check_output(['/usr/bin/docker','inspect','supabase-auth'],timeout=10))
+if len(rows)!=1 or rows[0]['Name']!='/supabase-auth':raise RuntimeError('business_auth_identity_missing')
+keys=[entry.split('=',1)[1] for entry in rows[0]['Config'].get('Env',[]) if entry.startswith('GOTRUE_JWT_SECRET=')]
+if len(keys)!=1 or not keys[0]:raise RuntimeError('business_auth_key_missing')
+print(hashlib.sha256(keys[0].encode()).hexdigest())
+"""
+        business_digest=self.command('operator_business_realm_digest',
+            ['/usr/bin/python3','-I','-B','-c',code],timeout=15).stdout
+        if not re.fullmatch('[0-9a-f]{64}',business_digest):raise UpgradeError('release_operator_business_realm_unverified')
+        return authenticate_release_operator(token,environment_id=policy['environment_id'],
+            database_system_identifier=policy['database_system_identifier'],controller_sha=self.installed_sha(),
+            business_auth_key_sha256=business_digest)
+
     def write_authorization(
         self, approved_sha: str, *, recovery: bool = False,
         schema: int | None = None, rehearsal_sha256: str | None = None,
@@ -3577,6 +3601,8 @@ def main(argv: list[str] | None = None) -> int:
             "installed controller"
         ),
     )
+    parser.add_argument('--authenticate-operator',action='store_true',
+        help='Authenticate independent infrastructure AAL2 from stdin/terminal; does not approve or execute a release')
     parser.add_argument(
         "--recover-current-schema", action="store_true",
         help=(
@@ -3597,6 +3623,25 @@ def main(argv: list[str] | None = None) -> int:
     if os.geteuid() != 0:
         print("CONTROL-PLANE UPGRADE: FAILED\nerror: effective_root_required", file=sys.stderr)
         return 1
+    if args.authenticate_operator:
+        if args.dry_run or args.recover_current_schema or args.rehearsal_attestation:
+            parser.error('--authenticate-operator is an identity-only operation')
+        try:
+            normalize_sha(args.sha)
+            if sys.stdin.isatty():
+                import getpass
+                token=getpass.getpass('Infrastructure AAL2 access token: ')
+            else:
+                token=sys.stdin.read(16385).strip()
+            if len(token)>16384:raise RuntimeError('release_operator_credential_invalid')
+            result=SystemOperations().authenticate_operator(token)
+            print(json.dumps({'operation':'release-operator-authentication','identity':result,
+                'release_approved':False,'authority_issued':False},sort_keys=True))
+            return 0
+        except (RuntimeError,ValueError,OSError) as error:
+            code=str(error) if re.fullmatch('[a-z_]+',str(error)) else 'release_operator_authentication_failed'
+            print('RELEASE OPERATOR: REFUSED\nerror: '+code,file=sys.stderr)
+            return 1
     try:
         approved_sha = normalize_sha(args.sha)
         operations = SystemOperations()

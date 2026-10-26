@@ -112,6 +112,7 @@ def generate(root, inventory: Inventory, *, origin, target=None):
     intent=compatibility_intent(git,inventory.source_sha)
     automation=automation_inputs(git,inventory.source_sha)
     previous_intent=compatibility_intent(git,inventory.history_base_sha)
+    previous_compatible=bool(previous_intent and previous_intent['compatible_min']<=origin<=target<=previous_intent['compatible_max'])
     protocol_change=bool(intent and (not previous_intent or intent['worker_protocols']!=previous_intent['worker_protocols']))
     # Use the existing control-plane guard's actual protected-path contract.
     from .control_plane_upgrade import PROTECTED_PATHS
@@ -128,8 +129,10 @@ def generate(root, inventory: Inventory, *, origin, target=None):
     if intent and RANK[intent['declared_class']]>RANK[classification]: classification=intent['declared_class']
     if RANK[changes['class']]>RANK[classification]:classification=changes['class']
     if protocol_change and RANK[classification]<RANK['C']: classification='C'
+    if not previous_compatible and RANK[classification]<RANK['C']:classification='C'
     if intent and not intent['rolling_compatible'] and RANK[classification]<RANK['C']: classification='C'
-    compatible=bool(intent and intent['compatible_min']<=origin<=target<=intent['compatible_max'])
+    candidate_compatible=bool(intent and intent['compatible_min']<=origin<=target<=intent['compatible_max'])
+    compatible=candidate_compatible and previous_compatible
     gates=['exact_source','protected_integration','authenticated_images','staging_acceptance',
            'application_compatibility','worker_compatibility','database_identity','schema_and_history_drift',
            'controller_identity','deployment_lock','trusted_automation_inputs','fresh_independent_authority']
@@ -144,6 +147,10 @@ def generate(root, inventory: Inventory, *, origin, target=None):
         'origin_schema':origin,'target_schema':target,'migrations':rows,'risk_class':classification,
         'automation_inputs':automation,
         'compatibility_intent':intent,'compatibility_covers_path':compatible,'worker_protocol_change':protocol_change,
+        'origin_compatibility_intent':previous_intent,'origin_compatibility_covers_path':previous_compatible,
+        'candidate_compatibility_covers_path':candidate_compatible,
+        'origin_accepts_origin':bool(previous_intent and previous_intent['compatible_min']<=origin<=previous_intent['compatible_max']),
+        'candidate_accepts_target':bool(intent and intent['compatible_min']<=target<=intent['compatible_max']),
         'protected_control_plane_changed':control_plane_changed,
         'release_change_risk':changes,
         'execution_class':'transactional' if all(row['risk']['transactional'] for row in rows) else 'unsupported',

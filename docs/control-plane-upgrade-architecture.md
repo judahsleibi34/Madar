@@ -1959,3 +1959,23 @@ recovery acceptance false. `verify_complete_rehearsal` refuses fresh evidence as
 protected146→160 acceptance; operational registration and admitted_manifest stay
 closed. This connects candidate evidence only, not private original-provider
 acceptance or production authorization.
+
+### Independent operator identity interface (engineering, 2026-10-26)
+
+The existing root controller has an identity-only `--authenticate-operator`
+mode. It reads the token from terminal/stdin, never argv, and cannot approve,
+install or execute a release. A root-private operational policy enrolls explicit
+infrastructure Auth IDs in an independently signed identity realm. Business or
+tenant admin roles are insufficient. The operator signing key must differ from
+the business realm key, whose digest is projected without auditing raw secrets.
+Signature/issuer/audience/expiry, fresh AAL2/TOTP and current verified factors
+and user identity are mandatory. Provider redirects, stale MFA, missing factors,
+foreign scope and business-realm tokens refuse. HTTP needs the live disposable
+KVM/owned-runtime environment contract; production identity endpoints use TLS.
+
+This is identity observation for the SAME existing issuer, not a new issuer,
+approval or production authority. Exact-request approval, revocation/consumption
+and technical-gate revalidation still have to be connected before operational
+approval or generic dispatch is available. Model identity tests are not an
+independent real MFA acceptance demonstration. No production operator policy,
+key, controller or service is provisioned by this source increment.

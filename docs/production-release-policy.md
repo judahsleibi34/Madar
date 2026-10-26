@@ -3964,3 +3964,11 @@ booleans or a policy match grant no execution authority; generic dispatch stays
 closed until its independent issuer/controller/recovery acceptance is complete.
 Whole-release security, worker, verification and controller changes escalate
 review even without SQL. An administrator cannot approve unsupported execution.
+
+Generic rolling plans require the accepted predecessor as well as the candidate
+to cover every exact schema boundary; unknown old compatibility cannot be
+self-certified by new metadata. The application's unselected generic intent is
+exact160/protocols2/2/2 and grants no146 compatibility or execution permission.
+Infrastructure operator identity must be independent of business service-role
+credentials and tenant roles. Its new CLI observation is not release approval;
+request-bound approval and protected execution gates remain separate.
