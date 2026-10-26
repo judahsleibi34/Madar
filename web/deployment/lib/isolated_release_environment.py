@@ -158,6 +158,31 @@ def verify_runtime_scope(scope,rows):
                 raise RuntimeError('isolated_release_bind_source_changed')
 
 
+
+def verify_host_interfaces(control_interface,networks):
+    """No second physical/tunnel uplink outside the measured control fence."""
+    links=json.loads(run(['/usr/sbin/ip','-json','-details','link','show']))
+    if (not isinstance(links,list) or not 2<=len(links)<=512
+            or len({r.get('ifname') for r in links})!=len(links)):
+        raise RuntimeError('isolated_release_host_interface_inventory_invalid')
+    bridges={((n.get('Options') or {}).get('com.docker.network.bridge.name') or 'br-'+n['Id'][:12]) for n in networks}
+    if any(r.get('ifname')=='docker0' for r in links):
+        default=json.loads(run(['/usr/bin/docker','network','inspect','bridge']))
+        if (len(default)!=1 or default[0].get('Name')!='bridge' or default[0].get('Driver')!='bridge'
+                or default[0].get('Containers') or default[0].get('EnableIPv6')
+                or (default[0].get('Options') or {}).get('com.docker.network.bridge.name')!='docker0'):
+            raise RuntimeError('isolated_release_default_bridge_not_empty')
+        bridges.add('docker0')
+    seen={r.get('ifname') for r in links}
+    if not {'lo',control_interface}<=seen:
+        raise RuntimeError('isolated_release_control_interface_missing')
+    for row in links:
+        if row['ifname'] in {'lo',control_interface}:continue
+        kind=row.get('linkinfo',{}).get('info_kind')
+        if kind=='bridge' and row['ifname'] in bridges:continue
+        if kind=='veth':continue # Docker endpoints; all actors/networks measured separately.
+        raise RuntimeError('isolated_release_unfenced_host_interface')
+
 def observe(policy_path=POLICY):
     if os.geteuid()!=0:raise RuntimeError('isolated_release_environment_root_required')
     path=protected(policy_path,private=True)
@@ -199,7 +224,7 @@ def observe(policy_path=POLICY):
     if len(rows)!=len(ids) or {r['Id'] for r in rows}!=set(ids):
         raise RuntimeError('isolated_release_actor_inventory_changed')
     if p['version']==2:verify_runtime_scope(p['runtime_scope'],rows)
-    network_ids=set();volume_names=set()
+    network_ids=set();volume_names=set();networks=[]
     for row in rows:
         host=row['HostConfig']
         if (row['Config'].get('Labels',{}).get(REALM_LABEL)!=p['realm_id']
@@ -232,6 +257,7 @@ def observe(policy_path=POLICY):
                 v.get('Driver')!='local' or v.get('Options')
                 or (v.get('Labels') or {}).get(REALM_LABEL)!=p['realm_id'] for v in volumes)):
             raise RuntimeError('isolated_release_unowned_volume')
+    if p['version']==2:verify_host_interfaces(interface,networks)
     if database is None or database['Name']!='/supabase-db':raise RuntimeError('isolated_release_database_identity_invalid')
     query="BEGIN READ ONLY; SET LOCAL statement_timeout='3s'; SELECT json_build_array((SELECT system_identifier::text FROM pg_control_system()),shobj_description(oid,'pg_database')) FROM pg_database WHERE datname='postgres'; COMMIT;"
     observed=json.loads(run(['/usr/bin/docker','exec',database['Id'],'psql','-XqAt','-v','ON_ERROR_STOP=1','-U','supabase_admin' if p['version']==2 else 'postgres','-d','postgres','-c',query]))

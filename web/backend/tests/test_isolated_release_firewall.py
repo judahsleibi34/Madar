@@ -49,5 +49,14 @@ class NativeIsolatedFirewallTests(unittest.TestCase):
         subprocess.run(['/usr/sbin/nft','add','rule','inet',env.TABLE,'output','accept'],check=True)
         with self.assertRaisesRegex(RuntimeError,'effect_fencing_invalid'):env.observe_effect_fence(execution=True)
 
+    def test_native_second_unfenced_interface_refuses(self):
+        self.install(True)
+        env.verify_host_interfaces('control0',[])
+        subprocess.run(['/usr/sbin/ip','link','add','foreign1','type','dummy'],check=True)
+        try:
+            with self.assertRaisesRegex(RuntimeError,'unfenced_host_interface'):
+                env.verify_host_interfaces('control0',[])
+        finally:subprocess.run(['/usr/sbin/ip','link','del','foreign1'],check=True)
+
 
 if __name__=='__main__':unittest.main()

@@ -2002,3 +2002,9 @@ session revocation. This verifies identity, not administrator release approval,
 rehearsal completion or execution authority. The harness pins images, bounds
 resources, checks subnet overlap, journals owned IDs, handles interruption and
 removes owned containers/network and temporary credentials on completion/failure.
+
+Execution environment v2 additionally measures host links: only the control
+NIC, loopback, enrolled Docker bridges and their veth endpoints are accepted.
+The default Docker bridge must be empty. An additional physical/tunnel uplink
+is refused even when the default-NIC firewall is valid. Native network-namespace
+tests prove that a second interface is detected; no host firewall is modified.

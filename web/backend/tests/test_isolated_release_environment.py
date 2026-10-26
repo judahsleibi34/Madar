@@ -37,6 +37,8 @@ class EnvironmentTests(unittest.TestCase):
         if args==['/usr/bin/systemd-detect-virt']:return self.virt.encode()
         if args==['/bin/hostname']:return self.hostname.encode()
         if args[0]=='/usr/bin/findmnt':return ('/dev/vda1 ext4 '+self.p['root_filesystem_uuid']).encode()
+        if args[:4]==['/usr/sbin/ip','-json','-details','link']:
+            return json.dumps(getattr(self,'links',[{'ifname':'lo'},{'ifname':self.interface}])).encode()
         if args[0]=='/usr/sbin/ip':return json.dumps([{'dev':self.interface}]).encode()
         if args[0]=='/usr/sbin/nft':return json.dumps({'nftables':self.chains+self.rules}).encode()
         if args[1:3]==['ps','-aq']:return ('\n'.join(r['Id'] for r in self.actors)).encode()
@@ -140,6 +142,12 @@ class EnvironmentTests(unittest.TestCase):
             measure.assert_called_once_with('/etc/madar/test-input',mutable=False)
         with patch.object(env,'measure_bind_source',return_value=dict(expected,contents_sha256='f'*64)):
             with self.assertRaisesRegex(RuntimeError,'bind_source_changed'):self.observe()
+
+    def test_v2_second_uplink_or_tunnel_refuses_even_with_valid_default_firewall(self):
+        self.enroll_v2_model()
+        for kind in ('dummy','tun','ether'):
+            self.links=[{'ifname':'lo'},{'ifname':self.interface},{'ifname':'foreign1','linkinfo':{'info_kind':kind}}]
+            with self.subTest(kind=kind),self.assertRaisesRegex(RuntimeError,'unfenced_host_interface'):self.observe()
 
     def test_v2_host_network_restricted_to_exact_bounded_proxy_and_strict_firewall(self):
         self.actors[0]['HostConfig']['NetworkMode']='host'
