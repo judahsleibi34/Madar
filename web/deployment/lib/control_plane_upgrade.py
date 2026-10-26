@@ -2726,7 +2726,7 @@ print(hashlib.sha256(keys[0].encode()).hexdigest())
 
     def execute_automatic_release(self,sha,*,manual_retry=False):
         from deployment.lib.automatic_release_execution import execute
-        from deployment.lib.automatic_release_admission import execution_policy
+        from deployment.lib.automatic_release_admission import execution_policy,require_no_pending_operation
         from deployment.lib.environment_file import load_environment_file
         import importlib.machinery,importlib.util
         require_no_pending_operation()
