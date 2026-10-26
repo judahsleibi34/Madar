@@ -315,9 +315,23 @@ def operations_adapter(base,system,value):
                 self._candidate_rows={r['Id']:{'Name':r['Name'],'Image':r['Image'],'spec_sha256':measured_spec(r)} for r in rows}
                 atomic_json(admission.ROOT/'attempts'/value['attempt_id']/'candidate-runtime.json',self._candidate_rows,exclusive=True)
                 self.verify_actor_scope()
-                self._compose(sha,slot,images,'up','-d','--no-build','--no-recreate','--wait','--wait-timeout','180',
-                    'redis','parser-worker','remote-ingestion-worker','backend','frontend',workers_active=True)
-                self.verify_actor_scope()
+                try:
+                    self._compose(sha,slot,images,'up','-d','--no-build','--no-recreate','--wait','--wait-timeout','180',
+                        'redis','parser-worker','remote-ingestion-worker','backend','frontend',workers_active=True)
+                    self.verify_actor_scope()
+                except BaseException:
+                    # Preserve bounded PRIVATE diagnostics before the existing
+                    # deployer tears down this exact sealed failed candidate.
+                    diagnostics={}
+                    for identity in self._candidate_rows:
+                        try:
+                            result=subprocess.run(['/usr/bin/docker','logs','--tail','100',identity],
+                                capture_output=True,timeout=10)
+                            diagnostics[identity]=(result.stdout+result.stderr)[-16384:].decode(errors='replace')
+                        except Exception as error:diagnostics[identity]={'unavailable':type(error).__name__}
+                    atomic_json(admission.ROOT/'attempts'/value['attempt_id']/'private-candidate-start-diagnostics.json',
+                        diagnostics,exclusive=True)
+                    raise
 
         def preflight(self,sha,slot,images,schema):
             self.guard();self._compose(sha,slot,images,'config','--format','json',workers_active=True)
