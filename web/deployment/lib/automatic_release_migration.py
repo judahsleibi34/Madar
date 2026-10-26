@@ -69,6 +69,8 @@ def prepared(value,system):
     from .migration_policy import load_policy
     from .automatic_release_selection import select
     policy,_=admission.execution_policy(system);routine=load_policy()
+    if not routine['enabled'] or routine['expires_at']<=int(time.time()):
+        raise RuntimeError('automatic_migration_policy_disabled_or_expired')
     proof=admission.independent_evidence(value['source_sha'],policy,now=int(time.time()))
     inventory,target,selection=select(system,value['source_sha'],proof,policy,routine,value['database']['origin_schema'])
     plan=generate(system.repo,inventory,origin=value['database']['origin_schema'],target=target)

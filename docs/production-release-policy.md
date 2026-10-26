@@ -4151,3 +4151,5 @@ select production SQL, open schema160 coordinated admission or authorize product
 The exact fixture manifest must be independently pinned in the root selection and
 pass positive KVM/isolation admission. Full application A/B promotion and recovery
 remain unaccepted until the actual installed entrypoint completes those tests.
+
+Automatic operation expiry cannot outlive the independently protected routine policy. SQL preparation rechecks enabled/expiry immediately before execution; a still-valid signed test packet cannot extend an expired policy.

@@ -362,7 +362,8 @@ def observe_admission(operations,source,*,attempt_id=None,created_at=None,expire
     result=assess(plan,routine,observation,now=now)
     if not result['policy_match']:raise RuntimeError('automatic_policy_refused:'+','.join(result['reasons']))
     start=now if created_at is None else created_at
-    end=min(start+policy['operation_max_seconds'],proof['expires_at']) if expires_at is None else expires_at
+    end=min(start+policy['operation_max_seconds'],proof['expires_at'],routine['expires_at']) if expires_at is None else expires_at
+    if end>routine['expires_at']:raise RuntimeError('automatic_scope_exceeds_policy_expiry')
     target_slot='green' if slot=='blue' else 'blue'
     output={'version':1,'operation':OPERATION,'operation_id':value['operation_id'],'attempt_id':attempt_id or proof['attempt_id'],
         'environment':policy['environment'],'source_sha':source,'controller_sha':policy['controller_sha'],'plan':value,
