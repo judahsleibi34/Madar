@@ -226,7 +226,7 @@ def observe(policy_path=POLICY):
     if len(rows)!=len(ids) or {r['Id'] for r in rows}!=set(ids):
         raise RuntimeError('isolated_release_actor_inventory_changed')
     if p['version']==2:verify_runtime_scope(p['runtime_scope'],rows)
-    network_ids=set();volume_names=set();networks=[]
+    network_ids=set();host_network_ids=set();volume_names=set();networks=[]
     for row in rows:
         host=row['HostConfig']
         if (row['Config'].get('Labels',{}).get(REALM_LABEL)!=p['realm_id']
@@ -245,7 +245,14 @@ def observe(policy_path=POLICY):
                 # Exact root-owned test inputs are introduced by a separate
                 # reviewed preparation interface, not this environment policy.
                 raise RuntimeError('isolated_release_unowned_mount')
-        network_ids.update(v['NetworkID'] for v in row['NetworkSettings']['Networks'].values())
+        attached=row['NetworkSettings']['Networks']
+        if host.get('NetworkMode')=='host':
+            # Native Docker reports its host endpoint here. It is not an owned
+            # bridge and must not be accepted as one (nor silently unobserved).
+            if set(attached)!={'host'} or not re.fullmatch('[a-f0-9]{64}',str(attached['host'].get('NetworkID'))):
+                raise RuntimeError('isolated_release_proxy_host_endpoint_invalid')
+            host_network_ids.add(attached['host']['NetworkID'])
+        else:network_ids.update(v['NetworkID'] for v in attached.values())
         if row['Id']==p['database_container_id']:database=row
     if network_ids:
         networks=json.loads(run(['/usr/bin/docker','network','inspect',*sorted(network_ids)]))
@@ -259,6 +266,12 @@ def observe(policy_path=POLICY):
                 v.get('Driver')!='local' or v.get('Options')
                 or (v.get('Labels') or {}).get(REALM_LABEL)!=p['realm_id'] for v in volumes)):
             raise RuntimeError('isolated_release_unowned_volume')
+    if host_network_ids:
+        host_networks=json.loads(run(['/usr/bin/docker','network','inspect',*sorted(host_network_ids)]))
+        if (len(host_network_ids)!=1 or len(host_networks)!=1 or host_networks[0]['Id'] not in host_network_ids
+                or host_networks[0].get('Name')!='host' or host_networks[0].get('Driver')!='host'
+                or host_networks[0].get('EnableIPv6') or host_networks[0].get('IPAM',{}).get('Config')):
+            raise RuntimeError('isolated_release_proxy_host_network_invalid')
     if p['version']==2:verify_host_interfaces(interface,networks)
     if database is None or database['Name']!='/supabase-db':raise RuntimeError('isolated_release_database_identity_invalid')
     query="BEGIN READ ONLY; SET LOCAL statement_timeout='3s'; SELECT json_build_array((SELECT system_identifier::text FROM pg_control_system()),shobj_description(oid,'pg_database')) FROM pg_database WHERE datname='postgres'; COMMIT;"

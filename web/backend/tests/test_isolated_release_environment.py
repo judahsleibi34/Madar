@@ -43,7 +43,7 @@ class EnvironmentTests(unittest.TestCase):
         if args[0]=='/usr/sbin/nft':return json.dumps({'nftables':self.chains+self.rules}).encode()
         if args[1:3]==['ps','-aq']:return ('\n'.join(r['Id'] for r in self.actors)).encode()
         if args[1]=='inspect':return json.dumps(self.actors).encode()
-        if args[1:3]==['network','inspect']:return json.dumps(self.networks).encode()
+        if args[1:3]==['network','inspect']:return json.dumps([n for n in self.networks if n['Id'] in args[3:]]).encode()
         if args[1:3]==['volume','inspect']:return json.dumps(self.volumes).encode()
         if args[1]=='exec':
             self.assertIn('BEGIN READ ONLY;',args[-1]);self.assertIn('pg_control_system()',args[-1])
@@ -155,9 +155,14 @@ class EnvironmentTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError,'foreign_or_exposed_actor'):self.observe()
         # Actual fixture database stays bridged; only proxy may share guest loopback.
         proxy=copy.deepcopy(self.actors[0]);proxy.update(Id='d'*64,Name='/madar-release-proxy')
-        proxy['Mounts']=[];proxy['NetworkSettings']['Networks']={}
+        proxy['Mounts']=[];proxy['NetworkSettings']['Networks']={'host':{'NetworkID':'f'*64}}
+        self.networks.append({'Id':'f'*64,'Name':'host','Driver':'host','EnableIPv6':False,'IPAM':{'Config':[]}})
         self.actors[0]['HostConfig']['NetworkMode']='owned-test';self.actors.append(proxy);self.enroll_v2_model()
         self.assertEqual(self.observe()['version'],2)
+        for change in ({'Driver':'bridge'},{'Name':'foreign-host'},{'EnableIPv6':True},{'IPAM':{'Config':[{'Subnet':'10.0.0.0/24'}]}}):
+            old=copy.deepcopy(self.networks[-1]);self.networks[-1].update(change)
+            with self.subTest(change=change),self.assertRaisesRegex(RuntimeError,'proxy_host_network_invalid'):self.observe()
+            self.networks[-1]=old
 
     def test_ordinary_user_cannot_activate_environment_observation(self):
         with patch.object(env.os,'geteuid',return_value=1000):
