@@ -2376,3 +2376,11 @@ replaces a live lock or makes it group/world writable. Symlinks, shared inodes,
 unsafe modes and foreign ownership refuse. A real root/traffic-UID test verifies
 mutual exclusion and acquisition after release. This fixes an observed promotion
 refusal after committed SQL, not permission to replay the consumed operation.
+
+Automatic preflight now checks the canonical unprivileged traffic UID's Docker
+access and actual running proxy before any selected SQL. The existing root
+parent's access is insufficient. The original route file must already have its
+canonical private-directory owner and nonsecret 0644 mode; symlink/shared/foreign
+files refuse rather than being silently repaired. No route publication is used
+as a probe. Disposable bootstrap fixtures must establish these real operating
+permissions before enrollment, not grant privileges after a migration commits.

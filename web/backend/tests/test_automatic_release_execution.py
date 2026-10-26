@@ -6,6 +6,40 @@ from deployment.lib.automatic_release_execution import (
 from test_automatic_release_admission import sample
 
 
+class TrafficDriverPreflightTests(unittest.TestCase):
+    def check(self,*,owner=1000,mode=0o100644,links=1,docker_exit=0,running='true\n'):
+        from types import SimpleNamespace
+        from unittest.mock import patch
+        from deployment.lib.automatic_release_execution import verify_traffic_driver_access
+        metadata=SimpleNamespace(st_uid=owner,st_mode=mode,st_nlink=links)
+        parent=SimpleNamespace(st_uid=1000,st_mode=0o40755)
+        with patch('pwd.getpwnam',return_value=SimpleNamespace(pw_uid=1000)),\
+                patch.object(Path,'lstat',side_effect=[metadata,parent]),\
+                patch('deployment.lib.automatic_release_execution.subprocess.run',
+                    return_value=SimpleNamespace(returncode=docker_exit,stdout=running)) as run:
+            try:verify_traffic_driver_access()
+            finally:self.last_probe=run.call_args
+
+    def test_canonical_child_identity_and_daemon_are_probed_without_mutation(self):
+        self.check()
+        command=self.last_probe.args[0]
+        self.assertEqual(command[:5],['/usr/sbin/runuser','-u','madar','--','/usr/bin/docker'])
+        self.assertIn('unix:///var/run/docker.sock',command)
+        self.assertEqual(command[-1],'madar-release-proxy')
+        self.assertEqual(self.last_probe.kwargs['timeout'],5)
+
+    def test_root_daemon_access_cannot_substitute_for_denied_or_stopped_child_proxy(self):
+        for change in ({'docker_exit':1},{'running':'false\n'}):
+            with self.subTest(change=change),self.assertRaisesRegex(RuntimeError,'driver_unavailable'):
+                self.check(**change)
+
+    def test_foreign_owner_symlink_shared_inode_or_unsafe_mode_refuses_before_probe(self):
+        for change in ({'owner':0},{'mode':0o120777},{'links':2},{'mode':0o100666}):
+            with self.subTest(change=change),self.assertRaisesRegex(RuntimeError,'permissions_invalid'):
+                self.check(**change)
+            self.assertIsNone(self.last_probe)
+
+
 class CandidatePrivilegesTests(unittest.TestCase):
     def setUp(self):
         self.value=sample();self.source=Path('/var/lib/madar/releases/releases')/self.value['source_sha']

@@ -20,6 +20,29 @@ LIMITS_MIB={'backend':1280,'frontend':128,'redis':128,'parser-worker':768,
     'remote-ingestion-worker':256,'notification-worker':256,'calendar-sync-worker':256,'data-deletion-worker':256}
 
 
+def verify_traffic_driver_access():
+    """Observe the canonical traffic UID's prerequisites BEFORE persistent SQL.
+
+    The root issuer's Docker access cannot prove the child driver's access.
+    Do not repair permissions or publish upstreams as a readiness probe.
+    """
+    import pwd,stat
+    user=pwd.getpwnam('madar')
+    target=Path('/var/lib/madar/proxy/active-upstreams.conf')
+    metadata=target.lstat();parent=target.parent.lstat()
+    if (not stat.S_ISREG(metadata.st_mode) or metadata.st_uid!=user.pw_uid
+            or metadata.st_mode&0o777!=0o644 or metadata.st_nlink!=1
+            or not stat.S_ISDIR(parent.st_mode) or parent.st_uid!=user.pw_uid
+            or parent.st_mode&0o777!=0o755):
+        raise RuntimeError('automatic_traffic_driver_route_permissions_invalid')
+    result=subprocess.run(['/usr/sbin/runuser','-u','madar','--','/usr/bin/docker',
+        '--host','unix:///var/run/docker.sock','inspect','--format','{{.State.Running}}',
+        'madar-release-proxy'],env={'PATH':os.defpath,'HOME':'/nonexistent'},
+        text=True,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,timeout=5)
+    if result.returncode or result.stdout.strip()!='true':
+        raise RuntimeError('automatic_traffic_driver_unavailable')
+
+
 
 def source_check_git_index(directory,repository,source_sha):
     """Expose only authenticated tracked paths, never operational Git metadata.
@@ -355,6 +378,7 @@ def operations_adapter(base,system,value):
             if self._model is None or digest(self._model)!=value['candidate']['configuration_sha256']:
                 raise RuntimeError('automatic_candidate_configuration_substituted')
             super().preflight(sha,slot,images,schema)
+            verify_traffic_driver_access()
 
         def deactivate_workers(self,release):
             super().deactivate_workers(release)
