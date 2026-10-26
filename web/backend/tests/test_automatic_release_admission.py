@@ -23,6 +23,13 @@ def sample():
 
 
 class AutomaticAdmissionTests(unittest.TestCase):
+    def test_native_reused_artifact_receipt_projects_only_exact_identity(self):
+        images=sample()['origin']['images']
+        self.assertEqual(admission.image_identities(dict(images,artifact_reused=True)),images)
+        for fields in ({'artifact_reused':'true'},{'authority':'PASS'},{'image_override':'foreign'}):
+            with self.subTest(fields=fields),self.assertRaises(RuntimeError):
+                admission.image_identities(dict(images,**fields))
+
     def test_exact_application_only_scope_is_data_not_authority(self):
         value=sample();self.assertEqual(admission.validate(value),value)
         self.assertNotIn('token',value);self.assertNotIn('PASS',canonical(value).decode())

@@ -17,6 +17,16 @@ FIELDS={'version','operation','operation_id','attempt_id','environment','source_
 GATES={'source','ci','artifacts','staging','compatibility','recovery','resources'}
 
 
+def image_identities(images):
+    """Separate existing build-reuse receipt metadata from immutable identity."""
+    fields={'backend','frontend','worker','build_timestamp'}
+    if (not isinstance(images,dict) or not fields<=set(images)
+            or set(images)-fields-{'artifact_reused'}
+            or 'artifact_reused' in images and type(images['artifact_reused']) is not bool):
+        raise RuntimeError('automatic_origin_image_receipt_invalid')
+    return {key:images[key] for key in fields}
+
+
 def validate(value,*,now=None):
     now=int(time.time()) if now is None else now
     if (not isinstance(value,dict) or set(value)!=FIELDS or type(value['version']) is not int or value['version']!=1
@@ -348,7 +358,7 @@ def observe_admission(operations,source,*,attempt_id=None,created_at=None,expire
         'policy_sha256':digest({'routine':routine,'execution':policy}),
         'database':{'system_identifier':catalog.system_identifier,'origin_schema':catalog.schema,
             'target_schema':value['target_schema'],'structure_sha256':catalog.structure_sha256},
-        'origin':{'source_sha':origin['sha'],'slot':slot,'images':origin['images'],
+        'origin':{'source_sha':origin['sha'],'slot':slot,'images':image_identities(origin['images']),
             'compatible_min':compat['origin_range'][0],'compatible_max':compat['origin_range'][1],
             'configuration_sha256':actual},
         'candidate':{'source_sha':source,'slot':target_slot,'images':images,
