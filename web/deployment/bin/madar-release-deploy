@@ -234,7 +234,9 @@ class DockerGitOperations:
         ):
             raise RuntimeError("release_worktree_dirty")
         attached = subprocess.run(
-            ["git", "symbolic-ref", "-q", "HEAD"],
+            ["/usr/bin/git", "-c", "safe.directory=" + str(release_root),
+             "-c", "core.hooksPath=/dev/null", "-c", "core.fsmonitor=false",
+             "symbolic-ref", "-q", "HEAD"],
             cwd=release_root,
             check=False,
             stdout=subprocess.DEVNULL,
@@ -242,6 +244,8 @@ class DockerGitOperations:
         )
         if attached.returncode == 0:
             raise RuntimeError("release_worktree_not_detached")
+        if attached.returncode != 1:
+            raise RuntimeError("release_worktree_ref_observation_failed")
         self.release_root = release_root
 
     def _digest(self, tag: str) -> str:
